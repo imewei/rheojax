@@ -1,0 +1,29 @@
+# Include package metadata
+include README.md
+include LICENSE
+include pyproject.toml
+include requirements*.txt
+
+# Include type hints
+include rheo/py.typed
+
+# Include configuration files
+recursive-include rheo *.json *.yaml *.yml
+
+# Include test data (but not test code - that's excluded in pyproject.toml)
+recursive-include tests/data *
+
+# Exclude development and build artifacts
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+global-exclude .git*
+global-exclude .coverage
+global-exclude .pytest_cache
+global-exclude .mypy_cache
+global-exclude .ruff_cache
+
+# Exclude documentation source files
+prune docs
+prune examples
+prune notebooks

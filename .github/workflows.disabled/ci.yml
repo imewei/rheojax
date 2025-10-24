@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run at 2 AM UTC every Monday
+    - cron: '0 2 * * 1'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black ruff mypy
+
+    - name: Run Black
+      run: black --check rheo tests
+
+    - name: Run Ruff
+      run: ruff check rheo tests
+
+    - name: Run MyPy
+      run: mypy rheo
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Run tests
+      run: |
+        pytest -v --cov=rheo --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  docs:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Build documentation
+      run: |
+        cd docs
+        make html
+
+    - name: Upload documentation artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: docs
+        path: docs/build/html/
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Build package
+      run: python -m build
+
+    - name: Check package with twine
+      run: twine check dist/*
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/

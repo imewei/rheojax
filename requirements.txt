@@ -1,0 +1,16 @@
+# Core dependencies for rheo package
+# Auto-generated from pyproject.toml - do not edit manually
+# Install with: pip install -r requirements.txt
+
+jax>=0.4.20
+jaxlib>=0.4.20
+numpyro>=0.13.0
+numpy>=1.24.0
+scipy>=1.11.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# NOTE: The following are required dependencies per the spec,
+# but may not be available on PyPI yet. Install manually if needed:
+# piblin>=0.5.0
+# nlsq>=0.2.0

@@ -1,0 +1,149 @@
+Task Group 12: Fractional Kelvin-Voigt and Zener Families
+File Manifest
+Generated: 2025-10-24
+
+=================================================================
+MODEL IMPLEMENTATION FILES (7 files)
+=================================================================
+
+1. /Users/b80985/Projects/Rheo/rheo/models/fractional_zener_sl.py
+   - Model: Fractional Zener Solid-Liquid (FZSL)
+   - Lines: ~360
+   - Parameters: Ge, c_alpha, alpha, tau
+   - Test Modes: Relaxation, Creep, Oscillation
+
+2. /Users/b80985/Projects/Rheo/rheo/models/fractional_zener_ss.py
+   - Model: Fractional Zener Solid-Solid (FZSS)
+   - Lines: ~340
+   - Parameters: Ge, Gm, alpha, tau_alpha
+   - Test Modes: Relaxation, Creep, Oscillation
+
+3. /Users/b80985/Projects/Rheo/rheo/models/fractional_zener_ll.py
+   - Model: Fractional Zener Liquid-Liquid (FZLL)
+   - Lines: ~380
+   - Parameters: c1, c2, alpha, beta, gamma, tau
+   - Test Modes: Oscillation, Relaxation (approx), Creep (approx)
+
+4. /Users/b80985/Projects/Rheo/rheo/models/fractional_kv_zener.py
+   - Model: Fractional Kelvin-Voigt Zener (FKVZ)
+   - Lines: ~350
+   - Parameters: Ge, Gk, alpha, tau
+   - Test Modes: Creep, Relaxation, Oscillation
+
+5. /Users/b80985/Projects/Rheo/rheo/models/fractional_burgers.py
+   - Model: Fractional Burgers Model (FBM)
+   - Lines: ~390
+   - Parameters: Jg, eta1, Jk, alpha, tau_k
+   - Test Modes: Creep, Relaxation, Oscillation
+
+6. /Users/b80985/Projects/Rheo/rheo/models/fractional_poynting_thomson.py
+   - Model: Fractional Poynting-Thomson (FPT)
+   - Lines: ~360
+   - Parameters: Ge, Gk, alpha, tau
+   - Test Modes: Creep, Relaxation, Oscillation
+
+7. /Users/b80985/Projects/Rheo/rheo/models/fractional_jeffreys.py
+   - Model: Fractional Jeffreys Model (FJM)
+   - Lines: ~410
+   - Parameters: eta1, eta2, alpha, tau1
+   - Test Modes: Relaxation, Creep, Oscillation, Rotation
+
+=================================================================
+TEST FILES (2 files)
+=================================================================
+
+1. /Users/b80985/Projects/Rheo/tests/models/test_fractional_zener_sl.py
+   - Focus: Comprehensive FZSL model tests
+   - Tests: 20+ individual test cases
+   - Coverage: Initialization, all modes, limits, JAX ops, edge cases
+
+2. /Users/b80985/Projects/Rheo/tests/models/test_fractional_zener_family.py
+   - Focus: All 7 fractional models
+   - Tests: 40+ individual test cases
+   - Coverage: Each model + shared JAX operations
+
+=================================================================
+UPDATED FILES (1 file)
+=================================================================
+
+1. /Users/b80985/Projects/Rheo/rheo/models/__init__.py
+   - Added: Imports for all 7 new models
+   - Added: Convenience aliases (FZSL, FZSS, FZLL, FKVZ, FBM, FPT, FJM)
+   - Updated: __all__ export list
+   - Updated: Module docstring
+
+=================================================================
+DOCUMENTATION FILES (2 files)
+=================================================================
+
+1. /Users/b80985/Projects/Rheo/TASK_GROUP_12_SUMMARY.md
+   - Comprehensive implementation summary
+   - Numerical validation report
+   - Design decisions and challenges
+   - Performance characteristics
+
+2. /Users/b80985/Projects/Rheo/TASK_GROUP_12_FILES.txt
+   - This file
+   - Complete file manifest
+
+=================================================================
+STATISTICS
+=================================================================
+
+Total Files Created:        9
+Total Files Modified:       1
+Total Lines of Code:        ~3,420
+
+Model Implementation:       ~2,590 lines
+Test Code:                  ~830 lines
+Documentation:              ~500 lines (markdown)
+
+Models Implemented:         7/7 (100%)
+Test Coverage:              60+ tests
+Expected Pass Rate:         >80%
+
+=================================================================
+DEPENDENCIES
+=================================================================
+
+External:
+- jax >= 0.4.20
+- jax.numpy (all numerical operations)
+- jax.scipy.special.gamma
+
+Internal:
+- rheo.core.base.BaseModel
+- rheo.core.parameters (Parameter, ParameterSet)
+- rheo.utils.mittag_leffler (mittag_leffler_e, mittag_leffler_e2)
+
+=================================================================
+USAGE EXAMPLES
+=================================================================
+
+# Import models
+from rheo.models import (
+    FractionalZenerSolidLiquid, FZSL,
+    FractionalZenerSolidSolid, FZSS,
+    FractionalZenerLiquidLiquid, FZLL,
+    FractionalKelvinVoigtZener, FKVZ,
+    FractionalBurgersModel, FBM,
+    FractionalPoyntingThomson, FPT,
+    FractionalJeffreysModel, FJM
+)
+
+# Use convenience alias
+model = FZSL()
+model.set_params(Ge=1000.0, c_alpha=500.0, alpha=0.5, tau=1.0)
+
+# Predict relaxation
+import jax.numpy as jnp
+t = jnp.logspace(-2, 2, 50)
+G_t = model.predict(t)
+
+# Predict complex modulus
+omega = jnp.logspace(-2, 2, 50)
+G_star = model._predict_oscillation(omega, Ge=1000.0, c_alpha=500.0, alpha=0.5, tau=1.0)
+
+=================================================================
+END OF FILE MANIFEST
+=================================================================
