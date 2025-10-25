@@ -327,6 +327,7 @@ clean-build:
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info
+	rm -rf .benchmarks/
 	find . -type d -name "*.egg-info" \
 		-not -path "./.venv/*" \
 		-not -path "./venv/*" \
