@@ -21,8 +21,7 @@ class BatchTestModel(BaseModel):
 
     def __init__(self):
         super().__init__()
-        from rheo.core.parameters import Parameter
-        self.parameters.add(Parameter('a', value=1.0, bounds=(0, 100)))
+        self.parameters.add(name='a', value=1.0, bounds=(0, 100))
 
     def _fit(self, X, y, **kwargs):
         self.parameters.set_value('a', float(np.mean(y)))
@@ -111,7 +110,8 @@ class TestBatchProcessing:
 
     def test_process_files(self, temp_csv_files):
         """Test processing multiple files."""
-        template = Pipeline().fit('batch_test_model')
+        # Create template pipeline (no need to fit, BatchPipeline will apply template to each file)
+        template = Pipeline()
         batch = BatchPipeline(template)
 
         batch.process_files(

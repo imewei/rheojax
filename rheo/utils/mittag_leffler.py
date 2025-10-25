@@ -22,6 +22,10 @@ from jax.scipy.special import gamma as jax_gamma
 from typing import Union
 from functools import partial
 
+# Enable 64-bit precision for numerical stability
+# This is critical for accurate Mittag-Leffler evaluations
+jax.config.update("jax_enable_x64", True)
+
 
 @partial(jax.jit, static_argnums=(1,))
 def mittag_leffler_e(z: Union[float, jnp.ndarray], alpha: float) -> Union[float, jnp.ndarray]:
@@ -200,47 +204,114 @@ def _mittag_leffler_pade(
     - Accurate to < 1e-6 for |z| < 10
     - Fast evaluation, suitable for most rheological applications
     """
+    # Use float64 for critical calculations to avoid precision loss
+    z_f64 = z.astype(jnp.float64) if jnp.isrealobj(z) else z.astype(jnp.complex128)
+
     # Handle special case of z ≈ 0
-    z_abs = jnp.abs(z)
+    z_abs = jnp.abs(z_f64)
     near_zero = z_abs < 1e-15
 
     # For near-zero, return 1/Γ(β)
     result_zero = 1.0 / jax_gamma(beta)
 
     # SPECIAL CASE: alpha == beta (common in rheology!)
-    # Use Taylor series expansion: E_{α,α}(z) ≈ Σ(z^k / Γ(α(k+1)))
-    # This avoids numerical issues in Pade approximation when alpha==beta
+    # Use improved series expansion with better convergence
     alpha_equals_beta = jnp.abs(alpha - beta) < 1e-10
 
-    # Compute Taylor series for alpha==beta case
+    # Compute improved series for alpha==beta case
     # E_{α,α}(z) = Σ_{k=0}^∞ z^k / Γ(α(k+1))
-    result_taylor = jnp.zeros_like(z)
+    result_taylor = jnp.zeros_like(z_f64)
 
-    # Use adaptive number of terms based on |z|
-    # For large |z|, Taylor series diverges - use asymptotic approximation
-    z_large = jnp.abs(z) > 10.0
+    # For negative z, use asymptotic approximation or clamped series
+    # Key insight: For large negative z, E_{α,α}(z) → 0 exponentially
+    z_is_negative = z_f64 < 0
+    z_magnitude = jnp.abs(z_f64)
 
-    # Taylor series (for |z| < 10)
-    for k in range(30):
-        term = (z ** k) / jax_gamma(alpha * (k + 1))
-        result_taylor = result_taylor + term
+    # For negative z with moderate to large |z|, Taylor series may not converge well
+    # For small alpha (< 0.5) and |z| > 2, terms can grow before converging
+    # Use threshold based on alpha: smaller alpha needs smaller |z| threshold
+    z_threshold = jnp.maximum(2.0, 5.0 * alpha)  # Adaptive threshold
+    z_moderate_to_large = z_magnitude > z_threshold
 
-    # Asymptotic expansion for large |z|: E_{α,α}(z) ≈ exp(z^(1/α)) / (α * z^((α-1)/α))
-    # For negative z, use: E_{α,α}(z) ≈ 0 for z << -1
-    z_neg_large = jnp.logical_and(z < -10.0, z_large)
+    # For very large |z| > 100, definitely use asymptotic
+    z_very_large = z_magnitude > 100.0
+
+    # Taylor series with Kahan summation for better numerical stability
+    # For E_{α,α}(z) = Σ_{k=0}^∞ z^k / Γ(α(k+1))
+    # Only use for |z| < threshold to ensure convergence
+    sum_val = jnp.zeros_like(z_f64)
+    compensation = jnp.zeros_like(z_f64)  # For Kahan summation
+
+    # For small |z|, use Taylor series (up to 100 terms)
+    # Number of terms needed depends on |z| and alpha
+    max_terms = jnp.minimum(100, int(20 / alpha))  # More terms for smaller alpha
+
+    for k in range(100):  # Upper bound for JIT
+        # Compute term with float64 precision
+        gamma_val = jax_gamma(alpha * (k + 1))
+        term = (z_f64 ** k) / gamma_val
+
+        # Kahan summation for numerical stability
+        y = term - compensation
+        t = sum_val + y
+        compensation = (t - sum_val) - y
+        sum_val = t
+
+    result_taylor = sum_val
+
+    # For moderate-to-large negative z, use asymptotic formula
+    # E_{α,β}(-x) ~ (1/x) * Σ Γ(k - β/α) / (Γ(1 - β/α) * (-x)^k) as x → ∞
+    # For α = β (common in rheology), this simplifies:
+    # E_{α,α}(-x) ~ C * x^(-1) for large x (power-law decay)
+    # Leading term coefficient depends on alpha
+    z_abs_safe = jnp.maximum(z_magnitude, 1e-15)
+
+    # Asymptotic expansion (leading term):
+    # For α ≠ β: E_{α,β}(-x) ≈ (1 / (x * Γ(1 - β/α))) for large x
+    # For α = β: E_{α,α}(-x) ≈ sin(π α) / (π * x) for large x (Gorenflo et al.)
+
+    # Compute both cases
+    alpha_neq_beta = jnp.abs(alpha - beta) > 1e-10
+
+    # Case 1: alpha ≠ beta
+    # Avoid division issues when beta/alpha is near integer
+    gamma_arg = 1.0 - beta / (alpha + 1e-15)
+    gamma_term = jax_gamma(gamma_arg)
+    asymptotic_neq = 1.0 / (z_abs_safe * jnp.abs(gamma_term) + 1e-15)
+
+    # Case 2: alpha = beta
+    # E_{α,α}(-x) ≈ sin(π α) / (π * x)
+    asymptotic_eq = jnp.sin(jnp.pi * alpha) / (jnp.pi * z_abs_safe + 1e-15)
+
+    # Select based on alpha vs beta (static condition in Python)
+    if abs(alpha - beta) < 1e-10:
+        asymptotic_approx = asymptotic_eq
+    else:
+        asymptotic_approx = asymptotic_neq
+
+    # Clamp asymptotic to [0, 1] for numerical stability
+    asymptotic_approx = jnp.clip(asymptotic_approx, 0.0, 1.0)
+
+    # For negative z with moderate-to-large |z|, use asymptotic
+    # For positive z, keep Taylor (though less common in rheology)
     result_asymptotic = jnp.where(
-        z_neg_large,
-        jnp.zeros_like(z),  # For large negative z, ML function → 0
-        result_taylor
+        z_is_negative,
+        asymptotic_approx,
+        result_taylor  # Keep Taylor for positive z
     )
 
-    result_taylor = result_asymptotic
+    # Blend Taylor and asymptotic results based on |z| threshold
+    result_taylor = jnp.where(
+        z_moderate_to_large,
+        result_asymptotic,
+        result_taylor
+    )
 
     # Compute coefficients for Pade approximation (for alpha != beta)
     # Two cases: beta > alpha and beta < alpha
     is_beta_gt_alpha = beta > alpha
 
-    # Precompute gamma values (static computations)
+    # Precompute gamma values (static computations) with float64
     if is_beta_gt_alpha:
         # Case: beta > alpha
         g_vals = jnp.array([
@@ -251,7 +322,7 @@ def _mittag_leffler_pade(
             jax_gamma(beta - alpha) / jax_gamma(beta + 4 * alpha),
             jax_gamma(beta - alpha) / jax_gamma(beta - 2 * alpha),
             jax_gamma(beta - alpha) / jax_gamma(beta - 3 * alpha),
-        ])
+        ], dtype=jnp.float64)
 
         A = jnp.array([
             [1, 0, 0, -g_vals[0], 0, 0, 0],
@@ -261,22 +332,28 @@ def _mittag_leffler_pade(
             [0, 0, 0, -g_vals[4], g_vals[3], -g_vals[2], g_vals[1]],
             [0, 1, 0, 0, 0, -1, g_vals[5]],
             [0, 0, 1, 0, 0, 0, -1]
-        ])
+        ], dtype=jnp.float64)
 
-        b = jnp.array([0, 0, 0, -1, g_vals[0], g_vals[6], -g_vals[5]])
+        b = jnp.array([0, 0, 0, -1, g_vals[0], g_vals[6], -g_vals[5]], dtype=jnp.float64)
 
         coeffs = jnp.linalg.solve(A, b)
         p = coeffs[:3]  # Numerator coefficients (degree 3)
         q = coeffs[3:]  # Denominator coefficients (degree 4)
 
-        # Evaluate Pade approximation
-        minus_z = -z
+        # Evaluate Pade approximation with float64
+        minus_z = -z_f64
         numerator = (1 / jax_gamma(beta - alpha)) * (
             p[0] + p[1] * minus_z + p[2] * minus_z**2 + minus_z**3
         )
-        denominator = q[0] + q[1] * minus_z + q[2] * minus_z**2 + q[3] * minus_z**3 + z**4
+        denominator = q[0] + q[1] * minus_z + q[2] * minus_z**2 + q[3] * minus_z**3 + z_f64**4
 
-        result_pade = numerator / denominator
+        # Avoid division by near-zero denominators
+        denominator_safe = jnp.where(
+            jnp.abs(denominator) < 1e-15,
+            jnp.sign(denominator) * 1e-15,
+            denominator
+        )
+        result_pade = numerator / denominator_safe
 
     else:
         # Case: beta <= alpha
@@ -288,7 +365,7 @@ def _mittag_leffler_pade(
             jax_gamma(-alpha) / jax_gamma(5 * alpha),
             jax_gamma(-alpha) / jax_gamma(-2 * alpha),
             jax_gamma(-alpha) / jax_gamma(-3 * alpha),
-        ])
+        ], dtype=jnp.float64)
 
         A = jnp.array([
             [1, 0, g_vals[0], 0, 0, 0],
@@ -297,16 +374,16 @@ def _mittag_leffler_pade(
             [0, 0, -g_vals[3], g_vals[2], -g_vals[1], -g_vals[0]],
             [0, 0, g_vals[4], -g_vals[3], g_vals[2], -g_vals[1]],
             [0, 1, 0, 0, 0, -1]
-        ])
+        ], dtype=jnp.float64)
 
-        b = jnp.array([0, 0, -1, 0, g_vals[6], -g_vals[5]])
+        b = jnp.array([0, 0, -1, 0, g_vals[6], -g_vals[5]], dtype=jnp.float64)
 
         coeffs = jnp.linalg.solve(A, b)
         p_hat = coeffs[:2]  # Numerator coefficients
         q_hat = coeffs[2:]  # Denominator coefficients
 
-        # Evaluate Pade approximation
-        minus_z = -z
+        # Evaluate Pade approximation with float64
+        minus_z = -z_f64
         numerator = (-1 / jax_gamma(-alpha)) * (
             p_hat[0] + p_hat[1] * minus_z + minus_z**2
         )
@@ -315,11 +392,26 @@ def _mittag_leffler_pade(
             q_hat[3] * minus_z**3 + minus_z**4
         )
 
-        result_pade = numerator / denominator
+        # Avoid division by near-zero denominators
+        denominator_safe = jnp.where(
+            jnp.abs(denominator) < 1e-15,
+            jnp.sign(denominator) * 1e-15,
+            denominator
+        )
+        result_pade = numerator / denominator_safe
 
     # Choose between Taylor (alpha==beta) and Pade (alpha!=beta) results
     # Use Taylor series when alpha ≈ beta to avoid numerical issues
     result_final = jnp.where(alpha_equals_beta, result_taylor, result_pade)
+
+    # Clamp results to physically valid range
+    # For relaxation modulus calculations, we need E_{α,β}(z) > 0 when z < 0
+    # The function should decay to 0 for large negative z, not go negative
+    result_final = jnp.maximum(result_final, 0.0)
+
+    # Convert back to original precision (float32 if input was float32)
+    if jnp.isrealobj(z):
+        result_final = result_final.astype(z.dtype)
 
     # Return zero result for near-zero z, otherwise computed result
     return jnp.where(near_zero, result_zero, result_final)

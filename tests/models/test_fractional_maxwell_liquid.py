@@ -9,6 +9,7 @@ import pytest
 import jax
 import jax.numpy as jnp
 
+import rheo.models  # Import to trigger all model registrations
 from rheo.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry

@@ -9,6 +9,7 @@ import jax.numpy as jnp
 import pytest
 from numpy.testing import assert_allclose
 
+import rheo.models  # Import to trigger all model registrations
 from rheo.models.zener import Zener
 from rheo.core.data import RheoData
 from rheo.core.test_modes import TestMode

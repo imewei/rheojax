@@ -52,7 +52,7 @@ class TestJAXvsNumPyPerformance:
         # Time JAX fitting
         start_jax = time.time()
         try:
-            model_jax.fit(data)
+            model_jax.fit(data.x, data.y)
             time_jax = time.time() - start_jax
             print(f"\n  JAX (with JIT): {time_jax:.3f}s")
         except Exception as e:
@@ -78,27 +78,29 @@ class TestJITCompilationOverhead:
     def test_first_vs_subsequent_calls(self):
         """Measure JIT compilation overhead for Maxwell model."""
         model = Maxwell()
-        model.parameters["E"].value = 1e6
-        model.parameters["tau"].value = 1.0
+        model.parameters.set_value('G0', 1e6)
+        model.parameters.set_value('eta', 1e6)  # eta = G0 * tau, so eta = 1e6 * 1.0
 
         t = np.array([0.1, 1.0, 10.0])
+        from rheo.core.data import RheoData
+        data = RheoData(x=t, y=np.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
 
         # First call (includes JIT compilation)
         start_first = time.time()
         try:
-            pred_first = model.predict(t, test_mode="relaxation")
+            pred_first = model.predict(data)
             time_first = (time.time() - start_first) * 1000  # ms
         except Exception as e:
             pytest.skip(f"First call failed: {e}")
 
         # Second call (JIT compiled)
         start_second = time.time()
-        pred_second = model.predict(t, test_mode="relaxation")
+        pred_second = model.predict(data)
         time_second = (time.time() - start_second) * 1000  # ms
 
         # Third call (also compiled)
         start_third = time.time()
-        pred_third = model.predict(t, test_mode="relaxation")
+        pred_third = model.predict(data)
         time_third = (time.time() - start_third) * 1000  # ms
 
         print(f"\n  Call 1 (with compilation): {time_first:.2f}ms")
@@ -164,7 +166,7 @@ class TestMemoryProfiling:
         # Fit model
         model = Maxwell()
         try:
-            model.fit(data)
+            model.fit(data.x, data.y)
             mem_after_fit = process.memory_info().rss / 1024**2
 
             # Make predictions
@@ -199,7 +201,7 @@ class TestMemoryProfiling:
         mem_readings = []
         for i in range(10):
             try:
-                model.fit(data)
+                model.fit(data.x, data.y)
                 pred = model.predict(t)
                 mem = process.memory_info().rss / 1024**2
                 mem_readings.append(mem)
@@ -242,7 +244,7 @@ class TestScalability:
         # Time fitting
         start = time.time()
         try:
-            model.fit(data)
+            model.fit(data.x, data.y)
             fit_time = time.time() - start
 
             print(f"\n  N={N}: Fit time = {fit_time:.3f}s ({fit_time/N*1000:.3f}ms per point)")

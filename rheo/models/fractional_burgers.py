@@ -92,41 +92,41 @@ class FractionalBurgersModel(BaseModel):
 
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
-        self.parameters.add(Parameter(
+        self.parameters.add(
             name='Jg',
             value=None,
             bounds=(1e-9, 1e3),
             units='1/Pa',
             description='Glassy compliance'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='eta1',
             value=None,
             bounds=(1e-6, 1e12),
             units='Pa·s',
             description='Viscosity (Maxwell arm)'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='Jk',
             value=None,
             bounds=(1e-9, 1e3),
             units='1/Pa',
             description='Kelvin compliance'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='alpha',
             value=None,
             bounds=(0.0, 1.0),
             units='',
             description='Fractional order'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='tau_k',
             value=None,
             bounds=(1e-6, 1e6),
             units='s',
             description='Retardation time'
-        ))
+        )
 
     def _predict_creep(self, t: jnp.ndarray, Jg: float, eta1: float, Jk: float,
                       alpha: float, tau_k: float) -> jnp.ndarray:

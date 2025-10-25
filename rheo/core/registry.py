@@ -11,7 +11,7 @@ import inspect
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 
 class PluginType(Enum):
@@ -246,6 +246,19 @@ class Registry:
         # Remove if exists
         if name in registry:
             del registry[name]
+
+    def get_all(self) -> Dict[str, Tuple[type, PluginType]]:
+        """Get all registered plugins with their types.
+
+        Returns:
+            Dictionary mapping plugin names to (class, type) tuples
+        """
+        result = {}
+        for name, info in self._models.items():
+            result[name] = (info.plugin_class, PluginType.MODEL)
+        for name, info in self._transforms.items():
+            result[name] = (info.plugin_class, PluginType.TRANSFORM)
+        return result
 
     def clear(self):
         """Clear all registered plugins."""

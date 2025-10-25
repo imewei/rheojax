@@ -7,6 +7,7 @@ import pytest
 import numpy as np
 import jax
 import jax.numpy as jnp
+from functools import partial
 from rheo.core.data import RheoData
 from rheo.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
 
@@ -63,7 +64,11 @@ class TestJITCompilation:
         import time
 
         def slow_function(x):
-            return jnp.sum(jnp.sin(x) ** 2 for _ in range(100))
+            # Compute sum of sin^2 repeated 100 times (JAX-compatible)
+            result = 0.0
+            for _ in range(100):
+                result = result + jnp.sum(jnp.sin(x) ** 2)
+            return result
 
         jitted_function = jax.jit(slow_function)
 
@@ -240,8 +245,9 @@ class TestMittagLefflerJAX:
 
     @pytest.mark.jax
     def test_mittag_leffler_jitted(self):
-        """Test JIT compilation of Mittag-Leffler."""
-        @jax.jit
+        """Test JIT compilation of Mittag-Leffler with static alpha."""
+        # alpha must be static (constant) for JIT compilation
+        @partial(jax.jit, static_argnames=['alpha'])
         def ml_jitted(z, alpha):
             return mittag_leffler_e(z, alpha=alpha)
 
@@ -353,12 +359,22 @@ class TestNumericalPrecision:
 
     @pytest.mark.jax
     def test_float64_precision(self):
-        """Test float64 precision."""
-        x64 = jnp.array([0.1, 0.2, 0.3], dtype=jnp.float64)
-        result = jnp.sum(x64)
+        """Test float64 precision (requires JAX_ENABLE_X64)."""
+        import jax
 
-        # Check that we get float64 result
-        assert result.dtype == jnp.float64
+        # Enable x64 mode for this test (using new API)
+        try:
+            # JAX 0.8.0+ API
+            with jax.config.enable_x64(True):
+                x64 = jnp.array([0.1, 0.2, 0.3], dtype=jnp.float64)
+                result = jnp.sum(x64)
+                assert result.dtype == jnp.float64
+        except AttributeError:
+            # Fallback for older JAX versions
+            with jax.experimental.enable_x64():
+                x64 = jnp.array([0.1, 0.2, 0.3], dtype=jnp.float64)
+                result = jnp.sum(x64)
+                assert result.dtype == jnp.float64
 
     @pytest.mark.jax
     def test_complex64_operations(self):
@@ -371,12 +387,24 @@ class TestNumericalPrecision:
 
     @pytest.mark.jax
     def test_complex128_operations(self):
-        """Test complex128 operations."""
-        x = jnp.array([1+2j, 3+4j], dtype=jnp.complex128)
-        y = jnp.array([1-2j, 3-4j], dtype=jnp.complex128)
+        """Test complex128 operations (requires JAX_ENABLE_X64)."""
+        import jax
 
-        result = x * y
-        assert result.dtype == jnp.complex128
+        # Enable x64 mode for this test (using new API)
+        try:
+            # JAX 0.8.0+ API
+            with jax.config.enable_x64(True):
+                x = jnp.array([1+2j, 3+4j], dtype=jnp.complex128)
+                y = jnp.array([1-2j, 3-4j], dtype=jnp.complex128)
+                result = x * y
+                assert result.dtype == jnp.complex128
+        except AttributeError:
+            # Fallback for older JAX versions
+            with jax.experimental.enable_x64():
+                x = jnp.array([1+2j, 3+4j], dtype=jnp.complex128)
+                y = jnp.array([1-2j, 3-4j], dtype=jnp.complex128)
+                result = x * y
+                assert result.dtype == jnp.complex128
 
 
 class TestJAXDeviceHandling:

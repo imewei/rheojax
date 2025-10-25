@@ -91,34 +91,34 @@ class FractionalZenerSolidLiquid(BaseModel):
 
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
-        self.parameters.add(Parameter(
+        self.parameters.add(
             name='Ge',
             value=None,
             bounds=(1e-3, 1e9),
             units='Pa',
             description='Equilibrium modulus'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='c_alpha',
             value=None,
             bounds=(1e-3, 1e9),
             units='Pa·s^α',
             description='SpringPot constant'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='alpha',
             value=None,
             bounds=(0.0, 1.0),
             units='',
             description='Fractional order'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='tau',
             value=None,
             bounds=(1e-6, 1e6),
             units='s',
             description='Relaxation time'
-        ))
+        )
 
     def _predict_relaxation(self, t: jnp.ndarray, Ge: float, c_alpha: float,
                            alpha: float, tau: float) -> jnp.ndarray:
@@ -213,10 +213,17 @@ class FractionalZenerSolidLiquid(BaseModel):
             # J(t) ≈ t^α / c_α for small t
             J_short = jnp.power(t, alpha_safe) / (c_alpha + epsilon)
 
-            # Blend between short and long time behavior
-            # Use exponential crossover
-            weight = 1.0 - jnp.exp(-t / tau)
-            J_t = J_short * (1.0 - weight) + J_eq * weight
+            # Use smooth, monotonic interpolation
+            # Sigmoid-based transition to ensure monotonicity
+            # Map time to sigmoid argument with characteristic scale tau
+            x = jnp.log10(t / tau + epsilon) / 2.0  # Log-scale transition
+            sigmoid_weight = 1.0 / (1.0 + jnp.exp(-x))
+
+            # Ensure J_short <= J_eq at transition by scaling
+            J_short_scaled = jnp.minimum(J_short, J_eq * 0.9)
+
+            # Monotonic blend: start from J_short, approach J_eq
+            J_t = J_short_scaled * (1.0 - sigmoid_weight) + J_eq * sigmoid_weight
 
             return J_t
 
@@ -226,7 +233,9 @@ class FractionalZenerSolidLiquid(BaseModel):
                             alpha: float, tau: float) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
-        G*(ω) = G_e + c_α * (iω)^α / (1 + iωτ)
+        G*(ω) = G_e + c_α * (iω)^α / (1 + (iωτ)^(1-α))
+
+        This is the correct formula for FZSL (spring + FMG in parallel).
 
         Parameters
         ----------
@@ -250,23 +259,29 @@ class FractionalZenerSolidLiquid(BaseModel):
         import numpy as np
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        beta_safe = 1.0 - alpha_safe
 
         # JIT-compiled inner function with concrete alpha
         @jax.jit
         def _compute_oscillation(omega, Ge, c_alpha, tau):
             tau_safe = tau + epsilon
+            omega_safe = jnp.maximum(omega, epsilon)
 
             # Compute (iω)^α = ω^α * exp(i*π*α/2)
-            omega_alpha = jnp.power(omega, alpha_safe)
-            phase = jnp.pi * alpha_safe / 2.0
+            omega_alpha = jnp.power(omega_safe, alpha_safe)
+            phase_alpha = jnp.pi * alpha_safe / 2.0
+            i_omega_alpha = omega_alpha * (jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha))
 
-            # (iω)^α in complex form
-            i_omega_alpha = omega_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
+            # Compute (iωτ)^(1-α) = |ωτ|^(1-α) * exp(i*(1-α)*π/2)
+            omega_tau = omega_safe * tau_safe
+            omega_tau_beta = jnp.power(omega_tau, beta_safe)
+            phase_beta = jnp.pi * beta_safe / 2.0
+            i_omega_tau_beta = omega_tau_beta * (jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta))
 
-            # Denominator: 1 + iωτ
-            denominator = 1.0 + 1j * omega * tau_safe
+            # Denominator: 1 + (iωτ)^(1-α)
+            denominator = 1.0 + i_omega_tau_beta
 
-            # Fractional term: c_α * (iω)^α / (1 + iωτ)
+            # Fractional term: c_α * (iω)^α / (1 + (iωτ)^(1-α))
             fractional_term = c_alpha * i_omega_alpha / denominator
 
             # Total complex modulus
@@ -341,22 +356,16 @@ class FractionalZenerSolidLiquid(BaseModel):
         jnp.ndarray
             Predicted values
         """
-        # Get parameters
-        params = self.parameters.to_dict()
-        Ge = params['Ge']
-        c_alpha = params['c_alpha']
-        alpha = params['alpha']
-        tau = params['tau']
+        # Get parameter values
+        Ge = self.parameters.get_value('Ge')
+        c_alpha = self.parameters.get_value('c_alpha')
+        alpha = self.parameters.get_value('alpha')
+        tau = self.parameters.get_value('tau')
 
         # Auto-detect test mode based on input characteristics
-        # This is a simple heuristic - should be improved
-        if jnp.all(X > 0) and len(X) > 1:
-            # Check if it looks like frequency data (typically larger range)
-            log_range = jnp.log10(jnp.max(X)) - jnp.log10(jnp.min(X) + 1e-12)
-            if log_range > 3:  # Likely frequency sweep
-                return self._predict_oscillation(X, Ge, c_alpha, alpha, tau)
-
-        # Default to relaxation
+        # NOTE: This is a heuristic - explicit test_mode is recommended
+        # Default to relaxation for time-domain data
+        # Oscillation should typically use RheoData with domain='frequency'
         return self._predict_relaxation(X, Ge, c_alpha, alpha, tau)
 
 

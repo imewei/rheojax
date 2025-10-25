@@ -7,7 +7,15 @@ from pathlib import Path
 from rheo.core.data import RheoData
 from rheo.io.writers import save_hdf5, save_excel
 
+# Check if h5py is available
+try:
+    import h5py
+    HAS_H5PY = True
+except ImportError:
+    HAS_H5PY = False
 
+
+@pytest.mark.skipif(not HAS_H5PY, reason="h5py not installed")
 class TestHDF5Writer:
     """Tests for HDF5 writer (7.11)."""
 

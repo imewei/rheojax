@@ -218,12 +218,17 @@ class TestExcelWriting:
             temp_path = f.name
 
         try:
-            # Prepare data dict
+            # Prepare data dict with expected structure for save_excel
+            # save_excel expects 'parameters' and/or 'fit_quality' keys
             results = {
-                "x": data.x.tolist(),
-                "y_real": data.y.real.tolist(),
-                "y_imag": data.y.imag.tolist(),
-                "test_mode": "oscillation",
+                "parameters": {
+                    "test_mode": "oscillation",
+                    "n_points": len(data.x)
+                },
+                "fit_quality": {
+                    "R2": 0.99,
+                    "RMSE": 0.01
+                }
             }
 
             try:

@@ -15,6 +15,13 @@ from rheo.core.data import RheoData
 from rheo.core.base import BaseModel, BaseTransform
 from rheo.core.registry import ModelRegistry, TransformRegistry
 
+# Check if h5py is available
+try:
+    import h5py
+    HAS_H5PY = True
+except ImportError:
+    HAS_H5PY = False
+
 
 # Mock model for testing
 class MockModel(BaseModel):
@@ -238,6 +245,7 @@ class TestPipelineMethodChaining:
         assert pipeline._last_model is not None
         assert len(pipeline.history) == 2
 
+    @pytest.mark.skipif(not HAS_H5PY, reason="h5py not installed")
     def test_full_chain(self, temp_csv_file):
         """Test full workflow chain."""
         with tempfile.NamedTemporaryFile(suffix='.hdf5', delete=False) as f:
@@ -373,6 +381,7 @@ class TestPipelinePlotting:
 class TestPipelineSaving:
     """Test data saving functionality."""
 
+    @pytest.mark.skipif(not HAS_H5PY, reason="h5py not installed")
     def test_save_hdf5(self, sample_data):
         """Test saving to HDF5."""
         with tempfile.NamedTemporaryFile(suffix='.hdf5', delete=False) as f:

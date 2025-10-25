@@ -470,6 +470,21 @@ def json_file_data():
 # REGISTRY AND PLUGIN FIXTURES
 # =============================================================================
 
+@pytest.fixture(scope="session", autouse=True)
+def load_all_plugins():
+    """Load all models and transforms at the start of test session.
+
+    This ensures that all plugins are registered before any tests run,
+    preventing registry isolation issues in the full test suite.
+    """
+    # Import all model modules to trigger registration
+    import rheo.models
+    # Import all transform modules to trigger registration
+    import rheo.transforms
+
+    yield
+
+
 @pytest.fixture
 def clean_registries():
     """Provide clean model and transform registries for testing.
@@ -488,9 +503,11 @@ def clean_registries():
 
     yield ModelRegistry, TransformRegistry
 
-    # Restore original registries
-    ModelRegistry._models = original_models
-    TransformRegistry._transforms = original_transforms
+    # Restore original registries (update dict in place to preserve singleton)
+    ModelRegistry._models.clear()
+    ModelRegistry._models.update(original_models)
+    TransformRegistry._transforms.clear()
+    TransformRegistry._transforms.update(original_transforms)
 
 
 # =============================================================================

@@ -297,7 +297,11 @@ class FractionalMaxwellLiquid(BaseModel):
         """
         # Auto-detect test mode if not provided
         if test_mode is None:
-            test_mode = rheo_data.test_mode
+            # Check for explicit test_mode in metadata first
+            if 'test_mode' in rheo_data.metadata:
+                test_mode = rheo_data.metadata['test_mode']
+            else:
+                test_mode = rheo_data.test_mode
 
         # Get parameters
         Gm = self.parameters.get_value('Gm')

@@ -87,34 +87,34 @@ class FractionalZenerSolidSolid(BaseModel):
 
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
-        self.parameters.add(Parameter(
+        self.parameters.add(
             name='Ge',
             value=None,
             bounds=(1e-3, 1e9),
             units='Pa',
             description='Equilibrium modulus'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='Gm',
             value=None,
             bounds=(1e-3, 1e9),
             units='Pa',
             description='Maxwell arm modulus'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='alpha',
             value=None,
             bounds=(0.0, 1.0),
             units='',
             description='Fractional order'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='tau_alpha',
             value=None,
             bounds=(1e-6, 1e6),
             units='s^α',
             description='Relaxation time'
-        ))
+        )
 
     def _predict_relaxation(self, t: jnp.ndarray, Ge: float, Gm: float,
                            alpha: float, tau_alpha: float) -> jnp.ndarray:
@@ -332,20 +332,16 @@ class FractionalZenerSolidSolid(BaseModel):
         jnp.ndarray
             Predicted values
         """
-        # Get parameters
-        params = self.parameters.to_dict()
-        Ge = params['Ge']
-        Gm = params['Gm']
-        alpha = params['alpha']
-        tau_alpha = params['tau_alpha']
+        # Get parameter values
+        Ge = self.parameters.get_value('Ge')
+        Gm = self.parameters.get_value('Gm')
+        alpha = self.parameters.get_value('alpha')
+        tau_alpha = self.parameters.get_value('tau_alpha')
 
-        # Auto-detect test mode
-        if jnp.all(X > 0) and len(X) > 1:
-            log_range = jnp.log10(jnp.max(X)) - jnp.log10(jnp.min(X) + 1e-12)
-            if log_range > 3:
-                return self._predict_oscillation(X, Ge, Gm, alpha, tau_alpha)
-
-        # Default to relaxation
+        # Auto-detect test mode based on input characteristics
+        # NOTE: This is a heuristic - explicit test_mode is recommended
+        # Default to relaxation for time-domain data
+        # Oscillation should typically use RheoData with domain='frequency'
         return self._predict_relaxation(X, Ge, Gm, alpha, tau_alpha)
 
 

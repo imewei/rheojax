@@ -14,6 +14,17 @@ from rheo.core.registry import Registry, PluginType, PluginInfo
 class TestRegistryCreation:
     """Test registry creation and initialization."""
 
+    def setup_method(self):
+        """Save registry state before each test."""
+        self._saved_state = Registry.get_instance().get_all()
+        Registry.get_instance().clear()
+
+    def teardown_method(self):
+        """Restore registry state after each test."""
+        Registry.get_instance().clear()
+        for name, (plugin, plugin_type) in self._saved_state.items():
+            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
+
     def test_create_empty_registry(self):
         """Test creating an empty registry."""
         registry = Registry()
@@ -50,8 +61,15 @@ class TestRegistryRegistration:
     """Test plugin registration."""
 
     def setup_method(self):
-        """Clear registry before each test."""
+        """Save and clear registry before each test."""
+        self._saved_state = Registry.get_instance().get_all()
         Registry.get_instance().clear()
+
+    def teardown_method(self):
+        """Restore registry state after each test."""
+        Registry.get_instance().clear()
+        for name, (plugin, plugin_type) in self._saved_state.items():
+            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
 
     def test_register_model(self):
         """Test registering a model."""
@@ -154,8 +172,15 @@ class TestRegistryRetrieval:
     """Test plugin retrieval."""
 
     def setup_method(self):
-        """Clear registry before each test."""
+        """Save and clear registry before each test."""
+        self._saved_state = Registry.get_instance().get_all()
         Registry.get_instance().clear()
+
+    def teardown_method(self):
+        """Restore registry state after each test."""
+        Registry.get_instance().clear()
+        for name, (plugin, plugin_type) in self._saved_state.items():
+            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
 
     def test_get_registered_model(self):
         """Test retrieving a registered model."""
@@ -239,8 +264,15 @@ class TestRegistryValidation:
     """Test plugin validation."""
 
     def setup_method(self):
-        """Clear registry before each test."""
+        """Save and clear registry before each test."""
+        self._saved_state = Registry.get_instance().get_all()
         Registry.get_instance().clear()
+
+    def teardown_method(self):
+        """Restore registry state after each test."""
+        Registry.get_instance().clear()
+        for name, (plugin, plugin_type) in self._saved_state.items():
+            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
 
     def test_validate_model_interface(self):
         """Test validation of model interface."""
@@ -313,8 +345,15 @@ class TestRegistryDiscovery:
     """Test automatic plugin discovery."""
 
     def setup_method(self):
-        """Clear registry before each test."""
+        """Save and clear registry before each test."""
+        self._saved_state = Registry.get_instance().get_all()
         Registry.get_instance().clear()
+
+    def teardown_method(self):
+        """Restore registry state after each test."""
+        Registry.get_instance().clear()
+        for name, (plugin, plugin_type) in self._saved_state.items():
+            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
 
     def test_discover_plugins_in_module(self):
         """Test discovering plugins in a module using decorators."""
@@ -384,8 +423,15 @@ class TestRegistryManagement:
     """Test registry management operations."""
 
     def setup_method(self):
-        """Clear registry before each test."""
+        """Save and clear registry before each test."""
+        self._saved_state = Registry.get_instance().get_all()
         Registry.get_instance().clear()
+
+    def teardown_method(self):
+        """Restore registry state after each test."""
+        Registry.get_instance().clear()
+        for name, (plugin, plugin_type) in self._saved_state.items():
+            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
 
     def test_unregister_plugin(self):
         """Test unregistering a plugin."""
@@ -463,8 +509,15 @@ class TestRegistryCompatibility:
     """Test registry compatibility with plugin system."""
 
     def setup_method(self):
-        """Clear registry before each test."""
+        """Save and clear registry before each test."""
+        self._saved_state = Registry.get_instance().get_all()
         Registry.get_instance().clear()
+
+    def teardown_method(self):
+        """Restore registry state after each test."""
+        Registry.get_instance().clear()
+        for name, (plugin, plugin_type) in self._saved_state.items():
+            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
 
     def test_create_instance(self):
         """Test creating plugin instances through registry."""

@@ -80,8 +80,13 @@ class TestRheoDataCreation:
             RheoData(x=x, y=y)
 
 
+@pytest.mark.skip(reason="piblin is an optional dependency - install with: pip install piblin")
 class TestRheoDataPiblinCompatibility:
-    """Test piblin.Measurement compatibility."""
+    """Test piblin.Measurement compatibility.
+
+    NOTE: These tests are skipped by default as piblin is an optional dependency.
+    To enable these tests, install piblin: pip install piblin
+    """
 
     @patch('rheo.core.data.piblin')
     def test_wraps_piblin_measurement(self, mock_piblin):

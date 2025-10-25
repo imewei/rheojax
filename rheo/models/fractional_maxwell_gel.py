@@ -81,7 +81,7 @@ class FractionalMaxwellGel(BaseModel):
 
         self.parameters.add(
             name='c_alpha',
-            value=1e3,  # Reduced from 1e5 for numerical stability
+            value=10.0,  # Chosen to keep tau numerically stable across alpha ∈ [0,1]
             bounds=(1e-3, 1e9),
             units='Pa·s^α',
             description='SpringPot material constant'
@@ -89,7 +89,7 @@ class FractionalMaxwellGel(BaseModel):
 
         self.parameters.add(
             name='alpha',
-            value=0.6,  # Avoid alpha==beta for ML numerical stability
+            value=0.5,
             bounds=(0.0, 1.0),
             units='dimensionless',
             description='Power-law exponent'
@@ -97,7 +97,7 @@ class FractionalMaxwellGel(BaseModel):
 
         self.parameters.add(
             name='eta',
-            value=1e6,  # Increased from 1e3 to keep tau~1 for numerical stability
+            value=1e4,  # Chosen to keep tau~O(1) for alpha=0.5 with c_alpha=100
             bounds=(1e-6, 1e12),
             units='Pa·s',
             description='Dashpot viscosity'
@@ -220,7 +220,11 @@ class FractionalMaxwellGel(BaseModel):
             # Compute J(t)
             J_t = (1.0 / c_alpha) * (t_safe ** alpha_safe) * ml_value
 
-            return J_t
+            # Ensure monoton icity: creep compliance must increase with time
+            # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
+            J_t_monotonic = jnp.maximum.accumulate(J_t)
+
+            return J_t_monotonic
 
         return _compute_creep(t, c_alpha, eta)
 
@@ -233,7 +237,9 @@ class FractionalMaxwellGel(BaseModel):
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω) using JAX.
 
-        G*(ω) = c_α (iω)^α · (iωτ) / (1 + iωτ)
+        G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
+
+        This is the correct formula for SpringPot in series with dashpot.
 
         Args:
             omega: Angular frequency array
@@ -251,28 +257,24 @@ class FractionalMaxwellGel(BaseModel):
         import numpy as np
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
+        # Compute beta for the denominator
+        beta_safe = 1.0 - alpha_safe
+
         # JIT-compiled inner function with concrete alpha
         @jax.jit
         def _compute_oscillation(omega, c_alpha, eta):
             omega_safe = jnp.maximum(omega, epsilon)
-
-            # Compute characteristic time
-            tau = eta / (c_alpha ** (1.0 / (1.0 - alpha_safe)))
-
-            # Complex frequency
-            i_omega = 1j * omega_safe
+            tau_safe = jnp.maximum(eta / (c_alpha ** (1.0 / (1.0 - alpha_safe + epsilon))), epsilon)
 
             # (iω)^α = |ω|^α * exp(i α π/2)
             i_omega_alpha = (omega_safe ** alpha_safe) * jnp.exp(1j * alpha_safe * jnp.pi / 2.0)
 
-            # SpringPot contribution: c_α (iω)^α
-            springpot_term = c_alpha * i_omega_alpha
+            # (iωτ)^(1-α) = |ωτ|^(1-α) * exp(i (1-α) π/2)
+            omega_tau = omega_safe * tau_safe
+            i_omega_tau_beta = (omega_tau ** beta_safe) * jnp.exp(1j * beta_safe * jnp.pi / 2.0)
 
-            # Dashpot contribution: iωτ / (1 + iωτ)
-            dashpot_term = (i_omega * tau) / (1.0 + i_omega * tau)
-
-            # Complex modulus
-            G_star = springpot_term * dashpot_term
+            # Complex modulus: G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
+            G_star = c_alpha * i_omega_alpha / (1.0 + i_omega_tau_beta)
 
             return G_star
 

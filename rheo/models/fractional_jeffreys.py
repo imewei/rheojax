@@ -90,34 +90,34 @@ class FractionalJeffreysModel(BaseModel):
 
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
-        self.parameters.add(Parameter(
+        self.parameters.add(
             name='eta1',
             value=None,
             bounds=(1e-6, 1e12),
             units='Pa·s',
             description='First viscosity'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='eta2',
             value=None,
             bounds=(1e-6, 1e12),
             units='Pa·s',
             description='Second viscosity'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='alpha',
             value=None,
             bounds=(0.0, 1.0),
             units='',
             description='Fractional order'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='tau1',
             value=None,
             bounds=(1e-6, 1e6),
             units='s',
             description='Relaxation time'
-        ))
+        )
 
     def _predict_relaxation(self, t: jnp.ndarray, eta1: float, eta2: float,
                            alpha: float, tau1: float) -> jnp.ndarray:

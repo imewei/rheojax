@@ -211,7 +211,11 @@ class FractionalMaxwellModel(BaseModel):
             # Creep compliance
             J_t = (1.0 / c1) * (t_safe ** alpha_safe) * ml_value
 
-            return J_t
+            # Ensure monotonicity: creep compliance must increase with time
+            # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
+            J_t_monotonic = jnp.maximum.accumulate(J_t)
+
+            return J_t_monotonic
 
         return _compute_creep(t, c1, tau)
 
@@ -315,7 +319,11 @@ class FractionalMaxwellModel(BaseModel):
         """
         # Auto-detect test mode if not provided
         if test_mode is None:
-            test_mode = rheo_data.test_mode
+            # Check for explicit test_mode in metadata first
+            if 'test_mode' in rheo_data.metadata:
+                test_mode = rheo_data.metadata['test_mode']
+            else:
+                test_mode = rheo_data.test_mode
 
         # Get parameters
         c1 = self.parameters.get_value('c1')

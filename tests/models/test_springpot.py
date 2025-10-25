@@ -10,6 +10,7 @@ import pytest
 from numpy.testing import assert_allclose
 from jax.scipy.special import gamma as jax_gamma
 
+import rheo.models  # Import to trigger all model registrations
 from rheo.models.springpot import SpringPot
 from rheo.core.data import RheoData
 from rheo.core.test_modes import TestMode

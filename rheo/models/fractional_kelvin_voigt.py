@@ -143,9 +143,16 @@ class FractionalKelvinVoigt(BaseModel):
         # Add small epsilon to prevent issues
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
+        # Clip alpha to safe range
+        # For gradient computation, alpha may be a tracer - use jnp.clip
+        # For normal operation, convert to float for ML function
         import numpy as np
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        try:
+            # Try to convert to float (works for concrete values)
+            alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        except:
+            # If alpha is a tracer (during gradient computation), use jnp.clip
+            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         # JIT-compiled inner function with concrete alpha
         @jax.jit
@@ -191,9 +198,16 @@ class FractionalKelvinVoigt(BaseModel):
         # Add small epsilon
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
+        # Clip alpha to safe range
+        # For gradient computation, alpha may be a tracer - use jnp.clip
+        # For normal operation, convert to float for ML function
         import numpy as np
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        try:
+            # Try to convert to float (works for concrete values)
+            alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        except:
+            # If alpha is a tracer (during gradient computation), use jnp.clip
+            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         # JIT-compiled inner function with concrete alpha
         @jax.jit
@@ -239,9 +253,16 @@ class FractionalKelvinVoigt(BaseModel):
         # Add small epsilon
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
+        # Clip alpha to safe range
+        # For gradient computation, alpha may be a tracer - use jnp.clip
+        # For normal operation, convert to float for ML function
         import numpy as np
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        try:
+            # Try to convert to float (works for concrete values)
+            alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        except:
+            # If alpha is a tracer (during gradient computation), use jnp.clip
+            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         # JIT-compiled inner function with concrete alpha
         @jax.jit
@@ -310,7 +331,11 @@ class FractionalKelvinVoigt(BaseModel):
         """
         # Auto-detect test mode if not provided
         if test_mode is None:
-            test_mode = rheo_data.test_mode
+            # Check for explicit test_mode in metadata first
+            if 'test_mode' in rheo_data.metadata:
+                test_mode = rheo_data.metadata['test_mode']
+            else:
+                test_mode = rheo_data.test_mode
 
         # Get parameters
         Ge = self.parameters.get_value('Ge')

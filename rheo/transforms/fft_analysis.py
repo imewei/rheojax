@@ -221,7 +221,9 @@ class FFTAnalysis(BaseTransform):
             'psd': self.return_psd,
             'original_domain': 'time',
             'n_points': len(t),
-            'dt': float(dt)
+            'dt': float(dt),
+            # Store complex coefficients for inverse transform
+            'fft_complex': fft_result
         })
 
         # Create new RheoData in frequency domain
@@ -264,25 +266,17 @@ class FFTAnalysis(BaseTransform):
         # Get original parameters
         n_points = data.metadata.get('n_points')
         dt = data.metadata.get('dt')
+        fft_complex = data.metadata.get('fft_complex')
 
         if n_points is None or dt is None:
             raise ValueError("Missing metadata for inverse FFT (n_points, dt)")
 
-        # Get frequency-domain data
-        spectrum = data.y
+        if fft_complex is None:
+            raise ValueError("Missing complex FFT coefficients for inverse transform")
 
-        # Convert to JAX
-        if not isinstance(spectrum, jnp.ndarray):
-            spectrum = jnp.array(spectrum)
-
-        # Reconstruct complex spectrum (assuming symmetry for real signal)
-        # Note: This is approximate if PSD was computed
-        if data.metadata.get('psd', False):
-            # Convert PSD back to magnitude (approximate)
-            spectrum = jnp.sqrt(spectrum * n_points * dt)
-
+        # Use the stored complex coefficients for accurate reconstruction
         # Apply inverse FFT
-        y_reconstructed = jnp.fft.irfft(spectrum, n=n_points)
+        y_reconstructed = jnp.fft.irfft(fft_complex, n=n_points)
 
         # Reconstruct time array
         t = jnp.arange(n_points) * dt

@@ -46,4 +46,5 @@ def test_version_info():
     assert version_info["major"] == 1
     assert version_info["minor"] == 0
     assert version_info["patch"] == 0
-    assert version_info["python_requires"] == ">=3.12"
+    # Python 3.9+ is required (JAX supports 3.9+)
+    assert version_info["python_requires"] == ">=3.9"

@@ -28,16 +28,46 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 
-# Note: piblin and nlsq are marked as required in the spec but may not be available
-# in PyPI yet. For development, these can be installed separately.
+# ============================================================================
+# GPU ACCELERATION (20-100x speedup for large datasets)
+# ============================================================================
+# Default: CPU-only JAX (works on ALL platforms: Linux, macOS, Windows)
+#
+# For GPU acceleration (Linux + CUDA 12.1-12.9 ONLY):
+#
+#   Quick install (from repository):
+#     make install-jax-gpu
+#
+#   Manual install:
+#     pip uninstall -y jax jaxlib
+#     pip install jax[cuda12-local]==0.8.0 jaxlib==0.8.0
+#
+#   Platform support:
+#     ✅ Linux + NVIDIA GPU + CUDA 12.1-12.9: Full GPU acceleration
+#     ❌ macOS: CPU-only (Apple Silicon/Intel, no NVIDIA GPU support)
+#     ❌ Windows: CPU-only (CUDA support experimental/unstable)
+#
+#   Requirements:
+#     - System CUDA 12.1-12.9 pre-installed (not bundled)
+#     - NVIDIA driver >= 525
+#     - Linux x86_64 or aarch64
+#
+# See README.md for detailed GPU installation guide
+# ============================================================================
 dependencies = [
-    "jax>=0.4.20",
-    "jaxlib>=0.4.20",
-    "numpyro>=0.13.0",
-    "numpy>=1.24.0",
-    "scipy>=1.11.0",
-    "pandas>=2.0.0",
-    "matplotlib>=3.7.0",
+    # Core scientific computing
+    "numpy>=1.24.0,<3.0.0",
+    "scipy>=1.11.0,<2.0.0",
+    "pandas>=2.0.0,<3.0.0",
+    "matplotlib>=3.7.0,<4.0.0",
+
+    # JAX ecosystem (CPU-only - works on all platforms)
+    # GPU users: see installation instructions above
+    "jax==0.8.0",     # JAX 0.8.0 CPU-only - exact version required
+    "jaxlib==0.8.0",  # jaxlib 0.8.0 CPU-only - must match JAX version exactly
+
+    # Probabilistic programming
+    "numpyro>=0.13.0,<1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -69,9 +99,9 @@ io = [
     "openpyxl>=3.1.0",
     "xlrd>=2.0.0",
 ]
-gpu = [
-    "jax[cuda12_pip]>=0.4.20",
-]
+# NOTE: No gpu extra - GPU installation must be done manually to avoid conflicts.
+# See GPU ACCELERATION section above for installation instructions.
+# Use: make install-jax-gpu (from repository) or manual pip commands.
 all = [
     "rheo[core,dev,ml,io]",
 ]

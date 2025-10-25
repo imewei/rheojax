@@ -54,7 +54,8 @@ class MastercurvePipeline(Pipeline):
         self,
         file_paths: List[str],
         temperatures: List[float],
-        format: str = 'auto'
+        format: str = 'auto',
+        **load_kwargs
     ) -> MastercurvePipeline:
         """Execute mastercurve workflow.
 
@@ -62,6 +63,7 @@ class MastercurvePipeline(Pipeline):
             file_paths: List of data file paths (one per temperature)
             temperatures: List of temperatures (in Kelvin)
             format: File format for loading
+            **load_kwargs: Additional arguments passed to load (e.g., x_col, y_col)
 
         Returns:
             self for method chaining
@@ -79,7 +81,7 @@ class MastercurvePipeline(Pipeline):
         datasets = []
         for file_path in file_paths:
             temp_pipeline = Pipeline()
-            temp_pipeline.load(file_path, format=format)
+            temp_pipeline.load(file_path, format=format, **load_kwargs)
             datasets.append(temp_pipeline.get_result())
 
         # Merge datasets with temperature metadata

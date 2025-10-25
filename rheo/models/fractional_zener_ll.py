@@ -87,48 +87,48 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
-        self.parameters.add(Parameter(
+        self.parameters.add(
             name='c1',
             value=None,
             bounds=(1e-3, 1e9),
             units='Pa·s^α',
             description='First SpringPot constant'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='c2',
             value=None,
             bounds=(1e-3, 1e9),
             units='Pa·s^γ',
             description='Second SpringPot constant'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='alpha',
             value=None,
             bounds=(0.0, 1.0),
             units='',
             description='First fractional order'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='beta',
             value=None,
             bounds=(0.0, 1.0),
             units='',
             description='Second fractional order'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='gamma',
             value=None,
             bounds=(0.0, 1.0),
             units='',
             description='Third fractional order'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='tau',
             value=None,
             bounds=(1e-6, 1e6),
             units='s',
             description='Relaxation time'
-        ))
+        )
 
     def _predict_oscillation(self, omega: jnp.ndarray, c1: float, c2: float,
                             alpha: float, beta: float, gamma: float,
@@ -380,23 +380,19 @@ class FractionalZenerLiquidLiquid(BaseModel):
         jnp.ndarray
             Predicted values
         """
-        # Get parameters
-        params = self.parameters.to_dict()
-        c1 = params['c1']
-        c2 = params['c2']
-        alpha = params['alpha']
-        beta = params['beta']
-        gamma = params['gamma']
-        tau = params['tau']
+        # Get parameter values
+        c1 = self.parameters.get_value('c1')
+        c2 = self.parameters.get_value('c2')
+        alpha = self.parameters.get_value('alpha')
+        beta = self.parameters.get_value('beta')
+        gamma = self.parameters.get_value('gamma')
+        tau = self.parameters.get_value('tau')
 
-        # Auto-detect test mode (prefer oscillation for FZLL)
-        if jnp.all(X > 0) and len(X) > 1:
-            log_range = jnp.log10(jnp.max(X)) - jnp.log10(jnp.min(X) + 1e-12)
-            if log_range > 3:
-                return self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
-
-        # Default to oscillation (most accurate for FZLL)
-        return self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
+        # Auto-detect test mode based on input characteristics
+        # NOTE: This is a heuristic - explicit test_mode is recommended
+        # Default to relaxation for time-domain data
+        # Oscillation should typically use RheoData with domain='frequency'
+        return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
 
 
 # Convenience alias

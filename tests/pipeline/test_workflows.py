@@ -26,9 +26,8 @@ class MockMaxwell(BaseModel):
 
     def __init__(self):
         super().__init__()
-        from rheo.core.parameters import Parameter
-        self.parameters.add(Parameter('G', value=1000.0, bounds=(0, 1e6)))
-        self.parameters.add(Parameter('tau', value=1.0, bounds=(0, 100)))
+        self.parameters.add(name='G', value=1000.0, bounds=(0, 1e6))
+        self.parameters.add(name='tau', value=1.0, bounds=(0, 100))
 
     def _fit(self, X, y, **kwargs):
         self.parameters.set_value('G', float(np.max(y)))
@@ -46,10 +45,9 @@ class MockZener(BaseModel):
 
     def __init__(self):
         super().__init__()
-        from rheo.core.parameters import Parameter
-        self.parameters.add(Parameter('G1', value=1000.0, bounds=(0, 1e6)))
-        self.parameters.add(Parameter('G2', value=500.0, bounds=(0, 1e6)))
-        self.parameters.add(Parameter('tau', value=1.0, bounds=(0, 100)))
+        self.parameters.add(name='G1', value=1000.0, bounds=(0, 1e6))
+        self.parameters.add(name='G2', value=500.0, bounds=(0, 1e6))
+        self.parameters.add(name='tau', value=1.0, bounds=(0, 100))
 
     def _fit(self, X, y, **kwargs):
         self.parameters.set_value('G1', float(np.max(y) * 0.6))
@@ -165,7 +163,9 @@ class TestMastercurvePipeline:
         pipeline.run(
             file_paths=files,
             temperatures=temps,
-            format='csv'
+            format='csv',
+            x_col='time',
+            y_col='modulus'
         )
 
         assert pipeline.data is not None
@@ -182,7 +182,7 @@ class TestMastercurvePipeline:
         files, temps = multi_temp_csv_files
 
         pipeline = MastercurvePipeline(reference_temp=298.15)
-        pipeline.run(files, temps, format='csv')
+        pipeline.run(files, temps, format='csv', x_col='time', y_col='modulus')
 
         shift_factors = pipeline.get_shift_factors()
         assert len(shift_factors) > 0

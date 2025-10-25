@@ -93,34 +93,34 @@ class FractionalPoyntingThomson(BaseModel):
 
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
-        self.parameters.add(Parameter(
+        self.parameters.add(
             name='Ge',
             value=None,
             bounds=(1e-3, 1e9),
             units='Pa',
             description='Instantaneous modulus'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='Gk',
             value=None,
             bounds=(1e-3, 1e9),
             units='Pa',
             description='Retarded modulus'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='alpha',
             value=None,
             bounds=(0.0, 1.0),
             units='',
             description='Fractional order'
-        ))
-        self.parameters.add(Parameter(
+        )
+        self.parameters.add(
             name='tau',
             value=None,
             bounds=(1e-6, 1e6),
             units='s',
             description='Retardation time'
-        ))
+        )
 
     def _predict_creep(self, t: jnp.ndarray, Ge: float, Gk: float,
                       alpha: float, tau: float) -> jnp.ndarray:

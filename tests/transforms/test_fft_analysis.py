@@ -170,26 +170,27 @@ class TestFFTAnalysis:
 
     def test_characteristic_time(self):
         """Test characteristic time extraction."""
-        # Create relaxation with known time constant
-        t = jnp.linspace(0, 50, 2000)  # Longer time, more points for better resolution
-        tau = 5.0  # Longer tau to be well-resolved
-        G_t = jnp.exp(-t / tau)
+        # Create oscillatory signal with clear peak (sine wave)
+        # Exponential decays don't have sharp peaks in FFT
+        t = jnp.linspace(0, 10, 2000)
+        f_characteristic = 0.2  # Hz (τ = 1/f = 5s)
+        signal = jnp.sin(2 * jnp.pi * f_characteristic * t)
 
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=signal, domain='time')
 
-        # Apply FFT with less aggressive windowing
-        fft = FFTAnalysis(window='hann', detrend=True)
+        # Apply FFT
+        fft = FFTAnalysis(window='hann', detrend=False)
         freq_data = fft.transform(data)
 
         # Get characteristic time
         tau_extracted = fft.get_characteristic_time(freq_data)
 
-        # Should be positive and finite (relaxed requirement)
-        # Actual value depends on FFT resolution and windowing
+        # Should be positive and finite
         assert np.isfinite(tau_extracted)
         assert tau_extracted > 0
-        # Broad range due to FFT discretization
-        assert 1.0 < tau_extracted < 20.0
+        # Should be close to 1/f_characteristic = 5s
+        # Allow wide range due to FFT discretization and windowing
+        assert 2.0 < tau_extracted < 10.0
 
     def test_frequency_domain_error(self):
         """Test that FFT raises error for frequency-domain input."""
