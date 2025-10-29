@@ -12,13 +12,16 @@ import json
 import tempfile
 from pathlib import Path
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from rheo.core.data import RheoData
+from rheo.core.jax_config import safe_import_jax
 from rheo.core.parameters import Parameter, ParameterSet
 from rheo.core.test_modes import TestMode
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 # =============================================================================
 # OSCILLATORY TEST DATA (SAOS - Small Amplitude Oscillatory Shear)
