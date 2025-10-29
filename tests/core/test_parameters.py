@@ -10,18 +10,17 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-from rheo.core.parameters import (
-
 from rheo.core.jax_config import safe_import_jax
-
-# Safe JAX import (enforces float64)
-jax, jnp = safe_import_jax()
+from rheo.core.parameters import (
     Parameter,
     ParameterConstraint,
     ParameterOptimizer,
     ParameterSet,
     SharedParameterSet,
 )
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 
 class TestParameterConstraints:

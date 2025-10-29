@@ -12,21 +12,19 @@ Tests validate:
 5. Edge cases and parameter validation
 """
 
-import jax
 import numpy as np
 import pytest
 
-from rheo.utils.mittag_leffler import (
-
 from rheo.core.jax_config import safe_import_jax
-
-# Safe JAX import (enforces float64)
-jax, jnp = safe_import_jax()
+from rheo.utils.mittag_leffler import (
     mittag_leffler_e,
     mittag_leffler_e2,
     ml_e,
     ml_e2,
 )
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 
 class TestMittagLefflerBasicFunctionality:
