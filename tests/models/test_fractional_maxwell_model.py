@@ -5,15 +5,15 @@ Tests cover initialization, all test modes, limit cases, JAX operations,
 numerical stability, and two-parameter fractional behavior.
 """
 
-import numpy as np
-import pytest
 import jax
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 import rheo.models  # Import to trigger all model registrations
-from rheo.models.fractional_maxwell_model import FractionalMaxwellModel
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
+from rheo.models.fractional_maxwell_model import FractionalMaxwellModel
 
 
 class TestFractionalMaxwellModelInitialization:
@@ -25,27 +25,27 @@ class TestFractionalMaxwellModelInitialization:
 
     def test_parameters_exist(self):
         model = FractionalMaxwellModel()
-        assert 'c1' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'beta' in model.parameters
-        assert 'tau' in model.parameters
+        assert "c1" in model.parameters
+        assert "alpha" in model.parameters
+        assert "beta" in model.parameters
+        assert "tau" in model.parameters
 
     def test_parameter_defaults(self):
         model = FractionalMaxwellModel()
-        assert model.parameters.get_value('c1') == 1e5
-        assert model.parameters.get_value('alpha') == 0.5
-        assert model.parameters.get_value('beta') == 0.5
-        assert model.parameters.get_value('tau') == 1.0
+        assert model.parameters.get_value("c1") == 1e5
+        assert model.parameters.get_value("alpha") == 0.5
+        assert model.parameters.get_value("beta") == 0.5
+        assert model.parameters.get_value("tau") == 1.0
 
     def test_parameter_bounds(self):
         model = FractionalMaxwellModel()
-        assert model.parameters.get('c1').bounds == (1e-3, 1e9)
-        assert model.parameters.get('alpha').bounds == (0.0, 1.0)
-        assert model.parameters.get('beta').bounds == (0.0, 1.0)
-        assert model.parameters.get('tau').bounds == (1e-6, 1e6)
+        assert model.parameters.get("c1").bounds == (1e-3, 1e9)
+        assert model.parameters.get("alpha").bounds == (0.0, 1.0)
+        assert model.parameters.get("beta").bounds == (0.0, 1.0)
+        assert model.parameters.get("tau").bounds == (1e-6, 1e6)
 
     def test_registry_registration(self):
-        assert 'fractional_maxwell_model' in ModelRegistry.list_models()
+        assert "fractional_maxwell_model" in ModelRegistry.list_models()
 
 
 class TestFractionalMaxwellModelRelaxation:
@@ -54,8 +54,8 @@ class TestFractionalMaxwellModelRelaxation:
     def test_relaxation_basic(self):
         model = FractionalMaxwellModel()
         t = np.array([0.01, 0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -64,8 +64,8 @@ class TestFractionalMaxwellModelRelaxation:
     def test_relaxation_monotonic_decrease(self):
         model = FractionalMaxwellModel()
         t = np.logspace(-2, 2, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         diffs = np.diff(result.y)
@@ -74,14 +74,14 @@ class TestFractionalMaxwellModelRelaxation:
     def test_relaxation_short_time_power_law(self):
         """G(t) ~ c1 * t^(-α) at short times."""
         model = FractionalMaxwellModel()
-        model.parameters.set_value('c1', 1e5)
-        model.parameters.set_value('alpha', 0.5)
-        model.parameters.set_value('beta', 0.7)
-        model.parameters.set_value('tau', 10.0)
+        model.parameters.set_value("c1", 1e5)
+        model.parameters.set_value("alpha", 0.5)
+        model.parameters.set_value("beta", 0.7)
+        model.parameters.set_value("tau", 10.0)
 
         t = np.logspace(-3, -1, 20)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
         result = model.predict(data)
 
         log_t = np.log10(t)
@@ -95,17 +95,17 @@ class TestFractionalMaxwellModelRelaxation:
         t = np.logspace(-2, 2, 50)
 
         # Case 1: alpha=beta
-        model.parameters.set_value('alpha', 0.5)
-        model.parameters.set_value('beta', 0.5)
-        data1 = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data1.metadata['test_mode'] = 'relaxation'
+        model.parameters.set_value("alpha", 0.5)
+        model.parameters.set_value("beta", 0.5)
+        data1 = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data1.metadata["test_mode"] = "relaxation"
         result1 = model.predict(data1)
 
         # Case 2: alpha≠beta
-        model.parameters.set_value('alpha', 0.3)
-        model.parameters.set_value('beta', 0.7)
-        data2 = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data2.metadata['test_mode'] = 'relaxation'
+        model.parameters.set_value("alpha", 0.3)
+        model.parameters.set_value("beta", 0.7)
+        data2 = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data2.metadata["test_mode"] = "relaxation"
         result2 = model.predict(data2)
 
         # Should give different results
@@ -118,8 +118,8 @@ class TestFractionalMaxwellModelCreep:
     def test_creep_basic(self):
         model = FractionalMaxwellModel()
         t = np.array([0.01, 0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'creep'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "creep"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -128,8 +128,8 @@ class TestFractionalMaxwellModelCreep:
     def test_creep_monotonic_increase(self):
         model = FractionalMaxwellModel()
         t = np.logspace(-2, 2, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'creep'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "creep"
 
         result = model.predict(data)
         diffs = np.diff(result.y)
@@ -138,12 +138,12 @@ class TestFractionalMaxwellModelCreep:
     def test_creep_power_law_behavior(self):
         """J(t) ~ t^α at short times."""
         model = FractionalMaxwellModel()
-        model.parameters.set_value('c1', 1e5)
-        model.parameters.set_value('alpha', 0.5)
+        model.parameters.set_value("c1", 1e5)
+        model.parameters.set_value("alpha", 0.5)
 
         t = np.logspace(-3, -1, 20)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'creep'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "creep"
         result = model.predict(data)
 
         log_t = np.log10(t)
@@ -158,8 +158,10 @@ class TestFractionalMaxwellModelOscillation:
     def test_oscillation_basic(self):
         model = FractionalMaxwellModel()
         omega = np.array([0.1, 1.0, 10.0, 100.0])
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
         assert np.iscomplexobj(result.y)
@@ -168,8 +170,10 @@ class TestFractionalMaxwellModelOscillation:
     def test_oscillation_moduli_positive(self):
         model = FractionalMaxwellModel()
         omega = np.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
         assert np.all(np.real(result.y) > 0)
@@ -178,12 +182,14 @@ class TestFractionalMaxwellModelOscillation:
     def test_oscillation_low_frequency_scaling(self):
         """Test power-law scaling ~ ω^α at low frequency."""
         model = FractionalMaxwellModel()
-        model.parameters.set_value('alpha', 0.5)
-        model.parameters.set_value('beta', 0.7)
+        model.parameters.set_value("alpha", 0.5)
+        model.parameters.set_value("beta", 0.7)
 
         omega = np.logspace(-3, -1, 20)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
         log_omega = np.log10(omega)
@@ -198,16 +204,20 @@ class TestFractionalMaxwellModelOscillation:
         omega = np.logspace(-2, 2, 50)
 
         # Vary alpha, fix beta
-        model.parameters.set_value('alpha', 0.3)
-        model.parameters.set_value('beta', 0.5)
-        data1 = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data1.metadata['test_mode'] = 'oscillation'
+        model.parameters.set_value("alpha", 0.3)
+        model.parameters.set_value("beta", 0.5)
+        data1 = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data1.metadata["test_mode"] = "oscillation"
         result1 = model.predict(data1)
 
-        model.parameters.set_value('alpha', 0.7)
-        model.parameters.set_value('beta', 0.5)
-        data2 = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data2.metadata['test_mode'] = 'oscillation'
+        model.parameters.set_value("alpha", 0.7)
+        model.parameters.set_value("beta", 0.5)
+        data2 = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data2.metadata["test_mode"] = "oscillation"
         result2 = model.predict(data2)
 
         # Should be different
@@ -220,12 +230,12 @@ class TestFractionalMaxwellModelLimitCases:
     def test_alpha_beta_equal(self):
         """Test when alpha = beta (reduced symmetry)."""
         model = FractionalMaxwellModel()
-        model.parameters.set_value('alpha', 0.5)
-        model.parameters.set_value('beta', 0.5)
+        model.parameters.set_value("alpha", 0.5)
+        model.parameters.set_value("beta", 0.5)
 
         t = np.logspace(-2, 2, 30)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -233,12 +243,12 @@ class TestFractionalMaxwellModelLimitCases:
     def test_alpha_near_zero_beta_near_one(self):
         """Test extreme parameter combinations."""
         model = FractionalMaxwellModel()
-        model.parameters.set_value('alpha', 0.05)
-        model.parameters.set_value('beta', 0.95)
+        model.parameters.set_value("alpha", 0.05)
+        model.parameters.set_value("beta", 0.95)
 
         t = np.logspace(-2, 2, 30)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -246,12 +256,12 @@ class TestFractionalMaxwellModelLimitCases:
     def test_both_alpha_beta_near_one(self):
         """Test when both approach 1 (should approach Maxwell)."""
         model = FractionalMaxwellModel()
-        model.parameters.set_value('alpha', 0.95)
-        model.parameters.set_value('beta', 0.95)
+        model.parameters.set_value("alpha", 0.95)
+        model.parameters.set_value("beta", 0.95)
 
         t = np.logspace(-2, 2, 30)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -259,8 +269,8 @@ class TestFractionalMaxwellModelLimitCases:
     def test_zero_time_handling(self):
         model = FractionalMaxwellModel()
         t = np.array([0.0, 0.01, 0.1, 1.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -281,13 +291,15 @@ class TestFractionalMaxwellModelJAX:
         def loss_fn(c1):
             t = jnp.array([1.0])
             result = model._predict_relaxation_jax(t, c1, 0.5, 0.5, 1.0)
-            return jnp.sum(result ** 2)
+            return jnp.sum(result**2)
 
         grad_fn = jax.grad(loss_fn)
         gradient = grad_fn(1e5)
         assert np.isfinite(gradient)
 
-    @pytest.mark.xfail(reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler")
+    @pytest.mark.xfail(
+        reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler"
+    )
     def test_vmap_over_alpha_beta(self):
         """Test vectorization over two parameters simultaneously."""
         model = FractionalMaxwellModel()
@@ -311,7 +323,7 @@ class TestFractionalMaxwellModelJAX:
             c1, tau = params
             t = jnp.array([1.0])
             result = model._predict_relaxation_jax(t, c1, 0.5, 0.5, tau)
-            return jnp.sum(result ** 2)
+            return jnp.sum(result**2)
 
         hessian_fn = jax.hessian(loss_fn)
         params = jnp.array([1e5, 1.0])
@@ -327,9 +339,9 @@ class TestFractionalMaxwellModelNumericalStability:
         model = FractionalMaxwellModel()
         t = np.logspace(-2, 2, 30)
 
-        for mode in ['relaxation', 'creep']:
-            data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-            data.metadata['test_mode'] = mode
+        for mode in ["relaxation", "creep"]:
+            data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+            data.metadata["test_mode"] = mode
             result = model.predict(data)
             assert np.all(np.isfinite(result.y))
 
@@ -338,9 +350,9 @@ class TestFractionalMaxwellModelNumericalStability:
         model = FractionalMaxwellModel()
 
         test_cases = [
-            {'c1': 1e-2, 'alpha': 0.1, 'beta': 0.1, 'tau': 1e-4},
-            {'c1': 1e8, 'alpha': 0.9, 'beta': 0.9, 'tau': 1e5},
-            {'c1': 1e5, 'alpha': 0.1, 'beta': 0.9, 'tau': 1.0},
+            {"c1": 1e-2, "alpha": 0.1, "beta": 0.1, "tau": 1e-4},
+            {"c1": 1e8, "alpha": 0.9, "beta": 0.9, "tau": 1e5},
+            {"c1": 1e5, "alpha": 0.1, "beta": 0.9, "tau": 1.0},
         ]
 
         t = np.logspace(-2, 2, 20)
@@ -349,8 +361,8 @@ class TestFractionalMaxwellModelNumericalStability:
             for key, value in params.items():
                 model.parameters.set_value(key, value)
 
-            data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-            data.metadata['test_mode'] = 'relaxation'
+            data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+            data.metadata["test_mode"] = "relaxation"
             result = model.predict(data)
             assert np.all(np.isfinite(result.y))
 
@@ -358,13 +370,13 @@ class TestFractionalMaxwellModelNumericalStability:
         """Test that small parameter changes give small result changes."""
         model = FractionalMaxwellModel()
         t = np.array([1.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
-        model.parameters.set_value('alpha', 0.5)
+        model.parameters.set_value("alpha", 0.5)
         result1 = model.predict(data)
 
-        model.parameters.set_value('alpha', 0.51)
+        model.parameters.set_value("alpha", 0.51)
         result2 = model.predict(data)
 
         relative_change = np.abs(result2.y[0] - result1.y[0]) / result1.y[0]
@@ -377,8 +389,8 @@ class TestFractionalMaxwellModelRheoDataIntegration:
     def test_rheodata_input_output(self):
         model = FractionalMaxwellModel()
         t = np.logspace(-2, 2, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert isinstance(result, RheoData)
@@ -386,17 +398,19 @@ class TestFractionalMaxwellModelRheoDataIntegration:
     def test_metadata_preservation(self):
         model = FractionalMaxwellModel()
         t = np.logspace(-2, 2, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
-        data.metadata['param_set'] = 'A'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
+        data.metadata["param_set"] = "A"
 
         result = model.predict(data)
-        assert result.metadata['param_set'] == 'A'
+        assert result.metadata["param_set"] == "A"
 
     def test_auto_detect_frequency_domain(self):
         model = FractionalMaxwellModel()
         omega = np.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
 
         result = model.predict(data)
         assert np.iscomplexobj(result.y)
@@ -408,8 +422,8 @@ class TestFractionalMaxwellModelErrorHandling:
     def test_invalid_test_mode(self):
         model = FractionalMaxwellModel()
         t = np.array([0.1, 1.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'invalid'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "invalid"
 
         with pytest.raises(ValueError, match="Unknown test mode"):
             model.predict(data)
@@ -418,7 +432,7 @@ class TestFractionalMaxwellModelErrorHandling:
         model = FractionalMaxwellModel()
 
         with pytest.raises(ValueError):
-            model.parameters.set_value('alpha', 1.5)
+            model.parameters.set_value("alpha", 1.5)
 
         with pytest.raises(ValueError):
-            model.parameters.set_value('beta', -0.1)
+            model.parameters.set_value("beta", -0.1)

@@ -8,21 +8,22 @@ This module provides:
 - Registry fixtures for model/transform discovery testing
 """
 
-import pytest
-import numpy as np
-import jax.numpy as jnp
-from pathlib import Path
-import tempfile
 import json
+import tempfile
+from pathlib import Path
+
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.data import RheoData
 from rheo.core.parameters import Parameter, ParameterSet
 from rheo.core.test_modes import TestMode
 
-
 # =============================================================================
 # OSCILLATORY TEST DATA (SAOS - Small Amplitude Oscillatory Shear)
 # =============================================================================
+
 
 @pytest.fixture
 def oscillation_data_simple():
@@ -67,7 +68,7 @@ def oscillation_data_simple():
         x_units="Hz",
         y_units="Pa",
         domain="frequency",
-        metadata=metadata
+        metadata=metadata,
     )
 
 
@@ -90,7 +91,7 @@ def oscillation_data_large():
 
     # Complex modulus for Zener (standard linear solid)
     numerator = G_s * (1j * omega * eta_p + (G_s + G_p))
-    denominator = (1j * omega * eta_p + G_p)
+    denominator = 1j * omega * eta_p + G_p
     G_complex = numerator / denominator
 
     metadata = {
@@ -109,13 +110,14 @@ def oscillation_data_large():
         x_units="Hz",
         y_units="Pa",
         domain="frequency",
-        metadata=metadata
+        metadata=metadata,
     )
 
 
 # =============================================================================
 # RELAXATION TEST DATA
 # =============================================================================
+
 
 @pytest.fixture
 def relaxation_data_simple():
@@ -142,12 +144,7 @@ def relaxation_data_simple():
     }
 
     return RheoData(
-        x=time,
-        y=stress,
-        x_units="s",
-        y_units="Pa",
-        domain="time",
-        metadata=metadata
+        x=time, y=stress, x_units="s", y_units="Pa", domain="time", metadata=metadata
     )
 
 
@@ -178,18 +175,14 @@ def relaxation_data_multi_mode():
     }
 
     return RheoData(
-        x=time,
-        y=stress,
-        x_units="s",
-        y_units="Pa",
-        domain="time",
-        metadata=metadata
+        x=time, y=stress, x_units="s", y_units="Pa", domain="time", metadata=metadata
     )
 
 
 # =============================================================================
 # CREEP TEST DATA
 # =============================================================================
+
 
 @pytest.fixture
 def creep_data_simple():
@@ -222,13 +215,14 @@ def creep_data_simple():
         x_units="s",
         y_units="Pa^-1",
         domain="time",
-        metadata=metadata
+        metadata=metadata,
     )
 
 
 # =============================================================================
 # STEADY SHEAR / FLOW DATA
 # =============================================================================
+
 
 @pytest.fixture
 def flow_data_power_law():
@@ -241,7 +235,7 @@ def flow_data_power_law():
 
     # Power-law parameters
     K = 1000.0  # Consistency index
-    n = 0.5     # Flow index (shear thinning: n < 1)
+    n = 0.5  # Flow index (shear thinning: n < 1)
 
     viscosity = K * shear_rate ** (n - 1)
 
@@ -260,7 +254,7 @@ def flow_data_power_law():
         x_units="1/s",
         y_units="Pa.s",
         domain="time",  # Shear rate is quasi-static
-        metadata=metadata
+        metadata=metadata,
     )
 
 
@@ -274,7 +268,7 @@ def flow_data_bingham():
 
     # Bingham parameters
     tau_0 = 100.0  # Yield stress
-    eta_p = 1.0    # Plastic viscosity
+    eta_p = 1.0  # Plastic viscosity
 
     # Avoid zero shear rate region
     shear_rate = shear_rate[shear_rate > 0.1]
@@ -296,13 +290,14 @@ def flow_data_bingham():
         x_units="1/s",
         y_units="Pa.s",
         domain="time",
-        metadata=metadata
+        metadata=metadata,
     )
 
 
 # =============================================================================
 # PARAMETER FIXTURES
 # =============================================================================
+
 
 @pytest.fixture
 def maxwell_parameters():
@@ -311,10 +306,16 @@ def maxwell_parameters():
     Returns ParameterSet with Gₛ and η_s.
     """
     params = ParameterSet()
-    params.add("G_s", value=1e5, bounds=(1e3, 1e8), units="Pa",
-               description="Spring modulus")
-    params.add("eta_s", value=10.0, bounds=(0.01, 1e6), units="Pa.s",
-               description="Dashpot viscosity")
+    params.add(
+        "G_s", value=1e5, bounds=(1e3, 1e8), units="Pa", description="Spring modulus"
+    )
+    params.add(
+        "eta_s",
+        value=10.0,
+        bounds=(0.01, 1e6),
+        units="Pa.s",
+        description="Dashpot viscosity",
+    )
     return params
 
 
@@ -322,12 +323,23 @@ def maxwell_parameters():
 def zener_parameters():
     """Parameters for Zener (standard linear solid) model."""
     params = ParameterSet()
-    params.add("G_s", value=1e5, bounds=(1e3, 1e8), units="Pa",
-               description="Spring modulus")
-    params.add("G_p", value=5e4, bounds=(1e3, 1e8), units="Pa",
-               description="Parallel spring modulus")
-    params.add("eta_p", value=100.0, bounds=(0.1, 1e6), units="Pa.s",
-               description="Parallel damper viscosity")
+    params.add(
+        "G_s", value=1e5, bounds=(1e3, 1e8), units="Pa", description="Spring modulus"
+    )
+    params.add(
+        "G_p",
+        value=5e4,
+        bounds=(1e3, 1e8),
+        units="Pa",
+        description="Parallel spring modulus",
+    )
+    params.add(
+        "eta_p",
+        value=100.0,
+        bounds=(0.1, 1e6),
+        units="Pa.s",
+        description="Parallel damper viscosity",
+    )
     return params
 
 
@@ -335,16 +347,27 @@ def zener_parameters():
 def power_law_parameters():
     """Parameters for power-law flow model."""
     params = ParameterSet()
-    params.add("K", value=1000.0, bounds=(0.1, 1e6), units="Pa.s^n",
-               description="Consistency index")
-    params.add("n", value=0.5, bounds=(0.0, 1.0), units="dimensionless",
-               description="Flow index")
+    params.add(
+        "K",
+        value=1000.0,
+        bounds=(0.1, 1e6),
+        units="Pa.s^n",
+        description="Consistency index",
+    )
+    params.add(
+        "n",
+        value=0.5,
+        bounds=(0.0, 1.0),
+        units="dimensionless",
+        description="Flow index",
+    )
     return params
 
 
 # =============================================================================
 # SYNTHETIC DATA GENERATORS
 # =============================================================================
+
 
 @pytest.fixture
 def synthetic_noisy_data():
@@ -363,8 +386,14 @@ def synthetic_noisy_data():
     y_noisy = y_clean + noise
 
     clean = RheoData(x=x, y=y_clean, x_units="s", y_units="Pa", domain="time")
-    noisy = RheoData(x=x, y=y_noisy, x_units="s", y_units="Pa", domain="time",
-                     metadata={"noise_level": 0.05})
+    noisy = RheoData(
+        x=x,
+        y=y_noisy,
+        x_units="s",
+        y_units="Pa",
+        domain="time",
+        metadata={"noise_level": 0.05},
+    )
 
     return clean, noisy
 
@@ -386,7 +415,7 @@ def synthetic_multi_temperature_data():
 
         # Create complex modulus data
         G_s = 1e5
-        eta_s = 10.0 * 10**(log_aT / 2)  # Temperature-dependent viscosity
+        eta_s = 10.0 * 10 ** (log_aT / 2)  # Temperature-dependent viscosity
         omega = 2 * np.pi * shifted_freq
 
         G_prime = G_s * (omega * eta_s) ** 2 / (1 + (omega * eta_s) ** 2)
@@ -406,7 +435,7 @@ def synthetic_multi_temperature_data():
             x_units="Hz",
             y_units="Pa",
             domain="frequency",
-            metadata=metadata
+            metadata=metadata,
         )
         datasets.append(data)
 
@@ -417,10 +446,11 @@ def synthetic_multi_temperature_data():
 # FILE I/O TEST DATA
 # =============================================================================
 
+
 @pytest.fixture
 def csv_file_data():
     """Create a temporary CSV file for testing readers."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         # Write CSV with headers
         f.write("frequency,G_prime,G_double_prime\n")
         frequency = np.logspace(-1, 1, 10)
@@ -445,17 +475,14 @@ def csv_file_data():
 @pytest.fixture
 def json_file_data():
     """Create a temporary JSON file for testing serialization."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         data = {
             "x": [0.1, 1.0, 10.0],
             "y": [100.0, 1000.0, 10000.0],
             "x_units": "Hz",
             "y_units": "Pa",
             "domain": "frequency",
-            "metadata": {
-                "test_mode": "oscillation",
-                "temperature": 25.0
-            }
+            "metadata": {"test_mode": "oscillation", "temperature": 25.0},
         }
         json.dump(data, f)
         temp_path = f.name
@@ -470,6 +497,7 @@ def json_file_data():
 # REGISTRY AND PLUGIN FIXTURES
 # =============================================================================
 
+
 @pytest.fixture(scope="session", autouse=True)
 def load_all_plugins():
     """Load all models and transforms at the start of test session.
@@ -479,6 +507,7 @@ def load_all_plugins():
     """
     # Import all model modules to trigger registration
     import rheo.models
+
     # Import all transform modules to trigger registration
     import rheo.transforms
 
@@ -514,6 +543,7 @@ def clean_registries():
 # NUMPY VS JAX COMPARISON FIXTURES
 # =============================================================================
 
+
 @pytest.fixture
 def array_pair_numpy_jax():
     """Provide matching numpy and JAX arrays for comparison testing."""
@@ -536,31 +566,25 @@ def complex_array_pair_numpy_jax():
 # PYTEST CONFIGURATION AND MARKERS
 # =============================================================================
 
+
 def pytest_configure(config):
     """Register custom pytest markers."""
-    config.addinivalue_line(
-        "markers", "integration: mark test as an integration test"
-    )
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
     config.addinivalue_line(
         "markers", "slow: mark test as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers", "edge_case: mark test as testing edge cases"
-    )
-    config.addinivalue_line(
-        "markers", "io: mark test as I/O related"
-    )
+    config.addinivalue_line("markers", "edge_case: mark test as testing edge cases")
+    config.addinivalue_line("markers", "io: mark test as I/O related")
     config.addinivalue_line(
         "markers", "performance: mark test as performance/benchmark"
     )
-    config.addinivalue_line(
-        "markers", "jax: mark test as JAX-specific"
-    )
+    config.addinivalue_line("markers", "jax: mark test as JAX-specific")
 
 
 # =============================================================================
 # CLEANUP FIXTURES
 # =============================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_jax_config():

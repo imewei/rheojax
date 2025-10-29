@@ -5,7 +5,6 @@ when they have GPU hardware available but are using CPU-only JAX.
 """
 
 import subprocess
-from typing import List, Tuple
 
 
 def check_gpu_availability() -> None:
@@ -48,7 +47,7 @@ def check_gpu_availability() -> None:
                 print("\n⚠️  GPU ACCELERATION AVAILABLE")
                 print("═══════════════════════════════")
                 print(f"NVIDIA GPU detected: {gpu_name}")
-                print(f"JAX is currently using: CPU-only")
+                print("JAX is currently using: CPU-only")
                 print("\nEnable 20-100x speedup with GPU acceleration:")
                 print("  make install-jax-gpu")
                 print("\nOr manually:")
@@ -64,7 +63,7 @@ def check_gpu_availability() -> None:
         pass
 
 
-def get_device_info() -> Tuple[List[str], bool]:
+def get_device_info() -> tuple[list[str], bool]:
     """Get information about available JAX devices.
 
     Returns

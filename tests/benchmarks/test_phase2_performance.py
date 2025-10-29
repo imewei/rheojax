@@ -8,16 +8,17 @@ NOTE: These benchmarks require the Parameter hashability issue to be fixed
 before fractional models can be tested.
 """
 
-import pytest
-import numpy as np
-import jax.numpy as jnp
-import time
-import psutil
 import os
+import time
 
+import jax.numpy as jnp
+import numpy as np
+import psutil
+import pytest
+
+from rheo.core.data import RheoData
 from rheo.models.maxwell import Maxwell
 from rheo.models.zener import Zener
-from rheo.core.data import RheoData
 
 
 class TestJAXvsNumPyPerformance:
@@ -60,7 +61,9 @@ class TestJAXvsNumPyPerformance:
 
         # NOTE: Pure NumPy baseline would be implemented here
         # For now, we verify JAX performance is reasonable
-        assert time_jax < 10.0, f"Fitting {N} points should take <10s, got {time_jax:.3f}s"
+        assert (
+            time_jax < 10.0
+        ), f"Fitting {N} points should take <10s, got {time_jax:.3f}s"
 
         # Target: ≥2x speedup (would compare against NumPy baseline)
         print(f"  Performance: {N} points fitted in {time_jax:.3f}s")
@@ -78,12 +81,15 @@ class TestJITCompilationOverhead:
     def test_first_vs_subsequent_calls(self):
         """Measure JIT compilation overhead for Maxwell model."""
         model = Maxwell()
-        model.parameters.set_value('G0', 1e6)
-        model.parameters.set_value('eta', 1e6)  # eta = G0 * tau, so eta = 1e6 * 1.0
+        model.parameters.set_value("G0", 1e6)
+        model.parameters.set_value("eta", 1e6)  # eta = G0 * tau, so eta = 1e6 * 1.0
 
         t = np.array([0.1, 1.0, 10.0])
         from rheo.core.data import RheoData
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+
+        data = RheoData(
+            x=t, y=np.zeros_like(t), domain="time", metadata={"test_mode": "relaxation"}
+        )
 
         # First call (includes JIT compilation)
         start_first = time.time()
@@ -112,7 +118,9 @@ class TestJITCompilationOverhead:
         print(f"  Estimated JIT overhead: {overhead:.2f}ms")
 
         # Target: overhead <100ms
-        assert overhead < 1000, f"JIT overhead {overhead:.2f}ms too large (target <1000ms)"
+        assert (
+            overhead < 1000
+        ), f"JIT overhead {overhead:.2f}ms too large (target <1000ms)"
 
         # Verify numerical consistency
         assert np.allclose(pred_first, pred_second)
@@ -131,7 +139,9 @@ class TestGPUAcceleration:
     @pytest.mark.gpu
     def test_gpu_vs_cpu_performance(self):
         """Compare CPU vs GPU performance (if GPU available)."""
-        pytest.skip("GPU benchmarking requires GPU hardware - marked for manual testing")
+        pytest.skip(
+            "GPU benchmarking requires GPU hardware - marked for manual testing"
+        )
 
         # NOTE: This would be implemented when GPU is available
         # Expected code:
@@ -175,13 +185,21 @@ class TestMemoryProfiling:
 
             print(f"\n  Memory usage:")
             print(f"    Start: {mem_start:.1f} MB")
-            print(f"    After data creation: {mem_after_data:.1f} MB (+{mem_after_data-mem_start:.1f} MB)")
-            print(f"    After fitting: {mem_after_fit:.1f} MB (+{mem_after_fit-mem_start:.1f} MB)")
-            print(f"    After prediction: {mem_after_predict:.1f} MB (+{mem_after_predict-mem_start:.1f} MB)")
+            print(
+                f"    After data creation: {mem_after_data:.1f} MB (+{mem_after_data-mem_start:.1f} MB)"
+            )
+            print(
+                f"    After fitting: {mem_after_fit:.1f} MB (+{mem_after_fit-mem_start:.1f} MB)"
+            )
+            print(
+                f"    After prediction: {mem_after_predict:.1f} MB (+{mem_after_predict-mem_start:.1f} MB)"
+            )
 
             # Memory usage should be reasonable (<500 MB for this workflow)
             total_usage = mem_after_predict - mem_start
-            assert total_usage < 500, f"Memory usage {total_usage:.1f} MB excessive for simple workflow"
+            assert (
+                total_usage < 500
+            ), f"Memory usage {total_usage:.1f} MB excessive for simple workflow"
 
         except Exception as e:
             pytest.skip(f"Memory profiling failed: {e}")
@@ -217,7 +235,9 @@ class TestMemoryProfiling:
             print(f"\n  Memory growth over 10 iterations: {memory_growth:.1f} MB")
 
             # Should not grow significantly (< 100 MB for 10 iterations)
-            assert memory_growth < 100, f"Possible memory leak: {memory_growth:.1f} MB growth"
+            assert (
+                memory_growth < 100
+            ), f"Possible memory leak: {memory_growth:.1f} MB growth"
         else:
             pytest.skip("Not enough successful iterations to check for memory leaks")
 
@@ -247,7 +267,9 @@ class TestScalability:
             model.fit(data.x, data.y)
             fit_time = time.time() - start
 
-            print(f"\n  N={N}: Fit time = {fit_time:.3f}s ({fit_time/N*1000:.3f}ms per point)")
+            print(
+                f"\n  N={N}: Fit time = {fit_time:.3f}s ({fit_time/N*1000:.3f}ms per point)"
+            )
 
             # Performance should be reasonable
             # Target: <10s for N=10000

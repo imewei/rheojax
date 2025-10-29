@@ -18,19 +18,21 @@ References:
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
+
 from jax.scipy.special import gamma as jax_gamma
-from typing import Optional
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
 from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode, detect_test_mode
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
+from rheo.core.test_modes import TestMode, detect_test_mode
 
 
-@ModelRegistry.register('springpot')
+@ModelRegistry.register("springpot")
 class SpringPot(BaseModel):
     """SpringPot fractional viscoelastic element.
 
@@ -70,18 +72,18 @@ class SpringPot(BaseModel):
         # Define parameters with physical bounds
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='c_alpha',
+            name="c_alpha",
             value=1e5,
             bounds=(1e-3, 1e9),
-            units='Pa·s^alpha',
-            description='Material constant'
+            units="Pa·s^alpha",
+            description="Material constant",
         )
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=0.5,
             bounds=(0.0, 1.0),
-            units='dimensionless',
-            description='Power-law exponent (0=fluid, 1=solid)'
+            units="dimensionless",
+            description="Power-law exponent (0=fluid, 1=solid)",
         )
 
         self.fitted_ = False
@@ -97,7 +99,10 @@ class SpringPot(BaseModel):
         Returns:
             self for method chaining
         """
-        from rheo.utils.optimization import nlsq_optimize, create_least_squares_objective
+        from rheo.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
 
         # Handle RheoData input
         if isinstance(X, RheoData):
@@ -108,11 +113,13 @@ class SpringPot(BaseModel):
         else:
             x_data = jnp.array(X)
             y_data = jnp.array(y)
-            test_mode = kwargs.get('test_mode', TestMode.RELAXATION)
+            test_mode = kwargs.get("test_mode", TestMode.RELAXATION)
 
         # Validate test mode
         if test_mode == TestMode.ROTATION:
-            raise ValueError("SpringPot model does not support steady shear (rotation) test mode")
+            raise ValueError(
+                "SpringPot model does not support steady shear (rotation) test mode"
+            )
 
         # Create objective function with stateless predictions
         def model_fn(x, params):
@@ -129,15 +136,17 @@ class SpringPot(BaseModel):
             else:
                 raise ValueError(f"Unsupported test mode: {test_mode}")
 
-        objective = create_least_squares_objective(model_fn, x_data, y_data, normalize=True)
+        objective = create_least_squares_objective(
+            model_fn, x_data, y_data, normalize=True
+        )
 
         # Optimize
-        result = nlsq_optimize(
+        nlsq_optimize(
             objective,
             self.parameters,
-            use_jax=kwargs.get('use_jax', True),
-            method=kwargs.get('method', 'auto'),
-            max_iter=kwargs.get('max_iter', 1000)
+            use_jax=kwargs.get("use_jax", True),
+            method=kwargs.get("method", "auto"),
+            max_iter=kwargs.get("max_iter", 1000),
         )
 
         self.fitted_ = True
@@ -163,11 +172,13 @@ class SpringPot(BaseModel):
 
         # Validate test mode
         if test_mode == TestMode.ROTATION:
-            raise ValueError("SpringPot model does not support steady shear (rotation) test mode")
+            raise ValueError(
+                "SpringPot model does not support steady shear (rotation) test mode"
+            )
 
         # Get parameter values
-        c_alpha = self.parameters.get_value('c_alpha')
-        alpha = self.parameters.get_value('alpha')
+        c_alpha = self.parameters.get_value("c_alpha")
+        alpha = self.parameters.get_value("alpha")
 
         # Dispatch to appropriate prediction method
         if test_mode == TestMode.RELAXATION:
@@ -181,7 +192,9 @@ class SpringPot(BaseModel):
 
     @staticmethod
     @jax.jit
-    def _predict_relaxation(t: jnp.ndarray, c_alpha: float, alpha: float) -> jnp.ndarray:
+    def _predict_relaxation(
+        t: jnp.ndarray, c_alpha: float, alpha: float
+    ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         Theory: G(t) = c_alpha * t^(-alpha) / Gamma(1-alpha)
@@ -229,7 +242,9 @@ class SpringPot(BaseModel):
 
     @staticmethod
     @jax.jit
-    def _predict_oscillation(omega: jnp.ndarray, c_alpha: float, alpha: float) -> jnp.ndarray:
+    def _predict_oscillation(
+        omega: jnp.ndarray, c_alpha: float, alpha: float
+    ) -> jnp.ndarray:
         """Predict complex modulus G*(omega).
 
         Theory: G*(omega) = c_alpha * (i*omega)^alpha
@@ -277,21 +292,21 @@ class SpringPot(BaseModel):
         Returns:
             Characteristic time in seconds
         """
-        c_alpha = self.parameters.get_value('c_alpha')
-        alpha = self.parameters.get_value('alpha')
+        c_alpha = self.parameters.get_value("c_alpha")
+        alpha = self.parameters.get_value("alpha")
 
         # Avoid division by zero for alpha=0
         if alpha < 1e-10:
-            return float('inf')
+            return float("inf")
 
         gamma_factor = float(jax_gamma(1.0 - alpha))
         return (c_alpha / (reference_value * gamma_factor)) ** (1.0 / alpha)
 
     def __repr__(self) -> str:
         """String representation of SpringPot model."""
-        c_alpha = self.parameters.get_value('c_alpha')
-        alpha = self.parameters.get_value('alpha')
+        c_alpha = self.parameters.get_value("c_alpha")
+        alpha = self.parameters.get_value("alpha")
         return f"SpringPot(c_alpha={c_alpha:.2e} Pa·s^{alpha:.2f}, alpha={alpha:.2f})"
 
 
-__all__ = ['SpringPot']
+__all__ = ["SpringPot"]

@@ -18,20 +18,21 @@ References:
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
 
-import jax
-import jax.numpy as jnp
+jax, jnp = safe_import_jax()
+
+from functools import partial
+
 import numpy as np
 
-from rheo.core.base import BaseModel, Parameter, ParameterSet
+from rheo.core.base import BaseModel, ParameterSet
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
 from rheo.core.test_modes import TestMode, detect_test_mode
 
 
-@ModelRegistry.register('herschel_bulkley')
+@ModelRegistry.register("herschel_bulkley")
 class HerschelBulkley(BaseModel):
     """Herschel-Bulkley model for viscoplastic flow (ROTATION only).
 
@@ -62,25 +63,25 @@ class HerschelBulkley(BaseModel):
         super().__init__()
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='sigma_y',
+            name="sigma_y",
             value=10.0,
             bounds=(0.0, 1e6),
-            units='Pa',
-            description='Yield stress'
+            units="Pa",
+            description="Yield stress",
         )
         self.parameters.add(
-            name='K',
+            name="K",
             value=1.0,
             bounds=(1e-6, 1e6),
-            units='Pa·s^n',
-            description='Consistency index'
+            units="Pa·s^n",
+            description="Consistency index",
         )
         self.parameters.add(
-            name='n',
+            name="n",
             value=0.5,
             bounds=(0.01, 2.0),
-            units='dimensionless',
-            description='Flow behavior index'
+            units="dimensionless",
+            description="Flow behavior index",
         )
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> HerschelBulkley:
@@ -101,7 +102,7 @@ class HerschelBulkley(BaseModel):
 
         # Estimate yield stress from low shear rate extrapolation
         # σ_y ≈ stress at γ̇ → 0
-        sigma_y_est = np.min(y_sorted[:len(y_sorted)//10 + 1])
+        sigma_y_est = np.min(y_sorted[: len(y_sorted) // 10 + 1])
         if sigma_y_est < 0:
             sigma_y_est = 0.0
 
@@ -124,9 +125,9 @@ class HerschelBulkley(BaseModel):
         K_est = np.clip(K_est, 1e-6, 1e6)
         n_est = np.clip(n_est, 0.01, 2.0)
 
-        self.parameters.set_value('sigma_y', float(sigma_y_est))
-        self.parameters.set_value('K', float(K_est))
-        self.parameters.set_value('n', float(n_est))
+        self.parameters.set_value("sigma_y", float(sigma_y_est))
+        self.parameters.set_value("K", float(K_est))
+        self.parameters.set_value("n", float(n_est))
 
         return self
 
@@ -139,9 +140,9 @@ class HerschelBulkley(BaseModel):
         Returns:
             Predicted stress σ(γ̇)
         """
-        sigma_y = self.parameters.get_value('sigma_y')
-        K = self.parameters.get_value('K')
-        n = self.parameters.get_value('n')
+        sigma_y = self.parameters.get_value("sigma_y")
+        K = self.parameters.get_value("K")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX for computation
         gamma_dot = jnp.array(X)
@@ -159,7 +160,7 @@ class HerschelBulkley(BaseModel):
         sigma_y: float,
         K: float,
         n: float,
-        threshold: float = 1e-9
+        threshold: float = 1e-9,
     ) -> jnp.ndarray:
         """Compute shear stress using Herschel-Bulkley model.
 
@@ -190,7 +191,7 @@ class HerschelBulkley(BaseModel):
         sigma_y: float,
         K: float,
         n: float,
-        threshold: float = 1e-9
+        threshold: float = 1e-9,
     ) -> jnp.ndarray:
         """Compute apparent viscosity using Herschel-Bulkley model.
 
@@ -208,7 +209,9 @@ class HerschelBulkley(BaseModel):
         abs_gamma_dot = jnp.abs(gamma_dot)
 
         # Compute viscosity above yield
-        viscosity_above_yield = sigma_y / (abs_gamma_dot + threshold) + K * jnp.power(abs_gamma_dot, n - 1.0)
+        viscosity_above_yield = sigma_y / (abs_gamma_dot + threshold) + K * jnp.power(
+            abs_gamma_dot, n - 1.0
+        )
 
         # Apply yield condition
         return jnp.where(abs_gamma_dot > threshold, viscosity_above_yield, jnp.inf)
@@ -222,9 +225,9 @@ class HerschelBulkley(BaseModel):
         Returns:
             Predicted apparent viscosity η_app(γ̇)
         """
-        sigma_y = self.parameters.get_value('sigma_y')
-        K = self.parameters.get_value('K')
-        n = self.parameters.get_value('n')
+        sigma_y = self.parameters.get_value("sigma_y")
+        K = self.parameters.get_value("K")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX for computation
         gamma_dot_jax = jnp.array(gamma_dot)
@@ -238,8 +241,8 @@ class HerschelBulkley(BaseModel):
     def predict_rheo(
         self,
         rheo_data: RheoData,
-        test_mode: Optional[TestMode] = None,
-        output: str = 'stress'
+        test_mode: TestMode | None = None,
+        output: str = "stress",
     ) -> RheoData:
         """Predict rheological response for RheoData.
 
@@ -268,22 +271,24 @@ class HerschelBulkley(BaseModel):
         gamma_dot = rheo_data.x
 
         # Get parameters
-        sigma_y = self.parameters.get_value('sigma_y')
-        K = self.parameters.get_value('K')
-        n = self.parameters.get_value('n')
+        sigma_y = self.parameters.get_value("sigma_y")
+        K = self.parameters.get_value("K")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX
         gamma_dot_jax = jnp.array(gamma_dot)
 
         # Compute prediction based on output type
-        if output == 'stress':
+        if output == "stress":
             y_pred = self._predict_stress(gamma_dot_jax, sigma_y, K, n)
-            y_units = 'Pa'
-        elif output == 'viscosity':
+            y_units = "Pa"
+        elif output == "viscosity":
             y_pred = self._predict_viscosity(gamma_dot_jax, sigma_y, K, n)
-            y_units = 'Pa·s'
+            y_units = "Pa·s"
         else:
-            raise ValueError(f"Invalid output type: {output}. Must be 'stress' or 'viscosity'")
+            raise ValueError(
+                f"Invalid output type: {output}. Must be 'stress' or 'viscosity'"
+            )
 
         # Convert back to numpy
         y_pred = np.array(y_pred)
@@ -292,26 +297,26 @@ class HerschelBulkley(BaseModel):
         return RheoData(
             x=np.array(gamma_dot),
             y=y_pred,
-            x_units=rheo_data.x_units or '1/s',
+            x_units=rheo_data.x_units or "1/s",
             y_units=y_units,
-            domain='time',
+            domain="time",
             metadata={
-                'model': 'HerschelBulkley',
-                'test_mode': TestMode.ROTATION,
-                'output': output,
-                'sigma_y': sigma_y,
-                'K': K,
-                'n': n
+                "model": "HerschelBulkley",
+                "test_mode": TestMode.ROTATION,
+                "output": output,
+                "sigma_y": sigma_y,
+                "K": K,
+                "n": n,
             },
-            validate=False
+            validate=False,
         )
 
     def __repr__(self) -> str:
         """String representation."""
-        sigma_y = self.parameters.get_value('sigma_y')
-        K = self.parameters.get_value('K')
-        n = self.parameters.get_value('n')
+        sigma_y = self.parameters.get_value("sigma_y")
+        K = self.parameters.get_value("K")
+        n = self.parameters.get_value("n")
         return f"HerschelBulkley(sigma_y={sigma_y:.3e}, K={K:.3e}, n={n:.3f})"
 
 
-__all__ = ['HerschelBulkley']
+__all__ = ["HerschelBulkley"]

@@ -6,20 +6,22 @@ and optimization support for rheological models.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Union
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 
 try:
     import jax
+
     HAS_JAX = True
 except ImportError:
     HAS_JAX = False
 
 
-ArrayLike = Union[np.ndarray, jnp.ndarray, List, float]
+ArrayLike = Union[np.ndarray, jnp.ndarray, list, float]
 
 
 @dataclass
@@ -27,14 +29,16 @@ class ParameterConstraint:
     """Constraint on a parameter value."""
 
     type: str  # 'bounds', 'positive', 'integer', 'fixed', 'relative', 'custom'
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    value: Optional[float] = None  # For fixed constraints
-    relation: Optional[str] = None  # For relative constraints
-    other_param: Optional[str] = None  # For relative constraints
-    validator: Optional[Callable] = None  # For custom constraints
+    min_value: float | None = None
+    max_value: float | None = None
+    value: float | None = None  # For fixed constraints
+    relation: str | None = None  # For relative constraints
+    other_param: str | None = None  # For relative constraints
+    validator: Callable | None = None  # For custom constraints
 
-    def validate(self, value: float, context: Optional[Dict[str, float]] = None) -> bool:
+    def validate(
+        self, value: float, context: dict[str, float] | None = None
+    ) -> bool:
         """Check if value satisfies the constraint.
 
         Args:
@@ -84,11 +88,11 @@ class Parameter:
     """Single parameter with value, bounds, and metadata."""
 
     name: str
-    value: Optional[float] = None
-    bounds: Optional[Tuple[float, float]] = None
-    units: Optional[str] = None
-    description: Optional[str] = None
-    constraints: List[ParameterConstraint] = field(default_factory=list)
+    value: float | None = None
+    bounds: tuple[float, float] | None = None
+    units: str | None = None
+    description: str | None = None
+    constraints: list[ParameterConstraint] = field(default_factory=list)
 
     def __post_init__(self):
         """Validate parameter after initialization."""
@@ -97,26 +101,29 @@ class Parameter:
 
         # Add bounds as constraint if specified
         if self.bounds:
-            self.constraints.insert(0, ParameterConstraint(
-                type="bounds",
-                min_value=self.bounds[0],
-                max_value=self.bounds[1]
-            ))
+            self.constraints.insert(
+                0,
+                ParameterConstraint(
+                    type="bounds", min_value=self.bounds[0], max_value=self.bounds[1]
+                ),
+            )
 
     @property
-    def value(self) -> Optional[float]:
+    def value(self) -> float | None:
         """Get parameter value."""
-        return self._value if hasattr(self, '_value') else None
+        return self._value if hasattr(self, "_value") else None
 
     @value.setter
-    def value(self, val: Optional[float]):
+    def value(self, val: float | None):
         """Set parameter value with validation."""
         if val is not None and self.bounds:
             if val < self.bounds[0] or val > self.bounds[1]:
                 raise ValueError(f"Value {val} out of bounds {self.bounds}")
         self._value = val
 
-    def validate(self, value: float, context: Optional[Dict[str, float]] = None) -> bool:
+    def validate(
+        self, value: float, context: dict[str, float] | None = None
+    ) -> bool:
         """Validate value against all constraints.
 
         Args:
@@ -150,30 +157,32 @@ class Parameter:
         """
         if not isinstance(other, Parameter):
             return NotImplemented
-        return (self.name == other.name and
-                self.value == other.value and
-                self.bounds == other.bounds and
-                self.units == other.units)
+        return (
+            self.name == other.name
+            and self.value == other.value
+            and self.bounds == other.bounds
+            and self.units == other.units
+        )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "name": self.name,
             "value": self.value,
             "bounds": self.bounds,
             "units": self.units,
-            "description": self.description
+            "description": self.description,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> Parameter:
+    def from_dict(cls, data: dict[str, Any]) -> Parameter:
         """Create from dictionary representation."""
         return cls(
             name=data["name"],
             value=data.get("value"),
             bounds=tuple(data["bounds"]) if data.get("bounds") else None,
             units=data.get("units"),
-            description=data.get("description")
+            description=data.get("description"),
         )
 
 
@@ -182,17 +191,17 @@ class ParameterSet:
 
     def __init__(self):
         """Initialize empty parameter set."""
-        self._parameters: Dict[str, Parameter] = {}
-        self._order: List[str] = []
+        self._parameters: dict[str, Parameter] = {}
+        self._order: list[str] = []
 
     def add(
         self,
         name: str,
-        value: Optional[float] = None,
-        bounds: Optional[Tuple[float, float]] = None,
-        units: Optional[str] = None,
-        description: Optional[str] = None,
-        constraints: Optional[List[ParameterConstraint]] = None
+        value: float | None = None,
+        bounds: tuple[float, float] | None = None,
+        units: str | None = None,
+        description: str | None = None,
+        constraints: list[ParameterConstraint] | None = None,
     ) -> Parameter:
         """Add a parameter to the set.
 
@@ -213,7 +222,7 @@ class ParameterSet:
             bounds=bounds,
             units=units,
             description=description,
-            constraints=constraints or []
+            constraints=constraints or [],
         )
 
         self._parameters[name] = param
@@ -222,7 +231,7 @@ class ParameterSet:
 
         return param
 
-    def get(self, name: str) -> Optional[Parameter]:
+    def get(self, name: str) -> Parameter | None:
         """Get a parameter by name.
 
         Args:
@@ -250,9 +259,13 @@ class ParameterSet:
         param = self._parameters[name]
 
         # Validate against constraints
-        context = {p.name: p.value for p in self._parameters.values() if p.value is not None}
+        context = {
+            p.name: p.value for p in self._parameters.values() if p.value is not None
+        }
         if not param.validate(value, context):
-            raise ValueError(f"Value {value} violates constraints for parameter '{name}'")
+            raise ValueError(
+                f"Value {value} violates constraints for parameter '{name}'"
+            )
 
         param.value = value
 
@@ -281,10 +294,10 @@ class ParameterSet:
         if len(values) != len(self._order):
             raise ValueError(f"Expected {len(self._order)} values, got {len(values)}")
 
-        for name, value in zip(self._order, values):
+        for name, value in zip(self._order, values, strict=False):
             self.set_value(name, float(value))
 
-    def get_bounds(self) -> List[Tuple[Optional[float], Optional[float]]]:
+    def get_bounds(self) -> list[tuple[float | None, float | None]]:
         """Get bounds for all parameters.
 
         Returns:
@@ -299,7 +312,7 @@ class ParameterSet:
                 bounds.append((None, None))
         return bounds
 
-    def get_value(self, name: str) -> Optional[float]:
+    def get_value(self, name: str) -> float | None:
         """Get value of a specific parameter.
 
         Args:
@@ -345,7 +358,7 @@ class ParameterSet:
             raise KeyError(f"Parameter '{key}' not found in ParameterSet")
         return self._parameters[key]
 
-    def __setitem__(self, key: str, value: Union[float, Parameter]):
+    def __setitem__(self, key: str, value: float | Parameter):
         """Set parameter value using subscript notation.
 
         Args:
@@ -371,18 +384,17 @@ class ParameterSet:
         else:
             # Set value only
             if key not in self._parameters:
-                raise KeyError(f"Parameter '{key}' not found. Use add() to create new parameters.")
+                raise KeyError(
+                    f"Parameter '{key}' not found. Use add() to create new parameters."
+                )
             self.set_value(key, float(value))
 
-    def to_dict(self) -> Dict[str, Dict[str, Any]]:
+    def to_dict(self) -> dict[str, dict[str, Any]]:
         """Convert to dictionary representation."""
-        return {
-            name: self._parameters[name].to_dict()
-            for name in self._order
-        }
+        return {name: self._parameters[name].to_dict() for name in self._order}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> ParameterSet:
+    def from_dict(cls, data: dict[str, Any]) -> ParameterSet:
         """Create from dictionary representation."""
         params = cls()
         for name, param_data in data.items():
@@ -390,9 +402,13 @@ class ParameterSet:
                 params.add(
                     name=name,
                     value=param_data.get("value"),
-                    bounds=tuple(param_data["bounds"]) if param_data.get("bounds") else None,
+                    bounds=(
+                        tuple(param_data["bounds"])
+                        if param_data.get("bounds")
+                        else None
+                    ),
                     units=param_data.get("units"),
-                    description=param_data.get("description")
+                    description=param_data.get("description"),
                 )
         return params
 
@@ -402,18 +418,18 @@ class SharedParameterSet:
 
     def __init__(self):
         """Initialize shared parameter set."""
-        self._shared: Dict[str, Parameter] = {}
-        self._links: Dict[str, List[Any]] = {}  # Parameter -> list of linked objects
-        self._groups: Dict[str, List[str]] = {}  # Group name -> parameter names
+        self._shared: dict[str, Parameter] = {}
+        self._links: dict[str, list[Any]] = {}  # Parameter -> list of linked objects
+        self._groups: dict[str, list[str]] = {}  # Group name -> parameter names
 
     def add_shared(
         self,
         name: str,
-        value: Optional[float] = None,
-        bounds: Optional[Tuple[float, float]] = None,
-        units: Optional[str] = None,
-        constraints: Optional[List[ParameterConstraint]] = None,
-        group: Optional[str] = None
+        value: float | None = None,
+        bounds: tuple[float, float] | None = None,
+        units: str | None = None,
+        constraints: list[ParameterConstraint] | None = None,
+        group: str | None = None,
     ) -> Parameter:
         """Add a shared parameter.
 
@@ -433,7 +449,7 @@ class SharedParameterSet:
             value=value,
             bounds=bounds,
             units=units,
-            constraints=constraints or []
+            constraints=constraints or [],
         )
 
         self._shared[name] = param
@@ -489,20 +505,26 @@ class SharedParameterSet:
 
         # Validate
         if not param.validate(value):
-            raise ValueError(f"Value {value} violates constraints for parameter '{name}'")
+            raise ValueError(
+                f"Value {value} violates constraints for parameter '{name}'"
+            )
 
         param.value = value
 
         # Update linked models/parameter sets
         for linked in self._links.get(name, []):
-            if hasattr(linked, 'set_value') and hasattr(linked, '__contains__') and name in linked:
+            if (
+                hasattr(linked, "set_value")
+                and hasattr(linked, "__contains__")
+                and name in linked
+            ):
                 # This is a ParameterSet with the parameter
                 linked.set_value(name, value)
-            elif hasattr(linked, 'parameters') and name in linked.parameters:
+            elif hasattr(linked, "parameters") and name in linked.parameters:
                 # This is a model with parameters
                 linked.parameters.set_value(name, value)
 
-    def get_value(self, name: str) -> Optional[float]:
+    def get_value(self, name: str) -> float | None:
         """Get shared parameter value.
 
         Args:
@@ -514,7 +536,7 @@ class SharedParameterSet:
         param = self._shared.get(name)
         return param.value if param else None
 
-    def get_linked_models(self, param_name: str) -> List[Any]:
+    def get_linked_models(self, param_name: str) -> list[Any]:
         """Get models linked to a parameter.
 
         Args:
@@ -525,7 +547,7 @@ class SharedParameterSet:
         """
         return self._links.get(param_name, [])
 
-    def create_group(self, group_name: str, param_names: List[str]):
+    def create_group(self, group_name: str, param_names: list[str]):
         """Create a parameter group.
 
         Args:
@@ -534,7 +556,7 @@ class SharedParameterSet:
         """
         self._groups[group_name] = param_names
 
-    def get_group(self, group_name: str) -> List[str]:
+    def get_group(self, group_name: str) -> list[str]:
         """Get parameters in a group.
 
         Args:
@@ -557,7 +579,7 @@ class ParameterOptimizer:
         self,
         parameters: ParameterSet,
         use_jax: bool = False,
-        track_history: bool = False
+        track_history: bool = False,
     ):
         """Initialize parameter optimizer.
 
@@ -569,10 +591,10 @@ class ParameterOptimizer:
         self.parameters = parameters
         self.use_jax = use_jax and HAS_JAX
         self.track_history = track_history
-        self.history: List[Dict[str, Any]] = []
-        self.objective: Optional[Callable] = None
-        self.constraints: List[Callable] = []
-        self.callback: Optional[Callable] = None
+        self.history: list[dict[str, Any]] = []
+        self.objective: Callable | None = None
+        self.constraints: list[Callable] = []
+        self.callback: Callable | None = None
 
     @property
     def n_parameters(self) -> int:
@@ -583,7 +605,7 @@ class ParameterOptimizer:
         """Get current parameter values."""
         return self.parameters.get_values()
 
-    def get_bounds(self) -> List[Tuple[Optional[float], Optional[float]]]:
+    def get_bounds(self) -> list[tuple[float | None, float | None]]:
         """Get parameter bounds."""
         return self.parameters.get_bounds()
 
@@ -675,7 +697,7 @@ class ParameterOptimizer:
         """
         self.callback = callback
 
-    def step(self, values: ArrayLike, iteration: Optional[int] = None):
+    def step(self, values: ArrayLike, iteration: int | None = None):
         """Perform one optimization step.
 
         Args:
@@ -690,17 +712,19 @@ class ParameterOptimizer:
 
         # Track history
         if self.track_history:
-            self.history.append({
-                "iteration": iteration or len(self.history),
-                "values": values.copy(),
-                "objective": obj_value
-            })
+            self.history.append(
+                {
+                    "iteration": iteration or len(self.history),
+                    "values": values.copy(),
+                    "objective": obj_value,
+                }
+            )
 
         # Call callback
         if self.callback:
             self.callback(iteration or 0, values, obj_value)
 
-    def get_history(self) -> List[Dict[str, Any]]:
+    def get_history(self) -> list[dict[str, Any]]:
         """Get optimization history.
 
         Returns:

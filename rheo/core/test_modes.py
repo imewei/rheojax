@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 
 if TYPE_CHECKING:
     from rheo.core.data import RheoData
@@ -20,11 +20,11 @@ if TYPE_CHECKING:
 class TestMode(str, Enum):
     """Enumeration of rheological test modes."""
 
-    RELAXATION = 'relaxation'
-    CREEP = 'creep'
-    OSCILLATION = 'oscillation'
-    ROTATION = 'rotation'
-    UNKNOWN = 'unknown'
+    RELAXATION = "relaxation"
+    CREEP = "creep"
+    OSCILLATION = "oscillation"
+    ROTATION = "rotation"
+    UNKNOWN = "unknown"
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -32,9 +32,7 @@ class TestMode(str, Enum):
 
 
 def is_monotonic_increasing(
-    data: Union[np.ndarray, jnp.ndarray],
-    strict: bool = False,
-    tolerance: float = 1e-10
+    data: np.ndarray | jnp.ndarray, strict: bool = False, tolerance: float = 1e-10
 ) -> bool:
     """Check if data is monotonically increasing.
 
@@ -62,9 +60,7 @@ def is_monotonic_increasing(
 
 
 def is_monotonic_decreasing(
-    data: Union[np.ndarray, jnp.ndarray],
-    strict: bool = False,
-    tolerance: float = 1e-10
+    data: np.ndarray | jnp.ndarray, strict: bool = False, tolerance: float = 1e-10
 ) -> bool:
     """Check if data is monotonically decreasing.
 
@@ -117,14 +113,18 @@ def detect_test_mode(rheo_data: RheoData) -> TestMode:
         raise ValueError("Invalid RheoData: x and y must be provided")
 
     # 1. Check for explicit test_mode in metadata
-    if 'test_mode' in rheo_data.metadata:
-        explicit_mode = rheo_data.metadata['test_mode']
+    if "test_mode" in rheo_data.metadata:
+        explicit_mode = rheo_data.metadata["test_mode"]
         try:
-            return TestMode(explicit_mode.lower() if isinstance(explicit_mode, str) else explicit_mode)
+            return TestMode(
+                explicit_mode.lower()
+                if isinstance(explicit_mode, str)
+                else explicit_mode
+            )
         except (ValueError, AttributeError):
             warnings.warn(
                 f"Invalid test_mode in metadata: {explicit_mode}. Attempting auto-detection.",
-                UserWarning
+                UserWarning, stacklevel=2,
             )
 
     # 2. Check domain and units
@@ -132,7 +132,7 @@ def detect_test_mode(rheo_data: RheoData) -> TestMode:
     x_units = rheo_data.x_units
 
     # Frequency domain → OSCILLATION (SAOS)
-    if domain == 'frequency':
+    if domain == "frequency":
         return TestMode.OSCILLATION
 
     # Check x_units for frequency indicators
@@ -140,15 +140,15 @@ def detect_test_mode(rheo_data: RheoData) -> TestMode:
         x_units_lower = x_units.lower().strip()
 
         # Frequency units → OSCILLATION
-        if any(unit in x_units_lower for unit in ['rad/s', 'hz', 'hertz']):
+        if any(unit in x_units_lower for unit in ["rad/s", "hz", "hertz"]):
             return TestMode.OSCILLATION
 
         # Shear rate units → ROTATION (steady shear)
-        if any(unit in x_units_lower for unit in ['1/s', 's^-1', 's-1', '/s']):
+        if any(unit in x_units_lower for unit in ["1/s", "s^-1", "s-1", "/s"]):
             return TestMode.ROTATION
 
     # 3. Time-domain analysis: check monotonicity
-    if domain == 'time' or domain is None:
+    if domain == "time" or domain is None:
         # Get y data (handle complex by taking real part if needed)
         y_data = rheo_data.y
         if isinstance(y_data, jnp.ndarray):
@@ -173,12 +173,12 @@ def detect_test_mode(rheo_data: RheoData) -> TestMode:
     warnings.warn(
         "Could not automatically detect test mode. "
         "Consider setting test_mode explicitly in metadata.",
-        UserWarning
+        UserWarning, stacklevel=2,
     )
     return TestMode.UNKNOWN
 
 
-def validate_test_mode(test_mode: Union[str, TestMode]) -> TestMode:
+def validate_test_mode(test_mode: str | TestMode) -> TestMode:
     """Validate and convert test mode to TestMode enum.
 
     Args:
@@ -232,10 +232,10 @@ def suggest_models_for_test_mode(test_mode: TestMode) -> list[str]:
     """
     # Placeholder implementation
     recommendations = {
-        TestMode.RELAXATION: ['Maxwell', 'Zener', 'FractionalMaxwell'],
-        TestMode.CREEP: ['Zener', 'FractionalKelvinVoigt'],
-        TestMode.OSCILLATION: ['Maxwell', 'Zener', 'SpringPot', 'FractionalMaxwell'],
-        TestMode.ROTATION: ['PowerLaw', 'HerschelBulkley', 'Carreau', 'Cross'],
-        TestMode.UNKNOWN: []
+        TestMode.RELAXATION: ["Maxwell", "Zener", "FractionalMaxwell"],
+        TestMode.CREEP: ["Zener", "FractionalKelvinVoigt"],
+        TestMode.OSCILLATION: ["Maxwell", "Zener", "SpringPot", "FractionalMaxwell"],
+        TestMode.ROTATION: ["PowerLaw", "HerschelBulkley", "Carreau", "Cross"],
+        TestMode.UNKNOWN: [],
     }
     return recommendations.get(test_mode, [])

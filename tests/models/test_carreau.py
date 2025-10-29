@@ -7,9 +7,9 @@ transition from Newtonian to power-law behavior.
 import numpy as np
 import pytest
 
-from rheo.models.carreau import Carreau
 from rheo.core.data import RheoData
 from rheo.core.test_modes import TestMode
+from rheo.models.carreau import Carreau
 
 
 class TestCarreauBasics:
@@ -19,13 +19,13 @@ class TestCarreauBasics:
         """Test model initialization."""
         model = Carreau()
         assert model is not None
-        assert 'eta0' in model.parameters
-        assert 'eta_inf' in model.parameters
-        assert 'lambda_' in model.parameters
-        assert 'n' in model.parameters
+        assert "eta0" in model.parameters
+        assert "eta_inf" in model.parameters
+        assert "lambda_" in model.parameters
+        assert "n" in model.parameters
 
         # Check default values
-        eta0 = model.parameters.get_value('eta0')
+        eta0 = model.parameters.get_value("eta0")
         assert eta0 == 1000.0
 
     def test_parameter_bounds(self):
@@ -33,19 +33,19 @@ class TestCarreauBasics:
         model = Carreau()
 
         # eta0 bounds
-        eta0_param = model.parameters.get('eta0')
+        eta0_param = model.parameters.get("eta0")
         assert eta0_param.bounds == (1e-3, 1e12)
 
         # eta_inf bounds
-        eta_inf_param = model.parameters.get('eta_inf')
+        eta_inf_param = model.parameters.get("eta_inf")
         assert eta_inf_param.bounds == (1e-6, 1e6)
 
         # lambda_ bounds
-        lambda_param = model.parameters.get('lambda_')
+        lambda_param = model.parameters.get("lambda_")
         assert lambda_param.bounds == (1e-6, 1e6)
 
         # n bounds
-        n_param = model.parameters.get('n')
+        n_param = model.parameters.get("n")
         assert n_param.bounds == (0.01, 1.0)
 
 
@@ -55,10 +55,10 @@ class TestCarreauPredictions:
     def test_low_shear_rate_limit(self):
         """Test Newtonian plateau at low shear rates."""
         model = Carreau()
-        model.parameters.set_value('eta0', 1000.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 1000.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Very low shear rates (λγ̇ << 1)
         gamma_dot = np.array([1e-6, 1e-5, 1e-4])
@@ -71,10 +71,10 @@ class TestCarreauPredictions:
     def test_high_shear_rate_limit(self):
         """Test power-law behavior at high shear rates."""
         model = Carreau()
-        model.parameters.set_value('eta0', 1000.0)
-        model.parameters.set_value('eta_inf', 1e-6)  # Very small, effectively zero
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 1000.0)
+        model.parameters.set_value("eta_inf", 1e-6)  # Very small, effectively zero
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Very high shear rates (λγ̇ >> 1)
         gamma_dot = np.array([1e3, 1e4, 1e5])
@@ -91,10 +91,10 @@ class TestCarreauPredictions:
     def test_transition_region(self):
         """Test smooth transition in middle shear rates."""
         model = Carreau()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Shear rates spanning low to high
         gamma_dot = np.logspace(-3, 3, 100)
@@ -111,10 +111,10 @@ class TestCarreauPredictions:
     def test_stress_prediction(self):
         """Test stress prediction: σ = η(γ̇) * γ̇."""
         model = Carreau()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.array([0.1, 1.0, 10.0])
 
@@ -128,10 +128,10 @@ class TestCarreauPredictions:
     def test_newtonian_limit_lambda_zero(self):
         """Test Newtonian limit when λ → 0."""
         model = Carreau()
-        model.parameters.set_value('eta0', 50.0)
-        model.parameters.set_value('eta_inf', 10.0)
-        model.parameters.set_value('lambda_', 1e-6)  # Very small λ (at lower bound)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 50.0)
+        model.parameters.set_value("eta_inf", 10.0)
+        model.parameters.set_value("lambda_", 1e-6)  # Very small λ (at lower bound)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.logspace(-2, 2, 50)
 
@@ -143,10 +143,10 @@ class TestCarreauPredictions:
     def test_newtonian_limit_n_equals_one(self):
         """Test Newtonian limit when n = 1."""
         model = Carreau()
-        model.parameters.set_value('eta0', 50.0)
-        model.parameters.set_value('eta_inf', 10.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 1.0)  # n = 1
+        model.parameters.set_value("eta0", 50.0)
+        model.parameters.set_value("eta_inf", 10.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 1.0)  # n = 1
 
         gamma_dot = np.logspace(-2, 2, 50)
 
@@ -162,27 +162,27 @@ class TestCarreauRheoData:
     def test_predict_rheo_viscosity(self):
         """Test prediction with RheoData (viscosity output)."""
         model = Carreau()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.logspace(-2, 2, 50)
         rheo_data = RheoData(
             x=gamma_dot,
             y=np.zeros_like(gamma_dot),
-            x_units='1/s',
-            y_units='Pa·s',
-            domain='time',
-            metadata={'test_mode': TestMode.ROTATION},
-            validate=False
+            x_units="1/s",
+            y_units="Pa·s",
+            domain="time",
+            metadata={"test_mode": TestMode.ROTATION},
+            validate=False,
         )
 
-        result = model.predict_rheo(rheo_data, output='viscosity')
+        result = model.predict_rheo(rheo_data, output="viscosity")
 
-        assert result.x_units == '1/s'
-        assert result.y_units == 'Pa·s'
-        assert result.metadata['model'] == 'Carreau'
+        assert result.x_units == "1/s"
+        assert result.y_units == "Pa·s"
+        assert result.metadata["model"] == "Carreau"
 
         # Verify monotonic decrease (shear-thinning)
         assert np.all(np.diff(result.y) <= 0)
@@ -194,8 +194,8 @@ class TestCarreauRheoData:
         rheo_data = RheoData(
             x=np.array([1.0, 10.0]),
             y=np.array([0.0, 0.0]),
-            metadata={'test_mode': TestMode.OSCILLATION},
-            validate=False
+            metadata={"test_mode": TestMode.OSCILLATION},
+            validate=False,
         )
 
         with pytest.raises(ValueError, match="only supports ROTATION"):
@@ -238,10 +238,10 @@ class TestCarreauNumericalStability:
     def test_extreme_shear_rates(self):
         """Test with extreme shear rates."""
         model = Carreau()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.array([1e-12, 1e-6, 1e6, 1e12])
 
@@ -257,10 +257,10 @@ class TestCarreauNumericalStability:
     def test_zero_shear_rate(self):
         """Test behavior at zero shear rate."""
         model = Carreau()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.array([0.0])
 
@@ -272,10 +272,10 @@ class TestCarreauNumericalStability:
     def test_negative_shear_rates(self):
         """Test with negative shear rates."""
         model = Carreau()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot_pos = np.array([1.0, 10.0, 100.0])
         gamma_dot_neg = -gamma_dot_pos
@@ -298,10 +298,10 @@ class TestCarreauComparison:
         lambda_ = 2.0
         n = 0.6
 
-        model.parameters.set_value('eta0', eta0)
-        model.parameters.set_value('eta_inf', eta_inf)
-        model.parameters.set_value('lambda_', lambda_)
-        model.parameters.set_value('n', n)
+        model.parameters.set_value("eta0", eta0)
+        model.parameters.set_value("eta_inf", eta_inf)
+        model.parameters.set_value("lambda_", lambda_)
+        model.parameters.set_value("n", n)
 
         gamma_dot = np.array([0.1, 1.0, 10.0, 100.0])
 
@@ -315,5 +315,5 @@ class TestCarreauComparison:
         np.testing.assert_allclose(viscosity, expected, rtol=1e-6)
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

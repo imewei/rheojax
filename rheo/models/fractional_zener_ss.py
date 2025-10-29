@@ -41,17 +41,18 @@ References
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-from jax.scipy.special import gamma as jax_gamma
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
 from rheo.utils.mittag_leffler import mittag_leffler_e
 
 
-@ModelRegistry.register('fractional_zener_ss')
+@ModelRegistry.register("fractional_zener_ss")
 class FractionalZenerSolidSolid(BaseModel):
     """Fractional Zener Solid-Solid model.
 
@@ -88,36 +89,37 @@ class FractionalZenerSolidSolid(BaseModel):
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='Ge',
+            name="Ge",
             value=None,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='Equilibrium modulus'
+            units="Pa",
+            description="Equilibrium modulus",
         )
         self.parameters.add(
-            name='Gm',
+            name="Gm",
             value=None,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='Maxwell arm modulus'
+            units="Pa",
+            description="Maxwell arm modulus",
         )
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=None,
             bounds=(0.0, 1.0),
-            units='',
-            description='Fractional order'
+            units="",
+            description="Fractional order",
         )
         self.parameters.add(
-            name='tau_alpha',
+            name="tau_alpha",
             value=None,
             bounds=(1e-6, 1e6),
-            units='s^α',
-            description='Relaxation time'
+            units="s^α",
+            description="Relaxation time",
         )
 
-    def _predict_relaxation(self, t: jnp.ndarray, Ge: float, Gm: float,
-                           alpha: float, tau_alpha: float) -> jnp.ndarray:
+    def _predict_relaxation(
+        self, t: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
+    ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         G(t) = G_e + G_m * E_α(-(t/τ_α)^α)
@@ -142,6 +144,7 @@ class FractionalZenerSolidSolid(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -161,8 +164,9 @@ class FractionalZenerSolidSolid(BaseModel):
 
         return _compute_relaxation(t, Ge, Gm, tau_alpha)
 
-    def _predict_creep(self, t: jnp.ndarray, Ge: float, Gm: float,
-                      alpha: float, tau_alpha: float) -> jnp.ndarray:
+    def _predict_creep(
+        self, t: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
+    ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
         For FZSS, creep compliance is:
@@ -188,6 +192,7 @@ class FractionalZenerSolidSolid(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -212,8 +217,9 @@ class FractionalZenerSolidSolid(BaseModel):
 
         return _compute_creep(t, Ge, Gm, tau_alpha)
 
-    def _predict_oscillation(self, omega: jnp.ndarray, Ge: float, Gm: float,
-                            alpha: float, tau_alpha: float) -> jnp.ndarray:
+    def _predict_oscillation(
+        self, omega: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
+    ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
         G*(ω) = G_e + G_m / (1 + (iωτ_α)^(-α))
@@ -238,6 +244,7 @@ class FractionalZenerSolidSolid(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -271,7 +278,9 @@ class FractionalZenerSolidSolid(BaseModel):
 
         return _compute_oscillation(omega, Ge, Gm, tau_alpha)
 
-    def _fit(self, X: jnp.ndarray, y: jnp.ndarray, **kwargs) -> FractionalZenerSolidSolid:
+    def _fit(
+        self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
+    ) -> FractionalZenerSolidSolid:
         """Fit model to data.
 
         Parameters
@@ -291,23 +300,21 @@ class FractionalZenerSolidSolid(BaseModel):
         from rheo.core.parameters import ParameterOptimizer
 
         # Detect test mode
-        test_mode = kwargs.get('test_mode', 'relaxation')
+        test_mode = kwargs.get("test_mode", "relaxation")
 
         # Select prediction function
-        if test_mode == 'relaxation':
+        if test_mode == "relaxation":
             predict_fn = self._predict_relaxation
-        elif test_mode == 'creep':
+        elif test_mode == "creep":
             predict_fn = self._predict_creep
-        elif test_mode == 'oscillation':
+        elif test_mode == "oscillation":
             predict_fn = self._predict_oscillation
         else:
             raise ValueError(f"Test mode '{test_mode}' not supported for FZSS model")
 
         # Set up optimizer
         optimizer = ParameterOptimizer(
-            parameters=self.parameters,
-            predict_fn=predict_fn,
-            loss='mse'
+            parameters=self.parameters, predict_fn=predict_fn, loss="mse"
         )
 
         # Fit parameters
@@ -333,10 +340,10 @@ class FractionalZenerSolidSolid(BaseModel):
             Predicted values
         """
         # Get parameter values
-        Ge = self.parameters.get_value('Ge')
-        Gm = self.parameters.get_value('Gm')
-        alpha = self.parameters.get_value('alpha')
-        tau_alpha = self.parameters.get_value('tau_alpha')
+        Ge = self.parameters.get_value("Ge")
+        Gm = self.parameters.get_value("Gm")
+        alpha = self.parameters.get_value("alpha")
+        tau_alpha = self.parameters.get_value("tau_alpha")
 
         # Auto-detect test mode based on input characteristics
         # NOTE: This is a heuristic - explicit test_mode is recommended
@@ -348,4 +355,4 @@ class FractionalZenerSolidSolid(BaseModel):
 # Convenience alias
 FZSS = FractionalZenerSolidSolid
 
-__all__ = ['FractionalZenerSolidSolid', 'FZSS']
+__all__ = ["FractionalZenerSolidSolid", "FZSS"]

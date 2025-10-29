@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -13,14 +12,14 @@ from rheo.core.data import RheoData
 
 def load_csv(
     filepath: str,
-    x_col: Union[str, int],
-    y_col: Union[str, int],
-    x_units: Optional[str] = None,
-    y_units: Optional[str] = None,
-    domain: str = 'time',
-    delimiter: Optional[str] = None,
-    header: Optional[int] = 0,
-    **kwargs
+    x_col: str | int,
+    y_col: str | int,
+    x_units: str | None = None,
+    y_units: str | None = None,
+    domain: str = "time",
+    delimiter: str | None = None,
+    header: int | None = 0,
+    **kwargs,
 ) -> RheoData:
     """Load data from CSV file.
 
@@ -53,19 +52,18 @@ def load_csv(
 
     # Read CSV file
     try:
-        df = pd.read_csv(
-            filepath,
-            sep=delimiter,
-            header=header,
-            **kwargs
-        )
+        df = pd.read_csv(filepath, sep=delimiter, header=header, **kwargs)
     except Exception as e:
         raise ValueError(f"Failed to parse CSV file: {e}")
 
     # Extract x and y columns
     try:
-        x_data = df[x_col].values if isinstance(x_col, str) else df.iloc[:, x_col].values
-        y_data = df[y_col].values if isinstance(y_col, str) else df.iloc[:, y_col].values
+        x_data = (
+            df[x_col].values if isinstance(x_col, str) else df.iloc[:, x_col].values
+        )
+        y_data = (
+            df[y_col].values if isinstance(y_col, str) else df.iloc[:, y_col].values
+        )
     except (KeyError, IndexError) as e:
         raise KeyError(f"Column not found: {e}")
 
@@ -83,10 +81,10 @@ def load_csv(
 
     # Create metadata
     metadata = {
-        'source_file': str(filepath),
-        'file_type': 'csv',
-        'x_column': x_col,
-        'y_column': y_col,
+        "source_file": str(filepath),
+        "file_type": "csv",
+        "x_column": x_col,
+        "y_column": y_col,
     }
 
     return RheoData(
@@ -96,7 +94,7 @@ def load_csv(
         y_units=y_units,
         domain=domain,
         metadata=metadata,
-        validate=True
+        validate=True,
     )
 
 
@@ -109,13 +107,13 @@ def _detect_delimiter(filepath: Path) -> str:
     Returns:
         Detected delimiter character
     """
-    with open(filepath, 'r') as f:
+    with open(filepath) as f:
         # Read first few lines
         lines = [f.readline() for _ in range(5)]
 
     # Count occurrences of common delimiters
-    delimiters = [',', '\t', ';', '|']
-    delimiter_counts = {d: 0 for d in delimiters}
+    delimiters = [",", "\t", ";", "|"]
+    delimiter_counts = dict.fromkeys(delimiters, 0)
 
     for line in lines:
         for delimiter in delimiters:
@@ -124,6 +122,6 @@ def _detect_delimiter(filepath: Path) -> str:
     # Return most common delimiter
     max_count = max(delimiter_counts.values())
     if max_count == 0:
-        return ','  # Default to comma
+        return ","  # Default to comma
 
     return max(delimiter_counts, key=delimiter_counts.get)

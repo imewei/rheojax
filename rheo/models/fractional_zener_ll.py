@@ -43,15 +43,17 @@ References
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
 
 
-@ModelRegistry.register('fractional_zener_ll')
+@ModelRegistry.register("fractional_zener_ll")
 class FractionalZenerLiquidLiquid(BaseModel):
     """Fractional Zener Liquid-Liquid model.
 
@@ -88,51 +90,58 @@ class FractionalZenerLiquidLiquid(BaseModel):
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='c1',
+            name="c1",
             value=None,
             bounds=(1e-3, 1e9),
-            units='Pa·s^α',
-            description='First SpringPot constant'
+            units="Pa·s^α",
+            description="First SpringPot constant",
         )
         self.parameters.add(
-            name='c2',
+            name="c2",
             value=None,
             bounds=(1e-3, 1e9),
-            units='Pa·s^γ',
-            description='Second SpringPot constant'
+            units="Pa·s^γ",
+            description="Second SpringPot constant",
         )
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=None,
             bounds=(0.0, 1.0),
-            units='',
-            description='First fractional order'
+            units="",
+            description="First fractional order",
         )
         self.parameters.add(
-            name='beta',
+            name="beta",
             value=None,
             bounds=(0.0, 1.0),
-            units='',
-            description='Second fractional order'
+            units="",
+            description="Second fractional order",
         )
         self.parameters.add(
-            name='gamma',
+            name="gamma",
             value=None,
             bounds=(0.0, 1.0),
-            units='',
-            description='Third fractional order'
+            units="",
+            description="Third fractional order",
         )
         self.parameters.add(
-            name='tau',
+            name="tau",
             value=None,
             bounds=(1e-6, 1e6),
-            units='s',
-            description='Relaxation time'
+            units="s",
+            description="Relaxation time",
         )
 
-    def _predict_oscillation(self, omega: jnp.ndarray, c1: float, c2: float,
-                            alpha: float, beta: float, gamma: float,
-                            tau: float) -> jnp.ndarray:
+    def _predict_oscillation(
+        self,
+        omega: jnp.ndarray,
+        c1: float,
+        c2: float,
+        alpha: float,
+        beta: float,
+        gamma: float,
+        tau: float,
+    ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
         G*(ω) = c_1 * (iω)^α / (1 + (iωτ)^β) + c_2 * (iω)^γ
@@ -161,6 +170,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         """
         # Clip fractional orders BEFORE JIT to make them concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
         beta_safe = float(np.clip(beta, epsilon, 1.0 - epsilon))
@@ -176,12 +186,16 @@ class FractionalZenerLiquidLiquid(BaseModel):
             # Compute (iω)^α
             omega_alpha = jnp.power(omega, alpha_safe)
             phase_alpha = jnp.pi * alpha_safe / 2.0
-            i_omega_alpha = omega_alpha * (jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha))
+            i_omega_alpha = omega_alpha * (
+                jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
+            )
 
             # Compute (iωτ)^β
             omega_tau_beta = jnp.power(omega * tau_safe, beta_safe)
             phase_beta = jnp.pi * beta_safe / 2.0
-            i_omega_tau_beta = omega_tau_beta * (jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta))
+            i_omega_tau_beta = omega_tau_beta * (
+                jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta)
+            )
 
             # First term
             term1 = c1 * i_omega_alpha / (1.0 + i_omega_tau_beta)
@@ -189,7 +203,9 @@ class FractionalZenerLiquidLiquid(BaseModel):
             # Second term: c_2 * (iω)^γ
             omega_gamma = jnp.power(omega, gamma_safe)
             phase_gamma = jnp.pi * gamma_safe / 2.0
-            i_omega_gamma = omega_gamma * (jnp.cos(phase_gamma) + 1j * jnp.sin(phase_gamma))
+            i_omega_gamma = omega_gamma * (
+                jnp.cos(phase_gamma) + 1j * jnp.sin(phase_gamma)
+            )
 
             term2 = c2 * i_omega_gamma
 
@@ -204,9 +220,16 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         return _compute_oscillation(omega, c1, c2, tau)
 
-    def _predict_relaxation(self, t: jnp.ndarray, c1: float, c2: float,
-                           alpha: float, beta: float, gamma: float,
-                           tau: float) -> jnp.ndarray:
+    def _predict_relaxation(
+        self,
+        t: jnp.ndarray,
+        c1: float,
+        c2: float,
+        alpha: float,
+        beta: float,
+        gamma: float,
+        tau: float,
+    ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         Note: Analytical relaxation modulus is complex for FZLL.
@@ -236,13 +259,14 @@ class FractionalZenerLiquidLiquid(BaseModel):
         """
         # Clip fractional orders BEFORE JIT to make them concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
         gamma_safe = float(np.clip(gamma, epsilon, 1.0 - epsilon))
 
         # Compute max/min orders as concrete values
         max_order = max(alpha_safe, gamma_safe)
-        min_order = min(alpha_safe, gamma_safe)
+        min(alpha_safe, gamma_safe)
 
         # JIT-compiled inner function with concrete alpha/gamma
         @jax.jit
@@ -263,9 +287,16 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         return _compute_relaxation(t, c1, c2, tau)
 
-    def _predict_creep(self, t: jnp.ndarray, c1: float, c2: float,
-                      alpha: float, beta: float, gamma: float,
-                      tau: float) -> jnp.ndarray:
+    def _predict_creep(
+        self,
+        t: jnp.ndarray,
+        c1: float,
+        c2: float,
+        alpha: float,
+        beta: float,
+        gamma: float,
+        tau: float,
+    ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
         Note: Analytical creep compliance is complex for FZLL.
@@ -295,6 +326,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         """
         # Clip fractional orders BEFORE JIT to make them concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
         gamma_safe = float(np.clip(gamma, epsilon, 1.0 - epsilon))
@@ -319,7 +351,9 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         return _compute_creep(t, c1, c2, tau)
 
-    def _fit(self, X: jnp.ndarray, y: jnp.ndarray, **kwargs) -> FractionalZenerLiquidLiquid:
+    def _fit(
+        self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
+    ) -> FractionalZenerLiquidLiquid:
         """Fit model to data.
 
         Parameters
@@ -339,23 +373,21 @@ class FractionalZenerLiquidLiquid(BaseModel):
         from rheo.core.parameters import ParameterOptimizer
 
         # Detect test mode
-        test_mode = kwargs.get('test_mode', 'oscillation')
+        test_mode = kwargs.get("test_mode", "oscillation")
 
         # Select prediction function
-        if test_mode == 'relaxation':
+        if test_mode == "relaxation":
             predict_fn = self._predict_relaxation
-        elif test_mode == 'creep':
+        elif test_mode == "creep":
             predict_fn = self._predict_creep
-        elif test_mode == 'oscillation':
+        elif test_mode == "oscillation":
             predict_fn = self._predict_oscillation
         else:
             raise ValueError(f"Test mode '{test_mode}' not supported for FZLL model")
 
         # Set up optimizer
         optimizer = ParameterOptimizer(
-            parameters=self.parameters,
-            predict_fn=predict_fn,
-            loss='mse'
+            parameters=self.parameters, predict_fn=predict_fn, loss="mse"
         )
 
         # Fit parameters
@@ -381,12 +413,12 @@ class FractionalZenerLiquidLiquid(BaseModel):
             Predicted values
         """
         # Get parameter values
-        c1 = self.parameters.get_value('c1')
-        c2 = self.parameters.get_value('c2')
-        alpha = self.parameters.get_value('alpha')
-        beta = self.parameters.get_value('beta')
-        gamma = self.parameters.get_value('gamma')
-        tau = self.parameters.get_value('tau')
+        c1 = self.parameters.get_value("c1")
+        c2 = self.parameters.get_value("c2")
+        alpha = self.parameters.get_value("alpha")
+        beta = self.parameters.get_value("beta")
+        gamma = self.parameters.get_value("gamma")
+        tau = self.parameters.get_value("tau")
 
         # Auto-detect test mode based on input characteristics
         # NOTE: This is a heuristic - explicit test_mode is recommended
@@ -398,4 +430,4 @@ class FractionalZenerLiquidLiquid(BaseModel):
 # Convenience alias
 FZLL = FractionalZenerLiquidLiquid
 
-__all__ = ['FractionalZenerLiquidLiquid', 'FZLL']
+__all__ = ["FractionalZenerLiquidLiquid", "FZLL"]

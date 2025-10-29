@@ -15,9 +15,9 @@ from rheo.transforms.owchirp import OWChirp
 from rheo.transforms.smooth_derivative import SmoothDerivative
 
 __all__ = [
-    'FFTAnalysis',
-    'Mastercurve',
-    'MutationNumber',
-    'OWChirp',
-    'SmoothDerivative',
+    "FFTAnalysis",
+    "Mastercurve",
+    "MutationNumber",
+    "OWChirp",
+    "SmoothDerivative",
 ]

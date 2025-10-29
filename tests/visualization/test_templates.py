@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
-import pytest
-import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for testing
+import numpy as np
+import pytest
+
+matplotlib.use("Agg")  # Non-interactive backend for testing
 import matplotlib.pyplot as plt
 
 from rheo.core.data import RheoData
 from rheo.visualization.templates import (
-    plot_stress_strain,
-    plot_modulus_frequency,
+    apply_template_style,
     plot_mastercurve,
     plot_model_fit,
-    apply_template_style,
+    plot_modulus_frequency,
+    plot_stress_strain,
 )
 
 
@@ -32,15 +33,15 @@ class TestStressStrainTemplate:
             x_units="s",
             y_units="Pa",
             domain="time",
-            metadata={"test_mode": "relaxation"}
+            metadata={"test_mode": "relaxation"},
         )
 
         fig, ax = plot_stress_strain(data)
 
         assert fig is not None
         assert ax is not None
-        assert 'Time' in ax.get_xlabel()
-        assert 'Stress' in ax.get_ylabel()
+        assert "Time" in ax.get_xlabel()
+        assert "Stress" in ax.get_ylabel()
         plt.close(fig)
 
     def test_plot_creep(self):
@@ -54,13 +55,13 @@ class TestStressStrainTemplate:
             x_units="s",
             y_units="unitless",
             domain="time",
-            metadata={"test_mode": "creep"}
+            metadata={"test_mode": "creep"},
         )
 
         fig, ax = plot_stress_strain(data)
 
         assert fig is not None
-        assert 'Time' in ax.get_xlabel()
+        assert "Time" in ax.get_xlabel()
         plt.close(fig)
 
 
@@ -80,7 +81,7 @@ class TestModulusFrequencyTemplate:
             x_units="rad/s",
             y_units="Pa",
             domain="frequency",
-            metadata={"test_mode": "oscillation"}
+            metadata={"test_mode": "oscillation"},
         )
 
         fig, axes = plot_modulus_frequency(data)
@@ -99,11 +100,7 @@ class TestModulusFrequencyTemplate:
         G_complex = G_storage + 1j * G_loss
 
         data = RheoData(
-            x=frequency,
-            y=G_complex,
-            x_units="rad/s",
-            y_units="Pa",
-            domain="frequency"
+            x=frequency, y=G_complex, x_units="rad/s", y_units="Pa", domain="frequency"
         )
 
         fig, ax = plot_modulus_frequency(data, separate_axes=False)
@@ -127,14 +124,14 @@ class TestMastercurveTemplate:
             x_units="rad/s",
             y_units="Pa",
             domain="frequency",
-            metadata={"temperature": 25}
+            metadata={"temperature": 25},
         )
 
         fig, ax = plot_mastercurve([data])
 
         assert fig is not None
         assert ax is not None
-        assert 'Frequency' in ax.get_xlabel()
+        assert "Frequency" in ax.get_xlabel()
         plt.close(fig)
 
     def test_plot_multi_temperature_mastercurve(self):
@@ -143,7 +140,7 @@ class TestMastercurveTemplate:
         for temp in [20, 25, 30, 35, 40]:
             frequency = np.logspace(-2, 2, 50)
             shift = 10 ** ((temp - 25) / 10)
-            G_storage = 1e5 * (frequency * shift)**2 / (1 + (frequency * shift)**2)
+            G_storage = 1e5 * (frequency * shift) ** 2 / (1 + (frequency * shift) ** 2)
 
             data = RheoData(
                 x=frequency,
@@ -151,7 +148,7 @@ class TestMastercurveTemplate:
                 x_units="rad/s",
                 y_units="Pa",
                 domain="frequency",
-                metadata={"temperature": temp}
+                metadata={"temperature": temp},
             )
             datasets.append(data)
 
@@ -172,11 +169,7 @@ class TestModelFitTemplate:
         G_fit = 1e5 * frequency**2 / (1 + frequency**2) * 1.05  # Slight variation
 
         data = RheoData(
-            x=frequency,
-            y=G_data,
-            x_units="rad/s",
-            y_units="Pa",
-            domain="frequency"
+            x=frequency, y=G_data, x_units="rad/s", y_units="Pa", domain="frequency"
         )
 
         fig, axes = plot_model_fit(data, G_fit, show_residuals=True)
@@ -192,11 +185,7 @@ class TestModelFitTemplate:
         G_fit = G_data * 1.02
 
         data = RheoData(
-            x=frequency,
-            y=G_data,
-            x_units="rad/s",
-            y_units="Pa",
-            domain="frequency"
+            x=frequency, y=G_data, x_units="rad/s", y_units="Pa", domain="frequency"
         )
 
         fig, ax = plot_model_fit(data, G_fit, show_residuals=False)
@@ -212,7 +201,7 @@ class TestTemplateStyles:
     def test_apply_default_style(self):
         """Test applying default style."""
         fig, ax = plt.subplots()
-        apply_template_style(ax, style='default')
+        apply_template_style(ax, style="default")
 
         assert fig is not None
         plt.close(fig)
@@ -220,7 +209,7 @@ class TestTemplateStyles:
     def test_apply_publication_style(self):
         """Test applying publication style."""
         fig, ax = plt.subplots()
-        apply_template_style(ax, style='publication')
+        apply_template_style(ax, style="publication")
 
         assert fig is not None
         # Check that font sizes are appropriate for publication
@@ -230,7 +219,7 @@ class TestTemplateStyles:
     def test_apply_presentation_style(self):
         """Test applying presentation style."""
         fig, ax = plt.subplots()
-        apply_template_style(ax, style='presentation')
+        apply_template_style(ax, style="presentation")
 
         assert fig is not None
         # Check that font sizes are larger for presentation
@@ -240,7 +229,7 @@ class TestTemplateStyles:
     def test_invalid_style_fallback(self):
         """Test that invalid style falls back to default."""
         fig, ax = plt.subplots()
-        apply_template_style(ax, style='invalid_style')
+        apply_template_style(ax, style="invalid_style")
 
         assert fig is not None
         plt.close(fig)

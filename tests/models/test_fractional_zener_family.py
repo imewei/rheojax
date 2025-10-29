@@ -17,18 +17,18 @@ Each model is tested for:
 5. JAX operations
 """
 
-import pytest
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
-from rheo.models.fractional_zener_sl import FractionalZenerSolidLiquid, FZSL
-from rheo.models.fractional_zener_ss import FractionalZenerSolidSolid, FZSS
-from rheo.models.fractional_zener_ll import FractionalZenerLiquidLiquid, FZLL
-from rheo.models.fractional_kv_zener import FractionalKelvinVoigtZener, FKVZ
-from rheo.models.fractional_burgers import FractionalBurgersModel, FBM
-from rheo.models.fractional_poynting_thomson import FractionalPoyntingThomson, FPT
-from rheo.models.fractional_jeffreys import FractionalJeffreysModel, FJM
+from rheo.models.fractional_burgers import FBM, FractionalBurgersModel
+from rheo.models.fractional_jeffreys import FJM, FractionalJeffreysModel
+from rheo.models.fractional_kv_zener import FKVZ, FractionalKelvinVoigtZener
+from rheo.models.fractional_poynting_thomson import FPT, FractionalPoyntingThomson
+from rheo.models.fractional_zener_ll import FZLL, FractionalZenerLiquidLiquid
+from rheo.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
+from rheo.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
 
 
 class TestFractionalZenerSolidLiquid:
@@ -40,14 +40,14 @@ class TestFractionalZenerSolidLiquid:
 
     @pytest.fixture
     def params(self):
-        return {'Ge': 1000.0, 'c_alpha': 500.0, 'alpha': 0.5, 'tau': 1.0}
+        return {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.5, "tau": 1.0}
 
     def test_initialization(self, model):
         """Test parameter initialization."""
-        assert 'Ge' in model.parameters
-        assert 'c_alpha' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'tau' in model.parameters
+        assert "Ge" in model.parameters
+        assert "c_alpha" in model.parameters
+        assert "alpha" in model.parameters
+        assert "tau" in model.parameters
 
     def test_relaxation(self, model, params):
         """Test relaxation modulus."""
@@ -66,8 +66,8 @@ class TestFractionalZenerSolidLiquid:
 
     def test_alpha_limits(self, model):
         """Test alpha limit cases."""
-        params_low = {'Ge': 1000.0, 'c_alpha': 500.0, 'alpha': 0.01, 'tau': 1.0}
-        params_high = {'Ge': 1000.0, 'c_alpha': 500.0, 'alpha': 0.99, 'tau': 1.0}
+        params_low = {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.01, "tau": 1.0}
+        params_high = {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.99, "tau": 1.0}
         t = jnp.logspace(-2, 2, 10)
 
         G_low = model._predict_relaxation(t, **params_low)
@@ -86,14 +86,14 @@ class TestFractionalZenerSolidSolid:
 
     @pytest.fixture
     def params(self):
-        return {'Ge': 1000.0, 'Gm': 500.0, 'alpha': 0.5, 'tau_alpha': 1.0}
+        return {"Ge": 1000.0, "Gm": 500.0, "alpha": 0.5, "tau_alpha": 1.0}
 
     def test_initialization(self, model):
         """Test parameter initialization."""
-        assert 'Ge' in model.parameters
-        assert 'Gm' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'tau_alpha' in model.parameters
+        assert "Ge" in model.parameters
+        assert "Gm" in model.parameters
+        assert "alpha" in model.parameters
+        assert "tau_alpha" in model.parameters
 
     def test_relaxation(self, model, params):
         """Test relaxation modulus."""
@@ -103,7 +103,7 @@ class TestFractionalZenerSolidSolid:
         assert jnp.all(G_t > 0)
 
         # Should approach G_e at long times
-        assert jnp.allclose(G_t[-1], params['Ge'], rtol=0.2)
+        assert jnp.allclose(G_t[-1], params["Ge"], rtol=0.2)
 
     def test_creep(self, model, params):
         """Test creep compliance."""
@@ -113,7 +113,7 @@ class TestFractionalZenerSolidSolid:
         assert jnp.all(J_t > 0)
 
         # Should approach 1/Ge at long times
-        expected_J = 1.0 / params['Ge']
+        expected_J = 1.0 / params["Ge"]
         assert jnp.allclose(J_t[-1], expected_J, rtol=0.3)
 
     def test_oscillation(self, model, params):
@@ -135,19 +135,22 @@ class TestFractionalZenerLiquidLiquid:
     @pytest.fixture
     def params(self):
         return {
-            'c1': 500.0, 'c2': 100.0,
-            'alpha': 0.5, 'beta': 0.3, 'gamma': 0.7,
-            'tau': 1.0
+            "c1": 500.0,
+            "c2": 100.0,
+            "alpha": 0.5,
+            "beta": 0.3,
+            "gamma": 0.7,
+            "tau": 1.0,
         }
 
     def test_initialization(self, model):
         """Test parameter initialization."""
-        assert 'c1' in model.parameters
-        assert 'c2' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'beta' in model.parameters
-        assert 'gamma' in model.parameters
-        assert 'tau' in model.parameters
+        assert "c1" in model.parameters
+        assert "c2" in model.parameters
+        assert "alpha" in model.parameters
+        assert "beta" in model.parameters
+        assert "gamma" in model.parameters
+        assert "tau" in model.parameters
 
     def test_oscillation(self, model, params):
         """Test complex modulus (primary mode for FZLL)."""
@@ -159,9 +162,12 @@ class TestFractionalZenerLiquidLiquid:
     def test_multiple_fractional_orders(self, model):
         """Test model with three different fractional orders."""
         params = {
-            'c1': 500.0, 'c2': 100.0,
-            'alpha': 0.3, 'beta': 0.5, 'gamma': 0.7,
-            'tau': 1.0
+            "c1": 500.0,
+            "c2": 100.0,
+            "alpha": 0.3,
+            "beta": 0.5,
+            "gamma": 0.7,
+            "tau": 1.0,
         }
         omega = jnp.logspace(-2, 2, 20)
         G_star = model._predict_oscillation(omega, **params)
@@ -180,14 +186,14 @@ class TestFractionalKelvinVoigtZener:
 
     @pytest.fixture
     def params(self):
-        return {'Ge': 1000.0, 'Gk': 500.0, 'alpha': 0.5, 'tau': 1.0}
+        return {"Ge": 1000.0, "Gk": 500.0, "alpha": 0.5, "tau": 1.0}
 
     def test_initialization(self, model):
         """Test parameter initialization."""
-        assert 'Ge' in model.parameters
-        assert 'Gk' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'tau' in model.parameters
+        assert "Ge" in model.parameters
+        assert "Gk" in model.parameters
+        assert "alpha" in model.parameters
+        assert "tau" in model.parameters
 
     def test_creep(self, model, params):
         """Test creep compliance (primary mode)."""
@@ -223,18 +229,15 @@ class TestFractionalBurgersModel:
 
     @pytest.fixture
     def params(self):
-        return {
-            'Jg': 1e-6, 'eta1': 1000.0,
-            'Jk': 5e-6, 'alpha': 0.5, 'tau_k': 1.0
-        }
+        return {"Jg": 1e-6, "eta1": 1000.0, "Jk": 5e-6, "alpha": 0.5, "tau_k": 1.0}
 
     def test_initialization(self, model):
         """Test parameter initialization."""
-        assert 'Jg' in model.parameters
-        assert 'eta1' in model.parameters
-        assert 'Jk' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'tau_k' in model.parameters
+        assert "Jg" in model.parameters
+        assert "eta1" in model.parameters
+        assert "Jk" in model.parameters
+        assert "alpha" in model.parameters
+        assert "tau_k" in model.parameters
 
     def test_creep(self, model, params):
         """Test creep compliance with viscous flow."""
@@ -272,14 +275,14 @@ class TestFractionalPoyntingThomson:
 
     @pytest.fixture
     def params(self):
-        return {'Ge': 1500.0, 'Gk': 500.0, 'alpha': 0.5, 'tau': 1.0}
+        return {"Ge": 1500.0, "Gk": 500.0, "alpha": 0.5, "tau": 1.0}
 
     def test_initialization(self, model):
         """Test parameter initialization."""
-        assert 'Ge' in model.parameters
-        assert 'Gk' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'tau' in model.parameters
+        assert "Ge" in model.parameters
+        assert "Gk" in model.parameters
+        assert "alpha" in model.parameters
+        assert "tau" in model.parameters
 
     def test_creep(self, model, params):
         """Test creep compliance."""
@@ -300,9 +303,10 @@ class TestFractionalPoyntingThomson:
 
     def test_similarity_to_fkvz(self, model):
         """Test that FPT and FKVZ have identical mathematical forms."""
-        params_fpt = {'Ge': 1000.0, 'Gk': 500.0, 'alpha': 0.5, 'tau': 1.0}
+        params_fpt = {"Ge": 1000.0, "Gk": 500.0, "alpha": 0.5, "tau": 1.0}
 
         from rheo.models.fractional_kv_zener import FractionalKelvinVoigtZener
+
         fkvz = FractionalKelvinVoigtZener()
 
         t = jnp.logspace(-2, 2, 20)
@@ -322,14 +326,14 @@ class TestFractionalJeffreysModel:
 
     @pytest.fixture
     def params(self):
-        return {'eta1': 1000.0, 'eta2': 500.0, 'alpha': 0.5, 'tau1': 1.0}
+        return {"eta1": 1000.0, "eta2": 500.0, "alpha": 0.5, "tau1": 1.0}
 
     def test_initialization(self, model):
         """Test parameter initialization."""
-        assert 'eta1' in model.parameters
-        assert 'eta2' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'tau1' in model.parameters
+        assert "eta1" in model.parameters
+        assert "eta2" in model.parameters
+        assert "alpha" in model.parameters
+        assert "tau1" in model.parameters
 
     def test_relaxation(self, model, params):
         """Test relaxation modulus."""
@@ -373,46 +377,50 @@ class TestJAXOperations:
             FractionalKelvinVoigtZener(),
             FractionalBurgersModel(),
             FractionalPoyntingThomson(),
-            FractionalJeffreysModel()
+            FractionalJeffreysModel(),
         ]
 
     def test_jit_compilation(self, models):
         """Test JIT compilation for all models."""
         for model in models:
             # Skip models without simple relaxation
-            if hasattr(model, '_predict_relaxation'):
+            if hasattr(model, "_predict_relaxation"):
                 params = model.parameters.to_dict()
                 # Set some default values
                 for key in params:
-                    if 'eta' in key or 'J' in key:
+                    if "eta" in key or "J" in key:
                         params[key] = 1000.0
-                    elif 'alpha' in key or 'beta' in key or 'gamma' in key:
+                    elif "alpha" in key or "beta" in key or "gamma" in key:
                         params[key] = 0.5
-                    elif 'tau' in key or 'c' in key or 'G' in key:
+                    elif "tau" in key or "c" in key or "G" in key:
                         params[key] = 1.0
 
                 t = jnp.array([0.1, 1.0, 10.0])
 
                 # Should compile without error
                 try:
-                    predict_jit = jax.jit(lambda t: model._predict_relaxation(t, **params))
+                    predict_jit = jax.jit(
+                        lambda t: model._predict_relaxation(t, **params)
+                    )
                     result = predict_jit(t)
                     assert jnp.all(jnp.isfinite(result))
                 except Exception as e:
-                    pytest.skip(f"JIT compilation failed for {model.__class__.__name__}: {e}")
+                    pytest.skip(
+                        f"JIT compilation failed for {model.__class__.__name__}: {e}"
+                    )
 
     def test_numerical_stability(self, models):
         """Test numerical stability for all models."""
         for model in models:
-            if hasattr(model, '_predict_oscillation'):
+            if hasattr(model, "_predict_oscillation"):
                 params = model.parameters.to_dict()
                 # Set default values
                 for key in params:
-                    if 'eta' in key or 'J' in key:
+                    if "eta" in key or "J" in key:
                         params[key] = 1000.0
-                    elif 'alpha' in key or 'beta' in key or 'gamma' in key:
+                    elif "alpha" in key or "beta" in key or "gamma" in key:
                         params[key] = 0.5
-                    elif 'tau' in key or 'c' in key or 'G' in key:
+                    elif "tau" in key or "c" in key or "G" in key:
                         params[key] = 1.0
 
                 omega = jnp.logspace(-3, 3, 20)
@@ -422,7 +430,9 @@ class TestJAXOperations:
                     assert jnp.all(jnp.isfinite(G_star))
                     assert G_star.shape == (20, 2)
                 except Exception as e:
-                    pytest.skip(f"Oscillation test failed for {model.__class__.__name__}: {e}")
+                    pytest.skip(
+                        f"Oscillation test failed for {model.__class__.__name__}: {e}"
+                    )
 
 
 class TestAliases:

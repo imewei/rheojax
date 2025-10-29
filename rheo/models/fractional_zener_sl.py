@@ -41,17 +41,18 @@ References
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-from jax.scipy.special import gamma as jax_gamma
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
 from rheo.utils.mittag_leffler import mittag_leffler_e2
 
 
-@ModelRegistry.register('fractional_zener_sl')
+@ModelRegistry.register("fractional_zener_sl")
 class FractionalZenerSolidLiquid(BaseModel):
     """Fractional Zener Solid-Liquid model.
 
@@ -92,36 +93,37 @@ class FractionalZenerSolidLiquid(BaseModel):
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='Ge',
+            name="Ge",
             value=None,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='Equilibrium modulus'
+            units="Pa",
+            description="Equilibrium modulus",
         )
         self.parameters.add(
-            name='c_alpha',
+            name="c_alpha",
             value=None,
             bounds=(1e-3, 1e9),
-            units='Pa·s^α',
-            description='SpringPot constant'
+            units="Pa·s^α",
+            description="SpringPot constant",
         )
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=None,
             bounds=(0.0, 1.0),
-            units='',
-            description='Fractional order'
+            units="",
+            description="Fractional order",
         )
         self.parameters.add(
-            name='tau',
+            name="tau",
             value=None,
             bounds=(1e-6, 1e6),
-            units='s',
-            description='Relaxation time'
+            units="s",
+            description="Relaxation time",
         )
 
-    def _predict_relaxation(self, t: jnp.ndarray, Ge: float, c_alpha: float,
-                           alpha: float, tau: float) -> jnp.ndarray:
+    def _predict_relaxation(
+        self, t: jnp.ndarray, Ge: float, c_alpha: float, alpha: float, tau: float
+    ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         G(t) = G_e + c_α * t^(-α) * E_{1-α,1}(-(t/τ)^(1-α))
@@ -146,6 +148,7 @@ class FractionalZenerSolidLiquid(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -172,8 +175,9 @@ class FractionalZenerSolidLiquid(BaseModel):
 
         return _compute_relaxation(t, Ge, c_alpha, tau)
 
-    def _predict_creep(self, t: jnp.ndarray, Ge: float, c_alpha: float,
-                      alpha: float, tau: float) -> jnp.ndarray:
+    def _predict_creep(
+        self, t: jnp.ndarray, Ge: float, c_alpha: float, alpha: float, tau: float
+    ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
         Note: Analytical creep compliance for FZSL is complex.
@@ -199,6 +203,7 @@ class FractionalZenerSolidLiquid(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -229,8 +234,9 @@ class FractionalZenerSolidLiquid(BaseModel):
 
         return _compute_creep(t, Ge, c_alpha, tau)
 
-    def _predict_oscillation(self, omega: jnp.ndarray, Ge: float, c_alpha: float,
-                            alpha: float, tau: float) -> jnp.ndarray:
+    def _predict_oscillation(
+        self, omega: jnp.ndarray, Ge: float, c_alpha: float, alpha: float, tau: float
+    ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
         G*(ω) = G_e + c_α * (iω)^α / (1 + (iωτ)^(1-α))
@@ -257,6 +263,7 @@ class FractionalZenerSolidLiquid(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
         beta_safe = 1.0 - alpha_safe
@@ -270,13 +277,17 @@ class FractionalZenerSolidLiquid(BaseModel):
             # Compute (iω)^α = ω^α * exp(i*π*α/2)
             omega_alpha = jnp.power(omega_safe, alpha_safe)
             phase_alpha = jnp.pi * alpha_safe / 2.0
-            i_omega_alpha = omega_alpha * (jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha))
+            i_omega_alpha = omega_alpha * (
+                jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
+            )
 
             # Compute (iωτ)^(1-α) = |ωτ|^(1-α) * exp(i*(1-α)*π/2)
             omega_tau = omega_safe * tau_safe
             omega_tau_beta = jnp.power(omega_tau, beta_safe)
             phase_beta = jnp.pi * beta_safe / 2.0
-            i_omega_tau_beta = omega_tau_beta * (jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta))
+            i_omega_tau_beta = omega_tau_beta * (
+                jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta)
+            )
 
             # Denominator: 1 + (iωτ)^(1-α)
             denominator = 1.0 + i_omega_tau_beta
@@ -295,7 +306,9 @@ class FractionalZenerSolidLiquid(BaseModel):
 
         return _compute_oscillation(omega, Ge, c_alpha, tau)
 
-    def _fit(self, X: jnp.ndarray, y: jnp.ndarray, **kwargs) -> FractionalZenerSolidLiquid:
+    def _fit(
+        self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
+    ) -> FractionalZenerSolidLiquid:
         """Fit model to data.
 
         Parameters
@@ -315,23 +328,21 @@ class FractionalZenerSolidLiquid(BaseModel):
         from rheo.core.parameters import ParameterOptimizer
 
         # Detect test mode if not provided
-        test_mode = kwargs.get('test_mode', 'relaxation')
+        test_mode = kwargs.get("test_mode", "relaxation")
 
         # Select prediction function based on test mode
-        if test_mode == 'relaxation':
+        if test_mode == "relaxation":
             predict_fn = self._predict_relaxation
-        elif test_mode == 'creep':
+        elif test_mode == "creep":
             predict_fn = self._predict_creep
-        elif test_mode == 'oscillation':
+        elif test_mode == "oscillation":
             predict_fn = self._predict_oscillation
         else:
             raise ValueError(f"Test mode '{test_mode}' not supported for FZSL model")
 
         # Set up optimizer
         optimizer = ParameterOptimizer(
-            parameters=self.parameters,
-            predict_fn=predict_fn,
-            loss='mse'
+            parameters=self.parameters, predict_fn=predict_fn, loss="mse"
         )
 
         # Fit parameters
@@ -357,10 +368,10 @@ class FractionalZenerSolidLiquid(BaseModel):
             Predicted values
         """
         # Get parameter values
-        Ge = self.parameters.get_value('Ge')
-        c_alpha = self.parameters.get_value('c_alpha')
-        alpha = self.parameters.get_value('alpha')
-        tau = self.parameters.get_value('tau')
+        Ge = self.parameters.get_value("Ge")
+        c_alpha = self.parameters.get_value("c_alpha")
+        alpha = self.parameters.get_value("alpha")
+        tau = self.parameters.get_value("tau")
 
         # Auto-detect test mode based on input characteristics
         # NOTE: This is a heuristic - explicit test_mode is recommended
@@ -372,4 +383,4 @@ class FractionalZenerSolidLiquid(BaseModel):
 # Convenience alias
 FZSL = FractionalZenerSolidLiquid
 
-__all__ = ['FractionalZenerSolidLiquid', 'FZSL']
+__all__ = ["FractionalZenerSolidLiquid", "FZSL"]

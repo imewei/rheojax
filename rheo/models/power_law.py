@@ -17,20 +17,21 @@ References:
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
 
-import jax
-import jax.numpy as jnp
+jax, jnp = safe_import_jax()
+
+from functools import partial
+
 import numpy as np
 
-from rheo.core.base import BaseModel, Parameter, ParameterSet
+from rheo.core.base import BaseModel, ParameterSet
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
 from rheo.core.test_modes import TestMode, detect_test_mode
 
 
-@ModelRegistry.register('power_law')
+@ModelRegistry.register("power_law")
 class PowerLaw(BaseModel):
     """Power Law model for non-Newtonian flow (ROTATION only).
 
@@ -60,18 +61,18 @@ class PowerLaw(BaseModel):
         super().__init__()
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='K',
+            name="K",
             value=1.0,
             bounds=(1e-6, 1e6),
-            units='Pa·s^n',
-            description='Consistency index'
+            units="Pa·s^n",
+            description="Consistency index",
         )
         self.parameters.add(
-            name='n',
+            name="n",
             value=0.5,
             bounds=(0.01, 2.0),
-            units='dimensionless',
-            description='Flow behavior index'
+            units="dimensionless",
+            description="Flow behavior index",
         )
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> PowerLaw:
@@ -105,8 +106,8 @@ class PowerLaw(BaseModel):
         n_fit = np.clip(n_fit, 0.01, 2.0)
         K_fit = np.clip(K_fit, 1e-6, 1e6)
 
-        self.parameters.set_value('K', float(K_fit))
-        self.parameters.set_value('n', float(n_fit))
+        self.parameters.set_value("K", float(K_fit))
+        self.parameters.set_value("n", float(n_fit))
 
         return self
 
@@ -119,8 +120,8 @@ class PowerLaw(BaseModel):
         Returns:
             Predicted viscosity η(γ̇) = K |γ̇|^(n-1)
         """
-        K = self.parameters.get_value('K')
-        n = self.parameters.get_value('n')
+        K = self.parameters.get_value("K")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX for computation
         gamma_dot = jnp.array(X)
@@ -133,10 +134,7 @@ class PowerLaw(BaseModel):
 
     @partial(jax.jit, static_argnums=(0,))
     def _predict_viscosity(
-        self,
-        gamma_dot: jnp.ndarray,
-        K: float,
-        n: float
+        self, gamma_dot: jnp.ndarray, K: float, n: float
     ) -> jnp.ndarray:
         """Compute viscosity: η(γ̇) = K |γ̇|^(n-1).
 
@@ -152,10 +150,7 @@ class PowerLaw(BaseModel):
 
     @partial(jax.jit, static_argnums=(0,))
     def _predict_stress(
-        self,
-        gamma_dot: jnp.ndarray,
-        K: float,
-        n: float
+        self, gamma_dot: jnp.ndarray, K: float, n: float
     ) -> jnp.ndarray:
         """Compute shear stress: σ(γ̇) = K |γ̇|^n.
 
@@ -178,8 +173,8 @@ class PowerLaw(BaseModel):
         Returns:
             Predicted shear stress σ(γ̇) = K |γ̇|^n
         """
-        K = self.parameters.get_value('K')
-        n = self.parameters.get_value('n')
+        K = self.parameters.get_value("K")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX for computation
         gamma_dot_jax = jnp.array(gamma_dot)
@@ -193,8 +188,8 @@ class PowerLaw(BaseModel):
     def predict_rheo(
         self,
         rheo_data: RheoData,
-        test_mode: Optional[TestMode] = None,
-        output: str = 'viscosity'
+        test_mode: TestMode | None = None,
+        output: str = "viscosity",
     ) -> RheoData:
         """Predict rheological response for RheoData.
 
@@ -223,21 +218,23 @@ class PowerLaw(BaseModel):
         gamma_dot = rheo_data.x
 
         # Get parameters
-        K = self.parameters.get_value('K')
-        n = self.parameters.get_value('n')
+        K = self.parameters.get_value("K")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX
         gamma_dot_jax = jnp.array(gamma_dot)
 
         # Compute prediction based on output type
-        if output == 'viscosity':
+        if output == "viscosity":
             y_pred = self._predict_viscosity(gamma_dot_jax, K, n)
-            y_units = 'Pa·s'
-        elif output == 'stress':
+            y_units = "Pa·s"
+        elif output == "stress":
             y_pred = self._predict_stress(gamma_dot_jax, K, n)
-            y_units = 'Pa'
+            y_units = "Pa"
         else:
-            raise ValueError(f"Invalid output type: {output}. Must be 'viscosity' or 'stress'")
+            raise ValueError(
+                f"Invalid output type: {output}. Must be 'viscosity' or 'stress'"
+            )
 
         # Convert back to numpy
         y_pred = np.array(y_pred)
@@ -246,24 +243,24 @@ class PowerLaw(BaseModel):
         return RheoData(
             x=np.array(gamma_dot),
             y=y_pred,
-            x_units=rheo_data.x_units or '1/s',
+            x_units=rheo_data.x_units or "1/s",
             y_units=y_units,
-            domain='time',
+            domain="time",
             metadata={
-                'model': 'PowerLaw',
-                'test_mode': TestMode.ROTATION,
-                'output': output,
-                'K': K,
-                'n': n
+                "model": "PowerLaw",
+                "test_mode": TestMode.ROTATION,
+                "output": output,
+                "K": K,
+                "n": n,
             },
-            validate=False
+            validate=False,
         )
 
     def __repr__(self) -> str:
         """String representation."""
-        K = self.parameters.get_value('K')
-        n = self.parameters.get_value('n')
+        K = self.parameters.get_value("K")
+        n = self.parameters.get_value("n")
         return f"PowerLaw(K={K:.3e}, n={n:.3f})"
 
 
-__all__ = ['PowerLaw']
+__all__ = ["PowerLaw"]

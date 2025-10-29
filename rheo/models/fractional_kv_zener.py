@@ -41,16 +41,18 @@ References
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
 from rheo.utils.mittag_leffler import mittag_leffler_e
 
 
-@ModelRegistry.register('fractional_kv_zener')
+@ModelRegistry.register("fractional_kv_zener")
 class FractionalKelvinVoigtZener(BaseModel):
     """Fractional Kelvin-Voigt Zener model.
 
@@ -87,36 +89,37 @@ class FractionalKelvinVoigtZener(BaseModel):
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='Ge',
+            name="Ge",
             value=None,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='Series spring modulus'
+            units="Pa",
+            description="Series spring modulus",
         )
         self.parameters.add(
-            name='Gk',
+            name="Gk",
             value=None,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='KV element modulus'
+            units="Pa",
+            description="KV element modulus",
         )
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=None,
             bounds=(0.0, 1.0),
-            units='',
-            description='Fractional order'
+            units="",
+            description="Fractional order",
         )
         self.parameters.add(
-            name='tau',
+            name="tau",
             value=None,
             bounds=(1e-6, 1e6),
-            units='s',
-            description='Retardation time'
+            units="s",
+            description="Retardation time",
         )
 
-    def _predict_creep(self, t: jnp.ndarray, Ge: float, Gk: float,
-                      alpha: float, tau: float) -> jnp.ndarray:
+    def _predict_creep(
+        self, t: jnp.ndarray, Ge: float, Gk: float, alpha: float, tau: float
+    ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
         J(t) = 1/G_e + (1/G_k) * (1 - E_α(-(t/τ)^α))
@@ -141,6 +144,7 @@ class FractionalKelvinVoigtZener(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -168,8 +172,9 @@ class FractionalKelvinVoigtZener(BaseModel):
 
         return _compute_creep(t, Ge, Gk, tau)
 
-    def _predict_relaxation(self, t: jnp.ndarray, Ge: float, Gk: float,
-                           alpha: float, tau: float) -> jnp.ndarray:
+    def _predict_relaxation(
+        self, t: jnp.ndarray, Ge: float, Gk: float, alpha: float, tau: float
+    ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         Note: Analytical relaxation modulus requires numerical inversion.
@@ -195,6 +200,7 @@ class FractionalKelvinVoigtZener(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -220,8 +226,9 @@ class FractionalKelvinVoigtZener(BaseModel):
 
         return _compute_relaxation(t, Ge, Gk, tau)
 
-    def _predict_oscillation(self, omega: jnp.ndarray, Ge: float, Gk: float,
-                            alpha: float, tau: float) -> jnp.ndarray:
+    def _predict_oscillation(
+        self, omega: jnp.ndarray, Ge: float, Gk: float, alpha: float, tau: float
+    ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
         Convert from complex compliance:
@@ -248,6 +255,7 @@ class FractionalKelvinVoigtZener(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -278,7 +286,9 @@ class FractionalKelvinVoigtZener(BaseModel):
 
         return _compute_oscillation(omega, Ge, Gk, tau)
 
-    def _fit(self, X: jnp.ndarray, y: jnp.ndarray, **kwargs) -> FractionalKelvinVoigtZener:
+    def _fit(
+        self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
+    ) -> FractionalKelvinVoigtZener:
         """Fit model to data.
 
         Parameters
@@ -298,23 +308,21 @@ class FractionalKelvinVoigtZener(BaseModel):
         from rheo.core.parameters import ParameterOptimizer
 
         # Detect test mode
-        test_mode = kwargs.get('test_mode', 'creep')
+        test_mode = kwargs.get("test_mode", "creep")
 
         # Select prediction function
-        if test_mode == 'relaxation':
+        if test_mode == "relaxation":
             predict_fn = self._predict_relaxation
-        elif test_mode == 'creep':
+        elif test_mode == "creep":
             predict_fn = self._predict_creep
-        elif test_mode == 'oscillation':
+        elif test_mode == "oscillation":
             predict_fn = self._predict_oscillation
         else:
             raise ValueError(f"Test mode '{test_mode}' not supported for FKVZ model")
 
         # Set up optimizer
         optimizer = ParameterOptimizer(
-            parameters=self.parameters,
-            predict_fn=predict_fn,
-            loss='mse'
+            parameters=self.parameters, predict_fn=predict_fn, loss="mse"
         )
 
         # Fit parameters
@@ -341,10 +349,10 @@ class FractionalKelvinVoigtZener(BaseModel):
         """
         # Get parameters
         params = self.parameters.to_dict()
-        Ge = params['Ge']
-        Gk = params['Gk']
-        alpha = params['alpha']
-        tau = params['tau']
+        Ge = params["Ge"]
+        Gk = params["Gk"]
+        alpha = params["alpha"]
+        tau = params["tau"]
 
         # Auto-detect test mode
         if jnp.all(X > 0) and len(X) > 1:
@@ -359,4 +367,4 @@ class FractionalKelvinVoigtZener(BaseModel):
 # Convenience alias
 FKVZ = FractionalKelvinVoigtZener
 
-__all__ = ['FractionalKelvinVoigtZener', 'FKVZ']
+__all__ = ["FractionalKelvinVoigtZener", "FKVZ"]

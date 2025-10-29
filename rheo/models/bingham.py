@@ -18,20 +18,21 @@ References:
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
 
-import jax
-import jax.numpy as jnp
+jax, jnp = safe_import_jax()
+
+from functools import partial
+
 import numpy as np
 
-from rheo.core.base import BaseModel, Parameter, ParameterSet
+from rheo.core.base import BaseModel, ParameterSet
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
 from rheo.core.test_modes import TestMode, detect_test_mode
 
 
-@ModelRegistry.register('bingham')
+@ModelRegistry.register("bingham")
 class Bingham(BaseModel):
     """Bingham model for linear viscoplastic flow (ROTATION only).
 
@@ -61,18 +62,18 @@ class Bingham(BaseModel):
         super().__init__()
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='sigma_y',
+            name="sigma_y",
             value=10.0,
             bounds=(0.0, 1e6),
-            units='Pa',
-            description='Yield stress'
+            units="Pa",
+            description="Yield stress",
         )
         self.parameters.add(
-            name='eta_p',
+            name="eta_p",
             value=0.1,
             bounds=(1e-6, 1e12),
-            units='Pa·s',
-            description='Plastic viscosity'
+            units="Pa·s",
+            description="Plastic viscosity",
         )
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> Bingham:
@@ -113,8 +114,8 @@ class Bingham(BaseModel):
         sigma_y_est = np.clip(sigma_y_est, 0.0, 1e6)
         eta_p_est = np.clip(eta_p_est, 1e-6, 1e12)
 
-        self.parameters.set_value('sigma_y', float(sigma_y_est))
-        self.parameters.set_value('eta_p', float(eta_p_est))
+        self.parameters.set_value("sigma_y", float(sigma_y_est))
+        self.parameters.set_value("eta_p", float(eta_p_est))
 
         return self
 
@@ -127,8 +128,8 @@ class Bingham(BaseModel):
         Returns:
             Predicted stress σ(γ̇)
         """
-        sigma_y = self.parameters.get_value('sigma_y')
-        eta_p = self.parameters.get_value('eta_p')
+        sigma_y = self.parameters.get_value("sigma_y")
+        eta_p = self.parameters.get_value("eta_p")
 
         # Convert to JAX for computation
         gamma_dot = jnp.array(X)
@@ -145,7 +146,7 @@ class Bingham(BaseModel):
         gamma_dot: jnp.ndarray,
         sigma_y: float,
         eta_p: float,
-        threshold: float = 1e-9
+        threshold: float = 1e-9,
     ) -> jnp.ndarray:
         """Compute shear stress using Bingham model.
 
@@ -174,7 +175,7 @@ class Bingham(BaseModel):
         gamma_dot: jnp.ndarray,
         sigma_y: float,
         eta_p: float,
-        threshold: float = 1e-9
+        threshold: float = 1e-9,
     ) -> jnp.ndarray:
         """Compute apparent viscosity using Bingham model.
 
@@ -205,8 +206,8 @@ class Bingham(BaseModel):
         Returns:
             Predicted apparent viscosity η_app(γ̇)
         """
-        sigma_y = self.parameters.get_value('sigma_y')
-        eta_p = self.parameters.get_value('eta_p')
+        sigma_y = self.parameters.get_value("sigma_y")
+        eta_p = self.parameters.get_value("eta_p")
 
         # Convert to JAX for computation
         gamma_dot_jax = jnp.array(gamma_dot)
@@ -220,8 +221,8 @@ class Bingham(BaseModel):
     def predict_rheo(
         self,
         rheo_data: RheoData,
-        test_mode: Optional[TestMode] = None,
-        output: str = 'stress'
+        test_mode: TestMode | None = None,
+        output: str = "stress",
     ) -> RheoData:
         """Predict rheological response for RheoData.
 
@@ -250,21 +251,23 @@ class Bingham(BaseModel):
         gamma_dot = rheo_data.x
 
         # Get parameters
-        sigma_y = self.parameters.get_value('sigma_y')
-        eta_p = self.parameters.get_value('eta_p')
+        sigma_y = self.parameters.get_value("sigma_y")
+        eta_p = self.parameters.get_value("eta_p")
 
         # Convert to JAX
         gamma_dot_jax = jnp.array(gamma_dot)
 
         # Compute prediction based on output type
-        if output == 'stress':
+        if output == "stress":
             y_pred = self._predict_stress(gamma_dot_jax, sigma_y, eta_p)
-            y_units = 'Pa'
-        elif output == 'viscosity':
+            y_units = "Pa"
+        elif output == "viscosity":
             y_pred = self._predict_viscosity(gamma_dot_jax, sigma_y, eta_p)
-            y_units = 'Pa·s'
+            y_units = "Pa·s"
         else:
-            raise ValueError(f"Invalid output type: {output}. Must be 'stress' or 'viscosity'")
+            raise ValueError(
+                f"Invalid output type: {output}. Must be 'stress' or 'viscosity'"
+            )
 
         # Convert back to numpy
         y_pred = np.array(y_pred)
@@ -273,24 +276,24 @@ class Bingham(BaseModel):
         return RheoData(
             x=np.array(gamma_dot),
             y=y_pred,
-            x_units=rheo_data.x_units or '1/s',
+            x_units=rheo_data.x_units or "1/s",
             y_units=y_units,
-            domain='time',
+            domain="time",
             metadata={
-                'model': 'Bingham',
-                'test_mode': TestMode.ROTATION,
-                'output': output,
-                'sigma_y': sigma_y,
-                'eta_p': eta_p
+                "model": "Bingham",
+                "test_mode": TestMode.ROTATION,
+                "output": output,
+                "sigma_y": sigma_y,
+                "eta_p": eta_p,
             },
-            validate=False
+            validate=False,
         )
 
     def __repr__(self) -> str:
         """String representation."""
-        sigma_y = self.parameters.get_value('sigma_y')
-        eta_p = self.parameters.get_value('eta_p')
+        sigma_y = self.parameters.get_value("sigma_y")
+        eta_p = self.parameters.get_value("eta_p")
         return f"Bingham(sigma_y={sigma_y:.3e}, eta_p={eta_p:.3e})"
 
 
-__all__ = ['Bingham']
+__all__ = ["Bingham"]

@@ -1,8 +1,8 @@
 """Tests for Mastercurve transform (Time-Temperature Superposition)."""
 
-import pytest
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.data import RheoData
 from rheo.transforms.mastercurve import Mastercurve
@@ -15,19 +15,15 @@ class TestMastercurve:
         """Test basic mastercurve initialization."""
         mc = Mastercurve()
         assert mc.T_ref == 298.15
-        assert mc.method == 'wlf'
+        assert mc.method == "wlf"
         assert mc.C1 == 17.44
         assert mc.C2 == 51.6
 
     def test_custom_initialization(self):
         """Test mastercurve with custom parameters."""
-        mc = Mastercurve(
-            reference_temp=273.15,
-            method='arrhenius',
-            E_a=50000
-        )
+        mc = Mastercurve(reference_temp=273.15, method="arrhenius", E_a=50000)
         assert mc.T_ref == 273.15
-        assert mc.method == 'arrhenius'
+        assert mc.method == "arrhenius"
         assert mc.E_a == 50000
 
     def test_wlf_shift_factor(self):
@@ -48,11 +44,7 @@ class TestMastercurve:
 
     def test_arrhenius_shift_factor(self):
         """Test Arrhenius shift factor calculation."""
-        mc = Mastercurve(
-            reference_temp=298.15,
-            method='arrhenius',
-            E_a=50000  # J/mol
-        )
+        mc = Mastercurve(reference_temp=298.15, method="arrhenius", E_a=50000)  # J/mol
 
         # At reference temperature
         a_T = mc.get_shift_factor(298.15)
@@ -73,10 +65,7 @@ class TestMastercurve:
         G_prime = 1000 * freq  # Simplified modulus
 
         data = RheoData(
-            x=freq,
-            y=G_prime,
-            domain='frequency',
-            metadata={'temperature': 323.15}
+            x=freq, y=G_prime, domain="frequency", metadata={"temperature": 323.15}
         )
 
         # Shift to reference temperature
@@ -87,7 +76,7 @@ class TestMastercurve:
         assert not np.array_equal(shifted.x, data.x)
 
         # Shift factor should be in metadata
-        assert 'horizontal_shift' in shifted.metadata
+        assert "horizontal_shift" in shifted.metadata
 
     def test_multi_temperature_mastercurve(self):
         """Test creating mastercurve from multiple temperatures."""
@@ -101,10 +90,7 @@ class TestMastercurve:
             G_prime = 1000 * freq * (T / 298.15)
 
             data = RheoData(
-                x=freq,
-                y=G_prime,
-                domain='frequency',
-                metadata={'temperature': T}
+                x=freq, y=G_prime, domain="frequency", metadata={"temperature": T}
             )
             datasets.append(data)
 
@@ -119,8 +105,8 @@ class TestMastercurve:
         assert np.all(np.diff(mastercurve.x) >= 0)
 
         # Metadata should track temperatures
-        assert 'temperatures' in mastercurve.metadata
-        assert len(mastercurve.metadata['temperatures']) == len(temps)
+        assert "temperatures" in mastercurve.metadata
+        assert len(mastercurve.metadata["temperatures"]) == len(temps)
 
     def test_mastercurve_no_merge(self):
         """Test creating mastercurve without merging."""
@@ -131,10 +117,7 @@ class TestMastercurve:
         for T in temps:
             G_prime = 1000 * freq
             data = RheoData(
-                x=freq,
-                y=G_prime,
-                domain='frequency',
-                metadata={'temperature': T}
+                x=freq, y=G_prime, domain="frequency", metadata={"temperature": T}
             )
             datasets.append(data)
 
@@ -156,10 +139,7 @@ class TestMastercurve:
         G_prime = 1000 * freq
 
         data = RheoData(
-            x=freq,
-            y=G_prime,
-            domain='frequency',
-            metadata={'temperature': 323.15}
+            x=freq, y=G_prime, domain="frequency", metadata={"temperature": 323.15}
         )
 
         # With vertical shift
@@ -174,22 +154,18 @@ class TestMastercurve:
         assert not np.array_equal(shifted_vert.y, shifted_horiz.y)
 
         # Vertical shift should be in metadata
-        assert shifted_vert.metadata['vertical_shift'] != 1.0
+        assert shifted_vert.metadata["vertical_shift"] != 1.0
 
     def test_manual_shift_factors(self):
         """Test setting manual shift factors."""
         mc = Mastercurve()
 
         # Set manual shifts
-        shifts = {
-            273.15: 2.0,
-            298.15: 1.0,
-            323.15: 0.5
-        }
+        shifts = {273.15: 2.0, 298.15: 1.0, 323.15: 0.5}
         mc.set_manual_shifts(shifts)
 
         # Should use manual shifts
-        assert mc.method == 'manual'
+        assert mc.method == "manual"
         assert mc.get_shift_factor(273.15) == 2.0
         assert mc.get_shift_factor(298.15) == 1.0
         assert mc.get_shift_factor(323.15) == 0.5
@@ -200,7 +176,7 @@ class TestMastercurve:
         G_prime = 1000 * freq
 
         # No temperature in metadata
-        data = RheoData(x=freq, y=G_prime, domain='frequency')
+        data = RheoData(x=freq, y=G_prime, domain="frequency")
 
         mc = Mastercurve()
         with pytest.raises(ValueError, match="Temperature"):
@@ -220,13 +196,10 @@ class TestMastercurve:
             a_T = mc_temp.get_shift_factor(T)
 
             freq_shifted = freq * a_T
-            G_prime = 1000 * freq_shifted ** 0.5  # Power law
+            G_prime = 1000 * freq_shifted**0.5  # Power law
 
             data = RheoData(
-                x=freq,
-                y=G_prime,
-                domain='frequency',
-                metadata={'temperature': T}
+                x=freq, y=G_prime, domain="frequency", metadata={"temperature": T}
             )
             datasets.append(data)
 
@@ -257,19 +230,18 @@ class TestMastercurve:
 
             # Create shifted data
             freq_shifted = freq * a_T
-            G_prime = 1000 * freq_shifted ** 0.5
+            G_prime = 1000 * freq_shifted**0.5
 
             data = RheoData(
-                x=freq,
-                y=G_prime,
-                domain='frequency',
-                metadata={'temperature': T}
+                x=freq, y=G_prime, domain="frequency", metadata={"temperature": T}
             )
             datasets.append(data)
 
         # Optimize WLF parameters
         mc = Mastercurve(reference_temp=T_ref)
-        C1_opt, C2_opt = mc.optimize_wlf_parameters(datasets, initial_C1=17.0, initial_C2=50.0)
+        C1_opt, C2_opt = mc.optimize_wlf_parameters(
+            datasets, initial_C1=17.0, initial_C2=50.0
+        )
 
         # Should be reasonable (may not recover exact values due to synthetic data)
         assert 10 < C1_opt < 30
@@ -283,25 +255,21 @@ class TestMastercurve:
         data = RheoData(
             x=freq,
             y=G_prime,
-            domain='frequency',
-            metadata={
-                'temperature': 323.15,
-                'sample': 'polymer_A',
-                'strain': 0.01
-            }
+            domain="frequency",
+            metadata={"temperature": 323.15, "sample": "polymer_A", "strain": 0.01},
         )
 
         mc = Mastercurve(reference_temp=298.15)
         shifted = mc.transform(data)
 
         # Original metadata preserved
-        assert shifted.metadata['sample'] == 'polymer_A'
-        assert shifted.metadata['strain'] == 0.01
+        assert shifted.metadata["sample"] == "polymer_A"
+        assert shifted.metadata["strain"] == 0.01
 
         # Transform metadata added
-        assert 'transform' in shifted.metadata
-        assert shifted.metadata['transform'] == 'mastercurve'
+        assert "transform" in shifted.metadata
+        assert shifted.metadata["transform"] == "mastercurve"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

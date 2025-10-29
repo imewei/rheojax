@@ -3,11 +3,13 @@
 Tests JIT compilation, automatic differentiation, and JAX compatibility.
 """
 
-import pytest
-import numpy as np
+from functools import partial
+
 import jax
 import jax.numpy as jnp
-from functools import partial
+import numpy as np
+import pytest
+
 from rheo.core.data import RheoData
 from rheo.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
 
@@ -18,9 +20,10 @@ class TestJITCompilation:
     @pytest.mark.jax
     def test_simple_jitted_function(self):
         """Test basic JIT compilation."""
+
         @jax.jit
         def quadratic(x):
-            return x ** 2 + 2 * x + 1
+            return x**2 + 2 * x + 1
 
         x = jnp.array([1.0, 2.0, 3.0])
         result = quadratic(x)
@@ -31,6 +34,7 @@ class TestJITCompilation:
     @pytest.mark.jax
     def test_jitted_relu(self):
         """Test JIT compilation of activation function."""
+
         @jax.jit
         def relu(x):
             return jnp.maximum(x, 0.0)
@@ -44,13 +48,14 @@ class TestJITCompilation:
     @pytest.mark.jax
     def test_jitted_complex_function(self):
         """Test JIT compilation with complex operations."""
+
         @jax.jit
         def complex_ops(x, y):
             z = jnp.sin(x) * jnp.cos(y)
-            return jnp.sum(z ** 2)
+            return jnp.sum(z**2)
 
         x = jnp.linspace(0, np.pi, 10)
-        y = jnp.linspace(0, 2*np.pi, 10)
+        y = jnp.linspace(0, 2 * np.pi, 10)
 
         result = complex_ops(x, y)
 
@@ -94,8 +99,9 @@ class TestAutomaticDifferentiation:
     @pytest.mark.jax
     def test_gradient_simple_function(self):
         """Test gradient computation."""
+
         def f(x):
-            return x ** 2 + 3 * x + 2
+            return x**2 + 3 * x + 2
 
         grad_f = jax.grad(f)
 
@@ -109,8 +115,9 @@ class TestAutomaticDifferentiation:
     @pytest.mark.jax
     def test_gradient_vector_function(self):
         """Test gradient of vector-valued function."""
+
         def f(x):
-            return jnp.sum(x ** 2)
+            return jnp.sum(x**2)
 
         grad_f = jax.grad(f)
 
@@ -124,6 +131,7 @@ class TestAutomaticDifferentiation:
     @pytest.mark.jax
     def test_jacobian_computation(self):
         """Test Jacobian matrix computation."""
+
         def f(x):
             return jnp.array([x[0] ** 2, x[0] * x[1], x[1] ** 2])
 
@@ -138,6 +146,7 @@ class TestAutomaticDifferentiation:
     @pytest.mark.jax
     def test_hessian_computation(self):
         """Test Hessian matrix computation."""
+
         def f(x):
             return x[0] ** 2 + x[0] * x[1] + x[1] ** 2
 
@@ -155,12 +164,13 @@ class TestAutomaticDifferentiation:
     @pytest.mark.jax
     def test_grad_with_jit(self):
         """Test combining JIT and grad."""
+
         def f(x):
             return jnp.sum(jnp.sin(x) ** 2)
 
         grad_f = jax.jit(jax.grad(f))
 
-        x = jnp.linspace(0, 2*np.pi, 100)
+        x = jnp.linspace(0, 2 * np.pi, 100)
         gradient = grad_f(x)
 
         assert gradient.shape == x.shape
@@ -169,17 +179,20 @@ class TestAutomaticDifferentiation:
     @pytest.mark.jax
     def test_grad_with_vmap(self):
         """Test combining grad and vmap for batched derivatives."""
+
         def f(x):
-            return jnp.sum(x ** 3)
+            return jnp.sum(x**3)
 
         grad_f = jax.grad(f)
         batched_grad = jax.vmap(grad_f)
 
         # Batch of vectors
-        x_batch = jnp.array([
-            [1.0, 2.0, 3.0],
-            [4.0, 5.0, 6.0],
-        ])
+        x_batch = jnp.array(
+            [
+                [1.0, 2.0, 3.0],
+                [4.0, 5.0, 6.0],
+            ]
+        )
 
         gradients = batched_grad(x_batch)
 
@@ -192,20 +205,22 @@ class TestVectorization:
     @pytest.mark.jax
     def test_vmap_basic(self):
         """Test basic vmap usage."""
+
         def f(x):
-            return x ** 2
+            return x**2
 
         vmapped_f = jax.vmap(f)
 
         x = jnp.array([1.0, 2.0, 3.0, 4.0, 5.0])
         result = vmapped_f(x)
 
-        expected = x ** 2
+        expected = x**2
         np.testing.assert_allclose(result, expected)
 
     @pytest.mark.jax
     def test_vmap_batch_processing(self):
         """Test vmap for batch processing."""
+
         def compute_mean_sq_difference(x, y):
             return jnp.mean((x - y) ** 2)
 
@@ -223,13 +238,12 @@ class TestVectorization:
     @pytest.mark.jax
     def test_vmap_with_custom_function(self):
         """Test vmap with custom function."""
+
         def scale_and_shift(x, scale, shift):
             return scale * x + shift
 
         # Apply to batch with same scale/shift
-        batched_func = jax.vmap(
-            scale_and_shift, in_axes=(0, None, None)
-        )
+        batched_func = jax.vmap(scale_and_shift, in_axes=(0, None, None))
 
         x_batch = jnp.array([[1.0, 2.0], [3.0, 4.0]])
         scale = 2.0
@@ -246,8 +260,9 @@ class TestMittagLefflerJAX:
     @pytest.mark.jax
     def test_mittag_leffler_jitted(self):
         """Test JIT compilation of Mittag-Leffler with static alpha."""
+
         # alpha must be static (constant) for JIT compilation
-        @partial(jax.jit, static_argnames=['alpha'])
+        @partial(jax.jit, static_argnames=["alpha"])
         def ml_jitted(z, alpha):
             return mittag_leffler_e(z, alpha=alpha)
 
@@ -262,6 +277,7 @@ class TestMittagLefflerJAX:
     @pytest.mark.jax
     def test_mittag_leffler_grad(self):
         """Test gradient of Mittag-Leffler."""
+
         def f(z):
             return jnp.sum(mittag_leffler_e(z, alpha=0.7))
 
@@ -278,7 +294,9 @@ class TestMittagLefflerJAX:
             pytest.skip("Mittag-Leffler gradient not implemented")
 
     @pytest.mark.jax
-    @pytest.mark.xfail(reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler")
+    @pytest.mark.xfail(
+        reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler"
+    )
     def test_mittag_leffler_vmap(self):
         """Test vmap of Mittag-Leffler."""
         # Apply to batch of alphas
@@ -379,8 +397,8 @@ class TestNumericalPrecision:
     @pytest.mark.jax
     def test_complex64_operations(self):
         """Test complex64 operations."""
-        x = jnp.array([1+2j, 3+4j], dtype=jnp.complex64)
-        y = jnp.array([1-2j, 3-4j], dtype=jnp.complex64)
+        x = jnp.array([1 + 2j, 3 + 4j], dtype=jnp.complex64)
+        y = jnp.array([1 - 2j, 3 - 4j], dtype=jnp.complex64)
 
         result = x * y
         assert result.dtype == jnp.complex64
@@ -394,15 +412,15 @@ class TestNumericalPrecision:
         try:
             # JAX 0.8.0+ API
             with jax.config.enable_x64(True):
-                x = jnp.array([1+2j, 3+4j], dtype=jnp.complex128)
-                y = jnp.array([1-2j, 3-4j], dtype=jnp.complex128)
+                x = jnp.array([1 + 2j, 3 + 4j], dtype=jnp.complex128)
+                y = jnp.array([1 - 2j, 3 - 4j], dtype=jnp.complex128)
                 result = x * y
                 assert result.dtype == jnp.complex128
         except AttributeError:
             # Fallback for older JAX versions
             with jax.experimental.enable_x64():
-                x = jnp.array([1+2j, 3+4j], dtype=jnp.complex128)
-                y = jnp.array([1-2j, 3-4j], dtype=jnp.complex128)
+                x = jnp.array([1 + 2j, 3 + 4j], dtype=jnp.complex128)
+                y = jnp.array([1 - 2j, 3 - 4j], dtype=jnp.complex128)
                 result = x * y
                 assert result.dtype == jnp.complex128
 
@@ -439,7 +457,7 @@ class TestJAXDeviceHandling:
         x = jnp.array([1.0, 2.0, 3.0])
 
         # Should support standard operations
-        assert hasattr(x, 'shape')
-        assert hasattr(x, 'dtype')
-        assert hasattr(x, 'ndim')
-        assert hasattr(x, 'size')
+        assert hasattr(x, "shape")
+        assert hasattr(x, "dtype")
+        assert hasattr(x, "ndim")
+        assert hasattr(x, "size")

@@ -16,18 +16,19 @@ References:
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
 from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode, detect_test_mode
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
+from rheo.core.test_modes import TestMode, detect_test_mode
 
 
-@ModelRegistry.register('maxwell')
+@ModelRegistry.register("maxwell")
 class Maxwell(BaseModel):
     """Maxwell viscoelastic model (spring and dashpot in series).
 
@@ -67,21 +68,22 @@ class Maxwell(BaseModel):
         # Define parameters with physical bounds
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='G0',
+            name="G0",
             value=1e5,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='Elastic modulus'
+            units="Pa",
+            description="Elastic modulus",
         )
         self.parameters.add(
-            name='eta',
+            name="eta",
             value=1e3,
             bounds=(1e-6, 1e12),
-            units='Pa·s',
-            description='Viscosity'
+            units="Pa·s",
+            description="Viscosity",
         )
 
         self.fitted_ = False
+        self._test_mode = TestMode.RELAXATION  # Store test mode for model_function
 
     def _fit(self, X, y, **kwargs):
         """Fit Maxwell model to data.
@@ -94,7 +96,10 @@ class Maxwell(BaseModel):
         Returns:
             self for method chaining
         """
-        from rheo.utils.optimization import nlsq_optimize, create_least_squares_objective
+        from rheo.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
 
         # Handle RheoData input
         if isinstance(X, RheoData):
@@ -105,7 +110,10 @@ class Maxwell(BaseModel):
         else:
             x_data = jnp.array(X)
             y_data = jnp.array(y)
-            test_mode = kwargs.get('test_mode', TestMode.RELAXATION)
+            test_mode = kwargs.get("test_mode", TestMode.RELAXATION)
+
+        # Store test mode for model_function
+        self._test_mode = test_mode
 
         # Create objective function with stateless predictions
         def model_fn(x, params):
@@ -124,15 +132,17 @@ class Maxwell(BaseModel):
             else:
                 raise ValueError(f"Unsupported test mode: {test_mode}")
 
-        objective = create_least_squares_objective(model_fn, x_data, y_data, normalize=True)
+        objective = create_least_squares_objective(
+            model_fn, x_data, y_data, normalize=True
+        )
 
         # Optimize
-        result = nlsq_optimize(
+        nlsq_optimize(
             objective,
             self.parameters,
-            use_jax=kwargs.get('use_jax', True),
-            method=kwargs.get('method', 'auto'),
-            max_iter=kwargs.get('max_iter', 1000)
+            use_jax=kwargs.get("use_jax", True),
+            method=kwargs.get("method", "auto"),
+            max_iter=kwargs.get("max_iter", 1000),
         )
 
         self.fitted_ = True
@@ -157,8 +167,8 @@ class Maxwell(BaseModel):
             test_mode = TestMode.RELAXATION  # Default
 
         # Get parameter values
-        G0 = self.parameters.get_value('G0')
-        eta = self.parameters.get_value('eta')
+        G0 = self.parameters.get_value("G0")
+        eta = self.parameters.get_value("eta")
 
         # Dispatch to appropriate prediction method
         if test_mode == TestMode.RELAXATION:
@@ -169,6 +179,38 @@ class Maxwell(BaseModel):
             return self._predict_oscillation(x_data, G0, eta)
         elif test_mode == TestMode.ROTATION:
             return self._predict_rotation(x_data, G0, eta)
+        else:
+            raise ValueError(f"Unsupported test mode: {test_mode}")
+
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (time, frequency, or shear rate)
+            params: Array of parameter values [G0, eta]
+
+        Returns:
+            Model predictions as JAX array
+        """
+        # Extract parameters from array
+        G0 = params[0]
+        eta = params[1]
+
+        # Use stored test mode from last fit, or default to RELAXATION
+        test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+
+        # Dispatch to appropriate prediction method
+        if test_mode == TestMode.RELAXATION:
+            return self._predict_relaxation(X, G0, eta)
+        elif test_mode == TestMode.CREEP:
+            return self._predict_creep(X, G0, eta)
+        elif test_mode == TestMode.OSCILLATION:
+            return self._predict_oscillation(X, G0, eta)
+        elif test_mode == TestMode.ROTATION:
+            return self._predict_rotation(X, G0, eta)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
 
@@ -227,7 +269,7 @@ class Maxwell(BaseModel):
         """
         tau = eta / G0  # Relaxation time
         omega_tau = omega * tau
-        omega_tau_sq = omega_tau ** 2
+        omega_tau_sq = omega_tau**2
 
         # Storage modulus G'
         G_prime = G0 * omega_tau_sq / (1.0 + omega_tau_sq)
@@ -261,16 +303,16 @@ class Maxwell(BaseModel):
         Returns:
             Relaxation time in seconds
         """
-        G0 = self.parameters.get_value('G0')
-        eta = self.parameters.get_value('eta')
+        G0 = self.parameters.get_value("G0")
+        eta = self.parameters.get_value("eta")
         return eta / G0
 
     def __repr__(self) -> str:
         """String representation of Maxwell model."""
-        G0 = self.parameters.get_value('G0')
-        eta = self.parameters.get_value('eta')
+        G0 = self.parameters.get_value("G0")
+        eta = self.parameters.get_value("eta")
         tau = self.get_relaxation_time()
         return f"Maxwell(G0={G0:.2e} Pa, eta={eta:.2e} Pa·s, tau={tau:.2e} s)"
 
 
-__all__ = ['Maxwell']
+__all__ = ["Maxwell"]

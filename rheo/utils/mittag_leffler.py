@@ -16,11 +16,11 @@ References
   functions, SIAM Journal of Numerical Analysis, 2015, 53(3), 1350-1369
 """
 
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 from jax.scipy.special import gamma as jax_gamma
-from typing import Union
-from functools import partial
 
 # Enable 64-bit precision for numerical stability
 # This is critical for accurate Mittag-Leffler evaluations
@@ -28,7 +28,9 @@ jax.config.update("jax_enable_x64", True)
 
 
 @partial(jax.jit, static_argnums=(1,))
-def mittag_leffler_e(z: Union[float, jnp.ndarray], alpha: float) -> Union[float, jnp.ndarray]:
+def mittag_leffler_e(
+    z: float | jnp.ndarray, alpha: float
+) -> float | jnp.ndarray:
     """
     One-parameter Mittag-Leffler function E_α(z).
 
@@ -83,10 +85,8 @@ def mittag_leffler_e(z: Union[float, jnp.ndarray], alpha: float) -> Union[float,
 
 @partial(jax.jit, static_argnums=(1, 2))
 def mittag_leffler_e2(
-    z: Union[float, jnp.ndarray],
-    alpha: float,
-    beta: float
-) -> Union[float, jnp.ndarray]:
+    z: float | jnp.ndarray, alpha: float, beta: float
+) -> float | jnp.ndarray:
     """
     Two-parameter Mittag-Leffler function E_{α,β}(z).
 
@@ -146,9 +146,7 @@ def mittag_leffler_e2(
     """
     # Validate alpha parameter
     if not (0 < alpha <= 2):
-        raise ValueError(
-            f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}"
-        )
+        raise ValueError(f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}")
 
     # Convert input to JAX array
     z = jnp.asarray(z)
@@ -173,11 +171,7 @@ def mittag_leffler_e2(
     return result
 
 
-def _mittag_leffler_pade(
-    z: jnp.ndarray,
-    alpha: float,
-    beta: float
-) -> jnp.ndarray:
+def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarray:
     """
     Pade approximation for Mittag-Leffler function (internal, JIT-compiled).
 
@@ -234,7 +228,6 @@ def _mittag_leffler_pade(
     z_moderate_to_large = z_magnitude > z_threshold
 
     # For very large |z| > 100, definitely use asymptotic
-    z_very_large = z_magnitude > 100.0
 
     # Taylor series with Kahan summation for better numerical stability
     # For E_{α,α}(z) = Σ_{k=0}^∞ z^k / Γ(α(k+1))
@@ -244,12 +237,12 @@ def _mittag_leffler_pade(
 
     # For small |z|, use Taylor series (up to 100 terms)
     # Number of terms needed depends on |z| and alpha
-    max_terms = jnp.minimum(100, int(20 / alpha))  # More terms for smaller alpha
+    jnp.minimum(100, int(20 / alpha))  # More terms for smaller alpha
 
     for k in range(100):  # Upper bound for JIT
         # Compute term with float64 precision
         gamma_val = jax_gamma(alpha * (k + 1))
-        term = (z_f64 ** k) / gamma_val
+        term = (z_f64**k) / gamma_val
 
         # Kahan summation for numerical stability
         y = term - compensation
@@ -271,7 +264,7 @@ def _mittag_leffler_pade(
     # For α = β: E_{α,α}(-x) ≈ sin(π α) / (π * x) for large x (Gorenflo et al.)
 
     # Compute both cases
-    alpha_neq_beta = jnp.abs(alpha - beta) > 1e-10
+    jnp.abs(alpha - beta) > 1e-10
 
     # Case 1: alpha ≠ beta
     # Avoid division issues when beta/alpha is near integer
@@ -295,17 +288,11 @@ def _mittag_leffler_pade(
     # For negative z with moderate-to-large |z|, use asymptotic
     # For positive z, keep Taylor (though less common in rheology)
     result_asymptotic = jnp.where(
-        z_is_negative,
-        asymptotic_approx,
-        result_taylor  # Keep Taylor for positive z
+        z_is_negative, asymptotic_approx, result_taylor  # Keep Taylor for positive z
     )
 
     # Blend Taylor and asymptotic results based on |z| threshold
-    result_taylor = jnp.where(
-        z_moderate_to_large,
-        result_asymptotic,
-        result_taylor
-    )
+    result_taylor = jnp.where(z_moderate_to_large, result_asymptotic, result_taylor)
 
     # Compute coefficients for Pade approximation (for alpha != beta)
     # Two cases: beta > alpha and beta < alpha
@@ -314,27 +301,35 @@ def _mittag_leffler_pade(
     # Precompute gamma values (static computations) with float64
     if is_beta_gt_alpha:
         # Case: beta > alpha
-        g_vals = jnp.array([
-            jax_gamma(beta - alpha) / jax_gamma(beta),
-            jax_gamma(beta - alpha) / jax_gamma(beta + alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta + 2 * alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta + 3 * alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta + 4 * alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta - 2 * alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta - 3 * alpha),
-        ], dtype=jnp.float64)
+        g_vals = jnp.array(
+            [
+                jax_gamma(beta - alpha) / jax_gamma(beta),
+                jax_gamma(beta - alpha) / jax_gamma(beta + alpha),
+                jax_gamma(beta - alpha) / jax_gamma(beta + 2 * alpha),
+                jax_gamma(beta - alpha) / jax_gamma(beta + 3 * alpha),
+                jax_gamma(beta - alpha) / jax_gamma(beta + 4 * alpha),
+                jax_gamma(beta - alpha) / jax_gamma(beta - 2 * alpha),
+                jax_gamma(beta - alpha) / jax_gamma(beta - 3 * alpha),
+            ],
+            dtype=jnp.float64,
+        )
 
-        A = jnp.array([
-            [1, 0, 0, -g_vals[0], 0, 0, 0],
-            [0, 1, 0, g_vals[1], -g_vals[0], 0, 0],
-            [0, 0, 1, -g_vals[2], g_vals[1], -g_vals[0], 0],
-            [0, 0, 0, g_vals[3], -g_vals[2], g_vals[1], -g_vals[0]],
-            [0, 0, 0, -g_vals[4], g_vals[3], -g_vals[2], g_vals[1]],
-            [0, 1, 0, 0, 0, -1, g_vals[5]],
-            [0, 0, 1, 0, 0, 0, -1]
-        ], dtype=jnp.float64)
+        A = jnp.array(
+            [
+                [1, 0, 0, -g_vals[0], 0, 0, 0],
+                [0, 1, 0, g_vals[1], -g_vals[0], 0, 0],
+                [0, 0, 1, -g_vals[2], g_vals[1], -g_vals[0], 0],
+                [0, 0, 0, g_vals[3], -g_vals[2], g_vals[1], -g_vals[0]],
+                [0, 0, 0, -g_vals[4], g_vals[3], -g_vals[2], g_vals[1]],
+                [0, 1, 0, 0, 0, -1, g_vals[5]],
+                [0, 0, 1, 0, 0, 0, -1],
+            ],
+            dtype=jnp.float64,
+        )
 
-        b = jnp.array([0, 0, 0, -1, g_vals[0], g_vals[6], -g_vals[5]], dtype=jnp.float64)
+        b = jnp.array(
+            [0, 0, 0, -1, g_vals[0], g_vals[6], -g_vals[5]], dtype=jnp.float64
+        )
 
         coeffs = jnp.linalg.solve(A, b)
         p = coeffs[:3]  # Numerator coefficients (degree 3)
@@ -345,36 +340,42 @@ def _mittag_leffler_pade(
         numerator = (1 / jax_gamma(beta - alpha)) * (
             p[0] + p[1] * minus_z + p[2] * minus_z**2 + minus_z**3
         )
-        denominator = q[0] + q[1] * minus_z + q[2] * minus_z**2 + q[3] * minus_z**3 + z_f64**4
+        denominator = (
+            q[0] + q[1] * minus_z + q[2] * minus_z**2 + q[3] * minus_z**3 + z_f64**4
+        )
 
         # Avoid division by near-zero denominators
         denominator_safe = jnp.where(
-            jnp.abs(denominator) < 1e-15,
-            jnp.sign(denominator) * 1e-15,
-            denominator
+            jnp.abs(denominator) < 1e-15, jnp.sign(denominator) * 1e-15, denominator
         )
         result_pade = numerator / denominator_safe
 
     else:
         # Case: beta <= alpha
-        g_vals = jnp.array([
-            jax_gamma(-alpha) / jax_gamma(alpha),
-            jax_gamma(-alpha) / jax_gamma(2 * alpha),
-            jax_gamma(-alpha) / jax_gamma(3 * alpha),
-            jax_gamma(-alpha) / jax_gamma(4 * alpha),
-            jax_gamma(-alpha) / jax_gamma(5 * alpha),
-            jax_gamma(-alpha) / jax_gamma(-2 * alpha),
-            jax_gamma(-alpha) / jax_gamma(-3 * alpha),
-        ], dtype=jnp.float64)
+        g_vals = jnp.array(
+            [
+                jax_gamma(-alpha) / jax_gamma(alpha),
+                jax_gamma(-alpha) / jax_gamma(2 * alpha),
+                jax_gamma(-alpha) / jax_gamma(3 * alpha),
+                jax_gamma(-alpha) / jax_gamma(4 * alpha),
+                jax_gamma(-alpha) / jax_gamma(5 * alpha),
+                jax_gamma(-alpha) / jax_gamma(-2 * alpha),
+                jax_gamma(-alpha) / jax_gamma(-3 * alpha),
+            ],
+            dtype=jnp.float64,
+        )
 
-        A = jnp.array([
-            [1, 0, g_vals[0], 0, 0, 0],
-            [0, 1, -g_vals[1], g_vals[0], 0, 0],
-            [0, 0, g_vals[2], -g_vals[1], g_vals[0], 0],
-            [0, 0, -g_vals[3], g_vals[2], -g_vals[1], -g_vals[0]],
-            [0, 0, g_vals[4], -g_vals[3], g_vals[2], -g_vals[1]],
-            [0, 1, 0, 0, 0, -1]
-        ], dtype=jnp.float64)
+        A = jnp.array(
+            [
+                [1, 0, g_vals[0], 0, 0, 0],
+                [0, 1, -g_vals[1], g_vals[0], 0, 0],
+                [0, 0, g_vals[2], -g_vals[1], g_vals[0], 0],
+                [0, 0, -g_vals[3], g_vals[2], -g_vals[1], -g_vals[0]],
+                [0, 0, g_vals[4], -g_vals[3], g_vals[2], -g_vals[1]],
+                [0, 1, 0, 0, 0, -1],
+            ],
+            dtype=jnp.float64,
+        )
 
         b = jnp.array([0, 0, -1, 0, g_vals[6], -g_vals[5]], dtype=jnp.float64)
 
@@ -388,15 +389,16 @@ def _mittag_leffler_pade(
             p_hat[0] + p_hat[1] * minus_z + minus_z**2
         )
         denominator = (
-            q_hat[0] + q_hat[1] * minus_z + q_hat[2] * minus_z**2 +
-            q_hat[3] * minus_z**3 + minus_z**4
+            q_hat[0]
+            + q_hat[1] * minus_z
+            + q_hat[2] * minus_z**2
+            + q_hat[3] * minus_z**3
+            + minus_z**4
         )
 
         # Avoid division by near-zero denominators
         denominator_safe = jnp.where(
-            jnp.abs(denominator) < 1e-15,
-            jnp.sign(denominator) * 1e-15,
-            denominator
+            jnp.abs(denominator) < 1e-15, jnp.sign(denominator) * 1e-15, denominator
         )
         result_pade = numerator / denominator_safe
 
@@ -422,8 +424,8 @@ ml_e = mittag_leffler_e
 ml_e2 = mittag_leffler_e2
 
 __all__ = [
-    'mittag_leffler_e',
-    'mittag_leffler_e2',
-    'ml_e',
-    'ml_e2',
+    "mittag_leffler_e",
+    "mittag_leffler_e2",
+    "ml_e",
+    "ml_e2",
 ]

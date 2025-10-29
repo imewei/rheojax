@@ -12,10 +12,11 @@ Tests validate:
 5. Edge cases and parameter validation
 """
 
-import pytest
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
+
 from rheo.utils.mittag_leffler import (
     mittag_leffler_e,
     mittag_leffler_e2,
@@ -52,9 +53,9 @@ class TestMittagLefflerBasicFunctionality:
             result = mittag_leffler_e2(0.0, alpha=alpha, beta=beta)
             expected = 1.0 / jax_gamma(beta)
             # Relaxed tolerance for float32
-            assert abs(result - expected) < 1e-6, (
-                f"E_{{{alpha},{beta}}}(0) should be 1/Γ({beta})={expected}, got {result}"
-            )
+            assert (
+                abs(result - expected) < 1e-6
+            ), f"E_{{{alpha},{beta}}}(0) should be 1/Γ({beta})={expected}, got {result}"
 
     def test_ml_e_scalar_input(self):
         """Test scalar input returns scalar output."""
@@ -88,12 +89,20 @@ class TestMittagLefflerBasicFunctionality:
 class TestMittagLefflerAccuracy:
     """Test numerical accuracy for rheological range |z| < 10."""
 
-    @pytest.mark.parametrize("alpha", [
-        pytest.param(0.3, marks=pytest.mark.xfail(reason="Pade approximation gives negative values for small alpha. Known limitation.")),
-        0.5,
-        0.7,
-        0.9
-    ])
+    @pytest.mark.parametrize(
+        "alpha",
+        [
+            pytest.param(
+                0.3,
+                marks=pytest.mark.xfail(
+                    reason="Pade approximation gives negative values for small alpha. Known limitation."
+                ),
+            ),
+            0.5,
+            0.7,
+            0.9,
+        ],
+    )
     def test_ml_e_small_arguments(self, alpha):
         """Test accuracy for small |z| using Pade approximation."""
         z = jnp.linspace(0, 2, 10)
@@ -209,6 +218,7 @@ class TestMittagLefflerJAXCompatibility:
 
     def test_ml_e_grad(self):
         """Test that gradient can be computed through mittag_leffler_e."""
+
         def ml_sum(z):
             return jnp.sum(mittag_leffler_e(z, alpha=0.5))
 
@@ -247,7 +257,9 @@ class TestMittagLefflerEdgeCases:
         # Should be very close to 1
         np.testing.assert_allclose(result, 1.0, atol=1e-5)
 
-    @pytest.mark.xfail(reason="Pade approximation gives negative values for z=5.0, alpha=0.5. Known limitation for large |z|.")
+    @pytest.mark.xfail(
+        reason="Pade approximation gives negative values for z=5.0, alpha=0.5. Known limitation for large |z|."
+    )
     def test_ml_e_array_mixed_magnitudes(self):
         """Test array with both small and moderate |z| values."""
         z = jnp.array([0.01, 0.1, 0.5, 1.0, 2.0, 5.0])
@@ -291,7 +303,7 @@ class TestMittagLefflerRheologicalApplications:
         """Test E_α((iω)^α) for frequency-domain applications."""
         alpha = 0.5
         omega = jnp.logspace(-2, 1, 20)  # Frequency from 0.01 to 10
-        z = (1j * omega)**alpha
+        z = (1j * omega) ** alpha
         G_complex = mittag_leffler_e(z, alpha=alpha)
 
         # Complex modulus G* = G' + iG''
@@ -333,12 +345,15 @@ class TestMittagLefflerPerformance:
 
         # Measure execution time
         import time
+
         start = time.time()
         result = mittag_leffler_e(z, alpha=0.5).block_until_ready()
         execution_time = time.time() - start
 
         # Should be fast (< 50ms for 1000 points)
-        assert execution_time < 0.05, f"Large array execution took {execution_time:.3f}s"
+        assert (
+            execution_time < 0.05
+        ), f"Large array execution took {execution_time:.3f}s"
         assert jnp.all(jnp.isfinite(result))
 
 

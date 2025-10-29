@@ -4,16 +4,16 @@ This test suite validates the Zener model implementation across all test modes,
 parameter constraints, optimization, and numerical accuracy.
 """
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
 import rheo.models  # Import to trigger all model registrations
-from rheo.models.zener import Zener
 from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
 from rheo.core.registry import ModelRegistry
+from rheo.core.test_modes import TestMode
+from rheo.models.zener import Zener
 
 
 class TestZenerBasics:
@@ -23,7 +23,7 @@ class TestZenerBasics:
         """Test Zener model can be instantiated."""
         model = Zener()
         assert model is not None
-        assert hasattr(model, 'parameters')
+        assert hasattr(model, "parameters")
         assert len(model.parameters) == 3
 
     def test_model_parameters(self):
@@ -31,19 +31,19 @@ class TestZenerBasics:
         model = Zener()
 
         # Check parameter names
-        assert 'Ge' in model.parameters
-        assert 'Gm' in model.parameters
-        assert 'eta' in model.parameters
+        assert "Ge" in model.parameters
+        assert "Gm" in model.parameters
+        assert "eta" in model.parameters
 
         # Check default values
-        assert model.parameters.get_value('Ge') == 1e4
-        assert model.parameters.get_value('Gm') == 1e5
-        assert model.parameters.get_value('eta') == 1e3
+        assert model.parameters.get_value("Ge") == 1e4
+        assert model.parameters.get_value("Gm") == 1e5
+        assert model.parameters.get_value("eta") == 1e3
 
         # Check bounds
-        Ge_param = model.parameters.get('Ge')
-        Gm_param = model.parameters.get('Gm')
-        eta_param = model.parameters.get('eta')
+        Ge_param = model.parameters.get("Ge")
+        Gm_param = model.parameters.get("Gm")
+        eta_param = model.parameters.get("eta")
         assert Ge_param.bounds == (1e-3, 1e9)
         assert Gm_param.bounds == (1e-3, 1e9)
         assert eta_param.bounds == (1e-6, 1e12)
@@ -53,13 +53,13 @@ class TestZenerBasics:
         model = Zener()
 
         # Set valid parameters
-        model.parameters.set_value('Ge', 2e4)
-        model.parameters.set_value('Gm', 1e6)
-        model.parameters.set_value('eta', 5e3)
+        model.parameters.set_value("Ge", 2e4)
+        model.parameters.set_value("Gm", 1e6)
+        model.parameters.set_value("eta", 5e3)
 
-        assert model.parameters.get_value('Ge') == 2e4
-        assert model.parameters.get_value('Gm') == 1e6
-        assert model.parameters.get_value('eta') == 5e3
+        assert model.parameters.get_value("Ge") == 2e4
+        assert model.parameters.get_value("Gm") == 1e6
+        assert model.parameters.get_value("eta") == 5e3
 
     def test_parameter_bounds_enforcement(self):
         """Test parameter bounds are enforced."""
@@ -67,27 +67,27 @@ class TestZenerBasics:
 
         # Test Ge bounds
         with pytest.raises(ValueError):
-            model.parameters.set_value('Ge', -1.0)
+            model.parameters.set_value("Ge", -1.0)
         with pytest.raises(ValueError):
-            model.parameters.set_value('Ge', 1e10)
+            model.parameters.set_value("Ge", 1e10)
 
         # Test Gm bounds
         with pytest.raises(ValueError):
-            model.parameters.set_value('Gm', -1.0)
+            model.parameters.set_value("Gm", -1.0)
         with pytest.raises(ValueError):
-            model.parameters.set_value('Gm', 1e10)
+            model.parameters.set_value("Gm", 1e10)
 
         # Test eta bounds
         with pytest.raises(ValueError):
-            model.parameters.set_value('eta', -100.0)
+            model.parameters.set_value("eta", -100.0)
         with pytest.raises(ValueError):
-            model.parameters.set_value('eta', 1e13)
+            model.parameters.set_value("eta", 1e13)
 
     def test_relaxation_time_calculation(self):
         """Test relaxation time calculation."""
         model = Zener()
-        model.parameters.set_value('Gm', 1e5)
-        model.parameters.set_value('eta', 1e3)
+        model.parameters.set_value("Gm", 1e5)
+        model.parameters.set_value("eta", 1e3)
 
         tau = model.get_relaxation_time()
         expected_tau = 1e3 / 1e5  # eta / Gm
@@ -96,9 +96,9 @@ class TestZenerBasics:
     def test_retardation_time_calculation(self):
         """Test retardation time calculation for creep."""
         model = Zener()
-        model.parameters.set_value('Ge', 1e4)
-        model.parameters.set_value('Gm', 1e5)
-        model.parameters.set_value('eta', 1e3)
+        model.parameters.set_value("Ge", 1e4)
+        model.parameters.set_value("Gm", 1e5)
+        model.parameters.set_value("eta", 1e3)
 
         tau_c = model.get_retardation_time()
         expected_tau_c = 1e3 * (1e4 + 1e5) / (1e4 * 1e5)  # eta * (Ge + Gm) / (Ge * Gm)
@@ -107,20 +107,20 @@ class TestZenerBasics:
     def test_model_registry(self):
         """Test Zener is registered in ModelRegistry."""
         models = ModelRegistry.list_models()
-        assert 'zener' in models
+        assert "zener" in models
 
         # Test factory creation
-        model = ModelRegistry.create('zener')
+        model = ModelRegistry.create("zener")
         assert isinstance(model, Zener)
 
     def test_repr(self):
         """Test string representation."""
         model = Zener()
         repr_str = repr(model)
-        assert 'Zener' in repr_str
-        assert 'Ge' in repr_str
-        assert 'Gm' in repr_str
-        assert 'eta' in repr_str
+        assert "Zener" in repr_str
+        assert "Ge" in repr_str
+        assert "Gm" in repr_str
+        assert "eta" in repr_str
 
 
 class TestZenerRelaxation:
@@ -130,7 +130,12 @@ class TestZenerRelaxation:
         """Test relaxation prediction returns correct shape."""
         model = Zener()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
 
@@ -143,14 +148,19 @@ class TestZenerRelaxation:
         Ge = 1e4
         Gm = 1e5
         eta = 1e3
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
+        model.parameters.set_value("eta", eta)
 
         t = jnp.array([0.01, 0.1, 1.0, 10.0])
         tau = eta / Gm
 
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # Analytical solution: G(t) = Ge + Gm * exp(-t/tau)
@@ -162,7 +172,12 @@ class TestZenerRelaxation:
         """Test relaxation modulus decreases monotonically."""
         model = Zener()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
 
@@ -175,11 +190,16 @@ class TestZenerRelaxation:
         model = Zener()
         Ge = 1e4
         Gm = 1e5
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
 
         t_small = jnp.array([1e-10])
-        data = RheoData(x=t_small, y=jnp.zeros_like(t_small), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t_small,
+            y=jnp.zeros_like(t_small),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # At very small t, G(t) should be approximately Ge + Gm
@@ -191,14 +211,19 @@ class TestZenerRelaxation:
         Ge = 1e4
         Gm = 1e5
         eta = 1e3
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
+        model.parameters.set_value("eta", eta)
 
         tau = eta / Gm
         t_long = jnp.array([100 * tau])  # Much longer than relaxation time
 
-        data = RheoData(x=t_long, y=jnp.zeros_like(t_long), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t_long,
+            y=jnp.zeros_like(t_long),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # At long times, G(t) should approach Ge
@@ -212,7 +237,9 @@ class TestZenerCreep:
         """Test creep prediction returns correct shape."""
         model = Zener()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
 
         J_t = model.predict(data)
 
@@ -225,19 +252,23 @@ class TestZenerCreep:
         Ge = 1e4
         Gm = 1e5
         eta = 1e3
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
+        model.parameters.set_value("eta", eta)
 
         t = jnp.array([0.01, 0.1, 1.0, 10.0])
 
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
         J_t = model.predict(data)
 
         # Analytical solution: J(t) = 1/(Ge+Gm) + (Gm/(Ge*(Ge+Gm))) * (1 - exp(-t/tau_c))
         G_total = Ge + Gm
         tau_c = eta * G_total / (Ge * Gm)
-        J_expected = (1.0 / G_total) + (Gm / (Ge * G_total)) * (1.0 - np.exp(-np.array(t) / tau_c))
+        J_expected = (1.0 / G_total) + (Gm / (Ge * G_total)) * (
+            1.0 - np.exp(-np.array(t) / tau_c)
+        )
 
         assert_allclose(J_t, J_expected, rtol=1e-6)
 
@@ -245,7 +276,9 @@ class TestZenerCreep:
         """Test creep compliance increases monotonically."""
         model = Zener()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
 
         J_t = model.predict(data)
 
@@ -258,11 +291,16 @@ class TestZenerCreep:
         model = Zener()
         Ge = 1e4
         Gm = 1e5
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
 
         t_small = jnp.array([1e-10])
-        data = RheoData(x=t_small, y=jnp.zeros_like(t_small), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t_small,
+            y=jnp.zeros_like(t_small),
+            domain="time",
+            metadata={"test_mode": "creep"},
+        )
         J_t = model.predict(data)
 
         # At t=0, J(0) = 1/(Ge + Gm)
@@ -274,15 +312,20 @@ class TestZenerCreep:
         Ge = 1e4
         Gm = 1e5
         eta = 1e3
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
+        model.parameters.set_value("eta", eta)
 
         # At long times, J(inf) = 1/Ge
         tau_c = eta * (Ge + Gm) / (Ge * Gm)
         t_long = jnp.array([100 * tau_c])
 
-        data = RheoData(x=t_long, y=jnp.zeros_like(t_long), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t_long,
+            y=jnp.zeros_like(t_long),
+            domain="time",
+            metadata={"test_mode": "creep"},
+        )
         J_t = model.predict(data)
 
         # At equilibrium, J(inf) = 1/Ge
@@ -297,7 +340,12 @@ class TestZenerOscillation:
         """Test oscillation prediction returns correct shape."""
         model = Zener()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
 
@@ -310,14 +358,19 @@ class TestZenerOscillation:
         Ge = 1e4
         Gm = 1e5
         eta = 1e3
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
+        model.parameters.set_value("eta", eta)
 
         omega = jnp.array([0.1, 1.0, 10.0, 100.0])
         tau = eta / Gm
 
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # Analytical solution
@@ -333,7 +386,12 @@ class TestZenerOscillation:
         """Test storage modulus G' is positive."""
         model = Zener()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
         G_prime = G_star.real
@@ -344,7 +402,12 @@ class TestZenerOscillation:
         """Test loss modulus G'' is positive."""
         model = Zener()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
         G_double_prime = G_star.imag
@@ -356,12 +419,17 @@ class TestZenerOscillation:
         model = Zener()
         Ge = 1e4
         Gm = 1e5
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
 
         # At very low frequency, G' -> Ge
         omega = jnp.array([1e-6])
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # G' should approach Ge at low frequency
@@ -373,13 +441,18 @@ class TestZenerOscillation:
         Ge = 1e4
         Gm = 1e5
         eta = 1e3
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('Gm', Gm)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("Gm", Gm)
+        model.parameters.set_value("eta", eta)
 
         # At very high frequency, G' -> Ge + Gm
         omega = jnp.array([1e6])
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # G' should approach Ge + Gm at high frequency
@@ -393,7 +466,12 @@ class TestZenerRotation:
         """Test rotation prediction returns correct shape."""
         model = Zener()
         gamma_dot = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=gamma_dot, y=jnp.zeros_like(gamma_dot), x_units='1/s', metadata={'test_mode': 'rotation'})
+        data = RheoData(
+            x=gamma_dot,
+            y=jnp.zeros_like(gamma_dot),
+            x_units="1/s",
+            metadata={"test_mode": "rotation"},
+        )
 
         eta_app = model.predict(data)
 
@@ -404,10 +482,15 @@ class TestZenerRotation:
         """Test steady shear viscosity is constant (Newtonian)."""
         model = Zener()
         eta = 1e3
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("eta", eta)
 
         gamma_dot = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=gamma_dot, y=jnp.zeros_like(gamma_dot), x_units='1/s', metadata={'test_mode': 'rotation'})
+        data = RheoData(
+            x=gamma_dot,
+            y=jnp.zeros_like(gamma_dot),
+            x_units="1/s",
+            metadata={"test_mode": "rotation"},
+        )
 
         eta_app = model.predict(data)
 
@@ -436,24 +519,32 @@ class TestZenerOptimization:
 
         # Fit model
         model = Zener()
-        model.parameters.set_value('Ge', 5e3)  # Initial guess
-        model.parameters.set_value('Gm', 5e4)  # Initial guess
-        model.parameters.set_value('eta', 5e2)  # Initial guess
+        model.parameters.set_value("Ge", 5e3)  # Initial guess
+        model.parameters.set_value("Gm", 5e4)  # Initial guess
+        model.parameters.set_value("eta", 5e2)  # Initial guess
 
-        data = RheoData(x=t, y=G_noisy, domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t, y=G_noisy, domain="time", metadata={"test_mode": "relaxation"}
+        )
         # BaseModel.fit requires y parameter even if X is RheoData
         model.fit(data, G_noisy)
 
         # Check fitted parameters are close to true values
-        Ge_fit = model.parameters.get_value('Ge')
-        Gm_fit = model.parameters.get_value('Gm')
-        eta_fit = model.parameters.get_value('eta')
+        Ge_fit = model.parameters.get_value("Ge")
+        Gm_fit = model.parameters.get_value("Gm")
+        eta_fit = model.parameters.get_value("eta")
 
         # Relax tolerance for 3-parameter model (can be challenging to fit due to parameter correlation)
         # Note: This is proof-of-concept, showing the optimizer works but may need better initial guesses
-        assert_allclose(Ge_fit, Ge_true, rtol=0.7)  # Very relaxed tolerance for proof of concept
-        assert_allclose(Gm_fit, Gm_true, rtol=0.7)  # Very relaxed tolerance for proof of concept
-        assert_allclose(eta_fit, eta_true, rtol=0.7)  # Very relaxed tolerance for proof of concept
+        assert_allclose(
+            Ge_fit, Ge_true, rtol=0.7
+        )  # Very relaxed tolerance for proof of concept
+        assert_allclose(
+            Gm_fit, Gm_true, rtol=0.7
+        )  # Very relaxed tolerance for proof of concept
+        assert_allclose(
+            eta_fit, eta_true, rtol=0.7
+        )  # Very relaxed tolerance for proof of concept
 
     def test_model_score(self):
         """Test model scoring (R²) for fitted data."""
@@ -468,12 +559,14 @@ class TestZenerOptimization:
 
         # Set model to true parameters
         model = Zener()
-        model.parameters.set_value('Ge', Ge_true)
-        model.parameters.set_value('Gm', Gm_true)
-        model.parameters.set_value('eta', eta_true)
+        model.parameters.set_value("Ge", Ge_true)
+        model.parameters.set_value("Gm", Gm_true)
+        model.parameters.set_value("eta", eta_true)
         model.fitted_ = True
 
-        data = RheoData(x=t, y=G_true, domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t, y=G_true, domain="time", metadata={"test_mode": "relaxation"}
+        )
 
         # Score should be perfect (R² = 1.0) for noiseless data
         score = model.score(data, G_true)
@@ -489,7 +582,12 @@ class TestZenerEdgeCases:
 
         # Include t=0
         t = jnp.array([0.0, 0.01, 0.1, 1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         # Should not raise error
         G_t = model.predict(data)
@@ -500,7 +598,12 @@ class TestZenerEdgeCases:
         model = Zener()
 
         t = jnp.array([1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
         assert len(G_t) == 1
@@ -508,12 +611,17 @@ class TestZenerEdgeCases:
     def test_equal_moduli(self):
         """Test model when Ge = Gm."""
         model = Zener()
-        model.parameters.set_value('Ge', 1e5)
-        model.parameters.set_value('Gm', 1e5)
-        model.parameters.set_value('eta', 1e3)
+        model.parameters.set_value("Ge", 1e5)
+        model.parameters.set_value("Gm", 1e5)
+        model.parameters.set_value("eta", 1e3)
 
         t = jnp.array([1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
         assert jnp.isfinite(G_t[0])
@@ -521,12 +629,17 @@ class TestZenerEdgeCases:
     def test_small_equilibrium_modulus(self):
         """Test model when Ge << Gm (nearly Maxwell-like)."""
         model = Zener()
-        model.parameters.set_value('Ge', 1e2)  # Very small
-        model.parameters.set_value('Gm', 1e5)
-        model.parameters.set_value('eta', 1e3)
+        model.parameters.set_value("Ge", 1e2)  # Very small
+        model.parameters.set_value("Gm", 1e5)
+        model.parameters.set_value("eta", 1e3)
 
         t = jnp.array([1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
         assert jnp.isfinite(G_t[0])

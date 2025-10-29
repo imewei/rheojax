@@ -18,20 +18,21 @@ References:
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
 
-import jax
-import jax.numpy as jnp
+jax, jnp = safe_import_jax()
+
+from functools import partial
+
 import numpy as np
 
-from rheo.core.base import BaseModel, Parameter, ParameterSet
+from rheo.core.base import BaseModel, ParameterSet
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
 from rheo.core.test_modes import TestMode, detect_test_mode
 
 
-@ModelRegistry.register('carreau')
+@ModelRegistry.register("carreau")
 class Carreau(BaseModel):
     """Carreau model for non-Newtonian flow (ROTATION only).
 
@@ -63,32 +64,32 @@ class Carreau(BaseModel):
         super().__init__()
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='eta0',
+            name="eta0",
             value=1000.0,
             bounds=(1e-3, 1e12),
-            units='Pa·s',
-            description='Zero-shear viscosity'
+            units="Pa·s",
+            description="Zero-shear viscosity",
         )
         self.parameters.add(
-            name='eta_inf',
+            name="eta_inf",
             value=0.001,
             bounds=(1e-6, 1e6),
-            units='Pa·s',
-            description='Infinite-shear viscosity'
+            units="Pa·s",
+            description="Infinite-shear viscosity",
         )
         self.parameters.add(
-            name='lambda_',
+            name="lambda_",
             value=1.0,
             bounds=(1e-6, 1e6),
-            units='s',
-            description='Time constant'
+            units="s",
+            description="Time constant",
         )
         self.parameters.add(
-            name='n',
+            name="n",
             value=0.5,
             bounds=(0.01, 1.0),
-            units='dimensionless',
-            description='Power-law index'
+            units="dimensionless",
+            description="Power-law index",
         )
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> Carreau:
@@ -114,8 +115,8 @@ class Carreau(BaseModel):
         y_sorted = y[sort_idx]
 
         # Estimate plateaus
-        eta0_est = np.max(y_sorted[:len(y_sorted)//10 + 1])  # Average low shear
-        eta_inf_est = np.min(y_sorted[-len(y_sorted)//10:])  # Average high shear
+        eta0_est = np.max(y_sorted[: len(y_sorted) // 10 + 1])  # Average low shear
+        eta_inf_est = np.min(y_sorted[-len(y_sorted) // 10 :])  # Average high shear
 
         # Find characteristic shear rate (midpoint)
         eta_mid = (eta0_est + eta_inf_est) / 2.0
@@ -144,10 +145,10 @@ class Carreau(BaseModel):
         if eta0_est <= eta_inf_est:
             eta0_est = eta_inf_est * 10.0
 
-        self.parameters.set_value('eta0', float(eta0_est))
-        self.parameters.set_value('eta_inf', float(eta_inf_est))
-        self.parameters.set_value('lambda_', float(lambda_est))
-        self.parameters.set_value('n', float(n_est))
+        self.parameters.set_value("eta0", float(eta0_est))
+        self.parameters.set_value("eta_inf", float(eta_inf_est))
+        self.parameters.set_value("lambda_", float(lambda_est))
+        self.parameters.set_value("n", float(n_est))
 
         return self
 
@@ -160,10 +161,10 @@ class Carreau(BaseModel):
         Returns:
             Predicted viscosity η(γ̇)
         """
-        eta0 = self.parameters.get_value('eta0')
-        eta_inf = self.parameters.get_value('eta_inf')
-        lambda_ = self.parameters.get_value('lambda_')
-        n = self.parameters.get_value('n')
+        eta0 = self.parameters.get_value("eta0")
+        eta_inf = self.parameters.get_value("eta_inf")
+        lambda_ = self.parameters.get_value("lambda_")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX for computation
         gamma_dot = jnp.array(X)
@@ -181,7 +182,7 @@ class Carreau(BaseModel):
         eta0: float,
         eta_inf: float,
         lambda_: float,
-        n: float
+        n: float,
     ) -> jnp.ndarray:
         """Compute viscosity using Carreau model.
 
@@ -207,7 +208,7 @@ class Carreau(BaseModel):
         eta0: float,
         eta_inf: float,
         lambda_: float,
-        n: float
+        n: float,
     ) -> jnp.ndarray:
         """Compute shear stress using Carreau model.
 
@@ -234,10 +235,10 @@ class Carreau(BaseModel):
         Returns:
             Predicted shear stress σ(γ̇)
         """
-        eta0 = self.parameters.get_value('eta0')
-        eta_inf = self.parameters.get_value('eta_inf')
-        lambda_ = self.parameters.get_value('lambda_')
-        n = self.parameters.get_value('n')
+        eta0 = self.parameters.get_value("eta0")
+        eta_inf = self.parameters.get_value("eta_inf")
+        lambda_ = self.parameters.get_value("lambda_")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX for computation
         gamma_dot_jax = jnp.array(gamma_dot)
@@ -251,8 +252,8 @@ class Carreau(BaseModel):
     def predict_rheo(
         self,
         rheo_data: RheoData,
-        test_mode: Optional[TestMode] = None,
-        output: str = 'viscosity'
+        test_mode: TestMode | None = None,
+        output: str = "viscosity",
     ) -> RheoData:
         """Predict rheological response for RheoData.
 
@@ -281,23 +282,25 @@ class Carreau(BaseModel):
         gamma_dot = rheo_data.x
 
         # Get parameters
-        eta0 = self.parameters.get_value('eta0')
-        eta_inf = self.parameters.get_value('eta_inf')
-        lambda_ = self.parameters.get_value('lambda_')
-        n = self.parameters.get_value('n')
+        eta0 = self.parameters.get_value("eta0")
+        eta_inf = self.parameters.get_value("eta_inf")
+        lambda_ = self.parameters.get_value("lambda_")
+        n = self.parameters.get_value("n")
 
         # Convert to JAX
         gamma_dot_jax = jnp.array(gamma_dot)
 
         # Compute prediction based on output type
-        if output == 'viscosity':
+        if output == "viscosity":
             y_pred = self._predict_viscosity(gamma_dot_jax, eta0, eta_inf, lambda_, n)
-            y_units = 'Pa·s'
-        elif output == 'stress':
+            y_units = "Pa·s"
+        elif output == "stress":
             y_pred = self._predict_stress(gamma_dot_jax, eta0, eta_inf, lambda_, n)
-            y_units = 'Pa'
+            y_units = "Pa"
         else:
-            raise ValueError(f"Invalid output type: {output}. Must be 'viscosity' or 'stress'")
+            raise ValueError(
+                f"Invalid output type: {output}. Must be 'viscosity' or 'stress'"
+            )
 
         # Convert back to numpy
         y_pred = np.array(y_pred)
@@ -306,28 +309,28 @@ class Carreau(BaseModel):
         return RheoData(
             x=np.array(gamma_dot),
             y=y_pred,
-            x_units=rheo_data.x_units or '1/s',
+            x_units=rheo_data.x_units or "1/s",
             y_units=y_units,
-            domain='time',
+            domain="time",
             metadata={
-                'model': 'Carreau',
-                'test_mode': TestMode.ROTATION,
-                'output': output,
-                'eta0': eta0,
-                'eta_inf': eta_inf,
-                'lambda_': lambda_,
-                'n': n
+                "model": "Carreau",
+                "test_mode": TestMode.ROTATION,
+                "output": output,
+                "eta0": eta0,
+                "eta_inf": eta_inf,
+                "lambda_": lambda_,
+                "n": n,
             },
-            validate=False
+            validate=False,
         )
 
     def __repr__(self) -> str:
         """String representation."""
-        eta0 = self.parameters.get_value('eta0')
-        eta_inf = self.parameters.get_value('eta_inf')
-        lambda_ = self.parameters.get_value('lambda_')
-        n = self.parameters.get_value('n')
+        eta0 = self.parameters.get_value("eta0")
+        eta_inf = self.parameters.get_value("eta_inf")
+        lambda_ = self.parameters.get_value("lambda_")
+        n = self.parameters.get_value("n")
         return f"Carreau(eta0={eta0:.3e}, eta_inf={eta_inf:.3e}, lambda={lambda_:.3e}, n={n:.3f})"
 
 
-__all__ = ['Carreau']
+__all__ = ["Carreau"]

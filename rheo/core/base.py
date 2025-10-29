@@ -7,28 +7,41 @@ for all models and transforms in the rheo package, with full JAX support.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Union
+from typing import Any, Union
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 
-from .parameters import ParameterSet
-
+from rheo.core.bayesian import BayesianMixin, BayesianResult
+from rheo.core.parameters import ParameterSet
 
 ArrayLike = Union[np.ndarray, jnp.ndarray]
 
 
-class BaseModel(ABC):
+class BaseModel(BayesianMixin, ABC):
     """Abstract base class for all rheological models.
 
     This class defines the standard interface that all models must implement,
-    supporting JAX arrays and multiple API styles (fluent, scikit-learn, piblin).
+    supporting JAX arrays, multiple API styles (fluent, scikit-learn, piblin),
+    and Bayesian inference via NumPyro NUTS.
+
+    All models inherit Bayesian capabilities from BayesianMixin, including:
+    - fit_bayesian(): Bayesian parameter estimation using NUTS
+    - sample_prior(): Sample from prior distributions
+    - get_credible_intervals(): Compute highest density intervals
+
+    The fit() method uses NLSQ optimization by default for fast point estimation,
+    which can be used to warm-start Bayesian inference.
     """
 
     def __init__(self):
         """Initialize base model."""
         self.parameters = ParameterSet()
         self.fitted_ = False
+        self._nlsq_result = None  # Store NLSQ optimization result
+        self._bayesian_result = None  # Store Bayesian inference result
+        self.X_data = None  # Store data for Bayesian inference
+        self.y_data = None
 
     @abstractmethod
     def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> BaseModel:
@@ -56,20 +69,110 @@ class BaseModel(ABC):
         """
         pass
 
-    def fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> BaseModel:
-        """Fit the model to data.
+    def fit(
+        self, X: ArrayLike, y: ArrayLike, method: str = "nlsq", **kwargs
+    ) -> BaseModel:
+        """Fit the model to data using NLSQ optimization.
+
+        This method uses NLSQ (GPU-accelerated nonlinear least squares) by default
+        for fast point estimation. The optimization result is stored for potential
+        warm-starting of Bayesian inference.
 
         Args:
             X: Input features
             y: Target values
-            **kwargs: Additional fitting options
+            method: Optimization method ('nlsq' by default for compatibility)
+            **kwargs: Additional fitting options passed to _fit()
 
         Returns:
             self for method chaining (scikit-learn style)
+
+        Example:
+            >>> model = Maxwell()
+            >>> model.fit(t, G_data)  # Uses NLSQ by default
+            >>> model.fit(t, G_data, method='nlsq', max_iter=1000)
         """
-        self._fit(X, y, **kwargs)
+        # Store data for potential Bayesian inference
+        self.X_data = X
+        self.y_data = y
+
+        # Call subclass implementation (which uses NLSQ via optimization module)
+        self._fit(X, y, method=method, **kwargs)
         self.fitted_ = True
+
+        # Note: _nlsq_result would be set by subclass _fit implementation
+        # if it explicitly stores the OptimizationResult
         return self
+
+    def fit_bayesian(
+        self,
+        X: ArrayLike,
+        y: ArrayLike,
+        num_warmup: int = 1000,
+        num_samples: int = 2000,
+        num_chains: int = 1,
+        initial_values: dict[str, float] | None = None,
+        **nuts_kwargs,
+    ) -> BayesianResult:
+        """Perform Bayesian inference using NumPyro NUTS sampler.
+
+        This method delegates to BayesianMixin.fit_bayesian() to run NUTS sampling
+        for Bayesian parameter estimation. If initial_values is not provided and
+        the model has been previously fitted with fit(), the NLSQ point estimates
+        are automatically used for warm-starting.
+
+        Args:
+            X: Independent variable data (input features)
+            y: Dependent variable data (observations to fit)
+            num_warmup: Number of warmup/burn-in iterations (default: 1000)
+            num_samples: Number of posterior samples to collect (default: 2000)
+            num_chains: Number of MCMC chains (default: 1)
+            initial_values: Optional dict of initial parameter values for
+                warm-start. If None and model is fitted, uses NLSQ estimates.
+            **nuts_kwargs: Additional arguments passed to NUTS sampler
+
+        Returns:
+            BayesianResult containing posterior samples, summary statistics,
+            and convergence diagnostics (R-hat, ESS, divergences)
+
+        Example:
+            >>> model = Maxwell()
+            >>> # Warm-start from NLSQ
+            >>> model.fit(t, G_data)  # NLSQ optimization
+            >>> result = model.fit_bayesian(t, G_data)  # NUTS with warm-start
+            >>>
+            >>> # Or provide explicit initial values
+            >>> result = model.fit_bayesian(
+            ...     t, G_data,
+            ...     initial_values={'G0': 1e5, 'eta': 1e3}
+            ... )
+        """
+        # Store data for model_function access
+        self.X_data = X
+        self.y_data = y
+
+        # Auto warm-start from NLSQ if available and no explicit initial values
+        if initial_values is None and self.fitted_:
+            # Extract current parameter values as initial values
+            initial_values = {
+                name: self.parameters.get_value(name) for name in self.parameters
+            }
+
+        # Call BayesianMixin implementation
+        result = super().fit_bayesian(
+            X,
+            y,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            initial_values=initial_values,
+            **nuts_kwargs,
+        )
+
+        # Store result for later access
+        self._bayesian_result = result
+
+        return result
 
     def predict(self, X: ArrayLike) -> ArrayLike:
         """Make predictions.
@@ -102,7 +205,34 @@ class BaseModel(ABC):
         self.fit(X, y, **kwargs)
         return self.predict(X)
 
-    def get_params(self, deep: bool = True) -> Dict[str, Any]:
+    def get_nlsq_result(self):
+        """Get stored NLSQ optimization result.
+
+        Returns:
+            OptimizationResult from NLSQ fit, or None if not fitted
+
+        Example:
+            >>> model.fit(t, G_data)
+            >>> result = model.get_nlsq_result()
+            >>> if result:
+            ...     print(f"Converged: {result.success}")
+        """
+        return self._nlsq_result
+
+    def get_bayesian_result(self) -> BayesianResult | None:
+        """Get stored Bayesian inference result.
+
+        Returns:
+            BayesianResult from fit_bayesian(), or None if not run
+
+        Example:
+            >>> model.fit_bayesian(t, G_data)
+            >>> result = model.get_bayesian_result()
+            >>> print(result.diagnostics['r_hat'])
+        """
+        return self._bayesian_result
+
+    def get_params(self, deep: bool = True) -> dict[str, Any]:
         """Get model parameters.
 
         Args:
@@ -111,7 +241,7 @@ class BaseModel(ABC):
         Returns:
             Dictionary of parameter names and values
         """
-        if hasattr(self, 'parameters') and self.parameters:
+        if hasattr(self, "parameters") and self.parameters:
             return self.parameters.to_dict()
         return {}
 
@@ -124,7 +254,7 @@ class BaseModel(ABC):
         Returns:
             self for method chaining
         """
-        if hasattr(self, 'parameters'):
+        if hasattr(self, "parameters"):
             for name, value in params.items():
                 if name in self.parameters:
                     self.parameters.set_value(name, value)
@@ -164,7 +294,7 @@ class BaseModel(ABC):
 
         return float(r2)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize model to dictionary.
 
         Returns:
@@ -173,11 +303,11 @@ class BaseModel(ABC):
         return {
             "class": self.__class__.__name__,
             "parameters": self.parameters.to_dict() if self.parameters else {},
-            "fitted": self.fitted_
+            "fitted": self.fitted_,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> BaseModel:
+    def from_dict(cls, data: dict[str, Any]) -> BaseModel:
         """Create model from dictionary.
 
         Args:
@@ -234,7 +364,9 @@ class BaseTransform(ABC):
         Raises:
             NotImplementedError: If inverse transform not available
         """
-        raise NotImplementedError(f"{self.__class__.__name__} does not support inverse transform")
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support inverse transform"
+        )
 
     def transform(self, data: ArrayLike) -> ArrayLike:
         """Transform the data.
@@ -366,12 +498,12 @@ class TransformPipeline(BaseTransform):
 
 
 # Import Parameter and ParameterSet for convenience
-from .parameters import Parameter, ParameterSet
+from rheo.core.parameters import Parameter
 
 __all__ = [
-    'BaseModel',
-    'BaseTransform',
-    'TransformPipeline',
-    'Parameter',
-    'ParameterSet'
+    "BaseModel",
+    "BaseTransform",
+    "TransformPipeline",
+    "Parameter",
+    "ParameterSet",
 ]

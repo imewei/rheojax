@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Union, List
 
 from rheo.core.data import RheoData
-from rheo.io.readers.trios import load_trios
 from rheo.io.readers.csv_reader import load_csv
 from rheo.io.readers.excel_reader import load_excel
-from rheo.io.readers.anton_paar import load_anton_paar
+from rheo.io.readers.trios import load_trios
 
 
-def auto_load(filepath: str, **kwargs) -> Union[RheoData, List[RheoData]]:
+def auto_load(filepath: str, **kwargs) -> RheoData | list[RheoData]:
     """Automatically detect file format and load data.
 
     This function attempts to determine the file format based on:
@@ -41,17 +39,17 @@ def auto_load(filepath: str, **kwargs) -> Union[RheoData, List[RheoData]]:
     extension = filepath.suffix.lower()
 
     # Try based on file extension first
-    if extension == '.txt':
+    if extension == ".txt":
         return _try_trios_then_csv(filepath, **kwargs)
 
-    elif extension == '.csv':
+    elif extension == ".csv":
         return _try_csv(filepath, **kwargs)
 
-    elif extension in ['.xlsx', '.xls']:
+    elif extension in [".xlsx", ".xls"]:
         return _try_excel(filepath, **kwargs)
 
-    elif extension == '.tsv':
-        kwargs['delimiter'] = '\t'
+    elif extension == ".tsv":
+        kwargs["delimiter"] = "\t"
         return _try_csv(filepath, **kwargs)
 
     else:
@@ -59,7 +57,7 @@ def auto_load(filepath: str, **kwargs) -> Union[RheoData, List[RheoData]]:
         return _try_all_readers(filepath, **kwargs)
 
 
-def _try_trios_then_csv(filepath: Path, **kwargs) -> Union[RheoData, List[RheoData]]:
+def _try_trios_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
     """Try TRIOS reader first, then CSV.
 
     Args:
@@ -73,7 +71,7 @@ def _try_trios_then_csv(filepath: Path, **kwargs) -> Union[RheoData, List[RheoDa
     try:
         return load_trios(str(filepath), **kwargs)
     except Exception as e:
-        warnings.warn(f"TRIOS reader failed: {e}. Trying CSV reader.")
+        warnings.warn(f"TRIOS reader failed: {e}. Trying CSV reader.", stacklevel=2)
 
     # Try CSV as fallback
     try:
@@ -93,35 +91,53 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
         RheoData object
     """
     # Check if x_col and y_col are specified
-    if 'x_col' not in kwargs or 'y_col' not in kwargs:
+    if "x_col" not in kwargs or "y_col" not in kwargs:
         # Try to auto-detect common column names
         import pandas as pd
+
         try:
             df = pd.read_csv(filepath)
             columns_lower = [c.lower() for c in df.columns]
 
             # Try to find time/frequency column
             x_col = None
-            for col_name in ['time', 'frequency', 'angular frequency', 't', 'f', 'omega']:
+            for col_name in [
+                "time",
+                "frequency",
+                "angular frequency",
+                "t",
+                "f",
+                "omega",
+            ]:
                 if col_name in columns_lower:
                     x_col = df.columns[columns_lower.index(col_name)]
                     break
 
             # Try to find stress/modulus column
             y_col = None
-            for col_name in ['stress', 'strain', 'modulus', 'storage modulus', 'viscosity']:
+            for col_name in [
+                "stress",
+                "strain",
+                "modulus",
+                "storage modulus",
+                "viscosity",
+            ]:
                 if col_name in columns_lower:
                     y_col = df.columns[columns_lower.index(col_name)]
                     break
 
             if x_col is None or y_col is None:
-                raise ValueError("Could not auto-detect x and y columns. Please specify x_col and y_col.")
+                raise ValueError(
+                    "Could not auto-detect x and y columns. Please specify x_col and y_col."
+                )
 
-            kwargs['x_col'] = x_col
-            kwargs['y_col'] = y_col
+            kwargs["x_col"] = x_col
+            kwargs["y_col"] = y_col
 
         except Exception as e:
-            raise ValueError(f"Could not auto-detect columns: {e}. Please specify x_col and y_col.")
+            raise ValueError(
+                f"Could not auto-detect columns: {e}. Please specify x_col and y_col."
+            )
 
     return load_csv(str(filepath), **kwargs)
 
@@ -137,13 +153,13 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
         RheoData object
     """
     # Check if x_col and y_col are specified
-    if 'x_col' not in kwargs or 'y_col' not in kwargs:
+    if "x_col" not in kwargs or "y_col" not in kwargs:
         raise ValueError("For Excel files, please specify x_col and y_col parameters")
 
     return load_excel(str(filepath), **kwargs)
 
 
-def _try_all_readers(filepath: Path, **kwargs) -> Union[RheoData, List[RheoData]]:
+def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
     """Try all available readers in sequence.
 
     Args:
@@ -157,8 +173,8 @@ def _try_all_readers(filepath: Path, **kwargs) -> Union[RheoData, List[RheoData]
         ValueError: If no reader can parse the file
     """
     readers = [
-        ('TRIOS', lambda: load_trios(str(filepath), **kwargs)),
-        ('CSV', lambda: _try_csv(filepath, **kwargs)),
+        ("TRIOS", lambda: load_trios(str(filepath), **kwargs)),
+        ("CSV", lambda: _try_csv(filepath, **kwargs)),
     ]
 
     errors = []

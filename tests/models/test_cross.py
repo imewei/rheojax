@@ -6,9 +6,9 @@ This module tests the Cross model for non-Newtonian flow.
 import numpy as np
 import pytest
 
-from rheo.models.cross import Cross
 from rheo.core.data import RheoData
 from rheo.core.test_modes import TestMode
+from rheo.models.cross import Cross
 
 
 class TestCrossBasics:
@@ -17,15 +17,15 @@ class TestCrossBasics:
     def test_initialization(self):
         """Test model initialization."""
         model = Cross()
-        assert 'eta0' in model.parameters
-        assert 'eta_inf' in model.parameters
-        assert 'lambda_' in model.parameters
-        assert 'm' in model.parameters
+        assert "eta0" in model.parameters
+        assert "eta_inf" in model.parameters
+        assert "lambda_" in model.parameters
+        assert "m" in model.parameters
 
     def test_parameter_bounds(self):
         """Test parameter bounds."""
         model = Cross()
-        m_param = model.parameters.get('m')
+        m_param = model.parameters.get("m")
         assert m_param.bounds == (0.1, 2.0)
 
 
@@ -35,10 +35,10 @@ class TestCrossPredictions:
     def test_low_shear_plateau(self):
         """Test Newtonian plateau at low shear rates."""
         model = Cross()
-        model.parameters.set_value('eta0', 1000.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('m', 1.0)
+        model.parameters.set_value("eta0", 1000.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("m", 1.0)
 
         gamma_dot = np.array([1e-6, 1e-5, 1e-4])
         viscosity = model.predict(gamma_dot)
@@ -53,10 +53,10 @@ class TestCrossPredictions:
         lambda_ = 2.0
         m = 1.5
 
-        model.parameters.set_value('eta0', eta0)
-        model.parameters.set_value('eta_inf', eta_inf)
-        model.parameters.set_value('lambda_', lambda_)
-        model.parameters.set_value('m', m)
+        model.parameters.set_value("eta0", eta0)
+        model.parameters.set_value("eta_inf", eta_inf)
+        model.parameters.set_value("lambda_", lambda_)
+        model.parameters.set_value("m", m)
 
         gamma_dot = np.array([0.1, 1.0, 10.0])
         viscosity = model.predict(gamma_dot)
@@ -70,10 +70,10 @@ class TestCrossPredictions:
     def test_shear_thinning(self):
         """Test shear-thinning behavior."""
         model = Cross()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('m', 1.0)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("m", 1.0)
 
         gamma_dot = np.logspace(-2, 2, 50)
         viscosity = model.predict(gamma_dot)
@@ -84,10 +84,10 @@ class TestCrossPredictions:
     def test_stress_prediction(self):
         """Test stress prediction."""
         model = Cross()
-        model.parameters.set_value('eta0', 50.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('m', 1.0)
+        model.parameters.set_value("eta0", 50.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("m", 1.0)
 
         gamma_dot = np.array([1.0, 10.0])
         stress = model.predict_stress(gamma_dot)
@@ -99,10 +99,10 @@ class TestCrossPredictions:
     def test_newtonian_limit_lambda_zero(self):
         """Test Newtonian limit when λ → 0."""
         model = Cross()
-        model.parameters.set_value('eta0', 50.0)
-        model.parameters.set_value('eta_inf', 10.0)
-        model.parameters.set_value('lambda_', 1e-6)  # Very small λ (at lower bound)
-        model.parameters.set_value('m', 1.0)
+        model.parameters.set_value("eta0", 50.0)
+        model.parameters.set_value("eta_inf", 10.0)
+        model.parameters.set_value("lambda_", 1e-6)  # Very small λ (at lower bound)
+        model.parameters.set_value("m", 1.0)
 
         gamma_dot = np.logspace(-2, 2, 50)
         viscosity = model.predict(gamma_dot)
@@ -116,22 +116,22 @@ class TestCrossRheoData:
     def test_predict_rheo_viscosity(self):
         """Test prediction with RheoData."""
         model = Cross()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('m', 1.0)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("m", 1.0)
 
         gamma_dot = np.logspace(-2, 2, 50)
         rheo_data = RheoData(
             x=gamma_dot,
             y=np.zeros_like(gamma_dot),
-            metadata={'test_mode': TestMode.ROTATION},
-            validate=False
+            metadata={"test_mode": TestMode.ROTATION},
+            validate=False,
         )
 
-        result = model.predict_rheo(rheo_data, output='viscosity')
-        assert result.metadata['model'] == 'Cross'
-        assert result.y_units == 'Pa·s'
+        result = model.predict_rheo(rheo_data, output="viscosity")
+        assert result.metadata["model"] == "Cross"
+        assert result.y_units == "Pa·s"
 
     def test_wrong_test_mode(self):
         """Test error for wrong test mode."""
@@ -139,8 +139,8 @@ class TestCrossRheoData:
         rheo_data = RheoData(
             x=np.array([1.0]),
             y=np.array([0.0]),
-            metadata={'test_mode': TestMode.CREEP},
-            validate=False
+            metadata={"test_mode": TestMode.CREEP},
+            validate=False,
         )
 
         with pytest.raises(ValueError, match="only supports ROTATION"):
@@ -153,10 +153,10 @@ class TestCrossStability:
     def test_extreme_shear_rates(self):
         """Test with extreme shear rates."""
         model = Cross()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('m', 1.0)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("m", 1.0)
 
         gamma_dot = np.array([1e-12, 1e12])
         viscosity = model.predict(gamma_dot)
@@ -168,10 +168,10 @@ class TestCrossStability:
     def test_zero_shear_rate(self):
         """Test at zero shear rate."""
         model = Cross()
-        model.parameters.set_value('eta0', 100.0)
-        model.parameters.set_value('eta_inf', 1.0)
-        model.parameters.set_value('lambda_', 1.0)
-        model.parameters.set_value('m', 1.0)
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("m", 1.0)
 
         gamma_dot = np.array([0.0])
         viscosity = model.predict(gamma_dot)
@@ -191,7 +191,9 @@ class TestCrossFitting:
 
         gamma_dot = np.logspace(-2, 2, 50)
         lambda_gamma = lambda_true * gamma_dot
-        viscosity_true = eta_inf_true + (eta0_true - eta_inf_true) / (1.0 + np.power(lambda_gamma, m_true))
+        viscosity_true = eta_inf_true + (eta0_true - eta_inf_true) / (
+            1.0 + np.power(lambda_gamma, m_true)
+        )
 
         model = Cross()
         model.fit(gamma_dot, viscosity_true)
@@ -203,5 +205,5 @@ class TestCrossFitting:
         assert np.all(predictions > 0)
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

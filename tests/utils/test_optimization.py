@@ -5,13 +5,13 @@ including JAX gradient integration, parameter bounds handling,
 and optimization convergence.
 """
 
-import numpy as np
-import pytest
 import jax
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.parameters import ParameterSet
-from rheo.utils.optimization import nlsq_optimize, OptimizationResult
+from rheo.utils.optimization import OptimizationResult, nlsq_optimize
 
 
 class TestOptimizationBasics:
@@ -283,7 +283,9 @@ class TestMaxwellModelFitting:
             return rss
 
         # Optimize with more iterations
-        result = nlsq_optimize(objective, params, use_jax=True, method="auto", max_iter=2000)
+        result = nlsq_optimize(
+            objective, params, use_jax=True, method="auto", max_iter=2000
+        )
 
         # Check convergence
         assert result.success, "Maxwell fitting should converge"

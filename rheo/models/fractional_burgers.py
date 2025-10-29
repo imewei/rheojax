@@ -46,17 +46,19 @@ References
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
 from jax.scipy.special import gamma as jax_gamma
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
 from rheo.utils.mittag_leffler import mittag_leffler_e
 
 
-@ModelRegistry.register('fractional_burgers')
+@ModelRegistry.register("fractional_burgers")
 class FractionalBurgersModel(BaseModel):
     """Fractional Burgers model.
 
@@ -93,43 +95,50 @@ class FractionalBurgersModel(BaseModel):
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='Jg',
+            name="Jg",
             value=None,
             bounds=(1e-9, 1e3),
-            units='1/Pa',
-            description='Glassy compliance'
+            units="1/Pa",
+            description="Glassy compliance",
         )
         self.parameters.add(
-            name='eta1',
+            name="eta1",
             value=None,
             bounds=(1e-6, 1e12),
-            units='Pa·s',
-            description='Viscosity (Maxwell arm)'
+            units="Pa·s",
+            description="Viscosity (Maxwell arm)",
         )
         self.parameters.add(
-            name='Jk',
+            name="Jk",
             value=None,
             bounds=(1e-9, 1e3),
-            units='1/Pa',
-            description='Kelvin compliance'
+            units="1/Pa",
+            description="Kelvin compliance",
         )
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=None,
             bounds=(0.0, 1.0),
-            units='',
-            description='Fractional order'
+            units="",
+            description="Fractional order",
         )
         self.parameters.add(
-            name='tau_k',
+            name="tau_k",
             value=None,
             bounds=(1e-6, 1e6),
-            units='s',
-            description='Retardation time'
+            units="s",
+            description="Retardation time",
         )
 
-    def _predict_creep(self, t: jnp.ndarray, Jg: float, eta1: float, Jk: float,
-                      alpha: float, tau_k: float) -> jnp.ndarray:
+    def _predict_creep(
+        self,
+        t: jnp.ndarray,
+        Jg: float,
+        eta1: float,
+        Jk: float,
+        alpha: float,
+        tau_k: float,
+    ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
         J(t) = J_g + t^α/(η_1 * Γ(1+α)) + J_k * (1 - E_α(-(t/τ_k)^α))
@@ -156,6 +165,7 @@ class FractionalBurgersModel(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -184,8 +194,15 @@ class FractionalBurgersModel(BaseModel):
 
         return _compute_creep(t, Jg, eta1, Jk, tau_k)
 
-    def _predict_relaxation(self, t: jnp.ndarray, Jg: float, eta1: float, Jk: float,
-                           alpha: float, tau_k: float) -> jnp.ndarray:
+    def _predict_relaxation(
+        self,
+        t: jnp.ndarray,
+        Jg: float,
+        eta1: float,
+        Jk: float,
+        alpha: float,
+        tau_k: float,
+    ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         Note: Analytical relaxation modulus requires numerical inversion.
@@ -213,6 +230,7 @@ class FractionalBurgersModel(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -240,8 +258,15 @@ class FractionalBurgersModel(BaseModel):
 
         return _compute_relaxation(t, Jg, eta1, Jk, tau_k)
 
-    def _predict_oscillation(self, omega: jnp.ndarray, Jg: float, eta1: float, Jk: float,
-                            alpha: float, tau_k: float) -> jnp.ndarray:
+    def _predict_oscillation(
+        self,
+        omega: jnp.ndarray,
+        Jg: float,
+        eta1: float,
+        Jk: float,
+        alpha: float,
+        tau_k: float,
+    ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
         Computed from complex compliance:
@@ -270,6 +295,7 @@ class FractionalBurgersModel(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -293,7 +319,9 @@ class FractionalBurgersModel(BaseModel):
             # Retardation term: J_k / (1 + (iωτ_k)^α)
             omega_tau_alpha = jnp.power(omega * tau_k_safe, alpha_safe)
             phase_alpha = jnp.pi * alpha_safe / 2.0
-            i_omega_tau_alpha = omega_tau_alpha * (jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha))
+            i_omega_tau_alpha = omega_tau_alpha * (
+                jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
+            )
 
             J_retard = Jk / (1.0 + i_omega_tau_alpha)
 
@@ -331,23 +359,21 @@ class FractionalBurgersModel(BaseModel):
         from rheo.core.parameters import ParameterOptimizer
 
         # Detect test mode
-        test_mode = kwargs.get('test_mode', 'creep')
+        test_mode = kwargs.get("test_mode", "creep")
 
         # Select prediction function
-        if test_mode == 'relaxation':
+        if test_mode == "relaxation":
             predict_fn = self._predict_relaxation
-        elif test_mode == 'creep':
+        elif test_mode == "creep":
             predict_fn = self._predict_creep
-        elif test_mode == 'oscillation':
+        elif test_mode == "oscillation":
             predict_fn = self._predict_oscillation
         else:
             raise ValueError(f"Test mode '{test_mode}' not supported for FBM")
 
         # Set up optimizer
         optimizer = ParameterOptimizer(
-            parameters=self.parameters,
-            predict_fn=predict_fn,
-            loss='mse'
+            parameters=self.parameters, predict_fn=predict_fn, loss="mse"
         )
 
         # Fit parameters
@@ -374,11 +400,11 @@ class FractionalBurgersModel(BaseModel):
         """
         # Get parameters
         params = self.parameters.to_dict()
-        Jg = params['Jg']
-        eta1 = params['eta1']
-        Jk = params['Jk']
-        alpha = params['alpha']
-        tau_k = params['tau_k']
+        Jg = params["Jg"]
+        eta1 = params["eta1"]
+        Jk = params["Jk"]
+        alpha = params["alpha"]
+        tau_k = params["tau_k"]
 
         # Auto-detect test mode
         if jnp.all(X > 0) and len(X) > 1:
@@ -393,4 +419,4 @@ class FractionalBurgersModel(BaseModel):
 # Convenience alias
 FBM = FractionalBurgersModel
 
-__all__ = ['FractionalBurgersModel', 'FBM']
+__all__ = ["FractionalBurgersModel", "FBM"]

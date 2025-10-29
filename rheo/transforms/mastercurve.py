@@ -6,9 +6,8 @@ from multi-temperature rheological data using WLF or Arrhenius shift factors.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union, Literal, Dict, List
+from typing import TYPE_CHECKING, Literal
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -19,10 +18,10 @@ if TYPE_CHECKING:
     from rheo.core.data import RheoData
 
 
-ShiftMethod = Literal['wlf', 'arrhenius', 'manual']
+ShiftMethod = Literal["wlf", "arrhenius", "manual"]
 
 
-@TransformRegistry.register('mastercurve')
+@TransformRegistry.register("mastercurve")
 class Mastercurve(BaseTransform):
     """Time-Temperature Superposition (TTS) mastercurve generation.
 
@@ -77,12 +76,12 @@ class Mastercurve(BaseTransform):
     def __init__(
         self,
         reference_temp: float = 298.15,
-        method: ShiftMethod = 'wlf',
+        method: ShiftMethod = "wlf",
         C1: float = 17.44,
         C2: float = 51.6,
-        E_a: Optional[float] = None,
+        E_a: float | None = None,
         vertical_shift: bool = False,
-        optimize_shifts: bool = True
+        optimize_shifts: bool = True,
     ):
         """Initialize Mastercurve transform.
 
@@ -113,16 +112,12 @@ class Mastercurve(BaseTransform):
         self.optimize_shifts = optimize_shifts
 
         # Store computed shift factors
-        self.shift_factors_: Optional[Dict[float, float]] = None
-        self.vertical_shifts_: Optional[Dict[float, float]] = None
+        self.shift_factors_: dict[float, float] | None = None
+        self.vertical_shifts_: dict[float, float] | None = None
 
     def _calculate_wlf_shift(
-        self,
-        T: Union[float, jnp.ndarray],
-        T_ref: float,
-        C1: float,
-        C2: float
-    ) -> Union[float, jnp.ndarray]:
+        self, T: float | jnp.ndarray, T_ref: float, C1: float, C2: float
+    ) -> float | jnp.ndarray:
         """Calculate WLF shift factor.
 
         Parameters
@@ -146,11 +141,8 @@ class Mastercurve(BaseTransform):
         return jnp.power(10.0, log_aT)
 
     def _calculate_arrhenius_shift(
-        self,
-        T: Union[float, jnp.ndarray],
-        T_ref: float,
-        E_a: float
-    ) -> Union[float, jnp.ndarray]:
+        self, T: float | jnp.ndarray, T_ref: float, E_a: float
+    ) -> float | jnp.ndarray:
         """Calculate Arrhenius shift factor.
 
         Parameters
@@ -186,20 +178,20 @@ class Mastercurve(BaseTransform):
         float
             Horizontal shift factor a_T
         """
-        if self.method == 'wlf':
+        if self.method == "wlf":
             return float(self._calculate_wlf_shift(T, self.T_ref, self.C1, self.C2))
-        elif self.method == 'arrhenius':
+        elif self.method == "arrhenius":
             if self.E_a is None:
                 raise ValueError("E_a must be provided for Arrhenius method")
             return float(self._calculate_arrhenius_shift(T, self.T_ref, self.E_a))
-        elif self.method == 'manual':
+        elif self.method == "manual":
             if self.shift_factors_ is None:
                 raise ValueError("Manual shift factors not set")
             return self.shift_factors_.get(T, 1.0)
         else:
             raise ValueError(f"Unknown shift method: {self.method}")
 
-    def set_manual_shifts(self, shift_factors: Dict[float, float]):
+    def set_manual_shifts(self, shift_factors: dict[float, float]):
         """Set manual shift factors for each temperature.
 
         Parameters
@@ -207,7 +199,7 @@ class Mastercurve(BaseTransform):
         shift_factors : dict
             Dictionary mapping temperature (K) to shift factor
         """
-        self.method = 'manual'
+        self.method = "manual"
         self.shift_factors_ = shift_factors
 
     def _transform(self, data: RheoData) -> RheoData:
@@ -234,10 +226,10 @@ class Mastercurve(BaseTransform):
         from rheo.core.data import RheoData
 
         # Get temperature from metadata
-        if 'temperature' not in data.metadata:
+        if "temperature" not in data.metadata:
             raise ValueError("Temperature must be in metadata for mastercurve shifting")
 
-        T = data.metadata['temperature']
+        T = data.metadata["temperature"]
 
         # Get shift factor
         a_T = self.get_shift_factor(T)
@@ -256,13 +248,15 @@ class Mastercurve(BaseTransform):
 
         # Create metadata
         new_metadata = data.metadata.copy()
-        new_metadata.update({
-            'transform': 'mastercurve',
-            'reference_temperature': self.T_ref,
-            'shift_method': self.method,
-            'horizontal_shift': float(a_T),
-            'vertical_shift': float(T / self.T_ref) if self.vertical_shift else 1.0
-        })
+        new_metadata.update(
+            {
+                "transform": "mastercurve",
+                "reference_temperature": self.T_ref,
+                "shift_method": self.method,
+                "horizontal_shift": float(a_T),
+                "vertical_shift": float(T / self.T_ref) if self.vertical_shift else 1.0,
+            }
+        )
 
         return RheoData(
             x=x_shifted,
@@ -271,14 +265,12 @@ class Mastercurve(BaseTransform):
             y_units=data.y_units,
             domain=data.domain,
             metadata=new_metadata,
-            validate=False
+            validate=False,
         )
 
     def create_mastercurve(
-        self,
-        datasets: List[RheoData],
-        merge: bool = True
-    ) -> Union[RheoData, List[RheoData]]:
+        self, datasets: list[RheoData], merge: bool = True
+    ) -> RheoData | list[RheoData]:
         """Create mastercurve from multiple temperature datasets.
 
         Parameters
@@ -306,10 +298,10 @@ class Mastercurve(BaseTransform):
         temperatures = []
 
         for data in datasets:
-            if 'temperature' not in data.metadata:
+            if "temperature" not in data.metadata:
                 raise ValueError("All datasets must have 'temperature' in metadata")
 
-            temperatures.append(data.metadata['temperature'])
+            temperatures.append(data.metadata["temperature"])
             shifted = self.transform(data)
             shifted_datasets.append(shifted)
 
@@ -322,7 +314,7 @@ class Mastercurve(BaseTransform):
         all_y = []
         all_temps = []
 
-        for data, T in zip(shifted_datasets, temperatures):
+        for data, T in zip(shifted_datasets, temperatures, strict=False):
             x_data = data.x if isinstance(data.x, np.ndarray) else np.array(data.x)
             y_data = data.y if isinstance(data.y, np.ndarray) else np.array(data.y)
 
@@ -343,12 +335,12 @@ class Mastercurve(BaseTransform):
 
         # Create merged metadata
         merged_metadata = {
-            'transform': 'mastercurve',
-            'reference_temperature': self.T_ref,
-            'shift_method': self.method,
-            'temperatures': temperatures,
-            'n_datasets': len(datasets),
-            'source_temperatures': merged_temps
+            "transform": "mastercurve",
+            "reference_temperature": self.T_ref,
+            "shift_method": self.method,
+            "temperatures": temperatures,
+            "n_datasets": len(datasets),
+            "source_temperatures": merged_temps,
         }
 
         return RheoData(
@@ -356,12 +348,12 @@ class Mastercurve(BaseTransform):
             y=merged_y,
             x_units=datasets[0].x_units if datasets else None,
             y_units=datasets[0].y_units if datasets else None,
-            domain=datasets[0].domain if datasets else 'frequency',
+            domain=datasets[0].domain if datasets else "frequency",
             metadata=merged_metadata,
-            validate=False
+            validate=False,
         )
 
-    def compute_overlap_error(self, datasets: List[RheoData]) -> float:
+    def compute_overlap_error(self, datasets: list[RheoData]) -> float:
         """Compute overlap error for multi-temperature data.
 
         This metric quantifies how well the datasets collapse onto a
@@ -393,8 +385,12 @@ class Mastercurve(BaseTransform):
                 data_j = shifted_datasets[j]
 
                 # Find overlap region
-                x_i = data_i.x if isinstance(data_i.x, np.ndarray) else np.array(data_i.x)
-                x_j = data_j.x if isinstance(data_j.x, np.ndarray) else np.array(data_j.x)
+                x_i = (
+                    data_i.x if isinstance(data_i.x, np.ndarray) else np.array(data_i.x)
+                )
+                x_j = (
+                    data_j.x if isinstance(data_j.x, np.ndarray) else np.array(data_j.x)
+                )
 
                 x_min = max(x_i.min(), x_j.min())
                 x_max = min(x_i.max(), x_j.max())
@@ -414,15 +410,15 @@ class Mastercurve(BaseTransform):
                 n_overlaps += 1
 
         if n_overlaps == 0:
-            return float('inf')
+            return float("inf")
 
         return total_error / n_overlaps
 
     def optimize_wlf_parameters(
         self,
-        datasets: List[RheoData],
+        datasets: list[RheoData],
         initial_C1: float = 17.44,
-        initial_C2: float = 51.6
+        initial_C2: float = 51.6,
     ) -> tuple[float, float]:
         """Optimize WLF parameters to minimize overlap error.
 
@@ -455,8 +451,8 @@ class Mastercurve(BaseTransform):
         result = minimize(
             objective,
             x0=[initial_C1, initial_C2],
-            method='Nelder-Mead',
-            bounds=[(5, 50), (20, 200)]
+            method="Nelder-Mead",
+            bounds=[(5, 50), (20, 200)],
         )
 
         C1_opt, C2_opt = result.x
@@ -466,4 +462,4 @@ class Mastercurve(BaseTransform):
         return C1_opt, C2_opt
 
 
-__all__ = ['Mastercurve']
+__all__ = ["Mastercurve"]

@@ -8,22 +8,23 @@ NOTE: This requires hermes-rheo to be installed and accessible.
 Path: /Users/b80985/Documents/GitHub/hermes-rheo/
 """
 
-import pytest
-import numpy as np
 import sys
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 # Add hermes-rheo to path
 HERMES_PATH = Path("/Users/b80985/Documents/GitHub/hermes-rheo/")
 if HERMES_PATH.exists():
     sys.path.insert(0, str(HERMES_PATH))
 
+from rheo.core.data import RheoData
 from rheo.transforms.fft_analysis import FFTAnalysis
 from rheo.transforms.mastercurve import Mastercurve
 from rheo.transforms.mutation_number import MutationNumber
 from rheo.transforms.owchirp import OWChirp
 from rheo.transforms.smooth_derivative import SmoothDerivative
-from rheo.core.data import RheoData
 
 
 class TestFFTAnalysisVsHermes:
@@ -38,11 +39,7 @@ class TestFFTAnalysisVsHermes:
         omega = np.logspace(-2, 2, 50)
         G_star = 1e6 * (1 + 1j * omega)
 
-        data = RheoData(
-            x=omega,
-            y=G_star,
-            domain="frequency"
-        )
+        data = RheoData(x=omega, y=G_star, domain="frequency")
 
         # rheo transform
         fft_rheo = FFTAnalysis()

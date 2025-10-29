@@ -10,26 +10,22 @@ The Pipeline API provides the simplest way to analyze rheological data:
 
 .. code-block:: python
 
-   from rheo.pipelines import RheoPipeline
+   from rheo.pipeline import Pipeline
 
    # Create pipeline
-   pipeline = RheoPipeline()
+   pipeline = Pipeline()
 
    # Load data (auto-detects format)
    pipeline.load('experiment.txt')
 
-   # Analyze data
-   pipeline.analyze(method='fft')
-
    # Fit model
-   pipeline.fit_model('Maxwell')
+   pipeline.fit('maxwell')
 
-   # Get results
-   results = pipeline.get_results()
-   print(f"G_s = {results['parameters']['G_s']:.2e} Pa")
+   # Plot results
+   pipeline.plot()
 
-   # Visualize
-   pipeline.plot(save='fit.png')
+   # Save results
+   pipeline.save('results.hdf5')
 
 Working with Models
 -------------------

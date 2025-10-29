@@ -1,11 +1,11 @@
 """Tests for test mode detection functionality."""
 
-import pytest
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.data import RheoData
-from rheo.core.test_modes import detect_test_mode, TestMode
+from rheo.core.test_modes import TestMode, detect_test_mode
 
 
 class TestModeDetection:
@@ -17,13 +17,7 @@ class TestModeDetection:
         time = np.linspace(0, 100, 100)
         stress = 1000 * np.exp(-time / 10)  # Exponential decay
 
-        data = RheoData(
-            x=time,
-            y=stress,
-            x_units='s',
-            y_units='Pa',
-            domain='time'
-        )
+        data = RheoData(x=time, y=stress, x_units="s", y_units="Pa", domain="time")
 
         mode = detect_test_mode(data)
         assert mode == TestMode.RELAXATION
@@ -35,11 +29,7 @@ class TestModeDetection:
         strain = 0.01 * (1 - np.exp(-time / 20))  # Creep compliance curve
 
         data = RheoData(
-            x=time,
-            y=strain,
-            x_units='s',
-            y_units='unitless',
-            domain='time'
+            x=time, y=strain, x_units="s", y_units="unitless", domain="time"
         )
 
         mode = detect_test_mode(data)
@@ -52,11 +42,7 @@ class TestModeDetection:
         G_prime = 1000 * freq**0.5  # Storage modulus
 
         data = RheoData(
-            x=freq,
-            y=G_prime,
-            x_units='rad/s',
-            y_units='Pa',
-            domain='frequency'
+            x=freq, y=G_prime, x_units="rad/s", y_units="Pa", domain="frequency"
         )
 
         mode = detect_test_mode(data)
@@ -69,11 +55,7 @@ class TestModeDetection:
         G_double_prime = 500 * freq**0.8  # Loss modulus
 
         data = RheoData(
-            x=freq,
-            y=G_double_prime,
-            x_units='Hz',
-            y_units='Pa',
-            domain='frequency'
+            x=freq, y=G_double_prime, x_units="Hz", y_units="Pa", domain="frequency"
         )
 
         mode = detect_test_mode(data)
@@ -83,14 +65,14 @@ class TestModeDetection:
         """Test rotation (steady shear) detection with shear rate."""
         # Steady shear data (rotation)
         shear_rate = np.logspace(-2, 3, 50)  # 0.01 to 1000 1/s
-        viscosity = 100 * shear_rate**(-0.3)  # Shear-thinning
+        viscosity = 100 * shear_rate ** (-0.3)  # Shear-thinning
 
         data = RheoData(
             x=shear_rate,
             y=viscosity,
-            x_units='1/s',
-            y_units='Pa.s',
-            domain='time'  # Steady shear is typically time-domain measurement
+            x_units="1/s",
+            y_units="Pa.s",
+            domain="time",  # Steady shear is typically time-domain measurement
         )
 
         mode = detect_test_mode(data)
@@ -102,11 +84,7 @@ class TestModeDetection:
         stress = 50 + 10 * shear_rate**0.5  # Herschel-Bulkley-like
 
         data = RheoData(
-            x=shear_rate,
-            y=stress,
-            x_units='s^-1',
-            y_units='Pa',
-            domain='time'
+            x=shear_rate, y=stress, x_units="s^-1", y_units="Pa", domain="time"
         )
 
         mode = detect_test_mode(data)
@@ -121,10 +99,10 @@ class TestModeDetection:
         data = RheoData(
             x=time,
             y=stress,
-            x_units='s',
-            y_units='Pa',
-            domain='time',
-            metadata={'test_mode': 'oscillation'}
+            x_units="s",
+            y_units="Pa",
+            domain="time",
+            metadata={"test_mode": "oscillation"},
         )
 
         mode = detect_test_mode(data)
@@ -137,11 +115,7 @@ class TestModeDetection:
         data_oscillating = 1000 * np.sin(time / 10)  # Oscillating in time
 
         data = RheoData(
-            x=time,
-            y=data_oscillating,
-            x_units='s',
-            y_units='Pa',
-            domain='time'
+            x=time, y=data_oscillating, x_units="s", y_units="Pa", domain="time"
         )
 
         mode = detect_test_mode(data)
@@ -154,11 +128,7 @@ class TestModeDetection:
         G_star = 1000 * (1 + 0.5j) * freq**0.5
 
         data = RheoData(
-            x=freq,
-            y=G_star,
-            x_units='rad/s',
-            y_units='Pa',
-            domain='frequency'
+            x=freq, y=G_star, x_units="rad/s", y_units="Pa", domain="frequency"
         )
 
         mode = detect_test_mode(data)
@@ -170,21 +140,15 @@ class TestModeDetection:
         time = np.linspace(0, 100, 100)
         stress = 1000 * np.exp(-time / 10)
 
-        data = RheoData(
-            x=time,
-            y=stress,
-            x_units='s',
-            y_units='Pa',
-            domain='time'
-        )
+        data = RheoData(x=time, y=stress, x_units="s", y_units="Pa", domain="time")
 
         # Access test_mode property
         mode = data.test_mode
         assert mode == TestMode.RELAXATION
 
         # Verify it's cached in metadata
-        assert 'detected_test_mode' in data.metadata
-        assert data.metadata['detected_test_mode'] == TestMode.RELAXATION
+        assert "detected_test_mode" in data.metadata
+        assert data.metadata["detected_test_mode"] == TestMode.RELAXATION
 
     def test_jax_arrays_work(self):
         """Test that detection works with JAX arrays."""
@@ -192,13 +156,7 @@ class TestModeDetection:
         time = jnp.linspace(0, 100, 100)
         stress = 1000 * jnp.exp(-time / 10)
 
-        data = RheoData(
-            x=time,
-            y=stress,
-            x_units='s',
-            y_units='Pa',
-            domain='time'
-        )
+        data = RheoData(x=time, y=stress, x_units="s", y_units="Pa", domain="time")
 
         mode = detect_test_mode(data)
         assert mode == TestMode.RELAXATION
@@ -247,16 +205,16 @@ class TestModeEnum:
 
     def test_test_mode_values(self):
         """Test TestMode enum values."""
-        assert TestMode.RELAXATION == 'relaxation'
-        assert TestMode.CREEP == 'creep'
-        assert TestMode.OSCILLATION == 'oscillation'
-        assert TestMode.ROTATION == 'rotation'
-        assert TestMode.UNKNOWN == 'unknown'
+        assert TestMode.RELAXATION == "relaxation"
+        assert TestMode.CREEP == "creep"
+        assert TestMode.OSCILLATION == "oscillation"
+        assert TestMode.ROTATION == "rotation"
+        assert TestMode.UNKNOWN == "unknown"
 
     def test_test_mode_from_string(self):
         """Test converting string to TestMode."""
-        assert TestMode('relaxation') == TestMode.RELAXATION
-        assert TestMode('oscillation') == TestMode.OSCILLATION
+        assert TestMode("relaxation") == TestMode.RELAXATION
+        assert TestMode("oscillation") == TestMode.OSCILLATION
 
 
 class TestValidationDataset:
@@ -264,7 +222,7 @@ class TestValidationDataset:
 
     def test_detection_accuracy_target(self):
         """Test that detection achieves >95% accuracy on validation dataset."""
-        from rheo.core.test_modes import detect_test_mode, TestMode
+        from rheo.core.test_modes import TestMode, detect_test_mode
 
         # Create comprehensive validation dataset
         test_cases = []
@@ -277,11 +235,15 @@ class TestValidationDataset:
             initial = np.random.uniform(100, 10000)
             stress = initial * np.exp(-time / tau)
 
-            test_cases.append({
-                'data': RheoData(x=time, y=stress, x_units='s', y_units='Pa', domain='time'),
-                'expected': TestMode.RELAXATION,
-                'description': f'Relaxation case {i+1}'
-            })
+            test_cases.append(
+                {
+                    "data": RheoData(
+                        x=time, y=stress, x_units="s", y_units="Pa", domain="time"
+                    ),
+                    "expected": TestMode.RELAXATION,
+                    "description": f"Relaxation case {i+1}",
+                }
+            )
 
         # Creep cases (20 variants)
         for i in range(20):
@@ -291,52 +253,72 @@ class TestValidationDataset:
             tau = np.random.uniform(10, 50)
             strain = J0 * (1 - np.exp(-time / tau))
 
-            test_cases.append({
-                'data': RheoData(x=time, y=strain, x_units='s', y_units='unitless', domain='time'),
-                'expected': TestMode.CREEP,
-                'description': f'Creep case {i+1}'
-            })
+            test_cases.append(
+                {
+                    "data": RheoData(
+                        x=time, y=strain, x_units="s", y_units="unitless", domain="time"
+                    ),
+                    "expected": TestMode.CREEP,
+                    "description": f"Creep case {i+1}",
+                }
+            )
 
         # Oscillation cases (30 variants)
         for i in range(30):
             # Vary frequency range and units
             if i < 15:
                 freq = np.logspace(-2, 2, 50)
-                x_units = 'rad/s'
+                x_units = "rad/s"
             else:
                 freq = np.logspace(-1, 1, 50)
-                x_units = 'Hz'
+                x_units = "Hz"
 
             # Vary modulus scaling
             alpha = np.random.uniform(0.3, 0.8)
             G0 = np.random.uniform(100, 10000)
             modulus = G0 * freq**alpha
 
-            test_cases.append({
-                'data': RheoData(x=freq, y=modulus, x_units=x_units, y_units='Pa', domain='frequency'),
-                'expected': TestMode.OSCILLATION,
-                'description': f'Oscillation case {i+1}'
-            })
+            test_cases.append(
+                {
+                    "data": RheoData(
+                        x=freq,
+                        y=modulus,
+                        x_units=x_units,
+                        y_units="Pa",
+                        domain="frequency",
+                    ),
+                    "expected": TestMode.OSCILLATION,
+                    "description": f"Oscillation case {i+1}",
+                }
+            )
 
         # Rotation cases (20 variants)
         for i in range(20):
             shear_rate = np.logspace(-2, 3, 50)
             # Vary flow behavior
             if i < 10:
-                x_units = '1/s'
+                x_units = "1/s"
             else:
-                x_units = 's^-1'
+                x_units = "s^-1"
 
             # Power law viscosity
             n = np.random.uniform(0.2, 0.9)
             K = np.random.uniform(10, 1000)
-            viscosity = K * shear_rate**(n - 1)
+            viscosity = K * shear_rate ** (n - 1)
 
-            test_cases.append({
-                'data': RheoData(x=shear_rate, y=viscosity, x_units=x_units, y_units='Pa.s', domain='time'),
-                'expected': TestMode.ROTATION,
-                'description': f'Rotation case {i+1}'
-            })
+            test_cases.append(
+                {
+                    "data": RheoData(
+                        x=shear_rate,
+                        y=viscosity,
+                        x_units=x_units,
+                        y_units="Pa.s",
+                        domain="time",
+                    ),
+                    "expected": TestMode.ROTATION,
+                    "description": f"Rotation case {i+1}",
+                }
+            )
 
         # Complex modulus cases (10 variants)
         for i in range(10):
@@ -345,11 +327,19 @@ class TestValidationDataset:
             G_double_prime = 500 * freq**0.7
             G_star = G_prime + 1j * G_double_prime
 
-            test_cases.append({
-                'data': RheoData(x=freq, y=G_star, x_units='rad/s', y_units='Pa', domain='frequency'),
-                'expected': TestMode.OSCILLATION,
-                'description': f'Complex modulus case {i+1}'
-            })
+            test_cases.append(
+                {
+                    "data": RheoData(
+                        x=freq,
+                        y=G_star,
+                        x_units="rad/s",
+                        y_units="Pa",
+                        domain="frequency",
+                    ),
+                    "expected": TestMode.OSCILLATION,
+                    "description": f"Complex modulus case {i+1}",
+                }
+            )
 
         # Run detection on all cases
         correct = 0
@@ -357,15 +347,17 @@ class TestValidationDataset:
         failed_cases = []
 
         for case in test_cases:
-            detected = detect_test_mode(case['data'])
-            if detected == case['expected']:
+            detected = detect_test_mode(case["data"])
+            if detected == case["expected"]:
                 correct += 1
             else:
-                failed_cases.append({
-                    'description': case['description'],
-                    'expected': case['expected'],
-                    'detected': detected
-                })
+                failed_cases.append(
+                    {
+                        "description": case["description"],
+                        "expected": case["expected"],
+                        "detected": detected,
+                    }
+                )
 
         accuracy = (correct / total) * 100
 
@@ -387,8 +379,10 @@ class TestValidationDataset:
                 print(f"    Expected: {case['expected']}, Detected: {case['detected']}")
 
         # Assert >95% accuracy
-        assert accuracy > 95.0, f"Detection accuracy {accuracy:.2f}% is below target of 95%"
+        assert (
+            accuracy > 95.0
+        ), f"Detection accuracy {accuracy:.2f}% is below target of 95%"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

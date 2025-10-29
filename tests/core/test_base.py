@@ -4,14 +4,15 @@ This test suite ensures that BaseModel and BaseTransform provide
 consistent interfaces with JAX support and proper parameter management.
 """
 
-import numpy as np
-import jax.numpy as jnp
-import pytest
-from unittest.mock import Mock, patch
-from typing import Any, Dict, Optional
 from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional
+from unittest.mock import Mock, patch
 
-from rheo.core.base import BaseModel, BaseTransform, ParameterSet, Parameter
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
+from rheo.core.base import BaseModel, BaseTransform, Parameter, ParameterSet
 
 
 class TestParameterClass:
@@ -24,7 +25,7 @@ class TestParameterClass:
             value=100.0,
             bounds=(0.0, 1e6),
             units="Pa",
-            description="Storage modulus"
+            description="Storage modulus",
         )
 
         assert param.name == "modulus"
@@ -58,12 +59,7 @@ class TestParameterClass:
 
     def test_parameter_to_dict(self):
         """Test parameter serialization to dict."""
-        param = Parameter(
-            name="test",
-            value=100.0,
-            bounds=(0.0, 200.0),
-            units="Pa"
-        )
+        param = Parameter(name="test", value=100.0, bounds=(0.0, 200.0), units="Pa")
 
         param_dict = param.to_dict()
 
@@ -78,7 +74,7 @@ class TestParameterClass:
             "name": "test",
             "value": 50.0,
             "bounds": [0.0, 100.0],
-            "units": "Pa"
+            "units": "Pa",
         }
 
         param = Parameter.from_dict(param_dict)
@@ -185,7 +181,7 @@ class TestParameterSet:
         """Test creating parameter set from dict."""
         params_dict = {
             "G": {"value": 100.0, "units": "Pa"},
-            "eta": {"value": 1000.0, "units": "Pa.s"}
+            "eta": {"value": 1000.0, "units": "Pa.s"},
         }
 
         params = ParameterSet.from_dict(params_dict)
@@ -200,6 +196,7 @@ class TestBaseModel:
 
     def test_base_model_interface(self):
         """Test that BaseModel defines required interface."""
+
         # Create a concrete implementation
         class ConcreteModel(BaseModel):
             def _fit(self, X, y, **kwargs):
@@ -218,13 +215,14 @@ class TestBaseModel:
         model = ConcreteModel()
 
         # Test that interface methods exist
-        assert hasattr(model, 'fit')
-        assert hasattr(model, 'predict')
-        assert hasattr(model, 'get_params')
-        assert hasattr(model, 'set_params')
+        assert hasattr(model, "fit")
+        assert hasattr(model, "predict")
+        assert hasattr(model, "get_params")
+        assert hasattr(model, "set_params")
 
     def test_model_fit_with_numpy(self):
         """Test model fitting with numpy arrays."""
+
         class TestModel(BaseModel):
             def _fit(self, X, y, **kwargs):
                 self.coef_ = np.mean(y) / np.mean(X)
@@ -239,11 +237,12 @@ class TestBaseModel:
 
         model.fit(X, y)
 
-        assert hasattr(model, 'coef_')
+        assert hasattr(model, "coef_")
         assert model.coef_ == 2.0
 
     def test_model_fit_with_jax(self):
         """Test model fitting with JAX arrays."""
+
         class TestModel(BaseModel):
             def _fit(self, X, y, **kwargs):
                 self.coef_ = jnp.mean(y) / jnp.mean(X)
@@ -258,11 +257,12 @@ class TestBaseModel:
 
         model.fit(X, y)
 
-        assert hasattr(model, 'coef_')
+        assert hasattr(model, "coef_")
         assert float(model.coef_) == 2.0
 
     def test_model_predict(self):
         """Test model prediction."""
+
         class TestModel(BaseModel):
             def _fit(self, X, y, **kwargs):
                 self.coef_ = 2.0
@@ -281,6 +281,7 @@ class TestBaseModel:
 
     def test_model_parameters(self):
         """Test model parameter management."""
+
         class TestModel(BaseModel):
             def __init__(self):
                 super().__init__()
@@ -310,6 +311,7 @@ class TestBaseModel:
 
     def test_model_serialization(self):
         """Test model serialization."""
+
         class TestModel(BaseModel):
             def __init__(self):
                 super().__init__()
@@ -324,10 +326,7 @@ class TestBaseModel:
                 return X * self.coef_
 
             def to_dict(self):
-                return {
-                    "fitted": self.fitted_,
-                    "coef": getattr(self, 'coef_', None)
-                }
+                return {"fitted": self.fitted_, "coef": getattr(self, "coef_", None)}
 
             @classmethod
             def from_dict(cls, data):
@@ -352,6 +351,7 @@ class TestBaseModel:
 
     def test_model_sklearn_compatibility(self):
         """Test scikit-learn style interface."""
+
         class TestModel(BaseModel):
             def _fit(self, X, y, **kwargs):
                 self.fitted_ = True
@@ -387,6 +387,7 @@ class TestBaseTransform:
 
     def test_base_transform_interface(self):
         """Test that BaseTransform defines required interface."""
+
         class ConcreteTransform(BaseTransform):
             def _transform(self, data):
                 return data * 2
@@ -397,12 +398,13 @@ class TestBaseTransform:
         transform = ConcreteTransform()
 
         # Test that interface methods exist
-        assert hasattr(transform, 'transform')
-        assert hasattr(transform, 'inverse_transform')
-        assert hasattr(transform, 'fit_transform')
+        assert hasattr(transform, "transform")
+        assert hasattr(transform, "inverse_transform")
+        assert hasattr(transform, "fit_transform")
 
     def test_transform_with_numpy(self):
         """Test transform with numpy arrays."""
+
         class TestTransform(BaseTransform):
             def _transform(self, data):
                 return np.log(data)
@@ -421,12 +423,13 @@ class TestBaseTransform:
 
     def test_transform_with_jax(self):
         """Test transform with JAX arrays."""
+
         class TestTransform(BaseTransform):
             def _transform(self, data):
                 return jnp.sqrt(data)
 
             def _inverse_transform(self, data):
-                return data ** 2
+                return data**2
 
         transform = TestTransform()
         data = jnp.array([1, 4, 9, 16, 25])
@@ -439,6 +442,7 @@ class TestBaseTransform:
 
     def test_fit_transform(self):
         """Test fit_transform method."""
+
         class TestTransform(BaseTransform):
             def fit(self, data):
                 """Learn parameters from data."""
@@ -455,13 +459,14 @@ class TestBaseTransform:
         # fit_transform should fit then transform
         transformed = transform.fit_transform(data)
 
-        assert hasattr(transform, 'mean_')
-        assert hasattr(transform, 'std_')
+        assert hasattr(transform, "mean_")
+        assert hasattr(transform, "std_")
         assert np.allclose(np.mean(transformed), 0.0, atol=1e-10)
         assert np.allclose(np.std(transformed), 1.0)
 
     def test_transform_parameters(self):
         """Test transform with parameters."""
+
         class TestTransform(BaseTransform):
             def __init__(self, scale=1.0, offset=0.0):
                 super().__init__()
@@ -485,6 +490,7 @@ class TestBaseTransform:
 
     def test_transform_validation(self):
         """Test transform input validation."""
+
         class TestTransform(BaseTransform):
             def _transform(self, data):
                 if np.any(data < 0):
@@ -505,6 +511,7 @@ class TestBaseTransform:
 
     def test_transform_chaining(self):
         """Test chaining multiple transforms."""
+
         class LogTransform(BaseTransform):
             def _transform(self, data):
                 return np.log(data)
@@ -547,7 +554,7 @@ class TestJAXSupport:
                 return self
 
             def _predict(self, X):
-                return jnp.sum(X ** 2)
+                return jnp.sum(X**2)
 
         model = TestModel()
 
@@ -568,7 +575,7 @@ class TestJAXSupport:
                 return self
 
             def _predict(self, X):
-                return jnp.sum(X ** 2)
+                return jnp.sum(X**2)
 
         model = TestModel()
 

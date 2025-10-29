@@ -6,28 +6,26 @@ plots including stress-strain, modulus-frequency, and mastercurve plots.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
-import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
+import numpy as np
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from rheo.core.data import RheoData
 from rheo.visualization.plotter import (
     _apply_style,
     _ensure_numpy,
-    plot_time_domain,
     plot_frequency_domain,
     plot_residuals,
+    plot_time_domain,
 )
 
 
 def plot_stress_strain(
-    data: RheoData,
-    style: str = 'default',
-    **kwargs: Any
-) -> Tuple[Figure, Axes]:
+    data: RheoData, style: str = "default", **kwargs: Any
+) -> tuple[Figure, Axes]:
     """Plot stress-strain or time-dependent rheological data.
 
     This template is designed for relaxation and creep tests, plotting
@@ -47,7 +45,7 @@ def plot_stress_strain(
         >>> data = RheoData(x=time, y=stress, domain="time")
         >>> fig, ax = plot_stress_strain(data)
     """
-    test_mode = data.metadata.get('test_mode', '')
+    test_mode = data.metadata.get("test_mode", "")
 
     # Determine if log scale is appropriate
     log_x = False
@@ -69,14 +67,14 @@ def plot_stress_strain(
         log_x=log_x,
         log_y=log_y,
         style=style,
-        **kwargs
+        **kwargs,
     )
 
     # Update labels based on test mode
-    if test_mode == 'relaxation':
+    if test_mode == "relaxation":
         ax.set_ylabel(f"Stress ({data.y_units})" if data.y_units else "Stress (Pa)")
         ax.set_title("Stress Relaxation")
-    elif test_mode == 'creep':
+    elif test_mode == "creep":
         ax.set_ylabel(f"Strain ({data.y_units})" if data.y_units else "Strain")
         ax.set_title("Creep Compliance")
 
@@ -84,11 +82,8 @@ def plot_stress_strain(
 
 
 def plot_modulus_frequency(
-    data: RheoData,
-    separate_axes: bool = True,
-    style: str = 'default',
-    **kwargs: Any
-) -> Tuple[Figure, Union[Axes, np.ndarray]]:
+    data: RheoData, separate_axes: bool = True, style: str = "default", **kwargs: Any
+) -> tuple[Figure, Axes | np.ndarray]:
     """Plot storage and loss modulus versus frequency.
 
     This template is designed for oscillatory (SAOS) test data, plotting
@@ -120,7 +115,7 @@ def plot_modulus_frequency(
             x_units=data.x_units,
             y_units=data.y_units,
             style=style,
-            **kwargs
+            **kwargs,
         )
 
         axes[0].set_title("Storage Modulus (G')")
@@ -131,50 +126,54 @@ def plot_modulus_frequency(
         # Single axis (either real data or combined plot)
         style_params = _apply_style(style)
 
-        fig, ax = plt.subplots(figsize=style_params['figure.figsize'])
+        fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
         # Set font sizes
-        plt.rcParams.update({
-            'font.size': style_params['font.size'],
-            'axes.labelsize': style_params['axes.labelsize'],
-            'xtick.labelsize': style_params['xtick.labelsize'],
-            'ytick.labelsize': style_params['ytick.labelsize'],
-        })
+        plt.rcParams.update(
+            {
+                "font.size": style_params["font.size"],
+                "axes.labelsize": style_params["axes.labelsize"],
+                "xtick.labelsize": style_params["xtick.labelsize"],
+                "ytick.labelsize": style_params["ytick.labelsize"],
+            }
+        )
 
         plot_kwargs = {
-            'linewidth': style_params['lines.linewidth'],
-            'marker': 'o',
-            'markersize': style_params['lines.markersize'],
-            'markerfacecolor': 'none',
-            'markeredgewidth': 1.0,
+            "linewidth": style_params["lines.linewidth"],
+            "marker": "o",
+            "markersize": style_params["lines.markersize"],
+            "markerfacecolor": "none",
+            "markeredgewidth": 1.0,
         }
         plot_kwargs.update(kwargs)
 
         if np.iscomplexobj(y_data):
             # Plot both on same axes
             ax.loglog(x_data, np.real(y_data), **plot_kwargs, label="G'")
-            ax.loglog(x_data, np.imag(y_data), **plot_kwargs, label='G"', color='C1')
+            ax.loglog(x_data, np.imag(y_data), **plot_kwargs, label='G"', color="C1")
             ax.legend()
         else:
             ax.loglog(x_data, y_data, **plot_kwargs)
 
-        ax.set_xlabel(f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)")
+        ax.set_xlabel(
+            f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+        )
         ax.set_ylabel(f"Modulus ({data.y_units})" if data.y_units else "Modulus (Pa)")
         ax.set_title("Dynamic Moduli")
-        ax.grid(True, which='both', alpha=0.3, linestyle='--')
+        ax.grid(True, which="both", alpha=0.3, linestyle="--")
 
         fig.tight_layout()
         return fig, ax
 
 
 def plot_mastercurve(
-    datasets: List[RheoData],
-    reference_temp: Optional[float] = None,
-    shift_factors: Optional[Dict[float, float]] = None,
+    datasets: list[RheoData],
+    reference_temp: float | None = None,
+    shift_factors: dict[float, float] | None = None,
     show_shifts: bool = False,
-    style: str = 'default',
-    **kwargs: Any
-) -> Tuple[Figure, Axes]:
+    style: str = "default",
+    **kwargs: Any,
+) -> tuple[Figure, Axes]:
     """Plot mastercurve from multiple temperature datasets.
 
     This template creates a time-temperature superposition plot, overlaying
@@ -201,25 +200,27 @@ def plot_mastercurve(
     """
     style_params = _apply_style(style)
 
-    fig, ax = plt.subplots(figsize=style_params['figure.figsize'])
+    fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
     # Set font sizes
-    plt.rcParams.update({
-        'font.size': style_params['font.size'],
-        'axes.labelsize': style_params['axes.labelsize'],
-        'xtick.labelsize': style_params['xtick.labelsize'],
-        'ytick.labelsize': style_params['ytick.labelsize'],
-    })
+    plt.rcParams.update(
+        {
+            "font.size": style_params["font.size"],
+            "axes.labelsize": style_params["axes.labelsize"],
+            "xtick.labelsize": style_params["xtick.labelsize"],
+            "ytick.labelsize": style_params["ytick.labelsize"],
+        }
+    )
 
     # Get reference temperature
     if reference_temp is None:
-        reference_temp = datasets[0].metadata.get('temperature', 25)
+        reference_temp = datasets[0].metadata.get("temperature", 25)
 
     # Plot each dataset
     colors = plt.cm.viridis(np.linspace(0, 1, len(datasets)))
 
     for i, data in enumerate(datasets):
-        temp = data.metadata.get('temperature', None)
+        temp = data.metadata.get("temperature", None)
         x_data = _ensure_numpy(data.x)
         y_data = _ensure_numpy(data.y)
 
@@ -242,25 +243,43 @@ def plot_mastercurve(
 
         # Plot (handle complex data)
         if np.iscomplexobj(y_data):
-            ax.loglog(x_shifted, np.real(y_data), 'o', color=colors[i],
-                     markersize=style_params['lines.markersize'],
-                     markerfacecolor='none', markeredgewidth=1.0,
-                     label=label, **kwargs)
+            ax.loglog(
+                x_shifted,
+                np.real(y_data),
+                "o",
+                color=colors[i],
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+                label=label,
+                **kwargs,
+            )
         else:
-            ax.loglog(x_shifted, y_data, 'o', color=colors[i],
-                     markersize=style_params['lines.markersize'],
-                     markerfacecolor='none', markeredgewidth=1.0,
-                     label=label, **kwargs)
+            ax.loglog(
+                x_shifted,
+                y_data,
+                "o",
+                color=colors[i],
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+                label=label,
+                **kwargs,
+            )
 
     # Labels
     x_units = datasets[0].x_units if datasets[0].x_units else "rad/s"
     y_units = datasets[0].y_units if datasets[0].y_units else "Pa"
 
-    ax.set_xlabel(f"Frequency ({x_units})" if shift_factors else f"Shifted Frequency (a_T × {x_units})")
+    ax.set_xlabel(
+        f"Frequency ({x_units})"
+        if shift_factors
+        else f"Shifted Frequency (a_T × {x_units})"
+    )
     ax.set_ylabel(f"G' ({y_units})")
     ax.set_title(f"Master Curve (T_ref = {reference_temp}°C)")
-    ax.legend(loc='best', fontsize=style_params['legend.fontsize'])
-    ax.grid(True, which='both', alpha=0.3, linestyle='--')
+    ax.legend(loc="best", fontsize=style_params["legend.fontsize"])
+    ax.grid(True, which="both", alpha=0.3, linestyle="--")
 
     fig.tight_layout()
 
@@ -269,12 +288,12 @@ def plot_mastercurve(
 
 def plot_model_fit(
     data: RheoData,
-    predictions: Union[np.ndarray, jnp.ndarray],
+    predictions: np.ndarray | jnp.ndarray,
     show_residuals: bool = True,
-    style: str = 'default',
-    model_name: Optional[str] = None,
-    **kwargs: Any
-) -> Tuple[Figure, Union[Axes, np.ndarray]]:
+    style: str = "default",
+    model_name: str | None = None,
+    **kwargs: Any,
+) -> tuple[Figure, Axes | np.ndarray]:
     """Plot experimental data with model predictions and residuals.
 
     This template creates a standard model fitting visualization showing
@@ -301,12 +320,14 @@ def plot_model_fit(
     style_params = _apply_style(style)
 
     # Set font sizes
-    plt.rcParams.update({
-        'font.size': style_params['font.size'],
-        'axes.labelsize': style_params['axes.labelsize'],
-        'xtick.labelsize': style_params['xtick.labelsize'],
-        'ytick.labelsize': style_params['ytick.labelsize'],
-    })
+    plt.rcParams.update(
+        {
+            "font.size": style_params["font.size"],
+            "axes.labelsize": style_params["axes.labelsize"],
+            "xtick.labelsize": style_params["xtick.labelsize"],
+            "ytick.labelsize": style_params["ytick.labelsize"],
+        }
+    )
 
     x_data = _ensure_numpy(data.x)
     y_data = _ensure_numpy(data.y)
@@ -316,51 +337,98 @@ def plot_model_fit(
         # Two subplots: fit and residuals
         if np.iscomplexobj(y_data):
             # For complex data, plot G' and G'' separately
-            fig, axes = plt.subplots(2, 2, figsize=(style_params['figure.figsize'][0] * 1.5,
-                                                      style_params['figure.figsize'][1] * 1.5))
+            fig, axes = plt.subplots(
+                2,
+                2,
+                figsize=(
+                    style_params["figure.figsize"][0] * 1.5,
+                    style_params["figure.figsize"][1] * 1.5,
+                ),
+            )
 
             # G' fit
-            axes[0, 0].loglog(x_data, np.real(y_data), 'o', label='Data',
-                            markersize=style_params['lines.markersize'],
-                            markerfacecolor='none', markeredgewidth=1.0)
-            axes[0, 0].loglog(x_data, np.real(y_pred), '-', label='Model',
-                            linewidth=style_params['lines.linewidth'])
+            axes[0, 0].loglog(
+                x_data,
+                np.real(y_data),
+                "o",
+                label="Data",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+            )
+            axes[0, 0].loglog(
+                x_data,
+                np.real(y_pred),
+                "-",
+                label="Model",
+                linewidth=style_params["lines.linewidth"],
+            )
             axes[0, 0].set_ylabel(f"G' ({data.y_units})" if data.y_units else "G' (Pa)")
             axes[0, 0].legend()
-            axes[0, 0].grid(True, which='both', alpha=0.3, linestyle='--')
+            axes[0, 0].grid(True, which="both", alpha=0.3, linestyle="--")
 
             # G'' fit
-            axes[0, 1].loglog(x_data, np.imag(y_data), 'o', label='Data',
-                            markersize=style_params['lines.markersize'],
-                            markerfacecolor='none', markeredgewidth=1.0, color='C1')
-            axes[0, 1].loglog(x_data, np.imag(y_pred), '-', label='Model',
-                            linewidth=style_params['lines.linewidth'], color='C1')
+            axes[0, 1].loglog(
+                x_data,
+                np.imag(y_data),
+                "o",
+                label="Data",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+                color="C1",
+            )
+            axes[0, 1].loglog(
+                x_data,
+                np.imag(y_pred),
+                "-",
+                label="Model",
+                linewidth=style_params["lines.linewidth"],
+                color="C1",
+            )
             axes[0, 1].set_ylabel(f'G" ({data.y_units})' if data.y_units else 'G" (Pa)')
             axes[0, 1].legend()
-            axes[0, 1].grid(True, which='both', alpha=0.3, linestyle='--')
+            axes[0, 1].grid(True, which="both", alpha=0.3, linestyle="--")
 
             # G' residuals
             residuals_gp = np.real(y_data) - np.real(y_pred)
-            axes[1, 0].semilogx(x_data, residuals_gp / np.real(y_data) * 100, 'o',
-                              markersize=style_params['lines.markersize'],
-                              markerfacecolor='none', markeredgewidth=1.0)
-            axes[1, 0].axhline(y=0, color='k', linestyle='--', linewidth=1.0)
-            axes[1, 0].set_xlabel(f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)")
+            axes[1, 0].semilogx(
+                x_data,
+                residuals_gp / np.real(y_data) * 100,
+                "o",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+            )
+            axes[1, 0].axhline(y=0, color="k", linestyle="--", linewidth=1.0)
+            axes[1, 0].set_xlabel(
+                f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+            )
             axes[1, 0].set_ylabel("G' Residuals (%)")
-            axes[1, 0].grid(True, alpha=0.3, linestyle='--')
+            axes[1, 0].grid(True, alpha=0.3, linestyle="--")
 
             # G'' residuals
             residuals_gpp = np.imag(y_data) - np.imag(y_pred)
-            axes[1, 1].semilogx(x_data, residuals_gpp / np.imag(y_data) * 100, 'o',
-                              markersize=style_params['lines.markersize'],
-                              markerfacecolor='none', markeredgewidth=1.0, color='C1')
-            axes[1, 1].axhline(y=0, color='k', linestyle='--', linewidth=1.0)
-            axes[1, 1].set_xlabel(f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)")
+            axes[1, 1].semilogx(
+                x_data,
+                residuals_gpp / np.imag(y_data) * 100,
+                "o",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+                color="C1",
+            )
+            axes[1, 1].axhline(y=0, color="k", linestyle="--", linewidth=1.0)
+            axes[1, 1].set_xlabel(
+                f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+            )
             axes[1, 1].set_ylabel('G" Residuals (%)')
-            axes[1, 1].grid(True, alpha=0.3, linestyle='--')
+            axes[1, 1].grid(True, alpha=0.3, linestyle="--")
 
             if model_name:
-                fig.suptitle(f"Model Fit: {model_name}", fontsize=style_params['axes.titlesize'])
+                fig.suptitle(
+                    f"Model Fit: {model_name}", fontsize=style_params["axes.titlesize"]
+                )
 
             fig.tight_layout()
             return fig, axes
@@ -374,7 +442,7 @@ def plot_model_fit(
                 y_true=y_data,
                 y_pred=y_pred,
                 x_units=data.x_units,
-                style=style
+                style=style,
             )
 
             if model_name:
@@ -384,49 +452,96 @@ def plot_model_fit(
     else:
         # Single plot: fit only
         if np.iscomplexobj(y_data):
-            fig, axes = plt.subplots(1, 2, figsize=(style_params['figure.figsize'][0] * 1.5,
-                                                      style_params['figure.figsize'][1]))
+            fig, axes = plt.subplots(
+                1,
+                2,
+                figsize=(
+                    style_params["figure.figsize"][0] * 1.5,
+                    style_params["figure.figsize"][1],
+                ),
+            )
 
             # G' fit
-            axes[0].loglog(x_data, np.real(y_data), 'o', label='Data',
-                          markersize=style_params['lines.markersize'],
-                          markerfacecolor='none', markeredgewidth=1.0)
-            axes[0].loglog(x_data, np.real(y_pred), '-', label='Model',
-                          linewidth=style_params['lines.linewidth'])
-            axes[0].set_xlabel(f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)")
+            axes[0].loglog(
+                x_data,
+                np.real(y_data),
+                "o",
+                label="Data",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+            )
+            axes[0].loglog(
+                x_data,
+                np.real(y_pred),
+                "-",
+                label="Model",
+                linewidth=style_params["lines.linewidth"],
+            )
+            axes[0].set_xlabel(
+                f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+            )
             axes[0].set_ylabel(f"G' ({data.y_units})" if data.y_units else "G' (Pa)")
             axes[0].legend()
-            axes[0].grid(True, which='both', alpha=0.3, linestyle='--')
+            axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
 
             # G'' fit
-            axes[1].loglog(x_data, np.imag(y_data), 'o', label='Data',
-                          markersize=style_params['lines.markersize'],
-                          markerfacecolor='none', markeredgewidth=1.0, color='C1')
-            axes[1].loglog(x_data, np.imag(y_pred), '-', label='Model',
-                          linewidth=style_params['lines.linewidth'], color='C1')
-            axes[1].set_xlabel(f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)")
+            axes[1].loglog(
+                x_data,
+                np.imag(y_data),
+                "o",
+                label="Data",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+                color="C1",
+            )
+            axes[1].loglog(
+                x_data,
+                np.imag(y_pred),
+                "-",
+                label="Model",
+                linewidth=style_params["lines.linewidth"],
+                color="C1",
+            )
+            axes[1].set_xlabel(
+                f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+            )
             axes[1].set_ylabel(f'G" ({data.y_units})' if data.y_units else 'G" (Pa)')
             axes[1].legend()
-            axes[1].grid(True, which='both', alpha=0.3, linestyle='--')
+            axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
 
             if model_name:
-                fig.suptitle(f"Model Fit: {model_name}", fontsize=style_params['axes.titlesize'])
+                fig.suptitle(
+                    f"Model Fit: {model_name}", fontsize=style_params["axes.titlesize"]
+                )
 
             fig.tight_layout()
             return fig, axes
         else:
-            fig, ax = plt.subplots(figsize=style_params['figure.figsize'])
+            fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
-            ax.plot(x_data, y_data, 'o', label='Data',
-                   markersize=style_params['lines.markersize'],
-                   markerfacecolor='none', markeredgewidth=1.0)
-            ax.plot(x_data, y_pred, '-', label='Model',
-                   linewidth=style_params['lines.linewidth'])
+            ax.plot(
+                x_data,
+                y_data,
+                "o",
+                label="Data",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+            )
+            ax.plot(
+                x_data,
+                y_pred,
+                "-",
+                label="Model",
+                linewidth=style_params["lines.linewidth"],
+            )
 
             ax.set_xlabel(f"x ({data.x_units})" if data.x_units else "x")
             ax.set_ylabel(f"y ({data.y_units})" if data.y_units else "y")
             ax.legend()
-            ax.grid(True, alpha=0.3, linestyle='--')
+            ax.grid(True, alpha=0.3, linestyle="--")
 
             if model_name:
                 ax.set_title(f"Model Fit: {model_name}")
@@ -435,11 +550,7 @@ def plot_model_fit(
             return fig, ax
 
 
-def apply_template_style(
-    ax: Axes,
-    style: str = 'default',
-    **kwargs: Any
-) -> None:
+def apply_template_style(ax: Axes, style: str = "default", **kwargs: Any) -> None:
     """Apply template styling to an existing axis.
 
     This function applies consistent styling to matplotlib axes based on
@@ -459,21 +570,21 @@ def apply_template_style(
     style_params.update(kwargs)
 
     # Apply font sizes
-    ax.xaxis.label.set_size(style_params['axes.labelsize'])
-    ax.yaxis.label.set_size(style_params['axes.labelsize'])
-    ax.title.set_size(style_params['axes.titlesize'])
+    ax.xaxis.label.set_size(style_params["axes.labelsize"])
+    ax.yaxis.label.set_size(style_params["axes.labelsize"])
+    ax.title.set_size(style_params["axes.titlesize"])
 
     for label in ax.get_xticklabels():
-        label.set_fontsize(style_params['xtick.labelsize'])
+        label.set_fontsize(style_params["xtick.labelsize"])
     for label in ax.get_yticklabels():
-        label.set_fontsize(style_params['ytick.labelsize'])
+        label.set_fontsize(style_params["ytick.labelsize"])
 
     # Update line widths and marker sizes
     for line in ax.get_lines():
-        if line.get_linewidth() == plt.rcParams['lines.linewidth']:
-            line.set_linewidth(style_params['lines.linewidth'])
-        if line.get_markersize() == plt.rcParams['lines.markersize']:
-            line.set_markersize(style_params['lines.markersize'])
+        if line.get_linewidth() == plt.rcParams["lines.linewidth"]:
+            line.set_linewidth(style_params["lines.linewidth"])
+        if line.get_markersize() == plt.rcParams["lines.markersize"]:
+            line.set_markersize(style_params["lines.markersize"])
 
     # Grid
-    ax.grid(True, which='both', alpha=0.3, linestyle='--')
+    ax.grid(True, which="both", alpha=0.3, linestyle="--")

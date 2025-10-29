@@ -7,9 +7,9 @@ with yield stress and power-law behavior.
 import numpy as np
 import pytest
 
-from rheo.models.herschel_bulkley import HerschelBulkley
 from rheo.core.data import RheoData
 from rheo.core.test_modes import TestMode
+from rheo.models.herschel_bulkley import HerschelBulkley
 
 
 class TestHerschelBulkleyBasics:
@@ -19,21 +19,21 @@ class TestHerschelBulkleyBasics:
         """Test model initialization."""
         model = HerschelBulkley()
         assert model is not None
-        assert 'sigma_y' in model.parameters
-        assert 'K' in model.parameters
-        assert 'n' in model.parameters
+        assert "sigma_y" in model.parameters
+        assert "K" in model.parameters
+        assert "n" in model.parameters
 
     def test_parameter_bounds(self):
         """Test parameter bounds."""
         model = HerschelBulkley()
 
-        sigma_y_param = model.parameters.get('sigma_y')
+        sigma_y_param = model.parameters.get("sigma_y")
         assert sigma_y_param.bounds == (0.0, 1e6)
 
-        K_param = model.parameters.get('K')
+        K_param = model.parameters.get("K")
         assert K_param.bounds == (1e-6, 1e6)
 
-        n_param = model.parameters.get('n')
+        n_param = model.parameters.get("n")
         assert n_param.bounds == (0.01, 2.0)
 
 
@@ -43,9 +43,9 @@ class TestHerschelBulkleyPredictions:
     def test_stress_prediction_basic(self):
         """Test basic stress prediction: σ = σ_y + K γ̇^n."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 2.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 2.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.array([1.0, 10.0, 100.0])
 
@@ -59,9 +59,9 @@ class TestHerschelBulkleyPredictions:
     def test_yield_stress_behavior(self):
         """Test that stress is zero below yield threshold."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 100.0)
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 1.0)
+        model.parameters.set_value("sigma_y", 100.0)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 1.0)
 
         # Very low shear rates (below yield threshold)
         gamma_dot = np.array([1e-12, 1e-11, 1e-10])
@@ -74,9 +74,9 @@ class TestHerschelBulkleyPredictions:
     def test_power_law_limit(self):
         """Test that σ_y = 0 reduces to Power Law."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 0.0)  # No yield stress
-        model.parameters.set_value('K', 2.5)
-        model.parameters.set_value('n', 0.6)
+        model.parameters.set_value("sigma_y", 0.0)  # No yield stress
+        model.parameters.set_value("K", 2.5)
+        model.parameters.set_value("n", 0.6)
 
         gamma_dot = np.array([0.1, 1.0, 10.0, 100.0])
 
@@ -90,9 +90,9 @@ class TestHerschelBulkleyPredictions:
     def test_bingham_limit(self):
         """Test that n = 1 reduces to Bingham model."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 0.5)
-        model.parameters.set_value('n', 1.0)  # Linear
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 0.5)
+        model.parameters.set_value("n", 1.0)  # Linear
 
         gamma_dot = np.array([1.0, 10.0, 100.0])
 
@@ -106,9 +106,9 @@ class TestHerschelBulkleyPredictions:
     def test_viscosity_prediction(self):
         """Test apparent viscosity prediction."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.array([1.0, 10.0, 100.0])
 
@@ -122,9 +122,9 @@ class TestHerschelBulkleyPredictions:
     def test_shear_thinning_behavior(self):
         """Test shear-thinning behavior (n < 1)."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 5.0)
-        model.parameters.set_value('K', 2.0)
-        model.parameters.set_value('n', 0.6)
+        model.parameters.set_value("sigma_y", 5.0)
+        model.parameters.set_value("K", 2.0)
+        model.parameters.set_value("n", 0.6)
 
         gamma_dot = np.array([1.0, 10.0, 100.0, 1000.0])
 
@@ -136,9 +136,9 @@ class TestHerschelBulkleyPredictions:
     def test_shear_thickening_behavior(self):
         """Test shear-thickening behavior (n > 1)."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 5.0)
-        model.parameters.set_value('K', 0.1)
-        model.parameters.set_value('n', 1.3)
+        model.parameters.set_value("sigma_y", 5.0)
+        model.parameters.set_value("K", 0.1)
+        model.parameters.set_value("n", 1.3)
 
         gamma_dot = np.array([10.0, 100.0, 1000.0])
 
@@ -157,25 +157,25 @@ class TestHerschelBulkleyRheoData:
     def test_predict_rheo_stress(self):
         """Test prediction with RheoData (stress output)."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.logspace(-1, 2, 50)
         rheo_data = RheoData(
             x=gamma_dot,
             y=np.zeros_like(gamma_dot),
-            x_units='1/s',
-            y_units='Pa',
-            domain='time',
-            metadata={'test_mode': TestMode.ROTATION},
-            validate=False
+            x_units="1/s",
+            y_units="Pa",
+            domain="time",
+            metadata={"test_mode": TestMode.ROTATION},
+            validate=False,
         )
 
-        result = model.predict_rheo(rheo_data, output='stress')
+        result = model.predict_rheo(rheo_data, output="stress")
 
-        assert result.y_units == 'Pa'
-        assert result.metadata['model'] == 'HerschelBulkley'
+        assert result.y_units == "Pa"
+        assert result.metadata["model"] == "HerschelBulkley"
 
         # Stress should be monotonically increasing
         assert np.all(np.diff(result.y) >= 0)
@@ -183,24 +183,24 @@ class TestHerschelBulkleyRheoData:
     def test_predict_rheo_viscosity(self):
         """Test prediction with RheoData (viscosity output)."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.logspace(-1, 2, 50)
         rheo_data = RheoData(
             x=gamma_dot,
             y=np.zeros_like(gamma_dot),
-            x_units='1/s',
-            y_units='Pa·s',
-            domain='time',
-            metadata={'test_mode': TestMode.ROTATION},
-            validate=False
+            x_units="1/s",
+            y_units="Pa·s",
+            domain="time",
+            metadata={"test_mode": TestMode.ROTATION},
+            validate=False,
         )
 
-        result = model.predict_rheo(rheo_data, output='viscosity')
+        result = model.predict_rheo(rheo_data, output="viscosity")
 
-        assert result.y_units == 'Pa·s'
+        assert result.y_units == "Pa·s"
 
         # Viscosity should be monotonically decreasing (shear-thinning)
         assert np.all(np.diff(result.y) <= 0)
@@ -212,8 +212,8 @@ class TestHerschelBulkleyRheoData:
         rheo_data = RheoData(
             x=np.array([1.0, 10.0]),
             y=np.array([0.0, 0.0]),
-            metadata={'test_mode': TestMode.CREEP},
-            validate=False
+            metadata={"test_mode": TestMode.CREEP},
+            validate=False,
         )
 
         with pytest.raises(ValueError, match="only supports ROTATION"):
@@ -260,9 +260,9 @@ class TestHerschelBulkleyFitting:
 
         # Check fitted parameters are reasonable (within 30% due to noise and fitting complexity)
         # HB model has challenging parameter correlations that make fitting difficult
-        sigma_y_fit = model.parameters.get_value('sigma_y')
-        K_fit = model.parameters.get_value('K')
-        n_fit = model.parameters.get_value('n')
+        sigma_y_fit = model.parameters.get_value("sigma_y")
+        K_fit = model.parameters.get_value("K")
+        n_fit = model.parameters.get_value("n")
 
         assert abs(sigma_y_fit - sigma_y_true) / sigma_y_true < 0.3
         assert abs(K_fit - K_true) / K_true < 0.3
@@ -275,9 +275,9 @@ class TestHerschelBulkleyNumericalStability:
     def test_extreme_shear_rates(self):
         """Test with extreme shear rates."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.array([1e-15, 1e-6, 1e6, 1e15])
 
@@ -289,9 +289,9 @@ class TestHerschelBulkleyNumericalStability:
     def test_zero_shear_rate(self):
         """Test behavior at exactly zero shear rate."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot = np.array([0.0])
 
@@ -303,9 +303,9 @@ class TestHerschelBulkleyNumericalStability:
     def test_negative_shear_rates(self):
         """Test with negative shear rates."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot_pos = np.array([1.0, 10.0, 100.0])
         gamma_dot_neg = -gamma_dot_pos
@@ -321,9 +321,9 @@ class TestHerschelBulkleyNumericalStability:
         model = HerschelBulkley()
 
         # Minimum values
-        model.parameters.set_value('sigma_y', 0.0)
-        model.parameters.set_value('K', 1e-6)
-        model.parameters.set_value('n', 0.01)
+        model.parameters.set_value("sigma_y", 0.0)
+        model.parameters.set_value("K", 1e-6)
+        model.parameters.set_value("n", 0.01)
 
         gamma_dot = np.logspace(-2, 2, 50)
         stress = model.predict(gamma_dot)
@@ -332,9 +332,9 @@ class TestHerschelBulkleyNumericalStability:
         assert np.all(stress >= 0)
 
         # Maximum values
-        model.parameters.set_value('sigma_y', 1e6)
-        model.parameters.set_value('K', 1e6)
-        model.parameters.set_value('n', 2.0)
+        model.parameters.set_value("sigma_y", 1e6)
+        model.parameters.set_value("K", 1e6)
+        model.parameters.set_value("n", 2.0)
 
         stress = model.predict(gamma_dot)
 
@@ -348,9 +348,9 @@ class TestHerschelBulkleyPhysicalBehavior:
     def test_yield_stress_consistency(self):
         """Test that yield stress is consistent across predictions."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 50.0)
-        model.parameters.set_value('K', 2.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 50.0)
+        model.parameters.set_value("K", 2.0)
+        model.parameters.set_value("n", 0.5)
 
         # At very low shear rates, stress should be zero (below yield)
         gamma_dot_low = np.array([1e-12, 1e-11, 1e-10])
@@ -367,9 +367,9 @@ class TestHerschelBulkleyPhysicalBehavior:
     def test_stress_continuity(self):
         """Test that stress is continuous across yield threshold."""
         model = HerschelBulkley()
-        model.parameters.set_value('sigma_y', 10.0)
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Sample around yield threshold
         gamma_dot = np.logspace(-12, -6, 1000)
@@ -384,5 +384,5 @@ class TestHerschelBulkleyPhysicalBehavior:
         assert np.all(np.abs(diffs) < 15)
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

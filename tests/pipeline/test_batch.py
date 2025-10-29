@@ -3,16 +3,17 @@
 This module tests batch processing of multiple datasets with the same pipeline.
 """
 
-import pytest
-import numpy as np
-import tempfile
 import os
+import tempfile
 from pathlib import Path
 
-from rheo.pipeline import Pipeline, BatchPipeline
-from rheo.core.data import RheoData
+import numpy as np
+import pytest
+
 from rheo.core.base import BaseModel
+from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
+from rheo.pipeline import BatchPipeline, Pipeline
 
 
 # Mock model for testing
@@ -21,23 +22,23 @@ class BatchTestModel(BaseModel):
 
     def __init__(self):
         super().__init__()
-        self.parameters.add(name='a', value=1.0, bounds=(0, 100))
+        self.parameters.add(name="a", value=1.0, bounds=(0, 100))
 
     def _fit(self, X, y, **kwargs):
-        self.parameters.set_value('a', float(np.mean(y)))
+        self.parameters.set_value("a", float(np.mean(y)))
         return self
 
     def _predict(self, X):
-        a = self.parameters.get_value('a')
+        a = self.parameters.get_value("a")
         return a * np.ones_like(X)
 
 
-@pytest.fixture(scope='module', autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def register_batch_model():
     """Register batch test model."""
-    ModelRegistry.register('batch_test_model')(BatchTestModel)
+    ModelRegistry.register("batch_test_model")(BatchTestModel)
     yield
-    ModelRegistry.unregister('batch_test_model')
+    ModelRegistry.unregister("batch_test_model")
 
 
 @pytest.fixture
@@ -46,10 +47,10 @@ def temp_csv_files():
     files = []
 
     for i in range(3):
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
-            f.write('x,y\n')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            f.write("x,y\n")
             for j in range(10):
-                f.write(f'{j},{j * (i + 1)}\n')
+                f.write(f"{j},{j * (i + 1)}\n")
             files.append(f.name)
 
     yield files
@@ -62,17 +63,17 @@ def temp_csv_files():
 @pytest.fixture
 def temp_directory_with_files():
     """Create temporary directory with CSV files."""
-    import tempfile
     import shutil
+    import tempfile
 
     temp_dir = tempfile.mkdtemp()
 
     for i in range(3):
-        file_path = os.path.join(temp_dir, f'data_{i}.csv')
-        with open(file_path, 'w') as f:
-            f.write('x,y\n')
+        file_path = os.path.join(temp_dir, f"data_{i}.csv")
+        with open(file_path, "w") as f:
+            f.write("x,y\n")
             for j in range(10):
-                f.write(f'{j},{j * (i + 1)}\n')
+                f.write(f"{j},{j * (i + 1)}\n")
 
     yield temp_dir
 
@@ -114,12 +115,7 @@ class TestBatchProcessing:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         # Note: Results might be empty if template execution is simplified
         # This tests the interface, not full execution
@@ -140,10 +136,10 @@ class TestBatchProcessing:
 
         batch.process_directory(
             temp_directory_with_files,
-            pattern='*.csv',
-            format='csv',
-            x_col='x',
-            y_col='y'
+            pattern="*.csv",
+            format="csv",
+            x_col="x",
+            y_col="y",
         )
 
         # At least some files should be found
@@ -155,7 +151,7 @@ class TestBatchProcessing:
         batch = BatchPipeline(Pipeline())
 
         with pytest.raises(FileNotFoundError):
-            batch.process_directory('/nonexistent/directory')
+            batch.process_directory("/nonexistent/directory")
 
     def test_process_directory_no_matches(self, temp_directory_with_files):
         """Test processing directory with no matching files."""
@@ -164,7 +160,7 @@ class TestBatchProcessing:
         with pytest.warns(UserWarning, match="No files matching"):
             batch.process_directory(
                 temp_directory_with_files,
-                pattern='*.xyz'  # No files with this extension
+                pattern="*.xyz",  # No files with this extension
             )
 
 
@@ -176,12 +172,7 @@ class TestBatchResults:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         results = batch.get_results()
         assert isinstance(results, list)
@@ -191,12 +182,7 @@ class TestBatchResults:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files[:1],
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files[:1], format="csv", x_col="x", y_col="y")
 
         results1 = batch.get_results()
         results2 = batch.get_results()
@@ -210,10 +196,7 @@ class TestBatchResults:
 
         # Add a non-existent file to trigger error
         batch.process_files(
-            temp_csv_files + ['/nonexistent.csv'],
-            format='csv',
-            x_col='x',
-            y_col='y'
+            temp_csv_files + ["/nonexistent.csv"], format="csv", x_col="x", y_col="y"
         )
 
         errors = batch.get_errors()
@@ -224,12 +207,7 @@ class TestBatchResults:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         df = batch.get_summary_dataframe()
         assert df is not None
@@ -252,12 +230,7 @@ class TestBatchStatistics:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         stats = batch.get_statistics()
         assert isinstance(stats, dict)
@@ -267,12 +240,7 @@ class TestBatchStatistics:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         assert len(batch) == len(batch.results)
 
@@ -285,12 +253,7 @@ class TestBatchFiltering:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         initial_count = len(batch.results)
 
@@ -304,12 +267,7 @@ class TestBatchFiltering:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         # Filter to remove all
         batch.apply_filter(lambda p, d, m: False)
@@ -325,12 +283,7 @@ class TestBatchUtilities:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         batch.clear()
 
@@ -342,9 +295,9 @@ class TestBatchUtilities:
         batch = BatchPipeline()
         repr_str = repr(batch)
 
-        assert 'BatchPipeline' in repr_str
-        assert 'results=0' in repr_str
-        assert 'errors=0' in repr_str
+        assert "BatchPipeline" in repr_str
+        assert "results=0" in repr_str
+        assert "errors=0" in repr_str
 
 
 class TestBatchExport:
@@ -355,20 +308,15 @@ class TestBatchExport:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             output_path = f.name
 
         try:
             # This might fail if no pandas-excel support
             # Just test the interface
-            batch.export_summary(output_path, format='excel')
+            batch.export_summary(output_path, format="excel")
         except Exception:
             pass  # Expected if openpyxl not installed
         finally:
@@ -380,18 +328,13 @@ class TestBatchExport:
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        batch.process_files(
-            temp_csv_files,
-            format='csv',
-            x_col='x',
-            y_col='y'
-        )
+        batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
-        with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
             output_path = f.name
 
         try:
-            batch.export_summary(output_path, format='csv')
+            batch.export_summary(output_path, format="csv")
         finally:
             if os.path.exists(output_path):
                 os.unlink(output_path)
@@ -401,4 +344,4 @@ class TestBatchExport:
         batch = BatchPipeline()
 
         with pytest.warns(UserWarning, match="No results"):
-            batch.export_summary('output.xlsx')
+            batch.export_summary("output.xlsx")

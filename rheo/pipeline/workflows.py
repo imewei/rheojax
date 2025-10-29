@@ -12,14 +12,13 @@ Example:
 
 from __future__ import annotations
 
-from typing import List, Dict, Any, Optional, Union
 import warnings
+from typing import Any
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 
 from rheo.core.data import RheoData
-from rheo.core.base import BaseModel
 from rheo.core.registry import ModelRegistry
 from rheo.pipeline.base import Pipeline
 
@@ -48,14 +47,14 @@ class MastercurvePipeline(Pipeline):
         """
         super().__init__()
         self.reference_temp = reference_temp
-        self.shift_factors: Dict[float, float] = {}
+        self.shift_factors: dict[float, float] = {}
 
     def run(
         self,
-        file_paths: List[str],
-        temperatures: List[float],
-        format: str = 'auto',
-        **load_kwargs
+        file_paths: list[str],
+        temperatures: list[float],
+        format: str = "auto",
+        **load_kwargs,
     ) -> MastercurvePipeline:
         """Execute mastercurve workflow.
 
@@ -92,13 +91,11 @@ class MastercurvePipeline(Pipeline):
         self.data = merged_data
         self._apply_mastercurve_shift()
 
-        self.history.append(('mastercurve', len(file_paths), self.reference_temp))
+        self.history.append(("mastercurve", len(file_paths), self.reference_temp))
         return self
 
     def _merge_datasets(
-        self,
-        datasets: List[RheoData],
-        temperatures: List[float]
+        self, datasets: list[RheoData], temperatures: list[float]
     ) -> RheoData:
         """Merge multiple datasets with temperature metadata.
 
@@ -110,16 +107,16 @@ class MastercurvePipeline(Pipeline):
             Merged RheoData
         """
         # Add temperature metadata to each dataset
-        for data, temp in zip(datasets, temperatures):
-            data.metadata['temperature'] = temp
+        for data, temp in zip(datasets, temperatures, strict=False):
+            data.metadata["temperature"] = temp
 
         # For simplicity, concatenate all data
         # In practice, this would be more sophisticated
         all_x = np.concatenate([np.array(d.x) for d in datasets])
         all_y = np.concatenate([np.array(d.y) for d in datasets])
-        all_temps = np.concatenate([
-            np.full(len(d.x), temp) for d, temp in zip(datasets, temperatures)
-        ])
+        all_temps = np.concatenate(
+            [np.full(len(d.x), temp) for d, temp in zip(datasets, temperatures, strict=False)]
+        )
 
         return RheoData(
             x=all_x,
@@ -128,11 +125,11 @@ class MastercurvePipeline(Pipeline):
             y_units=datasets[0].y_units,
             domain=datasets[0].domain,
             metadata={
-                'type': 'mastercurve',
-                'reference_temp': self.reference_temp,
-                'temperatures': all_temps.tolist()
+                "type": "mastercurve",
+                "reference_temp": self.reference_temp,
+                "temperatures": all_temps.tolist(),
             },
-            validate=False
+            validate=False,
         )
 
     def _apply_mastercurve_shift(self):
@@ -144,7 +141,7 @@ class MastercurvePipeline(Pipeline):
         if self.data is None:
             return
 
-        temps = np.array(self.data.metadata.get('temperatures', []))
+        temps = np.array(self.data.metadata.get("temperatures", []))
         if len(temps) == 0:
             return
 
@@ -157,10 +154,12 @@ class MastercurvePipeline(Pipeline):
             if temp == self.reference_temp:
                 shift = 1.0
             else:
-                log_shift = -C1 * (temp - self.reference_temp) / (
-                    C2 + temp - self.reference_temp
+                log_shift = (
+                    -C1
+                    * (temp - self.reference_temp)
+                    / (C2 + temp - self.reference_temp)
                 )
-                shift = 10 ** log_shift
+                shift = 10**log_shift
 
             self.shift_factors[float(temp)] = shift
 
@@ -168,15 +167,17 @@ class MastercurvePipeline(Pipeline):
         shifted_x = self.data.x.copy()
         for i, temp in enumerate(temps):
             shift = self.shift_factors[float(temp)]
-            shifted_x = shifted_x.at[i].set(shifted_x[i] / shift) if isinstance(
-                shifted_x, jnp.ndarray
-            ) else shifted_x
+            shifted_x = (
+                shifted_x.at[i].set(shifted_x[i] / shift)
+                if isinstance(shifted_x, jnp.ndarray)
+                else shifted_x
+            )
             if isinstance(shifted_x, np.ndarray):
                 shifted_x[i] = shifted_x[i] / shift
 
         self.data.x = shifted_x
 
-    def get_shift_factors(self) -> Dict[float, float]:
+    def get_shift_factors(self) -> dict[float, float]:
         """Get computed shift factors.
 
         Returns:
@@ -202,7 +203,7 @@ class ModelComparisonPipeline(Pipeline):
         >>> print(pipeline.get_comparison_table())
     """
 
-    def __init__(self, models: List[str]):
+    def __init__(self, models: list[str]):
         """Initialize model comparison pipeline.
 
         Args:
@@ -210,7 +211,7 @@ class ModelComparisonPipeline(Pipeline):
         """
         super().__init__()
         self.models = models
-        self.results: Dict[str, Dict[str, Any]] = {}
+        self.results: dict[str, dict[str, Any]] = {}
 
     def run(self, data: RheoData, **fit_kwargs) -> ModelComparisonPipeline:
         """Fit multiple models and compare.
@@ -245,38 +246,36 @@ class ModelComparisonPipeline(Pipeline):
 
                 # Store results
                 self.results[model_name] = {
-                    'model': model,
-                    'parameters': model.get_params(),
-                    'predictions': y_pred,
-                    'residuals': residuals,
-                    'rmse': float(rmse),
-                    'rel_rmse': float(rel_rmse),
-                    'r_squared': float(r_squared),
-                    'n_params': len(model.parameters) if hasattr(model, 'parameters') else 0
+                    "model": model,
+                    "parameters": model.get_params(),
+                    "predictions": y_pred,
+                    "residuals": residuals,
+                    "rmse": float(rmse),
+                    "rel_rmse": float(rel_rmse),
+                    "r_squared": float(r_squared),
+                    "n_params": (
+                        len(model.parameters) if hasattr(model, "parameters") else 0
+                    ),
                 }
 
                 # Calculate AIC (Akaike Information Criterion)
                 n = len(y)
-                k = self.results[model_name]['n_params']
+                k = self.results[model_name]["n_params"]
                 if n > 0 and rmse > 0:
                     aic = n * np.log(rmse**2) + 2 * k
-                    self.results[model_name]['aic'] = float(aic)
+                    self.results[model_name]["aic"] = float(aic)
                 else:
-                    self.results[model_name]['aic'] = np.inf
+                    self.results[model_name]["aic"] = np.inf
 
-                self.history.append(('fit_compare', model_name, r_squared))
+                self.history.append(("fit_compare", model_name, r_squared))
 
             except Exception as e:
-                warnings.warn(f"Failed to fit model {model_name}: {e}")
+                warnings.warn(f"Failed to fit model {model_name}: {e}", stacklevel=2)
                 continue
 
         return self
 
-    def get_best_model(
-        self,
-        metric: str = 'rmse',
-        minimize: bool = True
-    ) -> str:
+    def get_best_model(self, metric: str = "rmse", minimize: bool = True) -> str:
         """Return name of best-fitting model.
 
         Args:
@@ -293,17 +292,11 @@ class ModelComparisonPipeline(Pipeline):
             raise ValueError("No models fitted. Call run() first.")
 
         if minimize:
-            return min(
-                self.results.items(),
-                key=lambda x: x[1].get(metric, np.inf)
-            )[0]
+            return min(self.results.items(), key=lambda x: x[1].get(metric, np.inf))[0]
         else:
-            return max(
-                self.results.items(),
-                key=lambda x: x[1].get(metric, -np.inf)
-            )[0]
+            return max(self.results.items(), key=lambda x: x[1].get(metric, -np.inf))[0]
 
-    def get_comparison_table(self) -> Dict[str, Dict[str, float]]:
+    def get_comparison_table(self) -> dict[str, dict[str, float]]:
         """Get comparison table of all models.
 
         Returns:
@@ -316,16 +309,16 @@ class ModelComparisonPipeline(Pipeline):
         """
         return {
             name: {
-                'rmse': result['rmse'],
-                'rel_rmse': result['rel_rmse'],
-                'r_squared': result['r_squared'],
-                'aic': result.get('aic', np.nan),
-                'n_params': result['n_params']
+                "rmse": result["rmse"],
+                "rel_rmse": result["rel_rmse"],
+                "r_squared": result["r_squared"],
+                "aic": result.get("aic", np.nan),
+                "n_params": result["n_params"],
             }
             for name, result in self.results.items()
         }
 
-    def get_model_result(self, model_name: str) -> Dict[str, Any]:
+    def get_model_result(self, model_name: str) -> dict[str, Any]:
         """Get detailed results for a specific model.
 
         Args:
@@ -356,9 +349,7 @@ class CreepToRelaxationPipeline(Pipeline):
     """
 
     def run(
-        self,
-        creep_data: RheoData,
-        method: str = 'approximate'
+        self, creep_data: RheoData, method: str = "approximate"
     ) -> CreepToRelaxationPipeline:
         """Execute conversion workflow.
 
@@ -375,21 +366,21 @@ class CreepToRelaxationPipeline(Pipeline):
         self.data = creep_data
 
         # Validate test mode
-        test_mode = creep_data.metadata.get('test_mode', '').lower()
-        if test_mode and test_mode != 'creep':
+        test_mode = creep_data.metadata.get("test_mode", "").lower()
+        if test_mode and test_mode != "creep":
             warnings.warn(
                 f"Input appears to be {test_mode} data, not creep. "
-                "Results may be inaccurate."
+                "Results may be inaccurate.", stacklevel=2
             )
 
-        if method == 'approximate':
+        if method == "approximate":
             self._approximate_conversion()
-        elif method == 'exact':
+        elif method == "exact":
             self._exact_conversion()
         else:
             raise ValueError(f"Unknown method: {method}")
 
-        self.history.append(('creep_to_relaxation', method))
+        self.history.append(("creep_to_relaxation", method))
         return self
 
     def _approximate_conversion(self):
@@ -411,14 +402,14 @@ class CreepToRelaxationPipeline(Pipeline):
             x=self.data.x,
             y=G_t,
             x_units=self.data.x_units,
-            y_units='Pa' if not self.data.y_units else self.data.y_units,
+            y_units="Pa" if not self.data.y_units else self.data.y_units,
             domain=self.data.domain,
             metadata={
                 **self.data.metadata,
-                'test_mode': 'relaxation',
-                'conversion_method': 'approximate'
+                "test_mode": "relaxation",
+                "conversion_method": "approximate",
             },
-            validate=False
+            validate=False,
         )
 
     def _exact_conversion(self):
@@ -433,10 +424,10 @@ class CreepToRelaxationPipeline(Pipeline):
         # This would use a proper Laplace transform inversion
         # For now, fall back to approximate
         warnings.warn(
-            "Exact conversion not fully implemented. Using approximate method."
+            "Exact conversion not fully implemented. Using approximate method.", stacklevel=2
         )
         self._approximate_conversion()
-        self.data.metadata['conversion_method'] = 'exact_approximate'
+        self.data.metadata["conversion_method"] = "exact_approximate"
 
 
 class FrequencyToTimePipeline(Pipeline):
@@ -454,8 +445,8 @@ class FrequencyToTimePipeline(Pipeline):
     def run(
         self,
         frequency_data: RheoData,
-        time_range: Optional[tuple] = None,
-        n_points: int = 100
+        time_range: tuple | None = None,
+        n_points: int = 100,
     ) -> FrequencyToTimePipeline:
         """Execute frequency to time conversion.
 
@@ -469,8 +460,8 @@ class FrequencyToTimePipeline(Pipeline):
         """
         self.data = frequency_data
 
-        if frequency_data.domain != 'frequency':
-            warnings.warn("Input data may not be in frequency domain")
+        if frequency_data.domain != "frequency":
+            warnings.warn("Input data may not be in frequency domain", stacklevel=2)
 
         # Generate time points
         if time_range is None:
@@ -496,25 +487,22 @@ class FrequencyToTimePipeline(Pipeline):
         self.data = RheoData(
             x=t,
             y=G_t,
-            x_units='s',
+            x_units="s",
             y_units=frequency_data.y_units,
-            domain='time',
+            domain="time",
             metadata={
                 **frequency_data.metadata,
-                'conversion': 'frequency_to_time',
-                'original_domain': 'frequency'
+                "conversion": "frequency_to_time",
+                "original_domain": "frequency",
             },
-            validate=False
+            validate=False,
         )
 
-        self.history.append(('frequency_to_time', n_points))
+        self.history.append(("frequency_to_time", n_points))
         return self
 
     def _approximate_inverse_transform(
-        self,
-        t: np.ndarray,
-        omega: np.ndarray,
-        G_star: np.ndarray
+        self, t: np.ndarray, omega: np.ndarray, G_star: np.ndarray
     ) -> np.ndarray:
         """Approximate inverse Fourier transform.
 
@@ -532,17 +520,16 @@ class FrequencyToTimePipeline(Pipeline):
 
         for i, t_i in enumerate(t):
             # Approximate G(t) from G*(ω) using cos transform
-            G_t[i] = np.trapz(
-                np.real(G_star) * np.cos(omega * t_i),
-                omega
-            ) * (2 / np.pi)
+            G_t[i] = np.trapz(np.real(G_star) * np.cos(omega * t_i), omega) * (
+                2 / np.pi
+            )
 
         return G_t
 
 
 __all__ = [
-    'MastercurvePipeline',
-    'ModelComparisonPipeline',
-    'CreepToRelaxationPipeline',
-    'FrequencyToTimePipeline',
+    "MastercurvePipeline",
+    "ModelComparisonPipeline",
+    "CreepToRelaxationPipeline",
+    "FrequencyToTimePipeline",
 ]

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Union
 
 import numpy as np
 
@@ -12,14 +11,14 @@ from rheo.core.data import RheoData
 
 def load_excel(
     filepath: str,
-    x_col: Union[str, int],
-    y_col: Union[str, int],
-    sheet: Union[str, int] = 0,
-    x_units: Optional[str] = None,
-    y_units: Optional[str] = None,
-    domain: str = 'time',
-    header: Optional[int] = 0,
-    **kwargs
+    x_col: str | int,
+    y_col: str | int,
+    sheet: str | int = 0,
+    x_units: str | None = None,
+    y_units: str | None = None,
+    domain: str = "time",
+    header: int | None = 0,
+    **kwargs,
 ) -> RheoData:
     """Load data from Excel file.
 
@@ -46,7 +45,9 @@ def load_excel(
     try:
         import pandas as pd
     except ImportError:
-        raise ImportError("pandas is required for Excel reading. Install with: pip install pandas openpyxl")
+        raise ImportError(
+            "pandas is required for Excel reading. Install with: pip install pandas openpyxl"
+        )
 
     filepath = Path(filepath)
     if not filepath.exists():
@@ -54,19 +55,18 @@ def load_excel(
 
     # Read Excel file
     try:
-        df = pd.read_excel(
-            filepath,
-            sheet_name=sheet,
-            header=header,
-            **kwargs
-        )
+        df = pd.read_excel(filepath, sheet_name=sheet, header=header, **kwargs)
     except Exception as e:
         raise ValueError(f"Failed to parse Excel file: {e}")
 
     # Extract x and y columns
     try:
-        x_data = df[x_col].values if isinstance(x_col, str) else df.iloc[:, x_col].values
-        y_data = df[y_col].values if isinstance(y_col, str) else df.iloc[:, y_col].values
+        x_data = (
+            df[x_col].values if isinstance(x_col, str) else df.iloc[:, x_col].values
+        )
+        y_data = (
+            df[y_col].values if isinstance(y_col, str) else df.iloc[:, y_col].values
+        )
     except (KeyError, IndexError) as e:
         raise KeyError(f"Column not found: {e}")
 
@@ -84,11 +84,11 @@ def load_excel(
 
     # Create metadata
     metadata = {
-        'source_file': str(filepath),
-        'file_type': 'excel',
-        'sheet': sheet,
-        'x_column': x_col,
-        'y_column': y_col,
+        "source_file": str(filepath),
+        "file_type": "excel",
+        "sheet": sheet,
+        "x_column": x_col,
+        "y_column": y_col,
     }
 
     return RheoData(
@@ -98,5 +98,5 @@ def load_excel(
         y_units=y_units,
         domain=domain,
         metadata=metadata,
-        validate=True
+        validate=True,
     )

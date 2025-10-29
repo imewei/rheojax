@@ -8,18 +8,18 @@ This module provides:
 """
 
 from rheo.visualization.plotter import (
+    plot_flow_curve,
+    plot_frequency_domain,
+    plot_residuals,
     plot_rheo_data,
     plot_time_domain,
-    plot_frequency_domain,
-    plot_flow_curve,
-    plot_residuals,
 )
 from rheo.visualization.templates import (
-    plot_stress_strain,
-    plot_modulus_frequency,
+    apply_template_style,
     plot_mastercurve,
     plot_model_fit,
-    apply_template_style,
+    plot_modulus_frequency,
+    plot_stress_strain,
 )
 
 __all__ = [

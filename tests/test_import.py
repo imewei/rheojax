@@ -21,7 +21,16 @@ def test_rheo_import():
 
 def test_submodule_imports():
     """Test that all submodules can be imported."""
-    from rheo import core, io, legacy, models, pipelines, transforms, utils, visualization
+    from rheo import (
+        core,
+        io,
+        legacy,
+        models,
+        pipelines,
+        transforms,
+        utils,
+        visualization,
+    )
 
     # Check that modules exist
     assert core is not None

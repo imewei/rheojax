@@ -4,11 +4,12 @@ This test suite ensures the registry system can discover, register,
 validate, and manage models and transforms as plugins.
 """
 
-import pytest
-from unittest.mock import Mock, patch
 from typing import Any, Dict, Type
+from unittest.mock import Mock, patch
 
-from rheo.core.registry import Registry, PluginType, PluginInfo
+import pytest
+
+from rheo.core.registry import PluginInfo, PluginType, Registry
 
 
 class TestRegistryCreation:
@@ -54,7 +55,10 @@ class TestRegistryCreation:
 
         # Should be able to retrieve both without conflict
         assert registry.get("test_item", plugin_type=PluginType.MODEL) is mock_model
-        assert registry.get("test_item", plugin_type=PluginType.TRANSFORM) is mock_transform
+        assert (
+            registry.get("test_item", plugin_type=PluginType.TRANSFORM)
+            is mock_transform
+        )
 
 
 class TestRegistryRegistration:
@@ -117,12 +121,12 @@ class TestRegistryRegistration:
             "description": "Maxwell viscoelastic model",
             "parameters": ["G", "eta"],
             "domain": "frequency",
-            "version": "1.0.0"
+            "version": "1.0.0",
         }
 
-        registry.register("maxwell", MockModel,
-                         plugin_type=PluginType.MODEL,
-                         metadata=metadata)
+        registry.register(
+            "maxwell", MockModel, plugin_type=PluginType.MODEL, metadata=metadata
+        )
 
         # Retrieve plugin info
         info = registry.get_info("maxwell", plugin_type=PluginType.MODEL)
@@ -206,7 +210,9 @@ class TestRegistryRetrieval:
         registry = Registry()
 
         with pytest.raises(KeyError, match="not found in registry"):
-            registry.get("nonexistent", plugin_type=PluginType.MODEL, raise_on_missing=True)
+            registry.get(
+                "nonexistent", plugin_type=PluginType.MODEL, raise_on_missing=True
+            )
 
     def test_get_all_models(self):
         """Test retrieving all registered models."""
@@ -244,12 +250,13 @@ class TestRegistryRetrieval:
 
         class MockModel:
             """Test model documentation."""
+
             pass
 
         metadata = {"version": "1.0.0", "author": "test"}
-        registry.register("test", MockModel,
-                         plugin_type=PluginType.MODEL,
-                         metadata=metadata)
+        registry.register(
+            "test", MockModel, plugin_type=PluginType.MODEL, metadata=metadata
+        )
 
         info = registry.get_info("test", plugin_type=PluginType.MODEL)
 
@@ -291,15 +298,15 @@ class TestRegistryValidation:
             pass
 
         # Valid model should register successfully
-        registry.register("valid", ValidModel,
-                         plugin_type=PluginType.MODEL,
-                         validate=True)
+        registry.register(
+            "valid", ValidModel, plugin_type=PluginType.MODEL, validate=True
+        )
 
         # Invalid model should raise error with validation
         with pytest.raises(ValueError, match="does not implement required interface"):
-            registry.register("invalid", InvalidModel,
-                             plugin_type=PluginType.MODEL,
-                             validate=True)
+            registry.register(
+                "invalid", InvalidModel, plugin_type=PluginType.MODEL, validate=True
+            )
 
     def test_validate_transform_interface(self):
         """Test validation of transform interface."""
@@ -315,15 +322,18 @@ class TestRegistryValidation:
             pass
 
         # Valid transform should register successfully
-        registry.register("valid", ValidTransform,
-                         plugin_type=PluginType.TRANSFORM,
-                         validate=True)
+        registry.register(
+            "valid", ValidTransform, plugin_type=PluginType.TRANSFORM, validate=True
+        )
 
         # Invalid transform should raise error
         with pytest.raises(ValueError, match="does not implement required interface"):
-            registry.register("invalid", InvalidTransform,
-                             plugin_type=PluginType.TRANSFORM,
-                             validate=True)
+            registry.register(
+                "invalid",
+                InvalidTransform,
+                plugin_type=PluginType.TRANSFORM,
+                validate=True,
+            )
 
     def test_skip_validation(self):
         """Test that validation can be skipped."""
@@ -334,9 +344,9 @@ class TestRegistryValidation:
             pass
 
         # Should register successfully without validation
-        registry.register("test", InvalidModel,
-                         plugin_type=PluginType.MODEL,
-                         validate=False)
+        registry.register(
+            "test", InvalidModel, plugin_type=PluginType.MODEL, validate=False
+        )
 
         assert registry.get("test", plugin_type=PluginType.MODEL) is InvalidModel
 
@@ -374,8 +384,8 @@ class TestRegistryDiscovery:
                 pass
 
         # Should have discovered the valid plugins
-        assert 'MaxwellModel' in registry.get_all_models()
-        assert 'FFTTransform' in registry.get_all_transforms()
+        assert "MaxwellModel" in registry.get_all_models()
+        assert "FFTTransform" in registry.get_all_transforms()
 
     def test_discover_with_decorators(self):
         """Test plugin discovery using decorators."""
@@ -404,16 +414,20 @@ class TestRegistryDiscovery:
         registry = Registry()
 
         # Mock custom plugin directory
-        with patch('os.path.exists', return_value=True), \
-             patch('os.listdir', return_value=['custom_model.py']), \
-             patch('importlib.import_module') as mock_import:
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.listdir", return_value=["custom_model.py"]),
+            patch("importlib.import_module") as mock_import,
+        ):
 
             # Setup mock module
             mock_module = Mock()
-            mock_module.CustomModel = type('CustomModel', (), {'fit': None, 'predict': None})
+            mock_module.CustomModel = type(
+                "CustomModel", (), {"fit": None, "predict": None}
+            )
             mock_import.return_value = mock_module
 
-            registry.discover_directory('/custom/plugins')
+            registry.discover_directory("/custom/plugins")
 
             # Should discover custom plugins
             assert len(registry.get_all_models()) > 0
@@ -472,7 +486,9 @@ class TestRegistryManagement:
         for i in range(5):
             registry.register(f"model_{i}", Mock(), plugin_type=PluginType.MODEL)
         for i in range(3):
-            registry.register(f"transform_{i}", Mock(), plugin_type=PluginType.TRANSFORM)
+            registry.register(
+                f"transform_{i}", Mock(), plugin_type=PluginType.TRANSFORM
+            )
 
         stats = registry.get_stats()
 
@@ -485,10 +501,15 @@ class TestRegistryManagement:
         registry = Registry()
 
         # Register plugins with metadata
-        registry.register("model1", Mock, plugin_type=PluginType.MODEL,
-                         metadata={"version": "1.0"})
-        registry.register("transform1", Mock, plugin_type=PluginType.TRANSFORM,
-                         metadata={"author": "test"})
+        registry.register(
+            "model1", Mock, plugin_type=PluginType.MODEL, metadata={"version": "1.0"}
+        )
+        registry.register(
+            "transform1",
+            Mock,
+            plugin_type=PluginType.TRANSFORM,
+            metadata={"author": "test"},
+        )
 
         # Export registry state
         state = registry.export_state()
@@ -531,8 +552,9 @@ class TestRegistryCompatibility:
         registry.register("test", MockModel, plugin_type=PluginType.MODEL)
 
         # Create instance through registry
-        instance = registry.create_instance("test", PluginType.MODEL,
-                                           param1=10, param2=20)
+        instance = registry.create_instance(
+            "test", PluginType.MODEL, param1=10, param2=20
+        )
 
         assert isinstance(instance, MockModel)
         assert instance.param1 == 10
@@ -548,10 +570,18 @@ class TestRegistryCompatibility:
         class TimeModel:
             domain = "time"
 
-        registry.register("freq_model", FrequencyModel, plugin_type=PluginType.MODEL,
-                         metadata={"domain": "frequency"})
-        registry.register("time_model", TimeModel, plugin_type=PluginType.MODEL,
-                         metadata={"domain": "time"})
+        registry.register(
+            "freq_model",
+            FrequencyModel,
+            plugin_type=PluginType.MODEL,
+            metadata={"domain": "frequency"},
+        )
+        registry.register(
+            "time_model",
+            TimeModel,
+            plugin_type=PluginType.MODEL,
+            metadata={"domain": "time"},
+        )
 
         # Find compatible models for frequency data
         compatible = registry.find_compatible(domain="frequency")
@@ -570,12 +600,21 @@ class TestRegistryCompatibility:
             version = "2.0.0"
 
         # Register different versions
-        registry.register("model", ModelV1, plugin_type=PluginType.MODEL,
-                         metadata={"version": "1.0.0"})
+        registry.register(
+            "model",
+            ModelV1,
+            plugin_type=PluginType.MODEL,
+            metadata={"version": "1.0.0"},
+        )
 
         # Try to register newer version
-        registry.register("model", ModelV2, plugin_type=PluginType.MODEL,
-                         metadata={"version": "2.0.0"}, force=True)
+        registry.register(
+            "model",
+            ModelV2,
+            plugin_type=PluginType.MODEL,
+            metadata={"version": "2.0.0"},
+            force=True,
+        )
 
         # Should get the newer version
         model = registry.get("model", plugin_type=PluginType.MODEL)

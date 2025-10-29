@@ -4,15 +4,19 @@ This test suite ensures proper parameter handling, validation,
 and optimization support for models and transforms.
 """
 
-import numpy as np
-import jax.numpy as jnp
-import pytest
-from unittest.mock import Mock, patch
 from typing import Any, Dict, List, Optional, Tuple
+from unittest.mock import Mock, patch
+
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.parameters import (
-    Parameter, ParameterSet, ParameterConstraint,
-    SharedParameterSet, ParameterOptimizer
+    Parameter,
+    ParameterConstraint,
+    ParameterOptimizer,
+    ParameterSet,
+    SharedParameterSet,
 )
 
 
@@ -21,11 +25,7 @@ class TestParameterConstraints:
 
     def test_bounds_constraint(self):
         """Test bounds constraints on parameters."""
-        constraint = ParameterConstraint(
-            type="bounds",
-            min_value=0.0,
-            max_value=100.0
-        )
+        constraint = ParameterConstraint(type="bounds", min_value=0.0, max_value=100.0)
 
         # Valid values
         assert constraint.validate(50.0) == True
@@ -66,9 +66,7 @@ class TestParameterConstraints:
         """Test relative constraints between parameters."""
         # Parameter A must be less than parameter B
         constraint = ParameterConstraint(
-            type="relative",
-            relation="less_than",
-            other_param="param_b"
+            type="relative", relation="less_than", other_param="param_b"
         )
 
         # Need context with both parameters
@@ -80,14 +78,12 @@ class TestParameterConstraints:
 
     def test_custom_constraint(self):
         """Test custom constraint function."""
+
         def custom_validator(value):
             # Value must be even
             return value % 2 == 0
 
-        constraint = ParameterConstraint(
-            type="custom",
-            validator=custom_validator
-        )
+        constraint = ParameterConstraint(type="custom", validator=custom_validator)
 
         assert constraint.validate(4) == True
         assert constraint.validate(5) == False
@@ -100,8 +96,8 @@ class TestParameterConstraints:
             constraints=[
                 ParameterConstraint(type="positive"),
                 ParameterConstraint(type="bounds", min_value=0, max_value=10),
-                ParameterConstraint(type="integer")
-            ]
+                ParameterConstraint(type="integer"),
+            ],
         )
 
         # Valid value
@@ -110,7 +106,7 @@ class TestParameterConstraints:
         # Invalid values
         assert param.validate(-1.0) == False  # Not positive
         assert param.validate(11.0) == False  # Out of bounds
-        assert param.validate(5.5) == False   # Not integer
+        assert param.validate(5.5) == False  # Not integer
 
 
 class TestSharedParameters:
@@ -175,9 +171,7 @@ class TestSharedParameters:
         shared.add_shared(
             "ratio",
             value=0.5,
-            constraints=[
-                ParameterConstraint(type="bounds", min_value=0, max_value=1)
-            ]
+            constraints=[ParameterConstraint(type="bounds", min_value=0, max_value=1)],
         )
 
         # Valid update
@@ -271,7 +265,7 @@ class TestParameterOptimizer:
         # Define differentiable objective
         def objective(values):
             x = values[0]
-            return x**3 - 2*x + 1
+            return x**3 - 2 * x + 1
 
         optimizer.set_objective(objective)
 
@@ -334,11 +328,13 @@ class TestParameterOptimizer:
         callback_data = []
 
         def callback(iteration, values, objective_value):
-            callback_data.append({
-                "iteration": iteration,
-                "values": values.copy(),
-                "objective": objective_value
-            })
+            callback_data.append(
+                {
+                    "iteration": iteration,
+                    "values": values.copy(),
+                    "objective": objective_value,
+                }
+            )
 
         optimizer.set_callback(callback)
 

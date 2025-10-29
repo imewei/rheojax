@@ -11,11 +11,12 @@ import inspect
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any
 
 
 class PluginType(Enum):
     """Types of plugins that can be registered."""
+
     MODEL = "model"
     TRANSFORM = "transform"
 
@@ -23,11 +24,12 @@ class PluginType(Enum):
 @dataclass
 class PluginInfo:
     """Information about a registered plugin."""
+
     name: str
-    plugin_class: Type
+    plugin_class: type
     plugin_type: PluginType
-    metadata: Dict[str, Any]
-    doc: Optional[str] = None
+    metadata: dict[str, Any]
+    doc: str | None = None
 
     def __post_init__(self):
         """Extract documentation from plugin class."""
@@ -42,9 +44,9 @@ class Registry:
     for all models and transforms in the rheo package.
     """
 
-    _instance: Optional[Registry] = None
-    _models: Dict[str, PluginInfo]
-    _transforms: Dict[str, PluginInfo]
+    _instance: Registry | None = None
+    _models: dict[str, PluginInfo]
+    _transforms: dict[str, PluginInfo]
 
     def __new__(cls):
         """Ensure singleton pattern."""
@@ -66,11 +68,11 @@ class Registry:
     def register(
         self,
         name: str,
-        plugin_class: Type,
-        plugin_type: Union[PluginType, str],
-        metadata: Optional[Dict[str, Any]] = None,
+        plugin_class: type,
+        plugin_type: PluginType | str,
+        metadata: dict[str, Any] | None = None,
         validate: bool = False,
-        force: bool = False
+        force: bool = False,
     ):
         """Register a plugin in the registry.
 
@@ -90,7 +92,9 @@ class Registry:
             try:
                 plugin_type = PluginType(plugin_type.lower())
             except ValueError:
-                raise ValueError(f"Invalid plugin type: {plugin_type}. Must be 'model' or 'transform'")
+                raise ValueError(
+                    f"Invalid plugin type: {plugin_type}. Must be 'model' or 'transform'"
+                )
 
         # Select appropriate registry
         if plugin_type == PluginType.MODEL:
@@ -102,7 +106,9 @@ class Registry:
 
         # Check if already registered
         if name in registry and not force:
-            raise ValueError(f"Plugin '{name}' is already registered as a {plugin_type.value}")
+            raise ValueError(
+                f"Plugin '{name}' is already registered as a {plugin_type.value}"
+            )
 
         # Validate interface if requested
         if validate:
@@ -113,13 +119,13 @@ class Registry:
             name=name,
             plugin_class=plugin_class,
             plugin_type=plugin_type,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         # Register the plugin
         registry[name] = info
 
-    def _validate_plugin(self, plugin_class: Type, plugin_type: PluginType):
+    def _validate_plugin(self, plugin_class: type, plugin_type: PluginType):
         """Validate that a plugin implements the required interface.
 
         Args:
@@ -131,7 +137,7 @@ class Registry:
         """
         if plugin_type == PluginType.MODEL:
             # Check for required model methods
-            required_methods = ['fit', 'predict']
+            required_methods = ["fit", "predict"]
             for method in required_methods:
                 if not hasattr(plugin_class, method):
                     raise ValueError(
@@ -140,7 +146,7 @@ class Registry:
 
         elif plugin_type == PluginType.TRANSFORM:
             # Check for required transform methods
-            if not hasattr(plugin_class, 'transform'):
+            if not hasattr(plugin_class, "transform"):
                 raise ValueError(
                     "Transform plugin does not implement required interface: missing 'transform' method"
                 )
@@ -148,9 +154,9 @@ class Registry:
     def get(
         self,
         name: str,
-        plugin_type: Union[PluginType, str],
-        raise_on_missing: bool = False
-    ) -> Optional[Type]:
+        plugin_type: PluginType | str,
+        raise_on_missing: bool = False,
+    ) -> type | None:
         """Retrieve a registered plugin class.
 
         Args:
@@ -180,11 +186,15 @@ class Registry:
         if name in registry:
             return registry[name].plugin_class
         elif raise_on_missing:
-            raise KeyError(f"Plugin '{name}' not found in registry for type {plugin_type.value}")
+            raise KeyError(
+                f"Plugin '{name}' not found in registry for type {plugin_type.value}"
+            )
         else:
             return None
 
-    def get_info(self, name: str, plugin_type: Union[PluginType, str]) -> Optional[PluginInfo]:
+    def get_info(
+        self, name: str, plugin_type: PluginType | str
+    ) -> PluginInfo | None:
         """Get full information about a registered plugin.
 
         Args:
@@ -208,7 +218,7 @@ class Registry:
 
         return registry.get(name)
 
-    def get_all_models(self) -> List[str]:
+    def get_all_models(self) -> list[str]:
         """Get list of all registered model names.
 
         Returns:
@@ -216,7 +226,7 @@ class Registry:
         """
         return list(self._models.keys())
 
-    def get_all_transforms(self) -> List[str]:
+    def get_all_transforms(self) -> list[str]:
         """Get list of all registered transform names.
 
         Returns:
@@ -224,7 +234,7 @@ class Registry:
         """
         return list(self._transforms.keys())
 
-    def unregister(self, name: str, plugin_type: Union[PluginType, str]):
+    def unregister(self, name: str, plugin_type: PluginType | str):
         """Remove a plugin from the registry.
 
         Args:
@@ -247,7 +257,7 @@ class Registry:
         if name in registry:
             del registry[name]
 
-    def get_all(self) -> Dict[str, Tuple[type, PluginType]]:
+    def get_all(self) -> dict[str, tuple[type, PluginType]]:
         """Get all registered plugins with their types.
 
         Returns:
@@ -284,7 +294,7 @@ class Registry:
         """
         return name in self._models or name in self._transforms
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get registration statistics.
 
         Returns:
@@ -293,7 +303,7 @@ class Registry:
         return {
             "total": len(self),
             "models": len(self._models),
-            "transforms": len(self._transforms)
+            "transforms": len(self._transforms),
         }
 
     def discover(self, module_name: str):
@@ -311,10 +321,10 @@ class Registry:
         for name, obj in inspect.getmembers(module):
             if inspect.isclass(obj):
                 # Check if it's a model
-                if hasattr(obj, 'fit') and hasattr(obj, 'predict'):
+                if hasattr(obj, "fit") and hasattr(obj, "predict"):
                     self.register(name, obj, PluginType.MODEL, validate=False)
                 # Check if it's a transform
-                elif hasattr(obj, 'transform'):
+                elif hasattr(obj, "transform"):
                     self.register(name, obj, PluginType.TRANSFORM, validate=False)
 
     def discover_directory(self, path: str):
@@ -328,12 +338,13 @@ class Registry:
 
         # Add path to Python path temporarily
         import sys
+
         sys.path.insert(0, path)
 
         try:
             # Scan for Python files
             for filename in os.listdir(path):
-                if filename.endswith('.py') and not filename.startswith('_'):
+                if filename.endswith(".py") and not filename.startswith("_"):
                     module_name = filename[:-3]
                     self.discover(module_name)
         finally:
@@ -341,11 +352,7 @@ class Registry:
             sys.path.pop(0)
 
     def create_instance(
-        self,
-        name: str,
-        plugin_type: Union[PluginType, str],
-        *args,
-        **kwargs
+        self, name: str, plugin_type: PluginType | str, *args, **kwargs
     ) -> Any:
         """Create an instance of a registered plugin.
 
@@ -364,7 +371,7 @@ class Registry:
         plugin_class = self.get(name, plugin_type, raise_on_missing=True)
         return plugin_class(*args, **kwargs)
 
-    def find_compatible(self, **criteria) -> List[str]:
+    def find_compatible(self, **criteria) -> list[str]:
         """Find plugins matching certain criteria.
 
         Args:
@@ -387,7 +394,9 @@ class Registry:
 
         return compatible
 
-    def _matches_criteria(self, metadata: Dict[str, Any], criteria: Dict[str, Any]) -> bool:
+    def _matches_criteria(
+        self, metadata: dict[str, Any], criteria: dict[str, Any]
+    ) -> bool:
         """Check if metadata matches all criteria.
 
         Args:
@@ -402,7 +411,7 @@ class Registry:
                 return False
         return True
 
-    def export_state(self) -> Dict[str, Any]:
+    def export_state(self) -> dict[str, Any]:
         """Export registry state for serialization.
 
         Returns:
@@ -413,7 +422,7 @@ class Registry:
                 name: {
                     "class_name": info.plugin_class.__name__,
                     "module": info.plugin_class.__module__,
-                    "metadata": info.metadata
+                    "metadata": info.metadata,
                 }
                 for name, info in self._models.items()
             },
@@ -421,13 +430,13 @@ class Registry:
                 name: {
                     "class_name": info.plugin_class.__name__,
                     "module": info.plugin_class.__module__,
-                    "metadata": info.metadata
+                    "metadata": info.metadata,
                 }
                 for name, info in self._transforms.items()
-            }
+            },
         }
 
-    def import_state(self, state: Dict[str, Any]):
+    def import_state(self, state: dict[str, Any]):
         """Import registry state from serialization.
 
         Args:
@@ -438,8 +447,13 @@ class Registry:
             try:
                 module = importlib.import_module(info["module"])
                 plugin_class = getattr(module, info["class_name"])
-                self.register(name, plugin_class, PluginType.MODEL,
-                            metadata=info.get("metadata", {}), force=True)
+                self.register(
+                    name,
+                    plugin_class,
+                    PluginType.MODEL,
+                    metadata=info.get("metadata", {}),
+                    force=True,
+                )
             except (ImportError, AttributeError):
                 continue
 
@@ -448,13 +462,18 @@ class Registry:
             try:
                 module = importlib.import_module(info["module"])
                 plugin_class = getattr(module, info["class_name"])
-                self.register(name, plugin_class, PluginType.TRANSFORM,
-                            metadata=info.get("metadata", {}), force=True)
+                self.register(
+                    name,
+                    plugin_class,
+                    PluginType.TRANSFORM,
+                    metadata=info.get("metadata", {}),
+                    force=True,
+                )
             except (ImportError, AttributeError):
                 continue
 
     # Decorator methods for easy registration
-    def model(self, name: Optional[str] = None, **metadata):
+    def model(self, name: str | None = None, **metadata):
         """Decorator for registering a model.
 
         Args:
@@ -464,13 +483,15 @@ class Registry:
         Returns:
             Decorator function
         """
+
         def decorator(cls):
             model_name = name or cls.__name__
             self.register(model_name, cls, PluginType.MODEL, metadata=metadata)
             return cls
+
         return decorator
 
-    def transform(self, name: Optional[str] = None, **metadata):
+    def transform(self, name: str | None = None, **metadata):
         """Decorator for registering a transform.
 
         Args:
@@ -480,10 +501,12 @@ class Registry:
         Returns:
             Decorator function
         """
+
         def decorator(cls):
             transform_name = name or cls.__name__
             self.register(transform_name, cls, PluginType.TRANSFORM, metadata=metadata)
             return cls
+
         return decorator
 
 
@@ -527,10 +550,12 @@ class ModelRegistry:
             >>> class Maxwell(BaseModel):
             ...     pass
         """
+
         def decorator(model_class):
             registry = cls._get_registry()
             registry.register(name, model_class, PluginType.MODEL, metadata=metadata)
             return model_class
+
         return decorator
 
     @classmethod
@@ -555,7 +580,7 @@ class ModelRegistry:
         return registry.create_instance(name, PluginType.MODEL, *args, **kwargs)
 
     @classmethod
-    def list_models(cls) -> List[str]:
+    def list_models(cls) -> list[str]:
         """List all registered model names (discovery).
 
         Returns:
@@ -570,7 +595,7 @@ class ModelRegistry:
         return registry.get_all_models()
 
     @classmethod
-    def get_info(cls, name: str) -> Optional[PluginInfo]:
+    def get_info(cls, name: str) -> PluginInfo | None:
         """Get information about a registered model.
 
         Args:
@@ -638,10 +663,14 @@ class TransformRegistry:
             >>> class RheoAnalysis(BaseTransform):
             ...     pass
         """
+
         def decorator(transform_class):
             registry = cls._get_registry()
-            registry.register(name, transform_class, PluginType.TRANSFORM, metadata=metadata)
+            registry.register(
+                name, transform_class, PluginType.TRANSFORM, metadata=metadata
+            )
             return transform_class
+
         return decorator
 
     @classmethod
@@ -666,7 +695,7 @@ class TransformRegistry:
         return registry.create_instance(name, PluginType.TRANSFORM, *args, **kwargs)
 
     @classmethod
-    def list_transforms(cls) -> List[str]:
+    def list_transforms(cls) -> list[str]:
         """List all registered transform names (discovery).
 
         Returns:
@@ -681,7 +710,7 @@ class TransformRegistry:
         return registry.get_all_transforms()
 
     @classmethod
-    def get_info(cls, name: str) -> Optional[PluginInfo]:
+    def get_info(cls, name: str) -> PluginInfo | None:
         """Get information about a registered transform.
 
         Args:

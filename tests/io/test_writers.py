@@ -1,15 +1,17 @@
 """Tests for file writers (Task Group 7.11, 7.13)."""
 
-import pytest
-import numpy as np
 from pathlib import Path
 
+import numpy as np
+import pytest
+
 from rheo.core.data import RheoData
-from rheo.io.writers import save_hdf5, save_excel
+from rheo.io.writers import save_excel, save_hdf5
 
 # Check if h5py is available
 try:
     import h5py
+
     HAS_H5PY = True
 except ImportError:
     HAS_H5PY = False
@@ -25,14 +27,14 @@ class TestHDF5Writer:
         return RheoData(
             x=np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
             y=np.array([100.0, 200.0, 300.0, 400.0, 500.0]),
-            x_units='s',
-            y_units='Pa',
-            domain='time',
+            x_units="s",
+            y_units="Pa",
+            domain="time",
             metadata={
-                'sample_name': 'Test Sample',
-                'temperature': 25.0,
-                'test_mode': 'relaxation'
-            }
+                "sample_name": "Test Sample",
+                "temperature": 25.0,
+                "test_mode": "relaxation",
+            },
         )
 
     def test_hdf5_basic_write(self, tmp_path, sample_data):
@@ -52,10 +54,11 @@ class TestHDF5Writer:
 
         # Verify we can read it back (would need read function)
         import h5py
-        with h5py.File(str(output_file), 'r') as f:
-            assert 'x' in f
-            assert 'y' in f
-            assert 'metadata' in f.attrs or 'metadata' in f
+
+        with h5py.File(str(output_file), "r") as f:
+            assert "x" in f
+            assert "y" in f
+            assert "metadata" in f.attrs or "metadata" in f
 
     def test_hdf5_compression(self, tmp_path, sample_data):
         """Test HDF5 compression."""
@@ -65,9 +68,9 @@ class TestHDF5Writer:
         large_data = RheoData(
             x=np.linspace(0, 100, 10000),
             y=np.random.randn(10000),
-            x_units='s',
-            y_units='Pa',
-            domain='time'
+            x_units="s",
+            y_units="Pa",
+            domain="time",
         )
 
         save_hdf5(large_data, str(output_file), compression=True)
@@ -83,9 +86,10 @@ class TestHDF5Writer:
 
         # Read back (would need read function)
         import h5py
-        with h5py.File(str(output_file), 'r') as f:
-            x_read = f['x'][:]
-            y_read = f['y'][:]
+
+        with h5py.File(str(output_file), "r") as f:
+            x_read = f["x"][:]
+            y_read = f["y"][:]
 
             np.testing.assert_array_equal(x_read, sample_data.x)
             np.testing.assert_array_equal(y_read, sample_data.y)
@@ -98,16 +102,16 @@ class TestExcelWriter:
     def results_dict(self):
         """Create sample results dictionary."""
         return {
-            'parameters': {
-                'G_s': 1.5e5,
-                'eta_s': 2.3e3,
+            "parameters": {
+                "G_s": 1.5e5,
+                "eta_s": 2.3e3,
             },
-            'fit_quality': {
-                'R2': 0.95,
-                'RMSE': 12.3,
+            "fit_quality": {
+                "R2": 0.95,
+                "RMSE": 12.3,
             },
-            'residuals': np.array([0.1, -0.2, 0.15, -0.1, 0.05]),
-            'predictions': np.array([100, 200, 300, 400, 500]),
+            "residuals": np.array([0.1, -0.2, 0.15, -0.1, 0.05]),
+            "predictions": np.array([100, 200, 300, 400, 500]),
         }
 
     @pytest.mark.skip(reason="Requires openpyxl/xlsxwriter installation")
@@ -128,8 +132,9 @@ class TestExcelWriter:
 
         # Verify structure
         import openpyxl
+
         wb = openpyxl.load_workbook(str(output_file))
-        assert 'Parameters' in wb.sheetnames or len(wb.sheetnames) > 0
+        assert "Parameters" in wb.sheetnames or len(wb.sheetnames) > 0
 
     @pytest.mark.skip(reason="Requires plotting integration")
     def test_excel_plot_inclusion(self, tmp_path, results_dict):

@@ -17,14 +17,14 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union, Tuple
 import warnings
+from typing import Any
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 
-from rheo.core.data import RheoData
 from rheo.core.base import BaseModel, BaseTransform
+from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry, TransformRegistry
 
 
@@ -46,18 +46,18 @@ class Pipeline:
         >>> pipeline.load('data.csv').fit('maxwell').plot()
     """
 
-    def __init__(self, data: Optional[RheoData] = None):
+    def __init__(self, data: RheoData | None = None):
         """Initialize pipeline.
 
         Args:
             data: Optional initial RheoData. If None, must call load() first.
         """
         self.data = data
-        self.steps: List[Tuple[str, Any]] = []
-        self.history: List[Tuple[str, ...]] = []
-        self._last_model: Optional[BaseModel] = None
+        self.steps: list[tuple[str, Any]] = []
+        self.history: list[tuple[str, ...]] = []
+        self._last_model: BaseModel | None = None
 
-    def load(self, file_path: str, format: str = 'auto', **kwargs) -> Pipeline:
+    def load(self, file_path: str, format: str = "auto", **kwargs) -> Pipeline:
         """Load data from file.
 
         Args:
@@ -77,21 +77,25 @@ class Pipeline:
         """
         from rheo.io import auto_load
 
-        if format == 'auto':
+        if format == "auto":
             result = auto_load(file_path, **kwargs)
         else:
             # Format-specific loading
-            if format == 'csv':
+            if format == "csv":
                 from rheo.io import load_csv
+
                 result = load_csv(file_path, **kwargs)
-            elif format == 'excel':
+            elif format == "excel":
                 from rheo.io import load_excel
+
                 result = load_excel(file_path, **kwargs)
-            elif format == 'trios':
+            elif format == "trios":
                 from rheo.io import load_trios
+
                 result = load_trios(file_path, **kwargs)
-            elif format == 'hdf5':
+            elif format == "hdf5":
                 from rheo.io import load_hdf5
+
                 result = load_hdf5(file_path, **kwargs)
             else:
                 raise ValueError(f"Unknown format: {format}")
@@ -101,19 +105,15 @@ class Pipeline:
             if len(result) == 1:
                 self.data = result[0]
             else:
-                warnings.warn(f"Loaded {len(result)} segments. Using first segment.")
+                warnings.warn(f"Loaded {len(result)} segments. Using first segment.", stacklevel=2)
                 self.data = result[0]
         else:
             self.data = result
 
-        self.history.append(('load', file_path, format))
+        self.history.append(("load", file_path, format))
         return self
 
-    def transform(
-        self,
-        transform: Union[str, BaseTransform],
-        **kwargs
-    ) -> Pipeline:
+    def transform(self, transform: str | BaseTransform, **kwargs) -> Pipeline:
         """Apply a transform to the data.
 
         Args:
@@ -147,15 +147,15 @@ class Pipeline:
         # The transform operates on the y data
         self.data.y = transform_obj.transform(self.data.y)
 
-        self.history.append(('transform', transform_name))
+        self.history.append(("transform", transform_name))
         return self
 
     def fit(
         self,
-        model: Union[str, BaseModel],
-        method: str = 'auto',
+        model: str | BaseModel,
+        method: str = "auto",
         use_jax: bool = True,
-        **fit_kwargs
+        **fit_kwargs,
     ) -> Pipeline:
         """Fit a model to the data.
 
@@ -202,15 +202,13 @@ class Pipeline:
 
         # Store fitted model
         self._last_model = model_obj
-        self.steps.append(('fit', model_obj))
-        self.history.append(('fit', model_name, model_obj.score(X, y)))
+        self.steps.append(("fit", model_obj))
+        self.history.append(("fit", model_name, model_obj.score(X, y)))
 
         return self
 
     def predict(
-        self,
-        model: Optional[BaseModel] = None,
-        X: Optional[np.ndarray] = None
+        self, model: BaseModel | None = None, X: np.ndarray | None = None
     ) -> RheoData:
         """Generate predictions from fitted model.
 
@@ -249,21 +247,21 @@ class Pipeline:
             y=predictions,
             x_units=self.data.x_units if self.data else None,
             y_units=self.data.y_units if self.data else None,
-            domain=self.data.domain if self.data else 'time',
+            domain=self.data.domain if self.data else "time",
             metadata={
                 **(self.data.metadata if self.data else {}),
-                'type': 'prediction',
-                'model': model.__class__.__name__
+                "type": "prediction",
+                "model": model.__class__.__name__,
             },
-            validate=False
+            validate=False,
         )
 
     def plot(
         self,
         show: bool = True,
-        style: str = 'default',
+        style: str = "default",
         include_prediction: bool = False,
-        **plot_kwargs
+        **plot_kwargs,
     ) -> Pipeline:
         """Plot current data state.
 
@@ -300,25 +298,21 @@ class Pipeline:
             ax_plot.plot(
                 predictions.x,
                 predictions.y,
-                '--',
-                label='Model Prediction',
-                linewidth=2
+                "--",
+                label="Model Prediction",
+                linewidth=2,
             )
             ax_plot.legend()
 
         if show:
             import matplotlib.pyplot as plt
+
             plt.show()
 
-        self.history.append(('plot', style))
+        self.history.append(("plot", style))
         return self
 
-    def save(
-        self,
-        file_path: str,
-        format: str = 'hdf5',
-        **kwargs
-    ) -> Pipeline:
+    def save(self, file_path: str, format: str = "hdf5", **kwargs) -> Pipeline:
         """Save current data to file.
 
         Args:
@@ -335,24 +329,24 @@ class Pipeline:
         if self.data is None:
             raise ValueError("No data to save. Call load() first.")
 
-        if format == 'hdf5':
+        if format == "hdf5":
             from rheo.io import save_hdf5
+
             save_hdf5(self.data, file_path, **kwargs)
-        elif format == 'excel':
+        elif format == "excel":
             from rheo.io import save_excel
+
             save_excel(self.data, file_path, **kwargs)
-        elif format == 'csv':
+        elif format == "csv":
             # Simple CSV export
             import pandas as pd
-            df = pd.DataFrame({
-                'x': np.array(self.data.x),
-                'y': np.array(self.data.y)
-            })
+
+            df = pd.DataFrame({"x": np.array(self.data.x), "y": np.array(self.data.y)})
             df.to_csv(file_path, index=False, **kwargs)
         else:
             raise ValueError(f"Unknown format: {format}")
 
-        self.history.append(('save', file_path, format))
+        self.history.append(("save", file_path, format))
         return self
 
     def get_result(self) -> RheoData:
@@ -368,7 +362,7 @@ class Pipeline:
             raise ValueError("No data available. Call load() first.")
         return self.data
 
-    def get_history(self) -> List[Tuple]:
+    def get_history(self) -> list[tuple]:
         """Get pipeline execution history.
 
         Returns:
@@ -381,7 +375,7 @@ class Pipeline:
         """
         return self.history.copy()
 
-    def get_last_model(self) -> Optional[BaseModel]:
+    def get_last_model(self) -> BaseModel | None:
         """Get the last fitted model.
 
         Returns:
@@ -393,7 +387,7 @@ class Pipeline:
         """
         return self._last_model
 
-    def get_all_models(self) -> List[BaseModel]:
+    def get_all_models(self) -> list[BaseModel]:
         """Get all fitted models from pipeline.
 
         Returns:
@@ -402,7 +396,7 @@ class Pipeline:
         Example:
             >>> models = pipeline.get_all_models()
         """
-        return [step[1] for step in self.steps if step[0] == 'fit']
+        return [step[1] for step in self.steps if step[0] == "fit"]
 
     def clone(self) -> Pipeline:
         """Create a copy of the pipeline.
@@ -446,4 +440,4 @@ class Pipeline:
         )
 
 
-__all__ = ['Pipeline']
+__all__ = ["Pipeline"]

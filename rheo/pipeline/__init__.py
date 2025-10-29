@@ -5,6 +5,7 @@ enabling intuitive workflows from data loading through modeling and visualizatio
 
 Main Components:
     - Pipeline: Core fluent API for method chaining
+    - BayesianPipeline: Specialized pipeline for NLSQ → NUTS Bayesian workflows
     - Workflow pipelines: Pre-configured pipelines for common tasks
     - PipelineBuilder: Programmatic pipeline construction
     - BatchPipeline: Process multiple datasets
@@ -16,6 +17,15 @@ Example - Basic workflow:
     ...     .fit('maxwell')
     ...     .plot()
     ...     .save('result.hdf5'))
+
+Example - Bayesian workflow:
+    >>> from rheo.pipeline import BayesianPipeline
+    >>> pipeline = (BayesianPipeline()
+    ...     .load('data.csv')
+    ...     .fit_nlsq('maxwell')
+    ...     .fit_bayesian(num_samples=2000)
+    ...     .plot_posterior()
+    ...     .save('results.hdf5'))
 
 Example - Model comparison:
     >>> from rheo.pipeline import ModelComparisonPipeline
@@ -40,32 +50,31 @@ Example - Pipeline builder:
 """
 
 from rheo.pipeline.base import Pipeline
+from rheo.pipeline.batch import BatchPipeline
+from rheo.pipeline.bayesian import BayesianPipeline
+from rheo.pipeline.builder import (
+    ConditionalPipelineBuilder,
+    PipelineBuilder,
+)
 from rheo.pipeline.workflows import (
-    MastercurvePipeline,
-    ModelComparisonPipeline,
     CreepToRelaxationPipeline,
     FrequencyToTimePipeline,
+    MastercurvePipeline,
+    ModelComparisonPipeline,
 )
-from rheo.pipeline.builder import (
-    PipelineBuilder,
-    ConditionalPipelineBuilder,
-)
-from rheo.pipeline.batch import BatchPipeline
 
 __all__ = [
     # Core pipeline
-    'Pipeline',
-
+    "Pipeline",
+    "BayesianPipeline",
     # Workflow pipelines
-    'MastercurvePipeline',
-    'ModelComparisonPipeline',
-    'CreepToRelaxationPipeline',
-    'FrequencyToTimePipeline',
-
+    "MastercurvePipeline",
+    "ModelComparisonPipeline",
+    "CreepToRelaxationPipeline",
+    "FrequencyToTimePipeline",
     # Builders
-    'PipelineBuilder',
-    'ConditionalPipelineBuilder',
-
+    "PipelineBuilder",
+    "ConditionalPipelineBuilder",
     # Batch processing
-    'BatchPipeline',
+    "BatchPipeline",
 ]

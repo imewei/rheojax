@@ -4,15 +4,15 @@ Tests spring and SpringPot in parallel configuration. This model describes
 solid-like materials with power-law creep behavior.
 """
 
-import numpy as np
-import pytest
 import jax
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 import rheo.models  # Import to trigger all model registrations
-from rheo.models.fractional_kelvin_voigt import FractionalKelvinVoigt
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
+from rheo.models.fractional_kelvin_voigt import FractionalKelvinVoigt
 
 
 class TestFractionalKelvinVoigtInitialization:
@@ -24,24 +24,24 @@ class TestFractionalKelvinVoigtInitialization:
 
     def test_parameters_exist(self):
         model = FractionalKelvinVoigt()
-        assert 'Ge' in model.parameters
-        assert 'c_alpha' in model.parameters
-        assert 'alpha' in model.parameters
+        assert "Ge" in model.parameters
+        assert "c_alpha" in model.parameters
+        assert "alpha" in model.parameters
 
     def test_parameter_defaults(self):
         model = FractionalKelvinVoigt()
-        assert model.parameters.get_value('Ge') == 1e6
-        assert model.parameters.get_value('c_alpha') == 1e4
-        assert model.parameters.get_value('alpha') == 0.5
+        assert model.parameters.get_value("Ge") == 1e6
+        assert model.parameters.get_value("c_alpha") == 1e4
+        assert model.parameters.get_value("alpha") == 0.5
 
     def test_parameter_bounds(self):
         model = FractionalKelvinVoigt()
-        assert model.parameters.get('Ge').bounds == (1e-3, 1e9)
-        assert model.parameters.get('c_alpha').bounds == (1e-3, 1e9)
-        assert model.parameters.get('alpha').bounds == (0.0, 1.0)
+        assert model.parameters.get("Ge").bounds == (1e-3, 1e9)
+        assert model.parameters.get("c_alpha").bounds == (1e-3, 1e9)
+        assert model.parameters.get("alpha").bounds == (0.0, 1.0)
 
     def test_registry_registration(self):
-        assert 'fractional_kelvin_voigt' in ModelRegistry.list_models()
+        assert "fractional_kelvin_voigt" in ModelRegistry.list_models()
 
 
 class TestFractionalKelvinVoigtRelaxation:
@@ -50,8 +50,8 @@ class TestFractionalKelvinVoigtRelaxation:
     def test_relaxation_basic(self):
         model = FractionalKelvinVoigt()
         t = np.array([0.01, 0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -61,11 +61,11 @@ class TestFractionalKelvinVoigtRelaxation:
         """Test that G(t) ≥ Ge (elastic modulus is floor)."""
         model = FractionalKelvinVoigt()
         Ge = 1e6
-        model.parameters.set_value('Ge', Ge)
+        model.parameters.set_value("Ge", Ge)
 
         t = np.logspace(-2, 2, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         # All values should be >= Ge
@@ -74,13 +74,13 @@ class TestFractionalKelvinVoigtRelaxation:
     def test_relaxation_power_law_plus_constant(self):
         """Test G(t) = Ge + c_α t^(-α) / Γ(1-α)."""
         model = FractionalKelvinVoigt()
-        model.parameters.set_value('Ge', 1e6)
-        model.parameters.set_value('c_alpha', 1e4)
-        model.parameters.set_value('alpha', 0.5)
+        model.parameters.set_value("Ge", 1e6)
+        model.parameters.set_value("c_alpha", 1e4)
+        model.parameters.set_value("alpha", 0.5)
 
         t = np.logspace(-3, -1, 20)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
 
@@ -91,13 +91,13 @@ class TestFractionalKelvinVoigtRelaxation:
         """Test that G(t) → Ge at long times."""
         model = FractionalKelvinVoigt()
         Ge = 1e6
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('c_alpha', 1e4)
-        model.parameters.set_value('alpha', 0.5)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("c_alpha", 1e4)
+        model.parameters.set_value("alpha", 0.5)
 
         t = np.array([1e6])  # Very long time
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         # Should approach Ge
@@ -110,8 +110,8 @@ class TestFractionalKelvinVoigtCreep:
     def test_creep_basic(self):
         model = FractionalKelvinVoigt()
         t = np.array([0.01, 0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'creep'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "creep"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -121,22 +121,22 @@ class TestFractionalKelvinVoigtCreep:
         """Test that J(t) is bounded (doesn't flow to infinity)."""
         model = FractionalKelvinVoigt()
         Ge = 1e6
-        model.parameters.set_value('Ge', Ge)
+        model.parameters.set_value("Ge", Ge)
 
         t = np.logspace(-2, 4, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'creep'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "creep"
 
         result = model.predict(data)
         # Should be bounded by 1/Ge
-        assert np.all(result.y <= 1.0/Ge * 1.1)  # Allow 10% numerical tolerance
+        assert np.all(result.y <= 1.0 / Ge * 1.1)  # Allow 10% numerical tolerance
 
     def test_creep_monotonic_increase(self):
         """Test that J(t) increases monotonically."""
         model = FractionalKelvinVoigt()
         t = np.logspace(-2, 2, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'creep'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "creep"
 
         result = model.predict(data)
         diffs = np.diff(result.y)
@@ -146,15 +146,15 @@ class TestFractionalKelvinVoigtCreep:
         """Test J(t) → 1/Ge at long times."""
         model = FractionalKelvinVoigt()
         Ge = 1e6
-        model.parameters.set_value('Ge', Ge)
+        model.parameters.set_value("Ge", Ge)
 
         t = np.array([1e6])  # Very long time
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'creep'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "creep"
 
         result = model.predict(data)
         # Should approach 1/Ge
-        assert np.abs(result.y[0] - 1.0/Ge) / (1.0/Ge) < 0.1
+        assert np.abs(result.y[0] - 1.0 / Ge) / (1.0 / Ge) < 0.1
 
 
 class TestFractionalKelvinVoigtOscillation:
@@ -163,8 +163,10 @@ class TestFractionalKelvinVoigtOscillation:
     def test_oscillation_basic(self):
         model = FractionalKelvinVoigt()
         omega = np.array([0.1, 1.0, 10.0, 100.0])
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
         assert np.iscomplexobj(result.y)
@@ -173,8 +175,10 @@ class TestFractionalKelvinVoigtOscillation:
     def test_oscillation_moduli_positive(self):
         model = FractionalKelvinVoigt()
         omega = np.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
         assert np.all(np.real(result.y) > 0)
@@ -184,11 +188,13 @@ class TestFractionalKelvinVoigtOscillation:
         """Test that G' ≥ Ge at all frequencies."""
         model = FractionalKelvinVoigt()
         Ge = 1e6
-        model.parameters.set_value('Ge', Ge)
+        model.parameters.set_value("Ge", Ge)
 
         omega = np.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
         G_prime = np.real(result.y)
@@ -198,11 +204,13 @@ class TestFractionalKelvinVoigtOscillation:
     def test_oscillation_power_law_scaling(self):
         """Test G'' ~ ω^α at low frequency."""
         model = FractionalKelvinVoigt()
-        model.parameters.set_value('alpha', 0.5)
+        model.parameters.set_value("alpha", 0.5)
 
         omega = np.logspace(-3, -1, 20)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
         G_double_prime = np.imag(result.y)
@@ -219,13 +227,15 @@ class TestFractionalKelvinVoigtOscillation:
         Ge = 1e6
         c_alpha = 1e4
         alpha = 0.5
-        model.parameters.set_value('Ge', Ge)
-        model.parameters.set_value('c_alpha', c_alpha)
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("Ge", Ge)
+        model.parameters.set_value("c_alpha", c_alpha)
+        model.parameters.set_value("alpha", alpha)
 
         omega = np.array([1.0])
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
 
@@ -243,11 +253,11 @@ class TestFractionalKelvinVoigtLimitCases:
     def test_alpha_near_zero(self):
         """As alpha→0, SpringPot → spring, total → two springs."""
         model = FractionalKelvinVoigt()
-        model.parameters.set_value('alpha', 0.05)
+        model.parameters.set_value("alpha", 0.05)
 
         t = np.logspace(-2, 2, 30)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -255,11 +265,11 @@ class TestFractionalKelvinVoigtLimitCases:
     def test_alpha_near_one(self):
         """As alpha→1, SpringPot → dashpot (parallel spring-dashpot)."""
         model = FractionalKelvinVoigt()
-        model.parameters.set_value('alpha', 0.95)
+        model.parameters.set_value("alpha", 0.95)
 
         t = np.logspace(-2, 2, 30)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -267,13 +277,13 @@ class TestFractionalKelvinVoigtLimitCases:
     def test_very_low_c_alpha(self):
         """Test with very small SpringPot contribution."""
         model = FractionalKelvinVoigt()
-        model.parameters.set_value('Ge', 1e6)
-        model.parameters.set_value('c_alpha', 1.0)  # Very small
-        model.parameters.set_value('alpha', 0.5)
+        model.parameters.set_value("Ge", 1e6)
+        model.parameters.set_value("c_alpha", 1.0)  # Very small
+        model.parameters.set_value("alpha", 0.5)
 
         t = np.logspace(-2, 2, 30)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         # Should be close to Ge everywhere
@@ -282,8 +292,8 @@ class TestFractionalKelvinVoigtLimitCases:
     def test_zero_time_handling(self):
         model = FractionalKelvinVoigt()
         t = np.array([0.0, 0.01, 0.1, 1.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
@@ -304,13 +314,15 @@ class TestFractionalKelvinVoigtJAX:
         def loss_fn(Ge):
             t = jnp.array([1.0])
             result = model._predict_relaxation_jax(t, Ge, 1e4, 0.5)
-            return jnp.sum(result ** 2)
+            return jnp.sum(result**2)
 
         grad_fn = jax.grad(loss_fn)
         gradient = grad_fn(1e6)
         assert np.isfinite(gradient)
 
-    @pytest.mark.xfail(reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler")
+    @pytest.mark.xfail(
+        reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler"
+    )
     def test_vmap_over_alpha(self):
         model = FractionalKelvinVoigt()
         t = jnp.array([1.0])
@@ -349,15 +361,17 @@ class TestFractionalKelvinVoigtNumericalStability:
         model = FractionalKelvinVoigt()
         t = np.logspace(-2, 2, 30)
 
-        for mode in ['relaxation', 'creep']:
-            data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-            data.metadata['test_mode'] = mode
+        for mode in ["relaxation", "creep"]:
+            data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+            data.metadata["test_mode"] = mode
             result = model.predict(data)
             assert np.all(np.isfinite(result.y))
 
         omega = np.logspace(-2, 2, 30)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
         result = model.predict(data)
         assert np.all(np.isfinite(result.y))
 
@@ -366,9 +380,9 @@ class TestFractionalKelvinVoigtNumericalStability:
         model = FractionalKelvinVoigt()
 
         test_cases = [
-            {'Ge': 1e-2, 'c_alpha': 1e-2, 'alpha': 0.1},
-            {'Ge': 1e8, 'c_alpha': 1e8, 'alpha': 0.9},
-            {'Ge': 1e6, 'c_alpha': 1.0, 'alpha': 0.5},
+            {"Ge": 1e-2, "c_alpha": 1e-2, "alpha": 0.1},
+            {"Ge": 1e8, "c_alpha": 1e8, "alpha": 0.9},
+            {"Ge": 1e6, "c_alpha": 1.0, "alpha": 0.5},
         ]
 
         t = np.logspace(-2, 2, 20)
@@ -377,8 +391,8 @@ class TestFractionalKelvinVoigtNumericalStability:
             for key, value in params.items():
                 model.parameters.set_value(key, value)
 
-            data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-            data.metadata['test_mode'] = 'relaxation'
+            data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+            data.metadata["test_mode"] = "relaxation"
             result = model.predict(data)
             assert np.all(np.isfinite(result.y))
 
@@ -386,17 +400,17 @@ class TestFractionalKelvinVoigtNumericalStability:
         """Test that different modes give consistent physical behavior."""
         model = FractionalKelvinVoigt()
         Ge = 1e6
-        model.parameters.set_value('Ge', Ge)
+        model.parameters.set_value("Ge", Ge)
 
         # Relaxation should give G(∞) = Ge
         t_long = np.array([1e6])
-        data_relax = RheoData(x=t_long, y=np.zeros_like(t_long), domain='time')
-        data_relax.metadata['test_mode'] = 'relaxation'
+        data_relax = RheoData(x=t_long, y=np.zeros_like(t_long), domain="time")
+        data_relax.metadata["test_mode"] = "relaxation"
         result_relax = model.predict(data_relax)
 
         # Creep should give J(∞) = 1/Ge
-        data_creep = RheoData(x=t_long, y=np.zeros_like(t_long), domain='time')
-        data_creep.metadata['test_mode'] = 'creep'
+        data_creep = RheoData(x=t_long, y=np.zeros_like(t_long), domain="time")
+        data_creep.metadata["test_mode"] = "creep"
         result_creep = model.predict(data_creep)
 
         # Check consistency: G(∞) * J(∞) ≈ 1
@@ -410,8 +424,8 @@ class TestFractionalKelvinVoigtRheoDataIntegration:
     def test_rheodata_input_output(self):
         model = FractionalKelvinVoigt()
         t = np.logspace(-2, 2, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
 
         result = model.predict(data)
         assert isinstance(result, RheoData)
@@ -419,28 +433,30 @@ class TestFractionalKelvinVoigtRheoDataIntegration:
     def test_metadata_preservation(self):
         model = FractionalKelvinVoigt()
         t = np.logspace(-2, 2, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'relaxation'
-        data.metadata['material'] = 'filled_polymer'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "relaxation"
+        data.metadata["material"] = "filled_polymer"
 
         result = model.predict(data)
-        assert result.metadata['material'] == 'filled_polymer'
+        assert result.metadata["material"] == "filled_polymer"
 
     def test_auto_detect_test_mode(self):
         model = FractionalKelvinVoigt()
 
         # Frequency domain auto-detection
         omega = np.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
         result = model.predict(data)
         assert np.iscomplexobj(result.y)
 
     def test_explicit_test_mode_override(self):
         model = FractionalKelvinVoigt()
         t = np.array([0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
 
-        result = model.predict(data, test_mode='creep')
+        result = model.predict(data, test_mode="creep")
         assert isinstance(result, RheoData)
 
 
@@ -450,8 +466,8 @@ class TestFractionalKelvinVoigtErrorHandling:
     def test_invalid_test_mode(self):
         model = FractionalKelvinVoigt()
         t = np.array([0.1, 1.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'invalid'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "invalid"
 
         with pytest.raises(ValueError, match="Unknown test mode"):
             model.predict(data)
@@ -460,16 +476,16 @@ class TestFractionalKelvinVoigtErrorHandling:
         model = FractionalKelvinVoigt()
 
         with pytest.raises(ValueError):
-            model.parameters.set_value('alpha', 1.5)
+            model.parameters.set_value("alpha", 1.5)
 
         with pytest.raises(ValueError):
-            model.parameters.set_value('alpha', -0.1)
+            model.parameters.set_value("alpha", -0.1)
 
     def test_negative_modulus_rejected(self):
         model = FractionalKelvinVoigt()
 
         with pytest.raises(ValueError):
-            model.parameters.set_value('Ge', -1000)
+            model.parameters.set_value("Ge", -1000)
 
 
 class TestFractionalKelvinVoigtPhysicalBehavior:
@@ -480,8 +496,8 @@ class TestFractionalKelvinVoigtPhysicalBehavior:
         model = FractionalKelvinVoigt()
 
         t = np.logspace(-2, 4, 50)
-        data = RheoData(x=t, y=np.zeros_like(t), domain='time')
-        data.metadata['test_mode'] = 'creep'
+        data = RheoData(x=t, y=np.zeros_like(t), domain="time")
+        data.metadata["test_mode"] = "creep"
 
         result = model.predict(data)
 
@@ -495,8 +511,10 @@ class TestFractionalKelvinVoigtPhysicalBehavior:
         model = FractionalKelvinVoigt()
 
         omega = np.logspace(2, 4, 30)
-        data = RheoData(x=omega, y=np.zeros_like(omega, dtype=complex), domain='frequency')
-        data.metadata['test_mode'] = 'oscillation'
+        data = RheoData(
+            x=omega, y=np.zeros_like(omega, dtype=complex), domain="frequency"
+        )
+        data.metadata["test_mode"] = "oscillation"
 
         result = model.predict(data)
 

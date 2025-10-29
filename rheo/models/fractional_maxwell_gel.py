@@ -28,20 +28,20 @@ References:
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
 
-import jax
-import jax.numpy as jnp
+jax, jnp = safe_import_jax()
+
+
 import numpy as np
 
-from rheo.core.base import BaseModel, Parameter, ParameterSet
+from rheo.core.base import BaseModel, ParameterSet
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
 from rheo.utils.mittag_leffler import mittag_leffler_e2
 
 
-@ModelRegistry.register('fractional_maxwell_gel')
+@ModelRegistry.register("fractional_maxwell_gel")
 class FractionalMaxwellGel(BaseModel):
     """Fractional Maxwell Gel model: SpringPot in series with dashpot.
 
@@ -80,27 +80,27 @@ class FractionalMaxwellGel(BaseModel):
         self.parameters = ParameterSet()
 
         self.parameters.add(
-            name='c_alpha',
+            name="c_alpha",
             value=10.0,  # Chosen to keep tau numerically stable across alpha ∈ [0,1]
             bounds=(1e-3, 1e9),
-            units='Pa·s^α',
-            description='SpringPot material constant'
+            units="Pa·s^α",
+            description="SpringPot material constant",
         )
 
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=0.5,
             bounds=(0.0, 1.0),
-            units='dimensionless',
-            description='Power-law exponent'
+            units="dimensionless",
+            description="Power-law exponent",
         )
 
         self.parameters.add(
-            name='eta',
+            name="eta",
             value=1e4,  # Chosen to keep tau~O(1) for alpha=0.5 with c_alpha=100
             bounds=(1e-6, 1e12),
-            units='Pa·s',
-            description='Dashpot viscosity'
+            units="Pa·s",
+            description="Dashpot viscosity",
         )
 
         self.fitted_ = False
@@ -115,17 +115,13 @@ class FractionalMaxwellGel(BaseModel):
         Returns:
             Characteristic time τ = η / c_α^(1/(1-α))
         """
-        eta = self.parameters.get_value('eta')
+        eta = self.parameters.get_value("eta")
         # Add small epsilon to prevent division by zero
         epsilon = 1e-12
         return eta / (c_alpha ** (1.0 / (1.0 - alpha + epsilon)))
 
     def _predict_relaxation_jax(
-        self,
-        t: jnp.ndarray,
-        c_alpha: float,
-        alpha: float,
-        eta: float
+        self, t: jnp.ndarray, c_alpha: float, alpha: float, eta: float
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t) using JAX.
 
@@ -145,6 +141,7 @@ class FractionalMaxwellGel(BaseModel):
 
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
         # Compute Mittag-Leffler parameters as concrete values
@@ -173,11 +170,7 @@ class FractionalMaxwellGel(BaseModel):
         return _compute_relaxation(t, c_alpha, eta)
 
     def _predict_creep_jax(
-        self,
-        t: jnp.ndarray,
-        c_alpha: float,
-        alpha: float,
-        eta: float
+        self, t: jnp.ndarray, c_alpha: float, alpha: float, eta: float
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
@@ -197,6 +190,7 @@ class FractionalMaxwellGel(BaseModel):
 
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
         # Compute Mittag-Leffler parameters as concrete values
@@ -212,13 +206,13 @@ class FractionalMaxwellGel(BaseModel):
             tau = eta / (c_alpha ** (1.0 / (1.0 - alpha_safe)))
 
             # Compute argument for Mittag-Leffler function
-            z = -(t_safe / tau) ** (1.0 - alpha_safe)
+            z = -((t_safe / tau) ** (1.0 - alpha_safe))
 
             # Compute E_{1+α,1+α}(z) with concrete alpha/beta
             ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
 
             # Compute J(t)
-            J_t = (1.0 / c_alpha) * (t_safe ** alpha_safe) * ml_value
+            J_t = (1.0 / c_alpha) * (t_safe**alpha_safe) * ml_value
 
             # Ensure monoton icity: creep compliance must increase with time
             # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
@@ -229,11 +223,7 @@ class FractionalMaxwellGel(BaseModel):
         return _compute_creep(t, c_alpha, eta)
 
     def _predict_oscillation_jax(
-        self,
-        omega: jnp.ndarray,
-        c_alpha: float,
-        alpha: float,
-        eta: float
+        self, omega: jnp.ndarray, c_alpha: float, alpha: float, eta: float
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω) using JAX.
 
@@ -255,6 +245,7 @@ class FractionalMaxwellGel(BaseModel):
 
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
         # Compute beta for the denominator
@@ -264,14 +255,20 @@ class FractionalMaxwellGel(BaseModel):
         @jax.jit
         def _compute_oscillation(omega, c_alpha, eta):
             omega_safe = jnp.maximum(omega, epsilon)
-            tau_safe = jnp.maximum(eta / (c_alpha ** (1.0 / (1.0 - alpha_safe + epsilon))), epsilon)
+            tau_safe = jnp.maximum(
+                eta / (c_alpha ** (1.0 / (1.0 - alpha_safe + epsilon))), epsilon
+            )
 
             # (iω)^α = |ω|^α * exp(i α π/2)
-            i_omega_alpha = (omega_safe ** alpha_safe) * jnp.exp(1j * alpha_safe * jnp.pi / 2.0)
+            i_omega_alpha = (omega_safe**alpha_safe) * jnp.exp(
+                1j * alpha_safe * jnp.pi / 2.0
+            )
 
             # (iωτ)^(1-α) = |ωτ|^(1-α) * exp(i (1-α) π/2)
             omega_tau = omega_safe * tau_safe
-            i_omega_tau_beta = (omega_tau ** beta_safe) * jnp.exp(1j * beta_safe * jnp.pi / 2.0)
+            i_omega_tau_beta = (omega_tau**beta_safe) * jnp.exp(
+                1j * beta_safe * jnp.pi / 2.0
+            )
 
             # Complex modulus: G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
             G_star = c_alpha * i_omega_alpha / (1.0 + i_omega_tau_beta)
@@ -293,7 +290,9 @@ class FractionalMaxwellGel(BaseModel):
         """
         # Placeholder for optimization implementation
         # This will be implemented with scipy.optimize or JAX optimization
-        raise NotImplementedError("Parameter fitting will be implemented in optimization module")
+        raise NotImplementedError(
+            "Parameter fitting will be implemented in optimization module"
+        )
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Internal predict implementation.
@@ -310,14 +309,16 @@ class FractionalMaxwellGel(BaseModel):
 
         # Handle raw array input (assume relaxation mode)
         x = jnp.asarray(X)
-        c_alpha = self.parameters.get_value('c_alpha')
-        alpha = self.parameters.get_value('alpha')
-        eta = self.parameters.get_value('eta')
+        c_alpha = self.parameters.get_value("c_alpha")
+        alpha = self.parameters.get_value("alpha")
+        eta = self.parameters.get_value("eta")
 
         result = self._predict_relaxation_jax(x, c_alpha, alpha, eta)
         return np.array(result)
 
-    def predict_rheodata(self, rheo_data: RheoData, test_mode: Optional[str] = None) -> RheoData:
+    def predict_rheodata(
+        self, rheo_data: RheoData, test_mode: str | None = None
+    ) -> RheoData:
         """Predict response for RheoData.
 
         Args:
@@ -333,19 +334,19 @@ class FractionalMaxwellGel(BaseModel):
             test_mode = rheo_data.test_mode
 
         # Get parameters
-        c_alpha = self.parameters.get_value('c_alpha')
-        alpha = self.parameters.get_value('alpha')
-        eta = self.parameters.get_value('eta')
+        c_alpha = self.parameters.get_value("c_alpha")
+        alpha = self.parameters.get_value("alpha")
+        eta = self.parameters.get_value("eta")
 
         # Convert input to JAX
         x = jnp.asarray(rheo_data.x)
 
         # Route to appropriate prediction method
-        if test_mode == 'relaxation':
+        if test_mode == "relaxation":
             y_pred = self._predict_relaxation_jax(x, c_alpha, alpha, eta)
-        elif test_mode == 'creep':
+        elif test_mode == "creep":
             y_pred = self._predict_creep_jax(x, c_alpha, alpha, eta)
-        elif test_mode == 'oscillation':
+        elif test_mode == "oscillation":
             y_pred = self._predict_oscillation_jax(x, c_alpha, alpha, eta)
         else:
             raise ValueError(
@@ -360,12 +361,12 @@ class FractionalMaxwellGel(BaseModel):
             x_units=rheo_data.x_units,
             y_units=rheo_data.y_units,
             domain=rheo_data.domain,
-            metadata=rheo_data.metadata.copy()
+            metadata=rheo_data.metadata.copy(),
         )
 
         return result
 
-    def predict(self, X, test_mode: Optional[str] = None):
+    def predict(self, X, test_mode: str | None = None):
         """Predict response.
 
         Args:

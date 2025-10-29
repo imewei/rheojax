@@ -1,8 +1,8 @@
 """Tests for OWChirp transform."""
 
-import pytest
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.data import RheoData
 from rheo.transforms.owchirp import OWChirp
@@ -26,7 +26,7 @@ class TestOWChirp:
             frequency_range=(0.1, 10),
             wavelet_width=3.0,
             extract_harmonics=False,
-            max_harmonic=5
+            max_harmonic=5,
         )
         assert ow.n_frequencies == 50
         assert ow.frequency_range == (0.1, 10)
@@ -42,14 +42,14 @@ class TestOWChirp:
         omega = 2 * jnp.pi * f0
         signal = jnp.sin(omega * t)
 
-        data = RheoData(x=t, y=signal, domain='time')
+        data = RheoData(x=t, y=signal, domain="time")
 
         # Apply OWChirp
         ow = OWChirp(n_frequencies=50, frequency_range=(0.1, 10))
         spectrum = ow.transform(data)
 
         # Check output
-        assert spectrum.domain == 'frequency'
+        assert spectrum.domain == "frequency"
         assert len(spectrum.x) == 50
         assert len(spectrum.y) == 50
 
@@ -68,18 +68,20 @@ class TestOWChirp:
         omega = 2 * jnp.pi * 1.0  # 1 Hz
         signal = jnp.sin(omega * t) + 0.3 * jnp.sin(3 * omega * t)
 
-        data = RheoData(x=t, y=signal, domain='time')
+        data = RheoData(x=t, y=signal, domain="time")
 
         # Extract harmonics
-        ow = OWChirp(n_frequencies=100, frequency_range=(0.1, 10), extract_harmonics=True)
+        ow = OWChirp(
+            n_frequencies=100, frequency_range=(0.1, 10), extract_harmonics=True
+        )
         harmonics = ow.get_harmonics(data, fundamental_freq=1.0)
 
         # Should find fundamental and third harmonic
-        assert 'fundamental' in harmonics
-        assert 'third' in harmonics
+        assert "fundamental" in harmonics
+        assert "third" in harmonics
 
-        fundamental_freq, fundamental_amp = harmonics['fundamental']
-        third_freq, third_amp = harmonics['third']
+        fundamental_freq, fundamental_amp = harmonics["fundamental"]
+        third_freq, third_amp = harmonics["third"]
 
         # Frequencies should be correct
         assert 0.8 < fundamental_freq < 1.2
@@ -93,11 +95,13 @@ class TestOWChirp:
         # Simulate LAOS response with odd harmonics
         t = jnp.linspace(0, 50, 5000)
         omega = 2 * jnp.pi * 2.0  # 2 Hz
-        signal = (jnp.sin(omega * t) +
-                 0.2 * jnp.sin(3 * omega * t) +
-                 0.1 * jnp.sin(5 * omega * t))
+        signal = (
+            jnp.sin(omega * t)
+            + 0.2 * jnp.sin(3 * omega * t)
+            + 0.1 * jnp.sin(5 * omega * t)
+        )
 
-        data = RheoData(x=t, y=signal, domain='time')
+        data = RheoData(x=t, y=signal, domain="time")
 
         ow = OWChirp(extract_harmonics=True, max_harmonic=7)
         spectrum = ow.transform(data)
@@ -114,7 +118,7 @@ class TestOWChirp:
         phase = 2 * jnp.pi * (0.5 * t + 0.05 * t**2)
         signal = jnp.sin(phase)
 
-        data = RheoData(x=t, y=signal, domain='time')
+        data = RheoData(x=t, y=signal, domain="time")
 
         ow = OWChirp(n_frequencies=30, frequency_range=(0.1, 5))
         times, freqs, coeffs = ow.get_time_frequency_map(data)
@@ -135,13 +139,13 @@ class TestOWChirp:
         omega = 2 * jnp.pi * f0
         signal = jnp.sin(omega * t) + 0.1 * jnp.sin(3 * omega * t)
 
-        data = RheoData(x=t, y=signal, domain='time')
+        data = RheoData(x=t, y=signal, domain="time")
 
         ow = OWChirp(extract_harmonics=True)
         harmonics = ow.get_harmonics(data)  # No fundamental_freq provided
 
         # Should auto-detect fundamental
-        fundamental_freq, _ = harmonics['fundamental']
+        fundamental_freq, _ = harmonics["fundamental"]
 
         # Should be close to f0
         assert 1.0 < fundamental_freq < 2.0
@@ -150,7 +154,7 @@ class TestOWChirp:
         """Test that wavelet transform is consistent."""
         t = jnp.linspace(0, 20, 1000)
         signal = jnp.sin(2 * jnp.pi * 1.0 * t)
-        data = RheoData(x=t, y=signal, domain='time')
+        data = RheoData(x=t, y=signal, domain="time")
 
         # Apply transform twice
         ow = OWChirp(n_frequencies=20)
@@ -164,7 +168,7 @@ class TestOWChirp:
         """Test that OWChirp raises error for frequency-domain input."""
         freq = jnp.logspace(-2, 2, 100)
         spectrum = jnp.ones_like(freq)
-        data = RheoData(x=freq, y=spectrum, domain='frequency')
+        data = RheoData(x=freq, y=spectrum, domain="frequency")
 
         ow = OWChirp()
         with pytest.raises(ValueError, match="time-domain"):
@@ -175,7 +179,7 @@ class TestOWChirp:
         t = jnp.linspace(0, 20, 1000)
         # Complex signal (should take real part)
         signal = jnp.sin(2 * jnp.pi * 1.0 * t) + 1j * jnp.cos(2 * jnp.pi * 1.0 * t)
-        data = RheoData(x=t, y=signal, domain='time')
+        data = RheoData(x=t, y=signal, domain="time")
 
         ow = OWChirp()
         spectrum = ow.transform(data)
@@ -187,7 +191,7 @@ class TestOWChirp:
         """Test effect of wavelet width on resolution."""
         t = jnp.linspace(0, 50, 2000)
         signal = jnp.sin(2 * jnp.pi * 1.0 * t)
-        data = RheoData(x=t, y=signal, domain='time')
+        data = RheoData(x=t, y=signal, domain="time")
 
         # Narrow wavelet (better frequency resolution)
         ow_narrow = OWChirp(wavelet_width=2.0, n_frequencies=50)
@@ -209,21 +213,21 @@ class TestOWChirp:
         data = RheoData(
             x=t,
             y=signal,
-            domain='time',
-            metadata={'sample': 'gel', 'strain_amplitude': 1.0}
+            domain="time",
+            metadata={"sample": "gel", "strain_amplitude": 1.0},
         )
 
         ow = OWChirp()
         spectrum = ow.transform(data)
 
         # Original metadata preserved
-        assert spectrum.metadata['sample'] == 'gel'
-        assert spectrum.metadata['strain_amplitude'] == 1.0
+        assert spectrum.metadata["sample"] == "gel"
+        assert spectrum.metadata["strain_amplitude"] == 1.0
 
         # Transform metadata added
-        assert 'transform' in spectrum.metadata
-        assert spectrum.metadata['transform'] == 'owchirp'
+        assert "transform" in spectrum.metadata
+        assert spectrum.metadata["transform"] == "owchirp"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

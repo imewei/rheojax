@@ -11,22 +11,22 @@ from __future__ import annotations
 import re
 import warnings
 from pathlib import Path
-from typing import Dict, List, Union, Optional
 
 import numpy as np
 
 from rheo.core.data import RheoData
 
-
 # Unit conversion factors
 UNIT_CONVERSIONS = {
-    'MPa': ('Pa', 1e6),
-    'kPa': ('Pa', 1e3),
-    '%': ('unitless', 0.01),
+    "MPa": ("Pa", 1e6),
+    "kPa": ("Pa", 1e3),
+    "%": ("unitless", 0.01),
 }
 
 
-def convert_units(value: Union[float, np.ndarray], from_unit: str, to_unit: str) -> Union[float, np.ndarray]:
+def convert_units(
+    value: float | np.ndarray, from_unit: str, to_unit: str
+) -> float | np.ndarray:
     """Convert values between units.
 
     Args:
@@ -42,13 +42,13 @@ def convert_units(value: Union[float, np.ndarray], from_unit: str, to_unit: str)
 
     if from_unit in UNIT_CONVERSIONS:
         target, factor = UNIT_CONVERSIONS[from_unit]
-        if target == to_unit or to_unit == 'Pa':
+        if target == to_unit or to_unit == "Pa":
             return value * factor
 
     return value
 
 
-def load_trios(filepath: str, **kwargs) -> Union[RheoData, List[RheoData]]:
+def load_trios(filepath: str, **kwargs) -> RheoData | list[RheoData]:
     """Load TA Instruments TRIOS .txt file.
 
     Reads rheological data from TRIOS exported .txt files. Supports multiple
@@ -78,11 +78,11 @@ def load_trios(filepath: str, **kwargs) -> Union[RheoData, List[RheoData]]:
         raise FileNotFoundError(f"File not found: {filepath}")
 
     # Read file contents
-    with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+    with open(filepath, encoding="utf-8", errors="replace") as f:
         content = f.read()
 
     # Split into lines
-    lines = content.split('\n')
+    lines = content.split("\n")
 
     # Extract metadata
     metadata = _extract_metadata(lines)
@@ -101,20 +101,20 @@ def load_trios(filepath: str, **kwargs) -> Union[RheoData, List[RheoData]]:
             if data is not None:
                 rheo_data_list.append(data)
         except Exception as e:
-            warnings.warn(f"Failed to parse segment starting at line {seg_start}: {e}")
+            warnings.warn(f"Failed to parse segment starting at line {seg_start}: {e}", stacklevel=2)
 
     if not rheo_data_list:
         raise ValueError("No valid data segments could be parsed")
 
     # Return single RheoData or list
-    return_all = kwargs.get('return_all_segments', False)
+    return_all = kwargs.get("return_all_segments", False)
     if len(rheo_data_list) == 1 and not return_all:
         return rheo_data_list[0]
     else:
         return rheo_data_list
 
 
-def _extract_metadata(lines: List[str]) -> Dict:
+def _extract_metadata(lines: list[str]) -> dict:
     """Extract metadata from file header.
 
     Args:
@@ -127,14 +127,14 @@ def _extract_metadata(lines: List[str]) -> Dict:
 
     # Regular expressions for metadata
     patterns = {
-        'filename': r'Filename\s+(.*)',
-        'instrument_serial_number': r'Instrument serial number\s+(.*)',
-        'instrument_name': r'Instrument name\s+(.*)',
-        'operator': r'operator\s+(.*)',
-        'run_date': r'rundate\s+(.*)',
-        'sample_name': r'Sample name\s+(.*)',
-        'geometry': r'Geometry name\s+(.*)',
-        'geometry_type': r'Geometry type\s+(.*)',
+        "filename": r"Filename\s+(.*)",
+        "instrument_serial_number": r"Instrument serial number\s+(.*)",
+        "instrument_name": r"Instrument name\s+(.*)",
+        "operator": r"operator\s+(.*)",
+        "run_date": r"rundate\s+(.*)",
+        "sample_name": r"Sample name\s+(.*)",
+        "geometry": r"Geometry name\s+(.*)",
+        "geometry_type": r"Geometry type\s+(.*)",
     }
 
     for line in lines[:100]:  # Check first 100 lines for metadata
@@ -146,7 +146,7 @@ def _extract_metadata(lines: List[str]) -> Dict:
     return metadata
 
 
-def _find_data_segments(lines: List[str]) -> List[tuple]:
+def _find_data_segments(lines: list[str]) -> list[tuple]:
     """Find all [step] data segments in file.
 
     Args:
@@ -156,7 +156,7 @@ def _find_data_segments(lines: List[str]) -> List[tuple]:
         List of (start_index, end_index) tuples
     """
     segments = []
-    step_pattern = r'\[step\]'
+    step_pattern = r"\[step\]"
 
     for i, line in enumerate(lines):
         if re.match(step_pattern, line, re.IGNORECASE):
@@ -172,7 +172,9 @@ def _find_data_segments(lines: List[str]) -> List[tuple]:
     return segment_pairs
 
 
-def _parse_segment(lines: List[str], start: int, end: int, metadata: Dict) -> Optional[RheoData]:
+def _parse_segment(
+    lines: list[str], start: int, end: int, metadata: dict
+) -> RheoData | None:
     """Parse a single data segment.
 
     Args:
@@ -190,7 +192,7 @@ def _parse_segment(lines: List[str], start: int, end: int, metadata: Dict) -> Op
     # Look for "Number of points" line
     num_points_line = None
     for i, line in enumerate(segment_lines):
-        if line.startswith('Number of points'):
+        if line.startswith("Number of points"):
             num_points_line = i
             break
 
@@ -205,28 +207,34 @@ def _parse_segment(lines: List[str], start: int, end: int, metadata: Dict) -> Op
         return None
 
     header_line = segment_lines[header_offset].strip()
-    unit_line = segment_lines[header_offset + 1].strip() if header_offset + 1 < len(segment_lines) else ""
+    unit_line = (
+        segment_lines[header_offset + 1].strip()
+        if header_offset + 1 < len(segment_lines)
+        else ""
+    )
 
     if not header_line:
         return None
 
     # Parse column names
-    columns = [col.strip() for col in header_line.split('\t')]
-    units = [u.strip() for u in unit_line.split('\t')] if unit_line else [''] * len(columns)
+    columns = [col.strip() for col in header_line.split("\t")]
+    units = (
+        [u.strip() for u in unit_line.split("\t")] if unit_line else [""] * len(columns)
+    )
 
     # Ensure we have same number of units as columns
     while len(units) < len(columns):
-        units.append('')
+        units.append("")
 
     # Parse data rows
     data_start = header_offset + 2
     data_rows = []
 
     for line in segment_lines[data_start:]:
-        if not line.strip() or line.startswith('['):
+        if not line.strip() or line.startswith("["):
             break
 
-        values = line.split('\t')
+        values = line.split("\t")
         if len(values) == len(columns):
             try:
                 row = [float(v) if v.strip() else np.nan for v in values]
@@ -245,7 +253,7 @@ def _parse_segment(lines: List[str], start: int, end: int, metadata: Dict) -> Op
     x_col, x_units, y_col, y_units = _determine_xy_columns(columns, units, data_array)
 
     if x_col is None or y_col is None:
-        warnings.warn(f"Could not determine x/y columns from: {columns}")
+        warnings.warn(f"Could not determine x/y columns from: {columns}", stacklevel=2)
         return None
 
     # Extract x and y data
@@ -261,13 +269,15 @@ def _parse_segment(lines: List[str], start: int, end: int, metadata: Dict) -> Op
         return None
 
     # Determine domain and test mode
-    domain, test_mode = _infer_domain_and_mode(columns[x_col], columns[y_col], x_units, y_units)
+    domain, test_mode = _infer_domain_and_mode(
+        columns[x_col], columns[y_col], x_units, y_units
+    )
 
     # Update metadata
     segment_metadata = metadata.copy()
-    segment_metadata['test_mode'] = test_mode
-    segment_metadata['columns'] = columns
-    segment_metadata['units'] = units
+    segment_metadata["test_mode"] = test_mode
+    segment_metadata["columns"] = columns
+    segment_metadata["units"] = units
 
     return RheoData(
         x=x_data,
@@ -276,11 +286,13 @@ def _parse_segment(lines: List[str], start: int, end: int, metadata: Dict) -> Op
         y_units=y_units,
         domain=domain,
         metadata=segment_metadata,
-        validate=True
+        validate=True,
     )
 
 
-def _determine_xy_columns(columns: List[str], units: List[str], data: np.ndarray) -> tuple:
+def _determine_xy_columns(
+    columns: list[str], units: list[str], data: np.ndarray
+) -> tuple:
     """Determine which columns to use for x and y.
 
     Args:
@@ -295,14 +307,25 @@ def _determine_xy_columns(columns: List[str], units: List[str], data: np.ndarray
 
     # Priority lists for x and y columns
     x_priorities = [
-        'time', 'angular frequency', 'frequency', 'shear rate',
-        'temperature', 'strain', 'step time'
+        "time",
+        "angular frequency",
+        "frequency",
+        "shear rate",
+        "temperature",
+        "strain",
+        "step time",
     ]
 
     y_priorities = [
-        'storage modulus', 'loss modulus', 'stress', 'strain',
-        'viscosity', 'complex modulus', 'complex viscosity',
-        'torque', 'normal stress'
+        "storage modulus",
+        "loss modulus",
+        "stress",
+        "strain",
+        "viscosity",
+        "complex modulus",
+        "complex viscosity",
+        "torque",
+        "normal stress",
     ]
 
     # Find x column
@@ -339,13 +362,15 @@ def _determine_xy_columns(columns: List[str], units: List[str], data: np.ndarray
     if x_col is None or y_col is None:
         return None, None, None, None
 
-    x_units = units[x_col] if x_col < len(units) else ''
-    y_units = units[y_col] if y_col < len(units) else ''
+    x_units = units[x_col] if x_col < len(units) else ""
+    y_units = units[y_col] if y_col < len(units) else ""
 
     return x_col, x_units, y_col, y_units
 
 
-def _infer_domain_and_mode(x_name: str, y_name: str, x_units: str, y_units: str) -> tuple:
+def _infer_domain_and_mode(
+    x_name: str, y_name: str, x_units: str, y_units: str
+) -> tuple:
     """Infer domain and test mode from column names and units.
 
     Args:
@@ -361,31 +386,31 @@ def _infer_domain_and_mode(x_name: str, y_name: str, x_units: str, y_units: str)
     y_lower = y_name.lower()
 
     # Frequency domain (SAOS)
-    if 'frequency' in x_lower or 'rad/s' in x_units.lower() or 'hz' in x_units.lower():
-        if 'modulus' in y_lower:
-            return 'frequency', 'oscillation'
+    if "frequency" in x_lower or "rad/s" in x_units.lower() or "hz" in x_units.lower():
+        if "modulus" in y_lower:
+            return "frequency", "oscillation"
 
     # Time domain
-    if 'time' in x_lower or 's' == x_units.lower():
-        if 'stress' in y_lower:
+    if "time" in x_lower or "s" == x_units.lower():
+        if "stress" in y_lower:
             # Check if strain or stress in name
-            if 'relax' in y_lower:
-                return 'time', 'relaxation'
+            if "relax" in y_lower:
+                return "time", "relaxation"
             else:
-                return 'time', 'creep'
-        elif 'modulus' in y_lower:
-            return 'time', 'relaxation'
+                return "time", "creep"
+        elif "modulus" in y_lower:
+            return "time", "relaxation"
 
     # Shear rate (steady shear / flow)
-    if 'shear rate' in x_lower or '1/s' in x_units:
-        return 'time', 'rotation'
+    if "shear rate" in x_lower or "1/s" in x_units:
+        return "time", "rotation"
 
     # Temperature sweep
-    if 'temperature' in x_lower:
-        if 'modulus' in y_lower:
-            return 'frequency', 'oscillation'  # Temperature sweep at constant frequency
+    if "temperature" in x_lower:
+        if "modulus" in y_lower:
+            return "frequency", "oscillation"  # Temperature sweep at constant frequency
         else:
-            return 'time', 'temperature_sweep'
+            return "time", "temperature_sweep"
 
     # Default
-    return 'time', 'unknown'
+    return "time", "unknown"

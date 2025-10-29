@@ -5,19 +5,20 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
-import pytest
-import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for testing
+import numpy as np
+import pytest
+
+matplotlib.use("Agg")  # Non-interactive backend for testing
 import matplotlib.pyplot as plt
 
 from rheo.core.data import RheoData
 from rheo.visualization.plotter import (
+    plot_flow_curve,
+    plot_frequency_domain,
+    plot_residuals,
     plot_rheo_data,
     plot_time_domain,
-    plot_frequency_domain,
-    plot_flow_curve,
-    plot_residuals,
 )
 
 
@@ -35,7 +36,7 @@ class TestPlotRheoData:
             x_units="s",
             y_units="Pa",
             domain="time",
-            metadata={"test_mode": "relaxation"}
+            metadata={"test_mode": "relaxation"},
         )
 
         fig, ax = plot_rheo_data(data)
@@ -57,7 +58,7 @@ class TestPlotRheoData:
             x_units="rad/s",
             y_units="Pa",
             domain="frequency",
-            metadata={"test_mode": "oscillation"}
+            metadata={"test_mode": "oscillation"},
         )
 
         fig, ax = plot_rheo_data(data)
@@ -72,15 +73,9 @@ class TestPlotRheoData:
         time = np.linspace(0, 10, 100)
         stress = 1000 * np.exp(-time / 2)
 
-        data = RheoData(
-            x=time,
-            y=stress,
-            x_units="s",
-            y_units="Pa",
-            domain="time"
-        )
+        data = RheoData(x=time, y=stress, x_units="s", y_units="Pa", domain="time")
 
-        fig, ax = plot_rheo_data(data, color='red', linewidth=2, label='Test Data')
+        fig, ax = plot_rheo_data(data, color="red", linewidth=2, label="Test Data")
 
         assert fig is not None
         plt.close(fig)
@@ -96,7 +91,7 @@ class TestPlotRheoData:
             x_units="1/s",
             y_units="Pa.s",
             domain="time",
-            metadata={"test_mode": "rotation"}
+            metadata={"test_mode": "rotation"},
         )
 
         fig, ax = plot_rheo_data(data)
@@ -118,8 +113,8 @@ class TestPlotTimeDomain:
 
         assert fig is not None
         assert ax is not None
-        assert 'Time' in ax.get_xlabel()
-        assert 'Stress' in ax.get_ylabel()
+        assert "Time" in ax.get_xlabel()
+        assert "Stress" in ax.get_ylabel()
         plt.close(fig)
 
     def test_plot_with_log_scale(self):
@@ -130,8 +125,8 @@ class TestPlotTimeDomain:
         fig, ax = plot_time_domain(time, stress, log_x=True, log_y=True)
 
         assert fig is not None
-        assert ax.get_xscale() == 'log'
-        assert ax.get_yscale() == 'log'
+        assert ax.get_xscale() == "log"
+        assert ax.get_yscale() == "log"
         plt.close(fig)
 
 
@@ -148,7 +143,7 @@ class TestPlotFrequencyDomain:
         assert fig is not None
         assert len(axes) == 2
         # xlabel is on the bottom (second) axis
-        assert 'Frequency' in axes[1].get_xlabel()
+        assert "Frequency" in axes[1].get_xlabel()
         assert "G'" in axes[0].get_ylabel()
         assert 'G"' in axes[1].get_ylabel()
         plt.close(fig)
@@ -181,8 +176,8 @@ class TestPlotFlowCurve:
 
         assert fig is not None
         assert ax is not None
-        assert ax.get_xscale() == 'log'
-        assert ax.get_yscale() == 'log'
+        assert ax.get_xscale() == "log"
+        assert ax.get_yscale() == "log"
         plt.close(fig)
 
     def test_plot_shear_stress(self):
@@ -190,14 +185,10 @@ class TestPlotFlowCurve:
         shear_rate = np.logspace(-2, 2, 50)
         shear_stress = 10 + 0.5 * shear_rate**0.8
 
-        fig, ax = plot_flow_curve(
-            shear_rate,
-            shear_stress,
-            y_label="Shear Stress (Pa)"
-        )
+        fig, ax = plot_flow_curve(shear_rate, shear_stress, y_label="Shear Stress (Pa)")
 
         assert fig is not None
-        assert 'Shear Stress' in ax.get_ylabel()
+        assert "Shear Stress" in ax.get_ylabel()
         plt.close(fig)
 
 
@@ -215,7 +206,7 @@ class TestPlotResiduals:
 
         assert fig is not None
         assert ax is not None
-        assert 'Residuals' in ax.get_ylabel()
+        assert "Residuals" in ax.get_ylabel()
         plt.close(fig)
 
     def test_plot_with_predictions(self):
@@ -285,7 +276,7 @@ class TestPublicationQuality:
         time = np.linspace(0, 10, 100)
         stress = 1000 * np.exp(-time / 2)
 
-        fig, ax = plot_time_domain(time, stress, style='publication')
+        fig, ax = plot_time_domain(time, stress, style="publication")
 
         assert fig is not None
         # Check figure size is appropriate for publication

@@ -10,20 +10,21 @@ Path: /Users/b80985/Documents/GitHub/pyRheo/
 STATUS: BLOCKED by Parameter hashability issue - fractional models cannot be tested.
 """
 
-import pytest
-import numpy as np
 import sys
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 # Add pyRheo to path
 PYRHEO_PATH = Path("/Users/b80985/Documents/GitHub/pyRheo/")
 if PYRHEO_PATH.exists():
     sys.path.insert(0, str(PYRHEO_PATH))
 
-from rheo.models.maxwell import Maxwell
-from rheo.models.zener import Zener
-from rheo.models.springpot import SpringPot
 from rheo.core.data import RheoData
+from rheo.models.maxwell import Maxwell
+from rheo.models.springpot import SpringPot
+from rheo.models.zener import Zener
 
 
 class TestClassicalModelsVsPyRheo:
@@ -75,7 +76,9 @@ class TestFractionalModelsVsPyRheo:
     """
 
     @pytest.mark.validation
-    @pytest.mark.xfail(reason="BLOCKED: Parameter hashability issue prevents fractional model testing")
+    @pytest.mark.xfail(
+        reason="BLOCKED: Parameter hashability issue prevents fractional model testing"
+    )
     def test_fractional_maxwell_vs_pyrheo(self):
         """Compare FractionalMaxwellModel with pyRheo."""
         pytest.skip("BLOCKED by Parameter.__hash__() issue")

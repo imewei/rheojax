@@ -19,20 +19,21 @@ References:
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
 
-import jax
-import jax.numpy as jnp
+jax, jnp = safe_import_jax()
+
+from functools import partial
+
 import numpy as np
 
-from rheo.core.base import BaseModel, Parameter, ParameterSet
+from rheo.core.base import BaseModel, ParameterSet
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
 from rheo.core.test_modes import TestMode, detect_test_mode
 
 
-@ModelRegistry.register('carreau_yasuda')
+@ModelRegistry.register("carreau_yasuda")
 class CarreauYasuda(BaseModel):
     """Carreau-Yasuda model for non-Newtonian flow (ROTATION only).
 
@@ -65,39 +66,39 @@ class CarreauYasuda(BaseModel):
         super().__init__()
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='eta0',
+            name="eta0",
             value=1000.0,
             bounds=(1e-3, 1e12),
-            units='Pa·s',
-            description='Zero-shear viscosity'
+            units="Pa·s",
+            description="Zero-shear viscosity",
         )
         self.parameters.add(
-            name='eta_inf',
+            name="eta_inf",
             value=0.001,
             bounds=(1e-6, 1e6),
-            units='Pa·s',
-            description='Infinite-shear viscosity'
+            units="Pa·s",
+            description="Infinite-shear viscosity",
         )
         self.parameters.add(
-            name='lambda_',
+            name="lambda_",
             value=1.0,
             bounds=(1e-6, 1e6),
-            units='s',
-            description='Time constant'
+            units="s",
+            description="Time constant",
         )
         self.parameters.add(
-            name='n',
+            name="n",
             value=0.5,
             bounds=(0.01, 1.0),
-            units='dimensionless',
-            description='Power-law index'
+            units="dimensionless",
+            description="Power-law index",
         )
         self.parameters.add(
-            name='a',
+            name="a",
             value=2.0,
             bounds=(0.1, 2.0),
-            units='dimensionless',
-            description='Transition parameter'
+            units="dimensionless",
+            description="Transition parameter",
         )
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> CarreauYasuda:
@@ -118,8 +119,8 @@ class CarreauYasuda(BaseModel):
         y_sorted = y[sort_idx]
 
         # Estimate plateaus
-        eta0_est = np.max(y_sorted[:len(y_sorted)//10 + 1])
-        eta_inf_est = np.min(y_sorted[-len(y_sorted)//10:])
+        eta0_est = np.max(y_sorted[: len(y_sorted) // 10 + 1])
+        eta_inf_est = np.min(y_sorted[-len(y_sorted) // 10 :])
 
         # Find characteristic shear rate (midpoint)
         eta_mid = (eta0_est + eta_inf_est) / 2.0
@@ -151,11 +152,11 @@ class CarreauYasuda(BaseModel):
         if eta0_est <= eta_inf_est:
             eta0_est = eta_inf_est * 10.0
 
-        self.parameters.set_value('eta0', float(eta0_est))
-        self.parameters.set_value('eta_inf', float(eta_inf_est))
-        self.parameters.set_value('lambda_', float(lambda_est))
-        self.parameters.set_value('n', float(n_est))
-        self.parameters.set_value('a', float(a_est))
+        self.parameters.set_value("eta0", float(eta0_est))
+        self.parameters.set_value("eta_inf", float(eta_inf_est))
+        self.parameters.set_value("lambda_", float(lambda_est))
+        self.parameters.set_value("n", float(n_est))
+        self.parameters.set_value("a", float(a_est))
 
         return self
 
@@ -168,11 +169,11 @@ class CarreauYasuda(BaseModel):
         Returns:
             Predicted viscosity η(γ̇)
         """
-        eta0 = self.parameters.get_value('eta0')
-        eta_inf = self.parameters.get_value('eta_inf')
-        lambda_ = self.parameters.get_value('lambda_')
-        n = self.parameters.get_value('n')
-        a = self.parameters.get_value('a')
+        eta0 = self.parameters.get_value("eta0")
+        eta_inf = self.parameters.get_value("eta_inf")
+        lambda_ = self.parameters.get_value("lambda_")
+        n = self.parameters.get_value("n")
+        a = self.parameters.get_value("a")
 
         # Convert to JAX for computation
         gamma_dot = jnp.array(X)
@@ -191,7 +192,7 @@ class CarreauYasuda(BaseModel):
         eta_inf: float,
         lambda_: float,
         n: float,
-        a: float
+        a: float,
     ) -> jnp.ndarray:
         """Compute viscosity using Carreau-Yasuda model.
 
@@ -219,7 +220,7 @@ class CarreauYasuda(BaseModel):
         eta_inf: float,
         lambda_: float,
         n: float,
-        a: float
+        a: float,
     ) -> jnp.ndarray:
         """Compute shear stress using Carreau-Yasuda model.
 
@@ -247,11 +248,11 @@ class CarreauYasuda(BaseModel):
         Returns:
             Predicted shear stress σ(γ̇)
         """
-        eta0 = self.parameters.get_value('eta0')
-        eta_inf = self.parameters.get_value('eta_inf')
-        lambda_ = self.parameters.get_value('lambda_')
-        n = self.parameters.get_value('n')
-        a = self.parameters.get_value('a')
+        eta0 = self.parameters.get_value("eta0")
+        eta_inf = self.parameters.get_value("eta_inf")
+        lambda_ = self.parameters.get_value("lambda_")
+        n = self.parameters.get_value("n")
+        a = self.parameters.get_value("a")
 
         # Convert to JAX for computation
         gamma_dot_jax = jnp.array(gamma_dot)
@@ -265,8 +266,8 @@ class CarreauYasuda(BaseModel):
     def predict_rheo(
         self,
         rheo_data: RheoData,
-        test_mode: Optional[TestMode] = None,
-        output: str = 'viscosity'
+        test_mode: TestMode | None = None,
+        output: str = "viscosity",
     ) -> RheoData:
         """Predict rheological response for RheoData.
 
@@ -295,24 +296,28 @@ class CarreauYasuda(BaseModel):
         gamma_dot = rheo_data.x
 
         # Get parameters
-        eta0 = self.parameters.get_value('eta0')
-        eta_inf = self.parameters.get_value('eta_inf')
-        lambda_ = self.parameters.get_value('lambda_')
-        n = self.parameters.get_value('n')
-        a = self.parameters.get_value('a')
+        eta0 = self.parameters.get_value("eta0")
+        eta_inf = self.parameters.get_value("eta_inf")
+        lambda_ = self.parameters.get_value("lambda_")
+        n = self.parameters.get_value("n")
+        a = self.parameters.get_value("a")
 
         # Convert to JAX
         gamma_dot_jax = jnp.array(gamma_dot)
 
         # Compute prediction based on output type
-        if output == 'viscosity':
-            y_pred = self._predict_viscosity(gamma_dot_jax, eta0, eta_inf, lambda_, n, a)
-            y_units = 'Pa·s'
-        elif output == 'stress':
+        if output == "viscosity":
+            y_pred = self._predict_viscosity(
+                gamma_dot_jax, eta0, eta_inf, lambda_, n, a
+            )
+            y_units = "Pa·s"
+        elif output == "stress":
             y_pred = self._predict_stress(gamma_dot_jax, eta0, eta_inf, lambda_, n, a)
-            y_units = 'Pa'
+            y_units = "Pa"
         else:
-            raise ValueError(f"Invalid output type: {output}. Must be 'viscosity' or 'stress'")
+            raise ValueError(
+                f"Invalid output type: {output}. Must be 'viscosity' or 'stress'"
+            )
 
         # Convert back to numpy
         y_pred = np.array(y_pred)
@@ -321,31 +326,33 @@ class CarreauYasuda(BaseModel):
         return RheoData(
             x=np.array(gamma_dot),
             y=y_pred,
-            x_units=rheo_data.x_units or '1/s',
+            x_units=rheo_data.x_units or "1/s",
             y_units=y_units,
-            domain='time',
+            domain="time",
             metadata={
-                'model': 'CarreauYasuda',
-                'test_mode': TestMode.ROTATION,
-                'output': output,
-                'eta0': eta0,
-                'eta_inf': eta_inf,
-                'lambda_': lambda_,
-                'n': n,
-                'a': a
+                "model": "CarreauYasuda",
+                "test_mode": TestMode.ROTATION,
+                "output": output,
+                "eta0": eta0,
+                "eta_inf": eta_inf,
+                "lambda_": lambda_,
+                "n": n,
+                "a": a,
             },
-            validate=False
+            validate=False,
         )
 
     def __repr__(self) -> str:
         """String representation."""
-        eta0 = self.parameters.get_value('eta0')
-        eta_inf = self.parameters.get_value('eta_inf')
-        lambda_ = self.parameters.get_value('lambda_')
-        n = self.parameters.get_value('n')
-        a = self.parameters.get_value('a')
-        return (f"CarreauYasuda(eta0={eta0:.3e}, eta_inf={eta_inf:.3e}, "
-                f"lambda={lambda_:.3e}, n={n:.3f}, a={a:.3f})")
+        eta0 = self.parameters.get_value("eta0")
+        eta_inf = self.parameters.get_value("eta_inf")
+        lambda_ = self.parameters.get_value("lambda_")
+        n = self.parameters.get_value("n")
+        a = self.parameters.get_value("a")
+        return (
+            f"CarreauYasuda(eta0={eta0:.3e}, eta_inf={eta_inf:.3e}, "
+            f"lambda={lambda_:.3e}, n={n:.3f}, a={a:.3f})"
+        )
 
 
-__all__ = ['CarreauYasuda']
+__all__ = ["CarreauYasuda"]

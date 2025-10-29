@@ -19,18 +19,19 @@ References:
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
 from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode, detect_test_mode
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
+from rheo.core.test_modes import TestMode, detect_test_mode
 
 
-@ModelRegistry.register('zener')
+@ModelRegistry.register("zener")
 class Zener(BaseModel):
     """Zener (Standard Linear Solid) viscoelastic model.
 
@@ -73,25 +74,25 @@ class Zener(BaseModel):
         # Define parameters with physical bounds
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='Ge',
+            name="Ge",
             value=1e4,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='Equilibrium modulus'
+            units="Pa",
+            description="Equilibrium modulus",
         )
         self.parameters.add(
-            name='Gm',
+            name="Gm",
             value=1e5,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='Maxwell modulus'
+            units="Pa",
+            description="Maxwell modulus",
         )
         self.parameters.add(
-            name='eta',
+            name="eta",
             value=1e3,
             bounds=(1e-6, 1e12),
-            units='Pa·s',
-            description='Viscosity'
+            units="Pa·s",
+            description="Viscosity",
         )
 
         self.fitted_ = False
@@ -107,7 +108,10 @@ class Zener(BaseModel):
         Returns:
             self for method chaining
         """
-        from rheo.utils.optimization import nlsq_optimize, create_least_squares_objective
+        from rheo.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
 
         # Handle RheoData input
         if isinstance(X, RheoData):
@@ -118,7 +122,7 @@ class Zener(BaseModel):
         else:
             x_data = jnp.array(X)
             y_data = jnp.array(y)
-            test_mode = kwargs.get('test_mode', TestMode.RELAXATION)
+            test_mode = kwargs.get("test_mode", TestMode.RELAXATION)
 
         # Create objective function with stateless predictions
         def model_fn(x, params):
@@ -137,15 +141,17 @@ class Zener(BaseModel):
             else:
                 raise ValueError(f"Unsupported test mode: {test_mode}")
 
-        objective = create_least_squares_objective(model_fn, x_data, y_data, normalize=True)
+        objective = create_least_squares_objective(
+            model_fn, x_data, y_data, normalize=True
+        )
 
         # Optimize
-        result = nlsq_optimize(
+        nlsq_optimize(
             objective,
             self.parameters,
-            use_jax=kwargs.get('use_jax', True),
-            method=kwargs.get('method', 'auto'),
-            max_iter=kwargs.get('max_iter', 1000)
+            use_jax=kwargs.get("use_jax", True),
+            method=kwargs.get("method", "auto"),
+            max_iter=kwargs.get("max_iter", 1000),
         )
 
         self.fitted_ = True
@@ -170,9 +176,9 @@ class Zener(BaseModel):
             test_mode = TestMode.RELAXATION  # Default
 
         # Get parameter values
-        Ge = self.parameters.get_value('Ge')
-        Gm = self.parameters.get_value('Gm')
-        eta = self.parameters.get_value('eta')
+        Ge = self.parameters.get_value("Ge")
+        Gm = self.parameters.get_value("Gm")
+        eta = self.parameters.get_value("eta")
 
         # Dispatch to appropriate prediction method
         if test_mode == TestMode.RELAXATION:
@@ -188,7 +194,9 @@ class Zener(BaseModel):
 
     @staticmethod
     @jax.jit
-    def _predict_relaxation(t: jnp.ndarray, Ge: float, Gm: float, eta: float) -> jnp.ndarray:
+    def _predict_relaxation(
+        t: jnp.ndarray, Ge: float, Gm: float, eta: float
+    ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         Theory: G(t) = G_e + G_m * exp(-t/tau) where tau = eta/G_m
@@ -231,7 +239,9 @@ class Zener(BaseModel):
 
     @staticmethod
     @jax.jit
-    def _predict_oscillation(omega: jnp.ndarray, Ge: float, Gm: float, eta: float) -> jnp.ndarray:
+    def _predict_oscillation(
+        omega: jnp.ndarray, Ge: float, Gm: float, eta: float
+    ) -> jnp.ndarray:
         """Predict complex modulus G*(omega).
 
         Theory:
@@ -250,7 +260,7 @@ class Zener(BaseModel):
         """
         tau = eta / Gm  # Relaxation time
         omega_tau = omega * tau
-        omega_tau_sq = omega_tau ** 2
+        omega_tau_sq = omega_tau**2
 
         # Storage modulus G'
         G_prime = Ge + Gm * omega_tau_sq / (1.0 + omega_tau_sq)
@@ -263,7 +273,9 @@ class Zener(BaseModel):
 
     @staticmethod
     @jax.jit
-    def _predict_rotation(gamma_dot: jnp.ndarray, Ge: float, Gm: float, eta: float) -> jnp.ndarray:
+    def _predict_rotation(
+        gamma_dot: jnp.ndarray, Ge: float, Gm: float, eta: float
+    ) -> jnp.ndarray:
         """Predict steady shear viscosity eta(gamma_dot).
 
         Theory: eta(gamma_dot) = eta (constant, Newtonian behavior)
@@ -285,8 +297,8 @@ class Zener(BaseModel):
         Returns:
             Relaxation time in seconds
         """
-        Gm = self.parameters.get_value('Gm')
-        eta = self.parameters.get_value('eta')
+        Gm = self.parameters.get_value("Gm")
+        eta = self.parameters.get_value("eta")
         return eta / Gm
 
     def get_retardation_time(self) -> float:
@@ -297,18 +309,18 @@ class Zener(BaseModel):
         Returns:
             Retardation time in seconds
         """
-        Ge = self.parameters.get_value('Ge')
-        Gm = self.parameters.get_value('Gm')
-        eta = self.parameters.get_value('eta')
+        Ge = self.parameters.get_value("Ge")
+        Gm = self.parameters.get_value("Gm")
+        eta = self.parameters.get_value("eta")
         return eta * (Ge + Gm) / (Ge * Gm)
 
     def __repr__(self) -> str:
         """String representation of Zener model."""
-        Ge = self.parameters.get_value('Ge')
-        Gm = self.parameters.get_value('Gm')
-        eta = self.parameters.get_value('eta')
+        Ge = self.parameters.get_value("Ge")
+        Gm = self.parameters.get_value("Gm")
+        eta = self.parameters.get_value("eta")
         tau = self.get_relaxation_time()
         return f"Zener(Ge={Ge:.2e} Pa, Gm={Gm:.2e} Pa, eta={eta:.2e} Pa·s, tau={tau:.2e} s)"
 
 
-__all__ = ['Zener']
+__all__ = ["Zener"]

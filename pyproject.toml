@@ -59,6 +59,10 @@ dependencies = [
     "pandas>=2.0.0,<3.0.0",
     "matplotlib>=3.7.0,<4.0.0",
 
+    # GPU-accelerated optimization (CRITICAL: must be imported before JAX)
+    # NLSQ auto-configures JAX for float64 precision when imported
+    "nlsq>=0.1.6",
+
     # JAX ecosystem (CPU-only - works on all platforms)
     # GPU users: see installation instructions above
     "jax==0.8.0",     # JAX 0.8.0 CPU-only - exact version required
@@ -72,7 +76,6 @@ dependencies = [
 # Core dependencies that may not be on PyPI yet
 core = [
     # "piblin>=0.5.0",  # Required but may need manual installation
-    # "nlsq>=0.2.0",     # Required but may need manual installation
 ]
 dev = [
     "pytest>=7.4.0",

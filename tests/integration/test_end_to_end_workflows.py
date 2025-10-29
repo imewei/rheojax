@@ -4,12 +4,13 @@ Tests complete pipelines from data loading through analysis and fitting.
 Validates that all core components work together correctly.
 """
 
-import pytest
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
+import pytest
+
 from rheo.core.data import RheoData
-from rheo.core.test_modes import detect_test_mode
 from rheo.core.parameters import ParameterSet
+from rheo.core.test_modes import detect_test_mode
 
 
 class TestEndToEndOscillation:
@@ -56,18 +57,20 @@ class TestEndToEndOscillation:
         # Verify physical properties
         assert np.all(G_prime > 0), "Storage modulus should be positive"
         assert np.all(G_double_prime > 0), "Loss modulus should be positive"
-        assert np.all(np.abs(G_double_prime) <= np.abs(G_prime)),\
-            "Loss should be less than storage for typical polymers"
+        assert np.all(
+            np.abs(G_double_prime) <= np.abs(G_prime)
+        ), "Loss should be less than storage for typical polymers"
 
     @pytest.mark.integration
-    def test_oscillation_multi_dataset_consistency(self, oscillation_data_simple,
-                                                    oscillation_data_large):
+    def test_oscillation_multi_dataset_consistency(
+        self, oscillation_data_simple, oscillation_data_large
+    ):
         """Test consistency across different oscillatory datasets."""
         simple = oscillation_data_simple
         large = oscillation_data_large
 
         # Both should be detected as oscillation
-        
+
         assert detect_test_mode(simple) == "oscillation"
         assert detect_test_mode(large) == "oscillation"
 
@@ -92,7 +95,7 @@ class TestEndToEndRelaxation:
         assert data.x_units == "s"
 
         # Detect test mode
-        
+
         detected_mode = detect_test_mode(data)
 
         assert detected_mode == "relaxation"
@@ -112,7 +115,7 @@ class TestEndToEndRelaxation:
         data = relaxation_data_multi_mode
 
         # Should be detected as relaxation
-        
+
         detected_mode = detect_test_mode(data)
 
         assert detected_mode == "relaxation"
@@ -132,7 +135,7 @@ class TestEndToEndRelaxation:
             x_units="log(s)",
             y_units="log(Pa)",
             domain=data.domain,
-            metadata=data.metadata
+            metadata=data.metadata,
         )
 
         # Verify shapes match
@@ -154,7 +157,7 @@ class TestEndToEndCreep:
         assert data.domain == "time"
 
         # Detect test mode
-        
+
         detected_mode = detect_test_mode(data)
 
         assert detected_mode == "creep"
@@ -194,7 +197,7 @@ class TestEndToEndFlow:
         data = flow_data_power_law
 
         # Should be detected as rotation (steady shear)
-        
+
         detected_mode = detect_test_mode(data)
 
         assert detected_mode == "rotation"
@@ -233,16 +236,16 @@ class TestCrossTestModeWorkflows:
     """Test workflows mixing different test modes."""
 
     @pytest.mark.integration
-    def test_multi_technique_analysis(self, oscillation_data_simple,
-                                      relaxation_data_simple,
-                                      creep_data_simple):
+    def test_multi_technique_analysis(
+        self, oscillation_data_simple, relaxation_data_simple, creep_data_simple
+    ):
         """Test analyzing multiple test modes from same sample."""
         osc = oscillation_data_simple
         relax = relaxation_data_simple
         creep = creep_data_simple
 
         # All should be detected correctly
-        
+
         assert detect_test_mode(osc) == "oscillation"
         assert detect_test_mode(relax) == "relaxation"
         assert detect_test_mode(creep) == "creep"
@@ -308,7 +311,7 @@ class TestDataQuality:
         assert len(set(lengths)) == 1, "All datasets should have same length"
 
         # All should be oscillation mode
-        
+
         for data in datasets:
             assert detect_test_mode(data) == "oscillation"
 
@@ -356,11 +359,12 @@ class TestMetadataPreservation:
         metadata2["modified"] = True
 
         data2 = RheoData(
-            x=data1.x, y=data1.y,
+            x=data1.x,
+            y=data1.y,
             x_units=data1.x_units,
             y_units=data1.y_units,
             domain=data1.domain,
-            metadata=metadata2
+            metadata=metadata2,
         )
 
         # Original should be unchanged

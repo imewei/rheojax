@@ -1,19 +1,20 @@
-"""Optimization utilities for parameter fitting.
+"""Optimization utilities for parameter fitting using NLSQ.
 
-This module provides optimization wrappers that integrate JAX automatic
-differentiation with scipy.optimize for model parameter fitting.
+This module provides GPU-accelerated optimization using the NLSQ package
+(https://github.com/imewei/NLSQ). NLSQ provides 5-270x speedup over scipy
+through JAX JIT compilation and automatic differentiation.
 
-The original plan was to use NLSQ (https://github.com/imewei/NLSQ), but as
-NLSQ is not available, this implementation uses scipy.optimize as the fallback
-with JAX gradients for enhanced performance.
+Critical: This module imports NLSQ, which must be imported before JAX to
+enable float64 precision mode. The rheo package handles this automatically
+in __init__.py.
 
 Example:
-    >>> from rheo.core.parameters import Parameter, ParameterSet
+    >>> from rheo.core.parameters import ParameterSet
     >>> from rheo.utils.optimization import nlsq_optimize
     >>>
     >>> # Set up parameters
     >>> params = ParameterSet()
-    >>> params.add(Parameter(name="x", value=1.0, bounds=(0, 10)))
+    >>> params.add("x", value=1.0, bounds=(0, 10))
     >>>
     >>> # Define objective function
     >>> def objective(values):
@@ -27,23 +28,33 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any, Union
 
+import nlsq
 import numpy as np
-import jax
-import jax.numpy as jnp
-from scipy.optimize import minimize, OptimizeResult as ScipyOptimizeResult
 
+from rheo.core.jax_config import safe_import_jax
 from rheo.core.parameters import ParameterSet
+
+# Safe JAX import (verifies NLSQ was imported first)
+jax, jnp = safe_import_jax()
+
+
+ArrayLike = Union[np.ndarray, jnp.ndarray, list, float]
 
 
 @dataclass
 class OptimizationResult:
     """Result from optimization.
 
+    This dataclass stores the results of NLSQ optimization, including optimal
+    parameter values, objective function value, convergence information, and
+    NLSQ-specific diagnostic data.
+
     Attributes:
-        x: Optimal parameter values
+        x: Optimal parameter values (float64 array)
         fun: Objective function value at optimum
         jac: Jacobian (gradient) at optimum
         success: Whether optimization converged successfully
@@ -51,36 +62,79 @@ class OptimizationResult:
         nit: Number of iterations
         nfev: Number of function evaluations
         njev: Number of Jacobian evaluations
+        optimality: Optimality metric (gradient norm)
+        active_mask: Active bound constraints at solution
+        cost: Final cost value
+        grad: Final gradient
+        nlsq_result: Full NLSQ result dictionary (for advanced diagnostics)
     """
 
     x: np.ndarray
     fun: float
-    jac: Optional[np.ndarray] = None
+    jac: np.ndarray | None = None
     success: bool = True
     message: str = ""
     nit: int = 0
     nfev: int = 0
     njev: int = 0
+    optimality: float | None = None
+    active_mask: np.ndarray | None = None
+    cost: float | None = None
+    grad: np.ndarray | None = None
+    nlsq_result: dict[str, Any] | None = field(default=None, repr=False)
 
     @classmethod
-    def from_scipy(cls, scipy_result: ScipyOptimizeResult) -> "OptimizationResult":
-        """Create OptimizationResult from scipy OptimizeResult.
+    def from_nlsq(cls, nlsq_result: dict[str, Any]) -> OptimizationResult:
+        """Create OptimizationResult from NLSQ result dictionary.
 
         Args:
-            scipy_result: Result from scipy.optimize
+            nlsq_result: Result dictionary from nlsq.LeastSquares.least_squares
 
         Returns:
-            OptimizationResult instance
+            OptimizationResult instance with fields extracted from NLSQ result
         """
+        # Extract common fields
+        x = np.asarray(nlsq_result.get("x", []), dtype=np.float64)
+        fun = float(nlsq_result.get("cost", nlsq_result.get("fun", 0.0)))
+        success = bool(nlsq_result.get("success", False))
+        message = str(nlsq_result.get("message", ""))
+        nfev = int(nlsq_result.get("nfev", 0))
+        njev = int(nlsq_result.get("njev", 0))
+
+        # Extract NLSQ-specific fields
+        jac = nlsq_result.get("jac")
+        if jac is not None:
+            jac = np.asarray(jac, dtype=np.float64)
+
+        grad = nlsq_result.get("grad")
+        if grad is not None:
+            grad = np.asarray(grad, dtype=np.float64)
+
+        optimality = nlsq_result.get("optimality")
+        if optimality is not None:
+            optimality = float(optimality)
+
+        active_mask = nlsq_result.get("active_mask")
+        if active_mask is not None:
+            active_mask = np.asarray(active_mask)
+
+        # Note: NLSQ uses 'nfev' for iterations in some contexts
+        nit = int(nlsq_result.get("nit", nlsq_result.get("nfev", 0)))
+
         return cls(
-            x=np.array(scipy_result.x),
-            fun=float(scipy_result.fun),
-            jac=np.array(scipy_result.jac) if hasattr(scipy_result, "jac") else None,
-            success=bool(scipy_result.success),
-            message=str(scipy_result.message),
-            nit=int(scipy_result.nit) if hasattr(scipy_result, "nit") else 0,
-            nfev=int(scipy_result.nfev) if hasattr(scipy_result, "nfev") else 0,
-            njev=int(scipy_result.njev) if hasattr(scipy_result, "njev") else 0,
+            x=x,
+            fun=fun,
+            jac=jac,
+            success=success,
+            message=message,
+            nit=nit,
+            nfev=nfev,
+            njev=njev,
+            optimality=optimality,
+            active_mask=active_mask,
+            cost=fun,  # NLSQ uses 'cost' terminology
+            grad=grad,
+            nlsq_result=nlsq_result,
         )
 
 
@@ -95,28 +149,33 @@ def nlsq_optimize(
     gtol: float = 1e-8,
     **kwargs,
 ) -> OptimizationResult:
-    """Optimize objective function with respect to parameters.
+    """Optimize objective function using NLSQ (GPU-accelerated).
 
-    This function provides a unified interface for parameter optimization with
-    automatic gradient computation via JAX. Originally designed to use NLSQ,
-    it falls back to scipy.optimize with JAX gradients.
+    This function provides GPU-accelerated nonlinear least squares optimization
+    using the NLSQ package. It achieves 5-270x speedup over scipy through JAX
+    JIT compilation and automatic differentiation.
+
+    The objective function should accept parameter values as a 1D array and
+    return a scalar value to minimize. NLSQ internally converts this to a
+    residual minimization problem.
 
     Args:
         objective: Objective function to minimize. Takes parameter values as
-            array and returns scalar.
+            array and returns scalar. Should use jax.numpy for operations to
+            enable GPU acceleration and automatic differentiation.
         parameters: ParameterSet with initial values and bounds
         method: Optimization method. Options:
             - "auto": Automatically select based on bounds (default)
-            - "L-BFGS-B": L-BFGS with bounds
-            - "TNC": Truncated Newton with bounds
-            - "SLSQP": Sequential Least Squares
-            - "trust-constr": Trust region with constraints
-        use_jax: Whether to use JAX for gradient computation (default: True)
+            - "trf": Trust Region Reflective (supports bounds)
+            - "lm": Levenberg-Marquardt (no bounds)
+            NLSQ internally selects the best algorithm regardless of this parameter.
+        use_jax: Whether to use JAX for gradient computation (default: True).
+            Should always be True for GPU acceleration and float64 precision.
         max_iter: Maximum number of iterations (default: 1000)
         ftol: Function tolerance for convergence (default: 1e-8)
         xtol: Parameter tolerance for convergence (default: 1e-8)
         gtol: Gradient tolerance for convergence (default: 1e-8)
-        **kwargs: Additional arguments passed to scipy.optimize.minimize
+        **kwargs: Additional arguments passed to nlsq.LeastSquares.least_squares
 
     Returns:
         OptimizationResult with optimal parameters and convergence info
@@ -125,10 +184,10 @@ def nlsq_optimize(
         ValueError: If objective is not callable or parameters is not ParameterSet
 
     Example:
-        >>> from rheo.core.parameters import Parameter, ParameterSet
+        >>> from rheo.core.parameters import ParameterSet
         >>> params = ParameterSet()
-        >>> params.add(Parameter(name="a", value=1.0, bounds=(0, 10)))
-        >>> params.add(Parameter(name="b", value=1.0, bounds=(0, 10)))
+        >>> params.add("a", value=1.0, bounds=(0, 10))
+        >>> params.add("b", value=1.0, bounds=(0, 10))
         >>>
         >>> def objective(values):
         ...     a, b = values
@@ -136,94 +195,103 @@ def nlsq_optimize(
         >>>
         >>> result = nlsq_optimize(objective, params)
         >>> print(result.x)  # Should be close to [5.0, 3.0]
+
+    Notes:
+        - This function automatically handles float64 precision through NLSQ
+        - JAX JIT compilation provides 5-270x speedup over scipy
+        - Automatic differentiation eliminates need for manual Jacobian
+        - Bounds are automatically extracted from ParameterSet
+        - Parameters are updated in-place with optimal values
     """
+    # Validate inputs
     if not callable(objective):
         raise ValueError("objective must be callable")
 
     if not isinstance(parameters, ParameterSet):
         raise ValueError("parameters must be ParameterSet")
 
-    # Get initial values and bounds
+    # Get initial values and bounds from ParameterSet
     x0 = parameters.get_values()
-    bounds = parameters.get_bounds()
+    bounds_list = parameters.get_bounds()
 
-    # Auto-select method based on bounds
-    if method == "auto":
-        has_bounds = any(b is not None for b_pair in bounds for b in b_pair if b_pair)
-        method = "L-BFGS-B" if has_bounds else "BFGS"
+    # Ensure float64 precision for initial values
+    x0 = np.asarray(x0, dtype=np.float64)
 
-    # Convert bounds to scipy format
-    # scipy expects list of (min, max) tuples or None
-    scipy_bounds = []
-    for b in bounds:
-        if b is None or (b[0] is None and b[1] is None):
-            scipy_bounds.append((None, None))
+    # Convert bounds to NLSQ format: (lower_array, upper_array)
+    lower_bounds = []
+    upper_bounds = []
+    for bound_pair in bounds_list:
+        if bound_pair is None or (bound_pair[0] is None and bound_pair[1] is None):
+            # Unbounded
+            lower_bounds.append(-np.inf)
+            upper_bounds.append(np.inf)
         else:
-            scipy_bounds.append((b[0], b[1]))
+            lower = bound_pair[0] if bound_pair[0] is not None else -np.inf
+            upper = bound_pair[1] if bound_pair[1] is not None else np.inf
+            lower_bounds.append(lower)
+            upper_bounds.append(upper)
 
-    # Set up JAX gradient if requested
-    if use_jax:
-        # Create JAX-compatible objective wrapper for gradient computation
-        # Note: We must NOT convert to float inside this function, as it will
-        # be differentiated by JAX
-        def jax_objective_for_grad(x):
-            x_jax = jnp.asarray(x)
-            result = objective(x_jax)
-            # Ensure scalar output, but keep as JAX array for differentiation
-            if isinstance(result, (jnp.ndarray, np.ndarray)):
-                result = jnp.asarray(result).reshape(())
-            return result
+    lower_bounds = np.asarray(lower_bounds, dtype=np.float64)
+    upper_bounds = np.asarray(upper_bounds, dtype=np.float64)
+    nlsq_bounds = (lower_bounds, upper_bounds)
 
-        # Compute gradient function
-        jac = jax.grad(jax_objective_for_grad)
+    # NLSQ expects a residual function, but we have a scalar objective
+    # Convert scalar objective to residual by taking square root
+    # This maintains the same minimum while allowing NLSQ to work
+    def residual_function(params):
+        """Convert scalar objective to residual for NLSQ."""
+        # Ensure params are JAX arrays for autodiff
+        params_jax = jnp.asarray(params, dtype=jnp.float64)
+        obj_value = objective(params_jax)
 
-        # Wrapper to convert JAX arrays to numpy for scipy
-        def jac_wrapper(x):
-            grad = jac(jnp.asarray(x))
-            return np.asarray(grad)
+        # Convert scalar objective to residual (single-element array)
+        # NLSQ minimizes sum(residuals**2), so we return sqrt(objective)
+        # This gives the same minimum as minimizing objective directly
+        residual = jnp.sqrt(jnp.maximum(obj_value, 0.0))  # Ensure non-negative
+        return jnp.array([residual])  # Return as 1-element array
 
-        # Objective wrapper for scipy (can convert to float here)
-        def objective_wrapper(x):
-            result = objective(x)
-            if isinstance(result, (jnp.ndarray, np.ndarray)):
-                return float(jnp.asarray(result).reshape(()))
-            return float(result)
-
-    else:
-        # Use numerical gradients (scipy default)
-        jac_wrapper = None
-        objective_wrapper = objective
-
-    # Set up options
-    options = {
-        "maxiter": max_iter,
+    # Set up NLSQ optimization parameters
+    nlsq_kwargs = {
+        "fun": residual_function,
+        "x0": x0,
+        "bounds": nlsq_bounds,
+        "method": "trf",  # Trust Region Reflective (supports bounds)
         "ftol": ftol,
+        "xtol": xtol,
         "gtol": gtol,
+        "max_nfev": max_iter * 10,  # NLSQ uses max_nfev for iteration limit
+        "verbose": 0,
     }
 
-    # Add method-specific options
-    if method in ["L-BFGS-B", "TNC"]:
-        options["maxfun"] = max_iter * 10  # Function evaluation limit
+    # Merge with user-provided kwargs
+    nlsq_kwargs.update(kwargs)
 
-    # Merge with user options
-    options.update(kwargs.get("options", {}))
+    # Create NLSQ optimizer instance and run optimization
+    try:
+        optimizer = nlsq.LeastSquares()
+        nlsq_result = optimizer.least_squares(**nlsq_kwargs)
+    except Exception as e:
+        # If NLSQ fails, return a failure result
+        return OptimizationResult(
+            x=x0,
+            fun=float(objective(x0)),
+            success=False,
+            message=f"NLSQ optimization failed: {str(e)}",
+            nit=0,
+            nfev=0,
+        )
 
-    # Run optimization
-    scipy_result = minimize(
-        fun=objective_wrapper,
-        x0=x0,
-        method=method,
-        jac=jac_wrapper,
-        bounds=scipy_bounds if scipy_bounds else None,
-        options=options,
-        **{k: v for k, v in kwargs.items() if k != "options"},
-    )
+    # Convert NLSQ result to OptimizationResult
+    result = OptimizationResult.from_nlsq(nlsq_result)
 
-    # Update parameters with optimal values
-    parameters.set_values(scipy_result.x)
+    # Ensure x is float64
+    result.x = np.asarray(result.x, dtype=np.float64)
 
-    # Convert result
-    result = OptimizationResult.from_scipy(scipy_result)
+    # Update ParameterSet with optimal values
+    parameters.set_values(result.x)
+
+    # Recompute objective at optimal point (NLSQ returns residual cost)
+    result.fun = float(objective(result.x))
 
     return result
 
@@ -231,7 +299,7 @@ def nlsq_optimize(
 def optimize_with_bounds(
     objective: Callable[[np.ndarray], float],
     x0: np.ndarray,
-    bounds: List[Tuple[Optional[float], Optional[float]]],
+    bounds: list[tuple[float | None, float | None]],
     use_jax: bool = True,
     **kwargs,
 ) -> OptimizationResult:
@@ -244,8 +312,8 @@ def optimize_with_bounds(
         objective: Objective function to minimize
         x0: Initial parameter values
         bounds: List of (min, max) tuples for each parameter
-        use_jax: Whether to use JAX for gradients
-        **kwargs: Additional arguments passed to scipy.optimize.minimize
+        use_jax: Whether to use JAX for gradients (default: True)
+        **kwargs: Additional arguments passed to nlsq_optimize
 
     Returns:
         OptimizationResult with optimal parameters
@@ -260,18 +328,17 @@ def optimize_with_bounds(
         ... )
     """
     # Create temporary ParameterSet for interface consistency
-    from rheo.core.parameters import Parameter
 
     params = ParameterSet()
-    for i, (val, bound) in enumerate(zip(x0, bounds)):
-        params.add(Parameter(name=f"p{i}", value=val, bounds=bound))
+    for i, (val, bound) in enumerate(zip(x0, bounds, strict=False)):
+        params.add(name=f"p{i}", value=val, bounds=bound)
 
     # Use main optimization function
     return nlsq_optimize(objective, params, use_jax=use_jax, **kwargs)
 
 
 def residual_sum_of_squares(
-    y_true: np.ndarray, y_pred: np.ndarray, normalize: bool = True
+    y_true: ArrayLike, y_pred: ArrayLike, normalize: bool = True
 ) -> float:
     """Compute residual sum of squares (RSS).
 
@@ -281,7 +348,7 @@ def residual_sum_of_squares(
         normalize: Whether to normalize by y_true (relative error)
 
     Returns:
-        RSS value (as scalar, not necessarily Python float for JAX compatibility)
+        RSS value (scalar, maintains float64 precision)
 
     Example:
         >>> y_true = np.array([1.0, 2.0, 3.0])
@@ -289,23 +356,27 @@ def residual_sum_of_squares(
         >>> rss = residual_sum_of_squares(y_true, y_pred)
     """
     # Use JAX operations if inputs are JAX arrays for gradient support
-    if isinstance(y_pred, jnp.ndarray):
-        residuals = y_pred - y_true
+    if isinstance(y_pred, jnp.ndarray) or isinstance(y_true, jnp.ndarray):
+        y_true_jax = jnp.asarray(y_true, dtype=jnp.float64)
+        y_pred_jax = jnp.asarray(y_pred, dtype=jnp.float64)
+        residuals = y_pred_jax - y_true_jax
 
         if normalize:
             # Relative error (avoid division by zero)
-            residuals = residuals / jnp.maximum(jnp.abs(y_true), 1e-10)
+            residuals = residuals / jnp.maximum(jnp.abs(y_true_jax), 1e-10)
 
         # Return scalar JAX array, don't convert to Python float (breaks gradients)
         return jnp.sum(residuals**2)
     else:
         # NumPy path
-        residuals = y_pred - y_true
+        y_true_np = np.asarray(y_true, dtype=np.float64)
+        y_pred_np = np.asarray(y_pred, dtype=np.float64)
+        residuals = y_pred_np - y_true_np
 
         if normalize:
             # Relative error (avoid division by zero)
             with np.errstate(divide="ignore", invalid="ignore"):
-                residuals = residuals / np.maximum(np.abs(y_true), 1e-10)
+                residuals = residuals / np.maximum(np.abs(y_true_np), 1e-10)
 
         return float(np.sum(residuals**2))
 

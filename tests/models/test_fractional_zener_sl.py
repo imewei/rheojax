@@ -10,12 +10,12 @@ This test suite validates:
 7. JAX operations (JIT, vmap, grad)
 """
 
-import pytest
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
-from rheo.models.fractional_zener_sl import FractionalZenerSolidLiquid, FZSL
+from rheo.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
 
 
 class TestFractionalZenerSolidLiquid:
@@ -30,26 +30,26 @@ class TestFractionalZenerSolidLiquid:
     def standard_params(self):
         """Standard parameter set for testing."""
         return {
-            'Ge': 1000.0,  # Equilibrium modulus (Pa)
-            'c_alpha': 500.0,  # SpringPot constant (Pa·s^α)
-            'alpha': 0.5,  # Fractional order
-            'tau': 1.0  # Relaxation time (s)
+            "Ge": 1000.0,  # Equilibrium modulus (Pa)
+            "c_alpha": 500.0,  # SpringPot constant (Pa·s^α)
+            "alpha": 0.5,  # Fractional order
+            "tau": 1.0,  # Relaxation time (s)
         }
 
     def test_model_initialization(self, model):
         """Test that model initializes with correct parameters."""
-        assert hasattr(model, 'parameters')
-        assert 'Ge' in model.parameters
-        assert 'c_alpha' in model.parameters
-        assert 'alpha' in model.parameters
-        assert 'tau' in model.parameters
+        assert hasattr(model, "parameters")
+        assert "Ge" in model.parameters
+        assert "c_alpha" in model.parameters
+        assert "alpha" in model.parameters
+        assert "tau" in model.parameters
 
     def test_parameter_bounds(self, model):
         """Test that parameters have correct bounds."""
-        assert model.parameters['Ge'].bounds == (1e-3, 1e9)
-        assert model.parameters['c_alpha'].bounds == (1e-3, 1e9)
-        assert model.parameters['alpha'].bounds == (0.0, 1.0)
-        assert model.parameters['tau'].bounds == (1e-6, 1e6)
+        assert model.parameters["Ge"].bounds == (1e-3, 1e9)
+        assert model.parameters["c_alpha"].bounds == (1e-3, 1e9)
+        assert model.parameters["alpha"].bounds == (0.0, 1.0)
+        assert model.parameters["tau"].bounds == (1e-6, 1e6)
 
     def test_relaxation_mode(self, model, standard_params):
         """Test relaxation modulus prediction."""
@@ -65,7 +65,7 @@ class TestFractionalZenerSolidLiquid:
         assert G_t[0] > G_t[-1]
 
         # Check that G(∞) approaches Ge
-        assert jnp.allclose(G_t[-1], standard_params['Ge'], rtol=0.1)
+        assert jnp.allclose(G_t[-1], standard_params["Ge"], rtol=0.1)
 
         # Check all values are positive
         assert jnp.all(G_t > 0)
@@ -84,7 +84,7 @@ class TestFractionalZenerSolidLiquid:
         assert jnp.all(jnp.diff(J_t) >= 0)
 
         # Check that J(∞) approaches 1/Ge
-        expected_J_inf = 1.0 / standard_params['Ge']
+        expected_J_inf = 1.0 / standard_params["Ge"]
         assert jnp.allclose(J_t[-1], expected_J_inf, rtol=0.2)
 
         # Check all values are positive
@@ -108,21 +108,23 @@ class TestFractionalZenerSolidLiquid:
         assert jnp.all(G_double_prime > 0)
 
         # Check that G' approaches Ge at low frequencies
-        assert jnp.allclose(G_prime[0], standard_params['Ge'], rtol=0.2)
+        assert jnp.allclose(G_prime[0], standard_params["Ge"], rtol=0.2)
 
         # Check causality: G' and G'' should have proper frequency dependence
         # At high frequencies, both should increase (or at least not decrease)
         assert G_prime[-1] > G_prime[0]
         # Use allclose for comparison to handle exact equality with JAX arrays
-        assert G_double_prime[-1] >= G_double_prime[0] or jnp.allclose(G_double_prime[-1], G_double_prime[0])
+        assert G_double_prime[-1] >= G_double_prime[0] or jnp.allclose(
+            G_double_prime[-1], G_double_prime[0]
+        )
 
     def test_limit_case_alpha_near_zero(self, model):
         """Test limit case: alpha → 0 (purely elastic)."""
         params = {
-            'Ge': 1000.0,
-            'c_alpha': 500.0,
-            'alpha': 0.01,  # Near zero
-            'tau': 1.0
+            "Ge": 1000.0,
+            "c_alpha": 500.0,
+            "alpha": 0.01,  # Near zero
+            "tau": 1.0,
         }
         model.set_params(**params)
 
@@ -132,18 +134,13 @@ class TestFractionalZenerSolidLiquid:
         # For alpha → 0, SpringPot becomes spring-like
         # G(t) ≈ Ge + c_alpha at short times, relaxes to Ge at long times
         # Check that long-time behavior approaches Ge
-        assert jnp.allclose(G_t[-5:], params['Ge'], rtol=0.01)
+        assert jnp.allclose(G_t[-5:], params["Ge"], rtol=0.01)
         # Check that short-time behavior is higher (includes SpringPot contribution)
-        assert G_t[0] > params['Ge']
+        assert G_t[0] > params["Ge"]
 
     def test_limit_case_alpha_near_one(self, model):
         """Test limit case: alpha → 1 (classical viscoelastic)."""
-        params = {
-            'Ge': 1000.0,
-            'c_alpha': 500.0,
-            'alpha': 0.99,  # Near one
-            'tau': 1.0
-        }
+        params = {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.99, "tau": 1.0}  # Near one
         model.set_params(**params)
 
         t = jnp.logspace(-2, 2, 20)
@@ -151,14 +148,14 @@ class TestFractionalZenerSolidLiquid:
 
         # For alpha → 1, should show exponential relaxation
         # G(t) ≈ Ge + c_alpha * exp(-t/tau)
-        expected_G = params['Ge'] + params['c_alpha'] * jnp.exp(-t / params['tau'])
+        expected_G = params["Ge"] + params["c_alpha"] * jnp.exp(-t / params["tau"])
 
         # ML approximation for very small ml_alpha (1-0.99=0.01) has known numerical challenges
         # The Pade approximation with Γ(-0.01) introduces errors
         # Check that at least the long-time behavior approaches Ge (within 2%)
-        assert jnp.allclose(G_t[-5:], params['Ge'], rtol=0.02)
+        assert jnp.allclose(G_t[-5:], params["Ge"], rtol=0.02)
         # And that short-time values are higher than equilibrium
-        assert jnp.all(G_t > params['Ge'])
+        assert jnp.all(G_t > params["Ge"])
 
     def test_complex_modulus_storage_loss_relationship(self, model, standard_params):
         """Test that G' and G'' satisfy physical constraints."""
@@ -182,16 +179,16 @@ class TestFractionalZenerSolidLiquid:
     def test_time_scale_independence(self, model):
         """Test that model works across wide range of time scales."""
         params_short = {
-            'Ge': 1000.0,
-            'c_alpha': 500.0,
-            'alpha': 0.5,
-            'tau': 1e-3  # millisecond scale
+            "Ge": 1000.0,
+            "c_alpha": 500.0,
+            "alpha": 0.5,
+            "tau": 1e-3,  # millisecond scale
         }
         params_long = {
-            'Ge': 1000.0,
-            'c_alpha': 500.0,
-            'alpha': 0.5,
-            'tau': 1e3  # kilosecond scale
+            "Ge": 1000.0,
+            "c_alpha": 500.0,
+            "alpha": 0.5,
+            "tau": 1e3,  # kilosecond scale
         }
 
         t_short = jnp.logspace(-5, -1, 20)
@@ -208,12 +205,7 @@ class TestFractionalZenerSolidLiquid:
 
     def test_parameter_sensitivity(self, model):
         """Test that model is sensitive to parameter changes."""
-        base_params = {
-            'Ge': 1000.0,
-            'c_alpha': 500.0,
-            'alpha': 0.5,
-            'tau': 1.0
-        }
+        base_params = {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.5, "tau": 1.0}
 
         t = jnp.array([0.1, 1.0, 10.0])
 
@@ -222,12 +214,12 @@ class TestFractionalZenerSolidLiquid:
 
         # Change each parameter and verify different output
         params_varied_Ge = base_params.copy()
-        params_varied_Ge['Ge'] = 2000.0
+        params_varied_Ge["Ge"] = 2000.0
         G_varied_Ge = model._predict_relaxation(t, **params_varied_Ge)
         assert not jnp.allclose(G_base, G_varied_Ge)
 
         params_varied_alpha = base_params.copy()
-        params_varied_alpha['alpha'] = 0.3
+        params_varied_alpha["alpha"] = 0.3
         G_varied_alpha = model._predict_relaxation(t, **params_varied_alpha)
         assert not jnp.allclose(G_base, G_varied_alpha)
 
@@ -245,7 +237,9 @@ class TestFractionalZenerSolidLiquid:
         # Results should match
         assert jnp.allclose(G_jit, G_normal)
 
-    @pytest.mark.xfail(reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler")
+    @pytest.mark.xfail(
+        reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler"
+    )
     def test_jax_vmap(self, model, standard_params):
         """Test vectorization with vmap."""
         t = jnp.logspace(-2, 2, 10)
@@ -256,7 +250,7 @@ class TestFractionalZenerSolidLiquid:
         # Define function that takes alpha as parameter
         def predict_with_alpha(alpha):
             params = standard_params.copy()
-            params['alpha'] = alpha
+            params["alpha"] = alpha
             return model._predict_relaxation(t, **params)
 
         # Vectorize over alphas
@@ -272,16 +266,16 @@ class TestFractionalZenerSolidLiquid:
     def test_numerical_stability_extreme_alpha(self, model):
         """Test numerical stability at extreme alpha values."""
         params_low = {
-            'Ge': 1000.0,
-            'c_alpha': 500.0,
-            'alpha': 0.01,  # Very low
-            'tau': 1.0
+            "Ge": 1000.0,
+            "c_alpha": 500.0,
+            "alpha": 0.01,  # Very low
+            "tau": 1.0,
         }
         params_high = {
-            'Ge': 1000.0,
-            'c_alpha': 500.0,
-            'alpha': 0.99,  # Very high
-            'tau': 1.0
+            "Ge": 1000.0,
+            "c_alpha": 500.0,
+            "alpha": 0.99,  # Very high
+            "tau": 1.0,
         }
 
         t = jnp.logspace(-2, 2, 20)
@@ -314,12 +308,7 @@ class TestFractionalZenerSolidLiquid:
 
     def test_parameter_recovery_synthetic_data(self, model):
         """Test that we can recover known parameters from synthetic data."""
-        true_params = {
-            'Ge': 1000.0,
-            'c_alpha': 500.0,
-            'alpha': 0.5,
-            'tau': 1.0
-        }
+        true_params = {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.5, "tau": 1.0}
 
         # Generate synthetic data
         t = jnp.logspace(-2, 2, 30)

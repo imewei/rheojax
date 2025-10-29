@@ -13,10 +13,10 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Callable
-from pathlib import Path
 import warnings
-import glob
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -41,7 +41,7 @@ class BatchPipeline:
         >>> batch.process_files(['data1.csv', 'data2.csv'])
     """
 
-    def __init__(self, template_pipeline: Optional[Pipeline] = None):
+    def __init__(self, template_pipeline: Pipeline | None = None):
         """Initialize batch pipeline.
 
         Args:
@@ -49,8 +49,8 @@ class BatchPipeline:
                 If None, must be set before processing.
         """
         self.template_pipeline = template_pipeline
-        self.results: List[Tuple[str, Any, Dict[str, Any]]] = []
-        self.errors: List[Tuple[str, Exception]] = []
+        self.results: list[tuple[str, Any, dict[str, Any]]] = []
+        self.errors: list[tuple[str, Exception]] = []
 
     def set_template(self, pipeline: Pipeline) -> BatchPipeline:
         """Set template pipeline.
@@ -66,11 +66,11 @@ class BatchPipeline:
 
     def process_files(
         self,
-        file_paths: List[str],
-        format: str = 'auto',
+        file_paths: list[str],
+        format: str = "auto",
         parallel: bool = False,
-        n_workers: Optional[int] = None,
-        **load_kwargs
+        n_workers: int | None = None,
+        **load_kwargs,
     ) -> BatchPipeline:
         """Process multiple files with the pipeline.
 
@@ -91,28 +91,22 @@ class BatchPipeline:
             raise ValueError("No template pipeline set. Call set_template() first.")
 
         if parallel:
-            warnings.warn("Parallel processing not yet implemented. Using sequential.")
+            warnings.warn("Parallel processing not yet implemented. Using sequential.", stacklevel=2)
 
         for file_path in file_paths:
             try:
                 result, metrics = self._process_file(
-                    file_path,
-                    format=format,
-                    **load_kwargs
+                    file_path, format=format, **load_kwargs
                 )
                 self.results.append((file_path, result, metrics))
             except Exception as e:
                 self.errors.append((file_path, e))
-                warnings.warn(f"Failed to process {file_path}: {e}")
+                warnings.warn(f"Failed to process {file_path}: {e}", stacklevel=2)
 
         return self
 
     def process_directory(
-        self,
-        directory: str,
-        pattern: str = '*.csv',
-        recursive: bool = False,
-        **kwargs
+        self, directory: str, pattern: str = "*.csv", recursive: bool = False, **kwargs
     ) -> BatchPipeline:
         """Process all files in directory matching pattern.
 
@@ -140,17 +134,14 @@ class BatchPipeline:
         file_paths = [str(p) for p in file_paths]
 
         if not file_paths:
-            warnings.warn(f"No files matching '{pattern}' found in {directory}")
+            warnings.warn(f"No files matching '{pattern}' found in {directory}", stacklevel=2)
             return self
 
         return self.process_files(file_paths, **kwargs)
 
     def _process_file(
-        self,
-        file_path: str,
-        format: str = 'auto',
-        **load_kwargs
-    ) -> Tuple[RheoData, Dict[str, Any]]:
+        self, file_path: str, format: str = "auto", **load_kwargs
+    ) -> tuple[RheoData, dict[str, Any]]:
         """Process single file with pipeline.
 
         Args:
@@ -182,14 +173,14 @@ class BatchPipeline:
             X = np.array(result.x)
             y = np.array(result.y)
 
-            metrics['r_squared'] = model.score(X, y)
-            metrics['parameters'] = model.get_params()
-            metrics['model'] = model.__class__.__name__
+            metrics["r_squared"] = model.score(X, y)
+            metrics["parameters"] = model.get_params()
+            metrics["model"] = model.__class__.__name__
 
             # Calculate RMSE
             y_pred = model.predict(X)
             residuals = y - y_pred
-            metrics['rmse'] = float(np.sqrt(np.mean(residuals**2)))
+            metrics["rmse"] = float(np.sqrt(np.mean(residuals**2)))
 
         return result, metrics
 
@@ -206,7 +197,7 @@ class BatchPipeline:
         # A full implementation would deep copy the pipeline configuration
         return Pipeline()
 
-    def get_results(self) -> List[Tuple[str, RheoData, Dict[str, Any]]]:
+    def get_results(self) -> list[tuple[str, RheoData, dict[str, Any]]]:
         """Get all processing results.
 
         Returns:
@@ -219,7 +210,7 @@ class BatchPipeline:
         """
         return self.results.copy()
 
-    def get_errors(self) -> List[Tuple[str, Exception]]:
+    def get_errors(self) -> list[tuple[str, Exception]]:
         """Get processing errors.
 
         Returns:
@@ -248,20 +239,16 @@ class BatchPipeline:
         summary_data = []
         for file_path, result, metrics in self.results:
             row = {
-                'file_path': file_path,
-                'file_name': Path(file_path).name,
-                'n_points': len(result.x),
+                "file_path": file_path,
+                "file_name": Path(file_path).name,
+                "n_points": len(result.x),
             }
             row.update(metrics)
             summary_data.append(row)
 
         return pd.DataFrame(summary_data)
 
-    def export_summary(
-        self,
-        output_path: str,
-        format: str = 'excel'
-    ) -> BatchPipeline:
+    def export_summary(self, output_path: str, format: str = "excel") -> BatchPipeline:
         """Export summary of batch results.
 
         Args:
@@ -277,12 +264,12 @@ class BatchPipeline:
         df = self.get_summary_dataframe()
 
         if df.empty:
-            warnings.warn("No results to export")
+            warnings.warn("No results to export", stacklevel=2)
             return self
 
-        if format == 'excel':
+        if format == "excel":
             df.to_excel(output_path, index=False)
-        elif format == 'csv':
+        elif format == "csv":
             df.to_csv(output_path, index=False)
         else:
             raise ValueError(f"Unknown format: {format}")
@@ -290,8 +277,7 @@ class BatchPipeline:
         return self
 
     def apply_filter(
-        self,
-        filter_fn: Callable[[str, RheoData, Dict], bool]
+        self, filter_fn: Callable[[str, RheoData, dict], bool]
     ) -> BatchPipeline:
         """Filter results based on custom criteria.
 
@@ -313,7 +299,7 @@ class BatchPipeline:
         ]
         return self
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics across all results.
 
         Returns:
@@ -331,34 +317,40 @@ class BatchPipeline:
         rmse_values = []
 
         for _, _, metrics in self.results:
-            if 'r_squared' in metrics:
-                r_squared_values.append(metrics['r_squared'])
-            if 'rmse' in metrics:
-                rmse_values.append(metrics['rmse'])
+            if "r_squared" in metrics:
+                r_squared_values.append(metrics["r_squared"])
+            if "rmse" in metrics:
+                rmse_values.append(metrics["rmse"])
 
         stats = {
-            'total_files': len(self.results),
-            'total_errors': len(self.errors),
-            'success_rate': len(self.results) / (
-                len(self.results) + len(self.errors)
-            ) if (len(self.results) + len(self.errors)) > 0 else 0,
+            "total_files": len(self.results),
+            "total_errors": len(self.errors),
+            "success_rate": (
+                len(self.results) / (len(self.results) + len(self.errors))
+                if (len(self.results) + len(self.errors)) > 0
+                else 0
+            ),
         }
 
         if r_squared_values:
-            stats.update({
-                'mean_r_squared': float(np.mean(r_squared_values)),
-                'std_r_squared': float(np.std(r_squared_values)),
-                'min_r_squared': float(np.min(r_squared_values)),
-                'max_r_squared': float(np.max(r_squared_values)),
-            })
+            stats.update(
+                {
+                    "mean_r_squared": float(np.mean(r_squared_values)),
+                    "std_r_squared": float(np.std(r_squared_values)),
+                    "min_r_squared": float(np.min(r_squared_values)),
+                    "max_r_squared": float(np.max(r_squared_values)),
+                }
+            )
 
         if rmse_values:
-            stats.update({
-                'mean_rmse': float(np.mean(rmse_values)),
-                'std_rmse': float(np.std(rmse_values)),
-                'min_rmse': float(np.min(rmse_values)),
-                'max_rmse': float(np.max(rmse_values)),
-            })
+            stats.update(
+                {
+                    "mean_rmse": float(np.mean(rmse_values)),
+                    "std_rmse": float(np.std(rmse_values)),
+                    "min_rmse": float(np.min(rmse_values)),
+                    "max_rmse": float(np.max(rmse_values)),
+                }
+            )
 
         return stats
 
@@ -379,9 +371,8 @@ class BatchPipeline:
     def __repr__(self) -> str:
         """String representation."""
         return (
-            f"BatchPipeline(results={len(self.results)}, "
-            f"errors={len(self.errors)})"
+            f"BatchPipeline(results={len(self.results)}, " f"errors={len(self.errors)})"
         )
 
 
-__all__ = ['BatchPipeline']
+__all__ = ["BatchPipeline"]

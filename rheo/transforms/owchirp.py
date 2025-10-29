@@ -7,21 +7,19 @@ viscoelastic parameter extraction.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 
 from rheo.core.base import BaseTransform
 from rheo.core.registry import TransformRegistry
-from rheo.core.test_modes import TestMode, detect_test_mode
 
 if TYPE_CHECKING:
     from rheo.core.data import RheoData
 
 
-@TransformRegistry.register('owchirp')
+@TransformRegistry.register("owchirp")
 class OWChirp(BaseTransform):
     """Optimally Windowed Chirp transform for LAOS data analysis.
 
@@ -75,10 +73,10 @@ class OWChirp(BaseTransform):
     def __init__(
         self,
         n_frequencies: int = 100,
-        frequency_range: Tuple[float, float] = (1e-2, 1e2),
+        frequency_range: tuple[float, float] = (1e-2, 1e2),
         wavelet_width: float = 5.0,
         extract_harmonics: bool = True,
-        max_harmonic: int = 7
+        max_harmonic: int = 7,
     ):
         """Initialize OWChirp transform.
 
@@ -103,11 +101,7 @@ class OWChirp(BaseTransform):
         self.max_harmonic = max_harmonic
 
     def _chirp_wavelet(
-        self,
-        t: jnp.ndarray,
-        t_center: float,
-        frequency: float,
-        width: float
+        self, t: jnp.ndarray, t_center: float, frequency: float, width: float
     ) -> jnp.ndarray:
         """Generate chirp wavelet at given frequency.
 
@@ -134,7 +128,7 @@ class OWChirp(BaseTransform):
         sigma = width / (2.0 * jnp.pi * frequency)
 
         # Gaussian envelope
-        envelope = jnp.exp(-((t - t_center) / sigma) ** 2)
+        envelope = jnp.exp(-(((t - t_center) / sigma) ** 2))
 
         # Complex exponential (chirp)
         omega = 2.0 * jnp.pi * frequency
@@ -143,10 +137,7 @@ class OWChirp(BaseTransform):
         return envelope * chirp
 
     def _wavelet_transform(
-        self,
-        t: jnp.ndarray,
-        signal: jnp.ndarray,
-        frequencies: jnp.ndarray
+        self, t: jnp.ndarray, signal: jnp.ndarray, frequencies: jnp.ndarray
     ) -> jnp.ndarray:
         """Compute wavelet transform of signal.
 
@@ -183,10 +174,7 @@ class OWChirp(BaseTransform):
         return coefficients
 
     def _optimized_wavelet_transform(
-        self,
-        t: jnp.ndarray,
-        signal: jnp.ndarray,
-        frequencies: jnp.ndarray
+        self, t: jnp.ndarray, signal: jnp.ndarray, frequencies: jnp.ndarray
     ) -> jnp.ndarray:
         """Optimized wavelet transform using FFT convolution.
 
@@ -207,7 +195,7 @@ class OWChirp(BaseTransform):
             Wavelet coefficients
         """
         dt = t[1] - t[0]
-        n = len(t)
+        len(t)
 
         coefficients_list = []
 
@@ -248,7 +236,7 @@ class OWChirp(BaseTransform):
         from rheo.core.data import RheoData
 
         # Validate domain
-        if data.domain != 'time':
+        if data.domain != "time":
             raise ValueError("OWChirp requires time-domain data")
 
         # Get time and signal
@@ -269,7 +257,7 @@ class OWChirp(BaseTransform):
         frequencies = jnp.logspace(
             jnp.log10(self.frequency_range[0]),
             jnp.log10(self.frequency_range[1]),
-            self.n_frequencies
+            self.n_frequencies,
         )
 
         # Compute wavelet transform (use optimized FFT method)
@@ -280,26 +268,30 @@ class OWChirp(BaseTransform):
 
         # Create metadata
         new_metadata = data.metadata.copy()
-        new_metadata.update({
-            'transform': 'owchirp',
-            'wavelet_width': self.wavelet_width,
-            'n_frequencies': self.n_frequencies,
-            'frequency_range': self.frequency_range,
-            'time_frequency_map': True  # Full 2D map available
-        })
+        new_metadata.update(
+            {
+                "transform": "owchirp",
+                "wavelet_width": self.wavelet_width,
+                "n_frequencies": self.n_frequencies,
+                "frequency_range": self.frequency_range,
+                "time_frequency_map": True,  # Full 2D map available
+            }
+        )
 
         # Return frequency-domain data (averaged)
         return RheoData(
             x=frequencies,
             y=spectrum,
-            x_units='Hz',
-            y_units='magnitude',
-            domain='frequency',
+            x_units="Hz",
+            y_units="magnitude",
+            domain="frequency",
             metadata=new_metadata,
-            validate=False
+            validate=False,
         )
 
-    def get_time_frequency_map(self, data: RheoData) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    def get_time_frequency_map(
+        self, data: RheoData
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         """Get full time-frequency map (spectrogram).
 
         Parameters
@@ -334,7 +326,7 @@ class OWChirp(BaseTransform):
         frequencies = jnp.logspace(
             jnp.log10(self.frequency_range[0]),
             jnp.log10(self.frequency_range[1]),
-            self.n_frequencies
+            self.n_frequencies,
         )
 
         # Compute wavelet transform
@@ -343,9 +335,7 @@ class OWChirp(BaseTransform):
         return t, frequencies, coefficients
 
     def get_harmonics(
-        self,
-        data: RheoData,
-        fundamental_freq: Optional[float] = None
+        self, data: RheoData, fundamental_freq: float | None = None
     ) -> dict:
         """Extract harmonic content from LAOS data.
 
@@ -380,6 +370,7 @@ class OWChirp(BaseTransform):
         if fundamental_freq is None:
             # Find peak in spectrum
             from scipy.signal import find_peaks
+
             peaks, properties = find_peaks(spectrum, prominence=0.1 * np.max(spectrum))
 
             if len(peaks) == 0:
@@ -391,7 +382,10 @@ class OWChirp(BaseTransform):
 
         # Extract harmonics
         harmonics = {}
-        harmonics['fundamental'] = (fundamental_freq, self._get_amplitude_at_freq(freqs, spectrum, fundamental_freq))
+        harmonics["fundamental"] = (
+            fundamental_freq,
+            self._get_amplitude_at_freq(freqs, spectrum, fundamental_freq),
+        )
 
         if self.extract_harmonics:
             # Extract odd harmonics up to max_harmonic
@@ -399,7 +393,7 @@ class OWChirp(BaseTransform):
                 harmonic_freq = n * fundamental_freq
                 amplitude = self._get_amplitude_at_freq(freqs, spectrum, harmonic_freq)
 
-                harmonic_name = {3: 'third', 5: 'fifth', 7: 'seventh', 9: 'ninth'}
+                harmonic_name = {3: "third", 5: "fifth", 7: "seventh", 9: "ninth"}
                 if n in harmonic_name:
                     harmonics[harmonic_name[n]] = (harmonic_freq, amplitude)
 
@@ -410,7 +404,7 @@ class OWChirp(BaseTransform):
         freqs: np.ndarray,
         spectrum: np.ndarray,
         target_freq: float,
-        window: float = 0.1
+        window: float = 0.1,
     ) -> float:
         """Get amplitude at specific frequency (with averaging window).
 
@@ -443,4 +437,4 @@ class OWChirp(BaseTransform):
         return float(np.max(spectrum[mask]))
 
 
-__all__ = ['OWChirp']
+__all__ = ["OWChirp"]

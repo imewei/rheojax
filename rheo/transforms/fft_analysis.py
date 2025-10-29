@@ -6,7 +6,7 @@ This module provides FFT analysis to convert time-domain rheological data
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union, Literal
+from typing import TYPE_CHECKING, Literal
 
 import jax.numpy as jnp
 import numpy as np
@@ -18,10 +18,10 @@ if TYPE_CHECKING:
     from rheo.core.data import RheoData
 
 
-WindowType = Literal['hann', 'hamming', 'blackman', 'bartlett', 'none']
+WindowType = Literal["hann", "hamming", "blackman", "bartlett", "none"]
 
 
-@TransformRegistry.register('fft_analysis')
+@TransformRegistry.register("fft_analysis")
 class FFTAnalysis(BaseTransform):
     """Transform time-domain rheological data to frequency domain using FFT.
 
@@ -67,10 +67,10 @@ class FFTAnalysis(BaseTransform):
 
     def __init__(
         self,
-        window: WindowType = 'hann',
+        window: WindowType = "hann",
         detrend: bool = True,
         return_psd: bool = False,
-        normalize: bool = True
+        normalize: bool = True,
     ):
         """Initialize FFT Analysis transform.
 
@@ -104,15 +104,15 @@ class FFTAnalysis(BaseTransform):
         jnp.ndarray
             Window coefficients
         """
-        if self.window == 'hann':
+        if self.window == "hann":
             return jnp.hanning(n)
-        elif self.window == 'hamming':
+        elif self.window == "hamming":
             return jnp.hamming(n)
-        elif self.window == 'blackman':
+        elif self.window == "blackman":
             return jnp.blackman(n)
-        elif self.window == 'bartlett':
+        elif self.window == "bartlett":
             return jnp.bartlett(n)
-        elif self.window == 'none':
+        elif self.window == "none":
             return jnp.ones(n)
         else:
             raise ValueError(f"Unknown window type: {self.window}")
@@ -166,7 +166,7 @@ class FFTAnalysis(BaseTransform):
         from rheo.core.data import RheoData
 
         # Validate domain
-        if data.domain == 'frequency':
+        if data.domain == "frequency":
             raise ValueError("FFT analysis requires time-domain data")
 
         # Get time and signal data
@@ -214,27 +214,29 @@ class FFTAnalysis(BaseTransform):
 
         # Create metadata
         new_metadata = data.metadata.copy()
-        new_metadata.update({
-            'transform': 'fft',
-            'window': self.window,
-            'detrended': self.detrend,
-            'psd': self.return_psd,
-            'original_domain': 'time',
-            'n_points': len(t),
-            'dt': float(dt),
-            # Store complex coefficients for inverse transform
-            'fft_complex': fft_result
-        })
+        new_metadata.update(
+            {
+                "transform": "fft",
+                "window": self.window,
+                "detrended": self.detrend,
+                "psd": self.return_psd,
+                "original_domain": "time",
+                "n_points": len(t),
+                "dt": float(dt),
+                # Store complex coefficients for inverse transform
+                "fft_complex": fft_result,
+            }
+        )
 
         # Create new RheoData in frequency domain
         return RheoData(
             x=freqs,
             y=spectrum,
-            x_units='Hz' if data.x_units else None,
-            y_units='PSD' if self.return_psd else 'magnitude',
-            domain='frequency',
+            x_units="Hz" if data.x_units else None,
+            y_units="PSD" if self.return_psd else "magnitude",
+            domain="frequency",
             metadata=new_metadata,
-            validate=False
+            validate=False,
         )
 
     def _inverse_transform(self, data: RheoData) -> RheoData:
@@ -257,16 +259,16 @@ class FFTAnalysis(BaseTransform):
         """
         from rheo.core.data import RheoData
 
-        if data.domain != 'frequency':
+        if data.domain != "frequency":
             raise ValueError("Inverse FFT requires frequency-domain data")
 
-        if 'transform' not in data.metadata or data.metadata['transform'] != 'fft':
+        if "transform" not in data.metadata or data.metadata["transform"] != "fft":
             raise ValueError("Data was not created by FFT transform")
 
         # Get original parameters
-        n_points = data.metadata.get('n_points')
-        dt = data.metadata.get('dt')
-        fft_complex = data.metadata.get('fft_complex')
+        n_points = data.metadata.get("n_points")
+        dt = data.metadata.get("dt")
+        fft_complex = data.metadata.get("fft_complex")
 
         if n_points is None or dt is None:
             raise ValueError("Missing metadata for inverse FFT (n_points, dt)")
@@ -283,26 +285,20 @@ class FFTAnalysis(BaseTransform):
 
         # Create metadata
         new_metadata = data.metadata.copy()
-        new_metadata.update({
-            'transform': 'ifft',
-            'original_domain': 'frequency'
-        })
+        new_metadata.update({"transform": "ifft", "original_domain": "frequency"})
 
         return RheoData(
             x=t,
             y=y_reconstructed,
-            x_units='s' if data.x_units else None,
-            y_units='reconstructed',
-            domain='time',
+            x_units="s" if data.x_units else None,
+            y_units="reconstructed",
+            domain="time",
             metadata=new_metadata,
-            validate=False
+            validate=False,
         )
 
     def find_peaks(
-        self,
-        freq_data: RheoData,
-        prominence: float = 0.1,
-        n_peaks: int = 5
+        self, freq_data: RheoData, prominence: float = 0.1, n_peaks: int = 5
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Find characteristic frequency peaks in FFT spectrum.
 
@@ -339,13 +335,12 @@ class FFTAnalysis(BaseTransform):
 
         # Find peaks
         peak_indices, properties = scipy_find_peaks(
-            spectrum_norm,
-            prominence=prominence
+            spectrum_norm, prominence=prominence
         )
 
         # Sort by prominence and take top n_peaks
         if len(peak_indices) > n_peaks:
-            prominences = properties['prominences']
+            prominences = properties["prominences"]
             top_indices = np.argsort(prominences)[-n_peaks:]
             peak_indices = peak_indices[top_indices]
 
@@ -372,10 +367,10 @@ class FFTAnalysis(BaseTransform):
 
         if len(peak_freqs) == 0:
             # No peak found, return NaN
-            return float('nan')
+            return float("nan")
 
         # Characteristic time is inverse of dominant frequency
         return 1.0 / float(peak_freqs[0])
 
 
-__all__ = ['FFTAnalysis']
+__all__ = ["FFTAnalysis"]

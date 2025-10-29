@@ -3,14 +3,15 @@
 Tests that verify data can be written to file and read back with integrity.
 """
 
-import pytest
-import numpy as np
-import tempfile
 import json
+import tempfile
 from pathlib import Path
 
+import numpy as np
+import pytest
+
 from rheo.core.data import RheoData
-from rheo.io import save_hdf5, save_excel
+from rheo.io import save_excel, save_hdf5
 from rheo.io.readers import load_csv, load_excel
 
 
@@ -23,7 +24,7 @@ class TestCSVRoundTrip:
         """Test writing and reading CSV files."""
         data = oscillation_data_simple
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             # Write simple CSV format
             temp_path = f.name
             f.write("frequency,G_prime,G_double_prime\n")
@@ -33,20 +34,20 @@ class TestCSVRoundTrip:
 
         try:
             # Read back
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 lines = f.readlines()
 
             assert len(lines) > 1, "CSV should have header + data rows"
 
             # Parse data
-            header = lines[0].strip().split(',')
+            header = lines[0].strip().split(",")
             assert header[0] == "frequency"
             assert header[1] == "G_prime"
 
             # Read numeric values
             values = []
             for line in lines[1:]:
-                parts = line.strip().split(',')
+                parts = line.strip().split(",")
                 values.append([float(p) for p in parts])
 
             values = np.array(values)
@@ -62,7 +63,7 @@ class TestCSVRoundTrip:
         data = oscillation_data_simple
         original_metadata = data.metadata.copy()
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             temp_path = f.name
 
             # Write with metadata in comments
@@ -75,7 +76,7 @@ class TestCSVRoundTrip:
 
         try:
             # Verify file contains metadata comments
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 content = f.read()
 
             assert "# test_mode:" in content
@@ -100,16 +101,16 @@ class TestJSONSerialization:
             "x_units": data.x_units,
             "y_units": data.y_units,
             "domain": data.domain,
-            "metadata": data.metadata
+            "metadata": data.metadata,
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             temp_path = f.name
             json.dump(data_dict, f)
 
         try:
             # Read back
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 loaded = json.load(f)
 
             # Verify structure
@@ -129,13 +130,13 @@ class TestJSONSerialization:
         # Convert to dict
         params_dict = params.to_dict()
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             temp_path = f.name
             json.dump(params_dict, f)
 
         try:
             # Read back and reconstruct
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 loaded_dict = json.load(f)
 
             restored_params = type(params).from_dict(loaded_dict)
@@ -160,7 +161,7 @@ class TestHDF5Support:
         """Test basic HDF5 writing."""
         data = oscillation_data_simple
 
-        with tempfile.NamedTemporaryFile(suffix='.h5', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -179,22 +180,25 @@ class TestHDF5Support:
     @pytest.mark.integration
     @pytest.mark.io
     @pytest.mark.slow
-    def test_hdf5_multiple_datasets(self, oscillation_data_simple,
-                                     relaxation_data_simple):
+    def test_hdf5_multiple_datasets(
+        self, oscillation_data_simple, relaxation_data_simple
+    ):
         """Test writing multiple datasets to HDF5."""
         datasets = {
             "oscillation": oscillation_data_simple,
             "relaxation": relaxation_data_simple,
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.h5', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
             temp_path = f.name
 
         try:
             # Write multiple datasets
             try:
                 for name, data in datasets.items():
-                    save_hdf5(data, temp_path, mode='a' if name != "oscillation" else 'w')
+                    save_hdf5(
+                        data, temp_path, mode="a" if name != "oscillation" else "w"
+                    )
 
                 # File should exist
                 assert Path(temp_path).exists()
@@ -214,21 +218,15 @@ class TestExcelWriting:
         """Test basic Excel writing."""
         data = oscillation_data_simple
 
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             temp_path = f.name
 
         try:
             # Prepare data dict with expected structure for save_excel
             # save_excel expects 'parameters' and/or 'fit_quality' keys
             results = {
-                "parameters": {
-                    "test_mode": "oscillation",
-                    "n_points": len(data.x)
-                },
-                "fit_quality": {
-                    "R2": 0.99,
-                    "RMSE": 0.01
-                }
+                "parameters": {"test_mode": "oscillation", "n_points": len(data.x)},
+                "fit_quality": {"R2": 0.99, "RMSE": 0.01},
             }
 
             try:
@@ -246,7 +244,7 @@ class TestExcelWriting:
         """Test Excel writing with metadata sheets."""
         data = oscillation_data_simple
 
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -276,14 +274,14 @@ class TestDataIntegrity:
         data = oscillation_data_simple
         original_values = data.x.copy()
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             temp_path = f.name
             f.write("value\n")
             for val in original_values:
                 f.write(f"{val:.15e}\n")  # High precision
 
         try:
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 lines = f.readlines()[1:]  # Skip header
 
             loaded_values = np.array([float(line.strip()) for line in lines])
@@ -305,8 +303,11 @@ class TestDataIntegrity:
             # Convert to dict and back
             data_dict = {
                 "x": data.x.tolist(),
-                "y": data.y.tolist() if np.isrealobj(data.y) else
-                     [complex(y) for y in data.y],
+                "y": (
+                    data.y.tolist()
+                    if np.isrealobj(data.y)
+                    else [complex(y) for y in data.y]
+                ),
             }
 
             # Reconstruct

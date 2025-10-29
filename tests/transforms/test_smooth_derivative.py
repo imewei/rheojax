@@ -1,8 +1,8 @@
 """Tests for Smooth Derivative transform."""
 
-import pytest
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.data import RheoData
 from rheo.transforms.smooth_derivative import SmoothDerivative
@@ -14,7 +14,7 @@ class TestSmoothDerivative:
     def test_basic_initialization(self):
         """Test basic initialization."""
         deriv = SmoothDerivative()
-        assert deriv.method == 'savgol'
+        assert deriv.method == "savgol"
         assert deriv.window_length == 11
         assert deriv.polyorder == 3
         assert deriv.deriv == 1
@@ -22,12 +22,9 @@ class TestSmoothDerivative:
     def test_custom_initialization(self):
         """Test custom parameters."""
         deriv = SmoothDerivative(
-            method='finite_diff',
-            window_length=21,
-            polyorder=5,
-            deriv=2
+            method="finite_diff", window_length=21, polyorder=5, deriv=2
         )
-        assert deriv.method == 'finite_diff'
+        assert deriv.method == "finite_diff"
         assert deriv.window_length == 21
         assert deriv.polyorder == 5
         assert deriv.deriv == 2
@@ -52,9 +49,9 @@ class TestSmoothDerivative:
         x = jnp.linspace(0, 10, 100)
         y = 2 * x + 3
 
-        data = RheoData(x=x, y=y, domain='time')
+        data = RheoData(x=x, y=y, domain="time")
 
-        deriv = SmoothDerivative(method='savgol', window_length=11, polyorder=2)
+        deriv = SmoothDerivative(method="savgol", window_length=11, polyorder=2)
         dy_dx = deriv.transform(data)
 
         # Derivative should be approximately 2
@@ -64,11 +61,11 @@ class TestSmoothDerivative:
         """Test derivative of quadratic function."""
         # dy/dx of (y = x²) should be 2x
         x = jnp.linspace(0, 10, 200)
-        y = x ** 2
+        y = x**2
 
-        data = RheoData(x=x, y=y, domain='time')
+        data = RheoData(x=x, y=y, domain="time")
 
-        deriv = SmoothDerivative(method='savgol', window_length=11, polyorder=3)
+        deriv = SmoothDerivative(method="savgol", window_length=11, polyorder=3)
         dy_dx = deriv.transform(data)
 
         # Derivative should be approximately 2x
@@ -79,11 +76,13 @@ class TestSmoothDerivative:
         """Test second derivative calculation."""
         # d²y/dx² of (y = x²) should be 2
         x = jnp.linspace(0, 10, 200)
-        y = x ** 2
+        y = x**2
 
-        data = RheoData(x=x, y=y, domain='time')
+        data = RheoData(x=x, y=y, domain="time")
 
-        deriv = SmoothDerivative(method='savgol', window_length=11, polyorder=4, deriv=2)
+        deriv = SmoothDerivative(
+            method="savgol", window_length=11, polyorder=4, deriv=2
+        )
         d2y_dx2 = deriv.transform(data)
 
         # Second derivative should be approximately 2
@@ -95,9 +94,9 @@ class TestSmoothDerivative:
         x = jnp.linspace(0, 5, 200)
         y = jnp.exp(x)
 
-        data = RheoData(x=x, y=y, domain='time')
+        data = RheoData(x=x, y=y, domain="time")
 
-        deriv = SmoothDerivative(method='savgol', window_length=11, polyorder=3)
+        deriv = SmoothDerivative(method="savgol", window_length=11, polyorder=3)
         dy_dx = deriv.transform(data)
 
         # Derivative should be approximately exp(x)
@@ -116,10 +115,10 @@ class TestSmoothDerivative:
         noise = 0.5 * np.random.randn(len(x))
         y_noisy = y_true + noise
 
-        data = RheoData(x=x, y=y_noisy, domain='time')
+        data = RheoData(x=x, y=y_noisy, domain="time")
 
         # Savitzky-Golay should smooth noise
-        deriv = SmoothDerivative(method='savgol', window_length=21, polyorder=3)
+        deriv = SmoothDerivative(method="savgol", window_length=21, polyorder=3)
         dy_dx = deriv.transform(data)
 
         # Derivative should be close to 2 (with some noise tolerance)
@@ -131,13 +130,13 @@ class TestSmoothDerivative:
     def test_different_methods(self):
         """Test different differentiation methods."""
         x = jnp.linspace(0, 10, 200)
-        y = x ** 2
-        data = RheoData(x=x, y=y, domain='time')
+        y = x**2
+        data = RheoData(x=x, y=y, domain="time")
 
-        methods = ['savgol', 'finite_diff', 'spline']
+        methods = ["savgol", "finite_diff", "spline"]
 
         for method in methods:
-            if method == 'savgol':
+            if method == "savgol":
                 deriv = SmoothDerivative(method=method, window_length=11, polyorder=3)
             else:
                 deriv = SmoothDerivative(method=method)
@@ -155,7 +154,7 @@ class TestSmoothDerivative:
         x = jnp.linspace(0, 10, 200)
         dy_dx = 2 * jnp.ones_like(x)  # Constant derivative
 
-        data = RheoData(x=x, y=dy_dx, domain='time')
+        data = RheoData(x=x, y=dy_dx, domain="time")
 
         deriv = SmoothDerivative()
         integrated = deriv.inverse_transform(data)
@@ -173,7 +172,7 @@ class TestSmoothDerivative:
         noise = 1.0 * np.random.randn(len(x))
         y_noisy = y_true + noise
 
-        data = RheoData(x=x, y=y_noisy, domain='time')
+        data = RheoData(x=x, y=y_noisy, domain="time")
 
         # With pre-smoothing
         deriv_smooth = SmoothDerivative(smooth_before=True, smooth_window=11)
@@ -194,11 +193,11 @@ class TestSmoothDerivative:
         """Test post-smoothing option."""
         np.random.seed(42)
         x = jnp.linspace(0, 10, 200)
-        y_true = x ** 2
+        y_true = x**2
         noise = 2.0 * np.random.randn(len(x))
         y_noisy = y_true + noise
 
-        data = RheoData(x=x, y=y_noisy, domain='time')
+        data = RheoData(x=x, y=y_noisy, domain="time")
 
         # With post-smoothing
         deriv_smooth = SmoothDerivative(smooth_after=True, smooth_window=11)
@@ -216,7 +215,7 @@ class TestSmoothDerivative:
         x = jnp.linspace(0, 10, 200)
         y_complex = (2 * x + 3) + 1j * x  # Complex linear
 
-        data = RheoData(x=x, y=y_complex, domain='time')
+        data = RheoData(x=x, y=y_complex, domain="time")
 
         deriv = SmoothDerivative()
         dy_dx = deriv.transform(data)
@@ -227,15 +226,12 @@ class TestSmoothDerivative:
     def test_non_uniform_spacing(self):
         """Test derivative with non-uniform spacing."""
         # Non-uniform spacing
-        x = jnp.concatenate([
-            jnp.linspace(0, 1, 20),
-            jnp.linspace(1, 10, 180)
-        ])
+        x = jnp.concatenate([jnp.linspace(0, 1, 20), jnp.linspace(1, 10, 180)])
         y = 2 * x + 3
 
-        data = RheoData(x=x, y=y, domain='time')
+        data = RheoData(x=x, y=y, domain="time")
 
-        deriv = SmoothDerivative(method='finite_diff')
+        deriv = SmoothDerivative(method="finite_diff")
         dy_dx = deriv.transform(data)
 
         # Finite diff can produce NaN at duplicate points (x=1.0 appears twice)
@@ -251,7 +247,7 @@ class TestSmoothDerivative:
         noise = noise_std * np.random.randn(len(x))
         y_noisy = y_true + noise
 
-        data = RheoData(x=x, y=y_noisy, domain='time')
+        data = RheoData(x=x, y=y_noisy, domain="time")
 
         deriv = SmoothDerivative()
         estimated_noise = deriv.estimate_noise_level(data)
@@ -267,20 +263,20 @@ class TestSmoothDerivative:
         x = jnp.linspace(0, 10, 100)
         y = 2 * x
 
-        data = RheoData(x=x, y=y, x_units='s', y_units='Pa', domain='time')
+        data = RheoData(x=x, y=y, x_units="s", y_units="Pa", domain="time")
 
         # First derivative
         deriv1 = SmoothDerivative(deriv=1)
         dy_dx = deriv1.transform(data)
 
-        assert 'Pa' in dy_dx.y_units
-        assert 's' in dy_dx.y_units
+        assert "Pa" in dy_dx.y_units
+        assert "s" in dy_dx.y_units
 
         # Second derivative
         deriv2 = SmoothDerivative(deriv=2)
         d2y_dx2 = deriv2.transform(data)
 
-        assert '^2' in d2y_dx2.y_units or 'order_2' in d2y_dx2.y_units
+        assert "^2" in d2y_dx2.y_units or "order_2" in d2y_dx2.y_units
 
     def test_metadata_preservation(self):
         """Test metadata preservation."""
@@ -288,23 +284,20 @@ class TestSmoothDerivative:
         y = 2 * x
 
         data = RheoData(
-            x=x,
-            y=y,
-            domain='time',
-            metadata={'sample': 'polymer', 'temperature': 298}
+            x=x, y=y, domain="time", metadata={"sample": "polymer", "temperature": 298}
         )
 
         deriv = SmoothDerivative()
         dy_dx = deriv.transform(data)
 
         # Original metadata preserved
-        assert dy_dx.metadata['sample'] == 'polymer'
-        assert dy_dx.metadata['temperature'] == 298
+        assert dy_dx.metadata["sample"] == "polymer"
+        assert dy_dx.metadata["temperature"] == 298
 
         # Transform metadata added
-        assert 'transform' in dy_dx.metadata
-        assert dy_dx.metadata['transform'] == 'derivative'
+        assert "transform" in dy_dx.metadata
+        assert dy_dx.metadata["transform"] == "derivative"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

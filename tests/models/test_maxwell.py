@@ -4,16 +4,16 @@ This test suite validates the Maxwell model implementation across all test modes
 parameter constraints, optimization, and numerical accuracy.
 """
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
 import rheo.models  # Import to trigger all model registrations
-from rheo.models.maxwell import Maxwell
 from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
 from rheo.core.registry import ModelRegistry
+from rheo.core.test_modes import TestMode
+from rheo.models.maxwell import Maxwell
 
 
 class TestMaxwellBasics:
@@ -23,7 +23,7 @@ class TestMaxwellBasics:
         """Test Maxwell model can be instantiated."""
         model = Maxwell()
         assert model is not None
-        assert hasattr(model, 'parameters')
+        assert hasattr(model, "parameters")
         assert len(model.parameters) == 2
 
     def test_model_parameters(self):
@@ -31,16 +31,16 @@ class TestMaxwellBasics:
         model = Maxwell()
 
         # Check parameter names
-        assert 'G0' in model.parameters
-        assert 'eta' in model.parameters
+        assert "G0" in model.parameters
+        assert "eta" in model.parameters
 
         # Check default values
-        assert model.parameters.get_value('G0') == 1e5
-        assert model.parameters.get_value('eta') == 1e3
+        assert model.parameters.get_value("G0") == 1e5
+        assert model.parameters.get_value("eta") == 1e3
 
         # Check bounds
-        G0_param = model.parameters.get('G0')
-        eta_param = model.parameters.get('eta')
+        G0_param = model.parameters.get("G0")
+        eta_param = model.parameters.get("eta")
         assert G0_param.bounds == (1e-3, 1e9)
         assert eta_param.bounds == (1e-6, 1e12)
 
@@ -49,11 +49,11 @@ class TestMaxwellBasics:
         model = Maxwell()
 
         # Set valid parameters
-        model.parameters.set_value('G0', 1e6)
-        model.parameters.set_value('eta', 5e3)
+        model.parameters.set_value("G0", 1e6)
+        model.parameters.set_value("eta", 5e3)
 
-        assert model.parameters.get_value('G0') == 1e6
-        assert model.parameters.get_value('eta') == 5e3
+        assert model.parameters.get_value("G0") == 1e6
+        assert model.parameters.get_value("eta") == 5e3
 
     def test_parameter_bounds_enforcement(self):
         """Test parameter bounds are enforced."""
@@ -61,21 +61,21 @@ class TestMaxwellBasics:
 
         # Test G0 bounds
         with pytest.raises(ValueError):
-            model.parameters.set_value('G0', -1.0)  # Negative
+            model.parameters.set_value("G0", -1.0)  # Negative
         with pytest.raises(ValueError):
-            model.parameters.set_value('G0', 1e10)  # Too large
+            model.parameters.set_value("G0", 1e10)  # Too large
 
         # Test eta bounds
         with pytest.raises(ValueError):
-            model.parameters.set_value('eta', -100.0)  # Negative
+            model.parameters.set_value("eta", -100.0)  # Negative
         with pytest.raises(ValueError):
-            model.parameters.set_value('eta', 1e13)  # Too large
+            model.parameters.set_value("eta", 1e13)  # Too large
 
     def test_relaxation_time_calculation(self):
         """Test relaxation time calculation."""
         model = Maxwell()
-        model.parameters.set_value('G0', 1e5)
-        model.parameters.set_value('eta', 1e3)
+        model.parameters.set_value("G0", 1e5)
+        model.parameters.set_value("eta", 1e3)
 
         tau = model.get_relaxation_time()
         expected_tau = 1e3 / 1e5  # eta / G0
@@ -84,20 +84,20 @@ class TestMaxwellBasics:
     def test_model_registry(self):
         """Test Maxwell is registered in ModelRegistry."""
         models = ModelRegistry.list_models()
-        assert 'maxwell' in models
+        assert "maxwell" in models
 
         # Test factory creation
-        model = ModelRegistry.create('maxwell')
+        model = ModelRegistry.create("maxwell")
         assert isinstance(model, Maxwell)
 
     def test_repr(self):
         """Test string representation."""
         model = Maxwell()
         repr_str = repr(model)
-        assert 'Maxwell' in repr_str
-        assert 'G0' in repr_str
-        assert 'eta' in repr_str
-        assert 'tau' in repr_str
+        assert "Maxwell" in repr_str
+        assert "G0" in repr_str
+        assert "eta" in repr_str
+        assert "tau" in repr_str
 
 
 class TestMaxwellRelaxation:
@@ -107,7 +107,12 @@ class TestMaxwellRelaxation:
         """Test relaxation prediction returns correct shape."""
         model = Maxwell()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
 
@@ -119,13 +124,18 @@ class TestMaxwellRelaxation:
         model = Maxwell()
         G0 = 1e5
         eta = 1e3
-        model.parameters.set_value('G0', G0)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("G0", G0)
+        model.parameters.set_value("eta", eta)
 
         t = jnp.array([0.01, 0.1, 1.0, 10.0])
         tau = eta / G0
 
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # Analytical solution: G(t) = G0 * exp(-t/tau)
@@ -138,7 +148,12 @@ class TestMaxwellRelaxation:
         """Test relaxation modulus decreases monotonically."""
         model = Maxwell()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
 
@@ -150,10 +165,15 @@ class TestMaxwellRelaxation:
         """Test relaxation modulus at t=0 approaches G0."""
         model = Maxwell()
         G0 = 1e5
-        model.parameters.set_value('G0', G0)
+        model.parameters.set_value("G0", G0)
 
         t_small = jnp.array([1e-10])
-        data = RheoData(x=t_small, y=jnp.zeros_like(t_small), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t_small,
+            y=jnp.zeros_like(t_small),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # At very small t, G(t) should be approximately G0
@@ -164,13 +184,18 @@ class TestMaxwellRelaxation:
         model = Maxwell()
         G0 = 1e5
         eta = 1e3
-        model.parameters.set_value('G0', G0)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("G0", G0)
+        model.parameters.set_value("eta", eta)
 
         tau = eta / G0
         t_long = jnp.array([100 * tau])  # Much longer than relaxation time
 
-        data = RheoData(x=t_long, y=jnp.zeros_like(t_long), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t_long,
+            y=jnp.zeros_like(t_long),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # At long times, G(t) should be very small
@@ -184,7 +209,9 @@ class TestMaxwellCreep:
         """Test creep prediction returns correct shape."""
         model = Maxwell()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
 
         J_t = model.predict(data)
 
@@ -196,12 +223,14 @@ class TestMaxwellCreep:
         model = Maxwell()
         G0 = 1e5
         eta = 1e3
-        model.parameters.set_value('G0', G0)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("G0", G0)
+        model.parameters.set_value("eta", eta)
 
         t = jnp.array([0.01, 0.1, 1.0, 10.0])
 
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
         J_t = model.predict(data)
 
         # Analytical solution: J(t) = 1/G0 + t/eta
@@ -213,7 +242,9 @@ class TestMaxwellCreep:
         """Test creep compliance increases monotonically."""
         model = Maxwell()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
 
         J_t = model.predict(data)
 
@@ -225,10 +256,15 @@ class TestMaxwellCreep:
         """Test creep compliance at t=0 equals 1/G0."""
         model = Maxwell()
         G0 = 1e5
-        model.parameters.set_value('G0', G0)
+        model.parameters.set_value("G0", G0)
 
         t_small = jnp.array([1e-10])
-        data = RheoData(x=t_small, y=jnp.zeros_like(t_small), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t_small,
+            y=jnp.zeros_like(t_small),
+            domain="time",
+            metadata={"test_mode": "creep"},
+        )
         J_t = model.predict(data)
 
         # At t=0, J(0) = 1/G0
@@ -239,12 +275,14 @@ class TestMaxwellCreep:
         model = Maxwell()
         G0 = 1e5
         eta = 1e3
-        model.parameters.set_value('G0', G0)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("G0", G0)
+        model.parameters.set_value("eta", eta)
 
         # At long times, J(t) ≈ t/eta (linear term dominates)
         t = jnp.array([100.0, 200.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
         J_t = model.predict(data)
 
         # Check linear growth rate
@@ -260,7 +298,12 @@ class TestMaxwellOscillation:
         """Test oscillation prediction returns correct shape."""
         model = Maxwell()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
 
@@ -272,13 +315,18 @@ class TestMaxwellOscillation:
         model = Maxwell()
         G0 = 1e5
         eta = 1e3
-        model.parameters.set_value('G0', G0)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("G0", G0)
+        model.parameters.set_value("eta", eta)
 
         omega = jnp.array([0.1, 1.0, 10.0, 100.0])
         tau = eta / G0
 
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # Analytical solution
@@ -294,7 +342,12 @@ class TestMaxwellOscillation:
         """Test storage modulus G' is positive."""
         model = Maxwell()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
         G_prime = G_star.real
@@ -305,7 +358,12 @@ class TestMaxwellOscillation:
         """Test loss modulus G'' is positive."""
         model = Maxwell()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
         G_double_prime = G_star.imag
@@ -317,12 +375,17 @@ class TestMaxwellOscillation:
         model = Maxwell()
         G0 = 1e5
         eta = 1e3
-        model.parameters.set_value('G0', G0)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("G0", G0)
+        model.parameters.set_value("eta", eta)
 
         # At very low frequency, G' ~ omega^2, G'' ~ omega
         omega = jnp.array([1e-6])
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # G'' should dominate at low frequency
@@ -333,12 +396,17 @@ class TestMaxwellOscillation:
         model = Maxwell()
         G0 = 1e5
         eta = 1e3
-        model.parameters.set_value('G0', G0)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("G0", G0)
+        model.parameters.set_value("eta", eta)
 
         # At very high frequency, G' -> G0
         omega = jnp.array([1e6])
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # G' should approach G0 at high frequency
@@ -352,7 +420,12 @@ class TestMaxwellRotation:
         """Test rotation prediction returns correct shape."""
         model = Maxwell()
         gamma_dot = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=gamma_dot, y=jnp.zeros_like(gamma_dot), x_units='1/s', metadata={'test_mode': 'rotation'})
+        data = RheoData(
+            x=gamma_dot,
+            y=jnp.zeros_like(gamma_dot),
+            x_units="1/s",
+            metadata={"test_mode": "rotation"},
+        )
 
         eta_app = model.predict(data)
 
@@ -363,10 +436,15 @@ class TestMaxwellRotation:
         """Test steady shear viscosity is constant (Newtonian)."""
         model = Maxwell()
         eta = 1e3
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("eta", eta)
 
         gamma_dot = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=gamma_dot, y=jnp.zeros_like(gamma_dot), x_units='1/s', metadata={'test_mode': 'rotation'})
+        data = RheoData(
+            x=gamma_dot,
+            y=jnp.zeros_like(gamma_dot),
+            x_units="1/s",
+            metadata={"test_mode": "rotation"},
+        )
 
         eta_app = model.predict(data)
 
@@ -394,16 +472,18 @@ class TestMaxwellOptimization:
 
         # Fit model
         model = Maxwell()
-        model.parameters.set_value('G0', 5e4)  # Initial guess
-        model.parameters.set_value('eta', 5e2)  # Initial guess
+        model.parameters.set_value("G0", 5e4)  # Initial guess
+        model.parameters.set_value("eta", 5e2)  # Initial guess
 
-        data = RheoData(x=t, y=G_noisy, domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t, y=G_noisy, domain="time", metadata={"test_mode": "relaxation"}
+        )
         # BaseModel.fit requires y parameter even if X is RheoData
         model.fit(data, G_noisy)
 
         # Check fitted parameters are close to true values
-        G0_fit = model.parameters.get_value('G0')
-        eta_fit = model.parameters.get_value('eta')
+        G0_fit = model.parameters.get_value("G0")
+        eta_fit = model.parameters.get_value("eta")
 
         assert_allclose(G0_fit, G0_true, rtol=0.1)
         assert_allclose(eta_fit, eta_true, rtol=0.1)
@@ -424,16 +504,16 @@ class TestMaxwellOptimization:
 
         # Fit model
         model = Maxwell()
-        model.parameters.set_value('G0', 5e4)  # Initial guess
-        model.parameters.set_value('eta', 5e2)  # Initial guess
+        model.parameters.set_value("G0", 5e4)  # Initial guess
+        model.parameters.set_value("eta", 5e2)  # Initial guess
 
-        data = RheoData(x=t, y=J_noisy, domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(x=t, y=J_noisy, domain="time", metadata={"test_mode": "creep"})
         # BaseModel.fit requires y parameter even if X is RheoData
         model.fit(data, J_noisy)
 
         # Check fitted parameters are close to true values
-        G0_fit = model.parameters.get_value('G0')
-        eta_fit = model.parameters.get_value('eta')
+        G0_fit = model.parameters.get_value("G0")
+        eta_fit = model.parameters.get_value("eta")
 
         assert_allclose(G0_fit, G0_true, rtol=0.1)
         assert_allclose(eta_fit, eta_true, rtol=0.1)
@@ -450,11 +530,13 @@ class TestMaxwellOptimization:
 
         # Set model to true parameters
         model = Maxwell()
-        model.parameters.set_value('G0', G0_true)
-        model.parameters.set_value('eta', eta_true)
+        model.parameters.set_value("G0", G0_true)
+        model.parameters.set_value("eta", eta_true)
         model.fitted_ = True
 
-        data = RheoData(x=t, y=G_true, domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t, y=G_true, domain="time", metadata={"test_mode": "relaxation"}
+        )
 
         # Score should be perfect (R² = 1.0) for noiseless data
         score = model.score(data, G_true)
@@ -470,7 +552,12 @@ class TestMaxwellEdgeCases:
 
         # Include t=0 (will be very small in practice due to singularity)
         t = jnp.array([0.0, 0.01, 0.1, 1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         # Should not raise error
         G_t = model.predict(data)
@@ -481,7 +568,12 @@ class TestMaxwellEdgeCases:
         model = Maxwell()
 
         t = jnp.array([1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
         assert len(G_t) == 1
@@ -491,11 +583,16 @@ class TestMaxwellEdgeCases:
         model = Maxwell()
 
         # Very stiff material
-        model.parameters.set_value('G0', 1e9)
-        model.parameters.set_value('eta', 1e12)
+        model.parameters.set_value("G0", 1e9)
+        model.parameters.set_value("eta", 1e12)
 
         t = jnp.array([1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
         assert jnp.isfinite(G_t[0])
@@ -505,11 +602,16 @@ class TestMaxwellEdgeCases:
         model = Maxwell()
 
         # Very soft material
-        model.parameters.set_value('G0', 1e-2)
-        model.parameters.set_value('eta', 1e-5)
+        model.parameters.set_value("G0", 1e-2)
+        model.parameters.set_value("eta", 1e-5)
 
         t = jnp.array([1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
         assert jnp.isfinite(G_t[0])

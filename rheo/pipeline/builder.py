@@ -15,11 +15,11 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
 import warnings
+from typing import Any
 
-from rheo.pipeline.base import Pipeline
 from rheo.core.registry import ModelRegistry, TransformRegistry
+from rheo.pipeline.base import Pipeline
 
 
 class PipelineBuilder:
@@ -37,13 +37,10 @@ class PipelineBuilder:
 
     def __init__(self):
         """Initialize pipeline builder."""
-        self.steps: List[Tuple[str, Dict[str, Any]]] = []
+        self.steps: list[tuple[str, dict[str, Any]]] = []
 
     def add_load_step(
-        self,
-        file_path: str,
-        format: str = 'auto',
-        **kwargs
+        self, file_path: str, format: str = "auto", **kwargs
     ) -> PipelineBuilder:
         """Add data loading step.
 
@@ -58,18 +55,12 @@ class PipelineBuilder:
         Example:
             >>> builder.add_load_step('data.csv', x_col='time', y_col='stress')
         """
-        self.steps.append(('load', {
-            'file_path': file_path,
-            'format': format,
-            **kwargs
-        }))
+        self.steps.append(
+            ("load", {"file_path": file_path, "format": format, **kwargs})
+        )
         return self
 
-    def add_transform_step(
-        self,
-        transform_name: str,
-        **kwargs
-    ) -> PipelineBuilder:
+    def add_transform_step(self, transform_name: str, **kwargs) -> PipelineBuilder:
         """Add transform step.
 
         Args:
@@ -82,18 +73,11 @@ class PipelineBuilder:
         Example:
             >>> builder.add_transform_step('smooth', window_size=5)
         """
-        self.steps.append(('transform', {
-            'name': transform_name,
-            **kwargs
-        }))
+        self.steps.append(("transform", {"name": transform_name, **kwargs}))
         return self
 
     def add_fit_step(
-        self,
-        model_name: str,
-        method: str = 'auto',
-        use_jax: bool = True,
-        **kwargs
+        self, model_name: str, method: str = "auto", use_jax: bool = True, **kwargs
     ) -> PipelineBuilder:
         """Add model fitting step.
 
@@ -109,18 +93,16 @@ class PipelineBuilder:
         Example:
             >>> builder.add_fit_step('maxwell')
         """
-        self.steps.append(('fit', {
-            'model': model_name,
-            'method': method,
-            'use_jax': use_jax,
-            **kwargs
-        }))
+        self.steps.append(
+            (
+                "fit",
+                {"model": model_name, "method": method, "use_jax": use_jax, **kwargs},
+            )
+        )
         return self
 
     def add_predict_step(
-        self,
-        store_as: Optional[str] = None,
-        **kwargs
+        self, store_as: str | None = None, **kwargs
     ) -> PipelineBuilder:
         """Add prediction step.
 
@@ -134,17 +116,11 @@ class PipelineBuilder:
         Example:
             >>> builder.add_predict_step(store_as='prediction')
         """
-        self.steps.append(('predict', {
-            'store_as': store_as,
-            **kwargs
-        }))
+        self.steps.append(("predict", {"store_as": store_as, **kwargs}))
         return self
 
     def add_plot_step(
-        self,
-        show: bool = False,
-        style: str = 'default',
-        **kwargs
+        self, show: bool = False, style: str = "default", **kwargs
     ) -> PipelineBuilder:
         """Add plotting step.
 
@@ -159,18 +135,11 @@ class PipelineBuilder:
         Example:
             >>> builder.add_plot_step(style='publication', show=True)
         """
-        self.steps.append(('plot', {
-            'show': show,
-            'style': style,
-            **kwargs
-        }))
+        self.steps.append(("plot", {"show": show, "style": style, **kwargs}))
         return self
 
     def add_save_step(
-        self,
-        file_path: str,
-        format: str = 'hdf5',
-        **kwargs
+        self, file_path: str, format: str = "hdf5", **kwargs
     ) -> PipelineBuilder:
         """Add data saving step.
 
@@ -185,11 +154,9 @@ class PipelineBuilder:
         Example:
             >>> builder.add_save_step('output.hdf5')
         """
-        self.steps.append(('save', {
-            'file_path': file_path,
-            'format': format,
-            **kwargs
-        }))
+        self.steps.append(
+            ("save", {"file_path": file_path, "format": format, **kwargs})
+        )
         return self
 
     def build(self, validate: bool = True) -> Pipeline:
@@ -213,21 +180,21 @@ class PipelineBuilder:
         pipeline = Pipeline()
 
         for step_type, step_kwargs in self.steps:
-            if step_type == 'load':
+            if step_type == "load":
                 pipeline.load(**step_kwargs)
-            elif step_type == 'transform':
-                transform_name = step_kwargs.pop('name')
+            elif step_type == "transform":
+                transform_name = step_kwargs.pop("name")
                 pipeline.transform(transform_name, **step_kwargs)
-            elif step_type == 'fit':
-                model_name = step_kwargs.pop('model')
+            elif step_type == "fit":
+                model_name = step_kwargs.pop("model")
                 pipeline.fit(model_name, **step_kwargs)
-            elif step_type == 'predict':
+            elif step_type == "predict":
                 # Store prediction but don't break chain
-                step_kwargs.pop('store_as', None)  # Remove for now
+                step_kwargs.pop("store_as", None)  # Remove for now
                 # Predictions are implicit in pipeline
-            elif step_type == 'plot':
+            elif step_type == "plot":
                 pipeline.plot(**step_kwargs)
-            elif step_type == 'save':
+            elif step_type == "save":
                 pipeline.save(**step_kwargs)
 
         return pipeline
@@ -242,7 +209,7 @@ class PipelineBuilder:
             raise ValueError("Pipeline has no steps")
 
         # Check that first step is load
-        if self.steps[0][0] != 'load':
+        if self.steps[0][0] != "load":
             raise ValueError(
                 "Pipeline must start with a load step. "
                 f"First step is: {self.steps[0][0]}"
@@ -251,9 +218,9 @@ class PipelineBuilder:
         # Check that data-dependent steps come after load
         has_loaded = False
         for step_type, _ in self.steps:
-            if step_type == 'load':
+            if step_type == "load":
                 has_loaded = True
-            elif step_type in ['transform', 'fit', 'plot', 'save']:
+            elif step_type in ["transform", "fit", "plot", "save"]:
                 if not has_loaded:
                     raise ValueError(
                         f"Step '{step_type}' requires data to be loaded first"
@@ -261,19 +228,15 @@ class PipelineBuilder:
 
         # Check that fit comes before predict
         fit_indices = [
-            i for i, (step_type, _) in enumerate(self.steps)
-            if step_type == 'fit'
+            i for i, (step_type, _) in enumerate(self.steps) if step_type == "fit"
         ]
         predict_indices = [
-            i for i, (step_type, _) in enumerate(self.steps)
-            if step_type == 'predict'
+            i for i, (step_type, _) in enumerate(self.steps) if step_type == "predict"
         ]
 
         for pred_idx in predict_indices:
             if not any(fit_idx < pred_idx for fit_idx in fit_indices):
-                warnings.warn(
-                    f"Predict step at index {pred_idx} has no prior fit step"
-                )
+                warnings.warn(f"Predict step at index {pred_idx} has no prior fit step", stacklevel=2)
 
         # Validate that referenced models/transforms exist
         self._validate_components()
@@ -285,8 +248,8 @@ class PipelineBuilder:
             ValueError: If component not found
         """
         for step_type, step_kwargs in self.steps:
-            if step_type == 'fit':
-                model_name = step_kwargs.get('model')
+            if step_type == "fit":
+                model_name = step_kwargs.get("model")
                 if model_name:
                     available = ModelRegistry.list_models()
                     if model_name not in available:
@@ -295,8 +258,8 @@ class PipelineBuilder:
                             f"Available: {available}"
                         )
 
-            elif step_type == 'transform':
-                transform_name = step_kwargs.get('name')
+            elif step_type == "transform":
+                transform_name = step_kwargs.get("name")
                 if transform_name:
                     available = TransformRegistry.list_transforms()
                     if transform_name not in available:
@@ -317,7 +280,7 @@ class PipelineBuilder:
         self.steps = []
         return self
 
-    def get_steps(self) -> List[Tuple[str, Dict[str, Any]]]:
+    def get_steps(self) -> list[tuple[str, dict[str, Any]]]:
         """Get current pipeline steps.
 
         Returns:
@@ -353,13 +316,10 @@ class ConditionalPipelineBuilder(PipelineBuilder):
     def __init__(self):
         """Initialize conditional builder."""
         super().__init__()
-        self.conditions: Dict[int, Any] = {}
+        self.conditions: dict[int, Any] = {}
 
     def add_conditional_step(
-        self,
-        step_type: str,
-        condition: callable,
-        **kwargs
+        self, step_type: str, condition: callable, **kwargs
     ) -> ConditionalPipelineBuilder:
         """Add a conditional step.
 
@@ -394,13 +354,13 @@ class ConditionalPipelineBuilder(PipelineBuilder):
         if self.conditions:
             warnings.warn(
                 "Conditional steps are not fully implemented. "
-                "All steps will be executed unconditionally."
+                "All steps will be executed unconditionally.", stacklevel=2
             )
 
         return super().build(validate=validate)
 
 
 __all__ = [
-    'PipelineBuilder',
-    'ConditionalPipelineBuilder',
+    "PipelineBuilder",
+    "ConditionalPipelineBuilder",
 ]

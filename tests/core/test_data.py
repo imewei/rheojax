@@ -4,14 +4,15 @@ This test suite ensures that RheoData maintains full compatibility
 with piblin.Measurement while adding JAX support and additional features.
 """
 
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
+
+import jax.numpy as jnp
 import numpy as np
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-import jax.numpy as jnp
-from typing import Any, Dict
 
 # We'll mock piblin for now since it's not installed yet
-with patch.dict('sys.modules', {'piblin': MagicMock()}):
+with patch.dict("sys.modules", {"piblin": MagicMock()}):
     from rheo.core.data import RheoData
 
 
@@ -80,7 +81,9 @@ class TestRheoDataCreation:
             RheoData(x=x, y=y)
 
 
-@pytest.mark.skip(reason="piblin is an optional dependency - install with: pip install piblin")
+@pytest.mark.skip(
+    reason="piblin is an optional dependency - install with: pip install piblin"
+)
 class TestRheoDataPiblinCompatibility:
     """Test piblin.Measurement compatibility.
 
@@ -88,7 +91,7 @@ class TestRheoDataPiblinCompatibility:
     To enable these tests, install piblin: pip install piblin
     """
 
-    @patch('rheo.core.data.piblin')
+    @patch("rheo.core.data.piblin")
     def test_wraps_piblin_measurement(self, mock_piblin):
         """Test that RheoData properly wraps piblin.Measurement."""
         # Create a mock piblin measurement
@@ -104,7 +107,7 @@ class TestRheoDataPiblinCompatibility:
         assert np.array_equal(data.x, mock_measurement.x)
         assert np.array_equal(data.y, mock_measurement.y)
 
-    @patch('rheo.core.data.piblin')
+    @patch("rheo.core.data.piblin")
     def test_to_piblin_returns_measurement(self, mock_piblin):
         """Test converting RheoData to piblin.Measurement."""
         x = np.array([1, 2, 3])
@@ -125,9 +128,9 @@ class TestRheoDataPiblinCompatibility:
         data = RheoData(x=x, y=y)
 
         # Test that common piblin methods are accessible
-        assert hasattr(data, 'copy')
-        assert hasattr(data, 'slice')
-        assert hasattr(data, 'interpolate')
+        assert hasattr(data, "copy")
+        assert hasattr(data, "slice")
+        assert hasattr(data, "interpolate")
 
 
 class TestRheoDataNumpyCompatibility:
@@ -253,7 +256,7 @@ class TestRheoDataMetadata:
             "temperature": 25.0,
             "sample": "polymer_A",
             "operator": "John Doe",
-            "date": "2024-01-01"
+            "date": "2024-01-01",
         }
 
         data = RheoData(x=x, y=y, metadata=metadata)
@@ -330,8 +333,8 @@ class TestRheoDataDomainSupport:
         data = RheoData(x=time, y=signal, domain="time")
 
         # Check that conversion methods exist
-        assert hasattr(data, 'to_frequency_domain')
-        assert hasattr(data, 'to_time_domain')
+        assert hasattr(data, "to_frequency_domain")
+        assert hasattr(data, "to_time_domain")
 
 
 class TestRheoDataValidation:
@@ -407,7 +410,7 @@ class TestRheoDataSerialization:
             "metadata": {"test": "data"},
             "x_units": "Hz",
             "y_units": "Pa",
-            "domain": "frequency"
+            "domain": "frequency",
         }
 
         data = RheoData.from_dict(data_dict)
@@ -425,8 +428,9 @@ class TestRheoDataSerialization:
         y = np.array([10.5, 20.5, 30.5])
         metadata = {"temperature": 25.0, "sample": "test"}
 
-        original = RheoData(x=x, y=y, metadata=metadata,
-                           x_units="s", y_units="Pa", domain="time")
+        original = RheoData(
+            x=x, y=y, metadata=metadata, x_units="s", y_units="Pa", domain="time"
+        )
 
         # Round trip
         data_dict = original.to_dict()

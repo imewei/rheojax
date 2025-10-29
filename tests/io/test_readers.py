@@ -1,18 +1,18 @@
 """Tests for file readers (Task Group 7.1, 7.3, 7.5, 7.7, 7.9)."""
 
-import pytest
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 from rheo.core.data import RheoData
 from rheo.io.readers import (
-    load_trios,
+    auto_load,
+    load_anton_paar,
     load_csv,
     load_excel,
-    load_anton_paar,
-    auto_load,
+    load_trios,
 )
-
 
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent / "test_data"
@@ -86,15 +86,16 @@ s	Pa
         data = load_trios(str(test_file))
 
         # Check metadata was extracted
-        assert 'sample_name' in data.metadata
-        assert data.metadata['sample_name'] == 'Polymer XYZ'
-        assert 'instrument_serial_number' in data.metadata
+        assert "sample_name" in data.metadata
+        assert data.metadata["sample_name"] == "Polymer XYZ"
+        assert "instrument_serial_number" in data.metadata
 
     def test_trios_unit_conversion(self):
         """Test TRIOS unit conversion (MPa→Pa, %→unitless)."""
         # This test would verify unit conversion logic
         # For now, just check that the function exists
         from rheo.io.readers.trios import convert_units
+
         assert callable(convert_units)
 
     def test_trios_multiple_segments(self, tmp_path):
@@ -147,7 +148,7 @@ class TestCSVReader:
         test_file = tmp_path / "test.csv"
         test_file.write_text(csv_content)
 
-        data = load_csv(str(test_file), x_col='time', y_col='stress')
+        data = load_csv(str(test_file), x_col="time", y_col="stress")
 
         assert isinstance(data, RheoData)
         assert len(data.x) == 4
@@ -162,7 +163,7 @@ class TestCSVReader:
         test_file = tmp_path / "test.tsv"
         test_file.write_text(tsv_content)
 
-        data = load_csv(str(test_file), x_col='time', y_col='stress')
+        data = load_csv(str(test_file), x_col="time", y_col="stress")
 
         assert isinstance(data, RheoData)
         assert len(data.x) == 2
@@ -189,15 +190,11 @@ class TestCSVReader:
         test_file.write_text(csv_content)
 
         data = load_csv(
-            str(test_file),
-            x_col='freq',
-            y_col='modulus',
-            x_units='Hz',
-            y_units='Pa'
+            str(test_file), x_col="freq", y_col="modulus", x_units="Hz", y_units="Pa"
         )
 
-        assert data.x_units == 'Hz'
-        assert data.y_units == 'Pa'
+        assert data.x_units == "Hz"
+        assert data.y_units == "Pa"
 
 
 class TestExcelReader:
@@ -248,21 +245,23 @@ class TestAutoDetection:
         csv_file = tmp_path / "test.csv"
         csv_file.write_text("time,stress\n1.0,100.0\n2.0,200.0\n")
 
-        data = auto_load(str(csv_file), x_col='time', y_col='stress')
+        data = auto_load(str(csv_file), x_col="time", y_col="stress")
 
         assert isinstance(data, RheoData)
 
     def test_auto_detect_trios_extension(self, tmp_path):
         """Test TRIOS detection from .txt extension."""
         trios_file = tmp_path / "test.txt"
-        trios_file.write_text("""Filename	test.txt
+        trios_file.write_text(
+            """Filename	test.txt
 Instrument serial number	4010-1234
 
 [step]
 Time	Stress
 s	Pa
 1.0	100
-""")
+"""
+        )
 
         data = auto_load(str(trios_file))
 
@@ -274,7 +273,7 @@ s	Pa
         csv_file = tmp_path / "test.dat"
         csv_file.write_text("time,stress\n1.0,100.0\n2.0,200.0\n")
 
-        data = auto_load(str(csv_file), x_col='time', y_col='stress')
+        data = auto_load(str(csv_file), x_col="time", y_col="stress")
 
         assert isinstance(data, RheoData)
 
@@ -285,6 +284,6 @@ s	Pa
         test_file.write_text("time,stress\n1.0,100.0\n")
 
         # Should try readers in sequence
-        data = auto_load(str(test_file), x_col='time', y_col='stress')
+        data = auto_load(str(test_file), x_col="time", y_col="stress")
 
         assert isinstance(data, RheoData)

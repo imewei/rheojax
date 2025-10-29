@@ -3,10 +3,11 @@
 Tests boundary conditions, invalid inputs, and error recovery.
 """
 
-import pytest
-import numpy as np
-import jax.numpy as jnp
 from unittest.mock import patch
+
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.data import RheoData
 from rheo.core.parameters import Parameter, ParameterSet
@@ -174,8 +175,8 @@ class TestNumericalEdgeCases:
     def test_data_near_machine_epsilon(self):
         """Test data near machine epsilon."""
         eps = np.finfo(float).eps
-        x = np.array([1.0, 1.0 + eps, 1.0 + 2*eps])
-        y = np.array([1.0, 1.0 + eps, 1.0 + 2*eps])
+        x = np.array([1.0, 1.0 + eps, 1.0 + 2 * eps])
+        y = np.array([1.0, 1.0 + eps, 1.0 + 2 * eps])
 
         # Should handle without error
         data = RheoData(x=x, y=y, validate=False)
@@ -194,10 +195,12 @@ class TestNumericalEdgeCases:
         # Should create but warn
         with pytest.warns(UserWarning):
             data = RheoData(
-                x=frequency, y=G_complex,
-                x_units="Hz", y_units="Pa",
+                x=frequency,
+                y=G_complex,
+                x_units="Hz",
+                y_units="Pa",
                 domain="frequency",
-                validate=True
+                validate=True,
             )
 
         assert data is not None
@@ -216,7 +219,6 @@ class TestTestModeDetectionEdgeCases:
 
         data = RheoData(x=time, y=response, x_units="s", domain="time")
 
-        
         detected = detect_test_mode(data)
 
         # Should default to something or return unknown
@@ -226,8 +228,6 @@ class TestTestModeDetectionEdgeCases:
     def test_detection_with_noisy_data(self, synthetic_noisy_data):
         """Test detection with noisy data."""
         clean, noisy = synthetic_noisy_data
-
-
 
         clean_mode = detect_test_mode(clean)
         noisy_mode = detect_test_mode(noisy)
@@ -249,7 +249,7 @@ class TestTestModeDetectionEdgeCases:
         data = RheoData(x=time, y=stress, x_units="s", domain="time")
 
         # Should still detect (or warn about non-monotonic axis)
-        
+
         detected = detect_test_mode(data)
 
         assert detected is not None
@@ -262,13 +262,14 @@ class TestTestModeDetectionEdgeCases:
 
         # Minimal metadata
         data = RheoData(
-            x=frequency, y=modulus,
-            x_units="Hz", y_units="Pa",
+            x=frequency,
+            y=modulus,
+            x_units="Hz",
+            y_units="Pa",
             domain="frequency",
-            metadata={}
+            metadata={},
         )
 
-        
         detected = detect_test_mode(data)
 
         # Should infer from domain/units
@@ -285,9 +286,7 @@ class TestComplexNumberEdgeCases:
         G_complex = np.array([1e5 + 0j, 2e5 + 0j, 3e5 + 0j])
 
         data = RheoData(
-            x=frequency, y=G_complex,
-            x_units="Hz", y_units="Pa",
-            domain="frequency"
+            x=frequency, y=G_complex, x_units="Hz", y_units="Pa", domain="frequency"
         )
 
         # Extract components
@@ -302,10 +301,12 @@ class TestComplexNumberEdgeCases:
         G_complex = np.array([0 + 1e5j, 0 + 2e5j, 0 + 3e5j])
 
         data = RheoData(
-            x=frequency, y=G_complex,
-            x_units="Hz", y_units="Pa",
+            x=frequency,
+            y=G_complex,
+            x_units="Hz",
+            y_units="Pa",
             domain="frequency",
-            validate=False  # Bypass validation
+            validate=False,  # Bypass validation
         )
 
         assert np.all(data.y.real == 0)
@@ -319,9 +320,7 @@ class TestComplexNumberEdgeCases:
         G_complex = np.array([1e3 + 1e6j, 2e3 + 2e6j, 3e3 + 3e6j])
 
         data = RheoData(
-            x=frequency, y=G_complex,
-            x_units="Hz", y_units="Pa",
-            domain="frequency"
+            x=frequency, y=G_complex, x_units="Hz", y_units="Pa", domain="frequency"
         )
 
         # Magnitude should be dominated by imaginary

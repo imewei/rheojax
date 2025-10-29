@@ -4,17 +4,17 @@ This test suite validates the SpringPot model implementation for power-law
 viscoelastic behavior, including analytical validation and edge cases.
 """
 
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 import pytest
-from numpy.testing import assert_allclose
 from jax.scipy.special import gamma as jax_gamma
+from numpy.testing import assert_allclose
 
 import rheo.models  # Import to trigger all model registrations
-from rheo.models.springpot import SpringPot
 from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
 from rheo.core.registry import ModelRegistry
+from rheo.core.test_modes import TestMode
+from rheo.models.springpot import SpringPot
 
 
 class TestSpringPotBasics:
@@ -24,7 +24,7 @@ class TestSpringPotBasics:
         """Test SpringPot model can be instantiated."""
         model = SpringPot()
         assert model is not None
-        assert hasattr(model, 'parameters')
+        assert hasattr(model, "parameters")
         assert len(model.parameters) == 2
 
     def test_model_parameters(self):
@@ -32,16 +32,16 @@ class TestSpringPotBasics:
         model = SpringPot()
 
         # Check parameter names
-        assert 'c_alpha' in model.parameters
-        assert 'alpha' in model.parameters
+        assert "c_alpha" in model.parameters
+        assert "alpha" in model.parameters
 
         # Check default values
-        assert model.parameters.get_value('c_alpha') == 1e5
-        assert model.parameters.get_value('alpha') == 0.5
+        assert model.parameters.get_value("c_alpha") == 1e5
+        assert model.parameters.get_value("alpha") == 0.5
 
         # Check bounds
-        c_alpha_param = model.parameters.get('c_alpha')
-        alpha_param = model.parameters.get('alpha')
+        c_alpha_param = model.parameters.get("c_alpha")
+        alpha_param = model.parameters.get("alpha")
         assert c_alpha_param.bounds == (1e-3, 1e9)
         assert alpha_param.bounds == (0.0, 1.0)
 
@@ -50,11 +50,11 @@ class TestSpringPotBasics:
         model = SpringPot()
 
         # Set valid parameters
-        model.parameters.set_value('c_alpha', 1e6)
-        model.parameters.set_value('alpha', 0.7)
+        model.parameters.set_value("c_alpha", 1e6)
+        model.parameters.set_value("alpha", 0.7)
 
-        assert model.parameters.get_value('c_alpha') == 1e6
-        assert model.parameters.get_value('alpha') == 0.7
+        assert model.parameters.get_value("c_alpha") == 1e6
+        assert model.parameters.get_value("alpha") == 0.7
 
     def test_parameter_bounds_enforcement(self):
         """Test parameter bounds are enforced."""
@@ -62,44 +62,44 @@ class TestSpringPotBasics:
 
         # Test c_alpha bounds
         with pytest.raises(ValueError):
-            model.parameters.set_value('c_alpha', -1.0)
+            model.parameters.set_value("c_alpha", -1.0)
         with pytest.raises(ValueError):
-            model.parameters.set_value('c_alpha', 1e10)
+            model.parameters.set_value("c_alpha", 1e10)
 
         # Test alpha bounds
         with pytest.raises(ValueError):
-            model.parameters.set_value('alpha', -0.1)
+            model.parameters.set_value("alpha", -0.1)
         with pytest.raises(ValueError):
-            model.parameters.set_value('alpha', 1.1)
+            model.parameters.set_value("alpha", 1.1)
 
     def test_alpha_boundary_values(self):
         """Test alpha at boundary values (0 and 1)."""
         model = SpringPot()
 
         # Alpha = 0 (pure fluid)
-        model.parameters.set_value('alpha', 0.0)
-        assert model.parameters.get_value('alpha') == 0.0
+        model.parameters.set_value("alpha", 0.0)
+        assert model.parameters.get_value("alpha") == 0.0
 
         # Alpha = 1 (pure solid)
-        model.parameters.set_value('alpha', 1.0)
-        assert model.parameters.get_value('alpha') == 1.0
+        model.parameters.set_value("alpha", 1.0)
+        assert model.parameters.get_value("alpha") == 1.0
 
     def test_model_registry(self):
         """Test SpringPot is registered in ModelRegistry."""
         models = ModelRegistry.list_models()
-        assert 'springpot' in models
+        assert "springpot" in models
 
         # Test factory creation
-        model = ModelRegistry.create('springpot')
+        model = ModelRegistry.create("springpot")
         assert isinstance(model, SpringPot)
 
     def test_repr(self):
         """Test string representation."""
         model = SpringPot()
         repr_str = repr(model)
-        assert 'SpringPot' in repr_str
-        assert 'c_alpha' in repr_str
-        assert 'alpha' in repr_str
+        assert "SpringPot" in repr_str
+        assert "c_alpha" in repr_str
+        assert "alpha" in repr_str
 
 
 class TestSpringPotRelaxation:
@@ -109,7 +109,12 @@ class TestSpringPotRelaxation:
         """Test relaxation prediction returns correct shape."""
         model = SpringPot()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
 
@@ -121,12 +126,17 @@ class TestSpringPotRelaxation:
         model = SpringPot()
         c_alpha = 1e5
         alpha = 0.5
-        model.parameters.set_value('c_alpha', c_alpha)
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("c_alpha", c_alpha)
+        model.parameters.set_value("alpha", alpha)
 
         t = jnp.array([0.1, 1.0, 10.0])
 
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # Analytical solution: G(t) = c_alpha * t^(-alpha) / Gamma(1-alpha)
@@ -139,16 +149,21 @@ class TestSpringPotRelaxation:
         """Test relaxation modulus follows power-law decay."""
         model = SpringPot()
         alpha = 0.5
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("alpha", alpha)
 
         t = jnp.array([0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # Check power-law scaling: G(t2)/G(t1) = (t1/t2)^alpha
         for i in range(len(t) - 1):
-            ratio = G_t[i+1] / G_t[i]
-            expected_ratio = (t[i] / t[i+1]) ** alpha
+            ratio = G_t[i + 1] / G_t[i]
+            expected_ratio = (t[i] / t[i + 1]) ** alpha
             assert_allclose(ratio, expected_ratio, rtol=1e-5)
 
     def test_relaxation_alpha_zero_limit(self):
@@ -156,11 +171,16 @@ class TestSpringPotRelaxation:
         model = SpringPot()
         c_alpha = 1e5
         alpha = 1e-6  # Nearly zero
-        model.parameters.set_value('c_alpha', c_alpha)
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("c_alpha", c_alpha)
+        model.parameters.set_value("alpha", alpha)
 
         t = jnp.array([0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # For alpha -> 0: G(t) = c_alpha * t^(-alpha) / Gamma(1-alpha)
@@ -179,11 +199,16 @@ class TestSpringPotRelaxation:
         model = SpringPot()
         c_alpha = 1e5
         alpha = 1.0 - 1e-6  # Nearly one
-        model.parameters.set_value('c_alpha', c_alpha)
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("c_alpha", c_alpha)
+        model.parameters.set_value("alpha", alpha)
 
         t = jnp.array([0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         # For alpha -> 1: G(t) -> c_alpha (constant)
@@ -204,7 +229,9 @@ class TestSpringPotCreep:
         """Test creep prediction returns correct shape."""
         model = SpringPot()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
 
         J_t = model.predict(data)
 
@@ -216,12 +243,14 @@ class TestSpringPotCreep:
         model = SpringPot()
         c_alpha = 1e5
         alpha = 0.5
-        model.parameters.set_value('c_alpha', c_alpha)
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("c_alpha", c_alpha)
+        model.parameters.set_value("alpha", alpha)
 
         t = jnp.array([0.1, 1.0, 10.0])
 
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
         J_t = model.predict(data)
 
         # Analytical solution: J(t) = (1/c_alpha) * t^alpha / Gamma(1+alpha)
@@ -234,7 +263,9 @@ class TestSpringPotCreep:
         """Test creep compliance increases monotonically."""
         model = SpringPot()
         t = jnp.linspace(0.01, 10, 100)
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
 
         J_t = model.predict(data)
 
@@ -246,16 +277,18 @@ class TestSpringPotCreep:
         """Test creep compliance follows power-law growth."""
         model = SpringPot()
         alpha = 0.5
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("alpha", alpha)
 
         t = jnp.array([0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'creep'})
+        data = RheoData(
+            x=t, y=jnp.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+        )
         J_t = model.predict(data)
 
         # Check power-law scaling: J(t2)/J(t1) = (t2/t1)^alpha
         for i in range(len(t) - 1):
-            ratio = J_t[i+1] / J_t[i]
-            expected_ratio = (t[i+1] / t[i]) ** alpha
+            ratio = J_t[i + 1] / J_t[i]
+            expected_ratio = (t[i + 1] / t[i]) ** alpha
             assert_allclose(ratio, expected_ratio, rtol=1e-5)
 
 
@@ -266,7 +299,12 @@ class TestSpringPotOscillation:
         """Test oscillation prediction returns correct shape."""
         model = SpringPot()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
 
@@ -278,12 +316,17 @@ class TestSpringPotOscillation:
         model = SpringPot()
         c_alpha = 1e5
         alpha = 0.5
-        model.parameters.set_value('c_alpha', c_alpha)
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("c_alpha", c_alpha)
+        model.parameters.set_value("alpha", alpha)
 
         omega = jnp.array([0.1, 1.0, 10.0, 100.0])
 
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # Analytical solution: G*(omega) = c_alpha * (i*omega)^alpha
@@ -301,7 +344,12 @@ class TestSpringPotOscillation:
         """Test storage modulus G' is positive."""
         model = SpringPot()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
         G_prime = G_star.real
@@ -312,7 +360,12 @@ class TestSpringPotOscillation:
         """Test loss modulus G'' is positive."""
         model = SpringPot()
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
 
         G_star = model.predict(data)
         G_double_prime = G_star.imag
@@ -323,10 +376,15 @@ class TestSpringPotOscillation:
         """Test complex modulus follows power-law in frequency."""
         model = SpringPot()
         alpha = 0.6
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("alpha", alpha)
 
         omega = jnp.array([1.0, 10.0])
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # |G*| should scale as omega^alpha
@@ -340,10 +398,15 @@ class TestSpringPotOscillation:
         """Test loss tangent tan(delta) = G''/G' is constant."""
         model = SpringPot()
         alpha = 0.5
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("alpha", alpha)
 
         omega = jnp.logspace(-2, 2, 50)
-        data = RheoData(x=omega, y=jnp.zeros_like(omega), domain='frequency', metadata={'test_mode': 'oscillation'})
+        data = RheoData(
+            x=omega,
+            y=jnp.zeros_like(omega),
+            domain="frequency",
+            metadata={"test_mode": "oscillation"},
+        )
         G_star = model.predict(data)
 
         # For SpringPot, tan(delta) = tan(pi*alpha/2) = constant
@@ -361,7 +424,12 @@ class TestSpringPotRotation:
         model = SpringPot()
 
         gamma_dot = jnp.array([1.0])
-        data = RheoData(x=gamma_dot, y=jnp.zeros_like(gamma_dot), x_units='1/s', metadata={'test_mode': 'rotation'})
+        data = RheoData(
+            x=gamma_dot,
+            y=jnp.zeros_like(gamma_dot),
+            x_units="1/s",
+            metadata={"test_mode": "rotation"},
+        )
 
         with pytest.raises(ValueError, match="does not support steady shear"):
             model.predict(data)
@@ -397,21 +465,25 @@ class TestSpringPotOptimization:
 
         # Fit model
         model = SpringPot()
-        model.parameters.set_value('c_alpha', 8e4)  # Better initial guess
-        model.parameters.set_value('alpha', 0.55)  # Better initial guess
+        model.parameters.set_value("c_alpha", 8e4)  # Better initial guess
+        model.parameters.set_value("alpha", 0.55)  # Better initial guess
 
-        data = RheoData(x=t, y=G_noisy, domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t, y=G_noisy, domain="time", metadata={"test_mode": "relaxation"}
+        )
         # BaseModel.fit requires y parameter even if X is RheoData
         model.fit(data, G_noisy)
 
         # Check fitted parameters are reasonably close to true values
         # SpringPot fitting can be challenging due to power-law behavior
-        c_alpha_fit = model.parameters.get_value('c_alpha')
-        alpha_fit = model.parameters.get_value('alpha')
+        c_alpha_fit = model.parameters.get_value("c_alpha")
+        alpha_fit = model.parameters.get_value("alpha")
 
         # Relax tolerance for fractional model optimization
         # Note: SpringPot fitting is challenging due to power-law behavior and correlation between parameters
-        assert_allclose(c_alpha_fit, c_alpha_true, rtol=0.55)  # Very relaxed for proof of concept
+        assert_allclose(
+            c_alpha_fit, c_alpha_true, rtol=0.55
+        )  # Very relaxed for proof of concept
         assert_allclose(alpha_fit, alpha_true, rtol=0.15)
 
     def test_model_score(self):
@@ -426,11 +498,13 @@ class TestSpringPotOptimization:
 
         # Set model to true parameters
         model = SpringPot()
-        model.parameters.set_value('c_alpha', c_alpha_true)
-        model.parameters.set_value('alpha', alpha_true)
+        model.parameters.set_value("c_alpha", c_alpha_true)
+        model.parameters.set_value("alpha", alpha_true)
         model.fitted_ = True
 
-        data = RheoData(x=t, y=G_true, domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t, y=G_true, domain="time", metadata={"test_mode": "relaxation"}
+        )
 
         # Score should be perfect (R² = 1.0) for noiseless data
         score = model.score(data, G_true)
@@ -445,7 +519,12 @@ class TestSpringPotEdgeCases:
         model = SpringPot()
 
         t = jnp.array([1e-6, 1e-3, 1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         # Should not raise error
         G_t = model.predict(data)
@@ -457,7 +536,12 @@ class TestSpringPotEdgeCases:
         model = SpringPot()
 
         t = jnp.array([1.0, 1e3, 1e6])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         # Should not raise error
         G_t = model.predict(data)
@@ -469,7 +553,12 @@ class TestSpringPotEdgeCases:
         model = SpringPot()
 
         t = jnp.array([1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
         assert len(G_t) == 1
@@ -479,8 +568,8 @@ class TestSpringPotEdgeCases:
         model = SpringPot()
         c_alpha = 1e5
         alpha = 0.5
-        model.parameters.set_value('c_alpha', c_alpha)
-        model.parameters.set_value('alpha', alpha)
+        model.parameters.set_value("c_alpha", c_alpha)
+        model.parameters.set_value("alpha", alpha)
 
         # Get characteristic time where G(t) = reference_value
         ref_value = 1e4
@@ -488,7 +577,12 @@ class TestSpringPotEdgeCases:
 
         # Verify: G(t_char) should equal ref_value
         t = jnp.array([t_char])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
         G_t = model.predict(data)
 
         assert_allclose(G_t[0], ref_value, rtol=1e-5)
@@ -496,10 +590,15 @@ class TestSpringPotEdgeCases:
     def test_alpha_near_zero(self):
         """Test alpha very close to zero."""
         model = SpringPot()
-        model.parameters.set_value('alpha', 1e-8)
+        model.parameters.set_value("alpha", 1e-8)
 
         t = jnp.array([1.0])
-        data = RheoData(x=t, y=jnp.zeros_like(t), domain='time', metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "relaxation"},
+        )
 
         G_t = model.predict(data)
         assert jnp.isfinite(G_t[0])

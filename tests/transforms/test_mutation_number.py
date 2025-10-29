@@ -1,12 +1,12 @@
 """Tests for Mutation Number transform."""
 
-import pytest
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from rheo.core.data import RheoData
-from rheo.transforms.mutation_number import MutationNumber
 from rheo.core.test_modes import TestMode
+from rheo.transforms.mutation_number import MutationNumber
 
 
 class TestMutationNumber:
@@ -15,19 +15,19 @@ class TestMutationNumber:
     def test_basic_initialization(self):
         """Test basic mutation number initialization."""
         mn = MutationNumber()
-        assert mn.integration_method == 'trapz'
+        assert mn.integration_method == "trapz"
         assert mn.extrapolate is False
 
     def test_custom_initialization(self):
         """Test mutation number with custom parameters."""
         mn = MutationNumber(
-            integration_method='simpson',
+            integration_method="simpson",
             extrapolate=True,
-            extrapolation_model='powerlaw'
+            extrapolation_model="powerlaw",
         )
-        assert mn.integration_method == 'simpson'
+        assert mn.integration_method == "simpson"
         assert mn.extrapolate is True
-        assert mn.extrapolation_model == 'powerlaw'
+        assert mn.extrapolation_model == "powerlaw"
 
     def test_exponential_relaxation(self):
         """Test mutation number for exponential relaxation."""
@@ -38,15 +38,10 @@ class TestMutationNumber:
         G_0 = 1000.0
         G_t = G_0 * jnp.exp(-t / tau)
 
-        data = RheoData(
-            x=t,
-            y=G_t,
-            domain='time',
-            metadata={'test_mode': 'relaxation'}
-        )
+        data = RheoData(x=t, y=G_t, domain="time", metadata={"test_mode": "relaxation"})
 
         # Calculate mutation number
-        mn = MutationNumber(integration_method='trapz')
+        mn = MutationNumber(integration_method="trapz")
         delta = mn.calculate(data)
 
         # For exponential decay, Δ ≈ 1 (viscous)
@@ -61,7 +56,7 @@ class TestMutationNumber:
         G_0 = 1000.0
         G_t = G_0 * jnp.exp(-t / tau)
 
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=G_t, domain="time")
 
         # Should auto-detect as relaxation
         mn = MutationNumber()
@@ -79,7 +74,7 @@ class TestMutationNumber:
         tau = 5.0
         G_t = G_eq + (G_0 - G_eq) * jnp.exp(-t / tau)
 
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=G_t, domain="time")
 
         mn = MutationNumber()
         delta = mn.calculate(data)
@@ -92,9 +87,9 @@ class TestMutationNumber:
         t = jnp.linspace(0, 50, 1000)
         tau = 5.0
         G_t = 1000.0 * jnp.exp(-t / tau)
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=G_t, domain="time")
 
-        methods = ['trapz', 'simpson', 'cumulative']
+        methods = ["trapz", "simpson", "cumulative"]
         deltas = []
 
         for method in methods:
@@ -113,7 +108,7 @@ class TestMutationNumber:
         """Test transform method returns RheoData."""
         t = jnp.linspace(0, 50, 1000)
         G_t = 1000.0 * jnp.exp(-t / 5.0)
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=G_t, domain="time")
 
         mn = MutationNumber()
         result = mn.transform(data)
@@ -125,7 +120,7 @@ class TestMutationNumber:
         assert len(result.y) == 1
 
         # Mutation number should be in metadata
-        assert 'mutation_number' in result.metadata
+        assert "mutation_number" in result.metadata
 
     def test_relaxation_time_calculation(self):
         """Test average relaxation time calculation."""
@@ -135,7 +130,7 @@ class TestMutationNumber:
         G_0 = 1000.0
         G_t = G_0 * jnp.exp(-t / tau)
 
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=G_t, domain="time")
 
         mn = MutationNumber()
         tau_avg = mn.get_relaxation_time(data)
@@ -153,7 +148,7 @@ class TestMutationNumber:
         tau = 5.0
         G_t = G_eq + (G_0 - G_eq) * jnp.exp(-t / tau)
 
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=G_t, domain="time")
 
         mn = MutationNumber()
         G_eq_est = mn.get_equilibrium_modulus(data)
@@ -168,14 +163,14 @@ class TestMutationNumber:
         tau = 20.0  # Long relaxation time
         G_t = 1000.0 * jnp.exp(-t / tau)
 
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=G_t, domain="time")
 
         # Without extrapolation
         mn_no_extrap = MutationNumber(extrapolate=False)
         delta_no_extrap = mn_no_extrap.calculate(data)
 
         # With extrapolation
-        mn_extrap = MutationNumber(extrapolate=True, extrapolation_model='exponential')
+        mn_extrap = MutationNumber(extrapolate=True, extrapolation_model="exponential")
         delta_extrap = mn_extrap.calculate(data)
 
         # Extrapolated should be larger (captures tail)
@@ -187,7 +182,7 @@ class TestMutationNumber:
         t = jnp.linspace(0, 10, 100)
         J_t = t  # Linear creep
 
-        data = RheoData(x=t, y=J_t, domain='time')
+        data = RheoData(x=t, y=J_t, domain="time")
 
         mn = MutationNumber()
         with pytest.raises(ValueError, match="RELAXATION"):
@@ -199,7 +194,7 @@ class TestMutationNumber:
         G_real = 1000.0 * jnp.exp(-t / 5.0)
         G_complex = G_real + 1j * G_real * 0.1  # Add small imaginary part
 
-        data = RheoData(x=t, y=G_complex, domain='time')
+        data = RheoData(x=t, y=G_complex, domain="time")
 
         mn = MutationNumber()
         delta = mn.calculate(data)
@@ -213,7 +208,7 @@ class TestMutationNumber:
         t = jnp.linspace(0, 10, 100)
         G_t = jnp.zeros_like(t)
 
-        data = RheoData(x=t, y=G_t, domain='time')
+        data = RheoData(x=t, y=G_t, domain="time")
 
         mn = MutationNumber()
         with pytest.raises(ValueError, match="positive"):
@@ -227,22 +222,22 @@ class TestMutationNumber:
         data = RheoData(
             x=t,
             y=G_t,
-            domain='time',
-            metadata={'sample': 'polymer', 'temperature': 298}
+            domain="time",
+            metadata={"sample": "polymer", "temperature": 298},
         )
 
         mn = MutationNumber()
         result = mn.transform(data)
 
         # Original metadata preserved
-        assert result.metadata['sample'] == 'polymer'
-        assert result.metadata['temperature'] == 298
+        assert result.metadata["sample"] == "polymer"
+        assert result.metadata["temperature"] == 298
 
         # Transform metadata added
-        assert 'transform' in result.metadata
-        assert result.metadata['transform'] == 'mutation_number'
-        assert 'integration_method' in result.metadata
+        assert "transform" in result.metadata
+        assert result.metadata["transform"] == "mutation_number"
+        assert "integration_method" in result.metadata
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -6,7 +6,7 @@ to quantify the degree of time-dependence in viscoelastic materials.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Literal
+from typing import TYPE_CHECKING, Literal
 
 import jax.numpy as jnp
 import numpy as np
@@ -19,10 +19,10 @@ if TYPE_CHECKING:
     from rheo.core.data import RheoData
 
 
-IntegrationMethod = Literal['trapz', 'simpson', 'cumulative']
+IntegrationMethod = Literal["trapz", "simpson", "cumulative"]
 
 
-@TransformRegistry.register('mutation_number')
+@TransformRegistry.register("mutation_number")
 class MutationNumber(BaseTransform):
     """Calculate mutation number from relaxation modulus data.
 
@@ -75,9 +75,9 @@ class MutationNumber(BaseTransform):
 
     def __init__(
         self,
-        integration_method: IntegrationMethod = 'trapz',
+        integration_method: IntegrationMethod = "trapz",
         extrapolate: bool = False,
-        extrapolation_model: str = 'exponential'
+        extrapolation_model: str = "exponential",
     ):
         """Initialize Mutation Number transform.
 
@@ -95,11 +95,7 @@ class MutationNumber(BaseTransform):
         self.extrapolate = extrapolate
         self.extrapolation_model = extrapolation_model
 
-    def _integrate(
-        self,
-        x: jnp.ndarray,
-        y: jnp.ndarray
-    ) -> float:
+    def _integrate(self, x: jnp.ndarray, y: jnp.ndarray) -> float:
         """Perform numerical integration.
 
         Parameters
@@ -114,29 +110,28 @@ class MutationNumber(BaseTransform):
         float
             Integral value
         """
-        if self.integration_method == 'trapz':
+        if self.integration_method == "trapz":
             # Use trapezoidal rule
             from jax.scipy.integrate import trapezoid
+
             return float(trapezoid(y, x))
-        elif self.integration_method == 'simpson':
+        elif self.integration_method == "simpson":
             # Simpson's rule requires odd number of points
             # Use scipy simpson
             from scipy.integrate import simpson
+
             x_np = np.array(x) if isinstance(x, jnp.ndarray) else x
             y_np = np.array(y) if isinstance(y, jnp.ndarray) else y
             return float(simpson(y_np, x_np))
-        elif self.integration_method == 'cumulative':
+        elif self.integration_method == "cumulative":
             # Use trapezoid for cumulative integral
             from jax.scipy.integrate import trapezoid
+
             return float(trapezoid(y, x))
         else:
             raise ValueError(f"Unknown integration method: {self.integration_method}")
 
-    def _extrapolate_tail(
-        self,
-        t: jnp.ndarray,
-        G_t: jnp.ndarray
-    ) -> float:
+    def _extrapolate_tail(self, t: jnp.ndarray, G_t: jnp.ndarray) -> float:
         """Extrapolate tail contribution to infinite time.
 
         Parameters
@@ -156,7 +151,7 @@ class MutationNumber(BaseTransform):
         t_fit = t[-n_fit:]
         G_fit = G_t[-n_fit:]
 
-        if self.extrapolation_model == 'exponential':
+        if self.extrapolation_model == "exponential":
             # Fit G(t) = A * exp(-t/tau)
             # ln(G) = ln(A) - t/tau
             log_G = jnp.log(G_fit + 1e-10)  # Avoid log(0)
@@ -165,7 +160,9 @@ class MutationNumber(BaseTransform):
             t_mean = jnp.mean(t_fit)
             log_G_mean = jnp.mean(log_G)
 
-            slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / jnp.sum((t_fit - t_mean) ** 2)
+            slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / jnp.sum(
+                (t_fit - t_mean) ** 2
+            )
             intercept = log_G_mean - slope * t_mean
 
             # Extract parameters
@@ -178,7 +175,7 @@ class MutationNumber(BaseTransform):
 
             return float(tail_integral)
 
-        elif self.extrapolation_model == 'powerlaw':
+        elif self.extrapolation_model == "powerlaw":
             # Fit G(t) = A * t^(-n)
             # ln(G) = ln(A) - n*ln(t)
             log_t = jnp.log(t_fit)
@@ -188,7 +185,9 @@ class MutationNumber(BaseTransform):
             log_t_mean = jnp.mean(log_t)
             log_G_mean = jnp.mean(log_G)
 
-            n = -jnp.sum((log_t - log_t_mean) * (log_G - log_G_mean)) / jnp.sum((log_t - log_t_mean) ** 2)
+            n = -jnp.sum((log_t - log_t_mean) * (log_G - log_G_mean)) / jnp.sum(
+                (log_t - log_t_mean) ** 2
+            )
             A = jnp.exp(log_G_mean + n * log_t_mean)
 
             # Integrate from t_max to infinity
@@ -274,7 +273,7 @@ class MutationNumber(BaseTransform):
         # Calculate mutation number
         # Δ = ∫G(t)dt / (G(0) * τ_avg) = (∫G(t)dt)² / (G(0) * ∫t*G(t)dt)
         if integral_tG > 0:
-            delta = (integral_G ** 2) / (G_0 * integral_tG)
+            delta = (integral_G**2) / (G_0 * integral_tG)
         else:
             # Fallback: use simple definition
             delta = integral_G / (G_0 * tau_avg)
@@ -303,22 +302,24 @@ class MutationNumber(BaseTransform):
 
         # Create metadata
         new_metadata = data.metadata.copy()
-        new_metadata.update({
-            'transform': 'mutation_number',
-            'mutation_number': delta,
-            'integration_method': self.integration_method,
-            'extrapolated': self.extrapolate
-        })
+        new_metadata.update(
+            {
+                "transform": "mutation_number",
+                "mutation_number": delta,
+                "integration_method": self.integration_method,
+                "extrapolated": self.extrapolate,
+            }
+        )
 
         # Return scalar RheoData
         return RheoData(
             x=jnp.array([0.0]),
             y=jnp.array([delta]),
             x_units=None,
-            y_units='dimensionless',
-            domain='scalar',
+            y_units="dimensionless",
+            domain="scalar",
             metadata=new_metadata,
-            validate=False
+            validate=False,
         )
 
     def get_relaxation_time(self, rheo_data: RheoData) -> float:
@@ -389,4 +390,4 @@ class MutationNumber(BaseTransform):
         return G_eq
 
 
-__all__ = ['MutationNumber']
+__all__ = ["MutationNumber"]

@@ -7,24 +7,25 @@ These tests validate the integration of all Phase 2 components.
 Task 16.2: Maximum 10 integration tests covering critical scenarios.
 """
 
-import numpy as np
-import jax.numpy as jnp
-import pytest
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
-from rheo.core.data import RheoData
-from rheo.core.registry import ModelRegistry, TransformRegistry
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
 import rheo.models  # Import all models to trigger registration
-from rheo.models.maxwell import Maxwell
-from rheo.models.zener import Zener
-from rheo.models.springpot import SpringPot
 import rheo.transforms  # Import all transforms to trigger registration
-from rheo.transforms.fft_analysis import FFTAnalysis
-from rheo.transforms.smooth_derivative import SmoothDerivative
-from rheo.transforms.mastercurve import Mastercurve
+from rheo.core.data import RheoData
 from rheo.core.parameters import SharedParameterSet
+from rheo.core.registry import ModelRegistry, TransformRegistry
 from rheo.io.readers.csv_reader import load_csv
+from rheo.models.maxwell import Maxwell
+from rheo.models.springpot import SpringPot
+from rheo.models.zener import Zener
+from rheo.transforms.fft_analysis import FFTAnalysis
+from rheo.transforms.mastercurve import Mastercurve
+from rheo.transforms.smooth_derivative import SmoothDerivative
 
 
 class TestMultiModelComparison:
@@ -49,19 +50,11 @@ class TestMultiModelComparison:
         G_data = G_true + noise
 
         data = RheoData(
-            x=np.array(t),
-            y=np.array(G_data),
-            x_units="s",
-            y_units="Pa",
-            domain="time"
+            x=np.array(t), y=np.array(G_data), x_units="s", y_units="Pa", domain="time"
         )
 
         # Fit three models
-        models = {
-            "Maxwell": Maxwell(),
-            "Zener": Zener(),
-            "SpringPot": SpringPot()
-        }
+        models = {"Maxwell": Maxwell(), "Zener": Zener(), "SpringPot": SpringPot()}
 
         results = {}
         for name, model in models.items():
@@ -81,7 +74,7 @@ class TestMultiModelComparison:
                 results[name] = {
                     "rmse": rmse,
                     "aic": aic,
-                    "params": model.parameters.to_dict()
+                    "params": model.parameters.to_dict(),
                 }
             except Exception as e:
                 pytest.skip(f"Model {name} fitting failed: {e}")
@@ -100,8 +93,9 @@ class TestMultiModelComparison:
         print(f"Best model by RMSE: {best_model_rmse}")
 
         # Verify RMSE is reasonable for best model
-        assert results[best_model_rmse]["rmse"] < 0.1 * G0, \
-            "Best model should fit data reasonably well"
+        assert (
+            results[best_model_rmse]["rmse"] < 0.1 * G0
+        ), "Best model should fit data reasonably well"
 
 
 class TestTransformComposition:
@@ -115,23 +109,17 @@ class TestTransformComposition:
         """Apply smoothing followed by derivative calculation."""
         # Generate noisy quadratic data: y = x^2
         x = jnp.linspace(0, 10, 100)
-        y_true = x ** 2
+        y_true = x**2
         np.random.seed(42)
         # Use smaller noise for better derivative estimation
         y_noisy = y_true + np.random.normal(0, 2, len(x))
 
-        data = RheoData(
-            x=np.array(x),
-            y=np.array(y_noisy),
-            domain="time"
-        )
+        data = RheoData(x=np.array(x), y=np.array(y_noisy), domain="time")
 
         # SmoothDerivative requires deriv >= 1, so we test composition of derivatives
         # First transform: Compute first derivative (smoothed)
         first_deriv = SmoothDerivative(
-            window_length=11,
-            polyorder=3,
-            deriv=1  # First derivative
+            window_length=11, polyorder=3, deriv=1  # First derivative
         )
         dy_dx = first_deriv.fit_transform(data)
 
@@ -145,7 +133,7 @@ class TestTransformComposition:
         second_deriv = SmoothDerivative(
             window_length=11,
             polyorder=3,
-            deriv=1  # Take derivative of dy_dx to get d2y_dx2
+            deriv=1,  # Take derivative of dy_dx to get d2y_dx2
         )
         d2y_dx2 = second_deriv.fit_transform(dy_dx)
 
@@ -155,16 +143,18 @@ class TestTransformComposition:
         # Check second derivative is approximately correct (middle points)
         mid_start = 20
         mid_end = 80
-        second_deriv_error = float(jnp.mean(jnp.abs(
-            d2y_dx2.y[mid_start:mid_end] - expected_second_deriv
-        )))
+        second_deriv_error = float(
+            jnp.mean(jnp.abs(d2y_dx2.y[mid_start:mid_end] - expected_second_deriv))
+        )
 
         # Allow tolerance for numerical differentiation of noisy data
         # Derivatives amplify noise significantly, especially second derivatives
-        assert first_deriv_error < 5.0, \
-            f"First derivative error {first_deriv_error:.2f} too large"
-        assert second_deriv_error < 20.0, \
-            f"Second derivative error {second_deriv_error:.2f} too large"
+        assert (
+            first_deriv_error < 5.0
+        ), f"First derivative error {first_deriv_error:.2f} too large"
+        assert (
+            second_deriv_error < 20.0
+        ), f"Second derivative error {second_deriv_error:.2f} too large"
 
         # Verify metadata propagation
         assert "transform" in dy_dx.metadata
@@ -182,7 +172,7 @@ class TestTransformComposition:
             y=np.array(signal),
             x_units="s",
             y_units="dimensionless",
-            domain="time"
+            domain="time",
         )
 
         # Apply FFT analysis
@@ -212,7 +202,9 @@ class TestMultiTechniqueFitting:
     Will be marked as expectedFailure until Parameter.__hash__() is implemented.
     """
 
-    @pytest.mark.xfail(reason="Blocked by Parameter hashability issue (Task 16 blocker)")
+    @pytest.mark.xfail(
+        reason="Blocked by Parameter hashability issue (Task 16 blocker)"
+    )
     def test_shared_parameter_across_datasets(self):
         """Fit Maxwell model to relaxation AND oscillation with shared E."""
         # This test requires SharedParameterSet which uses Parameter as dict key
@@ -255,7 +247,7 @@ class TestEndToEndFileWorkflow:
             t = np.logspace(-2, 2, 50)
             G = 1e6 * np.exp(-t / 1.0)
 
-            with open(csv_path, 'w') as f:
+            with open(csv_path, "w") as f:
                 f.write("time,modulus\n")
                 for ti, Gi in zip(t, G):
                     f.write(f"{ti},{Gi}\n")
@@ -284,8 +276,9 @@ class TestEndToEndFileWorkflow:
                 print(f"  RMSE: {rmse:.2e}")
 
                 # Should fit reasonably well
-                assert rmse < 0.5 * np.max(np.abs(data.y)), \
-                    "Model should fit data with reasonable accuracy"
+                assert rmse < 0.5 * np.max(
+                    np.abs(data.y)
+                ), "Model should fit data with reasonable accuracy"
 
                 print(f"Workflow complete: CSV → Model → Predictions")
 
@@ -307,15 +300,28 @@ class TestModelRegistry:
         # Expected models (20 total) - using actual registry names (lowercase snake_case)
         expected_models = [
             # Classical (3)
-            "maxwell", "zener", "springpot",
+            "maxwell",
+            "zener",
+            "springpot",
             # Fractional (11)
-            "fractional_maxwell_model", "fractional_maxwell_gel", "fractional_maxwell_liquid",
-            "fractional_kelvin_voigt", "fractional_zener_sl", "fractional_zener_ss",
-            "fractional_zener_ll", "fractional_kv_zener", "fractional_burgers",
-            "fractional_poynting_thomson", "fractional_jeffreys",
+            "fractional_maxwell_model",
+            "fractional_maxwell_gel",
+            "fractional_maxwell_liquid",
+            "fractional_kelvin_voigt",
+            "fractional_zener_sl",
+            "fractional_zener_ss",
+            "fractional_zener_ll",
+            "fractional_kv_zener",
+            "fractional_burgers",
+            "fractional_poynting_thomson",
+            "fractional_jeffreys",
             # Flow (6)
-            "power_law", "bingham", "herschel_bulkley",
-            "cross", "carreau", "carreau_yasuda"
+            "power_law",
+            "bingham",
+            "herschel_bulkley",
+            "cross",
+            "carreau",
+            "carreau_yasuda",
         ]
 
         print(f"\nRegistered models ({len(registered_models)}):")
@@ -323,8 +329,9 @@ class TestModelRegistry:
             print(f"  - {model_name}")
 
         # Check we have reasonable number of models registered
-        assert len(registered_models) >= 15, \
-            f"Expected ~20 models, found {len(registered_models)}"
+        assert (
+            len(registered_models) >= 15
+        ), f"Expected ~20 models, found {len(registered_models)}"
 
         # Verify we can create instances of classical models
         for model_name in ["maxwell", "zener", "springpot"]:
@@ -345,9 +352,9 @@ class TestModelRegistry:
                 model = ModelRegistry.create(model_name)
 
                 # Verify it has required methods
-                assert hasattr(model, 'fit')
-                assert hasattr(model, 'predict')
-                assert hasattr(model, 'parameters')
+                assert hasattr(model, "fit")
+                assert hasattr(model, "predict")
+                assert hasattr(model, "parameters")
 
                 # Verify it can generate predictions (even with default params)
                 t = np.array([0.1, 1.0, 10.0])
@@ -381,7 +388,7 @@ class TestTransformRegistry:
             "mastercurve",
             "mutation_number",
             "owchirp",
-            "smooth_derivative"
+            "smooth_derivative",
         ]
 
         print(f"\nRegistered transforms ({len(registered_transforms)}):")
@@ -389,15 +396,14 @@ class TestTransformRegistry:
             print(f"  - {transform_name}")
 
         # Verify all expected transforms are registered
-        assert len(registered_transforms) >= 5, \
-            f"Expected 5 transforms, found {len(registered_transforms)}"
+        assert (
+            len(registered_transforms) >= 5
+        ), f"Expected 5 transforms, found {len(registered_transforms)}"
 
     def test_factory_pattern_for_all_transforms(self):
         """Test factory pattern for each transform."""
         test_data = RheoData(
-            x=np.linspace(0, 10, 50),
-            y=np.linspace(0, 10, 50),
-            domain="time"
+            x=np.linspace(0, 10, 50), y=np.linspace(0, 10, 50), domain="time"
         )
 
         transform_names = TransformRegistry.list_transforms()
@@ -409,9 +415,9 @@ class TestTransformRegistry:
                 transform = TransformRegistry.create(transform_name)
 
                 # Verify it has required methods
-                assert hasattr(transform, 'fit')
-                assert hasattr(transform, 'transform')
-                assert hasattr(transform, 'fit_transform')
+                assert hasattr(transform, "fit")
+                assert hasattr(transform, "transform")
+                assert hasattr(transform, "fit_transform")
 
                 success_count += 1
                 print(f"  ✓ {transform_name} factory pattern works")
@@ -419,8 +425,9 @@ class TestTransformRegistry:
             except Exception as e:
                 print(f"  ✗ {transform_name} failed: {e}")
 
-        assert success_count >= 4, \
-            f"At least 4/5 transforms should work, got {success_count}"
+        assert (
+            success_count >= 4
+        ), f"At least 4/5 transforms should work, got {success_count}"
 
 
 class TestCrossModeConsistency:
@@ -437,20 +444,25 @@ class TestCrossModeConsistency:
         # Set reasonable parameters (Maxwell has G0 and eta, not E and tau)
         G0 = 1e6  # Pa
         eta = 1e6  # Pa·s (tau = eta/G0 = 1.0 s)
-        model.parameters.set_value('G0', G0)
-        model.parameters.set_value('eta', eta)
+        model.parameters.set_value("G0", G0)
+        model.parameters.set_value("eta", eta)
 
         modes_tested = {}
 
         # 1. Relaxation mode
         try:
             t = np.array([0.01, 0.1, 1.0, 10.0])
-            data_relax = RheoData(x=t, y=np.zeros_like(t), domain="time", metadata={'test_mode': 'relaxation'})
+            data_relax = RheoData(
+                x=t,
+                y=np.zeros_like(t),
+                domain="time",
+                metadata={"test_mode": "relaxation"},
+            )
             G_relax = model.predict(data_relax)
             assert len(G_relax) == len(t)
             assert all(np.isfinite(G_relax))
             # Should decay monotonically
-            assert all(G_relax[i] >= G_relax[i+1] for i in range(len(G_relax)-1))
+            assert all(G_relax[i] >= G_relax[i + 1] for i in range(len(G_relax) - 1))
             modes_tested["relaxation"] = True
             print("  ✓ Relaxation mode works")
         except Exception as e:
@@ -459,12 +471,14 @@ class TestCrossModeConsistency:
 
         # 2. Creep mode
         try:
-            data_creep = RheoData(x=t, y=np.zeros_like(t), domain="time", metadata={'test_mode': 'creep'})
+            data_creep = RheoData(
+                x=t, y=np.zeros_like(t), domain="time", metadata={"test_mode": "creep"}
+            )
             J_creep = model.predict(data_creep)
             assert len(J_creep) == len(t)
             assert all(np.isfinite(J_creep))
             # Creep compliance should increase
-            assert all(J_creep[i] <= J_creep[i+1] for i in range(len(J_creep)-1))
+            assert all(J_creep[i] <= J_creep[i + 1] for i in range(len(J_creep) - 1))
             modes_tested["creep"] = True
             print("  ✓ Creep mode works")
         except Exception as e:
@@ -474,7 +488,12 @@ class TestCrossModeConsistency:
         # 3. Oscillation mode
         try:
             omega = np.array([0.01, 0.1, 1.0, 10.0])
-            data_osc = RheoData(x=omega, y=np.zeros_like(omega), domain="frequency", metadata={'test_mode': 'oscillation'})
+            data_osc = RheoData(
+                x=omega,
+                y=np.zeros_like(omega),
+                domain="frequency",
+                metadata={"test_mode": "oscillation"},
+            )
             G_star = model.predict(data_osc)
             assert len(G_star) == len(omega)
             assert all(np.isfinite(G_star))
@@ -489,7 +508,12 @@ class TestCrossModeConsistency:
         # 4. Rotation/flow mode (may not be applicable for Maxwell)
         try:
             shear_rate = np.array([0.01, 0.1, 1.0, 10.0])
-            data_rot = RheoData(x=shear_rate, y=np.zeros_like(shear_rate), domain="shear_rate", metadata={'test_mode': 'rotation'})
+            data_rot = RheoData(
+                x=shear_rate,
+                y=np.zeros_like(shear_rate),
+                domain="shear_rate",
+                metadata={"test_mode": "rotation"},
+            )
             viscosity = model.predict(data_rot)
             modes_tested["rotation"] = True
             print("  ✓ Rotation mode works")
@@ -502,8 +526,9 @@ class TestCrossModeConsistency:
 
         # Verify at least 3 modes work (relaxation, creep, oscillation)
         working_modes = sum(1 for v in modes_tested.values() if v is True)
-        assert working_modes >= 3, \
-            f"Maxwell should support at least 3 modes, got {working_modes}"
+        assert (
+            working_modes >= 3
+        ), f"Maxwell should support at least 3 modes, got {working_modes}"
 
 
 class TestParameterConstraints:
@@ -524,25 +549,27 @@ class TestParameterConstraints:
         model = Maxwell()
 
         # Set bounds that should be reasonable (Maxwell has G0 and eta)
-        model.parameters.get('G0').bounds = (1e5, 1e7)  # Modulus range
+        model.parameters.get("G0").bounds = (1e5, 1e7)  # Modulus range
         # For tau = eta/G0 in range (0.1, 10.0) with G0~1e6, eta should be (1e5, 1e7)
-        model.parameters.get('eta').bounds = (1e5, 1e8)  # Viscosity range
+        model.parameters.get("eta").bounds = (1e5, 1e8)  # Viscosity range
 
         # Fit model
         try:
             model.fit(data.x, data.y)
 
             # Verify fitted parameters are within bounds
-            G0_fitted = model.parameters.get_value('G0')
-            eta_fitted = model.parameters.get_value('eta')
+            G0_fitted = model.parameters.get_value("G0")
+            eta_fitted = model.parameters.get_value("eta")
             tau_fitted = eta_fitted / G0_fitted
 
-            assert 1e5 <= G0_fitted <= 1e7, \
-                f"G0={G0_fitted} outside bounds [1e5, 1e7]"
-            assert 0.1 <= tau_fitted <= 10.0, \
-                f"tau={tau_fitted} outside expected range [0.1, 10.0]"
+            assert 1e5 <= G0_fitted <= 1e7, f"G0={G0_fitted} outside bounds [1e5, 1e7]"
+            assert (
+                0.1 <= tau_fitted <= 10.0
+            ), f"tau={tau_fitted} outside expected range [0.1, 10.0]"
 
-            print(f"  ✓ Fitted params in bounds: G0={G0_fitted:.2e}, eta={eta_fitted:.2e}, tau={tau_fitted:.2f}")
+            print(
+                f"  ✓ Fitted params in bounds: G0={G0_fitted:.2e}, eta={eta_fitted:.2e}, tau={tau_fitted:.2f}"
+            )
 
         except Exception as e:
             pytest.skip(f"Fitting with constraints failed: {e}")
@@ -558,11 +585,16 @@ class TestErrorHandling:
     def test_invalid_test_mode_error(self):
         """Should handle invalid test mode gracefully with warning."""
         model = Maxwell()
-        model.parameters.set_value('G0', 1e6)
-        model.parameters.set_value('eta', 1e6)
+        model.parameters.set_value("G0", 1e6)
+        model.parameters.set_value("eta", 1e6)
 
         t = np.array([0.1, 1.0, 10.0])
-        data = RheoData(x=t, y=np.zeros_like(t), domain="time", metadata={'test_mode': 'invalid_mode'})
+        data = RheoData(
+            x=t,
+            y=np.zeros_like(t),
+            domain="time",
+            metadata={"test_mode": "invalid_mode"},
+        )
 
         # Invalid test_mode triggers warning and auto-detection (robust behavior)
         with pytest.warns(UserWarning, match="Invalid test_mode"):
@@ -574,11 +606,7 @@ class TestErrorHandling:
     def test_empty_data_error(self):
         """Test that empty data is handled gracefully (robust behavior)."""
         # System is lenient - empty data is allowed without raising
-        data = RheoData(
-            x=np.array([]),
-            y=np.array([]),
-            domain="time"
-        )
+        data = RheoData(x=np.array([]), y=np.array([]), domain="time")
         assert len(data.x) == 0
         assert len(data.y) == 0
 
@@ -586,9 +614,7 @@ class TestErrorHandling:
         """Should raise clear error for mismatched x/y dimensions."""
         with pytest.raises((ValueError, AssertionError)):
             data = RheoData(
-                x=np.array([1, 2, 3]),
-                y=np.array([1, 2]),  # Wrong length
-                domain="time"
+                x=np.array([1, 2, 3]), y=np.array([1, 2]), domain="time"  # Wrong length
             )
 
     def test_nan_handling_in_data(self):
@@ -619,11 +645,13 @@ class TestPerformanceIntegration:
         # Large dataset
         t = np.logspace(-2, 2, 1000)
         G = 1e6 * np.exp(-t / 1.0)
-        data = RheoData(x=t, y=np.zeros_like(t), domain="time", metadata={'test_mode': 'relaxation'})
+        data = RheoData(
+            x=t, y=np.zeros_like(t), domain="time", metadata={"test_mode": "relaxation"}
+        )
 
         model = Maxwell()
-        model.parameters.set_value('G0', 1e6)
-        model.parameters.set_value('eta', 1e6)
+        model.parameters.set_value("G0", 1e6)
+        model.parameters.set_value("eta", 1e6)
 
         # First call (with JIT compilation overhead)
         start_first = time.time()
@@ -646,8 +674,9 @@ class TestPerformanceIntegration:
 
         # Subsequent calls should be faster (or similar if already optimized)
         # We're lenient here because small functions may not show huge speedup
-        assert time_second <= time_first * 2.0, \
-            "Second call should not be slower than first (compilation overhead)"
+        assert (
+            time_second <= time_first * 2.0
+        ), "Second call should not be slower than first (compilation overhead)"
 
         # Verify numerical consistency
         assert np.allclose(pred_first, pred_second)
@@ -670,6 +699,7 @@ class TestPerformanceIntegration:
         model = Maxwell()
         try:
             import time
+
             start = time.time()
             model.fit(data.x, data.y)
             fit_time = time.time() - start

@@ -44,17 +44,19 @@ References
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
+from rheo.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
 from jax.scipy.special import gamma as jax_gamma
 
 from rheo.core.base import BaseModel
-from rheo.core.parameters import Parameter, ParameterSet
+from rheo.core.parameters import ParameterSet
 from rheo.core.registry import ModelRegistry
 from rheo.utils.mittag_leffler import mittag_leffler_e2
 
 
-@ModelRegistry.register('fractional_jeffreys')
+@ModelRegistry.register("fractional_jeffreys")
 class FractionalJeffreysModel(BaseModel):
     """Fractional Jeffreys model.
 
@@ -91,36 +93,37 @@ class FractionalJeffreysModel(BaseModel):
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
         self.parameters.add(
-            name='eta1',
+            name="eta1",
             value=None,
             bounds=(1e-6, 1e12),
-            units='Pa·s',
-            description='First viscosity'
+            units="Pa·s",
+            description="First viscosity",
         )
         self.parameters.add(
-            name='eta2',
+            name="eta2",
             value=None,
             bounds=(1e-6, 1e12),
-            units='Pa·s',
-            description='Second viscosity'
+            units="Pa·s",
+            description="Second viscosity",
         )
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=None,
             bounds=(0.0, 1.0),
-            units='',
-            description='Fractional order'
+            units="",
+            description="Fractional order",
         )
         self.parameters.add(
-            name='tau1',
+            name="tau1",
             value=None,
             bounds=(1e-6, 1e6),
-            units='s',
-            description='Relaxation time'
+            units="s",
+            description="Relaxation time",
         )
 
-    def _predict_relaxation(self, t: jnp.ndarray, eta1: float, eta2: float,
-                           alpha: float, tau1: float) -> jnp.ndarray:
+    def _predict_relaxation(
+        self, t: jnp.ndarray, eta1: float, eta2: float, alpha: float, tau1: float
+    ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         G(t) = (η_1/τ_1) * t^(-α) * E_{1-α,1-α}(-(t/τ_1)^(1-α))
@@ -145,6 +148,7 @@ class FractionalJeffreysModel(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -173,8 +177,9 @@ class FractionalJeffreysModel(BaseModel):
 
         return _compute_relaxation(t, eta1, eta2, tau1)
 
-    def _predict_creep(self, t: jnp.ndarray, eta1: float, eta2: float,
-                      alpha: float, tau1: float) -> jnp.ndarray:
+    def _predict_creep(
+        self, t: jnp.ndarray, eta1: float, eta2: float, alpha: float, tau1: float
+    ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
         For Jeffreys model, creep shows unbounded flow behavior.
@@ -199,6 +204,7 @@ class FractionalJeffreysModel(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -215,7 +221,11 @@ class FractionalJeffreysModel(BaseModel):
 
             # Short time: elastic-like response
             # Approximate using SpringPot behavior
-            J_short = jnp.power(t, alpha_safe) * jax_gamma(1.0 + alpha_safe) / (eta1_safe * tau1_safe**alpha_safe)
+            J_short = (
+                jnp.power(t, alpha_safe)
+                * jax_gamma(1.0 + alpha_safe)
+                / (eta1_safe * tau1_safe**alpha_safe)
+            )
 
             # Long time: Newtonian flow
             J_long = t / eta_eff
@@ -228,8 +238,9 @@ class FractionalJeffreysModel(BaseModel):
 
         return _compute_creep(t, eta1, eta2, tau1)
 
-    def _predict_oscillation(self, omega: jnp.ndarray, eta1: float, eta2: float,
-                            alpha: float, tau1: float) -> jnp.ndarray:
+    def _predict_oscillation(
+        self, omega: jnp.ndarray, eta1: float, eta2: float, alpha: float, tau1: float
+    ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
         G*(ω) = η_1(iω) * [1 + (iωτ_2)^α] / [1 + (iωτ_1)^α]
@@ -256,6 +267,7 @@ class FractionalJeffreysModel(BaseModel):
         """
         # Clip alpha BEFORE JIT to make it concrete (not traced)
         import numpy as np
+
         epsilon = 1e-12
         alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
@@ -275,12 +287,16 @@ class FractionalJeffreysModel(BaseModel):
             # Compute (iωτ_1)^α
             omega_tau1_alpha = jnp.power(omega * tau1_safe, alpha_safe)
             phase1 = jnp.pi * alpha_safe / 2.0
-            i_omega_tau1_alpha = omega_tau1_alpha * (jnp.cos(phase1) + 1j * jnp.sin(phase1))
+            i_omega_tau1_alpha = omega_tau1_alpha * (
+                jnp.cos(phase1) + 1j * jnp.sin(phase1)
+            )
 
             # Compute (iωτ_2)^α
             omega_tau2_alpha = jnp.power(omega * tau2, alpha_safe)
             phase2 = jnp.pi * alpha_safe / 2.0
-            i_omega_tau2_alpha = omega_tau2_alpha * (jnp.cos(phase2) + 1j * jnp.sin(phase2))
+            i_omega_tau2_alpha = omega_tau2_alpha * (
+                jnp.cos(phase2) + 1j * jnp.sin(phase2)
+            )
 
             # Complex modulus: G*(ω) = η_1(iω) * [1 + (iωτ_2)^α] / [1 + (iωτ_1)^α]
             numerator = 1.0 + i_omega_tau2_alpha
@@ -296,8 +312,14 @@ class FractionalJeffreysModel(BaseModel):
 
         return _compute_oscillation(omega, eta1, eta2, tau1)
 
-    def _predict_rotation(self, gamma_dot: jnp.ndarray, eta1: float, eta2: float,
-                         alpha: float, tau1: float) -> jnp.ndarray:
+    def _predict_rotation(
+        self,
+        gamma_dot: jnp.ndarray,
+        eta1: float,
+        eta2: float,
+        alpha: float,
+        tau1: float,
+    ) -> jnp.ndarray:
         """Predict steady shear viscosity η(γ̇).
 
         For Jeffreys model at steady state:
@@ -350,25 +372,23 @@ class FractionalJeffreysModel(BaseModel):
         from rheo.core.parameters import ParameterOptimizer
 
         # Detect test mode
-        test_mode = kwargs.get('test_mode', 'relaxation')
+        test_mode = kwargs.get("test_mode", "relaxation")
 
         # Select prediction function
-        if test_mode == 'relaxation':
+        if test_mode == "relaxation":
             predict_fn = self._predict_relaxation
-        elif test_mode == 'creep':
+        elif test_mode == "creep":
             predict_fn = self._predict_creep
-        elif test_mode == 'oscillation':
+        elif test_mode == "oscillation":
             predict_fn = self._predict_oscillation
-        elif test_mode == 'rotation':
+        elif test_mode == "rotation":
             predict_fn = self._predict_rotation
         else:
             raise ValueError(f"Test mode '{test_mode}' not supported for FJM")
 
         # Set up optimizer
         optimizer = ParameterOptimizer(
-            parameters=self.parameters,
-            predict_fn=predict_fn,
-            loss='mse'
+            parameters=self.parameters, predict_fn=predict_fn, loss="mse"
         )
 
         # Fit parameters
@@ -395,10 +415,10 @@ class FractionalJeffreysModel(BaseModel):
         """
         # Get parameters
         params = self.parameters.to_dict()
-        eta1 = params['eta1']
-        eta2 = params['eta2']
-        alpha = params['alpha']
-        tau1 = params['tau1']
+        eta1 = params["eta1"]
+        eta2 = params["eta2"]
+        alpha = params["alpha"]
+        tau1 = params["tau1"]
 
         # Auto-detect test mode
         if jnp.all(X > 0) and len(X) > 1:
@@ -413,4 +433,4 @@ class FractionalJeffreysModel(BaseModel):
 # Convenience alias
 FJM = FractionalJeffreysModel
 
-__all__ = ['FractionalJeffreysModel', 'FJM']
+__all__ = ["FractionalJeffreysModel", "FJM"]

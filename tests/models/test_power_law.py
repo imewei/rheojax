@@ -6,9 +6,9 @@ This module tests the Power Law (Ostwald-de Waele) model for non-Newtonian flow.
 import numpy as np
 import pytest
 
-from rheo.models.power_law import PowerLaw
 from rheo.core.data import RheoData
 from rheo.core.test_modes import TestMode
+from rheo.models.power_law import PowerLaw
 
 
 class TestPowerLawBasics:
@@ -18,12 +18,12 @@ class TestPowerLawBasics:
         """Test model initialization."""
         model = PowerLaw()
         assert model is not None
-        assert 'K' in model.parameters
-        assert 'n' in model.parameters
+        assert "K" in model.parameters
+        assert "n" in model.parameters
 
         # Check default values
-        K = model.parameters.get_value('K')
-        n = model.parameters.get_value('n')
+        K = model.parameters.get_value("K")
+        n = model.parameters.get_value("n")
         assert K == 1.0
         assert n == 0.5
 
@@ -32,11 +32,11 @@ class TestPowerLawBasics:
         model = PowerLaw()
 
         # K bounds
-        K_param = model.parameters.get('K')
+        K_param = model.parameters.get("K")
         assert K_param.bounds == (1e-6, 1e6)
 
         # n bounds
-        n_param = model.parameters.get('n')
+        n_param = model.parameters.get("n")
         assert n_param.bounds == (0.01, 2.0)
 
     def test_parameter_setting(self):
@@ -44,11 +44,11 @@ class TestPowerLawBasics:
         model = PowerLaw()
 
         # Set valid parameters
-        model.parameters.set_value('K', 10.0)
-        model.parameters.set_value('n', 0.7)
+        model.parameters.set_value("K", 10.0)
+        model.parameters.set_value("n", 0.7)
 
-        assert model.parameters.get_value('K') == 10.0
-        assert model.parameters.get_value('n') == 0.7
+        assert model.parameters.get_value("K") == 10.0
+        assert model.parameters.get_value("n") == 0.7
 
 
 class TestPowerLawPredictions:
@@ -57,8 +57,8 @@ class TestPowerLawPredictions:
     def test_viscosity_prediction_shear_thinning(self):
         """Test viscosity prediction for shear-thinning (n < 1)."""
         model = PowerLaw()
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Shear rates
         gamma_dot = np.array([0.1, 1.0, 10.0, 100.0])
@@ -77,8 +77,8 @@ class TestPowerLawPredictions:
     def test_viscosity_prediction_shear_thickening(self):
         """Test viscosity prediction for shear-thickening (n > 1)."""
         model = PowerLaw()
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 1.5)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 1.5)
 
         # Shear rates
         gamma_dot = np.array([0.1, 1.0, 10.0, 100.0])
@@ -97,8 +97,8 @@ class TestPowerLawPredictions:
     def test_stress_prediction(self):
         """Test stress prediction: σ = K * γ̇^n."""
         model = PowerLaw()
-        model.parameters.set_value('K', 2.0)
-        model.parameters.set_value('n', 0.6)
+        model.parameters.set_value("K", 2.0)
+        model.parameters.set_value("n", 0.6)
 
         gamma_dot = np.array([1.0, 10.0, 100.0])
 
@@ -113,8 +113,8 @@ class TestPowerLawPredictions:
     def test_newtonian_limit(self):
         """Test Newtonian limit (n = 1)."""
         model = PowerLaw()
-        model.parameters.set_value('K', 5.0)
-        model.parameters.set_value('n', 1.0)
+        model.parameters.set_value("K", 5.0)
+        model.parameters.set_value("n", 1.0)
 
         gamma_dot = np.array([0.1, 1.0, 10.0, 100.0])
 
@@ -133,28 +133,28 @@ class TestPowerLawRheoData:
     def test_predict_rheo_viscosity(self):
         """Test prediction with RheoData (viscosity output)."""
         model = PowerLaw()
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Create RheoData with shear rate
         gamma_dot = np.logspace(-2, 2, 50)
         rheo_data = RheoData(
             x=gamma_dot,
             y=np.zeros_like(gamma_dot),  # Placeholder
-            x_units='1/s',
-            y_units='Pa·s',
-            domain='time',
-            metadata={'test_mode': TestMode.ROTATION},
-            validate=False
+            x_units="1/s",
+            y_units="Pa·s",
+            domain="time",
+            metadata={"test_mode": TestMode.ROTATION},
+            validate=False,
         )
 
         # Predict
-        result = model.predict_rheo(rheo_data, output='viscosity')
+        result = model.predict_rheo(rheo_data, output="viscosity")
 
         # Check result
-        assert result.x_units == '1/s'
-        assert result.y_units == 'Pa·s'
-        assert result.metadata['model'] == 'PowerLaw'
+        assert result.x_units == "1/s"
+        assert result.y_units == "Pa·s"
+        assert result.metadata["model"] == "PowerLaw"
 
         # Verify values
         expected = 1.0 * np.power(gamma_dot, -0.5)
@@ -163,26 +163,26 @@ class TestPowerLawRheoData:
     def test_predict_rheo_stress(self):
         """Test prediction with RheoData (stress output)."""
         model = PowerLaw()
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Create RheoData with shear rate
         gamma_dot = np.logspace(-2, 2, 50)
         rheo_data = RheoData(
             x=gamma_dot,
             y=np.zeros_like(gamma_dot),
-            x_units='1/s',
-            y_units='Pa',
-            domain='time',
-            metadata={'test_mode': TestMode.ROTATION},
-            validate=False
+            x_units="1/s",
+            y_units="Pa",
+            domain="time",
+            metadata={"test_mode": TestMode.ROTATION},
+            validate=False,
         )
 
         # Predict
-        result = model.predict_rheo(rheo_data, output='stress')
+        result = model.predict_rheo(rheo_data, output="stress")
 
         # Check result
-        assert result.y_units == 'Pa'
+        assert result.y_units == "Pa"
 
         # Verify values
         expected = 1.0 * np.power(gamma_dot, 0.5)
@@ -196,8 +196,8 @@ class TestPowerLawRheoData:
         rheo_data = RheoData(
             x=np.array([1.0, 10.0]),
             y=np.array([0.0, 0.0]),
-            metadata={'test_mode': TestMode.OSCILLATION},
-            validate=False
+            metadata={"test_mode": TestMode.OSCILLATION},
+            validate=False,
         )
 
         # Should raise ValueError
@@ -219,15 +219,17 @@ class TestPowerLawFitting:
 
         # Add small noise
         np.random.seed(42)
-        viscosity_noisy = viscosity_true * (1.0 + 0.01 * np.random.randn(len(gamma_dot)))
+        viscosity_noisy = viscosity_true * (
+            1.0 + 0.01 * np.random.randn(len(gamma_dot))
+        )
 
         # Fit model
         model = PowerLaw()
         model.fit(gamma_dot, viscosity_noisy)
 
         # Check fitted parameters are close to true values
-        K_fit = model.parameters.get_value('K')
-        n_fit = model.parameters.get_value('n')
+        K_fit = model.parameters.get_value("K")
+        n_fit = model.parameters.get_value("n")
 
         # Allow 5% error due to noise
         assert abs(K_fit - K_true) / K_true < 0.05
@@ -255,8 +257,8 @@ class TestPowerLawNumericalStability:
     def test_extreme_shear_rates(self):
         """Test with extreme shear rates."""
         model = PowerLaw()
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Very low and very high shear rates
         gamma_dot = np.array([1e-12, 1e-6, 1e6, 1e12])
@@ -270,8 +272,8 @@ class TestPowerLawNumericalStability:
     def test_zero_shear_rate(self):
         """Test behavior at zero shear rate."""
         model = PowerLaw()
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Zero shear rate (should give infinite viscosity for n < 1)
         gamma_dot = np.array([0.0])
@@ -284,8 +286,8 @@ class TestPowerLawNumericalStability:
     def test_negative_shear_rates(self):
         """Test with negative shear rates (should use absolute value)."""
         model = PowerLaw()
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         gamma_dot_pos = np.array([1.0, 10.0, 100.0])
         gamma_dot_neg = -gamma_dot_pos
@@ -303,8 +305,8 @@ class TestPowerLawPerformance:
     def test_jit_compilation(self):
         """Test that JIT compilation works."""
         model = PowerLaw()
-        model.parameters.set_value('K', 1.0)
-        model.parameters.set_value('n', 0.5)
+        model.parameters.set_value("K", 1.0)
+        model.parameters.set_value("n", 0.5)
 
         # Large array for performance testing
         gamma_dot = np.logspace(-3, 3, 10000)
@@ -321,8 +323,8 @@ class TestPowerLawPerformance:
     def test_vectorization(self):
         """Test that vectorization works correctly."""
         model = PowerLaw()
-        model.parameters.set_value('K', 2.0)
-        model.parameters.set_value('n', 0.7)
+        model.parameters.set_value("K", 2.0)
+        model.parameters.set_value("n", 0.7)
 
         # Test with different array sizes
         for size in [10, 100, 1000]:
@@ -333,5 +335,5 @@ class TestPowerLawPerformance:
             assert np.all(np.isfinite(viscosity))
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

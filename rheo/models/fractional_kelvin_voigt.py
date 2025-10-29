@@ -27,21 +27,21 @@ References:
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Optional
+from rheo.core.jax_config import safe_import_jax
 
-import jax
-import jax.numpy as jnp
+jax, jnp = safe_import_jax()
+
+
 import numpy as np
 from jax.scipy.special import gamma as jax_gamma
 
-from rheo.core.base import BaseModel, Parameter, ParameterSet
+from rheo.core.base import BaseModel, ParameterSet
 from rheo.core.data import RheoData
 from rheo.core.registry import ModelRegistry
 from rheo.utils.mittag_leffler import mittag_leffler_e
 
 
-@ModelRegistry.register('fractional_kelvin_voigt')
+@ModelRegistry.register("fractional_kelvin_voigt")
 class FractionalKelvinVoigt(BaseModel):
     """Fractional Kelvin-Voigt model: Spring and SpringPot in parallel.
 
@@ -80,27 +80,27 @@ class FractionalKelvinVoigt(BaseModel):
         self.parameters = ParameterSet()
 
         self.parameters.add(
-            name='Ge',
+            name="Ge",
             value=1e6,
             bounds=(1e-3, 1e9),
-            units='Pa',
-            description='Equilibrium modulus'
+            units="Pa",
+            description="Equilibrium modulus",
         )
 
         self.parameters.add(
-            name='c_alpha',
+            name="c_alpha",
             value=1e4,
             bounds=(1e-3, 1e9),
-            units='Pa·s^α',
-            description='SpringPot constant'
+            units="Pa·s^α",
+            description="SpringPot constant",
         )
 
         self.parameters.add(
-            name='alpha',
+            name="alpha",
             value=0.5,
             bounds=(0.0, 1.0),
-            units='dimensionless',
-            description='Fractional order'
+            units="dimensionless",
+            description="Fractional order",
         )
 
         self.fitted_ = False
@@ -121,11 +121,7 @@ class FractionalKelvinVoigt(BaseModel):
         return (c_alpha / Ge) ** (1.0 / alpha_safe)
 
     def _predict_relaxation_jax(
-        self,
-        t: jnp.ndarray,
-        Ge: float,
-        c_alpha: float,
-        alpha: float
+        self, t: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t) using JAX.
 
@@ -147,6 +143,7 @@ class FractionalKelvinVoigt(BaseModel):
         # For gradient computation, alpha may be a tracer - use jnp.clip
         # For normal operation, convert to float for ML function
         import numpy as np
+
         try:
             # Try to convert to float (works for concrete values)
             alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
@@ -174,11 +171,7 @@ class FractionalKelvinVoigt(BaseModel):
         return _compute_relaxation(t, Ge, c_alpha)
 
     def _predict_creep_jax(
-        self,
-        t: jnp.ndarray,
-        Ge: float,
-        c_alpha: float,
-        alpha: float
+        self, t: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
@@ -202,6 +195,7 @@ class FractionalKelvinVoigt(BaseModel):
         # For gradient computation, alpha may be a tracer - use jnp.clip
         # For normal operation, convert to float for ML function
         import numpy as np
+
         try:
             # Try to convert to float (works for concrete values)
             alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
@@ -231,11 +225,7 @@ class FractionalKelvinVoigt(BaseModel):
         return _compute_creep(t, Ge, c_alpha)
 
     def _predict_oscillation_jax(
-        self,
-        omega: jnp.ndarray,
-        Ge: float,
-        c_alpha: float,
-        alpha: float
+        self, omega: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω) using JAX.
 
@@ -257,6 +247,7 @@ class FractionalKelvinVoigt(BaseModel):
         # For gradient computation, alpha may be a tracer - use jnp.clip
         # For normal operation, convert to float for ML function
         import numpy as np
+
         try:
             # Try to convert to float (works for concrete values)
             alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
@@ -273,7 +264,11 @@ class FractionalKelvinVoigt(BaseModel):
             G_elastic = Ge
 
             # SpringPot part: c_α (iω)^α = c_α |ω|^α exp(i α π/2)
-            G_springpot = c_alpha * (omega_safe ** alpha_safe) * jnp.exp(1j * alpha_safe * jnp.pi / 2.0)
+            G_springpot = (
+                c_alpha
+                * (omega_safe**alpha_safe)
+                * jnp.exp(1j * alpha_safe * jnp.pi / 2.0)
+            )
 
             # Complex modulus
             G_star = G_elastic + G_springpot
@@ -294,7 +289,9 @@ class FractionalKelvinVoigt(BaseModel):
             self
         """
         # Placeholder for optimization implementation
-        raise NotImplementedError("Parameter fitting will be implemented in optimization module")
+        raise NotImplementedError(
+            "Parameter fitting will be implemented in optimization module"
+        )
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Internal predict implementation.
@@ -311,14 +308,16 @@ class FractionalKelvinVoigt(BaseModel):
 
         # Handle raw array input (assume relaxation mode)
         x = jnp.asarray(X)
-        Ge = self.parameters.get_value('Ge')
-        c_alpha = self.parameters.get_value('c_alpha')
-        alpha = self.parameters.get_value('alpha')
+        Ge = self.parameters.get_value("Ge")
+        c_alpha = self.parameters.get_value("c_alpha")
+        alpha = self.parameters.get_value("alpha")
 
         result = self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
         return np.array(result)
 
-    def predict_rheodata(self, rheo_data: RheoData, test_mode: Optional[str] = None) -> RheoData:
+    def predict_rheodata(
+        self, rheo_data: RheoData, test_mode: str | None = None
+    ) -> RheoData:
         """Predict response for RheoData.
 
         Args:
@@ -332,25 +331,25 @@ class FractionalKelvinVoigt(BaseModel):
         # Auto-detect test mode if not provided
         if test_mode is None:
             # Check for explicit test_mode in metadata first
-            if 'test_mode' in rheo_data.metadata:
-                test_mode = rheo_data.metadata['test_mode']
+            if "test_mode" in rheo_data.metadata:
+                test_mode = rheo_data.metadata["test_mode"]
             else:
                 test_mode = rheo_data.test_mode
 
         # Get parameters
-        Ge = self.parameters.get_value('Ge')
-        c_alpha = self.parameters.get_value('c_alpha')
-        alpha = self.parameters.get_value('alpha')
+        Ge = self.parameters.get_value("Ge")
+        c_alpha = self.parameters.get_value("c_alpha")
+        alpha = self.parameters.get_value("alpha")
 
         # Convert input to JAX
         x = jnp.asarray(rheo_data.x)
 
         # Route to appropriate prediction method
-        if test_mode == 'relaxation':
+        if test_mode == "relaxation":
             y_pred = self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
-        elif test_mode == 'creep':
+        elif test_mode == "creep":
             y_pred = self._predict_creep_jax(x, Ge, c_alpha, alpha)
-        elif test_mode == 'oscillation':
+        elif test_mode == "oscillation":
             y_pred = self._predict_oscillation_jax(x, Ge, c_alpha, alpha)
         else:
             raise ValueError(
@@ -365,12 +364,12 @@ class FractionalKelvinVoigt(BaseModel):
             x_units=rheo_data.x_units,
             y_units=rheo_data.y_units,
             domain=rheo_data.domain,
-            metadata=rheo_data.metadata.copy()
+            metadata=rheo_data.metadata.copy(),
         )
 
         return result
 
-    def predict(self, X, test_mode: Optional[str] = None):
+    def predict(self, X, test_mode: str | None = None):
         """Predict response.
 
         Args:
