@@ -11,14 +11,17 @@ before fractional models can be tested.
 import os
 import time
 
-import jax.numpy as jnp
 import numpy as np
 import psutil
 import pytest
 
 from rheo.core.data import RheoData
+from rheo.core.jax_config import safe_import_jax
 from rheo.models.maxwell import Maxwell
 from rheo.models.zener import Zener
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 
 class TestJAXvsNumPyPerformance:
