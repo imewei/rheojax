@@ -15,12 +15,15 @@ from __future__ import annotations
 import warnings
 from typing import Any
 
-import jax.numpy as jnp
 import numpy as np
 
 from rheo.core.data import RheoData
+from rheo.core.jax_config import safe_import_jax
 from rheo.core.registry import ModelRegistry
 from rheo.pipeline.base import Pipeline
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 
 class MastercurvePipeline(Pipeline):

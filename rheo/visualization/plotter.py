@@ -8,13 +8,16 @@ from __future__ import annotations
 
 from typing import Any
 
-import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from rheo.core.data import RheoData
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 # Default plotting style parameters
 DEFAULT_STYLE = {

@@ -18,13 +18,12 @@ References
 
 from functools import partial
 
-import jax
-import jax.numpy as jnp
-from jax.scipy.special import gamma as jax_gamma
+from rheo.core.jax_config import safe_import_jax
 
-# Enable 64-bit precision for numerical stability
-# This is critical for accurate Mittag-Leffler evaluations
-jax.config.update("jax_enable_x64", True)
+# Safe JAX import (enforces float64)
+# Float64 precision is critical for accurate Mittag-Leffler evaluations
+jax, jnp = safe_import_jax()
+from jax.scipy.special import gamma as jax_gamma
 
 
 @partial(jax.jit, static_argnums=(1,))

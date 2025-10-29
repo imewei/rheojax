@@ -9,11 +9,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import jax.numpy as jnp
 import numpy as np
 
 from rheo.core.base import BaseTransform
+from rheo.core.jax_config import safe_import_jax
 from rheo.core.registry import TransformRegistry
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 if TYPE_CHECKING:
     from rheo.core.data import RheoData
