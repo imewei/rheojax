@@ -10,8 +10,12 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, Union
 
-import jax.numpy as jnp
 import numpy as np
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 try:
     import piblin

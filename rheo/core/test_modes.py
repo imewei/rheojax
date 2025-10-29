@@ -10,8 +10,12 @@ import warnings
 from enum import Enum
 from typing import TYPE_CHECKING
 
-import jax.numpy as jnp
 import numpy as np
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 if TYPE_CHECKING:
     from rheo.core.data import RheoData

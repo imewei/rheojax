@@ -10,15 +10,18 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Union
 
-import jax.numpy as jnp
 import numpy as np
 
-try:
-    import jax
+from rheo.core.jax_config import safe_import_jax
 
+# Safe JAX import (enforces float64)
+try:
+    jax, jnp = safe_import_jax()
     HAS_JAX = True
 except ImportError:
     HAS_JAX = False
+    jax = None
+    jnp = np
 
 
 ArrayLike = Union[np.ndarray, jnp.ndarray, list, float]

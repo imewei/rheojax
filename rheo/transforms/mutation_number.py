@@ -6,17 +6,18 @@ to quantify the degree of time-dependence in viscoelastic materials.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
-import jax.numpy as jnp
 import numpy as np
 
 from rheo.core.base import BaseTransform
+from rheo.core.data import RheoData
+from rheo.core.jax_config import safe_import_jax
 from rheo.core.registry import TransformRegistry
 from rheo.core.test_modes import TestMode, detect_test_mode
 
-if TYPE_CHECKING:
-    from rheo.core.data import RheoData
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 
 IntegrationMethod = Literal["trapz", "simpson", "cumulative"]
@@ -295,8 +296,6 @@ class MutationNumber(BaseTransform):
         RheoData
             Scalar data containing mutation number
         """
-        from rheo.core.data import RheoData
-
         # Calculate mutation number
         delta = self.calculate(data)
 

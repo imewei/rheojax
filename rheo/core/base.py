@@ -9,11 +9,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Union
 
-import jax.numpy as jnp
 import numpy as np
 
 from rheo.core.bayesian import BayesianMixin, BayesianResult
+from rheo.core.jax_config import safe_import_jax
 from rheo.core.parameters import ParameterSet
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 
 ArrayLike = Union[np.ndarray, jnp.ndarray]
 
