@@ -5,16 +5,12 @@ including JAX gradient integration, parameter bounds handling,
 and optimization convergence.
 """
 
-import jax
 import numpy as np
 import pytest
 
+from rheo.core.jax_config import safe_import_jax
 from rheo.core.parameters import ParameterSet
 from rheo.utils.optimization import OptimizationResult, nlsq_optimize
-
-
-
-from rheo.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

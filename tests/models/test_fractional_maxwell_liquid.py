@@ -4,7 +4,6 @@ Comprehensive test suite covering initialization, all test modes, limit cases,
 JAX operations, numerical stability, and RheoData integration.
 """
 
-import jax
 import numpy as np
 import pytest
 

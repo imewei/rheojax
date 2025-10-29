@@ -10,7 +10,6 @@ This test suite validates:
 7. JAX operations (JIT, vmap, grad)
 """
 
-import jax
 import numpy as np
 import pytest
 

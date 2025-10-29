@@ -17,7 +17,6 @@ Each model is tested for:
 5. JAX operations
 """
 
-import jax
 import numpy as np
 import pytest
 

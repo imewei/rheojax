@@ -5,7 +5,6 @@ Tests cover initialization, all test modes, limit cases, JAX operations,
 numerical stability, and two-parameter fractional behavior.
 """
 
-import jax
 import numpy as np
 import pytest
 
