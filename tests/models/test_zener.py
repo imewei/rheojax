@@ -509,7 +509,7 @@ class TestZenerOptimization:
         eta_true = 1e3
         tau_true = eta_true / Gm_true
 
-        t = jnp.linspace(0.01, 10, 50)
+        t = jnp.linspace(0.001, 1.0, 50)
         G_true = Ge_true + Gm_true * jnp.exp(-t / tau_true)
 
         # Add small noise
