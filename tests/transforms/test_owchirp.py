@@ -1,6 +1,5 @@
 """Tests for OWChirp transform."""
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -8,6 +7,11 @@ from rheo.core.data import RheoData
 from rheo.transforms.owchirp import OWChirp
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestOWChirp:
     """Test suite for OWChirp transform."""
 

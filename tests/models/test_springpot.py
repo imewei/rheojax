@@ -4,7 +4,6 @@ This test suite validates the SpringPot model implementation for power-law
 viscoelastic behavior, including analytical validation and edge cases.
 """
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 from jax.scipy.special import gamma as jax_gamma
@@ -17,6 +16,11 @@ from rheo.core.test_modes import TestMode
 from rheo.models.springpot import SpringPot
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestSpringPotBasics:
     """Test basic SpringPot model functionality."""
 

@@ -11,13 +11,17 @@ This test suite validates:
 """
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from rheo.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestFractionalZenerSolidLiquid:
     """Test suite for FZSL model."""
 

@@ -6,7 +6,6 @@ and optimization convergence.
 """
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -14,6 +13,11 @@ from rheo.core.parameters import ParameterSet
 from rheo.utils.optimization import OptimizationResult, nlsq_optimize
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestOptimizationBasics:
     """Test basic optimization functionality."""
 

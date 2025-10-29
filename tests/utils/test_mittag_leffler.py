@@ -13,11 +13,15 @@ Tests validate:
 """
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from rheo.utils.mittag_leffler import (
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
     mittag_leffler_e,
     mittag_leffler_e2,
     ml_e,

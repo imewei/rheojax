@@ -4,7 +4,6 @@ This test suite validates the Zener model implementation across all test modes,
 parameter constraints, optimization, and numerical accuracy.
 """
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -16,6 +15,11 @@ from rheo.core.test_modes import TestMode
 from rheo.models.zener import Zener
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestZenerBasics:
     """Test basic Zener model functionality."""
 

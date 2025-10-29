@@ -1,6 +1,5 @@
 """Tests for FFT Analysis transform."""
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -8,6 +7,11 @@ from rheo.core.data import RheoData
 from rheo.transforms.fft_analysis import FFTAnalysis
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestFFTAnalysis:
     """Test suite for FFT Analysis transform."""
 

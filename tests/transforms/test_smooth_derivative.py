@@ -1,6 +1,5 @@
 """Tests for Smooth Derivative transform."""
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -8,6 +7,11 @@ from rheo.core.data import RheoData
 from rheo.transforms.smooth_derivative import SmoothDerivative
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestSmoothDerivative:
     """Test suite for Smooth Derivative transform."""
 

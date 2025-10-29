@@ -7,11 +7,15 @@ with piblin.Measurement while adding JAX support and additional features.
 from typing import Any, Dict
 from unittest.mock import MagicMock, Mock, patch
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
 # We'll mock piblin for now since it's not installed yet
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 with patch.dict("sys.modules", {"piblin": MagicMock()}):
     from rheo.core.data import RheoData
 

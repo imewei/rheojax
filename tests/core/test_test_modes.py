@@ -1,6 +1,5 @@
 """Tests for test mode detection functionality."""
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -8,6 +7,11 @@ from rheo.core.data import RheoData
 from rheo.core.test_modes import TestMode, detect_test_mode
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestModeDetection:
     """Test automatic test mode detection."""
 

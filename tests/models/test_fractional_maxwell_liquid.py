@@ -5,7 +5,6 @@ JAX operations, numerical stability, and RheoData integration.
 """
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -15,6 +14,11 @@ from rheo.core.registry import ModelRegistry
 from rheo.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
 
 
+
+from rheo.core.jax_config import safe_import_jax
+
+# Safe JAX import (enforces float64)
+jax, jnp = safe_import_jax()
 class TestFractionalMaxwellLiquidInitialization:
     """Test model initialization and parameters."""
 
