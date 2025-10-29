@@ -44,7 +44,7 @@ class TestProjectStructure:
             "core",
             "models",
             "transforms",
-            "pipelines",
+            "pipeline",
             "io",
             "visualization",
             "utils",

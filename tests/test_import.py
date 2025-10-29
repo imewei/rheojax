@@ -26,7 +26,7 @@ def test_submodule_imports():
         io,
         legacy,
         models,
-        pipelines,
+        pipeline,
         transforms,
         utils,
         visualization,
@@ -36,7 +36,7 @@ def test_submodule_imports():
     assert core is not None
     assert models is not None
     assert transforms is not None
-    assert pipelines is not None
+    assert pipeline is not None
     assert io is not None
     assert visualization is not None
     assert utils is not None
