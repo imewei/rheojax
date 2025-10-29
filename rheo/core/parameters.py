@@ -15,13 +15,8 @@ import numpy as np
 from rheo.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
-try:
-    jax, jnp = safe_import_jax()
-    HAS_JAX = True
-except ImportError:
-    HAS_JAX = False
-    jax = None
-    jnp = np
+jax, jnp = safe_import_jax()
+HAS_JAX = True
 
 
 ArrayLike = Union[np.ndarray, jnp.ndarray, list, float]

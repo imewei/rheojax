@@ -169,20 +169,35 @@ class TestFloat64ImportOrder:
     def test_rheo_package_import_order(self):
         """Test that rheo package itself ensures proper import order."""
         # This test validates that importing rheo will import nlsq before JAX
-        # Clear sys.modules to force fresh import
-        modules_to_clear = [k for k in sys.modules.keys() if k.startswith("rheo")]
-        for mod in modules_to_clear:
-            if mod != "rheo.core.jax_config":  # Don't clear jax_config yet
-                del sys.modules[mod]
+        # Save current sys.modules state for rheo modules
+        saved_modules = {k: sys.modules[k] for k in list(sys.modules.keys()) if k.startswith("rheo")}
 
-        # Import rheo package
-        import rheo
+        try:
+            # Clear sys.modules to force fresh import
+            modules_to_clear = [k for k in sys.modules.keys() if k.startswith("rheo")]
+            for mod in modules_to_clear:
+                if mod != "rheo.core.jax_config":  # Don't clear jax_config yet
+                    del sys.modules[mod]
 
-        # Verify nlsq was imported
-        assert "nlsq" in sys.modules, "rheo package should import nlsq"
+            # Import rheo package
+            import rheo
 
-        # Verify JAX is in float64 mode
-        import jax.numpy as jnp
+            # Verify nlsq was imported
+            assert "nlsq" in sys.modules, "rheo package should import nlsq"
 
-        arr = jnp.array([1.0])
-        assert arr.dtype == jnp.float64
+            # Verify JAX is in float64 mode
+            import jax.numpy as jnp
+
+            arr = jnp.array([1.0])
+            assert arr.dtype == jnp.float64
+        finally:
+            # Restore all rheo modules to prevent state pollution
+            # First, remove any newly imported modules
+            current_modules = [k for k in sys.modules.keys() if k.startswith("rheo")]
+            for mod in current_modules:
+                if mod not in saved_modules:
+                    del sys.modules[mod]
+
+            # Then restore the saved modules
+            for mod, obj in saved_modules.items():
+                sys.modules[mod] = obj

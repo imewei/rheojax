@@ -593,5 +593,6 @@ def pytest_configure(config):
 def reset_jax_config():
     """Reset JAX configuration after each test to avoid state leakage."""
     yield
-    # Optional: Add any JAX state reset if needed
-    # For now, this is a placeholder for future use
+    # Reset JAX config validation state to avoid module import caching issues
+    from rheo.core.jax_config import reset_validation
+    reset_validation()
