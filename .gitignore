@@ -112,13 +112,16 @@ __pypackages__/
 # ----------------------------------------------------------------------------
 # Documentation
 # ----------------------------------------------------------------------------
-# Sphinx
+# Sphinx build artifacts
 docs/_build/
-docs/_static/
-docs/_templates/
 docs/build/
 doc/build/
 .doctrees/
+*.doctree
+
+# Sphinx generated files
+docs/source/_autosummary/
+docs/source/_generated/
 
 # MkDocs
 /site
@@ -155,6 +158,7 @@ dmypy.json
 .pytype/
 .ruff_cache/
 .pylint_cache/
+.nlsq_cache/
 
 # ----------------------------------------------------------------------------
 # IDEs & Editors
