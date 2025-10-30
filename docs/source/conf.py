@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.abspath('../..'))
 project = 'rheo'
 copyright = '2025, Rheo Development Team'
 author = 'Rheo Development Team'
-release = '1.0.0'
-version = '1.0.0'
+release = '0.1.0'
+version = '0.1.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -28,10 +28,61 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
     'sphinx.ext.ifconfig',
+    'sphinx.ext.autosummary',  # Auto-generate API docs
 ]
+
+# Optional extensions (graceful fallback if not installed)
+
+# Add copy button to code blocks
+try:
+    import sphinx_copybutton
+    extensions.append('sphinx_copybutton')
+except ImportError:
+    pass
+
+# Add markdown support via myst-parser
+try:
+    import myst_parser
+    extensions.append('myst_parser')
+except ImportError:
+    pass
+
+# Add tabs for multi-language examples
+try:
+    import sphinx_tabs
+    extensions.append('sphinx_tabs.tabs')
+except ImportError:
+    pass
+
+# Add type hints to autodoc
+try:
+    import sphinx_autodoc_typehints
+    extensions.append('sphinx_autodoc_typehints')
+except ImportError:
+    pass
 
 templates_path = ['../_templates']
 exclude_patterns = []
+
+# MyST parser settings (if available)
+try:
+    import myst_parser
+    myst_enable_extensions = [
+        "colon_fence",      # ::: style fences
+        "deflist",          # Definition lists
+        "dollarmath",       # $math$ and $$math$$
+        "fieldlist",        # Field lists
+        "html_admonition",  # HTML-style admonitions
+        "html_image",       # HTML images
+        "linkify",          # Auto-detect URLs
+        "replacements",     # Text replacements
+        "smartquotes",      # Smart quotes
+        "substitution",     # Substitutions
+        "tasklist",         # Task lists
+    ]
+    myst_heading_anchors = 3  # Auto-generate heading anchors
+except ImportError:
+    pass
 
 # Napoleon settings for Google and NumPy style docstrings
 napoleon_google_docstring = True
@@ -64,6 +115,9 @@ intersphinx_mapping = {
     'numpy': ('https://numpy.org/doc/stable/', None),
     'jax': ('https://jax.readthedocs.io/en/latest/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+    'numpyro': ('https://num.pyro.ai/en/stable/', None),
+    'arviz': ('https://arviz-devs.github.io/arviz/', None),
+    'matplotlib': ('https://matplotlib.org/stable/', None),
 }
 
 # -- Options for HTML output -------------------------------------------------
@@ -118,3 +172,20 @@ texinfo_documents = [
 
 # -- Extension configuration -------------------------------------------------
 todo_include_todos = True
+
+# Autosummary settings
+autosummary_generate = True
+autosummary_imported_members = False
+
+# Copybutton settings (hide prompts)
+copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
+copybutton_prompt_is_regexp = True
+copybutton_remove_prompts = True
+
+# Autodoc typehints settings
+autodoc_typehints = "description"  # Show type hints in description
+autodoc_typehints_description_target = "documented"  # Only documented parameters
+autodoc_type_aliases = {
+    'ArrayLike': 'numpy.typing.ArrayLike',
+    'NDArray': 'numpy.typing.NDArray',
+}

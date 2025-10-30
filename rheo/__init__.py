@@ -28,7 +28,7 @@ except ImportError:
         "NLSQ provides GPU-accelerated optimization and enables float64 precision in JAX."
     )
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 __author__ = "Rheo Development Team"
 __email__ = "rheo@example.com"
 __license__ = "MIT"
@@ -57,11 +57,11 @@ except ImportError:
 
 # Version information
 VERSION_INFO = {
-    "major": 1,
-    "minor": 0,
+    "major": 0,
+    "minor": 1,
     "patch": 0,
-    "release": "stable",
-    "python_requires": ">=3.9",
+    "release": "dev",
+    "python_requires": ">=3.12",
 }
 
 # Package metadata

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rheo"
-version = "1.0.0"
+version = "0.1.0"
 description = "Unified rheological analysis framework with JAX acceleration"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -70,6 +70,9 @@ dependencies = [
 
     # Probabilistic programming
     "numpyro>=0.13.0,<1.0.0",
+
+    # Bayesian visualization and diagnostics
+    "arviz>=0.15.0,<1.0.0",
 ]
 
 [project.optional-dependencies]

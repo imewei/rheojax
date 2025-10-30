@@ -691,8 +691,8 @@ Release Process
 
    .. code-block:: bash
 
-       git tag v1.0.0
-       git push origin v1.0.0
+       git tag v0.1.0
+       git push origin v0.1.0
 
 3. **Build and Publish**
 

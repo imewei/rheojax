@@ -362,13 +362,50 @@ clean-pyc:
 
 clean-test:
 	@echo "$(BOLD)$(BLUE)Removing test and coverage artifacts...$(RESET)"
-	rm -rf .pytest_cache/
+	find . -type d -name .pytest_cache \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name .nlsq_cache \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name .ruff_cache \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name .mypy_cache \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name htmlcov \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name .hypothesis \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
 	rm -rf .coverage
-	rm -rf htmlcov/
 	rm -rf coverage.xml
-	rm -rf .mypy_cache/
-	rm -rf .ruff_cache/
-	rm -rf .hypothesis/
 
 clean: clean-build clean-pyc clean-test
 	@echo "$(BOLD)$(GREEN)✓ Cleaned!$(RESET)"

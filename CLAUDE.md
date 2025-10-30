@@ -11,6 +11,7 @@ Rheo is a JAX-accelerated rheological analysis package providing a unified frame
 - JAX 0.8.0 for automatic differentiation and GPU acceleration
 - NLSQ 0.1.6+ for GPU-accelerated nonlinear least squares optimization
 - NumPyro for Bayesian inference (MCMC NUTS sampling)
+- ArviZ 0.15.0+ for Bayesian visualization and diagnostics
 - NumPy, SciPy for numerical operations
 - Matplotlib for visualization
 - h5py, pandas, openpyxl for I/O
@@ -98,7 +99,7 @@ rheo/
 │   ├── base.py        # BaseModel, BaseTransform abstract classes
 │   ├── data.py        # RheoData wrapper (JAX-compatible)
 │   ├── parameters.py  # Parameter, ParameterSet, ParameterOptimizer
-│   ├── bayesian.py    # BayesianMixin for NumPyro NUTS sampling
+│   ├── bayesian.py    # BayesianMixin for NumPyro NUTS sampling + ArviZ integration
 │   ├── jax_config.py  # Float64 precision enforcement
 │   ├── test_modes.py  # TestMode detection (relaxation, creep, oscillation, rotation)
 │   └── registry.py    # Plugin registry for models/transforms
@@ -114,7 +115,7 @@ rheo/
 │   └── smooth_derivative.py
 ├── pipeline/          # Fluent API for workflows
 │   ├── base.py        # Pipeline class (load → fit → plot → save)
-│   ├── bayesian.py    # BayesianPipeline (NLSQ → NUTS workflow)
+│   ├── bayesian.py    # BayesianPipeline (NLSQ → NUTS workflow + ArviZ diagnostics)
 │   ├── workflows.py   # Pre-configured pipelines (mastercurve, model comparison)
 │   ├── builder.py     # Programmatic pipeline construction
 │   └── batch.py       # Batch processing multiple datasets
@@ -308,7 +309,7 @@ print(f"Convergence: R-hat={result.diagnostics['r_hat']['G0']:.4f}, ESS={result.
 
 #### BayesianPipeline for Fluent API
 
-For complex workflows, use BayesianPipeline:
+For complex workflows, use BayesianPipeline with comprehensive ArviZ integration:
 
 ```python
 from rheo.pipeline.bayesian import BayesianPipeline
@@ -327,6 +328,88 @@ pipeline = BayesianPipeline()
 # Access diagnostics
 diagnostics = pipeline.get_diagnostics()
 summary = pipeline.get_posterior_summary()
+
+# ArviZ diagnostic plots (comprehensive MCMC quality assessment)
+(pipeline
+    .plot_pair(divergences=True)        # Parameter correlations with divergences
+    .plot_forest(hdi_prob=0.95)         # Credible intervals comparison
+    .plot_energy()                       # NUTS energy diagnostic
+    .plot_autocorr()                     # Mixing diagnostic
+    .plot_rank()                         # Convergence diagnostic
+    .plot_ess(kind='local'))            # Effective sample size
+```
+
+#### ArviZ Diagnostic Plots
+
+BayesianPipeline provides comprehensive MCMC diagnostics through ArviZ integration. All 6 diagnostic methods support the fluent API pattern with `show` parameter and `.save_figure()` chaining.
+
+**1. Pair Plot (`plot_pair`)** - Parameter Correlations
+```python
+# Identify parameter dependencies and non-identifiability
+pipeline.plot_pair(
+    var_names=['G0', 'eta'],    # Specific parameters (or None for all)
+    kind='scatter',              # 'scatter', 'kde', or 'hexbin'
+    divergences=True             # Highlight problematic regions
+)
+```
+Use for: Detecting correlations, funnel geometry, multimodal posteriors
+
+**2. Forest Plot (`plot_forest`)** - Credible Intervals
+```python
+# Compare parameter magnitudes and uncertainties
+pipeline.plot_forest(
+    hdi_prob=0.95,              # 0.68 (1σ), 0.95 (2σ), 0.997 (3σ)
+    combined=True                # Combine multiple chains
+)
+```
+Use for: Quick parameter comparison, uncertainty assessment
+
+**3. Energy Plot (`plot_energy`)** - NUTS Sampler Diagnostic
+```python
+# Identify problematic posterior geometry
+pipeline.plot_energy()
+```
+Use for: Detecting heavy tails, funnels, poor parameterizations
+Note: Requires multi-chain MCMC (not single-chain)
+
+**4. Autocorrelation Plot (`plot_autocorr`)** - Mixing Diagnostic
+```python
+# Check MCMC mixing quality
+pipeline.plot_autocorr(
+    max_lag=100,                # Lag length to display
+    combined=False               # Per-chain or combined
+)
+```
+Use for: Assessing mixing, determining if more samples needed
+Goal: Autocorrelation drops to ~0 within few dozen lags
+
+**5. Rank Plot (`plot_rank`)** - Convergence Diagnostic
+```python
+# Modern convergence diagnostic (alternative to trace plots)
+pipeline.plot_rank()
+```
+Use for: Detecting non-convergence, chain sticking, insufficient mixing
+Goal: Uniform histogram across all bins
+
+**6. ESS Plot (`plot_ess`)** - Effective Sample Size
+```python
+# Quantify sampling efficiency
+pipeline.plot_ess(
+    kind='local'                # 'local', 'quantile', or 'evolution'
+)
+```
+Use for: Assessing which parameters need more sampling
+Goal: ESS > 400 for bulk and tail estimates
+
+**Converting to ArviZ InferenceData**
+```python
+# Access ArviZ InferenceData directly for advanced analysis
+idata = pipeline._bayesian_result.to_inference_data()
+
+# Use any ArviZ function
+import arviz as az
+az.plot_trace(idata)
+az.summary(idata)
 ```
 
 ### Troubleshooting

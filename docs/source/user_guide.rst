@@ -24,6 +24,14 @@ Phase 2: Models and Transforms
    user_guide/modular_api
    user_guide/multi_technique_fitting
 
+Bayesian Inference (Phase 2+)
+------------------------------
+
+.. toctree::
+   :maxdepth: 2
+
+   user_guide/bayesian_inference
+
 Data Input/Output
 -----------------
 
@@ -58,8 +66,9 @@ Quick Navigation
 **For advanced users:**
 
 1. Implement :doc:`user_guide/multi_technique_fitting` for complex analyses
-2. Dive into :doc:`user_guide/core_concepts` for architecture details
-3. Study :doc:`user_guide/visualization_guide` for publication-quality plots
+2. Master :doc:`user_guide/bayesian_inference` for MCMC analysis with ArviZ diagnostics
+3. Dive into :doc:`user_guide/core_concepts` for architecture details
+4. Study :doc:`user_guide/visualization_guide` for publication-quality plots
 
 Package Overview
 ----------------
@@ -151,6 +160,10 @@ This user guide is organized as follows:
 - :doc:`user_guide/modular_api`: Low-level API for maximum control
 - :doc:`user_guide/multi_technique_fitting`: Combining multiple experimental techniques
 
+**Bayesian Inference (Phase 2+)**
+
+- :doc:`user_guide/bayesian_inference`: NLSQ → NUTS workflow, ArviZ diagnostics, credible intervals
+
 **Additional Resources**
 
 - :doc:`api_reference`: Complete API documentation
@@ -168,11 +181,15 @@ Support and Community
 Version Information
 ~~~~~~~~~~~~~~~~~~~
 
-This documentation covers rheo version 0.2.0 (Phase 2 release).
+This documentation covers rheo version 0.1.0 (Initial Development - Unreleased).
 
-- **Phase 1** (v0.1.0): Core infrastructure, test mode detection, I/O, visualization
-- **Phase 2** (v0.2.0): 20 models, 5 transforms, Pipeline API, multi-technique fitting
-- **Phase 3** (planned): Bayesian inference, ML model selection, PDF reports
+Current features include:
+- Core infrastructure, test mode detection, I/O, visualization
+- 20 rheological models, 5 transforms, Pipeline API, multi-technique fitting
+- Bayesian inference (NLSQ → NUTS), ArviZ diagnostics, comprehensive MCMC
+- GPU-accelerated optimization with JAX and NLSQ
+
+**Note**: This is pre-release software under active development.
 
 Next Steps
 ----------

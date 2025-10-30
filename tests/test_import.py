@@ -16,7 +16,7 @@ def test_rheo_import():
 
     assert rheo is not None
     assert hasattr(rheo, "__version__")
-    assert rheo.__version__ == "1.0.0"
+    assert rheo.__version__ == "0.1.0"
 
 
 def test_submodule_imports():

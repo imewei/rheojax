@@ -205,7 +205,7 @@ Community and Support
         year = {2024},
         author = {Rheo Development Team},
         url = {https://github.com/username/rheo},
-        version = {1.0.0}
+        version = {0.1.0}
       }
 
 Indices and Tables
