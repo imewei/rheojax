@@ -50,19 +50,28 @@ class BayesianResult:
             - r_hat: Gelman-Rubin statistic for each parameter (dict)
             - ess: Effective sample size for each parameter (dict)
             - divergences: Number of divergent transitions (int)
+        mcmc: NumPyro MCMC object containing full sampling information including
+            NUTS-specific diagnostics (energy, divergences, tree depth).
+            Required for ArviZ visualization with full diagnostics.
         model_comparison: Dictionary for model comparison metrics (WAIC, LOO).
             Currently a placeholder for future implementation.
+        _inference_data: Cached ArviZ InferenceData object. Automatically
+            created on first access via to_inference_data(). Do not set manually.
 
     Example:
         >>> result = model.fit_bayesian(X, y)
         >>> print(result.summary["a"]["mean"])
         >>> print(result.diagnostics["r_hat"]["a"])
+        >>> # Convert to ArviZ InferenceData for advanced plotting
+        >>> idata = result.to_inference_data()
     """
 
     posterior_samples: dict[str, np.ndarray]
     summary: dict[str, dict[str, float]]
     diagnostics: dict[str, Any]
+    mcmc: MCMC | None = None
     model_comparison: dict[str, float] = field(default_factory=dict)
+    _inference_data: Any | None = field(default=None, repr=False)
 
     def __post_init__(self):
         """Validate result after initialization."""
@@ -70,6 +79,68 @@ class BayesianResult:
         for name, samples in self.posterior_samples.items():
             if not isinstance(samples, np.ndarray):
                 self.posterior_samples[name] = np.asarray(samples, dtype=np.float64)
+
+    def to_inference_data(self) -> Any:
+        """Convert to ArviZ InferenceData format for advanced visualization.
+
+        Converts the NumPyro MCMC result to ArviZ InferenceData format, which
+        enables access to ArviZ's comprehensive plotting and diagnostic tools.
+        The conversion preserves all NUTS-specific diagnostics including energy,
+        divergences, and tree depth information.
+
+        The InferenceData object is cached after first conversion to avoid
+        repeated conversion overhead.
+
+        Returns:
+            ArviZ InferenceData object containing:
+                - posterior: Posterior samples for all parameters
+                - sample_stats: NUTS diagnostics (energy, divergences, etc.)
+                - Additional groups as available from NumPyro
+
+        Raises:
+            ImportError: If arviz is not installed
+            ValueError: If MCMC object was not stored (older results)
+
+        Example:
+            >>> result = model.fit_bayesian(X, y)
+            >>> idata = result.to_inference_data()
+            >>>
+            >>> # Now use ArviZ plotting functions
+            >>> import arviz as az
+            >>> az.plot_trace(idata)
+            >>> az.plot_pair(idata)
+            >>> az.plot_energy(idata)
+
+        Note:
+            Requires arviz package: pip install arviz
+            The MCMC object must be present (automatically stored by fit_bayesian).
+        """
+        # Return cached version if available
+        if self._inference_data is not None:
+            return self._inference_data
+
+        # Import arviz (lazy import)
+        try:
+            import arviz as az
+        except ImportError:
+            raise ImportError(
+                "ArviZ is required for InferenceData conversion. "
+                "Install it with: pip install arviz"
+            ) from None
+
+        # Ensure MCMC object is available
+        if self.mcmc is None:
+            raise ValueError(
+                "MCMC object not available for conversion. "
+                "This may be a result from an older version. "
+                "Re-run fit_bayesian() to generate a compatible result."
+            )
+
+        # Convert using ArviZ's from_numpyro utility
+        # This preserves all NUTS diagnostics (energy, divergences, etc.)
+        self._inference_data = az.from_numpyro(self.mcmc)
+
+        return self._inference_data
 
 
 class BayesianMixin:
@@ -416,11 +487,12 @@ class BayesianMixin:
         # Compute convergence diagnostics
         diagnostics = self._compute_diagnostics(mcmc, posterior_samples)
 
-        # Create BayesianResult
+        # Create BayesianResult with MCMC object for ArviZ conversion
         result = BayesianResult(
             posterior_samples=posterior_samples,
             summary=summary,
             diagnostics=diagnostics,
+            mcmc=mcmc,  # Store MCMC object for ArviZ InferenceData conversion
             model_comparison={},  # Placeholder for future WAIC/LOO
         )
 

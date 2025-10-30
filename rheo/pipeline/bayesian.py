@@ -269,7 +269,7 @@ class BayesianPipeline(Pipeline):
         return df
 
     def plot_posterior(
-        self, param_name: str | None = None, **plot_kwargs
+        self, param_name: str | None = None, show: bool = True, **plot_kwargs
     ) -> BayesianPipeline:
         """Plot posterior distributions.
 
@@ -280,6 +280,7 @@ class BayesianPipeline(Pipeline):
         Args:
             param_name: Name of specific parameter to plot. If None,
                 plots all parameters (default: None)
+            show: Whether to call plt.show() (default: True)
             **plot_kwargs: Additional arguments passed to matplotlib
                 (e.g., bins, alpha, color)
 
@@ -294,6 +295,8 @@ class BayesianPipeline(Pipeline):
             >>> pipeline.plot_posterior()
             >>> # Plot specific parameter
             >>> pipeline.plot_posterior('a', bins=50, alpha=0.7)
+            >>> # Plot without showing (for save_figure)
+            >>> pipeline.plot_posterior(show=False).save_figure('posterior.pdf')
         """
         if self._bayesian_result is None:
             raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
@@ -356,13 +359,18 @@ class BayesianPipeline(Pipeline):
             axes_flat[idx].set_visible(False)
 
         plt.tight_layout()
-        plt.show()
+
+        # Store figure for save_figure() method
+        self._current_figure = fig
+
+        if show:
+            plt.show()
 
         self.history.append(("plot_posterior", param_name if param_name else "all"))
         return self
 
     def plot_trace(
-        self, param_name: str | None = None, **plot_kwargs
+        self, param_name: str | None = None, show: bool = True, **plot_kwargs
     ) -> BayesianPipeline:
         """Plot MCMC trace plots.
 
@@ -373,6 +381,7 @@ class BayesianPipeline(Pipeline):
         Args:
             param_name: Name of specific parameter to plot. If None,
                 plots all parameters (default: None)
+            show: Whether to call plt.show() (default: True)
             **plot_kwargs: Additional arguments passed to matplotlib
                 (e.g., alpha, linewidth)
 
@@ -387,6 +396,8 @@ class BayesianPipeline(Pipeline):
             >>> pipeline.plot_trace()
             >>> # Plot specific parameter
             >>> pipeline.plot_trace('a', alpha=0.5)
+            >>> # Plot without showing (for save_figure)
+            >>> pipeline.plot_trace(show=False).save_figure('trace.pdf')
         """
         if self._bayesian_result is None:
             raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
@@ -434,9 +445,524 @@ class BayesianPipeline(Pipeline):
             ax.grid(alpha=0.3)
 
         plt.tight_layout()
-        plt.show()
+
+        # Store figure for save_figure() method
+        self._current_figure = fig
+
+        if show:
+            plt.show()
 
         self.history.append(("plot_trace", param_name if param_name else "all"))
+        return self
+
+    def _get_inference_data(self) -> Any:
+        """Get or create ArviZ InferenceData from Bayesian result.
+
+        Helper method that retrieves the InferenceData object from the
+        BayesianResult, converting it on first access. The InferenceData
+        is cached for subsequent calls.
+
+        Returns:
+            ArviZ InferenceData object
+
+        Raises:
+            ValueError: If Bayesian inference has not been run
+            ImportError: If arviz is not installed
+
+        Example:
+            >>> idata = pipeline._get_inference_data()
+        """
+        if self._bayesian_result is None:
+            raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
+
+        return self._bayesian_result.to_inference_data()
+
+    def plot_pair(
+        self,
+        var_names: list[str] | None = None,
+        kind: str = "scatter",
+        divergences: bool = True,
+        show: bool = True,
+        **plot_kwargs,
+    ) -> BayesianPipeline:
+        """Plot pairwise relationships between parameters (pair plot).
+
+        Creates a matrix of scatter or KDE plots showing correlations between
+        parameters. This is critical for identifying parameter dependencies,
+        non-identifiability issues, and understanding the joint posterior
+        structure. Divergent transitions are highlighted by default to identify
+        problematic posterior geometry.
+
+        Args:
+            var_names: List of parameter names to plot. If None, plots all
+                parameters (default: None)
+            kind: Type of pair plot - "scatter", "kde", or "hexbin"
+                (default: "scatter")
+            divergences: Whether to highlight divergent transitions in red
+                (default: True). Useful for identifying problematic regions.
+            show: Whether to call plt.show() (default: True)
+            **plot_kwargs: Additional arguments passed to arviz.plot_pair()
+                (e.g., marginals, point_estimate_marker_style)
+
+        Returns:
+            self for method chaining
+
+        Raises:
+            ValueError: If Bayesian inference has not been run
+            ImportError: If arviz is not installed
+
+        Example:
+            >>> # Plot all parameters with divergences highlighted
+            >>> pipeline.plot_pair()
+            >>>
+            >>> # Plot specific parameters as KDE
+            >>> pipeline.plot_pair(var_names=["G0", "eta"], kind="kde")
+            >>>
+            >>> # Save without showing
+            >>> pipeline.plot_pair(show=False).save_figure("pair.pdf")
+
+        Note:
+            Pair plots are essential for diagnosing:
+            - Parameter correlations (indicates non-identifiability)
+            - Funnel geometry (divergences concentrated in specific regions)
+            - Multimodal posteriors (multiple clusters)
+        """
+        try:
+            import arviz as az
+        except ImportError:
+            raise ImportError(
+                "ArviZ is required for pair plots. Install it with: pip install arviz"
+            ) from None
+
+        # Get InferenceData
+        idata = self._get_inference_data()
+
+        # Create pair plot
+        axes = az.plot_pair(
+            idata,
+            var_names=var_names,
+            kind=kind,
+            divergences=divergences,
+            **plot_kwargs,
+        )
+
+        # Extract figure from axes
+        import matplotlib.pyplot as plt
+
+        if hasattr(axes, "figure"):
+            fig = axes.figure
+        elif hasattr(axes, "ravel"):
+            fig = axes.ravel()[0].figure
+        else:
+            fig = plt.gcf()
+
+        # Store figure for save_figure() method
+        self._current_figure = fig
+
+        if show:
+            plt.show()
+
+        self.history.append(("plot_pair", var_names if var_names else "all"))
+        return self
+
+    def plot_forest(
+        self,
+        var_names: list[str] | None = None,
+        combined: bool = True,
+        hdi_prob: float = 0.95,
+        show: bool = True,
+        **plot_kwargs,
+    ) -> BayesianPipeline:
+        """Plot forest plot with credible intervals for parameters.
+
+        Creates a forest plot showing parameter estimates with credible intervals
+        (highest density intervals). Excellent for comparing parameter magnitudes
+        and uncertainties at a glance. Each parameter is shown as a point estimate
+        with error bars representing the credible interval.
+
+        Args:
+            var_names: List of parameter names to plot. If None, plots all
+                parameters (default: None)
+            combined: Whether to combine multiple chains (default: True)
+            hdi_prob: Probability mass for credible interval (default: 0.95).
+                Common values: 0.68 (1σ), 0.95 (2σ), 0.997 (3σ)
+            show: Whether to call plt.show() (default: True)
+            **plot_kwargs: Additional arguments passed to arviz.plot_forest()
+                (e.g., rope, ref_val, colors)
+
+        Returns:
+            self for method chaining
+
+        Raises:
+            ValueError: If Bayesian inference has not been run
+            ImportError: If arviz is not installed
+
+        Example:
+            >>> # Plot all parameters with 95% CI
+            >>> pipeline.plot_forest()
+            >>>
+            >>> # Plot specific parameters with 68% CI
+            >>> pipeline.plot_forest(var_names=["G0", "eta"], hdi_prob=0.68)
+            >>>
+            >>> # Save without showing
+            >>> pipeline.plot_forest(show=False).save_figure("forest.pdf")
+
+        Note:
+            Forest plots are useful for:
+            - Quickly comparing parameter magnitudes
+            - Assessing parameter uncertainty
+            - Identifying parameters with poor estimation (wide intervals)
+        """
+        try:
+            import arviz as az
+        except ImportError:
+            raise ImportError(
+                "ArviZ is required for forest plots. Install it with: pip install arviz"
+            ) from None
+
+        # Get InferenceData
+        idata = self._get_inference_data()
+
+        # Create forest plot
+        axes = az.plot_forest(
+            idata,
+            var_names=var_names,
+            combined=combined,
+            hdi_prob=hdi_prob,
+            **plot_kwargs,
+        )
+
+        # Extract figure from axes
+        import matplotlib.pyplot as plt
+
+        if hasattr(axes, "figure"):
+            fig = axes.figure
+        elif isinstance(axes, np.ndarray):
+            fig = axes.ravel()[0].figure
+        else:
+            fig = plt.gcf()
+
+        # Store figure for save_figure() method
+        self._current_figure = fig
+
+        if show:
+            plt.show()
+
+        self.history.append(("plot_forest", var_names if var_names else "all"))
+        return self
+
+    def plot_energy(
+        self, show: bool = True, **plot_kwargs
+    ) -> BayesianPipeline:
+        """Plot NUTS energy diagnostic plot.
+
+        Creates an energy plot showing the distribution of energy transitions
+        during NUTS sampling. This is a NUTS-specific diagnostic that helps
+        identify problematic posterior geometry such as heavy tails, funnels,
+        or multimodal distributions. Energy transitions that differ between
+        the marginal and transition distributions indicate sampling problems.
+
+        Args:
+            show: Whether to call plt.show() (default: True)
+            **plot_kwargs: Additional arguments passed to arviz.plot_energy()
+
+        Returns:
+            self for method chaining
+
+        Raises:
+            ValueError: If Bayesian inference has not been run
+            ImportError: If arviz is not installed
+
+        Example:
+            >>> # Plot energy diagnostic
+            >>> pipeline.plot_energy()
+            >>>
+            >>> # Save without showing
+            >>> pipeline.plot_energy(show=False).save_figure("energy.pdf")
+
+        Note:
+            Energy diagnostics help identify:
+            - Heavy-tailed posteriors (energy dist has fat tails)
+            - Funnel geometry (energy varies dramatically)
+            - Problematic parameterizations
+            Good NUTS sampling shows similar marginal and transition energy distributions.
+        """
+        try:
+            import arviz as az
+        except ImportError:
+            raise ImportError(
+                "ArviZ is required for energy plots. Install it with: pip install arviz"
+            ) from None
+
+        # Get InferenceData
+        idata = self._get_inference_data()
+
+        # Create energy plot
+        axes = az.plot_energy(idata, **plot_kwargs)
+
+        # Extract figure from axes
+        import matplotlib.pyplot as plt
+
+        if hasattr(axes, "figure"):
+            fig = axes.figure
+        elif isinstance(axes, np.ndarray):
+            fig = axes.ravel()[0].figure
+        else:
+            fig = plt.gcf()
+
+        # Store figure for save_figure() method
+        self._current_figure = fig
+
+        if show:
+            plt.show()
+
+        self.history.append(("plot_energy", None))
+        return self
+
+    def plot_autocorr(
+        self,
+        var_names: list[str] | None = None,
+        combined: bool = False,
+        show: bool = True,
+        **plot_kwargs,
+    ) -> BayesianPipeline:
+        """Plot autocorrelation diagnostic for MCMC mixing.
+
+        Creates autocorrelation plots showing how correlated consecutive samples
+        are in the MCMC chain. High autocorrelation indicates poor mixing and
+        suggests more samples are needed for reliable inference. Ideally,
+        autocorrelation should decay quickly to zero.
+
+        Args:
+            var_names: List of parameter names to plot. If None, plots all
+                parameters (default: None)
+            combined: Whether to combine multiple chains (default: False)
+            show: Whether to call plt.show() (default: True)
+            **plot_kwargs: Additional arguments passed to arviz.plot_autocorr()
+                (e.g., max_lag)
+
+        Returns:
+            self for method chaining
+
+        Raises:
+            ValueError: If Bayesian inference has not been run
+            ImportError: If arviz is not installed
+
+        Example:
+            >>> # Plot autocorrelation for all parameters
+            >>> pipeline.plot_autocorr()
+            >>>
+            >>> # Plot specific parameters with longer lag
+            >>> pipeline.plot_autocorr(var_names=["G0"], max_lag=100)
+            >>>
+            >>> # Save without showing
+            >>> pipeline.plot_autocorr(show=False).save_figure("autocorr.pdf")
+
+        Note:
+            Autocorrelation diagnostics help identify:
+            - Poor mixing (high autocorrelation persists)
+            - Need for more samples (ESS will be low)
+            - Chain length adequacy
+            Goal: autocorrelation drops to ~0 within a few dozen lags.
+        """
+        try:
+            import arviz as az
+        except ImportError:
+            raise ImportError(
+                "ArviZ is required for autocorrelation plots. Install it with: pip install arviz"
+            ) from None
+
+        # Get InferenceData
+        idata = self._get_inference_data()
+
+        # Create autocorrelation plot
+        axes = az.plot_autocorr(
+            idata,
+            var_names=var_names,
+            combined=combined,
+            **plot_kwargs,
+        )
+
+        # Extract figure from axes
+        import matplotlib.pyplot as plt
+
+        if hasattr(axes, "figure"):
+            fig = axes.figure
+        elif isinstance(axes, np.ndarray):
+            fig = axes.ravel()[0].figure
+        else:
+            fig = plt.gcf()
+
+        # Store figure for save_figure() method
+        self._current_figure = fig
+
+        if show:
+            plt.show()
+
+        self.history.append(("plot_autocorr", var_names if var_names else "all"))
+        return self
+
+    def plot_rank(
+        self,
+        var_names: list[str] | None = None,
+        show: bool = True,
+        **plot_kwargs,
+    ) -> BayesianPipeline:
+        """Plot rank plot for convergence diagnostics.
+
+        Creates rank plots (also called rank histograms or rank-normalization
+        plots) which are a modern alternative to trace plots for diagnosing
+        convergence. A uniform rank distribution across chains indicates good
+        mixing and convergence. Non-uniformity suggests convergence problems.
+
+        Args:
+            var_names: List of parameter names to plot. If None, plots all
+                parameters (default: None)
+            show: Whether to call plt.show() (default: True)
+            **plot_kwargs: Additional arguments passed to arviz.plot_rank()
+
+        Returns:
+            self for method chaining
+
+        Raises:
+            ValueError: If Bayesian inference has not been run
+            ImportError: If arviz is not installed
+
+        Example:
+            >>> # Plot rank diagnostic for all parameters
+            >>> pipeline.plot_rank()
+            >>>
+            >>> # Plot specific parameters
+            >>> pipeline.plot_rank(var_names=["G0", "eta"])
+            >>>
+            >>> # Save without showing
+            >>> pipeline.plot_rank(show=False).save_figure("rank.pdf")
+
+        Note:
+            Rank plots help identify:
+            - Non-convergence (non-uniform rank distribution)
+            - Chain sticking (vertical bands)
+            - Insufficient mixing (patterns in ranks)
+            Goal: uniform histogram across all bins.
+        """
+        try:
+            import arviz as az
+        except ImportError:
+            raise ImportError(
+                "ArviZ is required for rank plots. Install it with: pip install arviz"
+            ) from None
+
+        # Get InferenceData
+        idata = self._get_inference_data()
+
+        # Create rank plot
+        axes = az.plot_rank(
+            idata,
+            var_names=var_names,
+            **plot_kwargs,
+        )
+
+        # Extract figure from axes
+        import matplotlib.pyplot as plt
+
+        if hasattr(axes, "figure"):
+            fig = axes.figure
+        elif isinstance(axes, np.ndarray):
+            fig = axes.ravel()[0].figure
+        else:
+            fig = plt.gcf()
+
+        # Store figure for save_figure() method
+        self._current_figure = fig
+
+        if show:
+            plt.show()
+
+        self.history.append(("plot_rank", var_names if var_names else "all"))
+        return self
+
+    def plot_ess(
+        self,
+        var_names: list[str] | None = None,
+        kind: str = "local",
+        show: bool = True,
+        **plot_kwargs,
+    ) -> BayesianPipeline:
+        """Plot effective sample size (ESS) diagnostic.
+
+        Creates a plot showing the effective sample size for each parameter,
+        which quantifies how many independent samples the MCMC chain is
+        equivalent to. Low ESS indicates high autocorrelation and suggests
+        more samples are needed. ESS values should ideally be > 400.
+
+        Args:
+            var_names: List of parameter names to plot. If None, plots all
+                parameters (default: None)
+            kind: Type of ESS plot - "local", "quantile", or "evolution"
+                (default: "local")
+            show: Whether to call plt.show() (default: True)
+            **plot_kwargs: Additional arguments passed to arviz.plot_ess()
+                (e.g., min_ess)
+
+        Returns:
+            self for method chaining
+
+        Raises:
+            ValueError: If Bayesian inference has not been run
+            ImportError: If arviz is not installed
+
+        Example:
+            >>> # Plot ESS for all parameters
+            >>> pipeline.plot_ess()
+            >>>
+            >>> # Plot quantile ESS
+            >>> pipeline.plot_ess(kind="quantile")
+            >>>
+            >>> # Save without showing
+            >>> pipeline.plot_ess(show=False).save_figure("ess.pdf")
+
+        Note:
+            ESS diagnostics help assess:
+            - Sampling efficiency (ESS / total samples)
+            - Which parameters need more sampling
+            - Overall chain quality
+            Goal: ESS > 400 for bulk and tail estimates.
+        """
+        try:
+            import arviz as az
+        except ImportError:
+            raise ImportError(
+                "ArviZ is required for ESS plots. Install it with: pip install arviz"
+            ) from None
+
+        # Get InferenceData
+        idata = self._get_inference_data()
+
+        # Create ESS plot
+        axes = az.plot_ess(
+            idata,
+            var_names=var_names,
+            kind=kind,
+            **plot_kwargs,
+        )
+
+        # Extract figure from axes
+        import matplotlib.pyplot as plt
+
+        if hasattr(axes, "figure"):
+            fig = axes.figure
+        elif isinstance(axes, np.ndarray):
+            fig = axes.ravel()[0].figure
+        else:
+            fig = plt.gcf()
+
+        # Store figure for save_figure() method
+        self._current_figure = fig
+
+        if show:
+            plt.show()
+
+        self.history.append(("plot_ess", var_names if var_names else "all"))
         return self
 
     def reset(self) -> BayesianPipeline:

@@ -13,6 +13,7 @@ from rheo.visualization.plotter import (
     plot_residuals,
     plot_rheo_data,
     plot_time_domain,
+    save_figure,
 )
 from rheo.visualization.templates import (
     apply_template_style,
@@ -29,6 +30,7 @@ __all__ = [
     "plot_frequency_domain",
     "plot_flow_curve",
     "plot_residuals",
+    "save_figure",
     # Template functions
     "plot_stress_strain",
     "plot_modulus_frequency",

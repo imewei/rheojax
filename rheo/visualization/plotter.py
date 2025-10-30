@@ -6,6 +6,7 @@ with automatic plot type selection based on data characteristics.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -494,3 +495,129 @@ def plot_residuals(
 
         fig.tight_layout()
         return fig, ax
+
+
+def save_figure(
+    fig: Figure,
+    filepath: str | Path,
+    format: str | None = None,
+    dpi: int = 300,
+    bbox_inches: str = "tight",
+    **kwargs: Any,
+) -> Path:
+    """
+    Save matplotlib figure to file with publication-quality defaults.
+
+    This convenience function wraps matplotlib's savefig() with sensible defaults
+    for publication-quality figures, automatic format detection, and path validation.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Figure object to save
+    filepath : str or Path
+        Output file path. Format inferred from extension if not specified.
+    format : str, optional
+        Output format ('pdf', 'svg', 'png', 'eps'). If None, inferred from filepath extension.
+    dpi : int, default=300
+        Resolution for raster formats (PNG). Ignored for vector formats (PDF, SVG, EPS).
+        Common values:
+        - 150: Draft quality
+        - 300: Publication quality (default)
+        - 600: High-resolution print
+    bbox_inches : str, default='tight'
+        Bounding box adjustment. 'tight' removes extra whitespace around figure.
+    **kwargs : dict
+        Additional keyword arguments passed to matplotlib's savefig().
+        Common options:
+        - transparent : bool - Transparent background (default False)
+        - facecolor : color - Figure background color
+        - edgecolor : color - Figure edge color
+        - pad_inches : float - Padding around figure
+
+    Returns
+    -------
+    Path
+        Absolute path to saved file (for confirmation/logging)
+
+    Raises
+    ------
+    ValueError
+        If format cannot be inferred from filepath or is unsupported
+    OSError
+        If filepath directory doesn't exist or lacks write permissions
+
+    Examples
+    --------
+    Save figure to PDF with defaults:
+
+    >>> fig, ax = plot_rheo_data(data)
+    >>> save_figure(fig, 'analysis.pdf')
+    PosixPath('/path/to/analysis.pdf')
+
+    Save PNG with high resolution:
+
+    >>> save_figure(fig, 'figure.png', dpi=600)
+    PosixPath('/path/to/figure.png')
+
+    Save SVG with transparent background:
+
+    >>> save_figure(fig, 'diagram.svg', transparent=True)
+    PosixPath('/path/to/diagram.svg')
+
+    Explicit format specification:
+
+    >>> save_figure(fig, 'output', format='pdf')
+    PosixPath('/path/to/output.pdf')
+
+    See Also
+    --------
+    plot_rheo_data : Automatic plot type selection
+    Pipeline.save_figure : Fluent API integration
+
+    Notes
+    -----
+    Supported formats:
+    - PDF: Vector format, ideal for publications and LaTeX documents
+    - SVG: Vector format, editable in Inkscape/Illustrator
+    - PNG: Raster format, good for presentations and web
+    - EPS: Vector format, legacy publication format
+
+    DPI only affects raster formats (PNG). Vector formats (PDF, SVG, EPS) are
+    resolution-independent.
+    """
+    filepath = Path(filepath)
+
+    # Infer format from extension if not specified
+    if format is None:
+        if filepath.suffix:
+            format = filepath.suffix.lstrip(".")
+        else:
+            raise ValueError(
+                f"Cannot infer format from filepath '{filepath}' (no extension). "
+                "Provide explicit format parameter or use file extension "
+                "(e.g., 'output.pdf')."
+            )
+
+    # Validate format
+    supported_formats = {"pdf", "svg", "png", "eps"}
+    format_lower = format.lower()
+    if format_lower not in supported_formats:
+        raise ValueError(
+            f"Unsupported format '{format}'. "
+            f"Supported formats: {', '.join(sorted(supported_formats))}."
+        )
+
+    # Ensure directory exists
+    if not filepath.parent.exists():
+        raise OSError(
+            f"Directory does not exist: {filepath.parent}. "
+            "Create directory before saving."
+        )
+
+    # Save figure
+    fig.savefig(
+        filepath, format=format_lower, dpi=dpi, bbox_inches=bbox_inches, **kwargs
+    )
+
+    return filepath.resolve()
