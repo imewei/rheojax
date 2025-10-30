@@ -21,8 +21,12 @@ if TYPE_CHECKING:
     from rheo.core.data import RheoData
 
 
-class TestMode(str, Enum):
-    """Enumeration of rheological test modes."""
+class TestModeEnum(str, Enum):
+    """Enumeration of rheological test modes.
+
+    Note: Named TestModeEnum (not TestMode) to avoid pytest collection warnings.
+    Pytest treats classes starting with 'Test' and ending without 'Enum' as test classes.
+    """
 
     RELAXATION = "relaxation"
     CREEP = "creep"
@@ -33,6 +37,11 @@ class TestMode(str, Enum):
     def __str__(self) -> str:
         """Return string representation."""
         return self.value
+
+
+# Backward compatibility aliases
+RheoTestMode = TestModeEnum  # Transition name
+TestMode = TestModeEnum  # Original name (deprecated)
 
 
 def is_monotonic_increasing(
@@ -91,7 +100,7 @@ def is_monotonic_decreasing(
         return np.all(diffs <= tolerance)
 
 
-def detect_test_mode(rheo_data: RheoData) -> TestMode:
+def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
     """Detect rheological test mode from data characteristics.
 
     The detection algorithm uses the following heuristics:
@@ -137,7 +146,7 @@ def detect_test_mode(rheo_data: RheoData) -> TestMode:
 
     # Frequency domain → OSCILLATION (SAOS)
     if domain == "frequency":
-        return TestMode.OSCILLATION
+        return TestModeEnum.OSCILLATION
 
     # Check x_units for frequency indicators
     if x_units is not None:
@@ -145,11 +154,11 @@ def detect_test_mode(rheo_data: RheoData) -> TestMode:
 
         # Frequency units → OSCILLATION
         if any(unit in x_units_lower for unit in ["rad/s", "hz", "hertz"]):
-            return TestMode.OSCILLATION
+            return TestModeEnum.OSCILLATION
 
         # Shear rate units → ROTATION (steady shear)
         if any(unit in x_units_lower for unit in ["1/s", "s^-1", "s-1", "/s"]):
-            return TestMode.ROTATION
+            return TestModeEnum.ROTATION
 
     # 3. Time-domain analysis: check monotonicity
     if domain == "time" or domain is None:
@@ -167,11 +176,11 @@ def detect_test_mode(rheo_data: RheoData) -> TestMode:
 
         # For relaxation: stress should decrease over time
         if is_monotonic_decreasing(y_data, strict=False, tolerance=tolerance):
-            return TestMode.RELAXATION
+            return TestModeEnum.RELAXATION
 
         # For creep: strain/compliance should increase over time
         if is_monotonic_increasing(y_data, strict=False, tolerance=tolerance):
-            return TestMode.CREEP
+            return TestModeEnum.CREEP
 
     # 4. Fall back to UNKNOWN if we can't determine
     warnings.warn(
@@ -179,7 +188,7 @@ def detect_test_mode(rheo_data: RheoData) -> TestMode:
         "Consider setting test_mode explicitly in metadata.",
         UserWarning, stacklevel=2,
     )
-    return TestMode.UNKNOWN
+    return TestModeEnum.UNKNOWN
 
 
 def validate_test_mode(test_mode: str | TestMode) -> TestMode:

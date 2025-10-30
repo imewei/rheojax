@@ -523,7 +523,7 @@ class FrequencyToTimePipeline(Pipeline):
 
         for i, t_i in enumerate(t):
             # Approximate G(t) from G*(ω) using cos transform
-            G_t[i] = np.trapz(np.real(G_star) * np.cos(omega * t_i), omega) * (
+            G_t[i] = np.trapezoid(np.real(G_star) * np.cos(omega * t_i), omega) * (
                 2 / np.pi
             )
 
