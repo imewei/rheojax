@@ -168,7 +168,7 @@ This user guide is organized as follows:
 
 - :doc:`api_reference`: Complete API documentation
 - :doc:`developer/contributing`: Contributing guide for developers
-- Example notebooks: ``docs/examples/`` directory
+- :doc:`examples/index`: 20 tutorial notebooks (basic, transforms, bayesian, advanced)
 
 Support and Community
 ~~~~~~~~~~~~~~~~~~~~~

@@ -104,6 +104,12 @@ Contents
 
 .. toctree::
    :maxdepth: 2
+   :caption: Tutorial Notebooks
+
+   examples/index
+
+.. toctree::
+   :maxdepth: 2
    :caption: Developer Documentation
 
    developer/architecture
@@ -121,26 +127,28 @@ Contents
 Development Status
 ------------------
 
-**Phase 1 (Complete)**: Core Infrastructure
+**Phase 1 (Complete)**: Core Infrastructure ✅
    - ✅ Base abstractions (BaseModel, BaseTransform, RheoData, Parameters)
    - ✅ Test mode detection system
    - ✅ Mittag-Leffler functions for fractional calculus
-   - ✅ Optimization integration with JAX gradients
+   - ✅ Optimization integration with JAX gradients (NLSQ 5-270x speedup)
    - ✅ Model and Transform registry system
    - ✅ File I/O (TRIOS, CSV, Excel, Anton Paar readers; HDF5, Excel writers)
    - ✅ Visualization with matplotlib
 
-**Phase 2 (Planned)**: Models and Transforms
-   - 20+ rheological models (Maxwell, Zener, fractional models, flow models)
-   - Data transforms (master curves, FFT analysis, OWChirp)
-   - Pipeline API for workflows
-   - Enhanced visualization templates
+**Phase 2 (Complete)**: Models and Transforms ✅
+   - ✅ 20 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models)
+   - ✅ 5 data transforms (FFT, Mastercurve/TTS, Mutation Number, OWChirp/LAOS, Smooth Derivative)
+   - ✅ Pipeline API for fluent workflows
+   - ✅ BayesianPipeline with NLSQ → NUTS warm-start
+   - ✅ 20 tutorial notebooks (basic, transforms, bayesian, advanced)
 
-**Phase 3 (Future)**: Advanced Features
-   - Bayesian parameter estimation
-   - Uncertainty quantification
-   - Multi-objective optimization
-   - Machine learning integration
+**Phase 3 (Complete)**: Bayesian Inference ✅
+   - ✅ NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
+   - ✅ Uncertainty quantification via credible intervals
+   - ✅ ArviZ integration (6 diagnostic plot types)
+   - ✅ Model comparison (WAIC/LOO)
+   - ✅ All 20 models support Bayesian inference
 
 Technology Stack
 ----------------

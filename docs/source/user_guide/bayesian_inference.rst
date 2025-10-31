@@ -738,4 +738,4 @@ Further Reading
    - Betancourt (2017). "A Conceptual Introduction to Hamiltonian Monte Carlo"
 
 **Rheo Examples**
-   See ``docs/examples/`` for additional Bayesian workflow examples.
+   See :doc:`../examples/index` for 5 comprehensive Bayesian inference tutorial notebooks.
