@@ -17,6 +17,18 @@ data/
     └── polystyrene_creep.csv
 ```
 
+## Privacy and Anonymization
+
+**All experimental data files have been fully anonymized for privacy protection:**
+
+- **Instrument identifiers**: Serial numbers, instrument names → `ANONYMIZED`
+- **Personal information**: Operators, users, project names → `Anonymous`
+- **Document metadata**: File paths, document IDs → `ANONYMIZED`
+- **Dates**: Specific dates → `MM/DD/YYYY`
+- **Sample details**: Sample names, notes → `Anonymous`
+
+The original TRIOS file structure is preserved to ensure compatibility with `rheo.io.readers.TRIOSReader` for educational and testing purposes.
+
 ## Data Paradigms
 
 ### Synthetic Data (Generated In-Notebook)
@@ -204,6 +216,48 @@ tts_data = TriosReader().read(data_dir / 'frequency_sweep_tts.txt')
 # Or use Pipeline API with auto-detection
 from rheo.pipeline import Pipeline
 pipeline = Pipeline().load(str(data_dir / 'frequency_sweep_tts.txt'))
+```
+
+### Error Handling Best Practices
+
+**Always check for file existence before loading to provide helpful error messages:**
+
+```python
+from pathlib import Path
+
+data_path = Path('../data/experimental/frequency_sweep_tts.txt')
+
+if not data_path.exists():
+    print(f"❌ Data file not found: {data_path}")
+    print("\nOptions:")
+    print("  1. Check that you're running from the correct directory")
+    print("  2. Verify the relative path is correct")
+    print("  3. Download from: https://github.com/imewei/Rheo/tree/main/examples/data")
+    raise FileNotFoundError(f"Required data file missing: {data_path}")
+
+# File exists - proceed with loading
+data = read_trios(data_path)
+```
+
+**For notebooks that can fall back to synthetic data:**
+
+```python
+from pathlib import Path
+
+data_path = Path('../data/experimental/multi_technique.txt')
+
+if data_path.exists():
+    # Use real experimental data
+    print("✓ Loading experimental data")
+    data = read_trios(data_path)
+else:
+    # Generate synthetic data as fallback
+    print("⚠ Experimental data not found - using synthetic data")
+    import numpy as np
+    np.random.seed(42)
+    t = np.logspace(-2, 2, 50)
+    G_t = 1e5 * np.exp(-t / 0.01)
+    # ... generate synthetic dataset
 ```
 
 ### Generating Synthetic Data

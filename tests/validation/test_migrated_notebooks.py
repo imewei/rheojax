@@ -38,11 +38,15 @@ from typing import Dict, Any, Tuple, List
 
 
 # Configuration
-EXAMPLES_DIR = Path("/Users/b80985/Projects/Rheo/examples/")
-TOLERANCE = 1e-6
-RHAT_THRESHOLD = 1.01
-ESS_THRESHOLD = 400
-DIVERGENCE_RATE_THRESHOLD = 0.01
+EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
+
+# Numerical validation tolerance
+TOLERANCE = 1e-6  # Relative error tolerance for float64 precision validation
+
+# Bayesian convergence thresholds (per Vehtari et al. 2021, ArviZ documentation)
+RHAT_THRESHOLD = 1.01  # R-hat < 1.01 indicates convergence (strict criterion)
+ESS_THRESHOLD = 400  # Minimum effective sample size for reliable inference
+DIVERGENCE_RATE_THRESHOLD = 0.01  # < 1% divergences acceptable for NUTS sampler
 
 
 # ============================================================================

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- **Tutorial Consolidation**: Migrated all tutorial notebooks to unified `examples/` directory
+  - 22 notebooks organized into 4 learning paths (basic, transforms, bayesian, advanced)
+  - Added `examples/advanced/06-frequentist-model-selection.ipynb` (AIC/BIC model comparison)
+  - Added `examples/transforms/02b-mastercurve-wlf-validation.ipynb` (WLF parameter validation with synthetic data)
+  - Deprecated `docs/examples/` directory (legacy notebooks removed or superseded)
+  - Updated all Sphinx documentation references (`user_guide.rst`, `bayesian_inference.rst`, `examples/index.rst`)
+  - Total learning time: 13-16 hours across all tutorials
+  - See `examples/README.md` for complete tutorial guide
+
+### Changed
+- **Examples directory structure**: Moved from `docs/examples/` to `examples/` with improved organization
+- **Data anonymization**: Completed full anonymization of experimental data (serial numbers, operators, dates)
+- **Test configuration**: Added `notebook_smoke` pytest marker for notebook validation framework
+
+### Fixed
+- Fixed hardcoded absolute path in `tests/validation/test_migrated_notebooks.py`
+- Documented Bayesian convergence threshold rationale (R-hat, ESS, divergences)
+
 ## [0.1.0] - TBD (Initial Development)
 
 ### Added

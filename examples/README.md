@@ -13,11 +13,11 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - All 20 rheological models with examples
 - Advanced transforms for experimental data analysis
 
-**22 Tutorial Notebooks** organized into 4 learning paths:
-- **Basic Model Fitting** (5 notebooks) - Fundamental rheological models
-- **Transform Workflows** (6 notebooks) - Data analysis techniques
-- **Bayesian Inference** (5 notebooks) - Uncertainty quantification
-- **Advanced Workflows** (6 notebooks) - Production patterns
+**22 Tutorial Notebooks** (18 complete ✅, 4 stubs 🚧) organized into 4 learning paths:
+- **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
+- **Transform Workflows** (6 notebooks ✅) - Data analysis techniques
+- **Bayesian Inference** (5 notebooks ✅) - Uncertainty quantification
+- **Advanced Workflows** (2 complete ✅, 4 stubs 🚧) - Production patterns
 
 ## Prerequisites
 
@@ -170,14 +170,14 @@ Master Bayesian uncertainty quantification and advanced diagnostics with compreh
 
 Tackle complex, production-ready analysis patterns for advanced rheological characterization.
 
-| Notebook | Focus | Time | Key Topics |
-|----------|-------|------|------------|
-| **[01-multi-technique-fitting.ipynb](advanced/01-multi-technique-fitting.ipynb)** | Constrained Fitting | 45 min | Simultaneous oscillation + relaxation, parameter consistency validation, cross-domain predictions, uncertainty reduction |
-| **[02-batch-processing.ipynb](advanced/02-batch-processing.ipynb)** | Parallel Execution | 50 min | BatchPipeline, JAX vmap vectorization (5-10x speedup), aggregated statistics, HDF5 export |
-| **[03-custom-models.ipynb](advanced/03-custom-models.ipynb)** | Model Development | 55 min | BaseModel inheritance, Burgers model example, ModelRegistry integration, automatic Bayesian capabilities |
-| **[04-fractional-models-deep-dive.ipynb](advanced/04-fractional-models-deep-dive.ipynb)** | Fractional Calculus | 60 min | All 11 fractional models, α parameter interpretation, power-law vs exponential, model selection criteria |
-| **[05-performance-optimization.ipynb](advanced/05-performance-optimization.ipynb)** | GPU & JIT | 45 min | CPU vs GPU benchmarking, JAX JIT compilation, profiling, memory optimization, scaling to 100K+ points |
-| **[06-frequentist-model-selection.ipynb](advanced/06-frequentist-model-selection.ipynb)** | Frequentist Selection | 45 min | ModelComparisonPipeline, AIC/BIC information criteria, AIC weights, evidence ratios, complexity trade-offs |
+| Notebook | Focus | Time | Status | Key Topics |
+|----------|-------|------|--------|------------|
+| **[01-multi-technique-fitting.ipynb](advanced/01-multi-technique-fitting.ipynb)** | Constrained Fitting | 45 min | ✅ Complete | Simultaneous oscillation + relaxation, parameter consistency validation, cross-domain predictions, uncertainty reduction |
+| **[02-batch-processing.ipynb](advanced/02-batch-processing.ipynb)** | Parallel Execution | ~15 min | 🚧 Stub | BatchPipeline basics demonstrated; full version with vmap, aggregation, HDF5 export coming soon |
+| **[03-custom-models.ipynb](advanced/03-custom-models.ipynb)** | Model Development | ~20 min | 🚧 Stub | Simplified Burgers model shown; full version with advanced features coming soon |
+| **[04-fractional-models-deep-dive.ipynb](advanced/04-fractional-models-deep-dive.ipynb)** | Fractional Calculus | ~10 min | 🚧 Stub | Basic introduction; comprehensive coverage of 11 models coming soon |
+| **[05-performance-optimization.ipynb](advanced/05-performance-optimization.ipynb)** | GPU & JIT | ~10 min | 🚧 Stub | Basic concepts; full benchmarking and optimization guide coming soon |
+| **[06-frequentist-model-selection.ipynb](advanced/06-frequentist-model-selection.ipynb)** | Frequentist Selection | 45 min | ✅ Complete | ModelComparisonPipeline, AIC/BIC information criteria, AIC weights, evidence ratios, complexity trade-offs |
 
 **Recommended Learning Path:**
 1. Start with **01-multi-technique-fitting** - builds on Phase 1 Maxwell/Zener knowledge
@@ -194,7 +194,7 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 - Understanding of JAX acceleration concepts
 - For notebook 05: GPU installation (Linux + CUDA only, optional)
 
-**Total Time Investment:** 4.5-5.5 hours for all 6 notebooks
+**Total Time Investment:** ~2-2.5 hours for complete notebooks (01, 06); ~1 hour for stubs (02-05)
 
 **Learning Outcomes:**
 - Master multi-technique constrained fitting for parameter consistency
