@@ -57,7 +57,7 @@ For thermoplastic polymers above T_g:
 
    .. code-block:: python
 
-      from rheo.models import Maxwell
+      from rheojax.models import Maxwell
       model = Maxwell()
       model.fit(omega, G_star)
       # G_s: rubbery modulus, eta_s: viscosity
@@ -66,7 +66,7 @@ For thermoplastic polymers above T_g:
 
    .. code-block:: python
 
-      from rheo.models import FractionalMaxwellGel
+      from rheojax.models import FractionalMaxwellGel
       model = FractionalMaxwellGel()
       # G_s: modulus, V: fractional viscosity, alpha: fractional order
 
@@ -74,7 +74,7 @@ For thermoplastic polymers above T_g:
 
    .. code-block:: python
 
-      from rheo.models import FractionalMaxwellModel
+      from rheojax.models import FractionalMaxwellModel
       model = FractionalMaxwellModel()
       # Most flexible for wide frequency sweeps
 
@@ -86,7 +86,7 @@ For hydrogels, organogels, and soft biological materials:
 
    .. code-block:: python
 
-      from rheo.models import SpringPot
+      from rheojax.models import SpringPot
       model = SpringPot()
       # V: fractional stiffness, alpha: power-law exponent (0.1-0.5 typical)
 
@@ -94,7 +94,7 @@ For hydrogels, organogels, and soft biological materials:
 
    .. code-block:: python
 
-      from rheo.models import FractionalKelvinVoigt
+      from rheojax.models import FractionalKelvinVoigt
       model = FractionalKelvinVoigt()
       # Captures both elastic plateau and slow relaxation
 
@@ -102,7 +102,7 @@ For hydrogels, organogels, and soft biological materials:
 
    .. code-block:: python
 
-      from rheo.models import FractionalZenerSolidSolid, FZSS
+      from rheojax.models import FractionalZenerSolidSolid, FZSS
       model = FZSS()  # Short alias available
       # Two elastic components + fractional element
 
@@ -114,7 +114,7 @@ For dilute to concentrated polymer solutions in flow:
 
    .. code-block:: python
 
-      from rheo.models import PowerLaw
+      from rheojax.models import PowerLaw
       model = PowerLaw()
       # K: consistency, n: flow index (n<1 for shear thinning)
 
@@ -122,7 +122,7 @@ For dilute to concentrated polymer solutions in flow:
 
    .. code-block:: python
 
-      from rheo.models import Carreau
+      from rheojax.models import Carreau
       model = Carreau()
       # eta_0: zero-shear viscosity, eta_inf: infinite-shear viscosity
       # lambda: time constant, n: power-law index
@@ -131,7 +131,7 @@ For dilute to concentrated polymer solutions in flow:
 
    .. code-block:: python
 
-      from rheo.models import CarreauYasuda
+      from rheojax.models import CarreauYasuda
       model = CarreauYasuda()
       # Additional parameter 'a' controls transition sharpness
 
@@ -143,7 +143,7 @@ For concentrated suspensions, pastes, and yield stress fluids:
 
    .. code-block:: python
 
-      from rheo.models import HerschelBulkley
+      from rheojax.models import HerschelBulkley
       model = HerschelBulkley()
       # tau_0: yield stress, K: consistency, n: flow index
 
@@ -151,7 +151,7 @@ For concentrated suspensions, pastes, and yield stress fluids:
 
    .. code-block:: python
 
-      from rheo.models import Bingham
+      from rheojax.models import Bingham
       model = Bingham()
       # tau_0: yield stress, eta_pl: plastic viscosity
       # Simpler alternative to Herschel-Bulkley when n ≈ 1
@@ -243,8 +243,8 @@ Follow this systematic approach:
 
    .. code-block:: python
 
-      from rheo.models import Maxwell, Zener
-      from rheo.core.registry import ModelRegistry
+      from rheojax.models import Maxwell, Zener
+      from rheojax.core.registry import ModelRegistry
 
       # Try Maxwell first
       maxwell = Maxwell()
@@ -293,7 +293,7 @@ Follow this systematic approach:
    .. code-block:: python
 
       # If Maxwell/Zener have systematic errors in mid-frequency
-      from rheo.models import FractionalMaxwellGel
+      from rheojax.models import FractionalMaxwellGel
 
       fmg = FractionalMaxwellGel()
       fmg.fit(X, y)
@@ -386,7 +386,7 @@ For polymers and soft matter:
 
    import numpy as np
    import matplotlib.pyplot as plt
-   from rheo.models import Zener, FractionalMaxwellGel
+   from rheojax.models import Zener, FractionalMaxwellGel
 
    # Generate synthetic data with power-law decay
    omega = np.logspace(-2, 2, 50)
@@ -421,8 +421,8 @@ For complex materials, consider **multi-technique fitting** with fractional mode
 
 .. code-block:: python
 
-   from rheo.models import FractionalMaxwellModel
-   from rheo.core import SharedParameterSet
+   from rheojax.models import FractionalMaxwellModel
+   from rheojax.core import SharedParameterSet
 
    # Use same model for both oscillation and relaxation data
    shared_params = SharedParameterSet()
@@ -642,7 +642,7 @@ Solution: Check model documentation for supported test modes
 
 .. code-block:: python
 
-   from rheo.core.test_modes import get_compatible_test_modes
+   from rheojax.core.test_modes import get_compatible_test_modes
 
    model = HerschelBulkley()
    compatible = get_compatible_test_modes('herschel_bulkley')
@@ -655,7 +655,7 @@ Solution: Use smoothing transforms before fitting
 
 .. code-block:: python
 
-   from rheo.transforms import SmoothDerivative
+   from rheojax.transforms import SmoothDerivative
 
    # Smooth noisy data before fitting
    smoother = SmoothDerivative(method='savgol', window=11, order=2)
@@ -671,7 +671,7 @@ Solution: Examine parameter confidence intervals and correlations
 .. code-block:: python
 
    # After fitting, check parameter sensitivity
-   from rheo.utils.optimization import calculate_confidence_intervals
+   from rheojax.utils.optimization import calculate_confidence_intervals
 
    ci = calculate_confidence_intervals(model, X, y, alpha=0.05)
    print("95% Confidence Intervals:")

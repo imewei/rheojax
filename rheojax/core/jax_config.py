@@ -10,7 +10,7 @@ Critical Import Order:
 
 Usage:
     ```python
-    from rheo.core.jax_config import safe_import_jax
+    from rheojax.core.jax_config import safe_import_jax
     jax, jnp = safe_import_jax()
     ```
 
@@ -73,14 +73,14 @@ def safe_import_jax() -> tuple[Any, Any]:
     Example:
         >>> # Correct usage (NLSQ imported first at package level)
         >>> import nlsq
-        >>> from rheo.core.jax_config import safe_import_jax
+        >>> from rheojax.core.jax_config import safe_import_jax
         >>> jax, jnp = safe_import_jax()
         >>> arr = jnp.array([1.0, 2.0, 3.0])  # Operates in float64
 
     Note:
-        The rheo package automatically imports NLSQ before JAX in __init__.py,
+        The rheojax package automatically imports NLSQ before JAX in __init__.py,
         so users don't need to worry about import order. This function is for
-        internal use by Rheo modules.
+        internal use by RheoJAX modules.
     """
     global _validation_done, _jax_module, _jnp_module
 
@@ -93,12 +93,12 @@ def safe_import_jax() -> tuple[Any, Any]:
         if "nlsq" not in sys.modules:
             raise ImportError(
                 "NLSQ must be imported before JAX to enable float64 precision.\n\n"
-                "The rheo package should automatically import NLSQ before JAX.\n"
-                "If you are seeing this error, ensure you are importing from rheo "
+                "The rheojax package should automatically import NLSQ before JAX.\n"
+                "If you are seeing this error, ensure you are importing from rheojax "
                 "and not directly importing JAX.\n\n"
                 "Correct usage:\n"
-                "    import rheo  # Automatically imports nlsq before JAX\n"
-                "    from rheo.core.jax_config import safe_import_jax\n"
+                "    import rheojax  # Automatically imports nlsq before JAX\n"
+                "    from rheojax.core.jax_config import safe_import_jax\n"
                 "    jax, jnp = safe_import_jax()\n\n"
                 "Incorrect usage:\n"
                 "    import jax  # Direct import bypasses float64 configuration\n\n"

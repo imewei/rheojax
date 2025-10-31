@@ -12,7 +12,7 @@ from typing import Any, Union
 
 import numpy as np
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

@@ -6,9 +6,9 @@ This module tests the Carreau-Yasuda model with transition parameter 'a'.
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
-from rheo.models.carreau_yasuda import CarreauYasuda
+from rheojax.core.data import RheoData
+from rheojax.core.test_modes import TestMode
+from rheojax.models.carreau_yasuda import CarreauYasuda
 
 
 class TestCarreauYasudaBasics:

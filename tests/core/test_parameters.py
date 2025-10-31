@@ -10,8 +10,8 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.parameters import (
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.parameters import (
     Parameter,
     ParameterConstraint,
     ParameterOptimizer,

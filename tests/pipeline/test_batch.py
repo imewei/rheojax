@@ -10,10 +10,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rheo.core.base import BaseModel
-from rheo.core.data import RheoData
-from rheo.core.registry import ModelRegistry
-from rheo.pipeline import BatchPipeline, Pipeline
+from rheojax.core.base import BaseModel
+from rheojax.core.data import RheoData
+from rheojax.core.registry import ModelRegistry
+from rheojax.pipeline import BatchPipeline, Pipeline
 
 
 # Mock model for testing

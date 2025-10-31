@@ -11,7 +11,7 @@ Main Components:
     - BatchPipeline: Process multiple datasets
 
 Example - Basic workflow:
-    >>> from rheo.pipeline import Pipeline
+    >>> from rheojax.pipeline import Pipeline
     >>> pipeline = (Pipeline()
     ...     .load('data.csv')
     ...     .fit('maxwell')
@@ -19,7 +19,7 @@ Example - Basic workflow:
     ...     .save('result.hdf5'))
 
 Example - Bayesian workflow:
-    >>> from rheo.pipeline import BayesianPipeline
+    >>> from rheojax.pipeline import BayesianPipeline
     >>> pipeline = (BayesianPipeline()
     ...     .load('data.csv')
     ...     .fit_nlsq('maxwell')
@@ -28,20 +28,20 @@ Example - Bayesian workflow:
     ...     .save('results.hdf5'))
 
 Example - Model comparison:
-    >>> from rheo.pipeline import ModelComparisonPipeline
+    >>> from rheojax.pipeline import ModelComparisonPipeline
     >>> pipeline = ModelComparisonPipeline(['maxwell', 'zener', 'springpot'])
     >>> pipeline.run(data)
     >>> best = pipeline.get_best_model()
 
 Example - Batch processing:
-    >>> from rheo.pipeline import Pipeline, BatchPipeline
+    >>> from rheojax.pipeline import Pipeline, BatchPipeline
     >>> template = Pipeline().fit('maxwell')
     >>> batch = BatchPipeline(template)
     >>> batch.process_directory('data/')
     >>> batch.export_summary('summary.xlsx')
 
 Example - Pipeline builder:
-    >>> from rheo.pipeline import PipelineBuilder
+    >>> from rheojax.pipeline import PipelineBuilder
     >>> pipeline = (PipelineBuilder()
     ...     .add_load_step('data.csv')
     ...     .add_transform_step('smooth', window_size=5)
@@ -49,14 +49,14 @@ Example - Pipeline builder:
     ...     .build())
 """
 
-from rheo.pipeline.base import Pipeline
-from rheo.pipeline.batch import BatchPipeline
-from rheo.pipeline.bayesian import BayesianPipeline
-from rheo.pipeline.builder import (
+from rheojax.pipeline.base import Pipeline
+from rheojax.pipeline.batch import BatchPipeline
+from rheojax.pipeline.bayesian import BayesianPipeline
+from rheojax.pipeline.builder import (
     ConditionalPipelineBuilder,
     PipelineBuilder,
 )
-from rheo.pipeline.workflows import (
+from rheojax.pipeline.workflows import (
     CreepToRelaxationPipeline,
     FrequencyToTimePipeline,
     MastercurvePipeline,

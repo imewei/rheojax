@@ -55,7 +55,7 @@ The :class:`SharedParameterSet` class enables multiple models to share parameter
 
 .. code-block:: python
 
-   from rheo.core.parameters import SharedParameterSet
+   from rheojax.core.parameters import SharedParameterSet
 
    # Create shared parameter set
    shared = SharedParameterSet()
@@ -65,7 +65,7 @@ The :class:`SharedParameterSet` class enables multiple models to share parameter
    shared.add_shared('eta_s', value=1e3, bounds=(1e1, 1e5), units='Pa·s')
 
    # Link models
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
 
    model_relaxation = Maxwell()
    model_oscillation = Maxwell()
@@ -107,7 +107,7 @@ Step-by-Step Implementation
 
 .. code-block:: python
 
-   from rheo.io import auto_load
+   from rheojax.io import auto_load
 
    # Load relaxation data
    data_relax = auto_load('relaxation.txt')
@@ -121,7 +121,7 @@ Step-by-Step Implementation
 
 .. code-block:: python
 
-   from rheo.core.parameters import SharedParameterSet
+   from rheojax.core.parameters import SharedParameterSet
    import numpy as np
 
    # Estimate initial values from data
@@ -141,7 +141,7 @@ Step-by-Step Implementation
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
 
    # Create two model instances
    maxwell_relax = Maxwell()
@@ -196,7 +196,7 @@ Step-by-Step Implementation
 
 .. code-block:: python
 
-   from rheo.utils.optimization import nlsq_optimize
+   from rheojax.utils.optimization import nlsq_optimize
 
    # Get initial parameters
    p0 = jnp.array([shared.get_value('G_s'), shared.get_value('eta_s')])
@@ -302,7 +302,7 @@ Share some parameters while keeping others independent:
 
 .. code-block:: python
 
-   from rheo.models import FractionalMaxwellGel
+   from rheojax.models import FractionalMaxwellGel
 
    # Create models
    fmg_relax = FractionalMaxwellGel()
@@ -382,8 +382,8 @@ Implementation
 
 .. code-block:: python
 
-   from rheo.models import FractionalMaxwellGel
-   from rheo.core.parameters import SharedParameterSet
+   from rheojax.models import FractionalMaxwellGel
+   from rheojax.core.parameters import SharedParameterSet
    import jax.numpy as jnp
 
    # Load data
@@ -426,7 +426,7 @@ Implementation
        return rss
 
    # Optimize
-   from rheo.utils.optimization import nlsq_optimize
+   from rheojax.utils.optimization import nlsq_optimize
 
    p0 = jnp.array([
        shared.get_value('G_s'),
@@ -466,8 +466,8 @@ Implementation
 
 .. code-block:: python
 
-   from rheo.models import FractionalMaxwellGel
-   from rheo.core.parameters import SharedParameterSet
+   from rheojax.models import FractionalMaxwellGel
+   from rheojax.core.parameters import SharedParameterSet
    import jax.numpy as jnp
 
    # Load multi-temperature data
@@ -581,7 +581,7 @@ Monitor optimization convergence:
 
 .. code-block:: python
 
-   from rheo.utils.optimization import nlsq_optimize
+   from rheojax.utils.optimization import nlsq_optimize
 
    # Store optimization history
    history = {'iteration': [], 'rss': [], 'params': []}

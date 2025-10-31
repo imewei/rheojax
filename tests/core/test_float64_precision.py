@@ -28,7 +28,7 @@ class TestFloat64ImportOrder:
 
         try:
             # This should raise an ImportError
-            from rheo.core.jax_config import safe_import_jax
+            from rheojax.core.jax_config import safe_import_jax
 
             with pytest.raises(ImportError, match="NLSQ must be imported before JAX"):
                 jax, jnp = safe_import_jax()
@@ -46,7 +46,7 @@ class TestFloat64ImportOrder:
         if "rheo.core.jax_config" in sys.modules:
             del sys.modules["rheo.core.jax_config"]
 
-        from rheo.core.jax_config import safe_import_jax
+        from rheojax.core.jax_config import safe_import_jax
 
         # This should succeed without raising
         jax, jnp = safe_import_jax()
@@ -64,7 +64,7 @@ class TestFloat64ImportOrder:
         if "rheo.core.jax_config" in sys.modules:
             del sys.modules["rheo.core.jax_config"]
 
-        from rheo.core.jax_config import safe_import_jax
+        from rheojax.core.jax_config import safe_import_jax
 
         jax, jnp = safe_import_jax()
 
@@ -83,7 +83,7 @@ class TestFloat64ImportOrder:
         if "rheo.core.jax_config" in sys.modules:
             del sys.modules["rheo.core.jax_config"]
 
-        from rheo.core.jax_config import verify_float64
+        from rheojax.core.jax_config import verify_float64
 
         # This should not raise an exception
         verify_float64()
@@ -101,7 +101,7 @@ class TestFloat64ImportOrder:
             del sys.modules["rheo.core.jax_config"]
 
         try:
-            from rheo.core.jax_config import safe_import_jax
+            from rheojax.core.jax_config import safe_import_jax
 
             with pytest.raises(ImportError) as exc_info:
                 jax, jnp = safe_import_jax()
@@ -129,7 +129,7 @@ class TestFloat64ImportOrder:
         if "rheo.core.jax_config" in sys.modules:
             del sys.modules["rheo.core.jax_config"]
 
-        from rheo.core.jax_config import safe_import_jax
+        from rheojax.core.jax_config import safe_import_jax
 
         # Call multiple times
         jax1, jnp1 = safe_import_jax()
@@ -148,7 +148,7 @@ class TestFloat64ImportOrder:
         if "rheo.core.jax_config" in sys.modules:
             del sys.modules["rheo.core.jax_config"]
 
-        from rheo.core.jax_config import safe_import_jax
+        from rheojax.core.jax_config import safe_import_jax
 
         jax, jnp = safe_import_jax()
 

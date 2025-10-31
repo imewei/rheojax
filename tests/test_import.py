@@ -1,4 +1,4 @@
-"""Basic import test for the rheo package."""
+"""Basic import test for the rheojax package."""
 
 import sys
 
@@ -10,18 +10,18 @@ def test_python_version():
     assert sys.version_info >= (3, 12), "Python 3.12+ is required"
 
 
-def test_rheo_import():
-    """Test that rheo package can be imported."""
-    import rheo
+def test_rheojax_import():
+    """Test that rheojax package can be imported."""
+    import rheojax
 
-    assert rheo is not None
-    assert hasattr(rheo, "__version__")
-    assert rheo.__version__ == "0.1.0"
+    assert rheojax is not None
+    assert hasattr(rheojax, "__version__")
+    assert rheojax.__version__ == "0.1.0"
 
 
 def test_submodule_imports():
     """Test that all submodules can be imported."""
-    from rheo import (
+    from rheojax import (
         core,
         io,
         legacy,
@@ -45,10 +45,10 @@ def test_submodule_imports():
 
 def test_version_info():
     """Test version information structure."""
-    import rheo
+    import rheojax
 
-    assert hasattr(rheo, "VERSION_INFO")
-    version_info = rheo.VERSION_INFO
+    assert hasattr(rheojax, "VERSION_INFO")
+    version_info = rheojax.VERSION_INFO
     assert "major" in version_info
     assert "minor" in version_info
     assert "patch" in version_info

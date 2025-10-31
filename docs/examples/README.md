@@ -78,13 +78,13 @@ jupyter notebook examples/basic/01-maxwell-fitting.ipynb
 ```
 
 **📖 Browse online documentation:**
-- [Tutorial Index](https://rheo.readthedocs.io/en/latest/examples/index.html)
-- [User Guide](https://rheo.readthedocs.io/en/latest/user_guide.html)
+- [Tutorial Index](https://rheojax.readthedocs.io/en/latest/examples/index.html)
+- [User Guide](https://rheojax.readthedocs.io/en/latest/user_guide.html)
 
 ## Questions?
 
 - **Issues**: [GitHub Issues](https://github.com/imewei/Rheo/issues)
-- **Documentation**: [Read the Docs](https://rheo.readthedocs.io/)
+- **Documentation**: [Read the Docs](https://rheojax.readthedocs.io/)
 - **Examples**: `examples/README.md`
 
 ---

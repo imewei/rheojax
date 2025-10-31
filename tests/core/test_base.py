@@ -11,11 +11,11 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-from rheo.core.base import BaseModel, BaseTransform, Parameter, ParameterSet
+from rheojax.core.base import BaseModel, BaseTransform, Parameter, ParameterSet
 
 
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

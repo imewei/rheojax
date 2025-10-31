@@ -8,17 +8,17 @@ This module provides readers and writers for various data formats:
 - Automatic format detection
 """
 
-from rheo.io import readers, writers
+from rheojax.io import readers, writers
 
 # Import commonly used functions for convenience
-from rheo.io.readers import (
+from rheojax.io.readers import (
     auto_load,
     load_anton_paar,
     load_csv,
     load_excel,
     load_trios,
 )
-from rheo.io.writers import (
+from rheojax.io.writers import (
     load_hdf5,
     save_excel,
     save_hdf5,

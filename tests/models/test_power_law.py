@@ -6,9 +6,9 @@ This module tests the Power Law (Ostwald-de Waele) model for non-Newtonian flow.
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
-from rheo.models.power_law import PowerLaw
+from rheojax.core.data import RheoData
+from rheojax.core.test_modes import TestMode
+from rheojax.models.power_law import PowerLaw
 
 
 class TestPowerLawBasics:

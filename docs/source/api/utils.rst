@@ -1,4 +1,4 @@
-Utilities (rheo.utils)
+Utilities (rheojax.utils)
 ======================
 
 The utils module provides numerical utilities for rheological analysis, including special functions and optimization tools.
@@ -6,7 +6,7 @@ The utils module provides numerical utilities for rheological analysis, includin
 Mittag-Leffler Functions
 -------------------------
 
-.. automodule:: rheo.utils.mittag_leffler
+.. automodule:: rheojax.utils.mittag_leffler
    :members:
    :undoc-members:
    :show-inheritance:
@@ -17,18 +17,18 @@ This module provides JAX-compatible implementations with high accuracy.
 Functions
 ~~~~~~~~~
 
-.. autofunction:: rheo.utils.mittag_leffler.mittag_leffler_e
+.. autofunction:: rheojax.utils.mittag_leffler.mittag_leffler_e
 
-.. autofunction:: rheo.utils.mittag_leffler.mittag_leffler_e2
+.. autofunction:: rheojax.utils.mittag_leffler.mittag_leffler_e2
 
 Aliases
 ~~~~~~~
 
-.. data:: rheo.utils.mittag_leffler.ml_e
+.. data:: rheojax.utils.mittag_leffler.ml_e
 
    Alias for :func:`mittag_leffler_e`
 
-.. data:: rheo.utils.mittag_leffler.ml_e2
+.. data:: rheojax.utils.mittag_leffler.ml_e2
 
    Alias for :func:`mittag_leffler_e2`
 
@@ -84,7 +84,7 @@ Basic Usage
 .. code-block:: python
 
     import jax.numpy as jnp
-    from rheo.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
+    from rheojax.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
 
     # Single value
     result = mittag_leffler_e(0.5, alpha=0.5)
@@ -103,7 +103,7 @@ Fractional Relaxation Modulus
 .. code-block:: python
 
     import jax.numpy as jnp
-    from rheo.utils.mittag_leffler import mittag_leffler_e
+    from rheojax.utils.mittag_leffler import mittag_leffler_e
 
     def fractional_maxwell_relaxation(t, E, tau, alpha):
         """Relaxation modulus for fractional Maxwell model.
@@ -137,7 +137,7 @@ JIT Compilation
 
     import jax
     import jax.numpy as jnp
-    from rheo.utils.mittag_leffler import mittag_leffler_e
+    from rheojax.utils.mittag_leffler import mittag_leffler_e
 
     # JIT compile function (alpha must be static)
     @jax.jit
@@ -151,7 +151,7 @@ JIT Compilation
 Optimization
 ------------
 
-.. automodule:: rheo.utils.optimization
+.. automodule:: rheojax.utils.optimization
    :members:
    :undoc-members:
    :show-inheritance:
@@ -159,29 +159,29 @@ Optimization
 Functions and Classes
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.utils.optimization.OptimizationResult
+.. autoclass:: rheojax.utils.optimization.OptimizationResult
    :members:
    :undoc-members:
    :show-inheritance:
 
    Result container for optimization.
 
-.. autofunction:: rheo.utils.optimization.nlsq_optimize
+.. autofunction:: rheojax.utils.optimization.nlsq_optimize
 
-.. autofunction:: rheo.utils.optimization.optimize_with_bounds
+.. autofunction:: rheojax.utils.optimization.optimize_with_bounds
 
-.. autofunction:: rheo.utils.optimization.residual_sum_of_squares
+.. autofunction:: rheojax.utils.optimization.residual_sum_of_squares
 
-.. autofunction:: rheo.utils.optimization.create_least_squares_objective
+.. autofunction:: rheojax.utils.optimization.create_least_squares_objective
 
 Aliases
 ~~~~~~~
 
-.. data:: rheo.utils.optimization.optimize
+.. data:: rheojax.utils.optimization.optimize
 
    Alias for :func:`nlsq_optimize`
 
-.. data:: rheo.utils.optimization.fit_parameters
+.. data:: rheojax.utils.optimization.fit_parameters
 
    Alias for :func:`nlsq_optimize`
 
@@ -216,8 +216,8 @@ Basic Optimization
 
 .. code-block:: python
 
-    from rheo.core.parameters import ParameterSet
-    from rheo.utils.optimization import nlsq_optimize
+    from rheojax.core.parameters import ParameterSet
+    from rheojax.utils.optimization import nlsq_optimize
     import jax.numpy as jnp
 
     # Define objective function
@@ -242,8 +242,8 @@ Model Fitting
 .. code-block:: python
 
     import jax.numpy as jnp
-    from rheo.core.parameters import ParameterSet
-    from rheo.utils.optimization import nlsq_optimize
+    from rheojax.core.parameters import ParameterSet
+    from rheojax.utils.optimization import nlsq_optimize
 
     # Experimental data
     t_exp = jnp.array([0.1, 0.5, 1.0, 2.0, 5.0, 10.0])
@@ -283,7 +283,7 @@ Custom Objective with Least Squares
 
 .. code-block:: python
 
-    from rheo.utils.optimization import create_least_squares_objective
+    from rheojax.utils.optimization import create_least_squares_objective
 
     # Define model function
     def power_law(shear_rate, params):
@@ -315,7 +315,7 @@ Optimization with Constraints
 
 .. code-block:: python
 
-    from rheo.core.parameters import ParameterConstraint
+    from rheojax.core.parameters import ParameterConstraint
 
     # Add relative constraint: tau1 < tau2
     params = ParameterSet()
@@ -338,7 +338,7 @@ Monitoring Optimization
 
 .. code-block:: python
 
-    from rheo.core.parameters import ParameterOptimizer
+    from rheojax.core.parameters import ParameterOptimizer
 
     # Create optimizer with tracking
     optimizer = ParameterOptimizer(

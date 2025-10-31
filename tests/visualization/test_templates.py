@@ -9,8 +9,8 @@ import pytest
 matplotlib.use("Agg")  # Non-interactive backend for testing
 import matplotlib.pyplot as plt
 
-from rheo.core.data import RheoData
-from rheo.visualization.templates import (
+from rheojax.core.data import RheoData
+from rheojax.visualization.templates import (
     apply_template_style,
     plot_mastercurve,
     plot_model_fit,

@@ -4,7 +4,7 @@ This module provides the core Pipeline class that enables intuitive method
 chaining for common rheological analysis workflows.
 
 Example:
-    >>> from rheo.pipeline import Pipeline
+    >>> from rheojax.pipeline import Pipeline
     >>> pipeline = Pipeline()
     >>> result = (pipeline
     ...     .load('data.csv')
@@ -23,10 +23,10 @@ from typing import Any
 
 import numpy as np
 
-from rheo.core.base import BaseModel, BaseTransform
-from rheo.core.data import RheoData
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.registry import ModelRegistry, TransformRegistry
+from rheojax.core.base import BaseModel, BaseTransform
+from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import ModelRegistry, TransformRegistry
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -79,26 +79,26 @@ class Pipeline:
         Example:
             >>> pipeline = Pipeline().load('data.csv', x_col='time', y_col='stress')
         """
-        from rheo.io import auto_load
+        from rheojax.io import auto_load
 
         if format == "auto":
             result = auto_load(file_path, **kwargs)
         else:
             # Format-specific loading
             if format == "csv":
-                from rheo.io import load_csv
+                from rheojax.io import load_csv
 
                 result = load_csv(file_path, **kwargs)
             elif format == "excel":
-                from rheo.io import load_excel
+                from rheojax.io import load_excel
 
                 result = load_excel(file_path, **kwargs)
             elif format == "trios":
-                from rheo.io import load_trios
+                from rheojax.io import load_trios
 
                 result = load_trios(file_path, **kwargs)
             elif format == "hdf5":
-                from rheo.io import load_hdf5
+                from rheojax.io import load_hdf5
 
                 result = load_hdf5(file_path, **kwargs)
             else:
@@ -133,7 +133,7 @@ class Pipeline:
         Example:
             >>> pipeline.transform('smooth', window_size=5)
             >>> # or with instance
-            >>> from rheo.transforms import SmoothTransform
+            >>> from rheojax.transforms import SmoothTransform
             >>> pipeline.transform(SmoothTransform(window_size=5))
         """
         if self.data is None:
@@ -178,7 +178,7 @@ class Pipeline:
         Example:
             >>> pipeline.fit('maxwell')
             >>> # or with instance
-            >>> from rheo.models.linear import Maxwell
+            >>> from rheojax.models.linear import Maxwell
             >>> pipeline.fit(Maxwell())
         """
         if self.data is None:
@@ -284,7 +284,7 @@ class Pipeline:
         if self.data is None:
             raise ValueError("No data loaded. Call load() first.")
 
-        from rheo.visualization.plotter import plot_rheo_data
+        from rheojax.visualization.plotter import plot_rheo_data
 
         fig, ax = plot_rheo_data(self.data, style=style, **plot_kwargs)
 
@@ -337,11 +337,11 @@ class Pipeline:
             raise ValueError("No data to save. Call load() first.")
 
         if format == "hdf5":
-            from rheo.io import save_hdf5
+            from rheojax.io import save_hdf5
 
             save_hdf5(self.data, file_path, **kwargs)
         elif format == "excel":
-            from rheo.io import save_excel
+            from rheojax.io import save_excel
 
             save_excel(self.data, file_path, **kwargs)
         elif format == "csv":
@@ -432,7 +432,7 @@ class Pipeline:
                 "Example: pipeline.load('data.csv').fit('maxwell').plot().save_figure('output.pdf')"
             )
 
-        from rheo.visualization.plotter import save_figure
+        from rheojax.visualization.plotter import save_figure
 
         save_figure(self._current_figure, filepath, format=format, dpi=dpi, **kwargs)
 

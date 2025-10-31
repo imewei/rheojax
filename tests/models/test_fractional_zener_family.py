@@ -20,17 +20,17 @@ Each model is tested for:
 import numpy as np
 import pytest
 
-from rheo.models.fractional_burgers import FBM, FractionalBurgersModel
-from rheo.models.fractional_jeffreys import FJM, FractionalJeffreysModel
-from rheo.models.fractional_kv_zener import FKVZ, FractionalKelvinVoigtZener
-from rheo.models.fractional_poynting_thomson import FPT, FractionalPoyntingThomson
-from rheo.models.fractional_zener_ll import FZLL, FractionalZenerLiquidLiquid
-from rheo.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
-from rheo.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
+from rheojax.models.fractional_burgers import FBM, FractionalBurgersModel
+from rheojax.models.fractional_jeffreys import FJM, FractionalJeffreysModel
+from rheojax.models.fractional_kv_zener import FKVZ, FractionalKelvinVoigtZener
+from rheojax.models.fractional_poynting_thomson import FPT, FractionalPoyntingThomson
+from rheojax.models.fractional_zener_ll import FZLL, FractionalZenerLiquidLiquid
+from rheojax.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
+from rheojax.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
 
 
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -308,7 +308,7 @@ class TestFractionalPoyntingThomson:
         """Test that FPT and FKVZ have identical mathematical forms."""
         params_fpt = {"Ge": 1000.0, "Gk": 500.0, "alpha": 0.5, "tau": 1.0}
 
-        from rheo.models.fractional_kv_zener import FractionalKelvinVoigtZener
+        from rheojax.models.fractional_kv_zener import FractionalKelvinVoigtZener
 
         fkvz = FractionalKelvinVoigtZener()
 

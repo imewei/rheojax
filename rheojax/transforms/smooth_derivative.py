@@ -12,15 +12,15 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from scipy.signal import savgol_filter
 
-from rheo.core.base import BaseTransform
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.registry import TransformRegistry
+from rheojax.core.base import BaseTransform
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import TransformRegistry
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
 if TYPE_CHECKING:
-    from rheo.core.data import RheoData
+    from rheojax.core.data import RheoData
 
 
 DerivativeMethod = Literal["savgol", "finite_diff", "spline", "total_variation"]
@@ -64,8 +64,8 @@ class SmoothDerivative(BaseTransform):
 
     Examples
     --------
-    >>> from rheo.core.data import RheoData
-    >>> from rheo.transforms.smooth_derivative import SmoothDerivative
+    >>> from rheojax.core.data import RheoData
+    >>> from rheojax.transforms.smooth_derivative import SmoothDerivative
     >>>
     >>> # Create noisy creep compliance data
     >>> t = jnp.linspace(0.1, 10, 100)
@@ -300,7 +300,7 @@ class SmoothDerivative(BaseTransform):
         RheoData
             Derivative data
         """
-        from rheo.core.data import RheoData
+        from rheojax.core.data import RheoData
 
         # Get data
         x = data.x
@@ -384,7 +384,7 @@ class SmoothDerivative(BaseTransform):
         """
         from scipy.integrate import cumulative_trapezoid as scipy_cumtrapz
 
-        from rheo.core.data import RheoData
+        from rheojax.core.data import RheoData
 
         # Get data
         x = data.x

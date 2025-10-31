@@ -3,16 +3,16 @@ requires = ["setuptools>=68.0", "wheel", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rheo"
+name = "rheojax"
 version = "0.1.0"
 description = "Unified rheological analysis framework with JAX acceleration"
 readme = "README.md"
 license = {file = "LICENSE"}
 authors = [
-    {name = "Rheo Development Team", email = "rheo@example.com"},
+    {name = "RheoJAX Development Team", email = "rheojax@example.com"},
 ]
 maintainers = [
-    {name = "Rheo Development Team", email = "rheo@example.com"},
+    {name = "RheoJAX Development Team", email = "rheojax@example.com"},
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -107,21 +107,21 @@ io = [
 # See GPU ACCELERATION section above for installation instructions.
 # Use: make install-jax-gpu (from repository) or manual pip commands.
 all = [
-    "rheo[core,dev,ml,io]",
+    "rheojax[core,dev,ml,io]",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/username/rheo"
-"Bug Tracker" = "https://github.com/username/rheo/issues"
-"Documentation" = "https://rheo.readthedocs.io"
-"Source Code" = "https://github.com/username/rheo"
+"Homepage" = "https://github.com/imewei/rheojax"
+"Bug Tracker" = "https://github.com/imewei/rheojax/issues"
+"Documentation" = "https://rheojax.readthedocs.io"
+"Source Code" = "https://github.com/imewei/rheojax"
 
 [tool.setuptools.packages.find]
-include = ["rheo", "rheo.*"]
+include = ["rheojax", "rheojax.*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-"rheo" = ["py.typed", "*.json", "*.yaml"]
+"rheojax" = ["py.typed", "*.json", "*.yaml"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -129,7 +129,7 @@ testpaths = ["tests"]
 addopts = [
     "-v",
     "--strict-markers",
-    "--cov=rheo",
+    "--cov=rheojax",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",

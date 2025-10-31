@@ -3,13 +3,13 @@
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
-from rheo.transforms.mutation_number import MutationNumber
+from rheojax.core.data import RheoData
+from rheojax.core.test_modes import TestMode
+from rheojax.transforms.mutation_number import MutationNumber
 
 
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

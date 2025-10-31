@@ -989,7 +989,7 @@ class TestTransformNotebooks:
 
         for cell in nb.cells:
             if cell.cell_type == 'code':
-                if 'from rheo.transforms.mastercurve import Mastercurve' in cell.source:
+                if 'from rheojax.transforms.mastercurve import Mastercurve' in cell.source:
                     found_import = True
                 if 'create_mastercurve' in cell.source or '.transform(' in cell.source:
                     found_application = True
@@ -1404,7 +1404,7 @@ class TestBayesianNotebooks:
         found_zener = False
         for cell in nb.cells:
             if cell.cell_type == 'code':
-                if 'Zener' in cell.source or 'from rheo.models.zener' in cell.source:
+                if 'Zener' in cell.source or 'from rheojax.models.zener' in cell.source:
                     found_zener = True
                     break
 

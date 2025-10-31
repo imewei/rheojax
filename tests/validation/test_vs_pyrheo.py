@@ -21,10 +21,10 @@ PYRHEO_PATH = Path("/Users/b80985/Documents/GitHub/pyRheo/")
 if PYRHEO_PATH.exists():
     sys.path.insert(0, str(PYRHEO_PATH))
 
-from rheo.core.data import RheoData
-from rheo.models.maxwell import Maxwell
-from rheo.models.springpot import SpringPot
-from rheo.models.zener import Zener
+from rheojax.core.data import RheoData
+from rheojax.models.maxwell import Maxwell
+from rheojax.models.springpot import SpringPot
+from rheojax.models.zener import Zener
 
 
 class TestClassicalModelsVsPyRheo:

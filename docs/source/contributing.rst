@@ -11,7 +11,7 @@ Development Setup
 
    .. code-block:: bash
 
-      git clone https://github.com/your-username/rheo.git
+      git clone https://github.com/your-username/rheojax.git
       cd rheo
 
 3. Install development dependencies:

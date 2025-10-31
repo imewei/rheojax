@@ -8,11 +8,11 @@ This module provides readers for various instrument data formats:
 - Auto-detection wrapper
 """
 
-from rheo.io.readers.anton_paar import load_anton_paar
-from rheo.io.readers.auto import auto_load
-from rheo.io.readers.csv_reader import load_csv
-from rheo.io.readers.excel_reader import load_excel
-from rheo.io.readers.trios import load_trios, load_trios_chunked
+from rheojax.io.readers.anton_paar import load_anton_paar
+from rheojax.io.readers.auto import auto_load
+from rheojax.io.readers.csv_reader import load_csv
+from rheojax.io.readers.excel_reader import load_excel
+from rheojax.io.readers.trios import load_trios, load_trios_chunked
 
 __all__ = [
     "load_trios",

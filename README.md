@@ -1,10 +1,10 @@
-# Rheo - JAX-Powered Rheological Analysis
+# RheoJAX - JAX-Powered Rheological Analysis
 
-[![CI](https://github.com/username/rheo/actions/workflows/ci.yml/badge.svg)](https://github.com/username/rheo/actions/workflows/ci.yml)
-[![PyPI version](https://badge.fury.io/py/rheo.svg)](https://badge.fury.io/py/rheo)
+[![CI](https://github.com/imewei/rheojax/actions/workflows/ci.yml/badge.svg)](https://github.com/imewei/rheojax/actions/workflows/ci.yml)
+[![PyPI version](https://badge.fury.io/py/rheojax.svg)](https://badge.fury.io/py/rheojax)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheo.readthedocs.io)
+[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
 A modern, JAX-accelerated rheological analysis package providing a unified framework for analyzing experimental rheology data with state-of-the-art performance, Bayesian inference, and comprehensive tutorial notebooks.
 
@@ -22,7 +22,7 @@ Complete rheological analysis toolkit with Bayesian inference:
 ### Quick Example (New in v0.2.0)
 
 ```python
-from rheo.pipeline import BayesianPipeline
+from rheojax.pipeline import BayesianPipeline
 
 # Complete Bayesian workflow in 4 lines
 pipeline = (BayesianPipeline()
@@ -77,13 +77,13 @@ pipeline.plot_pair().plot_trace().plot_forest()
 ### Basic Installation
 
 ```bash
-pip install rheo
+pip install rheojax
 ```
 
 ### Development Installation
 
 ```bash
-git clone https://github.com/username/rheo.git
+git clone https://github.com/imewei/rheojax.git
 cd rheo
 pip install -e ".[dev]"
 ```
@@ -97,7 +97,7 @@ pip install -e ".[dev]"
 From the repository:
 
 ```bash
-git clone https://github.com/username/rheo.git
+git clone https://github.com/imewei/rheojax.git
 cd rheo
 make install-jax-gpu  # Automatically handles uninstall + GPU install
 ```
@@ -173,10 +173,10 @@ The package works seamlessly in conda environments using pip:
 ```bash
 conda create -n rheo python=3.12
 conda activate rheo
-pip install rheo
+pip install rheojax
 
 # For GPU acceleration (Linux only)
-git clone https://github.com/username/rheo.git
+git clone https://github.com/imewei/rheojax.git
 cd rheo
 make install-jax-gpu
 ```
@@ -188,8 +188,8 @@ make install-jax-gpu
 ### Loading and Visualizing Data
 
 ```python
-from rheo.io.readers import auto_read
-from rheo.visualization import plot_rheo_data
+from rheojax.io.readers import auto_read
+from rheojax.visualization import plot_rheo_data
 import matplotlib.pyplot as plt
 
 # Load data (auto-detect format)
@@ -206,7 +206,7 @@ plt.show()
 ### Basic Model Fitting
 
 ```python
-from rheo.models.maxwell import Maxwell
+from rheojax.models.maxwell import Maxwell
 import numpy as np
 
 # Generate or load data
@@ -224,7 +224,7 @@ print(f"eta = {model.parameters.get_value('eta'):.3e} Pa·s")
 ### Bayesian Inference Workflow
 
 ```python
-from rheo.models.maxwell import Maxwell
+from rheojax.models.maxwell import Maxwell
 import numpy as np
 
 # Create model and data
@@ -255,7 +255,7 @@ print(f"G0 95% CI: [{intervals['G0'][0]:.3e}, {intervals['G0'][1]:.3e}]")
 ### Complete Bayesian Pipeline with ArviZ Diagnostics
 
 ```python
-from rheo.pipeline.bayesian import BayesianPipeline
+from rheojax.pipeline.bayesian import BayesianPipeline
 
 pipeline = BayesianPipeline()
 
@@ -281,7 +281,7 @@ pipeline = BayesianPipeline()
 ### Working with Parameters
 
 ```python
-from rheo.core import ParameterSet
+from rheojax.core import ParameterSet
 
 # Create parameter set
 params = ParameterSet()
@@ -296,7 +296,7 @@ params.set_value("tau", 2.5)
 ### Data Transforms
 
 ```python
-from rheo.transforms import FFTAnalysis, Mastercurve, MutationNumber
+from rheojax.transforms import FFTAnalysis, Mastercurve, MutationNumber
 
 # FFT analysis for frequency spectrum
 fft = FFTAnalysis(window='hann', detrend=True)
@@ -348,17 +348,17 @@ See `examples/README.md` for complete learning path guide.
 
 ## Documentation
 
-Full documentation is available at [https://rheo.readthedocs.io](https://rheo.readthedocs.io)
+Full documentation is available at [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 
 ### Key Topics
 
-- [Getting Started](https://rheo.readthedocs.io/user_guide/getting_started.html) - Installation and basic usage
-- [Core Concepts](https://rheo.readthedocs.io/user_guide/core_concepts.html) - RheoData, Parameters, Test Modes
-- [Bayesian Inference](https://rheo.readthedocs.io/user_guide/bayesian_inference.html) - NLSQ → NUTS workflow, ArviZ diagnostics
-- [Pipeline API](https://rheo.readthedocs.io/user_guide/pipeline_api.html) - High-level workflows
-- [I/O Guide](https://rheo.readthedocs.io/user_guide/io_guide.html) - Reading and writing data
-- [Visualization Guide](https://rheo.readthedocs.io/user_guide/visualization_guide.html) - Creating plots
-- [API Reference](https://rheo.readthedocs.io/api_reference.html) - Complete API documentation
+- [Getting Started](https://rheojax.readthedocs.io/user_guide/getting_started.html) - Installation and basic usage
+- [Core Concepts](https://rheojax.readthedocs.io/user_guide/core_concepts.html) - RheoData, Parameters, Test Modes
+- [Bayesian Inference](https://rheojax.readthedocs.io/user_guide/bayesian_inference.html) - NLSQ → NUTS workflow, ArviZ diagnostics
+- [Pipeline API](https://rheojax.readthedocs.io/user_guide/pipeline_api.html) - High-level workflows
+- [I/O Guide](https://rheojax.readthedocs.io/user_guide/io_guide.html) - Reading and writing data
+- [Visualization Guide](https://rheojax.readthedocs.io/user_guide/visualization_guide.html) - Creating plots
+- [API Reference](https://rheojax.readthedocs.io/api_reference.html) - Complete API documentation
 
 ## Development Status
 
@@ -451,7 +451,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ```bash
 # Clone repository
-git clone https://github.com/username/rheo.git
+git clone https://github.com/imewei/rheojax.git
 cd rheo
 
 # Install development dependencies
@@ -516,7 +516,7 @@ If you use rheo in your research, please cite:
   title = {Rheo: JAX-Powered Unified Rheology Package with Bayesian Inference},
   year = {2024},
   author = {Rheo Development Team},
-  url = {https://github.com/username/rheo},
+  url = {https://github.com/imewei/rheojax},
   version = {0.2.0}
 }
 ```
@@ -534,9 +534,9 @@ rheo is built on excellent open-source software:
 
 ## Support
 
-- 📖 Documentation: [https://rheo.readthedocs.io](https://rheo.readthedocs.io)
-- 💬 Discussions: [GitHub Discussions](https://github.com/username/rheo/discussions)
-- 🐛 Issues: [GitHub Issues](https://github.com/username/rheo/issues)
+- 📖 Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
+- 💬 Discussions: [GitHub Discussions](https://github.com/imewei/rheojax/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/imewei/rheojax/issues)
 - 📧 Email: rheo@example.com
 
 ## Roadmap

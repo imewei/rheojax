@@ -1,6 +1,6 @@
-# Contributing to Rheo
+# Contributing to RheoJAX
 
-Thank you for your interest in contributing to Rheo! We welcome contributions from the community.
+Thank you for your interest in contributing to RheoJAX! We welcome contributions from the community.
 
 ## Development Setup
 
@@ -16,8 +16,8 @@ Thank you for your interest in contributing to Rheo! We welcome contributions fr
 
 2. **Clone your fork**:
 ```bash
-git clone https://github.com/yourusername/rheo.git
-cd rheo
+git clone https://github.com/yourusername/rheojax.git
+cd rheojax
 ```
 
 3. **Create a virtual environment**:
@@ -57,7 +57,7 @@ git checkout -b feature/your-feature-name
 pytest
 
 # Run with coverage
-pytest --cov=rheo
+pytest --cov=rheojax
 
 # Run specific test file
 pytest tests/test_specific.py
@@ -67,13 +67,13 @@ pytest tests/test_specific.py
 
 ```bash
 # Format code with Black
-black rheo tests
+black rheojax tests
 
 # Check with Ruff
-ruff check rheo tests
+ruff check rheojax tests
 
 # Type checking with MyPy
-mypy rheo
+mypy rheojax
 ```
 
 ### 5. Commit your changes
@@ -138,4 +138,4 @@ Please note we have a code of conduct. Please follow it in all your interactions
 
 Feel free to open an issue for any questions about contributing.
 
-Thank you for contributing to Rheo!
+Thank you for contributing to RheoJAX!

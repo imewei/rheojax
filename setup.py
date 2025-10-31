@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Setup script for rheo package - backward compatibility support."""
+"""Setup script for rheojax package - backward compatibility support."""
 
 from setuptools import setup
 

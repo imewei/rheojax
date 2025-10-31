@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rheo.core.data import RheoData
+from rheojax.core.data import RheoData
 
 
 def load_anton_paar(filepath: str, **kwargs) -> RheoData:

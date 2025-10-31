@@ -9,11 +9,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rheo.core.base import BaseModel
-from rheo.core.bayesian import BayesianResult
-from rheo.core.parameters import Parameter, ParameterSet
-from rheo.models.maxwell import Maxwell
-from rheo.utils.optimization import OptimizationResult
+from rheojax.core.base import BaseModel
+from rheojax.core.bayesian import BayesianResult
+from rheojax.core.parameters import Parameter, ParameterSet
+from rheojax.models.maxwell import Maxwell
+from rheojax.utils.optimization import OptimizationResult
 
 
 def test_basemodel_fit_uses_nlsq_by_default():

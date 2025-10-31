@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'rheo'
+project = 'rheojax'
 copyright = '2025, Rheo Development Team'
 author = 'Rheo Development Team'
 release = '0.1.0'
@@ -153,20 +153,20 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    ('index', 'rheo.tex', 'rheo Documentation',
+    ('index', 'rheojax.tex', 'rheo Documentation',
      'Rheo Development Team', 'manual'),
 ]
 
 # -- Options for manual page output ------------------------------------------
 man_pages = [
-    ('index', 'rheo', 'rheo Documentation',
+    ('index', 'rheojax', 'rheo Documentation',
      ['Rheo Development Team'], 1)
 ]
 
 # -- Options for Texinfo output ----------------------------------------------
 texinfo_documents = [
-    ('index', 'rheo', 'rheo Documentation',
-     'Rheo Development Team', 'rheo', 'JAX-powered unified rheology package',
+    ('index', 'rheojax', 'rheo Documentation',
+     'Rheo Development Team', 'rheojax', 'JAX-powered unified rheology package',
      'Miscellaneous'),
 ]
 

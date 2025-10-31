@@ -10,8 +10,8 @@ The simplest way to plot data:
 
 .. code-block:: python
 
-    from rheo.core import RheoData
-    from rheo.visualization import plot_rheo_data
+    from rheojax.core import RheoData
+    from rheojax.visualization import plot_rheo_data
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -92,7 +92,7 @@ For relaxation and creep tests:
 
 .. code-block:: python
 
-    from rheo.visualization import plot_time_domain
+    from rheojax.visualization import plot_time_domain
 
     # Stress relaxation
     time = np.logspace(-1, 2, 50)
@@ -123,7 +123,7 @@ For oscillatory measurements (SAOS):
 
 .. code-block:: python
 
-    from rheo.visualization import plot_frequency_domain
+    from rheojax.visualization import plot_frequency_domain
 
     # Complex modulus data
     omega = np.logspace(-2, 2, 50)
@@ -169,7 +169,7 @@ For steady shear (rotation) tests:
 
 .. code-block:: python
 
-    from rheo.visualization import plot_flow_curve
+    from rheojax.visualization import plot_flow_curve
 
     # Viscosity vs shear rate
     shear_rate = np.logspace(-2, 3, 50)
@@ -200,7 +200,7 @@ Visualize model fitting quality:
 
 .. code-block:: python
 
-    from rheo.visualization import plot_residuals
+    from rheojax.visualization import plot_residuals
 
     # After model fitting (Phase 2 feature)
     x = time
@@ -256,7 +256,7 @@ Full matplotlib control:
 .. code-block:: python
 
     import matplotlib.pyplot as plt
-    from rheo.visualization import plot_time_domain
+    from rheojax.visualization import plot_time_domain
 
     # Create figure with custom size
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -641,7 +641,7 @@ Template 1: Publication Figure
     def publication_plot(data, title, filename):
         """Create publication-quality plot."""
         import matplotlib.pyplot as plt
-        from rheo.visualization import plot_rheo_data
+        from rheojax.visualization import plot_rheo_data
 
         # Set style
         plt.rcParams['font.size'] = 10

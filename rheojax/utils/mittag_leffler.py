@@ -18,7 +18,7 @@ References
 
 from functools import partial
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 # Float64 precision is critical for accurate Mittag-Leffler evaluations
@@ -56,7 +56,7 @@ def mittag_leffler_e(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from rheo.utils.mittag_leffler import mittag_leffler_e
+    >>> from rheojax.utils.mittag_leffler import mittag_leffler_e
     >>>
     >>> # Single value
     >>> mittag_leffler_e(0.5, 0.5)
@@ -114,7 +114,7 @@ def mittag_leffler_e2(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from rheo.utils.mittag_leffler import mittag_leffler_e2
+    >>> from rheojax.utils.mittag_leffler import mittag_leffler_e2
     >>>
     >>> # Two-parameter evaluation
     >>> mittag_leffler_e2(0.5, alpha=0.5, beta=1.0)

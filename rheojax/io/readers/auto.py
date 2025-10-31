@@ -5,10 +5,10 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
-from rheo.core.data import RheoData
-from rheo.io.readers.csv_reader import load_csv
-from rheo.io.readers.excel_reader import load_excel
-from rheo.io.readers.trios import load_trios
+from rheojax.core.data import RheoData
+from rheojax.io.readers.csv_reader import load_csv
+from rheojax.io.readers.excel_reader import load_excel
+from rheojax.io.readers.trios import load_trios
 
 
 def auto_load(filepath: str, **kwargs) -> RheoData | list[RheoData]:

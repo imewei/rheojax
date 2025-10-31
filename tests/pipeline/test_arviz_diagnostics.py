@@ -16,12 +16,12 @@ import pytest
 # Use non-interactive backend for testing
 matplotlib.use("Agg")
 
-from rheo.core.base import BaseModel
-from rheo.core.bayesian import BayesianResult
-from rheo.core.data import RheoData
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.parameters import ParameterSet
-from rheo.pipeline.bayesian import BayesianPipeline
+from rheojax.core.base import BaseModel
+from rheojax.core.bayesian import BayesianResult
+from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.parameters import ParameterSet
+from rheojax.pipeline.bayesian import BayesianPipeline
 
 # Safe JAX import
 jax, jnp = safe_import_jax()
@@ -37,7 +37,7 @@ class MockBayesianModel(BaseModel):
         self.parameters.add(name="b", value=0.5, bounds=(0.01, 5))
 
     def _fit(self, X, y, **kwargs):
-        from rheo.utils.optimization import (
+        from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
         )

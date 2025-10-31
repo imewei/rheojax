@@ -10,7 +10,7 @@ The Pipeline API provides the simplest way to analyze rheological data:
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline
+   from rheojax.pipeline import Pipeline
 
    # Create pipeline
    pipeline = Pipeline()
@@ -37,8 +37,8 @@ For more control, use the Modular API:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
-   from rheo.io import load_trios
+   from rheojax.models import Maxwell
+   from rheojax.io import load_trios
 
    # Load data
    data = load_trios('experiment.txt')
@@ -78,8 +78,8 @@ Apply transforms to process raw data:
 
 .. code-block:: python
 
-   from rheo.transforms import RheoAnalysis
-   from rheo.io import load_trios
+   from rheojax.transforms import RheoAnalysis
+   from rheojax.io import load_trios
 
    # Load raw time-series data
    data = load_trios('chirp_experiment.txt')
@@ -95,7 +95,7 @@ Mastercurve Generation
 
 .. code-block:: python
 
-   from rheo.transforms import AutomatedMasterCurve
+   from rheojax.transforms import AutomatedMasterCurve
 
    # Load multi-temperature data
    data_list = [load_trios(f'temp_{t}C.txt') for t in [25, 35, 45, 55]]
@@ -112,7 +112,7 @@ Supported Formats
 
 .. code-block:: python
 
-   from rheo.io import auto_load, load_trios, load_csv, load_excel
+   from rheojax.io import auto_load, load_trios, load_csv, load_excel
 
    # Auto-detect format
    data = auto_load('experiment.txt')
@@ -127,7 +127,7 @@ Saving Results
 
 .. code-block:: python
 
-   from rheo.io import save_hdf5, save_excel
+   from rheojax.io import save_hdf5, save_excel
 
    # Save data
    save_hdf5(data, 'output.h5')

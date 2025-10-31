@@ -1,7 +1,7 @@
 Architecture Overview
 =====================
 
-This document describes the design principles and architectural decisions behind rheo.
+This document describes the design principles and architectural decisions behind rheojax.
 
 Design Philosophy
 -----------------
@@ -66,7 +66,7 @@ Full compatibility with piblin.Measurement:
 .. code-block:: python
 
     import piblin
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
 
     # From piblin
     measurement = piblin.Measurement.from_file("data.h5")
@@ -196,7 +196,7 @@ To add a custom model, inherit from ``BaseModel``:
 
 .. code-block:: python
 
-    from rheo.core import BaseModel, ParameterSet
+    from rheojax.core import BaseModel, ParameterSet
     import jax.numpy as jnp
 
     class CustomModel(BaseModel):
@@ -222,7 +222,7 @@ To add a custom model, inherit from ``BaseModel``:
 
         def _fit(self, X, y, **kwargs):
             """Implement fitting logic."""
-            from rheo.utils.optimization import nlsq_optimize
+            from rheojax.utils.optimization import nlsq_optimize
 
             def objective(params):
                 predictions = self._predict(X)
@@ -246,7 +246,7 @@ To add a custom transform, inherit from ``BaseTransform``:
 
 .. code-block:: python
 
-    from rheo.core import BaseTransform
+    from rheojax.core import BaseTransform
     import jax.numpy as jnp
 
     class CustomTransform(BaseTransform):
@@ -266,7 +266,7 @@ To add a custom transform, inherit from ``BaseTransform``:
             y_transformed = y * self.param
 
             # Return new RheoData
-            from rheo.core import RheoData
+            from rheojax.core import RheoData
             return RheoData(
                 x=x,
                 y=y_transformed,
@@ -280,7 +280,7 @@ To add a custom transform, inherit from ``BaseTransform``:
             """Implement inverse transform."""
             y_original = data.y / self.param
 
-            from rheo.core import RheoData
+            from rheojax.core import RheoData
             return RheoData(
                 x=data.x,
                 y=y_original,
@@ -297,7 +297,7 @@ Models and transforms are registered for discovery:
 
 .. code-block:: python
 
-    from rheo.core.registry import ModelRegistry, TransformRegistry
+    from rheojax.core.registry import ModelRegistry, TransformRegistry
 
     # Register model (Phase 2)
     @ModelRegistry.register(
@@ -372,7 +372,7 @@ rheo supports both NumPy and JAX arrays seamlessly:
 
     import numpy as np
     import jax.numpy as jnp
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
 
     # NumPy arrays
     data_np = RheoData(x=np.array([1, 2, 3]), y=np.array([10, 20, 30]))
@@ -425,7 +425,7 @@ JAX provides automatic gradients:
     gradients = grad_fn(params)
 
     # Use in optimization
-    from rheo.utils.optimization import nlsq_optimize
+    from rheojax.utils.optimization import nlsq_optimize
     result = nlsq_optimize(objective, parameters, use_jax=True)
 
 Performance Optimization

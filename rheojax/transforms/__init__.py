@@ -8,11 +8,11 @@ This module provides JAX-accelerated implementations of:
 - Smooth noise-robust differentiation
 """
 
-from rheo.transforms.fft_analysis import FFTAnalysis
-from rheo.transforms.mastercurve import Mastercurve
-from rheo.transforms.mutation_number import MutationNumber
-from rheo.transforms.owchirp import OWChirp
-from rheo.transforms.smooth_derivative import SmoothDerivative
+from rheojax.transforms.fft_analysis import FFTAnalysis
+from rheojax.transforms.mastercurve import Mastercurve
+from rheojax.transforms.mutation_number import MutationNumber
+from rheojax.transforms.owchirp import OWChirp
+from rheojax.transforms.smooth_derivative import SmoothDerivative
 
 __all__ = [
     "FFTAnalysis",

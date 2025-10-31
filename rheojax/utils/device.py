@@ -20,7 +20,7 @@ def check_gpu_availability() -> None:
     --------
     Call this at package initialization or in CLI entry points:
 
-    >>> from rheo.utils.device import check_gpu_availability
+    >>> from rheojax.utils.device import check_gpu_availability
     >>> check_gpu_availability()  # Prints warning if GPU detected but not used
     """
     try:
@@ -75,7 +75,7 @@ def get_device_info() -> tuple[list[str], bool]:
 
     Examples
     --------
-    >>> from rheo.utils.device import get_device_info
+    >>> from rheojax.utils.device import get_device_info
     >>> devices, has_gpu = get_device_info()
     >>> print(f"Devices: {devices}, Has GPU: {has_gpu}")
     Devices: ['cpu'], Has GPU: False
@@ -112,7 +112,7 @@ def get_gpu_memory_info() -> dict:
 
     Examples
     --------
-    >>> from rheo.utils.device import get_gpu_memory_info
+    >>> from rheojax.utils.device import get_gpu_memory_info
     >>> info = get_gpu_memory_info()
     >>> if info:
     ...     print(f"GPU Memory: {info['used_mb']}/{info['total_mb']} MB")
@@ -156,7 +156,7 @@ def print_device_summary() -> None:
 
     Examples
     --------
-    >>> from rheo.utils.device import print_device_summary
+    >>> from rheojax.utils.device import print_device_summary
     >>> print_device_summary()
     JAX Device Summary
     ==================

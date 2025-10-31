@@ -1,4 +1,4 @@
-I/O Module (rheo.io)
+I/O Module (rheojax.io)
 ====================
 
 The I/O module provides readers and writers for various rheometer data formats.
@@ -6,7 +6,7 @@ The I/O module provides readers and writers for various rheometer data formats.
 Readers
 -------
 
-.. automodule:: rheo.io.readers
+.. automodule:: rheojax.io.readers
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Readers
 Auto-Detection
 ~~~~~~~~~~~~~~
 
-.. autofunction:: rheo.io.readers.auto_read
+.. autofunction:: rheojax.io.readers.auto_read
 
    Automatically detect and read file format based on extension and content.
 
@@ -28,47 +28,47 @@ Auto-Detection
 TRIOS Reader
 ~~~~~~~~~~~~
 
-.. automodule:: rheo.io.readers.trios
+.. automodule:: rheojax.io.readers.trios
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheo.io.readers.trios.read_trios
+.. autofunction:: rheojax.io.readers.trios.read_trios
 
 CSV Reader
 ~~~~~~~~~~
 
-.. automodule:: rheo.io.readers.csv_reader
+.. automodule:: rheojax.io.readers.csv_reader
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheo.io.readers.csv_reader.read_csv
+.. autofunction:: rheojax.io.readers.csv_reader.read_csv
 
 Excel Reader
 ~~~~~~~~~~~~
 
-.. automodule:: rheo.io.readers.excel_reader
+.. automodule:: rheojax.io.readers.excel_reader
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheo.io.readers.excel_reader.read_excel
+.. autofunction:: rheojax.io.readers.excel_reader.read_excel
 
 Anton Paar Reader
 ~~~~~~~~~~~~~~~~~
 
-.. automodule:: rheo.io.readers.anton_paar
+.. automodule:: rheojax.io.readers.anton_paar
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheo.io.readers.anton_paar.read_anton_paar
+.. autofunction:: rheojax.io.readers.anton_paar.read_anton_paar
 
 Writers
 -------
 
-.. automodule:: rheo.io.writers
+.. automodule:: rheojax.io.writers
    :members:
    :undoc-members:
    :show-inheritance:
@@ -76,12 +76,12 @@ Writers
 HDF5 Writer
 ~~~~~~~~~~~
 
-.. automodule:: rheo.io.writers.hdf5_writer
+.. automodule:: rheojax.io.writers.hdf5_writer
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheo.io.writers.hdf5_writer.write_hdf5
+.. autofunction:: rheojax.io.writers.hdf5_writer.write_hdf5
 
    Write RheoData to HDF5 file with full metadata preservation.
 
@@ -101,12 +101,12 @@ HDF5 Writer
 Excel Writer
 ~~~~~~~~~~~~
 
-.. automodule:: rheo.io.writers.excel_writer
+.. automodule:: rheojax.io.writers.excel_writer
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheo.io.writers.excel_writer.write_excel
+.. autofunction:: rheojax.io.writers.excel_writer.write_excel
 
    Write RheoData to Excel file.
 
@@ -127,7 +127,7 @@ Auto-Detection
 
 .. code-block:: python
 
-    from rheo.io.readers import auto_read
+    from rheojax.io.readers import auto_read
 
     # Automatically detect format
     data = auto_read("experiment.txt")
@@ -139,7 +139,7 @@ TRIOS Files
 
 .. code-block:: python
 
-    from rheo.io.readers import read_trios
+    from rheojax.io.readers import read_trios
 
     # Read TRIOS file
     data = read_trios("stress_relaxation.txt")
@@ -156,7 +156,7 @@ CSV Files
 
 .. code-block:: python
 
-    from rheo.io.readers import read_csv
+    from rheojax.io.readers import read_csv
 
     # Simple CSV
     data = read_csv("data.csv")
@@ -181,7 +181,7 @@ Excel Files
 
 .. code-block:: python
 
-    from rheo.io.readers import read_excel
+    from rheojax.io.readers import read_excel
 
     # Read first sheet
     data = read_excel("results.xlsx")
@@ -205,7 +205,7 @@ Anton Paar Files
 
 .. code-block:: python
 
-    from rheo.io.readers import read_anton_paar
+    from rheojax.io.readers import read_anton_paar
 
     # Read Anton Paar file
     data = read_anton_paar("oscillation.txt")
@@ -218,7 +218,7 @@ HDF5 Format
 
 .. code-block:: python
 
-    from rheo.io.writers import write_hdf5
+    from rheojax.io.writers import write_hdf5
 
     # Write to HDF5
     write_hdf5(data, "results.h5")
@@ -235,7 +235,7 @@ Reading HDF5 Back
 .. code-block:: python
 
     import h5py
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
 
     with h5py.File("results.h5", "r") as f:
         x = f["x_data"][:]
@@ -251,7 +251,7 @@ Excel Format
 
 .. code-block:: python
 
-    from rheo.io.writers import write_excel
+    from rheojax.io.writers import write_excel
 
     # Write to Excel
     write_excel(data, "results.xlsx")
@@ -272,8 +272,8 @@ Convert Multiple Files
 .. code-block:: python
 
     from pathlib import Path
-    from rheo.io.readers import auto_read
-    from rheo.io.writers import write_hdf5
+    from rheojax.io.readers import auto_read
+    from rheojax.io.writers import write_hdf5
 
     # Convert all TXT to HDF5
     data_dir = Path("raw_data/")
@@ -291,8 +291,8 @@ Merge Multiple Tests
 
 .. code-block:: python
 
-    from rheo.io.readers import auto_read
-    from rheo.io.writers import write_hdf5
+    from rheojax.io.readers import auto_read
+    from rheojax.io.writers import write_hdf5
 
     files = ["test1.txt", "test2.txt", "test3.txt"]
 
@@ -434,7 +434,7 @@ All readers raise appropriate exceptions:
 
 .. code-block:: python
 
-    from rheo.io.readers import auto_read
+    from rheojax.io.readers import auto_read
 
     try:
         data = auto_read("experiment.txt")

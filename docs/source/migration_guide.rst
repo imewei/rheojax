@@ -40,7 +40,7 @@ Model Name Mappings
      - Notes
    * - ``MaxwellModel``
      - ``Maxwell``
-     - Now in ``rheo.models.Maxwell``
+     - Now in ``rheojax.models.Maxwell``
    * - ``ZenerModel`` / ``SLSModel``
      - ``Zener``
      - Standardized name: Zener (SLS)
@@ -168,7 +168,7 @@ Transform Name Mappings
      - Notes
    * - ``FFTTransform``
      - ``FFTAnalysis``
-     - Now in ``rheo.transforms.FFTAnalysis``
+     - Now in ``rheojax.transforms.FFTAnalysis``
    * - ``TimeTemperatureSuperposition``
      - ``Mastercurve``
      - Renamed for clarity, supports WLF/Arrhenius
@@ -259,8 +259,8 @@ Example 1: Basic Model Fitting
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline
-   from rheo.core.data import RheoData
+   from rheojax.pipeline import Pipeline
+   from rheojax.core.data import RheoData
    import numpy as np
 
    # Load data
@@ -327,8 +327,8 @@ Example 2: Fractional Model with Custom Bounds
 
 .. code-block:: python
 
-   from rheo.core.registry import ModelRegistry
-   from rheo.utils.optimization import nlsq_optimize
+   from rheojax.core.registry import ModelRegistry
+   from rheojax.utils.optimization import nlsq_optimize
 
    # Create fractional Zener model
    model = ModelRegistry.create('fractional_zener_ss')
@@ -383,7 +383,7 @@ Example 3: Mastercurve Generation (TTS)
 
 .. code-block:: python
 
-   from rheo.pipeline import MastercurvePipeline
+   from rheojax.pipeline import MastercurvePipeline
    import glob
 
    # Load multi-temperature data
@@ -437,8 +437,8 @@ Example 4: FFT Analysis for Frequency Domain
 
 .. code-block:: python
 
-   from rheo.transforms import FFTAnalysis
-   from rheo.core.data import RheoData
+   from rheojax.transforms import FFTAnalysis
+   from rheojax.core.data import RheoData
 
    # Time-domain data
    time = np.linspace(0, 10, 1000)
@@ -511,8 +511,8 @@ Example 5: Model Comparison with Information Criteria
 
 .. code-block:: python
 
-   from rheo.pipeline import ModelComparisonPipeline
-   from rheo.core.data import RheoData
+   from rheojax.pipeline import ModelComparisonPipeline
+   from rheojax.core.data import RheoData
 
    # Prepare data
    data = RheoData(
@@ -587,7 +587,7 @@ Example 6: Batch Processing Multiple Files
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline, BatchPipeline
+   from rheojax.pipeline import Pipeline, BatchPipeline
    import glob
 
    # Get all data files
@@ -649,7 +649,7 @@ Example 7: Custom Optimization with Constraints
 
 .. code-block:: python
 
-   from rheo.core.registry import ModelRegistry
+   from rheojax.core.registry import ModelRegistry
    from scipy.optimize import minimize
 
    model = ModelRegistry.create('zener')
@@ -715,7 +715,7 @@ Example 8: Visualization with Custom Styling
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline
+   from rheojax.pipeline import Pipeline
 
    # Create and fit pipeline
    pipeline = (Pipeline()
@@ -948,8 +948,8 @@ Verify installation:
 
 .. code-block:: python
 
-   import rheo
-   print(rheo.__version__)  # Should show v0.2.0 or later
+   import rheojax
+   print(rheojax.__version__)  # Should show v0.2.0 or later
 
 Step 2: Update Imports
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -962,7 +962,7 @@ Replace old imports incrementally:
 
    # Old pyRheo imports
    from pyrrheo import models
-   from pyrrheo.models import MaxwellModel, ZenerModel
+   from pyrrheojax.models import MaxwellModel, ZenerModel
 
    # Old hermes-rheo imports
    from hermes import transforms
@@ -973,13 +973,13 @@ Replace old imports incrementally:
 .. code-block:: python
 
    # New rheo imports - Pipeline API
-   from rheo.pipeline import Pipeline, ModelComparisonPipeline
+   from rheojax.pipeline import Pipeline, ModelComparisonPipeline
 
    # New rheo imports - Modular API
-   from rheo.models import Maxwell, Zener
-   from rheo.core.registry import ModelRegistry
-   from rheo.transforms import FFTAnalysis, Mastercurve
-   from rheo.core.data import RheoData
+   from rheojax.models import Maxwell, Zener
+   from rheojax.core.registry import ModelRegistry
+   from rheojax.transforms import FFTAnalysis, Mastercurve
+   from rheojax.core.data import RheoData
 
 **Tip**: Use your IDE's find-and-replace to batch update imports.
 
@@ -995,7 +995,7 @@ Wrap existing NumPy arrays in RheoData:
    stress = np.loadtxt('stress.txt')
 
    # New way - add RheoData wrapper
-   from rheo.core.data import RheoData
+   from rheojax.core.data import RheoData
 
    data = RheoData(
        x=time,
@@ -1045,11 +1045,11 @@ Step 4: Update Model Creation
    model = models.MaxwellModel()
 
    # New - using registry
-   from rheo.core.registry import ModelRegistry
+   from rheojax.core.registry import ModelRegistry
    model = ModelRegistry.create('maxwell')
 
    # Or direct import
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
    model = Maxwell()
 
 Step 5: Update Fitting Code
@@ -1101,7 +1101,7 @@ Step 6: Test and Validate
       old_predictions = old_model.predict(time)
 
       # Fit with rheo
-      new_model = rheo.models.Maxwell()
+      new_model = rheojax.models.Maxwell()
       new_data = RheoData(x=time, y=stress, domain='time')
       new_model.fit(new_data)
       new_predictions = new_model.predict(new_data)
@@ -1141,7 +1141,7 @@ Q: Are results numerically identical?
 
 **A:** Yes, within 1e-6 relative tolerance for all models and transforms. Both packages use the same underlying numerical methods (scipy.optimize, numerical integration), so results should be essentially identical.
 
-We've validated all 20 models against pyRheo and all 5 transforms against hermes-rheo. See ``docs/validation_report.md`` for detailed comparison.
+We've validated all 20 models against pyRheo and all 5 transforms against hermes-rheojax. See ``docs/validation_report.md`` for detailed comparison.
 
 Q: Can I mix rheo with pyRheo/hermes-rheo?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1151,7 +1151,7 @@ Q: Can I mix rheo with pyRheo/hermes-rheo?
 .. code-block:: python
 
    # Use pyRheo for fitting
-   old_model = pyrrheo.models.MaxwellModel()
+   old_model = pyrrheojax.models.MaxwellModel()
    old_model.fit(time, stress)
    old_predictions = old_model.predict(time)
 
@@ -1275,9 +1275,9 @@ Q: What if I find a bug or inconsistency?
 
    .. code-block:: python
 
-      import rheo, pyrrheo, hermes
-      print(f"rheo: {rheo.__version__}")
-      print(f"pyRheo: {pyrrheo.__version__}")
+      import rheojax, pyrrheo, hermes
+      print(f"rheo: {rheojax.__version__}")
+      print(f"pyRheo: {pyrrheojax.__version__}")
       print(f"hermes-rheo: {hermes.__version__}")
 
 Q: How do I migrate custom models/transforms?
@@ -1290,7 +1290,7 @@ Q: How do I migrate custom models/transforms?
 .. code-block:: python
 
    # Old pyRheo custom model
-   class MyCustomModel(pyrrheo.models.BaseModel):
+   class MyCustomModel(pyrrheojax.models.BaseModel):
        def __init__(self):
            self.param_names = ['A', 'B']
 
@@ -1298,8 +1298,8 @@ Q: How do I migrate custom models/transforms?
            return A * np.exp(-B * t)
 
    # New rheo custom model
-   from rheo.core.base_model import BaseModel
-   from rheo.core.parameters import ParameterSet
+   from rheojax.core.base_model import BaseModel
+   from rheojax.core.parameters import ParameterSet
 
    class MyCustomModel(BaseModel):
        def __init__(self):
@@ -1339,14 +1339,14 @@ Q: What about existing scripts and notebooks?
 
    # During migration (mixed)
    from pyrrheo import models
-   from rheo.core.data import RheoData
+   from rheojax.core.data import RheoData
    model = models.MaxwellModel()
    data = RheoData(x=time, y=stress)  # Wrap data
    model.fit(time, stress)  # Still using old model
 
    # After migration (100% new code)
-   from rheo.pipeline import Pipeline
-   from rheo.core.data import RheoData
+   from rheojax.pipeline import Pipeline
+   from rheojax.core.data import RheoData
    data = RheoData(x=time, y=stress, domain='time')
    pipeline = Pipeline().load_data(data).fit('maxwell')
 
@@ -1409,9 +1409,9 @@ Support Resources
 
 **Documentation**:
 
-* Full documentation: https://rheo.readthedocs.io
-* API reference: https://rheo.readthedocs.io/api_reference.html
-* User guides: https://rheo.readthedocs.io/user_guide.html
+* Full documentation: https://rheojax.readthedocs.io
+* API reference: https://rheojax.readthedocs.io/api_reference.html
+* User guides: https://rheojax.readthedocs.io/user_guide.html
 * Example notebooks: ``examples/`` directory
 
 **Community**:

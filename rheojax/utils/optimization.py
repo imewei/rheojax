@@ -9,8 +9,8 @@ enable float64 precision mode. The rheo package handles this automatically
 in __init__.py.
 
 Example:
-    >>> from rheo.core.parameters import ParameterSet
-    >>> from rheo.utils.optimization import nlsq_optimize
+    >>> from rheojax.core.parameters import ParameterSet
+    >>> from rheojax.utils.optimization import nlsq_optimize
     >>>
     >>> # Set up parameters
     >>> params = ParameterSet()
@@ -35,8 +35,8 @@ from typing import Any, Union
 import nlsq
 import numpy as np
 
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.parameters import ParameterSet
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.parameters import ParameterSet
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
@@ -184,7 +184,7 @@ def nlsq_optimize(
         ValueError: If objective is not callable or parameters is not ParameterSet
 
     Example:
-        >>> from rheo.core.parameters import ParameterSet
+        >>> from rheojax.core.parameters import ParameterSet
         >>> params = ParameterSet()
         >>> params.add("a", value=1.0, bounds=(0, 10))
         >>> params.add("b", value=1.0, bounds=(0, 10))

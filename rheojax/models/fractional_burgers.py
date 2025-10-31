@@ -46,16 +46,16 @@ References
 
 from __future__ import annotations
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
 from jax.scipy.special import gamma as jax_gamma
 
-from rheo.core.base import BaseModel
-from rheo.core.parameters import ParameterSet
-from rheo.core.registry import ModelRegistry
-from rheo.utils.mittag_leffler import mittag_leffler_e
+from rheojax.core.base import BaseModel
+from rheojax.core.parameters import ParameterSet
+from rheojax.core.registry import ModelRegistry
+from rheojax.utils.mittag_leffler import mittag_leffler_e
 
 
 @ModelRegistry.register("fractional_burgers")
@@ -75,7 +75,7 @@ class FractionalBurgersModel(BaseModel):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from rheo.models import FractionalBurgersModel
+    >>> from rheojax.models import FractionalBurgersModel
     >>>
     >>> # Create model
     >>> model = FractionalBurgersModel()
@@ -356,7 +356,7 @@ class FractionalBurgersModel(BaseModel):
         self
             Fitted model instance
         """
-        from rheo.core.parameters import ParameterOptimizer
+        from rheojax.core.parameters import ParameterOptimizer
 
         # Detect test mode
         test_mode = kwargs.get("test_mode", "creep")

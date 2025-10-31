@@ -18,7 +18,7 @@ References:
 
 from __future__ import annotations
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
@@ -26,10 +26,10 @@ from functools import partial
 
 import numpy as np
 
-from rheo.core.base import BaseModel, ParameterSet
-from rheo.core.data import RheoData
-from rheo.core.registry import ModelRegistry
-from rheo.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.base import BaseModel, ParameterSet
+from rheojax.core.data import RheoData
+from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import TestMode, detect_test_mode
 
 
 @ModelRegistry.register("bingham")

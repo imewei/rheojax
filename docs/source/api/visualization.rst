@@ -1,4 +1,4 @@
-Visualization (rheo.visualization)
+Visualization (rheojax.visualization)
 ===================================
 
 The visualization module provides publication-quality plotting functions for rheological data.
@@ -6,7 +6,7 @@ The visualization module provides publication-quality plotting functions for rhe
 Plotting Functions
 ------------------
 
-.. automodule:: rheo.visualization.plotter
+.. automodule:: rheojax.visualization.plotter
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Plotting Functions
 Main Plotting Function
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: rheo.visualization.plotter.plot_rheo_data
+.. autofunction:: rheojax.visualization.plotter.plot_rheo_data
 
    Main entry point for plotting RheoData with automatic plot type selection.
 
@@ -27,22 +27,22 @@ Main Plotting Function
 Specialized Plot Types
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: rheo.visualization.plotter.plot_time_domain
+.. autofunction:: rheojax.visualization.plotter.plot_time_domain
 
    Plot time-domain data (relaxation, creep).
 
-.. autofunction:: rheo.visualization.plotter.plot_frequency_domain
+.. autofunction:: rheojax.visualization.plotter.plot_frequency_domain
 
    Plot frequency-domain data (oscillatory tests).
 
    For complex data (G*), creates two subplots for G' and G".
    For real data, creates a single plot.
 
-.. autofunction:: rheo.visualization.plotter.plot_flow_curve
+.. autofunction:: rheojax.visualization.plotter.plot_flow_curve
 
    Plot flow curves (viscosity or stress vs shear rate).
 
-.. autofunction:: rheo.visualization.plotter.plot_residuals
+.. autofunction:: rheojax.visualization.plotter.plot_residuals
 
    Plot residuals from model fitting.
 
@@ -54,7 +54,7 @@ Plotting Styles
 
 Three built-in styles for different contexts:
 
-.. data:: rheo.visualization.plotter.DEFAULT_STYLE
+.. data:: rheojax.visualization.plotter.DEFAULT_STYLE
 
    General-purpose style for interactive work.
 
@@ -62,7 +62,7 @@ Three built-in styles for different contexts:
    - Font size: 11 pt
    - Line width: 1.5 pt
 
-.. data:: rheo.visualization.plotter.PUBLICATION_STYLE
+.. data:: rheojax.visualization.plotter.PUBLICATION_STYLE
 
    Optimized for journal publications.
 
@@ -71,7 +71,7 @@ Three built-in styles for different contexts:
    - Line width: 1.2 pt
    - Smaller markers
 
-.. data:: rheo.visualization.plotter.PRESENTATION_STYLE
+.. data:: rheojax.visualization.plotter.PRESENTATION_STYLE
 
    Large, clear plots for presentations.
 
@@ -83,7 +83,7 @@ Three built-in styles for different contexts:
 Templates
 ---------
 
-.. automodule:: rheo.visualization.templates
+.. automodule:: rheojax.visualization.templates
    :members:
    :undoc-members:
    :show-inheritance:
@@ -102,8 +102,8 @@ Auto-Detection
 
 .. code-block:: python
 
-    from rheo.core import RheoData
-    from rheo.visualization import plot_rheo_data
+    from rheojax.core import RheoData
+    from rheojax.visualization import plot_rheo_data
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -139,7 +139,7 @@ Stress Relaxation
 
 .. code-block:: python
 
-    from rheo.visualization import plot_time_domain
+    from rheojax.visualization import plot_time_domain
 
     time = np.logspace(-1, 2, 50)
     stress = 1000 * np.exp(-time / 5)
@@ -187,7 +187,7 @@ Complex Modulus
 
 .. code-block:: python
 
-    from rheo.visualization import plot_frequency_domain
+    from rheojax.visualization import plot_frequency_domain
 
     # Complex modulus
     omega = np.logspace(-2, 2, 50)
@@ -233,7 +233,7 @@ Viscosity vs Shear Rate
 
 .. code-block:: python
 
-    from rheo.visualization import plot_flow_curve
+    from rheojax.visualization import plot_flow_curve
 
     shear_rate = np.logspace(-2, 3, 50)
     viscosity = 100 * shear_rate**(-0.7)  # Shear thinning
@@ -275,7 +275,7 @@ With Data Comparison
 
 .. code-block:: python
 
-    from rheo.visualization import plot_residuals
+    from rheojax.visualization import plot_residuals
 
     # Experimental and predicted data
     time = np.linspace(0, 10, 50)

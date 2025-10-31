@@ -12,8 +12,8 @@ import pytest
 matplotlib.use("Agg")  # Non-interactive backend for testing
 import matplotlib.pyplot as plt
 
-from rheo.core.data import RheoData
-from rheo.visualization.plotter import (
+from rheojax.core.data import RheoData
+from rheojax.visualization.plotter import (
     plot_flow_curve,
     plot_frequency_domain,
     plot_residuals,

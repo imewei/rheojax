@@ -15,10 +15,10 @@ import numpy as np
 import psutil
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.jax_config import safe_import_jax
-from rheo.models.maxwell import Maxwell
-from rheo.models.zener import Zener
+from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.models.maxwell import Maxwell
+from rheojax.models.zener import Zener
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -89,7 +89,7 @@ class TestJITCompilationOverhead:
         model.parameters.set_value("eta", 1e6)  # eta = G0 * tau, so eta = 1e6 * 1.0
 
         t = np.array([0.1, 1.0, 10.0])
-        from rheo.core.data import RheoData
+        from rheojax.core.data import RheoData
 
         data = RheoData(
             x=t, y=np.zeros_like(t), domain="time", metadata={"test_mode": "relaxation"}

@@ -94,7 +94,7 @@ python -c "import jax; print('Devices:', jax.devices())"
 ### Core Package Structure
 
 ```
-rheo/
+rheojax/
 ├── core/               # Core abstractions and common functionality
 │   ├── base.py        # BaseModel, BaseTransform abstract classes
 │   ├── data.py        # RheoData wrapper (JAX-compatible)
@@ -134,7 +134,7 @@ rheo/
 ### Key Design Patterns
 
 **1. BaseModel Pattern**
-- All models inherit from `BaseModel` (rheo/core/base.py)
+- All models inherit from `BaseModel` (rheojax/core/base.py)
 - Implements scikit-learn compatible API: `.fit(X, y)`, `.predict(X)`
 - JAX-compatible: accepts both NumPy and JAX arrays
 - Internal methods: `_fit()`, `_predict()` for subclass implementation
@@ -165,7 +165,7 @@ rheo/
 
 ### Test Mode System
 
-Located in `rheo/core/test_modes.py`. Auto-detects:
+Located in `rheojax/core/test_modes.py`. Auto-detects:
 - **Relaxation**: stress decay over time
 - **Creep**: strain increase under constant stress
 - **Oscillation**: frequency-domain (G', G", tan δ)
@@ -175,40 +175,40 @@ Detection based on data characteristics (monotonicity, domain, column names). Us
 
 ### Float64 Precision Enforcement
 
-**Critical Requirement:** Rheo enforces float64 precision throughout the entire JAX stack to ensure numerical stability for rheological calculations. This is accomplished through mandatory import order.
+**Critical Requirement:** RheoJAX enforces float64 precision throughout the entire JAX stack to ensure numerical stability for rheological calculations. This is accomplished through mandatory import order.
 
 #### Import Order Requirement
 
 **NLSQ must be imported BEFORE JAX to enable float64 globally.**
 
-The package automatically handles this in `rheo/__init__.py`:
+The package automatically handles this in `rheojax/__init__.py`:
 ```python
-# rheo/__init__.py (automatic - no user action needed)
+# rheojax/__init__.py (automatic - no user action needed)
 import nlsq  # MUST come before any JAX imports
 # ... JAX is imported later by models/utils
 ```
 
 #### Safe JAX Import Pattern for Developers
 
-**DO NOT import JAX directly in Rheo modules.** Always use the safe import mechanism:
+**DO NOT import JAX directly in RheoJAX modules.** Always use the safe import mechanism:
 
 ```python
 # CORRECT - Safe import (enforces float64)
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 jax, jnp = safe_import_jax()
 
-# INCORRECT - Never do this in Rheo modules
+# INCORRECT - Never do this in RheoJAXJAX modules
 import jax  # Will raise ImportError if NLSQ not imported first
 import jax.numpy as jnp
 ```
 
-All 20 models in `rheo/models/` use the safe import pattern. If adding a new model or transform, always use `safe_import_jax()`.
+All 20 models in `rheojax/models/` use the safe import pattern. If adding a new model or transform, always use `safe_import_jax()`.
 
 #### Float64 Verification
 
 To verify JAX is operating in float64 mode:
 ```python
-from rheo.core.jax_config import verify_float64
+from rheojax.core.jax_config import verify_float64
 verify_float64()  # Raises exception if float64 not enabled
 ```
 
@@ -231,7 +231,7 @@ Rheo implements a two-step optimization workflow combining fast NLSQ point estim
 NLSQ provides GPU-accelerated nonlinear least squares with 5-270x speedup over scipy:
 
 ```python
-from rheo.models.maxwell import Maxwell
+from rheojax.models.maxwell import Maxwell
 import numpy as np
 
 # Generate data
@@ -277,7 +277,7 @@ print(f"G0 95% CI: [{intervals['G0'][0]:.3e}, {intervals['G0'][1]:.3e}]")
 #### Complete Workflow Example
 
 ```python
-from rheo.models.maxwell import Maxwell
+from rheojax.models.maxwell import Maxwell
 import numpy as np
 
 # 1. Create model and data
@@ -312,7 +312,7 @@ print(f"Convergence: R-hat={result.diagnostics['r_hat']['G0']:.4f}, ESS={result.
 For complex workflows, use BayesianPipeline with comprehensive ArviZ integration:
 
 ```python
-from rheo.pipeline.bayesian import BayesianPipeline
+from rheojax.pipeline.bayesian import BayesianPipeline
 
 pipeline = BayesianPipeline()
 
@@ -429,7 +429,7 @@ import jax
 import jax.numpy as jnp
 
 # To this:
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 jax, jnp = safe_import_jax()
 ```
 
@@ -443,7 +443,7 @@ assert 'nlsq' in sys.modules, "NLSQ must be imported before JAX"
 
 **Check:** Verify JAX default dtype:
 ```python
-from rheo.core.jax_config import verify_float64
+from rheojax.core.jax_config import verify_float64
 verify_float64()  # Will raise exception if not float64
 ```
 
@@ -497,11 +497,11 @@ verify_float64()  # Will raise exception if not float64
 - Optimization uses `jax.grad` for automatic differentiation
 - Convert data: `data.to_jax()` or `RheoData(..., use_jax=True)`
 - 2-10x speedup on CPU, 20-100x with GPU
-- **Always use safe_import_jax() in Rheo modules**
+- **Always use safe_import_jax() in RheoJAX modules**
 
 **Example:**
 ```python
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 jax, jnp = safe_import_jax()
 
 @jax.jit
@@ -510,20 +510,20 @@ def objective(params):
     return jnp.sum((predictions - data)**2)
 
 # NLSQ automatically uses JAX gradients
-from rheo.utils.optimization import nlsq_optimize
+from rheojax.utils.optimization import nlsq_optimize
 result = nlsq_optimize(objective, params, use_jax=True)
 ```
 
 ## Development Workflow
 
 ### Adding a New Model
-1. Create file in `rheo/models/` (e.g., `my_model.py`)
+1. Create file in `rheojax/models/` (e.g., `my_model.py`)
 2. **Use safe JAX imports:**
    ```python
-   from rheo.core.jax_config import safe_import_jax
+   from rheojax.core.jax_config import safe_import_jax
    jax, jnp = safe_import_jax()
    ```
-3. Inherit from `BaseModel` (`rheo/core/base.py`)
+3. Inherit from `BaseModel` (`rheojax/core/base.py`)
 4. Implement `_fit()` and `_predict()` methods
 5. Register with `@ModelRegistry.register("my_model")`
 6. Add tests in `tests/models/test_my_model.py`
@@ -531,9 +531,9 @@ result = nlsq_optimize(objective, params, use_jax=True)
 8. Add docstring with equations and references
 
 ### Adding a New Transform
-1. Create file in `rheo/transforms/` (e.g., `my_transform.py`)
+1. Create file in `rheojax/transforms/` (e.g., `my_transform.py`)
 2. **Use safe JAX imports if needed**
-3. Inherit from `BaseTransform` (`rheo/core/base.py`)
+3. Inherit from `BaseTransform` (`rheojax/core/base.py`)
 4. Implement `transform()` method
 5. Register with `@TransformRegistry.register("my_transform")`
 6. Add tests in `tests/transforms/test_my_transform.py`
@@ -561,7 +561,7 @@ result = nlsq_optimize(objective, params, use_jax=True)
 ### Python Version
 - **Requires Python 3.12+** (specified in pyproject.toml and CLAUDE.md)
 - JAX 0.8.0 compatibility requires modern Python
-- Runtime check in `rheo/__init__.py` enforces version
+- Runtime check in `rheojax/__init__.py` enforces version
 
 ### JAX Version Pinning
 - JAX and jaxlib must be **exactly 0.8.0** and match versions
@@ -574,8 +574,8 @@ result = nlsq_optimize(objective, params, use_jax=True)
 - Provides 5-270x speedup over scipy-based optimization
 
 ### Float64 Precision (Critical)
-- **NLSQ must be imported before JAX** - automatic in rheo package
-- **Always use safe_import_jax() in Rheo modules** - never import JAX directly
+- **NLSQ must be imported before JAX** - automatic in rheojax package
+- **Always use safe_import_jax() in RheoJAX modules** - never import JAX directly
 - Runtime checks enforce import order with helpful error messages
 - Float64 precision essential for numerical stability
 
@@ -595,8 +595,8 @@ result = nlsq_optimize(objective, params, use_jax=True)
 
 ### Import Style
 - **Always use explicit imports** (from user's global CLAUDE.md)
-- Example: `from rheo.core.base import BaseModel` (not `from rheo.core import *`)
-- **Never import JAX directly** - use `from rheo.core.jax_config import safe_import_jax`
+- Example: `from rheojax.core.base import BaseModel` (not `from rheojax.core import *`)
+- **Never import JAX directly** - use `from rheojax.core.jax_config import safe_import_jax`
 
 ### Package Manager Support
 - Makefile auto-detects: uv → conda/mamba → pip

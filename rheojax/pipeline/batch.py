@@ -4,7 +4,7 @@ This module provides utilities for applying the same pipeline to
 multiple datasets efficiently, with parallel processing support.
 
 Example:
-    >>> from rheo.pipeline import Pipeline, BatchPipeline
+    >>> from rheojax.pipeline import Pipeline, BatchPipeline
     >>> template = Pipeline().fit('maxwell').plot()
     >>> batch = BatchPipeline(template)
     >>> batch.process_directory('data/', pattern='*.csv')
@@ -21,8 +21,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from rheo.core.data import RheoData
-from rheo.pipeline.base import Pipeline
+from rheojax.core.data import RheoData
+from rheojax.pipeline.base import Pipeline
 
 
 class BatchPipeline:

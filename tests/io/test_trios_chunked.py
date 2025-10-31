@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.io.readers.trios import load_trios, load_trios_chunked
+from rheojax.core.data import RheoData
+from rheojax.io.readers.trios import load_trios, load_trios_chunked
 
 
 class TestTriosChunkedBasic:

@@ -4,7 +4,7 @@ This module provides the BayesianPipeline class for orchestrating the complete
 NLSQ → NumPyro NUTS workflow with a fluent API.
 
 Example:
-    >>> from rheo.pipeline.bayesian import BayesianPipeline
+    >>> from rheojax.pipeline.bayesian import BayesianPipeline
     >>> pipeline = BayesianPipeline()
     >>> result = (pipeline
     ...     .load('data.csv')
@@ -21,10 +21,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from rheo.core.base import BaseModel
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.registry import ModelRegistry
-from rheo.pipeline.base import Pipeline
+from rheojax.core.base import BaseModel
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import ModelRegistry
+from rheojax.pipeline.base import Pipeline
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
@@ -91,7 +91,7 @@ class BayesianPipeline(Pipeline):
         Example:
             >>> pipeline.fit_nlsq('maxwell')
             >>> # or with instance
-            >>> from rheo.models import Maxwell
+            >>> from rheojax.models import Maxwell
             >>> pipeline.fit_nlsq(Maxwell(), max_iter=1000)
         """
         if self.data is None:

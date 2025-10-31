@@ -15,8 +15,8 @@ Tests validate:
 import numpy as np
 import pytest
 
-from rheo.core.jax_config import safe_import_jax
-from rheo.utils.mittag_leffler import (
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.utils.mittag_leffler import (
     mittag_leffler_e,
     mittag_leffler_e2,
     ml_e,

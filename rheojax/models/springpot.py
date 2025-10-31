@@ -18,18 +18,18 @@ References:
 
 from __future__ import annotations
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
 
 from jax.scipy.special import gamma as jax_gamma
 
-from rheo.core.base import BaseModel
-from rheo.core.data import RheoData
-from rheo.core.parameters import ParameterSet
-from rheo.core.registry import ModelRegistry
-from rheo.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.base import BaseModel
+from rheojax.core.data import RheoData
+from rheojax.core.parameters import ParameterSet
+from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import TestMode, detect_test_mode
 
 
 @ModelRegistry.register("springpot")
@@ -50,8 +50,8 @@ class SpringPot(BaseModel):
         - Rotation: NOT SUPPORTED (SpringPot is linear viscoelastic)
 
     Example:
-        >>> from rheo.models.springpot import SpringPot
-        >>> from rheo.core.data import RheoData
+        >>> from rheojax.models.springpot import SpringPot
+        >>> from rheojax.core.data import RheoData
         >>> import jax.numpy as jnp
         >>>
         >>> # Create model
@@ -99,7 +99,7 @@ class SpringPot(BaseModel):
         Returns:
             self for method chaining
         """
-        from rheo.utils.optimization import (
+        from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
         )

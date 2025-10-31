@@ -18,7 +18,7 @@ The Pipeline API provides a fluent interface for chaining operations from data l
 Basic Pipeline
 --------------
 
-.. autoclass:: rheo.pipeline.Pipeline
+.. autoclass:: rheojax.pipeline.Pipeline
    :members:
    :undoc-members:
    :show-inheritance:
@@ -29,7 +29,7 @@ Basic Pipeline
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline
+   from rheojax.pipeline import Pipeline
 
    # Create pipeline and chain operations
    results = (Pipeline()
@@ -69,7 +69,7 @@ Load data from file or RheoData object.
                                x_col='frequency', y_col='modulus')
 
    # From RheoData object
-   from rheo.core import RheoData
+   from rheojax.core import RheoData
    data = RheoData(x=freq, y=modulus, ...)
    pipeline = Pipeline().load(data)
 
@@ -217,7 +217,7 @@ Specialized Workflows
 MastercurvePipeline
 ~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.pipeline.MastercurvePipeline
+.. autoclass:: rheojax.pipeline.MastercurvePipeline
    :members:
    :undoc-members:
    :show-inheritance:
@@ -228,7 +228,7 @@ MastercurvePipeline
 
 .. code-block:: python
 
-   from rheo.pipeline import MastercurvePipeline
+   from rheojax.pipeline import MastercurvePipeline
 
    # Create mastercurve pipeline
    mc_pipeline = MastercurvePipeline(
@@ -265,7 +265,7 @@ MastercurvePipeline
 ModelComparisonPipeline
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.pipeline.ModelComparisonPipeline
+.. autoclass:: rheojax.pipeline.ModelComparisonPipeline
    :members:
    :undoc-members:
    :show-inheritance:
@@ -276,7 +276,7 @@ ModelComparisonPipeline
 
 .. code-block:: python
 
-   from rheo.pipeline import ModelComparisonPipeline
+   from rheojax.pipeline import ModelComparisonPipeline
 
    # Models to compare
    models = ['maxwell', 'zener', 'fractional_maxwell_gel',
@@ -319,7 +319,7 @@ ModelComparisonPipeline
 CreepToRelaxationPipeline
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.pipeline.CreepToRelaxationPipeline
+.. autoclass:: rheojax.pipeline.CreepToRelaxationPipeline
    :members:
    :undoc-members:
    :show-inheritance:
@@ -330,7 +330,7 @@ CreepToRelaxationPipeline
 
 .. code-block:: python
 
-   from rheo.pipeline import CreepToRelaxationPipeline
+   from rheojax.pipeline import CreepToRelaxationPipeline
 
    converter = CreepToRelaxationPipeline(
        method='integration',    # 'integration' or 'approximate'
@@ -347,7 +347,7 @@ CreepToRelaxationPipeline
 FrequencyToTimePipeline
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.pipeline.FrequencyToTimePipeline
+.. autoclass:: rheojax.pipeline.FrequencyToTimePipeline
    :members:
    :undoc-members:
    :show-inheritance:
@@ -358,7 +358,7 @@ FrequencyToTimePipeline
 
 .. code-block:: python
 
-   from rheo.pipeline import FrequencyToTimePipeline
+   from rheojax.pipeline import FrequencyToTimePipeline
 
    ft_pipeline = FrequencyToTimePipeline(
        method='inverse_fft',     # 'inverse_fft' or 'analytical'
@@ -373,7 +373,7 @@ FrequencyToTimePipeline
 Pipeline Builder
 ----------------
 
-.. autoclass:: rheo.pipeline.PipelineBuilder
+.. autoclass:: rheojax.pipeline.PipelineBuilder
    :members:
    :undoc-members:
    :show-inheritance:
@@ -384,7 +384,7 @@ Pipeline Builder
 
 .. code-block:: python
 
-   from rheo.pipeline import PipelineBuilder
+   from rheojax.pipeline import PipelineBuilder
 
    # Build custom pipeline
    builder = PipelineBuilder()
@@ -434,7 +434,7 @@ Pipeline Builder
 Batch Processing
 ----------------
 
-.. autoclass:: rheo.pipeline.BatchPipeline
+.. autoclass:: rheojax.pipeline.BatchPipeline
    :members:
    :undoc-members:
    :show-inheritance:
@@ -445,7 +445,7 @@ Batch Processing
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline, BatchPipeline
+   from rheojax.pipeline import Pipeline, BatchPipeline
 
    # Define template pipeline
    template = (Pipeline()
@@ -620,5 +620,5 @@ See Also
 - :doc:`/user_guide/modular_api` - Low-level API for custom control
 - :doc:`/api/models` - Model API reference
 - :doc:`/api/transforms` - Transform API reference
-- :class:`rheo.core.base.BaseModel` - Base model class
-- :class:`rheo.core.base.BaseTransform` - Base transform class
+- :class:`rheojax.core.base.BaseModel` - Base model class
+- :class:`rheojax.core.base.BaseTransform` - Base transform class

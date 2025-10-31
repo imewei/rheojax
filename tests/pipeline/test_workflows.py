@@ -10,10 +10,10 @@ import tempfile
 import numpy as np
 import pytest
 
-from rheo.core.base import BaseModel
-from rheo.core.data import RheoData
-from rheo.core.registry import ModelRegistry
-from rheo.pipeline.workflows import (
+from rheojax.core.base import BaseModel
+from rheojax.core.data import RheoData
+from rheojax.core.registry import ModelRegistry
+from rheojax.pipeline.workflows import (
     CreepToRelaxationPipeline,
     FrequencyToTimePipeline,
     MastercurvePipeline,

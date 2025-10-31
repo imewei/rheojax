@@ -1,5 +1,5 @@
 """
-Project structure validation tests for rheo package.
+Project structure validation tests for rheojax package.
 
 These tests verify that the project setup is correct and all essential
 components are accessible. They serve as smoke tests for the project structure.
@@ -16,15 +16,15 @@ class TestProjectStructure:
     """Test suite for validating project structure and setup."""
 
     def test_package_imports_successfully(self):
-        """Test that the main rheo package can be imported."""
-        import rheo
+        """Test that the main rheojax package can be imported."""
+        import rheojax
 
-        assert rheo is not None
-        assert hasattr(rheo, "__version__")
+        assert rheojax is not None
+        assert hasattr(rheojax, "__version__")
 
     def test_core_modules_exist(self):
         """Test that all core submodules can be imported."""
-        from rheo import core
+        from rheojax import core
 
         # Verify core submodules exist
         assert hasattr(core, "base")
@@ -35,9 +35,9 @@ class TestProjectStructure:
     def test_package_structure_directories(self):
         """Test that all expected package directories exist."""
         # Get package root
-        import rheo
+        import rheojax
 
-        package_root = Path(rheo.__file__).parent
+        package_root = Path(rheojax.__file__).parent
 
         # Expected directories based on spec
         expected_dirs = [
@@ -61,9 +61,9 @@ class TestProjectStructure:
 
     def test_version_accessible(self):
         """Test that version information is accessible and valid."""
-        import rheo
+        import rheojax
 
-        version = rheo.__version__
+        version = rheojax.__version__
         assert version is not None
         assert isinstance(version, str)
         assert len(version) > 0
@@ -74,9 +74,9 @@ class TestProjectStructure:
 
     def test_jax_version_accessible(self):
         """Test that JAX version information is accessible."""
-        import rheo
+        import rheojax
 
-        jax_version = rheo.__jax_version__
+        jax_version = rheojax.__jax_version__
         assert jax_version is not None
         assert isinstance(jax_version, str)
         assert len(jax_version) > 0
@@ -121,9 +121,9 @@ class TestProjectStructure:
 
     def test_py_typed_marker_exists(self):
         """Test that py.typed marker file exists for type checking support."""
-        import rheo
+        import rheojax
 
-        package_root = Path(rheo.__file__).parent
+        package_root = Path(rheojax.__file__).parent
         py_typed = package_root / "py.typed"
 
         assert py_typed.exists(), "Missing py.typed marker file"
@@ -135,10 +135,10 @@ class TestDocumentation:
 
     def test_docs_directory_exists(self):
         """Test that documentation directory exists."""
-        # Get project root (parent of rheo package)
-        import rheo
+        # Get project root (parent of rheojax package)
+        import rheojax
 
-        project_root = Path(rheo.__file__).parent.parent
+        project_root = Path(rheojax.__file__).parent.parent
         docs_dir = project_root / "docs"
 
         assert docs_dir.exists(), "Missing docs directory"
@@ -146,9 +146,9 @@ class TestDocumentation:
 
     def test_sphinx_conf_exists(self):
         """Test that Sphinx configuration exists."""
-        import rheo
+        import rheojax
 
-        project_root = Path(rheo.__file__).parent.parent
+        project_root = Path(rheojax.__file__).parent.parent
         conf_file = project_root / "docs" / "source" / "conf.py"
 
         assert conf_file.exists(), "Missing Sphinx conf.py"
@@ -156,9 +156,9 @@ class TestDocumentation:
 
     def test_sphinx_index_exists(self):
         """Test that Sphinx index.rst exists."""
-        import rheo
+        import rheojax
 
-        project_root = Path(rheo.__file__).parent.parent
+        project_root = Path(rheojax.__file__).parent.parent
         index_file = project_root / "docs" / "source" / "index.rst"
 
         assert index_file.exists(), "Missing Sphinx index.rst"
@@ -170,9 +170,9 @@ class TestConfiguration:
 
     def test_pyproject_toml_exists(self):
         """Test that pyproject.toml exists and is valid."""
-        import rheo
+        import rheojax
 
-        project_root = Path(rheo.__file__).parent.parent
+        project_root = Path(rheojax.__file__).parent.parent
         pyproject = project_root / "pyproject.toml"
 
         assert pyproject.exists(), "Missing pyproject.toml"
@@ -193,22 +193,22 @@ class TestConfiguration:
         # Verify essential sections
         assert "project" in config
         assert "name" in config["project"]
-        assert config["project"]["name"] == "rheo"
+        assert config["project"]["name"] == "rheojax"
 
     def test_pytest_ini_exists(self):
         """Test that pytest.ini configuration exists."""
-        import rheo
+        import rheojax
 
-        project_root = Path(rheo.__file__).parent.parent
+        project_root = Path(rheojax.__file__).parent.parent
         pytest_ini = project_root / "pytest.ini"
 
         assert pytest_ini.exists(), "Missing pytest.ini"
 
     def test_pre_commit_config_exists(self):
         """Test that pre-commit configuration exists."""
-        import rheo
+        import rheojax
 
-        project_root = Path(rheo.__file__).parent.parent
+        project_root = Path(rheojax.__file__).parent.parent
         pre_commit_config = project_root / ".pre-commit-config.yaml"
 
         assert pre_commit_config.exists(), "Missing .pre-commit-config.yaml"
@@ -222,9 +222,9 @@ class TestCICD:
     )
     def test_github_workflows_exist(self):
         """Test that GitHub Actions workflows exist."""
-        import rheo
+        import rheojax
 
-        project_root = Path(rheo.__file__).parent.parent
+        project_root = Path(rheojax.__file__).parent.parent
         workflows_dir = project_root / ".github" / "workflows"
 
         assert workflows_dir.exists(), "Missing .github/workflows directory"

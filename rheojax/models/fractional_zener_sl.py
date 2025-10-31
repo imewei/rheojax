@@ -41,15 +41,15 @@ References
 
 from __future__ import annotations
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
 
-from rheo.core.base import BaseModel
-from rheo.core.parameters import ParameterSet
-from rheo.core.registry import ModelRegistry
-from rheo.utils.mittag_leffler import mittag_leffler_e2
+from rheojax.core.base import BaseModel
+from rheojax.core.parameters import ParameterSet
+from rheojax.core.registry import ModelRegistry
+from rheojax.utils.mittag_leffler import mittag_leffler_e2
 
 
 @ModelRegistry.register("fractional_zener_sl")
@@ -69,7 +69,7 @@ class FractionalZenerSolidLiquid(BaseModel):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from rheo.models import FractionalZenerSolidLiquid
+    >>> from rheojax.models import FractionalZenerSolidLiquid
     >>>
     >>> # Create model
     >>> model = FractionalZenerSolidLiquid()
@@ -325,7 +325,7 @@ class FractionalZenerSolidLiquid(BaseModel):
         self
             Fitted model instance
         """
-        from rheo.core.parameters import ParameterOptimizer
+        from rheojax.core.parameters import ParameterOptimizer
 
         # Detect test mode if not provided
         test_mode = kwargs.get("test_mode", "relaxation")

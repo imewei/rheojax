@@ -27,7 +27,7 @@ For Development
 
 Clone the repository and install in editable mode::
 
-    git clone https://github.com/username/rheo.git
+    git clone https://github.com/username/rheojax.git
     cd rheo
     pip install -e ".[dev]"
 
@@ -51,8 +51,8 @@ Loading and Analyzing Data
 .. code-block:: python
 
     import numpy as np
-    from rheo.core import RheoData
-    from rheo.io.readers import read_trios
+    from rheojax.core import RheoData
+    from rheojax.io.readers import read_trios
 
     # Load data from TRIOS file (auto-detects format)
     data = read_trios("stress_relaxation.txt")
@@ -76,7 +76,7 @@ Visualizing Data
 
 .. code-block:: python
 
-    from rheo.visualization import plot_rheo_data
+    from rheojax.visualization import plot_rheo_data
     import matplotlib.pyplot as plt
 
     # Create plot (automatic type detection based on data)
@@ -90,7 +90,7 @@ The parameter system provides bounds, constraints, and optimization support:
 
 .. code-block:: python
 
-    from rheo.core import Parameter, ParameterSet
+    from rheojax.core import Parameter, ParameterSet
 
     # Create parameter set
     params = ParameterSet()
@@ -160,7 +160,7 @@ All computations can leverage JAX for automatic differentiation and GPU accelera
         return E * jnp.exp(-t / tau)
 
     # Use with optimization
-    from rheo.utils.optimization import nlsq_optimize
+    from rheojax.utils.optimization import nlsq_optimize
 
     def objective(params):
         predictions = model_prediction(data_jax.x, params)
@@ -177,7 +177,7 @@ rheo supports multiple rheometer data formats:
 
 .. code-block:: python
 
-    from rheo.io.readers import (
+    from rheojax.io.readers import (
         read_trios,      # TA Instruments TRIOS
         read_csv,        # Generic CSV
         read_excel,      # Excel files
@@ -199,7 +199,7 @@ Save your analysis results in various formats:
 
 .. code-block:: python
 
-    from rheo.io.writers import write_hdf5, write_excel
+    from rheojax.io.writers import write_hdf5, write_excel
 
     # Write to HDF5 (preserves all metadata)
     write_hdf5(data, "results.h5")
@@ -214,7 +214,7 @@ rheo automatically detects the test type based on data characteristics:
 
 .. code-block:: python
 
-    from rheo.core.test_modes import TestMode, detect_test_mode
+    from rheojax.core.test_modes import TestMode, detect_test_mode
 
     # Automatic detection
     test_mode = detect_test_mode(data)
@@ -253,9 +253,9 @@ Pattern 1: Load, Analyze, Save
 
 .. code-block:: python
 
-    from rheo.io.readers import auto_read
-    from rheo.io.writers import write_hdf5
-    from rheo.visualization import plot_rheo_data
+    from rheojax.io.readers import auto_read
+    from rheojax.io.writers import write_hdf5
+    from rheojax.visualization import plot_rheo_data
 
     # Load data
     data = auto_read("experiment.txt")
@@ -295,7 +295,7 @@ Pattern 3: Batch Processing
 .. code-block:: python
 
     import pathlib
-    from rheo.io.readers import auto_read
+    from rheojax.io.readers import auto_read
 
     # Process all files in directory
     data_dir = pathlib.Path("experiments/")

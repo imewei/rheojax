@@ -8,9 +8,9 @@ and optimization convergence.
 import numpy as np
 import pytest
 
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.parameters import ParameterSet
-from rheo.utils.optimization import OptimizationResult, nlsq_optimize
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.parameters import ParameterSet
+from rheojax.utils.optimization import OptimizationResult, nlsq_optimize
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

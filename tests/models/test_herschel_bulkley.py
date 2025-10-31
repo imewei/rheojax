@@ -7,9 +7,9 @@ with yield stress and power-law behavior.
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
-from rheo.models.herschel_bulkley import HerschelBulkley
+from rheojax.core.data import RheoData
+from rheojax.core.test_modes import TestMode
+from rheojax.models.herschel_bulkley import HerschelBulkley
 
 
 class TestHerschelBulkleyBasics:

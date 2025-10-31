@@ -16,8 +16,8 @@ from pathlib import Path
 
 import numpy as np
 
-from rheo.io.readers.trios import load_trios, load_trios_chunked
-from rheo.models.maxwell import Maxwell
+from rheojax.io.readers.trios import load_trios, load_trios_chunked
+from rheojax.models.maxwell import Maxwell
 
 # =============================================================================
 # Example 1: Basic Chunked Reading

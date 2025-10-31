@@ -672,7 +672,7 @@ Most notebooks generate synthetic data in-notebook:
 .. code-block:: python
 
    import numpy as np
-   from rheo.models.maxwell import Maxwell
+   from rheojax.models.maxwell import Maxwell
 
    # Set seed for reproducibility
    np.random.seed(42)

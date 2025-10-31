@@ -51,8 +51,8 @@ Basic Usage
 
 .. code-block:: python
 
-   from rheo.io.readers import auto_read
-   from rheo.visualization import plot_rheo_data
+   from rheojax.io.readers import auto_read
+   from rheojax.visualization import plot_rheo_data
    import matplotlib.pyplot as plt
 
    # Load data (auto-detect format)
@@ -70,7 +70,7 @@ Working with Parameters
 
 .. code-block:: python
 
-   from rheo.core import ParameterSet
+   from rheojax.core import ParameterSet
 
    # Create parameter set
    params = ParameterSet()

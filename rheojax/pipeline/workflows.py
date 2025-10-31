@@ -4,7 +4,7 @@ This module provides pre-configured pipelines for standard analysis workflows
 like mastercurve construction, model comparison, and data conversion.
 
 Example:
-    >>> from rheo.pipeline.workflows import ModelComparisonPipeline
+    >>> from rheojax.pipeline.workflows import ModelComparisonPipeline
     >>> pipeline = ModelComparisonPipeline(['maxwell', 'kelvin_voigt', 'zener'])
     >>> pipeline.run(data)
     >>> best = pipeline.get_best_model()
@@ -17,10 +17,10 @@ from typing import Any
 
 import numpy as np
 
-from rheo.core.data import RheoData
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.registry import ModelRegistry
-from rheo.pipeline.base import Pipeline
+from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import ModelRegistry
+from rheojax.pipeline.base import Pipeline
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

@@ -35,7 +35,7 @@ The ModelRegistry provides centralized model management:
 
 .. code-block:: python
 
-   from rheo.core.registry import ModelRegistry
+   from rheojax.core.registry import ModelRegistry
 
    # List all available models
    available_models = ModelRegistry.list_models()
@@ -50,7 +50,7 @@ The ModelRegistry provides centralized model management:
    model = ModelRegistry.create('maxwell')
 
    # Alternative: direct import
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
    model = Maxwell()
 
 TransformRegistry
@@ -60,7 +60,7 @@ Similarly for transforms:
 
 .. code-block:: python
 
-   from rheo.core.registry import TransformRegistry
+   from rheojax.core.registry import TransformRegistry
 
    # List transforms
    transforms = TransformRegistry.list_transforms()
@@ -69,7 +69,7 @@ Similarly for transforms:
    fft = TransformRegistry.create('fft_analysis')
 
    # Alternative: direct import
-   from rheo.transforms import FFTAnalysis
+   from rheojax.transforms import FFTAnalysis
    fft = FFTAnalysis()
 
 Working with Models
@@ -82,7 +82,7 @@ Create and configure models directly:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell, Zener, FractionalMaxwellGel
+   from rheojax.models import Maxwell, Zener, FractionalMaxwellGel
    import numpy as np
 
    # Create model instance
@@ -106,7 +106,7 @@ Control parameter initialization:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
 
    maxwell = Maxwell()
 
@@ -135,7 +135,7 @@ Control optimization search space:
 
 .. code-block:: python
 
-   from rheo.models import FractionalMaxwellGel
+   from rheojax.models import FractionalMaxwellGel
 
    model = FractionalMaxwellGel()
 
@@ -158,7 +158,7 @@ Add complex constraints:
 
 .. code-block:: python
 
-   from rheo.core.parameters import Parameter, ParameterSet
+   from rheojax.core.parameters import Parameter, ParameterSet
 
    params = ParameterSet()
 
@@ -197,8 +197,8 @@ Fit model to data:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
-   from rheo.io import auto_load
+   from rheojax.models import Maxwell
+   from rheojax.io import auto_load
    import numpy as np
 
    # Load data
@@ -230,7 +230,7 @@ Provide data-driven initialization:
 
 .. code-block:: python
 
-   from rheo.models import FractionalMaxwellGel
+   from rheojax.models import FractionalMaxwellGel
    import numpy as np
 
    # Analyze data to inform initial guess
@@ -261,7 +261,7 @@ Try multiple initial guesses to avoid local minima:
 
 .. code-block:: python
 
-   from rheo.models import Zener
+   from rheojax.models import Zener
    import numpy as np
 
    # Generate multiple initial guesses
@@ -302,8 +302,8 @@ Use custom optimization algorithms:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
-   from rheo.utils.optimization import nlsq_optimize
+   from rheojax.models import Maxwell
+   from rheojax.utils.optimization import nlsq_optimize
    import jax.numpy as jnp
    import jax
 
@@ -353,9 +353,9 @@ Apply transforms directly to RheoData:
 
 .. code-block:: python
 
-   from rheo.transforms import FFTAnalysis, SmoothDerivative
-   from rheo.core import RheoData
-   from rheo.io import auto_load
+   from rheojax.transforms import FFTAnalysis, SmoothDerivative
+   from rheojax.core import RheoData
+   from rheojax.io import auto_load
 
    # Load time-series data
    data = auto_load('time_series.txt')
@@ -379,8 +379,8 @@ Chain transforms manually:
 
 .. code-block:: python
 
-   from rheo.transforms import SmoothDerivative, FFTAnalysis
-   from rheo.core.base import TransformPipeline
+   from rheojax.transforms import SmoothDerivative, FFTAnalysis
+   from rheojax.core.base import TransformPipeline
 
    # Create pipeline
    pipeline = TransformPipeline([
@@ -404,7 +404,7 @@ Some transforms are invertible:
 
 .. code-block:: python
 
-   from rheo.transforms import FFTAnalysis
+   from rheojax.transforms import FFTAnalysis
 
    fft = FFTAnalysis()
 
@@ -429,7 +429,7 @@ Fit parameters in stages for better convergence:
 
 .. code-block:: python
 
-   from rheo.models import FractionalMaxwellModel
+   from rheojax.models import FractionalMaxwellModel
    import numpy as np
 
    model = FractionalMaxwellModel()
@@ -463,8 +463,8 @@ Leverage JAX automatic differentiation:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
-   from rheo.utils.optimization import nlsq_optimize
+   from rheojax.models import Maxwell
+   from rheojax.utils.optimization import nlsq_optimize
    import jax
    import jax.numpy as jnp
 
@@ -498,7 +498,7 @@ Assess model generalization:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell, Zener
+   from rheojax.models import Maxwell, Zener
    import numpy as np
    from sklearn.model_selection import KFold
 
@@ -536,7 +536,7 @@ Systematically compare models:
 
 .. code-block:: python
 
-   from rheo.models import (Maxwell, Zener, SpringPot,
+   from rheojax.models import (Maxwell, Zener, SpringPot,
                             FractionalMaxwellGel, FractionalKelvinVoigt)
    import numpy as np
    import pandas as pd
@@ -602,7 +602,7 @@ Analyze how sensitive predictions are to parameters:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
    import numpy as np
    import matplotlib.pyplot as plt
 
@@ -643,8 +643,8 @@ Estimate parameter uncertainty:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
-   from rheo.utils.optimization import calculate_confidence_intervals
+   from rheojax.models import Maxwell
+   from rheojax.utils.optimization import calculate_confidence_intervals
    import numpy as np
 
    maxwell = Maxwell()
@@ -667,7 +667,7 @@ Check for parameter correlation:
 
 .. code-block:: python
 
-   from rheo.models import Zener
+   from rheojax.models import Zener
    import numpy as np
 
    zener = Zener()
@@ -712,7 +712,7 @@ Save fitted models for later use:
 
 .. code-block:: python
 
-   from rheo.models import FractionalMaxwellGel
+   from rheojax.models import FractionalMaxwellGel
    import pickle
 
    # Fit model
@@ -762,7 +762,7 @@ Export model parameters as JSON:
        loaded_dict = json.load(f)
 
    # Reconstruct model
-   from rheo.core.registry import ModelRegistry
+   from rheojax.core.registry import ModelRegistry
 
    model_reconstructed = ModelRegistry.create(loaded_dict['model_type'])
    model_reconstructed.parameters.set_values(loaded_dict['parameters'])
@@ -777,7 +777,7 @@ rheo models follow scikit-learn API:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
    from sklearn.model_selection import GridSearchCV
    from sklearn.base import BaseEstimator
 
@@ -821,7 +821,7 @@ Direct use of JAX arrays and operations:
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
    import jax.numpy as jnp
    import jax
 
@@ -968,7 +968,7 @@ Pattern 1: Custom Weighted Fitting
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
    import jax.numpy as jnp
 
    @jax.jit
@@ -983,7 +983,7 @@ Pattern 1: Custom Weighted Fitting
    # Emphasize low frequency
    weights = 1.0 / (1.0 + X)
 
-   from rheo.utils.optimization import nlsq_optimize
+   from rheojax.utils.optimization import nlsq_optimize
    maxwell = Maxwell()
    result = nlsq_optimize(
        lambda p: weighted_objective(p, X, y, weights),
@@ -996,7 +996,7 @@ Pattern 2: Hierarchical Model Selection
 
 .. code-block:: python
 
-   from rheo.models import Maxwell, Zener, FractionalMaxwellGel
+   from rheojax.models import Maxwell, Zener, FractionalMaxwellGel
 
    # Start simple, increase complexity if needed
    models_hierarchy = [Maxwell(), Zener(), FractionalMaxwellGel()]
@@ -1016,7 +1016,7 @@ Pattern 3: Ensemble Prediction
 
 .. code-block:: python
 
-   from rheo.models import Maxwell, Zener, SpringPot
+   from rheojax.models import Maxwell, Zener, SpringPot
    import numpy as np
 
    # Fit multiple models

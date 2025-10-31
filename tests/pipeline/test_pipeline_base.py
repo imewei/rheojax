@@ -11,10 +11,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rheo.core.base import BaseModel, BaseTransform
-from rheo.core.data import RheoData
-from rheo.core.registry import ModelRegistry, TransformRegistry
-from rheo.pipeline import Pipeline
+from rheojax.core.base import BaseModel, BaseTransform
+from rheojax.core.data import RheoData
+from rheojax.core.registry import ModelRegistry, TransformRegistry
+from rheojax.pipeline import Pipeline
 
 # Check if h5py is available
 try:

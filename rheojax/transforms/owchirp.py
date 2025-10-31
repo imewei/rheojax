@@ -11,15 +11,15 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from rheo.core.base import BaseTransform
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.registry import TransformRegistry
+from rheojax.core.base import BaseTransform
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import TransformRegistry
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
 if TYPE_CHECKING:
-    from rheo.core.data import RheoData
+    from rheojax.core.data import RheoData
 
 
 @TransformRegistry.register("owchirp")
@@ -54,8 +54,8 @@ class OWChirp(BaseTransform):
 
     Examples
     --------
-    >>> from rheo.core.data import RheoData
-    >>> from rheo.transforms.owchirp import OWChirp
+    >>> from rheojax.core.data import RheoData
+    >>> from rheojax.transforms.owchirp import OWChirp
     >>>
     >>> # LAOS stress response data
     >>> t = jnp.linspace(0, 100, 10000)
@@ -236,7 +236,7 @@ class OWChirp(BaseTransform):
         ValueError
             If data is not time-domain
         """
-        from rheo.core.data import RheoData
+        from rheojax.core.data import RheoData
 
         # Validate domain
         if data.domain != "time":

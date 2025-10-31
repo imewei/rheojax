@@ -8,15 +8,15 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-import rheo.models  # Import to trigger all model registrations
-from rheo.core.data import RheoData
-from rheo.core.registry import ModelRegistry
-from rheo.core.test_modes import TestMode
-from rheo.models.maxwell import Maxwell
+import rheojax.models  # Import to trigger all model registrations
+from rheojax.core.data import RheoData
+from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import TestMode
+from rheojax.models.maxwell import Maxwell
 
 
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

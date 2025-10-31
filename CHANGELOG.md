@@ -1,11 +1,21 @@
 # Changelog
 
-All notable changes to the Rheo project will be documented in this file.
+All notable changes to the RheoJAX project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### BREAKING CHANGES
+- **Package renamed from 'rheo' to 'rheojax'**: Due to PyPI name conflict, the package has been renamed to avoid conflicts with existing packages.
+  - **Migration required**: Update all imports in your code
+    - Old: `from rheo.models import Maxwell`
+    - New: `from rheojax.models import Maxwell`
+  - **Installation**: Use `pip install rheojax` (previously `pip install rheo`)
+  - **Repository**: Moved to https://github.com/imewei/rheojax
+  - **API unchanged**: All functionality remains identical; only the package name has changed
+  - See [MIGRATION.md](MIGRATION.md) for detailed upgrade instructions
 
 ### Documentation
 - **Tutorial Consolidation**: Migrated all tutorial notebooks to unified `examples/` directory
@@ -150,13 +160,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Links
 
-- **Documentation**: https://rheo.readthedocs.io
-- **Repository**: https://github.com/username/rheo
-- **Issue Tracker**: https://github.com/username/rheo/issues
+- **Documentation**: https://rheojax.readthedocs.io
+- **Repository**: https://github.com/imewei/rheojax
+- **Issue Tracker**: https://github.com/imewei/rheojax/issues
 
 ## Contributors
 
-- Rheo Development Team
+- RheoJAX Development Team
 - Community contributors (see GitHub)
 
 ## License

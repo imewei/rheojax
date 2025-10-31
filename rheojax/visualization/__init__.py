@@ -7,7 +7,7 @@ This module provides:
 - Export to PNG, PDF, SVG formats
 """
 
-from rheo.visualization.plotter import (
+from rheojax.visualization.plotter import (
     plot_flow_curve,
     plot_frequency_domain,
     plot_residuals,
@@ -15,7 +15,7 @@ from rheo.visualization.plotter import (
     plot_time_domain,
     save_figure,
 )
-from rheo.visualization.templates import (
+from rheojax.visualization.templates import (
     apply_template_style,
     plot_mastercurve,
     plot_model_fit,

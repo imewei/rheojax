@@ -1,7 +1,7 @@
 API Reference
 =============
 
-This page contains the complete API reference for all public modules, classes, and functions in rheo.
+This page contains the complete API reference for all public modules, classes, and functions in rheojax.
 
 .. toctree::
    :maxdepth: 2
@@ -39,136 +39,136 @@ Core Components
 
 **Base Classes**:
 
-- :class:`rheo.core.base.BaseModel` - Base class for all models
-- :class:`rheo.core.base.BaseTransform` - Base class for all transforms
+- :class:`rheojax.core.base.BaseModel` - Base class for all models
+- :class:`rheojax.core.base.BaseTransform` - Base class for all transforms
 
 **Data Structures**:
 
-- :class:`rheo.core.data.RheoData` - Primary data container
-- :class:`rheo.core.parameters.Parameter` - Single parameter
-- :class:`rheo.core.parameters.ParameterSet` - Parameter collection
-- :class:`rheo.core.parameters.SharedParameterSet` - Multi-technique shared parameters
+- :class:`rheojax.core.data.RheoData` - Primary data container
+- :class:`rheojax.core.parameters.Parameter` - Single parameter
+- :class:`rheojax.core.parameters.ParameterSet` - Parameter collection
+- :class:`rheojax.core.parameters.SharedParameterSet` - Multi-technique shared parameters
 
 **Registries**:
 
-- :class:`rheo.core.registry.ModelRegistry` - Model discovery and instantiation
-- :class:`rheo.core.registry.TransformRegistry` - Transform discovery and instantiation
+- :class:`rheojax.core.registry.ModelRegistry` - Model discovery and instantiation
+- :class:`rheojax.core.registry.TransformRegistry` - Transform discovery and instantiation
 
 **Test Modes**:
 
-- :class:`rheo.core.test_modes.TestMode` - Test mode enumeration
-- :func:`rheo.core.test_modes.detect_test_mode` - Automatic test mode detection
+- :class:`rheojax.core.test_modes.TestMode` - Test mode enumeration
+- :func:`rheojax.core.test_modes.detect_test_mode` - Automatic test mode detection
 
 Models (20 total)
 ~~~~~~~~~~~~~~~~~~
 
 **Classical Models (3)**:
 
-- :class:`rheo.models.Maxwell` - Spring and dashpot in series
-- :class:`rheo.models.Zener` - Standard Linear Solid (SLS)
-- :class:`rheo.models.SpringPot` - Fractional power-law element
+- :class:`rheojax.models.Maxwell` - Spring and dashpot in series
+- :class:`rheojax.models.Zener` - Standard Linear Solid (SLS)
+- :class:`rheojax.models.SpringPot` - Fractional power-law element
 
 **Fractional Maxwell Family (4)**:
 
-- :class:`rheo.models.FractionalMaxwellGel` - Spring + SpringPot
-- :class:`rheo.models.FractionalMaxwellLiquid` - SpringPot + dashpot
-- :class:`rheo.models.FractionalMaxwellModel` - Two SpringPots
-- :class:`rheo.models.FractionalKelvinVoigt` - Parallel spring + SpringPot
+- :class:`rheojax.models.FractionalMaxwellGel` - Spring + SpringPot
+- :class:`rheojax.models.FractionalMaxwellLiquid` - SpringPot + dashpot
+- :class:`rheojax.models.FractionalMaxwellModel` - Two SpringPots
+- :class:`rheojax.models.FractionalKelvinVoigt` - Parallel spring + SpringPot
 
 **Fractional Zener Family (4)**:
 
-- :class:`rheo.models.FractionalZenerSolidLiquid` (FZSL) - Solid + fractional liquid
-- :class:`rheo.models.FractionalZenerSolidSolid` (FZSS) - Two solids + fractional
-- :class:`rheo.models.FractionalZenerLiquidLiquid` (FZLL) - Most general
-- :class:`rheo.models.FractionalKelvinVoigtZener` (FKVZ) - FKV + series spring
+- :class:`rheojax.models.FractionalZenerSolidLiquid` (FZSL) - Solid + fractional liquid
+- :class:`rheojax.models.FractionalZenerSolidSolid` (FZSS) - Two solids + fractional
+- :class:`rheojax.models.FractionalZenerLiquidLiquid` (FZLL) - Most general
+- :class:`rheojax.models.FractionalKelvinVoigtZener` (FKVZ) - FKV + series spring
 
 **Advanced Fractional Models (3)**:
 
-- :class:`rheo.models.FractionalBurgersModel` (FBM) - Maxwell + FKV in series
-- :class:`rheo.models.FractionalPoyntingThomson` (FPT) - FKV + spring in series
-- :class:`rheo.models.FractionalJeffreysModel` (FJM) - Two dashpots + SpringPot
+- :class:`rheojax.models.FractionalBurgersModel` (FBM) - Maxwell + FKV in series
+- :class:`rheojax.models.FractionalPoyntingThomson` (FPT) - FKV + spring in series
+- :class:`rheojax.models.FractionalJeffreysModel` (FJM) - Two dashpots + SpringPot
 
 **Non-Newtonian Flow Models (6)**:
 
-- :class:`rheo.models.PowerLaw` - τ = K·γ̇^n
-- :class:`rheo.models.Carreau` - Smooth Newtonian → power-law
-- :class:`rheo.models.CarreauYasuda` - Extended Carreau
-- :class:`rheo.models.Cross` - Alternative to Carreau
-- :class:`rheo.models.HerschelBulkley` - Yield stress + power-law
-- :class:`rheo.models.Bingham` - Yield stress + Newtonian
+- :class:`rheojax.models.PowerLaw` - τ = K·γ̇^n
+- :class:`rheojax.models.Carreau` - Smooth Newtonian → power-law
+- :class:`rheojax.models.CarreauYasuda` - Extended Carreau
+- :class:`rheojax.models.Cross` - Alternative to Carreau
+- :class:`rheojax.models.HerschelBulkley` - Yield stress + power-law
+- :class:`rheojax.models.Bingham` - Yield stress + Newtonian
 
 Transforms (5 total)
 ~~~~~~~~~~~~~~~~~~~~~
 
-- :class:`rheo.transforms.FFTAnalysis` - Time → frequency domain (FFT)
-- :class:`rheo.transforms.Mastercurve` - Time-temperature superposition (WLF/Arrhenius)
-- :class:`rheo.transforms.MutationNumber` - Viscoelastic character quantification
-- :class:`rheo.transforms.OWChirp` - Optimal waveform analysis for LAOS
-- :class:`rheo.transforms.SmoothDerivative` - Noise-robust differentiation
+- :class:`rheojax.transforms.FFTAnalysis` - Time → frequency domain (FFT)
+- :class:`rheojax.transforms.Mastercurve` - Time-temperature superposition (WLF/Arrhenius)
+- :class:`rheojax.transforms.MutationNumber` - Viscoelastic character quantification
+- :class:`rheojax.transforms.OWChirp` - Optimal waveform analysis for LAOS
+- :class:`rheojax.transforms.SmoothDerivative` - Noise-robust differentiation
 
 Pipeline API
 ~~~~~~~~~~~~
 
 **Core Pipeline**:
 
-- :class:`rheo.pipeline.Pipeline` - Base fluent API with method chaining
+- :class:`rheojax.pipeline.Pipeline` - Base fluent API with method chaining
 
 **Specialized Workflows**:
 
-- :class:`rheo.pipeline.MastercurvePipeline` - Time-temperature superposition
-- :class:`rheo.pipeline.ModelComparisonPipeline` - Multi-model comparison
-- :class:`rheo.pipeline.CreepToRelaxationPipeline` - Creep → relaxation conversion
-- :class:`rheo.pipeline.FrequencyToTimePipeline` - Frequency → time conversion
+- :class:`rheojax.pipeline.MastercurvePipeline` - Time-temperature superposition
+- :class:`rheojax.pipeline.ModelComparisonPipeline` - Multi-model comparison
+- :class:`rheojax.pipeline.CreepToRelaxationPipeline` - Creep → relaxation conversion
+- :class:`rheojax.pipeline.FrequencyToTimePipeline` - Frequency → time conversion
 
 **Batch Processing**:
 
-- :class:`rheo.pipeline.PipelineBuilder` - Programmatic pipeline construction
-- :class:`rheo.pipeline.BatchPipeline` - Multi-file parallel processing
+- :class:`rheojax.pipeline.PipelineBuilder` - Programmatic pipeline construction
+- :class:`rheojax.pipeline.BatchPipeline` - Multi-file parallel processing
 
 I/O (Input/Output)
 ~~~~~~~~~~~~~~~~~~
 
 **Readers**:
 
-- :func:`rheo.io.auto_load` - Auto-detect format and load
-- :func:`rheo.io.load_trios` - TA TRIOS text files
-- :func:`rheo.io.load_csv` - CSV files
-- :func:`rheo.io.load_excel` - Excel files (.xlsx, .xls)
-- :func:`rheo.io.load_anton_paar` - Anton Paar files
+- :func:`rheojax.io.auto_load` - Auto-detect format and load
+- :func:`rheojax.io.load_trios` - TA TRIOS text files
+- :func:`rheojax.io.load_csv` - CSV files
+- :func:`rheojax.io.load_excel` - Excel files (.xlsx, .xls)
+- :func:`rheojax.io.load_anton_paar` - Anton Paar files
 
 **Writers**:
 
-- :func:`rheo.io.save_hdf5` - HDF5 format (full fidelity)
-- :func:`rheo.io.save_excel` - Excel reports (multi-sheet)
+- :func:`rheojax.io.save_hdf5` - HDF5 format (full fidelity)
+- :func:`rheojax.io.save_excel` - Excel reports (multi-sheet)
 
 Utilities
 ~~~~~~~~~
 
 **Optimization**:
 
-- :func:`rheo.utils.optimization.nlsq_optimize` - Nonlinear least squares with JAX
-- :func:`rheo.utils.optimization.calculate_confidence_intervals` - Parameter uncertainty
+- :func:`rheojax.utils.optimization.nlsq_optimize` - Nonlinear least squares with JAX
+- :func:`rheojax.utils.optimization.calculate_confidence_intervals` - Parameter uncertainty
 
 **Mittag-Leffler Functions**:
 
-- :func:`rheo.utils.mittag_leffler.mittag_leffler_e` - One-parameter: E_α(z)
-- :func:`rheo.utils.mittag_leffler.mittag_leffler_e2` - Two-parameter: E_α,β(z)
+- :func:`rheojax.utils.mittag_leffler.mittag_leffler_e` - One-parameter: E_α(z)
+- :func:`rheojax.utils.mittag_leffler.mittag_leffler_e2` - Two-parameter: E_α,β(z)
 
 **Test Modes**:
 
-- :func:`rheo.core.test_modes.detect_test_mode` - Auto-detect test mode
-- :func:`rheo.core.test_modes.get_compatible_test_modes` - Get compatible modes for model
-- :func:`rheo.core.test_modes.suggest_models_for_test_mode` - Suggest models for test mode
+- :func:`rheojax.core.test_modes.detect_test_mode` - Auto-detect test mode
+- :func:`rheojax.core.test_modes.get_compatible_test_modes` - Get compatible modes for model
+- :func:`rheojax.core.test_modes.suggest_models_for_test_mode` - Suggest models for test mode
 
 Visualization
 ~~~~~~~~~~~~~
 
 **Plotting Functions**:
 
-- :func:`rheo.visualization.plot_rheo_data` - Plot RheoData objects
-- :func:`rheo.visualization.plot_model_fit` - Plot data with model fit
-- :func:`rheo.visualization.plot_residuals` - Plot fit residuals
-- :func:`rheo.visualization.plot_mastercurve` - Plot mastercurve with shift factors
+- :func:`rheojax.visualization.plot_rheo_data` - Plot RheoData objects
+- :func:`rheojax.visualization.plot_model_fit` - Plot data with model fit
+- :func:`rheojax.visualization.plot_residuals` - Plot fit residuals
+- :func:`rheojax.visualization.plot_mastercurve` - Plot mastercurve with shift factors
 
 **Styles**:
 
@@ -284,7 +284,7 @@ This documentation covers rheo version 0.2.0 (Phase 2 release).
 Support
 -------
 
-- **Documentation**: https://rheo.readthedocs.io
+- **Documentation**: https://rheojax.readthedocs.io
 - **GitHub Issues**: https://github.com/username/rheo/issues
 - **Discussions**: https://github.com/username/rheo/discussions
 - **Email**: rheo@example.com

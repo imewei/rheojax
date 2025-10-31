@@ -15,10 +15,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.parameters import Parameter, ParameterSet
-from rheo.core.test_modes import TestMode
+from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.parameters import Parameter, ParameterSet
+from rheojax.core.test_modes import TestMode
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -509,10 +509,10 @@ def load_all_plugins():
     preventing registry isolation issues in the full test suite.
     """
     # Import all model modules to trigger registration
-    import rheo.models
+    import rheojax.models
 
     # Import all transform modules to trigger registration
-    import rheo.transforms
+    import rheojax.transforms
 
     yield
 
@@ -523,7 +523,7 @@ def clean_registries():
 
     Useful for testing registry functionality without side effects.
     """
-    from rheo.core.registry import ModelRegistry, TransformRegistry
+    from rheojax.core.registry import ModelRegistry, TransformRegistry
 
     # Save original registries
     original_models = ModelRegistry._models.copy()
@@ -594,5 +594,5 @@ def reset_jax_config():
     """Reset JAX configuration after each test to avoid state leakage."""
     yield
     # Reset JAX config validation state to avoid module import caching issues
-    from rheo.core.jax_config import reset_validation
+    from rheojax.core.jax_config import reset_validation
     reset_validation()

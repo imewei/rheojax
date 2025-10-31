@@ -7,8 +7,8 @@ capabilities as specified in Task Group 6.
 
 import pytest
 
-from rheo.core.base import BaseModel, BaseTransform
-from rheo.core.registry import ModelRegistry, Registry, TransformRegistry
+from rheojax.core.base import BaseModel, BaseTransform
+from rheojax.core.registry import ModelRegistry, Registry, TransformRegistry
 
 
 class TestModelRegistryDecorator:

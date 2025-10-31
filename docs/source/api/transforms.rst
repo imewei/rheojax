@@ -6,7 +6,7 @@ This page documents all 5 data transforms implemented in rheo for rheological da
 Overview
 --------
 
-rheo transforms process :class:`rheo.core.data.RheoData` objects to extract features, convert between domains, or preprocess data. All transforms inherit from :class:`rheo.core.base.BaseTransform` and provide ``transform()`` and ``fit_transform()`` methods.
+rheo transforms process :class:`rheojax.core.data.RheoData` objects to extract features, convert between domains, or preprocess data. All transforms inherit from :class:`rheojax.core.base.BaseTransform` and provide ``transform()`` and ``fit_transform()`` methods.
 
 **Available Transforms**:
 
@@ -23,7 +23,7 @@ Access transforms through the registry:
 
 .. code-block:: python
 
-   from rheo.core.registry import TransformRegistry
+   from rheojax.core.registry import TransformRegistry
 
    # List all transforms
    transforms = TransformRegistry.list_transforms()
@@ -37,7 +37,7 @@ Access transforms through the registry:
 FFTAnalysis
 -----------
 
-.. autoclass:: rheo.transforms.FFTAnalysis
+.. autoclass:: rheojax.transforms.FFTAnalysis
    :members:
    :undoc-members:
    :show-inheritance:
@@ -52,8 +52,8 @@ FFTAnalysis
 
 .. code-block:: python
 
-   from rheo.transforms import FFTAnalysis
-   from rheo.io import auto_load
+   from rheojax.transforms import FFTAnalysis
+   from rheojax.io import auto_load
 
    # Load time-series data
    data = auto_load('oscillation_time_series.txt')
@@ -92,7 +92,7 @@ FFTAnalysis
 Mastercurve
 -----------
 
-.. autoclass:: rheo.transforms.Mastercurve
+.. autoclass:: rheojax.transforms.Mastercurve
    :members:
    :undoc-members:
    :show-inheritance:
@@ -107,8 +107,8 @@ Mastercurve
 
 .. code-block:: python
 
-   from rheo.transforms import Mastercurve
-   from rheo.io import auto_load
+   from rheojax.transforms import Mastercurve
+   from rheojax.io import auto_load
 
    # Load multi-temperature data
    data_25C = auto_load('freq_sweep_25C.txt')
@@ -171,7 +171,7 @@ Mastercurve
 Mutation Number
 ---------------
 
-.. autoclass:: rheo.transforms.MutationNumber
+.. autoclass:: rheojax.transforms.MutationNumber
    :members:
    :undoc-members:
    :show-inheritance:
@@ -186,8 +186,8 @@ Mutation Number
 
 .. code-block:: python
 
-   from rheo.transforms import MutationNumber
-   from rheo.io import auto_load
+   from rheojax.transforms import MutationNumber
+   from rheojax.io import auto_load
 
    # Load time-resolved oscillatory data (curing, gelation)
    data = auto_load('curing_time_sweep.txt')
@@ -237,7 +237,7 @@ The mutation number quantifies the integrated rate of change in elastic characte
 OWChirp
 -------
 
-.. autoclass:: rheo.transforms.OWChirp
+.. autoclass:: rheojax.transforms.OWChirp
    :members:
    :undoc-members:
    :show-inheritance:
@@ -252,8 +252,8 @@ OWChirp
 
 .. code-block:: python
 
-   from rheo.transforms import OWChirp
-   from rheo.io import auto_load
+   from rheojax.transforms import OWChirp
+   from rheojax.io import auto_load
 
    # Load chirp experiment
    data = auto_load('owchirp_experiment.txt')
@@ -298,7 +298,7 @@ OWChirp
 SmoothDerivative
 ----------------
 
-.. autoclass:: rheo.transforms.SmoothDerivative
+.. autoclass:: rheojax.transforms.SmoothDerivative
    :members:
    :undoc-members:
    :show-inheritance:
@@ -313,8 +313,8 @@ SmoothDerivative
 
 .. code-block:: python
 
-   from rheo.transforms import SmoothDerivative
-   from rheo.io import auto_load
+   from rheojax.transforms import SmoothDerivative
+   from rheojax.io import auto_load
 
    # Load noisy strain vs time data
    data = auto_load('strain_vs_time.txt')
@@ -331,7 +331,7 @@ SmoothDerivative
    shear_rate_data.y_units = '1/s'  # Update units
 
    # Use for flow model fitting
-   from rheo.models import PowerLaw
+   from rheojax.models import PowerLaw
    power_law = PowerLaw()
    power_law.fit(shear_rate_data.y, stress_data.y)
 
@@ -383,12 +383,12 @@ Transform Composition
 Chaining Transforms
 ~~~~~~~~~~~~~~~~~~~
 
-Transforms can be chained using :class:`rheo.core.base.TransformPipeline`:
+Transforms can be chained using :class:`rheojax.core.base.TransformPipeline`:
 
 .. code-block:: python
 
-   from rheo.core.base import TransformPipeline
-   from rheo.transforms import SmoothDerivative, FFTAnalysis
+   from rheojax.core.base import TransformPipeline
+   from rheojax.transforms import SmoothDerivative, FFTAnalysis
 
    # Create pipeline
    pipeline = TransformPipeline([
@@ -443,5 +443,5 @@ See Also
 
 - :doc:`/user_guide/transforms` - Comprehensive transform usage guide
 - :doc:`/user_guide/pipeline_api` - Using transforms in pipelines
-- :class:`rheo.core.base.BaseTransform` - Base class documentation
-- :class:`rheo.core.data.RheoData` - Data structure transforms operate on
+- :class:`rheojax.core.base.BaseTransform` - Base class documentation
+- :class:`rheojax.core.data.RheoData` - Data structure transforms operate on

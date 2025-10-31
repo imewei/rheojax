@@ -1,7 +1,7 @@
 Models API
 ==========
 
-This page documents all 20 rheological models implemented in rheo.
+This page documents all 20 rheological models implemented in rheojax.
 
 Overview
 --------
@@ -12,7 +12,7 @@ rheo provides three families of models:
 - **Fractional Models** (11): Power-law viscoelastic behavior
 - **Non-Newtonian Flow Models** (6): Shear-rate dependent viscosity
 
-All models inherit from :class:`rheo.core.base.BaseModel` and follow the scikit-learn API pattern with ``fit()``, ``predict()``, and ``score()`` methods.
+All models inherit from :class:`rheojax.core.base.BaseModel` and follow the scikit-learn API pattern with ``fit()``, ``predict()``, and ``score()`` methods.
 
 Model Registry
 --------------
@@ -21,7 +21,7 @@ Access models through the registry:
 
 .. code-block:: python
 
-   from rheo.core.registry import ModelRegistry
+   from rheojax.core.registry import ModelRegistry
 
    # List all available models
    models = ModelRegistry.list_models()
@@ -38,7 +38,7 @@ Classical Models
 Maxwell Model
 ~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.Maxwell
+.. autoclass:: rheojax.models.Maxwell
    :members:
    :undoc-members:
    :show-inheritance:
@@ -55,7 +55,7 @@ Maxwell Model
 
    .. code-block:: python
 
-      from rheo.models import Maxwell
+      from rheojax.models import Maxwell
       import numpy as np
 
       # Create model
@@ -76,7 +76,7 @@ Maxwell Model
 Zener Model
 ~~~~~~~~~~~
 
-.. autoclass:: rheo.models.Zener
+.. autoclass:: rheojax.models.Zener
    :members:
    :undoc-members:
    :show-inheritance:
@@ -94,7 +94,7 @@ Zener Model
 
    .. code-block:: python
 
-      from rheo.models import Zener
+      from rheojax.models import Zener
 
       zener = Zener()
       zener.fit(omega, G_star)
@@ -105,7 +105,7 @@ Zener Model
 SpringPot Model
 ~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.SpringPot
+.. autoclass:: rheojax.models.SpringPot
    :members:
    :undoc-members:
    :show-inheritance:
@@ -122,7 +122,7 @@ SpringPot Model
 
    .. code-block:: python
 
-      from rheo.models import SpringPot
+      from rheojax.models import SpringPot
 
       springpot = SpringPot()
       springpot.fit(omega, G_star)
@@ -138,7 +138,7 @@ Fractional Maxwell Family
 FractionalMaxwellGel
 ~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalMaxwellGel
+.. autoclass:: rheojax.models.FractionalMaxwellGel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -154,7 +154,7 @@ FractionalMaxwellGel
 
    .. code-block:: python
 
-      from rheo.models import FractionalMaxwellGel
+      from rheojax.models import FractionalMaxwellGel
 
       fmg = FractionalMaxwellGel()
       fmg.fit(omega, G_star)
@@ -164,7 +164,7 @@ FractionalMaxwellGel
 FractionalMaxwellLiquid
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalMaxwellLiquid
+.. autoclass:: rheojax.models.FractionalMaxwellLiquid
    :members:
    :undoc-members:
    :show-inheritance:
@@ -179,7 +179,7 @@ FractionalMaxwellLiquid
 FractionalMaxwellModel
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalMaxwellModel
+.. autoclass:: rheojax.models.FractionalMaxwellModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -191,7 +191,7 @@ FractionalMaxwellModel
 FractionalKelvinVoigt
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalKelvinVoigt
+.. autoclass:: rheojax.models.FractionalKelvinVoigt
    :members:
    :undoc-members:
    :show-inheritance:
@@ -210,13 +210,13 @@ Fractional Zener Family
 FractionalZenerSolidLiquid (FZSL)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalZenerSolidLiquid
+.. autoclass:: rheojax.models.FractionalZenerSolidLiquid
    :members:
    :undoc-members:
    :show-inheritance:
    :noindex:
 
-.. autoclass:: rheo.models.FZSL
+.. autoclass:: rheojax.models.FZSL
    :members:
    :undoc-members:
    :show-inheritance:
@@ -233,7 +233,7 @@ FractionalZenerSolidLiquid (FZSL)
 
    .. code-block:: python
 
-      from rheo.models import FZSL  # Short alias
+      from rheojax.models import FZSL  # Short alias
 
       fzsl = FZSL()
       fzsl.fit(omega, G_star)
@@ -243,13 +243,13 @@ FractionalZenerSolidLiquid (FZSL)
 FractionalZenerSolidSolid (FZSS)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalZenerSolidSolid
+.. autoclass:: rheojax.models.FractionalZenerSolidSolid
    :members:
    :undoc-members:
    :show-inheritance:
    :noindex:
 
-.. autoclass:: rheo.models.FZSS
+.. autoclass:: rheojax.models.FZSS
    :members:
    :undoc-members:
    :show-inheritance:
@@ -265,13 +265,13 @@ FractionalZenerSolidSolid (FZSS)
 FractionalZenerLiquidLiquid (FZLL)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalZenerLiquidLiquid
+.. autoclass:: rheojax.models.FractionalZenerLiquidLiquid
    :members:
    :undoc-members:
    :show-inheritance:
    :noindex:
 
-.. autoclass:: rheo.models.FZLL
+.. autoclass:: rheojax.models.FZLL
    :members:
    :undoc-members:
    :show-inheritance:
@@ -283,13 +283,13 @@ FractionalZenerLiquidLiquid (FZLL)
 FractionalKelvinVoigtZener (FKVZ)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalKelvinVoigtZener
+.. autoclass:: rheojax.models.FractionalKelvinVoigtZener
    :members:
    :undoc-members:
    :show-inheritance:
    :noindex:
 
-.. autoclass:: rheo.models.FKVZ
+.. autoclass:: rheojax.models.FKVZ
    :members:
    :undoc-members:
    :show-inheritance:
@@ -304,13 +304,13 @@ Advanced Fractional Models
 FractionalBurgersModel (FBM)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalBurgersModel
+.. autoclass:: rheojax.models.FractionalBurgersModel
    :members:
    :undoc-members:
    :show-inheritance:
    :noindex:
 
-.. autoclass:: rheo.models.FBM
+.. autoclass:: rheojax.models.FBM
    :members:
    :undoc-members:
    :show-inheritance:
@@ -323,7 +323,7 @@ FractionalBurgersModel (FBM)
 
    .. code-block:: python
 
-      from rheo.models import FBM
+      from rheojax.models import FBM
 
       fbm = FBM()
       fbm.fit(time, creep_compliance)
@@ -333,13 +333,13 @@ FractionalBurgersModel (FBM)
 FractionalPoyntingThomson (FPT)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalPoyntingThomson
+.. autoclass:: rheojax.models.FractionalPoyntingThomson
    :members:
    :undoc-members:
    :show-inheritance:
    :noindex:
 
-.. autoclass:: rheo.models.FPT
+.. autoclass:: rheojax.models.FPT
    :members:
    :undoc-members:
    :show-inheritance:
@@ -351,13 +351,13 @@ FractionalPoyntingThomson (FPT)
 FractionalJeffreysModel (FJM)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.FractionalJeffreysModel
+.. autoclass:: rheojax.models.FractionalJeffreysModel
    :members:
    :undoc-members:
    :show-inheritance:
    :noindex:
 
-.. autoclass:: rheo.models.FJM
+.. autoclass:: rheojax.models.FJM
    :members:
    :undoc-members:
    :show-inheritance:
@@ -376,7 +376,7 @@ These models describe shear-rate dependent viscosity for steady shear flows.
 PowerLaw
 ~~~~~~~~
 
-.. autoclass:: rheo.models.PowerLaw
+.. autoclass:: rheojax.models.PowerLaw
    :members:
    :undoc-members:
    :show-inheritance:
@@ -391,7 +391,7 @@ PowerLaw
 
    .. code-block:: python
 
-      from rheo.models import PowerLaw
+      from rheojax.models import PowerLaw
       import numpy as np
 
       # Shear thinning data
@@ -411,7 +411,7 @@ PowerLaw
 Carreau
 ~~~~~~~
 
-.. autoclass:: rheo.models.Carreau
+.. autoclass:: rheojax.models.Carreau
    :members:
    :undoc-members:
    :show-inheritance:
@@ -430,7 +430,7 @@ Carreau
 
    .. code-block:: python
 
-      from rheo.models import Carreau
+      from rheojax.models import Carreau
 
       carreau = Carreau()
       carreau.fit(shear_rate, viscosity)
@@ -440,7 +440,7 @@ Carreau
 CarreauYasuda
 ~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.CarreauYasuda
+.. autoclass:: rheojax.models.CarreauYasuda
    :members:
    :undoc-members:
    :show-inheritance:
@@ -454,7 +454,7 @@ CarreauYasuda
 Cross
 ~~~~~
 
-.. autoclass:: rheo.models.Cross
+.. autoclass:: rheojax.models.Cross
    :members:
    :undoc-members:
    :show-inheritance:
@@ -472,7 +472,7 @@ Cross
 HerschelBulkley
 ~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.models.HerschelBulkley
+.. autoclass:: rheojax.models.HerschelBulkley
    :members:
    :undoc-members:
    :show-inheritance:
@@ -490,7 +490,7 @@ HerschelBulkley
 
    .. code-block:: python
 
-      from rheo.models import HerschelBulkley
+      from rheojax.models import HerschelBulkley
 
       hb = HerschelBulkley()
       hb.fit(shear_rate, stress)
@@ -503,7 +503,7 @@ HerschelBulkley
 Bingham
 ~~~~~~~
 
-.. autoclass:: rheo.models.Bingham
+.. autoclass:: rheojax.models.Bingham
    :members:
    :undoc-members:
    :show-inheritance:
@@ -520,7 +520,7 @@ Bingham
 
    .. code-block:: python
 
-      from rheo.models import Bingham
+      from rheojax.models import Bingham
 
       bingham = Bingham()
       bingham.fit(shear_rate, stress)
@@ -535,7 +535,7 @@ Comparing Multiple Models
 
 .. code-block:: python
 
-   from rheo.models import Maxwell, Zener, FractionalMaxwellGel
+   from rheojax.models import Maxwell, Zener, FractionalMaxwellGel
    import numpy as np
 
    models = [Maxwell(), Zener(), FractionalMaxwellGel()]
@@ -567,4 +567,4 @@ See Also
 - :doc:`/user_guide/model_selection` - Decision tree for model selection
 - :doc:`/user_guide/modular_api` - Direct model usage examples
 - :doc:`/user_guide/multi_technique_fitting` - Fitting across multiple test modes
-- :class:`rheo.core.base.BaseModel` - Base class documentation
+- :class:`rheojax.core.base.BaseModel` - Base class documentation

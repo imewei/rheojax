@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.io.writers import save_excel, save_hdf5
+from rheojax.core.data import RheoData
+from rheojax.io.writers import save_excel, save_hdf5
 
 # Check if h5py is available
 try:

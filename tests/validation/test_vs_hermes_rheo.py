@@ -19,12 +19,12 @@ HERMES_PATH = Path("/Users/b80985/Documents/GitHub/hermes-rheo/")
 if HERMES_PATH.exists():
     sys.path.insert(0, str(HERMES_PATH))
 
-from rheo.core.data import RheoData
-from rheo.transforms.fft_analysis import FFTAnalysis
-from rheo.transforms.mastercurve import Mastercurve
-from rheo.transforms.mutation_number import MutationNumber
-from rheo.transforms.owchirp import OWChirp
-from rheo.transforms.smooth_derivative import SmoothDerivative
+from rheojax.core.data import RheoData
+from rheojax.transforms.fft_analysis import FFTAnalysis
+from rheojax.transforms.mastercurve import Mastercurve
+from rheojax.transforms.mutation_number import MutationNumber
+from rheojax.transforms.owchirp import OWChirp
+from rheojax.transforms.smooth_derivative import SmoothDerivative
 
 
 class TestFFTAnalysisVsHermes:

@@ -4,7 +4,7 @@ This module provides a builder pattern for creating and validating
 complex pipelines programmatically with fluent API.
 
 Example:
-    >>> from rheo.pipeline.builder import PipelineBuilder
+    >>> from rheojax.pipeline.builder import PipelineBuilder
     >>> pipeline = (PipelineBuilder()
     ...     .add_load_step('data.csv', x_col='time', y_col='stress')
     ...     .add_transform_step('smooth', window_size=5)
@@ -18,8 +18,8 @@ from __future__ import annotations
 import warnings
 from typing import Any
 
-from rheo.core.registry import ModelRegistry, TransformRegistry
-from rheo.pipeline.base import Pipeline
+from rheojax.core.registry import ModelRegistry, TransformRegistry
+from rheojax.pipeline.base import Pipeline
 
 
 class PipelineBuilder:

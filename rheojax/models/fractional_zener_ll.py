@@ -43,14 +43,14 @@ References
 
 from __future__ import annotations
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
 
-from rheo.core.base import BaseModel
-from rheo.core.parameters import ParameterSet
-from rheo.core.registry import ModelRegistry
+from rheojax.core.base import BaseModel
+from rheojax.core.parameters import ParameterSet
+from rheojax.core.registry import ModelRegistry
 
 
 @ModelRegistry.register("fractional_zener_ll")
@@ -70,7 +70,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from rheo.models import FractionalZenerLiquidLiquid
+    >>> from rheojax.models import FractionalZenerLiquidLiquid
     >>>
     >>> # Create model
     >>> model = FractionalZenerLiquidLiquid()
@@ -370,7 +370,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         self
             Fitted model instance
         """
-        from rheo.core.parameters import ParameterOptimizer
+        from rheojax.core.parameters import ParameterOptimizer
 
         # Detect test mode
         test_mode = kwargs.get("test_mode", "oscillation")

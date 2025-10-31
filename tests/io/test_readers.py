@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.io.readers import (
+from rheojax.core.data import RheoData
+from rheojax.io.readers import (
     auto_load,
     load_anton_paar,
     load_csv,
@@ -94,7 +94,7 @@ s	Pa
         """Test TRIOS unit conversion (MPa→Pa, %→unitless)."""
         # This test would verify unit conversion logic
         # For now, just check that the function exists
-        from rheo.io.readers.trios import convert_units
+        from rheojax.io.readers.trios import convert_units
 
         assert callable(convert_units)
 

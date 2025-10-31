@@ -1,12 +1,12 @@
 Core Concepts
 =============
 
-This guide provides an in-depth look at the fundamental concepts and data structures in rheo.
+This guide provides an in-depth look at the fundamental concepts and data structures in rheojax.
 
 RheoData Container
 ------------------
 
-The :class:`~rheo.core.data.RheoData` class is the central data container in rheo, wrapping piblin.Measurement while adding JAX support and rheology-specific features.
+The :class:`~rheojax.core.data.RheoData` class is the central data container in rheo, wrapping piblin.Measurement while adding JAX support and rheology-specific features.
 
 Basic Structure
 ~~~~~~~~~~~~~~~
@@ -15,7 +15,7 @@ RheoData stores experimental rheological data with metadata:
 
 .. code-block:: python
 
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
     import numpy as np
 
     # Create RheoData
@@ -197,13 +197,13 @@ Save and load RheoData:
     restored = RheoData.from_dict(data_dict)
 
     # Use I/O writers for files
-    from rheo.io.writers import write_hdf5
+    from rheojax.io.writers import write_hdf5
     write_hdf5(data, "results.h5")
 
 Parameter System
 ----------------
 
-The parameter system (:class:`~rheo.core.parameters.Parameter`, :class:`~rheo.core.parameters.ParameterSet`) manages model parameters with bounds, constraints, and optimization support.
+The parameter system (:class:`~rheojax.core.parameters.Parameter`, :class:`~rheojax.core.parameters.ParameterSet`) manages model parameters with bounds, constraints, and optimization support.
 
 Parameter Class
 ~~~~~~~~~~~~~~~
@@ -212,7 +212,7 @@ Individual parameters with metadata:
 
 .. code-block:: python
 
-    from rheo.core import Parameter
+    from rheojax.core import Parameter
 
     # Create parameter
     modulus = Parameter(
@@ -239,7 +239,7 @@ Collection of parameters for models:
 
 .. code-block:: python
 
-    from rheo.core import ParameterSet
+    from rheojax.core import ParameterSet
 
     # Create parameter set
     params = ParameterSet()
@@ -290,7 +290,7 @@ Advanced constraint system:
 
 .. code-block:: python
 
-    from rheo.core.parameters import ParameterConstraint
+    from rheojax.core.parameters import ParameterConstraint
 
     # Bounds constraint (automatic from bounds parameter)
     constraint = ParameterConstraint(
@@ -332,7 +332,7 @@ Share parameters across multiple models:
 
 .. code-block:: python
 
-    from rheo.core.parameters import SharedParameterSet
+    from rheojax.core.parameters import SharedParameterSet
 
     # Create shared parameter set
     shared = SharedParameterSet()
@@ -363,7 +363,7 @@ TestMode Enum
 
 .. code-block:: python
 
-    from rheo.core.test_modes import TestMode
+    from rheojax.core.test_modes import TestMode
 
     # Available test modes
     TestMode.RELAXATION   # Stress relaxation
@@ -379,7 +379,7 @@ The detection follows this logic:
 
 .. code-block:: python
 
-    from rheo.core.test_modes import detect_test_mode
+    from rheojax.core.test_modes import detect_test_mode
 
     # 1. Check explicit metadata
     data.metadata['test_mode'] = 'relaxation'
@@ -407,7 +407,7 @@ Helper functions for data analysis:
 
 .. code-block:: python
 
-    from rheo.core.test_modes import is_monotonic_increasing, is_monotonic_decreasing
+    from rheojax.core.test_modes import is_monotonic_increasing, is_monotonic_decreasing
     import numpy as np
 
     data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -452,7 +452,7 @@ The registry system (implemented in Phase 2) will provide model and transform di
 .. code-block:: python
 
     # Phase 2 feature preview
-    from rheo.core.registry import get_model, list_models
+    from rheojax.core.registry import get_model, list_models
 
     # List available models
     # models = list_models()

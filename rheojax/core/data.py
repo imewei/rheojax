@@ -12,7 +12,7 @@ from typing import Any, Union
 
 import numpy as np
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -352,7 +352,7 @@ class RheoData:
             return self.metadata["detected_test_mode"]
 
         # Lazy import to avoid circular dependency
-        from rheo.core.test_modes import detect_test_mode
+        from rheojax.core.test_modes import detect_test_mode
 
         # Detect test mode
         mode = detect_test_mode(self)

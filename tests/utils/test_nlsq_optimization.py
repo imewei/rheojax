@@ -8,8 +8,8 @@ integration.
 import numpy as np
 import pytest
 
-from rheo.core.parameters import Parameter, ParameterSet
-from rheo.utils.optimization import OptimizationResult, nlsq_optimize
+from rheojax.core.parameters import Parameter, ParameterSet
+from rheojax.utils.optimization import OptimizationResult, nlsq_optimize
 
 
 class TestNLSQOptimizer:
@@ -111,7 +111,7 @@ class TestNLSQOptimizer:
         # Objective requiring high precision
         def objective(values):
             # Use JAX arrays to maintain precision
-            from rheo.core.jax_config import safe_import_jax
+            from rheojax.core.jax_config import safe_import_jax
 
             jax, jnp = safe_import_jax()
 
@@ -265,7 +265,7 @@ class TestNLSQGradientValidation:
 
     def test_gradient_computation_accuracy(self):
         """Test that JAX automatic differentiation produces accurate gradients."""
-        from rheo.core.jax_config import safe_import_jax
+        from rheojax.core.jax_config import safe_import_jax
 
         jax, jnp = safe_import_jax()
 
@@ -294,7 +294,7 @@ class TestNLSQGradientValidation:
 
     def test_jacobian_for_residual_function(self):
         """Test Jacobian computation for residual-based optimization."""
-        from rheo.core.jax_config import safe_import_jax
+        from rheojax.core.jax_config import safe_import_jax
 
         jax, jnp = safe_import_jax()
 

@@ -10,15 +10,15 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from rheo.core.base import BaseTransform
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.registry import TransformRegistry
+from rheojax.core.base import BaseTransform
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import TransformRegistry
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
 if TYPE_CHECKING:
-    from rheo.core.data import RheoData
+    from rheojax.core.data import RheoData
 
 
 WindowType = Literal["hann", "hamming", "blackman", "bartlett", "none"]
@@ -53,8 +53,8 @@ class FFTAnalysis(BaseTransform):
 
     Examples
     --------
-    >>> from rheo.core.data import RheoData
-    >>> from rheo.transforms.fft_analysis import FFTAnalysis
+    >>> from rheojax.core.data import RheoData
+    >>> from rheojax.transforms.fft_analysis import FFTAnalysis
     >>>
     >>> # Create time-domain relaxation data
     >>> t = jnp.linspace(0, 10, 1000)
@@ -166,7 +166,7 @@ class FFTAnalysis(BaseTransform):
         ValueError
             If data is already in frequency domain
         """
-        from rheo.core.data import RheoData
+        from rheojax.core.data import RheoData
 
         # Validate domain
         if data.domain == "frequency":
@@ -260,7 +260,7 @@ class FFTAnalysis(BaseTransform):
         ValueError
             If data is not in frequency domain or missing required metadata
         """
-        from rheo.core.data import RheoData
+        from rheojax.core.data import RheoData
 
         if data.domain != "frequency":
             raise ValueError("Inverse FFT requires frequency-domain data")

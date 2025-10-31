@@ -9,8 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rheo.core.bayesian import BayesianMixin, BayesianResult
-from rheo.core.parameters import ParameterSet
+from rheojax.core.bayesian import BayesianMixin, BayesianResult
+from rheojax.core.parameters import ParameterSet
 
 
 class SimpleBayesianModel(BayesianMixin):

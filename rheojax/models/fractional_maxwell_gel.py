@@ -28,17 +28,17 @@ References:
 
 from __future__ import annotations
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
 
 import numpy as np
 
-from rheo.core.base import BaseModel, ParameterSet
-from rheo.core.data import RheoData
-from rheo.core.registry import ModelRegistry
-from rheo.utils.mittag_leffler import mittag_leffler_e2
+from rheojax.core.base import BaseModel, ParameterSet
+from rheojax.core.data import RheoData
+from rheojax.core.registry import ModelRegistry
+from rheojax.utils.mittag_leffler import mittag_leffler_e2
 
 
 @ModelRegistry.register("fractional_maxwell_gel")
@@ -52,8 +52,8 @@ class FractionalMaxwellGel(BaseModel):
         parameters: ParameterSet with c_alpha, alpha, eta
 
     Examples:
-        >>> from rheo.models import FractionalMaxwellGel
-        >>> from rheo.core.data import RheoData
+        >>> from rheojax.models import FractionalMaxwellGel
+        >>> from rheojax.core.data import RheoData
         >>> import numpy as np
         >>>
         >>> # Create model with parameters

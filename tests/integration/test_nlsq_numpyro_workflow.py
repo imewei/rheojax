@@ -9,8 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rheo.core.bayesian import BayesianResult
-from rheo.models.maxwell import Maxwell
+from rheojax.core.bayesian import BayesianResult
+from rheojax.models.maxwell import Maxwell
 
 
 def test_nlsq_to_nuts_workflow_on_maxwell_model():

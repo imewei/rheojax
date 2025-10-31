@@ -13,8 +13,8 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from rheo.core.data import RheoData
-from rheo.visualization.plotter import (
+from rheojax.core.data import RheoData
+from rheojax.visualization.plotter import (
     _apply_style,
     _ensure_numpy,
     plot_frequency_domain,

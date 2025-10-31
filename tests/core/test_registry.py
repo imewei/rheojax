@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from rheo.core.registry import PluginInfo, PluginType, Registry
+from rheojax.core.registry import PluginInfo, PluginType, Registry
 
 
 class TestRegistryCreation:

@@ -10,9 +10,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.io import save_excel, save_hdf5
-from rheo.io.readers import load_csv, load_excel
+from rheojax.core.data import RheoData
+from rheojax.io import save_excel, save_hdf5
+from rheojax.io.readers import load_csv, load_excel
 
 
 class TestCSVRoundTrip:

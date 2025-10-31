@@ -125,7 +125,7 @@ Typical Workflow
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline
+   from rheojax.pipeline import Pipeline
 
    # Complete analysis in one chain
    results = (Pipeline()
@@ -173,7 +173,7 @@ This user guide is organized as follows:
 Support and Community
 ~~~~~~~~~~~~~~~~~~~~~
 
-- **Documentation**: https://rheo.readthedocs.io
+- **Documentation**: https://rheojax.readthedocs.io
 - **Issues**: https://github.com/username/rheo/issues
 - **Discussions**: https://github.com/username/rheo/discussions
 - **Email**: rheo@example.com

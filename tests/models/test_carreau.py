@@ -7,9 +7,9 @@ transition from Newtonian to power-law behavior.
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
-from rheo.models.carreau import Carreau
+from rheojax.core.data import RheoData
+from rheojax.core.test_modes import TestMode
+from rheojax.models.carreau import Carreau
 
 
 class TestCarreauBasics:

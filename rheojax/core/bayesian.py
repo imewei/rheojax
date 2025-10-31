@@ -5,8 +5,8 @@ capabilities to rheological models. It uses NumPyro's NUTS sampler for
 efficient MCMC sampling with warm-start support from NLSQ optimization.
 
 Example:
-    >>> from rheo.core.bayesian import BayesianMixin
-    >>> from rheo.core.parameters import ParameterSet
+    >>> from rheojax.core.bayesian import BayesianMixin
+    >>> from rheojax.core.parameters import ParameterSet
     >>>
     >>> class MyModel(BayesianMixin):
     ...     def __init__(self):
@@ -27,7 +27,7 @@ import numpyro
 import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()

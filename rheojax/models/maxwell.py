@@ -16,16 +16,16 @@ References:
 
 from __future__ import annotations
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
 
-from rheo.core.base import BaseModel
-from rheo.core.data import RheoData
-from rheo.core.parameters import ParameterSet
-from rheo.core.registry import ModelRegistry
-from rheo.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.base import BaseModel
+from rheojax.core.data import RheoData
+from rheojax.core.parameters import ParameterSet
+from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import TestMode, detect_test_mode
 
 
 @ModelRegistry.register("maxwell")
@@ -46,8 +46,8 @@ class Maxwell(BaseModel):
         - Rotation: Steady shear flow
 
     Example:
-        >>> from rheo.models.maxwell import Maxwell
-        >>> from rheo.core.data import RheoData
+        >>> from rheojax.models.maxwell import Maxwell
+        >>> from rheojax.core.data import RheoData
         >>> import jax.numpy as jnp
         >>>
         >>> # Create model
@@ -96,7 +96,7 @@ class Maxwell(BaseModel):
         Returns:
             self for method chaining
         """
-        from rheo.utils.optimization import (
+        from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
         )

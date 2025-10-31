@@ -21,12 +21,12 @@ The reader supports two modes:
 - Chunked reading: ~80 bytes × chunk_size (e.g., 800 KB for 10k chunk_size)
 
 **Usage Example - Full Loading:**
-    >>> from rheo.io.readers import load_trios
+    >>> from rheojax.io.readers import load_trios
     >>> data = load_trios('small_file.txt')
     >>> print(f"Loaded {len(data.x)} points")
 
 **Usage Example - Chunked Reading:**
-    >>> from rheo.io.readers.trios import load_trios_chunked
+    >>> from rheojax.io.readers.trios import load_trios_chunked
     >>>
     >>> # Process large file in chunks of 10,000 points
     >>> for i, chunk in enumerate(load_trios_chunked('large_file.txt', chunk_size=10000)):
@@ -59,7 +59,7 @@ from pathlib import Path
 
 import numpy as np
 
-from rheo.core.data import RheoData
+from rheojax.core.data import RheoData
 
 # Unit conversion factors
 UNIT_CONVERSIONS = {

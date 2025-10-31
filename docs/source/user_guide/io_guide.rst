@@ -15,7 +15,7 @@ The simplest way to read data is using auto-detection:
 
 .. code-block:: python
 
-    from rheo.io.readers import auto_read
+    from rheojax.io.readers import auto_read
 
     # Automatically detect and read file
     data = auto_read("experiment.txt")
@@ -34,7 +34,7 @@ Read TA Instruments TRIOS export files:
 
 .. code-block:: python
 
-    from rheo.io.readers import read_trios
+    from rheojax.io.readers import read_trios
 
     # Read TRIOS text file
     data = read_trios("stress_relaxation.txt")
@@ -76,7 +76,7 @@ Read generic CSV files:
 
 .. code-block:: python
 
-    from rheo.io.readers import read_csv
+    from rheojax.io.readers import read_csv
 
     # Simple CSV with default columns (first two)
     data = read_csv("data.csv")
@@ -131,7 +131,7 @@ Read Microsoft Excel files:
 
 .. code-block:: python
 
-    from rheo.io.readers import read_excel
+    from rheojax.io.readers import read_excel
 
     # Read first sheet
     data = read_excel("results.xlsx")
@@ -178,7 +178,7 @@ Read Anton Paar rheometer files:
 
 .. code-block:: python
 
-    from rheo.io.readers import read_anton_paar
+    from rheojax.io.readers import read_anton_paar
 
     # Read Anton Paar file
     data = read_anton_paar("oscillation.txt")
@@ -203,7 +203,7 @@ For frequency-domain measurements with G' and G":
 
 .. code-block:: python
 
-    from rheo.io.readers import read_csv
+    from rheojax.io.readers import read_csv
     import pandas as pd
     import numpy as np
 
@@ -214,7 +214,7 @@ For frequency-domain measurements with G' and G":
     Gpp = df['G" (Pa)'].values
     G_star = Gp + 1j * Gpp
 
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
     data = RheoData(
         x=omega,
         y=G_star,
@@ -257,7 +257,7 @@ HDF5 is the recommended format for preserving all data and metadata:
 
 .. code-block:: python
 
-    from rheo.io.writers import write_hdf5
+    from rheojax.io.writers import write_hdf5
 
     # Write RheoData to HDF5
     write_hdf5(data, "results.h5")
@@ -287,7 +287,7 @@ HDF5 is the recommended format for preserving all data and metadata:
 .. code-block:: python
 
     import h5py
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
     import numpy as np
 
     with h5py.File("results.h5", "r") as f:
@@ -306,7 +306,7 @@ Write to Excel for easy sharing:
 
 .. code-block:: python
 
-    from rheo.io.writers import write_excel
+    from rheojax.io.writers import write_excel
 
     # Write to Excel
     write_excel(data, "results.xlsx")
@@ -363,8 +363,8 @@ Example 1: Convert All Files
 .. code-block:: python
 
     import pathlib
-    from rheo.io.readers import auto_read
-    from rheo.io.writers import write_hdf5
+    from rheojax.io.readers import auto_read
+    from rheojax.io.writers import write_hdf5
 
     # Convert all TXT files to HDF5
     data_dir = pathlib.Path("raw_data/")
@@ -389,8 +389,8 @@ Example 2: Merge Multiple Tests
 
 .. code-block:: python
 
-    from rheo.io.readers import auto_read
-    from rheo.io.writers import write_hdf5
+    from rheojax.io.readers import auto_read
+    from rheojax.io.writers import write_hdf5
 
     # Read multiple tests
     files = ["test1.txt", "test2.txt", "test3.txt"]
@@ -408,7 +408,7 @@ Example 3: Extract Metadata
 .. code-block:: python
 
     import pandas as pd
-    from rheo.io.readers import auto_read
+    from rheojax.io.readers import auto_read
 
     # Extract metadata from all files
     files = pathlib.Path("experiments/").glob("*.txt")
@@ -441,7 +441,7 @@ Adding Metadata
 
 .. code-block:: python
 
-    from rheo.io.readers import auto_read
+    from rheojax.io.readers import auto_read
 
     # Read data
     data = auto_read("experiment.txt")
@@ -460,7 +460,7 @@ Adding Metadata
     })
 
     # Save with metadata
-    from rheo.io.writers import write_hdf5
+    from rheojax.io.writers import write_hdf5
     write_hdf5(data, "annotated_results.h5")
 
 Reading Metadata
@@ -526,7 +526,7 @@ Handle common I/O errors gracefully:
 
 .. code-block:: python
 
-    from rheo.io.readers import auto_read
+    from rheojax.io.readers import auto_read
     import logging
 
     logging.basicConfig(level=logging.INFO)
@@ -606,7 +606,7 @@ Create custom readers for proprietary formats:
 .. code-block:: python
 
     import numpy as np
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
 
     def read_custom_format(filepath):
         """Read custom rheometer format."""
@@ -642,7 +642,7 @@ For very large files, process in chunks:
 .. code-block:: python
 
     import pandas as pd
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
 
     def read_large_csv_chunked(filepath, chunksize=10000):
         """Read large CSV in chunks."""

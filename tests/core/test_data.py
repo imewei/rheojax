@@ -12,12 +12,12 @@ import pytest
 
 # We'll mock piblin for now since it's not installed yet
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 with patch.dict("sys.modules", {"piblin": MagicMock()}):
-    from rheo.core.data import RheoData
+    from rheojax.core.data import RheoData
 
 
 class TestRheoDataCreation:

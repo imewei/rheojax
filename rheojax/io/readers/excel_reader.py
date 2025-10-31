@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from rheo.core.data import RheoData
+from rheojax.core.data import RheoData
 
 
 def load_excel(

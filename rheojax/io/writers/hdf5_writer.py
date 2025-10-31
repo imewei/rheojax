@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from rheo.core.data import RheoData
+from rheojax.core.data import RheoData
 
 
 def save_hdf5(
@@ -84,11 +84,11 @@ def save_hdf5(
             metadata_group = f.create_group("metadata")
             _write_metadata_recursive(metadata_group, data.metadata)
 
-        # Store rheo version
+        # Store rheojax version
         try:
-            import rheo
+            import rheojax
 
-            f.attrs["rheo_version"] = rheo.__version__
+            f.attrs["rheojax_version"] = rheojax.__version__
         except:
             pass
 

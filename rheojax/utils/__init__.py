@@ -7,13 +7,13 @@ This module provides:
 - Helper functions for numerical computations
 """
 
-from rheo.utils.device import (
+from rheojax.utils.device import (
     check_gpu_availability,
     get_device_info,
     get_gpu_memory_info,
     print_device_summary,
 )
-from rheo.utils.optimization import (
+from rheojax.utils.optimization import (
     OptimizationResult,
     create_least_squares_objective,
     fit_parameters,

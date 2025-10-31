@@ -1,7 +1,7 @@
 Transform Usage Guide
 =====================
 
-Data transforms are essential preprocessing and analysis tools for rheological data. This guide explains when and how to use each of the five transforms implemented in rheo.
+Data transforms are essential preprocessing and analysis tools for rheological data. This guide explains when and how to use each of the five transforms implemented in rheojax.
 
 Overview of Transforms
 -----------------------
@@ -75,8 +75,8 @@ Basic Usage
 
 .. code-block:: python
 
-   from rheo.transforms import FFTAnalysis
-   from rheo.io import auto_load
+   from rheojax.transforms import FFTAnalysis
+   from rheojax.io import auto_load
 
    # Load time-series data
    data = auto_load('oscillation_time_series.txt')
@@ -177,8 +177,8 @@ Basic Usage
 
 .. code-block:: python
 
-   from rheo.transforms import Mastercurve
-   from rheo.io import auto_load
+   from rheojax.transforms import Mastercurve
+   from rheojax.io import auto_load
 
    # Load data at multiple temperatures
    data_25C = auto_load('freq_sweep_25C.txt')
@@ -342,8 +342,8 @@ Basic Usage
 
 .. code-block:: python
 
-   from rheo.transforms import MutationNumber
-   from rheo.io import auto_load
+   from rheojax.transforms import MutationNumber
+   from rheojax.io import auto_load
 
    # Load time-resolved oscillatory data (time sweep)
    data = auto_load('curing_time_sweep.txt')
@@ -500,8 +500,8 @@ Basic Usage
 
 .. code-block:: python
 
-   from rheo.transforms import OWChirp
-   from rheo.io import auto_load
+   from rheojax.transforms import OWChirp
+   from rheojax.io import auto_load
 
    # Load chirp experiment data
    data = auto_load('owchirp_experiment.txt')
@@ -642,8 +642,8 @@ Basic Usage
 
 .. code-block:: python
 
-   from rheo.transforms import SmoothDerivative
-   from rheo.io import auto_load
+   from rheojax.transforms import SmoothDerivative
+   from rheojax.io import auto_load
 
    # Load noisy data
    data = auto_load('strain_vs_time.txt')
@@ -727,7 +727,7 @@ Common use case: convert strain vs time to shear rate:
    shear_rate_data.y_units = '1/s'
 
    # Now use for fitting flow models
-   from rheo.models import PowerLaw
+   from rheojax.models import PowerLaw
 
    model = PowerLaw()
    model.fit(shear_rate_data.y, stress_data.y)  # τ vs γ̇
@@ -746,7 +746,7 @@ Comparison of Methods
    dy_true = 2*np.pi*0.5 * np.cos(2*np.pi*0.5*t)
    y_noisy = y_true + 0.1 * np.random.randn(len(t))
 
-   from rheo.core import RheoData
+   from rheojax.core import RheoData
    data = RheoData(x=t, y=y_noisy, x_units='s', y_units='-', domain='time')
 
    # Try different methods
@@ -801,7 +801,7 @@ Combine multiple transforms in sequence:
 
 .. code-block:: python
 
-   from rheo.transforms import FFTAnalysis, SmoothDerivative, MutationNumber
+   from rheojax.transforms import FFTAnalysis, SmoothDerivative, MutationNumber
 
    # Load raw time-series data
    data = auto_load('noisy_oscillation.txt')
@@ -825,8 +825,8 @@ For cleaner code, use the pipeline pattern:
 
 .. code-block:: python
 
-   from rheo.core.base import TransformPipeline
-   from rheo.transforms import SmoothDerivative, FFTAnalysis
+   from rheojax.core.base import TransformPipeline
+   from rheojax.transforms import SmoothDerivative, FFTAnalysis
 
    # Create pipeline
    pipeline = TransformPipeline([
@@ -923,10 +923,10 @@ Complete analysis workflow with multiple transforms:
 
 .. code-block:: python
 
-   from rheo.io import auto_load
-   from rheo.transforms import (SmoothDerivative, FFTAnalysis,
+   from rheojax.io import auto_load
+   from rheojax.transforms import (SmoothDerivative, FFTAnalysis,
                                   Mastercurve, MutationNumber)
-   from rheo.models import FractionalMaxwellGel
+   from rheojax.models import FractionalMaxwellGel
    import matplotlib.pyplot as plt
 
    # 1. Load multi-temperature time-series data

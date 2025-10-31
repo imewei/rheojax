@@ -29,7 +29,7 @@ Basic Bayesian Workflow
 
 .. code-block:: python
 
-   from rheo.models.maxwell import Maxwell
+   from rheojax.models.maxwell import Maxwell
    import numpy as np
 
    # 1. Prepare data
@@ -60,7 +60,7 @@ For complex workflows, use the fluent API:
 
 .. code-block:: python
 
-   from rheo.pipeline.bayesian import BayesianPipeline
+   from rheojax.pipeline.bayesian import BayesianPipeline
 
    pipeline = (BayesianPipeline()
        .load('data.csv', x_col='time', y_col='stress')
@@ -84,7 +84,7 @@ NLSQ provides fast, GPU-accelerated optimization:
 
 .. code-block:: python
 
-   from rheo.models.maxwell import Maxwell
+   from rheojax.models.maxwell import Maxwell
 
    model = Maxwell()
    model.fit(t, G_data, method='nlsq')
@@ -328,7 +328,7 @@ Run all diagnostics in sequence:
 
 .. code-block:: python
 
-   from rheo.pipeline.bayesian import BayesianPipeline
+   from rheojax.pipeline.bayesian import BayesianPipeline
 
    pipeline = (BayesianPipeline()
        .load('data.csv', x_col='time', y_col='stress')
@@ -623,7 +623,7 @@ Example 1: Maxwell Model with Full Diagnostics
 
 .. code-block:: python
 
-   from rheo.pipeline.bayesian import BayesianPipeline
+   from rheojax.pipeline.bayesian import BayesianPipeline
    import numpy as np
    import pandas as pd
 
@@ -667,7 +667,7 @@ Example 2: Comparing Credibility Levels
 
 .. code-block:: python
 
-   from rheo.models.maxwell import Maxwell
+   from rheojax.models.maxwell import Maxwell
    import numpy as np
 
    model = Maxwell()
@@ -693,7 +693,7 @@ Example 3: Advanced ArviZ Analysis
 
 .. code-block:: python
 
-   from rheo.models.maxwell import Maxwell
+   from rheojax.models.maxwell import Maxwell
    import arviz as az
    import numpy as np
 

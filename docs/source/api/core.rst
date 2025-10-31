@@ -1,4 +1,4 @@
-Core Module (rheo.core)
+Core Module (rheojax.core)
 =======================
 
 The core module provides fundamental data structures and abstractions for rheological analysis.
@@ -6,7 +6,7 @@ The core module provides fundamental data structures and abstractions for rheolo
 Data Container
 --------------
 
-.. automodule:: rheo.core.data
+.. automodule:: rheojax.core.data
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Data Container
 RheoData
 ~~~~~~~~
 
-.. autoclass:: rheo.core.data.RheoData
+.. autoclass:: rheojax.core.data.RheoData
    :members:
    :undoc-members:
    :show-inheritance:
@@ -45,7 +45,7 @@ RheoData
 Base Classes
 ------------
 
-.. automodule:: rheo.core.base
+.. automodule:: rheojax.core.base
    :members:
    :undoc-members:
    :show-inheritance:
@@ -53,7 +53,7 @@ Base Classes
 BaseModel
 ~~~~~~~~~
 
-.. autoclass:: rheo.core.base.BaseModel
+.. autoclass:: rheojax.core.base.BaseModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -79,7 +79,7 @@ BaseModel
 BaseTransform
 ~~~~~~~~~~~~~
 
-.. autoclass:: rheo.core.base.BaseTransform
+.. autoclass:: rheojax.core.base.BaseTransform
    :members:
    :undoc-members:
    :show-inheritance:
@@ -101,7 +101,7 @@ BaseTransform
 TransformPipeline
 ~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.core.base.TransformPipeline
+.. autoclass:: rheojax.core.base.TransformPipeline
    :members:
    :undoc-members:
    :show-inheritance:
@@ -111,7 +111,7 @@ TransformPipeline
 Parameters
 ----------
 
-.. automodule:: rheo.core.parameters
+.. automodule:: rheojax.core.parameters
    :members:
    :undoc-members:
    :show-inheritance:
@@ -119,7 +119,7 @@ Parameters
 Parameter
 ~~~~~~~~~
 
-.. autoclass:: rheo.core.parameters.Parameter
+.. autoclass:: rheojax.core.parameters.Parameter
    :members:
    :undoc-members:
    :show-inheritance:
@@ -148,7 +148,7 @@ Parameter
 ParameterSet
 ~~~~~~~~~~~~
 
-.. autoclass:: rheo.core.parameters.ParameterSet
+.. autoclass:: rheojax.core.parameters.ParameterSet
    :members:
    :undoc-members:
    :show-inheritance:
@@ -174,7 +174,7 @@ ParameterSet
 ParameterConstraint
 ~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.core.parameters.ParameterConstraint
+.. autoclass:: rheojax.core.parameters.ParameterConstraint
    :members:
    :undoc-members:
    :show-inheritance:
@@ -193,7 +193,7 @@ ParameterConstraint
 SharedParameterSet
 ~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.core.parameters.SharedParameterSet
+.. autoclass:: rheojax.core.parameters.SharedParameterSet
    :members:
    :undoc-members:
    :show-inheritance:
@@ -203,7 +203,7 @@ SharedParameterSet
 ParameterOptimizer
 ~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheo.core.parameters.ParameterOptimizer
+.. autoclass:: rheojax.core.parameters.ParameterOptimizer
    :members:
    :undoc-members:
    :show-inheritance:
@@ -213,7 +213,7 @@ ParameterOptimizer
 Test Modes
 ----------
 
-.. automodule:: rheo.core.test_modes
+.. automodule:: rheojax.core.test_modes
    :members:
    :undoc-members:
    :show-inheritance:
@@ -221,7 +221,7 @@ Test Modes
 TestMode
 ~~~~~~~~
 
-.. autoclass:: rheo.core.test_modes.TestMode
+.. autoclass:: rheojax.core.test_modes.TestMode
    :members:
    :undoc-members:
    :show-inheritance:
@@ -239,22 +239,22 @@ TestMode
 Functions
 ~~~~~~~~~
 
-.. autofunction:: rheo.core.test_modes.detect_test_mode
+.. autofunction:: rheojax.core.test_modes.detect_test_mode
 
-.. autofunction:: rheo.core.test_modes.validate_test_mode
+.. autofunction:: rheojax.core.test_modes.validate_test_mode
 
-.. autofunction:: rheo.core.test_modes.is_monotonic_increasing
+.. autofunction:: rheojax.core.test_modes.is_monotonic_increasing
 
-.. autofunction:: rheo.core.test_modes.is_monotonic_decreasing
+.. autofunction:: rheojax.core.test_modes.is_monotonic_decreasing
 
-.. autofunction:: rheo.core.test_modes.get_compatible_test_modes
+.. autofunction:: rheojax.core.test_modes.get_compatible_test_modes
 
-.. autofunction:: rheo.core.test_modes.suggest_models_for_test_mode
+.. autofunction:: rheojax.core.test_modes.suggest_models_for_test_mode
 
 Registry
 --------
 
-.. automodule:: rheo.core.registry
+.. automodule:: rheojax.core.registry
    :members:
    :undoc-members:
    :show-inheritance:
@@ -274,7 +274,7 @@ Creating RheoData
 .. code-block:: python
 
     import numpy as np
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
 
     # Simple time-domain data
     time = np.array([0.1, 1.0, 10.0])
@@ -306,7 +306,7 @@ Working with Parameters
 
 .. code-block:: python
 
-    from rheo.core import Parameter, ParameterSet
+    from rheojax.core import Parameter, ParameterSet
 
     # Create parameter set
     params = ParameterSet()
@@ -338,7 +338,7 @@ Test Mode Detection
 
 .. code-block:: python
 
-    from rheo.core.test_modes import detect_test_mode, TestMode
+    from rheojax.core.test_modes import detect_test_mode, TestMode
 
     # Automatic detection
     mode = detect_test_mode(data)
@@ -353,7 +353,7 @@ Using Base Classes (Phase 2)
 
 .. code-block:: python
 
-    from rheo.core import BaseModel, ParameterSet
+    from rheojax.core import BaseModel, ParameterSet
     import jax.numpy as jnp
 
     class MaxwellModel(BaseModel):

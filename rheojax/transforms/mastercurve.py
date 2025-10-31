@@ -10,10 +10,10 @@ from typing import Literal
 
 import numpy as np
 
-from rheo.core.base import BaseTransform
-from rheo.core.data import RheoData
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.registry import TransformRegistry
+from rheojax.core.base import BaseTransform
+from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import TransformRegistry
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -55,8 +55,8 @@ class Mastercurve(BaseTransform):
 
     Examples
     --------
-    >>> from rheo.core.data import RheoData
-    >>> from rheo.transforms.mastercurve import Mastercurve
+    >>> from rheojax.core.data import RheoData
+    >>> from rheojax.transforms.mastercurve import Mastercurve
     >>>
     >>> # Create multi-temperature frequency sweep data
     >>> # (In practice, this would come from experimental measurements)
@@ -290,7 +290,7 @@ class Mastercurve(BaseTransform):
         ValueError
             If datasets don't have temperature metadata
         """
-        from rheo.core.data import RheoData
+        from rheojax.core.data import RheoData
 
         # Shift all datasets
         shifted_datasets = []

@@ -30,7 +30,7 @@ The typical pipeline follows this pattern:
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline
+   from rheojax.pipeline import Pipeline
 
    # Create pipeline and chain operations
    results = (Pipeline()
@@ -54,7 +54,7 @@ Load data, fit model, and visualize in 4 lines:
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline
+   from rheojax.pipeline import Pipeline
 
    pipeline = Pipeline()
    pipeline.load('oscillation_data.txt')
@@ -92,7 +92,7 @@ Loading Data
 
 .. code-block:: python
 
-   from rheo.core import RheoData
+   from rheojax.core import RheoData
    import numpy as np
 
    # Create data programmatically
@@ -178,7 +178,7 @@ Fitting Models
 
 .. code-block:: python
 
-   from rheo.models import Maxwell
+   from rheojax.models import Maxwell
 
    model = Maxwell()
    pipeline = Pipeline().load('data.txt').fit(model)
@@ -322,7 +322,7 @@ Full workflow in one chain:
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline
+   from rheojax.pipeline import Pipeline
 
    results = (Pipeline()
        .load('experimental_data.txt')
@@ -349,7 +349,7 @@ Pre-configured pipeline for time-temperature superposition:
 
 .. code-block:: python
 
-   from rheo.pipeline import MastercurvePipeline
+   from rheojax.pipeline import MastercurvePipeline
 
    # Create mastercurve pipeline
    mc_pipeline = MastercurvePipeline(
@@ -397,7 +397,7 @@ Compare multiple models systematically:
 
 .. code-block:: python
 
-   from rheo.pipeline import ModelComparisonPipeline
+   from rheojax.pipeline import ModelComparisonPipeline
 
    # Define models to compare
    models = ['maxwell', 'zener', 'fractional_maxwell_gel',
@@ -451,7 +451,7 @@ Convert creep data to relaxation modulus:
 
 .. code-block:: python
 
-   from rheo.pipeline import CreepToRelaxationPipeline
+   from rheojax.pipeline import CreepToRelaxationPipeline
 
    # Create conversion pipeline
    converter = CreepToRelaxationPipeline(
@@ -476,7 +476,7 @@ Convert frequency-domain data to time-domain:
 
 .. code-block:: python
 
-   from rheo.pipeline import FrequencyToTimePipeline
+   from rheojax.pipeline import FrequencyToTimePipeline
 
    # Create conversion pipeline
    ft_pipeline = FrequencyToTimePipeline(
@@ -501,7 +501,7 @@ The PipelineBuilder provides programmatic pipeline construction:
 
 .. code-block:: python
 
-   from rheo.pipeline import PipelineBuilder
+   from rheojax.pipeline import PipelineBuilder
 
    # Build custom pipeline step-by-step
    builder = PipelineBuilder()
@@ -568,7 +568,7 @@ The BatchPipeline processes multiple datasets with the same workflow:
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline, BatchPipeline
+   from rheojax.pipeline import Pipeline, BatchPipeline
 
    # Define template pipeline
    template = (Pipeline()
@@ -603,7 +603,7 @@ Process files in parallel for speed:
 
 .. code-block:: python
 
-   from rheo.pipeline import BatchPipeline
+   from rheojax.pipeline import BatchPipeline
 
    batch = BatchPipeline(template, n_jobs=4)  # Use 4 cores
 
@@ -619,7 +619,7 @@ Complete batch workflow:
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline, BatchPipeline
+   from rheojax.pipeline import Pipeline, BatchPipeline
    import matplotlib.pyplot as plt
    import numpy as np
 
@@ -892,7 +892,7 @@ Pattern 2: Comparison Study
 
 .. code-block:: python
 
-   from rheo.pipeline import ModelComparisonPipeline
+   from rheojax.pipeline import ModelComparisonPipeline
 
    comparison = (ModelComparisonPipeline(['maxwell', 'zener', 'springpot'])
        .load('data.txt')
@@ -905,7 +905,7 @@ Pattern 3: Multi-Temperature Analysis
 
 .. code-block:: python
 
-   from rheo.pipeline import MastercurvePipeline
+   from rheojax.pipeline import MastercurvePipeline
 
    mc = (MastercurvePipeline(reference_temp=50, method='wlf')
        .run(['25C.txt', '50C.txt', '75C.txt'], [25, 50, 75])
@@ -918,7 +918,7 @@ Pattern 4: Batch with Summary
 
 .. code-block:: python
 
-   from rheo.pipeline import Pipeline, BatchPipeline
+   from rheojax.pipeline import Pipeline, BatchPipeline
 
    template = Pipeline().fit('maxwell').plot(save='${filename}_fit.png')
    batch = BatchPipeline(template, n_jobs=4)

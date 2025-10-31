@@ -33,11 +33,11 @@ Non-Newtonian Flow Models (ROTATION test mode):
     - Bingham: Linear viscoplastic (yield stress + constant viscosity)
 
 Usage:
-    >>> from rheo.models import Maxwell, Zener, SpringPot
-    >>> from rheo.models import FractionalMaxwellGel, FractionalMaxwellLiquid
-    >>> from rheo.models import FractionalZenerSolidLiquid, FractionalBurgersModel
-    >>> from rheo.models import PowerLaw, Carreau, HerschelBulkley
-    >>> from rheo.core.registry import ModelRegistry
+    >>> from rheojax.models import Maxwell, Zener, SpringPot
+    >>> from rheojax.models import FractionalMaxwellGel, FractionalMaxwellLiquid
+    >>> from rheojax.models import FractionalZenerSolidLiquid, FractionalBurgersModel
+    >>> from rheojax.models import PowerLaw, Carreau, HerschelBulkley
+    >>> from rheojax.core.registry import ModelRegistry
     >>>
     >>> # Direct instantiation
     >>> model = Maxwell()
@@ -54,34 +54,34 @@ Usage:
 """
 
 # Classical models
-from rheo.models.bingham import Bingham
-from rheo.models.carreau import Carreau
-from rheo.models.carreau_yasuda import CarreauYasuda
-from rheo.models.cross import Cross
+from rheojax.models.bingham import Bingham
+from rheojax.models.carreau import Carreau
+from rheojax.models.carreau_yasuda import CarreauYasuda
+from rheojax.models.cross import Cross
 
 # Advanced Fractional Models (Task Group 12)
-from rheo.models.fractional_burgers import FBM, FractionalBurgersModel
-from rheo.models.fractional_jeffreys import FJM, FractionalJeffreysModel
-from rheo.models.fractional_kelvin_voigt import FractionalKelvinVoigt
-from rheo.models.fractional_kv_zener import FKVZ, FractionalKelvinVoigtZener
+from rheojax.models.fractional_burgers import FBM, FractionalBurgersModel
+from rheojax.models.fractional_jeffreys import FJM, FractionalJeffreysModel
+from rheojax.models.fractional_kelvin_voigt import FractionalKelvinVoigt
+from rheojax.models.fractional_kv_zener import FKVZ, FractionalKelvinVoigtZener
 
 # Fractional Maxwell family
-from rheo.models.fractional_maxwell_gel import FractionalMaxwellGel
-from rheo.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
-from rheo.models.fractional_maxwell_model import FractionalMaxwellModel
-from rheo.models.fractional_poynting_thomson import FPT, FractionalPoyntingThomson
-from rheo.models.fractional_zener_ll import FZLL, FractionalZenerLiquidLiquid
+from rheojax.models.fractional_maxwell_gel import FractionalMaxwellGel
+from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
+from rheojax.models.fractional_maxwell_model import FractionalMaxwellModel
+from rheojax.models.fractional_poynting_thomson import FPT, FractionalPoyntingThomson
+from rheojax.models.fractional_zener_ll import FZLL, FractionalZenerLiquidLiquid
 
 # Fractional Zener Family (Task Group 12)
-from rheo.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
-from rheo.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
-from rheo.models.herschel_bulkley import HerschelBulkley
-from rheo.models.maxwell import Maxwell
+from rheojax.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
+from rheojax.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
+from rheojax.models.herschel_bulkley import HerschelBulkley
+from rheojax.models.maxwell import Maxwell
 
 # Non-Newtonian flow models
-from rheo.models.power_law import PowerLaw
-from rheo.models.springpot import SpringPot
-from rheo.models.zener import Zener
+from rheojax.models.power_law import PowerLaw
+from rheojax.models.springpot import SpringPot
+from rheojax.models.zener import Zener
 
 __all__ = [
     # Classical models

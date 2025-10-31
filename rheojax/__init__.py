@@ -1,4 +1,4 @@
-"""Rheo: Unified Rheological Analysis Framework.
+"""RheoJAX: Unified Rheological Analysis Framework.
 
 A comprehensive rheological analysis package integrating pyRheo's constitutive
 models with hermes-rheo's data analysis transforms, providing JAX-accelerated
@@ -7,11 +7,11 @@ computations with multiple API styles and full piblin compatibility.
 Float64 Precision Enforcement:
     This package enforces float64 precision for JAX operations by importing
     NLSQ before JAX. NLSQ automatically configures JAX for float64 when imported.
-    All internal modules use safe_import_jax() from rheo.core.jax_config to ensure
+    All internal modules use safe_import_jax() from rheojax.core.jax_config to ensure
     proper import order.
 
-    Users should NOT import JAX directly in code that uses rheo. Instead, import
-    from rheo or use safe_import_jax() to maintain float64 precision.
+    Users should NOT import JAX directly in code that uses rheojax. Instead, import
+    from rheojax or use safe_import_jax() to maintain float64 precision.
 """
 
 # Runtime version check (must be first)
@@ -23,14 +23,14 @@ try:
     import nlsq  # noqa: F401
 except ImportError:
     raise ImportError(
-        "NLSQ is required for Rheo but not installed.\n"
+        "NLSQ is required for RheoJAX but not installed.\n"
         "Install with: pip install nlsq>=0.1.6\n"
         "NLSQ provides GPU-accelerated optimization and enables float64 precision in JAX."
     )
 
 __version__ = "0.1.0"
-__author__ = "Rheo Development Team"
-__email__ = "rheo@example.com"
+__author__ = "RheoJAX Development Team"
+__email__ = "rheojax@example.com"
 __license__ = "MIT"
 
 # JAX version information (imported AFTER nlsq)
@@ -86,7 +86,7 @@ __all__ = [
 import logging
 
 logger = logging.getLogger(__name__)
-logger.info(f"Loading rheo version {__version__}")
+logger.info(f"Loading rheojax version {__version__}")
 
 # Core imports will be added as modules are implemented
 # from . import core

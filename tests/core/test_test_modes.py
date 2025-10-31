@@ -3,12 +3,12 @@
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.data import RheoData
+from rheojax.core.test_modes import TestMode, detect_test_mode
 
 
 
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -171,7 +171,7 @@ class TestMonotonicityChecks:
 
     def test_monotonic_increasing(self):
         """Test detection of monotonic increasing."""
-        from rheo.core.test_modes import is_monotonic_increasing
+        from rheojax.core.test_modes import is_monotonic_increasing
 
         data = np.array([1, 2, 3, 4, 5])
         assert is_monotonic_increasing(data)
@@ -182,7 +182,7 @@ class TestMonotonicityChecks:
 
     def test_monotonic_decreasing(self):
         """Test detection of monotonic decreasing."""
-        from rheo.core.test_modes import is_monotonic_decreasing
+        from rheojax.core.test_modes import is_monotonic_decreasing
 
         data = np.array([5, 4, 3, 2, 1])
         assert is_monotonic_decreasing(data)
@@ -193,7 +193,7 @@ class TestMonotonicityChecks:
 
     def test_monotonic_with_noise(self):
         """Test monotonicity with small noise (tolerance)."""
-        from rheo.core.test_modes import is_monotonic_decreasing
+        from rheojax.core.test_modes import is_monotonic_decreasing
 
         # Mostly decreasing with small noise
         data = np.array([100, 95, 91, 90.5, 85, 80])
@@ -226,7 +226,7 @@ class TestValidationDataset:
 
     def test_detection_accuracy_target(self):
         """Test that detection achieves >95% accuracy on validation dataset."""
-        from rheo.core.test_modes import TestMode, detect_test_mode
+        from rheojax.core.test_modes import TestMode, detect_test_mode
 
         # Create comprehensive validation dataset
         test_cases = []

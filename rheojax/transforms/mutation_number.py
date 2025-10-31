@@ -10,11 +10,11 @@ from typing import Literal
 
 import numpy as np
 
-from rheo.core.base import BaseTransform
-from rheo.core.data import RheoData
-from rheo.core.jax_config import safe_import_jax
-from rheo.core.registry import TransformRegistry
-from rheo.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.base import BaseTransform
+from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import TransformRegistry
+from rheojax.core.test_modes import TestMode, detect_test_mode
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -59,8 +59,8 @@ class MutationNumber(BaseTransform):
 
     Examples
     --------
-    >>> from rheo.core.data import RheoData
-    >>> from rheo.transforms.mutation_number import MutationNumber
+    >>> from rheojax.core.data import RheoData
+    >>> from rheojax.transforms.mutation_number import MutationNumber
     >>>
     >>> # Create relaxation data
     >>> t = jnp.linspace(0, 100, 1000)

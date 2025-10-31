@@ -25,7 +25,7 @@ For development, clone the repository and install in editable mode:
 
 .. code-block:: bash
 
-   git clone https://github.com/username/rheo.git
+   git clone https://github.com/username/rheojax.git
    cd rheo
    pip install -e ".[dev]"
 
@@ -75,9 +75,9 @@ Verify the installation:
 
 .. code-block:: python
 
-   import rheo
-   print(rheo.__version__)
-   print(rheo.__jax_version__)
+   import rheojax
+   print(rheojax.__version__)
+   print(rheojax.__jax_version__)
 
 This should display the version numbers without errors.
 

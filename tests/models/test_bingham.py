@@ -6,9 +6,9 @@ This module tests the Bingham model for linear viscoplastic flow.
 import numpy as np
 import pytest
 
-from rheo.core.data import RheoData
-from rheo.core.test_modes import TestMode
-from rheo.models.bingham import Bingham
+from rheojax.core.data import RheoData
+from rheojax.core.test_modes import TestMode
+from rheojax.models.bingham import Bingham
 
 
 class TestBinghamBasics:

@@ -14,7 +14,7 @@ Development Setup
    .. code-block:: bash
 
        # Fork on GitHub, then clone your fork
-       git clone https://github.com/YOUR_USERNAME/rheo.git
+       git clone https://github.com/YOUR_USERNAME/rheojax.git
        cd rheo
 
 2. **Create Virtual Environment**
@@ -54,7 +54,7 @@ Development Setup
        pytest
 
        # Check imports
-       python -c "import rheo; print(rheo.__version__)"
+       python -c "import rheojax; print(rheojax.__version__)"
 
 Development Workflow
 --------------------
@@ -247,8 +247,8 @@ Organize imports in this order:
     from scipy.optimize import minimize
 
     # Local imports
-    from rheo.core import RheoData, BaseModel
-    from rheo.utils import nlsq_optimize
+    from rheojax.core import RheoData, BaseModel
+    from rheojax.utils import nlsq_optimize
 
 Testing
 -------
@@ -263,7 +263,7 @@ Every new feature needs tests:
     # tests/test_new_feature.py
     import pytest
     import numpy as np
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
 
     def test_rheodata_creation():
         """Test RheoData initialization."""
@@ -371,7 +371,7 @@ Add documentation for new features:
        New Function
        ~~~~~~~~~~~~
 
-       .. autofunction:: rheo.module.new_function
+       .. autofunction:: rheojax.module.new_function
 
 2. **Add User Guide Section**
 
@@ -401,7 +401,7 @@ Add documentation for new features:
            Examples
            --------
            >>> import numpy as np
-           >>> from rheo.core import RheoData
+           >>> from rheojax.core import RheoData
            >>> data = RheoData(x=np.array([1, 2, 3]), y=np.array([10, 20, 30]))
            >>> result = new_function(data)
            """
@@ -418,7 +418,7 @@ Adding a Model
    .. code-block:: python
 
        # rheo/models/new_model.py
-       from rheo.core import BaseModel, ParameterSet
+       from rheojax.core import BaseModel, ParameterSet
        import jax.numpy as jnp
 
        class NewModel(BaseModel):
@@ -443,7 +443,7 @@ Adding a Model
 
            def _fit(self, X, y, **kwargs):
                """Implement fitting."""
-               from rheo.utils.optimization import nlsq_optimize
+               from rheojax.utils.optimization import nlsq_optimize
 
                def objective(params):
                    predictions = self._predict(X)
@@ -465,7 +465,7 @@ Adding a Model
        # tests/models/test_new_model.py
        import pytest
        import numpy as np
-       from rheo.models import NewModel
+       from rheojax.models import NewModel
 
        def test_new_model_creation():
            """Test model instantiation."""
@@ -493,7 +493,7 @@ Adding a Model
        NewModel
        ~~~~~~~~
 
-       .. autoclass:: rheo.models.NewModel
+       .. autoclass:: rheojax.models.NewModel
           :members:
           :inherited-members:
 
@@ -514,7 +514,7 @@ Adding a Transform
    .. code-block:: python
 
        # rheo/transforms/new_transform.py
-       from rheo.core import BaseTransform, RheoData
+       from rheojax.core import BaseTransform, RheoData
        import jax.numpy as jnp
 
        class NewTransform(BaseTransform):
@@ -557,7 +557,7 @@ Adding a Reader
 
     # rheo/io/readers/new_reader.py
     import numpy as np
-    from rheo.core import RheoData
+    from rheojax.core import RheoData
 
     def read_new_format(filepath, **kwargs):
         """Read new file format.
