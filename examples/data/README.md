@@ -2,6 +2,42 @@
 
 This directory contains experimental datasets used in Rheo example notebooks. Synthetic datasets are generated programmatically within notebooks rather than stored as files.
 
+## Git LFS Requirement
+
+**Large experimental files are stored using Git Large File Storage (LFS).**
+
+The OWChirp datasets (`owchirp_tcs.txt`, `owchirp_tts.txt`) are large files (66-80MB each, 146MB total) stored with Git LFS to avoid bloating the repository.
+
+**Installation:**
+```bash
+# Install Git LFS (one-time setup)
+# macOS
+brew install git-lfs
+
+# Linux
+sudo apt-get install git-lfs  # Debian/Ubuntu
+sudo yum install git-lfs      # CentOS/RHEL
+
+# Windows
+# Download from https://git-lfs.github.com/
+
+# Initialize Git LFS in your repository
+git lfs install
+
+# Clone normally - LFS files download automatically
+git clone https://github.com/imewei/Rheo.git
+```
+
+**Verification:**
+```bash
+# Check that LFS files downloaded correctly
+git lfs ls-files
+# Should show: owchirp_tcs.txt, owchirp_tts.txt
+
+# If files didn't download, fetch them manually
+git lfs pull
+```
+
 ## Directory Structure
 
 ```

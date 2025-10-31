@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed hardcoded absolute path in `tests/validation/test_migrated_notebooks.py`
 - Documented Bayesian convergence threshold rationale (R-hat, ESS, divergences)
+- **Git LFS Migration**: Migrated large OWChirp files (146MB) to Git LFS to avoid repository bloat
+  - `owchirp_tcs.txt` (66MB) and `owchirp_tts.txt` (80MB) now stored with LFS
+  - Requires `git lfs install` for cloning (documented in `examples/data/README.md`)
+  - Resolves CRIT-001 from code quality review
 
 ## [0.1.0] - TBD (Initial Development)
 
