@@ -262,3 +262,11 @@ ipython_config.py
 # Archive files (optional)
 # *.tar.gz
 # *.zip
+
+# ----------------------------------------------------------------------------
+# Code Review & Analysis Artifacts (temporary)
+# ----------------------------------------------------------------------------
+commit_*_review.json
+commit_*_breaking_changes.json
+git_workflow_summary_*.md
+code_quality_fixes_summary.md
