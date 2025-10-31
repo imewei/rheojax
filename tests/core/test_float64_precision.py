@@ -166,24 +166,24 @@ class TestFloat64ImportOrder:
         assert d.dtype == jnp.float64
         assert e.dtype == jnp.float64
 
-    def test_rheo_package_import_order(self):
-        """Test that rheo package itself ensures proper import order."""
-        # This test validates that importing rheo will import nlsq before JAX
-        # Save current sys.modules state for rheo modules
-        saved_modules = {k: sys.modules[k] for k in list(sys.modules.keys()) if k.startswith("rheo")}
+    def test_rheojax_package_import_order(self):
+        """Test that rheojax package itself ensures proper import order."""
+        # This test validates that importing rheojax will import nlsq before JAX
+        # Save current sys.modules state for rheojax modules
+        saved_modules = {k: sys.modules[k] for k in list(sys.modules.keys()) if k.startswith("rheojax")}
 
         try:
             # Clear sys.modules to force fresh import
-            modules_to_clear = [k for k in sys.modules.keys() if k.startswith("rheo")]
+            modules_to_clear = [k for k in sys.modules.keys() if k.startswith("rheojax")]
             for mod in modules_to_clear:
-                if mod != "rheo.core.jax_config":  # Don't clear jax_config yet
+                if mod != "rheojax.core.jax_config":  # Don't clear jax_config yet
                     del sys.modules[mod]
 
-            # Import rheo package
-            import rheo
+            # Import rheojax package
+            import rheojax
 
             # Verify nlsq was imported
-            assert "nlsq" in sys.modules, "rheo package should import nlsq"
+            assert "nlsq" in sys.modules, "rheojax package should import nlsq"
 
             # Verify JAX is in float64 mode
             import jax.numpy as jnp
@@ -191,9 +191,9 @@ class TestFloat64ImportOrder:
             arr = jnp.array([1.0])
             assert arr.dtype == jnp.float64
         finally:
-            # Restore all rheo modules to prevent state pollution
+            # Restore all rheojax modules to prevent state pollution
             # First, remove any newly imported modules
-            current_modules = [k for k in sys.modules.keys() if k.startswith("rheo")]
+            current_modules = [k for k in sys.modules.keys() if k.startswith("rheojax")]
             for mod in current_modules:
                 if mod not in saved_modules:
                     del sys.modules[mod]

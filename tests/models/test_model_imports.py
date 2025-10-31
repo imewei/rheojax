@@ -14,8 +14,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-# Import rheo package first (triggers NLSQ import before JAX)
-import rheo
+# Import rheojax package first (triggers NLSQ import before JAX)
+import rheojax
 from rheojax.core.jax_config import safe_import_jax
 
 # Now safe to import JAX
