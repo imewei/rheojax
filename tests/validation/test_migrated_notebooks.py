@@ -27,15 +27,15 @@ Markers:
 - @pytest.mark.notebook_smoke: Framework smoke test
 """
 
-import pytest
-import nbformat
-from nbconvert.preprocessors import ExecutePreprocessor
-from pathlib import Path
-import numpy as np
-import tempfile
 import json
-from typing import Dict, Any, Tuple, List
+import tempfile
+from pathlib import Path
+from typing import Any
 
+import nbformat
+import numpy as np
+import pytest
+from nbconvert.preprocessors import ExecutePreprocessor
 
 # Configuration
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
@@ -100,7 +100,7 @@ def _execute_notebook(notebook_path: Path) -> nbformat.NotebookNode:
     return nb
 
 
-def _get_notebook_metadata(nb: nbformat.NotebookNode) -> Dict[str, Any]:
+def _get_notebook_metadata(nb: nbformat.NotebookNode) -> dict[str, Any]:
     """
     Extract notebook metadata (title, objectives, etc.).
 
@@ -225,7 +225,7 @@ def _extract_variable_from_output(nb: nbformat.NotebookNode, var_name: str) -> A
     raise ValueError(f"Could not extract variable '{var_name}' from notebook outputs")
 
 
-def _extract_fitted_parameters(nb: nbformat.NotebookNode) -> Dict[str, float]:
+def _extract_fitted_parameters(nb: nbformat.NotebookNode) -> dict[str, float]:
     """
     Extract fitted model parameters from notebook output.
 
@@ -378,7 +378,7 @@ def _validate_array_match(
 
 
 def _validate_rhat(
-    diagnostics: Dict[str, float],
+    diagnostics: dict[str, float],
     threshold: float = RHAT_THRESHOLD
 ) -> None:
     """
@@ -410,7 +410,7 @@ def _validate_rhat(
 
 
 def _validate_ess(
-    diagnostics: Dict[str, float],
+    diagnostics: dict[str, float],
     threshold: float = ESS_THRESHOLD
 ) -> None:
     """
@@ -442,7 +442,7 @@ def _validate_ess(
 
 
 def _validate_divergences(
-    diagnostics: Dict[str, Any],
+    diagnostics: dict[str, Any],
     max_rate: float = DIVERGENCE_RATE_THRESHOLD
 ) -> None:
     """
@@ -497,7 +497,7 @@ def tolerance() -> float:
 
 
 @pytest.fixture
-def convergence_thresholds() -> Dict[str, float]:
+def convergence_thresholds() -> dict[str, float]:
     """Fixture providing Bayesian convergence thresholds."""
     return {
         'rhat': RHAT_THRESHOLD,
@@ -507,7 +507,7 @@ def convergence_thresholds() -> Dict[str, float]:
 
 
 @pytest.fixture
-def expected_parameter_values() -> Dict[str, Dict[str, float]]:
+def expected_parameter_values() -> dict[str, dict[str, float]]:
     """
     Fixture providing expected parameter values for notebooks.
 
