@@ -7,11 +7,12 @@ from rheojax.core.data import RheoData
 from rheojax.transforms.owchirp import OWChirp
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestOWChirp:
     """Test suite for OWChirp transform."""
 

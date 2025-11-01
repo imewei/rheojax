@@ -27,9 +27,7 @@ from jax.scipy.special import gamma as jax_gamma
 
 
 @partial(jax.jit, static_argnums=(1,))
-def mittag_leffler_e(
-    z: float | jnp.ndarray, alpha: float
-) -> float | jnp.ndarray:
+def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarray:
     """
     One-parameter Mittag-Leffler function E_α(z).
 

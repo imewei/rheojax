@@ -264,7 +264,7 @@ class TestPlotEnergy:
 
         # Check if energy diagnostic is available
         idata = fitted_pipeline._bayesian_result.to_inference_data()
-        if not hasattr(idata.sample_stats, 'energy'):
+        if not hasattr(idata.sample_stats, "energy"):
             pytest.skip("Energy diagnostic not available in NumPyro MCMC output")
 
         result = fitted_pipeline.plot_energy()
@@ -281,7 +281,7 @@ class TestPlotEnergy:
 
         # Check if energy diagnostic is available
         idata = fitted_pipeline._bayesian_result.to_inference_data()
-        if not hasattr(idata.sample_stats, 'energy'):
+        if not hasattr(idata.sample_stats, "energy"):
             pytest.skip("Energy diagnostic not available in NumPyro MCMC output")
 
         # Energy plot should work even with divergences present

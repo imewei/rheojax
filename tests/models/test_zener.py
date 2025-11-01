@@ -15,11 +15,12 @@ from rheojax.core.test_modes import TestMode
 from rheojax.models.zener import Zener
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestZenerBasics:
     """Test basic Zener model functionality."""
 

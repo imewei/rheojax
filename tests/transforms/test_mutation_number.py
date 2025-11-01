@@ -8,11 +8,12 @@ from rheojax.core.test_modes import TestMode
 from rheojax.transforms.mutation_number import MutationNumber
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestMutationNumber:
     """Test suite for Mutation Number transform."""
 

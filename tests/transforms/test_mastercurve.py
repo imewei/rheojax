@@ -7,11 +7,12 @@ from rheojax.core.data import RheoData
 from rheojax.transforms.mastercurve import Mastercurve
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestMastercurve:
     """Test suite for Mastercurve transform."""
 

@@ -84,7 +84,7 @@ pip install rheojax
 
 ```bash
 git clone https://github.com/imewei/rheojax.git
-cd rheo
+cd rheojax
 pip install -e ".[dev]"
 ```
 
@@ -98,7 +98,7 @@ From the repository:
 
 ```bash
 git clone https://github.com/imewei/rheojax.git
-cd rheo
+cd rheojax
 make install-jax-gpu  # Automatically handles uninstall + GPU install
 ```
 
@@ -171,13 +171,13 @@ export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 The package works seamlessly in conda environments using pip:
 
 ```bash
-conda create -n rheo python=3.12
-conda activate rheo
+conda create -n rheojax python=3.12
+conda activate rheojax
 pip install rheojax
 
 # For GPU acceleration (Linux only)
 git clone https://github.com/imewei/rheojax.git
-cd rheo
+cd rheojax
 make install-jax-gpu
 ```
 
@@ -452,7 +452,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ```bash
 # Clone repository
 git clone https://github.com/imewei/rheojax.git
-cd rheo
+cd rheojax
 
 # Install development dependencies
 pip install -e ".[dev]"
@@ -473,7 +473,7 @@ Run the test suite:
 pytest
 
 # Run with coverage
-pytest --cov=rheo --cov-report=html
+pytest --cov=rheojax --cov-report=html
 
 # Run specific test categories
 pytest -m "not slow"  # Skip slow tests

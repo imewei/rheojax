@@ -14,6 +14,8 @@ from rheojax.utils.optimization import OptimizationResult, nlsq_optimize
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestOptimizationBasics:
     """Test basic optimization functionality."""
 

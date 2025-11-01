@@ -13,11 +13,12 @@ from rheojax.core.registry import ModelRegistry
 from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestFractionalMaxwellLiquidInitialization:
     """Test model initialization and parameters."""
 

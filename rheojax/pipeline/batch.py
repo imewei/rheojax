@@ -91,7 +91,10 @@ class BatchPipeline:
             raise ValueError("No template pipeline set. Call set_template() first.")
 
         if parallel:
-            warnings.warn("Parallel processing not yet implemented. Using sequential.", stacklevel=2)
+            warnings.warn(
+                "Parallel processing not yet implemented. Using sequential.",
+                stacklevel=2,
+            )
 
         for file_path in file_paths:
             try:
@@ -134,7 +137,9 @@ class BatchPipeline:
         file_paths = [str(p) for p in file_paths]
 
         if not file_paths:
-            warnings.warn(f"No files matching '{pattern}' found in {directory}", stacklevel=2)
+            warnings.warn(
+                f"No files matching '{pattern}' found in {directory}", stacklevel=2
+            )
             return self
 
         return self.process_files(file_paths, **kwargs)

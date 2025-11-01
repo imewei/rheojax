@@ -16,11 +16,12 @@ from rheojax.core.test_modes import TestMode
 from rheojax.models.springpot import SpringPot
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestSpringPotBasics:
     """Test basic SpringPot model functionality."""
 

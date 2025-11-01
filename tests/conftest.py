@@ -595,4 +595,5 @@ def reset_jax_config():
     yield
     # Reset JAX config validation state to avoid module import caching issues
     from rheojax.core.jax_config import reset_validation
+
     reset_validation()

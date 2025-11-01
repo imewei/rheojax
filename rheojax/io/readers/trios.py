@@ -164,7 +164,10 @@ def load_trios(filepath: str, **kwargs) -> RheoData | list[RheoData]:
             if data is not None:
                 rheo_data_list.append(data)
         except Exception as e:
-            warnings.warn(f"Failed to parse segment starting at line {seg_start}: {e}", stacklevel=2)
+            warnings.warn(
+                f"Failed to parse segment starting at line {seg_start}: {e}",
+                stacklevel=2,
+            )
 
     if not rheo_data_list:
         raise ValueError("No valid data segments could be parsed")
@@ -177,11 +180,7 @@ def load_trios(filepath: str, **kwargs) -> RheoData | list[RheoData]:
         return rheo_data_list
 
 
-def load_trios_chunked(
-    filepath: str,
-    chunk_size: int = 10000,
-    **kwargs
-):
+def load_trios_chunked(filepath: str, chunk_size: int = 10000, **kwargs):
     """Load TRIOS file in memory-efficient chunks (generator).
 
     This function reads TRIOS files using a streaming approach that yields
@@ -277,19 +276,12 @@ def load_trios_chunked(
 
         seg_start = segment_starts[seg_idx]
         seg_end = (
-            segment_starts[seg_idx + 1]
-            if seg_idx + 1 < len(segment_starts)
-            else None
+            segment_starts[seg_idx + 1] if seg_idx + 1 < len(segment_starts) else None
         )
 
         # Process this segment in chunks
         yield from _read_segment_chunked(
-            filepath,
-            seg_start,
-            seg_end,
-            metadata,
-            chunk_size,
-            validate_data
+            filepath, seg_start, seg_end, metadata, chunk_size, validate_data
         )
 
 
@@ -299,7 +291,7 @@ def _read_segment_chunked(
     seg_end: int | None,
     metadata: dict,
     chunk_size: int,
-    validate_data: bool
+    validate_data: bool,
 ):
     """Read a single segment in chunks (internal generator).
 
@@ -343,7 +335,11 @@ def _read_segment_chunked(
 
                 # Parse headers
                 columns = [col.strip() for col in header_line.split("\t")]
-                units = [u.strip() for u in unit_line.split("\t")] if unit_line else [""] * len(columns)
+                units = (
+                    [u.strip() for u in unit_line.split("\t")]
+                    if unit_line
+                    else [""] * len(columns)
+                )
 
                 # Ensure same number of units as columns
                 while len(units) < len(columns):
@@ -378,8 +374,7 @@ def _read_segment_chunked(
 
                 if x_col is None or y_col is None:
                     warnings.warn(
-                        f"Could not determine x/y columns from: {columns}",
-                        stacklevel=2
+                        f"Could not determine x/y columns from: {columns}", stacklevel=2
                     )
                     return
 

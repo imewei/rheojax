@@ -87,14 +87,13 @@ def _execute_notebook(notebook_path: Path) -> nbformat.NotebookNode:
         nb = nbformat.read(f, as_version=4)
 
     # Execute with timeout
-    ep = ExecutePreprocessor(timeout=600, kernel_name='python3')
+    ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
 
     try:
-        ep.preprocess(nb, {'metadata': {'path': str(notebook_path.parent)}})
+        ep.preprocess(nb, {"metadata": {"path": str(notebook_path.parent)}})
     except Exception as e:
         raise RuntimeError(
-            f"Notebook execution failed: {notebook_path}\n"
-            f"Error: {str(e)}"
+            f"Notebook execution failed: {notebook_path}\n" f"Error: {str(e)}"
         ) from e
 
     return nb
@@ -115,9 +114,9 @@ def _get_notebook_metadata(nb: nbformat.NotebookNode) -> dict[str, Any]:
         Dictionary with notebook metadata
     """
     metadata = {
-        'num_cells': len(nb.cells),
-        'num_code_cells': sum(1 for c in nb.cells if c.cell_type == 'code'),
-        'num_markdown_cells': sum(1 for c in nb.cells if c.cell_type == 'markdown'),
+        "num_cells": len(nb.cells),
+        "num_code_cells": sum(1 for c in nb.cells if c.cell_type == "code"),
+        "num_markdown_cells": sum(1 for c in nb.cells if c.cell_type == "markdown"),
     }
     return metadata
 
@@ -151,26 +150,28 @@ def _extract_cell_output(nb: nbformat.NotebookNode, cell_index: int) -> str:
         If cell has no text output
     """
     if cell_index >= len(nb.cells):
-        raise IndexError(f"Cell index {cell_index} out of range (notebook has {len(nb.cells)} cells)")
+        raise IndexError(
+            f"Cell index {cell_index} out of range (notebook has {len(nb.cells)} cells)"
+        )
 
     cell = nb.cells[cell_index]
-    if not hasattr(cell, 'outputs') or not cell.outputs:
+    if not hasattr(cell, "outputs") or not cell.outputs:
         raise ValueError(f"Cell {cell_index} has no outputs")
 
     # Concatenate all text outputs
     output_text = []
     for output in cell.outputs:
-        if output.output_type == 'stream' and output.name == 'stdout':
+        if output.output_type == "stream" and output.name == "stdout":
             output_text.append(output.text)
-        elif output.output_type == 'display_data' and 'text/plain' in output.data:
-            output_text.append(output.data['text/plain'])
-        elif output.output_type == 'execute_result' and 'text/plain' in output.data:
-            output_text.append(output.data['text/plain'])
+        elif output.output_type == "display_data" and "text/plain" in output.data:
+            output_text.append(output.data["text/plain"])
+        elif output.output_type == "execute_result" and "text/plain" in output.data:
+            output_text.append(output.data["text/plain"])
 
     if not output_text:
         raise ValueError(f"Cell {cell_index} has no text output")
 
-    return ''.join(output_text)
+    return "".join(output_text)
 
 
 def _extract_variable_from_output(nb: nbformat.NotebookNode, var_name: str) -> Any:
@@ -197,21 +198,21 @@ def _extract_variable_from_output(nb: nbformat.NotebookNode, var_name: str) -> A
     """
     # Search through cells for matching output
     for cell in nb.cells:
-        if not hasattr(cell, 'outputs'):
+        if not hasattr(cell, "outputs"):
             continue
 
         for output in cell.outputs:
-            if output.output_type == 'stream' and output.name == 'stdout':
+            if output.output_type == "stream" and output.name == "stdout":
                 # Parse stdout for variable assignment
-                if f'{var_name}' in output.text:
+                if f"{var_name}" in output.text:
                     # Try to extract numeric value
                     try:
                         # Simple pattern matching for "var_name = value"
-                        lines = output.text.split('\n')
+                        lines = output.text.split("\n")
                         for line in lines:
-                            if f'{var_name}' in line and '=' in line:
+                            if f"{var_name}" in line and "=" in line:
                                 # Extract right-hand side
-                                parts = line.split('=')
+                                parts = line.split("=")
                                 if len(parts) >= 2:
                                     value_str = parts[-1].strip()
                                     # Try to evaluate as number
@@ -248,24 +249,39 @@ def _extract_fitted_parameters(nb: nbformat.NotebookNode) -> dict[str, float]:
     parameters = {}
 
     # Common rheological parameter names
-    param_names = ['G0', 'eta', 'alpha', 'tau', 'k', 'yield_stress', 'consistency', 'flow_index']
+    param_names = [
+        "G0",
+        "eta",
+        "alpha",
+        "tau",
+        "k",
+        "yield_stress",
+        "consistency",
+        "flow_index",
+    ]
 
     for cell in nb.cells:
-        if not hasattr(cell, 'outputs'):
+        if not hasattr(cell, "outputs"):
             continue
 
         for output in cell.outputs:
-            if output.output_type == 'stream' and output.name == 'stdout':
+            if output.output_type == "stream" and output.name == "stdout":
                 text = output.text
                 # Search for parameter assignments
                 for param_name in param_names:
                     if param_name in text:
                         try:
-                            lines = text.split('\n')
+                            lines = text.split("\n")
                             for line in lines:
-                                if f'{param_name}' in line and ('=' in line or ':' in line):
+                                if f"{param_name}" in line and (
+                                    "=" in line or ":" in line
+                                ):
                                     # Extract numeric value
-                                    parts = line.split('=') if '=' in line else line.split(':')
+                                    parts = (
+                                        line.split("=")
+                                        if "=" in line
+                                        else line.split(":")
+                                    )
                                     if len(parts) >= 2:
                                         value_str = parts[-1].strip()
                                         # Remove units and extra characters
@@ -284,9 +300,7 @@ def _extract_fitted_parameters(nb: nbformat.NotebookNode) -> dict[str, float]:
 
 
 def _validate_relative_error(
-    actual: float,
-    expected: float,
-    tolerance: float = TOLERANCE
+    actual: float, expected: float, tolerance: float = TOLERANCE
 ) -> None:
     """
     Validate relative error between actual and expected values.
@@ -325,9 +339,7 @@ def _validate_relative_error(
 
 
 def _validate_array_match(
-    arr1: np.ndarray,
-    arr2: np.ndarray,
-    tolerance: float = TOLERANCE
+    arr1: np.ndarray, arr2: np.ndarray, tolerance: float = TOLERANCE
 ) -> None:
     """
     Validate that two arrays match within tolerance.
@@ -355,12 +367,12 @@ def _validate_array_match(
     arr1 = np.asarray(arr1)
     arr2 = np.asarray(arr2)
 
-    assert arr1.shape == arr2.shape, (
-        f"Array shape mismatch: {arr1.shape} vs {arr2.shape}"
-    )
+    assert (
+        arr1.shape == arr2.shape
+    ), f"Array shape mismatch: {arr1.shape} vs {arr2.shape}"
 
     # Compute relative error
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         rel_error = np.abs(arr1 - arr2) / np.abs(arr2)
         # Handle division by zero
         rel_error = np.where(arr2 == 0, np.abs(arr1 - arr2), rel_error)
@@ -378,8 +390,7 @@ def _validate_array_match(
 
 
 def _validate_rhat(
-    diagnostics: dict[str, float],
-    threshold: float = RHAT_THRESHOLD
+    diagnostics: dict[str, float], threshold: float = RHAT_THRESHOLD
 ) -> None:
     """
     Validate R-hat convergence diagnostic for all parameters.
@@ -410,8 +421,7 @@ def _validate_rhat(
 
 
 def _validate_ess(
-    diagnostics: dict[str, float],
-    threshold: float = ESS_THRESHOLD
+    diagnostics: dict[str, float], threshold: float = ESS_THRESHOLD
 ) -> None:
     """
     Validate Effective Sample Size (ESS) for all parameters.
@@ -442,8 +452,7 @@ def _validate_ess(
 
 
 def _validate_divergences(
-    diagnostics: dict[str, Any],
-    max_rate: float = DIVERGENCE_RATE_THRESHOLD
+    diagnostics: dict[str, Any], max_rate: float = DIVERGENCE_RATE_THRESHOLD
 ) -> None:
     """
     Validate NUTS sampler divergence rate.
@@ -467,8 +476,8 @@ def _validate_divergences(
     - Common causes: bad parameterization, strong correlations
     - Solutions: warm-start, reparameterization, tighter priors
     """
-    num_divergences = diagnostics.get('num_divergences', 0)
-    num_samples = diagnostics.get('num_samples', 1)
+    num_divergences = diagnostics.get("num_divergences", 0)
+    num_samples = diagnostics.get("num_samples", 1)
 
     divergence_rate = num_divergences / num_samples
     assert divergence_rate < max_rate, (
@@ -500,9 +509,9 @@ def tolerance() -> float:
 def convergence_thresholds() -> dict[str, float]:
     """Fixture providing Bayesian convergence thresholds."""
     return {
-        'rhat': RHAT_THRESHOLD,
-        'ess': ESS_THRESHOLD,
-        'divergence_rate': DIVERGENCE_RATE_THRESHOLD,
+        "rhat": RHAT_THRESHOLD,
+        "ess": ESS_THRESHOLD,
+        "divergence_rate": DIVERGENCE_RATE_THRESHOLD,
     }
 
 
@@ -522,9 +531,9 @@ def expected_parameter_values() -> dict[str, dict[str, float]]:
     Update as baseline notebooks are validated.
     """
     return {
-        'test_smoke_notebook': {
-            'x': 1.0,
-            'y': 2.0,
+        "test_smoke_notebook": {
+            "x": 1.0,
+            "y": 2.0,
         },
     }
 
@@ -581,10 +590,10 @@ class TestBasicNotebooks:
         # Look for convergence messages in output
         convergence_found = False
         for cell in nb.cells:
-            if hasattr(cell, 'outputs'):
+            if hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.output_type == 'stream':
-                        if 'CONVERGENCE' in output.text or 'R-hat' in output.text:
+                    if output.output_type == "stream":
+                        if "CONVERGENCE" in output.text or "R-hat" in output.text:
                             convergence_found = True
                             break
 
@@ -608,10 +617,10 @@ class TestBasicNotebooks:
         # Check for alpha parameter in range
         alpha_valid = False
         for cell in nb.cells:
-            if hasattr(cell, 'outputs'):
+            if hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.output_type == 'stream':
-                        if 'alpha' in output.text and '=' in output.text:
+                    if output.output_type == "stream":
+                        if "alpha" in output.text and "=" in output.text:
                             alpha_valid = True
                             break
 
@@ -635,10 +644,10 @@ class TestBasicNotebooks:
         # Look for yield stress (sigma_y) in outputs
         yield_stress_found = False
         for cell in nb.cells:
-            if hasattr(cell, 'outputs'):
+            if hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.output_type == 'stream':
-                        if 'sigma_y' in output.text or 'Yield' in output.text:
+                    if output.output_type == "stream":
+                        if "sigma_y" in output.text or "Yield" in output.text:
                             yield_stress_found = True
                             break
 
@@ -662,12 +671,14 @@ class TestBasicNotebooks:
         # Look for flow index n and shear-thinning behavior
         behavior_found = False
         for cell in nb.cells:
-            if hasattr(cell, 'outputs'):
+            if hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.output_type == 'stream':
-                        if ('Shear-thinning' in output.text or
-                            'flow_index' in output.text or
-                            'n =' in output.text):
+                    if output.output_type == "stream":
+                        if (
+                            "Shear-thinning" in output.text
+                            or "flow_index" in output.text
+                            or "n =" in output.text
+                        ):
                             behavior_found = True
                             break
 
@@ -682,8 +693,12 @@ class TestTransformNotebooks:
     def test_transform_notebook_structure(self, examples_dir):
         """Verify transforms notebooks directory exists and has expected structure."""
         transforms_dir = examples_dir / "transforms"
-        assert transforms_dir.exists(), f"Transforms notebooks directory not found: {transforms_dir}"
-        assert transforms_dir.is_dir(), f"transforms/ is not a directory: {transforms_dir}"
+        assert (
+            transforms_dir.exists()
+        ), f"Transforms notebooks directory not found: {transforms_dir}"
+        assert (
+            transforms_dir.is_dir()
+        ), f"transforms/ is not a directory: {transforms_dir}"
 
     @pytest.mark.validation
     @pytest.mark.slow
@@ -705,10 +720,10 @@ class TestTransformNotebooks:
 
         # Verify no execution errors
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if hasattr(cell, 'outputs'):
+            if cell.cell_type == "code":
+                if hasattr(cell, "outputs"):
                     for output in cell.outputs:
-                        if output.output_type == 'error':
+                        if output.output_type == "error":
                             raise RuntimeError(
                                 f"Cell execution error in FFT notebook:\n"
                                 f"{output.ename}: {output.evalue}"
@@ -729,22 +744,26 @@ class TestTransformNotebooks:
         # Look for cell with tau_fft calculation
         tau_fft = None
         for cell in nb.cells:
-            if cell.cell_type == 'code':
+            if cell.cell_type == "code":
                 outputs = _extract_cell_output(cell)
-                if 'tau_fft' in str(outputs):
+                if "tau_fft" in str(outputs):
                     # Extract from namespace (if available)
-                    tau_fft = _extract_variable_from_output(outputs, 'tau_fft')
+                    tau_fft = _extract_variable_from_output(outputs, "tau_fft")
                     break
 
         # If direct extraction fails, look for printed output
         if tau_fft is None:
             for cell in nb.cells:
-                if cell.cell_type == 'code' and hasattr(cell, 'outputs'):
+                if cell.cell_type == "code" and hasattr(cell, "outputs"):
                     for output in cell.outputs:
-                        if output.output_type == 'stream' and 'tau (FFT)' in output.text:
+                        if (
+                            output.output_type == "stream"
+                            and "tau (FFT)" in output.text
+                        ):
                             # Parse from text output
                             import re
-                            match = re.search(r'τ \(FFT\) = ([0-9.]+)', output.text)
+
+                            match = re.search(r"τ \(FFT\) = ([0-9.]+)", output.text)
                             if match:
                                 tau_fft = float(match.group(1))
                                 break
@@ -769,9 +788,9 @@ class TestTransformNotebooks:
         # Look for frequency-domain data (data_freq variable)
         found_freq_data = False
         for cell in nb.cells:
-            if cell.cell_type == 'code':
+            if cell.cell_type == "code":
                 # Check for FFT transform application
-                if 'fft_transform.transform' in cell.source:
+                if "fft_transform.transform" in cell.source:
                     found_freq_data = True
                     break
 
@@ -780,14 +799,14 @@ class TestTransformNotebooks:
         # Verify frequency domain visualization exists
         found_freq_plot = False
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if hasattr(cell, 'outputs'):
+            if cell.cell_type == "code":
+                if hasattr(cell, "outputs"):
                     for output in cell.outputs:
                         # Check for plot output
-                        if output.output_type == 'display_data':
-                            if 'image/png' in output.get('data', {}):
+                        if output.output_type == "display_data":
+                            if "image/png" in output.get("data", {}):
                                 # Check if this is frequency domain plot
-                                if 'Frequency (Hz)' in cell.source:
+                                if "Frequency (Hz)" in cell.source:
                                     found_freq_plot = True
                                     break
 
@@ -803,8 +822,8 @@ class TestTransformNotebooks:
         # Look for Cole-Cole plot
         found_cole_cole = False
         for cell in nb.cells:
-            if cell.cell_type == 'code' or cell.cell_type == 'markdown':
-                if 'cole-cole' in cell.source.lower():
+            if cell.cell_type == "code" or cell.cell_type == "markdown":
+                if "cole-cole" in cell.source.lower():
                     found_cole_cole = True
                     break
 
@@ -818,21 +837,21 @@ class TestTransformNotebooks:
         nb = _execute_notebook(fft_notebook)
 
         # Expected window functions
-        expected_windows = ['hann', 'hamming', 'blackman', 'bartlett']
+        expected_windows = ["hann", "hamming", "blackman", "bartlett"]
 
         # Look for window function comparison
         found_windows = []
         for cell in nb.cells:
-            if cell.cell_type == 'code':
+            if cell.cell_type == "code":
                 for window in expected_windows:
                     if window in cell.source.lower():
                         if window not in found_windows:
                             found_windows.append(window)
 
         # Should demonstrate at least 3 window functions
-        assert len(found_windows) >= 3, (
-            f"Expected at least 3 window functions, found {len(found_windows)}: {found_windows}"
-        )
+        assert (
+            len(found_windows) >= 3
+        ), f"Expected at least 3 window functions, found {len(found_windows)}: {found_windows}"
 
     @pytest.mark.validation
     @pytest.mark.slow
@@ -844,8 +863,8 @@ class TestTransformNotebooks:
         # Look for benchmark section
         found_benchmark = False
         for cell in nb.cells:
-            if cell.cell_type == 'code' or cell.cell_type == 'markdown':
-                if 'benchmark' in cell.source.lower() and 'jax' in cell.source.lower():
+            if cell.cell_type == "code" or cell.cell_type == "markdown":
+                if "benchmark" in cell.source.lower() and "jax" in cell.source.lower():
                     found_benchmark = True
                     break
 
@@ -854,8 +873,8 @@ class TestTransformNotebooks:
         # Verify timing comparison is present
         found_timing = False
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'time.time()' in cell.source and 'fft' in cell.source.lower():
+            if cell.cell_type == "code":
+                if "time.time()" in cell.source and "fft" in cell.source.lower():
                     found_timing = True
                     break
 
@@ -871,8 +890,8 @@ class TestTransformNotebooks:
         # Look for Kramers-Kronig discussion
         found_kk = False
         for cell in nb.cells:
-            if cell.cell_type == 'markdown':
-                if 'kramers' in cell.source.lower() and 'kronig' in cell.source.lower():
+            if cell.cell_type == "markdown":
+                if "kramers" in cell.source.lower() and "kronig" in cell.source.lower():
                     found_kk = True
                     break
 
@@ -888,7 +907,9 @@ class TestTransformNotebooks:
         """Verify mastercurve TTS notebook exists."""
         mc_notebook = examples_dir / "transforms" / "02-mastercurve-tts.ipynb"
         assert mc_notebook.exists(), f"Mastercurve notebook not found: {mc_notebook}"
-        assert mc_notebook.is_file(), f"Mastercurve notebook is not a file: {mc_notebook}"
+        assert (
+            mc_notebook.is_file()
+        ), f"Mastercurve notebook is not a file: {mc_notebook}"
 
     @pytest.mark.validation
     @pytest.mark.slow
@@ -902,10 +923,10 @@ class TestTransformNotebooks:
 
         # Verify no execution errors
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if hasattr(cell, 'outputs'):
+            if cell.cell_type == "code":
+                if hasattr(cell, "outputs"):
                     for output in cell.outputs:
-                        if output.output_type == 'error':
+                        if output.output_type == "error":
                             raise RuntimeError(
                                 f"Cell execution error in mastercurve notebook:\n"
                                 f"{output.ename}: {output.evalue}"
@@ -923,10 +944,10 @@ class TestTransformNotebooks:
         found_C2 = False
 
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'C1=' in cell.source or 'C1 =' in cell.source:
+            if cell.cell_type == "code":
+                if "C1=" in cell.source or "C1 =" in cell.source:
                     found_C1 = True
-                if 'C2=' in cell.source or 'C2 =' in cell.source:
+                if "C2=" in cell.source or "C2 =" in cell.source:
                     found_C2 = True
 
         assert found_C1, "WLF parameter C1 not defined in notebook"
@@ -942,8 +963,8 @@ class TestTransformNotebooks:
         # Look for shift factor calculation
         found_shift_calc = False
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'get_shift_factor' in cell.source or 'shift_factors' in cell.source:
+            if cell.cell_type == "code":
+                if "get_shift_factor" in cell.source or "shift_factors" in cell.source:
                     found_shift_calc = True
                     break
 
@@ -952,8 +973,8 @@ class TestTransformNotebooks:
         # Verify shift factors are plotted
         found_shift_plot = False
         for cell in nb.cells:
-            if cell.cell_type == 'code' or cell.cell_type == 'markdown':
-                if 'log(a_T)' in cell.source or 'log_aT' in cell.source:
+            if cell.cell_type == "code" or cell.cell_type == "markdown":
+                if "log(a_T)" in cell.source or "log_aT" in cell.source:
                     found_shift_plot = True
                     break
 
@@ -969,8 +990,8 @@ class TestTransformNotebooks:
         # Look for multi-temperature data loading
         found_data_load = False
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'frequency_sweep_tts' in cell.source or 'multi_temp' in cell.source:
+            if cell.cell_type == "code":
+                if "frequency_sweep_tts" in cell.source or "multi_temp" in cell.source:
                     found_data_load = True
                     break
 
@@ -988,10 +1009,13 @@ class TestTransformNotebooks:
         found_application = False
 
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'from rheojax.transforms.mastercurve import Mastercurve' in cell.source:
+            if cell.cell_type == "code":
+                if (
+                    "from rheojax.transforms.mastercurve import Mastercurve"
+                    in cell.source
+                ):
                     found_import = True
-                if 'create_mastercurve' in cell.source or '.transform(' in cell.source:
+                if "create_mastercurve" in cell.source or ".transform(" in cell.source:
                     found_application = True
 
         assert found_import, "Mastercurve transform not imported"
@@ -1007,9 +1031,13 @@ class TestTransformNotebooks:
         # Look for quality assessment
         found_quality = False
         for cell in nb.cells:
-            if cell.cell_type == 'code' or cell.cell_type == 'markdown':
+            if cell.cell_type == "code" or cell.cell_type == "markdown":
                 source_lower = cell.source.lower()
-                if 'overlap_error' in source_lower or 'r_squared' in source_lower or 'r²' in source_lower:
+                if (
+                    "overlap_error" in source_lower
+                    or "r_squared" in source_lower
+                    or "r²" in source_lower
+                ):
                     found_quality = True
                     break
 
@@ -1027,10 +1055,13 @@ class TestTransformNotebooks:
         found_shifted = False
 
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'unshifted' in cell.source.lower():
+            if cell.cell_type == "code":
+                if "unshifted" in cell.source.lower():
                     found_unshifted = True
-                if 'mastercurve' in cell.source.lower() or 'reduced frequency' in cell.source.lower():
+                if (
+                    "mastercurve" in cell.source.lower()
+                    or "reduced frequency" in cell.source.lower()
+                ):
                     found_shifted = True
 
         assert found_unshifted, "Unshifted data visualization not found"
@@ -1045,7 +1076,9 @@ class TestTransformNotebooks:
     def test_mutation_number_notebook_exists(self, examples_dir):
         """Verify mutation number notebook exists."""
         mn_notebook = examples_dir / "transforms" / "03-mutation-number.ipynb"
-        assert mn_notebook.exists(), f"Mutation number notebook not found: {mn_notebook}"
+        assert (
+            mn_notebook.exists()
+        ), f"Mutation number notebook not found: {mn_notebook}"
         assert mn_notebook.is_file()
 
     @pytest.mark.validation
@@ -1058,9 +1091,9 @@ class TestTransformNotebooks:
         assert len(nb.cells) > 0, "Mutation number notebook has no cells"
 
         for cell in nb.cells:
-            if cell.cell_type == 'code' and hasattr(cell, 'outputs'):
+            if cell.cell_type == "code" and hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.output_type == 'error':
+                    if output.output_type == "error":
                         raise RuntimeError(
                             f"Cell execution error in mutation number notebook:\n"
                             f"{output.ename}: {output.evalue}"
@@ -1076,7 +1109,10 @@ class TestTransformNotebooks:
         # Look for classification criteria (Δ < 0.3, 0.3-0.7, > 0.7)
         found_classification = False
         for cell in nb.cells:
-            if 'solid-like' in cell.source.lower() and 'fluid-like' in cell.source.lower():
+            if (
+                "solid-like" in cell.source.lower()
+                and "fluid-like" in cell.source.lower()
+            ):
                 found_classification = True
                 break
 
@@ -1092,7 +1128,9 @@ class TestTransformNotebooks:
         # Look for gel point discussion (Δ ≈ 0.5)
         found_gel_point = False
         for cell in nb.cells:
-            if 'gel' in cell.source.lower() and ('0.5' in cell.source or 'gelation' in cell.source.lower()):
+            if "gel" in cell.source.lower() and (
+                "0.5" in cell.source or "gelation" in cell.source.lower()
+            ):
                 found_gel_point = True
                 break
 
@@ -1106,17 +1144,19 @@ class TestTransformNotebooks:
         nb = _execute_notebook(mn_notebook)
 
         # Expected methods
-        expected_methods = ['trapz', 'simpson']
+        expected_methods = ["trapz", "simpson"]
         found_methods = []
 
         for cell in nb.cells:
-            if cell.cell_type == 'code':
+            if cell.cell_type == "code":
                 for method in expected_methods:
                     if method in cell.source.lower():
                         if method not in found_methods:
                             found_methods.append(method)
 
-        assert len(found_methods) >= 2, f"Expected 2+ integration methods, found {len(found_methods)}"
+        assert (
+            len(found_methods) >= 2
+        ), f"Expected 2+ integration methods, found {len(found_methods)}"
 
     # ========================================================================
     # OWChirp LAOS Analysis Notebook Tests (Task Group 2.4 - Priority 2)
@@ -1140,9 +1180,9 @@ class TestTransformNotebooks:
         assert len(nb.cells) > 0, "OWChirp notebook has no cells"
 
         for cell in nb.cells:
-            if cell.cell_type == 'code' and hasattr(cell, 'outputs'):
+            if cell.cell_type == "code" and hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.output_type == 'error':
+                    if output.output_type == "error":
                         raise RuntimeError(
                             f"Cell execution error in OWChirp notebook:\n"
                             f"{output.ename}: {output.evalue}"
@@ -1158,7 +1198,12 @@ class TestTransformNotebooks:
         # Look for harmonic extraction (3rd, 5th harmonics)
         found_harmonics = False
         for cell in nb.cells:
-            if '3rd harmonic' in cell.source.lower() or '3ω' in cell.source or 'I3' in cell.source or 'I₃' in cell.source:
+            if (
+                "3rd harmonic" in cell.source.lower()
+                or "3ω" in cell.source
+                or "I3" in cell.source
+                or "I₃" in cell.source
+            ):
                 found_harmonics = True
                 break
 
@@ -1174,7 +1219,7 @@ class TestTransformNotebooks:
         # Look for Lissajous discussion
         found_lissajous = False
         for cell in nb.cells:
-            if 'lissajous' in cell.source.lower():
+            if "lissajous" in cell.source.lower():
                 found_lissajous = True
                 break
 
@@ -1190,7 +1235,10 @@ class TestTransformNotebooks:
         # Look for spectrogram/time-frequency analysis
         found_spectrogram = False
         for cell in nb.cells:
-            if 'spectrogram' in cell.source.lower() or 'time-frequency' in cell.source.lower():
+            if (
+                "spectrogram" in cell.source.lower()
+                or "time-frequency" in cell.source.lower()
+            ):
                 found_spectrogram = True
                 break
 
@@ -1206,7 +1254,11 @@ class TestTransformNotebooks:
         # Look for nonlinearity discussion
         found_nonlinearity = False
         for cell in nb.cells:
-            if 'nonlinear' in cell.source.lower() and ('I3' in cell.source or 'I₃' in cell.source or 'harmonic ratio' in cell.source.lower()):
+            if "nonlinear" in cell.source.lower() and (
+                "I3" in cell.source
+                or "I₃" in cell.source
+                or "harmonic ratio" in cell.source.lower()
+            ):
                 found_nonlinearity = True
                 break
 
@@ -1221,7 +1273,9 @@ class TestTransformNotebooks:
     def test_smooth_derivative_notebook_exists(self, examples_dir):
         """Verify smooth derivative notebook exists."""
         sd_notebook = examples_dir / "transforms" / "05-smooth-derivative.ipynb"
-        assert sd_notebook.exists(), f"Smooth derivative notebook not found: {sd_notebook}"
+        assert (
+            sd_notebook.exists()
+        ), f"Smooth derivative notebook not found: {sd_notebook}"
         assert sd_notebook.is_file()
 
     @pytest.mark.validation
@@ -1234,9 +1288,9 @@ class TestTransformNotebooks:
         assert len(nb.cells) > 0, "Smooth derivative notebook has no cells"
 
         for cell in nb.cells:
-            if cell.cell_type == 'code' and hasattr(cell, 'outputs'):
+            if cell.cell_type == "code" and hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.output_type == 'error':
+                    if output.output_type == "error":
                         raise RuntimeError(
                             f"Cell execution error in smooth derivative notebook:\n"
                             f"{output.ename}: {output.evalue}"
@@ -1252,7 +1306,7 @@ class TestTransformNotebooks:
         # Look for Savitzky-Golay usage
         found_savgol = False
         for cell in nb.cells:
-            if 'savgol' in cell.source.lower() or 'savitzky' in cell.source.lower():
+            if "savgol" in cell.source.lower() or "savitzky" in cell.source.lower():
                 found_savgol = True
                 break
 
@@ -1268,7 +1322,9 @@ class TestTransformNotebooks:
         # Look for noise comparison (naive vs smooth)
         found_comparison = False
         for cell in nb.cells:
-            if ('naive' in cell.source.lower() or 'finite diff' in cell.source.lower()) and 'noise' in cell.source.lower():
+            if (
+                "naive" in cell.source.lower() or "finite diff" in cell.source.lower()
+            ) and "noise" in cell.source.lower():
                 found_comparison = True
                 break
 
@@ -1284,7 +1340,10 @@ class TestTransformNotebooks:
         # Look for parameter optimization
         found_optimization = False
         for cell in nb.cells:
-            if 'window_length' in cell.source.lower() and 'polyorder' in cell.source.lower():
+            if (
+                "window_length" in cell.source.lower()
+                and "polyorder" in cell.source.lower()
+            ):
                 found_optimization = True
                 break
 
@@ -1300,7 +1359,11 @@ class TestTransformNotebooks:
         # Look for second derivative
         found_second_deriv = False
         for cell in nb.cells:
-            if 'second derivative' in cell.source.lower() or 'd2' in cell.source.lower() or 'd²' in cell.source:
+            if (
+                "second derivative" in cell.source.lower()
+                or "d2" in cell.source.lower()
+                or "d²" in cell.source
+            ):
                 found_second_deriv = True
                 break
 
@@ -1315,7 +1378,9 @@ class TestBayesianNotebooks:
     def test_bayesian_notebook_structure(self, examples_dir):
         """Verify Bayesian notebooks directory exists and has expected structure."""
         bayesian_dir = examples_dir / "bayesian"
-        assert bayesian_dir.exists(), f"Bayesian notebooks directory not found: {bayesian_dir}"
+        assert (
+            bayesian_dir.exists()
+        ), f"Bayesian notebooks directory not found: {bayesian_dir}"
         assert bayesian_dir.is_dir(), f"bayesian/ is not a directory: {bayesian_dir}"
 
     # ========================================================================
@@ -1338,12 +1403,15 @@ class TestBayesianNotebooks:
         nb = _execute_notebook(notebook_path)
 
         # Look for all three models
-        found_models = {'Maxwell': False, 'Zener': False, 'SpringPot': False}
+        found_models = {"Maxwell": False, "Zener": False, "SpringPot": False}
 
         for cell in nb.cells:
-            if cell.cell_type == 'code':
+            if cell.cell_type == "code":
                 for model_name in found_models.keys():
-                    if model_name in cell.source or model_name.lower() in cell.source.lower():
+                    if (
+                        model_name in cell.source
+                        or model_name.lower() in cell.source.lower()
+                    ):
                         found_models[model_name] = True
 
         assert all(found_models.values()), f"Not all models found: {found_models}"
@@ -1358,8 +1426,8 @@ class TestBayesianNotebooks:
         # Look for az.compare usage
         found_compare = False
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'az.compare' in cell.source:
+            if cell.cell_type == "code":
+                if "az.compare" in cell.source:
                     found_compare = True
                     break
 
@@ -1375,7 +1443,7 @@ class TestBayesianNotebooks:
         # Look for WAIC discussion
         found_waic = False
         for cell in nb.cells:
-            if 'WAIC' in cell.source or 'waic' in cell.source:
+            if "WAIC" in cell.source or "waic" in cell.source:
                 found_waic = True
                 break
 
@@ -1403,8 +1471,8 @@ class TestBayesianNotebooks:
         # Look for Zener model usage
         found_zener = False
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'Zener' in cell.source or 'from rheojax.models.zener' in cell.source:
+            if cell.cell_type == "code":
+                if "Zener" in cell.source or "from rheojax.models.zener" in cell.source:
                     found_zener = True
                     break
 
@@ -1420,8 +1488,10 @@ class TestBayesianNotebooks:
         # Look for relaxation time tau computation
         found_tau = False
         for cell in nb.cells:
-            if cell.cell_type == 'code' or cell.cell_type == 'markdown':
-                if 'tau' in cell.source.lower() and ('samples' in cell.source or 'uncertainty' in cell.source.lower()):
+            if cell.cell_type == "code" or cell.cell_type == "markdown":
+                if "tau" in cell.source.lower() and (
+                    "samples" in cell.source or "uncertainty" in cell.source.lower()
+                ):
                     found_tau = True
                     break
 
@@ -1437,7 +1507,7 @@ class TestBayesianNotebooks:
         # Look for correlation analysis
         found_correlation = False
         for cell in nb.cells:
-            if 'correlation' in cell.source.lower() or 'pair' in cell.source.lower():
+            if "correlation" in cell.source.lower() or "pair" in cell.source.lower():
                 found_correlation = True
                 break
 
@@ -1453,8 +1523,12 @@ class TestBayesianNotebooks:
         # Look for prediction uncertainty
         found_prediction_bands = False
         for cell in nb.cells:
-            if cell.cell_type == 'code':
-                if 'pred' in cell.source.lower() and ('ci' in cell.source.lower() or 'credible' in cell.source.lower() or 'percentile' in cell.source):
+            if cell.cell_type == "code":
+                if "pred" in cell.source.lower() and (
+                    "ci" in cell.source.lower()
+                    or "credible" in cell.source.lower()
+                    or "percentile" in cell.source
+                ):
                     found_prediction_bands = True
                     break
 
@@ -1470,7 +1544,11 @@ class TestBayesianNotebooks:
         # Look for Deborah number or complex derived quantities
         found_complex_quantity = False
         for cell in nb.cells:
-            if 'Deborah' in cell.source or 'De' in cell.source or 'modulus_ratio' in cell.source:
+            if (
+                "Deborah" in cell.source
+                or "De" in cell.source
+                or "modulus_ratio" in cell.source
+            ):
                 found_complex_quantity = True
                 break
 
@@ -1486,7 +1564,11 @@ class TestBayesianNotebooks:
         # Look for reporting/summary section
         found_reporting = False
         for cell in nb.cells:
-            if 'report' in cell.source.lower() or 'summary' in cell.source.lower() or 'publication' in cell.source.lower():
+            if (
+                "report" in cell.source.lower()
+                or "summary" in cell.source.lower()
+                or "publication" in cell.source.lower()
+            ):
                 found_reporting = True
                 break
 
@@ -1506,7 +1588,7 @@ class TestBayesianNotebooks:
             "02-prior-selection.ipynb",
             "03-convergence-diagnostics.ipynb",
             "04-model-comparison.ipynb",
-            "05-uncertainty-propagation.ipynb"
+            "05-uncertainty-propagation.ipynb",
         ]
 
         for notebook_name in expected_notebooks:
@@ -1522,7 +1604,7 @@ class TestBayesianNotebooks:
         # Test notebooks 04 and 05 (already implemented)
         test_notebooks = [
             "04-model-comparison.ipynb",
-            "05-uncertainty-propagation.ipynb"
+            "05-uncertainty-propagation.ipynb",
         ]
 
         for notebook_name in test_notebooks:
@@ -1533,14 +1615,20 @@ class TestBayesianNotebooks:
                 # Look for convergence checks (R-hat or ESS)
                 found_convergence_check = False
                 for cell in nb.cells:
-                    if hasattr(cell, 'outputs'):
+                    if hasattr(cell, "outputs"):
                         for output in cell.outputs:
-                            if output.output_type == 'stream':
-                                if 'R-hat' in output.text or 'ESS' in output.text or 'convergence' in output.text.lower():
+                            if output.output_type == "stream":
+                                if (
+                                    "R-hat" in output.text
+                                    or "ESS" in output.text
+                                    or "convergence" in output.text.lower()
+                                ):
                                     found_convergence_check = True
                                     break
 
-                assert found_convergence_check, f"Convergence check not found in {notebook_name}"
+                assert (
+                    found_convergence_check
+                ), f"Convergence check not found in {notebook_name}"
 
 
 class TestAdvancedNotebooks:
@@ -1551,7 +1639,9 @@ class TestAdvancedNotebooks:
     def test_advanced_notebook_structure(self, examples_dir):
         """Verify advanced notebooks directory exists and has expected structure."""
         advanced_dir = examples_dir / "advanced"
-        assert advanced_dir.exists(), f"Advanced notebooks directory not found: {advanced_dir}"
+        assert (
+            advanced_dir.exists()
+        ), f"Advanced notebooks directory not found: {advanced_dir}"
         assert advanced_dir.is_dir(), f"advanced/ is not a directory: {advanced_dir}"
 
 
@@ -1578,7 +1668,7 @@ class TestFrameworkSmoke:
         assert examples_dir.exists(), f"Examples directory not found: {examples_dir}"
 
         # Check subdirectories
-        expected_dirs = ['basic', 'transforms', 'bayesian', 'advanced', 'data']
+        expected_dirs = ["basic", "transforms", "bayesian", "advanced", "data"]
         for subdir in expected_dirs:
             dir_path = examples_dir / subdir
             assert dir_path.exists(), f"Missing subdirectory: {dir_path}"
@@ -1587,10 +1677,14 @@ class TestFrameworkSmoke:
     @pytest.mark.notebook_smoke
     def test_tolerance_levels(self, tolerance, convergence_thresholds):
         """Verify tolerance levels are reasonable."""
-        assert 0 < tolerance < 1e-4, f"Numerical tolerance {tolerance} seems unreasonable"
-        assert convergence_thresholds['rhat'] > 1.0, "R-hat threshold should be > 1.0"
-        assert convergence_thresholds['ess'] > 0, "ESS threshold should be positive"
-        assert 0 < convergence_thresholds['divergence_rate'] < 1, "Divergence rate should be in (0,1)"
+        assert (
+            0 < tolerance < 1e-4
+        ), f"Numerical tolerance {tolerance} seems unreasonable"
+        assert convergence_thresholds["rhat"] > 1.0, "R-hat threshold should be > 1.0"
+        assert convergence_thresholds["ess"] > 0, "ESS threshold should be positive"
+        assert (
+            0 < convergence_thresholds["divergence_rate"] < 1
+        ), "Divergence rate should be in (0,1)"
 
     @pytest.mark.notebook_smoke
     def test_notebook_execution_helper(self):
@@ -1652,9 +1746,9 @@ class TestFrameworkSmoke:
     def test_rhat_validation_passes(self):
         """Test R-hat validation with passing values."""
         diagnostics = {
-            'param1': 1.005,
-            'param2': 1.001,
-            'param3': 1.002,
+            "param1": 1.005,
+            "param2": 1.001,
+            "param3": 1.002,
         }
         _validate_rhat(diagnostics, threshold=1.01)
 
@@ -1662,9 +1756,9 @@ class TestFrameworkSmoke:
     def test_rhat_validation_fails(self):
         """Test R-hat validation with failing values."""
         diagnostics = {
-            'param1': 1.005,
-            'param2': 1.02,  # Exceeds threshold
-            'param3': 1.002,
+            "param1": 1.005,
+            "param2": 1.02,  # Exceeds threshold
+            "param3": 1.002,
         }
         with pytest.raises(AssertionError):
             _validate_rhat(diagnostics, threshold=1.01)
@@ -1673,9 +1767,9 @@ class TestFrameworkSmoke:
     def test_ess_validation_passes(self):
         """Test ESS validation with passing values."""
         diagnostics = {
-            'param1': 500.0,
-            'param2': 450.0,
-            'param3': 600.0,
+            "param1": 500.0,
+            "param2": 450.0,
+            "param3": 600.0,
         }
         _validate_ess(diagnostics, threshold=400)
 
@@ -1683,9 +1777,9 @@ class TestFrameworkSmoke:
     def test_ess_validation_fails(self):
         """Test ESS validation with failing values."""
         diagnostics = {
-            'param1': 500.0,
-            'param2': 350.0,  # Below threshold
-            'param3': 600.0,
+            "param1": 500.0,
+            "param2": 350.0,  # Below threshold
+            "param3": 600.0,
         }
         with pytest.raises(AssertionError):
             _validate_ess(diagnostics, threshold=400)
@@ -1694,8 +1788,8 @@ class TestFrameworkSmoke:
     def test_divergence_validation_passes(self):
         """Test divergence validation with acceptable divergence rates."""
         diagnostics = {
-            'num_divergences': 5,
-            'num_samples': 2000,  # 0.25% divergence rate
+            "num_divergences": 5,
+            "num_samples": 2000,  # 0.25% divergence rate
         }
         _validate_divergences(diagnostics, max_rate=0.01)
 
@@ -1703,8 +1797,8 @@ class TestFrameworkSmoke:
     def test_divergence_validation_fails(self):
         """Test divergence validation with excessive divergences."""
         diagnostics = {
-            'num_divergences': 50,
-            'num_samples': 2000,  # 2.5% divergence rate
+            "num_divergences": 50,
+            "num_samples": 2000,  # 2.5% divergence rate
         }
         with pytest.raises(AssertionError):
             _validate_divergences(diagnostics, max_rate=0.01)
@@ -1721,14 +1815,15 @@ class TestFrameworkSmoke:
         ]
 
         metadata = _get_notebook_metadata(nb)
-        assert metadata['num_cells'] == 3
-        assert metadata['num_code_cells'] == 2
-        assert metadata['num_markdown_cells'] == 1
+        assert metadata["num_cells"] == 3
+        assert metadata["num_code_cells"] == 2
+        assert metadata["num_markdown_cells"] == 1
 
 
 # ============================================================================
 # Advanced Notebooks Validation Tests
 # ============================================================================
+
 
 class TestAdvancedNotebooks:
     """Test advanced workflow notebooks (Phase 4)."""
@@ -1810,14 +1905,18 @@ class TestAdvancedNotebooks:
     @pytest.mark.slow
     def test_fractional_models_notebook_exists(self):
         """Verify fractional models deep-dive notebook exists."""
-        notebook_path = EXAMPLES_DIR / "advanced" / "04-fractional-models-deep-dive.ipynb"
+        notebook_path = (
+            EXAMPLES_DIR / "advanced" / "04-fractional-models-deep-dive.ipynb"
+        )
         assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
 
     @pytest.mark.validation
     @pytest.mark.slow
     def test_fractional_models_notebook_executes(self):
         """Execute fractional models notebook without errors."""
-        notebook_path = EXAMPLES_DIR / "advanced" / "04-fractional-models-deep-dive.ipynb"
+        notebook_path = (
+            EXAMPLES_DIR / "advanced" / "04-fractional-models-deep-dive.ipynb"
+        )
         nb = _execute_notebook(notebook_path, timeout=600)
         assert nb is not None, "Notebook execution failed"
 
@@ -1825,7 +1924,9 @@ class TestAdvancedNotebooks:
     @pytest.mark.slow
     def test_fractional_models_coverage(self):
         """Validate fractional models demonstrated."""
-        notebook_path = EXAMPLES_DIR / "advanced" / "04-fractional-models-deep-dive.ipynb"
+        notebook_path = (
+            EXAMPLES_DIR / "advanced" / "04-fractional-models-deep-dive.ipynb"
+        )
         nb = _execute_notebook(notebook_path, timeout=600)
         # Verify multiple fractional models shown
         assert nb is not None
@@ -1851,10 +1952,10 @@ class TestAdvancedNotebooks:
     def test_performance_gpu_benchmark(self):
         """Test GPU benchmarking (skip if GPU unavailable)."""
         import jax
-        if jax.default_backend() != 'gpu':
+
+        if jax.default_backend() != "gpu":
             pytest.skip("GPU not available")
-        
+
         notebook_path = EXAMPLES_DIR / "advanced" / "05-performance-optimization.ipynb"
         nb = _execute_notebook(notebook_path, timeout=600)
         assert nb is not None, "GPU benchmark failed"
-

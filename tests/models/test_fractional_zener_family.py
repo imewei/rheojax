@@ -29,11 +29,12 @@ from rheojax.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
 from rheojax.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestFractionalZenerSolidLiquid:
     """Tests for FZSL model."""
 

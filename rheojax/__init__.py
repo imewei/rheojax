@@ -21,12 +21,12 @@ import sys
 # NLSQ auto-configures JAX for float64 when imported
 try:
     import nlsq  # noqa: F401
-except ImportError:
+except ImportError as e:
     raise ImportError(
         "NLSQ is required for RheoJAX but not installed.\n"
         "Install with: pip install nlsq>=0.1.6\n"
         "NLSQ provides GPU-accelerated optimization and enables float64 precision in JAX."
-    )
+    ) from e
 
 __version__ = "0.1.0"
 __author__ = "RheoJAX Development Team"

@@ -7,11 +7,12 @@ from rheojax.core.data import RheoData
 from rheojax.core.test_modes import TestMode, detect_test_mode
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestModeDetection:
     """Test automatic test mode detection."""
 

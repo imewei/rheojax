@@ -403,11 +403,15 @@ class BayesianMixin:
 
             # Compute heteroscedastic noise scale with floor to prevent singularities
             # This matches NLSQ's normalization while avoiding division by very small numbers
-            y_min = jnp.maximum(jnp.mean(jnp.abs(y)) * 0.01, 1e-10)  # 1% of mean magnitude
+            y_min = jnp.maximum(
+                jnp.mean(jnp.abs(y)) * 0.01, 1e-10
+            )  # 1% of mean magnitude
             y_scale = jnp.maximum(jnp.abs(y), y_min)
 
             # Observe data with weighted likelihood
-            numpyro.sample("obs", dist.Normal(loc=predictions, scale=sigma_abs * y_scale), obs=y)
+            numpyro.sample(
+                "obs", dist.Normal(loc=predictions, scale=sigma_abs * y_scale), obs=y
+            )
 
         # Set up NUTS sampler
         nuts_kernel = NUTS(numpyro_model, **nuts_kwargs)

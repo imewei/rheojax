@@ -118,7 +118,10 @@ class MastercurvePipeline(Pipeline):
         all_x = np.concatenate([np.array(d.x) for d in datasets])
         all_y = np.concatenate([np.array(d.y) for d in datasets])
         all_temps = np.concatenate(
-            [np.full(len(d.x), temp) for d, temp in zip(datasets, temperatures, strict=False)]
+            [
+                np.full(len(d.x), temp)
+                for d, temp in zip(datasets, temperatures, strict=False)
+            ]
         )
 
         return RheoData(
@@ -373,7 +376,8 @@ class CreepToRelaxationPipeline(Pipeline):
         if test_mode and test_mode != "creep":
             warnings.warn(
                 f"Input appears to be {test_mode} data, not creep. "
-                "Results may be inaccurate.", stacklevel=2
+                "Results may be inaccurate.",
+                stacklevel=2,
             )
 
         if method == "approximate":
@@ -427,7 +431,8 @@ class CreepToRelaxationPipeline(Pipeline):
         # This would use a proper Laplace transform inversion
         # For now, fall back to approximate
         warnings.warn(
-            "Exact conversion not fully implemented. Using approximate method.", stacklevel=2
+            "Exact conversion not fully implemented. Using approximate method.",
+            stacklevel=2,
         )
         self._approximate_conversion()
         self.data.metadata["conversion_method"] = "exact_approximate"

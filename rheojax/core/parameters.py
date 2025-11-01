@@ -34,9 +34,7 @@ class ParameterConstraint:
     other_param: str | None = None  # For relative constraints
     validator: Callable | None = None  # For custom constraints
 
-    def validate(
-        self, value: float, context: dict[str, float] | None = None
-    ) -> bool:
+    def validate(self, value: float, context: dict[str, float] | None = None) -> bool:
         """Check if value satisfies the constraint.
 
         Args:
@@ -119,9 +117,7 @@ class Parameter:
                 raise ValueError(f"Value {val} out of bounds {self.bounds}")
         self._value = val
 
-    def validate(
-        self, value: float, context: dict[str, float] | None = None
-    ) -> bool:
+    def validate(self, value: float, context: dict[str, float] | None = None) -> bool:
         """Validate value against all constraints.
 
         Args:

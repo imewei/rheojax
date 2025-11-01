@@ -53,12 +53,8 @@ s	Pa	Pa
         assert isinstance(chunk, RheoData)
         assert len(chunk.x) == 5
         assert len(chunk.y) == 5
-        np.testing.assert_array_almost_equal(
-            chunk.x, [0.1, 0.2, 0.3, 0.4, 0.5]
-        )
-        np.testing.assert_array_almost_equal(
-            chunk.y, [1000, 1200, 1400, 1600, 1800]
-        )
+        np.testing.assert_array_almost_equal(chunk.x, [0.1, 0.2, 0.3, 0.4, 0.5])
+        np.testing.assert_array_almost_equal(chunk.y, [1000, 1200, 1400, 1600, 1800])
 
     def test_chunked_multiple_chunks(self, tmp_path):
         """Test chunked reading with data split across chunks."""
@@ -210,7 +206,7 @@ class TestTriosChunkedAdvanced:
 
         # Verify continuity between chunks
         assert chunks[0].y[-1] == 1000  # Last of first chunk
-        assert chunks[1].y[0] == 1010   # First of second chunk
+        assert chunks[1].y[0] == 1010  # First of second chunk
 
     def test_chunked_vs_full_load_equivalence(self, tmp_path):
         """Test that chunked reading produces same data as full load."""
@@ -312,9 +308,7 @@ s	Pa
         test_file.write_text(trios_content)
 
         # Read only second segment
-        chunks = list(
-            load_trios_chunked(str(test_file), chunk_size=5, segment_index=1)
-        )
+        chunks = list(load_trios_chunked(str(test_file), chunk_size=5, segment_index=1))
 
         # Should have 2 chunks from second segment only
         assert len(chunks) == 2
@@ -579,7 +573,7 @@ class TestTriosChunkedMemoryProfile:
         # Process in small chunks
         chunk_count = 0
         total_points = 0
-        max_stress = -float('inf')
+        max_stress = -float("inf")
 
         for chunk in load_trios_chunked(str(test_file), chunk_size=1000):
             chunk_count += 1

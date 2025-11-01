@@ -24,7 +24,9 @@ try:
 except ImportError:
     HAS_PIBLIN = False
     warnings.warn(
-        "piblin is not installed. Some features may be limited.", ImportWarning, stacklevel=2
+        "piblin is not installed. Some features may be limited.",
+        ImportWarning,
+        stacklevel=2,
     )
 
 
@@ -139,13 +141,15 @@ class RheoData:
                 if np.any(np.real(self.y) < 0):
                     warnings.warn(
                         "y data contains negative values in frequency domain",
-                        UserWarning, stacklevel=2,
+                        UserWarning,
+                        stacklevel=2,
                     )
             elif isinstance(self.y, jnp.ndarray):
                 if jnp.any(jnp.real(self.y) < 0):
                     warnings.warn(
                         "y data contains negative values in frequency domain",
-                        UserWarning, stacklevel=2,
+                        UserWarning,
+                        stacklevel=2,
                     )
 
     def _create_piblin_measurement(self):
@@ -593,7 +597,9 @@ class RheoData:
             Frequency domain RheoData
         """
         if self.domain != "time":
-            warnings.warn("Data is already in frequency domain", UserWarning, stacklevel=2)
+            warnings.warn(
+                "Data is already in frequency domain", UserWarning, stacklevel=2
+            )
             return self.copy()
 
         # This would use FFT transform when implemented
@@ -617,9 +623,7 @@ class RheoData:
         )
 
     # piblin compatibility methods
-    def slice(
-        self, start: float | None = None, end: float | None = None
-    ) -> RheoData:
+    def slice(self, start: float | None = None, end: float | None = None) -> RheoData:
         """Slice data between x values (piblin compatibility).
 
         Args:

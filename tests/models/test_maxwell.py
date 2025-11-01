@@ -15,11 +15,12 @@ from rheojax.core.test_modes import TestMode
 from rheojax.models.maxwell import Maxwell
 
 
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+
 class TestMaxwellBasics:
     """Test basic Maxwell model functionality."""
 
@@ -524,7 +525,7 @@ class TestMaxwellOptimization:
         # Note: Creep compliance fitting is particularly challenging due to linear time dependence
         assert_allclose(G0_fit, G0_true, rtol=0.65)
         # Very relaxed tolerance for eta due to strong parameter correlation in creep
-        assert eta_fit > 0,  "eta must be positive"
+        assert eta_fit > 0, "eta must be positive"
 
     def test_model_score(self):
         """Test model scoring (R²) for fitted data."""

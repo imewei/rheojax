@@ -192,9 +192,7 @@ class Registry:
         else:
             return None
 
-    def get_info(
-        self, name: str, plugin_type: PluginType | str
-    ) -> PluginInfo | None:
+    def get_info(self, name: str, plugin_type: PluginType | str) -> PluginInfo | None:
         """Get full information about a registered plugin.
 
         Args:

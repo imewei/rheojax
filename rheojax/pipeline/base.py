@@ -109,7 +109,9 @@ class Pipeline:
             if len(result) == 1:
                 self.data = result[0]
             else:
-                warnings.warn(f"Loaded {len(result)} segments. Using first segment.", stacklevel=2)
+                warnings.warn(
+                    f"Loaded {len(result)} segments. Using first segment.", stacklevel=2
+                )
                 self.data = result[0]
         else:
             self.data = result

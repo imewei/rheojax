@@ -236,7 +236,10 @@ class PipelineBuilder:
 
         for pred_idx in predict_indices:
             if not any(fit_idx < pred_idx for fit_idx in fit_indices):
-                warnings.warn(f"Predict step at index {pred_idx} has no prior fit step", stacklevel=2)
+                warnings.warn(
+                    f"Predict step at index {pred_idx} has no prior fit step",
+                    stacklevel=2,
+                )
 
         # Validate that referenced models/transforms exist
         self._validate_components()
@@ -354,7 +357,8 @@ class ConditionalPipelineBuilder(PipelineBuilder):
         if self.conditions:
             warnings.warn(
                 "Conditional steps are not fully implemented. "
-                "All steps will be executed unconditionally.", stacklevel=2
+                "All steps will be executed unconditionally.",
+                stacklevel=2,
             )
 
         return super().build(validate=validate)

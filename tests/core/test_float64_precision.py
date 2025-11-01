@@ -170,11 +170,17 @@ class TestFloat64ImportOrder:
         """Test that rheojax package itself ensures proper import order."""
         # This test validates that importing rheojax will import nlsq before JAX
         # Save current sys.modules state for rheojax modules
-        saved_modules = {k: sys.modules[k] for k in list(sys.modules.keys()) if k.startswith("rheojax")}
+        saved_modules = {
+            k: sys.modules[k]
+            for k in list(sys.modules.keys())
+            if k.startswith("rheojax")
+        }
 
         try:
             # Clear sys.modules to force fresh import
-            modules_to_clear = [k for k in sys.modules.keys() if k.startswith("rheojax")]
+            modules_to_clear = [
+                k for k in sys.modules.keys() if k.startswith("rheojax")
+            ]
             for mod in modules_to_clear:
                 if mod != "rheojax.core.jax_config":  # Don't clear jax_config yet
                     del sys.modules[mod]

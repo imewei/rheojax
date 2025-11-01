@@ -651,9 +651,7 @@ class BayesianPipeline(Pipeline):
         self.history.append(("plot_forest", var_names if var_names else "all"))
         return self
 
-    def plot_energy(
-        self, show: bool = True, **plot_kwargs
-    ) -> BayesianPipeline:
+    def plot_energy(self, show: bool = True, **plot_kwargs) -> BayesianPipeline:
         """Plot NUTS energy diagnostic plot.
 
         Creates an energy plot showing the distribution of energy transitions

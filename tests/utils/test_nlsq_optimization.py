@@ -288,9 +288,7 @@ class TestNLSQGradientValidation:
         computed_grad = grad_fn(np.array([1.0, 1.0]))
 
         # Verify gradient accuracy
-        np.testing.assert_allclose(
-            computed_grad, expected_grad, rtol=1e-10, atol=1e-10
-        )
+        np.testing.assert_allclose(computed_grad, expected_grad, rtol=1e-10, atol=1e-10)
 
     def test_jacobian_for_residual_function(self):
         """Test Jacobian computation for residual-based optimization."""
@@ -513,7 +511,9 @@ class TestNLSQParameterScaling:
         # Just verify optimizer got reasonably close to optimal values
         assert result.x[0] > 0  # Should be positive
         assert result.x[0] < 1e-5  # Should be small (within 2 orders of magnitude)
-        assert abs(result.x[1] - 1e7) / 1e7 < 0.5  # 50% relative tolerance for large param
+        assert (
+            abs(result.x[1] - 1e7) / 1e7 < 0.5
+        )  # 50% relative tolerance for large param
 
 
 class TestNLSQRobustness:
@@ -551,9 +551,7 @@ class TestNLSQRobustness:
     def test_optimization_near_optimal(self):
         """Test optimization starting very close to optimal."""
         params = ParameterSet()
-        params.add(
-            name="x", value=4.9999, bounds=(0.0, 10.0)
-        )  # Very close to optimal
+        params.add(name="x", value=4.9999, bounds=(0.0, 10.0))  # Very close to optimal
 
         def objective(values):
             return (values[0] - 5.0) ** 2

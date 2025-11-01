@@ -29,7 +29,7 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 
 **Required Installation:**
 ```bash
-pip install rheo
+pip install rheojax
 # For GPU acceleration (Linux + CUDA only):
 pip install jax[cuda12-local]==0.8.0
 ```
@@ -249,7 +249,7 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 ### Option 1: Jupyter Lab (Recommended)
 
 ```bash
-cd /Users/b80985/Projects/Rheo/examples
+cd /Users/b80985/Projects/rheojax/examples
 jupyter lab
 ```
 
@@ -258,7 +258,7 @@ Then open any `.ipynb` file from the browser interface.
 ### Option 2: Jupyter Notebook
 
 ```bash
-cd /Users/b80985/Projects/Rheo/examples
+cd /Users/b80985/Projects/rheojax/examples
 jupyter notebook
 ```
 
@@ -284,11 +284,11 @@ done
 
 ### "Module not found" errors
 
-**Problem:** `ImportError: No module named 'rheo'`
+**Problem:** `ImportError: No module named 'rheojax'`
 
 **Solution:** Install the package in development mode:
 ```bash
-cd /Users/b80985/Projects/Rheo
+cd /Users/b80985/Projects/rheojax
 pip install -e .
 ```
 
@@ -298,7 +298,7 @@ pip install -e .
 
 **Solution:** JAX requires safe import order. The notebook template includes:
 ```python
-from rheo.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import safe_import_jax
 jax, jnp = safe_import_jax()  # Must be called before any JAX operations
 ```
 
@@ -345,7 +345,7 @@ See [data/README.md](data/README.md) for detailed dataset descriptions.
 
 Found an error or have a suggestion? Please:
 
-1. Open an issue on GitHub: https://github.com/rheo/rheo/issues
+1. Open an issue on GitHub: https://github.com/imewei/rheojax/issues
 2. Include the notebook name and specific section
 3. Provide error message or unexpected behavior
 4. Suggest improvements for clarity or pedagogy
@@ -354,8 +354,8 @@ Found an error or have a suggestion? Please:
 
 Once you've completed these examples:
 
-1. **Read the Documentation:** https://rheo.readthedocs.io/
-2. **Explore Source Code:** `/Users/b80985/Projects/Rheo/rheo/`
+1. **Read the Documentation:** https://rheojax.readthedocs.io/
+2. **Explore Source Code:** `/Users/b80985/Projects/rheojax/rheojax/`
 3. **Run Tests:** `make test` to verify your installation
 4. **Contribute:** Help improve Rheo or add new examples
 
@@ -392,4 +392,4 @@ Once you've completed these examples:
 
 **Last Updated:** [Date]
 **Examples Version:** 1.0
-**Rheo Version:** [Check with `import rheo; print(rheo.__version__)`]
+**RheoJAX Version:** [Check with `import rheojax; print(rheojax.__version__)`]

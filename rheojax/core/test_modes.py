@@ -137,7 +137,8 @@ def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
         except (ValueError, AttributeError):
             warnings.warn(
                 f"Invalid test_mode in metadata: {explicit_mode}. Attempting auto-detection.",
-                UserWarning, stacklevel=2,
+                UserWarning,
+                stacklevel=2,
             )
 
     # 2. Check domain and units
@@ -186,7 +187,8 @@ def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
     warnings.warn(
         "Could not automatically detect test mode. "
         "Consider setting test_mode explicitly in metadata.",
-        UserWarning, stacklevel=2,
+        UserWarning,
+        stacklevel=2,
     )
     return TestModeEnum.UNKNOWN
 
