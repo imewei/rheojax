@@ -248,18 +248,59 @@ class FractionalMaxwellLiquid(BaseModel):
         """Fit model parameters to data.
 
         Args:
-            X: Input features (time or frequency)
-            y: Target values (modulus or compliance)
+            X: Independent variable (time or frequency)
+            y: Dependent variable (modulus or compliance)
             **kwargs: Additional fitting options
 
         Returns:
-            self
+            self for method chaining
         """
-        # Placeholder for optimization implementation
-        raise NotImplementedError(
-            "Parameter fitting will be implemented in optimization module"
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
         )
 
+        # Handle RheoData input
+        if isinstance(X, RheoData):
+            rheo_data = X
+            x_data = jnp.array(rheo_data.x)
+            y_data = jnp.array(rheo_data.y)
+            test_mode = rheo_data.test_mode
+        else:
+            x_data = jnp.array(X)
+            y_data = jnp.array(y)
+            test_mode = kwargs.get("test_mode", "relaxation")
+
+        # Create objective function with stateless predictions
+        def model_fn(x, params):
+            """Model function for optimization (stateless)."""
+            Gm, alpha, tau_alpha = params[0], params[1], params[2]
+
+            # Direct prediction based on test mode (stateless, calls _jax methods)
+            if test_mode == "relaxation":
+                return self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
+            elif test_mode == "creep":
+                return self._predict_creep_jax(x, Gm, alpha, tau_alpha)
+            elif test_mode == "oscillation":
+                return self._predict_oscillation_jax(x, Gm, alpha, tau_alpha)
+            else:
+                raise ValueError(f"Unsupported test mode: {test_mode}")
+
+        objective = create_least_squares_objective(
+            model_fn, x_data, y_data, normalize=True
+        )
+
+        # Optimize using NLSQ
+        nlsq_optimize(
+            objective,
+            self.parameters,
+            use_jax=kwargs.get("use_jax", True),
+            method=kwargs.get("method", "auto"),
+            max_iter=kwargs.get("max_iter", 1000),
+        )
+
+        self.fitted_ = True
+        return self
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Internal predict implementation.
 
@@ -281,6 +322,28 @@ class FractionalMaxwellLiquid(BaseModel):
 
         result = self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
         return np.array(result)
+
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (time or frequency)
+            params: Array of parameter values [Gm, alpha, tau_alpha]
+
+        Returns:
+            Model predictions as JAX array
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        Gm = params[0]
+        alpha = params[1]
+        tau_alpha = params[2]
+
+        # Fractional models default to relaxation mode
+        # Call the _jax method directly
+        return self._predict_relaxation_jax(X, Gm, alpha, tau_alpha)
 
     def predict_rheodata(
         self, rheo_data: RheoData, test_mode: str | None = None
