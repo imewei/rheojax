@@ -132,6 +132,27 @@ class PowerLaw(BaseModel):
         # Convert back to numpy
         return np.array(viscosity)
 
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (shear rate γ̇)
+            params: Array of parameter values [K, n]
+
+        Returns:
+            Model predictions as JAX array (viscosity η)
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        K = params[0]
+        n = params[1]
+
+        # Power Law model only supports ROTATION test mode
+        # Compute viscosity using the internal JAX method
+        return self._predict_viscosity(X, K, n)
+
     @partial(jax.jit, static_argnums=(0,))
     def _predict_viscosity(
         self, gamma_dot: jnp.ndarray, K: float, n: float

@@ -140,6 +140,27 @@ class Bingham(BaseModel):
         # Convert back to numpy
         return np.array(stress)
 
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (shear rate γ̇)
+            params: Array of parameter values [sigma_y, eta_p]
+
+        Returns:
+            Model predictions as JAX array (shear stress σ)
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        sigma_y = params[0]
+        eta_p = params[1]
+
+        # Bingham model only supports ROTATION test mode
+        # Compute stress using the internal JAX method
+        return self._predict_stress(X, sigma_y, eta_p)
+
     @partial(jax.jit, static_argnums=(0,))
     def _predict_stress(
         self,
