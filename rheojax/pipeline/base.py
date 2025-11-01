@@ -490,6 +490,34 @@ class Pipeline:
         """
         return [step[1] for step in self.steps if step[0] == "fit"]
 
+    def get_fitted_parameters(self) -> dict[str, float]:
+        """Get fitted parameters from the last model as a dictionary.
+
+        This is a convenience method that extracts parameter values from
+        the last fitted model's ParameterSet.
+
+        Returns:
+            Dictionary mapping parameter names to their fitted values
+
+        Raises:
+            ValueError: If no model has been fitted yet
+
+        Example:
+            >>> pipeline = Pipeline()
+            >>> pipeline.load('data.csv').fit('maxwell')
+            >>> params = pipeline.get_fitted_parameters()
+            >>> print(params)  # {'G0': 100000.0, 'eta': 1000.0}
+            >>> G0 = params['G0']
+        """
+        if self._last_model is None:
+            raise ValueError("No model fitted. Call fit() first.")
+
+        # Extract all parameter values from the model's ParameterSet
+        return {
+            name: self._last_model.parameters.get_value(name)
+            for name in self._last_model.parameters._parameters.keys()
+        }
+
     def clone(self) -> Pipeline:
         """Create a copy of the pipeline.
 
