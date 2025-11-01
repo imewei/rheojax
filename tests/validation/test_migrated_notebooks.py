@@ -54,7 +54,7 @@ DIVERGENCE_RATE_THRESHOLD = 0.01  # < 1% divergences acceptable for NUTS sampler
 # ============================================================================
 
 
-def _execute_notebook(notebook_path: Path) -> nbformat.NotebookNode:
+def _execute_notebook(notebook_path: Path, timeout: int = 600) -> nbformat.NotebookNode:
     """
     Execute a Jupyter notebook and return the executed notebook object.
 
@@ -62,6 +62,8 @@ def _execute_notebook(notebook_path: Path) -> nbformat.NotebookNode:
     ----------
     notebook_path : Path
         Path to the .ipynb file to execute
+    timeout : int, optional
+        Maximum time in seconds to allow for notebook execution (default: 600)
 
     Returns
     -------
@@ -75,7 +77,7 @@ def _execute_notebook(notebook_path: Path) -> nbformat.NotebookNode:
 
     Notes
     -----
-    - Timeout: 600 seconds per notebook
+    - Default timeout: 600 seconds per notebook
     - Kernel: python3
     - Execution path: notebook's directory
     """
@@ -87,7 +89,7 @@ def _execute_notebook(notebook_path: Path) -> nbformat.NotebookNode:
         nb = nbformat.read(f, as_version=4)
 
     # Execute with timeout
-    ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
+    ep = ExecutePreprocessor(timeout=timeout, kernel_name="python3")
 
     try:
         ep.preprocess(nb, {"metadata": {"path": str(notebook_path.parent)}})

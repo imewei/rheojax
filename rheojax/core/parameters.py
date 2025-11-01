@@ -263,6 +263,41 @@ class ParameterSet:
 
         param.value = value
 
+    def set_bounds(self, name: str, bounds: tuple[float, float]):
+        """Set bounds for a parameter.
+
+        Args:
+            name: Parameter name
+            bounds: Tuple of (min, max) values
+
+        Raises:
+            KeyError: If parameter not found
+            ValueError: If bounds are invalid
+        """
+        if name not in self._parameters:
+            raise KeyError(f"Parameter '{name}' not found")
+
+        min_val, max_val = bounds
+        if min_val >= max_val:
+            raise ValueError(f"Invalid bounds: min ({min_val}) must be < max ({max_val})")
+
+        param = self._parameters[name]
+        param.bounds = bounds
+
+        # Update or add bounds constraint
+        # Remove existing bounds constraints
+        param.constraints = [c for c in param.constraints if c.type != "bounds"]
+
+        # Add new bounds constraint
+        param.constraints.insert(
+            0,
+            ParameterConstraint(
+                type="bounds",
+                min_value=min_val,
+                max_value=max_val,
+            ),
+        )
+
     def get_values(self) -> np.ndarray:
         """Get all parameter values as array.
 
