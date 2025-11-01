@@ -579,11 +579,29 @@ result = nlsq_optimize(objective, params, use_jax=True)
 - Runtime checks enforce import order with helpful error messages
 - Float64 precision essential for numerical stability
 
-### All Models Support Bayesian Inference
-- All 20 models inherit from BaseModel → BayesianMixin
-- Every model gains: `fit_bayesian()`, `sample_prior()`, `get_credible_intervals()`
-- Warm-start workflow: `fit()` (NLSQ) then `fit_bayesian()` (NUTS)
-- No model-specific changes needed for Bayesian capabilities
+### Bayesian Inference Support (16/20 Models - 80%)
+
+**All 20 models inherit from BaseModel → BayesianMixin**, providing the API:
+- `fit_bayesian()`, `sample_prior()`, `get_credible_intervals()`
+- Warm-start workflow: `fit()` (NLSQ) → `fit_bayesian()` (NUTS)
+
+**16 models with complete Bayesian support** (have `model_function()` implementation):
+
+Classical Viscoelastic (3):
+- Maxwell, Zener, SpringPot
+
+Flow Models (6):
+- Bingham, PowerLaw, Herschel-Bulkley
+- Carreau, Carreau-Yasuda, Cross
+
+Fractional Models (7):
+- fractional_burgers, fractional_jeffreys
+- fractional_kv_zener, fractional_poynting_thomson
+- fractional_zener_ll, fractional_zener_sl, fractional_zener_ss
+
+**4 fractional models pending** (NotImplementedError in _fit()):
+- fractional_kelvin_voigt, fractional_maxwell_gel
+- fractional_maxwell_liquid, fractional_maxwell_model
 
 ### Clean Commands Safety
 - `make clean` and `make clean-all` preserve:
