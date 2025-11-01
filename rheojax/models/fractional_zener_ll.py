@@ -426,6 +426,30 @@ class FractionalZenerLiquidLiquid(BaseModel):
         # Oscillation should typically use RheoData with domain='frequency'
         return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
 
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (time or frequency)
+            params: Array of parameter values [c1, c2, alpha, beta, gamma, tau]
+
+        Returns:
+            Model predictions as JAX array
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        c1 = params[0]
+        c2 = params[1]
+        alpha = params[2]
+        beta = params[3]
+        gamma = params[4]
+        tau = params[5]
+
+        # Fractional models default to relaxation mode
+        # Call the _jax method directly
+        return self._predict_relaxation_jax(X, c1, c2, alpha, beta, gamma, tau)
 
 # Convenience alias
 FZLL = FractionalZenerLiquidLiquid

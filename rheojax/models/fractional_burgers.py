@@ -415,6 +415,29 @@ class FractionalBurgersModel(BaseModel):
         # Default to creep (primary mode for Burgers)
         return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
 
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (time or frequency)
+            params: Array of parameter values [Jg, eta1, Jk, alpha, tau_k]
+
+        Returns:
+            Model predictions as JAX array
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        Jg = params[0]
+        eta1 = params[1]
+        Jk = params[2]
+        alpha = params[3]
+        tau_k = params[4]
+
+        # Fractional models default to relaxation mode
+        # Call the _jax method directly
+        return self._predict_relaxation_jax(X, Jg, eta1, Jk, alpha, tau_k)
 
 # Convenience alias
 FBM = FractionalBurgersModel

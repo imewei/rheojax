@@ -429,6 +429,28 @@ class FractionalJeffreysModel(BaseModel):
         # Default to relaxation
         return self._predict_relaxation(X, eta1, eta2, alpha, tau1)
 
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (time or frequency)
+            params: Array of parameter values [eta1, eta2, alpha, tau1]
+
+        Returns:
+            Model predictions as JAX array
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        eta1 = params[0]
+        eta2 = params[1]
+        alpha = params[2]
+        tau1 = params[3]
+
+        # Fractional models default to relaxation mode
+        # Call the _jax method directly
+        return self._predict_relaxation_jax(X, eta1, eta2, alpha, tau1)
 
 # Convenience alias
 FJM = FractionalJeffreysModel
