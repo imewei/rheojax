@@ -184,6 +184,30 @@ class CarreauYasuda(BaseModel):
         # Convert back to numpy
         return np.array(viscosity)
 
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (shear rate γ̇)
+            params: Array of parameter values [eta0, eta_inf, lambda_, n, a]
+
+        Returns:
+            Model predictions as JAX array
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        eta0 = params[0]
+        eta_inf = params[1]
+        lambda_ = params[2]
+        n = params[3]
+        a = params[4]
+
+        # Flow model only supports ROTATION test mode
+        # Compute prediction using the internal JAX method
+        return self._predict_viscosity(X, eta0, eta_inf, lambda_, n, a)
+
     @partial(jax.jit, static_argnums=(0,))
     def _predict_viscosity(
         self,

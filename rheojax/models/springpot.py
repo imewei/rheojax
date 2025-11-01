@@ -87,6 +87,7 @@ class SpringPot(BaseModel):
         )
 
         self.fitted_ = False
+        self._test_mode = TestMode.RELAXATION  # Store test mode for model_function
 
     def _fit(self, X, y, **kwargs):
         """Fit SpringPot model to data.
@@ -120,6 +121,9 @@ class SpringPot(BaseModel):
             raise ValueError(
                 "SpringPot model does not support steady shear (rotation) test mode"
             )
+
+        # Store test mode for model_function
+        self._test_mode = test_mode
 
         # Create objective function with stateless predictions
         def model_fn(x, params):
@@ -187,6 +191,36 @@ class SpringPot(BaseModel):
             return self._predict_creep(x_data, c_alpha, alpha)
         elif test_mode == TestMode.OSCILLATION:
             return self._predict_oscillation(x_data, c_alpha, alpha)
+        else:
+            raise ValueError(f"Unsupported test mode: {test_mode}")
+
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (time or frequency)
+            params: Array of parameter values [c_alpha, alpha]
+
+        Returns:
+            Model predictions as JAX array
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        c_alpha = params[0]
+        alpha = params[1]
+
+        # Use stored test mode from last fit, or default to RELAXATION
+        test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+
+        # Dispatch to appropriate prediction method
+        if test_mode == TestMode.RELAXATION:
+            return self._predict_relaxation(X, c_alpha, alpha)
+        elif test_mode == TestMode.CREEP:
+            return self._predict_creep(X, c_alpha, alpha)
+        elif test_mode == TestMode.OSCILLATION:
+            return self._predict_oscillation(X, c_alpha, alpha)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
 

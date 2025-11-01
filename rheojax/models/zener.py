@@ -96,6 +96,7 @@ class Zener(BaseModel):
         )
 
         self.fitted_ = False
+        self._test_mode = TestMode.RELAXATION  # Store test mode for model_function
 
     def _fit(self, X, y, **kwargs):
         """Fit Zener model to data.
@@ -123,6 +124,9 @@ class Zener(BaseModel):
             x_data = jnp.array(X)
             y_data = jnp.array(y)
             test_mode = kwargs.get("test_mode", TestMode.RELAXATION)
+
+        # Store test mode for model_function
+        self._test_mode = test_mode
 
         # Create objective function with stateless predictions
         def model_fn(x, params):
@@ -189,6 +193,39 @@ class Zener(BaseModel):
             return self._predict_oscillation(x_data, Ge, Gm, eta)
         elif test_mode == TestMode.ROTATION:
             return self._predict_rotation(x_data, Ge, Gm, eta)
+        else:
+            raise ValueError(f"Unsupported test mode: {test_mode}")
+
+    def model_function(self, X, params):
+        """Model function for Bayesian inference.
+
+        This method is required by BayesianMixin for NumPyro NUTS sampling.
+        It computes predictions given input X and a parameter array.
+
+        Args:
+            X: Independent variable (time, frequency, or shear rate)
+            params: Array of parameter values [Ge, Gm, eta]
+
+        Returns:
+            Model predictions as JAX array
+        """
+        # Extract parameters from array (in order they were added to ParameterSet)
+        Ge = params[0]
+        Gm = params[1]
+        eta = params[2]
+
+        # Use stored test mode from last fit, or default to RELAXATION
+        test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+
+        # Dispatch to appropriate prediction method
+        if test_mode == TestMode.RELAXATION:
+            return self._predict_relaxation(X, Ge, Gm, eta)
+        elif test_mode == TestMode.CREEP:
+            return self._predict_creep(X, Ge, Gm, eta)
+        elif test_mode == TestMode.OSCILLATION:
+            return self._predict_oscillation(X, Ge, Gm, eta)
+        elif test_mode == TestMode.ROTATION:
+            return self._predict_rotation(X, Ge, Gm, eta)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
 
