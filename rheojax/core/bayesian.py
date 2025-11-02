@@ -43,13 +43,15 @@ class BayesianResult:
 
     Attributes:
         posterior_samples: Dictionary mapping parameter names to arrays of
-            posterior samples (shape: [num_samples, ]). All arrays are float64.
+            posterior samples (shape: [num_samples * num_chains, ]). All arrays are float64.
         summary: Dictionary with summary statistics for each parameter.
             Contains nested dicts with 'mean', 'std', and quantiles.
         diagnostics: Dictionary with convergence diagnostics including:
             - r_hat: Gelman-Rubin statistic for each parameter (dict)
             - ess: Effective sample size for each parameter (dict)
             - divergences: Number of divergent transitions (int)
+        num_samples: Number of posterior samples per chain (after warmup).
+        num_chains: Number of MCMC chains used in sampling.
         mcmc: NumPyro MCMC object containing full sampling information including
             NUTS-specific diagnostics (energy, divergences, tree depth).
             Required for ArviZ visualization with full diagnostics.
@@ -69,6 +71,8 @@ class BayesianResult:
     posterior_samples: dict[str, np.ndarray]
     summary: dict[str, dict[str, float]]
     diagnostics: dict[str, Any]
+    num_samples: int
+    num_chains: int
     mcmc: MCMC | None = None
     model_comparison: dict[str, float] = field(default_factory=dict)
     _inference_data: Any | None = field(default=None, repr=False)
@@ -344,7 +348,24 @@ class BayesianMixin:
 
         # Convert data to JAX arrays with float64 precision
         X_jax = jnp.asarray(X, dtype=jnp.float64)
-        y_jax = jnp.asarray(y, dtype=jnp.float64)
+
+        # Handle complex data (e.g., G* = G' + iG" for oscillatory shear)
+        # JAX's grad requires real-valued outputs, so we decompose complex data
+        is_complex_data = jnp.iscomplexobj(y)
+        if is_complex_data:
+            # Store original complex data for scale computation
+            y_complex = jnp.asarray(y, dtype=jnp.complex128)
+            y_real = jnp.real(y_complex)
+            y_imag = jnp.imag(y_complex)
+            # Stack real and imaginary parts as [real_part, imag_part]
+            y_jax = jnp.concatenate([y_real, y_imag])
+            # Store scales for likelihood (avoid recomputing in model)
+            y_real_scale = jnp.std(y_real)
+            y_imag_scale = jnp.std(y_imag)
+        else:
+            y_jax = jnp.asarray(y, dtype=jnp.float64)
+            y_real_scale = None
+            y_imag_scale = None
 
         # Get parameter information
         param_names = list(self.parameters)
@@ -357,30 +378,33 @@ class BayesianMixin:
                 )
             param_bounds[name] = param.bounds
 
-        # Use tighter priors if initial values provided (informed by NLSQ)
-        # Otherwise use full parameter bounds
+        # For warm-start, use informative LogNormal priors centered at NLSQ estimates
+        # This is more robust than direct initialization which can cause NUTS issues
         use_informed_priors = initial_values is not None
 
         # Define NumPyro probabilistic model
         def numpyro_model(X, y=None):
-            """NumPyro model with uniform priors (tighter if warm-started)."""
+            """NumPyro model with LogNormal priors for warm-started parameters."""
             # Sample parameters from priors
             params_dict = {}
             for name in param_names:
                 lower, upper = param_bounds[name]
 
-                # If we have initial values from NLSQ, use tighter priors
-                # (factor of 10 around NLSQ estimate for well-informed posteriors)
+                # If we have initial values from NLSQ, use informative LogNormal priors
+                # LogNormal is the standard choice for positive parameters in Bayesian inference
                 if use_informed_priors and name in initial_values:
                     center = initial_values[name]
-                    # Use ±1 order of magnitude (factor of 10) for narrow informed prior
-                    tight_lower = max(center / 10, lower)
-                    tight_upper = min(center * 10, upper)
+                    # LogNormal parameterization: median = exp(loc)
+                    # For X ~ LogNormal(loc, scale), we want median ≈ center
+                    # So loc = log(center), and scale controls spread
+                    # Use scale = 0.5 for moderate uncertainty (~factor of 3 range at 95% CI)
+                    loc = jnp.log(jnp.maximum(center, 1e-10))  # Avoid log(0)
+                    scale = 0.5  # Wider than 0.3 to avoid overly tight priors
                     params_dict[name] = numpyro.sample(
-                        name, dist.Uniform(low=tight_lower, high=tight_upper)
+                        name, dist.LogNormal(loc=loc, scale=scale)
                     )
                 else:
-                    # Use full bounds for cold start
+                    # Use Uniform for cold start (no warm-start info)
                     params_dict[name] = numpyro.sample(
                         name, dist.Uniform(low=lower, high=upper)
                     )
@@ -389,29 +413,40 @@ class BayesianMixin:
             params_array = jnp.array([params_dict[name] for name in param_names])
 
             # Compute predictions
-            predictions = self.model_function(X, params_array)
+            predictions_raw = self.model_function(X, params_array)
 
-            # Likelihood: Use weighted Gaussian noise to match NLSQ relative error objective
-            # NLSQ minimizes sum((pred - data) / max(|data|, eps))^2
-            # So we use heteroscedastic noise: sigma_i = sigma_abs * max(|y_i|, y_min)
-            # where sigma_abs represents absolute error at scale y_min
+            # Handle complex predictions (convert to stacked real for JAX grad compatibility)
+            if is_complex_data:
+                # predictions_raw is complex, decompose to [real_part, imag_part]
+                pred_real = jnp.real(predictions_raw)
+                pred_imag = jnp.imag(predictions_raw)
 
-            # Prior on absolute noise scale (based on typical data magnitude)
-            # Use a tight prior based on observed data scale
-            data_scale = jnp.std(y)
-            sigma_abs = numpyro.sample("sigma", dist.HalfNormal(scale=data_scale * 0.2))
+                # Split observations into real and imaginary parts
+                n = len(y) // 2  # y is stacked [real, imag]
+                y_real_obs = y[:n]
+                y_imag_obs = y[n:]
+                predictions = jnp.concatenate([pred_real, pred_imag])
+            else:
+                predictions = predictions_raw
 
-            # Compute heteroscedastic noise scale with floor to prevent singularities
-            # This matches NLSQ's normalization while avoiding division by very small numbers
-            y_min = jnp.maximum(
-                jnp.mean(jnp.abs(y)) * 0.01, 1e-10
-            )  # 1% of mean magnitude
-            y_scale = jnp.maximum(jnp.abs(y), y_min)
+            # Likelihood: Use appropriate noise model for real or complex data
+            if is_complex_data:
+                # For complex data, use separate noise for real and imaginary parts
+                # Use weakly informative Exponential priors (heavier tails than HalfNormal)
+                # Scale = mean of Exponential, set to ~10% of data scale for stability
+                # (wider than residual std to avoid overly peaked likelihoods)
+                sigma_real = numpyro.sample("sigma_real", dist.Exponential(rate=1.0 / (y_real_scale * 0.1)))
+                sigma_imag = numpyro.sample("sigma_imag", dist.Exponential(rate=1.0 / (y_imag_scale * 0.1)))
 
-            # Observe data with weighted likelihood
-            numpyro.sample(
-                "obs", dist.Normal(loc=predictions, scale=sigma_abs * y_scale), obs=y
-            )
+                # Use pred_real and pred_imag already computed above (don't re-split!)
+                # Separate likelihoods for real and imaginary components
+                numpyro.sample("obs_real", dist.Normal(loc=pred_real, scale=sigma_real), obs=y_real_obs)
+                numpyro.sample("obs_imag", dist.Normal(loc=pred_imag, scale=sigma_imag), obs=y_imag_obs)
+            else:
+                # Real data: weakly informative Exponential prior on noise
+                data_scale = jnp.std(y)
+                sigma = numpyro.sample("sigma", dist.Exponential(rate=1.0 / (data_scale * 0.1)))
+                numpyro.sample("obs", dist.Normal(loc=predictions, scale=sigma), obs=y)
 
         # Set up NUTS sampler
         nuts_kernel = NUTS(numpyro_model, **nuts_kwargs)
@@ -424,45 +459,22 @@ class BayesianMixin:
             num_chains=num_chains,
         )
 
-        # Prepare initial values if provided
-        init_params = None
-        if initial_values is not None:
-            # Convert initial values to NumPyro format
-            init_params = {}
-            for name in param_names:
-                if name in initial_values:
-                    init_params[name] = initial_values[name]
-
-            # Add a reasonable initial sigma_abs if not provided
-            if "sigma" not in init_params:
-                # Estimate absolute noise from initial residuals if possible
-                if hasattr(self, "X_data") and hasattr(self, "y_data"):
-                    try:
-                        init_param_array = jnp.array(
-                            [
-                                initial_values.get(n, self.parameters.get(n).value)
-                                for n in param_names
-                            ]
-                        )
-                        init_pred = self.model_function(X_jax, init_param_array)
-                        # Compute absolute residuals
-                        residuals = y_jax - init_pred
-                        # Use std of residuals as initial sigma_abs
-                        init_params["sigma"] = float(jnp.std(residuals))
-                    except Exception:
-                        # Default to 10% of data scale
-                        init_params["sigma"] = float(jnp.std(y_jax) * 0.1)
-                else:
-                    # Default to 10% of data scale
-                    init_params["sigma"] = float(jnp.std(y_jax) * 0.1)
-
         # Run MCMC sampling
         rng_key = jax.random.PRNGKey(0)
+
+        # IMPORTANT: Do NOT pass init_params to MCMC.run()
+        # When using informative priors (LogNormal centered at NLSQ estimates),
+        # let NumPyro initialize from the priors using init_to_median() or init_to_sample().
+        # Passing init_params directly causes issues because NumPyro expects them in
+        # unconstrained space, not constrained parameter space.
+
+        # The warm-start happens through the informative LogNormal priors,
+        # which guide NUTS to start near the NLSQ estimates while maintaining
+        # proper initialization in unconstrained space.
+
         try:
-            if init_params is not None:
-                mcmc.run(rng_key, X_jax, y_jax, init_params=init_params)
-            else:
-                mcmc.run(rng_key, X_jax, y_jax)
+            # Always let NumPyro handle initialization from priors
+            mcmc.run(rng_key, X_jax, y_jax)
         except Exception as e:
             raise RuntimeError(f"NUTS sampling failed: {str(e)}") from e
 
@@ -496,6 +508,8 @@ class BayesianMixin:
             posterior_samples=posterior_samples,
             summary=summary,
             diagnostics=diagnostics,
+            num_samples=num_samples,
+            num_chains=num_chains,
             mcmc=mcmc,  # Store MCMC object for ArviZ InferenceData conversion
             model_comparison={},  # Placeholder for future WAIC/LOO
         )

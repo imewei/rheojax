@@ -144,9 +144,9 @@ def nlsq_optimize(
     method: str = "auto",
     use_jax: bool = True,
     max_iter: int = 1000,
-    ftol: float = 1e-8,
-    xtol: float = 1e-8,
-    gtol: float = 1e-8,
+    ftol: float = 1e-6,
+    xtol: float = 1e-6,
+    gtol: float = 1e-6,
     **kwargs,
 ) -> OptimizationResult:
     """Optimize objective function using NLSQ (GPU-accelerated).
@@ -172,9 +172,12 @@ def nlsq_optimize(
         use_jax: Whether to use JAX for gradient computation (default: True).
             Should always be True for GPU acceleration and float64 precision.
         max_iter: Maximum number of iterations (default: 1000)
-        ftol: Function tolerance for convergence (default: 1e-8)
-        xtol: Parameter tolerance for convergence (default: 1e-8)
-        gtol: Gradient tolerance for convergence (default: 1e-8)
+        ftol: Function tolerance for convergence (default: 1e-6).
+            Relaxed from 1e-8 due to NLSQ's mixed precision management.
+        xtol: Parameter tolerance for convergence (default: 1e-6).
+            Relaxed from 1e-8 due to NLSQ's mixed precision management.
+        gtol: Gradient tolerance for convergence (default: 1e-6).
+            Relaxed from 1e-8 due to NLSQ's mixed precision management.
         **kwargs: Additional arguments passed to nlsq.LeastSquares.least_squares
 
     Returns:
@@ -235,24 +238,14 @@ def nlsq_optimize(
     upper_bounds = np.asarray(upper_bounds, dtype=np.float64)
     nlsq_bounds = (lower_bounds, upper_bounds)
 
-    # NLSQ expects a residual function, but we have a scalar objective
-    # Convert scalar objective to residual by taking square root
-    # This maintains the same minimum while allowing NLSQ to work
-    def residual_function(params):
-        """Convert scalar objective to residual for NLSQ."""
-        # Ensure params are JAX arrays for autodiff
-        params_jax = jnp.asarray(params, dtype=jnp.float64)
-        obj_value = objective(params_jax)
-
-        # Convert scalar objective to residual (single-element array)
-        # NLSQ minimizes sum(residuals**2), so we return sqrt(objective)
-        # This gives the same minimum as minimizing objective directly
-        residual = jnp.sqrt(jnp.maximum(obj_value, 0.0))  # Ensure non-negative
-        return jnp.array([residual])  # Return as 1-element array
+    # NLSQ expects a residual function that returns a vector of residuals
+    # The objective function from create_least_squares_objective() now returns
+    # a proper residual vector, so we use it directly
+    # NLSQ will minimize sum(residuals²) internally
 
     # Set up NLSQ optimization parameters
     nlsq_kwargs = {
-        "fun": residual_function,
+        "fun": objective,  # Now a residual function returning vector
         "x0": x0,
         "bounds": nlsq_bounds,
         "method": "trf",  # Trust Region Reflective (supports bounds)
@@ -290,8 +283,10 @@ def nlsq_optimize(
     # Update ParameterSet with optimal values
     parameters.set_values(result.x)
 
-    # Recompute objective at optimal point (NLSQ returns residual cost)
-    result.fun = float(objective(result.x))
+    # Recompute objective at optimal point
+    # objective() now returns residual vector, so compute RSS = sum(residuals²)
+    residuals = objective(result.x)
+    result.fun = float(jnp.sum(residuals**2))
 
     return result
 
@@ -443,17 +438,26 @@ def create_least_squares_objective(
     x_data: np.ndarray,
     y_data: np.ndarray,
     normalize: bool = True,
-) -> Callable[[np.ndarray], float]:
-    """Create least squares objective function for model fitting.
+) -> Callable[[np.ndarray], np.ndarray]:
+    """Create residual function for NLSQ least-squares fitting.
+
+    IMPORTANT: This now returns a RESIDUAL FUNCTION (vector output), not a scalar
+    objective. NLSQ minimizes sum(residuals²), so this provides per-point residuals
+    to the optimizer, which enables proper gradient computation and weighting.
+
+    For complex data (e.g., G* = G' + iG"), returns stacked real and imaginary
+    residuals: [real_r1, ..., real_rN, imag_r1, ..., imag_rN] with shape (2N,).
+
+    For real data, returns residuals with shape (N,).
 
     Args:
         model_fn: Model function that takes (x_data, parameters) and returns predictions
         x_data: Independent variable data
-        y_data: Dependent variable data (observations)
+        y_data: Dependent variable data (observations, may be complex)
         normalize: Whether to use relative error (default: True)
 
     Returns:
-        Objective function that takes parameters and returns RSS
+        Residual function that takes parameters and returns residual vector
 
     Example:
         >>> def linear_model(x, params):
@@ -461,16 +465,50 @@ def create_least_squares_objective(
         ...     return a * x + b
         >>> x = np.array([1, 2, 3, 4, 5])
         >>> y = np.array([2.1, 4.0, 5.9, 8.1, 10.0])
-        >>> objective = create_least_squares_objective(linear_model, x, y)
-        >>> # Now use with nlsq_optimize
+        >>> residual_fn = create_least_squares_objective(linear_model, x, y)
+        >>> # Now use with nlsq_optimize - it receives proper residual vector
     """
+    # Convert to JAX arrays and detect if complex
+    x_data_jax = jnp.asarray(x_data, dtype=jnp.float64)
 
-    def objective(params: np.ndarray) -> float:
-        """Objective function to minimize."""
-        y_pred = model_fn(x_data, params)
-        return residual_sum_of_squares(y_data, y_pred, normalize=normalize)
+    # Preserve complex type for y_data
+    is_complex = jnp.iscomplexobj(y_data) or np.iscomplexobj(y_data)
+    if is_complex:
+        y_data_jax = jnp.asarray(y_data, dtype=jnp.complex128)
+    else:
+        y_data_jax = jnp.asarray(y_data, dtype=jnp.float64)
 
-    return objective
+    def residuals(params: np.ndarray) -> np.ndarray:
+        """Compute residual vector for all data points."""
+        # Ensure params are JAX arrays
+        params_jax = jnp.asarray(params, dtype=jnp.float64)
+
+        # Get model predictions
+        y_pred = model_fn(x_data_jax, params_jax)
+
+        if is_complex:
+            # Handle complex data: separate real and imaginary residuals
+            resid_real = jnp.real(y_pred) - jnp.real(y_data_jax)
+            resid_imag = jnp.imag(y_pred) - jnp.imag(y_data_jax)
+
+            if normalize:
+                # Normalize by magnitude of data (avoid division by zero)
+                resid_real = resid_real / jnp.maximum(jnp.abs(jnp.real(y_data_jax)), 1e-10)
+                resid_imag = resid_imag / jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), 1e-10)
+
+            # Stack: [real₁, ..., realₙ, imag₁, ..., imagₙ]
+            return jnp.concatenate([resid_real, resid_imag])
+        else:
+            # Real data path
+            residuals = y_pred - y_data_jax
+
+            if normalize:
+                # Relative error (avoid division by zero)
+                residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+
+            return residuals
+
+    return residuals
 
 
 # Convenience aliases for compatibility with different naming conventions

@@ -118,6 +118,8 @@ def test_bayesian_result_structure():
         posterior_samples=posterior_samples,
         summary=summary,
         diagnostics=diagnostics,
+        num_samples=100,
+        num_chains=1,
         model_comparison={},
     )
 
@@ -125,13 +127,21 @@ def test_bayesian_result_structure():
     assert hasattr(result, "posterior_samples")
     assert hasattr(result, "summary")
     assert hasattr(result, "diagnostics")
+    assert hasattr(result, "num_samples")
+    assert hasattr(result, "num_chains")
     assert hasattr(result, "model_comparison")
 
     # Check field types
     assert isinstance(result.posterior_samples, dict)
     assert isinstance(result.summary, dict)
     assert isinstance(result.diagnostics, dict)
+    assert isinstance(result.num_samples, int)
+    assert isinstance(result.num_chains, int)
     assert isinstance(result.model_comparison, dict)
+
+    # Check values
+    assert result.num_samples == 100
+    assert result.num_chains == 1
 
 
 def test_fit_bayesian_basic_functionality():
@@ -237,6 +247,60 @@ def test_warm_start_from_nlsq_initial_values():
     # Allow generous tolerance since we're using few samples (100 samples + MCMC stochasticity)
     assert abs(mean_a - 2.0) < 1.5
     assert abs(mean_b - 3.0) < 1.5
+
+
+def test_warm_start_multichain_initial_values():
+    """Test that warm-starting with initial values works correctly for multi-chain MCMC.
+
+    This test ensures that the fix for the 'tuple index out of range' error
+    when using num_chains > 1 with initial_values continues to work.
+    Previously, NumPyro expected initial values with shape (num_chains,) but
+    scalar values were being passed, causing the error.
+    """
+    model = SimpleBayesianModel()
+
+    # Create synthetic data
+    np.random.seed(42)
+    X = np.linspace(0, 10, 30)
+    y = 2.0 * X + 3.0 + np.random.normal(0, 0.5, 30)
+
+    model.X_data = X
+    model.y_data = y
+
+    # Provide initial values (simulating NLSQ results)
+    initial_values = {"a": 2.0, "b": 3.0}
+
+    # Run Bayesian inference with warm-start and MULTIPLE chains
+    # This previously failed with "tuple index out of range"
+    result = model.fit_bayesian(
+        X,
+        y,
+        num_warmup=50,
+        num_samples=100,
+        num_chains=4,  # Multi-chain with warm-start (the bug scenario)
+        initial_values=initial_values,
+    )
+
+    # Check that result exists and has correct structure
+    assert isinstance(result, BayesianResult)
+    assert "a" in result.posterior_samples
+    assert "b" in result.posterior_samples
+
+    # Total samples should be num_samples * num_chains
+    assert len(result.posterior_samples["a"]) == 100 * 4
+    assert len(result.posterior_samples["b"]) == 100 * 4
+
+    # Posterior means should be close to initial values (true parameters)
+    mean_a = np.mean(result.posterior_samples["a"])
+    mean_b = np.mean(result.posterior_samples["b"])
+
+    # Allow generous tolerance
+    assert abs(mean_a - 2.0) < 1.5
+    assert abs(mean_b - 3.0) < 1.5
+
+    # Check that convergence diagnostics exist
+    assert "r_hat" in result.diagnostics or "rhat" in result.diagnostics
+    assert "ess" in result.diagnostics or "n_eff" in result.diagnostics
 
 
 def test_convergence_diagnostics_rhat_computation():
