@@ -172,7 +172,8 @@ class SpringPot(BaseModel):
             x_data = jnp.array(rheo_data.x)
         else:
             x_data = jnp.array(X)
-            test_mode = TestMode.RELAXATION  # Default
+            # Use test_mode from last fit if available, otherwise default to RELAXATION
+            test_mode = getattr(self, '_test_mode', TestMode.RELAXATION)
 
         # Validate test mode
         if test_mode == TestMode.ROTATION:

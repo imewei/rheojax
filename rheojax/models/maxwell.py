@@ -164,7 +164,8 @@ class Maxwell(BaseModel):
             x_data = jnp.array(rheo_data.x)
         else:
             x_data = jnp.array(X)
-            test_mode = TestMode.RELAXATION  # Default
+            # Use test_mode from last fit if available, otherwise default to RELAXATION
+            test_mode = getattr(self, '_test_mode', TestMode.RELAXATION)
 
         # Get parameter values
         G0 = self.parameters.get_value("G0")
