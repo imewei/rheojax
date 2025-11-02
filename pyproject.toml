@@ -9,10 +9,10 @@ description = "Unified rheological analysis framework with JAX acceleration"
 readme = "README.md"
 license = {file = "LICENSE"}
 authors = [
-    {name = "RheoJAX Development Team", email = "rheojax@example.com"},
+    {name = "Wei Chen", email = "wchen@anl.gov"},
 ]
 maintainers = [
-    {name = "RheoJAX Development Team", email = "rheojax@example.com"},
+    {name = "Wei Chen", email = "wchen@anl.gov"},
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

@@ -515,7 +515,7 @@ If you use rheo in your research, please cite:
 @software{rheo2024,
   title = {Rheo: JAX-Powered Unified Rheology Package with Bayesian Inference},
   year = {2024},
-  author = {Rheo Development Team},
+  author = {Wei Chen},
   url = {https://github.com/imewei/rheojax},
   version = {0.2.0}
 }
@@ -537,7 +537,7 @@ rheo is built on excellent open-source software:
 - 📖 Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 - 💬 Discussions: [GitHub Discussions](https://github.com/imewei/rheojax/discussions)
 - 🐛 Issues: [GitHub Issues](https://github.com/imewei/rheojax/issues)
-- 📧 Email: rheo@example.com
+- 📧 Email: wchen@anl.gov
 
 ## Roadmap
 
@@ -545,4 +545,4 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed development history and [examples/
 
 ---
 
-Made with ❤️ by the Rheo Development Team
+Made with ❤️ by Wei Chen

@@ -166,7 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Contributors
 
-- RheoJAX Development Team
+- Wei Chen
 - Community contributors (see GitHub)
 
 ## License

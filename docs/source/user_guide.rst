@@ -176,7 +176,7 @@ Support and Community
 - **Documentation**: https://rheojax.readthedocs.io
 - **Issues**: https://github.com/username/rheo/issues
 - **Discussions**: https://github.com/username/rheo/discussions
-- **Email**: rheo@example.com
+- **Email**: wchen@anl.gov
 
 Version Information
 ~~~~~~~~~~~~~~~~~~~

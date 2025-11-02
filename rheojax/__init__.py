@@ -29,8 +29,8 @@ except ImportError as e:
     ) from e
 
 __version__ = "0.1.0"
-__author__ = "RheoJAX Development Team"
-__email__ = "rheojax@example.com"
+__author__ = "Wei Chen"
+__email__ = "wchen@anl.gov"
 __license__ = "MIT"
 
 # JAX version information (imported AFTER nlsq)

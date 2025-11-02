@@ -1359,7 +1359,7 @@ Q: How do I cite rheo vs pyRheo/hermes-rheo?
 
    @software{rheo2024,
      title = {Rheo: JAX-Powered Unified Rheology Package},
-     author = {Rheo Development Team},
+     author = {Wei Chen},
      year = {2024},
      url = {https://github.com/[org]/rheo},
      version = {0.2.0}

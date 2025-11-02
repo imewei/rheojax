@@ -211,7 +211,7 @@ Community and Support
       @software{rheo2024,
         title = {Rheo: JAX-Powered Unified Rheology Package},
         year = {2024},
-        author = {Rheo Development Team},
+        author = {Wei Chen},
         url = {https://github.com/username/rheo},
         version = {0.1.0}
       }
