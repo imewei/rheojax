@@ -340,7 +340,7 @@ class FractionalBurgersModel(BaseModel):
         return _compute_oscillation(omega, Jg, eta1, Jk, tau_k)
 
     def _fit(self, X: jnp.ndarray, y: jnp.ndarray, **kwargs) -> FractionalBurgersModel:
-        """Fit model to data.
+        """Fit model to data using NLSQ TRF optimization.
 
         Parameters
         ----------
@@ -356,33 +356,59 @@ class FractionalBurgersModel(BaseModel):
         self
             Fitted model instance
         """
-        from rheojax.core.parameters import ParameterOptimizer
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+        from rheojax.core.test_modes import TestMode
 
         # Detect test mode
-        test_mode = kwargs.get("test_mode", "creep")
+        test_mode_str = kwargs.get("test_mode", "creep")
 
-        # Select prediction function
-        if test_mode == "relaxation":
-            predict_fn = self._predict_relaxation
-        elif test_mode == "creep":
-            predict_fn = self._predict_creep
-        elif test_mode == "oscillation":
-            predict_fn = self._predict_oscillation
+        # Convert string to TestMode enum
+        if isinstance(test_mode_str, str):
+            test_mode_map = {
+                "creep": TestMode.CREEP,
+                "relaxation": TestMode.RELAXATION,
+                "oscillation": TestMode.OSCILLATION,
+            }
+            test_mode = test_mode_map.get(test_mode_str, TestMode.CREEP)
         else:
-            raise ValueError(f"Test mode '{test_mode}' not supported for FBM")
+            test_mode = test_mode_str
 
-        # Set up optimizer
-        optimizer = ParameterOptimizer(
-            parameters=self.parameters, predict_fn=predict_fn, loss="mse"
+        # Store test mode for model_function
+        self._test_mode = test_mode
+
+        # Create stateless model function for optimization
+        def model_fn(x, params):
+            """Model function for optimization (stateless)."""
+            Jg, eta1, Jk, alpha, tau_k = params[0], params[1], params[2], params[3], params[4]
+
+            # Direct prediction based on test mode (stateless)
+            if test_mode == TestMode.RELAXATION:
+                return self._predict_relaxation(x, Jg, eta1, Jk, alpha, tau_k)
+            elif test_mode == TestMode.CREEP:
+                return self._predict_creep(x, Jg, eta1, Jk, alpha, tau_k)
+            elif test_mode == TestMode.OSCILLATION:
+                return self._predict_oscillation(x, Jg, eta1, Jk, alpha, tau_k)
+            else:
+                raise ValueError(f"Unsupported test mode: {test_mode}")
+
+        # Create objective function
+        objective = create_least_squares_objective(
+            model_fn, jnp.array(X), jnp.array(y), normalize=True
         )
 
-        # Fit parameters
-        result = optimizer.fit(X, y, **kwargs)
+        # Optimize using NLSQ TRF
+        nlsq_optimize(
+            objective,
+            self.parameters,
+            use_jax=kwargs.get("use_jax", True),
+            method=kwargs.get("method", "auto"),
+            max_iter=kwargs.get("max_iter", 1000),
+        )
 
-        # Update parameters
-        for name, value in result.items():
-            self.parameters.set_value(name, value)
-
+        self.fitted_ = True
         return self
 
     def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
@@ -428,6 +454,8 @@ class FractionalBurgersModel(BaseModel):
         Returns:
             Model predictions as JAX array
         """
+        from rheojax.core.test_modes import TestMode
+
         # Extract parameters from array (in order they were added to ParameterSet)
         Jg = params[0]
         eta1 = params[1]
@@ -435,9 +463,19 @@ class FractionalBurgersModel(BaseModel):
         alpha = params[3]
         tau_k = params[4]
 
-        # Fractional models default to relaxation mode
-        # Call the _jax method directly
-        return self._predict_relaxation_jax(X, Jg, eta1, Jk, alpha, tau_k)
+        # Use test_mode from last fit if available, otherwise default to CREEP
+        test_mode = getattr(self, '_test_mode', TestMode.CREEP)
+
+        # Call appropriate prediction function based on test mode
+        if test_mode == TestMode.RELAXATION:
+            return self._predict_relaxation(X, Jg, eta1, Jk, alpha, tau_k)
+        elif test_mode == TestMode.CREEP:
+            return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
+        elif test_mode == TestMode.OSCILLATION:
+            return self._predict_oscillation(X, Jg, eta1, Jk, alpha, tau_k)
+        else:
+            # Default to creep mode for Burgers model
+            return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
 
 # Convenience alias
 FBM = FractionalBurgersModel

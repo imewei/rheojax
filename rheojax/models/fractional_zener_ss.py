@@ -281,7 +281,7 @@ class FractionalZenerSolidSolid(BaseModel):
     def _fit(
         self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
     ) -> FractionalZenerSolidSolid:
-        """Fit model to data.
+        """Fit model to data using NLSQ TRF optimization.
 
         Parameters
         ----------
@@ -297,33 +297,59 @@ class FractionalZenerSolidSolid(BaseModel):
         self
             Fitted model instance
         """
-        from rheojax.core.parameters import ParameterOptimizer
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+        from rheojax.core.test_modes import TestMode
 
         # Detect test mode
-        test_mode = kwargs.get("test_mode", "relaxation")
+        test_mode_str = kwargs.get("test_mode", "relaxation")
 
-        # Select prediction function
-        if test_mode == "relaxation":
-            predict_fn = self._predict_relaxation
-        elif test_mode == "creep":
-            predict_fn = self._predict_creep
-        elif test_mode == "oscillation":
-            predict_fn = self._predict_oscillation
+        # Convert string to TestMode enum
+        if isinstance(test_mode_str, str):
+            test_mode_map = {
+                "relaxation": TestMode.RELAXATION,
+                "creep": TestMode.CREEP,
+                "oscillation": TestMode.OSCILLATION,
+            }
+            test_mode = test_mode_map.get(test_mode_str, TestMode.RELAXATION)
         else:
-            raise ValueError(f"Test mode '{test_mode}' not supported for FZSS model")
+            test_mode = test_mode_str
 
-        # Set up optimizer
-        optimizer = ParameterOptimizer(
-            parameters=self.parameters, predict_fn=predict_fn, loss="mse"
+        # Store test mode for model_function
+        self._test_mode = test_mode
+
+        # Create stateless model function for optimization
+        def model_fn(x, params):
+            """Model function for optimization (stateless)."""
+            Ge, Gm, alpha, tau_alpha = params[0], params[1], params[2], params[3]
+
+            # Direct prediction based on test mode (stateless)
+            if test_mode == TestMode.RELAXATION:
+                return self._predict_relaxation(x, Ge, Gm, alpha, tau_alpha)
+            elif test_mode == TestMode.CREEP:
+                return self._predict_creep(x, Ge, Gm, alpha, tau_alpha)
+            elif test_mode == TestMode.OSCILLATION:
+                return self._predict_oscillation(x, Ge, Gm, alpha, tau_alpha)
+            else:
+                raise ValueError(f"Unsupported test mode: {test_mode}")
+
+        # Create objective function
+        objective = create_least_squares_objective(
+            model_fn, jnp.array(X), jnp.array(y), normalize=True
         )
 
-        # Fit parameters
-        result = optimizer.fit(X, y, **kwargs)
+        # Optimize using NLSQ TRF
+        nlsq_optimize(
+            objective,
+            self.parameters,
+            use_jax=kwargs.get("use_jax", True),
+            method=kwargs.get("method", "auto"),
+            max_iter=kwargs.get("max_iter", 1000),
+        )
 
-        # Update parameters
-        for name, value in result.items():
-            self.parameters.set_value(name, value)
-
+        self.fitted_ = True
         return self
 
     def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
@@ -364,15 +390,27 @@ class FractionalZenerSolidSolid(BaseModel):
         Returns:
             Model predictions as JAX array
         """
+        from rheojax.core.test_modes import TestMode
+
         # Extract parameters from array (in order they were added to ParameterSet)
         Ge = params[0]
         Gm = params[1]
         alpha = params[2]
         tau_alpha = params[3]
 
-        # Fractional models default to relaxation mode
-        # Call the _jax method directly
-        return self._predict_relaxation_jax(X, Ge, Gm, alpha, tau_alpha)
+        # Use test_mode from last fit if available, otherwise default to RELAXATION
+        test_mode = getattr(self, '_test_mode', TestMode.RELAXATION)
+
+        # Call appropriate prediction function based on test mode
+        if test_mode == TestMode.RELAXATION:
+            return self._predict_relaxation(X, Ge, Gm, alpha, tau_alpha)
+        elif test_mode == TestMode.CREEP:
+            return self._predict_creep(X, Ge, Gm, alpha, tau_alpha)
+        elif test_mode == TestMode.OSCILLATION:
+            return self._predict_oscillation(X, Ge, Gm, alpha, tau_alpha)
+        else:
+            # Default to relaxation mode for FZSS model
+            return self._predict_relaxation(X, Ge, Gm, alpha, tau_alpha)
 
 # Convenience alias
 FZSS = FractionalZenerSolidSolid
