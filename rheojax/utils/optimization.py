@@ -342,9 +342,13 @@ def residual_sum_of_squares(
 ) -> float:
     """Compute residual sum of squares (RSS).
 
+    Handles both real and complex data correctly. For complex data (e.g.,
+    oscillatory shear with G' + iG"), computes RSS for both real and imaginary
+    parts separately and returns the sum.
+
     Args:
-        y_true: True values
-        y_pred: Predicted values
+        y_true: True values (real or complex)
+        y_pred: Predicted values (real or complex)
         normalize: Whether to normalize by y_true (relative error)
 
     Returns:
@@ -357,28 +361,81 @@ def residual_sum_of_squares(
     """
     # Use JAX operations if inputs are JAX arrays for gradient support
     if isinstance(y_pred, jnp.ndarray) or isinstance(y_true, jnp.ndarray):
-        y_true_jax = jnp.asarray(y_true, dtype=jnp.float64)
-        y_pred_jax = jnp.asarray(y_pred, dtype=jnp.float64)
-        residuals = y_pred_jax - y_true_jax
+        # Convert to JAX arrays (preserving complex type)
+        y_true_jax = jnp.asarray(y_true)
+        y_pred_jax = jnp.asarray(y_pred)
 
-        if normalize:
-            # Relative error (avoid division by zero)
-            residuals = residuals / jnp.maximum(jnp.abs(y_true_jax), 1e-10)
+        # Check if data is complex
+        is_complex = jnp.iscomplexobj(y_true_jax) or jnp.iscomplexobj(y_pred_jax)
+
+        if is_complex:
+            # Handle complex data: fit both real and imaginary parts
+            # This is critical for oscillatory shear (G' + iG")
+            residuals_real = jnp.real(y_pred_jax) - jnp.real(y_true_jax)
+            residuals_imag = jnp.imag(y_pred_jax) - jnp.imag(y_true_jax)
+
+            if normalize:
+                # Normalize separately by magnitude of real and imaginary parts
+                residuals_real = residuals_real / jnp.maximum(
+                    jnp.abs(jnp.real(y_true_jax)), 1e-10
+                )
+                residuals_imag = residuals_imag / jnp.maximum(
+                    jnp.abs(jnp.imag(y_true_jax)), 1e-10
+                )
+
+            # Sum of squares for both components
+            rss = jnp.sum(residuals_real**2) + jnp.sum(residuals_imag**2)
+        else:
+            # Real data path (original behavior)
+            y_true_jax = jnp.asarray(y_true_jax, dtype=jnp.float64)
+            y_pred_jax = jnp.asarray(y_pred_jax, dtype=jnp.float64)
+            residuals = y_pred_jax - y_true_jax
+
+            if normalize:
+                # Relative error (avoid division by zero)
+                residuals = residuals / jnp.maximum(jnp.abs(y_true_jax), 1e-10)
+
+            rss = jnp.sum(residuals**2)
 
         # Return scalar JAX array, don't convert to Python float (breaks gradients)
-        return jnp.sum(residuals**2)
+        return rss
     else:
         # NumPy path
-        y_true_np = np.asarray(y_true, dtype=np.float64)
-        y_pred_np = np.asarray(y_pred, dtype=np.float64)
-        residuals = y_pred_np - y_true_np
+        y_true_np = np.asarray(y_true)
+        y_pred_np = np.asarray(y_pred)
 
-        if normalize:
-            # Relative error (avoid division by zero)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                residuals = residuals / np.maximum(np.abs(y_true_np), 1e-10)
+        # Check if data is complex
+        is_complex = np.iscomplexobj(y_true_np) or np.iscomplexobj(y_pred_np)
 
-        return float(np.sum(residuals**2))
+        if is_complex:
+            # Handle complex data
+            residuals_real = np.real(y_pred_np) - np.real(y_true_np)
+            residuals_imag = np.imag(y_pred_np) - np.imag(y_true_np)
+
+            if normalize:
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    residuals_real = residuals_real / np.maximum(
+                        np.abs(np.real(y_true_np)), 1e-10
+                    )
+                    residuals_imag = residuals_imag / np.maximum(
+                        np.abs(np.imag(y_true_np)), 1e-10
+                    )
+
+            rss = float(np.sum(residuals_real**2) + np.sum(residuals_imag**2))
+        else:
+            # Real data path (original behavior)
+            y_true_np = np.asarray(y_true_np, dtype=np.float64)
+            y_pred_np = np.asarray(y_pred_np, dtype=np.float64)
+            residuals = y_pred_np - y_true_np
+
+            if normalize:
+                # Relative error (avoid division by zero)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    residuals = residuals / np.maximum(np.abs(y_true_np), 1e-10)
+
+            rss = float(np.sum(residuals**2))
+
+        return rss
 
 
 def create_least_squares_objective(
