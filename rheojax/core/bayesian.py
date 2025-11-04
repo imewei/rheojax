@@ -92,6 +92,11 @@ class BayesianResult:
         The conversion preserves all NUTS-specific diagnostics including energy,
         divergences, and tree depth information.
 
+        The conversion automatically computes pointwise log-likelihood values
+        required for Bayesian model comparison metrics (WAIC and LOO). This
+        enables usage of az.waic(), az.loo(), and az.compare() for objective
+        model selection.
+
         The InferenceData object is cached after first conversion to avoid
         repeated conversion overhead.
 
@@ -99,6 +104,7 @@ class BayesianResult:
             ArviZ InferenceData object containing:
                 - posterior: Posterior samples for all parameters
                 - sample_stats: NUTS diagnostics (energy, divergences, etc.)
+                - log_likelihood: Pointwise log-likelihood for WAIC/LOO
                 - Additional groups as available from NumPyro
 
         Raises:
@@ -142,7 +148,8 @@ class BayesianResult:
 
         # Convert using ArviZ's from_numpyro utility
         # This preserves all NUTS diagnostics (energy, divergences, etc.)
-        self._inference_data = az.from_numpyro(self.mcmc)
+        # log_likelihood=True computes pointwise log-likelihood for WAIC/LOO model comparison
+        self._inference_data = az.from_numpyro(self.mcmc, log_likelihood=True)
 
         return self._inference_data
 
