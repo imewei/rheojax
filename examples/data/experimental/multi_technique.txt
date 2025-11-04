@@ -35,7 +35,7 @@ Environmental System	Anonymous
 Surface finish	Anonymous
 Disposable	No
 Serial number	000000
-Notes	
+Notes
 [Geometry Extended Parameters]
 Expansion coefficient	0.00000 µm/°C
 Expansion coefficient enabled	yes
@@ -134,23 +134,23 @@ Cursor x	 00.0000 rad/s
 Max y	 00000.0 MPa
 Min y	 00000.0 MPa
 Mean y	 00000.0 MPa
-Variance	 000000 
+Variance	 000000
 Standard Deviation	 000.000 MPa
-Relative Standard Deviation	 0.000000 
+Relative Standard Deviation	 0.000000
 [Analysis]
 Analyzed step	000-GID-000000 - 000000-0 - 0000.00.00 - Frequency sweep - 0
 Model	Continuous relaxation spectrum
 Cursor x	 0.000000 rad/s
 Cursor x	 00.0000 rad/s
-Terms	 00 
-R²	 0.000000 
+Terms	 00
+R²	 0.000000
 [Analysis]
 Analyzed step	000-GID-000000 - 000000-0 - 0000.00.00 - Frequency sweep - 0
 Model	Continuous relaxation spectrum
 Cursor x	 0.000000 rad/s
 Cursor x	 00.0000 rad/s
-Terms	 00 
-R²	 0.000000 
+Terms	 00
+R²	 0.000000
 [Analysis]
 Analyzed step	000-GID-000000 - 000000-0 - 0000.00.00 - Frequency sweep - 0
 Model	Statistics
@@ -160,7 +160,7 @@ Cursor x	 00.0000 rad/s
 Max y	 00000.0 MPa
 Min y	 00000.0 MPa
 Mean y	 00000.0 MPa
-Variance	 000000 
+Variance	 000000
 Standard Deviation	 000.000 MPa
 Relative Standard Deviation	 0.000000
 [step]
