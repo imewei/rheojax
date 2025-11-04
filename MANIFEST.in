@@ -5,10 +5,10 @@ include pyproject.toml
 include requirements*.txt
 
 # Include type hints
-include rheo/py.typed
+include rheojax/py.typed
 
 # Include configuration files
-recursive-include rheo *.json *.yaml *.yml
+recursive-include rheojax *.json *.yaml *.yml
 
 # Include test data (but not test code - that's excluded in pyproject.toml)
 recursive-include tests/data *
