@@ -90,6 +90,8 @@ Contents
 
    user_guide/getting_started
    user_guide/core_concepts
+   user_guide/bayesian_inference
+   user_guide/pipeline_api
    user_guide/io_guide
    user_guide/visualization_guide
 
@@ -140,29 +142,33 @@ Development Status
    - ✅ 20 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models)
    - ✅ 5 data transforms (FFT, Mastercurve/TTS, Mutation Number, OWChirp/LAOS, Smooth Derivative)
    - ✅ Pipeline API for fluent workflows
-   - ✅ BayesianPipeline with NLSQ → NUTS warm-start
    - ✅ 20 tutorial notebooks (basic, transforms, bayesian, advanced)
 
 **Phase 3 (Complete)**: Bayesian Inference ✅
    - ✅ NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
-   - ✅ Uncertainty quantification via credible intervals
-   - ✅ ArviZ integration (6 diagnostic plot types)
+   - ✅ Uncertainty quantification via credible intervals and posterior distributions
+   - ✅ ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
    - ✅ Model comparison (WAIC/LOO)
-   - ✅ All 20 models support Bayesian inference
+   - ✅ BayesianMixin: All 20 models support Bayesian inference
+   - ✅ BayesianPipeline with fluent API for NLSQ → NUTS workflows
+   - ✅ 5 comprehensive Bayesian inference tutorial notebooks
 
 Technology Stack
 ----------------
 
 **Core Dependencies**
    - Python 3.12+
-   - JAX for acceleration and automatic differentiation
+   - JAX 0.8.0 for acceleration and automatic differentiation
+   - NLSQ 0.1.6+ for GPU-accelerated optimization
+   - NumPyro for Bayesian inference (MCMC NUTS sampling)
+   - ArviZ 0.15.0+ for Bayesian visualization and diagnostics
    - NumPy, SciPy for numerical operations
    - Matplotlib for visualization
    - h5py, pandas, openpyxl for I/O
 
 **Optional Dependencies**
+   - CUDA 12.1-12.9 for GPU acceleration (Linux only)
    - piblin for enhanced data management
-   - CUDA for GPU acceleration
 
 Performance
 -----------

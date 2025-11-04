@@ -370,6 +370,79 @@ FrequencyToTimePipeline
    time_data = ft_pipeline.convert()
    ft_pipeline.plot(show=True)
 
+BayesianPipeline
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: rheojax.pipeline.bayesian.BayesianPipeline
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+**Description**: Specialized pipeline for Bayesian rheological analysis with NLSQ → NUTS workflow.
+
+**Key Features**:
+
+- NLSQ optimization for fast point estimation
+- Automatic warm-start for NumPyro NUTS sampling
+- Comprehensive ArviZ diagnostics (6 plot types)
+- Fluent API for method chaining
+- Convergence monitoring (R-hat, ESS, divergences)
+
+**Example - Complete Bayesian Workflow**:
+
+.. code-block:: python
+
+   from rheojax.pipeline.bayesian import BayesianPipeline
+
+   # Create and execute pipeline
+   pipeline = (BayesianPipeline()
+       .load('data.csv', x_col='time', y_col='stress')
+       .fit_nlsq('maxwell')                    # Fast point estimate
+       .fit_bayesian(num_samples=2000,         # NUTS with warm-start
+                     num_warmup=1000)
+       .plot_posterior()                       # Posterior distributions
+       .plot_trace()                           # MCMC trace plots
+       .save('results.hdf5'))                  # Export results
+
+   # Access results
+   summary = pipeline.get_posterior_summary()
+   diagnostics = pipeline.get_diagnostics()
+   intervals = pipeline.get_credible_intervals()
+
+**Example - ArviZ Diagnostic Suite**:
+
+.. code-block:: python
+
+   # Comprehensive MCMC quality assessment
+   (pipeline
+       .plot_pair(divergences=True)        # Parameter correlations with divergences
+       .plot_forest(hdi_prob=0.95)         # Credible intervals comparison
+       .plot_energy()                       # NUTS energy diagnostic
+       .plot_autocorr()                     # Mixing diagnostic
+       .plot_rank()                         # Convergence diagnostic
+       .plot_ess(kind='local'))            # Effective sample size
+
+   # Convert to ArviZ InferenceData for advanced analysis
+   idata = pipeline._bayesian_result.to_inference_data()
+   import arviz as az
+   az.summary(idata)
+
+**Key Methods**:
+
+- ``fit_nlsq(model_name, **kwargs)``: NLSQ optimization for point estimation
+- ``fit_bayesian(num_samples, num_warmup, **kwargs)``: NumPyro NUTS sampling with warm-start
+- ``plot_posterior(**kwargs)``: Plot posterior distributions
+- ``plot_trace(**kwargs)``: Plot MCMC trace diagnostics
+- ``plot_pair(**kwargs)``: Plot parameter correlations (ArviZ)
+- ``plot_forest(**kwargs)``: Plot credible intervals (ArviZ)
+- ``plot_energy(**kwargs)``: Plot NUTS energy diagnostic (ArviZ)
+- ``plot_autocorr(**kwargs)``: Plot autocorrelation (ArviZ)
+- ``plot_rank(**kwargs)``: Plot rank diagnostic (ArviZ)
+- ``plot_ess(**kwargs)``: Plot effective sample size (ArviZ)
+- ``get_posterior_summary()``: Get posterior summary statistics
+- ``get_diagnostics()``: Get convergence diagnostics (R-hat, ESS)
+- ``get_credible_intervals(credibility=0.95)``: Get credible intervals
+
 Pipeline Builder
 ----------------
 

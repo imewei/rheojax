@@ -251,6 +251,99 @@ Functions
 
 .. autofunction:: rheojax.core.test_modes.suggest_models_for_test_mode
 
+Bayesian Inference
+------------------
+
+.. automodule:: rheojax.core.bayesian
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The Bayesian inference module provides NumPyro NUTS sampling capabilities with NLSQ warm-start
+for all rheological models through the BayesianMixin class.
+
+BayesianMixin
+~~~~~~~~~~~~~
+
+.. autoclass:: rheojax.core.bayesian.BayesianMixin
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :special-members: __init__
+
+   Mixin class that adds Bayesian inference capabilities to models. Provides:
+
+   - NLSQ → NUTS warm-start workflow (2-5x faster convergence)
+   - Automatic prior specification from parameter bounds
+   - Credible interval calculation
+   - Model function for NumPyro NUTS sampling
+
+   **Key Methods:**
+
+   .. autosummary::
+      :toctree: generated/
+
+      ~BayesianMixin.fit_bayesian
+      ~BayesianMixin.sample_prior
+      ~BayesianMixin.get_credible_intervals
+      ~BayesianMixin.model_function
+
+BayesianResult
+~~~~~~~~~~~~~~
+
+.. autoclass:: rheojax.core.bayesian.BayesianResult
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+   Dataclass storing complete Bayesian inference results:
+
+   **Attributes:**
+
+   - ``posterior_samples``: Dict mapping parameter names to posterior samples (float64 arrays)
+   - ``summary``: Dict with summary statistics (mean, std, quantiles) for each parameter
+   - ``diagnostics``: Convergence diagnostics including R-hat, ESS, divergences
+   - ``waic``: WAIC model comparison metric (if computed)
+   - ``loo``: LOO cross-validation metric (if computed)
+   - ``inference_data``: ArviZ InferenceData object for advanced diagnostics
+
+   **Methods:**
+
+   .. autosummary::
+      :toctree: generated/
+
+      ~BayesianResult.to_inference_data
+
+JAX Configuration
+-----------------
+
+.. automodule:: rheojax.core.jax_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The JAX configuration module ensures float64 precision throughout the JAX stack by enforcing
+proper import order (NLSQ must be imported before JAX).
+
+.. autofunction:: rheojax.core.jax_config.safe_import_jax
+
+   Safe JAX import that verifies NLSQ was imported first for float64 precision.
+
+   **Usage:**
+
+   .. code-block:: python
+
+      # CORRECT - Always use in RheoJAX modules
+      from rheojax.core.jax_config import safe_import_jax
+      jax, jnp = safe_import_jax()
+
+      # INCORRECT - Never import JAX directly
+      import jax  # Will raise ImportError if NLSQ not imported first
+
+.. autofunction:: rheojax.core.jax_config.verify_float64
+
+   Verify JAX is operating in float64 mode. Raises exception if not.
+
 Registry
 --------
 
@@ -375,3 +468,36 @@ Using Base Classes (Phase 2)
     model = MaxwellModel()
     model.fit(time, stress)
     predictions = model.predict(time)
+
+Bayesian Inference (Phase 3)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from rheojax.models.maxwell import Maxwell
+    import numpy as np
+
+    # Generate data
+    t = np.linspace(0.1, 10, 50)
+    G_data = 1e5 * np.exp(-t / 0.01) + np.random.normal(0, 1e3, size=t.shape)
+
+    # 1. NLSQ optimization (fast point estimate)
+    model = Maxwell()
+    model.fit(t, G_data)
+    print(f"NLSQ: G0={model.parameters.get_value('G0'):.3e}")
+
+    # 2. Bayesian inference with warm-start
+    result = model.fit_bayesian(
+        t, G_data,
+        num_warmup=1000,
+        num_samples=2000,
+        num_chains=1
+    )
+
+    # 3. Analyze results
+    print(f"Posterior mean: G0={result.summary['G0']['mean']:.3e} ± {result.summary['G0']['std']:.3e}")
+    print(f"Convergence: R-hat={result.diagnostics['r_hat']['G0']:.4f}")
+
+    # 4. Get credible intervals
+    intervals = model.get_credible_intervals(result.posterior_samples, credibility=0.95)
+    print(f"G0 95% CI: [{intervals['G0'][0]:.3e}, {intervals['G0'][1]:.3e}]")

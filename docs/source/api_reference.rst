@@ -20,7 +20,7 @@ Quick Links
 
 **Phase 1 (Core Infrastructure)**:
 
-- :doc:`api/core` - Base classes, data structures, parameters, registry
+- :doc:`api/core` - Base classes, data structures, parameters, Bayesian inference, JAX configuration
 - :doc:`api/io` - File readers and writers (TRIOS, CSV, Excel, HDF5)
 - :doc:`api/utils` - Utilities (optimization, Mittag-Leffler functions)
 - :doc:`api/visualization` - Plotting functions and templates
@@ -30,6 +30,11 @@ Quick Links
 - :doc:`api/models` - All 20 rheological models (classical, fractional, flow)
 - :doc:`api/transforms` - All 5 data transforms (FFT, mastercurve, mutation, OWChirp, smoothing)
 - :doc:`api/pipeline` - Pipeline API for high-level workflows
+
+**Phase 3 (Bayesian Inference)**:
+
+- :doc:`api/core` - BayesianMixin, BayesianResult (NumPyro NUTS sampling)
+- :doc:`api/pipeline` - BayesianPipeline (NLSQ → NUTS workflow with ArviZ diagnostics)
 
 Overview by Category
 --------------------
@@ -273,13 +278,15 @@ For advanced users:
 Version Information
 -------------------
 
-This documentation covers rheo version 0.2.0 (Phase 2 release).
+This documentation covers rheojax version 0.2.0.
 
 **Phase 1** (v0.1.0): Core infrastructure, test mode detection, I/O, visualization
 
-**Phase 2** (v0.2.0): 20 models, 5 transforms, Pipeline API, multi-technique fitting
+**Phase 2** (v0.1.5): 20 models, 5 transforms, Pipeline API, multi-technique fitting
 
-**Phase 3** (planned): Bayesian inference, ML model selection, PDF reports
+**Phase 3** (v0.2.0): Bayesian inference with NumPyro NUTS, ArviZ diagnostics, BayesianPipeline, all 20 models support Bayesian inference
+
+**Phase 4** (planned): ML model selection, enhanced sensitivity analysis, real-time processing
 
 Support
 -------
