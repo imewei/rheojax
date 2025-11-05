@@ -278,6 +278,13 @@ pipeline = BayesianPipeline()
     .plot_ess(kind='local'))            # Effective sample size
 ```
 
+**📚 New to Bayesian inference?** See the comprehensive [Bayesian Quick Start Guide](docs/BAYESIAN_QUICK_START.md) for:
+- When and why to use Bayesian inference
+- Complete NLSQ → NUTS → ArviZ workflow walkthrough
+- Troubleshooting common convergence issues
+- Best practices checklist
+- Runnable demo: `python examples/bayesian_workflow_demo.py`
+
 ### Working with Parameters
 
 ```python
