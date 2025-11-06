@@ -244,10 +244,22 @@ class ModelComparisonPipeline(Pipeline):
                 # Generate predictions
                 y_pred = model.predict(X)
 
-                # Calculate metrics
-                residuals = y - y_pred
+                # Handle complex modulus (oscillation mode)
+                # Oscillation predictions return (n, 2) array: [G', G"]
+                # Convert to magnitude |G*| = sqrt(G'^2 + G"^2)
+                if y_pred.ndim == 2 and y_pred.shape[1] == 2:
+                    y_pred_magnitude = np.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
+                else:
+                    y_pred_magnitude = y_pred
+
+                # Calculate metrics using magnitude
+                residuals = y - y_pred_magnitude
                 rmse = np.sqrt(np.mean(residuals**2))
-                r_squared = model.score(X, y)
+
+                # Calculate R² manually (avoid calling model.score() which predicts again)
+                ss_res = np.sum(residuals**2)
+                ss_tot = np.sum((y - np.mean(y)) ** 2)
+                r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
                 # Calculate relative RMSE
                 rel_rmse = rmse / np.mean(np.abs(y))
@@ -256,7 +268,8 @@ class ModelComparisonPipeline(Pipeline):
                 self.results[model_name] = {
                     "model": model,
                     "parameters": model.get_params(),
-                    "predictions": y_pred,
+                    "predictions": y_pred,  # Original predictions (may be 2D for oscillation)
+                    "predictions_magnitude": y_pred_magnitude,  # Scalar magnitude for metrics
                     "residuals": residuals,
                     "rmse": float(rmse),
                     "rel_rmse": float(rel_rmse),
