@@ -69,9 +69,15 @@ class Mastercurve(BaseTransform):
     ...                     metadata={'temperature': T})
     ...     datasets.append(data)
     >>>
-    >>> # Create mastercurve at reference temperature
+    >>> # Create mastercurve at reference temperature (two equivalent APIs)
     >>> mc = Mastercurve(reference_temp=298.15, method='wlf')
+    >>>
+    >>> # Option 1: Using create_mastercurve (explicit)
     >>> mastercurve = mc.create_mastercurve(datasets)
+    >>>
+    >>> # Option 2: Using transform with list (returns shift factors too)
+    >>> mastercurve, shift_factors = mc.transform(datasets)
+    >>> print(shift_factors)  # {273.0: 42.5, 298.15: 1.0, 323.0: 0.024}
     """
 
     def __init__(
@@ -117,8 +123,8 @@ class Mastercurve(BaseTransform):
         self.vertical_shifts_: dict[float, float] | None = None
 
     def _calculate_wlf_shift(
-        self, T: float | jnp.ndarray, T_ref: float, C1: float, C2: float
-    ) -> float | jnp.ndarray:
+        self, T: float | jnp.ndarray, T_ref: float, C1: float, C2: float  # type: ignore[name-defined]
+    ) -> float | jnp.ndarray:  # type: ignore[name-defined]
         """Calculate WLF shift factor.
 
         Parameters
@@ -142,8 +148,8 @@ class Mastercurve(BaseTransform):
         return jnp.power(10.0, log_aT)
 
     def _calculate_arrhenius_shift(
-        self, T: float | jnp.ndarray, T_ref: float, E_a: float
-    ) -> float | jnp.ndarray:
+        self, T: float | jnp.ndarray, T_ref: float, E_a: float  # type: ignore[name-defined]
+    ) -> float | jnp.ndarray:  # type: ignore[name-defined]
         """Calculate Arrhenius shift factor.
 
         Parameters
@@ -203,11 +209,113 @@ class Mastercurve(BaseTransform):
         self.method = "manual"
         self.shift_factors_ = shift_factors
 
-    def _transform(self, data: RheoData) -> RheoData:
-        """Apply horizontal shift to single-temperature data.
+    def get_wlf_parameters(self) -> dict[str, float]:
+        """Get WLF parameters.
 
-        This method is for single datasets. For creating mastercurves from
-        multiple temperatures, use create_mastercurve() instead.
+        Returns
+        -------
+        dict
+            Dictionary with keys 'C1', 'C2', and 'T_ref' (reference temperature)
+
+        Raises
+        ------
+        ValueError
+            If method is not 'wlf'
+        """
+        if self.method != "wlf":
+            raise ValueError(f"WLF parameters not available for method '{self.method}'")
+
+        return {
+            "C1": self.C1,
+            "C2": self.C2,
+            "T_ref": self.T_ref,
+        }
+
+    def get_arrhenius_parameters(self) -> dict[str, float]:
+        """Get Arrhenius parameters.
+
+        Returns
+        -------
+        dict
+            Dictionary with keys 'E_a' (activation energy) and 'T_ref' (reference temperature)
+
+        Raises
+        ------
+        ValueError
+            If method is not 'arrhenius' or E_a is not set
+        """
+        if self.method != "arrhenius":
+            raise ValueError(
+                f"Arrhenius parameters not available for method '{self.method}'"
+            )
+
+        if self.E_a is None:
+            raise ValueError("E_a (activation energy) not set")
+
+        return {
+            "E_a": self.E_a,
+            "T_ref": self.T_ref,
+        }
+
+    def get_shift_factors_array(
+        self, temperatures: list[float] | np.ndarray | None = None
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Get shift factors as arrays for plotting and analysis.
+
+        Parameters
+        ----------
+        temperatures : list or ndarray, optional
+            Temperatures in Kelvin. If None, uses temperatures from the last
+            mastercurve creation (stored in shift_factors_).
+
+        Returns
+        -------
+        temperatures : ndarray
+            Array of temperatures in Kelvin (sorted)
+        shift_factors : ndarray
+            Array of shift factors corresponding to temperatures
+
+        Raises
+        ------
+        ValueError
+            If temperatures is None and no shift factors have been computed
+
+        Examples
+        --------
+        >>> mc = Mastercurve(reference_temp=298.15, method='wlf')
+        >>> temps, shifts = mc.get_shift_factors_array([273.15, 298.15, 323.15])
+        >>> import matplotlib.pyplot as plt
+        >>> plt.plot(temps - 273.15, np.log10(shifts))
+        """
+        if temperatures is None:
+            # Use stored shift factors from last mastercurve creation
+            if self.shift_factors_ is None:
+                raise ValueError(
+                    "No shift factors available. Either provide temperatures or "
+                    "create a mastercurve first."
+                )
+
+            # Extract from stored shift factors
+            temps_array = np.array(sorted(self.shift_factors_.keys()))
+            shifts_array = np.array([self.shift_factors_[T] for T in temps_array])
+
+        else:
+            # Calculate shift factors for provided temperatures
+            temps_array = np.array(temperatures)
+
+            # Sort by temperature
+            sort_idx = np.argsort(temps_array)
+            temps_array = temps_array[sort_idx]
+
+            # Calculate shift factors
+            shifts_array = np.array(
+                [self.get_shift_factor(float(T)) for T in temps_array]
+            )
+
+        return temps_array, shifts_array
+
+    def _transform_single(self, data: RheoData) -> RheoData:
+        """Apply horizontal shift to single-temperature data.
 
         Parameters
         ----------
@@ -234,7 +342,7 @@ class Mastercurve(BaseTransform):
         a_T = self.get_shift_factor(T)
 
         # Apply horizontal shift (frequency or time shift)
-        x_shifted = data.x * a_T
+        x_shifted = data.x * a_T  # type: ignore[operator]
 
         # Apply vertical shift if requested
         y_shifted = data.y
@@ -267,9 +375,37 @@ class Mastercurve(BaseTransform):
             validate=False,
         )
 
+    def _transform(
+        self, data: RheoData | list[RheoData]
+    ) -> RheoData | tuple[RheoData, dict[float, float]]:
+        """Apply horizontal shift to single-temperature data or create mastercurve.
+
+        Parameters
+        ----------
+        data : RheoData or list of RheoData
+            Single-temperature data to shift, or list of datasets for mastercurve
+
+        Returns
+        -------
+        RheoData or tuple of (RheoData, dict)
+            If data is a single RheoData: returns shifted data
+            If data is a list: returns (mastercurve, shift_factors)
+
+        Raises
+        ------
+        ValueError
+            If temperature metadata is missing
+        """
+        # Handle list of datasets (create mastercurve)
+        if isinstance(data, list):
+            return self.create_mastercurve(data, return_shifts=True)  # type: ignore[return-value]
+
+        # Handle single dataset
+        return self._transform_single(data)
+
     def create_mastercurve(
-        self, datasets: list[RheoData], merge: bool = True
-    ) -> RheoData | list[RheoData]:
+        self, datasets: list[RheoData], merge: bool = True, return_shifts: bool = False
+    ) -> RheoData | list[RheoData] | tuple[RheoData, dict[float, float]]:
         """Create mastercurve from multiple temperature datasets.
 
         Parameters
@@ -279,29 +415,45 @@ class Mastercurve(BaseTransform):
         merge : bool, default=True
             If True, merge all shifted data into single RheoData.
             If False, return list of shifted datasets.
+        return_shifts : bool, default=False
+            If True, return tuple of (mastercurve, shift_factors).
+            Only valid when merge=True.
 
         Returns
         -------
-        RheoData or list of RheoData
-            Mastercurve data (merged or list)
+        RheoData or list of RheoData or tuple
+            If merge=True and return_shifts=False: RheoData
+            If merge=False: list of RheoData
+            If merge=True and return_shifts=True: (RheoData, dict of shift factors)
 
         Raises
         ------
         ValueError
-            If datasets don't have temperature metadata
+            If datasets don't have temperature metadata or if return_shifts=True with merge=False
         """
         from rheojax.core.data import RheoData
+
+        if return_shifts and not merge:
+            raise ValueError("return_shifts=True requires merge=True")
 
         # Shift all datasets
         shifted_datasets = []
         temperatures = []
+        shift_factors = {}
 
         for data in datasets:
             if "temperature" not in data.metadata:
                 raise ValueError("All datasets must have 'temperature' in metadata")
 
-            temperatures.append(data.metadata["temperature"])
-            shifted = self.transform(data)
+            T = data.metadata["temperature"]
+            temperatures.append(T)
+
+            # Calculate shift factor for this temperature
+            a_T = self.get_shift_factor(T)
+            shift_factors[T] = float(a_T)
+
+            # Transform the data using the single-dataset method
+            shifted = self._transform_single(data)
             shifted_datasets.append(shifted)
 
         # If not merging, return list
@@ -340,9 +492,10 @@ class Mastercurve(BaseTransform):
             "temperatures": temperatures,
             "n_datasets": len(datasets),
             "source_temperatures": merged_temps,
+            "shift_factors": shift_factors,
         }
 
-        return RheoData(
+        mastercurve = RheoData(
             x=merged_x,
             y=merged_y,
             x_units=datasets[0].x_units if datasets else None,
@@ -351,6 +504,13 @@ class Mastercurve(BaseTransform):
             metadata=merged_metadata,
             validate=False,
         )
+
+        # Store shift factors for later retrieval
+        self.shift_factors_ = shift_factors
+
+        if return_shifts:
+            return mastercurve, shift_factors
+        return mastercurve
 
     def compute_overlap_error(self, datasets: list[RheoData]) -> float:
         """Compute overlap error for multi-temperature data.
@@ -372,7 +532,7 @@ class Mastercurve(BaseTransform):
         shifted_datasets = self.create_mastercurve(datasets, merge=False)
 
         if not isinstance(shifted_datasets, list):
-            shifted_datasets = [shifted_datasets]
+            shifted_datasets = [shifted_datasets]  # type: ignore[list-item]
 
         # Find overlapping regions and compute RMSE
         total_error = 0.0
