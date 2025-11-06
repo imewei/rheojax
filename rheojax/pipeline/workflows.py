@@ -94,7 +94,9 @@ class MastercurvePipeline(Pipeline):
         self.data = merged_data
         self._apply_mastercurve_shift()
 
-        self.history.append(("mastercurve", len(file_paths), self.reference_temp))
+        self.history.append(
+            ("mastercurve", str(len(file_paths)), str(self.reference_temp))
+        )
         return self
 
     def _merge_datasets(
@@ -270,10 +272,15 @@ class ModelComparisonPipeline(Pipeline):
                 if n > 0 and rmse > 0:
                     aic = n * np.log(rmse**2) + 2 * k
                     self.results[model_name]["aic"] = float(aic)
+
+                    # Calculate BIC (Bayesian Information Criterion)
+                    bic = n * np.log(rmse**2) + k * np.log(n)
+                    self.results[model_name]["bic"] = float(bic)
                 else:
                     self.results[model_name]["aic"] = np.inf
+                    self.results[model_name]["bic"] = np.inf
 
-                self.history.append(("fit_compare", model_name, r_squared))
+                self.history.append(("fit_compare", model_name, str(r_squared)))
 
             except Exception as e:
                 warnings.warn(f"Failed to fit model {model_name}: {e}", stacklevel=2)
@@ -285,8 +292,8 @@ class ModelComparisonPipeline(Pipeline):
         """Return name of best-fitting model.
 
         Args:
-            metric: Metric to use for comparison ('rmse', 'r_squared', 'aic')
-            minimize: If True, lower values are better (e.g., RMSE)
+            metric: Metric to use for comparison ('rmse', 'r_squared', 'aic', 'bic')
+            minimize: If True, lower values are better (e.g., RMSE, AIC, BIC)
 
         Returns:
             Name of best model
@@ -319,6 +326,7 @@ class ModelComparisonPipeline(Pipeline):
                 "rel_rmse": result["rel_rmse"],
                 "r_squared": result["r_squared"],
                 "aic": result.get("aic", np.nan),
+                "bic": result.get("bic", np.nan),
                 "n_params": result["n_params"],
             }
             for name, result in self.results.items()
@@ -506,7 +514,7 @@ class FrequencyToTimePipeline(Pipeline):
             validate=False,
         )
 
-        self.history.append(("frequency_to_time", n_points))
+        self.history.append(("frequency_to_time", str(n_points)))
         return self
 
     def _approximate_inverse_transform(
