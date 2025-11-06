@@ -313,12 +313,21 @@ def _read_segment_chunked(
 
         # Parse segment header
         segment_lines = []
+        step_temperature = None
 
         # Read until we find data start or reach segment end
         line_num = seg_start
         for line in f:
             segment_lines.append(line.rstrip("\n"))
             line_num += 1
+
+            # Extract temperature from step name
+            if "Step name" in line and step_temperature is None:
+                # Support negative temperatures with optional minus sign
+                temp_match = re.search(r"(-?\d+\.?\d*)\s*°C", line)
+                if temp_match:
+                    temp_c = float(temp_match.group(1))
+                    step_temperature = temp_c + 273.15  # Convert to Kelvin
 
             # Check if we've reached segment end
             if seg_end is not None and line_num >= seg_end:
@@ -357,8 +366,23 @@ def _read_segment_chunked(
                             break
                         values = line.split("\t")
                         if len(values) == len(columns):
-                            row = [float(v) if v.strip() else np.nan for v in values]
-                            sample_rows.append(row)
+                            # Skip first column (row label like "Data point")
+                            # Convert remaining columns, using np.nan for non-numeric values
+                            row = []
+                            for i, v in enumerate(values):
+                                if i == 0:
+                                    # Skip first column (row label)
+                                    continue
+                                if not v.strip():
+                                    row.append(np.nan)
+                                else:
+                                    try:
+                                        row.append(float(v))
+                                    except ValueError:
+                                        # Handle hex values (status bits), dates, strings
+                                        row.append(np.nan)
+                            if row:
+                                sample_rows.append(row)
                     except (StopIteration, ValueError):
                         break
 
@@ -366,6 +390,10 @@ def _read_segment_chunked(
                     return  # No data in segment
 
                 sample_array = np.array(sample_rows)
+
+                # Adjust column indices since we skipped column 0
+                columns = columns[1:]  # Remove first column ("Variables" or similar)
+                units = units[1:]  # Remove first unit
 
                 # Determine x/y columns
                 x_col, x_units, y_col, y_units = _determine_xy_columns(
@@ -388,6 +416,10 @@ def _read_segment_chunked(
                 segment_metadata["test_mode"] = test_mode
                 segment_metadata["columns"] = columns
                 segment_metadata["units"] = units
+
+                # Add temperature if found
+                if step_temperature is not None:
+                    segment_metadata["temperature"] = step_temperature
 
                 # Start accumulating data from sample rows
                 x_chunk = sample_array[:, x_col]
@@ -418,31 +450,46 @@ def _read_segment_chunked(
                         break
 
                     values = line.split("\t")
-                    if len(values) == len(columns):
+                    # Account for skipped first column
+                    expected_columns = len(columns) + 1  # +1 for the row label we skip
+                    if len(values) == expected_columns:
                         try:
-                            row = [float(v) if v.strip() else np.nan for v in values]
-                            x_val = row[x_col]
-                            y_val = row[y_col]
+                            # Skip first column and convert remaining with nan for non-numeric
+                            row = []
+                            for i, v in enumerate(values):
+                                if i == 0:
+                                    continue
+                                if not v.strip():
+                                    row.append(np.nan)
+                                else:
+                                    try:
+                                        row.append(float(v))
+                                    except ValueError:
+                                        row.append(np.nan)
 
-                            # Skip NaN values
-                            if not (np.isnan(x_val) or np.isnan(y_val)):
-                                current_x.append(x_val)
-                                current_y.append(y_val)
+                            if len(row) > max(x_col, y_col):
+                                x_val = row[x_col]
+                                y_val = row[y_col]
 
-                                # Yield chunk when size reached
-                                if len(current_x) >= chunk_size:
-                                    yield RheoData(
-                                        x=np.array(current_x),
-                                        y=np.array(current_y),
-                                        x_units=x_units,
-                                        y_units=y_units,
-                                        domain=domain,
-                                        metadata=segment_metadata.copy(),
-                                        validate=validate_data,
-                                    )
-                                    # Reset for next chunk
-                                    current_x = []
-                                    current_y = []
+                                # Skip NaN values
+                                if not (np.isnan(x_val) or np.isnan(y_val)):
+                                    current_x.append(x_val)
+                                    current_y.append(y_val)
+
+                                    # Yield chunk when size reached
+                                    if len(current_x) >= chunk_size:
+                                        yield RheoData(
+                                            x=np.array(current_x),
+                                            y=np.array(current_y),
+                                            x_units=x_units,
+                                            y_units=y_units,
+                                            domain=domain,
+                                            metadata=segment_metadata.copy(),
+                                            validate=validate_data,
+                                        )
+                                        # Reset for next chunk
+                                        current_x = []
+                                        current_y = []
 
                         except (ValueError, IndexError):
                             continue
@@ -537,6 +584,18 @@ def _parse_segment(
     # Find header and data lines
     segment_lines = lines[start:end]
 
+    # Extract temperature from step name (e.g., "Frequency sweep (150.0 °C)")
+    step_temperature = None
+    for i, line in enumerate(segment_lines[:5]):  # Check first few lines
+        if "Step name" in line or line.startswith("Step name"):
+            # Extract temperature from format: "Step name\tFrequency sweep (150.0 °C)"
+            # Support negative temperatures with optional minus sign
+            temp_match = re.search(r"(-?\d+\.?\d*)\s*°C", line)
+            if temp_match:
+                temp_c = float(temp_match.group(1))
+                step_temperature = temp_c + 273.15  # Convert to Kelvin
+                break
+
     # Look for "Number of points" line
     num_points_line = None
     for i, line in enumerate(segment_lines):
@@ -584,18 +643,34 @@ def _parse_segment(
 
         values = line.split("\t")
         if len(values) == len(columns):
-            try:
-                row = [float(v) if v.strip() else np.nan for v in values]
+            # Skip first column (row label like "Data point")
+            # Convert remaining columns, using np.nan for non-numeric values
+            row = []
+            for i, v in enumerate(values):
+                if i == 0:
+                    # Skip first column (row label)
+                    continue
+                if not v.strip():
+                    row.append(np.nan)
+                else:
+                    try:
+                        row.append(float(v))
+                    except ValueError:
+                        # Handle hex values (status bits), dates, strings
+                        row.append(np.nan)
+
+            if row:  # Only add if we have data
                 data_rows.append(row)
-            except ValueError:
-                # Skip rows that can't be converted
-                continue
 
     if not data_rows:
         return None
 
     # Convert to numpy array
     data_array = np.array(data_rows)
+
+    # Adjust column indices since we skipped column 0
+    columns = columns[1:]  # Remove first column ("Variables" or similar)
+    units = units[1:]  # Remove first unit
 
     # Determine x and y columns based on common column names
     x_col, x_units, y_col, y_units = _determine_xy_columns(columns, units, data_array)
@@ -627,6 +702,10 @@ def _parse_segment(
     segment_metadata["columns"] = columns
     segment_metadata["units"] = units
 
+    # Add temperature if found
+    if step_temperature is not None:
+        segment_metadata["temperature"] = step_temperature
+
     return RheoData(
         x=x_data,
         y=y_data,
@@ -654,14 +733,15 @@ def _determine_xy_columns(
     columns_lower = [c.lower() for c in columns]
 
     # Priority lists for x and y columns
+    # Note: Frequency comes before general "time" to prioritize frequency sweeps
     x_priorities = [
-        "time",
         "angular frequency",
         "frequency",
         "shear rate",
         "temperature",
-        "strain",
         "step time",
+        "time",
+        "strain",
     ]
 
     y_priorities = [

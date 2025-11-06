@@ -117,33 +117,38 @@ class FractionalMaxwellLiquid(BaseModel):
         # Add small epsilon to prevent issues
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
+        # Convert alpha to Python float for Mittag-Leffler (requires static values)
+        # During optimization, if alpha is traced, this will use the current value
+        alpha_float = (
+            float(alpha)
+            if not isinstance(alpha, (jnp.ndarray, jax.Array))
+            else float(jnp.asarray(alpha).item())
+        )
 
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        # Clip to safe range as Python float
+        alpha_safe_float = max(epsilon, min(alpha_float, 1.0 - epsilon))
 
-        # Compute Mittag-Leffler parameters as concrete values
-        ml_alpha = 1.0 - alpha_safe
-        ml_beta = 1.0 - alpha_safe
+        # Compute Mittag-Leffler parameters as Python floats
+        ml_alpha = 1.0 - alpha_safe_float
+        ml_beta = 1.0 - alpha_safe_float
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_relaxation(t, Gm, tau_alpha):
-            t_safe = jnp.maximum(t, epsilon)
-            tau_alpha_safe = jnp.maximum(tau_alpha, epsilon)
+        # Convert to JAX for computations
+        alpha_safe = jnp.array(alpha_safe_float)
 
-            # Compute argument for Mittag-Leffler function
-            z = -(t_safe ** (1.0 - alpha_safe)) / tau_alpha_safe
+        # Compute relaxation modulus
+        t_safe = jnp.maximum(t, epsilon)
+        tau_alpha_safe = jnp.maximum(tau_alpha, epsilon)
 
-            # Compute E_{1-α,1-α}(z) with concrete alpha/beta
-            ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
+        # Compute argument for Mittag-Leffler function
+        z = -(t_safe ** (1.0 - alpha_safe)) / tau_alpha_safe
 
-            # Compute G(t)
-            G_t = Gm * (t_safe ** (-alpha_safe)) * ml_value
+        # Compute E_{1-α,1-α}(z) with Python float alpha/beta
+        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
 
-            return G_t
+        # Compute G(t)
+        G_t = Gm * (t_safe ** (-alpha_safe)) * ml_value
 
-        return _compute_relaxation(t, Gm, tau_alpha)
+        return G_t
 
     def _predict_creep_jax(
         self, t: jnp.ndarray, Gm: float, alpha: float, tau_alpha: float
@@ -164,39 +169,43 @@ class FractionalMaxwellLiquid(BaseModel):
         # Add small epsilon
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
+        # Convert alpha to Python float for Mittag-Leffler (requires static values)
+        alpha_float = (
+            float(alpha)
+            if not isinstance(alpha, (jnp.ndarray, jax.Array))
+            else float(jnp.asarray(alpha).item())
+        )
 
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        # Clip to safe range as Python float
+        alpha_safe_float = max(epsilon, min(alpha_float, 1.0 - epsilon))
 
-        # Compute Mittag-Leffler parameters as concrete values
-        ml_alpha = alpha_safe
-        ml_beta = 1.0 + alpha_safe
+        # Compute Mittag-Leffler parameters as Python floats
+        ml_alpha = alpha_safe_float
+        ml_beta = 1.0 + alpha_safe_float
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_creep(t, Gm, tau_alpha):
-            t_safe = jnp.maximum(t, epsilon)
-            tau_alpha_safe = jnp.maximum(tau_alpha, epsilon)
+        # Convert to JAX for computations
+        alpha_safe = jnp.array(alpha_safe_float)
 
-            # Instantaneous compliance (elastic part)
-            J_instant = 1.0 / Gm
+        # Compute creep compliance
+        t_safe = jnp.maximum(t, epsilon)
+        tau_alpha_safe = jnp.maximum(tau_alpha, epsilon)
 
-            # Time-dependent part with Mittag-Leffler function
-            z = -((t_safe / tau_alpha_safe) ** alpha_safe)
+        # Instantaneous compliance (elastic part)
+        J_instant = 1.0 / Gm
 
-            # Compute E_{α,1+α}(z) with concrete alpha/beta
-            ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
+        # Time-dependent part with Mittag-Leffler function
+        z = -((t_safe / tau_alpha_safe) ** alpha_safe)
 
-            # Creep compliance
-            J_t = (
-                J_instant
-                + (t_safe**alpha_safe) / (Gm * (tau_alpha_safe**alpha_safe)) * ml_value
-            )
+        # Compute E_{α,1+α}(z) with Python float alpha/beta
+        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
 
-            return J_t
+        # Creep compliance
+        J_t = (
+            J_instant
+            + (t_safe**alpha_safe) / (Gm * (tau_alpha_safe**alpha_safe)) * ml_value
+        )
 
-        return _compute_creep(t, Gm, tau_alpha)
+        return J_t
 
     def _predict_oscillation_jax(
         self, omega: jnp.ndarray, Gm: float, alpha: float, tau_alpha: float
@@ -217,32 +226,31 @@ class FractionalMaxwellLiquid(BaseModel):
         # Add small epsilon
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
+        # Convert alpha to Python float for consistent behavior
+        alpha_float = (
+            float(alpha)
+            if not isinstance(alpha, (jnp.ndarray, jax.Array))
+            else float(jnp.asarray(alpha).item())
+        )
 
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        # Clip to safe range and convert back to JAX
+        alpha_safe_float = max(epsilon, min(alpha_float, 1.0 - epsilon))
+        alpha_safe = jnp.array(alpha_safe_float)
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_oscillation(omega, Gm, tau_alpha):
-            omega_safe = jnp.maximum(omega, epsilon)
-            tau_alpha_safe = jnp.maximum(tau_alpha, epsilon)
+        # Compute oscillation response
+        omega_safe = jnp.maximum(omega, epsilon)
+        tau_alpha_safe = jnp.maximum(tau_alpha, epsilon)
 
-            # Complex frequency term
-            1j * omega_safe
+        # (iωτ_α)^α = |ωτ_α|^α * exp(i α π/2)
+        omega_tau = omega_safe * tau_alpha_safe
+        i_omega_tau_alpha = (omega_tau**alpha_safe) * jnp.exp(
+            1j * alpha_safe * jnp.pi / 2.0
+        )
 
-            # (iωτ_α)^α = |ωτ_α|^α * exp(i α π/2)
-            omega_tau = omega_safe * tau_alpha_safe
-            i_omega_tau_alpha = (omega_tau**alpha_safe) * jnp.exp(
-                1j * alpha_safe * jnp.pi / 2.0
-            )
+        # Complex modulus
+        G_star = Gm * i_omega_tau_alpha / (1.0 + i_omega_tau_alpha)
 
-            # Complex modulus
-            G_star = Gm * i_omega_tau_alpha / (1.0 + i_omega_tau_alpha)
-
-            return G_star
-
-        return _compute_oscillation(omega, Gm, tau_alpha)
+        return G_star
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> FractionalMaxwellLiquid:
         """Fit model parameters to data.
@@ -301,6 +309,7 @@ class FractionalMaxwellLiquid(BaseModel):
 
         self.fitted_ = True
         return self
+
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Internal predict implementation.
 
