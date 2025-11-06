@@ -279,7 +279,9 @@ class ParameterSet:
 
         min_val, max_val = bounds
         if min_val >= max_val:
-            raise ValueError(f"Invalid bounds: min ({min_val}) must be < max ({max_val})")
+            raise ValueError(
+                f"Invalid bounds: min ({min_val}) must be < max ({max_val})"
+            )
 
         param = self._parameters[name]
         param.bounds = bounds
@@ -364,6 +366,53 @@ class ParameterSet:
     def __iter__(self):
         """Iterate over parameter names."""
         return iter(self._order)
+
+    def keys(self):
+        """Return an iterator over parameter names (dict-like interface).
+
+        Returns:
+            Iterator over parameter names in order
+
+        Examples:
+            >>> params = ParameterSet()
+            >>> params.add('alpha', value=0.5)
+            >>> params.add('beta', value=1.0)
+            >>> list(params.keys())
+            ['alpha', 'beta']
+        """
+        return iter(self._order)
+
+    def values(self):
+        """Return an iterator over Parameter objects (dict-like interface).
+
+        Returns:
+            Iterator over Parameter objects in order
+
+        Examples:
+            >>> params = ParameterSet()
+            >>> params.add('alpha', value=0.5, units='')
+            >>> for param in params.values():
+            ...     print(f"{param.name}: {param.value}")
+            alpha: 0.5
+        """
+        for name in self._order:
+            yield self._parameters[name]
+
+    def items(self):
+        """Return an iterator over (name, Parameter) tuples (dict-like interface).
+
+        Returns:
+            Iterator over (name, Parameter) tuples in order
+
+        Examples:
+            >>> params = ParameterSet()
+            >>> params.add('alpha', value=0.5)
+            >>> for name, param in params.items():
+            ...     print(f"{name}: {param.value}")
+            alpha: 0.5
+        """
+        for name in self._order:
+            yield name, self._parameters[name]
 
     def __getitem__(self, key: str) -> Parameter:
         """Get parameter by name using subscript notation.
