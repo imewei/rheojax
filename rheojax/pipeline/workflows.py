@@ -271,8 +271,7 @@ class ModelComparisonPipeline(Pipeline):
                 self.results[model_name] = {
                     "model": model,
                     "parameters": model.get_params(),
-                    "predictions": y_pred,  # Original predictions (may be 2D for oscillation)
-                    "predictions_magnitude": y_pred_magnitude,  # Scalar magnitude for metrics
+                    "predictions": y_pred_magnitude,  # Always real-valued, plottable magnitudes
                     "residuals": residuals,
                     "rmse": float(rmse),
                     "rel_rmse": float(rel_rmse),
