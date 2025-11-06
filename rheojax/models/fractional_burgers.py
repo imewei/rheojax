@@ -96,35 +96,35 @@ class FractionalBurgersModel(BaseModel):
         self.parameters = ParameterSet()
         self.parameters.add(
             name="Jg",
-            value=None,
+            value=1e-6,
             bounds=(1e-9, 1e3),
             units="1/Pa",
             description="Glassy compliance",
         )
         self.parameters.add(
             name="eta1",
-            value=None,
+            value=1000.0,
             bounds=(1e-6, 1e12),
             units="Pa·s",
             description="Viscosity (Maxwell arm)",
         )
         self.parameters.add(
             name="Jk",
-            value=None,
+            value=1e-5,
             bounds=(1e-9, 1e3),
             units="1/Pa",
             description="Kelvin compliance",
         )
         self.parameters.add(
             name="alpha",
-            value=None,
+            value=0.5,
             bounds=(0.0, 1.0),
             units="",
             description="Fractional order",
         )
         self.parameters.add(
             name="tau_k",
-            value=None,
+            value=1.0,
             bounds=(1e-6, 1e6),
             units="s",
             description="Retardation time",
@@ -356,11 +356,11 @@ class FractionalBurgersModel(BaseModel):
         self
             Fitted model instance
         """
+        from rheojax.core.test_modes import TestMode
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
         )
-        from rheojax.core.test_modes import TestMode
 
         # Detect test mode
         test_mode_str = kwargs.get("test_mode", "creep")
@@ -382,7 +382,13 @@ class FractionalBurgersModel(BaseModel):
         # Create stateless model function for optimization
         def model_fn(x, params):
             """Model function for optimization (stateless)."""
-            Jg, eta1, Jk, alpha, tau_k = params[0], params[1], params[2], params[3], params[4]
+            Jg, eta1, Jk, alpha, tau_k = (
+                params[0],
+                params[1],
+                params[2],
+                params[3],
+                params[4],
+            )
 
             # Direct prediction based on test mode (stateless)
             if test_mode == TestMode.RELAXATION:
@@ -400,13 +406,20 @@ class FractionalBurgersModel(BaseModel):
         )
 
         # Optimize using NLSQ TRF
-        nlsq_optimize(
+        result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
             method=kwargs.get("method", "auto"),
             max_iter=kwargs.get("max_iter", 1000),
         )
+
+        # Validate optimization succeeded
+        if not result.success:
+            raise RuntimeError(
+                f"Optimization failed: {result.message}. "
+                f"Try adjusting initial values, bounds, or max_iter."
+            )
 
         self.fitted_ = True
         return self
@@ -464,7 +477,7 @@ class FractionalBurgersModel(BaseModel):
         tau_k = params[4]
 
         # Use test_mode from last fit if available, otherwise default to CREEP
-        test_mode = getattr(self, '_test_mode', TestMode.CREEP)
+        test_mode = getattr(self, "_test_mode", TestMode.CREEP)
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:
@@ -476,6 +489,7 @@ class FractionalBurgersModel(BaseModel):
         else:
             # Default to creep mode for Burgers model
             return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
+
 
 # Convenience alias
 FBM = FractionalBurgersModel

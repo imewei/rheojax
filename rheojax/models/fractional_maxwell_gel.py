@@ -139,35 +139,27 @@ class FractionalMaxwellGel(BaseModel):
         # Add small epsilon to prevent issues at t=0 and with alpha=1
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
+        # Clip alpha to safe range (now works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        # Compute safe values
+        t_safe = jnp.maximum(t, epsilon)
 
-        # Compute Mittag-Leffler parameters as concrete values
+        # Compute characteristic time
+        tau = eta / (c_alpha ** (1.0 / (1.0 - alpha_safe)))
+
+        # Compute argument for Mittag-Leffler function
+        z = -(t_safe ** (1.0 - alpha_safe)) / tau
+
+        # Compute E_{1-α,1-α}(z) (requires concrete alpha/beta)
         ml_alpha = 1.0 - alpha_safe
         ml_beta = 1.0 - alpha_safe
+        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_relaxation(t, c_alpha, eta):
-            t_safe = jnp.maximum(t, epsilon)
+        # Compute G(t)
+        G_t = c_alpha * (t_safe ** (-alpha_safe)) * ml_value
 
-            # Compute characteristic time
-            tau = eta / (c_alpha ** (1.0 / (1.0 - alpha_safe)))
-
-            # Compute argument for Mittag-Leffler function
-            z = -(t_safe ** (1.0 - alpha_safe)) / tau
-
-            # Compute E_{1-α,1-α}(z) with concrete alpha/beta
-            ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
-
-            # Compute G(t)
-            G_t = c_alpha * (t_safe ** (-alpha_safe)) * ml_value
-
-            return G_t
-
-        return _compute_relaxation(t, c_alpha, eta)
+        return G_t
 
     def _predict_creep_jax(
         self, t: jnp.ndarray, c_alpha: float, alpha: float, eta: float
@@ -188,39 +180,31 @@ class FractionalMaxwellGel(BaseModel):
         # Add small epsilon to prevent issues
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
+        # Clip alpha to safe range (now works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        # Compute safe values
+        t_safe = jnp.maximum(t, epsilon)
 
-        # Compute Mittag-Leffler parameters as concrete values
+        # Compute characteristic time
+        tau = eta / (c_alpha ** (1.0 / (1.0 - alpha_safe)))
+
+        # Compute argument for Mittag-Leffler function
+        z = -((t_safe / tau) ** (1.0 - alpha_safe))
+
+        # Compute E_{1+α,1+α}(z) (requires concrete alpha/beta)
         ml_alpha = 1.0 + alpha_safe
         ml_beta = 1.0 + alpha_safe
+        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_creep(t, c_alpha, eta):
-            t_safe = jnp.maximum(t, epsilon)
+        # Compute J(t)
+        J_t = (1.0 / c_alpha) * (t_safe**alpha_safe) * ml_value
 
-            # Compute characteristic time
-            tau = eta / (c_alpha ** (1.0 / (1.0 - alpha_safe)))
+        # Ensure monotonicity: creep compliance must increase with time
+        # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
+        J_t_monotonic = jnp.maximum.accumulate(J_t)
 
-            # Compute argument for Mittag-Leffler function
-            z = -((t_safe / tau) ** (1.0 - alpha_safe))
-
-            # Compute E_{1+α,1+α}(z) with concrete alpha/beta
-            ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
-
-            # Compute J(t)
-            J_t = (1.0 / c_alpha) * (t_safe**alpha_safe) * ml_value
-
-            # Ensure monoton icity: creep compliance must increase with time
-            # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
-            J_t_monotonic = jnp.maximum.accumulate(J_t)
-
-            return J_t_monotonic
-
-        return _compute_creep(t, c_alpha, eta)
+        return J_t_monotonic
 
     def _predict_oscillation_jax(
         self, omega: jnp.ndarray, c_alpha: float, alpha: float, eta: float
@@ -243,39 +227,33 @@ class FractionalMaxwellGel(BaseModel):
         # Add small epsilon
         epsilon = 1e-12
 
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
+        # Clip alpha to safe range (now works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         # Compute beta for the denominator
         beta_safe = 1.0 - alpha_safe
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_oscillation(omega, c_alpha, eta):
-            omega_safe = jnp.maximum(omega, epsilon)
-            tau_safe = jnp.maximum(
-                eta / (c_alpha ** (1.0 / (1.0 - alpha_safe + epsilon))), epsilon
-            )
+        # Compute safe values
+        omega_safe = jnp.maximum(omega, epsilon)
+        tau_safe = jnp.maximum(
+            eta / (c_alpha ** (1.0 / (1.0 - alpha_safe + epsilon))), epsilon
+        )
 
-            # (iω)^α = |ω|^α * exp(i α π/2)
-            i_omega_alpha = (omega_safe**alpha_safe) * jnp.exp(
-                1j * alpha_safe * jnp.pi / 2.0
-            )
+        # (iω)^α = |ω|^α * exp(i α π/2)
+        i_omega_alpha = (omega_safe**alpha_safe) * jnp.exp(
+            1j * alpha_safe * jnp.pi / 2.0
+        )
 
-            # (iωτ)^(1-α) = |ωτ|^(1-α) * exp(i (1-α) π/2)
-            omega_tau = omega_safe * tau_safe
-            i_omega_tau_beta = (omega_tau**beta_safe) * jnp.exp(
-                1j * beta_safe * jnp.pi / 2.0
-            )
+        # (iωτ)^(1-α) = |ωτ|^(1-α) * exp(i (1-α) π/2)
+        omega_tau = omega_safe * tau_safe
+        i_omega_tau_beta = (omega_tau**beta_safe) * jnp.exp(
+            1j * beta_safe * jnp.pi / 2.0
+        )
 
-            # Complex modulus: G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
-            G_star = c_alpha * i_omega_alpha / (1.0 + i_omega_tau_beta)
+        # Complex modulus: G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
+        G_star = c_alpha * i_omega_alpha / (1.0 + i_omega_tau_beta)
 
-            return G_star
-
-        return _compute_oscillation(omega, c_alpha, eta)
+        return G_star
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> FractionalMaxwellGel:
         """Fit model parameters to data.
@@ -323,8 +301,8 @@ class FractionalMaxwellGel(BaseModel):
             model_fn, x_data, y_data, normalize=True
         )
 
-        # Optimize using NLSQ
-        nlsq_optimize(
+        # Optimize using NLSQ (JAX enabled by default)
+        result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
@@ -332,8 +310,16 @@ class FractionalMaxwellGel(BaseModel):
             max_iter=kwargs.get("max_iter", 1000),
         )
 
+        # Validate optimization succeeded
+        if not result.success:
+            raise RuntimeError(
+                f"Optimization failed: {result.message}. "
+                f"Try adjusting initial values, bounds, or max_iter."
+            )
+
         self.fitted_ = True
         return self
+
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Internal predict implementation.
 

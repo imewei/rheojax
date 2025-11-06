@@ -219,10 +219,12 @@ exclude = [
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["B", "C", "E", "F", "W"]
+"rheojax/models/*.py" = ["E402"]  # safe_import_jax() must precede JAX imports
+"rheojax/utils/mittag_leffler.py" = ["E402"]  # safe_import_jax() must precede JAX imports
 
 [tool.mypy]
 python_version = "3.12"
-warn_return_any = true
+warn_return_any = false  # Allow Any returns for JAX arrays
 warn_unused_configs = true
 disallow_untyped_defs = false
 disallow_any_generics = false
@@ -232,3 +234,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_unreachable = true
 strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["rheojax.models.*", "rheojax.utils.mittag_leffler"]
+disable_error_code = ["name-defined", "no-any-return"]

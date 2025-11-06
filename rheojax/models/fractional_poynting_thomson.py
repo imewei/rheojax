@@ -97,28 +97,28 @@ class FractionalPoyntingThomson(BaseModel):
         self.parameters = ParameterSet()
         self.parameters.add(
             name="Ge",
-            value=None,
+            value=1500.0,
             bounds=(1e-3, 1e9),
             units="Pa",
             description="Instantaneous modulus",
         )
         self.parameters.add(
             name="Gk",
-            value=None,
+            value=500.0,
             bounds=(1e-3, 1e9),
             units="Pa",
             description="Retarded modulus",
         )
         self.parameters.add(
             name="alpha",
-            value=None,
+            value=0.5,
             bounds=(0.0, 1.0),
             units="",
             description="Fractional order",
         )
         self.parameters.add(
             name="tau",
-            value=None,
+            value=1.0,
             bounds=(1e-6, 1e6),
             units="s",
             description="Retardation time",
@@ -313,11 +313,11 @@ class FractionalPoyntingThomson(BaseModel):
         self
             Fitted model instance
         """
+        from rheojax.core.test_modes import TestMode
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
         )
-        from rheojax.core.test_modes import TestMode
 
         # Detect test mode
         test_mode_str = kwargs.get("test_mode", "creep")
@@ -357,13 +357,20 @@ class FractionalPoyntingThomson(BaseModel):
         )
 
         # Optimize using NLSQ TRF
-        nlsq_optimize(
+        result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
             method=kwargs.get("method", "auto"),
             max_iter=kwargs.get("max_iter", 1000),
         )
+
+        # Validate optimization succeeded
+        if not result.success:
+            raise RuntimeError(
+                f"Optimization failed: {result.message}. "
+                f"Try adjusting initial values, bounds, or max_iter."
+            )
 
         self.fitted_ = True
         return self
@@ -419,7 +426,7 @@ class FractionalPoyntingThomson(BaseModel):
         tau = params[3]
 
         # Use test_mode from last fit if available, otherwise default to CREEP
-        test_mode = getattr(self, '_test_mode', TestMode.CREEP)
+        test_mode = getattr(self, "_test_mode", TestMode.CREEP)
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:
@@ -431,6 +438,7 @@ class FractionalPoyntingThomson(BaseModel):
         else:
             # Default to creep mode for FPT model
             return self._predict_creep(X, Ge, Gk, alpha, tau)
+
 
 # Convenience alias
 FPT = FractionalPoyntingThomson

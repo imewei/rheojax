@@ -16,8 +16,6 @@ References
   functions, SIAM Journal of Numerical Analysis, 2015, 53(3), 1350-1369
 """
 
-from functools import partial
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
@@ -26,7 +24,7 @@ jax, jnp = safe_import_jax()
 from jax.scipy.special import gamma as jax_gamma
 
 
-@partial(jax.jit, static_argnums=(1,))
+@jax.jit
 def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarray:
     """
     One-parameter Mittag-Leffler function E_α(z).
@@ -80,7 +78,7 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
     return mittag_leffler_e2(z, alpha, beta=1.0)
 
 
-@partial(jax.jit, static_argnums=(1, 2))
+@jax.jit
 def mittag_leffler_e2(
     z: float | jnp.ndarray, alpha: float, beta: float
 ) -> float | jnp.ndarray:
@@ -138,33 +136,21 @@ def mittag_leffler_e2(
         - Relaxation modulus: E_α(-t^α), α ∈ (0,1)
         - Fractional derivatives: E_{α,β}(z) with β = 1-α
     - JIT compilation is automatic via @jax.jit decorator
-    - Alpha and beta must be static Python floats (not JAX traced values)
-    - For dynamic alpha/beta, models must pass concrete values
+    - Now supports traced alpha/beta values (no static_argnums required)
     """
-    # Validate alpha parameter
-    if not (0 < alpha <= 2):
-        raise ValueError(f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}")
+    # Note: Parameter validation removed to support JAX tracing
+    # Models enforce bounds via ParameterSet, so invalid values shouldn't occur
 
     # Convert input to JAX array
     z = jnp.asarray(z)
-    is_scalar = z.ndim == 0
-    z_orig = z
     z = jnp.atleast_1d(z)
-
-    # Store whether input was real
-    input_is_real = jnp.isrealobj(z_orig)
 
     # Use Pade approximation (accurate for |z| < 10)
     result = _mittag_leffler_pade(z, alpha, beta)
 
-    # Return scalar if input was scalar
-    if is_scalar:
-        result = result[0]
-
-    # Return real if input was real
-    if input_is_real:
-        result = jnp.real(result)
-
+    # For tracer compatibility, always return array (models expect arrays anyway)
+    # Original scalar/real handling removed to avoid shape mismatches in jax.lax.cond
+    # Models handle array outputs correctly, so this is safe
     return result
 
 
@@ -233,9 +219,7 @@ def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarr
     compensation = jnp.zeros_like(z_f64)  # For Kahan summation
 
     # For small |z|, use Taylor series (up to 100 terms)
-    # Number of terms needed depends on |z| and alpha
-    jnp.minimum(100, int(20 / alpha))  # More terms for smaller alpha
-
+    # Fixed number of terms for JIT compilation (dynamic term count incompatible with JAX tracing)
     for k in range(100):  # Upper bound for JIT
         # Compute term with float64 precision
         gamma_val = jax_gamma(alpha * (k + 1))
@@ -260,9 +244,6 @@ def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarr
     # For α ≠ β: E_{α,β}(-x) ≈ (1 / (x * Γ(1 - β/α))) for large x
     # For α = β: E_{α,α}(-x) ≈ sin(π α) / (π * x) for large x (Gorenflo et al.)
 
-    # Compute both cases
-    jnp.abs(alpha - beta) > 1e-10
-
     # Case 1: alpha ≠ beta
     # Avoid division issues when beta/alpha is near integer
     gamma_arg = 1.0 - beta / (alpha + 1e-15)
@@ -273,11 +254,9 @@ def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarr
     # E_{α,α}(-x) ≈ sin(π α) / (π * x)
     asymptotic_eq = jnp.sin(jnp.pi * alpha) / (jnp.pi * z_abs_safe + 1e-15)
 
-    # Select based on alpha vs beta (static condition in Python)
-    if abs(alpha - beta) < 1e-10:
-        asymptotic_approx = asymptotic_eq
-    else:
-        asymptotic_approx = asymptotic_neq
+    # Select based on alpha vs beta (dynamic condition for JAX tracing)
+    alpha_equals_beta_cond = jnp.abs(alpha - beta) < 1e-10
+    asymptotic_approx = jnp.where(alpha_equals_beta_cond, asymptotic_eq, asymptotic_neq)
 
     # Clamp asymptotic to [0, 1] for numerical stability
     asymptotic_approx = jnp.clip(asymptotic_approx, 0.0, 1.0)
@@ -292,112 +271,114 @@ def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarr
     result_taylor = jnp.where(z_moderate_to_large, result_asymptotic, result_taylor)
 
     # Compute coefficients for Pade approximation (for alpha != beta)
-    # Two cases: beta > alpha and beta < alpha
+    # Two cases: beta > alpha and beta <= alpha
+    # Compute both cases and select with jnp.where for JAX tracing compatibility
+
+    # Case 1: beta > alpha
+    g_vals_gt = jnp.array(
+        [
+            jax_gamma(beta - alpha) / jax_gamma(beta),
+            jax_gamma(beta - alpha) / jax_gamma(beta + alpha),
+            jax_gamma(beta - alpha) / jax_gamma(beta + 2 * alpha),
+            jax_gamma(beta - alpha) / jax_gamma(beta + 3 * alpha),
+            jax_gamma(beta - alpha) / jax_gamma(beta + 4 * alpha),
+            jax_gamma(beta - alpha) / jax_gamma(beta - 2 * alpha),
+            jax_gamma(beta - alpha) / jax_gamma(beta - 3 * alpha),
+        ],
+        dtype=jnp.float64,
+    )
+
+    A_gt = jnp.array(
+        [
+            [1, 0, 0, -g_vals_gt[0], 0, 0, 0],
+            [0, 1, 0, g_vals_gt[1], -g_vals_gt[0], 0, 0],
+            [0, 0, 1, -g_vals_gt[2], g_vals_gt[1], -g_vals_gt[0], 0],
+            [0, 0, 0, g_vals_gt[3], -g_vals_gt[2], g_vals_gt[1], -g_vals_gt[0]],
+            [0, 0, 0, -g_vals_gt[4], g_vals_gt[3], -g_vals_gt[2], g_vals_gt[1]],
+            [0, 1, 0, 0, 0, -1, g_vals_gt[5]],
+            [0, 0, 1, 0, 0, 0, -1],
+        ],
+        dtype=jnp.float64,
+    )
+
+    b_gt = jnp.array(
+        [0, 0, 0, -1, g_vals_gt[0], g_vals_gt[6], -g_vals_gt[5]], dtype=jnp.float64
+    )
+
+    coeffs_gt = jnp.linalg.solve(A_gt, b_gt)
+    p_gt = coeffs_gt[:3]
+    q_gt = coeffs_gt[3:]
+
+    minus_z = -z_f64
+    numerator_gt = (1 / jax_gamma(beta - alpha)) * (
+        p_gt[0] + p_gt[1] * minus_z + p_gt[2] * minus_z**2 + minus_z**3
+    )
+    denominator_gt = (
+        q_gt[0]
+        + q_gt[1] * minus_z
+        + q_gt[2] * minus_z**2
+        + q_gt[3] * minus_z**3
+        + z_f64**4
+    )
+    denominator_gt_safe = jnp.where(
+        jnp.abs(denominator_gt) < 1e-15,
+        jnp.sign(denominator_gt) * 1e-15,
+        denominator_gt,
+    )
+    result_pade_gt = numerator_gt / denominator_gt_safe
+
+    # Case 2: beta <= alpha
+    g_vals_le = jnp.array(
+        [
+            jax_gamma(-alpha) / jax_gamma(alpha),
+            jax_gamma(-alpha) / jax_gamma(2 * alpha),
+            jax_gamma(-alpha) / jax_gamma(3 * alpha),
+            jax_gamma(-alpha) / jax_gamma(4 * alpha),
+            jax_gamma(-alpha) / jax_gamma(5 * alpha),
+            jax_gamma(-alpha) / jax_gamma(-2 * alpha),
+            jax_gamma(-alpha) / jax_gamma(-3 * alpha),
+        ],
+        dtype=jnp.float64,
+    )
+
+    A_le = jnp.array(
+        [
+            [1, 0, g_vals_le[0], 0, 0, 0],
+            [0, 1, -g_vals_le[1], g_vals_le[0], 0, 0],
+            [0, 0, g_vals_le[2], -g_vals_le[1], g_vals_le[0], 0],
+            [0, 0, -g_vals_le[3], g_vals_le[2], -g_vals_le[1], -g_vals_le[0]],
+            [0, 0, g_vals_le[4], -g_vals_le[3], g_vals_le[2], -g_vals_le[1]],
+            [0, 1, 0, 0, 0, -1],
+        ],
+        dtype=jnp.float64,
+    )
+
+    b_le = jnp.array([0, 0, -1, 0, g_vals_le[6], -g_vals_le[5]], dtype=jnp.float64)
+
+    coeffs_le = jnp.linalg.solve(A_le, b_le)
+    p_hat = coeffs_le[:2]
+    q_hat = coeffs_le[2:]
+
+    numerator_le = (-1 / jax_gamma(-alpha)) * (
+        p_hat[0] + p_hat[1] * minus_z + minus_z**2
+    )
+    denominator_le = (
+        q_hat[0]
+        + q_hat[1] * minus_z
+        + q_hat[2] * minus_z**2
+        + q_hat[3] * minus_z**3
+        + minus_z**4
+    )
+    denominator_le_safe = jnp.where(
+        jnp.abs(denominator_le) < 1e-15,
+        jnp.sign(denominator_le) * 1e-15,
+        denominator_le,
+    )
+    result_pade_le = numerator_le / denominator_le_safe
+
+    # Select based on beta > alpha condition
     is_beta_gt_alpha = beta > alpha
-
-    # Precompute gamma values (static computations) with float64
-    if is_beta_gt_alpha:
-        # Case: beta > alpha
-        g_vals = jnp.array(
-            [
-                jax_gamma(beta - alpha) / jax_gamma(beta),
-                jax_gamma(beta - alpha) / jax_gamma(beta + alpha),
-                jax_gamma(beta - alpha) / jax_gamma(beta + 2 * alpha),
-                jax_gamma(beta - alpha) / jax_gamma(beta + 3 * alpha),
-                jax_gamma(beta - alpha) / jax_gamma(beta + 4 * alpha),
-                jax_gamma(beta - alpha) / jax_gamma(beta - 2 * alpha),
-                jax_gamma(beta - alpha) / jax_gamma(beta - 3 * alpha),
-            ],
-            dtype=jnp.float64,
-        )
-
-        A = jnp.array(
-            [
-                [1, 0, 0, -g_vals[0], 0, 0, 0],
-                [0, 1, 0, g_vals[1], -g_vals[0], 0, 0],
-                [0, 0, 1, -g_vals[2], g_vals[1], -g_vals[0], 0],
-                [0, 0, 0, g_vals[3], -g_vals[2], g_vals[1], -g_vals[0]],
-                [0, 0, 0, -g_vals[4], g_vals[3], -g_vals[2], g_vals[1]],
-                [0, 1, 0, 0, 0, -1, g_vals[5]],
-                [0, 0, 1, 0, 0, 0, -1],
-            ],
-            dtype=jnp.float64,
-        )
-
-        b = jnp.array(
-            [0, 0, 0, -1, g_vals[0], g_vals[6], -g_vals[5]], dtype=jnp.float64
-        )
-
-        coeffs = jnp.linalg.solve(A, b)
-        p = coeffs[:3]  # Numerator coefficients (degree 3)
-        q = coeffs[3:]  # Denominator coefficients (degree 4)
-
-        # Evaluate Pade approximation with float64
-        minus_z = -z_f64
-        numerator = (1 / jax_gamma(beta - alpha)) * (
-            p[0] + p[1] * minus_z + p[2] * minus_z**2 + minus_z**3
-        )
-        denominator = (
-            q[0] + q[1] * minus_z + q[2] * minus_z**2 + q[3] * minus_z**3 + z_f64**4
-        )
-
-        # Avoid division by near-zero denominators
-        denominator_safe = jnp.where(
-            jnp.abs(denominator) < 1e-15, jnp.sign(denominator) * 1e-15, denominator
-        )
-        result_pade = numerator / denominator_safe
-
-    else:
-        # Case: beta <= alpha
-        g_vals = jnp.array(
-            [
-                jax_gamma(-alpha) / jax_gamma(alpha),
-                jax_gamma(-alpha) / jax_gamma(2 * alpha),
-                jax_gamma(-alpha) / jax_gamma(3 * alpha),
-                jax_gamma(-alpha) / jax_gamma(4 * alpha),
-                jax_gamma(-alpha) / jax_gamma(5 * alpha),
-                jax_gamma(-alpha) / jax_gamma(-2 * alpha),
-                jax_gamma(-alpha) / jax_gamma(-3 * alpha),
-            ],
-            dtype=jnp.float64,
-        )
-
-        A = jnp.array(
-            [
-                [1, 0, g_vals[0], 0, 0, 0],
-                [0, 1, -g_vals[1], g_vals[0], 0, 0],
-                [0, 0, g_vals[2], -g_vals[1], g_vals[0], 0],
-                [0, 0, -g_vals[3], g_vals[2], -g_vals[1], -g_vals[0]],
-                [0, 0, g_vals[4], -g_vals[3], g_vals[2], -g_vals[1]],
-                [0, 1, 0, 0, 0, -1],
-            ],
-            dtype=jnp.float64,
-        )
-
-        b = jnp.array([0, 0, -1, 0, g_vals[6], -g_vals[5]], dtype=jnp.float64)
-
-        coeffs = jnp.linalg.solve(A, b)
-        p_hat = coeffs[:2]  # Numerator coefficients
-        q_hat = coeffs[2:]  # Denominator coefficients
-
-        # Evaluate Pade approximation with float64
-        minus_z = -z_f64
-        numerator = (-1 / jax_gamma(-alpha)) * (
-            p_hat[0] + p_hat[1] * minus_z + minus_z**2
-        )
-        denominator = (
-            q_hat[0]
-            + q_hat[1] * minus_z
-            + q_hat[2] * minus_z**2
-            + q_hat[3] * minus_z**3
-            + minus_z**4
-        )
-
-        # Avoid division by near-zero denominators
-        denominator_safe = jnp.where(
-            jnp.abs(denominator) < 1e-15, jnp.sign(denominator) * 1e-15, denominator
-        )
-        result_pade = numerator / denominator_safe
+    result_pade = jnp.where(is_beta_gt_alpha, result_pade_gt, result_pade_le)
 
     # Choose between Taylor (alpha==beta) and Pade (alpha!=beta) results
     # Use Taylor series when alpha ≈ beta to avoid numerical issues

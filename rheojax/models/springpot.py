@@ -145,13 +145,20 @@ class SpringPot(BaseModel):
         )
 
         # Optimize
-        nlsq_optimize(
+        result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
             method=kwargs.get("method", "auto"),
             max_iter=kwargs.get("max_iter", 1000),
         )
+
+        # Validate optimization succeeded
+        if not result.success:
+            raise RuntimeError(
+                f"Optimization failed: {result.message}. "
+                f"Try adjusting initial values, bounds, or max_iter."
+            )
 
         self.fitted_ = True
         return self
@@ -173,7 +180,7 @@ class SpringPot(BaseModel):
         else:
             x_data = jnp.array(X)
             # Use test_mode from last fit if available, otherwise default to RELAXATION
-            test_mode = getattr(self, '_test_mode', TestMode.RELAXATION)
+            test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
 
         # Validate test mode
         if test_mode == TestMode.ROTATION:

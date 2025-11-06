@@ -90,28 +90,28 @@ class FractionalZenerSolidSolid(BaseModel):
         self.parameters = ParameterSet()
         self.parameters.add(
             name="Ge",
-            value=None,
+            value=1000.0,
             bounds=(1e-3, 1e9),
             units="Pa",
             description="Equilibrium modulus",
         )
         self.parameters.add(
             name="Gm",
-            value=None,
+            value=1000.0,
             bounds=(1e-3, 1e9),
             units="Pa",
             description="Maxwell arm modulus",
         )
         self.parameters.add(
             name="alpha",
-            value=None,
+            value=0.5,
             bounds=(0.0, 1.0),
             units="",
             description="Fractional order",
         )
         self.parameters.add(
             name="tau_alpha",
-            value=None,
+            value=1.0,
             bounds=(1e-6, 1e6),
             units="s^α",
             description="Relaxation time",
@@ -297,11 +297,11 @@ class FractionalZenerSolidSolid(BaseModel):
         self
             Fitted model instance
         """
+        from rheojax.core.test_modes import TestMode
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
         )
-        from rheojax.core.test_modes import TestMode
 
         # Detect test mode
         test_mode_str = kwargs.get("test_mode", "relaxation")
@@ -341,13 +341,20 @@ class FractionalZenerSolidSolid(BaseModel):
         )
 
         # Optimize using NLSQ TRF
-        nlsq_optimize(
+        result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
             method=kwargs.get("method", "auto"),
             max_iter=kwargs.get("max_iter", 1000),
         )
+
+        # Validate optimization succeeded
+        if not result.success:
+            raise RuntimeError(
+                f"Optimization failed: {result.message}. "
+                f"Try adjusting initial values, bounds, or max_iter."
+            )
 
         self.fitted_ = True
         return self
@@ -399,7 +406,7 @@ class FractionalZenerSolidSolid(BaseModel):
         tau_alpha = params[3]
 
         # Use test_mode from last fit if available, otherwise default to RELAXATION
-        test_mode = getattr(self, '_test_mode', TestMode.RELAXATION)
+        test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:
@@ -411,6 +418,7 @@ class FractionalZenerSolidSolid(BaseModel):
         else:
             # Default to relaxation mode for FZSS model
             return self._predict_relaxation(X, Ge, Gm, alpha, tau_alpha)
+
 
 # Convenience alias
 FZSS = FractionalZenerSolidSolid

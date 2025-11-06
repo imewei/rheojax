@@ -91,42 +91,42 @@ class FractionalZenerLiquidLiquid(BaseModel):
         self.parameters = ParameterSet()
         self.parameters.add(
             name="c1",
-            value=None,
+            value=500.0,
             bounds=(1e-3, 1e9),
             units="Pa·s^α",
             description="First SpringPot constant",
         )
         self.parameters.add(
             name="c2",
-            value=None,
+            value=500.0,
             bounds=(1e-3, 1e9),
             units="Pa·s^γ",
             description="Second SpringPot constant",
         )
         self.parameters.add(
             name="alpha",
-            value=None,
+            value=0.5,
             bounds=(0.0, 1.0),
             units="",
             description="First fractional order",
         )
         self.parameters.add(
             name="beta",
-            value=None,
+            value=0.5,
             bounds=(0.0, 1.0),
             units="",
             description="Second fractional order",
         )
         self.parameters.add(
             name="gamma",
-            value=None,
+            value=0.5,
             bounds=(0.0, 1.0),
             units="",
             description="Third fractional order",
         )
         self.parameters.add(
             name="tau",
-            value=None,
+            value=1.0,
             bounds=(1e-6, 1e6),
             units="s",
             description="Relaxation time",
@@ -370,11 +370,11 @@ class FractionalZenerLiquidLiquid(BaseModel):
         self
             Fitted model instance
         """
+        from rheojax.core.test_modes import TestMode
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
         )
-        from rheojax.core.test_modes import TestMode
 
         # Detect test mode
         test_mode_str = kwargs.get("test_mode", "oscillation")
@@ -396,7 +396,14 @@ class FractionalZenerLiquidLiquid(BaseModel):
         # Create stateless model function for optimization
         def model_fn(x, params):
             """Model function for optimization (stateless)."""
-            c1, c2, alpha, beta, gamma, tau = params[0], params[1], params[2], params[3], params[4], params[5]
+            c1, c2, alpha, beta, gamma, tau = (
+                params[0],
+                params[1],
+                params[2],
+                params[3],
+                params[4],
+                params[5],
+            )
 
             # Direct prediction based on test mode (stateless)
             if test_mode == TestMode.RELAXATION:
@@ -414,13 +421,20 @@ class FractionalZenerLiquidLiquid(BaseModel):
         )
 
         # Optimize using NLSQ TRF
-        nlsq_optimize(
+        result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
             method=kwargs.get("method", "auto"),
             max_iter=kwargs.get("max_iter", 1000),
         )
+
+        # Validate optimization succeeded
+        if not result.success:
+            raise RuntimeError(
+                f"Optimization failed: {result.message}. "
+                f"Try adjusting initial values, bounds, or max_iter."
+            )
 
         self.fitted_ = True
         return self
@@ -476,7 +490,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         tau = params[5]
 
         # Use test_mode from last fit if available, otherwise default to OSCILLATION
-        test_mode = getattr(self, '_test_mode', TestMode.OSCILLATION)
+        test_mode = getattr(self, "_test_mode", TestMode.OSCILLATION)
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:
@@ -488,6 +502,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         else:
             # Default to oscillation mode for FZLL model
             return self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
+
 
 # Convenience alias
 FZLL = FractionalZenerLiquidLiquid

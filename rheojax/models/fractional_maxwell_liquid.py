@@ -117,23 +117,12 @@ class FractionalMaxwellLiquid(BaseModel):
         # Add small epsilon to prevent issues
         epsilon = 1e-12
 
-        # Convert alpha to Python float for Mittag-Leffler (requires static values)
-        # During optimization, if alpha is traced, this will use the current value
-        alpha_float = (
-            float(alpha)
-            if not isinstance(alpha, (jnp.ndarray, jax.Array))
-            else float(jnp.asarray(alpha).item())
-        )
+        # Clip alpha to safe range (now works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        # Clip to safe range as Python float
-        alpha_safe_float = max(epsilon, min(alpha_float, 1.0 - epsilon))
-
-        # Compute Mittag-Leffler parameters as Python floats
-        ml_alpha = 1.0 - alpha_safe_float
-        ml_beta = 1.0 - alpha_safe_float
-
-        # Convert to JAX for computations
-        alpha_safe = jnp.array(alpha_safe_float)
+        # Compute Mittag-Leffler parameters
+        ml_alpha = 1.0 - alpha_safe
+        ml_beta = 1.0 - alpha_safe
 
         # Compute relaxation modulus
         t_safe = jnp.maximum(t, epsilon)
@@ -169,22 +158,12 @@ class FractionalMaxwellLiquid(BaseModel):
         # Add small epsilon
         epsilon = 1e-12
 
-        # Convert alpha to Python float for Mittag-Leffler (requires static values)
-        alpha_float = (
-            float(alpha)
-            if not isinstance(alpha, (jnp.ndarray, jax.Array))
-            else float(jnp.asarray(alpha).item())
-        )
+        # Clip alpha to safe range (now works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        # Clip to safe range as Python float
-        alpha_safe_float = max(epsilon, min(alpha_float, 1.0 - epsilon))
-
-        # Compute Mittag-Leffler parameters as Python floats
-        ml_alpha = alpha_safe_float
-        ml_beta = 1.0 + alpha_safe_float
-
-        # Convert to JAX for computations
-        alpha_safe = jnp.array(alpha_safe_float)
+        # Compute Mittag-Leffler parameters
+        ml_alpha = alpha_safe
+        ml_beta = 1.0 + alpha_safe
 
         # Compute creep compliance
         t_safe = jnp.maximum(t, epsilon)
@@ -226,16 +205,8 @@ class FractionalMaxwellLiquid(BaseModel):
         # Add small epsilon
         epsilon = 1e-12
 
-        # Convert alpha to Python float for consistent behavior
-        alpha_float = (
-            float(alpha)
-            if not isinstance(alpha, (jnp.ndarray, jax.Array))
-            else float(jnp.asarray(alpha).item())
-        )
-
-        # Clip to safe range and convert back to JAX
-        alpha_safe_float = max(epsilon, min(alpha_float, 1.0 - epsilon))
-        alpha_safe = jnp.array(alpha_safe_float)
+        # Clip alpha to safe range (now works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         # Compute oscillation response
         omega_safe = jnp.maximum(omega, epsilon)
@@ -299,13 +270,20 @@ class FractionalMaxwellLiquid(BaseModel):
         )
 
         # Optimize using NLSQ
-        nlsq_optimize(
+        result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
             method=kwargs.get("method", "auto"),
             max_iter=kwargs.get("max_iter", 1000),
         )
+
+        # Validate optimization succeeded
+        if not result.success:
+            raise RuntimeError(
+                f"Optimization failed: {result.message}. "
+                f"Try adjusting initial values, bounds, or max_iter."
+            )
 
         self.fitted_ = True
         return self

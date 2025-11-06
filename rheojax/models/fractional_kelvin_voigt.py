@@ -147,7 +147,7 @@ class FractionalKelvinVoigt(BaseModel):
         try:
             # Try to convert to float (works for concrete values)
             alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
-        except:
+        except (TypeError, AttributeError):
             # If alpha is a tracer (during gradient computation), use jnp.clip
             alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
@@ -199,7 +199,7 @@ class FractionalKelvinVoigt(BaseModel):
         try:
             # Try to convert to float (works for concrete values)
             alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
-        except:
+        except (TypeError, AttributeError):
             # If alpha is a tracer (during gradient computation), use jnp.clip
             alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
@@ -251,7 +251,7 @@ class FractionalKelvinVoigt(BaseModel):
         try:
             # Try to convert to float (works for concrete values)
             alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
-        except:
+        except (TypeError, AttributeError):
             # If alpha is a tracer (during gradient computation), use jnp.clip
             alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
@@ -324,7 +324,7 @@ class FractionalKelvinVoigt(BaseModel):
         )
 
         # Optimize using NLSQ
-        nlsq_optimize(
+        result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
@@ -332,8 +332,16 @@ class FractionalKelvinVoigt(BaseModel):
             max_iter=kwargs.get("max_iter", 1000),
         )
 
+        # Validate optimization succeeded
+        if not result.success:
+            raise RuntimeError(
+                f"Optimization failed: {result.message}. "
+                f"Try adjusting initial values, bounds, or max_iter."
+            )
+
         self.fitted_ = True
         return self
+
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Internal predict implementation.
 
