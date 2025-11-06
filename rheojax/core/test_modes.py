@@ -45,17 +45,21 @@ TestMode = TestModeEnum  # Original name (deprecated)
 
 
 def is_monotonic_increasing(
-    data: np.ndarray | jnp.ndarray, strict: bool = False, tolerance: float = 1e-10
+    data: np.ndarray | jnp.ndarray,  # type: ignore[name-defined]
+    strict: bool = False,
+    tolerance: float = 1e-10,
+    allow_fraction: float = 0.1,
 ) -> bool:
-    """Check if data is monotonically increasing.
+    """Check if data is mostly monotonically increasing.
 
     Args:
         data: Array to check
         strict: If True, require strictly increasing (no equal values)
-        tolerance: Relative tolerance for considering values equal
+        tolerance: Relative tolerance based on data magnitude
+        allow_fraction: Fraction of points allowed to violate monotonicity (0-1)
 
     Returns:
-        True if data is monotonically increasing
+        True if data is mostly monotonically increasing
     """
     # Convert to numpy for easier checking
     if isinstance(data, jnp.ndarray):
@@ -64,26 +68,43 @@ def is_monotonic_increasing(
     if len(data) < 2:
         return True
 
+    # Check overall trend first
+    overall_trend = data[-1] - data[0]
+    if overall_trend < 0:
+        return False
+
+    # Calculate tolerance based on data magnitude
+    data_mag = np.mean(np.abs(data))
+    rel_tolerance = tolerance * data_mag
+
     diffs = np.diff(data)
 
     if strict:
-        return np.all(diffs > tolerance)
+        violations = np.sum(diffs <= rel_tolerance)
     else:
-        return np.all(diffs >= -tolerance)
+        violations = np.sum(diffs < -rel_tolerance)
+
+    # Allow a small fraction of violations for noisy data
+    max_violations = int(allow_fraction * len(diffs))
+    return bool(violations <= max_violations)
 
 
 def is_monotonic_decreasing(
-    data: np.ndarray | jnp.ndarray, strict: bool = False, tolerance: float = 1e-10
+    data: np.ndarray | jnp.ndarray,  # type: ignore[name-defined]
+    strict: bool = False,
+    tolerance: float = 1e-10,
+    allow_fraction: float = 0.1,
 ) -> bool:
-    """Check if data is monotonically decreasing.
+    """Check if data is mostly monotonically decreasing.
 
     Args:
         data: Array to check
         strict: If True, require strictly decreasing (no equal values)
-        tolerance: Relative tolerance for considering values equal
+        tolerance: Relative tolerance based on data magnitude
+        allow_fraction: Fraction of points allowed to violate monotonicity (0-1)
 
     Returns:
-        True if data is monotonically decreasing
+        True if data is mostly monotonically decreasing
     """
     # Convert to numpy for easier checking
     if isinstance(data, jnp.ndarray):
@@ -92,12 +113,25 @@ def is_monotonic_decreasing(
     if len(data) < 2:
         return True
 
+    # Check overall trend first
+    overall_trend = data[-1] - data[0]
+    if overall_trend > 0:
+        return False
+
+    # Calculate tolerance based on data magnitude
+    data_mag = np.mean(np.abs(data))
+    rel_tolerance = tolerance * data_mag
+
     diffs = np.diff(data)
 
     if strict:
-        return np.all(diffs < -tolerance)
+        violations = np.sum(diffs >= -rel_tolerance)
     else:
-        return np.all(diffs <= tolerance)
+        violations = np.sum(diffs > rel_tolerance)
+
+    # Allow a small fraction of violations for noisy data
+    max_violations = int(allow_fraction * len(diffs))
+    return bool(violations <= max_violations)
 
 
 def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
@@ -171,16 +205,34 @@ def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
         if np.iscomplexobj(y_data):
             y_data = np.real(y_data)
 
+        # Check if data is essentially flat (no significant change)
+        # This handles elastic solids that have fully relaxed to equilibrium
+        overall_change = abs(y_data[-1] - y_data[0])
+        data_magnitude = np.mean(np.abs(y_data))
+        relative_change = overall_change / data_magnitude if data_magnitude > 0 else 0
+
+        # If change < 5% of magnitude, consider it flat
+        # Flat time-domain data is more likely relaxation (reached equilibrium) than creep
+        if relative_change < 0.05:
+            # Default to relaxation for flat data in time domain
+            return TestModeEnum.RELAXATION
+
         # Check for monotonic behavior
-        # Use a tolerance to handle numerical noise
-        tolerance = 1e-8
+        # Use relative tolerance of 1% of data magnitude
+        # Allow up to 30% of points to violate monotonicity (for noisy data that plateaus)
+        tolerance = 0.01  # 1% of data magnitude
+        allow_fraction = 0.3  # Allow 30% violations
 
         # For relaxation: stress should decrease over time
-        if is_monotonic_decreasing(y_data, strict=False, tolerance=tolerance):
+        if is_monotonic_decreasing(
+            y_data, strict=False, tolerance=tolerance, allow_fraction=allow_fraction
+        ):
             return TestModeEnum.RELAXATION
 
         # For creep: strain/compliance should increase over time
-        if is_monotonic_increasing(y_data, strict=False, tolerance=tolerance):
+        if is_monotonic_increasing(
+            y_data, strict=False, tolerance=tolerance, allow_fraction=allow_fraction
+        ):
             return TestModeEnum.CREEP
 
     # 4. Fall back to UNKNOWN if we can't determine
