@@ -33,6 +33,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test configuration**: Added `notebook_smoke` pytest marker for notebook validation framework
 
 ### Fixed
+- **All Models - Silent Optimization Failures**: Added explicit optimization validation to prevent silent failures across 14 models
+  - **7 Fractional Models with Default Values**: Added default initial parameter values and optimization validation (FZSL, FZLL, FZSS, FPT, FKVZ, FJM, FBM)
+    - All fractional model parameters now have sensible defaults (e.g., `Ge=1000.0 Pa`, `Jg=1e-6 1/Pa`, `alpha=0.5`, `tau=1.0 s`)
+    - Eliminates the `TypeError: '>=' not supported between 'NoneType' and 'float'` error that occurred when fitting with uninitialized parameters
+  - **7 Additional Models**: Added optimization validation to prevent silent failures (Maxwell, SpringPot, Zener, FractionalKelvinVoigt, FractionalMaxwellGel, FractionalMaxwellLiquid, FractionalMaxwellModel)
+    - These models already had default values but lacked optimization success validation
+  - **All 14 models now**: Optimization failures raise `RuntimeError` with clear error messages instead of silently setting `fitted_=True`
+  - **Comprehensive test coverage**: 32 tests added to validate default values, optimization failure detection, and error message quality
+  - Backward compatible: existing code continues to work without changes
+- **Mittag-Leffler Functions - JAX Tracing Compatibility**: Made Mittag-Leffler functions fully compatible with JAX tracing for optimization
+  - Removed `static_argnums` from `@jax.jit` decorators to allow traced alpha/beta parameters
+  - Converted Python conditionals to JAX-compatible operations using `jnp.where()` for control flow
+  - Removed parameter validation checks inside JIT-compiled functions (models enforce bounds)
+  - Removed dead code causing tracer conversion errors (`int(20 / alpha)`)
+  - Simplified scalar/array handling to always return arrays (models expect arrays)
+  - Fixes `TracerArrayConversionError` and `TracerBoolConversionError` that occurred during model fitting
+  - Enables full JAX optimization with autodiff for all fractional models (FractionalMaxwellGel, FractionalMaxwellModel, FractionalMaxwellLiquid, etc.)
+- **FractionalMaxwellLiquid - Removed .item() Calls**: Fixed JAX tracing errors in FractionalMaxwellLiquid model
+  - Removed `.item()` calls that attempted to convert traced arrays to Python floats
+  - Replaced Python float conversion with direct `jnp.clip()` operations on traced values
+  - Applied fix to all three prediction methods (relaxation, creep, oscillation)
+  - Fixes `ConcretizationTypeError: Abstract tracer value encountered where concrete value is expected`
+  - Model now fully supports JAX tracing during optimization
+- **Fractional Models Deep-Dive Notebook**: Fixed multiple API usage errors in `examples/advanced/04-fractional-models-deep-dive.ipynb`
+  - **Maxwell parameter name** (Cell 20): Changed `'G'` to `'G0'` to match Maxwell model API
+  - **Undefined model reference** (Cell 22): Removed reference to undefined `model_fzsl` variable
+  - **ParameterSet API** (Cell 22): Corrected from `model.parameters.parameters.values()` to `model.parameters._order`
+  - **RheoData plotting** (Cells 23, 25, 27): Added `.y` attribute extraction when `predict()` returns RheoData objects
+    - `model.predict(rheo_data)` returns RheoData when input is RheoData
+    - Fixed `ValueError: setting an array element with a sequence` by extracting numpy arrays with `.y`
+    - Applied to 4 locations across 3 cells for consistent plotting behavior
 - Fixed hardcoded absolute path in `tests/validation/test_migrated_notebooks.py`
 - Documented Bayesian convergence threshold rationale (R-hat, ESS, divergences)
 - **Git LFS Migration**: Migrated large OWChirp files (146MB) to Git LFS to avoid repository bloat

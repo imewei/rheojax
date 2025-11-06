@@ -32,7 +32,7 @@ pytest --cov=rheo --cov-report=html
 # Run specific test categories
 pytest -m unit          # Unit tests only
 pytest -m integration   # Integration tests
-pytest -m validation    # Validation against legacy packages
+pytest -m validation    # Validation against original pyRheo/hermes-rheo
 pytest -m benchmark     # Performance benchmarks
 
 # Run specific test file
@@ -125,10 +125,9 @@ rheojax/
 ├── visualization/     # Publication-quality plotting
 │   ├── plotter.py     # Automatic plot type selection
 │   └── templates.py   # Three styles: default, publication, presentation
-├── utils/
-│   ├── optimization.py     # NLSQ-based optimization (5-270x speedup)
-│   └── mittag_leffler.py  # Mittag-Leffler functions (1 and 2-parameter)
-└── legacy/            # Original pyrheo and hermes-rheo code (for validation)
+└── utils/
+    ├── optimization.py     # NLSQ-based optimization (5-270x speedup)
+    └── mittag_leffler.py  # Mittag-Leffler functions (1 and 2-parameter)
 ```
 
 ### Key Design Patterns

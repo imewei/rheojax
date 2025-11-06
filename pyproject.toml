@@ -221,6 +221,7 @@ exclude = [
 "tests/*" = ["B", "C", "E", "F", "W"]
 "rheojax/models/*.py" = ["E402"]  # safe_import_jax() must precede JAX imports
 "rheojax/utils/mittag_leffler.py" = ["E402"]  # safe_import_jax() must precede JAX imports
+"examples/**/*.ipynb" = ["B", "E", "F", "W"]  # Example notebooks have looser style requirements
 
 [tool.mypy]
 python_version = "3.12"
