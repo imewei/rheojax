@@ -28,7 +28,7 @@ except ImportError as e:
         "NLSQ provides GPU-accelerated optimization and enables float64 precision in JAX."
     ) from e
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Wei Chen"
 __email__ = "wchen@anl.gov"
 __license__ = "MIT"
@@ -58,7 +58,7 @@ except ImportError:
 # Version information
 VERSION_INFO = {
     "major": 0,
-    "minor": 1,
+    "minor": 2,
     "patch": 0,
     "release": "dev",
     "python_requires": ">=3.12",
@@ -88,7 +88,5 @@ import logging
 logger = logging.getLogger(__name__)
 logger.info(f"Loading rheojax version {__version__}")
 
-# Core imports will be added as modules are implemented
-# from . import core
-# from . import models
-# from . import transforms
+# Core imports - models must be imported to register with ModelRegistry
+from . import models  # noqa: F401

@@ -219,6 +219,7 @@ exclude = [
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["B", "C", "E", "F", "W"]
+"rheojax/__init__.py" = ["E402"]  # models import must come after version setup
 "rheojax/models/*.py" = ["E402"]  # safe_import_jax() must precede JAX imports
 "rheojax/utils/mittag_leffler.py" = ["E402"]  # safe_import_jax() must precede JAX imports
 "examples/**/*.ipynb" = ["B", "E", "F", "W"]  # Example notebooks have looser style requirements
