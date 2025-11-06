@@ -142,27 +142,25 @@ class FractionalZenerSolidSolid(BaseModel):
         jnp.ndarray
             Relaxation modulus G(t) (Pa)
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
+        # JIT-compiled function with JAX-compatible clipping
         @jax.jit
-        def _compute_relaxation(t, Ge, Gm, tau_alpha):
+        def _compute_relaxation(t, Ge, Gm, alpha, tau_alpha):
+            # Clip alpha using JAX operations (tracer-safe)
+            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
             tau_alpha_safe = tau_alpha + epsilon
 
             # Compute argument: z = -(t/τ_α)^α
             z = -jnp.power(t / tau_alpha_safe, alpha_safe)
 
-            # Mittag-Leffler function E_α(z) with concrete alpha
+            # Mittag-Leffler function E_α(z)
             ml_term = mittag_leffler_e(z, alpha_safe)
 
             # G(t) = G_e + G_m * E_α(-(t/τ_α)^α)
             return Ge + Gm * ml_term
 
-        return _compute_relaxation(t, Ge, Gm, tau_alpha)
+        return _compute_relaxation(t, Ge, Gm, alpha, tau_alpha)
 
     def _predict_creep(
         self, t: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
@@ -190,15 +188,13 @@ class FractionalZenerSolidSolid(BaseModel):
         jnp.ndarray
             Creep compliance J(t) (1/Pa)
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
+        # JIT-compiled function with JAX-compatible clipping
         @jax.jit
-        def _compute_creep(t, Ge, Gm, tau_alpha):
+        def _compute_creep(t, Ge, Gm, alpha, tau_alpha):
+            # Clip alpha using JAX operations (tracer-safe)
+            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
             tau_alpha_safe = tau_alpha + epsilon
 
             # Instantaneous and equilibrium compliances
@@ -209,13 +205,13 @@ class FractionalZenerSolidSolid(BaseModel):
             # Compute argument: z = -(t/τ_α)^α
             z = -jnp.power(t / tau_alpha_safe, alpha_safe)
 
-            # Mittag-Leffler function with concrete alpha
+            # Mittag-Leffler function
             ml_term = mittag_leffler_e(z, alpha_safe)
 
             # J(t) = J_inst + (J_eq - J_inst) * (1 - E_α(-t^α/τ_α))
             return J_inst + (J_eq - J_inst) * (1.0 - ml_term)
 
-        return _compute_creep(t, Ge, Gm, tau_alpha)
+        return _compute_creep(t, Ge, Gm, alpha, tau_alpha)
 
     def _predict_oscillation(
         self, omega: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
@@ -242,15 +238,13 @@ class FractionalZenerSolidSolid(BaseModel):
         jnp.ndarray
             Complex modulus array with shape (..., 2) where [:, 0] is G' and [:, 1] is G''
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
+        # JIT-compiled function with JAX-compatible clipping
         @jax.jit
-        def _compute_oscillation(omega, Ge, Gm, tau_alpha):
+        def _compute_oscillation(omega, Ge, Gm, alpha, tau_alpha):
+            # Clip alpha using JAX operations (tracer-safe)
+            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
             tau_alpha_safe = tau_alpha + epsilon
 
             # Compute (iω)^(-α) = ω^(-α) * exp(-i*π*α/2)
@@ -276,7 +270,7 @@ class FractionalZenerSolidSolid(BaseModel):
 
             return jnp.stack([G_prime, G_double_prime], axis=-1)
 
-        return _compute_oscillation(omega, Ge, Gm, tau_alpha)
+        return _compute_oscillation(omega, Ge, Gm, alpha, tau_alpha)
 
     def _fit(
         self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
