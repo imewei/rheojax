@@ -24,7 +24,6 @@ def test_submodule_imports():
     from rheojax import (
         core,
         io,
-        legacy,
         models,
         pipeline,
         transforms,
@@ -40,7 +39,6 @@ def test_submodule_imports():
     assert io is not None
     assert visualization is not None
     assert utils is not None
-    assert legacy is not None
 
 
 def test_version_info():
