@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Union
+from typing import Any
 
 import nlsq
 import numpy as np
@@ -42,7 +42,7 @@ from rheojax.core.parameters import ParameterSet
 jax, jnp = safe_import_jax()
 
 
-ArrayLike = Union[np.ndarray, jnp.ndarray, list, float]
+type ArrayLike = np.ndarray | list | float
 
 
 @dataclass
@@ -364,36 +364,56 @@ def residual_sum_of_squares(
         y_pred_jax = jnp.asarray(y_pred)
 
         # Check if data is complex
-        is_complex = jnp.iscomplexobj(y_true_jax) or jnp.iscomplexobj(y_pred_jax)
+        y_true_is_complex = jnp.iscomplexobj(y_true_jax)
+        y_pred_is_complex = jnp.iscomplexobj(y_pred_jax)
 
-        if is_complex:
-            # Handle complex data: fit both real and imaginary parts
-            # This is critical for oscillatory shear (G' + iG")
-            residuals_real = jnp.real(y_pred_jax) - jnp.real(y_true_jax)
-            residuals_imag = jnp.imag(y_pred_jax) - jnp.imag(y_true_jax)
+        if y_pred_is_complex:
+            if y_true_is_complex:
+                # Both complex: fit real and imaginary parts separately
+                residuals_real = jnp.real(y_pred_jax) - jnp.real(y_true_jax)
+                residuals_imag = jnp.imag(y_pred_jax) - jnp.imag(y_true_jax)
 
-            if normalize:
-                # Normalize separately by magnitude of real and imaginary parts
-                residuals_real = residuals_real / jnp.maximum(
-                    jnp.abs(jnp.real(y_true_jax)), 1e-10
-                )
-                residuals_imag = residuals_imag / jnp.maximum(
-                    jnp.abs(jnp.imag(y_true_jax)), 1e-10
-                )
+                if normalize:
+                    residuals_real = residuals_real / jnp.maximum(
+                        jnp.abs(jnp.real(y_true_jax)), 1e-10
+                    )
+                    residuals_imag = residuals_imag / jnp.maximum(
+                        jnp.abs(jnp.imag(y_true_jax)), 1e-10
+                    )
 
-            # Sum of squares for both components
-            rss = jnp.sum(residuals_real**2) + jnp.sum(residuals_imag**2)
+                rss = jnp.sum(residuals_real**2) + jnp.sum(residuals_imag**2)
+            else:
+                # Complex predictions, real data: fit to magnitude
+                y_pred_magnitude = jnp.abs(y_pred_jax)
+                y_true_jax = jnp.asarray(y_true_jax, dtype=jnp.float64)
+                residuals = y_pred_magnitude - y_true_jax
+
+                if normalize:
+                    residuals = residuals / jnp.maximum(jnp.abs(y_true_jax), 1e-10)
+
+                rss = jnp.sum(residuals**2)
         else:
-            # Real data path (original behavior)
-            y_true_jax = jnp.asarray(y_true_jax, dtype=jnp.float64)
-            y_pred_jax = jnp.asarray(y_pred_jax, dtype=jnp.float64)
-            residuals = y_pred_jax - y_true_jax
+            # Real predictions
+            if y_true_is_complex:
+                # Real predictions, complex data: fit to magnitude of data
+                y_true_magnitude = jnp.abs(y_true_jax)
+                y_pred_jax = jnp.asarray(y_pred_jax, dtype=jnp.float64)
+                residuals = y_pred_jax - y_true_magnitude
 
-            if normalize:
-                # Relative error (avoid division by zero)
-                residuals = residuals / jnp.maximum(jnp.abs(y_true_jax), 1e-10)
+                if normalize:
+                    residuals = residuals / jnp.maximum(y_true_magnitude, 1e-10)
 
-            rss = jnp.sum(residuals**2)
+                rss = jnp.sum(residuals**2)
+            else:
+                # Both real: standard case
+                y_true_jax = jnp.asarray(y_true_jax, dtype=jnp.float64)
+                y_pred_jax = jnp.asarray(y_pred_jax, dtype=jnp.float64)
+                residuals = y_pred_jax - y_true_jax
+
+                if normalize:
+                    residuals = residuals / jnp.maximum(jnp.abs(y_true_jax), 1e-10)
+
+                rss = jnp.sum(residuals**2)
 
         # Return scalar JAX array, don't convert to Python float (breaks gradients)
         return rss
@@ -403,35 +423,58 @@ def residual_sum_of_squares(
         y_pred_np = np.asarray(y_pred)
 
         # Check if data is complex
-        is_complex = np.iscomplexobj(y_true_np) or np.iscomplexobj(y_pred_np)
+        y_true_is_complex = np.iscomplexobj(y_true_np)
+        y_pred_is_complex = np.iscomplexobj(y_pred_np)
 
-        if is_complex:
-            # Handle complex data
-            residuals_real = np.real(y_pred_np) - np.real(y_true_np)
-            residuals_imag = np.imag(y_pred_np) - np.imag(y_true_np)
+        if y_pred_is_complex:
+            if y_true_is_complex:
+                # Both complex: fit real and imaginary parts separately
+                residuals_real = np.real(y_pred_np) - np.real(y_true_np)
+                residuals_imag = np.imag(y_pred_np) - np.imag(y_true_np)
 
-            if normalize:
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    residuals_real = residuals_real / np.maximum(
-                        np.abs(np.real(y_true_np)), 1e-10
-                    )
-                    residuals_imag = residuals_imag / np.maximum(
-                        np.abs(np.imag(y_true_np)), 1e-10
-                    )
+                if normalize:
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        residuals_real = residuals_real / np.maximum(
+                            np.abs(np.real(y_true_np)), 1e-10
+                        )
+                        residuals_imag = residuals_imag / np.maximum(
+                            np.abs(np.imag(y_true_np)), 1e-10
+                        )
 
-            rss = float(np.sum(residuals_real**2) + np.sum(residuals_imag**2))
+                rss = float(np.sum(residuals_real**2) + np.sum(residuals_imag**2))
+            else:
+                # Complex predictions, real data: fit to magnitude
+                y_pred_magnitude = np.abs(y_pred_np)
+                residuals = y_pred_magnitude - y_true_np
+
+                if normalize:
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        residuals = residuals / np.maximum(np.abs(y_true_np), 1e-10)
+
+                rss = float(np.sum(residuals**2))
         else:
-            # Real data path (original behavior)
-            y_true_np = np.asarray(y_true_np, dtype=np.float64)
-            y_pred_np = np.asarray(y_pred_np, dtype=np.float64)
-            residuals = y_pred_np - y_true_np
+            # Real predictions
+            if y_true_is_complex:
+                # Real predictions, complex data: fit to magnitude of data
+                y_true_magnitude = np.abs(y_true_np)
+                residuals = y_pred_np - y_true_magnitude
 
-            if normalize:
-                # Relative error (avoid division by zero)
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    residuals = residuals / np.maximum(np.abs(y_true_np), 1e-10)
+                if normalize:
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        residuals = residuals / np.maximum(y_true_magnitude, 1e-10)
 
-            rss = float(np.sum(residuals**2))
+                rss = float(np.sum(residuals**2))
+            else:
+                # Both real: standard case
+                y_true_np = np.asarray(y_true_np, dtype=np.float64)
+                y_pred_np = np.asarray(y_pred_np, dtype=np.float64)
+                residuals = y_pred_np - y_true_np
+
+                if normalize:
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        residuals = residuals / np.maximum(np.abs(y_true_np), 1e-10)
+
+                rss = float(np.sum(residuals**2))
 
         return rss
 
@@ -449,7 +492,7 @@ def create_least_squares_objective(
     to the optimizer, which enables proper gradient computation and weighting.
 
     For complex data (e.g., G* = G' + iG"), returns stacked real and imaginary
-    residuals: [real_r1, ..., real_rN, imag_r1, ..., imag_rN] with shape (2N,).
+    residuals: [real₁, ..., realₙ, imag₁, ..., imagₙ] with shape (2N,).
 
     For real data, returns residuals with shape (N,).
 
@@ -475,8 +518,8 @@ def create_least_squares_objective(
     x_data_jax = jnp.asarray(x_data, dtype=jnp.float64)
 
     # Preserve complex type for y_data
-    is_complex = jnp.iscomplexobj(y_data) or np.iscomplexobj(y_data)
-    if is_complex:
+    y_data_is_complex = jnp.iscomplexobj(y_data) or np.iscomplexobj(y_data)
+    if y_data_is_complex:
         y_data_jax = jnp.asarray(y_data, dtype=jnp.complex128)
     else:
         y_data_jax = jnp.asarray(y_data, dtype=jnp.float64)
@@ -489,27 +532,55 @@ def create_least_squares_objective(
         # Get model predictions
         y_pred = model_fn(x_data_jax, params_jax)
 
-        if is_complex:
-            # Handle complex data: separate real and imaginary residuals
-            resid_real = jnp.real(y_pred) - jnp.real(y_data_jax)
-            resid_imag = jnp.imag(y_pred) - jnp.imag(y_data_jax)
+        # Dynamically check if predictions are complex
+        y_pred_is_complex = jnp.iscomplexobj(y_pred)
 
-            if normalize:
-                # Normalize by magnitude of data (avoid division by zero)
-                resid_real = resid_real / jnp.maximum(jnp.abs(jnp.real(y_data_jax)), 1e-10)
-                resid_imag = resid_imag / jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), 1e-10)
+        if y_pred_is_complex:
+            # Case 1: Complex predictions
+            if y_data_is_complex:
+                # Both complex: fit real and imaginary parts separately
+                resid_real = jnp.real(y_pred) - jnp.real(y_data_jax)
+                resid_imag = jnp.imag(y_pred) - jnp.imag(y_data_jax)
 
-            # Stack: [real₁, ..., realₙ, imag₁, ..., imagₙ]
-            return jnp.concatenate([resid_real, resid_imag])
+                if normalize:
+                    resid_real = resid_real / jnp.maximum(
+                        jnp.abs(jnp.real(y_data_jax)), 1e-10
+                    )
+                    resid_imag = resid_imag / jnp.maximum(
+                        jnp.abs(jnp.imag(y_data_jax)), 1e-10
+                    )
+
+                return jnp.concatenate([resid_real, resid_imag])
+            else:
+                # Complex predictions, real data: fit to magnitude |G*|
+                # This is the common case for oscillation mode fitting
+                y_pred_magnitude = jnp.abs(y_pred)
+                residuals = y_pred_magnitude - y_data_jax
+
+                if normalize:
+                    residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+
+                return residuals
         else:
-            # Real data path
-            residuals = y_pred - y_data_jax
+            # Case 2: Real predictions
+            if y_data_is_complex:
+                # Real predictions, complex data: this is unusual but handle it
+                # Fit to magnitude of data
+                y_data_magnitude = jnp.abs(y_data_jax)
+                residuals = y_pred - y_data_magnitude
 
-            if normalize:
-                # Relative error (avoid division by zero)
-                residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+                if normalize:
+                    residuals = residuals / jnp.maximum(y_data_magnitude, 1e-10)
 
-            return residuals
+                return residuals
+            else:
+                # Both real: standard case
+                residuals = y_pred - y_data_jax
+
+                if normalize:
+                    residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+
+                return residuals
 
     return residuals
 

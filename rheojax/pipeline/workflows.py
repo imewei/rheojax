@@ -245,14 +245,17 @@ class ModelComparisonPipeline(Pipeline):
                 y_pred = model.predict(X)
 
                 # Handle complex modulus (oscillation mode)
-                # Oscillation predictions return (n, 2) array: [G', G"]
-                # Convert to magnitude |G*| = sqrt(G'^2 + G"^2)
-                if y_pred.ndim == 2 and y_pred.shape[1] == 2:
+                # Case 1: Complex predictions (G* = G' + iG")
+                if np.iscomplexobj(y_pred):
+                    y_pred_magnitude = np.abs(y_pred)
+                # Case 2: 2D array [G', G"] format
+                elif y_pred.ndim == 2 and y_pred.shape[1] == 2:
                     y_pred_magnitude = np.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
+                # Case 3: Real predictions
                 else:
                     y_pred_magnitude = y_pred
 
-                # Calculate metrics using magnitude
+                # Calculate metrics using magnitude (real values)
                 residuals = y - y_pred_magnitude
                 rmse = np.sqrt(np.mean(residuals**2))
 
