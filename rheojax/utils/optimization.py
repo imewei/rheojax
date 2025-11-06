@@ -532,11 +532,38 @@ def create_least_squares_objective(
         # Get model predictions
         y_pred = model_fn(x_data_jax, params_jax)
 
-        # Dynamically check if predictions are complex
+        # Check prediction format: complex, 2D [G', G"], or real
         y_pred_is_complex = jnp.iscomplexobj(y_pred)
+        y_pred_is_2d = y_pred.ndim == 2 and y_pred.shape[-1] == 2
 
-        if y_pred_is_complex:
-            # Case 1: Complex predictions
+        if y_pred_is_2d:
+            # Case 1: 2D [G', G"] format (e.g., FractionalZenerSolidSolid)
+            if y_data_is_complex:
+                # Fit to real and imaginary parts separately
+                resid_real = y_pred[:, 0] - jnp.real(y_data_jax)
+                resid_imag = y_pred[:, 1] - jnp.imag(y_data_jax)
+
+                if normalize:
+                    resid_real = resid_real / jnp.maximum(
+                        jnp.abs(jnp.real(y_data_jax)), 1e-10
+                    )
+                    resid_imag = resid_imag / jnp.maximum(
+                        jnp.abs(jnp.imag(y_data_jax)), 1e-10
+                    )
+
+                return jnp.concatenate([resid_real, resid_imag])
+            else:
+                # Fit to magnitude: |G*| = sqrt(G'^2 + G"^2)
+                y_pred_magnitude = jnp.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
+                residuals = y_pred_magnitude - y_data_jax
+
+                if normalize:
+                    residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+
+                return residuals
+
+        elif y_pred_is_complex:
+            # Case 2: Complex predictions (G' + iG")
             if y_data_is_complex:
                 # Both complex: fit real and imaginary parts separately
                 resid_real = jnp.real(y_pred) - jnp.real(y_data_jax)
@@ -562,7 +589,7 @@ def create_least_squares_objective(
 
                 return residuals
         else:
-            # Case 2: Real predictions
+            # Case 3: Real predictions
             if y_data_is_complex:
                 # Real predictions, complex data: this is unusual but handle it
                 # Fit to magnitude of data
