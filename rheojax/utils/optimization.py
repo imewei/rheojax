@@ -265,9 +265,12 @@ def nlsq_optimize(
         nlsq_result = optimizer.least_squares(**nlsq_kwargs)
     except Exception as e:
         # If NLSQ fails, return a failure result
+        # objective() returns residual vector, so compute RSS = sum(residuals²)
+        residuals = objective(x0)
+        rss = float(jnp.sum(residuals**2))
         return OptimizationResult(
             x=x0,
-            fun=float(objective(x0)),
+            fun=rss,
             success=False,
             message=f"NLSQ optimization failed: {str(e)}",
             nit=0,

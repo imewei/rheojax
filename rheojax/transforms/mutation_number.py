@@ -251,35 +251,68 @@ class MutationNumber(BaseTransform):
         if G_0 <= 0:
             raise ValueError("Initial modulus G(0) must be positive")
 
-        # Calculate integrals
-        # ∫G(t)dt
-        integral_G = self._integrate(t, G_t)
+        # Estimate equilibrium modulus (average of last 10% of data)
+        n_tail = max(10, len(G_t) // 10)
+        G_eq = float(jnp.mean(G_t[-n_tail:]))
 
-        # ∫t*G(t)dt (for average relaxation time)
-        integral_tG = self._integrate(t, t * G_t)
+        # For mutation number, integrate the relaxing part G(t) - G_eq
+        # For elastic solids: G(t) ≈ G_eq → G_relax ≈ 0 → Δ ≈ 0
+        # For viscous fluids: G_eq ≈ 0 → G_relax ≈ G(t) → Δ ≈ 1
+        G_relax = G_t - G_eq
+
+        # Calculate integrals of relaxing part
+        # ∫[G(t) - G_eq]dt
+        integral_G = self._integrate(t, G_relax)
+
+        # ∫t*[G(t) - G_eq]dt (for average relaxation time)
+        integral_tG = self._integrate(t, t * G_relax)
 
         # Add extrapolation if requested
+        # Only extrapolate if the tail values are positive and significant
+        # (for elastic solids that have plateaued, G_relax ≈ 0, so extrapolation not needed)
         if self.extrapolate:
-            tail_G = self._extrapolate_tail(t, G_t)
-            integral_G += tail_G
+            # Check if tail values are positive and significant
+            n_check = min(10, len(G_relax) // 4)
+            tail_values = G_relax[-n_check:]
+            tail_mean = float(jnp.mean(tail_values))
+            tail_positive = float(jnp.min(tail_values)) > 0
 
-            # Also extrapolate t*G(t) for better tau_avg estimate
-            # This is more complex, skip for now
-            # tail_tG = self._extrapolate_tail(t, t * G_t)
-            # integral_tG += tail_tG
+            # Only extrapolate if tail is positive and > 1% of initial relaxing modulus
+            if tail_positive and tail_mean > 0.01 * G_0_relax:
+                try:
+                    tail_G = self._extrapolate_tail(t, G_relax)
+                    if not jnp.isnan(tail_G) and not jnp.isinf(tail_G):
+                        integral_G += tail_G
+                except (ValueError, RuntimeWarning):
+                    # Extrapolation failed, continue without it
+                    pass
 
-        # Calculate average relaxation time
-        tau_avg = integral_G / G_0
+        # Calculate average relaxation time of the relaxing component
+        # Use G_0 - G_eq as the initial relaxing modulus
+        G_0_relax = G_0 - G_eq
+
+        if G_0_relax > 0:
+            tau_avg = integral_G / G_0_relax
+        else:
+            # No relaxation (pure elastic solid)
+            return 0.0
 
         # Calculate mutation number
-        # Δ = ∫G(t)dt / (G(0) * τ_avg) = (∫G(t)dt)² / (G(0) * ∫t*G(t)dt)
-        if integral_tG > 0:
-            delta = (integral_G**2) / (G_0 * integral_tG)
+        # Δ = ∫[G(t)-G_eq]dt / ((G_0-G_eq) * τ_avg) = (∫[G(t)-G_eq]dt)² / ((G_0-G_eq) * ∫t*[G(t)-G_eq]dt)
+        if integral_tG > 0 and G_0_relax > 0:
+            delta = (integral_G**2) / (G_0_relax * integral_tG)
         else:
-            # Fallback: use simple definition
-            delta = integral_G / (G_0 * tau_avg)
+            # Fallback or no relaxation
+            if G_0_relax > 0:
+                delta = integral_G / (G_0_relax * tau_avg)
+            else:
+                delta = 0.0
 
-        return float(delta)
+        # Clamp to physical range [0, 1]
+        # Values outside this range indicate numerical issues or insufficient data quality
+        delta = float(jnp.clip(delta, 0.0, 1.0))
+
+        return delta
 
     def _transform(self, data: RheoData) -> RheoData:
         """Transform relaxation data to mutation number.
