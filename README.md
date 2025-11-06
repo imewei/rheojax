@@ -312,7 +312,16 @@ tau_char = fft.get_characteristic_time(freq_data)
 
 # Time-temperature superposition (mastercurves)
 mc = Mastercurve(reference_temp=298.15, method='wlf')
+
+# Option 1: Create mastercurve (basic)
 mastercurve = mc.create_mastercurve(datasets)
+
+# Option 2: Transform with shift factors (recommended for plotting)
+mastercurve, shift_factors = mc.transform(datasets)
+
+# Get parameters and arrays for analysis
+wlf_params = mc.get_wlf_parameters()
+temps, shifts = mc.get_shift_factors_array()
 
 # Mutation number (viscoelastic character)
 mn = MutationNumber()

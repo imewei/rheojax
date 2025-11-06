@@ -412,6 +412,210 @@ az.plot_trace(idata)
 az.summary(idata)
 ```
 
+### Data Transforms: Mastercurve API
+
+Rheo provides comprehensive time-temperature superposition (TTS) capabilities through the `Mastercurve` transform with enhanced API for plotting and analysis.
+
+#### Basic Mastercurve Creation
+
+```python
+from rheojax.transforms.mastercurve import Mastercurve
+from rheojax.io.readers import auto_read
+
+# Load multi-temperature datasets
+temps = [273.15, 298.15, 323.15]  # Kelvin
+datasets = []
+for temp_file in temp_files:
+    data = auto_read(temp_file)
+    # Ensure temperature is in metadata
+    data.metadata['temperature'] = get_temperature(temp_file)
+    datasets.append(data)
+
+# Create Mastercurve transform
+mc = Mastercurve(
+    reference_temp=298.15,  # Reference temperature (K)
+    method='wlf',           # 'wlf', 'arrhenius', or 'manual'
+    C1=17.44,               # WLF parameter (optional, uses default)
+    C2=51.6,                # WLF parameter in K (optional)
+    vertical_shift=False,   # Apply vertical shifting
+    optimize_shifts=True    # Optimize shift factors
+)
+```
+
+#### Creating Mastercurves (Two API Options)
+
+**Option 1: Using `create_mastercurve()` (Explicit)**
+```python
+# Create mastercurve without returning shift factors
+mastercurve = mc.create_mastercurve(datasets)
+
+# Access shift factors from metadata
+shift_factors = mastercurve.metadata['shift_factors']
+print(f"Shift factors: {shift_factors}")
+```
+
+**Option 2: Using `transform()` (Recommended for Plotting)**
+```python
+# Transform returns both mastercurve and shift factors
+mastercurve, shift_factors = mc.transform(datasets)
+
+# shift_factors is a dict: {temperature: shift_factor}
+print(f"At 273.15 K: a_T = {shift_factors[273.15]}")
+print(f"At 298.15 K: a_T = {shift_factors[298.15]}")  # Should be ~1.0
+```
+
+#### Retrieving Model Parameters
+
+**Get WLF Parameters**
+```python
+# After creating WLF-based mastercurve
+wlf_params = mc.get_wlf_parameters()
+
+C1 = wlf_params['C1']       # WLF constant C1
+C2 = wlf_params['C2']       # WLF constant C2 (K)
+T_ref = wlf_params['T_ref'] # Reference temperature (K)
+
+print(f"WLF Parameters: C1={C1:.2f}, C2={C2:.2f} K, T_ref={T_ref:.2f} K")
+```
+
+**Get Arrhenius Parameters**
+```python
+# For Arrhenius-based mastercurve
+mc_arr = Mastercurve(reference_temp=298.15, method='arrhenius', E_a=50000)
+mastercurve, shifts = mc_arr.transform(datasets)
+
+arr_params = mc_arr.get_arrhenius_parameters()
+E_a = arr_params['E_a']     # Activation energy (J/mol)
+T_ref = arr_params['T_ref'] # Reference temperature (K)
+
+print(f"Arrhenius: E_a={E_a:.0f} J/mol, T_ref={T_ref:.2f} K")
+```
+
+#### Getting Shift Factors as Arrays (For Plotting)
+
+**After Mastercurve Creation**
+```python
+# Get shift factors as sorted NumPy arrays
+temps_array, shifts_array = mc.get_shift_factors_array()
+
+# temps_array: temperatures in Kelvin (sorted)
+# shifts_array: corresponding shift factors
+
+# Convert to Celsius for plotting
+temps_C = temps_array - 273.15
+
+# Plot WLF fit
+import matplotlib.pyplot as plt
+plt.figure(figsize=(8, 6))
+plt.plot(temps_C, np.log10(shifts_array), 'o-', label='WLF fit')
+plt.axhline(y=0, color='k', linestyle='--', alpha=0.5)
+plt.axvline(x=mc.T_ref - 273.15, color='k', linestyle='--', alpha=0.5)
+plt.xlabel('Temperature (°C)')
+plt.ylabel('log₁₀(aₜ)')
+plt.title('Time-Temperature Shift Factors')
+plt.grid(True, alpha=0.3)
+plt.legend()
+plt.show()
+```
+
+**Generate Smooth WLF Curve**
+```python
+# Create smooth temperature range for plotting
+temps_range = np.linspace(250, 350, 100)  # Kelvin
+temps_smooth, shifts_smooth = mc.get_shift_factors_array(temps_range)
+
+# Plot smooth WLF curve with data points
+plt.plot(temps_smooth - 273.15, np.log10(shifts_smooth), '-',
+         label='WLF model', linewidth=2)
+plt.plot(temps_array - 273.15, np.log10(shifts_array), 'o',
+         label='Data points', markersize=8)
+plt.xlabel('Temperature (°C)')
+plt.ylabel('log₁₀(aₜ)')
+plt.legend()
+```
+
+#### Complete Workflow Example
+
+```python
+from rheojax.transforms.mastercurve import Mastercurve
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 1. Create mastercurve
+mc = Mastercurve(reference_temp=298.15, method='wlf')
+mastercurve, shift_factors = mc.transform(datasets)
+
+# 2. Get WLF parameters
+wlf_params = mc.get_wlf_parameters()
+print(f"Fitted WLF: C1={wlf_params['C1']:.2f}, C2={wlf_params['C2']:.2f} K")
+
+# 3. Get shift factors for plotting
+temps, shifts = mc.get_shift_factors_array()
+
+# 4. Create publication-quality plot
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+# Left: Shift factors vs temperature
+temps_C = temps - 273.15
+ax1.plot(temps_C, np.log10(shifts), 'o-', markersize=8, linewidth=2)
+ax1.axhline(y=0, color='k', linestyle='--', alpha=0.5)
+ax1.axvline(x=wlf_params['T_ref'] - 273.15, color='k', linestyle='--', alpha=0.5)
+ax1.set_xlabel('Temperature (°C)')
+ax1.set_ylabel('log₁₀(aₜ)')
+ax1.set_title('Time-Temperature Shift Factors')
+ax1.grid(True, alpha=0.3)
+
+# Right: Mastercurve
+ax2.loglog(mastercurve.x, mastercurve.y, 'o', alpha=0.6)
+ax2.set_xlabel('Shifted Frequency (rad/s)')
+ax2.set_ylabel("G' (Pa)")
+ax2.set_title(f'Master Curve (T_ref = {wlf_params["T_ref"] - 273.15:.1f}°C)')
+ax2.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+# 5. Save results
+mastercurve.save('mastercurve.hdf5')
+```
+
+#### Optimizing WLF Parameters
+
+```python
+# Optimize WLF parameters to minimize overlap error
+C1_opt, C2_opt = mc.optimize_wlf_parameters(
+    datasets,
+    initial_C1=17.0,
+    initial_C2=50.0
+)
+
+print(f"Optimized WLF: C1={C1_opt:.2f}, C2={C2_opt:.2f} K")
+
+# Compute overlap error
+overlap_error = mc.compute_overlap_error(datasets)
+print(f"Overlap error: {overlap_error:.2e}")
+```
+
+#### Key Features Summary
+
+**`Mastercurve` Transform Methods:**
+- `transform(data)`: Transform single dataset or create mastercurve from list
+- `create_mastercurve(datasets, merge=True, return_shifts=False)`: Explicit mastercurve creation
+- `get_wlf_parameters()`: Get WLF constants (C1, C2, T_ref)
+- `get_arrhenius_parameters()`: Get Arrhenius parameters (E_a, T_ref)
+- `get_shift_factors_array(temperatures=None)`: Get shift factors as NumPy arrays
+- `optimize_wlf_parameters(datasets)`: Optimize WLF constants
+- `compute_overlap_error(datasets)`: Quantify mastercurve quality
+- `set_manual_shifts(shift_factors)`: Set manual shift factors
+
+**Best Practices:**
+1. Always ensure `temperature` is in dataset metadata
+2. Use `transform()` when you need shift factors for plotting
+3. Use `get_shift_factors_array()` for creating smooth plots
+4. Verify `a_T ≈ 1.0` at reference temperature
+5. Check overlap error to assess mastercurve quality
+6. Consider optimizing WLF parameters for better fit
+
 ### Troubleshooting
 
 #### Float64 Precision Issues
