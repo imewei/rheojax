@@ -7,18 +7,20 @@ for all models and transforms in the rheo package, with full JAX support.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Union
+from typing import Any
 
 import numpy as np
 
 from rheojax.core.bayesian import BayesianMixin, BayesianResult
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.core.parameters import ParameterSet
+from rheojax.core.parameters import Parameter, ParameterSet
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
-ArrayLike = Union[np.ndarray, jnp.ndarray]
+# Type alias for arrays (accepts both NumPy and JAX arrays)
+# Note: jnp.ndarray is dynamically imported, so we use np.ndarray for type checking
+type ArrayLike = np.ndarray
 
 
 class BaseModel(BayesianMixin, ABC):
@@ -73,7 +75,12 @@ class BaseModel(BayesianMixin, ABC):
         pass
 
     def fit(
-        self, X: ArrayLike, y: ArrayLike, method: str = "nlsq", **kwargs
+        self,
+        X: ArrayLike,
+        y: ArrayLike,
+        method: str = "nlsq",
+        check_compatibility: bool = False,
+        **kwargs,
     ) -> BaseModel:
         """Fit the model to data using NLSQ optimization.
 
@@ -85,6 +92,9 @@ class BaseModel(BayesianMixin, ABC):
             X: Input features
             y: Target values
             method: Optimization method ('nlsq' by default for compatibility)
+            check_compatibility: Whether to check model-data compatibility before
+                fitting. If True, warns when model may not be appropriate for data.
+                Default is False for backward compatibility.
             **kwargs: Additional fitting options passed to _fit()
 
         Returns:
@@ -94,14 +104,88 @@ class BaseModel(BayesianMixin, ABC):
             >>> model = Maxwell()
             >>> model.fit(t, G_data)  # Uses NLSQ by default
             >>> model.fit(t, G_data, method='nlsq', max_iter=1000)
+            >>> model.fit(t, G_data, check_compatibility=True)  # Check compatibility
         """
+        import logging
+
         # Store data for potential Bayesian inference
         self.X_data = X
         self.y_data = y
 
+        # Optional compatibility check
+        if check_compatibility:
+            try:
+                from rheojax.utils.compatibility import (
+                    check_model_compatibility,
+                    format_compatibility_message,
+                )
+
+                # Determine test mode if not provided
+                test_mode = kwargs.get("test_mode", None)
+
+                # Check compatibility
+                compatibility = check_model_compatibility(
+                    model=self,
+                    t=X if test_mode == "relaxation" else None,
+                    G_t=y if test_mode == "relaxation" else None,
+                    omega=X if test_mode == "oscillation" else None,
+                    G_star=y if test_mode == "oscillation" else None,
+                    test_mode=test_mode,
+                )
+
+                # Log compatibility results
+                if not compatibility["compatible"]:
+                    message = format_compatibility_message(compatibility)
+                    logging.warning(f"Model compatibility check:\n{message}")
+
+            except Exception as e:
+                logging.debug(f"Compatibility check failed: {e}")
+
         # Call subclass implementation (which uses NLSQ via optimization module)
-        self._fit(X, y, method=method, **kwargs)
-        self.fitted_ = True
+        try:
+            self._fit(X, y, method=method, **kwargs)
+            self.fitted_ = True
+        except RuntimeError as e:
+            # Enhance error message with compatibility information
+            error_msg = str(e)
+
+            # Check if this is an optimization failure
+            if "Optimization failed" in error_msg or "did not converge" in error_msg:
+                # Try to provide more context
+                try:
+                    from rheojax.utils.compatibility import (
+                        check_model_compatibility,
+                        format_compatibility_message,
+                    )
+
+                    test_mode = kwargs.get("test_mode", None)
+                    compatibility = check_model_compatibility(
+                        model=self,
+                        t=X if test_mode == "relaxation" else None,
+                        G_t=y if test_mode == "relaxation" else None,
+                        omega=X if test_mode == "oscillation" else None,
+                        G_star=y if test_mode == "oscillation" else None,
+                        test_mode=test_mode,
+                    )
+
+                    if not compatibility["compatible"]:
+                        # Provide enhanced error message
+                        compat_msg = format_compatibility_message(compatibility)
+                        enhanced_msg = (
+                            f"{error_msg}\n\n"
+                            f"Model-data compatibility issue detected:\n"
+                            f"{compat_msg}\n\n"
+                            f"Note: This model may not be appropriate for your data. "
+                            f"In model comparison pipelines, it's normal for some models "
+                            f"to fail when their underlying physics doesn't match the material behavior."
+                        )
+                        raise RuntimeError(enhanced_msg) from e
+                except Exception:
+                    # If compatibility check fails, just raise original error
+                    pass
+
+            # Re-raise original error if not enhanced
+            raise
 
         # Note: _nlsq_result would be set by subclass _fit implementation
         # if it explicitly stores the OptimizationResult
@@ -499,9 +583,6 @@ class TransformPipeline(BaseTransform):
         transform_names = " → ".join(t.__class__.__name__ for t in self.transforms)
         return f"TransformPipeline([{transform_names}])"
 
-
-# Import Parameter and ParameterSet for convenience
-from rheojax.core.parameters import Parameter
 
 __all__ = [
     "BaseModel",
