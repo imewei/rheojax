@@ -392,3 +392,351 @@ See Also
 - :doc:`../user_guide/getting_started` - Basic usage examples
 - `SciPy optimize <https://docs.scipy.org/doc/scipy/reference/optimize.html>`_ - Optimization algorithms
 - `JAX autodiff <https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html>`_ - Automatic differentiation
+
+Model-Data Compatibility
+-------------------------
+
+.. automodule:: rheojax.utils.compatibility
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The compatibility module provides intelligent detection of when rheological models
+are inappropriate for experimental data based on underlying physics. This helps users
+understand when model failures are expected due to physics mismatch rather than
+optimization issues.
+
+Enums
+~~~~~
+
+.. autoclass:: rheojax.utils.compatibility.DecayType
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+   Types of relaxation decay behavior:
+
+   - **EXPONENTIAL**: Simple Maxwell-like exp(-t/tau)
+   - **POWER_LAW**: Power-law t^(-alpha) (gel-like)
+   - **STRETCHED**: Stretched exponential exp(-(t/tau)^beta)
+   - **MITTAG_LEFFLER**: Mittag-Leffler E_alpha(-(t/tau)^alpha) (fractional)
+   - **MULTI_MODE**: Multiple relaxation modes
+   - **UNKNOWN**: Cannot determine
+
+.. autoclass:: rheojax.utils.compatibility.MaterialType
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+   Types of material behavior:
+
+   - **SOLID**: Solid-like (finite equilibrium modulus)
+   - **LIQUID**: Liquid-like (zero equilibrium modulus, flows)
+   - **GEL**: Gel-like (power-law relaxation)
+   - **VISCOELASTIC_SOLID**: Viscoelastic solid
+   - **VISCOELASTIC_LIQUID**: Viscoelastic liquid
+   - **UNKNOWN**: Cannot determine
+
+Functions
+~~~~~~~~~
+
+.. autofunction:: rheojax.utils.compatibility.detect_decay_type
+
+   Analyzes relaxation modulus data to determine the type of decay pattern.
+   Uses linear regression on log-transformed data to identify exponential,
+   power-law, stretched exponential, or Mittag-Leffler behavior.
+
+.. autofunction:: rheojax.utils.compatibility.detect_material_type
+
+   Classifies material behavior from relaxation or oscillation data.
+   Detects solid-like, liquid-like, gel-like, or viscoelastic behavior based on
+   equilibrium modulus or low-frequency response.
+
+.. autofunction:: rheojax.utils.compatibility.check_model_compatibility
+
+   Comprehensive compatibility check comparing model physics with data characteristics.
+   Returns detailed compatibility information including warnings and model recommendations.
+
+.. autofunction:: rheojax.utils.compatibility.format_compatibility_message
+
+   Formats compatibility check results as a human-readable message with warnings,
+   detected characteristics, and alternative model recommendations.
+
+Decay Detection Algorithm
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The decay type detection uses statistical analysis on log-transformed data:
+
+**Exponential Decay Detection**
+
+Linear regression on log(G) vs t:
+
+.. math::
+
+   \log G(t) = \log G_0 - \frac{t}{\tau}
+
+High R² (> 0.90) indicates exponential decay (Maxwell-like behavior).
+
+**Power-Law Decay Detection**
+
+Linear regression on log(G) vs log(t):
+
+.. math::
+
+   \log G(t) = \log G_0 - \alpha \log t
+
+High R² (> 0.90) indicates power-law decay (gel-like behavior).
+
+**Stretched Exponential Detection**
+
+Linear regression on log(-log(G/G₀)) vs log(t):
+
+.. math::
+
+   \log\left(-\log\frac{G(t)}{G_0}\right) = \beta \log t + \text{const}
+
+High R² (> 0.90) indicates stretched exponential behavior.
+
+Material Type Classification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**From Relaxation Data**
+
+Material type is determined by the decay ratio:
+
+.. math::
+
+   \text{decay ratio} = \frac{\text{mean}(G_{\text{final}})}{\text{mean}(G_{\text{initial}})}
+
+- **Solid-like**: decay ratio > 0.5 (significant equilibrium modulus)
+- **Liquid-like**: decay ratio < 0.1 (nearly complete relaxation)
+- **Power-law materials**: Classified based on decay type regardless of ratio
+
+**From Oscillation Data**
+
+Material type is determined by low-frequency behavior:
+
+- **Solid**: G' > G" at lowest frequency (elastic dominant)
+- **Liquid**: G" > G' at lowest frequency (viscous dominant)
+
+Examples
+~~~~~~~~
+
+Basic Compatibility Check
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+    from rheojax.utils.compatibility import (
+        check_model_compatibility,
+        format_compatibility_message
+    )
+    import numpy as np
+
+    # Generate exponential decay data (Maxwell-like)
+    t = np.logspace(-2, 2, 50)
+    G_t = 1e5 * np.exp(-t / 1.0)
+
+    # Check if FZSS is appropriate
+    model = FractionalZenerSolidSolid()
+    compatibility = check_model_compatibility(
+        model, t=t, G_t=G_t, test_mode='relaxation'
+    )
+
+    # Print human-readable report
+    print(format_compatibility_message(compatibility))
+    # Output:
+    # ⚠ Model may not be appropriate for this data
+    #   Confidence: 90%
+    #   Detected decay: exponential
+    #   Material type: viscoelastic_liquid
+    #
+    # Warnings:
+    #   • FZSS model expects Mittag-Leffler (power-law) relaxation,
+    #     but data shows exponential decay.
+    #
+    # Recommended alternative models:
+    #   • Maxwell
+    #   • Zener
+
+Automatic Checking During Fit
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.models.maxwell import Maxwell
+    import numpy as np
+
+    # Enable automatic compatibility checking
+    model = Maxwell()
+    model.fit(
+        t, G_data,
+        test_mode='relaxation',
+        check_compatibility=True  # Warns if model-data mismatch
+    )
+
+    # If incompatible, warning is logged and enhanced error
+    # messages provide physics-based explanations
+
+Detecting Decay Type
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils.compatibility import detect_decay_type, DecayType
+    import numpy as np
+
+    # Power-law decay (gel-like)
+    t = np.logspace(-2, 2, 100)
+    G_gel = 1e5 * t**(-0.5)
+
+    decay_type = detect_decay_type(t, G_gel)
+    print(decay_type)  # DecayType.POWER_LAW
+
+    # Exponential decay (Maxwell-like)
+    G_maxwell = 1e5 * np.exp(-t / 1.0)
+    decay_type = detect_decay_type(t, G_maxwell)
+    print(decay_type)  # DecayType.EXPONENTIAL
+
+Classifying Material Type
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils.compatibility import detect_material_type
+    import numpy as np
+
+    # Solid-like material (finite equilibrium modulus)
+    t = np.logspace(-2, 2, 50)
+    G_solid = 5e4 + 5e4 * np.exp(-t / 1.0)  # Ge + Gm*exp(-t/tau)
+
+    material_type = detect_material_type(t=t, G_t=G_solid)
+    print(material_type)  # MaterialType.VISCOELASTIC_SOLID
+
+    # Liquid-like material (no equilibrium modulus)
+    G_liquid = 1e5 * np.exp(-t / 1.0)
+    material_type = detect_material_type(t=t, G_t=G_liquid)
+    print(material_type)  # MaterialType.VISCOELASTIC_LIQUID
+
+Oscillation Data Analysis
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils.compatibility import (
+        check_model_compatibility,
+        detect_material_type
+    )
+    from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
+    import numpy as np
+
+    # Oscillation data (G', G")
+    omega = np.logspace(-2, 2, 50)
+    G_prime = 1e5 * np.ones(50)  # Constant storage modulus
+    G_double_prime = 1e3 * omega**0.5  # Frequency-dependent loss
+
+    G_star = np.column_stack([G_prime, G_double_prime])
+
+    # Detect material type
+    material_type = detect_material_type(omega=omega, G_star=G_star)
+    print(material_type)  # MaterialType.SOLID (G' > G" at low freq)
+
+    # Check model compatibility
+    model = FractionalMaxwellLiquid()
+    compatibility = check_model_compatibility(
+        model,
+        omega=omega,
+        G_star=G_star,
+        test_mode='oscillation'
+    )
+
+    if not compatibility['compatible']:
+        print(f"Confidence: {compatibility['confidence']}")
+        print(f"Warnings: {compatibility['warnings']}")
+        print(f"Try instead: {compatibility['recommendations']}")
+
+Enhanced Error Messages
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    import numpy as np
+    from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+
+    # Generate exponential data (incompatible with FZSS)
+    np.random.seed(42)
+    t = np.logspace(-2, 2, 50)
+    G_t = 1e5 * np.exp(-t / 1.0) + np.random.normal(0, 1000, size=len(t))
+
+    model = FractionalZenerSolidSolid()
+
+    try:
+        # Fit will fail with enhanced error message
+        model.fit(t, G_t, test_mode='relaxation', max_iter=100)
+    except RuntimeError as e:
+        print(e)
+        # Output includes:
+        # - Original optimization error
+        # - Detected decay type and material type
+        # - Physics-based explanation of mismatch
+        # - Recommended alternative models
+        # - Guidance that failures are normal in model comparison
+
+Model Compatibility Rules
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Fractional Zener Solid-Solid (FZSS)**
+
+- Expects: Mittag-Leffler or power-law relaxation with finite equilibrium modulus
+- Incompatible with: Exponential decay (use Maxwell/Zener instead)
+- Incompatible with: Liquid-like behavior (use FractionalMaxwellLiquid)
+
+**Fractional Maxwell Liquid (FML)**
+
+- Expects: Liquid-like behavior (no equilibrium modulus)
+- Incompatible with: Solid-like materials (use FZSS or FractionalKelvinVoigt)
+
+**Fractional Maxwell Gel (FMG)**
+
+- Expects: Power-law relaxation (gel-like)
+- Incompatible with: Exponential decay (use Maxwell instead)
+
+**Maxwell Model**
+
+- Expects: Exponential decay
+- Incompatible with: Power-law decay (use FMG or FZSS)
+
+**Zener Model**
+
+- Expects: Exponential decay with equilibrium modulus
+- Incompatible with: Power-law decay (use FZSS)
+
+**Fractional Kelvin-Voigt**
+
+- Expects: Solid-like behavior
+- Incompatible with: Liquid-like behavior (use FractionalMaxwellLiquid)
+
+Performance Considerations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Fast detection**: < 1 ms for typical datasets (50-100 points)
+- **Minimal overhead**: Can be enabled during fitting without performance impact
+- **Robust to noise**: Uses statistical regression with confidence thresholds
+- **Automatic test mode detection**: Works with relaxation, creep, and oscillation data
+
+Use Cases
+~~~~~~~~~
+
+1. **Model Selection**: Identify appropriate models before fitting
+2. **Error Diagnosis**: Understand why optimization failed
+3. **Automated Pipelines**: Filter incompatible model-data combinations
+4. **Model Comparison**: Expect some models to fail (this is normal!)
+5. **Educational**: Learn about rheological model physics
+
+See Also
+--------
+
+- :doc:`core` - BaseModel integration with check_compatibility parameter
+- :doc:`../user_guide/model_selection` - Comprehensive model selection guide
+- :doc:`../user_guide/getting_started` - Basic usage examples

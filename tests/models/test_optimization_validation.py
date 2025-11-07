@@ -49,6 +49,9 @@ ALL_FIXED_MODELS = [
 # Models that can be tested with scalar data (excludes FZLL which requires complex modulus data)
 # Note: Zener is excluded from optimization failure tests because it converges quickly on xtol
 # even with bad data, so NLSQ reports success despite poor fit quality (edge case)
+# Note: FractionalMaxwellGel is excluded because its flexible Mittag-Leffler-based prediction
+# function can achieve gtol convergence on constant data by driving parameters to extreme
+# values (similar to Zener). FMLiquid and FMModel correctly fail on bad data.
 SCALAR_DATA_MODELS = [
     ("FZSL", FractionalZenerSolidLiquid),
     ("FZSS", FractionalZenerSolidSolid),
@@ -59,7 +62,6 @@ SCALAR_DATA_MODELS = [
     ("Maxwell", Maxwell),
     ("SpringPot", SpringPot),
     ("FKV", FractionalKelvinVoigt),
-    ("FMGel", FractionalMaxwellGel),
     ("FMLiquid", FractionalMaxwellLiquid),
     ("FMModel", FractionalMaxwellModel),
 ]

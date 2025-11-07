@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Rheo is a JAX-accelerated rheological analysis package providing a unified framework for analyzing experimental rheology data. It integrates classical rheological models with modern data transforms, offering 2-10x performance improvements through JAX + GPU acceleration.
+RheoJAX is a JAX-accelerated rheological analysis package providing a unified framework for analyzing experimental rheology data. It integrates classical rheological models with modern data transforms, offering 2-10x performance improvements through JAX + GPU acceleration.
 
 **Technology Stack:**
 - Python 3.12+ (3.8-3.11 NOT supported)
@@ -15,6 +15,11 @@ Rheo is a JAX-accelerated rheological analysis package providing a unified frame
 - NumPy, SciPy for numerical operations
 - Matplotlib for visualization
 - h5py, pandas, openpyxl for I/O
+
+**Recent Major Features (v0.2.0):**
+- **Model-Data Compatibility Checking**: Intelligent detection of physics mismatches between models and data
+- **Smart Initialization**: Automatic parameter initialization for fractional models in oscillation mode
+- See [Recent Features](#recent-features-updated-2025-11-07) section below for details
 
 ## Common Development Commands
 
@@ -127,7 +132,9 @@ rheojax/
 │   └── templates.py   # Three styles: default, publication, presentation
 └── utils/
     ├── optimization.py     # NLSQ-based optimization (5-270x speedup)
-    └── mittag_leffler.py  # Mittag-Leffler functions (1 and 2-parameter)
+    ├── mittag_leffler.py   # Mittag-Leffler functions (1 and 2-parameter)
+    ├── compatibility.py    # Model-data compatibility checking (NEW in v0.2.0)
+    └── initialization.py   # Smart parameter initialization (NEW in v0.2.0)
 ```
 
 ### Key Design Patterns
@@ -221,9 +228,166 @@ Float64 precision is essential for:
 
 NLSQ automatically configures JAX for float64 when imported, making the import order critical.
 
+## Recent Features (Updated: 2025-11-07)
+
+### Model-Data Compatibility Checking System (v0.2.0)
+
+**Location:** `rheojax/utils/compatibility.py`
+
+A new intelligent system that detects when rheological models are inappropriate for experimental data based on underlying physics. This helps users understand why certain model-data combinations fail and recommends alternatives.
+
+#### Key Capabilities
+
+1. **Decay Type Detection (`detect_decay_type`)**: Automatically identifies relaxation patterns using statistical regression on log-transformed data
+   - Exponential (Maxwell-like): G(t) = G₀ exp(-t/τ)
+   - Power-law (gel-like): G(t) = G₀ t^(-α)
+   - Stretched exponential: G(t) = G₀ exp(-(t/τ)^β)
+   - Mittag-Leffler (fractional): G(t) = G₀ E_α(-(t/τ)^α)
+   - Multi-mode relaxation
+
+2. **Material Type Classification (`detect_material_type`)**: Classifies materials from relaxation or oscillation data
+   - Solid-like (finite equilibrium modulus)
+   - Liquid-like (zero equilibrium modulus, flows)
+   - Gel-like (power-law relaxation)
+   - Viscoelastic solid/liquid
+
+3. **Compatibility Checking (`check_model_compatibility`)**: Compares model physics with data characteristics
+   - Configurable confidence levels
+   - Physics-based compatibility rules for 6 major model families (FZSS, FML, FMG, Maxwell, Zener, FKV)
+   - Returns detailed warnings and recommendations
+
+4. **Enhanced Error Messages**: When optimization fails, provides physics-based explanations
+   ```python
+   try:
+       model.fit(t, G_data, check_compatibility=True)
+   except RuntimeError as e:
+       # Error message includes compatibility analysis and alternative models
+       print(e)
+   ```
+
+5. **Minimal Overhead**: Fast detection (< 1 ms for typical datasets)
+
+#### Usage Example
+
+```python
+from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+from rheojax.utils.compatibility import check_model_compatibility, format_compatibility_message
+import numpy as np
+
+# Test FZSS with exponential decay (incompatible)
+t = np.logspace(-2, 2, 50)
+G_t = 1e5 * np.exp(-t / 1.0)
+
+model = FractionalZenerSolidSolid()
+compat = check_model_compatibility(model, t=t, G_t=G_t, test_mode='relaxation')
+
+print(format_compatibility_message(compat))
+# Output: WARNING - FZSS expects power-law decay but detected exponential
+#         Recommended alternatives: Maxwell, Zener, FractionalMaxwellLiquid
+```
+
+#### Integration with BaseModel
+
+The compatibility checking is integrated into `BaseModel._fit()` with optional `check_compatibility=True` parameter:
+
+```python
+model.fit(X, y, test_mode='relaxation', check_compatibility=True)
+```
+
+When enabled and optimization fails, enhanced error messages include:
+- Detected decay type and material type
+- Model-specific compatibility warnings
+- Recommended alternative models
+- Physics-based explanation of failure
+
+See [Model Selection Guide](docs/model_selection_guide.md) for comprehensive decision flowcharts.
+
+### Smart Initialization for Fractional Models (Oscillation Mode) (v0.2.0)
+
+**Location:** `rheojax/utils/initialization.py`
+
+Automatic intelligent parameter initialization for fractional models when fitting oscillation data. This significantly improves convergence and parameter recovery for models that were previously unstable in oscillation mode (resolves Issue #9).
+
+#### Affected Models
+
+All 11 fractional models now support smart initialization:
+- `FractionalZenerSolidSolid` (FZSS)
+- `FractionalMaxwellLiquid` (FML)
+- `FractionalMaxwellGel` (FMG)
+- `FractionalMaxwellModel`, `FractionalBurgers`, `FractionalJeffreys`
+- `FractionalKelvinVoigt`, `FractionalKVZener`, `FractionalZenerLL`, `FractionalZenerSL`
+- `FractionalPoyntingThomson`
+
+#### How It Works
+
+When `test_mode='oscillation'`, the initialization system:
+
+1. **Estimates Initial Moduli**: From low/high-frequency plateau regions of G' and G"
+   - Low-frequency G' → equilibrium modulus (Ge)
+   - High-frequency G' → glassy modulus (Gm or G0)
+
+2. **Estimates Fractional Order (α)**: From frequency-dependence of loss tangent slope
+   - Analyzes slope of tan(δ) = G"/G' in intermediate frequency range
+   - Maps slope to fractional order α ∈ [0, 1]
+
+3. **Estimates Characteristic Time (τ)**: From crossover frequency (tan δ peak)
+   - Identifies frequency where G' = G" (or tan δ maximum)
+   - Converts to characteristic relaxation time: τ = 1/ω_crossover
+
+#### Usage
+
+Smart initialization is **automatic** when fitting oscillation data:
+
+```python
+from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+import numpy as np
+
+# Generate oscillation data
+omega = np.logspace(-2, 2, 50)
+G_star = ...  # Complex modulus [G', G"]
+
+# Fit automatically uses smart initialization
+model = FractionalZenerSolidSolid()
+model.fit(omega, G_star, test_mode='oscillation')  # Smart init applied transparently
+
+# Check fitted parameters
+print(f"Ge = {model.parameters.get_value('Ge'):.2e} Pa")
+print(f"alpha = {model.parameters.get_value('alpha'):.4f}")
+```
+
+No user action required - initialization happens transparently during `fit()`.
+
+#### Benefits
+
+- **Improved Convergence**: Reduces optimization failures in oscillation mode
+- **Better Parameter Recovery**: Starting from physics-based estimates
+- **Faster Optimization**: Fewer iterations needed with better initial guess
+- **Issue #9 Resolution**: Fixes long-standing instability in fractional model fitting
+
+#### Implementation Details
+
+Each fractional model now calls the appropriate initialization function in `_fit()`:
+
+```python
+# rheojax/models/fractional_zener_ss.py (example)
+def _fit(self, X, y, **kwargs):
+    test_mode = kwargs.get('test_mode', 'relaxation')
+
+    # Smart initialization for oscillation mode (Issue #9)
+    if test_mode == TestMode.OSCILLATION:
+        from rheojax.utils.initialization import initialize_fractional_zener_ss
+        success = initialize_fractional_zener_ss(
+            np.array(X), np.array(y), self.parameters
+        )
+        if success:
+            logging.debug("Smart initialization applied from frequency-domain features")
+
+    # ... continue with optimization using initialized parameters
+```
+
 ### NLSQ + NumPyro Workflow
 
-Rheo implements a two-step optimization workflow combining fast NLSQ point estimation with Bayesian NUTS inference.
+RheoJAX implements a two-step optimization workflow combining fast NLSQ point estimation with Bayesian NUTS inference.
 
 #### Step 1: NLSQ Optimization (Fast Point Estimation)
 
@@ -747,7 +911,7 @@ result = nlsq_optimize(objective, params, use_jax=True)
 - `tests/transforms/`: Transform implementations
 - `tests/io/`: File readers/writers
 - `tests/pipeline/`: Pipeline API (including BayesianPipeline)
-- `tests/utils/`: Optimization utilities (NLSQ integration)
+- `tests/utils/`: Optimization utilities (NLSQ integration, compatibility checking, initialization)
 - `tests/integration/`: End-to-end workflows (NLSQ → NUTS)
 - `tests/validation/`: Validation against legacy packages (pyrheo, hermes-rheo)
 

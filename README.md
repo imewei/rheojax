@@ -43,8 +43,10 @@ pipeline.plot_pair().plot_trace().plot_forest()
 ### Core Capabilities
 - **20 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models)
 - **5 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative
+- **Model-Data Compatibility Checking**: Intelligent system detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
 - **Bayesian Inference**: All 20 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
+- **Smart Initialization**: Automatic intelligent parameter initialization for fractional models in oscillation mode
 - **JAX-First Architecture**: 5-270x performance improvements with automatic differentiation and GPU support
 
 ### Data & I/O
@@ -284,6 +286,53 @@ pipeline = BayesianPipeline()
 - Troubleshooting common convergence issues
 - Best practices checklist
 - Runnable demo: `python examples/bayesian_workflow_demo.py`
+
+### Model-Data Compatibility Checking
+
+RheoJAX automatically detects when models are inappropriate for your data based on physics:
+
+```python
+from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+from rheojax.utils.compatibility import check_model_compatibility, format_compatibility_message
+import numpy as np
+
+# Generate exponential decay data
+t = np.logspace(-2, 2, 50)
+G_t = 1e5 * np.exp(-t / 1.0)
+
+# Check compatibility before fitting
+model = FractionalZenerSolidSolid()
+compat = check_model_compatibility(
+    model, t=t, G_t=G_t, test_mode='relaxation'
+)
+
+# Get human-readable report
+print(format_compatibility_message(compat))
+# Output:
+# ⚠ Model may not be appropriate for this data
+#   Confidence: 90%
+#   Detected decay: exponential
+#   Material type: viscoelastic_liquid
+#
+# Warnings:
+#   • FZSS model expects Mittag-Leffler (power-law) relaxation,
+#     but data shows exponential decay.
+#
+# Recommended alternative models:
+#   • Maxwell
+#   • Zener
+
+# Or enable automatic checking during fit
+model.fit(t, G_t, check_compatibility=True)  # Warns if incompatible
+```
+
+**Key Features:**
+- Detects decay type (exponential, power-law, stretched, Mittag-Leffler)
+- Classifies material type (solid, liquid, gel, viscoelastic)
+- Provides model recommendations when incompatible
+- Enhanced error messages explain physics mismatches
+
+**📖 See:** [Model Selection Guide](docs/model_selection_guide.md) for comprehensive decision flowcharts and model characteristics.
 
 ### Working with Parameters
 

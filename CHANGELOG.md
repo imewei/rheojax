@@ -17,6 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **API unchanged**: All functionality remains identical; only the package name has changed
   - See [MIGRATION.md](MIGRATION.md) for detailed upgrade instructions
 
+### Added
+- **Model-Data Compatibility Checking (`rheojax.utils.compatibility`)**: Intelligent system to detect when rheological models are inappropriate for experimental data based on underlying physics
+  - **Decay Type Detection**: Automatically identifies exponential, power-law, stretched exponential, Mittag-Leffler, or multi-mode relaxation patterns using statistical regression on log-transformed data
+  - **Material Type Classification**: Classifies materials as solid-like, liquid-like, gel-like, or viscoelastic based on equilibrium modulus (relaxation) or low-frequency response (oscillation)
+  - **Compatibility Checking**: Compares model physics with data characteristics to assess compatibility with configurable confidence levels
+  - **Enhanced Error Messages**: When optimization fails, provides physics-based explanations and recommends alternative models
+  - **Model-Specific Rules**: Built-in compatibility rules for 6 major model families (FZSS, FML, FMG, Maxwell, Zener, FKV)
+  - **Minimal Overhead**: Fast detection (< 1 ms for typical datasets) with optional `check_compatibility=True` parameter in `fit()`
+  - **Educational Value**: Helps users understand model physics and why certain model-data combinations fail
+  - See [Model Selection Guide](docs/model_selection_guide.md) for comprehensive decision flowcharts
+- **Smart Initialization for Fractional Models (Oscillation Mode)**: Automatic intelligent parameter initialization for fractional models (FZSS, FML, FMG) when fitting oscillation data
+  - Estimates initial moduli from low/high-frequency plateau regions of G' and G"
+  - Estimates fractional order alpha from frequency-dependence of loss tangent slope
+  - Estimates characteristic time from crossover frequency (tan δ peak)
+  - Significantly improves convergence and parameter recovery in oscillation mode
+  - Applied automatically during `fit()` when `test_mode='oscillation'`
+  - No user action required - initialization happens transparently
+
 ### Documentation
 - **Tutorial Consolidation**: Migrated all tutorial notebooks to unified `examples/` directory
   - 22 notebooks organized into 4 learning paths (basic, transforms, bayesian, advanced)
