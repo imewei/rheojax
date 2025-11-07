@@ -38,13 +38,13 @@ Temperature	°C
 
 [step]
 Number of points	5
-Time	Storage modulus	Loss modulus
-s	Pa	Pa
-0.1	1000	500
-0.2	1200	600
-0.3	1400	700
-0.4	1600	800
-0.5	1800	900
+Variables	Time	Storage modulus	Loss modulus
+	s	Pa	Pa
+data point 1	0.1	1000	500
+data point 2	0.2	1200	600
+data point 3	0.3	1400	700
+data point 4	0.4	1600	800
+data point 5	0.5	1800	900
 """
         test_file = tmp_path / "test_trios.txt"
         test_file.write_text(trios_content)
@@ -75,10 +75,10 @@ Temperature	°C
 25.0
 
 [step]
-Time	Stress
-s	Pa
-1.0	100
-2.0	200
+Variables	Time	Stress
+	s	Pa
+data point 1	1.0	100
+data point 2	2.0	200
 """
         test_file = tmp_path / "test_metadata.txt"
         test_file.write_text(trios_content)
@@ -105,16 +105,16 @@ Instrument serial number	4010-1234
 Instrument name	ARES-G2
 
 [step]
-Time	Stress
-s	Pa
-1.0	100
-2.0	200
+Variables	Time	Stress
+	s	Pa
+data point 1	1.0	100
+data point 2	2.0	200
 
 [step]
-Time	Stress
-s	Pa
-3.0	300
-4.0	400
+Variables	Time	Stress
+	s	Pa
+data point 1	3.0	300
+data point 2	4.0	400
 """
         test_file = tmp_path / "test_multiseg.txt"
         test_file.write_text(trios_content)
@@ -257,9 +257,9 @@ class TestAutoDetection:
 Instrument serial number	4010-1234
 
 [step]
-Time	Stress
-s	Pa
-1.0	100
+Variables	Time	Stress
+	s	Pa
+data point 1	1.0	100
 """
         )
 

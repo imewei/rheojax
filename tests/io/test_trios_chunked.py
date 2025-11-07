@@ -31,13 +31,13 @@ Temperature	°C
 
 [step]
 Number of points	5
-Time	Storage modulus	Loss modulus
-s	Pa	Pa
-0.1	1000	500
-0.2	1200	600
-0.3	1400	700
-0.4	1600	800
-0.5	1800	900
+Variables	Time	Storage modulus	Loss modulus
+	s	Pa	Pa
+data point 1	0.1	1000	500
+data point 2	0.2	1200	600
+data point 3	0.3	1400	700
+data point 4	0.4	1600	800
+data point 5	0.5	1800	900
 """
         test_file = tmp_path / "test_trios.txt"
         test_file.write_text(trios_content)
@@ -65,11 +65,11 @@ s	Pa	Pa
             "",
             "[step]",
             "Number of points\t25",
-            "Time\tStress",
-            "s\tPa",
+            "Variables\tTime\tStress",
+            "\ts\tPa",
         ]
         for i in range(25):
-            lines.append(f"{i * 0.1:.1f}\t{(i + 1) * 100}")
+            lines.append(f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 100}")
 
         test_file = tmp_path / "test_chunks.txt"
         test_file.write_text("\n".join(lines))
@@ -107,23 +107,23 @@ Geometry name	Cone and Plate
 
 [step]
 Number of points	15
-Time	Stress
-s	Pa
-1.0	100
-2.0	200
-3.0	300
-4.0	400
-5.0	500
-6.0	600
-7.0	700
-8.0	800
-9.0	900
-10.0	1000
-11.0	1100
-12.0	1200
-13.0	1300
-14.0	1400
-15.0	1500
+Variables	Time	Stress
+	s	Pa
+data point 1	1.0	100
+data point 2	2.0	200
+data point 3	3.0	300
+data point 4	4.0	400
+data point 5	5.0	500
+data point 6	6.0	600
+data point 7	7.0	700
+data point 8	8.0	800
+data point 9	9.0	900
+data point 10	10.0	1000
+data point 11	11.0	1100
+data point 12	12.0	1200
+data point 13	13.0	1300
+data point 14	14.0	1400
+data point 15	15.0	1500
 """
         test_file = tmp_path / "test_metadata.txt"
         test_file.write_text(trios_content)
@@ -148,20 +148,20 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	12
-Angular frequency	Storage modulus	Loss modulus
-rad/s	Pa	Pa
-0.1	1000	500
-0.2	1200	600
-0.3	1400	700
-0.4	1600	800
-0.5	1800	900
-0.6	2000	1000
-0.7	2200	1100
-0.8	2400	1200
-0.9	2600	1300
-1.0	2800	1400
-1.1	3000	1500
-1.2	3200	1600
+Variables	Angular frequency	Storage modulus	Loss modulus
+	rad/s	Pa	Pa
+data point 1	0.1	1000	500
+data point 2	0.2	1200	600
+data point 3	0.3	1400	700
+data point 4	0.4	1600	800
+data point 5	0.5	1800	900
+data point 6	0.6	2000	1000
+data point 7	0.7	2200	1100
+data point 8	0.8	2400	1200
+data point 9	0.9	2600	1300
+data point 10	1.0	2800	1400
+data point 11	1.1	3000	1500
+data point 12	1.2	3200	1600
 """
         test_file = tmp_path / "test_units.txt"
         test_file.write_text(trios_content)
@@ -185,12 +185,12 @@ class TestTriosChunkedAdvanced:
             "",
             "[step]",
             "Number of points\t1000",
-            "Time\tStress",
-            "s\tPa",
+            "Variables\tTime\tStress",
+            "\ts\tPa",
         ]
         # Generate 1000 data points
         for i in range(1000):
-            lines.append(f"{i * 0.01:.2f}\t{(i + 1) * 10}")
+            lines.append(f"data point {i+1}\t{i * 0.01:.2f}\t{(i + 1) * 10}")
 
         test_file = tmp_path / "large_file.txt"
         test_file.write_text("\n".join(lines))
@@ -215,12 +215,12 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	30
-Time	Stress
-s	Pa
+Variables	Time	Stress
+	s	Pa
 """
         # Add 30 data points
         for i in range(30):
-            trios_content += f"{i * 0.1:.1f}\t{(i + 1) * 100}\n"
+            trios_content += f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
 
         test_file = tmp_path / "test_equiv.txt"
         test_file.write_text(trios_content)
@@ -244,22 +244,22 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	20
-Time	Stress
-s	Pa
+Variables	Time	Stress
+	s	Pa
 """
         # First segment: 20 points
         for i in range(20):
-            trios_content += f"{i * 0.1:.1f}\t{(i + 1) * 100}\n"
+            trios_content += f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
 
         trios_content += """
 [step]
 Number of points	15
-Time	Stress
-s	Pa
+Variables	Time	Stress
+	s	Pa
 """
         # Second segment: 15 points
         for i in range(15):
-            trios_content += f"{i * 0.1:.1f}\t{(i + 1) * 50}\n"
+            trios_content += f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 50}\n"
 
         test_file = tmp_path / "test_multiseg.txt"
         test_file.write_text(trios_content)
@@ -287,22 +287,22 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	10
-Time	Stress
-s	Pa
+Variables	Time	Stress
+	s	Pa
 """
         # First segment
         for i in range(10):
-            trios_content += f"{i:.1f}\t100\n"
+            trios_content += f"data point {i+1}\t{i:.1f}\t100\n"
 
         trios_content += """
 [step]
 Number of points	10
-Time	Stress
-s	Pa
+Variables	Time	Stress
+	s	Pa
 """
         # Second segment
         for i in range(10):
-            trios_content += f"{i:.1f}\t200\n"
+            trios_content += f"data point {i+1}\t{i:.1f}\t200\n"
 
         test_file = tmp_path / "test_seg_select.txt"
         test_file.write_text(trios_content)
@@ -323,23 +323,23 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	15
-Time	Stress
-s	Pa
-0.1	100
-0.2
-0.3	300
-0.4	400
-	500
-0.6	600
-0.7	700
-0.8
-0.9	900
-1.0	1000
-1.1
-1.2	1200
-1.3	1300
-1.4	1400
-1.5	1500
+Variables	Time	Stress
+	s	Pa
+data point 1	0.1	100
+data point 2	0.2
+data point 3	0.3	300
+data point 4	0.4	400
+data point 5		500
+data point 6	0.6	600
+data point 7	0.7	700
+data point 8	0.8
+data point 9	0.9	900
+data point 10	1.0	1000
+data point 11	1.1
+data point 12	1.2	1200
+data point 13	1.3	1300
+data point 14	1.4	1400
+data point 15	1.5	1500
 """
         test_file = tmp_path / "test_nan.txt"
         test_file.write_text(trios_content)
@@ -367,7 +367,7 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	0
-Time	Stress
+Variables	Time	Stress
 s	Pa
 """
         test_file = tmp_path / "test_empty.txt"
@@ -385,9 +385,9 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	1
-Time	Stress
-s	Pa
-1.0	100
+Variables	Time	Stress
+	s	Pa
+data point 1	1.0	100
 """
         test_file = tmp_path / "test_single.txt"
         test_file.write_text(trios_content)
@@ -406,13 +406,13 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	5
-Time	Stress
-s	Pa
-1.0	100
-2.0	200
-3.0	300
-4.0	400
-5.0	500
+Variables	Time	Stress
+	s	Pa
+data point 1	1.0	100
+data point 2	2.0	200
+data point 3	3.0	300
+data point 4	4.0	400
+data point 5	5.0	500
 """
         test_file = tmp_path / "test_one.txt"
         test_file.write_text(trios_content)
@@ -456,18 +456,18 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	10
-Time	Stress
-s	Pa
-0.1	100
-0.2	200
-0.3	300
-0.4	400
-0.5	500
-0.6	600
-0.7	700
-0.8	800
-0.9	900
-1.0	1000
+Variables	Time	Stress
+	s	Pa
+data point 1	0.1	100
+data point 2	0.2	200
+data point 3	0.3	300
+data point 4	0.4	400
+data point 5	0.5	500
+data point 6	0.6	600
+data point 7	0.7	700
+data point 8	0.8	800
+data point 9	0.9	900
+data point 10	1.0	1000
 """
         test_file = tmp_path / "test_no_valid.txt"
         test_file.write_text(trios_content)
@@ -494,11 +494,11 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	20
-Time	Stress
-s	Pa
+Variables	Time	Stress
+	s	Pa
 """
         for i in range(20):
-            trios_content += f"{i * 0.1:.1f}\t{(i + 1) * 100}\n"
+            trios_content += f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
 
         test_file = tmp_path / "test_compat.txt"
         test_file.write_text(trios_content)
@@ -521,11 +521,11 @@ Instrument serial number	4010-1234
 
 [step]
 Number of points	100
-Time	Stress
-s	Pa
+Variables	Time	Stress
+	s	Pa
 """
         for i in range(100):
-            trios_content += f"{i * 0.01:.2f}\t{(i + 1) * 10}\n"
+            trios_content += f"data point {i+1}\t{i * 0.01:.2f}\t{(i + 1) * 10}\n"
 
         test_file = tmp_path / "test_cleanup.txt"
         test_file.write_text(trios_content)
@@ -561,11 +561,11 @@ class TestTriosChunkedMemoryProfile:
             "",
             "[step]",
             "Number of points\t10000",
-            "Time\tStress",
-            "s\tPa",
+            "Variables\tTime\tStress",
+            "\ts\tPa",
         ]
         for i in range(10000):
-            lines.append(f"{i * 0.001:.3f}\t{(i + 1) * 1.5:.1f}")
+            lines.append(f"data point {i+1}\t{i * 0.001:.3f}\t{(i + 1) * 1.5:.1f}")
 
         test_file = tmp_path / "large_sim.txt"
         test_file.write_text("\n".join(lines))
@@ -594,15 +594,15 @@ class TestTriosChunkedMemoryProfile:
             "",
             "[step]",
             "Number of points\t50",
-            "Time\tStress",
-            "s\tPa",
+            "Variables\tTime\tStress",
+            "\ts\tPa",
         ]
 
         # Generate synthetic relaxation data
         for i in range(50):
             t = i * 0.1
             stress = 1000 * np.exp(-t / 1.0)  # Simple exponential decay
-            lines.append(f"{t:.1f}\t{stress:.2f}")
+            lines.append(f"data point {i+1}\t{t:.1f}\t{stress:.2f}")
 
         test_file = tmp_path / "relax.txt"
         test_file.write_text("\n".join(lines))
