@@ -555,10 +555,24 @@ def create_least_squares_objective(
             else:
                 # Fit to magnitude: |G*| = sqrt(G'^2 + G"^2)
                 y_pred_magnitude = jnp.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
-                residuals = y_pred_magnitude - y_data_jax
+
+                # Check if data is also 2D [G', G"]
+                y_data_is_2d = y_data_jax.ndim == 2 and y_data_jax.shape[-1] == 2
+                if y_data_is_2d:
+                    # Data is also 2D: compute magnitude
+                    y_data_magnitude = jnp.sqrt(
+                        y_data_jax[:, 0] ** 2 + y_data_jax[:, 1] ** 2
+                    )
+                else:
+                    # Data is already magnitude (1D)
+                    y_data_magnitude = y_data_jax
+
+                residuals = y_pred_magnitude - y_data_magnitude
 
                 if normalize:
-                    residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+                    residuals = residuals / jnp.maximum(
+                        jnp.abs(y_data_magnitude), 1e-10
+                    )
 
                 return residuals
 
