@@ -250,6 +250,30 @@ class FractionalMaxwellLiquid(BaseModel):
             y_data = jnp.array(y)
             test_mode = kwargs.get("test_mode", "relaxation")
 
+        # Smart initialization for oscillation mode (Issue #9)
+        if test_mode == "oscillation":
+            try:
+                import numpy as np
+
+                from rheojax.utils.initialization import (
+                    initialize_fractional_maxwell_liquid,
+                )
+
+                success = initialize_fractional_maxwell_liquid(
+                    np.array(X), np.array(y), self.parameters
+                )
+                if success:
+                    import logging
+
+                    logging.debug(
+                        "Smart initialization applied from frequency-domain features"
+                    )
+            except Exception as e:
+                # Silent fallback to defaults - don't break if initialization fails
+                import logging
+
+                logging.debug(f"Smart initialization failed, using defaults: {e}")
+
         # Create objective function with stateless predictions
         def model_fn(x, params):
             """Model function for optimization (stateless)."""

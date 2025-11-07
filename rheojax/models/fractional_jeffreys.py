@@ -393,6 +393,30 @@ class FractionalJeffreysModel(BaseModel):
         # Store test mode for model_function
         self._test_mode = test_mode
 
+        # Smart initialization for oscillation mode (Issue #9)
+        if test_mode == TestMode.OSCILLATION:
+            try:
+                import numpy as np
+
+                from rheojax.utils.initialization import (
+                    initialize_fractional_jeffreys,
+                )
+
+                success = initialize_fractional_jeffreys(
+                    np.array(X), np.array(y), self.parameters
+                )
+                if success:
+                    import logging
+
+                    logging.debug(
+                        "Smart initialization applied from frequency-domain features"
+                    )
+            except Exception as e:
+                # Silent fallback to defaults - don't break if initialization fails
+                import logging
+
+                logging.debug(f"Smart initialization failed, using defaults: {e}")
+
         # Create stateless model function for optimization
         def model_fn(x, params):
             """Model function for optimization (stateless)."""
