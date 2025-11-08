@@ -271,6 +271,12 @@ NLSQ automatically configures JAX for float64 when imported, making the import o
 
 ## Recent Features (Updated: 2025-11-08)
 
+### Template Method Refactoring (v0.2.0 - 3 Phases Complete)
+
+**Phase 1: Template Method Pattern** - Eliminated code duplication via BaseInitializer
+**Phase 2: Constants Extraction** - Centralized configuration in dedicated module
+**Phase 3: FractionalModelMixin** - Reduced model class duplication
+
 ### Template Method Refactoring for Initialization (v0.2.0)
 
 **Location:** `rheojax/utils/initialization/` (modular package structure)
@@ -289,6 +295,18 @@ Refactored smart parameter initialization to use the Template Method design patt
 - Easy to extend with new fractional models
 - Comprehensive test suite validates all initializers
 - Zero breaking changes to public API
+
+**Phase 2: Constants Extraction** - Centralized magic numbers into `constants.py`:
+- `FEATURE_CONFIG`: Savitzky-Golay window, plateau percentile, epsilon
+- `PARAM_BOUNDS`: min/max fractional order constraints
+- `DEFAULT_PARAMS`: fallback values when initialization fails
+- Benefits: Tunable configuration, reduced coupling, better testability
+
+**Phase 3: FractionalModelMixin** - Reduced code duplication in model classes:
+- `_apply_smart_initialization()`: Delegated initialization for all 11 models
+- `_validate_fractional_parameters()`: Common validation logic
+- Automatic initializer mapping via class name lookup
+- Benefits: DRY principle, consistent error handling, easier maintenance
 
 See [Template Method Pattern](#6-template-method-pattern-for-initialization-v020-refactoring) section for implementation details.
 
