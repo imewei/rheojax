@@ -137,20 +137,29 @@ def mittag_leffler_e2(
         - Fractional derivatives: E_{α,β}(z) with β = 1-α
     - JIT compilation is automatic via @jax.jit decorator
     - Now supports traced alpha/beta values (no static_argnums required)
+
+    Raises
+    ------
+    ValueError
+        If alpha is outside the valid range (0, 2].
     """
-    # Note: Parameter validation removed to support JAX tracing
-    # Models enforce bounds via ParameterSet, so invalid values shouldn't occur
+    # Validate alpha when not traced (static values only)
+    # For JAX traced values, validation is skipped to allow JIT compilation
+    if not isinstance(alpha, jax.core.Tracer):
+        if not (0 < alpha <= 2):
+            raise ValueError(f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}")
 
     # Convert input to JAX array
-    z = jnp.asarray(z)
-    z = jnp.atleast_1d(z)
+    z_input = jnp.asarray(z)
+    is_scalar = z_input.ndim == 0
+    z = jnp.atleast_1d(z_input)
 
     # Use Pade approximation (accurate for |z| < 10)
     result = _mittag_leffler_pade(z, alpha, beta)
 
-    # For tracer compatibility, always return array (models expect arrays anyway)
-    # Original scalar/real handling removed to avoid shape mismatches in jax.lax.cond
-    # Models handle array outputs correctly, so this is safe
+    # Return scalar if input was scalar, otherwise return array
+    if is_scalar:
+        return result[0]
     return result
 
 

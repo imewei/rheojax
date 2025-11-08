@@ -25,7 +25,7 @@ from typing import Any
 import numpy as np
 import numpyro
 import numpyro.distributions as dist
-from numpyro.infer import MCMC, NUTS
+from numpyro.infer import MCMC, NUTS, init_to_uniform, init_to_value
 
 from rheojax.core.jax_config import safe_import_jax
 
@@ -385,36 +385,19 @@ class BayesianMixin:
                 )
             param_bounds[name] = param.bounds
 
-        # For warm-start, use informative LogNormal priors centered at NLSQ estimates
-        # This is more robust than direct initialization which can cause NUTS issues
-        use_informed_priors = initial_values is not None
-
         # Define NumPyro probabilistic model
         def numpyro_model(X, y=None):
-            """NumPyro model with LogNormal priors for warm-started parameters."""
+            """NumPyro model with uniform priors over parameter bounds."""
             # Sample parameters from priors
             params_dict = {}
             for name in param_names:
                 lower, upper = param_bounds[name]
 
-                # If we have initial values from NLSQ, use informative LogNormal priors
-                # LogNormal is the standard choice for positive parameters in Bayesian inference
-                if use_informed_priors and name in initial_values:
-                    center = initial_values[name]
-                    # LogNormal parameterization: median = exp(loc)
-                    # For X ~ LogNormal(loc, scale), we want median ≈ center
-                    # So loc = log(center), and scale controls spread
-                    # Use scale = 0.5 for moderate uncertainty (~factor of 3 range at 95% CI)
-                    loc = jnp.log(jnp.maximum(center, 1e-10))  # Avoid log(0)
-                    scale = 0.5  # Wider than 0.3 to avoid overly tight priors
-                    params_dict[name] = numpyro.sample(
-                        name, dist.LogNormal(loc=loc, scale=scale)
-                    )
-                else:
-                    # Use Uniform for cold start (no warm-start info)
-                    params_dict[name] = numpyro.sample(
-                        name, dist.Uniform(low=lower, high=upper)
-                    )
+                # Always use Uniform priors as documented
+                # Warm-start is handled via init_params in MCMC.run(), not through priors
+                params_dict[name] = numpyro.sample(
+                    name, dist.Uniform(low=lower, high=upper)
+                )
 
             # Convert to array for model_function
             params_array = jnp.array([params_dict[name] for name in param_names])
@@ -442,21 +425,49 @@ class BayesianMixin:
                 # Use weakly informative Exponential priors (heavier tails than HalfNormal)
                 # Scale = mean of Exponential, set to ~10% of data scale for stability
                 # (wider than residual std to avoid overly peaked likelihoods)
-                sigma_real = numpyro.sample("sigma_real", dist.Exponential(rate=1.0 / (y_real_scale * 0.1)))
-                sigma_imag = numpyro.sample("sigma_imag", dist.Exponential(rate=1.0 / (y_imag_scale * 0.1)))
+                sigma_real = numpyro.sample(
+                    "sigma_real", dist.Exponential(rate=1.0 / (y_real_scale * 0.1))
+                )
+                sigma_imag = numpyro.sample(
+                    "sigma_imag", dist.Exponential(rate=1.0 / (y_imag_scale * 0.1))
+                )
 
                 # Use pred_real and pred_imag already computed above (don't re-split!)
                 # Separate likelihoods for real and imaginary components
-                numpyro.sample("obs_real", dist.Normal(loc=pred_real, scale=sigma_real), obs=y_real_obs)
-                numpyro.sample("obs_imag", dist.Normal(loc=pred_imag, scale=sigma_imag), obs=y_imag_obs)
+                numpyro.sample(
+                    "obs_real",
+                    dist.Normal(loc=pred_real, scale=sigma_real),
+                    obs=y_real_obs,
+                )
+                numpyro.sample(
+                    "obs_imag",
+                    dist.Normal(loc=pred_imag, scale=sigma_imag),
+                    obs=y_imag_obs,
+                )
             else:
                 # Real data: weakly informative Exponential prior on noise
                 data_scale = jnp.std(y)
-                sigma = numpyro.sample("sigma", dist.Exponential(rate=1.0 / (data_scale * 0.1)))
+                sigma = numpyro.sample(
+                    "sigma", dist.Exponential(rate=1.0 / (data_scale * 0.1))
+                )
                 numpyro.sample("obs", dist.Normal(loc=predictions, scale=sigma), obs=y)
 
-        # Set up NUTS sampler
-        nuts_kernel = NUTS(numpyro_model, **nuts_kwargs)
+        # Set up NUTS sampler with warm-start initialization strategy
+        # When initial_values are provided, use init_to_value to warm-start from NLSQ estimates
+        # This significantly improves convergence and reduces divergences
+        if initial_values is not None:
+            # Create initialization dict with only model parameters (not sigma)
+            init_dict = {
+                name: initial_values[name]
+                for name in param_names
+                if name in initial_values
+            }
+            init_strategy = init_to_value(values=init_dict)
+        else:
+            # Default: random uniform initialization
+            init_strategy = init_to_uniform()
+
+        nuts_kernel = NUTS(numpyro_model, init_strategy=init_strategy, **nuts_kwargs)
 
         # Initialize MCMC
         mcmc = MCMC(
@@ -469,18 +480,7 @@ class BayesianMixin:
         # Run MCMC sampling
         rng_key = jax.random.PRNGKey(0)
 
-        # IMPORTANT: Do NOT pass init_params to MCMC.run()
-        # When using informative priors (LogNormal centered at NLSQ estimates),
-        # let NumPyro initialize from the priors using init_to_median() or init_to_sample().
-        # Passing init_params directly causes issues because NumPyro expects them in
-        # unconstrained space, not constrained parameter space.
-
-        # The warm-start happens through the informative LogNormal priors,
-        # which guide NUTS to start near the NLSQ estimates while maintaining
-        # proper initialization in unconstrained space.
-
         try:
-            # Always let NumPyro handle initialization from priors
             mcmc.run(rng_key, X_jax, y_jax)
         except Exception as e:
             raise RuntimeError(f"NUTS sampling failed: {str(e)}") from e
@@ -538,7 +538,7 @@ class BayesianMixin:
                 - ess: Effective sample size per parameter
                 - divergences: Number of divergent transitions
         """
-        diagnostics = {}
+        diagnostics: dict[str, Any] = {}
 
         # Get NumPyro diagnostics
         try:
