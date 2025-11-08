@@ -14,6 +14,8 @@ The template method enforces a consistent algorithm across all 11 fractional mod
 
 This pattern eliminates 70-90% code duplication while maintaining exact behavior
 of the original initialization functions.
+
+Phase 2: Constants extracted to constants.py module for improved maintainability.
 """
 
 from __future__ import annotations
@@ -22,6 +24,8 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from scipy.signal import savgol_filter
+
+from rheojax.utils.initialization.constants import FEATURE_CONFIG, PARAM_BOUNDS
 
 
 def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
@@ -59,11 +63,13 @@ def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
     """
     # Handle empty arrays defensively
     if len(omega) == 0 or len(G_star) == 0:
+        from rheojax.utils.initialization.constants import DEFAULT_PARAMS
+
         return {
-            "low_plateau": 0.0,
-            "high_plateau": 0.0,
-            "omega_mid": 0.0,
-            "alpha_estimate": 0.5,
+            "low_plateau": DEFAULT_PARAMS.modulus,
+            "high_plateau": DEFAULT_PARAMS.modulus,
+            "omega_mid": 1.0 / DEFAULT_PARAMS.tau,
+            "alpha_estimate": DEFAULT_PARAMS.alpha,
             "valid": False,
         }
 
@@ -76,35 +82,45 @@ def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
         else:
             G_mag = np.abs(G_star)  # Fall back to abs for 1D arrays
 
-    # Smooth to reduce noise (window=5, poly=2)
-    if len(G_mag) >= 5:
-        G_mag_smooth = savgol_filter(G_mag, window_length=5, polyorder=2)
+    # Smooth to reduce noise using configurable parameters
+    if len(G_mag) >= FEATURE_CONFIG.savgol_window:
+        G_mag_smooth = savgol_filter(
+            G_mag,
+            window_length=FEATURE_CONFIG.savgol_window,
+            polyorder=FEATURE_CONFIG.savgol_poly,
+        )
     else:
         G_mag_smooth = G_mag.copy()
 
-    # Low-frequency plateau: average lowest 10%
-    n_low = max(1, len(G_mag) // 10)
+    # Low-frequency plateau: average lowest fraction
+    n_low = max(1, int(len(G_mag) * FEATURE_CONFIG.plateau_percentile))
     low_plateau = np.mean(np.sort(G_mag_smooth)[:n_low])
 
-    # High-frequency plateau: average highest 10%
-    n_high = max(1, len(G_mag) // 10)
+    # High-frequency plateau: average highest fraction
+    n_high = max(1, int(len(G_mag) * FEATURE_CONFIG.plateau_percentile))
     high_plateau = np.mean(np.sort(G_mag_smooth)[-n_high:])
 
     # Find transition frequency (steepest slope in log-log)
-    log_omega = np.log10(omega + 1e-12)
-    log_G = np.log10(G_mag_smooth + 1e-12)
+    eps = FEATURE_CONFIG.epsilon
+    log_omega = np.log10(omega + eps)
+    log_G = np.log10(G_mag_smooth + eps)
     d_log_G = np.gradient(log_G, log_omega)
     idx_mid = np.argmax(np.abs(d_log_G))
     omega_mid = omega[idx_mid]
 
     # Estimate alpha from slope at transition
     alpha_estimate = d_log_G[idx_mid]
-    alpha_estimate = np.clip(alpha_estimate, 0.01, 0.99)
+    alpha_estimate = np.clip(
+        alpha_estimate, PARAM_BOUNDS.min_alpha, PARAM_BOUNDS.max_alpha
+    )
 
-    # Check validity
-    freq_range = np.log10((omega.max() + 1e-12) / (omega.min() + 1e-12))
-    plateau_ratio = high_plateau / (low_plateau + 1e-12)
-    valid = freq_range > 1.5 and plateau_ratio > 1.1
+    # Check validity using configurable thresholds
+    freq_range = np.log10((omega.max() + eps) / (omega.min() + eps))
+    plateau_ratio = high_plateau / (low_plateau + eps)
+    valid = (
+        freq_range > FEATURE_CONFIG.min_frequency_decades
+        and plateau_ratio > FEATURE_CONFIG.min_plateau_ratio
+    )
 
     return {
         "low_plateau": float(low_plateau),
@@ -258,11 +274,11 @@ class BaseInitializer(ABC):
             Dictionary of clipped parameter values
         """
         clipped = {}
-        epsilon = 1e-12
+        eps = FEATURE_CONFIG.epsilon
 
         for param_name, value in estimated_params.items():
-            # Ensure value is at least epsilon
-            value = max(value, epsilon)
+            # Ensure value is at least epsilon to prevent zeros
+            value = max(value, eps)
 
             # Check if parameter exists in ParameterSet
             if param_name in param_set._parameters:

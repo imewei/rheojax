@@ -134,10 +134,21 @@ rheojax/
     ├── optimization.py     # NLSQ-based optimization (5-270x speedup)
     ├── mittag_leffler.py   # Mittag-Leffler functions (1 and 2-parameter)
     ├── compatibility.py    # Model-data compatibility checking (NEW in v0.2.0)
-    ├── initialization.py   # Smart parameter initialization facade (refactored in v0.2.0)
-    └── initialization/     # Template Method initialization (NEW in v0.2.0)
-        ├── base.py         # BaseInitializer abstract class + extract_frequency_features()
-        └── fractional_*.py # 11 concrete initializers (one per fractional model)
+    ├── initialization.py   # Backward-compatible facade (471 lines, refactored in v0.2.0)
+    └── initialization/     # Template Method pattern (NEW in v0.2.0)
+        ├── __init__.py                      # Re-exports facade functions
+        ├── base.py                          # BaseInitializer + extract_frequency_features()
+        ├── fractional_zener_ss.py           # FZSS initializer
+        ├── fractional_maxwell_liquid.py     # FML initializer
+        ├── fractional_maxwell_gel.py        # FMG initializer
+        ├── fractional_maxwell_model.py      # FMM initializer
+        ├── fractional_zener_ll.py           # FZLL initializer
+        ├── fractional_zener_sl.py           # FZSL initializer
+        ├── fractional_burgers.py            # Burgers initializer
+        ├── fractional_jeffreys.py           # Jeffreys initializer
+        ├── fractional_kelvin_voigt.py       # FKV initializer
+        ├── fractional_kv_zener.py           # FKV-Zener initializer
+        └── fractional_poynting_thomson.py   # Poynting-Thomson initializer
 ```
 
 ### Key Design Patterns
@@ -172,19 +183,32 @@ rheojax/
 - Enables dynamic discovery and instantiation
 - Supports custom plugins
 
-**6. Template Method Pattern for Initialization**
-- `BaseInitializer` abstract class enforces consistent initialization algorithm (NEW in v0.2.0)
-- 11 concrete initializers for fractional models (one per model)
-- Template method `initialize()` defines 5-step algorithm skeleton:
-  1. Extract frequency features (common logic)
-  2. Validate features (common validation)
-  3. Estimate model-specific parameters (abstract methods)
-  4. Clip to parameter bounds (common logic)
-  5. Set parameters in ParameterSet (abstract method)
-- Eliminates code duplication across models (49% code reduction in `initialization.py`)
-- Performance overhead: <0.01% of total fitting time
-- Location: `rheojax/utils/initialization/` (modular structure)
-- Backward compatible: All public functions in `initialization.py` preserved
+**6. Template Method Pattern for Initialization (v0.2.0 Refactoring)**
+
+Smart parameter initialization for fractional models now uses the Template Method design pattern to eliminate code duplication while maintaining 100% backward compatibility.
+
+**Architecture:**
+- `BaseInitializer` abstract class (`rheojax/utils/initialization/base.py`) enforces consistent 5-step algorithm
+- 11 concrete initializer classes (one per fractional model)
+- Backward-compatible facade in `initialization.py` delegates to concrete initializers
+
+**Template Method Algorithm (`initialize()`):**
+1. **Extract frequency features** - Common logic using `extract_frequency_features(omega, G_star)`
+   - Identifies low/high frequency plateaus from |G*| data
+   - Finds transition frequency (steepest slope in log-log plot)
+   - Estimates fractional order α from slope
+2. **Validate features** - Common validation checking frequency range and plateau ratio
+3. **Estimate model-specific parameters** - Abstract method `_estimate_parameters(features)` implemented by each model
+4. **Clip to parameter bounds** - Common logic ensuring estimates respect ParameterSet bounds
+5. **Set parameters** - Abstract method `_set_parameters(param_set, clipped_params)` for safe parameter setting
+
+**Benefits:**
+- **Code reduction**: 49% (932 → 471 lines in `initialization.py`)
+- **Performance**: <0.01% overhead (187 μs initialization vs 1.76s total fitting time)
+- **Maintainability**: Single algorithm definition, no duplication across 11 models
+- **Backward compatible**: All public functions preserved (`initialize_fractional_zener_ss()`, etc.)
+
+**Location**: `rheojax/utils/initialization/` (modular structure with one file per model)
 
 ### Test Mode System
 
@@ -245,7 +269,40 @@ Float64 precision is essential for:
 
 NLSQ automatically configures JAX for float64 when imported, making the import order critical.
 
-## Recent Features (Updated: 2025-11-07)
+## Recent Features (Updated: 2025-11-08)
+
+### Template Method Refactoring for Initialization (v0.2.0)
+
+**Location:** `rheojax/utils/initialization/` (modular package structure)
+
+Refactored smart parameter initialization to use the Template Method design pattern, eliminating code duplication across all 11 fractional models while maintaining 100% backward compatibility.
+
+**Key Changes:**
+- **49% code reduction**: 932 → 471 lines in `initialization.py` facade
+- **Modular architecture**: 11 separate initializer files (one per model)
+- **Consistent algorithm**: BaseInitializer enforces 5-step template across all models
+- **Performance**: <0.01% overhead (187 μs initialization vs 1.76s total)
+- **Test coverage**: 22/22 tests passing (3 test files covering algorithm, models, and backward compatibility)
+
+**Benefits for Developers:**
+- Single source of truth for initialization algorithm
+- Easy to extend with new fractional models
+- Comprehensive test suite validates all initializers
+- Zero breaking changes to public API
+
+See [Template Method Pattern](#6-template-method-pattern-for-initialization-v020-refactoring) section for implementation details.
+
+### Example Notebooks (24 Total)
+
+**New in v0.2.0:**
+- `examples/advanced/07-trios_chunked_reading_example.ipynb` - Chunked reading for large TRIOS files (>1GB)
+- `examples/bayesian/06-bayesian_workflow_demo.ipynb` - Complete Bayesian workflow (NLSQ → NUTS → diagnostics)
+
+**All Example Categories:**
+- **Basic** (5 notebooks): Maxwell, Zener, SpringPot, Bingham, PowerLaw fitting
+- **Transforms** (6 notebooks): FFT, Mastercurve, Mutation Number, OWChirp, Derivatives
+- **Bayesian** (6 notebooks): Basics, Priors, Diagnostics, Model Comparison, Uncertainty, Workflow
+- **Advanced** (7 notebooks): Multi-technique, Batch, Custom Models, Fractional Deep-Dive, Performance, Model Selection, TRIOS Chunked
 
 ### Model-Data Compatibility Checking System (v0.2.0)
 
@@ -388,49 +445,39 @@ No user action required - initialization happens transparently during `fit()`.
 The initialization system uses the Template Method design pattern for consistency across all 11 fractional models:
 
 ```python
-# Abstract base class enforces 5-step algorithm
-from rheojax.utils.initialization.base import BaseInitializer
+# File: rheojax/utils/initialization/base.py
+from abc import ABC, abstractmethod
 
 class BaseInitializer(ABC):
-    def initialize(self, omega, G_star, param_set) -> bool:
-        # Step 1: Extract frequency features (common logic)
-        features = extract_frequency_features(omega, G_star)
+    """Template method pattern for fractional model initialization."""
 
-        # Step 2: Validate features (common validation)
+    def initialize(self, omega, G_star, param_set) -> bool:
+        """5-step template method: extract → validate → estimate → clip → set."""
+        features = extract_frequency_features(omega, G_star)
         if not self._validate_data(features):
             return False
-
-        # Step 3: Estimate parameters (model-specific - abstract)
-        estimated_params = self._estimate_parameters(features)
-
-        # Step 4: Clip to bounds (common logic)
-        clipped_params = self._clip_to_bounds(estimated_params, param_set)
-
-        # Step 5: Set parameters (model-specific - abstract)
-        self._set_parameters(param_set, clipped_params)
-
+        estimated = self._estimate_parameters(features)
+        clipped = self._clip_to_bounds(estimated, param_set)
+        self._set_parameters(param_set, clipped)
         return True
 
     @abstractmethod
     def _estimate_parameters(self, features: dict) -> dict:
-        """Model-specific parameter estimation logic."""
+        """Model-specific: extract parameters from features."""
         pass
 
     @abstractmethod
     def _set_parameters(self, param_set, clipped_params: dict) -> None:
-        """Model-specific parameter setting logic."""
+        """Model-specific: safely set parameters in ParameterSet."""
         pass
 ```
 
-**Concrete Initializer Example:**
+**Concrete Initializer Example (FZSS):**
 
 ```python
 # rheojax/utils/initialization/fractional_zener_ss.py
 class FractionalZenerSSInitializer(BaseInitializer):
-    """Concrete initializer for FZSS model."""
-
     def _estimate_parameters(self, features: dict) -> dict:
-        # Extract FZSS-specific parameters from features
         return {
             'Ge': features['low_plateau'],
             'Gm': features['high_plateau'] - features['low_plateau'],
@@ -439,51 +486,16 @@ class FractionalZenerSSInitializer(BaseInitializer):
         }
 
     def _set_parameters(self, param_set, clipped_params: dict) -> None:
-        # Set parameters safely (checks existence first)
-        self._safe_set_parameter(param_set, 'Ge', clipped_params['Ge'])
-        self._safe_set_parameter(param_set, 'Gm', clipped_params['Gm'])
-        self._safe_set_parameter(param_set, 'tau_alpha', clipped_params['tau_alpha'])
-        self._safe_set_parameter(param_set, 'alpha', clipped_params['alpha'])
+        for name in ['Ge', 'Gm', 'tau_alpha', 'alpha']:
+            if param_set.has_parameter(name):
+                param_set.set_value(name, clipped_params[name])
 ```
 
-**Model Integration:**
+**Model Integration:** Fractional models use initializers in `_fit()` when `test_mode='oscillation'`.
 
-Each fractional model instantiates its concrete initializer in `_fit()`:
+**Backward Compatibility:** Facade in `initialization.py` delegates to initializers (49% code reduction: 932 → 471 lines).
 
-```python
-# rheojax/models/fractional_zener_ss.py (updated in v0.2.0)
-def _fit(self, X, y, **kwargs):
-    test_mode = kwargs.get('test_mode', 'relaxation')
-
-    # Smart initialization for oscillation mode (Issue #9)
-    if test_mode == TestMode.OSCILLATION:
-        from rheojax.utils.initialization.fractional_zener_ss import (
-            FractionalZenerSSInitializer
-        )
-        initializer = FractionalZenerSSInitializer()
-        success = initializer.initialize(np.array(X), np.array(y), self.parameters)
-        if success:
-            logging.debug("Smart initialization applied from frequency-domain features")
-
-    # ... continue with optimization using initialized parameters
-```
-
-**Backward Compatibility:**
-
-The public API in `rheojax/utils/initialization.py` is preserved for 100% backward compatibility:
-
-```python
-# rheojax/utils/initialization.py (facade)
-def initialize_fractional_zener_ss(omega, G_star, param_set) -> bool:
-    """Backward-compatible facade that delegates to concrete initializer."""
-    initializer = FractionalZenerSSInitializer()
-    return initializer.initialize(omega, G_star, param_set)
-```
-
-**Performance:**
-- Initialization overhead: <0.01% of total fitting time (187 μs vs 1.76s total)
-- Code reduction: 49% (932 → 471 lines in `initialization.py`)
-- All 11 fractional models covered with 22/22 tests passing
+**Performance:** 187 μs overhead (<0.01% of 1.76s total), 22/22 tests passing.
 
 ### NLSQ + NumPyro Workflow
 
@@ -604,329 +616,55 @@ summary = pipeline.get_posterior_summary()
 
 #### ArviZ Diagnostic Plots
 
-BayesianPipeline provides comprehensive MCMC diagnostics through ArviZ integration. All 6 diagnostic methods support the fluent API pattern with `show` parameter and `.save_figure()` chaining.
+BayesianPipeline provides 6 MCMC diagnostics via ArviZ with fluent API:
 
-**1. Pair Plot (`plot_pair`)** - Parameter Correlations
+1. **`plot_pair()`** - Parameter correlations (detect non-identifiability, funnels)
+2. **`plot_forest()`** - Credible intervals (HDI: 0.68, 0.95, 0.997)
+3. **`plot_energy()`** - NUTS diagnostic (requires multi-chain)
+4. **`plot_autocorr()`** - Mixing quality (goal: drops to ~0 within few lags)
+5. **`plot_rank()`** - Convergence (goal: uniform histogram)
+6. **`plot_ess()`** - Effective sample size (goal: ESS > 400)
+
+All methods support `show=False` and `.save_figure()` chaining. Convert to ArviZ InferenceData: `pipeline._bayesian_result.to_inference_data()`.
+
+#### BayesianPlotter: Direct Access (v0.2.0)
+
+BayesianPlotter can be accessed via `.plotter` property or standalone:
+
 ```python
-# Identify parameter dependencies and non-identifiability
-pipeline.plot_pair(
-    var_names=['G0', 'eta'],    # Specific parameters (or None for all)
-    kind='scatter',              # 'scatter', 'kde', or 'hexbin'
-    divergences=True             # Highlight problematic regions
-)
-```
-Use for: Detecting correlations, funnel geometry, multimodal posteriors
+# Via pipeline (delegated API)
+pipeline.plot_pair().plot_forest()
 
-**2. Forest Plot (`plot_forest`)** - Credible Intervals
-```python
-# Compare parameter magnitudes and uncertainties
-pipeline.plot_forest(
-    hdi_prob=0.95,              # 0.68 (1σ), 0.95 (2σ), 0.997 (3σ)
-    combined=True                # Combine multiple chains
-)
-```
-Use for: Quick parameter comparison, uncertainty assessment
+# Direct access (for finer control)
+pipeline.plotter.plot_pair(var_names=['G0', 'eta'])
 
-**3. Energy Plot (`plot_energy`)** - NUTS Sampler Diagnostic
-```python
-# Identify problematic posterior geometry
-pipeline.plot_energy()
-```
-Use for: Detecting heavy tails, funnels, poor parameterizations
-Note: Requires multi-chain MCMC (not single-chain)
-
-**4. Autocorrelation Plot (`plot_autocorr`)** - Mixing Diagnostic
-```python
-# Check MCMC mixing quality
-pipeline.plot_autocorr(
-    max_lag=100,                # Lag length to display
-    combined=False               # Per-chain or combined
-)
-```
-Use for: Assessing mixing, determining if more samples needed
-Goal: Autocorrelation drops to ~0 within few dozen lags
-
-**5. Rank Plot (`plot_rank`)** - Convergence Diagnostic
-```python
-# Modern convergence diagnostic (alternative to trace plots)
-pipeline.plot_rank()
-```
-Use for: Detecting non-convergence, chain sticking, insufficient mixing
-Goal: Uniform histogram across all bins
-
-**6. ESS Plot (`plot_ess`)** - Effective Sample Size
-```python
-# Quantify sampling efficiency
-pipeline.plot_ess(
-    kind='local'                # 'local', 'quantile', or 'evolution'
-)
-```
-Use for: Assessing which parameters need more sampling
-Goal: ESS > 400 for bulk and tail estimates
-
-**Converting to ArviZ InferenceData**
-```python
-# Access ArviZ InferenceData directly for advanced analysis
-idata = pipeline._bayesian_result.to_inference_data()
-
-# Use any ArviZ function
-import arviz as az
-az.plot_trace(idata)
-az.summary(idata)
-```
-
-#### BayesianPlotter: Direct Access to Plotting
-
-**New in v0.2.0:** BayesianPlotter can be accessed directly via the `.plotter` property for advanced plotting control, while maintaining 100% backward compatibility with the original pipeline API.
-
-**Old API (backward compatible):**
-```python
-# Traditional fluent pipeline API - still works exactly as before
-(pipeline
-    .fit_bayesian(num_samples=2000, num_warmup=1000)
-    .plot_pair(show=False)          # Returns pipeline for chaining
-    .plot_forest(show=False)
-    .save_figure('diagnostics.png'))
-```
-
-**New API (direct plotter access):**
-```python
-# Access BayesianPlotter directly for finer control
-pipeline.fit_bayesian(num_samples=2000, num_warmup=1000)
-
-plotter = pipeline.plotter  # Lazy-loaded BayesianPlotter instance
-
-# Fluent API on plotter itself
-(plotter
-    .plot_pair(var_names=['G0', 'eta'], show=False)
-    .plot_forest(hdi_prob=0.95, show=False)
-    .save_figure('diagnostics.png'))  # Returns plotter for chaining
-```
-
-**When to use which API:**
-- **Old API (`pipeline.plot_*`)**: When chaining with pipeline methods like `.load()`, `.fit_nlsq()`, `.fit_bayesian()`, `.save()`
-- **New API (`pipeline.plotter.plot_*`)**: When you need multiple diagnostic plots without mixing pipeline operations, or when importing from `rheojax.visualization import BayesianPlotter` for standalone use
-
-**Standalone BayesianPlotter usage:**
-```python
+# Standalone usage
 from rheojax.visualization import BayesianPlotter
-
-# After running fit_bayesian() on any model
-result = model.fit_bayesian(t, G_data, num_samples=2000)
-
-# Create standalone plotter
 plotter = BayesianPlotter(result)
-
-# Generate diagnostic plots
-(plotter
-    .plot_pair(divergences=True, show=False)
-    .plot_autocorr(max_lag=100, show=False)
-    .save_figure('model_diagnostics.png'))
+plotter.plot_pair().save_figure('diagnostics.png')
 ```
 
 ### Data Transforms: Mastercurve API
 
-Rheo provides comprehensive time-temperature superposition (TTS) capabilities through the `Mastercurve` transform with enhanced API for plotting and analysis.
-
-#### Basic Mastercurve Creation
+Time-temperature superposition (TTS) via `Mastercurve` transform:
 
 ```python
 from rheojax.transforms.mastercurve import Mastercurve
-from rheojax.io.readers import auto_read
 
-# Load multi-temperature datasets
-temps = [273.15, 298.15, 323.15]  # Kelvin
-datasets = []
-for temp_file in temp_files:
-    data = auto_read(temp_file)
-    # Ensure temperature is in metadata
-    data.metadata['temperature'] = get_temperature(temp_file)
-    datasets.append(data)
-
-# Create Mastercurve transform
-mc = Mastercurve(
-    reference_temp=298.15,  # Reference temperature (K)
-    method='wlf',           # 'wlf', 'arrhenius', or 'manual'
-    C1=17.44,               # WLF parameter (optional, uses default)
-    C2=51.6,                # WLF parameter in K (optional)
-    vertical_shift=False,   # Apply vertical shifting
-    optimize_shifts=True    # Optimize shift factors
-)
-```
-
-#### Creating Mastercurves (Two API Options)
-
-**Option 1: Using `create_mastercurve()` (Explicit)**
-```python
-# Create mastercurve without returning shift factors
-mastercurve = mc.create_mastercurve(datasets)
-
-# Access shift factors from metadata
-shift_factors = mastercurve.metadata['shift_factors']
-print(f"Shift factors: {shift_factors}")
-```
-
-**Option 2: Using `transform()` (Recommended for Plotting)**
-```python
-# Transform returns both mastercurve and shift factors
+# Create mastercurve with WLF or Arrhenius shifting
+mc = Mastercurve(reference_temp=298.15, method='wlf', C1=17.44, C2=51.6)
 mastercurve, shift_factors = mc.transform(datasets)
 
-# shift_factors is a dict: {temperature: shift_factor}
-print(f"At 273.15 K: a_T = {shift_factors[273.15]}")
-print(f"At 298.15 K: a_T = {shift_factors[298.15]}")  # Should be ~1.0
+# Get model parameters and shift factors
+wlf_params = mc.get_wlf_parameters()  # Returns C1, C2, T_ref
+temps, shifts = mc.get_shift_factors_array()  # For plotting
+
+# Optimize and validate
+C1_opt, C2_opt = mc.optimize_wlf_parameters(datasets)
+error = mc.compute_overlap_error(datasets)
 ```
 
-#### Retrieving Model Parameters
-
-**Get WLF Parameters**
-```python
-# After creating WLF-based mastercurve
-wlf_params = mc.get_wlf_parameters()
-
-C1 = wlf_params['C1']       # WLF constant C1
-C2 = wlf_params['C2']       # WLF constant C2 (K)
-T_ref = wlf_params['T_ref'] # Reference temperature (K)
-
-print(f"WLF Parameters: C1={C1:.2f}, C2={C2:.2f} K, T_ref={T_ref:.2f} K")
-```
-
-**Get Arrhenius Parameters**
-```python
-# For Arrhenius-based mastercurve
-mc_arr = Mastercurve(reference_temp=298.15, method='arrhenius', E_a=50000)
-mastercurve, shifts = mc_arr.transform(datasets)
-
-arr_params = mc_arr.get_arrhenius_parameters()
-E_a = arr_params['E_a']     # Activation energy (J/mol)
-T_ref = arr_params['T_ref'] # Reference temperature (K)
-
-print(f"Arrhenius: E_a={E_a:.0f} J/mol, T_ref={T_ref:.2f} K")
-```
-
-#### Getting Shift Factors as Arrays (For Plotting)
-
-**After Mastercurve Creation**
-```python
-# Get shift factors as sorted NumPy arrays
-temps_array, shifts_array = mc.get_shift_factors_array()
-
-# temps_array: temperatures in Kelvin (sorted)
-# shifts_array: corresponding shift factors
-
-# Convert to Celsius for plotting
-temps_C = temps_array - 273.15
-
-# Plot WLF fit
-import matplotlib.pyplot as plt
-plt.figure(figsize=(8, 6))
-plt.plot(temps_C, np.log10(shifts_array), 'o-', label='WLF fit')
-plt.axhline(y=0, color='k', linestyle='--', alpha=0.5)
-plt.axvline(x=mc.T_ref - 273.15, color='k', linestyle='--', alpha=0.5)
-plt.xlabel('Temperature (°C)')
-plt.ylabel('log₁₀(aₜ)')
-plt.title('Time-Temperature Shift Factors')
-plt.grid(True, alpha=0.3)
-plt.legend()
-plt.show()
-```
-
-**Generate Smooth WLF Curve**
-```python
-# Create smooth temperature range for plotting
-temps_range = np.linspace(250, 350, 100)  # Kelvin
-temps_smooth, shifts_smooth = mc.get_shift_factors_array(temps_range)
-
-# Plot smooth WLF curve with data points
-plt.plot(temps_smooth - 273.15, np.log10(shifts_smooth), '-',
-         label='WLF model', linewidth=2)
-plt.plot(temps_array - 273.15, np.log10(shifts_array), 'o',
-         label='Data points', markersize=8)
-plt.xlabel('Temperature (°C)')
-plt.ylabel('log₁₀(aₜ)')
-plt.legend()
-```
-
-#### Complete Workflow Example
-
-```python
-from rheojax.transforms.mastercurve import Mastercurve
-import numpy as np
-import matplotlib.pyplot as plt
-
-# 1. Create mastercurve
-mc = Mastercurve(reference_temp=298.15, method='wlf')
-mastercurve, shift_factors = mc.transform(datasets)
-
-# 2. Get WLF parameters
-wlf_params = mc.get_wlf_parameters()
-print(f"Fitted WLF: C1={wlf_params['C1']:.2f}, C2={wlf_params['C2']:.2f} K")
-
-# 3. Get shift factors for plotting
-temps, shifts = mc.get_shift_factors_array()
-
-# 4. Create publication-quality plot
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-
-# Left: Shift factors vs temperature
-temps_C = temps - 273.15
-ax1.plot(temps_C, np.log10(shifts), 'o-', markersize=8, linewidth=2)
-ax1.axhline(y=0, color='k', linestyle='--', alpha=0.5)
-ax1.axvline(x=wlf_params['T_ref'] - 273.15, color='k', linestyle='--', alpha=0.5)
-ax1.set_xlabel('Temperature (°C)')
-ax1.set_ylabel('log₁₀(aₜ)')
-ax1.set_title('Time-Temperature Shift Factors')
-ax1.grid(True, alpha=0.3)
-
-# Right: Mastercurve
-ax2.loglog(mastercurve.x, mastercurve.y, 'o', alpha=0.6)
-ax2.set_xlabel('Shifted Frequency (rad/s)')
-ax2.set_ylabel("G' (Pa)")
-ax2.set_title(f'Master Curve (T_ref = {wlf_params["T_ref"] - 273.15:.1f}°C)')
-ax2.grid(True, alpha=0.3)
-
-plt.tight_layout()
-plt.show()
-
-# 5. Save results
-mastercurve.save('mastercurve.hdf5')
-```
-
-#### Optimizing WLF Parameters
-
-```python
-# Optimize WLF parameters to minimize overlap error
-C1_opt, C2_opt = mc.optimize_wlf_parameters(
-    datasets,
-    initial_C1=17.0,
-    initial_C2=50.0
-)
-
-print(f"Optimized WLF: C1={C1_opt:.2f}, C2={C2_opt:.2f} K")
-
-# Compute overlap error
-overlap_error = mc.compute_overlap_error(datasets)
-print(f"Overlap error: {overlap_error:.2e}")
-```
-
-#### Key Features Summary
-
-**`Mastercurve` Transform Methods:**
-- `transform(data)`: Transform single dataset or create mastercurve from list
-- `create_mastercurve(datasets, merge=True, return_shifts=False)`: Explicit mastercurve creation
-- `get_wlf_parameters()`: Get WLF constants (C1, C2, T_ref)
-- `get_arrhenius_parameters()`: Get Arrhenius parameters (E_a, T_ref)
-- `get_shift_factors_array(temperatures=None)`: Get shift factors as NumPy arrays
-- `optimize_wlf_parameters(datasets)`: Optimize WLF constants
-- `compute_overlap_error(datasets)`: Quantify mastercurve quality
-- `set_manual_shifts(shift_factors)`: Set manual shift factors
-
-**Best Practices:**
-1. Always ensure `temperature` is in dataset metadata
-2. Use `transform()` when you need shift factors for plotting
-3. Use `get_shift_factors_array()` for creating smooth plots
-4. Verify `a_T ≈ 1.0` at reference temperature
-5. Check overlap error to assess mastercurve quality
-6. Consider optimizing WLF parameters for better fit
+**Key Methods:** `transform()`, `get_wlf_parameters()`, `get_arrhenius_parameters()`, `get_shift_factors_array()`, `optimize_wlf_parameters()`, `compute_overlap_error()`
 
 ### Troubleshooting
 

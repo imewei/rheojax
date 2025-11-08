@@ -44,8 +44,8 @@ class MockInitializer(BaseInitializer):
 def create_mock_param_set():
     """Create mock ParameterSet for testing."""
     params = ParameterSet()
-    params.add(Parameter("param1", value=1.0, bounds=(1e-3, 1e6)))
-    params.add(Parameter("param2", value=1.0, bounds=(1e-3, 1e6)))
+    params.add("param1", value=1.0, bounds=(1e-3, 1e6))
+    params.add("param2", value=1.0, bounds=(1e-3, 1e6))
     return params
 
 
