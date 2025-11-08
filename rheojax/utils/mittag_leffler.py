@@ -24,7 +24,6 @@ jax, jnp = safe_import_jax()
 from jax.scipy.special import gamma as jax_gamma
 
 
-@jax.jit
 def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarray:
     """
     One-parameter Mittag-Leffler function E_α(z).
@@ -74,7 +73,17 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
     - Validated against mpmath with < 1e-6 relative error
     - For |z| > 10, accuracy may decrease (use with caution)
     - Alpha must be a concrete value (not traced) for JIT compilation
+
+    Raises
+    ------
+    ValueError
+        If alpha is outside the valid range (0, 2].
     """
+    # Validate alpha when not traced (static values only)
+    if not isinstance(alpha, jax.core.Tracer):
+        if not (0 < alpha <= 2):
+            raise ValueError(f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}")
+
     return mittag_leffler_e2(z, alpha, beta=1.0)
 
 
