@@ -179,20 +179,6 @@ extend-exclude = '''
 [tool.ruff]
 line-length = 88
 target-version = "py312"
-select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "C",  # flake8-comprehensions
-    "B",  # flake8-bugbear
-    "UP", # pyupgrade
-]
-ignore = [
-    "E501",  # line too long
-    "B008",  # do not perform function calls in argument defaults
-    "C901",  # too complex
-]
 exclude = [
     ".bzr",
     ".direnv",
@@ -216,13 +202,32 @@ exclude = [
     "venv",
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["B", "C", "E", "F", "W"]
 "rheojax/__init__.py" = ["E402"]  # models import must come after version setup
 "rheojax/models/*.py" = ["E402"]  # safe_import_jax() must precede JAX imports
 "rheojax/utils/mittag_leffler.py" = ["E402"]  # safe_import_jax() must precede JAX imports
+"rheojax/transforms/*.py" = ["E402"]  # safe_import_jax() may precede other imports
+"rheojax/utils/initialization/*.py" = ["E402"]  # initialization modules
 "examples/**/*.ipynb" = ["B", "E", "F", "W"]  # Example notebooks have looser style requirements
+"docs/source/conf.py" = ["F401"]  # Sphinx config checks imports for availability
 
 [tool.mypy]
 python_version = "3.12"

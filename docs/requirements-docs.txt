@@ -3,15 +3,20 @@
 # Install with: pip install -r docs/requirements-docs.txt
 
 # Core Sphinx and theme
-sphinx>=8.0.0,<9.0.0
-sphinx-rtd-theme>=2.0.0
+sphinx>=8.2.0,<9.0.0
+sphinx-rtd-theme>=3.0.0
 
 # Optional Sphinx extensions (gracefully handled if missing)
 sphinx-copybutton>=0.5.0      # Copy button for code blocks
 myst-parser>=2.0.0            # Markdown support
 sphinx-tabs>=3.4.0            # Multi-language example tabs
-sphinx-autodoc-typehints>=1.25.0  # Type hints in API docs
+sphinx-autodoc-typehints>=3.5.0  # Type hints in API docs
 
-# Required for building API documentation
-numpyro>=0.13.0,<1.0.0        # For intersphinx
-arviz>=0.15.0,<1.0.0          # For intersphinx
+# Required for building API documentation (match pyproject.toml versions)
+numpyro>=0.19.0,<1.0.0        # For intersphinx and model examples
+arviz>=0.22.0,<1.0.0          # For intersphinx and Bayesian diagnostics
+
+# Required for autodoc to parse JAX code
+jax==0.8.0                    # Exact version to match codebase
+jaxlib==0.8.0                 # Must match JAX version
+nlsq>=0.2.1                   # Required before JAX import for float64
