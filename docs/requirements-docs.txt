@@ -19,4 +19,4 @@ arviz>=0.22.0,<1.0.0          # For intersphinx and Bayesian diagnostics
 # Required for autodoc to parse JAX code
 jax==0.8.0                    # Exact version to match codebase
 jaxlib==0.8.0                 # Must match JAX version
-nlsq>=0.2.1                   # Required before JAX import for float64
+nlsq>=0.2.1                   # Required for GPU-accelerated optimization

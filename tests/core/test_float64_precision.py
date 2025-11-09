@@ -28,9 +28,14 @@ class TestFloat64ImportOrder:
 
         try:
             # This should raise an ImportError
-            from rheojax.core.jax_config import safe_import_jax
+            from rheojax.core.jax_config import reset_validation, safe_import_jax
 
-            with pytest.raises(ImportError, match="NLSQ must be imported before JAX"):
+            # Reset the validation cache to force re-validation
+            reset_validation()
+
+            with pytest.raises(
+                ImportError, match="NLSQ must be imported before using RheoJAX"
+            ):
                 jax, jnp = safe_import_jax()
         finally:
             # Restore nlsq module if it was present
@@ -101,7 +106,10 @@ class TestFloat64ImportOrder:
             del sys.modules["rheo.core.jax_config"]
 
         try:
-            from rheojax.core.jax_config import safe_import_jax
+            from rheojax.core.jax_config import reset_validation, safe_import_jax
+
+            # Reset the validation cache to force re-validation
+            reset_validation()
 
             with pytest.raises(ImportError) as exc_info:
                 jax, jnp = safe_import_jax()
@@ -109,7 +117,7 @@ class TestFloat64ImportOrder:
             error_message = str(exc_info.value)
 
             # Error message should be helpful and actionable
-            assert "NLSQ must be imported before JAX" in error_message
+            assert "NLSQ must be imported before using RheoJAX" in error_message
             assert (
                 "import nlsq" in error_message.lower()
                 or "nlsq" in error_message.lower()

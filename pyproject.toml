@@ -60,7 +60,8 @@ dependencies = [
     "matplotlib>=3.10.0,<4.0.0",
 
     # GPU-accelerated optimization (CRITICAL: must be imported before JAX)
-    # NLSQ auto-configures JAX for float64 precision when imported
+    # NLSQ v0.2.1+ uses float32 by default with automatic precision fallback
+    # RheoJAX explicitly enables float64 via jax.config.update("jax_enable_x64", True)
     "nlsq>=0.2.1",
 
     # JAX ecosystem (CPU-only - works on all platforms)

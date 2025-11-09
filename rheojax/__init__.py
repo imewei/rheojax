@@ -5,10 +5,17 @@ models with hermes-rheo's data analysis transforms, providing JAX-accelerated
 computations with multiple API styles and full piblin compatibility.
 
 Float64 Precision Enforcement:
-    This package enforces float64 precision for JAX operations by importing
-    NLSQ before JAX. NLSQ automatically configures JAX for float64 when imported.
+    This package enforces float64 precision for JAX operations by:
+    1. Importing NLSQ (required for GPU-accelerated optimization)
+    2. Importing JAX
+    3. Explicitly enabling float64: jax.config.update("jax_enable_x64", True)
+
+    NLSQ v0.2.1+ uses float32 by default with automatic precision fallback.
+    RheoJAX explicitly enables float64 for numerical stability in rheological
+    calculations.
+
     All internal modules use safe_import_jax() from rheojax.core.jax_config to ensure
-    proper import order.
+    proper configuration.
 
     Users should NOT import JAX directly in code that uses rheojax. Instead, import
     from rheojax or use safe_import_jax() to maintain float64 precision.
@@ -17,15 +24,15 @@ Float64 Precision Enforcement:
 # Runtime version check (must be first)
 import sys
 
-# CRITICAL: Import NLSQ before JAX to enable float64 precision
-# NLSQ auto-configures JAX for float64 when imported
+# CRITICAL: Import NLSQ before JAX
+# Required for GPU-accelerated optimization
 try:
     import nlsq  # noqa: F401
 except ImportError as e:
     raise ImportError(
         "NLSQ is required for RheoJAX but not installed.\n"
-        "Install with: pip install nlsq>=0.1.6\n"
-        "NLSQ provides GPU-accelerated optimization and enables float64 precision in JAX."
+        "Install with: pip install nlsq>=0.2.1\n"
+        "NLSQ provides GPU-accelerated optimization for rheological models."
     ) from e
 
 __version__ = "0.2.0"
@@ -38,6 +45,10 @@ try:
     import jax
     import jax.numpy as jnp
 
+    # CRITICAL: Explicitly enable float64 precision
+    # NLSQ v0.2.1+ uses float32 by default, so we must configure JAX explicitly
+    jax.config.update("jax_enable_x64", True)
+
     __jax_version__ = jax.__version__
 
     # Runtime check: Verify JAX is in float64 mode
@@ -48,7 +59,8 @@ try:
         warnings.warn(
             f"JAX is not operating in float64 mode (current dtype: {_test_array.dtype}). "
             f"Float64 precision is required for numerical stability in rheological calculations. "
-            f"Ensure NLSQ >= 0.1.6 is installed.",
+            f"This may indicate a JAX configuration issue. "
+            f"Ensure JAX 0.8.0 and NLSQ >= 0.2.1 are installed.",
             RuntimeWarning,
             stacklevel=2,
         )
