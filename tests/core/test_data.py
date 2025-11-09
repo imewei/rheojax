@@ -1,22 +1,22 @@
-"""Tests for RheoData class - piblin Measurement wrapper.
+"""Tests for RheoData class - piblin-jax Measurement wrapper.
 
 This test suite ensures that RheoData maintains full compatibility
-with piblin.Measurement while adding JAX support and additional features.
+with piblin_jax.Measurement while adding JAX support and additional features.
 """
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 
-# We'll mock piblin for now since it's not installed yet
+# We'll mock piblin_jax for now since it's not installed yet
 
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
-with patch.dict("sys.modules", {"piblin": MagicMock()}):
+with patch.dict("sys.modules", {"piblin_jax": MagicMock()}):
     from rheojax.core.data import RheoData
 
 
@@ -86,34 +86,34 @@ class TestRheoDataCreation:
 
 
 @pytest.mark.skip(
-    reason="piblin is an optional dependency - install with: pip install piblin"
+    reason="piblin-jax is an optional dependency - install with: pip install piblin-jax"
 )
 class TestRheoDataPiblinCompatibility:
-    """Test piblin.Measurement compatibility.
+    """Test piblin_jax.Measurement compatibility.
 
-    NOTE: These tests are skipped by default as piblin is an optional dependency.
-    To enable these tests, install piblin: pip install piblin
+    NOTE: These tests are skipped by default as piblin-jax is an optional dependency.
+    To enable these tests, install piblin-jax: pip install piblin-jax
     """
 
-    @patch("rheo.core.data.piblin")
+    @patch("rheojax.core.data.piblin")
     def test_wraps_piblin_measurement(self, mock_piblin):
-        """Test that RheoData properly wraps piblin.Measurement."""
-        # Create a mock piblin measurement
+        """Test that RheoData properly wraps piblin_jax.Measurement."""
+        # Create a mock piblin_jax measurement
         mock_measurement = Mock()
         mock_measurement.x = np.array([1, 2, 3])
         mock_measurement.y = np.array([10, 20, 30])
         mock_measurement.metadata = {"test": "data"}
 
-        # Create RheoData from piblin measurement
+        # Create RheoData from piblin_jax measurement
         data = RheoData.from_piblin(mock_measurement)
 
         assert data._measurement is mock_measurement
         assert np.array_equal(data.x, mock_measurement.x)
         assert np.array_equal(data.y, mock_measurement.y)
 
-    @patch("rheo.core.data.piblin")
+    @patch("rheojax.core.data.piblin")
     def test_to_piblin_returns_measurement(self, mock_piblin):
-        """Test converting RheoData to piblin.Measurement."""
+        """Test converting RheoData to piblin_jax.Measurement."""
         x = np.array([1, 2, 3])
         y = np.array([10, 20, 30])
 
@@ -121,17 +121,17 @@ class TestRheoDataPiblinCompatibility:
         measurement = data.to_piblin()
 
         assert measurement is not None
-        # Verify that piblin.Measurement was called
+        # Verify that piblin_jax.Measurement was called
         mock_piblin.Measurement.assert_called()
 
     def test_piblin_methods_forwarded(self):
-        """Test that piblin methods are accessible through RheoData."""
+        """Test that piblin_jax methods are accessible through RheoData."""
         x = np.array([1, 2, 3])
         y = np.array([10, 20, 30])
 
         data = RheoData(x=x, y=y)
 
-        # Test that common piblin methods are accessible
+        # Test that common piblin_jax methods are accessible
         assert hasattr(data, "copy")
         assert hasattr(data, "slice")
         assert hasattr(data, "interpolate")

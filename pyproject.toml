@@ -78,7 +78,7 @@ dependencies = [
 [project.optional-dependencies]
 # Core dependencies that may not be on PyPI yet
 core = [
-    # "piblin>=0.5.0",  # Required but may need manual installation
+    "piblin-jax>=0.0.3",  # JAX-first rewrite of piblin for data interoperability
 ]
 dev = [
     "pytest>=8.4.0",
