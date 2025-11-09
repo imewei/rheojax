@@ -96,7 +96,7 @@ class MutationNumber(BaseTransform):
         self.extrapolate = extrapolate
         self.extrapolation_model = extrapolation_model
 
-    def _integrate(self, x: jnp.ndarray, y: jnp.ndarray) -> float:
+    def _integrate(self, x, y) -> float:
         """Perform numerical integration.
 
         Parameters
@@ -132,7 +132,7 @@ class MutationNumber(BaseTransform):
         else:
             raise ValueError(f"Unknown integration method: {self.integration_method}")
 
-    def _extrapolate_tail(self, t: jnp.ndarray, G_t: jnp.ndarray) -> float:
+    def _extrapolate_tail(self, t, G_t) -> float:
         """Extrapolate tail contribution to infinite time.
 
         Parameters
@@ -255,17 +255,67 @@ class MutationNumber(BaseTransform):
         n_tail = max(10, len(G_t) // 10)
         G_eq = float(jnp.mean(G_t[-n_tail:]))
 
+        # If extrapolation is enabled, use exponential fit to estimate true G_eq
+        if self.extrapolate:
+            # Use last few points to fit extrapolation model
+            n_fit = min(10, len(t) // 4)
+            t_fit = t[-n_fit:]
+            G_fit = G_t[-n_fit:]
+
+            if self.extrapolation_model == "exponential":
+                # Fit G(t) = G_eq_extrap + A * exp(-t/tau)
+                # For large t, G(t) → G_eq_extrap
+                # ln(G - G_eq_guess) = ln(A) - t/tau
+
+                # First guess: use current G_eq estimate
+                G_eq_guess = G_eq
+
+                # Iteratively refine G_eq estimate
+                for _ in range(3):  # A few iterations usually suffice
+                    G_shifted = G_fit - G_eq_guess
+
+                    # Check if all values are positive
+                    if jnp.min(G_shifted) > 0:
+                        log_G = jnp.log(G_shifted + 1e-10)
+
+                        # Linear regression on log scale
+                        t_mean = jnp.mean(t_fit)
+                        log_G_mean = jnp.mean(log_G)
+
+                        slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / (
+                            jnp.sum((t_fit - t_mean) ** 2) + 1e-10
+                        )
+                        intercept = log_G_mean - slope * t_mean
+
+                        # Extract parameters
+                        tau = -1.0 / (slope + 1e-10)
+                        A = jnp.exp(intercept)
+
+                        # Estimate G_eq from fit: G_eq ≈ G(t_max) - A*exp(-t_max/tau)
+                        t_max = t[-1]
+                        G_eq_guess = G_t[-1] - A * jnp.exp(-t_max / tau)
+
+                        # Clamp to non-negative
+                        G_eq_guess = jnp.maximum(0.0, G_eq_guess)
+                    else:
+                        # Can't fit exponential, keep current guess
+                        break
+
+                # Use refined estimate if it's reasonable (between 0 and current estimate)
+                if 0 <= G_eq_guess <= G_eq:
+                    G_eq = float(G_eq_guess)
+
         # For mutation number, integrate the relaxing part G(t) - G_eq
         # For elastic solids: G(t) ≈ G_eq → G_relax ≈ 0 → Δ ≈ 0
         # For viscous fluids: G_eq ≈ 0 → G_relax ≈ G(t) → Δ ≈ 1
         G_relax = G_t - G_eq
 
-        # Calculate integrals of relaxing part
+        # Calculate G_0_relax = initial relaxing modulus
+        G_0_relax = G_0 - G_eq
+
+        # Calculate integrals of relaxing part (used for extrapolation)
         # ∫[G(t) - G_eq]dt
         integral_G = self._integrate(t, G_relax)
-
-        # ∫t*[G(t) - G_eq]dt (for average relaxation time)
-        integral_tG = self._integrate(t, t * G_relax)
 
         # Add extrapolation if requested
         # Only extrapolate if the tail values are positive and significant
@@ -287,26 +337,20 @@ class MutationNumber(BaseTransform):
                     # Extrapolation failed, continue without it
                     pass
 
-        # Calculate average relaxation time of the relaxing component
-        # Use G_0 - G_eq as the initial relaxing modulus
-        G_0_relax = G_0 - G_eq
-
-        if G_0_relax > 0:
-            tau_avg = integral_G / G_0_relax
-        else:
-            # No relaxation (pure elastic solid)
+        # Check for pure elastic solid (no relaxation)
+        if G_0_relax <= 0:
             return 0.0
 
-        # Calculate mutation number
-        # Δ = ∫[G(t)-G_eq]dt / ((G_0-G_eq) * τ_avg) = (∫[G(t)-G_eq]dt)² / ((G_0-G_eq) * ∫t*[G(t)-G_eq]dt)
-        if integral_tG > 0 and G_0_relax > 0:
-            delta = (integral_G**2) / (G_0_relax * integral_tG)
+        # Calculate mutation number using standard rheological definition
+        # Δ = (G_0 - G_eq) / G_0 = 1 - G_eq/G_0
+        # This quantifies the degree of relaxation:
+        # - Δ = 0: Purely elastic (no relaxation, G_eq = G_0)
+        # - Δ = 1: Purely viscous (complete relaxation, G_eq = 0)
+        # - 0 < Δ < 1: Viscoelastic material
+        if G_0 > 0:
+            delta = 1.0 - (G_eq / G_0)
         else:
-            # Fallback or no relaxation
-            if G_0_relax > 0:
-                delta = integral_G / (G_0_relax * tau_avg)
-            else:
-                delta = 0.0
+            delta = 0.0
 
         # Clamp to physical range [0, 1]
         # Values outside this range indicate numerical issues or insufficient data quality
