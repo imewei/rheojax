@@ -266,7 +266,7 @@ class Mastercurve(BaseTransform):
         ----------
         temperatures : list or ndarray, optional
             Temperatures in Kelvin. If None, uses temperatures from the last
-            mastercurve creation (stored in shift_factors_).
+            mastercurve creation (stored in ``shift_factors_``).
 
         Returns
         -------
@@ -389,7 +389,7 @@ class Mastercurve(BaseTransform):
         -------
         RheoData or tuple of (RheoData, dict)
             If data is a single RheoData: returns shifted data
-            If data is a list: returns (mastercurve, shift_factors)
+            If data is a list: returns (mastercurve, ``shift_factors``)
 
         Raises
         ------

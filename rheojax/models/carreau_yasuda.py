@@ -50,11 +50,11 @@ class CarreauYasuda(BaseModel):
         a: Transition parameter (dimensionless), controls transition width
 
     Constitutive Equation:
-        η(γ̇) = η_∞ + (η_0 - η_∞) [1 + (λγ̇)^a]^((n-1)/a)
+        η(γ̇) = η_∞ + (η_0 - η_∞) [1 + (``λ`` γ̇)^a]^((n-1)/a)
 
     Special Cases:
         a = 2: Reduces to Carreau model
-        λ → 0: Newtonian fluid with η = η_0
+        ``λ`` → 0: Newtonian fluid with η = η_0
         n = 1: Newtonian fluid for all shear rates
 
     Test Mode:
@@ -192,7 +192,7 @@ class CarreauYasuda(BaseModel):
 
         Args:
             X: Independent variable (shear rate γ̇)
-            params: Array of parameter values [eta0, eta_inf, lambda_, n, a]
+            params: Array of parameter values [eta0, eta_inf, ``lambda_``, n, a]
 
         Returns:
             Model predictions as JAX array

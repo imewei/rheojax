@@ -48,11 +48,11 @@ class Carreau(BaseModel):
         n: Power-law index (dimensionless), controls transition steepness
 
     Constitutive Equation:
-        η(γ̇) = η_∞ + (η_0 - η_∞) [1 + (λγ̇)²]^((n-1)/2)
+        η(γ̇) = η_∞ + (η_0 - η_∞) [1 + (``λ`` γ̇)²]^((n-1)/2)
 
     Special Cases:
-        λ → 0: Newtonian fluid with η = η_0
-        λ → ∞, η_∞ = 0: Power Law behavior
+        ``λ`` → 0: Newtonian fluid with η = η_0
+        ``λ`` → ∞, η_∞ = 0: Power Law behavior
         n = 1: Newtonian fluid for all shear rates
 
     Test Mode:
@@ -183,7 +183,7 @@ class Carreau(BaseModel):
 
         Args:
             X: Independent variable (shear rate γ̇)
-            params: Array of parameter values [eta0, eta_inf, lambda_, n]
+            params: Array of parameter values [eta0, eta_inf, ``lambda_``, n]
 
         Returns:
             Model predictions as JAX array

@@ -138,13 +138,18 @@ def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
     """Detect rheological test mode from data characteristics.
 
     The detection algorithm uses the following heuristics:
+
     1. Check metadata['test_mode'] if explicitly provided
     2. Check domain and units:
+
        - frequency domain with rad/s or Hz → OSCILLATION
        - time domain with 1/s or s^-1 x-units → ROTATION
+
     3. Check monotonicity for time-domain data:
+
        - monotonic decreasing → RELAXATION
        - monotonic increasing → CREEP
+
     4. Fall back to UNKNOWN if ambiguous
 
     Args:

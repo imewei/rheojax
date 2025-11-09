@@ -19,6 +19,8 @@ from rheojax.core.registry import TransformRegistry
 jax, jnp = safe_import_jax()
 
 if TYPE_CHECKING:
+    from jax import Array
+
     from rheojax.core.data import RheoData
 
 
@@ -54,6 +56,8 @@ class OWChirp(BaseTransform):
 
     Examples
     --------
+    Basic usage:
+
     >>> from rheojax.core.data import RheoData
     >>> from rheojax.transforms.owchirp import OWChirp
     >>>
@@ -104,8 +108,8 @@ class OWChirp(BaseTransform):
         self.max_harmonic = max_harmonic
 
     def _chirp_wavelet(
-        self, t: jnp.ndarray, t_center: float, frequency: float, width: float
-    ) -> jnp.ndarray:
+        self, t: Array, t_center: float, frequency: float, width: float
+    ) -> Array:
         """Generate chirp wavelet at given frequency.
 
         The chirp wavelet is a Morlet-like wavelet with a Gaussian envelope:
@@ -113,7 +117,7 @@ class OWChirp(BaseTransform):
 
         Parameters
         ----------
-        t : jnp.ndarray
+        t : Array
             Time array
         t_center : float
             Center time of wavelet
@@ -124,7 +128,7 @@ class OWChirp(BaseTransform):
 
         Returns
         -------
-        jnp.ndarray
+        Array
             Complex wavelet coefficients
         """
         # Gaussian envelope width
@@ -139,23 +143,21 @@ class OWChirp(BaseTransform):
 
         return envelope * chirp
 
-    def _wavelet_transform(
-        self, t: jnp.ndarray, signal: jnp.ndarray, frequencies: jnp.ndarray
-    ) -> jnp.ndarray:
+    def _wavelet_transform(self, t: Array, signal: Array, frequencies: Array) -> Array:
         """Compute wavelet transform of signal.
 
         Parameters
         ----------
-        t : jnp.ndarray
+        t : Array
             Time array
-        signal : jnp.ndarray
+        signal : Array
             Input signal
-        frequencies : jnp.ndarray
+        frequencies : Array
             Frequency array
 
         Returns
         -------
-        jnp.ndarray
+        Array
             Wavelet coefficients (n_frequencies, n_times)
         """
         n_times = len(t)
@@ -177,24 +179,24 @@ class OWChirp(BaseTransform):
         return coefficients
 
     def _optimized_wavelet_transform(
-        self, t: jnp.ndarray, signal: jnp.ndarray, frequencies: jnp.ndarray
-    ) -> jnp.ndarray:
+        self, t: Array, signal: Array, frequencies: Array
+    ) -> Array:
         """Optimized wavelet transform using FFT convolution.
 
         This is much faster than the direct method for long signals.
 
         Parameters
         ----------
-        t : jnp.ndarray
+        t : Array
             Time array
-        signal : jnp.ndarray
+        signal : Array
             Input signal
-        frequencies : jnp.ndarray
+        frequencies : Array
             Frequency array
 
         Returns
         -------
-        jnp.ndarray
+        Array
             Wavelet coefficients
         """
         dt = t[1] - t[0]
@@ -247,9 +249,9 @@ class OWChirp(BaseTransform):
         signal = data.y
 
         # Convert to JAX arrays
-        if not isinstance(t, jnp.ndarray):
+        if not isinstance(t, Array):
             t = jnp.array(t)
-        if not isinstance(signal, jnp.ndarray):
+        if not isinstance(signal, Array):
             signal = jnp.array(signal)
 
         # Handle complex data
@@ -292,9 +294,7 @@ class OWChirp(BaseTransform):
             validate=False,
         )
 
-    def get_time_frequency_map(
-        self, data: RheoData
-    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    def get_time_frequency_map(self, data: RheoData) -> tuple[Array, Array, Array]:
         """Get full time-frequency map (spectrogram).
 
         Parameters
@@ -304,11 +304,11 @@ class OWChirp(BaseTransform):
 
         Returns
         -------
-        times : jnp.ndarray
+        times : Array
             Time array
-        frequencies : jnp.ndarray
+        frequencies : Array
             Frequency array
-        coefficients : jnp.ndarray
+        coefficients : Array
             Complex wavelet coefficients (n_frequencies, n_times)
         """
         # Get time and signal
@@ -316,9 +316,9 @@ class OWChirp(BaseTransform):
         signal = data.y
 
         # Convert to JAX arrays
-        if not isinstance(t, jnp.ndarray):
+        if not isinstance(t, Array):
             t = jnp.array(t)
-        if not isinstance(signal, jnp.ndarray):
+        if not isinstance(signal, Array):
             signal = jnp.array(signal)
 
         # Handle complex
@@ -352,11 +352,12 @@ class OWChirp(BaseTransform):
         Returns
         -------
         dict
-            Dictionary with harmonic amplitudes:
-            {'fundamental': (freq, amplitude),
-             'third': (3*freq, amplitude),
-             'fifth': (5*freq, amplitude),
-             ...}
+            Dictionary with harmonic amplitudes::
+
+                {'fundamental': (freq, amplitude),
+                 'third': (3*freq, amplitude),
+                 'fifth': (5*freq, amplitude),
+                 ...}
         """
         # Get frequency spectrum
         freq_data = self.transform(data)
@@ -364,9 +365,9 @@ class OWChirp(BaseTransform):
         spectrum = freq_data.y
 
         # Convert to numpy for peak detection
-        if isinstance(freqs, jnp.ndarray):
+        if isinstance(freqs, Array):
             freqs = np.array(freqs)
-        if isinstance(spectrum, jnp.ndarray):
+        if isinstance(spectrum, Array):
             spectrum = np.array(spectrum)
 
         # Find fundamental frequency if not provided

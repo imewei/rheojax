@@ -6,12 +6,15 @@ plots including stress-strain, modulus-frequency, and mastercurve plots.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+
+if TYPE_CHECKING:
+    from jax import Array
 
 from rheojax.core.data import RheoData
 from rheojax.visualization.plotter import (
@@ -288,7 +291,7 @@ def plot_mastercurve(
 
 def plot_model_fit(
     data: RheoData,
-    predictions: np.ndarray | jnp.ndarray,
+    predictions: np.ndarray | Array,
     show_residuals: bool = True,
     style: str = "default",
     model_name: str | None = None,

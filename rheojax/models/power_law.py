@@ -44,8 +44,8 @@ class PowerLaw(BaseModel):
         n: Flow behavior index (dimensionless), controls shear-thinning/thickening
 
     Constitutive Equation:
-        σ(γ̇) = K |γ̇|^n
-        η(γ̇) = K |γ̇|^(n-1)
+        σ(γ̇) = K ``|γ̇|`` ^n
+        η(γ̇) = K ``|γ̇|`` ^(n-1)
 
     Special Cases:
         n = 1: Newtonian fluid with viscosity η = K
@@ -192,7 +192,7 @@ class PowerLaw(BaseModel):
             gamma_dot: Shear rate data (γ̇)
 
         Returns:
-            Predicted shear stress σ(γ̇) = K |γ̇|^n
+            Predicted shear stress σ(γ̇) = K ``|γ̇|^n``
         """
         K = self.parameters.get_value("K")
         n = self.parameters.get_value("n")

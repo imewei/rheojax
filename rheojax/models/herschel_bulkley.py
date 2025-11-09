@@ -5,8 +5,8 @@ behavior with power-law flow. This is the most general viscoplastic model,
 reducing to simpler models as special cases (ROTATION test mode).
 
 Theory:
-    σ(γ̇) = σ_y + K |γ̇|^n  for σ > σ_y
-    γ̇ = 0                  for σ ≤ σ_y
+    σ(γ̇) = σ_y + K ``|γ̇|`` ^n  for σ > σ_y
+    γ̇ = 0                     for σ ≤ σ_y
 
     - σ_y: Yield stress (material flows only when σ > σ_y)
     - K: Consistency index (viscosity-like parameter)
@@ -46,8 +46,8 @@ class HerschelBulkley(BaseModel):
         n: Flow behavior index (dimensionless), power-law exponent
 
     Constitutive Equation:
-        σ(γ̇) = σ_y + K |γ̇|^n  for |σ| > σ_y
-        γ̇ = 0                  for |σ| ≤ σ_y
+        σ(γ̇) = σ_y + K ``|γ̇|`` ^n  for ``|σ|`` > σ_y
+        γ̇ = 0                     for ``|σ|`` ≤ σ_y
 
     Special Cases:
         σ_y = 0: Reduces to Power Law model

@@ -4,7 +4,7 @@ JAX-compatible Mittag-Leffler function implementations.
 This module provides efficient, JAX-compatible implementations of the Mittag-Leffler
 function using Pade approximations optimized for fractional rheological models.
 
-For most rheological applications, arguments are in the range |z| < 10, where
+For most rheological applications, arguments are in the range ``|z|`` < 10, where
 Pade approximations provide excellent accuracy (< 1e-6 error) with fast computation.
 
 References
@@ -30,9 +30,9 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
 
     The Mittag-Leffler function is defined as:
 
-        E_α(z) = ∑_{k=0}^∞ z^k / Γ(αk + 1)
+        E_α(``z``) = ∑_{k=0}^∞ ``z`` ^k / Γ(αk + 1)
 
-    This is a generalization of the exponential function (α=1 gives exp(z)).
+    This is a generalization of the exponential function (α=1 gives exp(``z``)).
 
     Parameters
     ----------
@@ -46,7 +46,7 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
     Returns
     -------
     float or jnp.ndarray
-        Value(s) of E_α(z). Returns real values for real inputs, complex for complex inputs.
+        Value(s) of E_α(``z``). Returns real values for real inputs, complex for complex inputs.
 
     Examples
     --------
@@ -68,10 +68,10 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
 
     Notes
     -----
-    - Uses Pade(6,3) approximation for excellent accuracy in range |z| < 10
+    - Uses Pade(6,3) approximation for excellent accuracy in range ``|z|`` < 10
     - Compiled with @jax.jit for performance with static alpha
     - Validated against mpmath with < 1e-6 relative error
-    - For |z| > 10, accuracy may decrease (use with caution)
+    - For ``|z|`` > 10, accuracy may decrease (use with caution)
     - Alpha must be a concrete value (not traced) for JIT compilation
 
     Raises
@@ -92,13 +92,13 @@ def mittag_leffler_e2(
     z: float | jnp.ndarray, alpha: float, beta: float
 ) -> float | jnp.ndarray:
     """
-    Two-parameter Mittag-Leffler function E_{α,β}(z).
+    Two-parameter Mittag-Leffler function E_{α,β}(``z``).
 
     The two-parameter Mittag-Leffler function is defined as:
 
-        E_{α,β}(z) = ∑_{k=0}^∞ z^k / Γ(αk + β)
+        E_{α,β}(``z``) = ∑_{k=0}^∞ ``z`` ^k / Γ(αk + β)
 
-    This generalizes the one-parameter function (β=1 reduces to E_α(z)).
+    This generalizes the one-parameter function (β=1 reduces to E_α(``z``)).
 
     Parameters
     ----------
@@ -114,7 +114,7 @@ def mittag_leffler_e2(
     Returns
     -------
     float or jnp.ndarray
-        Value(s) of E_{α,β}(z). Returns real values for real inputs, complex for complex inputs.
+        Value(s) of E_{α,β}(``z``). Returns real values for real inputs, complex for complex inputs.
 
     Examples
     --------
@@ -140,10 +140,10 @@ def mittag_leffler_e2(
     Notes
     -----
     - Uses Pade(6,3) approximation optimized for rheological applications
-    - Accurate to < 1e-6 for |z| < 10 (covers most rheological cases)
+    - Accurate to < 1e-6 for ``|z|`` < 10 (covers most rheological cases)
     - For fractional calculus applications, common choices:
         - Relaxation modulus: E_α(-t^α), α ∈ (0,1)
-        - Fractional derivatives: E_{α,β}(z) with β = 1-α
+        - Fractional derivatives: E_{α,β}(``z``) with β = 1-α
     - JIT compilation is automatic via @jax.jit decorator
     - Now supports traced alpha/beta values (no static_argnums required)
 

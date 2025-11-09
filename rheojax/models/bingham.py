@@ -46,8 +46,8 @@ class Bingham(BaseModel):
         eta_p: Plastic viscosity (Pa·s), constant viscosity above yield
 
     Constitutive Equation:
-        σ(γ̇) = σ_y + η_p |γ̇|  for |σ| > σ_y
-        γ̇ = 0                  for |σ| ≤ σ_y
+        σ(γ̇) = σ_y + η_p ``|γ̇|``  for ``|σ|`` > σ_y
+        γ̇ = 0                      for ``|σ|`` ≤ σ_y
 
     Special Cases:
         σ_y = 0: Reduces to Newtonian fluid with η = η_p
