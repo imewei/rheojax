@@ -1,5 +1,5 @@
 Utilities (rheojax.utils)
-======================
+==========================
 
 The utils module provides numerical utilities for rheological analysis, including special functions and optimization tools.
 
@@ -18,8 +18,10 @@ Functions
 ~~~~~~~~~
 
 .. autofunction:: rheojax.utils.mittag_leffler.mittag_leffler_e
+   :noindex:
 
 .. autofunction:: rheojax.utils.mittag_leffler.mittag_leffler_e2
+   :noindex:
 
 Aliases
 ~~~~~~~
@@ -155,6 +157,7 @@ Optimization
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: OptimizationResult
 
 Functions and Classes
 ~~~~~~~~~~~~~~~~~~~~~
@@ -163,16 +166,22 @@ Functions and Classes
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
+   :exclude-members: x, fun, jac, success, message, nit, nfev, njev, optimality, active_mask, cost, grad, nlsq_result
 
    Result container for optimization.
 
 .. autofunction:: rheojax.utils.optimization.nlsq_optimize
+   :noindex:
 
 .. autofunction:: rheojax.utils.optimization.optimize_with_bounds
+   :noindex:
 
 .. autofunction:: rheojax.utils.optimization.residual_sum_of_squares
+   :noindex:
 
 .. autofunction:: rheojax.utils.optimization.create_least_squares_objective
+   :noindex:
 
 Aliases
 ~~~~~~~
@@ -413,6 +422,7 @@ Enums
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
    Types of relaxation decay behavior:
 
@@ -427,6 +437,7 @@ Enums
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
    Types of material behavior:
 
@@ -441,23 +452,27 @@ Functions
 ~~~~~~~~~
 
 .. autofunction:: rheojax.utils.compatibility.detect_decay_type
+   :noindex:
 
    Analyzes relaxation modulus data to determine the type of decay pattern.
    Uses linear regression on log-transformed data to identify exponential,
    power-law, stretched exponential, or Mittag-Leffler behavior.
 
 .. autofunction:: rheojax.utils.compatibility.detect_material_type
+   :noindex:
 
    Classifies material behavior from relaxation or oscillation data.
    Detects solid-like, liquid-like, gel-like, or viscoelastic behavior based on
    equilibrium modulus or low-frequency response.
 
 .. autofunction:: rheojax.utils.compatibility.check_model_compatibility
+   :noindex:
 
    Comprehensive compatibility check comparing model physics with data characteristics.
    Returns detailed compatibility information including warnings and model recommendations.
 
 .. autofunction:: rheojax.utils.compatibility.format_compatibility_message
+   :noindex:
 
    Formats compatibility check results as a human-readable message with warnings,
    detected characteristics, and alternative model recommendations.

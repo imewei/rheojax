@@ -44,7 +44,7 @@ Installation
 
 .. code-block:: bash
 
-   pip install rheo
+   pip install rheojax
 
 Basic Usage
 ~~~~~~~~~~~
@@ -88,10 +88,14 @@ Contents
    :maxdepth: 2
    :caption: User Guide
 
+   user_guide
    user_guide/getting_started
    user_guide/core_concepts
+   user_guide/model_selection
    user_guide/bayesian_inference
    user_guide/pipeline_api
+   user_guide/multi_technique_fitting
+   user_guide/transforms
    user_guide/io_guide
    user_guide/visualization_guide
 
@@ -99,6 +103,7 @@ Contents
    :maxdepth: 2
    :caption: API Reference
 
+   api_reference
    api/core
    api/utils
    api/io

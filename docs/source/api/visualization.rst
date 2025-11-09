@@ -1,5 +1,5 @@
 Visualization (rheojax.visualization)
-===================================
+=======================================
 
 The visualization module provides publication-quality plotting functions for rheological data.
 
@@ -15,6 +15,7 @@ Main Plotting Function
 ~~~~~~~~~~~~~~~~~~~~~~
 
 .. autofunction:: rheojax.visualization.plotter.plot_rheo_data
+   :noindex:
 
    Main entry point for plotting RheoData with automatic plot type selection.
 
@@ -28,10 +29,12 @@ Specialized Plot Types
 ~~~~~~~~~~~~~~~~~~~~~~
 
 .. autofunction:: rheojax.visualization.plotter.plot_time_domain
+   :noindex:
 
    Plot time-domain data (relaxation, creep).
 
 .. autofunction:: rheojax.visualization.plotter.plot_frequency_domain
+   :noindex:
 
    Plot frequency-domain data (oscillatory tests).
 
@@ -39,10 +42,12 @@ Specialized Plot Types
    For real data, creates a single plot.
 
 .. autofunction:: rheojax.visualization.plotter.plot_flow_curve
+   :noindex:
 
    Plot flow curves (viscosity or stress vs shear rate).
 
 .. autofunction:: rheojax.visualization.plotter.plot_residuals
+   :noindex:
 
    Plot residuals from model fitting.
 

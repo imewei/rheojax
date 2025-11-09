@@ -752,4 +752,4 @@ Next Steps
 - :doc:`/user_guide/model_selection` - Choose appropriate model
 - :doc:`/user_guide/modular_api` - Advanced parameter manipulation
 - :doc:`/api/core` - SharedParameterSet API reference
-- :doc:`/examples/multi_technique_fitting` - Complete example notebook
+- ``examples/advanced/multi_technique_fitting.ipynb`` - Complete example notebook

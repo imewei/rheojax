@@ -3,6 +3,30 @@ Model Selection Guide
 
 Choosing the right rheological model is critical for accurately characterizing material behavior. This guide helps you select the appropriate model based on your material type, test mode, and experimental objectives.
 
+Quick Selection Flowchart
+--------------------------
+
+.. code-block:: text
+
+   Data Type?
+   ├─ Time Domain (Relaxation/Creep)
+   │  ├─ Decay Type?
+   │  │  ├─ Exponential decay → Maxwell, Zener
+   │  │  ├─ Power-law decay → FractionalMaxwellGel, FZSS
+   │  │  └─ Finite equilibrium modulus → Zener, FZSS, FKV
+   │  └─ Material Type?
+   │     ├─ Liquid-like (flows) → Maxwell, FractionalMaxwellLiquid
+   │     ├─ Solid-like (elastic) → Zener, FZSS, FractionalKelvinVoigt
+   │     └─ Gel-like → FractionalMaxwellGel
+   └─ Frequency Domain (Oscillation)
+      ├─ Low-frequency behavior?
+      │  ├─ G' > G" → Solid-like models (FZSS, FKV, Zener)
+      │  └─ G" > G' → Liquid-like models (Maxwell, FML)
+      └─ Slope in log-log plot?
+         ├─ ~2 (liquid) → Maxwell, FML
+         ├─ ~0.5 (gel) → FractionalMaxwellGel
+         └─ plateau (solid) → FZSS, Zener, FKV
+
 Decision Tree: Which Model for Which Material?
 -----------------------------------------------
 
@@ -679,6 +703,98 @@ Solution: Examine parameter confidence intervals and correlations
        value = model.parameters.get_value(param)
        print(f"  {param}: {value:.2e} [{lower:.2e}, {upper:.2e}]")
 
+Data-Driven Selection Criteria
+-------------------------------
+
+Based on Relaxation Modulus G(t)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Linear in log(G) vs t** (Semi-log plot)
+   → Exponential decay → **Maxwell** or **Zener**
+
+**Linear in log(G) vs log(t)** (Log-log plot)
+   → Power-law decay → **FractionalMaxwellGel** or **FZSS**
+
+**Plateau at long times**
+   → Finite equilibrium modulus → **Zener**, **FZSS**, or **FKV**
+
+**No plateau (G → 0)**
+   → Liquid-like → **Maxwell** or **FractionalMaxwellLiquid**
+
+Based on Complex Modulus G*(ω)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Low-frequency slope in log(G') vs log(ω)**:
+
+- Slope ≈ 2: Liquid → **Maxwell**, **FML**
+- Slope ≈ 0: Solid → **Zener**, **FZSS**, **FKV**
+- Slope ≈ α (0 < α < 1): Gel → **FractionalMaxwellGel**
+
+**G'/G" crossover**:
+
+- Present: Relaxation time identifiable → **Maxwell**, **Zener**
+- Absent (G' > G" always): Strong solid → **FKV**, **FZSS**
+- Absent (G" > G' always): Strong liquid → **Maxwell**, **FML**
+
+Based on Creep Compliance J(t)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Linear in log(J) vs t**
+   → Exponential creep → Classical models
+
+**Linear in log(J) vs log(t)**
+   → Power-law creep → **FractionalKelvinVoigt**, **FKVZ**
+
+**Finite equilibrium compliance**
+   → Solid-like → **FKVZ**, **Zener**
+
+**Unbounded compliance**
+   → Liquid-like → **Maxwell**, **FML**
+
+Automatic Compatibility Checking
+---------------------------------
+
+RheoJAX provides automatic compatibility checking to help identify inappropriate models:
+
+.. code-block:: python
+
+   from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+   from rheojax.utils.compatibility import check_model_compatibility, format_compatibility_message
+
+   # Check before fitting
+   model = FractionalZenerSolidSolid()
+   compat = check_model_compatibility(
+       model,
+       t=time_data,
+       G_t=modulus_data,
+       test_mode='relaxation'
+   )
+
+   # Print compatibility report
+   print(format_compatibility_message(compat))
+
+   # Or enable automatic checking during fit
+   model.fit(time_data, modulus_data, check_compatibility=True)
+
+The system will:
+
+- Detect decay type (exponential, power-law, etc.)
+- Identify material type (solid, liquid, gel)
+- Warn about incompatibilities
+- Suggest alternative models
+
+Parameter Bounds Reference
+---------------------------
+
+All models have physically reasonable default bounds:
+
+- **Moduli (G, E)**: 1 Pa to 1 GPa
+- **Viscosity (η)**: 1 mPa·s to 1 MPa·s
+- **Time constants (τ)**: 1 μs to 1 Ms
+- **Fractional orders (α)**: 0 to 1
+
+Adjust bounds if your material is outside these ranges.
+
 Summary
 -------
 
@@ -696,8 +812,37 @@ Summary
 
 4. **Always validate with residual analysis, cross-validation, and physical parameter checks**
 
-For more examples, see:
+Further Reading
+---------------
+
+**Foundational Texts**:
+
+- **Mainardi (2010)**: Fractional Calculus and Waves in Linear Viscoelasticity
+- **Ferry (1980)**: Viscoelastic Properties of Polymers
+- **Barnes et al. (1989)**: An Introduction to Rheology
+- **Tschoegl (1989)**: The Phenomenological Theory of Linear Viscoelastic Behavior
+
+**RheoJAX Documentation**:
 
 - :doc:`/user_guide/modular_api` - Direct model usage
 - :doc:`/user_guide/pipeline_api` - High-level workflows
-- :doc:`/examples/model_comparison` - Side-by-side model comparison
+- :doc:`/user_guide/bayesian_inference` - Bayesian model comparison
+- ``examples/model_comparison.ipynb`` - Side-by-side model comparison
+
+Getting Help with Model Selection
+----------------------------------
+
+If you're unsure which model to use:
+
+1. **Run compatibility check first** - Use ``check_model_compatibility()``
+2. **Fit 3-4 candidate models** - Start simple, add complexity
+3. **Compare metrics** - R², AIC, BIC
+4. **Check physical reasonableness** - Do parameters make sense?
+5. **Validate on held-out data** - Cross-validation or test sets
+
+For advanced cases, consider:
+
+- **Bayesian model selection** - Use ``fit_bayesian()`` with WAIC/LOO
+- **Cross-validation** - k-fold or time-series splits
+- **Physical constraints** - Material science domain knowledge
+- **Multi-technique fitting** - Combine relaxation, oscillation, and flow data

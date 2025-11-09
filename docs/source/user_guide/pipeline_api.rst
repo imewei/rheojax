@@ -1,5 +1,5 @@
 Pipeline API Tutorial
-====================
+=====================
 
 The Pipeline API provides a fluent, high-level interface for rheological analysis workflows. It enables intuitive method chaining from data loading through model fitting, visualization, and export.
 
@@ -946,4 +946,4 @@ Next Steps
 - :doc:`/user_guide/modular_api` - Direct model and transform usage
 - :doc:`/user_guide/model_selection` - Choose the right model
 - :doc:`/user_guide/transforms` - Understand data transforms
-- :doc:`/examples/basic_model_fitting` - Complete example notebooks
+- ``examples/basic/`` - Complete example notebooks

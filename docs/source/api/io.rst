@@ -1,5 +1,5 @@
 I/O Module (rheojax.io)
-====================
+========================
 
 The I/O module provides readers and writers for various rheometer data formats.
 
@@ -14,7 +14,8 @@ Readers
 Auto-Detection
 ~~~~~~~~~~~~~~
 
-.. autofunction:: rheojax.io.readers.auto_read
+.. autofunction:: rheojax.io.readers.auto_load
+   :noindex:
 
    Automatically detect and read file format based on extension and content.
 
@@ -33,7 +34,8 @@ TRIOS Reader
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheojax.io.readers.trios.read_trios
+.. autofunction:: rheojax.io.readers.trios.load_trios
+   :noindex:
 
 CSV Reader
 ~~~~~~~~~~
@@ -43,7 +45,8 @@ CSV Reader
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheojax.io.readers.csv_reader.read_csv
+.. autofunction:: rheojax.io.readers.csv_reader.load_csv
+   :noindex:
 
 Excel Reader
 ~~~~~~~~~~~~
@@ -53,7 +56,8 @@ Excel Reader
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheojax.io.readers.excel_reader.read_excel
+.. autofunction:: rheojax.io.readers.excel_reader.load_excel
+   :noindex:
 
 Anton Paar Reader
 ~~~~~~~~~~~~~~~~~
@@ -63,7 +67,8 @@ Anton Paar Reader
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheojax.io.readers.anton_paar.read_anton_paar
+.. autofunction:: rheojax.io.readers.anton_paar.load_anton_paar
+   :noindex:
 
 Writers
 -------
@@ -81,7 +86,8 @@ HDF5 Writer
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheojax.io.writers.hdf5_writer.write_hdf5
+.. autofunction:: rheojax.io.writers.hdf5_writer.save_hdf5
+   :noindex:
 
    Write RheoData to HDF5 file with full metadata preservation.
 
@@ -106,7 +112,8 @@ Excel Writer
    :undoc-members:
    :show-inheritance:
 
-.. autofunction:: rheojax.io.writers.excel_writer.write_excel
+.. autofunction:: rheojax.io.writers.excel_writer.save_excel
+   :noindex:
 
    Write RheoData to Excel file.
 
@@ -127,25 +134,25 @@ Auto-Detection
 
 .. code-block:: python
 
-    from rheojax.io.readers import auto_read
+    from rheojax.io.readers import auto_load
 
     # Automatically detect format
-    data = auto_read("experiment.txt")
-    data = auto_read("data.csv")
-    data = auto_read("results.xlsx")
+    data = auto_load("experiment.txt")
+    data = auto_load("data.csv")
+    data = auto_load("results.xlsx")
 
 TRIOS Files
 ^^^^^^^^^^^
 
 .. code-block:: python
 
-    from rheojax.io.readers import read_trios
+    from rheojax.io.readers import load_trios
 
     # Read TRIOS file
-    data = read_trios("stress_relaxation.txt")
+    data = load_trios("stress_relaxation.txt")
 
     # Specify columns
-    data = read_trios(
+    data = load_trios(
         "custom.txt",
         x_column="time",
         y_column="modulus"
@@ -156,20 +163,20 @@ CSV Files
 
 .. code-block:: python
 
-    from rheojax.io.readers import read_csv
+    from rheojax.io.readers import load_csv
 
     # Simple CSV
-    data = read_csv("data.csv")
+    data = load_csv("data.csv")
 
     # Specify columns by name
-    data = read_csv(
+    data = load_csv(
         "experiment.csv",
         x_column="Time (s)",
         y_column="Stress (Pa)"
     )
 
     # Specify columns by index
-    data = read_csv(
+    data = load_csv(
         "results.csv",
         x_column=0,
         y_column=2,
@@ -181,19 +188,19 @@ Excel Files
 
 .. code-block:: python
 
-    from rheojax.io.readers import read_excel
+    from rheojax.io.readers import load_excel
 
     # Read first sheet
-    data = read_excel("results.xlsx")
+    data = load_excel("results.xlsx")
 
     # Specify sheet
-    data = read_excel(
+    data = load_excel(
         "experiment.xlsx",
         sheet_name="Frequency Sweep"
     )
 
     # Specify columns
-    data = read_excel(
+    data = load_excel(
         "results.xlsx",
         sheet_name="Data",
         x_column="Frequency",
@@ -205,10 +212,10 @@ Anton Paar Files
 
 .. code-block:: python
 
-    from rheojax.io.readers import read_anton_paar
+    from rheojax.io.readers import load_anton_paar
 
     # Read Anton Paar file
-    data = read_anton_paar("oscillation.txt")
+    data = load_anton_paar("oscillation.txt")
 
 Writing Data
 ~~~~~~~~~~~~
@@ -218,16 +225,16 @@ HDF5 Format
 
 .. code-block:: python
 
-    from rheojax.io.writers import write_hdf5
+    from rheojax.io.writers import save_hdf5
 
     # Write to HDF5
-    write_hdf5(data, "results.h5")
+    save_hdf5(data, "results.h5")
 
     # With custom dataset name
-    write_hdf5(data, "analysis.h5", dataset_name="relaxation_data")
+    save_hdf5(data, "analysis.h5", dataset_name="relaxation_data")
 
     # Append to existing file
-    write_hdf5(data, "results.h5", mode="a", dataset_name="test_2")
+    save_hdf5(data, "results.h5", mode="a", dataset_name="test_2")
 
 Reading HDF5 Back
 ^^^^^^^^^^^^^^^^^
@@ -251,17 +258,17 @@ Excel Format
 
 .. code-block:: python
 
-    from rheojax.io.writers import write_excel
+    from rheojax.io.writers import save_excel
 
     # Write to Excel
-    write_excel(data, "results.xlsx")
+    save_excel(data, "results.xlsx")
 
     # Specify sheet name
-    write_excel(data, "analysis.xlsx", sheet_name="Stress Relaxation")
+    save_excel(data, "analysis.xlsx", sheet_name="Stress Relaxation")
 
     # Append to existing file
-    write_excel(data1, "results.xlsx", sheet_name="Test 1")
-    write_excel(data2, "results.xlsx", sheet_name="Test 2", mode="a")
+    save_excel(data1, "results.xlsx", sheet_name="Test 1")
+    save_excel(data2, "results.xlsx", sheet_name="Test 2", mode="a")
 
 Batch Processing
 ~~~~~~~~~~~~~~~~
@@ -272,8 +279,8 @@ Convert Multiple Files
 .. code-block:: python
 
     from pathlib import Path
-    from rheojax.io.readers import auto_read
-    from rheojax.io.writers import write_hdf5
+    from rheojax.io.readers import auto_load
+    from rheojax.io.writers import save_hdf5
 
     # Convert all TXT to HDF5
     data_dir = Path("raw_data/")
@@ -281,9 +288,9 @@ Convert Multiple Files
     output_dir.mkdir(exist_ok=True)
 
     for txt_file in data_dir.glob("*.txt"):
-        data = auto_read(txt_file)
+        data = auto_load(txt_file)
         output_file = output_dir / f"{txt_file.stem}.h5"
-        write_hdf5(data, output_file)
+        save_hdf5(data, output_file)
         print(f"Converted: {txt_file.name}")
 
 Merge Multiple Tests
@@ -291,15 +298,15 @@ Merge Multiple Tests
 
 .. code-block:: python
 
-    from rheojax.io.readers import auto_read
-    from rheojax.io.writers import write_hdf5
+    from rheojax.io.readers import auto_load
+    from rheojax.io.writers import save_hdf5
 
     files = ["test1.txt", "test2.txt", "test3.txt"]
 
     for i, file in enumerate(files):
-        data = auto_read(file)
+        data = auto_load(file)
         mode = "w" if i == 0 else "a"
-        write_hdf5(data, "combined.h5", dataset_name=f"test_{i+1}", mode=mode)
+        save_hdf5(data, "combined.h5", dataset_name=f"test_{i+1}", mode=mode)
 
 Common Parameters
 -----------------
@@ -434,10 +441,10 @@ All readers raise appropriate exceptions:
 
 .. code-block:: python
 
-    from rheojax.io.readers import auto_read
+    from rheojax.io.readers import auto_load
 
     try:
-        data = auto_read("experiment.txt")
+        data = auto_load("experiment.txt")
     except FileNotFoundError:
         print("File not found")
     except ValueError as e:

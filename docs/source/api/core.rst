@@ -1,15 +1,10 @@
 Core Module (rheojax.core)
-=======================
+===========================
 
 The core module provides fundamental data structures and abstractions for rheological analysis.
 
 Data Container
 --------------
-
-.. automodule:: rheojax.core.data
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 RheoData
 ~~~~~~~~
@@ -19,36 +14,10 @@ RheoData
    :undoc-members:
    :show-inheritance:
    :special-members: __init__, __getitem__, __add__, __sub__, __mul__
-
-   .. rubric:: Methods
-
-   .. autosummary::
-      :toctree: generated/
-
-      ~RheoData.from_piblin
-      ~RheoData.to_piblin
-      ~RheoData.to_jax
-      ~RheoData.to_numpy
-      ~RheoData.copy
-      ~RheoData.update_metadata
-      ~RheoData.to_dict
-      ~RheoData.from_dict
-      ~RheoData.interpolate
-      ~RheoData.resample
-      ~RheoData.smooth
-      ~RheoData.derivative
-      ~RheoData.integral
-      ~RheoData.to_frequency_domain
-      ~RheoData.to_time_domain
-      ~RheoData.slice
+   :exclude-members: x, y, x_units, y_units, domain, metadata, validate
 
 Base Classes
 ------------
-
-.. automodule:: rheojax.core.base
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 BaseModel
 ~~~~~~~~~
@@ -57,24 +26,11 @@ BaseModel
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
    :special-members: __init__, __repr__
 
    Abstract base class for all rheological models. Provides a consistent interface
    with support for scikit-learn style API and JAX arrays.
-
-   .. rubric:: Methods
-
-   .. autosummary::
-      :toctree: generated/
-
-      ~BaseModel.fit
-      ~BaseModel.predict
-      ~BaseModel.fit_predict
-      ~BaseModel.score
-      ~BaseModel.get_params
-      ~BaseModel.set_params
-      ~BaseModel.to_dict
-      ~BaseModel.from_dict
 
 BaseTransform
 ~~~~~~~~~~~~~
@@ -83,20 +39,11 @@ BaseTransform
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
    :special-members: __init__, __add__, __repr__
 
    Abstract base class for data transforms. Supports fit, transform, and
    inverse_transform operations with pipeline composition.
-
-   .. rubric:: Methods
-
-   .. autosummary::
-      :toctree: generated/
-
-      ~BaseTransform.transform
-      ~BaseTransform.inverse_transform
-      ~BaseTransform.fit
-      ~BaseTransform.fit_transform
 
 TransformPipeline
 ~~~~~~~~~~~~~~~~~
@@ -105,16 +52,12 @@ TransformPipeline
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
    Pipeline for composing multiple transforms that are applied sequentially.
 
 Parameters
 ----------
-
-.. automodule:: rheojax.core.parameters
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 Parameter
 ~~~~~~~~~
@@ -123,6 +66,7 @@ Parameter
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
    :special-members: __init__
 
    Single parameter with value, bounds, units, and constraints.
@@ -136,15 +80,6 @@ Parameter
    - **description** (*str | None*) -- Parameter description
    - **constraints** (*list[ParameterConstraint]*) -- List of constraints
 
-   .. rubric:: Methods
-
-   .. autosummary::
-      :toctree: generated/
-
-      ~Parameter.validate
-      ~Parameter.to_dict
-      ~Parameter.from_dict
-
 ParameterSet
 ~~~~~~~~~~~~
 
@@ -152,24 +87,10 @@ ParameterSet
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
    :special-members: __init__, __len__, __contains__, __iter__
 
    Collection of parameters for a model or transform.
-
-   .. rubric:: Methods
-
-   .. autosummary::
-      :toctree: generated/
-
-      ~ParameterSet.add
-      ~ParameterSet.get
-      ~ParameterSet.set_value
-      ~ParameterSet.get_value
-      ~ParameterSet.get_values
-      ~ParameterSet.set_values
-      ~ParameterSet.get_bounds
-      ~ParameterSet.to_dict
-      ~ParameterSet.from_dict
 
 ParameterConstraint
 ~~~~~~~~~~~~~~~~~~~
@@ -178,6 +99,7 @@ ParameterConstraint
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
    Constraint on a parameter value.
 
@@ -197,6 +119,7 @@ SharedParameterSet
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
    Manages parameters shared across multiple models.
 
@@ -207,6 +130,7 @@ ParameterOptimizer
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
    Optimizer for parameter fitting with JAX gradient support.
 
@@ -225,6 +149,7 @@ TestMode
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
    Enumeration of rheological test modes.
 
@@ -240,24 +165,25 @@ Functions
 ~~~~~~~~~
 
 .. autofunction:: rheojax.core.test_modes.detect_test_mode
+   :noindex:
 
 .. autofunction:: rheojax.core.test_modes.validate_test_mode
+   :noindex:
 
 .. autofunction:: rheojax.core.test_modes.is_monotonic_increasing
+   :noindex:
 
 .. autofunction:: rheojax.core.test_modes.is_monotonic_decreasing
+   :noindex:
 
 .. autofunction:: rheojax.core.test_modes.get_compatible_test_modes
+   :noindex:
 
 .. autofunction:: rheojax.core.test_modes.suggest_models_for_test_mode
+   :noindex:
 
 Bayesian Inference
 ------------------
-
-.. automodule:: rheojax.core.bayesian
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 The Bayesian inference module provides NumPyro NUTS sampling capabilities with NLSQ warm-start
 for all rheological models through the BayesianMixin class.
@@ -269,6 +195,7 @@ BayesianMixin
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
    :special-members: __init__
 
    Mixin class that adds Bayesian inference capabilities to models. Provides:
@@ -278,16 +205,6 @@ BayesianMixin
    - Credible interval calculation
    - Model function for NumPyro NUTS sampling
 
-   **Key Methods:**
-
-   .. autosummary::
-      :toctree: generated/
-
-      ~BayesianMixin.fit_bayesian
-      ~BayesianMixin.sample_prior
-      ~BayesianMixin.get_credible_intervals
-      ~BayesianMixin.model_function
-
 BayesianResult
 ~~~~~~~~~~~~~~
 
@@ -295,6 +212,7 @@ BayesianResult
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
    Dataclass storing complete Bayesian inference results:
 
@@ -306,13 +224,6 @@ BayesianResult
    - ``waic``: WAIC model comparison metric (if computed)
    - ``loo``: LOO cross-validation metric (if computed)
    - ``inference_data``: ArviZ InferenceData object for advanced diagnostics
-
-   **Methods:**
-
-   .. autosummary::
-      :toctree: generated/
-
-      ~BayesianResult.to_inference_data
 
 JAX Configuration
 -----------------
@@ -326,6 +237,7 @@ The JAX configuration module ensures float64 precision throughout the JAX stack 
 proper import order (NLSQ must be imported before JAX).
 
 .. autofunction:: rheojax.core.jax_config.safe_import_jax
+   :noindex:
 
    Safe JAX import that verifies NLSQ was imported first for float64 precision.
 
@@ -341,6 +253,7 @@ proper import order (NLSQ must be imported before JAX).
       import jax  # Will raise ImportError if NLSQ not imported first
 
 .. autofunction:: rheojax.core.jax_config.verify_float64
+   :noindex:
 
    Verify JAX is operating in float64 mode. Raises exception if not.
 

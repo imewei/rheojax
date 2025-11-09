@@ -1011,5 +1011,5 @@ For more information:
 
 - :doc:`/user_guide/pipeline_api` - High-level transform workflows
 - :doc:`/api/transforms` - Complete API reference
-- :doc:`/examples/mastercurve_generation` - Mastercurve example notebook
-- :doc:`/examples/advanced_workflows` - Transform composition examples
+- ``examples/transforms/mastercurve_example.ipynb`` - Mastercurve example notebook
+- ``examples/transforms/`` - Transform composition examples
