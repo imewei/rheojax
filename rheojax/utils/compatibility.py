@@ -100,7 +100,9 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
         G0 = G_t[0]
         G_norm = G_t / G0
         G_norm = np.clip(G_norm, 1e-10, 1.0)  # Avoid log(0)
-        log_log = np.log(-np.log(G_norm))
+        # Suppress expected warnings for invalid log operations (handled by isfinite check)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log_log = np.log(-np.log(G_norm))
         log_t = np.log(t)
         valid_stretch = np.isfinite(log_log)
         if np.sum(valid_stretch) >= 5:

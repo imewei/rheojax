@@ -94,11 +94,14 @@ def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
 
     # Low-frequency plateau: average lowest fraction
     n_low = max(1, int(len(G_mag) * FEATURE_CONFIG.plateau_percentile))
-    low_plateau = np.mean(np.sort(G_mag_smooth)[:n_low])
+    # Suppress warnings for edge cases with small arrays (handled by validation later)
+    with np.errstate(invalid="ignore"):
+        low_plateau = np.mean(np.sort(G_mag_smooth)[:n_low])
 
     # High-frequency plateau: average highest fraction
     n_high = max(1, int(len(G_mag) * FEATURE_CONFIG.plateau_percentile))
-    high_plateau = np.mean(np.sort(G_mag_smooth)[-n_high:])
+    with np.errstate(invalid="ignore"):
+        high_plateau = np.mean(np.sort(G_mag_smooth)[-n_high:])
 
     # Find transition frequency (steepest slope in log-log)
     eps = FEATURE_CONFIG.epsilon
