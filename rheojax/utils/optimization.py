@@ -294,6 +294,153 @@ def nlsq_optimize(
     return result
 
 
+def nlsq_multistart_optimize(
+    objective: Callable[[np.ndarray], float],
+    parameters: ParameterSet,
+    n_starts: int = 5,
+    perturb_factor: float = 0.3,
+    method: str = "auto",
+    use_jax: bool = True,
+    max_iter: int = 1000,
+    ftol: float = 1e-6,
+    xtol: float = 1e-6,
+    gtol: float = 1e-6,
+    verbose: bool = False,
+    **kwargs,
+) -> OptimizationResult:
+    """Multi-start optimization to escape local minima.
+
+    For complex objective functions (e.g., mastercurves with 10+ decades),
+    single optimization runs may converge to poor local minima even from
+    good initial guesses. This function performs multiple optimization runs
+    from different starting points and returns the best result.
+
+    Strategy:
+        1. First attempt: Use current parameter values (from smart initialization)
+        2. Additional attempts: Random perturbations around initial values
+        3. Return result with lowest final cost (best fit)
+
+    Args:
+        objective: Objective function to minimize
+        parameters: ParameterSet with initial values and bounds
+        n_starts: Number of random starts (default: 5)
+        perturb_factor: Perturbation factor for random starts (default: 0.3)
+            Parameters are perturbed by ± perturb_factor * (value or range)
+        method: Optimization method (default: "auto")
+        use_jax: Whether to use JAX (default: True)
+        max_iter: Max iterations per start (default: 1000)
+        ftol: Function tolerance (default: 1e-6)
+        xtol: Parameter tolerance (default: 1e-6)
+        gtol: Gradient tolerance (default: 1e-6)
+        verbose: Print progress messages (default: False)
+        **kwargs: Additional arguments for nlsq_optimize
+
+    Returns:
+        OptimizationResult with best parameters from all starts
+
+    Example:
+        >>> # For mastercurve data (12+ decades)
+        >>> result = nlsq_multistart_optimize(
+        ...     objective, parameters, n_starts=5, verbose=True
+        ... )
+        >>> print(f"Best cost: {result.fun:.3e}")
+    """
+    import logging
+
+    # Store original parameter values
+    original_values = parameters.get_values()
+
+    # First attempt: Use smart initialization values
+    if verbose:
+        logging.info("Multi-start optimization: Attempt 1 (smart initialization)")
+
+    best_result = nlsq_optimize(
+        objective,
+        parameters,
+        method=method,
+        use_jax=use_jax,
+        max_iter=max_iter,
+        ftol=ftol,
+        xtol=xtol,
+        gtol=gtol,
+        **kwargs,
+    )
+    best_cost = best_result.fun
+
+    if verbose:
+        logging.info(f"  Cost: {best_cost:.3e}, Success: {best_result.success}")
+
+    # Additional attempts: Random perturbations
+    bounds_list = parameters.get_bounds()
+
+    for i in range(1, n_starts):
+        if verbose:
+            logging.info(
+                f"Multi-start optimization: Attempt {i+1} (random perturbation)"
+            )
+
+        # Generate perturbed initial values
+        perturbed_values = []
+        for orig_val, bounds in zip(original_values, bounds_list, strict=True):
+            if bounds is None or (bounds[0] is None and bounds[1] is None):
+                # No bounds - perturb by fraction of value
+                perturbation = np.random.uniform(-perturb_factor, perturb_factor)
+                new_val = orig_val * (1.0 + perturbation)
+            else:
+                # With bounds - perturb within range
+                lower = bounds[0] if bounds[0] is not None else orig_val - abs(orig_val)
+                upper = bounds[1] if bounds[1] is not None else orig_val + abs(orig_val)
+                range_size = upper - lower
+                perturbation = np.random.uniform(
+                    -perturb_factor * range_size, perturb_factor * range_size
+                )
+                new_val = np.clip(orig_val + perturbation, lower, upper)
+
+            perturbed_values.append(new_val)
+
+        # Set perturbed values and optimize
+        parameters.set_values(perturbed_values)
+
+        try:
+            result = nlsq_optimize(
+                objective,
+                parameters,
+                method=method,
+                use_jax=use_jax,
+                max_iter=max_iter,
+                ftol=ftol,
+                xtol=xtol,
+                gtol=gtol,
+                **kwargs,
+            )
+
+            if verbose:
+                logging.info(f"  Cost: {result.fun:.3e}, Success: {result.success}")
+
+            # Keep best result
+            if result.success and result.fun < best_cost:
+                best_result = result
+                best_cost = result.fun
+                if verbose:
+                    logging.info(f"  → New best! Cost: {best_cost:.3e}")
+
+        except Exception as e:
+            if verbose:
+                logging.warning(f"  Attempt {i+1} failed: {e}")
+            continue
+
+    # Restore best parameters
+    parameters.set_values(best_result.x)
+
+    if verbose:
+        logging.info(
+            f"\nMulti-start completed: Best cost = {best_cost:.3e} "
+            f"({n_starts} starts)"
+        )
+
+    return best_result
+
+
 def optimize_with_bounds(
     objective: Callable[[np.ndarray], float],
     x0: np.ndarray,
@@ -484,6 +631,7 @@ def create_least_squares_objective(
     x_data: np.ndarray,
     y_data: np.ndarray,
     normalize: bool = True,
+    use_log_residuals: bool = False,
 ) -> Callable[[np.ndarray], np.ndarray]:
     """Create residual function for NLSQ least-squares fitting.
 
@@ -496,11 +644,19 @@ def create_least_squares_objective(
 
     For real data, returns residuals with shape (N,).
 
+    **Log-space residuals (NEW)**: For rheological data spanning many decades (e.g.,
+    mastercurves with 8+ decades), use `use_log_residuals=True` to compute residuals
+    in log10 space. This gives equal weight to all frequency ranges and prevents
+    optimizer bias toward high-modulus regions.
+
     Args:
         model_fn: Model function that takes (x_data, parameters) and returns predictions
         x_data: Independent variable data
         y_data: Dependent variable data (observations, may be complex)
         normalize: Whether to use relative error (default: True)
+        use_log_residuals: Whether to compute residuals in log10 space (default: False).
+            Recommended for data spanning >8 decades. Formula:
+            residual = log10(|y_pred|) - log10(|y_data|)
 
     Returns:
         Residual function that takes parameters and returns residual vector
@@ -513,6 +669,11 @@ def create_least_squares_objective(
         >>> y = np.array([2.1, 4.0, 5.9, 8.1, 10.0])
         >>> residual_fn = create_least_squares_objective(linear_model, x, y)
         >>> # Now use with nlsq_optimize - it receives proper residual vector
+        >>>
+        >>> # For mastercurve data (wide frequency range):
+        >>> residual_fn_log = create_least_squares_objective(
+        ...     model_fn, omega, G_star, use_log_residuals=True
+        ... )
     """
     # Convert to JAX arrays and detect if complex
     x_data_jax = jnp.asarray(x_data, dtype=jnp.float64)
@@ -580,16 +741,28 @@ def create_least_squares_objective(
             # Case 2: Complex predictions (G' + iG")
             if y_data_is_complex:
                 # Both complex: fit real and imaginary parts separately
-                resid_real = jnp.real(y_pred) - jnp.real(y_data_jax)
-                resid_imag = jnp.imag(y_pred) - jnp.imag(y_data_jax)
+                if use_log_residuals:
+                    # Log-space residuals for rheological data (mastercurves)
+                    # Use magnitudes to avoid log of negative numbers
+                    resid_real = jnp.log10(
+                        jnp.maximum(jnp.abs(jnp.real(y_pred)), 1e-20)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), 1e-20))
+                    resid_imag = jnp.log10(
+                        jnp.maximum(jnp.abs(jnp.imag(y_pred)), 1e-20)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), 1e-20))
+                    # Note: normalize has no effect in log space (already relative)
+                else:
+                    # Linear residuals (default)
+                    resid_real = jnp.real(y_pred) - jnp.real(y_data_jax)
+                    resid_imag = jnp.imag(y_pred) - jnp.imag(y_data_jax)
 
-                if normalize:
-                    resid_real = resid_real / jnp.maximum(
-                        jnp.abs(jnp.real(y_data_jax)), 1e-10
-                    )
-                    resid_imag = resid_imag / jnp.maximum(
-                        jnp.abs(jnp.imag(y_data_jax)), 1e-10
-                    )
+                    if normalize:
+                        resid_real = resid_real / jnp.maximum(
+                            jnp.abs(jnp.real(y_data_jax)), 1e-10
+                        )
+                        resid_imag = resid_imag / jnp.maximum(
+                            jnp.abs(jnp.imag(y_data_jax)), 1e-10
+                        )
 
                 return jnp.concatenate([resid_real, resid_imag])
             else:
@@ -608,18 +781,30 @@ def create_least_squares_objective(
                 # Real predictions, complex data: this is unusual but handle it
                 # Fit to magnitude of data
                 y_data_magnitude = jnp.abs(y_data_jax)
-                residuals = y_pred - y_data_magnitude
 
-                if normalize:
-                    residuals = residuals / jnp.maximum(y_data_magnitude, 1e-10)
+                if use_log_residuals:
+                    # Log-space residuals
+                    residuals = jnp.log10(
+                        jnp.maximum(jnp.abs(y_pred), 1e-20)
+                    ) - jnp.log10(jnp.maximum(y_data_magnitude, 1e-20))
+                else:
+                    residuals = y_pred - y_data_magnitude
+                    if normalize:
+                        residuals = residuals / jnp.maximum(y_data_magnitude, 1e-10)
 
                 return residuals
             else:
                 # Both real: standard case
-                residuals = y_pred - y_data_jax
-
-                if normalize:
-                    residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+                if use_log_residuals:
+                    # Log-space residuals for rheological data
+                    # Handle both positive and negative values by using absolute value
+                    residuals = jnp.log10(
+                        jnp.maximum(jnp.abs(y_pred), 1e-20)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax), 1e-20))
+                else:
+                    residuals = y_pred - y_data_jax
+                    if normalize:
+                        residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
 
                 return residuals
 
@@ -634,6 +819,7 @@ fit_parameters = nlsq_optimize  # More descriptive for model fitting
 __all__ = [
     "OptimizationResult",
     "nlsq_optimize",
+    "nlsq_multistart_optimize",
     "optimize_with_bounds",
     "residual_sum_of_squares",
     "create_least_squares_objective",

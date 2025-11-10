@@ -80,6 +80,10 @@ class BaseModel(BayesianMixin, ABC):
         y: ArrayLike,
         method: str = "nlsq",
         check_compatibility: bool = False,
+        use_log_residuals: bool | None = None,
+        use_multi_start: bool | None = None,
+        n_starts: int = 5,
+        perturb_factor: float = 0.3,
         **kwargs,
     ) -> BaseModel:
         """Fit the model to data using NLSQ optimization.
@@ -88,6 +92,9 @@ class BaseModel(BayesianMixin, ABC):
         for fast point estimation. The optimization result is stored for potential
         warm-starting of Bayesian inference.
 
+        For very wide frequency ranges (>10 decades), multi-start optimization is
+        automatically enabled to escape local minima.
+
         Args:
             X: Input features
             y: Target values
@@ -95,6 +102,17 @@ class BaseModel(BayesianMixin, ABC):
             check_compatibility: Whether to check model-data compatibility before
                 fitting. If True, warns when model may not be appropriate for data.
                 Default is False for backward compatibility.
+            use_log_residuals: Whether to use log-space residuals for fitting.
+                Recommended for wide frequency ranges (>8 decades) to prevent
+                optimizer bias. If None (default), automatically detected based
+                on data range. Explicit True/False overrides auto-detection.
+            use_multi_start: Whether to use multi-start optimization to escape
+                local minima. Recommended for very wide ranges (>10 decades).
+                If None (default), automatically enabled for >10 decades.
+            n_starts: Number of random starts for multi-start optimization (default: 5)
+            perturb_factor: Perturbation magnitude for multi-start random starts (default: 0.3).
+                Parameters are perturbed by ± perturb_factor * (value or range).
+                Larger values (0.7-0.9) explore wider parameter space.
             **kwargs: Additional fitting options passed to _fit()
 
         Returns:
@@ -105,12 +123,62 @@ class BaseModel(BayesianMixin, ABC):
             >>> model.fit(t, G_data)  # Uses NLSQ by default
             >>> model.fit(t, G_data, method='nlsq', max_iter=1000)
             >>> model.fit(t, G_data, check_compatibility=True)  # Check compatibility
+            >>> model.fit(omega, G_star, use_log_residuals=True)  # Force log-residuals
+            >>> model.fit(mastercurve, None, use_multi_start=True, n_starts=10)  # Multi-start
         """
         import logging
 
         # Store data for potential Bayesian inference
         self.X_data = X
         self.y_data = y
+
+        # Auto-detect wide frequency ranges and configure optimization strategy
+        if use_log_residuals is None or use_multi_start is None:
+            try:
+                from rheojax.core.data import RheoData
+                from rheojax.utils.data_quality import detect_data_range_decades
+
+                # Extract x array from RheoData if needed
+                if isinstance(X, RheoData):
+                    x_array = X.x
+                else:
+                    x_array = X
+
+                decades = detect_data_range_decades(x_array)
+
+                # Auto-enable log-residuals for wide ranges (>8 decades)
+                if use_log_residuals is None:
+                    if decades > 8.0:
+                        use_log_residuals = True
+                        logging.info(
+                            f"Auto-enabling log-residuals for wide range ({decades:.1f} decades)"
+                        )
+                    else:
+                        use_log_residuals = False
+
+                # Auto-enable multi-start for very wide ranges (>10 decades)
+                if use_multi_start is None:
+                    if decades > 10.0:
+                        use_multi_start = True
+                        logging.info(
+                            f"Auto-enabling multi-start optimization for very wide range "
+                            f"({decades:.1f} decades, {n_starts} starts)"
+                        )
+                    else:
+                        use_multi_start = False
+
+            except Exception as e:
+                logging.debug(f"Range detection failed: {e}")
+                if use_log_residuals is None:
+                    use_log_residuals = False
+                if use_multi_start is None:
+                    use_multi_start = False
+
+        # Pass optimization strategy to _fit via kwargs
+        kwargs["use_log_residuals"] = use_log_residuals
+        kwargs["use_multi_start"] = use_multi_start
+        kwargs["n_starts"] = n_starts
+        kwargs["perturb_factor"] = perturb_factor
 
         # Optional compatibility check
         if check_compatibility:
@@ -366,8 +434,13 @@ class BaseModel(BayesianMixin, ABC):
             y = np.array(y)
 
         # Compute R² score
-        ss_res = np.sum((y - predictions) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        # For complex data (e.g., oscillatory shear), use magnitude of residuals
+        if np.iscomplexobj(y) or np.iscomplexobj(predictions):
+            ss_res = np.sum(np.abs(y - predictions) ** 2)
+            ss_tot = np.sum(np.abs(y - np.mean(y)) ** 2)
+        else:
+            ss_res = np.sum((y - predictions) ** 2)
+            ss_tot = np.sum((y - np.mean(y)) ** 2)
 
         # Handle edge cases
         if ss_tot == 0:
@@ -379,7 +452,7 @@ class BaseModel(BayesianMixin, ABC):
         if np.isnan(r2):
             return 0.0
 
-        return float(r2)
+        return float(np.real(r2))
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize model to dictionary.
