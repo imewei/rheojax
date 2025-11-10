@@ -396,8 +396,8 @@ def _read_segment_chunked(
                 units = units[1:]  # Remove first unit
 
                 # Determine x/y columns
-                x_col, x_units, y_col, y_units = _determine_xy_columns(
-                    columns, units, sample_array
+                x_col, x_units, y_col, y_units, y_col2, y_units2 = (
+                    _determine_xy_columns(columns, units, sample_array)
                 )
 
                 if x_col is None or y_col is None:
@@ -421,12 +421,41 @@ def _read_segment_chunked(
                 if step_temperature is not None:
                     segment_metadata["temperature"] = step_temperature
 
+                # Track whether we're constructing complex modulus
+                is_complex = y_col2 is not None
+
+                # Save original units before conversion (needed for processing remaining rows)
+                y_units_orig = y_units
+                y_units2_orig = y_units2 if y_col2 is not None else None
+
                 # Start accumulating data from sample rows
                 x_chunk = sample_array[:, x_col]
-                y_chunk = sample_array[:, y_col]
 
-                # Remove NaN values
-                valid_mask = ~(np.isnan(x_chunk) | np.isnan(y_chunk))
+                if is_complex:
+                    # Complex modulus: G* = G' + i*G''
+                    y_chunk_real = sample_array[:, y_col]  # Storage modulus
+                    y_chunk_imag = sample_array[:, y_col2]  # Loss modulus
+
+                    # Apply unit conversions
+                    y_chunk_real = convert_units(y_chunk_real, y_units_orig, "Pa")
+                    y_chunk_imag = convert_units(y_chunk_imag, y_units2_orig, "Pa")
+                    y_units = "Pa"  # Standardize for output
+
+                    # Construct complex modulus
+                    y_chunk = y_chunk_real + 1j * y_chunk_imag
+
+                    # Remove NaN values from either component
+                    valid_mask = ~(
+                        np.isnan(x_chunk)
+                        | np.isnan(y_chunk_real)
+                        | np.isnan(y_chunk_imag)
+                    )
+                else:
+                    y_chunk = sample_array[:, y_col]
+
+                    # Remove NaN values
+                    valid_mask = ~(np.isnan(x_chunk) | np.isnan(y_chunk))
+
                 x_chunk = x_chunk[valid_mask]
                 y_chunk = y_chunk[valid_mask]
 
@@ -435,9 +464,13 @@ def _read_segment_chunked(
                 current_y = []
 
                 # Add sample data to buffers
-                for x_val, y_val in zip(x_chunk, y_chunk):
-                    current_x.append(float(x_val))
-                    current_y.append(float(y_val))
+                for x_val, y_val in zip(x_chunk, y_chunk, strict=True):
+                    current_x.append(
+                        float(x_val) if np.isreal(x_val) else complex(x_val)
+                    )
+                    current_y.append(
+                        float(y_val) if np.isreal(y_val) else complex(y_val)
+                    )
 
                 for line in f:
                     line_num += 1
@@ -467,29 +500,56 @@ def _read_segment_chunked(
                                     except ValueError:
                                         row.append(np.nan)
 
-                            if len(row) > max(x_col, y_col):
+                            max_col_needed = max(
+                                x_col, y_col, y_col2 if y_col2 is not None else 0
+                            )
+                            if len(row) > max_col_needed:
                                 x_val = row[x_col]
-                                y_val = row[y_col]
 
-                                # Skip NaN values
-                                if not (np.isnan(x_val) or np.isnan(y_val)):
-                                    current_x.append(x_val)
-                                    current_y.append(y_val)
+                                if is_complex:
+                                    # Complex modulus construction
+                                    y_val_real = row[y_col]  # G'
+                                    y_val_imag = row[y_col2]  # G''
 
-                                    # Yield chunk when size reached
-                                    if len(current_x) >= chunk_size:
-                                        yield RheoData(
-                                            x=np.array(current_x),
-                                            y=np.array(current_y),
-                                            x_units=x_units,
-                                            y_units=y_units,
-                                            domain=domain,
-                                            metadata=segment_metadata.copy(),
-                                            validate=validate_data,
-                                        )
-                                        # Reset for next chunk
-                                        current_x = []
-                                        current_y = []
+                                    # Apply unit conversions using ORIGINAL units
+                                    y_val_real = convert_units(
+                                        y_val_real, y_units_orig, "Pa"
+                                    )
+                                    y_val_imag = convert_units(
+                                        y_val_imag, y_units2_orig, "Pa"
+                                    )
+
+                                    # Skip NaN values
+                                    if not (
+                                        np.isnan(x_val)
+                                        or np.isnan(y_val_real)
+                                        or np.isnan(y_val_imag)
+                                    ):
+                                        y_val = complex(y_val_real, y_val_imag)
+                                        current_x.append(x_val)
+                                        current_y.append(y_val)
+                                else:
+                                    y_val = row[y_col]
+
+                                    # Skip NaN values
+                                    if not (np.isnan(x_val) or np.isnan(y_val)):
+                                        current_x.append(x_val)
+                                        current_y.append(y_val)
+
+                                # Yield chunk when size reached
+                                if len(current_x) >= chunk_size:
+                                    yield RheoData(
+                                        x=np.array(current_x),
+                                        y=np.array(current_y),
+                                        x_units=x_units,
+                                        y_units=y_units,
+                                        domain=domain,
+                                        metadata=segment_metadata.copy(),
+                                        validate=validate_data,
+                                    )
+                                    # Reset for next chunk
+                                    current_x = []
+                                    current_y = []
 
                         except (ValueError, IndexError):
                             continue
@@ -586,7 +646,7 @@ def _parse_segment(
 
     # Extract temperature from step name (e.g., "Frequency sweep (150.0 °C)")
     step_temperature = None
-    for i, line in enumerate(segment_lines[:5]):  # Check first few lines
+    for line in segment_lines[:5]:  # Check first few lines
         if "Step name" in line or line.startswith("Step name"):
             # Extract temperature from format: "Step name\tFrequency sweep (150.0 °C)"
             # Support negative temperatures with optional minus sign
@@ -673,18 +733,40 @@ def _parse_segment(
     units = units[1:]  # Remove first unit
 
     # Determine x and y columns based on common column names
-    x_col, x_units, y_col, y_units = _determine_xy_columns(columns, units, data_array)
+    x_col, x_units, y_col, y_units, y_col2, y_units2 = _determine_xy_columns(
+        columns, units, data_array
+    )
 
     if x_col is None or y_col is None:
         warnings.warn(f"Could not determine x/y columns from: {columns}", stacklevel=2)
         return None
 
-    # Extract x and y data
+    # Extract x data
     x_data = data_array[:, x_col]
-    y_data = data_array[:, y_col]
 
-    # Remove NaN values
-    valid_mask = ~(np.isnan(x_data) | np.isnan(y_data))
+    # Extract y data (construct complex modulus if both G' and G'' are available)
+    if y_col2 is not None:
+        # Complex modulus: G* = G' + i*G''
+        y_data_real = data_array[:, y_col]  # Storage modulus (G')
+        y_data_imag = data_array[:, y_col2]  # Loss modulus (G'')
+
+        # Apply unit conversions to both components
+        y_data_real = convert_units(y_data_real, y_units, "Pa")
+        y_data_imag = convert_units(y_data_imag, y_units2, "Pa")
+
+        # Construct complex modulus
+        y_data = y_data_real + 1j * y_data_imag
+        y_units = "Pa"  # Standardize to Pa for complex modulus
+
+        # Remove NaN values from either component
+        valid_mask = ~(np.isnan(x_data) | np.isnan(y_data_real) | np.isnan(y_data_imag))
+    else:
+        # Real-valued data
+        y_data = data_array[:, y_col]
+
+        # Remove NaN values
+        valid_mask = ~(np.isnan(x_data) | np.isnan(y_data))
+
     x_data = x_data[valid_mask]
     y_data = y_data[valid_mask]
 
@@ -722,13 +804,18 @@ def _determine_xy_columns(
 ) -> tuple:
     """Determine which columns to use for x and y.
 
+    For oscillatory (SAOS) data with both Storage and Loss modulus columns,
+    this will return both column indices to construct complex modulus G* = G' + i·G''.
+
     Args:
         columns: Column names
         units: Column units
         data: Data array
 
     Returns:
-        Tuple of (x_col_index, x_units, y_col_index, y_units)
+        Tuple of (x_col_index, x_units, y_col_index, y_units, y_col2_index, y_units2)
+        where y_col2_index is None for non-complex data, or the Loss modulus column
+        index for complex modulus construction.
     """
     columns_lower = [c.lower() for c in columns]
 
@@ -766,7 +853,23 @@ def _determine_xy_columns(
         if x_col is not None:
             break
 
-    # Find y column (prefer storage/loss modulus for SAOS)
+    # Check for BOTH storage and loss modulus (for complex modulus construction)
+    storage_col = None
+    loss_col = None
+    for i, col in enumerate(columns_lower):
+        if "storage modulus" in col and i != x_col:
+            storage_col = i
+        elif "loss modulus" in col and i != x_col:
+            loss_col = i
+
+    # If we have both G' and G'', use them to construct complex modulus
+    if storage_col is not None and loss_col is not None:
+        x_units = units[x_col] if x_col < len(units) else ""
+        y_units = units[storage_col] if storage_col < len(units) else ""
+        y_units2 = units[loss_col] if loss_col < len(units) else ""
+        return x_col, x_units, storage_col, y_units, loss_col, y_units2
+
+    # Otherwise, find single y column (prefer storage/loss modulus for SAOS)
     y_col = None
     for priority in y_priorities:
         for i, col in enumerate(columns_lower):
@@ -788,12 +891,12 @@ def _determine_xy_columns(
             y_col = numeric_cols[1] if y_col is None else y_col
 
     if x_col is None or y_col is None:
-        return None, None, None, None
+        return None, None, None, None, None, None
 
     x_units = units[x_col] if x_col < len(units) else ""
     y_units = units[y_col] if y_col < len(units) else ""
 
-    return x_col, x_units, y_col, y_units
+    return x_col, x_units, y_col, y_units, None, None
 
 
 def _infer_domain_and_mode(

@@ -54,7 +54,15 @@ data point 5	0.5	1800	900
         assert len(chunk.x) == 5
         assert len(chunk.y) == 5
         np.testing.assert_array_almost_equal(chunk.x, [0.1, 0.2, 0.3, 0.4, 0.5])
-        np.testing.assert_array_almost_equal(chunk.y, [1000, 1200, 1400, 1600, 1800])
+
+        # With both Storage and Loss modulus columns, should return complex modulus
+        assert np.iscomplexobj(
+            chunk.y
+        ), "Should return complex modulus when both G' and G'' are available"
+        expected_complex = np.array(
+            [1000 + 500j, 1200 + 600j, 1400 + 700j, 1600 + 800j, 1800 + 900j]
+        )
+        np.testing.assert_array_almost_equal(chunk.y, expected_complex)
 
     def test_chunked_multiple_chunks(self, tmp_path):
         """Test chunked reading with data split across chunks."""
