@@ -19,6 +19,7 @@ Example:
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -470,12 +471,23 @@ class BayesianMixin:
         nuts_kernel = NUTS(numpyro_model, init_strategy=init_strategy, **nuts_kwargs)
 
         # Initialize MCMC
-        mcmc = MCMC(
-            nuts_kernel,
-            num_warmup=num_warmup,
-            num_samples=num_samples,
-            num_chains=num_chains,
-        )
+        # Note: On CPU with multiple chains, NumPyro may warn about sequential execution.
+        # This is expected and does not affect correctness. To enable parallel CPU chains,
+        # call numpyro.set_host_device_count(N) at the start of your script before any JAX operations.
+        with warnings.catch_warnings():
+            # Suppress the "not enough devices" warning - it's informational only
+            # Chains still run correctly, just sequentially on single-device systems
+            warnings.filterwarnings(
+                "ignore",
+                message="There are not enough devices to run parallel chains",
+                category=UserWarning,
+            )
+            mcmc = MCMC(
+                nuts_kernel,
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                num_chains=num_chains,
+            )
 
         # Run MCMC sampling
         rng_key = jax.random.PRNGKey(0)

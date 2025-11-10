@@ -289,18 +289,42 @@ class FractionalMaxwellLiquid(BaseModel):
             else:
                 raise ValueError(f"Unsupported test mode: {test_mode}")
 
+        # Extract optimization strategy from kwargs (set by BaseModel.fit)
+        use_log_residuals = kwargs.get("use_log_residuals", False)
+        use_multi_start = kwargs.get("use_multi_start", False)
+        n_starts = kwargs.get("n_starts", 5)
+        perturb_factor = kwargs.get("perturb_factor", 0.3)
+
         objective = create_least_squares_objective(
-            model_fn, x_data, y_data, normalize=True
+            model_fn,
+            x_data,
+            y_data,
+            normalize=True,
+            use_log_residuals=use_log_residuals,
         )
 
-        # Optimize using NLSQ
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
+        # Choose optimization strategy
+        if use_multi_start:
+            from rheojax.utils.optimization import nlsq_multistart_optimize
+
+            result = nlsq_multistart_optimize(
+                objective,
+                self.parameters,
+                n_starts=n_starts,
+                perturb_factor=perturb_factor,
+                use_jax=kwargs.get("use_jax", True),
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+                verbose=kwargs.get("verbose", False),
+            )
+        else:
+            result = nlsq_optimize(
+                objective,
+                self.parameters,
+                use_jax=kwargs.get("use_jax", True),
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
 
         # Validate optimization succeeded
         if not result.success:

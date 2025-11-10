@@ -20,6 +20,7 @@ from rheojax.core.data import RheoData
 from rheojax.visualization.plotter import (
     _apply_style,
     _ensure_numpy,
+    _filter_positive,
     plot_frequency_domain,
     plot_residuals,
     plot_time_domain,
@@ -152,11 +153,14 @@ def plot_modulus_frequency(
 
         if np.iscomplexobj(y_data):
             # Plot both on same axes
-            ax.loglog(x_data, np.real(y_data), **plot_kwargs, label="G'")
-            ax.loglog(x_data, np.imag(y_data), **plot_kwargs, label='G"', color="C1")
+            x_gp, gp = _filter_positive(x_data, np.real(y_data), warn=True)
+            x_gpp, gpp = _filter_positive(x_data, np.imag(y_data), warn=True)
+            ax.loglog(x_gp, gp, **plot_kwargs, label="G'")
+            ax.loglog(x_gpp, gpp, **plot_kwargs, label='G"', color="C1")
             ax.legend()
         else:
-            ax.loglog(x_data, y_data, **plot_kwargs)
+            x_filtered, y_filtered = _filter_positive(x_data, y_data, warn=True)
+            ax.loglog(x_filtered, y_filtered, **plot_kwargs)
 
         ax.set_xlabel(
             f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
@@ -246,9 +250,10 @@ def plot_mastercurve(
 
         # Plot (handle complex data)
         if np.iscomplexobj(y_data):
+            x_filt, y_filt = _filter_positive(x_shifted, np.real(y_data), warn=False)
             ax.loglog(
-                x_shifted,
-                np.real(y_data),
+                x_filt,
+                y_filt,
                 "o",
                 color=colors[i],
                 markersize=style_params["lines.markersize"],
@@ -258,9 +263,10 @@ def plot_mastercurve(
                 **kwargs,
             )
         else:
+            x_filt, y_filt = _filter_positive(x_shifted, y_data, warn=False)
             ax.loglog(
-                x_shifted,
-                y_data,
+                x_filt,
+                y_filt,
                 "o",
                 color=colors[i],
                 markersize=style_params["lines.markersize"],
@@ -350,9 +356,11 @@ def plot_model_fit(
             )
 
             # G' fit
+            x_gp_data, gp_data = _filter_positive(x_data, np.real(y_data), warn=True)
+            x_gp_pred, gp_pred = _filter_positive(x_data, np.real(y_pred), warn=False)
             axes[0, 0].loglog(
-                x_data,
-                np.real(y_data),
+                x_gp_data,
+                gp_data,
                 "o",
                 label="Data",
                 markersize=style_params["lines.markersize"],
@@ -360,8 +368,8 @@ def plot_model_fit(
                 markeredgewidth=1.0,
             )
             axes[0, 0].loglog(
-                x_data,
-                np.real(y_pred),
+                x_gp_pred,
+                gp_pred,
                 "-",
                 label="Model",
                 linewidth=style_params["lines.linewidth"],
@@ -371,9 +379,11 @@ def plot_model_fit(
             axes[0, 0].grid(True, which="both", alpha=0.3, linestyle="--")
 
             # G'' fit
+            x_gpp_data, gpp_data = _filter_positive(x_data, np.imag(y_data), warn=True)
+            x_gpp_pred, gpp_pred = _filter_positive(x_data, np.imag(y_pred), warn=False)
             axes[0, 1].loglog(
-                x_data,
-                np.imag(y_data),
+                x_gpp_data,
+                gpp_data,
                 "o",
                 label="Data",
                 markersize=style_params["lines.markersize"],
@@ -382,8 +392,8 @@ def plot_model_fit(
                 color="C1",
             )
             axes[0, 1].loglog(
-                x_data,
-                np.imag(y_pred),
+                x_gpp_pred,
+                gpp_pred,
                 "-",
                 label="Model",
                 linewidth=style_params["lines.linewidth"],
@@ -465,9 +475,11 @@ def plot_model_fit(
             )
 
             # G' fit
+            x_gp_data, gp_data = _filter_positive(x_data, np.real(y_data), warn=True)
+            x_gp_pred, gp_pred = _filter_positive(x_data, np.real(y_pred), warn=False)
             axes[0].loglog(
-                x_data,
-                np.real(y_data),
+                x_gp_data,
+                gp_data,
                 "o",
                 label="Data",
                 markersize=style_params["lines.markersize"],
@@ -475,8 +487,8 @@ def plot_model_fit(
                 markeredgewidth=1.0,
             )
             axes[0].loglog(
-                x_data,
-                np.real(y_pred),
+                x_gp_pred,
+                gp_pred,
                 "-",
                 label="Model",
                 linewidth=style_params["lines.linewidth"],
@@ -489,9 +501,11 @@ def plot_model_fit(
             axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
 
             # G'' fit
+            x_gpp_data, gpp_data = _filter_positive(x_data, np.imag(y_data), warn=True)
+            x_gpp_pred, gpp_pred = _filter_positive(x_data, np.imag(y_pred), warn=False)
             axes[1].loglog(
-                x_data,
-                np.imag(y_data),
+                x_gpp_data,
+                gpp_data,
                 "o",
                 label="Data",
                 markersize=style_params["lines.markersize"],
@@ -500,8 +514,8 @@ def plot_model_fit(
                 color="C1",
             )
             axes[1].loglog(
-                x_data,
-                np.imag(y_pred),
+                x_gpp_pred,
+                gpp_pred,
                 "-",
                 label="Model",
                 linewidth=style_params["lines.linewidth"],

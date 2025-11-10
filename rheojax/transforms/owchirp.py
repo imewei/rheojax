@@ -18,9 +18,10 @@ from rheojax.core.registry import TransformRegistry
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
-if TYPE_CHECKING:
-    from jax import Array
+# Import Array for runtime isinstance checks
+from jax import Array
 
+if TYPE_CHECKING:
     from rheojax.core.data import RheoData
 
 

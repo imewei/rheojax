@@ -267,8 +267,9 @@ class MutationNumber(BaseTransform):
                 # For large t, G(t) → G_eq_extrap
                 # ln(G - G_eq_guess) = ln(A) - t/tau
 
-                # First guess: use current G_eq estimate
-                G_eq_guess = G_eq
+                # First guess: start with 0 (assume pure decay)
+                # This avoids negative G_shifted values that break the fit
+                G_eq_guess = 0.0
 
                 # Iteratively refine G_eq estimate
                 for _ in range(3):  # A few iterations usually suffice

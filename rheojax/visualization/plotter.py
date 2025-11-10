@@ -75,7 +75,7 @@ def _apply_style(style: str = "default") -> dict[str, Any]:
         return DEFAULT_STYLE.copy()
 
 
-def _ensure_numpy(data: np.ndarray | jnp.ndarray) -> np.ndarray:
+def _ensure_numpy(data: np.ndarray) -> np.ndarray:
     """Ensure data is a NumPy array for plotting.
 
     Args:
@@ -87,6 +87,35 @@ def _ensure_numpy(data: np.ndarray | jnp.ndarray) -> np.ndarray:
     if isinstance(data, jnp.ndarray):
         return np.array(data)
     return np.asarray(data)
+
+
+def _filter_positive(
+    x: np.ndarray, y: np.ndarray, warn: bool = True
+) -> tuple[np.ndarray, np.ndarray]:
+    """Filter out non-positive y values for log-scale plotting.
+
+    Args:
+        x: X-axis data
+        y: Y-axis data
+        warn: If True, warn when filtering occurs
+
+    Returns:
+        Tuple of (filtered_x, filtered_y) with only positive y values
+    """
+    positive_mask = y > 0
+    n_removed = len(y) - np.sum(positive_mask)
+
+    if n_removed > 0 and warn:
+        import warnings
+
+        warnings.warn(
+            f"Removed {n_removed} non-positive values from log-scale plot. "
+            f"This is common for very small G'' values or measurement noise.",
+            UserWarning,
+            stacklevel=3,
+        )
+
+    return x[positive_mask], y[positive_mask]
 
 
 def plot_rheo_data(
@@ -289,13 +318,15 @@ def plot_frequency_domain(
         plot_kwargs.update(kwargs)
 
         # G' (storage modulus)
-        axes[0].loglog(x, np.real(y), **plot_kwargs, label="G'")
+        x_gp, gp = _filter_positive(x, np.real(y), warn=True)
+        axes[0].loglog(x_gp, gp, **plot_kwargs, label="G'")
         axes[0].set_ylabel(f"G' ({y_units})" if y_units else "G' (Pa)")
         axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
         axes[0].legend()
 
         # G'' (loss modulus)
-        axes[1].loglog(x, np.imag(y), **plot_kwargs, label='G"', color="C1")
+        x_gpp, gpp = _filter_positive(x, np.imag(y), warn=True)
+        axes[1].loglog(x_gpp, gpp, **plot_kwargs, label='G"', color="C1")
         axes[1].set_xlabel(f"Frequency ({x_units})" if x_units else "Frequency (rad/s)")
         axes[1].set_ylabel(f'G" ({y_units})' if y_units else 'G" (Pa)')
         axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
@@ -316,7 +347,8 @@ def plot_frequency_domain(
         }
         plot_kwargs.update(kwargs)
 
-        ax.loglog(x, y, **plot_kwargs)
+        x_filtered, y_filtered = _filter_positive(x, y, warn=True)
+        ax.loglog(x_filtered, y_filtered, **plot_kwargs)
         ax.set_xlabel(f"Frequency ({x_units})" if x_units else "Frequency (rad/s)")
         ax.set_ylabel(f"Modulus ({y_units})" if y_units else "Modulus (Pa)")
         ax.grid(True, which="both", alpha=0.3, linestyle="--")
@@ -374,7 +406,9 @@ def plot_flow_curve(
     }
     plot_kwargs.update(kwargs)
 
-    ax.loglog(x, y, **plot_kwargs)
+    # Filter positive values for log-log plot
+    x_filtered, y_filtered = _filter_positive(x, y, warn=True)
+    ax.loglog(x_filtered, y_filtered, **plot_kwargs)
 
     # Set labels
     if x_label is None:

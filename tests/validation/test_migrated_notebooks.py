@@ -745,9 +745,9 @@ class TestTransformNotebooks:
         # Extract detected characteristic time from notebook
         # Look for cell with tau_fft calculation
         tau_fft = None
-        for cell in nb.cells:
+        for cell_index, cell in enumerate(nb.cells):
             if cell.cell_type == "code":
-                outputs = _extract_cell_output(cell)
+                outputs = _extract_cell_output(nb, cell_index)
                 if "tau_fft" in str(outputs):
                     # Extract from namespace (if available)
                     tau_fft = _extract_variable_from_output(outputs, "tau_fft")
