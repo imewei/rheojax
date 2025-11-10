@@ -20,7 +20,7 @@ Basic Installation
 
 Install from PyPI::
 
-    pip install rheo
+    pip install rheojax
 
 For Development
 ~~~~~~~~~~~~~~~

@@ -592,14 +592,14 @@ Install Rheo with all dependencies:
 
 .. code-block:: bash
 
-   pip install rheo[all]
+   pip install rheojax[all]
 
 Or install with specific extras:
 
 .. code-block:: bash
 
-   pip install rheo[bayesian]  # NumPyro + ArviZ
-   pip install rheo[gpu]       # JAX with CUDA (Linux only)
+   pip install rheojax[bayesian]  # NumPyro + ArviZ
+   pip install rheojax[gpu]       # JAX with CUDA (Linux only)
 
 Jupyter Setup
 -------------

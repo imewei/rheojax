@@ -16,7 +16,7 @@ Install from PyPI:
 
 .. code-block:: bash
 
-   pip install rheo
+   pip install rheojax
 
 Development Installation
 ------------------------
@@ -39,7 +39,7 @@ For GPU acceleration:
 
 .. code-block:: bash
 
-   pip install "rheo[gpu]"
+   pip install "rheojax[gpu]"
 
 I/O Support
 ~~~~~~~~~~~
@@ -48,7 +48,7 @@ For additional file format support (HDF5, Excel):
 
 .. code-block:: bash
 
-   pip install "rheo[io]"
+   pip install "rheojax[io]"
 
 Machine Learning
 ~~~~~~~~~~~~~~~~
@@ -57,7 +57,7 @@ For ML-based transforms:
 
 .. code-block:: bash
 
-   pip install "rheo[ml]"
+   pip install "rheojax[ml]"
 
 All Dependencies
 ~~~~~~~~~~~~~~~~
@@ -66,7 +66,7 @@ To install all optional dependencies:
 
 .. code-block:: bash
 
-   pip install "rheo[all]"
+   pip install "rheojax[all]"
 
 Verifying Installation
 ----------------------

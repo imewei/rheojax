@@ -183,7 +183,7 @@ cd rheojax
 make install-jax-gpu
 ```
 
-**Note:** Conda extras syntax (`conda install rheo[gpu]`) is not supported. Use the Makefile or manual pip installation method above.
+**Note:** Conda extras syntax (`conda install rheojax[gpu]`) is not supported. Use the Makefile or manual pip installation method above.
 
 ## Quick Start
 
