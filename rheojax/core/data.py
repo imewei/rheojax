@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Union
+from typing import Any
 
 import numpy as np
 
@@ -30,7 +30,7 @@ except ImportError:
     )
 
 
-ArrayLike = Union[np.ndarray, jnp.ndarray, list, tuple]
+ArrayLike = np.ndarray | list | tuple
 
 
 @dataclass
@@ -84,7 +84,10 @@ class RheoData:
                 # Extract metadata from both dataset and measurement
                 if hasattr(dataset, "conditions") and dataset.conditions:
                     self.metadata.update(dataset.conditions)
-                if hasattr(self._measurement, "conditions") and self._measurement.conditions:
+                if (
+                    hasattr(self._measurement, "conditions")
+                    and self._measurement.conditions
+                ):
                     self.metadata.update(self._measurement.conditions)
 
         # Convert to arrays
@@ -105,7 +108,7 @@ class RheoData:
         if self._measurement is None and HAS_PIBLIN:
             self._create_piblin_measurement()
 
-    def _ensure_array(self, data: ArrayLike) -> np.ndarray | jnp.ndarray:
+    def _ensure_array(self, data: ArrayLike) -> np.ndarray:
         """Ensure data is a proper array."""
         if isinstance(data, (np.ndarray, jnp.ndarray)):
             return data
@@ -379,6 +382,110 @@ class RheoData:
         """Get phase of complex data."""
         if self.is_complex:
             return np.angle(self.y)
+        return None
+
+    @property
+    def y_real(self) -> np.ndarray:
+        """Get real component of y data.
+
+        For complex modulus data (G* = G' + i·G''), this returns the storage
+        modulus (G'). For real data, returns y unchanged.
+
+        Returns:
+            Real component of y data (G' for complex modulus)
+
+        Example:
+            >>> data = read_trios('frequency_sweep.txt')  # Returns complex G*
+            >>> G_prime = data[0].y_real  # Storage modulus (G')
+            >>> plt.loglog(data[0].x, G_prime, label="G'")
+        """
+        if self.is_complex:
+            if isinstance(self.y, jnp.ndarray):
+                return jnp.real(self.y)
+            return np.real(self.y)
+        return self.y
+
+    @property
+    def y_imag(self) -> np.ndarray:
+        """Get imaginary component of y data.
+
+        For complex modulus data (G* = G' + i·G''), this returns the loss
+        modulus (G''). For real data, returns zeros.
+
+        Returns:
+            Imaginary component of y data (G'' for complex modulus)
+
+        Example:
+            >>> data = read_trios('frequency_sweep.txt')  # Returns complex G*
+            >>> G_double_prime = data[0].y_imag  # Loss modulus (G'')
+            >>> plt.loglog(data[0].x, G_double_prime, label='G"')
+        """
+        if self.is_complex:
+            if isinstance(self.y, jnp.ndarray):
+                return jnp.imag(self.y)
+            return np.imag(self.y)
+        if isinstance(self.y, jnp.ndarray):
+            return jnp.zeros_like(self.y)
+        return np.zeros_like(self.y)
+
+    @property
+    def storage_modulus(self) -> np.ndarray | None:
+        """Get storage modulus (G') from complex modulus data.
+
+        Alias for y_real that makes rheological intent explicit.
+
+        Returns:
+            Storage modulus (G') if data is complex, None otherwise
+
+        Example:
+            >>> data = read_trios('frequency_sweep.txt')
+            >>> G_prime = data[0].storage_modulus
+        """
+        if self.is_complex:
+            return self.y_real
+        return None
+
+    @property
+    def loss_modulus(self) -> np.ndarray | None:
+        """Get loss modulus (G'') from complex modulus data.
+
+        Alias for y_imag that makes rheological intent explicit.
+
+        Returns:
+            Loss modulus (G'') if data is complex, None otherwise
+
+        Example:
+            >>> data = read_trios('frequency_sweep.txt')
+            >>> G_double_prime = data[0].loss_modulus
+        """
+        if self.is_complex:
+            return self.y_imag
+        return None
+
+    @property
+    def tan_delta(self) -> np.ndarray | None:
+        """Get loss tangent (tan δ = G''/G') from complex modulus data.
+
+        The loss tangent quantifies the ratio of viscous to elastic response:
+        - tan δ < 1: Elastic-dominant (solid-like)
+        - tan δ > 1: Viscous-dominant (liquid-like)
+        - tan δ = 1: Equal elastic and viscous contributions
+
+        Returns:
+            Loss tangent (dimensionless) if data is complex, None otherwise
+
+        Example:
+            >>> data = read_trios('frequency_sweep.txt')
+            >>> tan_d = data[0].tan_delta
+            >>> print(f"Material type: {'solid-like' if tan_d.mean() < 1 else 'liquid-like'}")
+        """
+        if self.is_complex:
+            G_prime = self.y_real
+            G_double_prime = self.y_imag
+            # Avoid division by zero
+            if isinstance(G_prime, jnp.ndarray):
+                return jnp.where(G_prime > 0, G_double_prime / G_prime, jnp.nan)
+            return np.where(G_prime > 0, G_double_prime / G_prime, np.nan)
         return None
 
     @property
