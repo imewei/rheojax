@@ -197,6 +197,8 @@ agent-os
 .cursor/
 .cursorignore
 .cursorindexingignore
+AGENTS.md
+CLAUDE.md
 
 # ----------------------------------------------------------------------------
 # Operating System
