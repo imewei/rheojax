@@ -755,3 +755,209 @@ See Also
 - :doc:`core` - BaseModel integration with check_compatibility parameter
 - :doc:`../user_guide/model_selection` - Comprehensive model selection guide
 - :doc:`../user_guide/getting_started` - Basic usage examples
+
+Data Quality Analysis
+---------------------
+
+.. automodule:: rheojax.utils.data_quality
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The data quality module provides intelligent analysis of experimental data characteristics
+to optimize fitting strategies, especially for wide-range frequency or time-domain data
+spanning multiple decades.
+
+Functions
+~~~~~~~~~
+
+.. autofunction:: rheojax.utils.data_quality.detect_data_range_decades
+   :noindex:
+
+   Detects the number of decades spanned by the independent variable (frequency, time,
+   or shear rate). This helps identify when multi-start or log-residuals optimization
+   may be beneficial.
+
+.. autofunction:: rheojax.utils.data_quality.check_wide_frequency_range
+   :noindex:
+
+   Comprehensive analysis of frequency-domain data to determine if it spans a wide range
+   (> 4 decades) and whether special optimization techniques are needed.
+
+.. autofunction:: rheojax.utils.data_quality.suggest_optimization_strategy
+   :noindex:
+
+   Provides intelligent recommendations for optimization strategy based on data
+   characteristics (range, domain, test mode). Returns configuration for:
+
+   - Use of log-residuals (for wide-range data)
+   - Multi-start optimization (for complex landscapes)
+   - Recommended number of random starts
+
+Wide-Range Data Challenges
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When experimental data spans many decades (e.g., frequency from 0.01 to 1000 Hz), standard
+least-squares fitting can encounter problems:
+
+**Problem**: Linear residuals :math:`\sum (y_{\text{pred}} - y_{\text{exp}})^2` are dominated
+by high-magnitude points, causing poor fits at low values.
+
+**Example**: For G' spanning 100 Pa to 1e6 Pa:
+
+- High-frequency error (1e6 Pa): residual ~ 1e12
+- Low-frequency error (100 Pa): residual ~ 1e4
+- Optimizer focuses on high-frequency region, ignores low-frequency
+
+**Solutions**:
+
+1. **Log-Residuals**: Minimize :math:`\sum (\log y_{\text{pred}} - \log y_{\text{exp}})^2`
+
+   - Balances contributions across decades
+   - Equivalent to minimizing relative error
+   - Automatically enabled for data > 4 decades
+
+2. **Multi-Start Optimization**: Run multiple optimizations from random initial points
+
+   - Escapes local minima
+   - Finds global optimum more reliably
+   - Recommended for complex model landscapes
+
+Detection and Recommendations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The module automatically detects when to use these strategies:
+
+.. code-block:: python
+
+    from rheojax.utils.data_quality import suggest_optimization_strategy
+    import numpy as np
+
+    # Wide-range oscillation data
+    omega = np.logspace(-2, 3, 100)  # 5 decades
+    G_star = ...  # Complex modulus data
+
+    strategy = suggest_optimization_strategy(
+        x=omega,
+        test_mode='oscillation'
+    )
+
+    print(f"Use log-residuals: {strategy['use_log_residuals']}")  # True
+    print(f"Use multi-start: {strategy['use_multi_start']}")      # True
+    print(f"Number of starts: {strategy['n_starts']}")            # 10
+
+    # Apply recommendations to model fitting
+    model.fit(
+        omega, G_star,
+        test_mode='oscillation',
+        use_log_residuals=strategy['use_log_residuals'],
+        multi_start=strategy['use_multi_start'],
+        n_starts=strategy['n_starts']
+    )
+
+Examples
+~~~~~~~~
+
+Detect Data Range
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils.data_quality import detect_data_range_decades
+    import numpy as np
+
+    # Narrow range (2 decades)
+    freq_narrow = np.logspace(0, 2, 50)
+    decades = detect_data_range_decades(freq_narrow)
+    print(f"Range: {decades:.1f} decades")  # 2.0 decades
+
+    # Wide range (5 decades)
+    freq_wide = np.logspace(-2, 3, 100)
+    decades = detect_data_range_decades(freq_wide)
+    print(f"Range: {decades:.1f} decades")  # 5.0 decades
+
+Check Frequency Range
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils.data_quality import check_wide_frequency_range
+    import numpy as np
+
+    omega = np.logspace(-1, 3, 80)  # 4 decades
+    result = check_wide_frequency_range(omega)
+
+    print(f"Is wide range: {result['is_wide_range']}")      # True
+    print(f"Decades: {result['decades']:.2f}")              # 4.0
+    print(f"Recommend log: {result['use_log_residuals']}")  # True
+    print(f"Recommend multi-start: {result['use_multi_start']}")  # False
+
+    # Very wide range triggers multi-start
+    omega_very_wide = np.logspace(-2, 4, 100)  # 6 decades
+    result = check_wide_frequency_range(omega_very_wide)
+    print(f"Multi-start: {result['use_multi_start']}")  # True
+    print(f"Starts: {result['n_starts']}")              # 15
+
+Get Complete Strategy
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils.data_quality import suggest_optimization_strategy
+    import numpy as np
+
+    # Time-domain relaxation data
+    time = np.logspace(-3, 2, 100)  # 5 decades
+    G_t = ...  # Relaxation modulus
+
+    strategy = suggest_optimization_strategy(
+        x=time,
+        test_mode='relaxation'
+    )
+
+    # Use strategy with BaseModel
+    from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
+
+    model = FractionalMaxwellLiquid()
+    model.fit(
+        time, G_t,
+        test_mode='relaxation',
+        **strategy  # Unpack all recommended settings
+    )
+
+Integration with BaseModel
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `BaseModel._fit()` method automatically uses `suggest_optimization_strategy()` when
+no explicit optimization configuration is provided. This ensures optimal fitting for all
+data ranges without user intervention.
+
+**Automatic behavior**:
+
+- Data < 3 decades: Standard least-squares
+- Data 3-5 decades: Log-residuals enabled
+- Data > 5 decades: Log-residuals + multi-start (10-20 starts)
+
+Performance Considerations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Detection overhead**: < 0.1 ms (negligible)
+- **Log-residuals**: Same computational cost as linear
+- **Multi-start**: N times slower (N = number of starts), but more robust
+- **Memory**: Minimal additional memory for multi-start
+
+Use Cases
+~~~~~~~~~
+
+1. **Wide-range oscillation data**: Master curves spanning 8+ decades
+2. **Time-temperature superposition**: Combined data across temperatures
+3. **Multi-technique fitting**: Combining relaxation + oscillation data
+4. **Fractional models**: Complex parameter landscapes benefit from multi-start
+5. **Automated pipelines**: Robust fitting without manual tuning
+
+See Also
+--------
+
+- :doc:`core` - BaseModel integration with automatic strategy selection
+- :doc:`../user_guide/getting_started` - Basic fitting examples
+- :mod:`rheojax.utils.optimization` - Optimization functions using these strategies

@@ -10,13 +10,16 @@ A modern, JAX-accelerated rheological analysis package providing a unified frame
 
 ## 🆕 What's New in v0.2.0
 
-Complete rheological analysis toolkit with Bayesian inference:
+Complete rheological analysis toolkit with Bayesian inference and intelligent optimization:
 
 - **20 rheological models** (classical, fractional, flow)
 - **5 data transforms** (FFT, mastercurve, mutation number, OWChirp, derivatives)
 - **Bayesian inference** with NumPyro NUTS sampling + ArviZ diagnostics
 - **Pipeline API** for intuitive workflows with NLSQ → NUTS warm-start
-- **20 tutorial notebooks** covering basic to advanced workflows
+- **24 tutorial notebooks** covering basic to advanced workflows
+- **Intelligent optimization** with automatic log-residuals and multi-start for wide-range data
+- **Complex modulus convenience properties** for easier oscillation data access
+- **Enhanced TRIOS I/O** with complex modulus handling and chunked reading
 - **5-270x performance improvement** with NLSQ + GPU acceleration
 
 ### Quick Example (New in v0.2.0)
@@ -59,12 +62,13 @@ pipeline.plot_pair().plot_trace().plot_forest()
 - **ArviZ Diagnostic Suite**: 6 plot types (pair, forest, energy, autocorr, rank, ESS) for MCMC quality
 - **Extensible Design**: Plugin system for custom models and transforms
 
-### Tutorial Notebooks (New!)
-- **20 Comprehensive Notebooks**: Organized in 4 learning phases
+### Tutorial Notebooks & Examples
+- **24 Comprehensive Notebooks**: Organized in 4 learning phases
   - `examples/basic/` - 5 notebooks covering fundamental models
-  - `examples/transforms/` - 5 notebooks for data transforms and analysis
-  - `examples/bayesian/` - 5 notebooks for Bayesian inference workflows
-  - `examples/advanced/` - 5 notebooks for production-ready patterns
+  - `examples/transforms/` - 6 notebooks for data transforms and analysis
+  - `examples/bayesian/` - 6 notebooks for Bayesian inference workflows
+  - `examples/advanced/` - 7 notebooks for production-ready patterns
+- **I/O Examples**: TRIOS complex modulus handling and plotting demonstrations
 
 ## Installation
 
@@ -379,7 +383,7 @@ delta = mn.calculate(data)  # 0=elastic, 1=viscous
 
 ## Tutorial Notebooks
 
-Comprehensive learning path with 20 tutorial notebooks:
+Comprehensive learning path with 24 tutorial notebooks:
 
 ```
 examples/
@@ -389,24 +393,31 @@ examples/
 │   ├── 03-springpot-fitting.ipynb
 │   ├── 04-bingham-fitting.ipynb
 │   └── 05-power-law-fitting.ipynb
-├── transforms/                  # 5 notebooks: Data analysis workflows
+├── transforms/                  # 6 notebooks: Data analysis workflows
 │   ├── 01-fft-analysis.ipynb
 │   ├── 02-mastercurve-tts.ipynb
+│   ├── 02b-mastercurve-wlf-validation.ipynb
 │   ├── 03-mutation-number.ipynb
 │   ├── 04-owchirp-laos-analysis.ipynb
 │   └── 05-smooth-derivative.ipynb
-├── bayesian/                    # 5 notebooks: Bayesian inference
+├── bayesian/                    # 6 notebooks: Bayesian inference
 │   ├── 01-bayesian-basics.ipynb
 │   ├── 02-prior-selection.ipynb
 │   ├── 03-convergence-diagnostics.ipynb
 │   ├── 04-model-comparison.ipynb
-│   └── 05-uncertainty-propagation.ipynb
-└── advanced/                    # 5 notebooks: Production patterns
-    ├── 01-multi-technique-fitting.ipynb
-    ├── 02-batch-processing.ipynb
-    ├── 03-custom-models.ipynb
-    ├── 04-fractional-models-deep-dive.ipynb
-    └── 05-performance-optimization.ipynb
+│   ├── 05-uncertainty-propagation.ipynb
+│   └── 06-bayesian_workflow_demo.ipynb
+├── advanced/                    # 7 notebooks: Production patterns
+│   ├── 01-multi-technique-fitting.ipynb
+│   ├── 02-batch-processing.ipynb
+│   ├── 03-custom-models.ipynb
+│   ├── 04-fractional-models-deep-dive.ipynb
+│   ├── 05-performance-optimization.ipynb
+│   ├── 06-frequentist-model-selection.ipynb
+│   └── 07-trios_chunked_reading_example.ipynb
+└── io/                          # I/O demonstrations
+    ├── fix_trios_plotting_warnings.py
+    └── plot_trios_complex_modulus.ipynb
 ```
 
 See `examples/README.md` for complete learning path guide.

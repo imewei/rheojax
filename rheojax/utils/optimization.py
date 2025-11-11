@@ -656,7 +656,7 @@ def create_least_squares_objective(
         normalize: Whether to use relative error (default: True)
         use_log_residuals: Whether to compute residuals in log10 space (default: False).
             Recommended for data spanning >8 decades. Formula:
-            residual = log10(|y_pred|) - log10(|y_data|)
+            ``residual = log10(abs(y_pred)) - log10(abs(y_data))``
 
     Returns:
         Residual function that takes parameters and returns residual vector
