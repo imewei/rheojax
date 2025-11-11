@@ -108,8 +108,10 @@ class FractionalMaxwellModel(BaseModel):
 
         self.fitted_ = False
 
+    @staticmethod
+    @jax.jit
     def _predict_relaxation_jax(
-        self, t: jnp.ndarray, c1: float, alpha: float, beta: float, tau: float
+        t: jnp.ndarray, c1: float, alpha: float, beta: float, tau: float
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t) using JAX.
 
@@ -148,8 +150,10 @@ class FractionalMaxwellModel(BaseModel):
 
         return G_t
 
+    @staticmethod
+    @jax.jit
     def _predict_creep_jax(
-        self, t: jnp.ndarray, c1: float, alpha: float, beta: float, tau: float
+        t: jnp.ndarray, c1: float, alpha: float, beta: float, tau: float
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
