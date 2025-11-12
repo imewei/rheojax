@@ -191,9 +191,10 @@ dmypy.json
 # ----------------------------------------------------------------------------
 # AI-Powered Development Tools
 # ----------------------------------------------------------------------------
-.claude
-.specify
-agent-os
+.claude/
+.code/
+.specify/
+agent-os/
 .cursor/
 .cursorignore
 .cursorindexingignore
