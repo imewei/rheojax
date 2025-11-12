@@ -53,8 +53,28 @@ class Registry:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._models = {}
-            cls._instance._transforms = {}
+            self._instance._transforms = {}
         return cls._instance
+
+    def _normalize_plugin_type(self, plugin_type: PluginType | str) -> PluginType:
+        """Normalize plugin type to PluginType enum."""
+        if isinstance(plugin_type, str):
+            try:
+                return PluginType(plugin_type.lower())
+            except ValueError:
+                raise ValueError(
+                    f"Invalid plugin type: {plugin_type}. Must be 'model' or 'transform'"
+                )
+        return plugin_type
+
+    def _get_registry_for_type(self, plugin_type: PluginType) -> dict[str, PluginInfo]:
+        """Get the appropriate registry (models or transforms) for a given plugin type."""
+        if plugin_type == PluginType.MODEL:
+            return self._models
+        elif plugin_type == PluginType.TRANSFORM:
+            return self._transforms
+        else:
+            raise ValueError(f"Invalid plugin type: {plugin_type}")
 
     @classmethod
     def get_instance(cls) -> Registry:
@@ -72,44 +92,29 @@ class Registry:
         plugin_type: PluginType | str,
         metadata: dict[str, Any] | None = None,
         validate: bool = False,
-        force: bool = False,
-    ):
-        """Register a plugin in the registry.
-
-        Args:
-            name: Unique name for the plugin
-            plugin_class: The plugin class to register
-            plugin_type: Type of plugin (MODEL or TRANSFORM)
-            metadata: Optional metadata dictionary
-            validate: Whether to validate the plugin interface
-            force: Whether to overwrite existing registration
-
-        Raises:
-            ValueError: If plugin is already registered (and force=False) or invalid
-        """
-        # Convert string to enum if needed
-        if isinstance(plugin_type, str):
-            try:
-                plugin_type = PluginType(plugin_type.lower())
-            except ValueError:
-                raise ValueError(
-                    f"Invalid plugin type: {plugin_type}. Must be 'model' or 'transform'"
-                )
-
-        # Select appropriate registry
-        if plugin_type == PluginType.MODEL:
-            registry = self._models
-        elif plugin_type == PluginType.TRANSFORM:
-            registry = self._transforms
-        else:
-            raise ValueError(f"Invalid plugin type: {plugin_type}")
-
-        # Check if already registered
-        if name in registry and not force:
-            raise ValueError(
-                f"Plugin '{name}' is already registered as a {plugin_type.value}"
-            )
-
+                    force: bool = False,
+            ):
+                """Register a plugin in the registry.
+        
+                Args:
+                    name: Unique name for the plugin
+                    plugin_class: The plugin class to register
+                    plugin_type: Type of plugin (MODEL or TRANSFORM)
+                    metadata: Optional metadata dictionary
+                    validate: Whether to validate the plugin interface
+                    force: Whether to overwrite existing registration
+        
+                Raises:
+                    ValueError: If plugin is already registered (and force=False) or invalid
+                """
+                plugin_type = self._normalize_plugin_type(plugin_type)
+                registry = self._get_registry_for_type(plugin_type)
+        
+                # Check if already registered
+                if name in registry and not force:
+                    raise ValueError(
+                        f"Plugin '{name}' is already registered as a {plugin_type.value}"
+                    )
         # Validate interface if requested
         if validate:
             self._validate_plugin(plugin_class, plugin_type)
@@ -170,17 +175,8 @@ class Registry:
         Raises:
             KeyError: If plugin not found and raise_on_missing=True
         """
-        # Convert string to enum if needed
-        if isinstance(plugin_type, str):
-            plugin_type = PluginType(plugin_type.lower())
-
-        # Select appropriate registry
-        if plugin_type == PluginType.MODEL:
-            registry = self._models
-        elif plugin_type == PluginType.TRANSFORM:
-            registry = self._transforms
-        else:
-            return None
+        plugin_type = self._normalize_plugin_type(plugin_type)
+        registry = self._get_registry_for_type(plugin_type)
 
         # Retrieve plugin
         if name in registry:
@@ -199,23 +195,13 @@ class Registry:
             name: Name of the plugin
             plugin_type: Type of plugin
 
-        Returns:
-            PluginInfo object or None if not found
-        """
-        # Convert string to enum if needed
-        if isinstance(plugin_type, str):
-            plugin_type = PluginType(plugin_type.lower())
-
-        # Select appropriate registry
-        if plugin_type == PluginType.MODEL:
-            registry = self._models
-        elif plugin_type == PluginType.TRANSFORM:
-            registry = self._transforms
-        else:
-            return None
-
-        return registry.get(name)
-
+                    Returns:
+                        PluginInfo object or None if not found
+                    """
+                    plugin_type = self._normalize_plugin_type(plugin_type)
+                    registry = self._get_registry_for_type(plugin_type)
+        
+                    return registry.get(name)
     def get_all_models(self) -> list[str]:
         """Get list of all registered model names.
 
@@ -235,26 +221,16 @@ class Registry:
     def unregister(self, name: str, plugin_type: PluginType | str):
         """Remove a plugin from the registry.
 
-        Args:
-            name: Name of the plugin to remove
-            plugin_type: Type of plugin
-        """
-        # Convert string to enum if needed
-        if isinstance(plugin_type, str):
-            plugin_type = PluginType(plugin_type.lower())
-
-        # Select appropriate registry
-        if plugin_type == PluginType.MODEL:
-            registry = self._models
-        elif plugin_type == PluginType.TRANSFORM:
-            registry = self._transforms
-        else:
-            return
-
-        # Remove if exists
-        if name in registry:
-            del registry[name]
-
+                    Args:
+                        name: Name of the plugin to remove
+                        plugin_type: Type of plugin
+                    """
+                    plugin_type = self._normalize_plugin_type(plugin_type)
+                    registry = self._get_registry_for_type(plugin_type)
+        
+                    # Remove if exists
+                    if name in registry:
+                        del registry[name]
     def get_all(self) -> dict[str, tuple[type, PluginType]]:
         """Get all registered plugins with their types.
 
@@ -363,12 +339,12 @@ class Registry:
         Returns:
             Instance of the plugin class
 
-        Raises:
-            KeyError: If plugin not found
-        """
-        plugin_class = self.get(name, plugin_type, raise_on_missing=True)
-        return plugin_class(*args, **kwargs)
-
+                    Raises:
+                        KeyError: If plugin not found
+                    """
+                    plugin_type = self._normalize_plugin_type(plugin_type)
+                    plugin_class = self.get(name, plugin_type, raise_on_missing=True)
+                    return plugin_class(*args, **kwargs)
     def find_compatible(self, **criteria) -> list[str]:
         """Find plugins matching certain criteria.
 
