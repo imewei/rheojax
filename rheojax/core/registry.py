@@ -57,6 +57,7 @@ class Registry:
         return cls._instance
 
     def _normalize_plugin_type(self, plugin_type: PluginType | str) -> PluginType:
+        """Normalize arbitrary plugin type inputs to the PluginType enum."""
         if isinstance(plugin_type, str):
             try:
                 return PluginType(plugin_type.lower())
@@ -69,6 +70,7 @@ class Registry:
     def _registry_for(
         self, plugin_type: PluginType | str
     ) -> tuple[PluginType, dict[str, PluginInfo]]:
+        """Return the normalized plugin type and its backing registry mapping."""
         plugin_enum = self._normalize_plugin_type(plugin_type)
         if plugin_enum == PluginType.MODEL:
             return plugin_enum, self._models
