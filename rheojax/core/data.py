@@ -8,14 +8,20 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:  # pragma: no cover - typing helper only
+    import jax.numpy as jnp_typing
+else:
+    jnp_typing = np
 
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+HAS_JAX = True
 
 try:
     import piblin_jax as piblin
@@ -30,7 +36,18 @@ except ImportError:
     )
 
 
-ArrayLike = np.ndarray | list | tuple
+type ArrayLike = np.ndarray | jnp_typing.ndarray | list | tuple
+
+
+def _coerce_ndarray(data: ArrayLike | jnp_typing.ndarray | None) -> np.ndarray:
+    """Convert any array-like input to a NumPy array for scalar ops."""
+    if data is None:
+        raise ValueError("Array data must be initialized before conversion")
+    if isinstance(data, np.ndarray):
+        return data
+    if HAS_JAX and isinstance(data, jnp.ndarray):
+        return np.asarray(data)
+    return np.asarray(data)
 
 
 @dataclass
@@ -94,10 +111,13 @@ class RheoData:
         self.x = self._ensure_array(self.x)
         self.y = self._ensure_array(self.y)
 
+        x_array = _coerce_ndarray(self.x)
+        y_array = _coerce_ndarray(self.y)
+
         # Validate shapes
-        if self.x.shape != self.y.shape:
+        if x_array.shape != y_array.shape:
             raise ValueError(
-                f"x and y must have the same shape. Got x: {self.x.shape}, y: {self.y.shape}"
+                f"x and y must have the same shape. Got x: {x_array.shape}, y: {y_array.shape}"
             )
 
         # Validate data if requested
@@ -348,27 +368,27 @@ class RheoData:
     @property
     def shape(self) -> tuple:
         """Shape of the y data."""
-        return self.y.shape
+        return _coerce_ndarray(self.y).shape
 
     @property
     def ndim(self) -> int:
         """Number of dimensions of y data."""
-        return self.y.ndim
+        return _coerce_ndarray(self.y).ndim
 
     @property
     def size(self) -> int:
         """Size of y data."""
-        return self.y.size
+        return int(_coerce_ndarray(self.y).size)
 
     @property
     def dtype(self):
         """Data type of y data."""
-        return self.y.dtype
+        return _coerce_ndarray(self.y).dtype
 
     @property
     def is_complex(self) -> bool:
         """Check if y data is complex."""
-        return np.iscomplexobj(self.y)
+        return np.iscomplexobj(_coerce_ndarray(self.y))
 
     @property
     def modulus(self) -> np.ndarray | None:
@@ -636,14 +656,16 @@ class RheoData:
         Returns:
             Resampled RheoData
         """
+        x_array = _coerce_ndarray(self.x)
+
         if self.domain == "frequency":
             # Log-spaced for frequency domain
             new_x = np.logspace(
-                np.log10(self.x.min()), np.log10(self.x.max()), n_points
+                np.log10(x_array.min()), np.log10(x_array.max()), n_points
             )
         else:
             # Linear-spaced for time domain
-            new_x = np.linspace(self.x.min(), self.x.max(), n_points)
+            new_x = np.linspace(x_array.min(), x_array.max(), n_points)
 
         return self.interpolate(new_x)
 
@@ -781,11 +803,25 @@ class RheoData:
         Returns:
             Sliced RheoData
         """
-        mask = np.ones_like(self.x, dtype=bool)
+        x_array = _coerce_ndarray(self.x)
+        y_array = _coerce_ndarray(self.y)
+
+        mask = np.ones_like(x_array, dtype=bool)
 
         if start is not None:
-            mask &= self.x >= start
+            mask &= x_array >= start
         if end is not None:
-            mask &= self.x <= end
+            mask &= x_array <= end
 
-        return self[mask]
+        sliced_x = x_array[mask]
+        sliced_y = y_array[mask]
+
+        return RheoData(
+            x=sliced_x,
+            y=sliced_y,
+            x_units=self.x_units,
+            y_units=self.y_units,
+            domain=self.domain,
+            metadata=self.metadata.copy(),
+            validate=False,
+        )

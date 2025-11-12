@@ -12,7 +12,7 @@ from rheojax.core.data import RheoData
 
 def save_hdf5(
     data: RheoData,
-    filepath: str,
+    filepath: str | Path,
     compression: bool = True,
     compression_level: int = 4,
     **kwargs,
@@ -39,18 +39,19 @@ def save_hdf5(
     """
     try:
         import h5py
-    except ImportError:
+    except ImportError as exc:
         raise ImportError(
             "h5py is required for HDF5 writing. Install with: pip install h5py"
-        )
+        ) from exc
 
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     # Determine compression settings
+    compression_algorithm: str | None = None
     compression_opts = None
     if compression:
-        compression = "gzip"
+        compression_algorithm = "gzip"
         compression_opts = compression_level
 
     # Write to HDF5
@@ -59,14 +60,14 @@ def save_hdf5(
         f.create_dataset(
             "x",
             data=np.array(data.x),
-            compression=compression if compression else None,
+            compression=compression_algorithm,
             compression_opts=compression_opts,
         )
 
         f.create_dataset(
             "y",
             data=np.array(data.y),
-            compression=compression if compression else None,
+            compression=compression_algorithm,
             compression_opts=compression_opts,
         )
 
@@ -89,7 +90,7 @@ def save_hdf5(
             import rheojax
 
             f.attrs["rheojax_version"] = rheojax.__version__
-        except:
+        except ImportError:
             pass
 
 
@@ -104,20 +105,27 @@ def _write_metadata_recursive(group: Any, metadata: dict[str, Any]) -> None:
         if isinstance(value, dict):
             subgroup = group.create_group(key)
             _write_metadata_recursive(subgroup, value)
-        elif isinstance(value, (list, tuple)):
-            # Convert to numpy array
+            continue
+
+        if isinstance(value, (list, tuple)):
             group.attrs[key] = np.array(value)
-        elif isinstance(value, (str, int, float, bool, np.ndarray)):
+            continue
+
+        if isinstance(value, np.ndarray):
             group.attrs[key] = value
-        else:
-            # Try to convert to string
-            try:
-                group.attrs[key] = str(value)
-            except:
-                pass  # Skip values that can't be serialized
+            continue
+
+        if isinstance(value, (str, int, float, bool)):
+            group.attrs[key] = value
+            continue
+
+        try:
+            group.attrs[key] = str(value)
+        except Exception:
+            pass  # Skip values that can't be serialized
 
 
-def load_hdf5(filepath: str) -> RheoData:
+def load_hdf5(filepath: str | Path) -> RheoData:
     """Load RheoData from HDF5 file.
 
     Args:
@@ -133,10 +141,10 @@ def load_hdf5(filepath: str) -> RheoData:
     """
     try:
         import h5py
-    except ImportError:
+    except ImportError as exc:
         raise ImportError(
             "h5py is required for HDF5 reading. Install with: pip install h5py"
-        )
+        ) from exc
 
     filepath = Path(filepath)
     if not filepath.exists():

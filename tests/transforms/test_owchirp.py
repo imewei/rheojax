@@ -4,10 +4,8 @@ import numpy as np
 import pytest
 
 from rheojax.core.data import RheoData
-from rheojax.transforms.owchirp import OWChirp
-
-
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.transforms.owchirp import OWChirp
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

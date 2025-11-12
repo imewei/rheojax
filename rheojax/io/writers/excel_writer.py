@@ -9,7 +9,7 @@ import numpy as np
 
 
 def save_excel(
-    results: dict[str, Any], filepath: str, include_plots: bool = False, **kwargs
+    results: dict[str, Any], filepath: str | Path, include_plots: bool = False, **kwargs
 ) -> None:
     """Save results to Excel file for reporting.
 
@@ -36,10 +36,10 @@ def save_excel(
     """
     try:
         import pandas as pd
-    except ImportError:
+    except ImportError as exc:
         raise ImportError(
             "pandas is required for Excel writing. Install with: pip install pandas openpyxl"
-        )
+        ) from exc
 
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)

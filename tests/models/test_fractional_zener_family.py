@@ -20,6 +20,7 @@ Each model is tested for:
 import numpy as np
 import pytest
 
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.fractional_burgers import FBM, FractionalBurgersModel
 from rheojax.models.fractional_jeffreys import FJM, FractionalJeffreysModel
 from rheojax.models.fractional_kv_zener import FKVZ, FractionalKelvinVoigtZener
@@ -27,9 +28,6 @@ from rheojax.models.fractional_poynting_thomson import FPT, FractionalPoyntingTh
 from rheojax.models.fractional_zener_ll import FZLL, FractionalZenerLiquidLiquid
 from rheojax.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
 from rheojax.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
-
-
-from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

@@ -11,7 +11,7 @@ from pathlib import Path
 from rheojax.core.data import RheoData
 
 
-def load_anton_paar(filepath: str, **kwargs) -> RheoData:
+def load_anton_paar(filepath: str | Path, **kwargs) -> RheoData:
     """Load data from Anton Paar file.
 
     Args:

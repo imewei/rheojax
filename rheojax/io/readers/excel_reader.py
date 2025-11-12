@@ -10,7 +10,7 @@ from rheojax.core.data import RheoData
 
 
 def load_excel(
-    filepath: str,
+    filepath: str | Path,
     x_col: str | int,
     y_col: str | int,
     sheet: str | int = 0,
@@ -44,10 +44,10 @@ def load_excel(
     """
     try:
         import pandas as pd
-    except ImportError:
+    except ImportError as exc:
         raise ImportError(
             "pandas is required for Excel reading. Install with: pip install pandas openpyxl"
-        )
+        ) from exc
 
     filepath = Path(filepath)
     if not filepath.exists():
@@ -57,7 +57,7 @@ def load_excel(
     try:
         df = pd.read_excel(filepath, sheet_name=sheet, header=header, **kwargs)
     except Exception as e:
-        raise ValueError(f"Failed to parse Excel file: {e}")
+        raise ValueError(f"Failed to parse Excel file: {e}") from e
 
     # Extract x and y columns
     try:
@@ -68,7 +68,7 @@ def load_excel(
             df[y_col].values if isinstance(y_col, str) else df.iloc[:, y_col].values
         )
     except (KeyError, IndexError) as e:
-        raise KeyError(f"Column not found: {e}")
+        raise KeyError(f"Column not found: {e}") from e
 
     # Convert to numpy arrays and handle NaN
     x_data = np.array(x_data, dtype=float)

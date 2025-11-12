@@ -17,8 +17,8 @@ to NumPyro expecting unconstrained space initialization.
 import numpy as np
 import pytest
 
-from rheojax.models.zener import Zener
 from rheojax.core.test_modes import TestMode
+from rheojax.models.zener import Zener
 
 
 def test_warm_start_complex_data_nuts_convergence():

@@ -16,6 +16,8 @@ Example:
 from __future__ import annotations
 
 import warnings
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from rheojax.core.registry import ModelRegistry, TransformRegistry
@@ -40,7 +42,7 @@ class PipelineBuilder:
         self.steps: list[tuple[str, dict[str, Any]]] = []
 
     def add_load_step(
-        self, file_path: str, format: str = "auto", **kwargs
+        self, file_path: str | Path, format: str = "auto", **kwargs
     ) -> PipelineBuilder:
         """Add data loading step.
 
@@ -56,7 +58,7 @@ class PipelineBuilder:
             >>> builder.add_load_step('data.csv', x_col='time', y_col='stress')
         """
         self.steps.append(
-            ("load", {"file_path": file_path, "format": format, **kwargs})
+            ("load", {"file_path": Path(file_path), "format": format, **kwargs})
         )
         return self
 
@@ -139,7 +141,7 @@ class PipelineBuilder:
         return self
 
     def add_save_step(
-        self, file_path: str, format: str = "hdf5", **kwargs
+        self, file_path: str | Path, format: str = "hdf5", **kwargs
     ) -> PipelineBuilder:
         """Add data saving step.
 
@@ -155,7 +157,7 @@ class PipelineBuilder:
             >>> builder.add_save_step('output.hdf5')
         """
         self.steps.append(
-            ("save", {"file_path": file_path, "format": format, **kwargs})
+            ("save", {"file_path": Path(file_path), "format": format, **kwargs})
         )
         return self
 
@@ -322,7 +324,7 @@ class ConditionalPipelineBuilder(PipelineBuilder):
         self.conditions: dict[int, Any] = {}
 
     def add_conditional_step(
-        self, step_type: str, condition: callable, **kwargs
+        self, step_type: str, condition: Callable[[Pipeline], bool], **kwargs
     ) -> ConditionalPipelineBuilder:
         """Add a conditional step.
 

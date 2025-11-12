@@ -6,7 +6,7 @@ from multi-temperature rheological data using WLF or Arrhenius shift factors.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -17,6 +17,14 @@ from rheojax.core.registry import TransformRegistry
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+if TYPE_CHECKING:
+    import jax.numpy as jnp_typing
+else:  # pragma: no cover - typing fallback
+    jnp_typing = np
+
+type JaxArray = jnp_typing.ndarray
+type ScalarOrArray = float | JaxArray
 
 
 ShiftMethod = Literal["wlf", "arrhenius", "manual"]
@@ -123,8 +131,8 @@ class Mastercurve(BaseTransform):
         self.vertical_shifts_: dict[float, float] | None = None
 
     def _calculate_wlf_shift(
-        self, T: float | jnp.ndarray, T_ref: float, C1: float, C2: float  # type: ignore[name-defined]
-    ) -> float | jnp.ndarray:  # type: ignore[name-defined]
+        self, T: ScalarOrArray, T_ref: float, C1: float, C2: float
+    ) -> ScalarOrArray:
         """Calculate WLF shift factor.
 
         Parameters
@@ -148,8 +156,8 @@ class Mastercurve(BaseTransform):
         return jnp.power(10.0, log_aT)
 
     def _calculate_arrhenius_shift(
-        self, T: float | jnp.ndarray, T_ref: float, E_a: float  # type: ignore[name-defined]
-    ) -> float | jnp.ndarray:  # type: ignore[name-defined]
+        self, T: ScalarOrArray, T_ref: float, E_a: float
+    ) -> ScalarOrArray:
         """Calculate Arrhenius shift factor.
 
         Parameters

@@ -20,7 +20,13 @@ from rheojax.core.registry import TransformRegistry
 jax, jnp = safe_import_jax()
 
 if TYPE_CHECKING:
+    import jax.numpy as jnp_typing
+
     from rheojax.core.data import RheoData
+else:  # pragma: no cover - typing fallback when JAX unavailable
+    jnp_typing = np
+
+type JaxArray = jnp_typing.ndarray
 
 
 DerivativeMethod = Literal["savgol", "finite_diff", "spline", "total_variation"]
@@ -129,7 +135,7 @@ class SmoothDerivative(BaseTransform):
         if self.deriv < 1:
             raise ValueError("deriv must be at least 1")
 
-    def _smooth_data(self, y: jnp.ndarray, window: int) -> jnp.ndarray:
+    def _smooth_data(self, y: JaxArray, window: int) -> JaxArray:
         """Apply moving average smoothing.
 
         Parameters
@@ -152,7 +158,7 @@ class SmoothDerivative(BaseTransform):
 
         return smoothed
 
-    def _savgol_derivative(self, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+    def _savgol_derivative(self, x: JaxArray, y: JaxArray) -> JaxArray:
         """Compute derivative using Savitzky-Golay filter.
 
         Parameters
@@ -192,7 +198,7 @@ class SmoothDerivative(BaseTransform):
 
         return jnp.array(dy_dx)
 
-    def _finite_diff_derivative(self, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+    def _finite_diff_derivative(self, x: JaxArray, y: JaxArray) -> JaxArray:
         """Compute derivative using finite differences.
 
         Parameters
@@ -222,7 +228,7 @@ class SmoothDerivative(BaseTransform):
 
         return dy_dx
 
-    def _spline_derivative(self, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+    def _spline_derivative(self, x: JaxArray, y: JaxArray) -> JaxArray:
         """Compute derivative using smoothing splines.
 
         Parameters
@@ -255,8 +261,8 @@ class SmoothDerivative(BaseTransform):
         return jnp.array(dy_dx)
 
     def _total_variation_derivative(
-        self, x: jnp.ndarray, y: jnp.ndarray, alpha: float = 0.1
-    ) -> jnp.ndarray:
+        self, x: JaxArray, y: JaxArray, alpha: float = 0.1
+    ) -> JaxArray:
         """Compute derivative with total variation regularization.
 
         This minimizes:

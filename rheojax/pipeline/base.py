@@ -58,10 +58,10 @@ class Pipeline:
         """
         self.data = data
         self.steps: list[tuple[str, Any]] = []
-        self.history: list[tuple[str, ...]] = []
+        self.history: list[tuple[Any, ...]] = []
         self._last_model: BaseModel | None = None
 
-    def load(self, file_path: str, format: str = "auto", **kwargs) -> Pipeline:
+    def load(self, file_path: str | Path, format: str = "auto", **kwargs) -> Pipeline:
         """Load data from file.
 
         Args:
@@ -81,26 +81,28 @@ class Pipeline:
         """
         from rheojax.io import auto_load
 
+        path = Path(file_path)
+
         if format == "auto":
-            result = auto_load(file_path, **kwargs)
+            result = auto_load(path, **kwargs)
         else:
             # Format-specific loading
             if format == "csv":
                 from rheojax.io import load_csv
 
-                result = load_csv(file_path, **kwargs)
+                result = load_csv(path, **kwargs)
             elif format == "excel":
                 from rheojax.io import load_excel
 
-                result = load_excel(file_path, **kwargs)
+                result = load_excel(path, **kwargs)
             elif format == "trios":
                 from rheojax.io import load_trios
 
-                result = load_trios(file_path, **kwargs)
+                result = load_trios(path, **kwargs)
             elif format == "hdf5":
                 from rheojax.io import load_hdf5
 
-                result = load_hdf5(file_path, **kwargs)
+                result = load_hdf5(path, **kwargs)
             else:
                 raise ValueError(f"Unknown format: {format}")
 
@@ -116,7 +118,7 @@ class Pipeline:
         else:
             self.data = result
 
-        self.history.append(("load", file_path, format))
+        self.history.append(("load", str(path), format))
         return self
 
     def transform(self, transform: str | BaseTransform, **kwargs) -> Pipeline:
@@ -321,7 +323,7 @@ class Pipeline:
         self.history.append(("plot", style))
         return self
 
-    def save(self, file_path: str, format: str = "hdf5", **kwargs) -> Pipeline:
+    def save(self, file_path: str | Path, format: str = "hdf5", **kwargs) -> Pipeline:
         """Save current data to file.
 
         Args:
@@ -338,24 +340,39 @@ class Pipeline:
         if self.data is None:
             raise ValueError("No data to save. Call load() first.")
 
+        path = Path(file_path)
+
         if format == "hdf5":
             from rheojax.io import save_hdf5
 
-            save_hdf5(self.data, file_path, **kwargs)
+            save_hdf5(self.data, path, **kwargs)
         elif format == "excel":
             from rheojax.io import save_excel
 
-            save_excel(self.data, file_path, **kwargs)
+            parameters: dict[str, Any] = {}
+            if self.data.x_units:
+                parameters["x_units"] = self.data.x_units
+            if self.data.y_units:
+                parameters["y_units"] = self.data.y_units
+            parameters["domain"] = self.data.domain
+            if self.data.metadata:
+                parameters["metadata"] = self.data.metadata
+
+            excel_payload = {
+                "parameters": parameters,
+                "predictions": np.array(self.data.y),
+            }
+            save_excel(excel_payload, path, **kwargs)
         elif format == "csv":
             # Simple CSV export
             import pandas as pd
 
             df = pd.DataFrame({"x": np.array(self.data.x), "y": np.array(self.data.y)})
-            df.to_csv(file_path, index=False, **kwargs)
+            df.to_csv(path, index=False, **kwargs)
         else:
             raise ValueError(f"Unknown format: {format}")
 
-        self.history.append(("save", file_path, format))
+        self.history.append(("save", str(path), format))
         return self
 
     def save_figure(
@@ -436,9 +453,10 @@ class Pipeline:
 
         from rheojax.visualization.plotter import save_figure
 
-        save_figure(self._current_figure, filepath, format=format, dpi=dpi, **kwargs)
+        path = Path(filepath)
+        save_figure(self._current_figure, path, format=format, dpi=dpi, **kwargs)
 
-        self.history.append(("save_figure", str(filepath)))
+        self.history.append(("save_figure", str(path)))
         return self
 
     def get_result(self) -> RheoData:
@@ -454,7 +472,7 @@ class Pipeline:
             raise ValueError("No data available. Call load() first.")
         return self.data
 
-    def get_history(self) -> list[tuple]:
+    def get_history(self) -> list[tuple[Any, ...]]:
         """Get pipeline execution history.
 
         Returns:

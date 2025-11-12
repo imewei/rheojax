@@ -93,7 +93,7 @@ def convert_units(
     return value
 
 
-def load_trios(filepath: str, **kwargs) -> RheoData | list[RheoData]:
+def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     """Load TA Instruments TRIOS .txt file.
 
     Reads rheological data from TRIOS exported .txt files. Supports multiple
@@ -180,7 +180,7 @@ def load_trios(filepath: str, **kwargs) -> RheoData | list[RheoData]:
         return rheo_data_list
 
 
-def load_trios_chunked(filepath: str, chunk_size: int = 10000, **kwargs):
+def load_trios_chunked(filepath: str | Path, chunk_size: int = 10000, **kwargs):
     """Load TRIOS file in memory-efficient chunks (generator).
 
     This function reads TRIOS files using a streaming approach that yields
@@ -431,6 +431,8 @@ def _read_segment_chunked(
                 # Start accumulating data from sample rows
                 x_chunk = sample_array[:, x_col]
 
+                x_chunk_array: np.ndarray = np.real_if_close(np.asarray(x_chunk))
+
                 if is_complex:
                     # Complex modulus: G* = G' + i*G''
                     y_chunk_real = sample_array[:, y_col]  # Storage modulus
@@ -445,19 +447,26 @@ def _read_segment_chunked(
                     y_chunk = y_chunk_real + 1j * y_chunk_imag
 
                     # Remove NaN values from either component
+                    y_chunk_real_array = np.real_if_close(np.asarray(y_chunk_real))
+                    y_chunk_imag_array = np.real_if_close(np.asarray(y_chunk_imag))
+
                     valid_mask = ~(
-                        np.isnan(x_chunk)
-                        | np.isnan(y_chunk_real)
-                        | np.isnan(y_chunk_imag)
+                        np.isnan(x_chunk_array)
+                        | np.isnan(y_chunk_real_array)
+                        | np.isnan(y_chunk_imag_array)
                     )
+
+                    y_chunk = (y_chunk_real_array + 1j * y_chunk_imag_array)[valid_mask]
                 else:
                     y_chunk = sample_array[:, y_col]
 
                     # Remove NaN values
-                    valid_mask = ~(np.isnan(x_chunk) | np.isnan(y_chunk))
+                    y_chunk_array = np.real_if_close(np.asarray(y_chunk))
+                    valid_mask = ~(np.isnan(x_chunk_array) | np.isnan(y_chunk_array))
 
-                x_chunk = x_chunk[valid_mask]
-                y_chunk = y_chunk[valid_mask]
+                    y_chunk = y_chunk_array[valid_mask]
+
+                x_chunk = x_chunk_array[valid_mask]
 
                 # Initialize chunk buffers
                 current_x = []
@@ -754,20 +763,30 @@ def _parse_segment(
         y_data_real = convert_units(y_data_real, y_units, "Pa")
         y_data_imag = convert_units(y_data_imag, y_units2, "Pa")
 
+        x_data_array = np.real_if_close(np.asarray(x_data))
+        y_real_array = np.real_if_close(np.asarray(y_data_real))
+        y_imag_array = np.real_if_close(np.asarray(y_data_imag))
+
         # Construct complex modulus
-        y_data = y_data_real + 1j * y_data_imag
+        y_data = y_real_array + 1j * y_imag_array
         y_units = "Pa"  # Standardize to Pa for complex modulus
 
         # Remove NaN values from either component
-        valid_mask = ~(np.isnan(x_data) | np.isnan(y_data_real) | np.isnan(y_data_imag))
+        valid_mask = ~(
+            np.isnan(x_data_array) | np.isnan(y_real_array) | np.isnan(y_imag_array)
+        )
     else:
         # Real-valued data
         y_data = data_array[:, y_col]
 
-        # Remove NaN values
-        valid_mask = ~(np.isnan(x_data) | np.isnan(y_data))
+        x_data_array = np.real_if_close(np.asarray(x_data))
+        y_data_array = np.real_if_close(np.asarray(y_data))
 
-    x_data = x_data[valid_mask]
+        # Remove NaN values
+        valid_mask = ~(np.isnan(x_data_array) | np.isnan(y_data_array))
+        y_data = y_data_array
+
+    x_data = x_data_array[valid_mask]
     y_data = y_data[valid_mask]
 
     if len(x_data) == 0:

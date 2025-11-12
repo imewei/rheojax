@@ -4,14 +4,12 @@ This test suite ensures that RheoData maintains full compatibility
 with piblin_jax.Measurement while adding JAX support and additional features.
 """
 
-from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 
 # We'll mock piblin_jax for now since it's not installed yet
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)

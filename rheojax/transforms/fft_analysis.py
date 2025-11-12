@@ -18,7 +18,13 @@ from rheojax.core.registry import TransformRegistry
 jax, jnp = safe_import_jax()
 
 if TYPE_CHECKING:
+    import jax.numpy as jnp_typing
+
     from rheojax.core.data import RheoData
+else:  # pragma: no cover - typing fallback when JAX missing at runtime
+    jnp_typing = np
+
+type JaxArray = jnp_typing.ndarray
 
 
 WindowType = Literal["hann", "hamming", "blackman", "bartlett", "none"]
@@ -94,7 +100,7 @@ class FFTAnalysis(BaseTransform):
         self.return_psd = return_psd
         self.normalize = normalize
 
-    def _get_window(self, n: int) -> jnp.ndarray:
+    def _get_window(self, n: int) -> JaxArray:
         """Get window function of length n.
 
         Parameters
@@ -120,7 +126,7 @@ class FFTAnalysis(BaseTransform):
         else:
             raise ValueError(f"Unknown window type: {self.window}")
 
-    def _detrend_data(self, y: jnp.ndarray) -> jnp.ndarray:
+    def _detrend_data(self, y: JaxArray) -> JaxArray:
         """Remove linear trend from data.
 
         Parameters
@@ -302,7 +308,7 @@ class FFTAnalysis(BaseTransform):
 
     def find_peaks(
         self, freq_data: RheoData, prominence: float = 0.1, n_peaks: int = 5
-    ) -> tuple[jnp.ndarray, jnp.ndarray]:
+    ) -> tuple[JaxArray, JaxArray]:
         """Find characteristic frequency peaks in FFT spectrum.
 
         Parameters
@@ -316,19 +322,13 @@ class FFTAnalysis(BaseTransform):
 
         Returns
         -------
-        peak_freqs : jnp.ndarray
+        peak_freqs : JaxArray
             Frequencies of detected peaks
-        peak_heights : jnp.ndarray
+        peak_heights : JaxArray
             Heights of detected peaks
         """
-        freqs = freq_data.x
-        spectrum = freq_data.y
-
-        # Convert to numpy for scipy peak detection
-        if isinstance(spectrum, jnp.ndarray):
-            spectrum = np.array(spectrum)
-        if isinstance(freqs, jnp.ndarray):
-            freqs = np.array(freqs)
+        freqs = np.asarray(freq_data.x)
+        spectrum = np.asarray(freq_data.y)
 
         # Simple peak detection: find local maxima
         from scipy.signal import find_peaks as scipy_find_peaks

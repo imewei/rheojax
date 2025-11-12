@@ -11,7 +11,7 @@ from rheojax.io.readers.excel_reader import load_excel
 from rheojax.io.readers.trios import load_trios
 
 
-def auto_load(filepath: str, **kwargs) -> RheoData | list[RheoData]:
+def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     """Automatically detect file format and load data.
 
     This function attempts to determine the file format based on:
@@ -69,7 +69,7 @@ def _try_trios_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
     """
     # Try TRIOS first
     try:
-        return load_trios(str(filepath), **kwargs)
+        return load_trios(filepath, **kwargs)
     except Exception as e:
         warnings.warn(f"TRIOS reader failed: {e}. Trying CSV reader.", stacklevel=2)
 
@@ -77,7 +77,7 @@ def _try_trios_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
     try:
         return _try_csv(filepath, **kwargs)
     except Exception as e:
-        raise ValueError(f"Could not parse file as TRIOS or CSV: {e}")
+        raise ValueError(f"Could not parse file as TRIOS or CSV: {e}") from e
 
 
 def _try_csv(filepath: Path, **kwargs) -> RheoData:
@@ -137,9 +137,9 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
         except Exception as e:
             raise ValueError(
                 f"Could not auto-detect columns: {e}. Please specify x_col and y_col."
-            )
+            ) from e
 
-    return load_csv(str(filepath), **kwargs)
+    return load_csv(filepath, **kwargs)
 
 
 def _try_excel(filepath: Path, **kwargs) -> RheoData:
@@ -156,7 +156,7 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
     if "x_col" not in kwargs or "y_col" not in kwargs:
         raise ValueError("For Excel files, please specify x_col and y_col parameters")
 
-    return load_excel(str(filepath), **kwargs)
+    return load_excel(filepath, **kwargs)
 
 
 def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
@@ -173,7 +173,7 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
         ValueError: If no reader can parse the file
     """
     readers = [
-        ("TRIOS", lambda: load_trios(str(filepath), **kwargs)),
+        ("TRIOS", lambda: load_trios(filepath, **kwargs)),
         ("CSV", lambda: _try_csv(filepath, **kwargs)),
     ]
 

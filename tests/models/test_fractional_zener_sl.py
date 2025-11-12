@@ -13,10 +13,8 @@ This test suite validates:
 import numpy as np
 import pytest
 
-from rheojax.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
-
-
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

@@ -14,7 +14,7 @@ Example:
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -49,8 +49,8 @@ class BatchPipeline:
                 If None, must be set before processing.
         """
         self.template_pipeline = template_pipeline
-        self.results: list[tuple[str, Any, dict[str, Any]]] = []
-        self.errors: list[tuple[str, Exception]] = []
+        self.results: list[tuple[Path, RheoData, dict[str, Any]]] = []
+        self.errors: list[tuple[Path, Exception]] = []
 
     def set_template(self, pipeline: Pipeline) -> BatchPipeline:
         """Set template pipeline.
@@ -66,7 +66,7 @@ class BatchPipeline:
 
     def process_files(
         self,
-        file_paths: list[str],
+        file_paths: Iterable[str | Path],
         format: str = "auto",
         parallel: bool = False,
         n_workers: int | None = None,
@@ -96,7 +96,13 @@ class BatchPipeline:
                 stacklevel=2,
             )
 
-        for file_path in file_paths:
+        normalized_paths = [Path(p) for p in file_paths]
+
+        if not normalized_paths:
+            warnings.warn("No files provided for processing", stacklevel=2)
+            return self
+
+        for file_path in normalized_paths:
             try:
                 result, metrics = self._process_file(
                     file_path, format=format, **load_kwargs
@@ -109,7 +115,11 @@ class BatchPipeline:
         return self
 
     def process_directory(
-        self, directory: str, pattern: str = "*.csv", recursive: bool = False, **kwargs
+        self,
+        directory: str | Path,
+        pattern: str = "*.csv",
+        recursive: bool = False,
+        **kwargs,
     ) -> BatchPipeline:
         """Process all files in directory matching pattern.
 
@@ -134,8 +144,6 @@ class BatchPipeline:
         else:
             file_paths = list(directory_path.glob(pattern))
 
-        file_paths = [str(p) for p in file_paths]
-
         if not file_paths:
             warnings.warn(
                 f"No files matching '{pattern}' found in {directory}", stacklevel=2
@@ -145,7 +153,7 @@ class BatchPipeline:
         return self.process_files(file_paths, **kwargs)
 
     def _process_file(
-        self, file_path: str, format: str = "auto", **load_kwargs
+        self, file_path: Path, format: str = "auto", **load_kwargs
     ) -> tuple[RheoData, dict[str, Any]]:
         """Process single file with pipeline.
 
@@ -159,9 +167,10 @@ class BatchPipeline:
         """
         # Clone template pipeline
         pipeline = self._clone_pipeline(self.template_pipeline)
+        path = Path(file_path)
 
         # Load data
-        pipeline.load(file_path, format=format, **load_kwargs)
+        pipeline.load(path, format=format, **load_kwargs)
 
         # Execute template steps (transforms, fits, etc.)
         # The template should already have the steps configured
@@ -172,7 +181,7 @@ class BatchPipeline:
         result = pipeline.get_result()
 
         # Compute metrics if model was fitted
-        metrics = {}
+        metrics: dict[str, Any] = {}
         if pipeline._last_model is not None:
             model = pipeline._last_model
             X = np.array(result.x)
@@ -202,7 +211,7 @@ class BatchPipeline:
         # A full implementation would deep copy the pipeline configuration
         return Pipeline()
 
-    def get_results(self) -> list[tuple[str, RheoData, dict[str, Any]]]:
+    def get_results(self) -> list[tuple[Path, RheoData, dict[str, Any]]]:
         """Get all processing results.
 
         Returns:
@@ -215,7 +224,7 @@ class BatchPipeline:
         """
         return self.results.copy()
 
-    def get_errors(self) -> list[tuple[str, Exception]]:
+    def get_errors(self) -> list[tuple[Path, Exception]]:
         """Get processing errors.
 
         Returns:
@@ -241,11 +250,11 @@ class BatchPipeline:
         if not self.results:
             return pd.DataFrame()
 
-        summary_data = []
+        summary_data: list[dict[str, Any]] = []
         for file_path, result, metrics in self.results:
             row = {
-                "file_path": file_path,
-                "file_name": Path(file_path).name,
+                "file_path": str(file_path),
+                "file_name": file_path.name,
                 "n_points": len(result.x),
             }
             row.update(metrics)
@@ -253,7 +262,9 @@ class BatchPipeline:
 
         return pd.DataFrame(summary_data)
 
-    def export_summary(self, output_path: str, format: str = "excel") -> BatchPipeline:
+    def export_summary(
+        self, output_path: str | Path, format: str = "excel"
+    ) -> BatchPipeline:
         """Export summary of batch results.
 
         Args:
@@ -272,6 +283,8 @@ class BatchPipeline:
             warnings.warn("No results to export", stacklevel=2)
             return self
 
+        output_path = Path(output_path)
+
         if format == "excel":
             df.to_excel(output_path, index=False)
         elif format == "csv":
@@ -282,7 +295,7 @@ class BatchPipeline:
         return self
 
     def apply_filter(
-        self, filter_fn: Callable[[str, RheoData, dict], bool]
+        self, filter_fn: Callable[[Path, RheoData, dict[str, Any]], bool]
     ) -> BatchPipeline:
         """Filter results based on custom criteria.
 
@@ -365,8 +378,8 @@ class BatchPipeline:
         Returns:
             self for method chaining
         """
-        self.results = []
-        self.errors = []
+        self.results.clear()
+        self.errors.clear()
         return self
 
     def __len__(self) -> int:

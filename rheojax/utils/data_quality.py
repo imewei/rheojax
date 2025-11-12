@@ -106,7 +106,7 @@ def suggest_optimization_strategy(
     x: np.ndarray,
     y: np.ndarray,
     test_mode: str | None = None,
-) -> dict[str, bool | str]:
+) -> dict[str, bool | str | float]:
     """Suggest optimization strategy based on data characteristics.
 
     Analyzes data range, complexity, and test mode to recommend:

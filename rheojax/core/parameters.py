@@ -7,8 +7,8 @@ and optimization support for rheological models.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import Any, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -19,7 +19,22 @@ jax, jnp = safe_import_jax()
 HAS_JAX = True
 
 
-ArrayLike = Union[np.ndarray, jnp.ndarray, list, float]
+if TYPE_CHECKING:  # pragma: no cover - typing helper only
+    import jax.numpy as jnp_typing
+else:
+    jnp_typing = np
+
+
+type ArrayLike = np.ndarray | jnp_typing.ndarray | list | tuple
+
+
+def _coerce_array(values: ArrayLike) -> np.ndarray:
+    """Convert array-like inputs to NumPy arrays without altering callers."""
+    if isinstance(values, np.ndarray):
+        return values
+    if HAS_JAX and isinstance(values, jnp.ndarray):
+        return np.asarray(values)
+    return np.asarray(values)
 
 
 @dataclass
@@ -79,21 +94,31 @@ class ParameterConstraint:
         return True
 
 
-@dataclass
 class Parameter:
     """Single parameter with value, bounds, and metadata."""
 
-    name: str
-    value: float | None = None
-    bounds: tuple[float, float] | None = None
-    units: str | None = None
-    description: str | None = None
-    constraints: list[ParameterConstraint] = field(default_factory=list)
+    def __init__(
+        self,
+        name: str,
+        value: float | None = None,
+        bounds: tuple[float, float] | None = None,
+        units: str | None = None,
+        description: str | None = None,
+        constraints: list[ParameterConstraint] | None = None,
+    ) -> None:
+        self.name = name
+        self.bounds = bounds
+        self.units = units
+        self.description = description
+        self.constraints = list(constraints) if constraints else []
+        self._value: float | None = None
+        self._initialize(value)
 
-    def __post_init__(self):
+    def _initialize(self, value: float | None) -> None:
         """Validate parameter after initialization."""
-        if self.bounds:
-            self.bounds = tuple(self.bounds)  # Ensure tuple
+        if self.bounds is not None:
+            lower, upper = self.bounds
+            self.bounds = (float(lower), float(upper))
 
         # Add bounds as constraint if specified
         if self.bounds:
@@ -104,13 +129,16 @@ class Parameter:
                 ),
             )
 
+        if value is not None:
+            self.value = value
+
     @property
     def value(self) -> float | None:
         """Get parameter value."""
-        return self._value if hasattr(self, "_value") else None
+        return self._value
 
     @value.setter
-    def value(self, val: float | None):
+    def value(self, val: float | None) -> None:
         """Set parameter value with validation."""
         if val is not None and self.bounds:
             if val < self.bounds[0] or val > self.bounds[1]:
@@ -727,15 +755,16 @@ class ParameterOptimizer:
         if not self.use_jax or not HAS_JAX:
             # Numerical gradient
             eps = 1e-8
-            n = len(values)
+            values_array = _coerce_array(values)
+            n = len(values_array)
             grad = np.zeros(n)
 
             for i in range(n):
-                values_plus = values.copy()
+                values_plus = values_array.copy()
                 values_plus[i] += eps
 
                 f_plus = self.evaluate(values_plus)
-                f = self.evaluate(values)
+                f = self.evaluate(values_array)
 
                 grad[i] = (f_plus - f) / eps
 
@@ -762,8 +791,9 @@ class ParameterOptimizer:
         Returns:
             True if all constraints satisfied
         """
+        values_array = _coerce_array(values)
         for constraint in self.constraints:
-            if constraint(values) < 0:
+            if constraint(values_array) < 0:
                 return False
         return True
 
@@ -783,24 +813,25 @@ class ParameterOptimizer:
             iteration: Current iteration number
         """
         # Update parameters
-        self.parameters.set_values(values)
+        coerced_values = _coerce_array(values)
+        self.parameters.set_values(coerced_values)
 
         # Evaluate objective
-        obj_value = self.evaluate(values)
+        obj_value = self.evaluate(coerced_values)
 
         # Track history
         if self.track_history:
             self.history.append(
                 {
                     "iteration": iteration or len(self.history),
-                    "values": values.copy(),
+                    "values": coerced_values.copy(),
                     "objective": obj_value,
                 }
             )
 
         # Call callback
         if self.callback:
-            self.callback(iteration or 0, values, obj_value)
+            self.callback(iteration or 0, coerced_values, obj_value)
 
     def get_history(self) -> list[dict[str, Any]]:
         """Get optimization history.
