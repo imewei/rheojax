@@ -4,7 +4,6 @@ This test suite ensures the registry system can discover, register,
 validate, and manage models and transforms as plugins.
 """
 
-
 from unittest.mock import Mock, patch
 
 import pytest
@@ -619,6 +618,7 @@ class TestRegistryCompatibility:
         # Should get the newer version
         model = registry.get("model", plugin_type=PluginType.MODEL)
         assert model is ModelV2
+
 
 from unittest.mock import Mock, patch
 

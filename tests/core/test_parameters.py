@@ -4,7 +4,6 @@ This test suite ensures proper parameter handling, validation,
 and optimization support for models and transforms.
 """
 
-
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -474,6 +473,7 @@ class TestParameterSensitivity:
         # Check condition number (high = poor identifiability)
         condition_number = np.linalg.cond(fim)
         assert condition_number > 100  # Indicates poor identifiability
+
 
 from unittest.mock import Mock, patch
 

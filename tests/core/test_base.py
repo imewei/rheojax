@@ -5,15 +5,12 @@ consistent interfaces with JAX support and proper parameter management.
 """
 
 from abc import ABC, abstractmethod
-
 from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
 
 from rheojax.core.base import BaseModel, BaseTransform, Parameter, ParameterSet
-
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
@@ -612,14 +609,14 @@ class TestJAXSupport:
 
         expected = jnp.exp(batch)
         assert jnp.allclose(result, expected)
+
+
 from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
 
 from rheojax.core.base import BaseModel, BaseTransform, Parameter, ParameterSet
-
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
