@@ -385,7 +385,6 @@ examples/
 │   ├── 06-frequentist-model-selection.ipynb
 │   └── 07-trios_chunked_reading_example.ipynb
 └── io/                          # I/O demonstrations
-    ├── fix_trios_plotting_warnings.py
     └── plot_trios_complex_modulus.ipynb
 ```
 
