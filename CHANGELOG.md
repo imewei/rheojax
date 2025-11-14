@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.2.1] - 2025-11-14
+
 ### Refactored - Template Method Pattern for Initialization
-**Phase 1 of 2: Template Method Architecture (v0.2.0)**
+**Phases 1-3 Complete: Template Method Architecture (v0.2.1)**
 
 Refactored the smart initialization system to use the Template Method design pattern, eliminating code duplication across all 11 fractional models while maintaining 100% backward compatibility.
 
@@ -54,8 +58,18 @@ Refactored the smart initialization system to use the Template Method design pat
 - Near-zero performance overhead
 - Easier to extend with new fractional models
 
-#### Next Phase
-**Phase 2 (Planned):** Extract model-specific constants into dedicated modules to further reduce coupling and improve maintainability.
+#### Phase 2: Constants Extraction (Complete)
+- **Added** `rheojax/utils/initialization/constants.py` for centralized configuration
+  - `FEATURE_CONFIG`: Savitzky-Golay window, plateau percentile, epsilon
+  - `PARAM_BOUNDS`: min/max fractional order constraints
+  - `DEFAULT_PARAMS`: fallback values when initialization fails
+- **Benefits**: Tunable configuration, reduced coupling, better testability
+
+#### Phase 3: FractionalModelMixin (Complete)
+- **Added** `_apply_smart_initialization()`: Delegated initialization for all 11 models
+- **Added** `_validate_fractional_parameters()`: Common validation logic
+- **Added** automatic initializer mapping via class name lookup
+- **Benefits**: DRY principle, consistent error handling, easier maintenance
 
 ---
 
@@ -63,5 +77,6 @@ Refactored the smart initialization system to use the Template Method design pat
 
 Previous releases documented in git history.
 
-[Unreleased]: https://github.com/username/rheojax/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/username/rheojax/releases/tag/v0.2.0
+[Unreleased]: https://github.com/imewei/rheojax/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/imewei/rheojax/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/imewei/rheojax/releases/tag/v0.2.0

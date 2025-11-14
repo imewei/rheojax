@@ -35,7 +35,7 @@ except ImportError as e:
         "NLSQ provides GPU-accelerated optimization for rheological models."
     ) from e
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "Wei Chen"
 __email__ = "wchen@anl.gov"
 __license__ = "MIT"
@@ -71,8 +71,8 @@ except ImportError:
 VERSION_INFO = {
     "major": 0,
     "minor": 2,
-    "patch": 0,
-    "release": "dev",
+    "patch": 1,
+    "release": "stable",
     "python_requires": ">=3.12",
 }
 

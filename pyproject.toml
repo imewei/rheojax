@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rheojax"
-version = "0.2.0"
+version = "0.2.1"
 description = "Unified rheological analysis framework with JAX acceleration"
 readme = "README.md"
 license = {file = "LICENSE"}
