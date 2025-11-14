@@ -141,4 +141,3 @@ Next Steps
 * Read the :doc:`user_guide` for detailed documentation
 * Explore :doc:`api_reference` for complete API documentation
 * See example notebooks for advanced usage
-

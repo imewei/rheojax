@@ -124,9 +124,9 @@ The Fractional Maxwell Model exhibits three distinct regimes:
 **Short-Time / High-Frequency Regime** (:math:`\omega\tau \gg 1`):
    Dominated by the first SpringPot (alpha):
 
-   
+
    .. math::
-   
+
       G^*(\omega) \sim c_1 (i\omega)^\alpha
 
    This gives a power-law with slope alpha in log-log plots of G' and G'' versus omega.
@@ -134,9 +134,9 @@ The Fractional Maxwell Model exhibits three distinct regimes:
 **Long-Time / Low-Frequency Regime** (:math:`\omega\tau \ll 1`):
    Controlled by the second SpringPot (beta) with modified scaling:
 
-   
+
    .. math::
-   
+
       G^*(\omega) \sim c_1 (i\omega)^\alpha \tau^{-\beta} (i\omega)^\beta = c_1 \tau^{-\beta} (i\omega)^{\alpha+\beta}
 
    This produces a power-law with slope (alpha+beta).

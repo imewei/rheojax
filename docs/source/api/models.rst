@@ -700,4 +700,3 @@ Yield stress and constant plastic viscosity.
    :members:
    :undoc-members:
    :show-inheritance:
-

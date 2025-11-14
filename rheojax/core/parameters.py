@@ -6,9 +6,9 @@ and optimization support for rheological models.
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -164,9 +164,7 @@ class Parameter:
             ) from exc
 
         if not np.isfinite(numeric_val):
-            raise ValueError(
-                f"Parameter '{self.name}' received non-finite value"
-            )
+            raise ValueError(f"Parameter '{self.name}' received non-finite value")
 
         clamped_during_init = False
         if self.bounds:

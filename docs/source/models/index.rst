@@ -51,4 +51,3 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    flow/cross
    flow/herschel_bulkley
    flow/bingham
-

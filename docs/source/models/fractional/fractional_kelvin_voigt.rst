@@ -116,9 +116,9 @@ The Fractional Kelvin-Voigt model exhibits characteristic behavior in different 
 **Short-Time / High-Frequency Regime** (:math:`t \ll \tau_\varepsilon` or :math:`\omega \gg \omega_c`):
    Instantaneous elastic response with additional power-law contribution:
 
-   
+
    .. math::
-   
+
       G(t) \sim G_e + \frac{c_\alpha t^{-\alpha}}{\Gamma(1-\alpha)}, \quad G^*(\omega) \sim G_e + c_\alpha (i\omega)^\alpha
 
    The material behaves as a stiff solid with frequency-dependent damping.
@@ -126,9 +126,9 @@ The Fractional Kelvin-Voigt model exhibits characteristic behavior in different 
 **Long-Time / Low-Frequency Regime** (:math:`t \gg \tau_\varepsilon` or :math:`\omega \ll \omega_c`):
    Equilibrium elastic plateau:
 
-   
+
    .. math::
-   
+
       G(t) \to G_e, \quad J(t) \to \frac{1}{G_e}
 
    The material reaches a constant equilibrium modulus, confirming solid-like behavior without terminal flow.
@@ -138,7 +138,7 @@ The Fractional Kelvin-Voigt model exhibits characteristic behavior in different 
 
 **Loss Tangent**:
 
-   
+
 .. math::
 
    \tan\delta = \frac{G''}{G'} = \frac{c_\alpha \omega^\alpha \sin(\alpha\pi/2)}{G_e + c_\alpha \omega^\alpha \cos(\alpha\pi/2)}

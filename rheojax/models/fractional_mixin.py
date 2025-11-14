@@ -200,9 +200,7 @@ class FractionalModelMixin:
         if beta_param is not None and beta_param.value is not None:
             beta = beta_param.value
             if beta_param.was_clamped:
-                raise ValueError(
-                    f"Fractional order beta must be in (0, 1), got {beta}"
-                )
+                raise ValueError(f"Fractional order beta must be in (0, 1), got {beta}")
             if not (0 < beta < 1):
                 raise ValueError(f"Fractional order beta must be in (0, 1), got {beta}")
 
