@@ -1,0 +1,28 @@
+# Sphinx build outputs
+build/
+_build/
+
+# Sphinx auto-generated files
+source/_autosummary/
+source/api/generated/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archive files (preserved in Git but not built)
+# Uncomment the line below if you want to exclude archive from Git
+# .archive/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
