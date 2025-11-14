@@ -82,13 +82,13 @@ core = [
     "piblin-jax>=0.0.3",  # JAX-first rewrite of piblin for data interoperability
 ]
 dev = [
-    "pytest>=8.4.0",
+    "pytest>=9.0.0",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
     "hypothesis>=6.145.0",
-    "black>=25.9.0",
-    "ruff>=0.14.0",
-    "mypy>=1.18.0",
+    "black>=25.11.0",
+    "ruff>=0.14.5",
+    "mypy>=1.18.2",
     "pre-commit>=4.3.0",
     "ipython>=9.6.0",
     "jupyter>=1.1.0",
