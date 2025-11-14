@@ -135,7 +135,6 @@ Contents
    installation
    quickstart
    contributing
-   migration_guide
 
 Development Status
 ------------------
