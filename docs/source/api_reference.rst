@@ -292,6 +292,6 @@ Support
 -------
 
 - **Documentation**: https://rheojax.readthedocs.io
-- **GitHub Issues**: https://github.com/username/rheo/issues
-- **Discussions**: https://github.com/username/rheo/discussions
+- **GitHub Issues**: https://github.com/imewei/rheojax/issues
+- **Discussions**: https://github.com/imewei/rheojax/discussions
 - **Email**: wchen@anl.gov

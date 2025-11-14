@@ -211,8 +211,8 @@ Community and Support
 
 **Getting Help**
    - Read the :doc:`user_guide/getting_started`
-   - Join `GitHub Discussions <https://github.com/username/rheo/discussions>`_
-   - Report issues on `GitHub <https://github.com/username/rheo/issues>`_
+   - Join `GitHub Discussions <https://github.com/imewei/rheojax/discussions>`_
+   - Report issues on `GitHub <https://github.com/imewei/rheojax/issues>`_
 
 **Contributing**
    - See :doc:`developer/contributing` for guidelines
@@ -224,12 +224,12 @@ Community and Support
 
    .. code-block:: bibtex
 
-      @software{rheo2024,
-        title = {Rheo: JAX-Powered Unified Rheology Package},
+      @software{rheojax2024,
+        title = {RheoJAX: JAX-Accelerated Rheological Analysis},
         year = {2024},
         author = {Wei Chen},
-        url = {https://github.com/username/rheo},
-        version = {0.1.0}
+        url = {https://github.com/imewei/rheojax},
+        version = {0.2.0}
       }
 
 Indices and Tables
