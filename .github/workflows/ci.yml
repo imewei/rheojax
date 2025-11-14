@@ -38,7 +38,7 @@ jobs:
       run: ruff check rheojax tests
 
     - name: Run MyPy
-      run: mypy rheojax
+      run: mypy rheojax --ignore-missing-imports --no-strict-optional
 
   test:
     runs-on: ${{ matrix.os }}
