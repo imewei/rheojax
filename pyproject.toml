@@ -125,7 +125,7 @@ exclude = ["tests*", "docs*", "examples*"]
 "rheojax" = ["py.typed", "*.json", "*.yaml"]
 
 [tool.pytest.ini_options]
-minversion = "7.0"
+minversion = "8.4"
 testpaths = ["tests"]
 addopts = [
     "-v",
