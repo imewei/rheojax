@@ -66,9 +66,15 @@ jobs:
         pip install -r requirements-dev.txt
         pip install -e .
 
-    - name: Run tests
+    - name: Run tests (fast - skip comprehensive validation, parallel)
+      if: github.event_name != 'schedule'
       run: |
-        pytest -v --cov=rheojax --cov-report=xml --cov-report=term-missing
+        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing -m "not notebook_comprehensive"
+
+    - name: Run tests (full - weekly comprehensive validation, parallel)
+      if: github.event_name == 'schedule'
+      run: |
+        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

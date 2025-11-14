@@ -98,10 +98,13 @@ help:
 	@echo "  $(CYAN)gpu-check$(RESET)        Check GPU availability and CUDA setup"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)TESTING$(RESET)"
-	@echo "  $(CYAN)test$(RESET)             Run all tests"
-	@echo "  $(CYAN)test-fast$(RESET)        Run tests excluding slow ones"
-	@echo "  $(CYAN)test-coverage$(RESET)    Run tests with coverage report"
-	@echo "  $(CYAN)test-integration$(RESET) Run integration tests only"
+	@echo "  $(CYAN)test$(RESET)                   Run all tests"
+	@echo "  $(CYAN)test-fast$(RESET)              Run tests excluding slow ones"
+	@echo "  $(CYAN)test-parallel$(RESET)          Run all tests in parallel (2-4x faster)"
+	@echo "  $(CYAN)test-parallel-fast$(RESET)     Run fast tests in parallel"
+	@echo "  $(CYAN)test-coverage$(RESET)          Run tests with coverage report"
+	@echo "  $(CYAN)test-coverage-parallel$(RESET) Run coverage with parallel execution"
+	@echo "  $(CYAN)test-integration$(RESET)       Run integration tests only"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)CODE QUALITY$(RESET)"
 	@echo "  $(CYAN)format$(RESET)           Format code with black and ruff"
@@ -254,9 +257,23 @@ test-fast:
 	@echo "$(BOLD)$(BLUE)Running fast tests (excluding slow)...$(RESET)"
 	$(RUN_CMD) $(PYTEST) -m "not slow"
 
+test-parallel:
+	@echo "$(BOLD)$(BLUE)Running tests in parallel (2-4x speedup)...$(RESET)"
+	$(RUN_CMD) $(PYTEST) -n auto
+
+test-parallel-fast:
+	@echo "$(BOLD)$(BLUE)Running fast tests in parallel...$(RESET)"
+	$(RUN_CMD) $(PYTEST) -n auto -m "not slow"
+
 test-coverage:
 	@echo "$(BOLD)$(BLUE)Running tests with coverage report...$(RESET)"
 	$(RUN_CMD) $(PYTEST) --cov=$(PACKAGE_NAME) --cov-report=term-missing --cov-report=html --cov-report=xml
+	@echo "$(BOLD)$(GREEN)✓ Coverage report generated!$(RESET)"
+	@echo "View HTML report: open htmlcov/index.html"
+
+test-coverage-parallel:
+	@echo "$(BOLD)$(BLUE)Running tests with coverage in parallel...$(RESET)"
+	$(RUN_CMD) $(PYTEST) -n auto --cov=$(PACKAGE_NAME) --cov-report=term-missing --cov-report=html --cov-report=xml
 	@echo "$(BOLD)$(GREEN)✓ Coverage report generated!$(RESET)"
 	@echo "View HTML report: open htmlcov/index.html"
 

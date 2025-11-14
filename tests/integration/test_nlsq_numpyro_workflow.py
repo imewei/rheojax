@@ -337,30 +337,6 @@ def test_all_20_models_inherit_fit_bayesian():
     print("[SUCCESS] All models inherit Bayesian capabilities!")
 
 
-@pytest.mark.skip(reason="Zener model fit() not fully implemented yet")
-def test_nlsq_to_nuts_workflow_on_zener_model():
-    """Test complete NLSQ → NUTS workflow on Zener (3-parameter) model."""
-    # Skipped: Zener.fit() returns None for parameter values
-    # Will be enabled once Zener model fitting is implemented
-    pass
-
-
-@pytest.mark.skip(reason="Springpot class not available in rheo.models.springpot")
-def test_nlsq_to_nuts_workflow_on_springpot_model():
-    """Test complete NLSQ → NUTS workflow on springpot (fractional) model."""
-    # Skipped: Springpot class doesn't exist in the models module
-    # May be implemented in a different location or under a different name
-    pass
-
-
-@pytest.mark.skip(reason="FractionalMaxwellGel.fit() not implemented yet")
-def test_nlsq_to_nuts_workflow_on_fractional_maxwell_model():
-    """Test complete NLSQ → NUTS workflow on Fractional Maxwell model."""
-    # Skipped: FractionalMaxwellGel.fit() raises NotImplementedError
-    # Will be enabled once fractional model fitting is implemented
-    pass
-
-
 def test_robustness_to_outliers():
     """Test NLSQ → NUTS workflow robustness to outliers in data."""
     # Setup: Create Maxwell model
