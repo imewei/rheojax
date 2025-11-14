@@ -193,9 +193,12 @@ def test_parameter_bounds_respected():
     omega, G_star = create_test_data()
 
     # Create params with tight bounds
+    # Initial values below bounds will trigger clamping warnings
     params = ParameterSet()
-    params.add("Ge", value=1.0, bounds=(1e4, 2e4))
-    params.add("Gm", value=1.0, bounds=(1e5, 2e5))
+    with pytest.warns(RuntimeWarning, match="Parameter 'Ge' initialized below bounds"):
+        params.add("Ge", value=1.0, bounds=(1e4, 2e4))
+    with pytest.warns(RuntimeWarning, match="Parameter 'Gm' initialized below bounds"):
+        params.add("Gm", value=1.0, bounds=(1e5, 2e5))
     params.add("alpha", value=0.5, bounds=(0.01, 0.99))
     params.add("tau_alpha", value=1.0, bounds=(0.1, 10.0))
 

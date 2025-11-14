@@ -144,15 +144,17 @@ def test_parameter_validation_alpha():
     params.add("alpha", value=0.5, bounds=(0.01, 0.99))
     mixin._validate_fractional_parameters(params)  # Should not raise
 
-    # Invalid alpha (too small)
+    # Invalid alpha (too small) - expect clamping warning
     params = ParameterSet()
-    params.add("alpha", value=0.0, bounds=(0.01, 0.99))
+    with pytest.warns(RuntimeWarning, match="Parameter 'alpha' initialized below bounds"):
+        params.add("alpha", value=0.0, bounds=(0.01, 0.99))
     with pytest.raises(ValueError, match="alpha must be in"):
         mixin._validate_fractional_parameters(params)
 
-    # Invalid alpha (too large)
+    # Invalid alpha (too large) - expect clamping warning
     params = ParameterSet()
-    params.add("alpha", value=1.0, bounds=(0.01, 0.99))
+    with pytest.warns(RuntimeWarning, match="Parameter 'alpha' initialized above bounds"):
+        params.add("alpha", value=1.0, bounds=(0.01, 0.99))
     with pytest.raises(ValueError, match="alpha must be in"):
         mixin._validate_fractional_parameters(params)
 

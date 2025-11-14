@@ -188,7 +188,9 @@ class TestModelFitTemplate:
             x=frequency, y=G_data, x_units="rad/s", y_units="Pa", domain="frequency"
         )
 
-        fig, ax = plot_model_fit(data, G_fit, show_residuals=False)
+        # Expect warning about non-positive values in log-scale plot
+        with pytest.warns(UserWarning, match="Removed .* non-positive values"):
+            fig, ax = plot_model_fit(data, G_fit, show_residuals=False)
 
         assert fig is not None
         assert ax is not None

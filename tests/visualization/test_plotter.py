@@ -61,7 +61,9 @@ class TestPlotRheoData:
             metadata={"test_mode": "oscillation"},
         )
 
-        fig, ax = plot_rheo_data(data)
+        # Expect warning about non-positive values in log-scale plot
+        with pytest.warns(UserWarning, match="Removed .* non-positive values"):
+            fig, ax = plot_rheo_data(data)
 
         assert fig is not None
         assert isinstance(ax, (list, np.ndarray))  # Should have 2 axes for G', G''
@@ -138,7 +140,9 @@ class TestPlotFrequencyDomain:
         frequency = np.logspace(-2, 2, 50)
         G_complex = 1e5 / (1 + 1j * frequency)
 
-        fig, axes = plot_frequency_domain(frequency, G_complex)
+        # Expect warning about non-positive values in log-scale plot
+        with pytest.warns(UserWarning, match="Removed .* non-positive values"):
+            fig, axes = plot_frequency_domain(frequency, G_complex)
 
         assert fig is not None
         assert len(axes) == 2
