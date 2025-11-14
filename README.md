@@ -8,21 +8,9 @@
 
 A modern, JAX-accelerated rheological analysis package providing a unified framework for analyzing experimental rheology data with state-of-the-art performance, Bayesian inference, and comprehensive tutorial notebooks.
 
-## 🆕 What's New in v0.2.0
+## Features & What's New in v0.2.0
 
-Complete rheological analysis toolkit with Bayesian inference and intelligent optimization:
-
-- **20 rheological models** (classical, fractional, flow)
-- **5 data transforms** (FFT, mastercurve, mutation number, OWChirp, derivatives)
-- **Bayesian inference** with NumPyro NUTS sampling + ArviZ diagnostics
-- **Pipeline API** for intuitive workflows with NLSQ → NUTS warm-start
-- **24 tutorial notebooks** covering basic to advanced workflows
-- **Intelligent optimization** with automatic log-residuals and multi-start for wide-range data
-- **Complex modulus convenience properties** for easier oscillation data access
-- **Enhanced TRIOS I/O** with complex modulus handling and chunked reading
-- **5-270x performance improvement** with NLSQ + GPU acceleration
-
-### Quick Example (New in v0.2.0)
+A complete rheological analysis toolkit with Bayesian inference, intelligent optimization, and comprehensive tutorial notebooks:
 
 ```python
 from rheojax.pipeline import BayesianPipeline
@@ -30,7 +18,7 @@ from rheojax.pipeline import BayesianPipeline
 # Complete Bayesian workflow in 4 lines
 pipeline = (BayesianPipeline()
     .load('polymer_data.csv')
-    .fit_nlsq('fractional_maxwell_liquid')  # Fast point estimate
+    .fit_nlsq('fractional_maxwell_liquid')  # Fast point estimate (5-270x faster)
     .fit_bayesian(num_samples=2000))        # NUTS with warm-start
 
 # Get credible intervals
@@ -40,8 +28,6 @@ print(f"Alpha 95% CI: {intervals['alpha']}")
 # Comprehensive diagnostics
 pipeline.plot_pair().plot_trace().plot_forest()
 ```
-
-## Features
 
 ### Core Capabilities
 - **20 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models)
@@ -436,64 +422,6 @@ Full documentation is available at [https://rheojax.readthedocs.io](https://rheo
 - [Visualization Guide](https://rheojax.readthedocs.io/user_guide/visualization_guide.html) - Creating plots
 - [API Reference](https://rheojax.readthedocs.io/api_reference.html) - Complete API documentation
 
-## Development Status
-
-### Phase 1 (Complete) - Core Infrastructure ✅
-
-**Base Abstractions**
-- BaseModel and BaseTransform interfaces
-- RheoData container with JAX support
-- Parameter system with bounds and constraints
-- Scikit-learn compatible API
-
-**Test Mode Detection**
-- Automatic detection: relaxation, creep, oscillation, rotation
-- Metadata-based override capability
-- Test mode validation and suggestions
-
-**Numerical Utilities**
-- Mittag-Leffler functions (one and two-parameter)
-- NLSQ-based optimization with JAX gradients (5-270x faster)
-- Float64 precision enforcement via safe_import_jax()
-
-**File I/O**
-- Readers: TRIOS, CSV, Excel, Anton Paar
-- Writers: HDF5 (full fidelity), Excel
-- Auto-detection with format inference
-
-**Visualization**
-- Automatic plot type selection
-- Three built-in styles (default, publication, presentation)
-- Time-domain, frequency-domain, and flow curve plots
-- Residual visualization
-
-### Phase 2 (Complete) - Models and Transforms ✅
-
-- ✅ **20 Rheological Models**: Maxwell, Zener, fractional models (11 variants), flow models (6)
-- ✅ **5 Data Transforms**: FFT analysis, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative
-- ✅ **Pipeline API**: Complete workflow orchestration with fluent interface
-- ✅ **Enhanced Visualization**: Advanced templates and multi-panel figures
-- ✅ **Comprehensive Testing**: 150+ tests with 90%+ coverage
-
-### Phase 3 (Complete) - Bayesian Inference ✅
-
-- ✅ **Bayesian Parameter Estimation**: NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
-- ✅ **Uncertainty Quantification**: Credible intervals, posterior distributions, parameter correlations
-- ✅ **ArviZ Integration**: Complete diagnostic suite (pair, forest, energy, autocorr, rank, ESS plots)
-- ✅ **Model Comparison**: WAIC/LOO for Bayesian model selection
-- ✅ **BayesianMixin**: All 20 models automatically support Bayesian inference
-- ✅ **BayesianPipeline**: Fluent API for NLSQ → NUTS workflows
-- ✅ **Tutorial Notebooks**: 5 comprehensive Bayesian inference examples
-
-### Phase 4 (Future) - Advanced Features
-
-- Multi-objective optimization
-- Machine learning integration for model selection
-- Automated hyperparameter tuning
-- Real-time data processing and streaming
-- Enhanced custom model framework
-- Advanced sensitivity analysis
-
 ## Performance
 
 ### NLSQ Optimization Performance
@@ -539,45 +467,6 @@ pre-commit install
 # Run tests
 pytest
 ```
-
-## Testing
-
-Run the test suite:
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=rheojax --cov-report=html
-
-# Run specific test categories
-pytest -m "not slow"  # Skip slow tests
-pytest -m unit        # Only unit tests
-pytest -m integration # Integration tests
-```
-
-## Technology Stack
-
-**Core**
-- Python 3.12+
-- JAX 0.8.0 for automatic differentiation and acceleration
-- NLSQ 0.1.6+ for GPU-accelerated optimization
-- NumPyro for Bayesian inference (MCMC NUTS)
-- ArviZ 0.15.0+ for Bayesian visualization and diagnostics
-- NumPy, SciPy for numerical operations
-
-**I/O**
-- h5py for HDF5 files
-- pandas for CSV/Excel
-- openpyxl for Excel writing
-
-**Visualization**
-- matplotlib for plotting
-- publication-quality output in multiple formats
-
-**Optional**
-- CUDA 12+ for GPU acceleration (Linux only)
 
 ## License
 
