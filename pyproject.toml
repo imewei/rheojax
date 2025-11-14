@@ -136,9 +136,23 @@ addopts = [
     "--cov-report=xml",
 ]
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    # Test tier markers (for tiered CI strategy)
+    "smoke: critical unit tests only (< 2 min target, ~100 tests)",
+    "unit: unit tests (default tier for most tests)",
+    "integration: integration tests across modules",
+    "validation: validation against legacy packages (pyrheo, hermes-rheo)",
+    "benchmark: performance benchmarks",
+
+    # Execution characteristics
+    "slow: marks tests as slow (> 30 seconds each, deselect with '-m \"not slow\"')",
     "gpu: marks tests that require GPU",
-    "integration: marks integration tests",
+
+    # Notebook tests
+    "notebook_smoke: quick notebook smoke tests",
+    "notebook_comprehensive: comprehensive notebook validation (slow)",
+
+    # I/O tests
+    "io: file I/O tests",
 ]
 filterwarnings = [
     # Expected warnings from tests

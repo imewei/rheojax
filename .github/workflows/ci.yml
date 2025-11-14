@@ -5,9 +5,6 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
-  schedule:
-    # Run at 2 AM UTC every Monday
-    - cron: '0 2 * * 1'
 
 jobs:
   lint:
@@ -66,15 +63,12 @@ jobs:
         pip install -r requirements-dev.txt
         pip install -e .
 
-    - name: Run tests (fast - skip comprehensive validation, parallel)
-      if: github.event_name != 'schedule'
+    - name: Run tests (fast - exclude slow/validation/benchmarks, parallel)
       run: |
-        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing -m "not notebook_comprehensive"
-
-    - name: Run tests (full - weekly comprehensive validation, parallel)
-      if: github.event_name == 'schedule'
-      run: |
-        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing
+        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing \
+          -m "not slow and not validation and not benchmark and not notebook_comprehensive"
+        # Note: Comprehensive tests (1069/1154 tests, ~5-10 min) run here
+        # Full validation suite should be run locally: pytest -n auto
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

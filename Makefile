@@ -98,8 +98,9 @@ help:
 	@echo "  $(CYAN)gpu-check$(RESET)        Check GPU availability and CUDA setup"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)TESTING$(RESET)"
-	@echo "  $(CYAN)test$(RESET)                   Run all tests"
+	@echo "  $(CYAN)test$(RESET)                   Run all tests (full suite, ~3 hours)"
 	@echo "  $(CYAN)test-fast$(RESET)              Run tests excluding slow ones"
+	@echo "  $(CYAN)test-ci$(RESET)                Run CI test suite (matches GitHub Actions, ~5-10 min)"
 	@echo "  $(CYAN)test-parallel$(RESET)          Run all tests in parallel (2-4x faster)"
 	@echo "  $(CYAN)test-parallel-fast$(RESET)     Run fast tests in parallel"
 	@echo "  $(CYAN)test-coverage$(RESET)          Run tests with coverage report"
@@ -264,6 +265,13 @@ test-parallel:
 test-parallel-fast:
 	@echo "$(BOLD)$(BLUE)Running fast tests in parallel...$(RESET)"
 	$(RUN_CMD) $(PYTEST) -n auto -m "not slow"
+
+test-ci:
+	@echo "$(BOLD)$(BLUE)Running CI test suite (matches GitHub Actions)...$(RESET)"
+	@echo "$(BOLD)Excludes:$(RESET) slow, validation, benchmark, notebook_comprehensive"
+	@echo "$(BOLD)Tests:$(RESET) ~1069/1154 tests, ~5-10 minutes"
+	$(RUN_CMD) $(PYTEST) -n auto -m "not slow and not validation and not benchmark and not notebook_comprehensive"
+	@echo "$(BOLD)$(GREEN)✓ CI test suite passed!$(RESET)"
 
 test-coverage:
 	@echo "$(BOLD)$(BLUE)Running tests with coverage report...$(RESET)"
