@@ -252,9 +252,10 @@ class BatchPipeline:
 
         summary_data: list[dict[str, Any]] = []
         for file_path, result, metrics in self.results:
+            path_obj = Path(file_path)
             row = {
-                "file_path": str(file_path),
-                "file_name": file_path.name,
+                "file_path": str(path_obj),
+                "file_name": path_obj.name,
                 "n_points": len(result.x),
             }
             row.update(metrics)

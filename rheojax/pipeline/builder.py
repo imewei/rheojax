@@ -57,8 +57,9 @@ class PipelineBuilder:
         Example:
             >>> builder.add_load_step('data.csv', x_col='time', y_col='stress')
         """
+        file_path_str = str(file_path)
         self.steps.append(
-            ("load", {"file_path": Path(file_path), "format": format, **kwargs})
+            ("load", {"file_path": file_path_str, "format": format, **kwargs})
         )
         return self
 
@@ -156,8 +157,9 @@ class PipelineBuilder:
         Example:
             >>> builder.add_save_step('output.hdf5')
         """
+        file_path_str = str(file_path)
         self.steps.append(
-            ("save", {"file_path": Path(file_path), "format": format, **kwargs})
+            ("save", {"file_path": file_path_str, "format": format, **kwargs})
         )
         return self
 

@@ -183,16 +183,26 @@ class FractionalModelMixin:
             If parameters are invalid
         """
         # Validate alpha parameter if it exists
-        if parameters.get_value("alpha") is not None:
-            alpha = parameters.get_value("alpha")
+        alpha_param = parameters.get("alpha")
+        if alpha_param is not None and alpha_param.value is not None:
+            alpha = alpha_param.value
+            if alpha_param.was_clamped:
+                raise ValueError(
+                    f"Fractional order alpha must be in (0, 1), got {alpha}"
+                )
             if not (0 < alpha < 1):
                 raise ValueError(
                     f"Fractional order alpha must be in (0, 1), got {alpha}"
                 )
 
         # Validate beta parameter if it exists (for Maxwell Model)
-        if parameters.get_value("beta") is not None:
-            beta = parameters.get_value("beta")
+        beta_param = parameters.get("beta")
+        if beta_param is not None and beta_param.value is not None:
+            beta = beta_param.value
+            if beta_param.was_clamped:
+                raise ValueError(
+                    f"Fractional order beta must be in (0, 1), got {beta}"
+                )
             if not (0 < beta < 1):
                 raise ValueError(f"Fractional order beta must be in (0, 1), got {beta}")
 

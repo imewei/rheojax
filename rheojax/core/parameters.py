@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -112,13 +113,21 @@ class Parameter:
         self.description = description
         self.constraints = list(constraints) if constraints else []
         self._value: float | None = None
+        self._clamp_on_set = False
+        self._was_clamped = False
         self._initialize(value)
 
     def _initialize(self, value: float | None) -> None:
         """Validate parameter after initialization."""
         if self.bounds is not None:
             lower, upper = self.bounds
-            self.bounds = (float(lower), float(upper))
+            lower = float(lower)
+            upper = float(upper)
+            if lower > upper:
+                raise ValueError(
+                    f"Invalid bounds for parameter '{self.name}': {(lower, upper)}"
+                )
+            self.bounds = (lower, upper)
 
         # Add bounds as constraint if specified
         if self.bounds:
@@ -130,7 +139,9 @@ class Parameter:
             )
 
         if value is not None:
+            self._clamp_on_set = True
             self.value = value
+            self._clamp_on_set = False
 
     @property
     def value(self) -> float | None:
@@ -140,10 +151,57 @@ class Parameter:
     @value.setter
     def value(self, val: float | None) -> None:
         """Set parameter value with validation."""
-        if val is not None and self.bounds:
-            if val < self.bounds[0] or val > self.bounds[1]:
-                raise ValueError(f"Value {val} out of bounds {self.bounds}")
-        self._value = val
+        if val is None:
+            self._value = None
+            self._was_clamped = False
+            return
+
+        try:
+            numeric_val = float(val)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Parameter '{self.name}' requires a numeric value"
+            ) from exc
+
+        if not np.isfinite(numeric_val):
+            raise ValueError(
+                f"Parameter '{self.name}' received non-finite value"
+            )
+
+        clamped_during_init = False
+        if self.bounds:
+            lower, upper = self.bounds
+            if self._clamp_on_set:
+                if numeric_val < lower:
+                    warnings.warn(
+                        f"Parameter '{self.name}' initialized below bounds; clamped to {lower}",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                    numeric_val = lower
+                    clamped_during_init = True
+                elif numeric_val > upper:
+                    warnings.warn(
+                        f"Parameter '{self.name}' initialized above bounds; clamped to {upper}",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                    numeric_val = upper
+                    clamped_during_init = True
+            elif numeric_val < lower or numeric_val > upper:
+                raise ValueError(f"Value {numeric_val} out of bounds {self.bounds}")
+
+        if self._clamp_on_set:
+            self._was_clamped = clamped_during_init
+        else:
+            self._was_clamped = False
+
+        self._value = numeric_val
+
+    @property
+    def was_clamped(self) -> bool:
+        """Return True if the last assignment clamped the value."""
+        return self._was_clamped
 
     def validate(self, value: float, context: dict[str, float] | None = None) -> bool:
         """Validate value against all constraints.
