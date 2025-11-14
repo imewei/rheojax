@@ -6,55 +6,38 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-A modern, JAX-accelerated rheological analysis package providing a unified framework for analyzing experimental rheology data with state-of-the-art performance, Bayesian inference, and comprehensive tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 20 rheological models, 5 data transforms, Bayesian inference via NumPyro, and 24 tutorial notebooks.
 
-## Features & What's New in v0.2.0
+## Features
 
-A complete rheological analysis toolkit with Bayesian inference, intelligent optimization, and comprehensive tutorial notebooks:
-
-```python
-from rheojax.pipeline import BayesianPipeline
-
-# Complete Bayesian workflow in 4 lines
-pipeline = (BayesianPipeline()
-    .load('polymer_data.csv')
-    .fit_nlsq('fractional_maxwell_liquid')  # Fast point estimate (5-270x faster)
-    .fit_bayesian(num_samples=2000))        # NUTS with warm-start
-
-# Get credible intervals
-intervals = pipeline.get_credible_intervals()
-print(f"Alpha 95% CI: {intervals['alpha']}")
-
-# Comprehensive diagnostics
-pipeline.plot_pair().plot_trace().plot_forest()
-```
+Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
 - **20 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models)
 - **5 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative
-- **Model-Data Compatibility Checking**: Intelligent system detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
+- **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
 - **Bayesian Inference**: All 20 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
-- **Smart Initialization**: Automatic intelligent parameter initialization for fractional models in oscillation mode
-- **JAX-First Architecture**: 5-270x performance improvements with automatic differentiation and GPU support
+- **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
+- **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
 
 ### Data & I/O
-- **Comprehensive Data Support**: Automatic test mode detection (relaxation, creep, oscillation, rotation)
-- **Multiple File Formats**: TRIOS, CSV, Excel, Anton Paar with intelligent auto-detection
-- **Flexible Parameter System**: Type-safe parameter management with bounds and constraints
+- **Data Support**: Automatic test mode detection (relaxation, creep, oscillation, rotation)
+- **File Formats**: TRIOS, CSV, Excel, Anton Paar with format auto-detection
+- **Parameter System**: Type-safe parameter management with bounds and constraints
 
 ### Visualization & Diagnostics
-- **Publication-Quality Visualization**: Three built-in styles (default, publication, presentation)
+- **Visualization**: Three built-in styles (default, publication, presentation)
 - **ArviZ Diagnostic Suite**: 6 plot types (pair, forest, energy, autocorr, rank, ESS) for MCMC quality
-- **Extensible Design**: Plugin system for custom models and transforms
+- **Plugin System**: Support for custom models and transforms
 
 ### Tutorial Notebooks & Examples
-- **24 Comprehensive Notebooks**: Organized in 4 learning phases
+- **24 Tutorial Notebooks**: Organized in 4 categories
   - `examples/basic/` - 5 notebooks covering fundamental models
   - `examples/transforms/` - 6 notebooks for data transforms and analysis
   - `examples/bayesian/` - 6 notebooks for Bayesian inference workflows
-  - `examples/advanced/` - 7 notebooks for production-ready patterns
-- **I/O Examples**: TRIOS complex modulus handling and plotting demonstrations
+  - `examples/advanced/` - 7 notebooks for production patterns
+- **I/O Examples**: TRIOS complex modulus handling and plotting
 
 ## Installation
 
@@ -80,21 +63,21 @@ cd rheojax
 pip install -e ".[dev]"
 ```
 
-### GPU Installation (Linux Only) ⚡
+### GPU Installation (Linux Only)
 
 **Performance Impact:** 20-100x speedup for large datasets (>10K points)
 
-#### Option 1: Quick Install via Makefile (Recommended)
+#### Option 1: Install via Makefile
 
 From the repository:
 
 ```bash
 git clone https://github.com/imewei/rheojax.git
 cd rheojax
-make install-jax-gpu  # Automatically handles uninstall + GPU install
+make install-jax-gpu  # Handles uninstall + GPU install
 ```
 
-This single command:
+This command:
 - Uninstalls CPU-only JAX
 - Installs GPU-enabled JAX with CUDA 12 support
 - Verifies GPU detection
@@ -149,9 +132,9 @@ export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 #### Platform Support
 
-- ✅ **Linux + NVIDIA GPU + CUDA 12.1-12.9:** Full GPU acceleration (20-100x speedup)
-- ❌ **macOS:** CPU-only (Apple Silicon/Intel, no NVIDIA GPU support)
-- ❌ **Windows:** CPU-only (CUDA support experimental/unstable)
+- **Linux + NVIDIA GPU + CUDA 12.1-12.9:** Full GPU acceleration (20-100x speedup)
+- **macOS:** CPU-only (Apple Silicon/Intel, no NVIDIA GPU support)
+- **Windows:** CPU-only (CUDA support experimental/unstable)
 
 **Requirements (Linux GPU):**
 - System CUDA 12.1-12.9 pre-installed
@@ -160,7 +143,7 @@ export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 #### Conda/Mamba Users
 
-The package works seamlessly in conda environments using pip:
+The package works in conda environments using pip:
 
 ```bash
 conda create -n rheojax python=3.12
@@ -244,7 +227,7 @@ intervals = model.get_credible_intervals(result.posterior_samples, credibility=0
 print(f"G0 95% CI: [{intervals['G0'][0]:.3e}, {intervals['G0'][1]:.3e}]")
 ```
 
-### Complete Bayesian Pipeline with ArviZ Diagnostics
+### Bayesian Pipeline with ArviZ Diagnostics
 
 ```python
 from rheojax.pipeline.bayesian import BayesianPipeline
@@ -260,7 +243,7 @@ pipeline = BayesianPipeline()
     .plot_trace()
     .save('results.hdf5'))
 
-# ArviZ diagnostic plots (comprehensive MCMC quality assessment)
+# ArviZ diagnostic plots (MCMC quality assessment)
 (pipeline
     .plot_pair(divergences=True)        # Parameter correlations with divergences
     .plot_forest(hdi_prob=0.95)         # Credible intervals comparison
@@ -270,16 +253,16 @@ pipeline = BayesianPipeline()
     .plot_ess(kind='local'))            # Effective sample size
 ```
 
-**📚 New to Bayesian inference?** See the comprehensive [Bayesian Quick Start Guide](docs/BAYESIAN_QUICK_START.md) for:
+**Reference:** See [Bayesian Quick Start Guide](docs/BAYESIAN_QUICK_START.md) for:
 - When and why to use Bayesian inference
-- Complete NLSQ → NUTS → ArviZ workflow walkthrough
-- Troubleshooting common convergence issues
+- NLSQ → NUTS → ArviZ workflow walkthrough
+- Troubleshooting convergence issues
 - Best practices checklist
 - Runnable demo: `python examples/bayesian_workflow_demo.py`
 
 ### Model-Data Compatibility Checking
 
-RheoJAX automatically detects when models are inappropriate for your data based on physics:
+RheoJAX detects when models are inappropriate for data based on physics:
 
 ```python
 from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
@@ -296,7 +279,7 @@ compat = check_model_compatibility(
     model, t=t, G_t=G_t, test_mode='relaxation'
 )
 
-# Get human-readable report
+# Get report
 print(format_compatibility_message(compat))
 # Output:
 # ⚠ Model may not be appropriate for this data
@@ -312,17 +295,17 @@ print(format_compatibility_message(compat))
 #   • Maxwell
 #   • Zener
 
-# Or enable automatic checking during fit
+# Or enable checking during fit
 model.fit(t, G_t, check_compatibility=True)  # Warns if incompatible
 ```
 
-**Key Features:**
+**Features:**
 - Detects decay type (exponential, power-law, stretched, Mittag-Leffler)
 - Classifies material type (solid, liquid, gel, viscoelastic)
 - Provides model recommendations when incompatible
-- Enhanced error messages explain physics mismatches
+- Error messages explain physics mismatches
 
-**📖 See:** [Model Selection Guide](docs/model_selection_guide.md) for comprehensive decision flowcharts and model characteristics.
+**Reference:** [Model Selection Guide](docs/model_selection_guide.md) for decision flowcharts and model characteristics.
 
 ### Working with Parameters
 
@@ -355,7 +338,7 @@ mc = Mastercurve(reference_temp=298.15, method='wlf')
 # Option 1: Create mastercurve (basic)
 mastercurve = mc.create_mastercurve(datasets)
 
-# Option 2: Transform with shift factors (recommended for plotting)
+# Option 2: Transform with shift factors (for plotting)
 mastercurve, shift_factors = mc.transform(datasets)
 
 # Get parameters and arrays for analysis
@@ -369,7 +352,7 @@ delta = mn.calculate(data)  # 0=elastic, 1=viscous
 
 ## Tutorial Notebooks
 
-Comprehensive learning path with 24 tutorial notebooks:
+24 tutorial notebooks organized by topic:
 
 ```
 examples/
@@ -406,11 +389,11 @@ examples/
     └── plot_trios_complex_modulus.ipynb
 ```
 
-See `examples/README.md` for complete learning path guide.
+See `examples/README.md` for learning path guide.
 
 ## Documentation
 
-Full documentation is available at [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
+Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 
 ### Key Topics
 
@@ -420,13 +403,13 @@ Full documentation is available at [https://rheojax.readthedocs.io](https://rheo
 - [Pipeline API](https://rheojax.readthedocs.io/user_guide/pipeline_api.html) - High-level workflows
 - [I/O Guide](https://rheojax.readthedocs.io/user_guide/io_guide.html) - Reading and writing data
 - [Visualization Guide](https://rheojax.readthedocs.io/user_guide/visualization_guide.html) - Creating plots
-- [API Reference](https://rheojax.readthedocs.io/api_reference.html) - Complete API documentation
+- [API Reference](https://rheojax.readthedocs.io/api_reference.html) - API documentation
 
 ## Performance
 
 ### NLSQ Optimization Performance
 
-NLSQ provides significant performance improvements over scipy:
+NLSQ performance compared to scipy:
 
 | Dataset Size | scipy (Powell) | NLSQ (JAX) | Speedup |
 |--------------|----------------|------------|---------|
@@ -437,7 +420,7 @@ NLSQ provides significant performance improvements over scipy:
 
 ### Bayesian Warm-Start Performance
 
-NLSQ → NUTS warm-start dramatically improves MCMC convergence:
+NLSQ → NUTS warm-start improves MCMC convergence:
 
 | Method | Convergence Time | Divergences | ESS/sec |
 |--------|------------------|-------------|---------|
@@ -449,7 +432,7 @@ NLSQ → NUTS warm-start dramatically improves MCMC convergence:
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+Contributions are accepted. See [Contributing Guide](CONTRIBUTING.md) for details.
 
 ### Development Setup
 
@@ -488,7 +471,7 @@ If you use rheo in your research, please cite:
 
 ## Acknowledgments
 
-rheo is built on excellent open-source software:
+Built on open-source software:
 
 - [JAX](https://github.com/google/jax) for automatic differentiation and acceleration
 - [NLSQ](https://github.com/rdyro/nlsq) for GPU-accelerated nonlinear least squares
@@ -499,15 +482,15 @@ rheo is built on excellent open-source software:
 
 ## Support
 
-- 📖 Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
-- 💬 Discussions: [GitHub Discussions](https://github.com/imewei/rheojax/discussions)
-- 🐛 Issues: [GitHub Issues](https://github.com/imewei/rheojax/issues)
-- 📧 Email: wchen@anl.gov
+- Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
+- Discussions: [GitHub Discussions](https://github.com/imewei/rheojax/discussions)
+- Issues: [GitHub Issues](https://github.com/imewei/rheojax/issues)
+- Email: wchen@anl.gov
 
 ## Roadmap
 
-See [CHANGELOG.md](CHANGELOG.md) for detailed development history and [examples/](examples/) for comprehensive tutorial notebooks.
+See [CHANGELOG.md](CHANGELOG.md) for development history and [examples/](examples/) for tutorial notebooks.
 
 ---
 
-Made with ❤️ by Wei Chen
+Wei Chen
