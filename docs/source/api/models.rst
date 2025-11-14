@@ -1,570 +1,703 @@
 Models API
 ==========
 
-This page documents all 20 rheological models implemented in rheojax.
+Concise parameter reference for every rheological model. For derivations, limits,
+and usage recipes see the :doc:`/models/index` handbook.
 
-Overview
---------
-
-rheo provides three families of models:
-
-- **Classical Models** (3): Spring-dashpot combinations
-- **Fractional Models** (11): Power-law viscoelastic behavior
-- **Non-Newtonian Flow Models** (6): Shear-rate dependent viscosity
-
-All models inherit from :class:`rheojax.core.base.BaseModel` and follow the scikit-learn API pattern with ``fit()``, ``predict()``, and ``score()`` methods.
-
-Model Registry
---------------
-
-Access models through the registry:
-
-.. code-block:: python
-
-   from rheojax.core.registry import ModelRegistry
-
-   # List all available models
-   models = ModelRegistry.list_models()
-
-   # Create model by name
-   model = ModelRegistry.create('maxwell')
-
-   # Get model information
-   info = ModelRegistry.get_info('fractional_maxwell_gel')
+.. contents::
+   :local:
+   :depth: 2
 
 Classical Models
 ----------------
 
-Maxwell Model
-~~~~~~~~~~~~~
+Maxwell
+~~~~~~~
 
-.. autoclass:: rheojax.models.Maxwell
+:class:`rheojax.models.maxwell.Maxwell` | Handbook: :doc:`/models/classical/maxwell`
+Spring and dashpot in series for single-mode relaxation.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``G0``
+     - Pa
+     - [0.001, 1e+09]
+     - Elastic modulus
+   * - ``eta``
+     - Pa*s
+     - [1e-06, 1e+12]
+     - Viscosity
+
+.. autoclass:: rheojax.models.maxwell.Maxwell
    :members:
    :undoc-members:
    :show-inheritance:
 
-   **Description**: Two-parameter viscoelastic model with a spring and dashpot in series.
-
-   **Parameters**:
-      - G_s (Pa): Shear modulus of spring element
-      - eta_s (Pa·s): Viscosity of dashpot element
-
-   **Test Modes**: Relaxation, Oscillation
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import Maxwell
-      import numpy as np
-
-      # Create model
-      maxwell = Maxwell()
-
-      # Fit to oscillation data
-      omega = np.logspace(-1, 2, 50)  # rad/s
-      G_star = 1e5 / (1 + 1j * omega * 0.1)  # Synthetic data
-      maxwell.fit(omega, np.abs(G_star))
-
-      # Get parameters
-      G_s = maxwell.parameters.get_value('G_s')
-      eta_s = maxwell.parameters.get_value('eta_s')
-      tau = eta_s / G_s
-
-      print(f"Relaxation time: {tau:.3f} s")
-
-Zener Model
-~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.Zener
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: Three-parameter standard linear solid (SLS) model.
-
-   **Parameters**:
-      - G_s (Pa): Equilibrium modulus
-      - G_p (Pa): Parallel spring modulus
-      - eta_p (Pa·s): Parallel dashpot viscosity
-
-   **Test Modes**: Relaxation, Creep, Oscillation
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import Zener
-
-      zener = Zener()
-      zener.fit(omega, G_star)
-
-      # Zener shows solid-like plateau at low frequency
-      # and relaxation at high frequency
-
-SpringPot Model
-~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.SpringPot
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: Two-parameter fractional power-law element.
-
-   **Parameters**:
-      - V (Pa·s^α): Fractional stiffness
-      - alpha (-): Fractional order (0 < alpha < 1)
-
-   **Test Modes**: Oscillation, Relaxation
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import SpringPot
-
-      springpot = SpringPot()
-      springpot.fit(omega, G_star)
-
-      alpha = springpot.parameters.get_value('alpha')
-      # alpha ≈ 0: solid-like
-      # alpha ≈ 1: liquid-like
-      # 0 < alpha < 1: power-law viscoelastic
-
-Fractional Maxwell Family
---------------------------
-
-FractionalMaxwellGel
-~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalMaxwellGel
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: Spring in series with SpringPot (gel-like behavior).
-
-   **Parameters**:
-      - G_s (Pa): Spring modulus
-      - V (Pa·s^α): SpringPot stiffness
-      - alpha (-): Fractional order
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import FractionalMaxwellGel
-
-      fmg = FractionalMaxwellGel()
-      fmg.fit(omega, G_star)
-
-      # Good for materials with elastic plateau and power-law relaxation
-
-FractionalMaxwellLiquid
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalMaxwellLiquid
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: SpringPot in series with dashpot (liquid-like with memory).
-
-   **Parameters**:
-      - V (Pa·s^α): SpringPot stiffness
-      - alpha (-): Fractional order
-      - eta_s (Pa·s): Dashpot viscosity
-
-FractionalMaxwellModel
-~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalMaxwellModel
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: General fractional Maxwell with two SpringPots in series.
-
-   **Parameters**: 4 parameters for maximum flexibility
-
-FractionalKelvinVoigt
-~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalKelvinVoigt
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: Spring and SpringPot in parallel (solid-like with slow relaxation).
-
-   **Parameters**:
-      - G_p (Pa): Parallel spring modulus
-      - V (Pa·s^α): SpringPot stiffness
-      - alpha (-): Fractional order
-      - eta_p (Pa·s, optional): Parallel dashpot viscosity
-
-Fractional Zener Family
-------------------------
-
-FractionalZenerSolidLiquid (FZSL)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalZenerSolidLiquid
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :noindex:
-
-.. autoclass:: rheojax.models.FZSL
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: Fractional Maxwell + spring in parallel (solid + fractional liquid).
-
-   **Parameters**:
-      - G_s (Pa): Series spring modulus
-      - eta_s (Pa·s): Series dashpot viscosity
-      - V (Pa·s^α): SpringPot stiffness
-      - alpha (-): Fractional order
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import FZSL  # Short alias
-
-      fzsl = FZSL()
-      fzsl.fit(omega, G_star)
-
-      # Good for polymer melts with plateau and power-law flow
-
-FractionalZenerSolidSolid (FZSS)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalZenerSolidSolid
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :noindex:
-
-.. autoclass:: rheojax.models.FZSS
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: Two springs + SpringPot (double elastic plateau).
-
-   **Parameters**:
-      - G_s (Pa): Series spring modulus
-      - G_p (Pa): Parallel spring modulus
-      - V (Pa·s^α): SpringPot stiffness
-      - alpha (-): Fractional order
-
-FractionalZenerLiquidLiquid (FZLL)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalZenerLiquidLiquid
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :noindex:
-
-.. autoclass:: rheojax.models.FZLL
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: Most general fractional Zener (two dashpots + SpringPot).
-
-   **Parameters**: 4 parameters for complex behavior
-
-FractionalKelvinVoigtZener (FKVZ)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalKelvinVoigtZener
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :noindex:
-
-.. autoclass:: rheojax.models.FKVZ
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-   **Description**: Fractional Kelvin-Voigt + spring in series.
-
-   **Parameters**: 4 parameters
-
-Advanced Fractional Models
----------------------------
-
-FractionalBurgersModel (FBM)
+Zener (Standard Linear Solid)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheojax.models.FractionalBurgersModel
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :noindex:
+:class:`rheojax.models.zener.Zener` | Handbook: :doc:`/models/classical/zener`
+Adds an equilibrium spring to capture solid plateaus.
 
-.. autoclass:: rheojax.models.FBM
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
 
-   **Description**: Maxwell + Fractional Kelvin-Voigt in series (creep + relaxation).
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``Ge``
+     - Pa
+     - [0.001, 1e+09]
+     - Equilibrium modulus
+   * - ``Gm``
+     - Pa
+     - [0.001, 1e+09]
+     - Maxwell modulus
+   * - ``eta``
+     - Pa*s
+     - [1e-06, 1e+12]
+     - Viscosity
 
-   **Parameters**: 5 parameters for complex time-dependent behavior
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import FBM
-
-      fbm = FBM()
-      fbm.fit(time, creep_compliance)
-
-      # Excellent for materials showing both creep and relaxation
-
-FractionalPoyntingThomson (FPT)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.FractionalPoyntingThomson
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :noindex:
-
-.. autoclass:: rheojax.models.FPT
+.. autoclass:: rheojax.models.zener.Zener
    :members:
    :undoc-members:
    :show-inheritance:
 
-   **Description**: Fractional Kelvin-Voigt + spring in series (alternative formulation).
+SpringPot
+~~~~~~~~~
 
-   **Parameters**: 5 parameters
+:class:`rheojax.models.springpot.SpringPot` | Handbook: :doc:`/models/classical/springpot`
+Fractional element interpolating between elastic and viscous limits.
 
-FractionalJeffreysModel (FJM)
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``c_alpha``
+     - Pa*s^alpha
+     - [0.001, 1e+09]
+     - Material constant
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Power-law exponent (0=fluid, 1=solid)
+
+.. autoclass:: rheojax.models.springpot.SpringPot
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Models
+-----------------
+
+Fractional Maxwell Gel
+~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_maxwell_gel.FractionalMaxwellGel` | Handbook: :doc:`/models/fractional/fractional_maxwell_gel`
+Spring in series with SpringPot for gel-like plateaus.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``c_alpha``
+     - Pa*s^alpha
+     - [0.001, 1e+09]
+     - SpringPot material constant
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Power-law exponent
+   * - ``eta``
+     - Pa*s
+     - [1e-06, 1e+12]
+     - Dashpot viscosity
+
+.. autoclass:: rheojax.models.fractional_maxwell_gel.FractionalMaxwellGel
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Maxwell Liquid
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_maxwell_liquid.FractionalMaxwellLiquid` | Handbook: :doc:`/models/fractional/fractional_maxwell_liquid`
+SpringPot plus dashpot for liquid-like systems with memory.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``Gm``
+     - Pa
+     - [0.001, 1e+09]
+     - Maxwell modulus
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Power-law exponent
+   * - ``tau_alpha``
+     - s^alpha
+     - [1e-06, 1e+06]
+     - Relaxation time
+
+.. autoclass:: rheojax.models.fractional_maxwell_liquid.FractionalMaxwellLiquid
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Maxwell (General)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_maxwell_model.FractionalMaxwellModel` | Handbook: :doc:`/models/fractional/fractional_maxwell_model`
+Two SpringPots in series for broad relaxation spectra.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``c1``
+     - Pa*s^alpha
+     - [0.001, 1e+09]
+     - Material constant
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - First fractional order
+   * - ``beta``
+     - dimensionless
+     - [0, 1]
+     - Second fractional order
+   * - ``tau``
+     - s
+     - [1e-06, 1e+06]
+     - Relaxation time
+
+.. autoclass:: rheojax.models.fractional_maxwell_model.FractionalMaxwellModel
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Kelvin-Voigt
+~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_kelvin_voigt.FractionalKelvinVoigt` | Handbook: :doc:`/models/fractional/fractional_kelvin_voigt`
+Spring plus SpringPot in parallel for solid-like gels.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``Ge``
+     - Pa
+     - [0.001, 1e+09]
+     - Equilibrium modulus
+   * - ``c_alpha``
+     - Pa*s^alpha
+     - [0.001, 1e+09]
+     - SpringPot constant
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Fractional order
+
+.. autoclass:: rheojax.models.fractional_kelvin_voigt.FractionalKelvinVoigt
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Zener Solid-Liquid
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_zener_sl.FractionalZenerSolidLiquid` | Handbook: :doc:`/models/fractional/fractional_zener_sl`
+Equilibrium spring parallel to fractional Maxwell arm.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``Ge``
+     - Pa
+     - [0.001, 1e+09]
+     - Equilibrium modulus
+   * - ``c_alpha``
+     - Pa*s^alpha
+     - [0.001, 1e+09]
+     - SpringPot constant
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Fractional order
+   * - ``tau``
+     - s
+     - [1e-06, 1e+06]
+     - Relaxation time
+
+.. autoclass:: rheojax.models.fractional_zener_sl.FractionalZenerSolidLiquid
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Zener Solid-Solid
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_zener_ss.FractionalZenerSolidSolid` | Handbook: :doc:`/models/fractional/fractional_zener_ss`
+Two springs plus SpringPot for stiff gels and glasses.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``Ge``
+     - Pa
+     - [0.001, 1e+09]
+     - Equilibrium modulus
+   * - ``Gm``
+     - Pa
+     - [0.001, 1e+09]
+     - Maxwell arm modulus
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Fractional order
+   * - ``tau_alpha``
+     - s^alpha
+     - [1e-06, 1e+06]
+     - Relaxation time
+
+.. autoclass:: rheojax.models.fractional_zener_ss.FractionalZenerSolidSolid
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Zener Liquid-Liquid
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: rheojax.models.FractionalJeffreysModel
+:class:`rheojax.models.fractional_zener_ll.FractionalZenerLiquidLiquid` | Handbook: :doc:`/models/fractional/fractional_zener_ll`
+Most general fractional Zener with three fractional orders.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``c1``
+     - Pa*s^alpha
+     - [0.001, 1e+09]
+     - First SpringPot constant
+   * - ``c2``
+     - Pa*s^gamma
+     - [0.001, 1e+09]
+     - Second SpringPot constant
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - First fractional order
+   * - ``beta``
+     - dimensionless
+     - [0, 1]
+     - Second fractional order
+   * - ``gamma``
+     - dimensionless
+     - [0, 1]
+     - Third fractional order
+   * - ``tau``
+     - s
+     - [1e-06, 1e+06]
+     - Relaxation time
+
+.. autoclass:: rheojax.models.fractional_zener_ll.FractionalZenerLiquidLiquid
    :members:
    :undoc-members:
    :show-inheritance:
-   :noindex:
 
-.. autoclass:: rheojax.models.FJM
+Fractional Kelvin-Voigt Zener
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_kv_zener.FractionalKelvinVoigtZener` | Handbook: :doc:`/models/fractional/fractional_kv_zener`
+Series spring plus fractional Kelvin-Voigt block.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``Ge``
+     - Pa
+     - [0.001, 1e+09]
+     - Series spring modulus
+   * - ``Gk``
+     - Pa
+     - [0.001, 1e+09]
+     - KV element modulus
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Fractional order
+   * - ``tau``
+     - s
+     - [1e-06, 1e+06]
+     - Retardation time
+
+.. autoclass:: rheojax.models.fractional_kv_zener.FractionalKelvinVoigtZener
    :members:
    :undoc-members:
    :show-inheritance:
 
-   **Description**: Two dashpots + SpringPot (liquid-like with fractional element).
+Fractional Burgers
+~~~~~~~~~~~~~~~~~~
 
-   **Parameters**: 4 parameters
+:class:`rheojax.models.fractional_burgers.FractionalBurgersModel` | Handbook: :doc:`/models/fractional/fractional_burgers`
+Combines Maxwell and Kelvin-Voigt elements for asphalt-like flows.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``Jg``
+     - 1/Pa
+     - [1e-09, 1000]
+     - Glassy compliance
+   * - ``eta1``
+     - Pa*s
+     - [1e-06, 1e+12]
+     - Viscosity (Maxwell arm)
+   * - ``Jk``
+     - 1/Pa
+     - [1e-09, 1000]
+     - Kelvin compliance
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Fractional order
+   * - ``tau_k``
+     - s
+     - [1e-06, 1e+06]
+     - Retardation time
+
+.. autoclass:: rheojax.models.fractional_burgers.FractionalBurgersModel
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Poynting-Thomson
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_poynting_thomson.FractionalPoyntingThomson` | Handbook: :doc:`/models/fractional/fractional_poynting_thomson`
+Fractional parallel branch with retardation time.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``Ge``
+     - Pa
+     - [0.001, 1e+09]
+     - Instantaneous modulus
+   * - ``Gk``
+     - Pa
+     - [0.001, 1e+09]
+     - Retarded modulus
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Fractional order
+   * - ``tau``
+     - s
+     - [1e-06, 1e+06]
+     - Retardation time
+
+.. autoclass:: rheojax.models.fractional_poynting_thomson.FractionalPoyntingThomson
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Fractional Jeffreys
+~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.fractional_jeffreys.FractionalJeffreysModel` | Handbook: :doc:`/models/fractional/fractional_jeffreys`
+Two dashpots plus SpringPot for thixotropic-like liquids.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``eta1``
+     - Pa*s
+     - [1e-06, 1e+12]
+     - First viscosity
+   * - ``eta2``
+     - Pa*s
+     - [1e-06, 1e+12]
+     - Second viscosity
+   * - ``alpha``
+     - dimensionless
+     - [0, 1]
+     - Fractional order
+   * - ``tau1``
+     - s
+     - [1e-06, 1e+06]
+     - Relaxation time
+
+.. autoclass:: rheojax.models.fractional_jeffreys.FractionalJeffreysModel
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Non-Newtonian Flow Models
---------------------------
+-------------------------
 
-These models describe shear-rate dependent viscosity for steady shear flows.
+Power Law
+~~~~~~~~~
 
-**Test Mode**: Rotation (steady shear) only
+:class:`rheojax.models.power_law.PowerLaw` | Handbook: :doc:`/models/flow/power_law`
+Two-parameter viscosity curve tau = K*gamma^n.
 
-PowerLaw
-~~~~~~~~
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
 
-.. autoclass:: rheojax.models.PowerLaw
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``K``
+     - Pa*s^n
+     - [1e-06, 1e+06]
+     - Consistency index
+   * - ``n``
+     - dimensionless
+     - [0.01, 2]
+     - Flow behavior index
+
+.. autoclass:: rheojax.models.power_law.PowerLaw
    :members:
    :undoc-members:
    :show-inheritance:
-
-   **Description**: Simple power-law: τ = K·γ̇^n
-
-   **Parameters**:
-      - K (Pa·s^n): Consistency index
-      - n (-): Flow index (n < 1: shear thinning, n > 1: shear thickening)
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import PowerLaw
-      import numpy as np
-
-      # Shear thinning data
-      shear_rate = np.logspace(-2, 2, 50)  # 1/s
-      viscosity = 10 * shear_rate**(-0.3)  # Synthetic
-      stress = viscosity * shear_rate
-
-      power_law = PowerLaw()
-      power_law.fit(shear_rate, stress)
-
-      K = power_law.parameters.get_value('K')
-      n = power_law.parameters.get_value('n')
-
-      print(f"Flow index n = {n:.3f}")
-      # n < 1: shear thinning
 
 Carreau
 ~~~~~~~
 
-.. autoclass:: rheojax.models.Carreau
+:class:`rheojax.models.carreau.Carreau` | Handbook: :doc:`/models/flow/carreau`
+Smooth transition from Newtonian plateau to shear thinning.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``eta0``
+     - Pa*s
+     - [0.001, 1e+12]
+     - Zero-shear viscosity
+   * - ``eta_inf``
+     - Pa*s
+     - [1e-06, 1e+06]
+     - Infinite-shear viscosity
+   * - ``lambda_``
+     - s
+     - [1e-06, 1e+06]
+     - Time constant
+   * - ``n``
+     - dimensionless
+     - [0.01, 1]
+     - Power-law index
+
+.. autoclass:: rheojax.models.carreau.Carreau
    :members:
    :undoc-members:
    :show-inheritance:
 
-   **Description**: Smooth transition from Newtonian to power-law behavior.
+Carreau-Yasuda
+~~~~~~~~~~~~~~
 
-   **Equation**: η = η_∞ + (η_0 - η_∞) · [1 + (λ·γ̇)²]^((n-1)/2)
+:class:`rheojax.models.carreau_yasuda.CarreauYasuda` | Handbook: :doc:`/models/flow/carreau_yasuda`
+Adds the Yasuda exponent to tune transition sharpness.
 
-   **Parameters**:
-      - eta_0 (Pa·s): Zero-shear viscosity
-      - eta_inf (Pa·s): Infinite-shear viscosity
-      - lambda (s): Time constant
-      - n (-): Power-law index
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
 
-   **Example**:
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``eta0``
+     - Pa*s
+     - [0.001, 1e+12]
+     - Zero-shear viscosity
+   * - ``eta_inf``
+     - Pa*s
+     - [1e-06, 1e+06]
+     - Infinite-shear viscosity
+   * - ``lambda_``
+     - s
+     - [1e-06, 1e+06]
+     - Time constant
+   * - ``n``
+     - dimensionless
+     - [0.01, 1]
+     - Power-law index
+   * - ``a``
+     - dimensionless
+     - [0.1, 2]
+     - Transition parameter
 
-   .. code-block:: python
-
-      from rheojax.models import Carreau
-
-      carreau = Carreau()
-      carreau.fit(shear_rate, viscosity)
-
-      # Good for polymer solutions
-
-CarreauYasuda
-~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.models.CarreauYasuda
+.. autoclass:: rheojax.models.carreau_yasuda.CarreauYasuda
    :members:
    :undoc-members:
    :show-inheritance:
-
-   **Description**: Extended Carreau with transition sharpness control.
-
-   **Equation**: η = η_∞ + (η_0 - η_∞) · [1 + (λ·γ̇)^a]^((n-1)/a)
-
-   **Parameters**: 5 parameters (adds parameter 'a' for transition sharpness)
 
 Cross
 ~~~~~
 
-.. autoclass:: rheojax.models.Cross
+:class:`rheojax.models.cross.Cross` | Handbook: :doc:`/models/flow/cross`
+Alternative viscosity curve with rate exponent m.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``eta0``
+     - Pa*s
+     - [0.001, 1e+12]
+     - Zero-shear viscosity
+   * - ``eta_inf``
+     - Pa*s
+     - [1e-06, 1e+06]
+     - Infinite-shear viscosity
+   * - ``lambda_``
+     - s
+     - [1e-06, 1e+06]
+     - Time constant
+   * - ``m``
+     - dimensionless
+     - [0.1, 2]
+     - Rate constant
+
+.. autoclass:: rheojax.models.cross.Cross
    :members:
    :undoc-members:
    :show-inheritance:
 
-   **Description**: Alternative to Carreau for polymer solutions.
+Herschel-Bulkley
+~~~~~~~~~~~~~~~~
 
-   **Equation**: η = η_∞ + (η_0 - η_∞) / [1 + (K·γ̇)^m]
+:class:`rheojax.models.herschel_bulkley.HerschelBulkley` | Handbook: :doc:`/models/flow/herschel_bulkley`
+Yield stress plus power-law viscosity.
 
-   **Parameters**:
-      - eta_0 (Pa·s): Zero-shear viscosity
-      - eta_inf (Pa·s): Infinite-shear viscosity
-      - K (s^m): Consistency parameter
-      - m (-): Rate constant
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
 
-HerschelBulkley
-~~~~~~~~~~~~~~~
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``sigma_y``
+     - Pa
+     - [0, 1e+06]
+     - Yield stress
+   * - ``K``
+     - Pa*s^n
+     - [1e-06, 1e+06]
+     - Consistency index
+   * - ``n``
+     - dimensionless
+     - [0.01, 2]
+     - Flow behavior index
 
-.. autoclass:: rheojax.models.HerschelBulkley
+.. autoclass:: rheojax.models.herschel_bulkley.HerschelBulkley
    :members:
    :undoc-members:
    :show-inheritance:
-
-   **Description**: Power-law with yield stress (τ_0).
-
-   **Equation**: τ = τ_0 + K·γ̇^n
-
-   **Parameters**:
-      - tau_0 (Pa): Yield stress
-      - K (Pa·s^n): Consistency index
-      - n (-): Flow index
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import HerschelBulkley
-
-      hb = HerschelBulkley()
-      hb.fit(shear_rate, stress)
-
-      tau_0 = hb.parameters.get_value('tau_0')
-      print(f"Yield stress: {tau_0:.2f} Pa")
-
-      # Good for pastes, suspensions, food products
 
 Bingham
 ~~~~~~~
 
-.. autoclass:: rheojax.models.Bingham
+:class:`rheojax.models.bingham.Bingham` | Handbook: :doc:`/models/flow/bingham`
+Yield stress and constant plastic viscosity.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``sigma_y``
+     - Pa
+     - [0, 1e+06]
+     - Yield stress
+   * - ``eta_p``
+     - Pa*s
+     - [1e-06, 1e+12]
+     - Plastic viscosity
+
+.. autoclass:: rheojax.models.bingham.Bingham
    :members:
    :undoc-members:
    :show-inheritance:
 
-   **Description**: Linear viscoplastic (yield stress + Newtonian).
-
-   **Equation**: τ = τ_0 + η_pl·γ̇
-
-   **Parameters**:
-      - tau_0 (Pa): Yield stress
-      - eta_pl (Pa·s): Plastic viscosity
-
-   **Example**:
-
-   .. code-block:: python
-
-      from rheojax.models import Bingham
-
-      bingham = Bingham()
-      bingham.fit(shear_rate, stress)
-
-      # Simpler than Herschel-Bulkley when n ≈ 1
-
-Model Comparison
-----------------
-
-Comparing Multiple Models
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   from rheojax.models import Maxwell, Zener, FractionalMaxwellGel
-   import numpy as np
-
-   models = [Maxwell(), Zener(), FractionalMaxwellGel()]
-   model_names = ['Maxwell', 'Zener', 'FractionalMaxwellGel']
-
-   for name, model in zip(model_names, models):
-       model.fit(omega, G_star)
-       r2 = model.score(omega, G_star)
-       n_params = len(model.parameters)
-
-       print(f"{name:25} R² = {r2:.4f}  ({n_params} parameters)")
-
-   # Select best model by AIC
-   aic_values = []
-   for model in models:
-       y_pred = model.predict(omega)
-       rss = np.sum((np.abs(G_star) - np.abs(y_pred))**2)
-       n = len(omega)
-       k = len(model.parameters)
-       aic = n * np.log(rss/n) + 2 * k
-       aic_values.append(aic)
-
-   best_idx = np.argmin(aic_values)
-   print(f"\nBest model (AIC): {model_names[best_idx]}")
-
-See Also
---------
-
-- :doc:`/user_guide/model_selection` - Decision tree for model selection
-- :doc:`/user_guide/modular_api` - Direct model usage examples
-- :doc:`/user_guide/multi_technique_fitting` - Fitting across multiple test modes
-- :class:`rheojax.core.base.BaseModel` - Base class documentation

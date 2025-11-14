@@ -4,7 +4,7 @@ Pipeline API Tutorial
 The Pipeline API provides a fluent, high-level interface for rheological analysis workflows. It enables intuitive method chaining from data loading through model fitting, visualization, and export.
 
 Why Use the Pipeline API?
---------------------------
+-------------------------
 
 **Advantages**:
 
@@ -42,7 +42,7 @@ The typical pipeline follows this pattern:
        .get_results())             # Get results dict
 
    # Access results
-   print(f"R² = {results['r2']:.4f}")
+   print(f"R^2 = {results['r2']:.4f}")
    print(f"Parameters: {results['parameters']}")
 
 Each method returns `self`, enabling clean method chaining.
@@ -65,7 +65,7 @@ Load data, fit model, and visualize in 4 lines:
    results = pipeline.get_results()
    G_s = results['parameters']['G_s']
    eta_s = results['parameters']['eta_s']
-   print(f"G_s = {G_s:.2e} Pa, eta_s = {eta_s:.2e} Pa·s")
+   print(f"G_s = {G_s:.2e} Pa, eta_s = {eta_s:.2e} Pa*s")
 
 Core Pipeline Operations
 ------------------------
@@ -125,7 +125,7 @@ Apply data transforms before fitting:
    # Single transform
    pipeline = (Pipeline()
        .load('time_series.txt')
-       .transform('fft', window='hann'))  # Time → frequency
+       .transform('fft', window='hann'))  # Time -> frequency
 
    # Multiple transforms (chained)
    pipeline = (Pipeline()
@@ -144,7 +144,7 @@ Apply data transforms before fitting:
 **Available Transforms**:
 
 - ``'smooth'`` or ``'smooth_derivative'``: Smooth noisy data
-- ``'fft'`` or ``'fft_analysis'``: FFT analysis (time → frequency)
+- ``'fft'`` or ``'fft_analysis'``: FFT analysis (time -> frequency)
 - ``'mastercurve'``: Time-temperature superposition
 - ``'mutation'`` or ``'mutation_number'``: Calculate mutation number
 - ``'owchirp'``: OWChirp analysis for LAOS
@@ -195,7 +195,7 @@ Fitting Models
    # Get comparison results
    results = pipeline.get_results()
    for model_name, model_results in results['models'].items():
-       print(f"{model_name}: R² = {model_results['r2']:.4f}")
+       print(f"{model_name}: R^2 = {model_results['r2']:.4f}")
 
 Visualization
 ~~~~~~~~~~~~~
@@ -303,7 +303,7 @@ Retrieve results programmatically:
 
    # Access components
    parameters = results['parameters']       # Dict of parameter values
-   r2 = results['r2']                       # R² score
+   r2 = results['r2']                       # R^2 score
    rmse = results['rmse']                   # Root mean squared error
    predictions = results['predictions']     # Model predictions
    residuals = results['residuals']         # Residuals
@@ -334,7 +334,7 @@ Full workflow in one chain:
        .get_results())
 
    print(f"Analysis complete!")
-   print(f"R² = {results['r2']:.4f}")
+   print(f"R^2 = {results['r2']:.4f}")
    print(f"Parameters:")
    for name, value in results['parameters'].items():
        print(f"  {name} = {value:.4e}")
@@ -353,7 +353,7 @@ Pre-configured pipeline for time-temperature superposition:
 
    # Create mastercurve pipeline
    mc_pipeline = MastercurvePipeline(
-       reference_temp=50,      # Reference temperature (°C)
+       reference_temp=50,      # Reference temperature ( degC)
        method='wlf',           # 'wlf' or 'arrhenius'
        optimize=True           # Optimize WLF/Arrhenius parameters
    )
@@ -416,7 +416,7 @@ Compare multiple models systematically:
 
    # Print comparison
    print("\nModel Comparison:")
-   print(f"{'Model':<30} {'R²':<10} {'RMSE':<12} {'AIC':<12} {'Parameters':<5}")
+   print(f"{'Model':<30} {'R^2':<10} {'RMSE':<12} {'AIC':<12} {'Parameters':<5}")
    print("-" * 75)
    for row in comparison_table:
        print(f"{row['model']:<30} {row['r2']:<10.4f} {row['rmse']:<12.2e} "
@@ -425,7 +425,7 @@ Compare multiple models systematically:
    # Get best model
    best_model = comparison.get_best_model(criterion='aic')  # 'aic', 'bic', 'r2'
    print(f"\nBest model (AIC): {best_model['name']}")
-   print(f"R² = {best_model['r2']:.4f}")
+   print(f"R^2 = {best_model['r2']:.4f}")
 
 **With Visualization**:
 
@@ -495,7 +495,7 @@ Pipeline Builder
 ----------------
 
 For Complex Custom Workflows
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The PipelineBuilder provides programmatic pipeline construction:
 
@@ -542,7 +542,7 @@ Add conditional logic to pipelines:
    results = pipeline.execute()
 
 Looping Over Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -658,7 +658,7 @@ Complete batch workflow:
    ax2.bar(x, eta_s_values)
    ax2.set_xticks(x)
    ax2.set_xticklabels(sample_names, rotation=45, ha='right')
-   ax2.set_ylabel('eta_s (Pa·s)')
+   ax2.set_ylabel('eta_s (Pa*s)')
    ax2.set_title('Viscosity Comparison')
 
    plt.tight_layout()
@@ -819,7 +819,7 @@ Document custom pipelines:
        filename : str
            Path to frequency sweep data
        temperature : float
-           Measurement temperature (°C)
+           Measurement temperature ( degC)
 
        Returns
        -------
@@ -888,7 +888,7 @@ Pattern 1: Quick Check
    Pipeline().load('data.txt').fit('maxwell').plot(show=True)
 
 Pattern 2: Comparison Study
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -901,7 +901,7 @@ Pattern 2: Comparison Study
        .save('comparison.xlsx'))
 
 Pattern 3: Multi-Temperature Analysis
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -914,7 +914,7 @@ Pattern 3: Multi-Temperature Analysis
        .save('mastercurve_analysis.hdf5'))
 
 Pattern 4: Batch with Summary
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -930,8 +930,8 @@ Summary
 
 Pipeline API Checklist:
 
-1. **Basic workflow**: ``load() → fit() → plot() → get_results()``
-2. **Add transforms**: ``.transform('smooth') → .transform('fft')``
+1. **Basic workflow**: ``load() -> fit() -> plot() -> get_results()``
+2. **Add transforms**: ``.transform('smooth') -> .transform('fft')``
 3. **Specialized workflows**: Use ``MastercurvePipeline``, ``ModelComparisonPipeline``
 4. **Batch processing**: Use ``BatchPipeline`` with template
 5. **Custom pipelines**: Use ``PipelineBuilder`` for complex logic

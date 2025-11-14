@@ -50,7 +50,7 @@ For more control, use the Modular API:
    # Get parameters
    params = model.parameters
    print(f"G_s = {params.get_value('G_s'):.2e} Pa")
-   print(f"eta_s = {params.get_value('eta_s'):.2e} Pa·s")
+   print(f"eta_s = {params.get_value('eta_s'):.2e} Pa*s")
 
    # Make predictions
    predictions = model.predict(data.x)
@@ -141,3 +141,4 @@ Next Steps
 * Read the :doc:`user_guide` for detailed documentation
 * Explore :doc:`api_reference` for complete API documentation
 * See example notebooks for advanced usage
+

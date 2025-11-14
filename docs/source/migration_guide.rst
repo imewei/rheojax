@@ -1,4 +1,4 @@
-Migration Guide: pyRheo/hermes-rheo → rheo
+Migration Guide: pyRheo/hermes-rheo -> rheo
 ===========================================
 
 Introduction
@@ -154,10 +154,10 @@ Parameter Name Changes
      - Underscore added
 
 From hermes-rheo to rheo
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Transform Name Mappings
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. list-table:: Data Transforms
    :header-rows: 1
@@ -223,10 +223,10 @@ Method Name Changes
      - Standardized
 
 Side-by-Side Code Examples
----------------------------
+--------------------------
 
 Example 1: Basic Model Fitting
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **pyRheo version:**
 
@@ -251,9 +251,9 @@ Example 1: Basic Model Fitting
    # Make predictions
    predictions = model.predict(time)
 
-   # Calculate R²
+   # Calculate R^2
    r2 = model.score(time, stress)
-   print(f"R² = {r2:.4f}")
+   print(f"R^2 = {r2:.4f}")
 
 **rheo equivalent:**
 
@@ -287,12 +287,12 @@ Example 1: Basic Model Fitting
    # Make predictions
    predictions = pipeline.predict(data)
 
-   # Get R²
+   # Get R^2
    metrics = pipeline.get_fit_metrics()
-   print(f"R² = {metrics['r_squared']:.4f}")
+   print(f"R^2 = {metrics['r_squared']:.4f}")
 
 Example 2: Fractional Model with Custom Bounds
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **pyRheo version:**
 
@@ -350,7 +350,7 @@ Example 2: Fractional Model with Custom Bounds
    params = model.parameters
 
 Example 3: Mastercurve Generation (TTS)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **hermes-rheo version:**
 
@@ -392,7 +392,7 @@ Example 3: Mastercurve Generation (TTS)
 
    # Create mastercurve pipeline
    pipeline = MastercurvePipeline(
-       reference_temp=298.15,  # Kelvin (25°C + 273.15)
+       reference_temp=298.15,  # Kelvin (25 degC + 273.15)
        method='wlf'
    )
 
@@ -409,7 +409,7 @@ Example 3: Mastercurve Generation (TTS)
    print(f"WLF: C1={C1:.2f}, C2={C2:.2f} K")
 
 Example 4: FFT Analysis for Frequency Domain
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **hermes-rheo version:**
 
@@ -464,7 +464,7 @@ Example 4: FFT Analysis for Frequency Domain
    time_reconstructed = fft.inverse_transform(freq_data)
 
 Example 5: Model Comparison with Information Criteria
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **pyRheo version:**
 
@@ -532,7 +532,7 @@ Example 5: Model Comparison with Information Criteria
    pipeline = ModelComparisonPipeline(models)
    results = pipeline.run(data)
 
-   # Get best model (automatically calculates AIC, BIC, R²)
+   # Get best model (automatically calculates AIC, BIC, R^2)
    best_model = pipeline.get_best_model(metric='aic')
    print(f"Best model: {best_model}")
 
@@ -541,7 +541,7 @@ Example 5: Model Comparison with Information Criteria
    print(comparison_df)
 
 Example 6: Batch Processing Multiple Files
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **pyRheo version:**
 
@@ -609,7 +609,7 @@ Example 6: Batch Processing Multiple Files
    batch.export_individual_results('results/')
 
 Example 7: Custom Optimization with Constraints
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **pyRheo version:**
 
@@ -686,7 +686,7 @@ Example 7: Custom Optimization with Constraints
        model.parameters[name].value = result.x[i]
 
 Example 8: Visualization with Custom Styling
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **pyRheo version:**
 
@@ -734,7 +734,7 @@ Example 8: Visualization with Custom Styling
    )
 
 Key Differences and Breaking Changes
--------------------------------------
+------------------------------------
 
 API Design Philosophy
 ~~~~~~~~~~~~~~~~~~~~~
@@ -828,8 +828,8 @@ Test Mode Handling
 
 1. **Relaxation**: G(t) decay after step strain
 2. **Creep**: J(t) increase under constant stress
-3. **Oscillation**: G'(ω), G"(ω) from dynamic tests
-4. **Rotation**: Viscosity η(γ̇) from flow curves
+3. **Oscillation**: G'(omega), G"(omega) from dynamic tests
+4. **Rotation**: Viscosity eta(gamma_dot) from flow curves
 
 **Breaking Change**: Must wrap data in ``RheoData`` containers for automatic detection, or specify ``test_mode`` explicitly.
 
@@ -952,7 +952,7 @@ Verify installation:
    print(rheojax.__version__)  # Should show v0.2.0 or later
 
 Step 2: Update Imports
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Replace old imports incrementally:
 
@@ -984,7 +984,7 @@ Replace old imports incrementally:
 **Tip**: Use your IDE's find-and-replace to batch update imports.
 
 Step 3: Convert Data Structures
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Wrap existing NumPy arrays in RheoData:
 
@@ -1022,7 +1022,7 @@ Wrap existing NumPy arrays in RheoData:
    data = convert_to_rheodata(time, stress)
 
 Step 4: Update Model Creation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Option 1: Using Pipeline API (recommended)**
 
@@ -1053,7 +1053,7 @@ Step 4: Update Model Creation
    model = Maxwell()
 
 Step 5: Update Fitting Code
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Pipeline API approach**:
 
@@ -1087,7 +1087,7 @@ Step 5: Update Fitting Code
    model.fit(data)  # Uses same scipy.optimize backend
 
 Step 6: Test and Validate
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Validation Strategy**:
 
@@ -1137,14 +1137,14 @@ Frequently Asked Questions
 --------------------------
 
 Q: Are results numerically identical?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** Yes, within 1e-6 relative tolerance for all models and transforms. Both packages use the same underlying numerical methods (scipy.optimize, numerical integration), so results should be essentially identical.
 
 We've validated all 20 models against pyRheo and all 5 transforms against hermes-rheojax. See ``docs/validation_report.md`` for detailed comparison.
 
 Q: Can I mix rheo with pyRheo/hermes-rheo?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** Yes, but you'll need to convert data structures at package boundaries.
 
@@ -1162,7 +1162,7 @@ Q: Can I mix rheo with pyRheo/hermes-rheo?
 **Recommendation**: Complete migration to rheo for one project/module at a time rather than mixing extensively.
 
 Q: What about performance?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** rheo is **2-10x faster** than pyRheo/hermes-rheo due to JAX + JIT compilation.
 
@@ -1200,7 +1200,7 @@ Q: What about performance?
 **First call**: rheo has ~100ms JIT compilation overhead on first call. Subsequent calls are fast.
 
 Q: Is GPU acceleration automatic?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** Yes! JAX automatically detects and uses GPUs when available.
 
@@ -1232,7 +1232,7 @@ Q: Is GPU acceleration automatic?
 For typical datasets (<1k points), CPU performance is usually sufficient.
 
 Q: Are there breaking changes?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** Yes, but they improve code quality and enable new features:
 
@@ -1257,7 +1257,7 @@ Q: Are there breaking changes?
 * Can install alongside old packages
 
 Q: What if I find a bug or inconsistency?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** Please report it!
 
@@ -1281,7 +1281,7 @@ Q: What if I find a bug or inconsistency?
       print(f"hermes-rheo: {hermes.__version__}")
 
 Q: How do I migrate custom models/transforms?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** Subclass ``BaseModel`` or ``BaseTransform`` in rheo:
 
@@ -1318,7 +1318,7 @@ Q: How do I migrate custom models/transforms?
 **See Also**: ``docs/developer/custom_models.rst`` for complete guide.
 
 Q: What about existing scripts and notebooks?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** Update incrementally:
 
@@ -1351,7 +1351,7 @@ Q: What about existing scripts and notebooks?
    pipeline = Pipeline().load_data(data).fit('maxwell')
 
 Q: How do I cite rheo vs pyRheo/hermes-rheo?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **A:** Cite rheo in new work:
 

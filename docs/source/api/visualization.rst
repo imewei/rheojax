@@ -1,5 +1,5 @@
 Visualization (rheojax.visualization)
-=======================================
+=====================================
 
 The visualization module provides publication-quality plotting functions for rheological data.
 
@@ -21,9 +21,9 @@ Main Plotting Function
 
    **Plot type selection logic:**
 
-   1. Frequency domain or oscillation test → :func:`plot_frequency_domain`
-   2. Rotation test or shear rate units → :func:`plot_flow_curve`
-   3. Time domain → :func:`plot_time_domain`
+   1. Frequency domain or oscillation test -> :func:`plot_frequency_domain`
+   2. Rotation test or shear rate units -> :func:`plot_flow_curve`
+   3. Time domain -> :func:`plot_time_domain`
 
 Specialized Plot Types
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -63,7 +63,7 @@ Three built-in styles for different contexts:
 
    General-purpose style for interactive work.
 
-   - Figure size: 8×6 inches
+   - Figure size: 8x6 inches
    - Font size: 11 pt
    - Line width: 1.5 pt
 
@@ -71,7 +71,7 @@ Three built-in styles for different contexts:
 
    Optimized for journal publications.
 
-   - Figure size: 6×4.5 inches
+   - Figure size: 6x4.5 inches
    - Font size: 10 pt
    - Line width: 1.2 pt
    - Smaller markers
@@ -80,7 +80,7 @@ Three built-in styles for different contexts:
 
    Large, clear plots for presentations.
 
-   - Figure size: 10×7 inches
+   - Figure size: 10x7 inches
    - Font size: 14 pt
    - Line width: 2.0 pt
    - Larger markers
@@ -234,7 +234,7 @@ Flow Curves
 ~~~~~~~~~~~
 
 Viscosity vs Shear Rate
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -249,7 +249,7 @@ Viscosity vs Shear Rate
         x_units="1/s",
         y_units="Pa.s",
         x_label="Shear Rate (1/s)",
-        y_label="Viscosity (Pa·s)",
+        y_label="Viscosity (Pa*s)",
         style='publication'
     )
 
@@ -382,14 +382,14 @@ Multi-Panel Figures
     # Bottom-left: Oscillatory
     axes[1, 0].loglog(omega, Gp, 'o-', label="G'")
     axes[1, 0].loglog(omega, Gpp, 's-', label='G"')
-    axes[1, 0].set_xlabel('ω (rad/s)')
+    axes[1, 0].set_xlabel('omega (rad/s)')
     axes[1, 0].set_ylabel('Modulus (Pa)')
     axes[1, 0].legend()
 
     # Bottom-right: Flow curve
     axes[1, 1].loglog(shear_rate, viscosity, '^-')
     axes[1, 1].set_xlabel('Shear Rate (1/s)')
-    axes[1, 1].set_ylabel('Viscosity (Pa·s)')
+    axes[1, 1].set_ylabel('Viscosity (Pa*s)')
 
     fig.tight_layout()
 

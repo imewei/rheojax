@@ -1,10 +1,10 @@
 Utilities (rheojax.utils)
-==========================
+=========================
 
 The utils module provides numerical utilities for rheological analysis, including special functions and optimization tools.
 
 Mittag-Leffler Functions
--------------------------
+------------------------
 
 .. automodule:: rheojax.utils.mittag_leffler
    :members:
@@ -54,7 +54,7 @@ where :math:`\Gamma` is the gamma function and :math:`0 < \alpha \leq 2`.
 - :math:`\alpha = 2`: :math:`E_2(z^2) = \cosh(z)` (hyperbolic cosine)
 
 Two-Parameter Function
-^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
 
 The two-parameter generalization:
 
@@ -70,9 +70,9 @@ The two-parameter generalization:
 Implementation Details
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The implementation uses Padé approximations for optimal performance:
+The implementation uses Pade approximations for optimal performance:
 
-- **Method**: Padé(6,3) approximation
+- **Method**: Pade(6,3) approximation
 - **Accuracy**: < 1e-6 relative error for :math:`|z| < 10`
 - **Performance**: JIT-compiled with JAX for speed
 - **Range**: Optimized for rheological applications (:math:`|z| < 10`)
@@ -100,7 +100,7 @@ Basic Usage
     result2 = mittag_leffler_e2(0.5, alpha=0.5, beta=1.0)
 
 Fractional Relaxation Modulus
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -206,7 +206,7 @@ The following scipy.optimize methods are supported:
 - **"BFGS"**: Broyden-Fletcher-Goldfarb-Shanno (default for unbounded)
 
 JAX Gradient Computation
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 When ``use_jax=True``, gradients are computed using JAX automatic differentiation:
 
@@ -288,7 +288,7 @@ Model Fitting
     print(f"Fitted: E={E_fit:.1f} Pa, tau={tau_fit:.2f} s")
 
 Custom Objective with Least Squares
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -320,7 +320,7 @@ Custom Objective with Least Squares
     result = nlsq_optimize(objective, params, use_jax=True)
 
 Optimization with Constraints
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -403,7 +403,7 @@ See Also
 - `JAX autodiff <https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html>`_ - Automatic differentiation
 
 Model-Data Compatibility
--------------------------
+------------------------
 
 .. automodule:: rheojax.utils.compatibility
    :members:
@@ -478,7 +478,7 @@ Functions
    detected characteristics, and alternative model recommendations.
 
 Decay Detection Algorithm
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The decay type detection uses statistical analysis on log-transformed data:
 
@@ -490,7 +490,7 @@ Linear regression on log(G) vs t:
 
    \log G(t) = \log G_0 - \frac{t}{\tau}
 
-High R² (> 0.90) indicates exponential decay (Maxwell-like behavior).
+High R^2 (> 0.90) indicates exponential decay (Maxwell-like behavior).
 
 **Power-Law Decay Detection**
 
@@ -500,20 +500,20 @@ Linear regression on log(G) vs log(t):
 
    \log G(t) = \log G_0 - \alpha \log t
 
-High R² (> 0.90) indicates power-law decay (gel-like behavior).
+High R^2 (> 0.90) indicates power-law decay (gel-like behavior).
 
 **Stretched Exponential Detection**
 
-Linear regression on log(-log(G/G₀)) vs log(t):
+Linear regression on log(-log(G/G_0)) vs log(t):
 
 .. math::
 
    \log\left(-\log\frac{G(t)}{G_0}\right) = \beta \log t + \text{const}
 
-High R² (> 0.90) indicates stretched exponential behavior.
+High R^2 (> 0.90) indicates stretched exponential behavior.
 
 Material Type Classification
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **From Relaxation Data**
 
@@ -538,7 +538,7 @@ Examples
 ~~~~~~~~
 
 Basic Compatibility Check
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -562,21 +562,21 @@ Basic Compatibility Check
     # Print human-readable report
     print(format_compatibility_message(compatibility))
     # Output:
-    # ⚠ Model may not be appropriate for this data
+    # WARNING: Model may not be appropriate for this data
     #   Confidence: 90%
     #   Detected decay: exponential
     #   Material type: viscoelastic_liquid
     #
     # Warnings:
-    #   • FZSS model expects Mittag-Leffler (power-law) relaxation,
+    #   - FZSS model expects Mittag-Leffler (power-law) relaxation,
     #     but data shows exponential decay.
     #
     # Recommended alternative models:
-    #   • Maxwell
-    #   • Zener
+    #   - Maxwell
+    #   - Zener
 
 Automatic Checking During Fit
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -595,7 +595,7 @@ Automatic Checking During Fit
     # messages provide physics-based explanations
 
 Detecting Decay Type
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -615,7 +615,7 @@ Detecting Decay Type
     print(decay_type)  # DecayType.EXPONENTIAL
 
 Classifying Material Type
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -635,7 +635,7 @@ Classifying Material Type
     print(material_type)  # MaterialType.VISCOELASTIC_LIQUID
 
 Oscillation Data Analysis
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -699,7 +699,7 @@ Enhanced Error Messages
         # - Guidance that failures are normal in model comparison
 
 Model Compatibility Rules
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Fractional Zener Solid-Solid (FZSS)**
 
@@ -733,7 +733,7 @@ Model Compatibility Rules
 - Incompatible with: Liquid-like behavior (use FractionalMaxwellLiquid)
 
 Performance Considerations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **Fast detection**: < 1 ms for typical datasets (50-100 points)
 - **Minimal overhead**: Can be enabled during fitting without performance impact
@@ -795,7 +795,7 @@ Functions
    - Recommended number of random starts
 
 Wide-Range Data Challenges
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When experimental data spans many decades (e.g., frequency from 0.01 to 1000 Hz), standard
 least-squares fitting can encounter problems:
@@ -824,7 +824,7 @@ by high-magnitude points, causing poor fits at low values.
    - Recommended for complex model landscapes
 
 Detection and Recommendations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The module automatically detects when to use these strategies:
 
@@ -859,7 +859,7 @@ Examples
 ~~~~~~~~
 
 Detect Data Range
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -877,7 +877,7 @@ Detect Data Range
     print(f"Range: {decades:.1f} decades")  # 5.0 decades
 
 Check Frequency Range
-^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -926,7 +926,7 @@ Get Complete Strategy
     )
 
 Integration with BaseModel
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The `BaseModel._fit()` method automatically uses `suggest_optimization_strategy()` when
 no explicit optimization configuration is provided. This ensures optimal fitting for all
@@ -939,7 +939,7 @@ data ranges without user intervention.
 - Data > 5 decades: Log-residuals + multi-start (10-20 starts)
 
 Performance Considerations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **Detection overhead**: < 0.1 ms (negligible)
 - **Log-residuals**: Same computational cost as linear

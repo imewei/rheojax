@@ -1,10 +1,10 @@
 Multi-Technique Fitting Guide
-==============================
+=============================
 
 Multi-technique fitting involves simultaneously fitting the same model to multiple datasets from different experimental techniques (e.g., relaxation and oscillation), ensuring physical consistency across test modes. This guide demonstrates how to leverage :class:`SharedParameterSet` for coupled parameter optimization.
 
 Why Multi-Technique Fitting?
------------------------------
+----------------------------
 
 Benefits
 ~~~~~~~~
@@ -46,7 +46,7 @@ Common Combinations
      - Validate temperature-dependent parameters
 
 SharedParameterSet Basics
---------------------------
+-------------------------
 
 Core Concept
 ~~~~~~~~~~~~
@@ -62,7 +62,7 @@ The :class:`SharedParameterSet` class enables multiple models to share parameter
 
    # Add shared parameters
    shared.add_shared('G_s', value=1e5, bounds=(1e3, 1e7), units='Pa')
-   shared.add_shared('eta_s', value=1e3, bounds=(1e1, 1e5), units='Pa·s')
+   shared.add_shared('eta_s', value=1e3, bounds=(1e1, 1e5), units='Pa*s')
 
    # Link models
    from rheojax.models import Maxwell
@@ -88,20 +88,20 @@ Key Features
 4. **Optimization support**: Compatible with JAX-based optimizers
 
 Example: Relaxation + Oscillation
-----------------------------------
+---------------------------------
 
 Scenario
 ~~~~~~~~
 
 You have:
 
-1. Stress relaxation data: σ(t) at fixed strain
-2. Frequency sweep data: G'(ω), G''(ω) from SAOS
+1. Stress relaxation data: sigma(t) at fixed strain
+2. Frequency sweep data: G'(omega), G''(omega) from SAOS
 
 You want to fit a Maxwell model to both datasets with consistent G_s and eta_s.
 
 Step-by-Step Implementation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Step 1: Load both datasets**
 
@@ -134,7 +134,7 @@ Step-by-Step Implementation
                      bounds=(1e3, 1e7), units='Pa',
                      description='Shear modulus')
    shared.add_shared('eta_s', value=eta_s_init,
-                     bounds=(1e1, 1e5), units='Pa·s',
+                     bounds=(1e1, 1e5), units='Pa*s',
                      description='Viscosity')
 
 **Step 3: Create and link models**
@@ -214,7 +214,7 @@ Step-by-Step Implementation
    shared.set_values({'G_s': G_s_opt, 'eta_s': eta_s_opt})
 
    print(f"Optimized G_s = {G_s_opt:.2e} Pa")
-   print(f"Optimized eta_s = {eta_s_opt:.2e} Pa·s")
+   print(f"Optimized eta_s = {eta_s_opt:.2e} Pa*s")
    print(f"Relaxation time tau = {eta_s_opt/G_s_opt:.3f} s")
 
 **Step 6: Validate and visualize**
@@ -227,13 +227,13 @@ Step-by-Step Implementation
    sigma_pred_relax = maxwell_relax.predict(data_relax.x)
    G_star_pred_osc = maxwell_osc.predict(data_osc.x)
 
-   # Calculate R² for each dataset
+   # Calculate R^2 for each dataset
    from sklearn.metrics import r2_score
    r2_relax = r2_score(data_relax.y, sigma_pred_relax)
    r2_osc = r2_score(np.abs(data_osc.y), np.abs(G_star_pred_osc))
 
-   print(f"R² (relaxation): {r2_relax:.4f}")
-   print(f"R² (oscillation): {r2_osc:.4f}")
+   print(f"R^2 (relaxation): {r2_relax:.4f}")
+   print(f"R^2 (oscillation): {r2_osc:.4f}")
 
    # Plot both datasets
    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
@@ -244,7 +244,7 @@ Step-by-Step Implementation
                 linewidth=2, label='Multi-technique fit')
    ax1.set_xlabel('Time (s)')
    ax1.set_ylabel('Stress (Pa)')
-   ax1.set_title(f'Stress Relaxation (R² = {r2_relax:.4f})')
+   ax1.set_title(f'Stress Relaxation (R^2 = {r2_relax:.4f})')
    ax1.legend()
    ax1.grid(True, alpha=0.3)
 
@@ -254,7 +254,7 @@ Step-by-Step Implementation
               linewidth=2, label='Multi-technique fit')
    ax2.set_xlabel('Frequency (rad/s)')
    ax2.set_ylabel('|G*| (Pa)')
-   ax2.set_title(f'Oscillation (R² = {r2_osc:.4f})')
+   ax2.set_title(f'Oscillation (R^2 = {r2_osc:.4f})')
    ax2.legend()
    ax2.grid(True, alpha=0.3)
 
@@ -266,7 +266,7 @@ Advanced Techniques
 -------------------
 
 Weighted Multi-Technique Fitting
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Balance datasets with different sizes or quality:
 
@@ -296,7 +296,7 @@ Balance datasets with different sizes or quality:
    )
 
 Selective Parameter Sharing
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Share some parameters while keeping others independent:
 
@@ -325,7 +325,7 @@ Share some parameters while keeping others independent:
    # Optimization only affects G_s and alpha
 
 Sequential Parameter Optimization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Optimize in stages for better convergence:
 
@@ -344,7 +344,7 @@ Optimize in stages for better convergence:
    result = nlsq_optimize(combined_objective, shared, use_jax=True)
 
 Cross-Validation Across Techniques
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Validate that model trained on one technique predicts another:
 
@@ -363,14 +363,14 @@ Validate that model trained on one technique predicts another:
    G_star_pred_cross = maxwell_osc_from_relax.predict(data_osc.x)
    r2_cross = r2_score(np.abs(data_osc.y), np.abs(G_star_pred_cross))
 
-   print(f"Cross-validation R² (relax → osc): {r2_cross:.4f}")
+   print(f"Cross-validation R^2 (relax -> osc): {r2_cross:.4f}")
 
    # Compare to multi-technique fit
-   print(f"Multi-technique R² (osc): {r2_osc:.4f}")
+   print(f"Multi-technique R^2 (osc): {r2_osc:.4f}")
    print(f"Improvement: {(r2_osc - r2_cross)*100:.1f} percentage points")
 
 Example: Fractional Model Multi-Technique
-------------------------------------------
+-----------------------------------------
 
 Scenario
 ~~~~~~~~
@@ -393,7 +393,7 @@ Implementation
    # Create shared parameters
    shared = SharedParameterSet()
    shared.add_shared('G_s', value=1e5, bounds=(1e3, 1e7), units='Pa')
-   shared.add_shared('V', value=1e3, bounds=(1e2, 1e5), units='Pa·s^α')
+   shared.add_shared('V', value=1e3, bounds=(1e2, 1e5), units='Pa*s^alpha')
    shared.add_shared('alpha', value=0.5, bounds=(0.1, 0.9), units='-')
 
    # Create models
@@ -442,7 +442,7 @@ Implementation
 
    print(f"Optimized parameters:")
    print(f"  G_s = {G_s_opt:.2e} Pa")
-   print(f"  V = {V_opt:.2e} Pa·s^{alpha_opt:.2f}")
+   print(f"  V = {V_opt:.2e} Pa*s^{alpha_opt:.2f}")
    print(f"  alpha = {alpha_opt:.3f}")
 
    # Validate
@@ -450,11 +450,11 @@ Implementation
    r2_osc = fmg_osc.score(data_osc.x, data_osc.y)
 
    print(f"\nFit quality:")
-   print(f"  R² (relaxation): {r2_relax:.4f}")
-   print(f"  R² (oscillation): {r2_osc:.4f}")
+   print(f"  R^2 (relaxation): {r2_relax:.4f}")
+   print(f"  R^2 (oscillation): {r2_osc:.4f}")
 
 Example: Multi-Temperature Fitting
------------------------------------
+----------------------------------
 
 Scenario
 ~~~~~~~~
@@ -471,7 +471,7 @@ Implementation
    import jax.numpy as jnp
 
    # Load multi-temperature data
-   temperatures = [25, 40, 55, 70]  # °C
+   temperatures = [25, 40, 55, 70]  #  degC
    datasets = [auto_load(f'freq_sweep_{T}C.txt') for T in temperatures]
 
    # Shared parameter: alpha (temperature-independent for many polymers)
@@ -529,13 +529,13 @@ Implementation
        G_s_T = model.parameters.get_value('G_s')
        V_T = model.parameters.get_value('V')
 
-       print(f"T = {T}°C: G_s = {G_s_T:.2e} Pa, V = {V_T:.2e} Pa·s^α")
+       print(f"T = {T} degC: G_s = {G_s_T:.2e} Pa, V = {V_T:.2e} Pa*s^alpha")
 
 Best Practices
 --------------
 
 Parameter Selection for Sharing
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Good candidates for sharing**:
 
@@ -635,8 +635,8 @@ Handle cases where datasets may be incompatible:
 
        if r2_relax < 0.8 or r2_osc < 0.8:
            print("Warning: Poor fit quality!")
-           print(f"  R² (relaxation): {r2_relax:.4f}")
-           print(f"  R² (oscillation): {r2_osc:.4f}")
+           print(f"  R^2 (relaxation): {r2_relax:.4f}")
+           print(f"  R^2 (oscillation): {r2_osc:.4f}")
 
    except Exception as e:
        print(f"Multi-technique fitting failed: {e}")
@@ -650,7 +650,7 @@ Common Pitfalls
 ---------------
 
 Pitfall 1: Incompatible Models
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Using different models for different techniques:
 
@@ -674,7 +674,7 @@ Solution: Use same model class for all techniques:
    maxwell_osc = Maxwell()
 
 Pitfall 2: Over-Constraining
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Sharing too many parameters can lead to poor fits:
 
@@ -691,7 +691,7 @@ Sharing too many parameters can lead to poor fits:
 Solution: Share only physically meaningful common parameters.
 
 Pitfall 3: Unbalanced Datasets
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 One dataset dominates optimization:
 
@@ -706,7 +706,7 @@ One dataset dominates optimization:
    total_rss = rss_relax_norm + rss_osc_norm
 
 Pitfall 4: Poor Initial Guess
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Multi-technique optimization is more sensitive to initialization:
 

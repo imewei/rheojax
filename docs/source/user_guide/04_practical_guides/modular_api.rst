@@ -4,7 +4,7 @@ Modular API Tutorial
 The Modular API provides direct access to models and transforms for maximum flexibility and control. Use this API when you need fine-grained parameter manipulation, custom optimization workflows, or complex analysis pipelines.
 
 When to Use the Modular API
-----------------------------
+---------------------------
 
 **Use the Modular API for:**
 
@@ -76,7 +76,7 @@ Working with Models
 -------------------
 
 Direct Model Instantiation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Create and configure models directly:
 
@@ -112,7 +112,7 @@ Control parameter initialization:
 
    # Set individual parameters
    maxwell.parameters.set_value('G_s', 1e5)      # Pa
-   maxwell.parameters.set_value('eta_s', 1e3)    # Pa·s
+   maxwell.parameters.set_value('eta_s', 1e3)    # Pa*s
 
    # Set multiple parameters
    maxwell.parameters.set_values({
@@ -129,7 +129,7 @@ Control parameter initialization:
    print(params_dict)
 
 Setting Parameter Bounds
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Control optimization search space:
 
@@ -214,14 +214,14 @@ Fit model to data:
    G_s = maxwell.parameters.get_value('G_s')
    eta_s = maxwell.parameters.get_value('eta_s')
    print(f"G_s = {G_s:.2e} Pa")
-   print(f"eta_s = {eta_s:.2e} Pa·s")
+   print(f"eta_s = {eta_s:.2e} Pa*s")
 
    # Make predictions
    y_pred = maxwell.predict(X)
 
    # Calculate fit quality
    r2 = maxwell.score(X, y)
-   print(f"R² = {r2:.4f}")
+   print(f"R^2 = {r2:.4f}")
 
 Custom Initial Guesses
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -255,7 +255,7 @@ Provide data-driven initialization:
    model.fit(X, y)
 
 Multi-Start Optimization
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Try multiple initial guesses to avoid local minima:
 
@@ -292,7 +292,7 @@ Try multiple initial guesses to avoid local minima:
            best_score = score
            best_model = model
 
-   print(f"Best R² = {best_score:.4f}")
+   print(f"Best R^2 = {best_score:.4f}")
    print(f"Best parameters: {best_model.parameters.to_dict()}")
 
 Custom Optimization
@@ -420,10 +420,10 @@ Some transforms are invertible:
    print(f"Reconstruction error: {error:.2e}")
 
 Custom Fitting Workflows
--------------------------
+------------------------
 
 Sequential Parameter Estimation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Fit parameters in stages for better convergence:
 
@@ -457,7 +457,7 @@ Fit parameters in stages for better convergence:
    print(model.parameters.to_dict())
 
 Fitting with Analytical Gradients
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Leverage JAX automatic differentiation:
 
@@ -523,11 +523,11 @@ Assess model generalization:
            cv_scores[model_name].append(score)
 
    # Report cross-validation scores
-   print("Cross-Validation R² Scores:")
+   print("Cross-Validation R^2 Scores:")
    for model_name, scores in cv_scores.items():
        mean_score = np.mean(scores)
        std_score = np.std(scores)
-       print(f"  {model_name}: {mean_score:.4f} ± {std_score:.4f}")
+       print(f"  {model_name}: {mean_score:.4f} +/- {std_score:.4f}")
 
 Model Comparison
 ~~~~~~~~~~~~~~~~
@@ -575,7 +575,7 @@ Systematically compare models:
        results.append({
            'Model': model_name,
            'N_params': n_params,
-           'R²': r2,
+           'R^2': r2,
            'RMSE': rmse,
            'AIC': aic,
            'BIC': bic
@@ -593,10 +593,10 @@ Systematically compare models:
    print(f"\nBest model (AIC): {best_model_name}")
 
 Advanced Parameter Management
-------------------------------
+-----------------------------
 
 Parameter Sensitivity Analysis
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Analyze how sensitive predictions are to parameters:
 
@@ -658,7 +658,7 @@ Estimate parameter uncertainty:
        value = maxwell.parameters.get_value(param_name)
        rel_error = (upper - lower) / (2 * value) * 100
        print(f"  {param_name}: {value:.2e} [{lower:.2e}, {upper:.2e}] "
-             f"(±{rel_error:.1f}%)")
+             f"(+/-{rel_error:.1f}%)")
 
 Parameter Correlation
 ~~~~~~~~~~~~~~~~~~~~~
@@ -703,7 +703,7 @@ Check for parameter correlation:
    # High correlation (>0.9) indicates parameter redundancy
 
 Serialization and Persistence
-------------------------------
+-----------------------------
 
 Saving Models
 ~~~~~~~~~~~~~
@@ -768,7 +768,7 @@ Export model parameters as JSON:
    model_reconstructed.parameters.set_values(loaded_dict['parameters'])
 
 Integration with External Libraries
-------------------------------------
+-----------------------------------
 
 scikit-learn Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -894,7 +894,7 @@ Always validate fitted models:
    # Check fit quality
    r2 = model.score(X, y)
    if r2 < 0.9:
-       print(f"Warning: Poor fit (R² = {r2:.3f})")
+       print(f"Warning: Poor fit (R^2 = {r2:.3f})")
 
    # Visual inspection
    import matplotlib.pyplot as plt
@@ -964,7 +964,7 @@ Common Patterns
 ---------------
 
 Pattern 1: Custom Weighted Fitting
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -992,7 +992,7 @@ Pattern 1: Custom Weighted Fitting
    )
 
 Pattern 2: Hierarchical Model Selection
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1006,13 +1006,13 @@ Pattern 2: Hierarchical Model Selection
        r2 = model.score(X, y)
 
        if r2 > 0.95:  # Satisfactory fit
-           print(f"Selected model: {type(model).__name__} (R² = {r2:.4f})")
+           print(f"Selected model: {type(model).__name__} (R^2 = {r2:.4f})")
            break
    else:
        print("Warning: No satisfactory fit found")
 
 Pattern 3: Ensemble Prediction
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1028,7 +1028,7 @@ Pattern 3: Ensemble Prediction
    predictions = np.array([m.predict(X) for m in models])
    ensemble_pred = np.mean(predictions, axis=0)
 
-   # Weighted ensemble (by R²)
+   # Weighted ensemble (by R^2)
    weights = np.array([m.score(X, y) for m in models])
    weights /= np.sum(weights)
    weighted_ensemble = np.average(predictions, axis=0, weights=weights)

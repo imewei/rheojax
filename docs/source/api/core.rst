@@ -1,5 +1,5 @@
 Core Module (rheojax.core)
-===========================
+==========================
 
 The core module provides fundamental data structures and abstractions for rheological analysis.
 
@@ -200,7 +200,7 @@ BayesianMixin
 
    Mixin class that adds Bayesian inference capabilities to models. Provides:
 
-   - NLSQ → NUTS warm-start workflow (2-5x faster convergence)
+   - NLSQ -> NUTS warm-start workflow (2-5x faster convergence)
    - Automatic prior specification from parameter bounds
    - Credible interval calculation
    - Model function for NumPyro NUTS sampling
@@ -355,7 +355,7 @@ Test Mode Detection
         print("This is a stress relaxation test")
 
 Using Base Classes (Phase 2)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -383,7 +383,7 @@ Using Base Classes (Phase 2)
     predictions = model.predict(time)
 
 Bayesian Inference (Phase 3)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -408,7 +408,7 @@ Bayesian Inference (Phase 3)
     )
 
     # 3. Analyze results
-    print(f"Posterior mean: G0={result.summary['G0']['mean']:.3e} ± {result.summary['G0']['std']:.3e}")
+    print(f"Posterior mean: G0={result.summary['G0']['mean']:.3e} +/- {result.summary['G0']['std']:.3e}")
     print(f"Convergence: R-hat={result.diagnostics['r_hat']['G0']:.4f}")
 
     # 4. Get credible intervals

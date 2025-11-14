@@ -1,7 +1,7 @@
 .. rheo documentation master file
 
 Welcome to rheo's documentation!
-=================================
+================================
 
 **rheo** is a unified, JAX-accelerated rheological analysis package that provides a modern,
 high-performance framework for analyzing experimental rheology data. Built on JAX for automatic
@@ -88,16 +88,12 @@ Contents
    :maxdepth: 2
    :caption: User Guide
 
-   user_guide
-   user_guide/getting_started
-   user_guide/core_concepts
-   user_guide/model_selection
-   user_guide/bayesian_inference
-   user_guide/pipeline_api
-   user_guide/multi_technique_fitting
-   user_guide/transforms
-   user_guide/io_guide
-   user_guide/visualization_guide
+   user_guide/index
+   user_guide/01_fundamentals/index
+   user_guide/02_model_usage/index
+   user_guide/03_advanced_topics/index
+   user_guide/04_practical_guides/index
+   user_guide/05_appendices/index
 
 .. toctree::
    :maxdepth: 2
@@ -105,9 +101,19 @@ Contents
 
    api_reference
    api/core
+   api/models
+   api/transforms
+   api/pipeline
    api/utils
    api/io
    api/visualization
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Handbooks
+
+   models/index
+   transforms/index
 
 .. toctree::
    :maxdepth: 2
@@ -134,29 +140,29 @@ Contents
 Development Status
 ------------------
 
-**Phase 1 (Complete)**: Core Infrastructure ✅
-   - ✅ Base abstractions (BaseModel, BaseTransform, RheoData, Parameters)
-   - ✅ Test mode detection system
-   - ✅ Mittag-Leffler functions for fractional calculus
-   - ✅ Optimization integration with JAX gradients (NLSQ 5-270x speedup)
-   - ✅ Model and Transform registry system
-   - ✅ File I/O (TRIOS, CSV, Excel, Anton Paar readers; HDF5, Excel writers)
-   - ✅ Visualization with matplotlib
+**Phase 1 (Complete)**: Core Infrastructure [done]
+   - [done] Base abstractions (BaseModel, BaseTransform, RheoData, Parameters)
+   - [done] Test mode detection system
+   - [done] Mittag-Leffler functions for fractional calculus
+   - [done] Optimization integration with JAX gradients (NLSQ 5-270x speedup)
+   - [done] Model and Transform registry system
+   - [done] File I/O (TRIOS, CSV, Excel, Anton Paar readers; HDF5, Excel writers)
+   - [done] Visualization with matplotlib
 
-**Phase 2 (Complete)**: Models and Transforms ✅
-   - ✅ 20 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models)
-   - ✅ 5 data transforms (FFT, Mastercurve/TTS, Mutation Number, OWChirp/LAOS, Smooth Derivative)
-   - ✅ Pipeline API for fluent workflows
-   - ✅ 20 tutorial notebooks (basic, transforms, bayesian, advanced)
+**Phase 2 (Complete)**: Models and Transforms [done]
+   - [done] 20 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models)
+   - [done] 5 data transforms (FFT, Mastercurve/TTS, Mutation Number, OWChirp/LAOS, Smooth Derivative)
+   - [done] Pipeline API for fluent workflows
+   - [done] 20 tutorial notebooks (basic, transforms, bayesian, advanced)
 
-**Phase 3 (Complete)**: Bayesian Inference ✅
-   - ✅ NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
-   - ✅ Uncertainty quantification via credible intervals and posterior distributions
-   - ✅ ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
-   - ✅ Model comparison (WAIC/LOO)
-   - ✅ BayesianMixin: All 20 models support Bayesian inference
-   - ✅ BayesianPipeline with fluent API for NLSQ → NUTS workflows
-   - ✅ 5 comprehensive Bayesian inference tutorial notebooks
+**Phase 3 (Complete)**: Bayesian Inference [done]
+   - [done] NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
+   - [done] Uncertainty quantification via credible intervals and posterior distributions
+   - [done] ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
+   - [done] Model comparison (WAIC/LOO)
+   - [done] BayesianMixin: All 20 models support Bayesian inference
+   - [done] BayesianPipeline with fluent API for NLSQ -> NUTS workflows
+   - [done] 5 comprehensive Bayesian inference tutorial notebooks
 
 Technology Stack
 ----------------
@@ -205,9 +211,9 @@ Community and Support
 ---------------------
 
 **Getting Help**
-   - 📖 Read the :doc:`user_guide/getting_started`
-   - 💬 Join `GitHub Discussions <https://github.com/username/rheo/discussions>`_
-   - 🐛 Report issues on `GitHub <https://github.com/username/rheo/issues>`_
+   - Read the :doc:`user_guide/getting_started`
+   - Join `GitHub Discussions <https://github.com/username/rheo/discussions>`_
+   - Report issues on `GitHub <https://github.com/username/rheo/issues>`_
 
 **Contributing**
    - See :doc:`developer/contributing` for guidelines

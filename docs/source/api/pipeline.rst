@@ -39,7 +39,7 @@ Basic Pipeline
        .plot(show=True)                    # Visualize
        .get_results())                     # Retrieve results
 
-   print(f"R² = {results['r2']:.4f}")
+   print(f"R^2 = {results['r2']:.4f}")
    print(f"Parameters: {results['parameters']}")
 
 **Key Methods**:
@@ -101,7 +101,7 @@ Apply data transform.
        .transform('fft', window='hann'))
 
 ``fit(model, initial_params=None, bounds=None, **kwargs)``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Fit rheological model to data.
 
@@ -134,7 +134,7 @@ Fit rheological model to data.
        .fit(['maxwell', 'zener', 'springpot']))
 
 ``plot(show=False, save=None, style='default', **kwargs)``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Visualize data and model fit.
 
@@ -192,7 +192,7 @@ Retrieve analysis results as dictionary.
 **Returns**: dict with keys:
 
 - ``'parameters'``: Fitted parameter values
-- ``'r2'``: R² score
+- ``'r2'``: R^2 score
 - ``'rmse'``: Root mean squared error
 - ``'predictions'``: Model predictions
 - ``'residuals'``: Fit residuals
@@ -205,7 +205,7 @@ Retrieve analysis results as dictionary.
 
    results = pipeline.get_results()
 
-   print(f"R² = {results['r2']:.4f}")
+   print(f"R^2 = {results['r2']:.4f}")
    print(f"RMSE = {results['rmse']:.2e}")
    print(f"Parameters:")
    for name, value in results['parameters'].items():
@@ -232,7 +232,7 @@ MastercurvePipeline
 
    # Create mastercurve pipeline
    mc_pipeline = MastercurvePipeline(
-       reference_temp=50,      # Reference temperature (°C)
+       reference_temp=50,      # Reference temperature ( degC)
        method='wlf',           # 'wlf' or 'arrhenius'
        optimize=True           # Optimize WLF/Arrhenius parameters
    )
@@ -295,7 +295,7 @@ ModelComparisonPipeline
 
    # Print comparison
    print("\\nModel Comparison:")
-   print(f"{'Model':<30} {'R²':<10} {'RMSE':<12} {'AIC':<12}")
+   print(f"{'Model':<30} {'R^2':<10} {'RMSE':<12} {'AIC':<12}")
    print("-" * 70)
    for row in comparison_table:
        print(f"{row['model']:<30} {row['r2']:<10.4f} "
@@ -312,7 +312,7 @@ ModelComparisonPipeline
 **Key Methods**:
 
 - ``run()``: Fit all models
-- ``get_best_model(criterion)``: Select best by AIC, BIC, or R²
+- ``get_best_model(criterion)``: Select best by AIC, BIC, or R^2
 - ``plot_comparison()``: Multi-panel plot of all models
 - ``plot_ranking()``: Bar chart ranking by criterion
 
@@ -378,7 +378,7 @@ BayesianPipeline
    :undoc-members:
    :show-inheritance:
 
-**Description**: Specialized pipeline for Bayesian rheological analysis with NLSQ → NUTS workflow.
+**Description**: Specialized pipeline for Bayesian rheological analysis with NLSQ -> NUTS workflow.
 
 **Key Features**:
 

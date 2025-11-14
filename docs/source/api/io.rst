@@ -1,5 +1,5 @@
 I/O Module (rheojax.io)
-========================
+=======================
 
 The I/O module provides readers and writers for various rheometer data formats.
 
@@ -96,13 +96,13 @@ HDF5 Writer
    .. code-block:: text
 
        file.h5
-       ├── x_data (dataset)         # Independent variable
-       ├── y_data (dataset)         # Dependent variable
-       ├── attributes/
-       │   ├── x_units (attr)
-       │   ├── y_units (attr)
-       │   ├── domain (attr)
-       │   └── ... (metadata)
+       |-- x_data (dataset)         # Independent variable
+       |-- y_data (dataset)         # Dependent variable
+       |-- attributes/
+       |   |-- x_units (attr)
+       |   |-- y_units (attr)
+       |   |-- domain (attr)
+       |   \-- ... (metadata)
 
 Excel Writer
 ~~~~~~~~~~~~

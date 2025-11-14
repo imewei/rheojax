@@ -36,7 +36,7 @@ Quick Navigation
      - 5 notebooks
 
 Basic Model Fitting
-====================
+===================
 
 Foundation tutorials for fundamental rheological models. Each notebook demonstrates:
 
@@ -46,7 +46,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 - Publication-quality visualization
 
 1. Maxwell Model Fitting
--------------------------
+------------------------
 
 **File**: ``examples/basic/01-maxwell-fitting.ipynb``
 
@@ -54,7 +54,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 
 **Content**:
    - Stress relaxation data (synthetic, 50 points)
-   - Two-parameter fitting: G₀ (elastic modulus), η (viscosity)
+   - Two-parameter fitting: G_0 (elastic modulus), eta (viscosity)
    - Analytical solution validation
    - Parameter bounds and optimization
 
@@ -70,7 +70,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
    - Visualize model predictions vs. data
 
 2. Zener Model Fitting
------------------------
+----------------------
 
 **File**: ``examples/basic/02-zener-fitting.ipynb``
 
@@ -78,7 +78,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 
 **Content**:
    - Frequency-domain oscillation data (complex modulus)
-   - Three-parameter fitting: G₀, G∞, τ
+   - Three-parameter fitting: G_0, G_inf, tau
    - Storage (G') and loss (G'') modulus
    - Real and imaginary components
 
@@ -94,7 +94,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
    - Fit multi-parameter models
 
 3. SpringPot Fitting (Fractional Calculus)
--------------------------------------------
+------------------------------------------
 
 **File**: ``examples/basic/03-springpot-fitting.ipynb``
 
@@ -102,7 +102,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 
 **Content**:
    - Power-law relaxation (fractional derivative behavior)
-   - Two-parameter fitting: α (fractional order), τ (relaxation time)
+   - Two-parameter fitting: alpha (fractional order), tau (relaxation time)
    - Mittag-Leffler function evaluation
    - Fractional calculus introduction
 
@@ -115,10 +115,10 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 **Learning Objectives**:
    - Understand fractional rheological models
    - Fit power-law materials
-   - Interpret fractional order α
+   - Interpret fractional order alpha
 
 4. Bingham Model Fitting (Yield Stress)
-----------------------------------------
+---------------------------------------
 
 **File**: ``examples/basic/04-bingham-fitting.ipynb``
 
@@ -126,7 +126,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 
 **Content**:
    - Steady shear flow curves (viscosity vs. shear rate)
-   - Two-parameter fitting: τ₀ (yield stress), η_p (plastic viscosity)
+   - Two-parameter fitting: tau_0 (yield stress), eta_p (plastic viscosity)
    - Yield stress materials (pastes, gels, slurries)
    - Flow curve analysis
 
@@ -142,7 +142,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
    - Understand shear-thinning behavior
 
 5. Power-Law Fitting (Shear-Thinning)
---------------------------------------
+-------------------------------------
 
 **File**: ``examples/basic/05-power-law-fitting.ipynb``
 
@@ -175,13 +175,13 @@ Data analysis techniques for advanced rheological characterization.
 
 **File**: ``examples/transforms/01-fft-analysis.ipynb``
 
-**Transform**: Fast Fourier Transform (time ↔ frequency domain)
+**Transform**: Fast Fourier Transform (time <-> frequency domain)
 
 **Content**:
-   - Time-domain relaxation → frequency-domain G'(ω), G''(ω)
+   - Time-domain relaxation -> frequency-domain G'(omega), G''(omega)
    - FFT validation with Maxwell analytical solution
    - Nyquist frequency and sampling considerations
-   - Inverse FFT: frequency → time
+   - Inverse FFT: frequency -> time
 
 **Key Concepts**:
    - FFT for rheological interconversion
@@ -195,7 +195,7 @@ Data analysis techniques for advanced rheological characterization.
    - Validate FFT accuracy
 
 7. Mastercurve Construction (Time-Temperature Superposition)
---------------------------------------------------------------
+------------------------------------------------------------
 
 **File**: ``examples/transforms/02-mastercurve-tts.ipynb``
 
@@ -210,7 +210,7 @@ Data analysis techniques for advanced rheological characterization.
 **Key Concepts**:
    - Time-temperature equivalence
    - Horizontal shifting
-   - WLF parameters (C₁, C₂, T_ref)
+   - WLF parameters (C_1, C_2, T_ref)
    - Master curve construction
 
 **Dataset**: ``data/experimental/frequency_sweep_tts.txt`` (TRIOS format)
@@ -221,7 +221,7 @@ Data analysis techniques for advanced rheological characterization.
    - Understand thermorheological simplicity
 
 7b. WLF Parameter Validation (Synthetic TTS)
-----------------------------------------------
+--------------------------------------------
 
 **File**: ``examples/transforms/02b-mastercurve-wlf-validation.ipynb``
 
@@ -229,7 +229,7 @@ Data analysis techniques for advanced rheological characterization.
 
 **Content**:
    - Synthetic multi-temperature data with **known WLF parameters**
-   - WLF parameter extraction accuracy validation (C₁=17.44, C₂=51.6K)
+   - WLF parameter extraction accuracy validation (C_1=17.44, C_2=51.6K)
    - Fractional Maxwell liquid fitting to mastercurve
    - Temperature-by-temperature prediction validation
    - Shift factor visualization and WLF linearization checks
@@ -246,7 +246,7 @@ Data analysis techniques for advanced rheological characterization.
    - Compare fitted vs true parameters
 
 8. Mutation Number (Material Classification)
----------------------------------------------
+--------------------------------------------
 
 **File**: ``examples/transforms/03-mutation-number.ipynb``
 
@@ -254,7 +254,7 @@ Data analysis techniques for advanced rheological characterization.
 
 **Content**:
    - Material classification: solid, viscoelastic, fluid
-   - Mutation number from G'(ω) and G''(ω)
+   - Mutation number from G'(omega) and G''(omega)
    - Three synthetic materials demonstration
    - Gelation point detection
 
@@ -270,7 +270,7 @@ Data analysis techniques for advanced rheological characterization.
    - Detect gelation transitions
 
 9. OWChirp LAOS Analysis
--------------------------
+------------------------
 
 **File**: ``examples/transforms/04-owchirp-laos-analysis.ipynb``
 
@@ -294,7 +294,7 @@ Data analysis techniques for advanced rheological characterization.
    - Quantify nonlinear viscoelastic response
 
 10. Smooth Derivative Calculation
-----------------------------------
+---------------------------------
 
 **File**: ``examples/transforms/05-smooth-derivative.ipynb``
 
@@ -321,7 +321,7 @@ Bayesian Inference
 ==================
 
 Bayesian parameter estimation, uncertainty quantification, and model comparison.
-All notebooks use NLSQ → NUTS warm-start workflow (2-5x faster convergence).
+All notebooks use NLSQ -> NUTS warm-start workflow (2-5x faster convergence).
 
 11. Bayesian Basics
 -------------------
@@ -335,7 +335,7 @@ All notebooks use NLSQ → NUTS warm-start workflow (2-5x faster convergence).
    - Posterior distribution visualization
 
 **Key Concepts**:
-   - Two-stage workflow: NLSQ → NUTS
+   - Two-stage workflow: NLSQ -> NUTS
    - Warm-start initialization
    - Posterior samples
    - Credible intervals (95%, 68%)
@@ -346,7 +346,7 @@ All notebooks use NLSQ → NUTS warm-start workflow (2-5x faster convergence).
    - Interpret credible intervals
 
 12. Prior Selection and Sensitivity
-------------------------------------
+-----------------------------------
 
 **File**: ``examples/bayesian/02-prior-selection.ipynb``
 
@@ -368,7 +368,7 @@ All notebooks use NLSQ → NUTS warm-start workflow (2-5x faster convergence).
    - Use domain knowledge in priors
 
 13. Convergence Diagnostics
-----------------------------
+---------------------------
 
 **File**: ``examples/bayesian/03-convergence-diagnostics.ipynb``
 
@@ -398,7 +398,7 @@ All notebooks use NLSQ → NUTS warm-start workflow (2-5x faster convergence).
    - Troubleshoot divergent transitions
 
 14. Bayesian Model Comparison
-------------------------------
+-----------------------------
 
 **File**: ``examples/bayesian/04-model-comparison.ipynb``
 
@@ -420,7 +420,7 @@ All notebooks use NLSQ → NUTS warm-start workflow (2-5x faster convergence).
    - Understand model complexity trade-offs
 
 15. Uncertainty Propagation
-----------------------------
+---------------------------
 
 **File**: ``examples/bayesian/05-uncertainty-propagation.ipynb``
 
@@ -447,7 +447,7 @@ Advanced Workflows
 Production patterns, custom model development, and performance optimization.
 
 16. Multi-Technique Fitting
-----------------------------
+---------------------------
 
 **File**: ``examples/advanced/01-multi-technique-fitting.ipynb``
 
@@ -491,7 +491,7 @@ Production patterns, custom model development, and performance optimization.
    - Generate batch reports
 
 18. Custom Model Development
------------------------------
+----------------------------
 
 **File**: ``examples/advanced/03-custom-models.ipynb``
 
@@ -513,7 +513,7 @@ Production patterns, custom model development, and performance optimization.
    - Use model registry for discovery
 
 19. Fractional Models Deep Dive
---------------------------------
+-------------------------------
 
 **File**: ``examples/advanced/04-fractional-models-deep-dive.ipynb``
 
@@ -535,7 +535,7 @@ Production patterns, custom model development, and performance optimization.
    - Select appropriate fractional model
 
 20. Performance Optimization
------------------------------
+----------------------------
 
 **File**: ``examples/advanced/05-performance-optimization.ipynb``
 
@@ -557,7 +557,7 @@ Production patterns, custom model development, and performance optimization.
    - Benchmark optimization methods
 
 21. Frequentist Model Selection
----------------------------------
+-------------------------------
 
 **File**: ``examples/advanced/06-frequentist-model-selection.ipynb``
 
@@ -579,7 +579,7 @@ Production patterns, custom model development, and performance optimization.
    - Use `ModelComparisonPipeline` for batch model fitting
    - Interpret AIC/BIC information criteria
    - Calculate and interpret AIC weights
-   - Understand ΔAIC thresholds (2, 4, 7, 10)
+   - Understand DeltaAIC thresholds (2, 4, 7, 10)
    - Compare frequentist vs Bayesian model selection
 
 Running the Notebooks
@@ -631,7 +631,7 @@ All notebooks are designed to run independently with:
 Some transform notebooks require experimental data files from ``examples/data/experimental/``.
 
 GPU Acceleration (Optional)
-----------------------------
+---------------------------
 
 For GPU acceleration (Linux + CUDA 12.1-12.9):
 
@@ -654,18 +654,20 @@ Dataset Organization
 .. code-block:: text
 
    examples/data/
-   └── experimental/    # 8 real instrument files
-       ├── polypropylene_relaxation.csv
-       ├── polystyrene_creep.csv
-       ├── cellulose_hydrogel_flow.csv
-       ├── frequency_sweep_tts.txt (TRIOS)
-       ├── owchirp_tts.txt (TRIOS, 80 MB)
-       ├── owchirp_tcs.txt (TRIOS, 66 MB)
-       ├── creep_experiment.txt (TRIOS)
-       └── multi_technique.txt (TRIOS)
+   |-- experimental/    # 8 real instrument files
+   |   |-- polypropylene_relaxation.csv
+   |   |-- polystyrene_creep.csv
+   |   |-- cellulose_hydrogel_flow.csv
+   |   |-- frequency_sweep_tts.txt (TRIOS)
+   |   |-- owchirp_tts.txt (TRIOS, 80 MB)
+   |   |-- owchirp_tcs.txt (TRIOS, 66 MB)
+   |   |-- creep_experiment.txt (TRIOS)
+   |   \-- multi_technique.txt (TRIOS)
+   \-- synthetic/
+       \-- ...
 
 Synthetic Data Pattern
------------------------
+----------------------
 
 Most notebooks generate synthetic data in-notebook:
 
@@ -682,7 +684,7 @@ Most notebooks generate synthetic data in-notebook:
 
    # Known parameters for validation
    G0_true = 1e5  # Pa
-   eta_true = 1e3  # Pa·s
+   eta_true = 1e3  # Pa*s
 
    # Generate clean data
    model = Maxwell()
@@ -734,7 +736,7 @@ Deep dive into fractional models and custom development:
 4. ``advanced/05-performance-optimization.ipynb``
 
 For Production Workflows
--------------------------
+------------------------
 
 Focus on automation and best practices:
 

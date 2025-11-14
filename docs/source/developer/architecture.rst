@@ -37,7 +37,7 @@ All numerical operations in rheo use JAX for:
     grad_fn = jax.grad(relaxation_modulus, argnums=(1, 2))
 
 Scikit-learn API Compatibility
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Models follow scikit-learn conventions:
 
@@ -84,66 +84,66 @@ Module Structure
 .. code-block:: text
 
     rheo/
-    ├── core/               # Core abstractions
-    │   ├── base.py        # BaseModel, BaseTransform
-    │   ├── data.py        # RheoData container
-    │   ├── parameters.py  # Parameter system
-    │   ├── test_modes.py  # Test mode detection
-    │   └── registry.py    # Model/transform registry
-    ├── models/            # Rheological models (Phase 2)
-    │   ├── maxwell.py
-    │   ├── zener.py
-    │   └── ...
-    ├── transforms/        # Data transforms (Phase 2)
-    │   ├── fft.py
-    │   ├── mastercurve.py
-    │   └── ...
-    ├── utils/             # Utilities
-    │   ├── mittag_leffler.py  # Special functions
-    │   └── optimization.py    # Fitting tools
-    ├── io/                # File I/O
-    │   ├── readers/       # Data readers
-    │   └── writers/       # Data writers
-    ├── visualization/     # Plotting
-    │   ├── plotter.py
-    │   └── templates.py
-    └── pipelines/         # High-level workflows (Phase 2)
+    |--- core/               # Core abstractions
+    |   |--- base.py        # BaseModel, BaseTransform
+    |   |--- data.py        # RheoData container
+    |   |--- parameters.py  # Parameter system
+    |   |--- test_modes.py  # Test mode detection
+    |   \--- registry.py    # Model/transform registry
+    |--- models/            # Rheological models (Phase 2)
+    |   |--- maxwell.py
+    |   |--- zener.py
+    |   \--- ...
+    |--- transforms/        # Data transforms (Phase 2)
+    |   |--- fft.py
+    |   |--- mastercurve.py
+    |   \--- ...
+    |--- utils/             # Utilities
+    |   |--- mittag_leffler.py  # Special functions
+    |   \--- optimization.py    # Fitting tools
+    |--- io/                # File I/O
+    |   |--- readers/       # Data readers
+    |   \--- writers/       # Data writers
+    |--- visualization/     # Plotting
+    |   |--- plotter.py
+    |   \--- templates.py
+    \--- pipelines/         # High-level workflows (Phase 2)
 
 Component Relationships
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
 
-    ┌─────────────────────────────────────────────┐
-    │           User Applications                  │
-    └─────────────────┬───────────────────────────┘
-                      │
-    ┌─────────────────▼───────────────────────────┐
-    │            Pipelines (Phase 2)               │
-    │  High-level workflows and analysis chains    │
-    └─────────────────┬───────────────────────────┘
-                      │
-         ┌────────────┼────────────┐
-         │            │            │
-    ┌────▼───┐   ┌───▼────┐  ┌───▼────────┐
-    │ Models │   │Transforms│ │Visualization│
-    │(Phase2)│   │ (Phase2) │ │   (Phase1) │
-    └────┬───┘   └───┬─────┘ └───┬────────┘
-         │           │            │
-    ┌────▼───────────▼────────────▼────────┐
-    │           Core Components             │
-    │  RheoData, Parameters, Base Classes   │
-    └────┬──────────────────────────┬───────┘
-         │                          │
-    ┌────▼─────┐              ┌────▼─────┐
-    │   I/O    │              │  Utils   │
-    │ (Phase1) │              │(Phase1)  │
-    └──────────┘              └──────────┘
-         │                          │
-    ┌────▼──────────────────────────▼────┐
-    │         JAX / NumPy / SciPy         │
-    │      (Numerical Foundation)         │
-    └─────────────────────────────────────┘
+    +---------------------------------------------+
+    |           User Applications                  |
+    \------------------+---------------------------+
+                      |
+    +-----------------v---------------------------+
+    |            Pipelines (Phase 2)               |
+    |  High-level workflows and analysis chains    |
+    \------------------+---------------------------+
+                      |
+         +------------+------------+
+         |            |            |
+    +----v---+   +---v----+  +---v--------+
+    | Models |   |Transforms| |Visualization|
+    |(Phase2)|   | (Phase2) | |   (Phase1) |
+    \-----+---+   \----+-----+ \----+--------+
+         |           |            |
+    +----v-----------v------------v--------+
+    |           Core Components             |
+    |  RheoData, Parameters, Base Classes   |
+    \-----+--------------------------+-------+
+         |                          |
+    +----v-----+              +----v-----+
+    |   I/O    |              |  Utils   |
+    | (Phase1) |              |(Phase1)  |
+    \-----------+              \-----------+
+         |                          |
+    +----v--------------------------v----+
+    |         JAX / NumPy / SciPy         |
+    |      (Numerical Foundation)         |
+    \--------------------------------------+
 
 Base Class Hierarchy
 --------------------
@@ -154,19 +154,19 @@ Model Hierarchy
 .. code-block:: text
 
     BaseModel (ABC)
-    ├── ViscoelasticModel
-    │   ├── Maxwell
-    │   ├── Zener
-    │   ├── KelvinVoigt
-    │   └── GeneralizedMaxwell
-    ├── FractionalModel
-    │   ├── FractionalMaxwell
-    │   ├── FractionalZener
-    │   └── FractionalKelvinVoigt
-    └── FlowModel
-        ├── PowerLaw
-        ├── Carreau
-        └── HerschelBulkley
+    |--- ViscoelasticModel
+    |   |--- Maxwell
+    |   |--- Zener
+    |   |--- KelvinVoigt
+    |   \--- GeneralizedMaxwell
+    |--- FractionalModel
+    |   |--- FractionalMaxwell
+    |   |--- FractionalZener
+    |   \--- FractionalKelvinVoigt
+    \--- FlowModel
+        |--- PowerLaw
+        |--- Carreau
+        \--- HerschelBulkley
 
 Transform Hierarchy
 ~~~~~~~~~~~~~~~~~~~
@@ -174,17 +174,17 @@ Transform Hierarchy
 .. code-block:: text
 
     BaseTransform (ABC)
-    ├── FrequencyTransform
-    │   ├── FFT
-    │   └── InverseFFT
-    ├── DataTransform
-    │   ├── Smoothing
-    │   ├── Interpolation
-    │   └── Resampling
-    └── AnalysisTransform
-        ├── Mastercurve
-        ├── OWChirp
-        └── MutationNumber
+    |--- FrequencyTransform
+    |   |--- FFT
+    |   \--- InverseFFT
+    |--- DataTransform
+    |   |--- Smoothing
+    |   |--- Interpolation
+    |   \--- Resampling
+    \--- AnalysisTransform
+        |--- Mastercurve
+        |--- OWChirp
+        \--- MutationNumber
 
 Extension Points
 ----------------
@@ -324,41 +324,41 @@ Data Flow
 ---------
 
 Typical Analysis Workflow
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: text
 
     1. Load Data
-       ├── Auto-detect format (auto_read)
-       ├── Parse file
-       └── Create RheoData
+       |--- Auto-detect format (auto_read)
+       |--- Parse file
+       \--- Create RheoData
 
     2. Preprocess
-       ├── Detect test mode
-       ├── Validate data
-       ├── Apply transforms (smooth, filter)
-       └── Convert to appropriate domain
+       |--- Detect test mode
+       |--- Validate data
+       |--- Apply transforms (smooth, filter)
+       \--- Convert to appropriate domain
 
     3. Model Fitting
-       ├── Select model (manual or auto)
-       ├── Set initial parameters
-       ├── Optimize parameters (JAX gradients)
-       └── Store fitted model
+       |--- Select model (manual or auto)
+       |--- Set initial parameters
+       |--- Optimize parameters (JAX gradients)
+       \--- Store fitted model
 
     4. Analysis
-       ├── Make predictions
-       ├── Compute residuals
-       ├── Calculate metrics
-       └── Cross-validate
+       |--- Make predictions
+       |--- Compute residuals
+       |--- Calculate metrics
+       \--- Cross-validate
 
     5. Visualization
-       ├── Plot data and fit
-       ├── Plot residuals
-       └── Save figures
+       |--- Plot data and fit
+       |--- Plot residuals
+       \--- Save figures
 
     6. Export
-       ├── Save results (HDF5, Excel)
-       └── Export parameters
+       |--- Save results (HDF5, Excel)
+       \--- Export parameters
 
 JAX Integration Details
 -----------------------
@@ -407,7 +407,7 @@ Functions are JIT-compiled for performance:
     result2 = model_function(t, params)  # ~0.1ms
 
 Automatic Differentiation
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 JAX provides automatic gradients:
 
@@ -622,7 +622,7 @@ Future Extensions
 -----------------
 
 Phase 2: Models and Transforms
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - 20+ rheological models
 - Master curve generation
@@ -631,7 +631,7 @@ Phase 2: Models and Transforms
 - Mutation number calculation
 
 Phase 3: Advanced Features
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Bayesian parameter estimation
 - Uncertainty quantification
@@ -640,7 +640,7 @@ Phase 3: Advanced Features
 - GPU-accelerated model fitting
 
 Phase 4: Machine Learning
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Neural network surrogate models
 - Active learning for parameter estimation

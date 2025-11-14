@@ -34,7 +34,7 @@ Quick Links
 **Phase 3 (Bayesian Inference)**:
 
 - :doc:`api/core` - BayesianMixin, BayesianResult (NumPyro NUTS sampling)
-- :doc:`api/pipeline` - BayesianPipeline (NLSQ → NUTS workflow with ArviZ diagnostics)
+- :doc:`api/pipeline` - BayesianPipeline (NLSQ -> NUTS workflow with ArviZ diagnostics)
 
 Overview by Category
 --------------------
@@ -65,7 +65,7 @@ Core Components
 - :func:`rheojax.core.test_modes.detect_test_mode` - Automatic test mode detection
 
 Models (20 total)
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 **Classical Models (3)**:
 
@@ -95,17 +95,17 @@ Models (20 total)
 
 **Non-Newtonian Flow Models (6)**:
 
-- :class:`rheojax.models.PowerLaw` - τ = K·γ̇^n
-- :class:`rheojax.models.Carreau` - Smooth Newtonian → power-law
+- :class:`rheojax.models.PowerLaw` - tau = :math:`K \, \dot{\gamma}^n`
+- :class:`rheojax.models.Carreau` - Smooth Newtonian -> power-law
 - :class:`rheojax.models.CarreauYasuda` - Extended Carreau
 - :class:`rheojax.models.Cross` - Alternative to Carreau
 - :class:`rheojax.models.HerschelBulkley` - Yield stress + power-law
 - :class:`rheojax.models.Bingham` - Yield stress + Newtonian
 
 Transforms (5 total)
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
-- :class:`rheojax.transforms.FFTAnalysis` - Time → frequency domain (FFT)
+- :class:`rheojax.transforms.FFTAnalysis` - Time -> frequency domain (FFT)
 - :class:`rheojax.transforms.Mastercurve` - Time-temperature superposition (WLF/Arrhenius)
 - :class:`rheojax.transforms.MutationNumber` - Viscoelastic character quantification
 - :class:`rheojax.transforms.OWChirp` - Optimal waveform analysis for LAOS
@@ -122,8 +122,8 @@ Pipeline API
 
 - :class:`rheojax.pipeline.MastercurvePipeline` - Time-temperature superposition
 - :class:`rheojax.pipeline.ModelComparisonPipeline` - Multi-model comparison
-- :class:`rheojax.pipeline.CreepToRelaxationPipeline` - Creep → relaxation conversion
-- :class:`rheojax.pipeline.FrequencyToTimePipeline` - Frequency → time conversion
+- :class:`rheojax.pipeline.CreepToRelaxationPipeline` - Creep -> relaxation conversion
+- :class:`rheojax.pipeline.FrequencyToTimePipeline` - Frequency -> time conversion
 
 **Batch Processing**:
 
@@ -156,8 +156,8 @@ Utilities
 
 **Mittag-Leffler Functions**:
 
-- :func:`rheojax.utils.mittag_leffler.mittag_leffler_e` - One-parameter: E_α(z)
-- :func:`rheojax.utils.mittag_leffler.mittag_leffler_e2` - Two-parameter: E_α,β(z)
+- :func:`rheojax.utils.mittag_leffler.mittag_leffler_e` - One-parameter: E_alpha(z)
+- :func:`rheojax.utils.mittag_leffler.mittag_leffler_e2` - Two-parameter: E_alpha,beta(z)
 
 **Test Modes**:
 
@@ -196,7 +196,7 @@ All rheo classes follow consistent patterns:
    model = ModelClass()              # Instantiate
    model.fit(X, y)                   # Fit to data
    predictions = model.predict(X)    # Make predictions
-   score = model.score(X, y)         # Calculate R²
+   score = model.score(X, y)         # Calculate R^2
 
 **Transforms**:
 
@@ -219,7 +219,7 @@ All rheo classes follow consistent patterns:
        .save(filepath))
 
 scikit-learn Compatibility
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 rheo models are compatible with scikit-learn:
 

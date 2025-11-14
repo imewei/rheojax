@@ -3,32 +3,35 @@ Model Selection Guide
 
 Choosing the right rheological model is critical for accurately characterizing material behavior. This guide helps you select the appropriate model based on your material type, test mode, and experimental objectives.
 
+For governing equations, parameter tables, and troubleshooting notes per model, refer to the
+:doc:`/models/index` handbook while using this decision guide.
+
 Quick Selection Flowchart
---------------------------
+-------------------------
 
 .. code-block:: text
 
    Data Type?
-   ├─ Time Domain (Relaxation/Creep)
-   │  ├─ Decay Type?
-   │  │  ├─ Exponential decay → Maxwell, Zener
-   │  │  ├─ Power-law decay → FractionalMaxwellGel, FZSS
-   │  │  └─ Finite equilibrium modulus → Zener, FZSS, FKV
-   │  └─ Material Type?
-   │     ├─ Liquid-like (flows) → Maxwell, FractionalMaxwellLiquid
-   │     ├─ Solid-like (elastic) → Zener, FZSS, FractionalKelvinVoigt
-   │     └─ Gel-like → FractionalMaxwellGel
-   └─ Frequency Domain (Oscillation)
-      ├─ Low-frequency behavior?
-      │  ├─ G' > G" → Solid-like models (FZSS, FKV, Zener)
-      │  └─ G" > G' → Liquid-like models (Maxwell, FML)
-      └─ Slope in log-log plot?
-         ├─ ~2 (liquid) → Maxwell, FML
-         ├─ ~0.5 (gel) → FractionalMaxwellGel
-         └─ plateau (solid) → FZSS, Zener, FKV
+   |-- Time Domain (Relaxation/Creep)
+   |   |-- Decay Type?
+   |   |   |-- Exponential decay -> Maxwell, Zener
+   |   |   |-- Power-law decay -> FractionalMaxwellGel, FZSS
+   |   |   \-- Finite equilibrium modulus -> Zener, FZSS, FKV
+   |   \-- Material Type?
+   |       |-- Liquid-like (flows) -> Maxwell, FractionalMaxwellLiquid
+   |       |-- Solid-like (elastic) -> Zener, FZSS, FractionalKelvinVoigt
+   |       \-- Gel-like -> FractionalMaxwellGel
+   \-- Frequency Domain (Oscillation)
+       |-- Low-frequency behavior?
+       |   |-- G' > G" -> Solid-like models (FZSS, FKV, Zener)
+       |   \-- G" > G' -> Liquid-like models (Maxwell, FML)
+       \-- Slope in log-log plot?
+           |-- ~2 (liquid) -> Maxwell, FML
+           |-- ~0.5 (gel) -> FractionalMaxwellGel
+           \-- plateau (solid) -> FZSS, Zener, FKV
 
 Decision Tree: Which Model for Which Material?
------------------------------------------------
+----------------------------------------------
 
 Quick Selection Table
 ~~~~~~~~~~~~~~~~~~~~~
@@ -71,7 +74,7 @@ Quick Selection Table
      - Advanced Fractional
 
 Material-Specific Recommendations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Polymers (Molten and Solid)**
 
@@ -142,7 +145,7 @@ For dilute to concentrated polymer solutions in flow:
       model = PowerLaw()
       # K: consistency, n: flow index (n<1 for shear thinning)
 
-2. **Newtonian → shear thinning**: Use :class:`Carreau` or :class:`Cross` (4 parameters)
+2. **Newtonian -> shear thinning**: Use :class:`Carreau` or :class:`Cross` (4 parameters)
 
    .. code-block:: python
 
@@ -178,14 +181,14 @@ For concentrated suspensions, pastes, and yield stress fluids:
       from rheojax.models import Bingham
       model = Bingham()
       # tau_0: yield stress, eta_pl: plastic viscosity
-      # Simpler alternative to Herschel-Bulkley when n ≈ 1
+      # Simpler alternative to Herschel-Bulkley when n approx 1
 
 
 Model Complexity vs Fitting Quality Trade-offs
------------------------------------------------
+----------------------------------------------
 
 Parameter Count and Model Selection
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **2-Parameter Models (Simplest)**
 
@@ -280,10 +283,10 @@ Follow this systematic approach:
       zener.fit(X, y)
       r2_zener = zener.score(X, y)
 
-      print(f"Maxwell R²: {r2_maxwell:.4f}")
-      print(f"Zener R²: {r2_zener:.4f}")
+      print(f"Maxwell R^2: {r2_maxwell:.4f}")
+      print(f"Zener R^2: {r2_zener:.4f}")
 
-2. **Check fit quality**: Look at R², residuals, physical parameter values
+2. **Check fit quality**: Look at R^2, residuals, physical parameter values
 
    .. code-block:: python
 
@@ -361,10 +364,10 @@ Follow this systematic approach:
       # Lower AIC indicates better model given complexity penalty
 
 When to Use Fractional vs Classical Models
--------------------------------------------
+------------------------------------------
 
 Classical Models (Integer-Order Derivatives)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Use classical models when**:
 
@@ -381,7 +384,7 @@ Classical Models (Integer-Order Derivatives)
 - Simple power-law for flow behavior in limited shear rate range
 
 Fractional Models (Fractional-Order Derivatives)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Use fractional models when**:
 
@@ -392,17 +395,17 @@ Fractional Models (Fractional-Order Derivatives)
 
 **Physical Interpretation**:
 
-The fractional order α has physical meaning:
+The fractional order alpha has physical meaning:
 
-- α = 0: Pure elastic (spring)
-- α = 1: Pure viscous (dashpot)
-- 0 < α < 1: Fractional viscoelastic (intermediate)
+- alpha = 0: Pure elastic (spring)
+- alpha = 1: Pure viscous (dashpot)
+- 0 < alpha < 1: Fractional viscoelastic (intermediate)
 
 For polymers and soft matter:
 
-- α ≈ 0.1-0.3: Highly entangled systems, strong caging
-- α ≈ 0.4-0.6: Moderate entanglement, broad relaxation spectrum
-- α ≈ 0.7-0.9: Weakly entangled, approaching liquid-like
+- alpha approx 0.1-0.3: Highly entangled systems, strong caging
+- alpha approx 0.4-0.6: Moderate entanglement, broad relaxation spectrum
+- alpha approx 0.7-0.9: Weakly entangled, approaching liquid-like
 
 **Example comparison**:
 
@@ -414,7 +417,7 @@ For polymers and soft matter:
 
    # Generate synthetic data with power-law decay
    omega = np.logspace(-2, 2, 50)
-   # True behavior: G' ~ ω^0.4 (fractional)
+   # True behavior: G' ~ omega^0.4 (fractional)
    G_prime_true = 1000 * omega**0.4
 
    # Fit with classical Zener (will struggle)
@@ -466,10 +469,10 @@ For complex materials, consider **multi-technique fitting** with fractional mode
 
 
 Complete Model Catalog
------------------------
+----------------------
 
 Classical Models (3 models)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -480,20 +483,20 @@ Classical Models (3 models)
      - Test Modes
      - Material Types
    * - **Maxwell**
-     - G_s (Pa), eta_s (Pa·s)
+     - G_s (Pa), eta_s (Pa*s)
      - Relaxation, Oscillation
      - Polymer melts, simple viscoelastic
    * - **Zener**
-     - G_s, G_p (Pa), eta_p (Pa·s)
+     - G_s, G_p (Pa), eta_p (Pa*s)
      - Relaxation, Creep, Oscillation
      - Viscoelastic solids, SLS
    * - **SpringPot**
-     - V (Pa·s^α), alpha (-)
+     - V (Pa*s^alpha), alpha (-)
      - Oscillation, Relaxation
      - Power-law materials, gels
 
 Fractional Maxwell Family (4 models)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -521,7 +524,7 @@ Fractional Maxwell Family (4 models)
      - Medium
 
 Fractional Zener Family (4 models)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -549,7 +552,7 @@ Fractional Zener Family (4 models)
      - Soft solids with compliance
 
 Advanced Fractional Models (3 models)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -573,7 +576,7 @@ Advanced Fractional Models (3 models)
      - Polymer solutions
 
 Non-Newtonian Flow Models (6 models)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -584,12 +587,12 @@ Non-Newtonian Flow Models (6 models)
      - Flow Behavior
      - Typical Applications
    * - **PowerLaw**
-     - K (Pa·s^n), n (-)
+     - K (Pa*s^n), n (-)
      - Shear thinning/thickening
      - Simple shear rate dependence
    * - **Carreau**
      - eta_0, eta_inf, lambda, m
-     - Smooth Newtonian → power-law
+     - Smooth Newtonian -> power-law
      - Polymer solutions
    * - **CarreauYasuda**
      - Carreau + parameter 'a'
@@ -612,7 +615,7 @@ Best Practices
 --------------
 
 Model Selection Checklist
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Before fitting:
 
@@ -620,7 +623,7 @@ Before fitting:
 2. **Know your frequency/time range**: Wide (>3 decades) or narrow (<2 decades)?
 3. **Understand your material**: Solid-like, liquid-like, or intermediate?
 4. **Check data quality**: Noise level, number of points, dynamic range
-5. **Define success criteria**: What R² or error level is acceptable?
+5. **Define success criteria**: What R^2 or error level is acceptable?
 
 During fitting:
 
@@ -639,7 +642,7 @@ After fitting:
 5. **Report uncertainties**: Especially for publication
 
 Common Pitfalls and How to Avoid Them
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Pitfall 1: Overfitting with too many parameters**
 
@@ -704,55 +707,55 @@ Solution: Examine parameter confidence intervals and correlations
        print(f"  {param}: {value:.2e} [{lower:.2e}, {upper:.2e}]")
 
 Data-Driven Selection Criteria
--------------------------------
+------------------------------
 
 Based on Relaxation Modulus G(t)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**Linear in log(G) vs t** (Semi-log plot)
-   → Exponential decay → **Maxwell** or **Zener**
-
-**Linear in log(G) vs log(t)** (Log-log plot)
-   → Power-law decay → **FractionalMaxwellGel** or **FZSS**
-
-**Plateau at long times**
-   → Finite equilibrium modulus → **Zener**, **FZSS**, or **FKV**
-
-**No plateau (G → 0)**
-   → Liquid-like → **Maxwell** or **FractionalMaxwellLiquid**
-
-Based on Complex Modulus G*(ω)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Low-frequency slope in log(G') vs log(ω)**:
+**Linear in log(G) vs t** (Semi-log plot)
+   -> Exponential decay -> **Maxwell** or **Zener**
 
-- Slope ≈ 2: Liquid → **Maxwell**, **FML**
-- Slope ≈ 0: Solid → **Zener**, **FZSS**, **FKV**
-- Slope ≈ α (0 < α < 1): Gel → **FractionalMaxwellGel**
+**Linear in log(G) vs log(t)** (Log-log plot)
+   -> Power-law decay -> **FractionalMaxwellGel** or **FZSS**
+
+**Plateau at long times**
+   -> Finite equilibrium modulus -> **Zener**, **FZSS**, or **FKV**
+
+**No plateau (G -> 0)**
+   -> Liquid-like -> **Maxwell** or **FractionalMaxwellLiquid**
+
+Based on Complex Modulus G*(omega)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Low-frequency slope in log(G') vs log(omega)**:
+
+- Slope approx 2: Liquid -> **Maxwell**, **FML**
+- Slope approx 0: Solid -> **Zener**, **FZSS**, **FKV**
+- Slope approx alpha (0 < alpha < 1): Gel -> **FractionalMaxwellGel**
 
 **G'/G" crossover**:
 
-- Present: Relaxation time identifiable → **Maxwell**, **Zener**
-- Absent (G' > G" always): Strong solid → **FKV**, **FZSS**
-- Absent (G" > G' always): Strong liquid → **Maxwell**, **FML**
+- Present: Relaxation time identifiable -> **Maxwell**, **Zener**
+- Absent (G' > G" always): Strong solid -> **FKV**, **FZSS**
+- Absent (G" > G' always): Strong liquid -> **Maxwell**, **FML**
 
 Based on Creep Compliance J(t)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Linear in log(J) vs t**
-   → Exponential creep → Classical models
+   -> Exponential creep -> Classical models
 
 **Linear in log(J) vs log(t)**
-   → Power-law creep → **FractionalKelvinVoigt**, **FKVZ**
+   -> Power-law creep -> **FractionalKelvinVoigt**, **FKVZ**
 
 **Finite equilibrium compliance**
-   → Solid-like → **FKVZ**, **Zener**
+   -> Solid-like -> **FKVZ**, **Zener**
 
 **Unbounded compliance**
-   → Liquid-like → **Maxwell**, **FML**
+   -> Liquid-like -> **Maxwell**, **FML**
 
 Automatic Compatibility Checking
----------------------------------
+--------------------------------
 
 RheoJAX provides automatic compatibility checking to help identify inappropriate models:
 
@@ -784,14 +787,14 @@ The system will:
 - Suggest alternative models
 
 Parameter Bounds Reference
----------------------------
+--------------------------
 
 All models have physically reasonable default bounds:
 
 - **Moduli (G, E)**: 1 Pa to 1 GPa
-- **Viscosity (η)**: 1 mPa·s to 1 MPa·s
-- **Time constants (τ)**: 1 μs to 1 Ms
-- **Fractional orders (α)**: 0 to 1
+- **Viscosity (eta)**: 1 mPa*s to 1 MPa*s
+- **Time constants (tau)**: 1 mus to 1 Ms
+- **Fractional orders (alpha)**: 0 to 1
 
 Adjust bounds if your material is outside these ranges.
 
@@ -800,7 +803,7 @@ Summary
 
 **Quick Decision Path**:
 
-1. **Test mode is rotation (steady shear)**: Use flow models (PowerLaw → Carreau/Cross → HerschelBulkley)
+1. **Test mode is rotation (steady shear)**: Use flow models (PowerLaw -> Carreau/Cross -> HerschelBulkley)
 2. **Test mode is oscillation or relaxation**:
 
    - Simple material, narrow range: Classical models (Maxwell, Zener)
@@ -830,13 +833,13 @@ Further Reading
 - ``examples/model_comparison.ipynb`` - Side-by-side model comparison
 
 Getting Help with Model Selection
-----------------------------------
+---------------------------------
 
 If you're unsure which model to use:
 
 1. **Run compatibility check first** - Use ``check_model_compatibility()``
 2. **Fit 3-4 candidate models** - Start simple, add complexity
-3. **Compare metrics** - R², AIC, BIC
+3. **Compare metrics** - R^2, AIC, BIC
 4. **Check physical reasonableness** - Do parameters make sense?
 5. **Validate on held-out data** - Cross-validation or test sets
 

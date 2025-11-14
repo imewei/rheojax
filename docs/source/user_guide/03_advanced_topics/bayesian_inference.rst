@@ -1,8 +1,8 @@
-====================
+==================
 Bayesian Inference
-====================
+==================
 
-This guide covers RheoJAX's comprehensive Bayesian inference capabilities, including NLSQ → NUTS workflow,
+This guide covers RheoJAX's comprehensive Bayesian inference capabilities, including NLSQ -> NUTS workflow,
 ArviZ diagnostic visualization, and best practices for MCMC analysis.
 
 .. contents:: Table of Contents
@@ -21,40 +21,40 @@ RheoJAX implements a state-of-the-art Bayesian workflow that combines:
 This workflow provides 2-5x faster convergence compared to cold-start MCMC while maintaining
 full Bayesian uncertainty quantification.
 
-**Implementation Status**: ✅ **FULLY IMPLEMENTED** (v0.2.0)
+**Implementation Status**: [done] **FULLY IMPLEMENTED** (v0.2.0)
 
 All 20 rheological models support the complete Bayesian workflow through ``BayesianMixin`` inheritance.
 
 When to Use Bayesian Inference
-===============================
+==============================
 
 Use Bayesian When You Need
----------------------------
+--------------------------
 
-✅ **Parameter uncertainty quantification** - "How well-constrained are my parameters?"
+[done] **Parameter uncertainty quantification** - "How well-constrained are my parameters?"
 
-✅ **Credible intervals** - "95% probability the parameter is in this range"
+[done] **Credible intervals** - "95% probability the parameter is in this range"
 
-✅ **Parameter correlations** - "Are G₀ and η identifiable with my data?"
+[done] **Parameter correlations** - "Are G_0 and eta identifiable with my data?"
 
-✅ **Prediction uncertainty** - "Error bands on model predictions"
+[done] **Prediction uncertainty** - "Error bands on model predictions"
 
-✅ **Model comparison** - "Which model best explains my data? (WAIC, LOO)"
+[done] **Model comparison** - "Which model best explains my data? (WAIC, LOO)"
 
 Skip Bayesian When
--------------------
+------------------
 
-❌ Quick screening with high signal-to-noise data
+- Avoid Bayesian inference for quick screening with high signal-to-noise data.
 
-❌ Real-time analysis where speed is critical
+- Avoid when real-time analysis speed is critical.
 
-❌ Parameters are well-constrained (uncertainty not important)
+- Avoid when parameters are already well-constrained and uncertainty is not important.
 
 Quick Start
 ===========
 
 Basic Bayesian Workflow
-------------------------
+-----------------------
 
 .. code-block:: python
 
@@ -107,7 +107,7 @@ NLSQ + NUTS Workflow
 ====================
 
 Step 1: NLSQ Point Estimation
-------------------------------
+-----------------------------
 
 NLSQ provides fast, GPU-accelerated optimization:
 
@@ -129,7 +129,7 @@ NLSQ provides fast, GPU-accelerated optimization:
 - Perfect for warm-starting MCMC
 
 Step 2: Bayesian Inference with Warm-Start
--------------------------------------------
+------------------------------------------
 
 Use NLSQ point estimates to initialize NUTS:
 
@@ -211,7 +211,7 @@ Rheo integrates ArviZ for comprehensive MCMC diagnostics. All plotting methods s
 the fluent API pattern with ``show`` parameter and ``.save_figure()`` chaining.
 
 1. Pair Plot (Parameter Correlations)
---------------------------------------
+-------------------------------------
 
 Visualize pairwise parameter relationships to identify correlations and non-identifiability:
 
@@ -237,14 +237,14 @@ Visualize pairwise parameter relationships to identify correlations and non-iden
 - Red points (divergences): Problematic posterior geometry
 
 2. Forest Plot (Credible Intervals)
-------------------------------------
+-----------------------------------
 
 Compare parameter estimates with uncertainty visualization:
 
 .. code-block:: python
 
    pipeline.plot_forest(
-       hdi_prob=0.95,              # 0.68 (1σ), 0.95 (2σ), 0.997 (3σ)
+       hdi_prob=0.95,              # 0.68 (1 sigma), 0.95 (2 sigma), 0.997 (3 sigma)
        combined=True                # Combine multiple chains
    )
 
@@ -263,7 +263,7 @@ Compare parameter estimates with uncertainty visualization:
 - Wide bars: High uncertainty
 
 3. Energy Plot (NUTS Diagnostic)
----------------------------------
+--------------------------------
 
 NUTS-specific diagnostic for posterior geometry:
 
@@ -284,7 +284,7 @@ NUTS-specific diagnostic for posterior geometry:
 **Note**: Energy plot requires ``num_chains > 1`` in ``fit_bayesian()``.
 
 4. Autocorrelation Plot (Mixing Diagnostic)
---------------------------------------------
+-------------------------------------------
 
 Check MCMC chain mixing quality:
 
@@ -306,7 +306,7 @@ Check MCMC chain mixing quality:
 - Quick decay: Good mixing, efficient sampling
 
 5. Rank Plot (Convergence Diagnostic)
---------------------------------------
+-------------------------------------
 
 Modern convergence diagnostic (alternative to trace plots):
 
@@ -326,7 +326,7 @@ Modern convergence diagnostic (alternative to trace plots):
 - Patterns in ranks: Insufficient mixing
 
 6. ESS Plot (Effective Sample Size)
-------------------------------------
+-----------------------------------
 
 Quantify sampling efficiency:
 
@@ -351,7 +351,7 @@ Quantify sampling efficiency:
 - Low ESS: High autocorrelation, poor exploration
 
 Complete Diagnostic Workflow
------------------------------
+----------------------------
 
 Run all diagnostics in sequence:
 
@@ -373,10 +373,10 @@ Run all diagnostics in sequence:
        .plot_ess(kind='local', show=False).save_figure('ess.pdf'))
 
 Advanced ArviZ Integration
-===========================
+==========================
 
 Converting to InferenceData
-----------------------------
+---------------------------
 
 Access ArviZ InferenceData for advanced analysis:
 
@@ -416,10 +416,10 @@ The InferenceData object contains:
    print(f"Divergent transitions: {divergences.sum().item()}")
 
 Convergence Diagnostics
-========================
+=======================
 
 R-hat (Gelman-Rubin Statistic)
--------------------------------
+------------------------------
 
 Measures convergence across multiple chains:
 
@@ -441,7 +441,7 @@ Measures convergence across multiple chains:
 4. Check for multimodal posterior
 
 Effective Sample Size (ESS)
-----------------------------
+---------------------------
 
 Quantifies independent samples:
 
@@ -463,7 +463,7 @@ Quantifies independent samples:
 4. Consider reparameterization if correlations high
 
 Divergent Transitions
-----------------------
+---------------------
 
 Indicates problematic posterior geometry:
 
@@ -577,7 +577,7 @@ Common Pitfalls
 ===============
 
 1. Skipping NLSQ Warm-Start
-----------------------------
+---------------------------
 
 **Problem**: Cold-start MCMC converges slowly with many divergences.
 
@@ -593,7 +593,7 @@ Common Pitfalls
    result = model.fit_bayesian(t, G_data)  # Auto warm-start
 
 2. Ignoring Convergence Diagnostics
-------------------------------------
+-----------------------------------
 
 **Problem**: Using results without checking convergence.
 
@@ -614,7 +614,7 @@ Common Pitfalls
        print("WARNING: Low ESS, increase num_samples")
 
 3. Insufficient Samples
-------------------------
+-----------------------
 
 **Problem**: Using too few samples leads to poor posterior approximation.
 
@@ -629,7 +629,7 @@ Common Pitfalls
    result = model.fit_bayesian(t, G_data, num_samples=2000)
 
 4. Not Checking Pair Plots
----------------------------
+--------------------------
 
 **Problem**: Missing parameter correlations and non-identifiability.
 
@@ -648,7 +648,7 @@ Examples
 ========
 
 Example 1: Maxwell Model with Full Diagnostics
------------------------------------------------
+----------------------------------------------
 
 .. code-block:: python
 
@@ -692,7 +692,7 @@ Example 1: Maxwell Model with Full Diagnostics
    print(summary)
 
 Example 2: Comparing Credibility Levels
-----------------------------------------
+---------------------------------------
 
 .. code-block:: python
 
@@ -713,12 +713,12 @@ Example 2: Comparing Credibility Levels
    ci_997 = model.get_credible_intervals(result.posterior_samples, credibility=0.997)
 
    print("G0 Credible Intervals:")
-   print(f"  68% (1σ): {ci_68['G0']}")
-   print(f"  95% (2σ): {ci_95['G0']}")
-   print(f"  99.7% (3σ): {ci_997['G0']}")
+   print(f"  68% (1 sigma): {ci_68['G0']}")
+   print(f"  95% (2 sigma): {ci_95['G0']}")
+   print(f"  99.7% (3 sigma): {ci_997['G0']}")
 
 Example 3: Advanced ArviZ Analysis
------------------------------------
+----------------------------------
 
 .. code-block:: python
 
@@ -753,16 +753,16 @@ Example 3: Advanced ArviZ Analysis
    print(f"MCSE: {mcse}")
 
 Troubleshooting Common Issues
-==============================
+=============================
 
 Issue 1: R-hat > 1.01 (Not Converged)
----------------------------------------
+-------------------------------------
 
 **Symptoms:**
 
 .. code-block:: text
 
-   R-hat (G₀): 1.0341  ✗ NOT converged
+   R-hat (G_0): 1.0341  [X] NOT converged
 
 **Solutions:**
 
@@ -776,16 +776,16 @@ Issue 1: R-hat > 1.01 (Not Converged)
    )
 
    # Check rank plot: Is histogram uniform?
-   pipeline.plot_rank()  # Non-uniform → not converged
+   pipeline.plot_rank()  # Non-uniform -> not converged
 
 Issue 2: ESS < 400 (Poor Sampling Efficiency)
-----------------------------------------------
+---------------------------------------------
 
 **Symptoms:**
 
 .. code-block:: text
 
-   ESS (G₀): 187  ✗ Low (increase samples)
+   ESS (G_0): 187  [X] Low (increase samples)
 
 **Solutions:**
 
@@ -799,16 +799,16 @@ Issue 2: ESS < 400 (Poor Sampling Efficiency)
    )
 
    # Check autocorrelation plot: Is mixing slow?
-   pipeline.plot_autocorr()  # Slow decay → high autocorrelation
+   pipeline.plot_autocorr()  # Slow decay -> high autocorrelation
 
 Issue 3: High Divergence Rate (>1%)
-------------------------------------
+-----------------------------------
 
 **Symptoms:**
 
 .. code-block:: text
 
-   Divergences: 84 (1.05%)  ✗ High
+   Divergences: 84 (1.05%)  [X] High
 
 **Solutions:**
 
@@ -831,71 +831,71 @@ Issue 3: High Divergence Rate (>1%)
    model.parameters.set_bounds('eta', (5e2, 2e3))
 
 Issue 4: Strong Parameter Correlations
----------------------------------------
+--------------------------------------
 
 **Symptoms:**
 
 .. code-block:: python
 
-   # Pair plot shows diagonal line between G₀ and η
+   # Pair plot shows diagonal line between G_0 and eta
    import numpy as np
    correlation = np.corrcoef(G0_samples, eta_samples)[0, 1]
-   print(f"Correlation: {correlation:.3f}")  # |ρ| > 0.7
+   print(f"Correlation: {correlation:.3f}")  # |rho| > 0.7
 
 **This is often EXPECTED for rheological models:**
 
-- Maxwell: G₀ and η both affect relaxation time τ = η/G₀
+- Maxwell: G_0 and eta both affect relaxation time tau = eta/G_0
 - This is a physical correlation, not a problem
 - If correlation > 0.9, consider collecting data at different time scales
 
 Best Practices Checklist
-=========================
+========================
 
 Before Running Bayesian Inference
-----------------------------------
+---------------------------------
 
-✅ Run NLSQ first (Stage 1) for warm-start
+[done] Run NLSQ first (Stage 1) for warm-start
 
-✅ Use meaningful parameter bounds
+[done] Use meaningful parameter bounds
 
-✅ Check data quality (outliers, noise level)
+[done] Check data quality (outliers, noise level)
 
-✅ Use multi-chain MCMC (``num_chains=4``)
+[done] Use multi-chain MCMC (``num_chains=4``)
 
 When Running Inference
------------------------
+----------------------
 
-✅ Start with ``num_warmup=1000``, ``num_samples=2000``
+[done] Start with ``num_warmup=1000``, ``num_samples=2000``
 
-✅ Use warm-start from NLSQ (automatically done by BayesianPipeline)
+[done] Use warm-start from NLSQ (automatically done by BayesianPipeline)
 
-✅ Monitor progress (NumPyro shows progress bars)
+[done] Monitor progress (NumPyro shows progress bars)
 
 After Inference
 ---------------
 
-✅ **ALWAYS check convergence** (R-hat, ESS, divergences)
+[done] **ALWAYS check convergence** (R-hat, ESS, divergences)
 
-✅ Run all 6 ArviZ diagnostic plots
+[done] Run all 6 ArviZ diagnostic plots
 
-✅ Verify rank plot is uniform
+[done] Verify rank plot is uniform
 
-✅ Check pair plot for correlations and divergences
+[done] Check pair plot for correlations and divergences
 
-✅ Document diagnostics in reports
+[done] Document diagnostics in reports
 
 Red Flags (Do Not Trust Results)
----------------------------------
+--------------------------------
 
-❌ R-hat > 1.01 for any parameter
+- R-hat > 1.01 for any parameter
 
-❌ ESS < 100 for any parameter
+- Effective sample size (ESS) < 100 for any parameter
 
-❌ Divergence rate > 5%
+- Divergence rate > 5%
 
-❌ Non-uniform rank plot
+- Non-uniform rank plot
 
-❌ Energy plot shows poor overlap
+- Energy plot shows poor overlap
 
 Model Support
 =============
@@ -903,14 +903,14 @@ Model Support
 All 20 rheological models inherit ``BayesianMixin`` through ``BaseModel`` and support complete Bayesian workflows:
 
 Classical Viscoelastic (3 models)
-----------------------------------
+---------------------------------
 
 - Maxwell
 - Zener
 - SpringPot
 
 Flow Models (6 models)
------------------------
+----------------------
 
 - Bingham
 - PowerLaw
@@ -920,7 +920,7 @@ Flow Models (6 models)
 - Cross
 
 Fractional Models (11 models)
-------------------------------
+-----------------------------
 
 - fractional_burgers
 - fractional_jeffreys
@@ -936,13 +936,13 @@ Fractional Models (11 models)
 
 Each model provides:
 
-- ``.fit()`` → NLSQ point estimation
-- ``.fit_bayesian()`` → NUTS posterior sampling
-- ``.sample_prior()`` → Prior predictive sampling
-- ``.get_credible_intervals()`` → Posterior uncertainty quantification
+- ``.fit()`` -> NLSQ point estimation
+- ``.fit_bayesian()`` -> NUTS posterior sampling
+- ``.sample_prior()`` -> Prior predictive sampling
+- ``.get_credible_intervals()`` -> Posterior uncertainty quantification
 
 Performance Characteristics
-============================
+===========================
 
 NLSQ Optimization
 -----------------
@@ -953,7 +953,7 @@ NLSQ Optimization
 - Typical: 50-500 iterations for rheological models
 
 Bayesian Inference (NUTS)
---------------------------
+-------------------------
 
 - **2-5x faster convergence** with NLSQ warm-start vs cold start
 - Typical settings: ``num_warmup=1000``, ``num_samples=2000``
@@ -1003,7 +1003,7 @@ Further Reading
 **RheoJAX Examples**
    See :doc:`../examples/index` for 5 comprehensive Bayesian inference tutorial notebooks:
 
-   1. ``examples/bayesian/01-bayesian-basics.ipynb`` - Complete NLSQ → NUTS workflow
+   1. ``examples/bayesian/01-bayesian-basics.ipynb`` - Complete NLSQ -> NUTS workflow
    2. ``examples/bayesian/02-prior-selection.ipynb`` - Prior elicitation and sensitivity
    3. ``examples/bayesian/03-convergence-diagnostics.ipynb`` - Master all 6 ArviZ diagnostic plots
    4. ``examples/bayesian/04-model-comparison.ipynb`` - WAIC, LOO, and model selection
