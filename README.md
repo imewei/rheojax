@@ -6,17 +6,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 20 rheological models, 5 data transforms, Bayesian inference via NumPyro, and 24 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 21 rheological models, 5 data transforms, Bayesian inference via NumPyro, and 27 tutorial notebooks.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **20 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models)
+- **21 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models), Multi-Mode (Generalized Maxwell)
 - **5 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
-- **Bayesian Inference**: All 20 models support NumPyro NUTS sampling with NLSQ warm-start
+- **Bayesian Inference**: All 21 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
@@ -32,11 +32,11 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Plugin System**: Support for custom models and transforms
 
 ### Tutorial Notebooks & Examples
-- **24 Tutorial Notebooks**: Organized in 4 categories
+- **27 Tutorial Notebooks**: Organized in 4 categories
   - `examples/basic/` - 5 notebooks covering fundamental models
-  - `examples/transforms/` - 6 notebooks for data transforms and analysis
-  - `examples/bayesian/` - 6 notebooks for Bayesian inference workflows
-  - `examples/advanced/` - 7 notebooks for production patterns
+  - `examples/transforms/` - 7 notebooks for data transforms and analysis
+  - `examples/bayesian/` - 7 notebooks for Bayesian inference workflows
+  - `examples/advanced/` - 8 notebooks for production patterns
 - **I/O Examples**: TRIOS complex modulus handling and plotting
 
 ## Installation
@@ -352,7 +352,7 @@ delta = mn.calculate(data)  # 0=elastic, 1=viscous
 
 ## Tutorial Notebooks
 
-24 tutorial notebooks organized by topic:
+27 tutorial notebooks organized by topic:
 
 ```
 examples/
@@ -362,28 +362,31 @@ examples/
 │   ├── 03-springpot-fitting.ipynb
 │   ├── 04-bingham-fitting.ipynb
 │   └── 05-power-law-fitting.ipynb
-├── transforms/                  # 6 notebooks: Data analysis workflows
+├── transforms/                  # 7 notebooks: Data analysis workflows
 │   ├── 01-fft-analysis.ipynb
 │   ├── 02-mastercurve-tts.ipynb
 │   ├── 02b-mastercurve-wlf-validation.ipynb
 │   ├── 03-mutation-number.ipynb
 │   ├── 04-owchirp-laos-analysis.ipynb
-│   └── 05-smooth-derivative.ipynb
-├── bayesian/                    # 6 notebooks: Bayesian inference
+│   ├── 05-smooth-derivative.ipynb
+│   └── 07-mastercurve_auto_shift.ipynb
+├── bayesian/                    # 7 notebooks: Bayesian inference
 │   ├── 01-bayesian-basics.ipynb
 │   ├── 02-prior-selection.ipynb
 │   ├── 03-convergence-diagnostics.ipynb
 │   ├── 04-model-comparison.ipynb
 │   ├── 05-uncertainty-propagation.ipynb
-│   └── 06-bayesian_workflow_demo.ipynb
-├── advanced/                    # 7 notebooks: Production patterns
+│   ├── 06-bayesian_workflow_demo.ipynb
+│   └── 07-gmm_bayesian_workflow.ipynb
+├── advanced/                    # 8 notebooks: Production patterns
 │   ├── 01-multi-technique-fitting.ipynb
 │   ├── 02-batch-processing.ipynb
 │   ├── 03-custom-models.ipynb
 │   ├── 04-fractional-models-deep-dive.ipynb
 │   ├── 05-performance-optimization.ipynb
 │   ├── 06-frequentist-model-selection.ipynb
-│   └── 07-trios_chunked_reading_example.ipynb
+│   ├── 07-trios_chunked_reading_example.ipynb
+│   └── 08-generalized_maxwell_fitting.ipynb
 └── io/                          # I/O demonstrations
     └── plot_trios_complex_modulus.ipynb
 ```
@@ -464,7 +467,7 @@ If you use rheo in your research, please cite:
   year = {2024},
   author = {Wei Chen},
   url = {https://github.com/imewei/rheojax},
-  version = {0.2.0}
+  version = {0.2.2}
 }
 ```
 

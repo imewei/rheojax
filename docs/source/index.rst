@@ -1,11 +1,11 @@
-.. rheo documentation master file
+.. RheoJAX documentation master file
 
-Welcome to rheo's documentation!
+Welcome to RheoJAX's documentation!
 ================================
 
-**rheo** is a unified, JAX-accelerated rheological analysis package that provides a modern,
+**RheoJAX** is a unified, JAX-accelerated rheological analysis package that provides a modern,
 high-performance framework for analyzing experimental rheology data. Built on JAX for automatic
-differentiation and GPU acceleration, rheo combines powerful numerical capabilities with an
+differentiation and GPU acceleration, RheoJAX combines powerful numerical capabilities with an
 intuitive API for seamless end-to-end analysis.
 
 .. image:: https://img.shields.io/badge/python-3.12+-blue.svg
@@ -220,7 +220,7 @@ Community and Support
    - Review open issues for contribution ideas
 
 **Citation**
-   If you use rheo in your research, please cite:
+   If you use RheoJAX in your research, please cite:
 
    .. code-block:: bibtex
 
@@ -229,7 +229,7 @@ Community and Support
         year = {2024},
         author = {Wei Chen},
         url = {https://github.com/imewei/rheojax},
-        version = {0.2.0}
+        version = {0.2.2}
       }
 
 Indices and Tables
@@ -242,4 +242,4 @@ Indices and Tables
 License
 -------
 
-rheo is released under the MIT License. See LICENSE file for details.
+RheoJAX is released under the MIT License. See LICENSE file for details.
