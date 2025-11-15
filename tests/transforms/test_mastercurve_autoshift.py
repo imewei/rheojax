@@ -26,7 +26,7 @@ class TestPowerLawFitting:
         y_data = y_true + 0.01 * np.random.randn(len(x))
 
         # Fit power-law
-        mc = Mastercurve(reference_temp=298.15, method='wlf')
+        mc = Mastercurve(reference_temp=298.15, method="wlf")
         popt, perr = mc._fit_power_law(x, y_data)
 
         # Check parameters recovered within tolerance
@@ -46,7 +46,7 @@ class TestPowerLawFitting:
         a_true, b_true = 2.0, -0.5
         y_data = a_true * x**b_true
 
-        mc = Mastercurve(reference_temp=298.15, method='wlf')
+        mc = Mastercurve(reference_temp=298.15, method="wlf")
 
         # Fit full data
         popt_full, perr_full = mc._fit_power_law(x, y_data)
@@ -82,7 +82,7 @@ class TestShiftCalculation:
         curve_top = np.column_stack([x1, y1])
         curve_bot = np.column_stack([x2, y2])
 
-        mc = Mastercurve(reference_temp=298.15, method='wlf')
+        mc = Mastercurve(reference_temp=298.15, method="wlf")
 
         # Power-law parameters for each curve
         popt_top = np.array([a1, b1, 0.0])
@@ -99,7 +99,7 @@ class TestShiftCalculation:
         """Test shift calculation for non-overlapping curves (gap)."""
         # Create two curves with gap between them
         x1 = np.logspace(-2, 0, 30)  # [0.01, 1]
-        x2 = np.logspace(1, 3, 30)   # [10, 1000] - gap from 1 to 10
+        x2 = np.logspace(1, 3, 30)  # [10, 1000] - gap from 1 to 10
 
         a1, b1 = 1.0, -0.5
         a2, b2 = 1.0, -0.5  # Same power-law
@@ -110,7 +110,7 @@ class TestShiftCalculation:
         curve_top = np.column_stack([x1, y1])
         curve_bot = np.column_stack([x2, y2])
 
-        mc = Mastercurve(reference_temp=298.15, method='wlf')
+        mc = Mastercurve(reference_temp=298.15, method="wlf")
 
         popt_top = np.array([a1, b1, 0.0])
         popt_bot = np.array([a2, b2, 0.0])
@@ -140,16 +140,12 @@ class TestSequentialShifting:
             amplitude = 1e5 * (1.5 ** -(i - ref_idx))  # Known amplitude pattern
 
             x = np.logspace(-1, 1, 30)
-            y = amplitude * x**(-0.6)
+            y = amplitude * x ** (-0.6)
 
-            data = RheoData(
-                x=x, y=y,
-                domain='frequency',
-                metadata={'temperature': T}
-            )
+            data = RheoData(x=x, y=y, domain="frequency", metadata={"temperature": T})
             datasets.append(data)
 
-        mc = Mastercurve(reference_temp=298.15, method='wlf')
+        mc = Mastercurve(reference_temp=298.15, method="wlf")
 
         # Compute auto shifts
         log_aT_array = mc._compute_auto_shift_factors(datasets, ref_idx)
@@ -168,7 +164,7 @@ class TestAutoShiftIntegration:
         """Test auto_shift parameter initialization."""
         # Default should be False
         mc_default = Mastercurve(reference_temp=298.15)
-        assert hasattr(mc_default, '_auto_shift')
+        assert hasattr(mc_default, "_auto_shift")
         assert mc_default._auto_shift is False
 
         # Explicit True
@@ -183,16 +179,12 @@ class TestAutoShiftIntegration:
 
         for T in temps:
             x = np.logspace(-1, 1, 30)
-            y = 1e5 * x**(-0.5)
-            data = RheoData(
-                x=x, y=y,
-                domain='frequency',
-                metadata={'temperature': T}
-            )
+            y = 1e5 * x ** (-0.5)
+            data = RheoData(x=x, y=y, domain="frequency", metadata={"temperature": T})
             datasets.append(data)
 
         # Test with auto_shift=False (default, WLF)
-        mc_wlf = Mastercurve(reference_temp=298.15, method='wlf', auto_shift=False)
+        mc_wlf = Mastercurve(reference_temp=298.15, method="wlf", auto_shift=False)
         mastercurve_wlf, shifts_wlf = mc_wlf.transform(datasets)
 
         # Should use WLF calculation

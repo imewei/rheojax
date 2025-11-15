@@ -51,8 +51,8 @@ class TestGMMBayesianInference:
 
         # Fit to set test_mode
         omega = np.logspace(-2, 2, 30)
-        G_prime = 1e6 * (omega * 0.1)**2 / (1 + (omega * 0.1)**2)
-        G_double_prime = 1e6 * (omega * 0.1) / (1 + (omega * 0.1)**2)
+        G_prime = 1e6 * (omega * 0.1) ** 2 / (1 + (omega * 0.1) ** 2)
+        G_double_prime = 1e6 * (omega * 0.1) / (1 + (omega * 0.1) ** 2)
         G_star = np.vstack([G_prime, G_double_prime])
         model.fit(omega, G_star, test_mode="oscillation")
 
@@ -105,11 +105,12 @@ class TestGMMBayesianInference:
 
         # Step 2: Bayesian inference with warm-start (short run for testing)
         result = model.fit_bayesian(
-            t, G_data,
+            t,
+            G_data,
             num_warmup=100,  # Minimal warmup for testing
             num_samples=100,  # Minimal samples for testing
             num_chains=1,
-            initial_values=initial_values
+            initial_values=initial_values,
         )
 
         # Verify result structure
@@ -118,7 +119,9 @@ class TestGMMBayesianInference:
         assert "tau_1" in result.posterior_samples
 
         # Verify sample shapes
-        assert result.posterior_samples["G_inf"].shape == (100,)  # num_samples * num_chains
+        assert result.posterior_samples["G_inf"].shape == (
+            100,
+        )  # num_samples * num_chains
 
         # Verify diagnostics exist
         assert "r_hat" in result.diagnostics
@@ -139,16 +142,16 @@ class TestGMMBayesianInference:
 
         # Bayesian inference with NLSQ warm-start
         initial_values = {
-            name: model.parameters.get_value(name)
-            for name in ["G_inf", "G_1", "tau_1"]
+            name: model.parameters.get_value(name) for name in ["G_inf", "G_1", "tau_1"]
         }
 
         result = model.fit_bayesian(
-            t, G_data,
+            t,
+            G_data,
             num_warmup=200,
             num_samples=200,
             num_chains=1,
-            initial_values=initial_values
+            initial_values=initial_values,
         )
 
         # Check R-hat (should be close to 1.0 for converged chains)
@@ -178,20 +181,22 @@ class TestGMMBayesianInference:
 
         # Bayesian inference
         initial_values = {
-            name: model.parameters.get_value(name)
-            for name in ["G_inf", "G_1", "tau_1"]
+            name: model.parameters.get_value(name) for name in ["G_inf", "G_1", "tau_1"]
         }
 
         result = model.fit_bayesian(
-            t, G_data,
+            t,
+            G_data,
             num_warmup=100,
             num_samples=200,
             num_chains=1,
-            initial_values=initial_values
+            initial_values=initial_values,
         )
 
         # Compute credible intervals
-        intervals = model.get_credible_intervals(result.posterior_samples, credibility=0.95)
+        intervals = model.get_credible_intervals(
+            result.posterior_samples, credibility=0.95
+        )
 
         # Verify intervals exist for all parameters
         assert "G_inf" in intervals

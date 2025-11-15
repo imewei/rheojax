@@ -78,17 +78,26 @@ def validate_prony_parameters(
 
     # Check array lengths match
     if len(E_i_arr) != len(tau_i_arr):
-        return False, f"E_i and tau_i must have same length, got {len(E_i_arr)} and {len(tau_i_arr)}"
+        return (
+            False,
+            f"E_i and tau_i must have same length, got {len(E_i_arr)} and {len(tau_i_arr)}",
+        )
 
     # Check all Eᵢ > 0
     if np.any(E_i_arr <= 0):
         neg_indices = np.where(E_i_arr <= 0)[0]
-        return False, f"All E_i must be positive, found non-positive at indices {neg_indices.tolist()}"
+        return (
+            False,
+            f"All E_i must be positive, found non-positive at indices {neg_indices.tolist()}",
+        )
 
     # Check all τᵢ > 0
     if np.any(tau_i_arr <= 0):
         neg_indices = np.where(tau_i_arr <= 0)[0]
-        return False, f"All tau_i must be positive, found non-positive at indices {neg_indices.tolist()}"
+        return (
+            False,
+            f"All tau_i must be positive, found non-positive at indices {neg_indices.tolist()}",
+        )
 
     return True, ""
 
@@ -122,7 +131,9 @@ def create_prony_parameter_set(
         raise ValueError(f"n_modes must be ≥ 1, got {n_modes}")
 
     if modulus_type not in ["shear", "tensile"]:
-        raise ValueError(f"modulus_type must be 'shear' or 'tensile', got {modulus_type}")
+        raise ValueError(
+            f"modulus_type must be 'shear' or 'tensile', got {modulus_type}"
+        )
 
     param_set = ParameterSet()
 
@@ -244,9 +255,7 @@ def compute_r_squared(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     return float(r2)
 
 
-def iterative_n_reduction(
-    fit_results_dict: dict[int, float]
-) -> dict[str, ArrayLike]:
+def iterative_n_reduction(fit_results_dict: dict[int, float]) -> dict[str, ArrayLike]:
     """Track R² vs N for element minimization visualization.
 
     Args:
@@ -329,7 +338,9 @@ def select_optimal_n(
         5
     """
     if optimization_factor < 1.0:
-        raise ValueError(f"optimization_factor must be ≥ 1.0, got {optimization_factor}")
+        raise ValueError(
+            f"optimization_factor must be ≥ 1.0, got {optimization_factor}"
+        )
 
     if not r2_values:
         raise ValueError("r2_values cannot be empty")

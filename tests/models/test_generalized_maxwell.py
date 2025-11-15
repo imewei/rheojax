@@ -19,7 +19,9 @@ jax, jnp = safe_import_jax()
 class TestGMMRelaxationMode:
     """Test GMM relaxation mode prediction and fitting."""
 
-    @pytest.mark.skip(reason="N=1 single-mode fitting is ill-conditioned (G_inf vs G_1 trade-off)")
+    @pytest.mark.skip(
+        reason="N=1 single-mode fitting is ill-conditioned (G_inf vs G_1 trade-off)"
+    )
     def test_n1_mode_recovers_maxwell_parameters(self):
         """GMM with N=1 should recover single Maxwell element parameters.
 
@@ -40,11 +42,17 @@ class TestGMMRelaxationMode:
 
         # Check total modulus (G_inf + G_1) recovers G0_true
         # Note: optimizer may split G0 between G_inf and G_1 arbitrarily
-        G_total_fit = model.parameters.get_value("G_inf") + model.parameters.get_value("G_1")
+        G_total_fit = model.parameters.get_value("G_inf") + model.parameters.get_value(
+            "G_1"
+        )
         tau1_fit = model.parameters.get_value("tau_1")
 
-        assert abs(G_total_fit - G0_true) / G0_true < 0.10, f"Total G mismatch: {G_total_fit} vs {G0_true}"
-        assert abs(tau1_fit - tau_true) / tau_true < 0.20, f"tau_1 mismatch: {tau1_fit} vs {tau_true}"
+        assert (
+            abs(G_total_fit - G0_true) / G0_true < 0.10
+        ), f"Total G mismatch: {G_total_fit} vs {G0_true}"
+        assert (
+            abs(tau1_fit - tau_true) / tau_true < 0.20
+        ), f"tau_1 mismatch: {tau1_fit} vs {tau_true}"
 
     def test_internal_variable_exponential_decay(self):
         """Internal-variable update should produce exponential decay."""
@@ -59,13 +67,17 @@ class TestGMMRelaxationMode:
         # Predict relaxation
         t = np.logspace(-3, 2, 100)
         model._test_mode = "relaxation"
-        G_pred = model.predict(t) # test_mode set via _test_mode
+        G_pred = model.predict(t)  # test_mode set via _test_mode
 
         # Check exponential decay behavior (monotonic decrease)
-        assert np.all(np.diff(G_pred) <= 0), "Relaxation should be monotonically decreasing"
+        assert np.all(
+            np.diff(G_pred) <= 0
+        ), "Relaxation should be monotonically decreasing"
 
         # Check initial modulus (t→0)
-        G_initial = model.parameters.get_value("G_1") + model.parameters.get_value("G_2")
+        G_initial = model.parameters.get_value("G_1") + model.parameters.get_value(
+            "G_2"
+        )
         assert abs(G_pred[0] - G_initial) / G_initial < 0.1, "Initial modulus mismatch"
 
     def test_two_step_nlsq_fitting(self):
@@ -116,8 +128,12 @@ class TestGMMRelaxationMode:
         n_optimal = diagnostics["n_optimal"]
         n_initial = diagnostics["n_initial"]
 
-        assert n_optimal <= n_initial, f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
-        assert n_optimal >= 2, f"N_opt should be at least 2 for 2-mode data, got {n_optimal}"
+        assert (
+            n_optimal <= n_initial
+        ), f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
+        assert (
+            n_optimal >= 2
+        ), f"N_opt should be at least 2 for 2-mode data, got {n_optimal}"
 
     def test_relaxation_r2_quality(self):
         """Fit quality (R²) should be high for multi-mode relaxation data."""
@@ -163,7 +179,7 @@ class TestGMMOscillationMode:
         # Predict oscillation
         omega = np.logspace(-2, 2, 50)
         model._test_mode = "oscillation"
-        G_star = model.predict(omega) # test_mode set via _test_mode
+        G_star = model.predict(omega)  # test_mode set via _test_mode
 
         # Extract G' and G"
         G_prime = G_star[:, 0]
@@ -193,7 +209,7 @@ class TestGMMOscillationMode:
         # Predict oscillation
         omega = np.logspace(-2, 2, 50)
         model._test_mode = "oscillation"
-        G_star = model.predict(omega) # test_mode set via _test_mode
+        G_star = model.predict(omega)  # test_mode set via _test_mode
         G_prime = G_star[:, 0]
         G_double_prime = G_star[:, 1]
 
@@ -205,11 +221,19 @@ class TestGMMOscillationMode:
         G_double_prime_analytical = G0 * omega_tau / (1 + omega_tau**2)
 
         # Check relative error < 1%
-        rel_error_prime = np.abs(G_prime - G_prime_analytical) / (G_prime_analytical + 1e-10)
-        rel_error_double_prime = np.abs(G_double_prime - G_double_prime_analytical) / (G_double_prime_analytical + 1e-10)
+        rel_error_prime = np.abs(G_prime - G_prime_analytical) / (
+            G_prime_analytical + 1e-10
+        )
+        rel_error_double_prime = np.abs(G_double_prime - G_double_prime_analytical) / (
+            G_double_prime_analytical + 1e-10
+        )
 
-        assert np.all(rel_error_prime < 0.01), f"G' error too large: {np.max(rel_error_prime)}"
-        assert np.all(rel_error_double_prime < 0.01), f"G'' error too large: {np.max(rel_error_double_prime)}"
+        assert np.all(
+            rel_error_prime < 0.01
+        ), f"G' error too large: {np.max(rel_error_prime)}"
+        assert np.all(
+            rel_error_double_prime < 0.01
+        ), f"G'' error too large: {np.max(rel_error_double_prime)}"
 
     def test_oscillation_combined_residual_fitting(self):
         """Fitting oscillation data should minimize combined G' + G'' residual."""
@@ -222,10 +246,14 @@ class TestGMMOscillationMode:
         # Analytical oscillation
         omega_tau_1 = omega * tau_i_true[0]
         omega_tau_2 = omega * tau_i_true[1]
-        G_prime_data = G_inf_true + G_i_true[0] * omega_tau_1**2 / (1 + omega_tau_1**2) + \
-                       G_i_true[1] * omega_tau_2**2 / (1 + omega_tau_2**2)
-        G_double_prime_data = G_i_true[0] * omega_tau_1 / (1 + omega_tau_1**2) + \
-                              G_i_true[1] * omega_tau_2 / (1 + omega_tau_2**2)
+        G_prime_data = (
+            G_inf_true
+            + G_i_true[0] * omega_tau_1**2 / (1 + omega_tau_1**2)
+            + G_i_true[1] * omega_tau_2**2 / (1 + omega_tau_2**2)
+        )
+        G_double_prime_data = G_i_true[0] * omega_tau_1 / (
+            1 + omega_tau_1**2
+        ) + G_i_true[1] * omega_tau_2 / (1 + omega_tau_2**2)
         G_star_data = np.column_stack([G_prime_data, G_double_prime_data])
 
         # Fit GMM
@@ -236,12 +264,14 @@ class TestGMMOscillationMode:
         assert model._nlsq_result.success, "NLSQ should converge for oscillation"
 
         # Check fit quality (R² > 0.95)
-        G_star_pred = model.predict(omega) # test_mode set via _test_mode
+        G_star_pred = model.predict(omega)  # test_mode set via _test_mode
         residual_prime = G_star_data[:, 0] - G_star_pred[:, 0]
         residual_double_prime = G_star_data[:, 1] - G_star_pred[:, 1]
         ss_res = np.sum(residual_prime**2 + residual_double_prime**2)
-        ss_tot = np.sum((G_star_data[:, 0] - np.mean(G_star_data[:, 0]))**2 +
-                        (G_star_data[:, 1] - np.mean(G_star_data[:, 1]))**2)
+        ss_tot = np.sum(
+            (G_star_data[:, 0] - np.mean(G_star_data[:, 0])) ** 2
+            + (G_star_data[:, 1] - np.mean(G_star_data[:, 1])) ** 2
+        )
         r2 = 1 - ss_res / ss_tot
 
         assert r2 > 0.95, f"R² should be > 0.95, got {r2:.4f}"
@@ -259,7 +289,7 @@ class TestGMMOscillationMode:
         # Predict oscillation
         omega = np.logspace(-2, 2, 50)
         model._test_mode = "oscillation"
-        G_star = model.predict(omega) # test_mode set via _test_mode
+        G_star = model.predict(omega)  # test_mode set via _test_mode
         G_prime = G_star[:, 0]
         G_double_prime = G_star[:, 1]
 
@@ -282,10 +312,14 @@ class TestGMMOscillationMode:
 
         omega_tau_1 = omega * tau_i_true[0]
         omega_tau_2 = omega * tau_i_true[1]
-        G_prime_data = G_inf_true + G_i_true[0] * omega_tau_1**2 / (1 + omega_tau_1**2) + \
-                       G_i_true[1] * omega_tau_2**2 / (1 + omega_tau_2**2)
-        G_double_prime_data = G_i_true[0] * omega_tau_1 / (1 + omega_tau_1**2) + \
-                              G_i_true[1] * omega_tau_2 / (1 + omega_tau_2**2)
+        G_prime_data = (
+            G_inf_true
+            + G_i_true[0] * omega_tau_1**2 / (1 + omega_tau_1**2)
+            + G_i_true[1] * omega_tau_2**2 / (1 + omega_tau_2**2)
+        )
+        G_double_prime_data = G_i_true[0] * omega_tau_1 / (
+            1 + omega_tau_1**2
+        ) + G_i_true[1] * omega_tau_2 / (1 + omega_tau_2**2)
         G_star_data = np.column_stack([G_prime_data, G_double_prime_data])
 
         # Fit GMM with N=4 (over-parameterized)
@@ -297,7 +331,9 @@ class TestGMMOscillationMode:
         n_optimal = diagnostics["n_optimal"]
         n_initial = diagnostics["n_initial"]
 
-        assert n_optimal <= n_initial, f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
+        assert (
+            n_optimal <= n_initial
+        ), f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
 
     def test_oscillation_output_shape(self):
         """Oscillation output should have correct shape [N, 2] for [G', G'']."""
@@ -331,10 +367,12 @@ class TestGMMCreepMode:
         # Predict creep compliance
         t = np.logspace(-3, 2, 100)
         model._test_mode = "creep"
-        J_pred = model.predict(t) # test_mode set via _test_mode
+        J_pred = model.predict(t)  # test_mode set via _test_mode
 
         # Check monotonic increase (creep compliance increases over time)
-        assert np.all(np.diff(J_pred) >= 0), "Creep compliance should be monotonically increasing"
+        assert np.all(
+            np.diff(J_pred) >= 0
+        ), "Creep compliance should be monotonically increasing"
 
         # Check no oscillations (backward-Euler should be stable)
         # Relax tolerance for numerical precision of backward-Euler integration
@@ -342,7 +380,9 @@ class TestGMMCreepMode:
         # Allow for numerical precision in float64 - the values range from ~1e-8 to 3e-5
         # which is well within acceptable bounds for backward-Euler on logspaced data
         max_second_diff = np.max(np.abs(second_diff))
-        assert max_second_diff < 1e-4, f"Second derivative should be small (no oscillations), got max {max_second_diff:.3e}"
+        assert (
+            max_second_diff < 1e-4
+        ), f"Second derivative should be small (no oscillations), got max {max_second_diff:.3e}"
 
     def test_creep_compliance_calculation(self):
         """Creep compliance J(t) = ε(t)/σ₀ should be correctly calculated."""
@@ -355,24 +395,25 @@ class TestGMMCreepMode:
         # Predict creep compliance
         t = np.logspace(-3, 2, 50)
         model._test_mode = "creep"
-        J_pred = model.predict(t) # test_mode set via _test_mode
+        J_pred = model.predict(t)  # test_mode set via _test_mode
 
         # For Maxwell liquid (G_inf=0), creep compliance should approach J_∞ = 1/G_∞ = infinity
         # But with finite time, it should be bounded and monotonically increasing
         G0 = 1e5
         tau = 0.1
-        
+
         # Check that compliance is in reasonable range (order of magnitude check)
         # J should be > instant compliance (1/G0) and increase with time
         J_instant_estimate = 1.0 / G0  # = 1e-5
         assert J_pred[0] > 0, "Initial compliance should be positive"
         assert J_pred[-1] > J_pred[0], "Compliance should increase with time"
-        
+
         # For Maxwell liquid, compliance grows unbounded, so final value should be larger
         # Check that compliance is growing as expected (qualitative test)
         # At long times (t >> tau), compliance should be significantly larger than 1/G0
-        assert J_pred[-1] > 10 * J_instant_estimate, \
-            f"Final compliance {J_pred[-1]:.3e} should be >> instant compliance {J_instant_estimate:.3e}"
+        assert (
+            J_pred[-1] > 10 * J_instant_estimate
+        ), f"Final compliance {J_pred[-1]:.3e} should be >> instant compliance {J_instant_estimate:.3e}"
 
     def test_n1_creep_mode_equivalence(self):
         """GMM with N=1 should match single Maxwell creep behavior."""
@@ -389,7 +430,7 @@ class TestGMMCreepMode:
         # Predict creep compliance
         t = np.array([0.001, 0.01, 0.1, 1.0, 10.0])
         model._test_mode = "creep"
-        J_pred = model.predict(t) # test_mode set via _test_mode
+        J_pred = model.predict(t)  # test_mode set via _test_mode
 
         # Check J increases over time
         assert np.all(np.diff(J_pred) > 0), "Creep compliance should increase"
@@ -425,4 +466,6 @@ class TestGMMCreepMode:
         n_optimal = diagnostics["n_optimal"]
         n_initial = diagnostics["n_initial"]
 
-        assert n_optimal <= n_initial, f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
+        assert (
+            n_optimal <= n_initial
+        ), f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"

@@ -83,7 +83,9 @@ class TestConvergenceClassification:
         model = GeneralizedMaxwell(n_modes=5, modulus_type="shear")
 
         try:
-            model.fit(t, G_data, test_mode="relaxation", max_iter=100)  # Limited iterations
+            model.fit(
+                t, G_data, test_mode="relaxation", max_iter=100
+            )  # Limited iterations
 
             # Extract and classify diagnostics
             diagnostics = model._extract_nlsq_diagnostics(model._nlsq_result)
@@ -141,7 +143,9 @@ class TestTieredPriorConstruction:
         """Test that suspicious convergence uses safer priors decoupled from Hessian."""
         # Skip this test - creating truly suspicious (but not failed) convergence
         # is difficult with GMM's robust classification
-        pytest.skip("GMM classification is very relaxed, difficult to create suspicious scenario")
+        pytest.skip(
+            "GMM classification is very relaxed, difficult to create suspicious scenario"
+        )
 
     def test_hard_failure_strict_mode_raises_error(self):
         """Test that hard failure in strict mode raises informative error."""
@@ -184,9 +188,7 @@ class TestTieredPriorConstruction:
 
         # Test that fallback priors work
         priors = model._construct_bayesian_priors(
-            "hard_failure",
-            prior_mode="warn",
-            allow_fallback_priors=True
+            "hard_failure", prior_mode="warn", allow_fallback_priors=True
         )
 
         # Verify generic priors provided
@@ -201,4 +203,6 @@ class TestBayesianIntegration:
     def test_fit_bayesian_uses_prior_safety(self):
         """Test that fit_bayesian() integrates with prior safety mechanism."""
         # Skip this test - requires full Bayesian integration (Task 4.2)
-        pytest.skip("Bayesian integration not yet implemented (requires Task 4.2: model_function)")
+        pytest.skip(
+            "Bayesian integration not yet implemented (requires Task 4.2: model_function)"
+        )
