@@ -15,6 +15,7 @@ from rheojax.utils.optimization import OptimizationResult, nlsq_optimize
 class TestNLSQOptimizer:
     """Test NLSQ optimizer implementation."""
 
+    @pytest.mark.smoke
     def test_nlsq_optimize_function_signature(self):
         """Test nlsq_optimize() function signature and parameter handling."""
         # Set up simple parameters
@@ -44,6 +45,7 @@ class TestNLSQOptimizer:
         assert hasattr(result, "fun")
         assert hasattr(result, "success")
 
+    @pytest.mark.smoke
     def test_bounds_extraction_from_parameterset(self):
         """Test that bounds are correctly extracted from ParameterSet."""
         # Create ParameterSet with various bound types
@@ -73,6 +75,7 @@ class TestNLSQOptimizer:
         assert -5.0 <= result.x[1] <= 5.0
         assert -100.0 <= result.x[2] <= 100.0
 
+    @pytest.mark.smoke
     def test_optimization_result_structure(self):
         """Test OptimizationResult dataclass structure and fields."""
         # Create simple optimization problem
@@ -101,6 +104,7 @@ class TestNLSQOptimizer:
         assert isinstance(result.nit, int)
         assert isinstance(result.nfev, int)
 
+    @pytest.mark.smoke
     def test_float64_precision_maintained(self):
         """Test that float64 precision is maintained throughout optimization."""
         # Create parameters with float64 values
@@ -135,6 +139,7 @@ class TestNLSQOptimizer:
                 value, float
             ), f"Parameter {name} value is not float64: {type(value)}"
 
+    @pytest.mark.smoke
     def test_convergence_simple_problem(self):
         """Test convergence for simple optimization problem."""
         # Classic quadratic problem: minimize (x - 5)^2 + (y - 3)^2
@@ -163,6 +168,7 @@ class TestNLSQOptimizer:
         assert abs(params.get_value("x") - 5.0) < 1e-2
         assert abs(params.get_value("y") - 3.0) < 1e-2
 
+    @pytest.mark.smoke
     def test_nlsq_updates_parameterset(self):
         """Test that nlsq_optimize() updates ParameterSet with optimal values."""
         # Create parameters with initial values

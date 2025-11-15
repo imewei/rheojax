@@ -15,6 +15,7 @@ import pytest
 class TestProjectStructure:
     """Test suite for validating project structure and setup."""
 
+    @pytest.mark.smoke
     def test_package_imports_successfully(self):
         """Test that the main rheojax package can be imported."""
         import rheojax
@@ -22,6 +23,7 @@ class TestProjectStructure:
         assert rheojax is not None
         assert hasattr(rheojax, "__version__")
 
+    @pytest.mark.smoke
     def test_core_modules_exist(self):
         """Test that all core submodules can be imported."""
         from rheojax import core
@@ -32,6 +34,7 @@ class TestProjectStructure:
         assert hasattr(core, "parameters")
         assert hasattr(core, "registry")
 
+    @pytest.mark.smoke
     def test_package_structure_directories(self):
         """Test that all expected package directories exist."""
         # Get package root
@@ -59,6 +62,7 @@ class TestProjectStructure:
             init_file = dir_path / "__init__.py"
             assert init_file.exists(), f"Missing __init__.py in {dirname}"
 
+    @pytest.mark.smoke
     def test_version_accessible(self):
         """Test that version information is accessible and valid."""
         import rheojax
@@ -72,6 +76,7 @@ class TestProjectStructure:
         parts = version.split(".")
         assert len(parts) >= 2, "Version should have at least major.minor"
 
+    @pytest.mark.smoke
     def test_jax_version_accessible(self):
         """Test that JAX version information is accessible."""
         import rheojax
@@ -84,6 +89,7 @@ class TestProjectStructure:
     @pytest.mark.skip(
         reason="Development dependencies are optional - check requirements-dev.txt for full list"
     )
+    @pytest.mark.smoke
     def test_development_dependencies_installed(self):
         """Test that required development dependencies are installed.
 

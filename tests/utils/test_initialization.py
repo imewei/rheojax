@@ -30,6 +30,7 @@ from rheojax.utils.initialization import (
 class TestExtractFrequencyFeatures:
     """Test frequency-domain feature extraction."""
 
+    @pytest.mark.smoke
     def test_extract_features_typical_solid(self):
         """Test feature extraction from typical solid-like material."""
         # Create synthetic data: solid with plateau at low freq, crossover, then increase
@@ -58,6 +59,7 @@ class TestExtractFrequencyFeatures:
         assert features["omega_mid"] > 0
         assert 0.01 < features["alpha_estimate"] < 0.99
 
+    @pytest.mark.smoke
     def test_extract_features_liquid_like(self):
         """Test feature extraction from liquid-like material (no low-freq plateau)."""
         omega = np.logspace(-2, 3, 100)
@@ -75,6 +77,7 @@ class TestExtractFrequencyFeatures:
         assert features["low_plateau"] > 0
         assert features["alpha_estimate"] > 0
 
+    @pytest.mark.smoke
     def test_extract_features_invalid_shape(self):
         """Test that invalid data shape returns dict with valid=False or raises."""
         omega = np.logspace(-2, 2, 50)
@@ -95,6 +98,7 @@ class TestExtractFrequencyFeatures:
             # ValueError is acceptable for malformed data
             pass
 
+    @pytest.mark.smoke
     def test_extract_features_size_mismatch(self):
         """Test that mismatched sizes raise ValueError or return invalid."""
         omega = np.logspace(-2, 2, 50)
@@ -108,6 +112,7 @@ class TestExtractFrequencyFeatures:
             # ValueError is acceptable for mismatched sizes
             pass
 
+    @pytest.mark.smoke
     def test_extract_features_noise_robustness(self):
         """Test that Savitzky-Golay filtering handles noisy data."""
         omega = np.logspace(-2, 3, 100)
@@ -137,6 +142,7 @@ class TestExtractFrequencyFeatures:
 class TestFractionalZenerSolidSolid:
     """Test initialize_fractional_zener_ss (4 parameters: Ge, Gm, alpha, tau_alpha)."""
 
+    @pytest.mark.smoke
     def test_initialize_success(self):
         """Test successful initialization with typical data."""
         omega = np.logspace(-2, 3, 100)

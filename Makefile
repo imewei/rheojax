@@ -3,9 +3,9 @@
 # GPU Acceleration Support and Development Tools
 
 .PHONY: help install install-dev install-jax-gpu gpu-check env-info \
-        test test-fast test-coverage test-integration clean clean-all clean-pyc \
-        clean-build clean-test clean-venv format lint type-check check quick \
-        docs build publish info version
+        test test-smoke test-fast test-ci test-ci-full test-coverage test-integration \
+        clean clean-all clean-pyc clean-build clean-test clean-venv \
+        format lint type-check check quick docs build publish info version
 
 # Configuration
 PYTHON := python
@@ -99,8 +99,10 @@ help:
 	@echo ""
 	@echo "$(BOLD)$(GREEN)TESTING$(RESET)"
 	@echo "  $(CYAN)test$(RESET)                   Run all tests (full suite, ~3 hours)"
+	@echo "  $(CYAN)test-smoke$(RESET)             Run smoke tests (105 critical tests, ~30s-2min)"
 	@echo "  $(CYAN)test-fast$(RESET)              Run tests excluding slow ones"
-	@echo "  $(CYAN)test-ci$(RESET)                Run CI test suite (matches GitHub Actions, ~5-10 min)"
+	@echo "  $(CYAN)test-ci$(RESET)                Run CI test suite (matches GitHub Actions, 105 smoke tests)"
+	@echo "  $(CYAN)test-ci-full$(RESET)           Run full CI suite (1069 tests, pre-v0.2.1 behavior)"
 	@echo "  $(CYAN)test-parallel$(RESET)          Run all tests in parallel (2-4x faster)"
 	@echo "  $(CYAN)test-parallel-fast$(RESET)     Run fast tests in parallel"
 	@echo "  $(CYAN)test-coverage$(RESET)          Run tests with coverage report"
@@ -112,7 +114,7 @@ help:
 	@echo "  $(CYAN)lint$(RESET)             Run linting checks (ruff)"
 	@echo "  $(CYAN)type-check$(RESET)       Run type checking (mypy)"
 	@echo "  $(CYAN)check$(RESET)            Run all checks (format + lint + type)"
-	@echo "  $(CYAN)quick$(RESET)            Fast iteration: format + test-fast"
+	@echo "  $(CYAN)quick$(RESET)            Fast iteration: format + smoke tests (~30s-2min)"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)DOCUMENTATION$(RESET)"
 	@echo "  $(CYAN)docs$(RESET)             Build documentation with Sphinx"
@@ -254,6 +256,11 @@ test:
 	@echo "$(BOLD)$(BLUE)Running all tests...$(RESET)"
 	$(RUN_CMD) $(PYTEST)
 
+test-smoke:
+	@echo "$(BOLD)$(BLUE)Running smoke tests (105 critical tests, ~30s-2min)...$(RESET)"
+	$(RUN_CMD) $(PYTEST) -n auto -m "smoke"
+	@echo "$(BOLD)$(GREEN)✓ Smoke tests passed!$(RESET)"
+
 test-fast:
 	@echo "$(BOLD)$(BLUE)Running fast tests (excluding slow)...$(RESET)"
 	$(RUN_CMD) $(PYTEST) -m "not slow"
@@ -268,10 +275,17 @@ test-parallel-fast:
 
 test-ci:
 	@echo "$(BOLD)$(BLUE)Running CI test suite (matches GitHub Actions)...$(RESET)"
+	@echo "$(BOLD)Tests:$(RESET) 105 smoke tests, ~30s-2min"
+	@echo "$(BOLD)Note:$(RESET) GitHub CI now runs smoke tests only for fast feedback"
+	$(RUN_CMD) $(PYTEST) -n auto -m "smoke"
+	@echo "$(BOLD)$(GREEN)✓ CI test suite passed!$(RESET)"
+
+test-ci-full:
+	@echo "$(BOLD)$(BLUE)Running full CI test suite (pre-v0.2.1 behavior)...$(RESET)"
 	@echo "$(BOLD)Excludes:$(RESET) slow, validation, benchmark, notebook_comprehensive"
 	@echo "$(BOLD)Tests:$(RESET) ~1069/1154 tests, ~5-10 minutes"
 	$(RUN_CMD) $(PYTEST) -n auto -m "not slow and not validation and not benchmark and not notebook_comprehensive"
-	@echo "$(BOLD)$(GREEN)✓ CI test suite passed!$(RESET)"
+	@echo "$(BOLD)$(GREEN)✓ Full CI test suite passed!$(RESET)"
 
 test-coverage:
 	@echo "$(BOLD)$(BLUE)Running tests with coverage report...$(RESET)"
@@ -311,7 +325,7 @@ type-check:
 check: lint type-check
 	@echo "$(BOLD)$(GREEN)✓ All checks passed!$(RESET)"
 
-quick: format test-fast
+quick: format test-smoke
 	@echo "$(BOLD)$(GREEN)✓ Quick iteration complete!$(RESET)"
 
 # ===================

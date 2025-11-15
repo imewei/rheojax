@@ -13,6 +13,7 @@ import pytest
 class TestFloat64ImportOrder:
     """Test import order enforcement for float64 precision."""
 
+    @pytest.mark.smoke
     def test_safe_import_jax_without_nlsq_raises_error(self):
         """Test that safe_import_jax() raises error when NLSQ not imported first."""
         # Remove nlsq from sys.modules if present
@@ -42,6 +43,7 @@ class TestFloat64ImportOrder:
             if nlsq_module is not None:
                 sys.modules["nlsq"] = nlsq_module
 
+    @pytest.mark.smoke
     def test_safe_import_jax_with_nlsq_succeeds(self):
         """Test that safe_import_jax() succeeds when NLSQ imported first."""
         # Ensure nlsq is imported
@@ -60,6 +62,7 @@ class TestFloat64ImportOrder:
         assert jnp is not None
         assert hasattr(jax, "numpy")
 
+    @pytest.mark.smoke
     def test_jax_operates_in_float64_mode(self):
         """Test that JAX operates in float64 mode after proper import."""
         # Ensure nlsq is imported first
@@ -79,6 +82,7 @@ class TestFloat64ImportOrder:
         # JAX should default to float64
         assert arr.dtype == jnp.float64, f"Expected float64, got {arr.dtype}"
 
+    @pytest.mark.smoke
     def test_verify_float64_helper_function(self):
         """Test verify_float64() helper function."""
         # Ensure nlsq is imported first
@@ -93,6 +97,7 @@ class TestFloat64ImportOrder:
         # This should not raise an exception
         verify_float64()
 
+    @pytest.mark.smoke
     def test_import_order_violation_error_message_clear(self):
         """Test that import order violation error messages are clear and actionable."""
         # Remove nlsq from sys.modules if present
@@ -128,6 +133,7 @@ class TestFloat64ImportOrder:
             if nlsq_module is not None:
                 sys.modules["nlsq"] = nlsq_module
 
+    @pytest.mark.smoke
     def test_safe_import_jax_is_idempotent(self):
         """Test that calling safe_import_jax() multiple times is safe."""
         # Ensure nlsq is imported first
@@ -147,6 +153,7 @@ class TestFloat64ImportOrder:
         assert jax1 is jax2
         assert jnp1 is jnp2
 
+    @pytest.mark.smoke
     def test_float64_precision_maintained_in_operations(self):
         """Test that float64 precision is maintained in JAX operations."""
         # Ensure nlsq is imported first
@@ -174,6 +181,7 @@ class TestFloat64ImportOrder:
         assert d.dtype == jnp.float64
         assert e.dtype == jnp.float64
 
+    @pytest.mark.smoke
     def test_rheojax_package_import_order(self):
         """Test that rheojax package itself ensures proper import order."""
         # This test validates that importing rheojax will import nlsq before JAX

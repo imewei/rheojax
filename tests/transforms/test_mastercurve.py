@@ -14,6 +14,7 @@ jax, jnp = safe_import_jax()
 class TestMastercurve:
     """Test suite for Mastercurve transform."""
 
+    @pytest.mark.smoke
     def test_basic_initialization(self):
         """Test basic mastercurve initialization."""
         mc = Mastercurve()
@@ -22,6 +23,7 @@ class TestMastercurve:
         assert mc.C1 == 17.44
         assert mc.C2 == 51.6
 
+    @pytest.mark.smoke
     def test_custom_initialization(self):
         """Test mastercurve with custom parameters."""
         mc = Mastercurve(reference_temp=273.15, method="arrhenius", E_a=50000)
@@ -29,6 +31,7 @@ class TestMastercurve:
         assert mc.method == "arrhenius"
         assert mc.E_a == 50000
 
+    @pytest.mark.smoke
     def test_wlf_shift_factor(self):
         """Test WLF shift factor calculation."""
         mc = Mastercurve(reference_temp=298.15, C1=17.44, C2=51.6)
@@ -45,6 +48,7 @@ class TestMastercurve:
         a_T_low = mc.get_shift_factor(273.15)
         assert a_T_low > 1.0
 
+    @pytest.mark.smoke
     def test_arrhenius_shift_factor(self):
         """Test Arrhenius shift factor calculation."""
         mc = Mastercurve(reference_temp=298.15, method="arrhenius", E_a=50000)  # J/mol
@@ -61,6 +65,7 @@ class TestMastercurve:
         a_T_low = mc.get_shift_factor(273.15)
         assert a_T_low > 1.0
 
+    @pytest.mark.smoke
     def test_single_dataset_shift(self):
         """Test shifting a single dataset."""
         # Create frequency sweep at elevated temperature

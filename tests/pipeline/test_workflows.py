@@ -150,12 +150,14 @@ def multi_temp_csv_files():
 class TestMastercurvePipeline:
     """Test mastercurve pipeline."""
 
+    @pytest.mark.smoke
     def test_initialization(self):
         """Test mastercurve pipeline initialization."""
         pipeline = MastercurvePipeline(reference_temp=298.15)
         assert pipeline.reference_temp == 298.15
         assert len(pipeline.shift_factors) == 0
 
+    @pytest.mark.smoke
     def test_run_with_files(self, multi_temp_csv_files):
         """Test running mastercurve with multiple files."""
         files, temps = multi_temp_csv_files
@@ -172,12 +174,14 @@ class TestMastercurvePipeline:
         assert pipeline.data is not None
         assert "mastercurve" in pipeline.data.metadata.get("type", "")
 
+    @pytest.mark.smoke
     def test_run_mismatched_lengths(self):
         """Test that mismatched file/temperature lengths raise error."""
         pipeline = MastercurvePipeline()
         with pytest.raises(ValueError, match="Number of files"):
             pipeline.run(["file1.csv"], [273.15, 298.15])
 
+    @pytest.mark.smoke
     def test_shift_factors(self, multi_temp_csv_files):
         """Test shift factor computation."""
         files, temps = multi_temp_csv_files

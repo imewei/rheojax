@@ -25,6 +25,7 @@ from rheojax.visualization.plotter import (
 class TestPlotRheoData:
     """Test plot_rheo_data automatic plot type selection."""
 
+    @pytest.mark.smoke
     def test_plot_time_domain_data(self):
         """Test plotting time-domain data."""
         time = np.linspace(0, 10, 100)
@@ -47,6 +48,7 @@ class TestPlotRheoData:
         assert ax.get_ylabel() is not None
         plt.close(fig)
 
+    @pytest.mark.smoke
     def test_plot_frequency_domain_data(self):
         """Test plotting frequency-domain data."""
         frequency = np.logspace(-2, 2, 50)
@@ -70,6 +72,7 @@ class TestPlotRheoData:
         assert len(ax) >= 2
         plt.close(fig)
 
+    @pytest.mark.smoke
     def test_plot_with_custom_kwargs(self):
         """Test plotting with custom matplotlib kwargs."""
         time = np.linspace(0, 10, 100)
@@ -82,6 +85,7 @@ class TestPlotRheoData:
         assert fig is not None
         plt.close(fig)
 
+    @pytest.mark.smoke
     def test_plot_rotation_data(self):
         """Test plotting rotation (flow curve) data."""
         shear_rate = np.logspace(-2, 2, 50)
@@ -106,6 +110,7 @@ class TestPlotRheoData:
 class TestPlotTimeDomain:
     """Test time-domain plotting functions."""
 
+    @pytest.mark.smoke
     def test_plot_relaxation_data(self):
         """Test plotting relaxation data."""
         time = np.linspace(0, 10, 100)

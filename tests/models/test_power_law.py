@@ -14,6 +14,7 @@ from rheojax.models.power_law import PowerLaw
 class TestPowerLawBasics:
     """Test basic functionality of Power Law model."""
 
+    @pytest.mark.smoke
     def test_initialization(self):
         """Test model initialization."""
         model = PowerLaw()
@@ -27,6 +28,7 @@ class TestPowerLawBasics:
         assert K == 1.0
         assert n == 0.5
 
+    @pytest.mark.smoke
     def test_parameter_bounds(self):
         """Test parameter bounds."""
         model = PowerLaw()
@@ -39,6 +41,7 @@ class TestPowerLawBasics:
         n_param = model.parameters.get("n")
         assert n_param.bounds == (0.01, 2.0)
 
+    @pytest.mark.smoke
     def test_parameter_setting(self):
         """Test setting parameters."""
         model = PowerLaw()
@@ -54,6 +57,7 @@ class TestPowerLawBasics:
 class TestPowerLawPredictions:
     """Test predictions for Power Law model."""
 
+    @pytest.mark.smoke
     def test_viscosity_prediction_shear_thinning(self):
         """Test viscosity prediction for shear-thinning (n < 1)."""
         model = PowerLaw()
@@ -74,6 +78,7 @@ class TestPowerLawPredictions:
         # Verify shear-thinning behavior (viscosity decreases with shear rate)
         assert viscosity[0] > viscosity[1] > viscosity[2] > viscosity[3]
 
+    @pytest.mark.smoke
     def test_viscosity_prediction_shear_thickening(self):
         """Test viscosity prediction for shear-thickening (n > 1)."""
         model = PowerLaw()

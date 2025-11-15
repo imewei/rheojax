@@ -22,6 +22,7 @@ jax, jnp = safe_import_jax()
 class TestMaxwellBasics:
     """Test basic Maxwell model functionality."""
 
+    @pytest.mark.smoke
     def test_model_creation(self):
         """Test Maxwell model can be instantiated."""
         model = Maxwell()
@@ -29,6 +30,7 @@ class TestMaxwellBasics:
         assert hasattr(model, "parameters")
         assert len(model.parameters) == 2
 
+    @pytest.mark.smoke
     def test_model_parameters(self):
         """Test Maxwell model has correct parameters."""
         model = Maxwell()
@@ -47,6 +49,7 @@ class TestMaxwellBasics:
         assert G0_param.bounds == (1e-3, 1e9)
         assert eta_param.bounds == (1e-6, 1e12)
 
+    @pytest.mark.smoke
     def test_parameter_setting(self):
         """Test setting Maxwell parameters."""
         model = Maxwell()
@@ -58,6 +61,7 @@ class TestMaxwellBasics:
         assert model.parameters.get_value("G0") == 1e6
         assert model.parameters.get_value("eta") == 5e3
 
+    @pytest.mark.smoke
     def test_parameter_bounds_enforcement(self):
         """Test parameter bounds are enforced."""
         model = Maxwell()
@@ -74,6 +78,7 @@ class TestMaxwellBasics:
         with pytest.raises(ValueError):
             model.parameters.set_value("eta", 1e13)  # Too large
 
+    @pytest.mark.smoke
     def test_relaxation_time_calculation(self):
         """Test relaxation time calculation."""
         model = Maxwell()
@@ -84,6 +89,7 @@ class TestMaxwellBasics:
         expected_tau = 1e3 / 1e5  # eta / G0
         assert_allclose(tau, expected_tau)
 
+    @pytest.mark.smoke
     def test_model_registry(self):
         """Test Maxwell is registered in ModelRegistry."""
         models = ModelRegistry.list_models()
@@ -93,6 +99,7 @@ class TestMaxwellBasics:
         model = ModelRegistry.create("maxwell")
         assert isinstance(model, Maxwell)
 
+    @pytest.mark.smoke
     def test_repr(self):
         """Test string representation."""
         model = Maxwell()
@@ -106,6 +113,7 @@ class TestMaxwellBasics:
 class TestMaxwellRelaxation:
     """Test Maxwell relaxation modulus predictions."""
 
+    @pytest.mark.smoke
     def test_relaxation_prediction_shape(self):
         """Test relaxation prediction returns correct shape."""
         model = Maxwell()
@@ -122,6 +130,7 @@ class TestMaxwellRelaxation:
         assert G_t.shape == t.shape
         assert isinstance(G_t, jnp.ndarray)
 
+    @pytest.mark.smoke
     def test_relaxation_analytical_solution(self):
         """Test relaxation modulus matches analytical solution."""
         model = Maxwell()
@@ -147,6 +156,7 @@ class TestMaxwellRelaxation:
         # Use atol for very small values to handle numerical underflow (float32 precision)
         assert_allclose(G_t, G_expected, rtol=1e-6, atol=1e-35)
 
+    @pytest.mark.smoke
     def test_relaxation_monotonic_decrease(self):
         """Test relaxation modulus decreases monotonically."""
         model = Maxwell()

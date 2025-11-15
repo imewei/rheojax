@@ -25,6 +25,7 @@ jax, jnp = safe_import_jax()
 class TestParameterConstraints:
     """Test parameter constraint system."""
 
+    @pytest.mark.smoke
     def test_bounds_constraint(self):
         """Test bounds constraints on parameters."""
         constraint = ParameterConstraint(type="bounds", min_value=0.0, max_value=100.0)
@@ -38,6 +39,7 @@ class TestParameterConstraints:
         assert constraint.validate(-1.0) == False
         assert constraint.validate(101.0) == False
 
+    @pytest.mark.smoke
     def test_positive_constraint(self):
         """Test positive value constraint."""
         constraint = ParameterConstraint(type="positive")
@@ -47,6 +49,7 @@ class TestParameterConstraints:
         assert constraint.validate(0.0) == False
         assert constraint.validate(-1.0) == False
 
+    @pytest.mark.smoke
     def test_integer_constraint(self):
         """Test integer value constraint."""
         constraint = ParameterConstraint(type="integer")
@@ -56,6 +59,7 @@ class TestParameterConstraints:
         assert constraint.validate(5.5) == False
         assert constraint.validate(5.1) == False
 
+    @pytest.mark.smoke
     def test_fixed_constraint(self):
         """Test fixed parameter constraint."""
         constraint = ParameterConstraint(type="fixed", value=10.0)
@@ -64,6 +68,7 @@ class TestParameterConstraints:
         assert constraint.validate(9.99) == False
         assert constraint.validate(10.01) == False
 
+    @pytest.mark.smoke
     def test_relative_constraint(self):
         """Test relative constraints between parameters."""
         # Parameter A must be less than parameter B
@@ -78,6 +83,7 @@ class TestParameterConstraints:
         context = {"param_a": 15.0, "param_b": 10.0}
         assert constraint.validate(15.0, context=context) == False
 
+    @pytest.mark.smoke
     def test_custom_constraint(self):
         """Test custom constraint function."""
 
@@ -90,6 +96,7 @@ class TestParameterConstraints:
         assert constraint.validate(4) == True
         assert constraint.validate(5) == False
 
+    @pytest.mark.smoke
     def test_multiple_constraints(self):
         """Test applying multiple constraints."""
         param = Parameter(
@@ -114,6 +121,7 @@ class TestParameterConstraints:
 class TestSharedParameters:
     """Test shared parameter management across models."""
 
+    @pytest.mark.smoke
     def test_create_shared_parameter_set(self):
         """Test creating shared parameters."""
         shared = SharedParameterSet()

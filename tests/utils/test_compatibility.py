@@ -21,6 +21,7 @@ from rheojax.utils.compatibility import (
 class TestDecayTypeDetection:
     """Tests for decay type detection from relaxation data."""
 
+    @pytest.mark.smoke
     def test_exponential_decay(self):
         """Test detection of exponential decay (Maxwell-like)."""
         t = np.logspace(-2, 2, 100)
@@ -30,6 +31,7 @@ class TestDecayTypeDetection:
 
         assert decay_type == DecayType.EXPONENTIAL
 
+    @pytest.mark.smoke
     def test_power_law_decay(self):
         """Test detection of power-law decay (gel-like)."""
         t = np.logspace(-2, 2, 100)
@@ -40,6 +42,7 @@ class TestDecayTypeDetection:
 
         assert decay_type == DecayType.POWER_LAW
 
+    @pytest.mark.smoke
     def test_insufficient_data(self):
         """Test that insufficient data returns UNKNOWN."""
         t = np.array([0.1, 0.2])
@@ -49,6 +52,7 @@ class TestDecayTypeDetection:
 
         assert decay_type == DecayType.UNKNOWN
 
+    @pytest.mark.smoke
     def test_invalid_data(self):
         """Test handling of invalid data (NaN, inf)."""
         t = np.logspace(-2, 2, 50)
@@ -58,6 +62,7 @@ class TestDecayTypeDetection:
 
         assert decay_type == DecayType.UNKNOWN
 
+    @pytest.mark.smoke
     def test_multi_mode_decay(self):
         """Test detection of multi-mode decay."""
         t = np.logspace(-2, 2, 100)

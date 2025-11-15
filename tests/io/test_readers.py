@@ -21,6 +21,7 @@ TEST_DATA_DIR = Path(__file__).parent / "test_data"
 class TestTriosReader:
     """Tests for TRIOS reader (7.1)."""
 
+    @pytest.mark.smoke
     def test_trios_reader_basic(self, tmp_path):
         """Test basic TRIOS file parsing with simple data."""
         # Create a minimal TRIOS file
@@ -60,6 +61,7 @@ data point 5	0.5	1800	900
         assert data.y is not None
         assert len(data.x) > 0
 
+    @pytest.mark.smoke
     def test_trios_metadata_extraction(self, tmp_path):
         """Test TRIOS metadata parsing."""
         trios_content = """Filename	metadata_test.txt
@@ -90,6 +92,7 @@ data point 2	2.0	200
         assert data.metadata["sample_name"] == "Polymer XYZ"
         assert "instrument_serial_number" in data.metadata
 
+    @pytest.mark.smoke
     def test_trios_unit_conversion(self):
         """Test TRIOS unit conversion (MPa→Pa, %→unitless)."""
         # This test would verify unit conversion logic
@@ -98,6 +101,7 @@ data point 2	2.0	200
 
         assert callable(convert_units)
 
+    @pytest.mark.smoke
     def test_trios_multiple_segments(self, tmp_path):
         """Test TRIOS with multiple procedure segments."""
         trios_content = """Filename	multiseg.txt
@@ -124,6 +128,7 @@ data point 2	4.0	400
         # Should handle multiple segments
         assert isinstance(data, (RheoData, list))
 
+    @pytest.mark.smoke
     def test_trios_error_handling(self, tmp_path):
         """Test TRIOS error handling for malformed files."""
         malformed_content = "Not a valid TRIOS file\nRandom data\n"

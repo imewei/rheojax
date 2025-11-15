@@ -13,6 +13,7 @@ from rheojax.core.bayesian import BayesianResult
 from rheojax.models.maxwell import Maxwell
 
 
+@pytest.mark.smoke
 def test_nlsq_to_nuts_workflow_on_maxwell_model():
     """Test complete NLSQ → NUTS workflow on Maxwell model with convergence checks."""
     # Setup: Create Maxwell model

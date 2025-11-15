@@ -20,6 +20,9 @@ jax, jnp = safe_import_jax()
 class TestParameterClass:
     """Test Parameter class for parameter management."""
 
+    @pytest.mark.smoke
+
+
     def test_create_parameter(self):
         """Test creating a parameter."""
         param = Parameter(
@@ -35,6 +38,9 @@ class TestParameterClass:
         assert param.bounds == (0.0, 1e6)
         assert param.units == "Pa"
         assert param.description == "Storage modulus"
+
+    @pytest.mark.smoke
+
 
     def test_parameter_validation(self):
         """Test parameter value validation."""
@@ -58,6 +64,9 @@ class TestParameterClass:
 
         param.value = 1e10
         assert param.value == 1e10
+
+    @pytest.mark.smoke
+
 
     def test_parameter_to_dict(self):
         """Test parameter serialization to dict."""
@@ -90,12 +99,18 @@ class TestParameterClass:
 class TestParameterSet:
     """Test ParameterSet for managing multiple parameters."""
 
+    @pytest.mark.smoke
+
+
     def test_create_empty_parameter_set(self):
         """Test creating an empty parameter set."""
         params = ParameterSet()
 
         assert len(params) == 0
         assert params.to_dict() == {}
+
+    @pytest.mark.smoke
+
 
     def test_add_parameters(self):
         """Test adding parameters to set."""
@@ -626,6 +641,9 @@ jax, jnp = safe_import_jax()
 class TestParameterClass:
     """Test Parameter class for parameter management."""
 
+    @pytest.mark.smoke
+
+
     def test_create_parameter(self):
         """Test creating a parameter."""
         param = Parameter(
@@ -641,6 +659,9 @@ class TestParameterClass:
         assert param.bounds == (0.0, 1e6)
         assert param.units == "Pa"
         assert param.description == "Storage modulus"
+
+    @pytest.mark.smoke
+
 
     def test_parameter_validation(self):
         """Test parameter value validation."""
@@ -664,6 +685,9 @@ class TestParameterClass:
 
         param.value = 1e10
         assert param.value == 1e10
+
+    @pytest.mark.smoke
+
 
     def test_parameter_to_dict(self):
         """Test parameter serialization to dict."""
@@ -696,12 +720,18 @@ class TestParameterClass:
 class TestParameterSet:
     """Test ParameterSet for managing multiple parameters."""
 
+    @pytest.mark.smoke
+
+
     def test_create_empty_parameter_set(self):
         """Test creating an empty parameter set."""
         params = ParameterSet()
 
         assert len(params) == 0
         assert params.to_dict() == {}
+
+    @pytest.mark.smoke
+
 
     def test_add_parameters(self):
         """Test adding parameters to set."""

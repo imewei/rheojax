@@ -21,6 +21,7 @@ with patch.dict("sys.modules", {"piblin_jax": MagicMock()}):
 class TestRheoDataCreation:
     """Test RheoData creation and initialization."""
 
+    @pytest.mark.smoke
     def test_create_from_numpy_arrays(self):
         """Test creating RheoData from numpy arrays."""
         x = np.array([1, 2, 3, 4, 5])
@@ -34,6 +35,7 @@ class TestRheoDataCreation:
         assert np.array_equal(data.y, y)
         assert data.metadata == metadata
 
+    @pytest.mark.smoke
     def test_create_from_jax_arrays(self):
         """Test creating RheoData from JAX arrays."""
         x = jnp.array([1, 2, 3, 4, 5])
@@ -45,6 +47,7 @@ class TestRheoDataCreation:
         assert jnp.array_equal(data.x, x)
         assert jnp.array_equal(data.y, y)
 
+    @pytest.mark.smoke
     def test_create_with_units(self):
         """Test creating RheoData with units."""
         x = np.array([1, 2, 3])
@@ -57,6 +60,7 @@ class TestRheoDataCreation:
         assert data.x_units == x_units
         assert data.y_units == y_units
 
+    @pytest.mark.smoke
     def test_create_with_domain_type(self):
         """Test creating RheoData with domain specification."""
         x = np.array([0.1, 0.2, 0.3])
@@ -69,11 +73,13 @@ class TestRheoDataCreation:
         data2 = RheoData(x=x, y=y, domain="time")
         assert data2.domain == "time"
 
+    @pytest.mark.smoke
     def test_create_empty_raises_error(self):
         """Test that creating empty RheoData raises appropriate error."""
         with pytest.raises(ValueError, match="x and y data must be provided"):
             RheoData()
 
+    @pytest.mark.smoke
     def test_create_mismatched_sizes_raises_error(self):
         """Test that mismatched array sizes raise error."""
         x = np.array([1, 2, 3])
@@ -94,6 +100,7 @@ class TestRheoDataPiblinCompatibility:
     """
 
     @patch("rheojax.core.data.piblin")
+    @pytest.mark.smoke
     def test_wraps_piblin_measurement(self, mock_piblin):
         """Test that RheoData properly wraps piblin_jax.Measurement."""
         # Create a mock piblin_jax measurement

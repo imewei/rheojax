@@ -22,6 +22,7 @@ jax, jnp = safe_import_jax()
 class TestZenerBasics:
     """Test basic Zener model functionality."""
 
+    @pytest.mark.smoke
     def test_model_creation(self):
         """Test Zener model can be instantiated."""
         model = Zener()
@@ -29,6 +30,7 @@ class TestZenerBasics:
         assert hasattr(model, "parameters")
         assert len(model.parameters) == 3
 
+    @pytest.mark.smoke
     def test_model_parameters(self):
         """Test Zener model has correct parameters."""
         model = Zener()
@@ -51,6 +53,7 @@ class TestZenerBasics:
         assert Gm_param.bounds == (1e-3, 1e9)
         assert eta_param.bounds == (1e-6, 1e12)
 
+    @pytest.mark.smoke
     def test_parameter_setting(self):
         """Test setting Zener parameters."""
         model = Zener()
@@ -64,6 +67,7 @@ class TestZenerBasics:
         assert model.parameters.get_value("Gm") == 1e6
         assert model.parameters.get_value("eta") == 5e3
 
+    @pytest.mark.smoke
     def test_parameter_bounds_enforcement(self):
         """Test parameter bounds are enforced."""
         model = Zener()
@@ -86,6 +90,7 @@ class TestZenerBasics:
         with pytest.raises(ValueError):
             model.parameters.set_value("eta", 1e13)
 
+    @pytest.mark.smoke
     def test_relaxation_time_calculation(self):
         """Test relaxation time calculation."""
         model = Zener()
@@ -96,6 +101,7 @@ class TestZenerBasics:
         expected_tau = 1e3 / 1e5  # eta / Gm
         assert_allclose(tau, expected_tau)
 
+    @pytest.mark.smoke
     def test_retardation_time_calculation(self):
         """Test retardation time calculation for creep."""
         model = Zener()

@@ -97,6 +97,7 @@ def temp_csv_file(sample_data):
 class TestPipelineInitialization:
     """Test Pipeline initialization."""
 
+    @pytest.mark.smoke
     def test_init_empty(self):
         """Test initialization without data."""
         pipeline = Pipeline()
@@ -105,6 +106,7 @@ class TestPipelineInitialization:
         assert len(pipeline.history) == 0
         assert pipeline._last_model is None
 
+    @pytest.mark.smoke
     def test_init_with_data(self, sample_data):
         """Test initialization with data."""
         pipeline = Pipeline(data=sample_data)
@@ -116,6 +118,7 @@ class TestPipelineInitialization:
 class TestPipelineDataLoading:
     """Test data loading functionality."""
 
+    @pytest.mark.smoke
     def test_load_csv(self, temp_csv_file):
         """Test loading CSV file."""
         pipeline = Pipeline()
@@ -126,12 +129,14 @@ class TestPipelineDataLoading:
         assert len(pipeline.history) == 1
         assert pipeline.history[0][0] == "load"
 
+    @pytest.mark.smoke
     def test_load_nonexistent_file(self):
         """Test loading non-existent file raises error."""
         pipeline = Pipeline()
         with pytest.raises(FileNotFoundError):
             pipeline.load("nonexistent.csv")
 
+    @pytest.mark.smoke
     def test_load_auto_format(self, temp_csv_file):
         """Test automatic format detection."""
         pipeline = Pipeline()
@@ -142,6 +147,7 @@ class TestPipelineDataLoading:
 class TestPipelineTransforms:
     """Test transform application."""
 
+    @pytest.mark.smoke
     def test_transform_with_string(self, sample_data):
         """Test applying transform by name."""
         pipeline = Pipeline(data=sample_data)
@@ -154,12 +160,14 @@ class TestPipelineTransforms:
         assert len(pipeline.history) == 1
         assert pipeline.history[0][0] == "transform"
 
+    @pytest.mark.smoke
     def test_transform_without_data(self):
         """Test transform without data raises error."""
         pipeline = Pipeline()
         with pytest.raises(ValueError, match="No data loaded"):
             pipeline.transform("mock_transform")
 
+    @pytest.mark.smoke
     def test_transform_with_instance(self, sample_data):
         """Test applying transform instance."""
         pipeline = Pipeline(data=sample_data)

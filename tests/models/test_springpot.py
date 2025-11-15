@@ -23,6 +23,7 @@ jax, jnp = safe_import_jax()
 class TestSpringPotBasics:
     """Test basic SpringPot model functionality."""
 
+    @pytest.mark.smoke
     def test_model_creation(self):
         """Test SpringPot model can be instantiated."""
         model = SpringPot()
@@ -30,6 +31,7 @@ class TestSpringPotBasics:
         assert hasattr(model, "parameters")
         assert len(model.parameters) == 2
 
+    @pytest.mark.smoke
     def test_model_parameters(self):
         """Test SpringPot model has correct parameters."""
         model = SpringPot()
@@ -48,6 +50,7 @@ class TestSpringPotBasics:
         assert c_alpha_param.bounds == (1e-3, 1e9)
         assert alpha_param.bounds == (0.0, 1.0)
 
+    @pytest.mark.smoke
     def test_parameter_setting(self):
         """Test setting SpringPot parameters."""
         model = SpringPot()
@@ -59,6 +62,7 @@ class TestSpringPotBasics:
         assert model.parameters.get_value("c_alpha") == 1e6
         assert model.parameters.get_value("alpha") == 0.7
 
+    @pytest.mark.smoke
     def test_parameter_bounds_enforcement(self):
         """Test parameter bounds are enforced."""
         model = SpringPot()
@@ -75,6 +79,7 @@ class TestSpringPotBasics:
         with pytest.raises(ValueError):
             model.parameters.set_value("alpha", 1.1)
 
+    @pytest.mark.smoke
     def test_alpha_boundary_values(self):
         """Test alpha at boundary values (0 and 1)."""
         model = SpringPot()

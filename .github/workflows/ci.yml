@@ -63,12 +63,12 @@ jobs:
         pip install -r requirements-dev.txt
         pip install -e .
 
-    - name: Run tests (fast - exclude slow/validation/benchmarks, parallel)
+    - name: Run smoke tests (105 critical tests, ~2-5 min per job)
       run: |
-        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing \
-          -m "not slow and not validation and not benchmark and not notebook_comprehensive"
-        # Note: Comprehensive tests (1069/1154 tests, ~5-10 min) run here
-        # Full validation suite should be run locally: pytest -n auto
+        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing -m "smoke"
+        # Note: Only smoke tests (105/1154 tests) run on every commit
+        # Fast tier (1069 tests): pytest -n auto -m "not slow and not validation and not benchmark and not notebook_comprehensive"
+        # Full validation suite: pytest -n auto (run locally before releases)
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

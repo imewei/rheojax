@@ -44,6 +44,7 @@ class TestFractionalZenerSolidLiquid:
     def params(self):
         return {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.5, "tau": 1.0}
 
+    @pytest.mark.smoke
     def test_initialization(self, model):
         """Test parameter initialization."""
         assert "Ge" in model.parameters
@@ -51,6 +52,7 @@ class TestFractionalZenerSolidLiquid:
         assert "alpha" in model.parameters
         assert "tau" in model.parameters
 
+    @pytest.mark.smoke
     def test_relaxation(self, model, params):
         """Test relaxation modulus."""
         t = jnp.logspace(-2, 2, 20)
@@ -59,6 +61,7 @@ class TestFractionalZenerSolidLiquid:
         assert jnp.all(G_t > 0)
         assert jnp.all(jnp.isfinite(G_t))
 
+    @pytest.mark.smoke
     def test_oscillation(self, model, params):
         """Test complex modulus."""
         omega = jnp.logspace(-2, 2, 20)
@@ -66,6 +69,7 @@ class TestFractionalZenerSolidLiquid:
         assert G_star.shape == (20, 2)
         assert jnp.all(G_star > 0)
 
+    @pytest.mark.smoke
     def test_alpha_limits(self, model):
         """Test alpha limit cases."""
         params_low = {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.01, "tau": 1.0}
@@ -90,6 +94,7 @@ class TestFractionalZenerSolidSolid:
     def params(self):
         return {"Ge": 1000.0, "Gm": 500.0, "alpha": 0.5, "tau_alpha": 1.0}
 
+    @pytest.mark.smoke
     def test_initialization(self, model):
         """Test parameter initialization."""
         assert "Ge" in model.parameters
@@ -97,6 +102,7 @@ class TestFractionalZenerSolidSolid:
         assert "alpha" in model.parameters
         assert "tau_alpha" in model.parameters
 
+    @pytest.mark.smoke
     def test_relaxation(self, model, params):
         """Test relaxation modulus."""
         t = jnp.logspace(-2, 2, 20)
@@ -107,6 +113,7 @@ class TestFractionalZenerSolidSolid:
         # Should approach G_e at long times
         assert jnp.allclose(G_t[-1], params["Ge"], rtol=0.2)
 
+    @pytest.mark.smoke
     def test_creep(self, model, params):
         """Test creep compliance."""
         t = jnp.logspace(-2, 2, 20)
@@ -118,6 +125,7 @@ class TestFractionalZenerSolidSolid:
         expected_J = 1.0 / params["Ge"]
         assert jnp.allclose(J_t[-1], expected_J, rtol=0.3)
 
+    @pytest.mark.smoke
     def test_oscillation(self, model, params):
         """Test complex modulus."""
         omega = jnp.logspace(-2, 2, 20)
