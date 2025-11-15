@@ -1,7 +1,8 @@
 """Time-Temperature Superposition (TTS) mastercurve generation.
 
 This module implements time-temperature superposition for creating mastercurves
-from multi-temperature rheological data using WLF or Arrhenius shift factors.
+from multi-temperature rheological data using WLF or Arrhenius shift factors,
+or automatic shift factor calculation via power-law intersection (pyvisco algorithm).
 """
 
 from __future__ import annotations
@@ -13,7 +14,9 @@ import numpy as np
 from rheojax.core.base import BaseTransform
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import TransformRegistry
+from rheojax.utils.optimization import create_least_squares_objective, nlsq_optimize
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -36,13 +39,17 @@ class Mastercurve(BaseTransform):
 
     This transform applies time-temperature superposition to create mastercurves
     from multi-temperature rheological data. Supports both WLF and Arrhenius
-    shift factor models for horizontal shifting, with optional vertical shifting.
+    shift factor models for horizontal shifting, with optional vertical shifting,
+    or automatic shift factor calculation via power-law intersection method.
 
     The WLF equation is:
         log(a_T) = -C1 * (T - T_ref) / (C2 + (T - T_ref))
 
     The Arrhenius equation is:
         log(a_T) = (E_a / R) * (1/T - 1/T_ref)
+
+    Automatic shift factors use power-law intersection (pyvisco algorithm):
+        Fits each curve to y = a*x^b + e, then computes shift from intersection
 
     Parameters
     ----------
@@ -60,6 +67,9 @@ class Mastercurve(BaseTransform):
         Whether to apply vertical shifting (for modulus scaling)
     optimize_shifts : bool, default=True
         Whether to optimize shift factors to minimize overlap error
+    auto_shift : bool, default=False
+        Whether to use automatic shift factor calculation via power-law intersection.
+        If True, overrides manual WLF/Arrhenius calculations.
 
     Examples
     --------
@@ -86,6 +96,10 @@ class Mastercurve(BaseTransform):
     >>> # Option 2: Using transform with list (returns shift factors too)
     >>> mastercurve, shift_factors = mc.transform(datasets)
     >>> print(shift_factors)  # {273.0: 42.5, 298.15: 1.0, 323.0: 0.024}
+    >>>
+    >>> # Option 3: Automatic shift factor calculation
+    >>> mc_auto = Mastercurve(reference_temp=298.15, auto_shift=True)
+    >>> mastercurve_auto, shifts_auto = mc_auto.transform(datasets)
     """
 
     def __init__(
@@ -97,6 +111,7 @@ class Mastercurve(BaseTransform):
         E_a: float | None = None,
         vertical_shift: bool = False,
         optimize_shifts: bool = True,
+        auto_shift: bool = False,
     ):
         """Initialize Mastercurve transform.
 
@@ -116,6 +131,8 @@ class Mastercurve(BaseTransform):
             Apply vertical shifting
         optimize_shifts : bool
             Optimize shift factors
+        auto_shift : bool
+            Use automatic power-law intersection for shift calculation
         """
         super().__init__()
         self.T_ref = reference_temp
@@ -125,10 +142,12 @@ class Mastercurve(BaseTransform):
         self.E_a = E_a
         self.vertical_shift = vertical_shift
         self.optimize_shifts = optimize_shifts
+        self._auto_shift = auto_shift
 
         # Store computed shift factors
         self.shift_factors_: dict[float, float] | None = None
         self.vertical_shifts_: dict[float, float] | None = None
+        self._auto_shift_factors: np.ndarray | None = None
 
     def _calculate_wlf_shift(
         self, T: ScalarOrArray, T_ref: float, C1: float, C2: float
@@ -179,6 +198,265 @@ class Mastercurve(BaseTransform):
         # Arrhenius: log(a_T) = (E_a/R) * (1/T - 1/T_ref)
         log_aT = (E_a / R) * (1.0 / T - 1.0 / T_ref)
         return jnp.exp(log_aT)
+
+    def _fit_power_law(
+        self, x: np.ndarray, y: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Fit power-law model: y = a*x^b + e using NLSQ.
+
+        Parameters
+        ----------
+        x : ndarray
+            X data (frequency or time)
+        y : ndarray
+            Y data (modulus or other response)
+
+        Returns
+        -------
+        popt : ndarray
+            Optimal parameters [a, b, e]
+        perr : ndarray
+            Parameter uncertainties (standard errors)
+        """
+        # Create parameter set with reasonable bounds
+        params = ParameterSet()
+        params.add("a", value=1.0, bounds=(1e-10, 1e10))
+        params.add("b", value=-0.5, bounds=(-5.0, 5.0))
+        params.add("e", value=0.0, bounds=(-1e10, 1e10))
+
+        # Define model function for power-law
+        def power_law_model(x_data: np.ndarray, param_values: np.ndarray) -> np.ndarray:
+            """Power-law model: y = a*x^b + e."""
+            a, b, e = param_values
+            return a * jnp.power(x_data, b) + e
+
+        # Create least-squares objective
+        objective = create_least_squares_objective(power_law_model, x, y)
+
+        # Optimize using NLSQ
+        result = nlsq_optimize(
+            objective, params, use_jax=True, max_iter=1000, ftol=1e-8, xtol=1e-8
+        )
+
+        # Extract parameter uncertainties from Jacobian
+        if result.jac is not None:
+            # Estimate covariance from Jacobian: Cov ≈ (J^T J)^-1
+            try:
+                jtj = result.jac.T @ result.jac
+                cov = np.linalg.inv(jtj)
+                perr = np.sqrt(np.diag(cov))
+            except np.linalg.LinAlgError:
+                # Singular matrix, use large uncertainties
+                perr = np.full(3, 1e6)
+        else:
+            perr = np.full(3, 1e6)
+
+        return result.x, perr
+
+    def _detect_outliers(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        popt_full: np.ndarray,
+        perr_full: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Detect and remove outliers (first point) if it improves fit.
+
+        Following pyvisco algorithm: try removing first point, keep removal
+        if exponent error improves.
+
+        Parameters
+        ----------
+        x : ndarray
+            X data
+        y : ndarray
+            Y data
+        popt_full : ndarray
+            Parameters from full fit [a, b, e]
+        perr_full : ndarray
+            Uncertainties from full fit
+
+        Returns
+        -------
+        x_clean : ndarray
+            Cleaned x data
+        y_clean : ndarray
+            Cleaned y data
+        popt_clean : ndarray
+            Parameters from cleaned fit
+        perr_clean : ndarray
+            Uncertainties from cleaned fit
+        """
+        # Try fit without first point
+        x_no_first = x[1:]
+        y_no_first = y[1:]
+
+        popt_no_first, perr_no_first = self._fit_power_law(x_no_first, y_no_first)
+
+        # Compare exponent (b) uncertainty
+        if perr_no_first[1] < perr_full[1]:
+            # Removing first point improves fit
+            return x_no_first, y_no_first, popt_no_first, perr_no_first
+        else:
+            # Keep all points
+            return x, y, popt_full, perr_full
+
+    def _compute_pairwise_shift(
+        self,
+        curve_top: np.ndarray,
+        curve_bot: np.ndarray,
+        popt_top: np.ndarray,
+        popt_bot: np.ndarray,
+    ) -> float:
+        """Compute shift factor between two adjacent curves via intersection.
+
+        Uses power-law intersection method: sample points in overlap/gap region,
+        compute inverse power-law to find x-shift, average log(aT).
+
+        Parameters
+        ----------
+        curve_top : ndarray
+            Top curve data [x, y] with shape (N, 2)
+        curve_bot : ndarray
+            Bottom curve data [x, y] with shape (M, 2)
+        popt_top : ndarray
+            Power-law parameters [a, b, e] for top curve
+        popt_bot : ndarray
+            Power-law parameters [a, b, e] for bottom curve
+
+        Returns
+        -------
+        log_aT : float
+            Log10 shift factor
+        """
+        # Extract x and y ranges
+        x_top, y_top = curve_top[:, 0], curve_top[:, 1]
+        x_bot, y_bot = curve_bot[:, 0], curve_bot[:, 1]
+
+        # Determine overlap or gap
+        y_min_top, y_max_top = y_top.min(), y_top.max()
+        y_min_bot, y_max_bot = y_bot.min(), y_bot.max()
+
+        # Find y-range for intersection sampling
+        if y_min_top < y_max_bot and y_max_bot < y_max_top:
+            # Overlap case
+            y_sample_min = max(y_min_top, y_min_bot)
+            y_sample_max = min(y_max_top, y_max_bot)
+        else:
+            # Gap case: sample in gap region
+            y_sample_min = min(y_max_bot, y_max_top)
+            y_sample_max = max(y_min_bot, y_min_top)
+
+        # Sample 10 points in y-range
+        y_samples = np.linspace(y_sample_min, y_sample_max, 10)
+
+        # Compute x from inverse power-law: x = ((y - e) / a)^(1/b)
+        a_top, b_top, e_top = popt_top
+        a_bot, b_bot, e_bot = popt_bot
+
+        # Inverse power-law for top curve
+        x_top_inv = np.power((y_samples - e_top) / a_top, 1.0 / b_top)
+
+        # Inverse power-law for bottom curve
+        x_bot_inv = np.power((y_samples - e_bot) / a_bot, 1.0 / b_bot)
+
+        # Compute log shift factors and average
+        log_shift_factors = np.log10(x_top_inv / x_bot_inv)
+
+        # Handle infinities and NaNs
+        valid = np.isfinite(log_shift_factors)
+        if np.sum(valid) == 0:
+            # Fallback: use geometric mean of x-ranges
+            return float(np.log10(np.mean(x_top) / np.mean(x_bot)))
+
+        log_aT = float(np.mean(log_shift_factors[valid]))
+
+        return log_aT
+
+    def _compute_auto_shift_factors(
+        self, datasets: list[RheoData], ref_temp_idx: int
+    ) -> np.ndarray:
+        """Compute automatic shift factors via sequential pairwise power-law intersection.
+
+        Follows pyvisco algorithm:
+        1. Fit power-law to each temperature curve
+        2. Detect and remove outliers
+        3. Compute pairwise shifts via intersection
+        4. Accumulate shifts sequentially from reference temperature
+
+        Parameters
+        ----------
+        datasets : list of RheoData
+            Multi-temperature datasets (must be sorted by temperature)
+        ref_temp_idx : int
+            Index of reference temperature in datasets
+
+        Returns
+        -------
+        log_aT_array : ndarray
+            Cumulative log10 shift factors for all temperatures
+        """
+        n_temps = len(datasets)
+        log_aT_array = np.zeros(n_temps)
+
+        # Fit power-law to each curve with outlier detection
+        power_law_params = []
+        curves = []
+
+        for data in datasets:
+            x = np.asarray(data.x, dtype=np.float64)
+            y = np.asarray(data.y, dtype=np.float64)
+
+            # Fit power-law
+            popt, perr = self._fit_power_law(x, y)
+
+            # Detect outliers
+            x_clean, y_clean, popt_clean, perr_clean = self._detect_outliers(
+                x, y, popt, perr
+            )
+
+            power_law_params.append(popt_clean)
+            curves.append(np.column_stack([x_clean, y_clean]))
+
+        # Sequential cumulative shifting below reference temperature
+        for i in range(ref_temp_idx - 1, -1, -1):
+            # Shift from i+1 to i (going down in temperature)
+            log_shift = self._compute_pairwise_shift(
+                curves[i + 1], curves[i], power_law_params[i + 1], power_law_params[i]
+            )
+            log_aT_array[i] = log_aT_array[i + 1] + log_shift
+
+        # Sequential cumulative shifting above reference temperature
+        for i in range(ref_temp_idx + 1, n_temps):
+            # Shift from i-1 to i (going up in temperature)
+            log_shift = self._compute_pairwise_shift(
+                curves[i - 1], curves[i], power_law_params[i - 1], power_law_params[i]
+            )
+            log_aT_array[i] = log_aT_array[i - 1] + log_shift
+
+        # Store for later retrieval
+        self._auto_shift_factors = log_aT_array
+
+        return log_aT_array
+
+    def get_auto_shift_factors(self) -> tuple[np.ndarray, np.ndarray] | None:
+        """Get automatic shift factors as arrays for plotting.
+
+        Returns
+        -------
+        temperatures : ndarray or None
+            Array of temperatures in Kelvin, or None if not computed
+        log_aT : ndarray or None
+            Array of log10 shift factors, or None if not computed
+        """
+        if self._auto_shift_factors is None:
+            return None
+
+        if self.shift_factors_ is None:
+            return None
+
+        temps = np.array(sorted(self.shift_factors_.keys()))
+        return temps, self._auto_shift_factors
 
     def get_shift_factor(self, T: float) -> float:
         """Get shift factor for a given temperature.
@@ -444,24 +722,75 @@ class Mastercurve(BaseTransform):
         if return_shifts and not merge:
             raise ValueError("return_shifts=True requires merge=True")
 
-        # Shift all datasets
-        shifted_datasets = []
+        # Extract temperatures and sort datasets
         temperatures = []
-        shift_factors = {}
-
         for data in datasets:
             if "temperature" not in data.metadata:
                 raise ValueError("All datasets must have 'temperature' in metadata")
+            temperatures.append(data.metadata["temperature"])
 
-            T = data.metadata["temperature"]
-            temperatures.append(T)
+        # Sort by temperature
+        temp_indices = np.argsort(temperatures)
+        datasets = [datasets[i] for i in temp_indices]
+        temperatures = [temperatures[i] for i in temp_indices]
 
-            # Calculate shift factor for this temperature
-            a_T = self.get_shift_factor(T)
-            shift_factors[T] = float(a_T)
+        # Find reference temperature index
+        ref_temp_idx = np.argmin(np.abs(np.array(temperatures) - self.T_ref))
 
-            # Transform the data using the single-dataset method
-            shifted = self._transform_single(data)
+        # Compute shift factors
+        if self._auto_shift:
+            # Use automatic shift factor calculation
+            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)
+            shift_factors = {
+                T: 10.0**log_aT
+                for T, log_aT in zip(temperatures, log_aT_array, strict=False)
+            }
+        else:
+            # Use manual WLF/Arrhenius/manual method
+            shift_factors = {}
+            for T in temperatures:
+                a_T = self.get_shift_factor(T)
+                shift_factors[T] = float(a_T)
+
+        # Shift all datasets
+        shifted_datasets = []
+
+        for data, T in zip(datasets, temperatures, strict=False):
+            # Get shift factor
+            a_T = shift_factors[T]
+
+            # Apply horizontal shift
+            x_shifted = data.x * a_T
+
+            # Apply vertical shift if requested
+            y_shifted = data.y
+            if self.vertical_shift:
+                b_T = T / self.T_ref
+                y_shifted = y_shifted * b_T
+
+            # Create metadata
+            new_metadata = data.metadata.copy()
+            new_metadata.update(
+                {
+                    "transform": "mastercurve",
+                    "reference_temperature": self.T_ref,
+                    "shift_method": "auto" if self._auto_shift else self.method,
+                    "horizontal_shift": float(a_T),
+                    "vertical_shift": (
+                        float(T / self.T_ref) if self.vertical_shift else 1.0
+                    ),
+                }
+            )
+
+            shifted = RheoData(
+                x=x_shifted,
+                y=y_shifted,
+                x_units=data.x_units,
+                y_units=data.y_units,
+                domain=data.domain,
+                metadata=new_metadata,
+                validate=False,
+            )
             shifted_datasets.append(shifted)
 
         # If not merging, return list
@@ -496,7 +825,7 @@ class Mastercurve(BaseTransform):
         merged_metadata = {
             "transform": "mastercurve",
             "reference_temperature": self.T_ref,
-            "shift_method": self.method,
+            "shift_method": "auto" if self._auto_shift else self.method,
             "temperatures": temperatures,
             "n_datasets": len(datasets),
             "source_temperatures": merged_temps,
