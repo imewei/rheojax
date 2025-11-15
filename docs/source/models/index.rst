@@ -51,3 +51,9 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    flow/cross
    flow/herschel_bulkley
    flow/bingham
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Multi-Mode Models
+
+   multi_mode/generalized_maxwell
