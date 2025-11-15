@@ -85,7 +85,7 @@ def _execute_notebook(notebook_path: Path, timeout: int = 600) -> nbformat.Noteb
         raise FileNotFoundError(f"Notebook not found: {notebook_path}")
 
     # Read notebook (explicit UTF-8 encoding for Windows compatibility)
-    with open(notebook_path, encoding='utf-8') as f:
+    with open(notebook_path, encoding="utf-8") as f:
         nb = nbformat.read(f, as_version=4)
 
     # Execute with timeout

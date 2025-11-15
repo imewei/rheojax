@@ -70,7 +70,7 @@ def temp_directory_with_files():
 
     for i in range(3):
         file_path = os.path.join(temp_dir, f"data_{i}.csv")
-        with open(file_path, "w", encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write("x,y\n")
             for j in range(10):
                 f.write(f"{j},{j * (i + 1)}\n")

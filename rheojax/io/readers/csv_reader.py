@@ -107,7 +107,7 @@ def _detect_delimiter(filepath: Path) -> str:
     Returns:
         Detected delimiter character
     """
-    with open(filepath, encoding='utf-8') as f:
+    with open(filepath, encoding="utf-8") as f:
         # Read first few lines
         lines = [f.readline() for _ in range(5)]
 

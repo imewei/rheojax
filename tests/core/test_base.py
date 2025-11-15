@@ -21,8 +21,6 @@ class TestParameterClass:
     """Test Parameter class for parameter management."""
 
     @pytest.mark.smoke
-
-
     def test_create_parameter(self):
         """Test creating a parameter."""
         param = Parameter(
@@ -40,8 +38,6 @@ class TestParameterClass:
         assert param.description == "Storage modulus"
 
     @pytest.mark.smoke
-
-
     def test_parameter_validation(self):
         """Test parameter value validation."""
         param = Parameter(name="test", value=50.0, bounds=(0.0, 100.0))
@@ -66,8 +62,6 @@ class TestParameterClass:
         assert param.value == 1e10
 
     @pytest.mark.smoke
-
-
     def test_parameter_to_dict(self):
         """Test parameter serialization to dict."""
         param = Parameter(name="test", value=100.0, bounds=(0.0, 200.0), units="Pa")
@@ -100,8 +94,6 @@ class TestParameterSet:
     """Test ParameterSet for managing multiple parameters."""
 
     @pytest.mark.smoke
-
-
     def test_create_empty_parameter_set(self):
         """Test creating an empty parameter set."""
         params = ParameterSet()
@@ -110,8 +102,6 @@ class TestParameterSet:
         assert params.to_dict() == {}
 
     @pytest.mark.smoke
-
-
     def test_add_parameters(self):
         """Test adding parameters to set."""
         params = ParameterSet()
@@ -642,8 +632,6 @@ class TestParameterClass:
     """Test Parameter class for parameter management."""
 
     @pytest.mark.smoke
-
-
     def test_create_parameter(self):
         """Test creating a parameter."""
         param = Parameter(
@@ -661,8 +649,6 @@ class TestParameterClass:
         assert param.description == "Storage modulus"
 
     @pytest.mark.smoke
-
-
     def test_parameter_validation(self):
         """Test parameter value validation."""
         param = Parameter(name="test", value=50.0, bounds=(0.0, 100.0))
@@ -687,8 +673,6 @@ class TestParameterClass:
         assert param.value == 1e10
 
     @pytest.mark.smoke
-
-
     def test_parameter_to_dict(self):
         """Test parameter serialization to dict."""
         param = Parameter(name="test", value=100.0, bounds=(0.0, 200.0), units="Pa")
@@ -721,8 +705,6 @@ class TestParameterSet:
     """Test ParameterSet for managing multiple parameters."""
 
     @pytest.mark.smoke
-
-
     def test_create_empty_parameter_set(self):
         """Test creating an empty parameter set."""
         params = ParameterSet()
@@ -731,8 +713,6 @@ class TestParameterSet:
         assert params.to_dict() == {}
 
     @pytest.mark.smoke
-
-
     def test_add_parameters(self):
         """Test adding parameters to set."""
         params = ParameterSet()
