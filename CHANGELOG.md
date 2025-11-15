@@ -9,6 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2025-11-15
+
+### Added - Generalized Maxwell Model & Advanced TTS
+**PyVisco Integration: Multi-Mode Viscoelastic Models with JAX Acceleration**
+
+Integration of PyVisco capabilities with 5-270x speedup via NLSQ/JAX optimization.
+
+#### Generalized Maxwell Model (GMM)
+- **Added** `rheojax/models/generalized_maxwell.py` (~1250 lines)
+  - Multi-mode Prony series representation: G(t) = G_∞ + Σᵢ Gᵢ exp(-t/τᵢ)
+  - Tri-mode equality: relaxation, oscillation, and creep predictions
+  - Transparent element minimization (auto-optimize N modes)
+  - Two-step NLSQ fitting with softmax penalty
+  - Bayesian inference support with tiered prior safety mechanism
+- **Added** `rheojax/utils/prony.py` (395 lines)
+  - Prony series validation and parameter utilities
+  - Element minimization with R²-based optimization
+  - Log-space transforms for wide time-scale ranges
+
+#### Automatic Shift Factor Calculation
+- **Enhanced** `rheojax/transforms/mastercurve.py` (+300 lines)
+  - Power-law intersection method for automatic shift factors
+  - No WLF parameters required
+  - JAX-native optimization (5-270x speedup over scipy)
+  - Backward compatible with existing WLF/Arrhenius methods
+
+#### Tiered Bayesian Prior Safety
+- **Added** Three-tier prior classification in GMM
+  - Tier 1: Hard failure → informative error or fallback priors
+  - Tier 2: Suspicious convergence → auto-widened priors
+  - Tier 3: Good convergence → NLSQ-based warm-start priors
+
+### Fixed - Type Annotations
+- **Fixed** 7 mypy type checking errors
+  - Added type annotations for `_test_mode`, `_nlsq_result`, `_element_minimization_diagnostics`
+  - Updated `optimization_factor` parameter types to `float | None`
+  - Added type cast for optimal_model attribute access
+  - Removed unused type ignore comment
+
+### Documentation
+- **Updated** README.md and docs/source/index.rst for v0.2.2
+- **Added** 3 example notebooks
+  - `examples/advanced/08-generalized_maxwell_fitting.ipynb`
+  - `examples/transforms/06-mastercurve_auto_shift.ipynb`
+  - `examples/bayesian/07-gmm_bayesian_workflow.ipynb`
+
+### Testing
+- **Added** 55 passing tests across 5 new test files
+  - 20 tests for Prony utilities
+  - 15 tests for GMM tri-mode equality
+  - 7 tests for Bayesian integration
+  - 7 tests for prior safety mechanism
+  - 7 tests for auto shift algorithm
+
+---
+
 ## [0.2.1] - 2025-11-14
 
 ### Refactored - Template Method Pattern for Initialization
