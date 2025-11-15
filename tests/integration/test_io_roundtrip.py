@@ -34,7 +34,7 @@ class TestCSVRoundTrip:
 
         try:
             # Read back
-            with open(temp_path) as f:
+            with open(temp_path, encoding='utf-8') as f:
                 lines = f.readlines()
 
             assert len(lines) > 1, "CSV should have header + data rows"
@@ -76,7 +76,7 @@ class TestCSVRoundTrip:
 
         try:
             # Verify file contains metadata comments
-            with open(temp_path) as f:
+            with open(temp_path, encoding='utf-8') as f:
                 content = f.read()
 
             assert "# test_mode:" in content
@@ -110,7 +110,7 @@ class TestJSONSerialization:
 
         try:
             # Read back
-            with open(temp_path) as f:
+            with open(temp_path, encoding='utf-8') as f:
                 loaded = json.load(f)
 
             # Verify structure
@@ -136,7 +136,7 @@ class TestJSONSerialization:
 
         try:
             # Read back and reconstruct
-            with open(temp_path) as f:
+            with open(temp_path, encoding='utf-8') as f:
                 loaded_dict = json.load(f)
 
             restored_params = type(params).from_dict(loaded_dict)
@@ -281,7 +281,7 @@ class TestDataIntegrity:
                 f.write(f"{val:.15e}\n")  # High precision
 
         try:
-            with open(temp_path) as f:
+            with open(temp_path, encoding='utf-8') as f:
                 lines = f.readlines()[1:]  # Skip header
 
             loaded_values = np.array([float(line.strip()) for line in lines])

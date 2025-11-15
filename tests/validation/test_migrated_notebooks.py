@@ -84,8 +84,8 @@ def _execute_notebook(notebook_path: Path, timeout: int = 600) -> nbformat.Noteb
     if not notebook_path.exists():
         raise FileNotFoundError(f"Notebook not found: {notebook_path}")
 
-    # Read notebook
-    with open(notebook_path) as f:
+    # Read notebook (explicit UTF-8 encoding for Windows compatibility)
+    with open(notebook_path, encoding='utf-8') as f:
         nb = nbformat.read(f, as_version=4)
 
     # Execute with timeout
@@ -1919,7 +1919,8 @@ class TestAdvancedNotebooks:
         notebook_path = (
             EXAMPLES_DIR / "advanced" / "04-fractional-models-deep-dive.ipynb"
         )
-        nb = _execute_notebook(notebook_path, timeout=600)
+        # Increased timeout to 1200s (20 min) for Windows compatibility
+        nb = _execute_notebook(notebook_path, timeout=1200)
         assert nb is not None, "Notebook execution failed"
 
     @pytest.mark.validation
@@ -1929,7 +1930,9 @@ class TestAdvancedNotebooks:
         notebook_path = (
             EXAMPLES_DIR / "advanced" / "04-fractional-models-deep-dive.ipynb"
         )
-        nb = _execute_notebook(notebook_path, timeout=600)
+        # Increased timeout to 1200s (20 min) for Windows compatibility
+        # This notebook fits multiple fractional models which is computationally intensive
+        nb = _execute_notebook(notebook_path, timeout=1200)
         # Verify multiple fractional models shown
         assert nb is not None
 
