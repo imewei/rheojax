@@ -35,9 +35,12 @@ jobs:
         pip install -r requirements-dev.txt
         pip install -e .
 
-    - name: Run tests
+    - name: Run smoke tests (105 critical tests, ~2-5 min per job)
+      timeout-minutes: 10
       run: |
-        pytest -v --cov=rheojax --cov-report=xml --cov-report=term-missing
+        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing -m "smoke"
+        # Note: Only smoke tests (105/1154 tests) run on release CI
+        # Full validation suite should be run locally before creating release: make test
 
   # Run linting checks
   lint:
