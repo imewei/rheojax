@@ -1,7 +1,7 @@
 .. RheoJAX documentation master file
 
 Welcome to RheoJAX's documentation!
-================================
+=====================================
 
 **RheoJAX** is a unified, JAX-accelerated rheological analysis package that provides a modern,
 high-performance framework for analyzing experimental rheology data. Built on JAX for automatic
