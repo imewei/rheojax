@@ -186,10 +186,11 @@ class TestTieredPriorConstruction:
         with pytest.raises(ValueError, match="NLSQ optimization.*failed"):
             model._construct_bayesian_priors("hard_failure", prior_mode="strict")
 
-        # Test that fallback priors work
-        priors = model._construct_bayesian_priors(
-            "hard_failure", prior_mode="warn", allow_fallback_priors=True
-        )
+        # Test that fallback priors work with expected warning
+        with pytest.warns(UserWarning, match="NLSQ optimization failed"):
+            priors = model._construct_bayesian_priors(
+                "hard_failure", prior_mode="warn", allow_fallback_priors=True
+            )
 
         # Verify generic priors provided
         assert priors is not None
