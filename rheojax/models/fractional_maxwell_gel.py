@@ -379,11 +379,6 @@ class FractionalMaxwellGel(BaseModel):
         Returns:
             Model predictions as JAX array
         """
-        # Extract parameters from array (in order they were added to ParameterSet)
-        c_alpha = params[0]
-        alpha = params[1]
-        eta = params[2]
-
         # Use explicit test_mode parameter (closure-captured in fit_bayesian)
         # Fall back to self._test_mode only for backward compatibility
         if test_mode is None:

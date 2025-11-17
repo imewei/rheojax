@@ -398,11 +398,6 @@ class FractionalKelvinVoigt(BaseModel):
         Returns:
             Model predictions as JAX array
         """
-        # Extract parameters from array (in order they were added to ParameterSet)
-        Ge = params[0]
-        c_alpha = params[1]
-        alpha = params[2]
-
         # Use explicit test_mode parameter (closure-captured in fit_bayesian)
         # Fall back to self._test_mode only for backward compatibility
         if test_mode is None:
