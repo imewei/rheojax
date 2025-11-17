@@ -57,6 +57,7 @@ import logging
 import os
 import re
 import warnings
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -312,7 +313,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
 def load_trios_chunked(
     filepath: str | Path,
     chunk_size: int = 10000,
-    progress_callback: callable | None = None,
+    progress_callback: Callable | None = None,
     **kwargs,
 ):
     """Load TRIOS file in memory-efficient chunks (generator).
@@ -448,7 +449,7 @@ def _read_segment_chunked(
     metadata: dict,
     chunk_size: int,
     validate_data: bool,
-    progress_callback: callable | None = None,
+    progress_callback: Callable | None = None,
 ):
     """Read a single segment in chunks (internal generator).
 

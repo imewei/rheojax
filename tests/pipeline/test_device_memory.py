@@ -5,9 +5,9 @@ ensuring data remains as JAX arrays throughout pipeline stages and only
 converts to NumPy at the plotting boundary.
 """
 
+import tempfile
 import time
 from pathlib import Path
-import tempfile
 
 import numpy as np
 import pytest
