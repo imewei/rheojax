@@ -126,12 +126,13 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     Args:
         filepath: Path to TRIOS .txt file
         **kwargs: Additional options
+
             - return_all_segments: If True, return list of RheoData for each segment
             - chunk_size: If provided, uses chunked reading (see load_trios_chunked)
             - auto_chunk: If True (default), automatically use chunked reading for
-                         files > 5 MB. Set to False to disable auto-detection.
+              files > 5 MB. Set to False to disable auto-detection.
             - progress_callback: Optional callback for progress tracking during
-                                chunked loading. Signature: callback(current, total)
+              chunked loading. Signature: callback(current, total)
 
     Returns:
         RheoData object or list of RheoData objects (if multiple segments)
@@ -153,10 +154,10 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     Example:
         >>> # Automatic chunking for large files
         >>> data = load_trios('large_file.txt')  # Auto-chunks if > 5 MB
-        >>>
+
         >>> # Disable auto-chunking
         >>> data = load_trios('large_file.txt', auto_chunk=False)
-        >>>
+
         >>> # With progress tracking
         >>> def progress(current, total):
         ...     print(f"Loading: {100*current/total:.1f}%")
