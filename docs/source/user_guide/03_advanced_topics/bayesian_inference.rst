@@ -997,7 +997,7 @@ Further Reading
    https://arviz-devs.github.io/arviz/
 
 **NLSQ Repository**
-   https://github.com/nlsq/nlsq
+   https://github.com/imewei/NLSQ
 
 **MCMC Best Practices**
    - Vehtari et al. (2021). "Rank-Normalization, Folding, and Localization"

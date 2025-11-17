@@ -607,4 +607,4 @@ References
 
 1. Ferry, J. D. (1980). *Viscoelastic Properties of Polymers*, 3rd Edition. Wiley.
 2. Williams, M. L., Landel, R. F., & Ferry, J. D. (1955). "The Temperature Dependence of Relaxation Mechanisms in Amorphous Polymers." *JACS*, 77(14), 3701-3707.
-3. PyVisco (2020-2024). Python package for viscoelastic model fitting. GitHub: https://github.com/saintsfan342000/pyvisco
+3. PyVisco (2020-2024). Python package for viscoelastic model fitting. GitHub: https://github.com/NREL/pyvisco

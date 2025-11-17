@@ -231,8 +231,8 @@ Community and Support
 
 **Getting Help**
    - Read the :doc:`user_guide/getting_started`
-   - Join `GitHub Discussions <https://github.com/imewei/rheojax/discussions>`_
    - Report issues on `GitHub <https://github.com/imewei/rheojax/issues>`_
+   - Contact: wchen@anl.gov
 
 **Contributing**
    - See :doc:`developer/contributing` for guidelines

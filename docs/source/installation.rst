@@ -125,7 +125,7 @@ JAX Installation Issues
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 If you encounter issues with JAX installation, refer to the
-`JAX installation guide <https://github.com/google/jax#installation>`_.
+`JAX installation guide <https://jax.readthedocs.io/en/latest/installation.html>`_.
 
 **GPU Support:**
 
