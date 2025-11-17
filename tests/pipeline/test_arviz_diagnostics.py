@@ -66,7 +66,7 @@ class MockBayesianModel(BaseModel):
         b = self.parameters.get_value("b")
         return np.array(self.model_function(X, jnp.array([a, b])))
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         a, b = params[0], params[1]
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         return a * jnp.exp(-b * X_jax)

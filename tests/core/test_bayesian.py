@@ -26,7 +26,7 @@ class SimpleBayesianModel(BayesianMixin):
         self.X_data = None
         self.y_data = None
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Simple linear model: y = a * X + b."""
         a, b = params
         return a * X + b
@@ -706,6 +706,7 @@ def test_warm_start_complex_data_nuts_convergence():
         num_samples=1000,
         num_chains=1,
         initial_values={"Ge": Ge_nlsq, "Gm": Gm_nlsq, "eta": eta_nlsq},
+        test_mode=TestMode.OSCILLATION,
     )
 
     # 1. Verify sample diversity (most critical diagnostic)
@@ -795,11 +796,11 @@ def test_cold_start_vs_warm_start_comparison():
         num_samples=1000,
         num_chains=1,
         initial_values={"Ge": Ge_nlsq, "Gm": Gm_nlsq, "eta": eta_nlsq},
+        test_mode=TestMode.OSCILLATION,
     )
 
     # Cold-start: Direct Bayesian (uniform priors)
     model_cold = Zener()
-    model_cold._test_mode = TestMode.OSCILLATION
 
     result_cold = model_cold.fit_bayesian(
         omega,
@@ -807,6 +808,7 @@ def test_cold_start_vs_warm_start_comparison():
         num_warmup=500,
         num_samples=1000,
         num_chains=1,
+        test_mode=TestMode.OSCILLATION,
         # No initial_values → uniform priors
     )
 

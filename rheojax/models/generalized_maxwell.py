@@ -568,16 +568,16 @@ class GeneralizedMaxwell(BaseModel):
         if E_star.ndim == 1:
             # Handle 1D concatenated [G', G"] from element minimization
             M = len(E_star) // 2
-            E_prime = E_star[:M]
-            E_double_prime = E_star[M:]
+            E_prime = np.real(E_star[:M])
+            E_double_prime = np.real(E_star[M:])
         elif E_star.shape[0] == 2:
             # Input is (2, M), extract directly
-            E_prime = E_star[0]
-            E_double_prime = E_star[1]  # FIX: Added missing assignment
+            E_prime = np.real(E_star[0])
+            E_double_prime = np.real(E_star[1])  # FIX: Added missing assignment
         elif E_star.shape[1] == 2:
             # Input is (M, 2), transpose to (2, M)
-            E_prime = E_star[:, 0]
-            E_double_prime = E_star[:, 1]
+            E_prime = np.real(E_star[:, 0])
+            E_double_prime = np.real(E_star[:, 1])
         else:
             raise ValueError(
                 f"E_star must have shape (2, M), (M, 2), or be 1D concatenated [G', G\"], got {E_star.shape}"
@@ -1357,7 +1357,7 @@ class GeneralizedMaxwell(BaseModel):
         """
         return self._element_minimization_diagnostics
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference with NumPyro NUTS.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.

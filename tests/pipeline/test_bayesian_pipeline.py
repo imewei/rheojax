@@ -65,7 +65,7 @@ class MockBayesianModel(BaseModel):
         b = self.parameters.get_value("b")
         return np.array(self.model_function(X, jnp.array([a, b])))
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference: y = a * exp(-b * X)"""
         # Use JAX operations for compatibility with NLSQ and NumPyro
         a, b = params[0], params[1]

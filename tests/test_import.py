@@ -16,7 +16,7 @@ def test_rheojax_import():
 
     assert rheojax is not None
     assert hasattr(rheojax, "__version__")
-    assert rheojax.__version__ == "0.2.2"
+    assert rheojax.__version__ == "0.4.0"
 
 
 def test_submodule_imports():
@@ -51,7 +51,7 @@ def test_version_info():
     assert "minor" in version_info
     assert "patch" in version_info
     assert version_info["major"] == 0
-    assert version_info["minor"] == 2
-    assert version_info["patch"] == 2
+    assert version_info["minor"] == 4
+    assert version_info["patch"] == 0
     # Python 3.12+ is required (specified in pyproject.toml and CLAUDE.md)
     assert version_info["python_requires"] == ">=3.12"
