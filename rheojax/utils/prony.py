@@ -404,3 +404,96 @@ def softmax_penalty(E_i: ArrayLike, scale: float = 1.0):
     penalty = scale * jnp.sum(jnp.log(1.0 + jnp.exp(-E_arr / scale)))
     # Return JAX array (do not convert to Python float for gradient compatibility)
     return penalty
+
+
+def warm_start_from_n_modes(
+    params_n: ArrayLike, n_target: int, modulus_type: str = "shear"
+) -> ArrayLike:
+    """Extract warm-start parameters for reduced-mode fit from N-mode solution.
+
+    Used in element minimization to initialize N-1 mode fit from N mode solution.
+    Provides intelligent parameter extraction for faster convergence in successive
+    NLSQ fits during element search optimization.
+
+    Algorithm:
+    1. Extract E_inf, E_i, tau_i from N-mode params
+    2. If n_target < N: Truncate to first n_target modes (keep strongest modes)
+    3. If n_target > N: Pad with zeros/default values (edge case, typically not used)
+    4. If n_target == N: Return params unchanged
+
+    Parameter Layout:
+    - params_n format: [E_inf, E_1, E_2, ..., E_N, tau_1, tau_2, ..., tau_N]
+    - Total length: 2*N + 1
+
+    Args:
+        params_n: Fitted parameters from N-mode optimization
+            Shape: (2*N + 1,) where N is current number of modes
+        n_target: Target number of modes for next fit (typically N-1)
+        modulus_type: 'shear' (G) or 'tensile' (E) - currently not used,
+            but kept for API consistency
+
+    Returns:
+        Initial parameters for n_target-mode fit
+        Shape: (2*n_target + 1,)
+
+    Raises:
+        ValueError: If n_target < 1 or params_n has invalid length
+
+    Example:
+        >>> # 5-mode fit result
+        >>> params_5 = np.array([1e3, 1e6, 5e5, 2e5, 8e4, 3e4,  # E_inf, E_1..E_5
+        ...                      1e-2, 1e-1, 1.0, 1e1, 1e2])    # tau_1..tau_5
+        >>> # Warm-start for 4-mode fit (truncate weakest mode E_5)
+        >>> params_4 = warm_start_from_n_modes(params_5, n_target=4)
+        >>> print(params_4.shape)
+        (9,)  # 2*4 + 1 = 9 parameters
+        >>> # E_inf, E_1..E_4, tau_1..tau_4
+        >>> print(params_4)
+        [1.e+03 1.e+06 5.e+05 2.e+05 8.e+04 1.e-02 1.e-01 1.e+00 1.e+01]
+
+    Notes:
+        - Truncation assumes modes are ordered by importance (strongest first)
+        - For GMM fitting, this ordering is typically achieved by sorting by E_i
+        - Warm-start can provide 2-5x speedup in element minimization
+        - Compilation reuse provides additional speedup when combined with this
+    """
+    if n_target < 1:
+        raise ValueError(f"n_target must be ≥ 1, got {n_target}")
+
+    params_arr = np.asarray(params_n)
+
+    # Infer current N from params length: 2*N + 1
+    if (len(params_arr) - 1) % 2 != 0:
+        raise ValueError(
+            f"Invalid params_n length {len(params_arr)}, expected 2*N+1 format"
+        )
+
+    n_current = (len(params_arr) - 1) // 2
+
+    # Extract components
+    E_inf = params_arr[0]
+    E_i = params_arr[1 : 1 + n_current]
+    tau_i = params_arr[1 + n_current :]
+
+    # Case 1: Reduce modes (typical for element minimization)
+    if n_target < n_current:
+        # Truncate to first n_target modes
+        E_i_target = E_i[:n_target]
+        tau_i_target = tau_i[:n_target]
+
+    # Case 2: Same number of modes (no-op)
+    elif n_target == n_current:
+        E_i_target = E_i
+        tau_i_target = tau_i
+
+    # Case 3: Increase modes (edge case, pad with small values)
+    else:
+        # Pad with small positive values
+        n_pad = n_target - n_current
+        E_i_target = np.concatenate([E_i, np.full(n_pad, 1e3)])
+        tau_i_target = np.concatenate([tau_i, np.logspace(-2, 2, n_pad)])
+
+    # Reconstruct parameter array
+    params_target = np.concatenate([[E_inf], E_i_target, tau_i_target])
+
+    return params_target

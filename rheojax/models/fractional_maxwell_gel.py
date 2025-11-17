@@ -366,7 +366,7 @@ class FractionalMaxwellGel(BaseModel):
         result = self._predict_relaxation_jax(x, c_alpha, alpha, eta)
         return np.array(result)
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -384,9 +384,30 @@ class FractionalMaxwellGel(BaseModel):
         alpha = params[1]
         eta = params[2]
 
-        # Fractional models default to relaxation mode
-        # Call the _jax method directly
-        return self._predict_relaxation_jax(X, c_alpha, alpha, eta)
+        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
+        # Fall back to self._test_mode only for backward compatibility
+        if test_mode is None:
+            test_mode = getattr(self, "_test_mode", "relaxation")
+
+        # Normalize test_mode to string
+        if hasattr(test_mode, "value"):
+            test_mode = test_mode.value
+
+        # Extract parameter names from function signature
+        params_dict = {
+            name: params[i] for i, name in enumerate(self.parameters.parameter_names)
+        }
+
+        # Dispatch to appropriate prediction method
+        if test_mode == "relaxation":
+            return self._predict_relaxation_jax(X, **params_dict)
+        elif test_mode == "creep":
+            return self._predict_creep_jax(X, **params_dict)
+        elif test_mode == "oscillation":
+            return self._predict_oscillation_jax(X, **params_dict)
+        else:
+            # Default to relaxation for unknown modes
+            return self._predict_relaxation_jax(X, **params_dict)
 
     def predict_rheodata(
         self, rheo_data: RheoData, test_mode: str | None = None

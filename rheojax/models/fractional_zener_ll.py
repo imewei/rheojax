@@ -169,12 +169,11 @@ class FractionalZenerLiquidLiquid(BaseModel):
             Complex modulus array with shape (..., 2) where [:, 0] is G' and [:, 1] is G''
         """
         # Clip fractional orders BEFORE JIT to make them concrete (not traced)
-        import numpy as np
 
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
-        beta_safe = float(np.clip(beta, epsilon, 1.0 - epsilon))
-        gamma_safe = float(np.clip(gamma, epsilon, 1.0 - epsilon))
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        beta_safe = jnp.clip(beta, epsilon, 1.0 - epsilon)
+        gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
 
         # JIT-compiled inner function with concrete alpha/beta/gamma
         @jax.jit
@@ -258,11 +257,10 @@ class FractionalZenerLiquidLiquid(BaseModel):
             Relaxation modulus G(t) (Pa)
         """
         # Clip fractional orders BEFORE JIT to make them concrete (not traced)
-        import numpy as np
 
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
-        gamma_safe = float(np.clip(gamma, epsilon, 1.0 - epsilon))
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
 
         # Compute max/min orders as concrete values
         max_order = max(alpha_safe, gamma_safe)
@@ -325,11 +323,10 @@ class FractionalZenerLiquidLiquid(BaseModel):
             Creep compliance J(t) (1/Pa)
         """
         # Clip fractional orders BEFORE JIT to make them concrete (not traced)
-        import numpy as np
 
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
-        gamma_safe = float(np.clip(gamma, epsilon, 1.0 - epsilon))
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
 
         # Compute average order as concrete value
         avg_order = (alpha_safe + gamma_safe) / 2.0
@@ -488,7 +485,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         # Oscillation should typically use RheoData with domain='frequency'
         return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -512,7 +509,17 @@ class FractionalZenerLiquidLiquid(BaseModel):
         tau = params[5]
 
         # Use test_mode from last fit if available, otherwise default to OSCILLATION
-        test_mode = getattr(self, "_test_mode", TestMode.OSCILLATION)
+        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
+
+        # Fall back to self._test_mode only for backward compatibility
+
+        if test_mode is None:
+
+            test_mode = getattr(self, "_test_mode", TestMode.OSCILLATION)
+
+        # Normalize test_mode to handle both string and TestMode enum
+        if hasattr(test_mode, "value"):
+            test_mode = test_mode.value
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:

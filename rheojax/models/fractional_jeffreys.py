@@ -121,8 +121,14 @@ class FractionalJeffreysModel(BaseModel):
             description="Relaxation time",
         )
 
+    @staticmethod
+    @jax.jit
     def _predict_relaxation(
-        self, t: jnp.ndarray, eta1: float, eta2: float, alpha: float, tau1: float
+        t: jnp.ndarray,
+        eta1: float,
+        eta2: float,
+        alpha: float,
+        tau1: float,
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
@@ -146,39 +152,37 @@ class FractionalJeffreysModel(BaseModel):
         jnp.ndarray
             Relaxation modulus G(t) (Pa)
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # Compute Mittag-Leffler parameters as concrete values
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+
+        # Parameters for two-parameter Mittag-Leffler: E_{1-α,1-α}
         ml_alpha = 1.0 - alpha_safe
         ml_beta = 1.0 - alpha_safe
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_relaxation(t, eta1, eta2, tau1):
-            tau1_safe = tau1 + epsilon
-            eta1_safe = eta1 + epsilon
+        tau1_safe = tau1 + epsilon
+        eta1_safe = eta1 + epsilon
+        # Compute fractional relaxation term
+        # E_{1-α,1-α}(-(t/τ_1)^(1-α))
+        z = -jnp.power(t / tau1_safe, ml_alpha)
+        # Two-parameter Mittag-Leffler function with concrete α and β
+        ml_term = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
+        # G(t) = (η_1/τ_1) * t^(-α) * E_{1-α,1-α}(-(t/τ_1)^(1-α))
+        prefactor = eta1_safe / tau1_safe
+        G_t = prefactor * jnp.power(t, -alpha_safe) * ml_term
 
-            # Compute fractional relaxation term
-            # E_{1-α,1-α}(-(t/τ_1)^(1-α))
-            z = -jnp.power(t / tau1_safe, ml_alpha)
+        return G_t
 
-            # Two-parameter Mittag-Leffler function with concrete α and β
-            ml_term = mittag_leffler_e2(z, ml_alpha, ml_beta)
-
-            # G(t) = (η_1/τ_1) * t^(-α) * E_{1-α,1-α}(-(t/τ_1)^(1-α))
-            prefactor = eta1_safe / tau1_safe
-            G_t = prefactor * jnp.power(t, -alpha_safe) * ml_term
-
-            return G_t
-
-        return _compute_relaxation(t, eta1, eta2, tau1)
-
+    @staticmethod
+    @jax.jit
     def _predict_creep(
-        self, t: jnp.ndarray, eta1: float, eta2: float, alpha: float, tau1: float
+        t: jnp.ndarray,
+        eta1: float,
+        eta2: float,
+        alpha: float,
+        tau1: float,
     ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
@@ -202,44 +206,41 @@ class FractionalJeffreysModel(BaseModel):
         jnp.ndarray
             Creep compliance J(t) (1/Pa)
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_creep(t, eta1, eta2, tau1):
-            tau1_safe = tau1 + epsilon
-            eta1_safe = eta1 + epsilon
-            eta2_safe = eta2 + epsilon
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-            # For liquid-like behavior: J(t) ~ t/η_eff at long times
-            # Effective viscosity combines both dashpots
-            eta_eff = (eta1_safe * eta2_safe) / (eta1_safe + eta2_safe)
+        tau1_safe = tau1 + epsilon
+        eta1_safe = eta1 + epsilon
+        eta2_safe = eta2 + epsilon
+        # For liquid-like behavior: J(t) ~ t/η_eff at long times
+        # Effective viscosity combines both dashpots
+        eta_eff = (eta1_safe * eta2_safe) / (eta1_safe + eta2_safe)
+        # Short time: elastic-like response
+        # Approximate using SpringPot behavior
+        J_short = (
+            jnp.power(t, alpha_safe)
+            * jax_gamma(1.0 + alpha_safe)
+            / (eta1_safe * tau1_safe**alpha_safe)
+        )
+        # Long time: Newtonian flow
+        J_long = t / eta_eff
+        # Crossover around tau1
+        weight = 1.0 - jnp.exp(-t / tau1_safe)
+        J_t = J_short * (1.0 - weight) + J_long * weight
 
-            # Short time: elastic-like response
-            # Approximate using SpringPot behavior
-            J_short = (
-                jnp.power(t, alpha_safe)
-                * jax_gamma(1.0 + alpha_safe)
-                / (eta1_safe * tau1_safe**alpha_safe)
-            )
+        return J_t
 
-            # Long time: Newtonian flow
-            J_long = t / eta_eff
-
-            # Crossover around tau1
-            weight = 1.0 - jnp.exp(-t / tau1_safe)
-            J_t = J_short * (1.0 - weight) + J_long * weight
-
-            return J_t
-
-        return _compute_creep(t, eta1, eta2, tau1)
-
+    @staticmethod
+    @jax.jit
     def _predict_oscillation(
-        self, omega: jnp.ndarray, eta1: float, eta2: float, alpha: float, tau1: float
+        omega: jnp.ndarray,
+        eta1: float,
+        eta2: float,
+        alpha: float,
+        tau1: float,
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
@@ -265,52 +266,36 @@ class FractionalJeffreysModel(BaseModel):
         jnp.ndarray
             Complex modulus array with shape (..., 2) where [:, 0] is G' and [:, 1] is G''
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_oscillation(omega, eta1, eta2, tau1):
-            tau1_safe = tau1 + epsilon
-            eta1_safe = eta1 + epsilon
-            eta2_safe = eta2 + epsilon
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-            # Second time constant
-            tau2 = (eta2_safe / eta1_safe) * tau1_safe
+        tau1_safe = tau1 + epsilon
+        eta1_safe = eta1 + epsilon
+        eta2_safe = eta2 + epsilon
+        # Second time constant
+        tau2 = (eta2_safe / eta1_safe) * tau1_safe
+        # Compute (iω)
+        i_omega = 1j * omega
+        # Compute (iωτ_1)^α
+        omega_tau1_alpha = jnp.power(omega * tau1_safe, alpha_safe)
+        phase1 = jnp.pi * alpha_safe / 2.0
+        i_omega_tau1_alpha = omega_tau1_alpha * (jnp.cos(phase1) + 1j * jnp.sin(phase1))
+        # Compute (iωτ_2)^α
+        omega_tau2_alpha = jnp.power(omega * tau2, alpha_safe)
+        phase2 = jnp.pi * alpha_safe / 2.0
+        i_omega_tau2_alpha = omega_tau2_alpha * (jnp.cos(phase2) + 1j * jnp.sin(phase2))
+        # Complex modulus: G*(ω) = η_1(iω) * [1 + (iωτ_2)^α] / [1 + (iωτ_1)^α]
+        numerator = 1.0 + i_omega_tau2_alpha
+        denominator = 1.0 + i_omega_tau1_alpha
+        G_star = eta1_safe * i_omega * (numerator / denominator)
+        # Extract storage and loss moduli
+        G_prime = jnp.real(G_star)
+        G_double_prime = jnp.imag(G_star)
 
-            # Compute (iω)
-            i_omega = 1j * omega
-
-            # Compute (iωτ_1)^α
-            omega_tau1_alpha = jnp.power(omega * tau1_safe, alpha_safe)
-            phase1 = jnp.pi * alpha_safe / 2.0
-            i_omega_tau1_alpha = omega_tau1_alpha * (
-                jnp.cos(phase1) + 1j * jnp.sin(phase1)
-            )
-
-            # Compute (iωτ_2)^α
-            omega_tau2_alpha = jnp.power(omega * tau2, alpha_safe)
-            phase2 = jnp.pi * alpha_safe / 2.0
-            i_omega_tau2_alpha = omega_tau2_alpha * (
-                jnp.cos(phase2) + 1j * jnp.sin(phase2)
-            )
-
-            # Complex modulus: G*(ω) = η_1(iω) * [1 + (iωτ_2)^α] / [1 + (iωτ_1)^α]
-            numerator = 1.0 + i_omega_tau2_alpha
-            denominator = 1.0 + i_omega_tau1_alpha
-
-            G_star = eta1_safe * i_omega * (numerator / denominator)
-
-            # Extract storage and loss moduli
-            G_prime = jnp.real(G_star)
-            G_double_prime = jnp.imag(G_star)
-
-            return jnp.stack([G_prime, G_double_prime], axis=-1)
-
-        return _compute_oscillation(omega, eta1, eta2, tau1)
+        return jnp.stack([G_prime, G_double_prime], axis=-1)
 
     def _predict_rotation(
         self,
@@ -487,7 +472,7 @@ class FractionalJeffreysModel(BaseModel):
         # Default to relaxation
         return self._predict_relaxation(X, eta1, eta2, alpha, tau1)
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -509,7 +494,17 @@ class FractionalJeffreysModel(BaseModel):
         tau1 = params[3]
 
         # Use test_mode from last fit if available, otherwise default to RELAXATION
-        test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
+
+        # Fall back to self._test_mode only for backward compatibility
+
+        if test_mode is None:
+
+            test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+
+        # Normalize test_mode to handle both string and TestMode enum
+        if hasattr(test_mode, "value"):
+            test_mode = test_mode.value
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:

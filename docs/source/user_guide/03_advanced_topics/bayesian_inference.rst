@@ -21,9 +21,13 @@ RheoJAX implements a state-of-the-art Bayesian workflow that combines:
 This workflow provides 2-5x faster convergence compared to cold-start MCMC while maintaining
 full Bayesian uncertainty quantification.
 
-**Implementation Status**: [done] **FULLY IMPLEMENTED** (v0.2.0)
+**Implementation Status**: [done] **FULLY IMPLEMENTED** (v0.2.0, enhanced v0.4.0)
 
-All 20 rheological models support the complete Bayesian workflow through ``BayesianMixin`` inheritance.
+All 21 rheological models support the complete Bayesian workflow through ``BayesianMixin`` inheritance.
+
+**v0.4.0 Enhancement**: Mode-aware Bayesian inference ensures correct posteriors for all test modes (relaxation, creep, oscillation).
+Previously, test_mode was captured as class state, causing all Bayesian fits to use the last-fitted mode.
+Now, test_mode is captured as a closure parameter, guaranteeing physically correct posteriors regardless of prior `.fit()` calls.
 
 When to Use Bayesian Inference
 ==============================

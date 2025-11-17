@@ -28,7 +28,9 @@ import numpyro
 import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS, init_to_uniform, init_to_value
 
+from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.test_modes import TestMode, detect_test_mode
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
@@ -294,12 +296,13 @@ class BayesianMixin:
 
     def fit_bayesian(
         self,
-        X: np.ndarray,
-        y: np.ndarray,
+        X: np.ndarray | RheoData,
+        y: np.ndarray | None = None,
         num_warmup: int = 1000,
         num_samples: int = 2000,
         num_chains: int = 1,
         initial_values: dict[str, float] | None = None,
+        test_mode: str | TestMode | None = None,
         **nuts_kwargs,
     ) -> BayesianResult:
         """Perform Bayesian inference using NumPyro NUTS sampler.
@@ -311,14 +314,22 @@ class BayesianMixin:
         The method constructs a NumPyro probabilistic model, runs NUTS sampling,
         and returns posterior samples with convergence diagnostics.
 
+        CRITICAL: test_mode is captured in model_function closure to ensure
+        correct posteriors for all test modes (relaxation, creep, oscillation).
+        This fixes the v0.3.1 bug where model_function read global state.
+
         Args:
-            X: Independent variable data (input features)
-            y: Dependent variable data (observations to fit)
+            X: Independent variable data (input features) or RheoData object
+            y: Dependent variable data (observations to fit). If X is RheoData,
+                y is ignored and extracted from X.
             num_warmup: Number of warmup/burn-in iterations (default: 1000)
             num_samples: Number of posterior samples to collect (default: 2000)
             num_chains: Number of MCMC chains (default: 1, multi-chain deferred)
             initial_values: Optional dict of initial parameter values for
                 warm-start (e.g., from NLSQ). Keys are parameter names.
+            test_mode: Explicit test mode (e.g., 'relaxation', 'creep', 'oscillation').
+                If None, inferred from RheoData.metadata['test_mode'] or defaults
+                to 'relaxation'. Overrides RheoData metadata if provided.
             **nuts_kwargs: Additional arguments passed to NUTS sampler
 
         Returns:
@@ -333,13 +344,17 @@ class BayesianMixin:
             RuntimeError: If NUTS sampling fails
 
         Example:
-            >>> # Basic usage
-            >>> result = model.fit_bayesian(X, y)
+            >>> # Basic usage with explicit mode
+            >>> result = model.fit_bayesian(X, y, test_mode='oscillation')
+            >>>
+            >>> # RheoData with embedded mode (recommended)
+            >>> rheo_data = RheoData(x=omega, y=G_star, metadata={'test_mode': 'oscillation'})
+            >>> result = model.fit_bayesian(rheo_data)
             >>>
             >>> # With warm-start from NLSQ
             >>> nlsq_result = model.fit(X, y)
             >>> initial = {name: p.value for name, p in model.parameters._parameters.items()}
-            >>> result = model.fit_bayesian(X, y, initial_values=initial)
+            >>> result = model.fit_bayesian(rheo_data, initial_values=initial)
             >>>
             >>> # Check convergence
             >>> print(result.diagnostics["r_hat"])  # Should be < 1.01
@@ -352,17 +367,49 @@ class BayesianMixin:
             )
 
         if not hasattr(self, "model_function"):
-            raise AttributeError("Class must define 'model_function(X, params)' method")
+            raise AttributeError(
+                "Class must define 'model_function(X, params, test_mode)' method"
+            )
+
+        # Handle RheoData input and infer test_mode
+        if isinstance(X, RheoData):
+            rheo_data = X
+            X_array = rheo_data.x
+            y_array = rheo_data.y
+
+            # Infer test_mode from RheoData if not explicitly provided
+            if test_mode is None:
+                inferred_mode = detect_test_mode(rheo_data)
+                test_mode = inferred_mode
+        else:
+            # Plain array input
+            X_array = X
+            y_array = y
+
+            # If test_mode not provided, default to relaxation (backward compatible)
+            if test_mode is None:
+                test_mode = TestMode.RELAXATION
+                warnings.warn(
+                    "test_mode not specified. Defaulting to 'relaxation'. "
+                    "For correct posteriors, pass RheoData with metadata['test_mode'] "
+                    "or specify test_mode explicitly.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
+        # Normalize test_mode to TestMode enum
+        if isinstance(test_mode, str):
+            test_mode = TestMode(test_mode.lower())
 
         # Convert data to JAX arrays with float64 precision
-        X_jax = jnp.asarray(X, dtype=jnp.float64)
+        X_jax = jnp.asarray(X_array, dtype=jnp.float64)
 
         # Handle complex data (e.g., G* = G' + iG" for oscillatory shear)
         # JAX's grad requires real-valued outputs, so we decompose complex data
-        is_complex_data = jnp.iscomplexobj(y)
+        is_complex_data = jnp.iscomplexobj(y_array)
         if is_complex_data:
             # Store original complex data for scale computation
-            y_complex = jnp.asarray(y, dtype=jnp.complex128)
+            y_complex = jnp.asarray(y_array, dtype=jnp.complex128)
             y_real = jnp.real(y_complex)
             y_imag = jnp.imag(y_complex)
             # Stack real and imaginary parts as [real_part, imag_part]
@@ -371,7 +418,7 @@ class BayesianMixin:
             y_real_scale = jnp.std(y_real)
             y_imag_scale = jnp.std(y_imag)
         else:
-            y_jax = jnp.asarray(y, dtype=jnp.float64)
+            y_jax = jnp.asarray(y_array, dtype=jnp.float64)
             y_real_scale = None
             y_imag_scale = None
 
@@ -386,9 +433,15 @@ class BayesianMixin:
                 )
             param_bounds[name] = param.bounds
 
-        # Define NumPyro probabilistic model
+        # Define NumPyro probabilistic model with test_mode captured in closure
+        # CRITICAL: test_mode is captured here, not read from self._test_mode
+        # This ensures correct posteriors for all test modes (fixes v0.3.1 bug)
         def numpyro_model(X, y=None):
-            """NumPyro model with uniform priors over parameter bounds."""
+            """NumPyro model with uniform priors over parameter bounds.
+
+            test_mode is captured in closure from fit_bayesian() scope, ensuring
+            model_function uses the correct mode throughout MCMC sampling.
+            """
             # Sample parameters from priors
             params_dict = {}
             for name in param_names:
@@ -403,8 +456,9 @@ class BayesianMixin:
             # Convert to array for model_function
             params_array = jnp.array([params_dict[name] for name in param_names])
 
-            # Compute predictions
-            predictions_raw = self.model_function(X, params_array)
+            # Compute predictions with test_mode from closure (NOT self._test_mode)
+            # Pass test_mode explicitly to ensure correct mode-aware predictions
+            predictions_raw = self.model_function(X, params_array, test_mode)
 
             # Handle complex predictions (convert to stacked real for JAX grad compatibility)
             if is_complex_data:

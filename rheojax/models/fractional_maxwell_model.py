@@ -355,15 +355,20 @@ class FractionalMaxwellModel(BaseModel):
         result = self._predict_relaxation_jax(x, c1, alpha, beta, tau)
         return np.array(result)
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
         It computes predictions given input X and a parameter array.
 
+        CRITICAL: test_mode is now passed as parameter (NOT read from self._test_mode)
+        to ensure correct posteriors in Bayesian inference (v0.4.0 fix).
+
         Args:
             X: Independent variable (time or frequency)
             params: Array of parameter values [c1, alpha, beta, tau]
+            test_mode: Explicit test mode for predictions. If None, defaults
+                to 'relaxation' for backward compatibility.
 
         Returns:
             Model predictions as JAX array
@@ -374,9 +379,25 @@ class FractionalMaxwellModel(BaseModel):
         beta = params[2]
         tau = params[3]
 
-        # Fractional models default to relaxation mode
-        # Call the _jax method directly
-        return self._predict_relaxation_jax(X, c1, alpha, beta, tau)
+        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
+        # Fall back to self._test_mode only for backward compatibility
+        if test_mode is None:
+            test_mode = getattr(self, "_test_mode", "relaxation")
+
+        # Normalize test_mode to string
+        if hasattr(test_mode, "value"):
+            test_mode = test_mode.value
+
+        # Dispatch to appropriate prediction method
+        if test_mode == "relaxation":
+            return self._predict_relaxation_jax(X, c1, alpha, beta, tau)
+        elif test_mode == "creep":
+            return self._predict_creep_jax(X, c1, alpha, beta, tau)
+        elif test_mode == "oscillation":
+            return self._predict_oscillation_jax(X, c1, alpha, beta, tau)
+        else:
+            # Default to relaxation for unknown modes
+            return self._predict_relaxation_jax(X, c1, alpha, beta, tau)
 
     def predict_rheodata(
         self, rheo_data: RheoData, test_mode: str | None = None

@@ -130,8 +130,9 @@ class FractionalBurgersModel(BaseModel):
             description="Retardation time",
         )
 
+    @staticmethod
+    @jax.jit
     def _predict_creep(
-        self,
         t: jnp.ndarray,
         Jg: float,
         eta1: float,
@@ -163,39 +164,31 @@ class FractionalBurgersModel(BaseModel):
         jnp.ndarray
             Creep compliance J(t) (1/Pa)
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_creep(t, Jg, eta1, Jk, tau_k):
-            tau_k_safe = tau_k + epsilon
-            eta1_safe = eta1 + epsilon
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-            # Instantaneous compliance (elastic response)
-            J_instant = Jg
+        tau_k_safe = tau_k + epsilon
+        eta1_safe = eta1 + epsilon
+        # Instantaneous compliance (elastic response)
+        J_instant = Jg
+        # Fractional viscous flow term: t^α / (η_1 * Γ(1+α))
+        gamma_term = jax_gamma(1.0 + alpha_safe)
+        J_flow = jnp.power(t, alpha_safe) / (eta1_safe * gamma_term)
+        # Retardation term: J_k * (1 - E_α(-(t/τ_k)^α))
+        z = -jnp.power(t / tau_k_safe, alpha_safe)
+        ml_term = mittag_leffler_e(z, alpha=alpha_safe)
+        J_retard = Jk * (1.0 - ml_term)
+        # Total creep compliance
+        J_t = J_instant + J_flow + J_retard
 
-            # Fractional viscous flow term: t^α / (η_1 * Γ(1+α))
-            gamma_term = jax_gamma(1.0 + alpha_safe)
-            J_flow = jnp.power(t, alpha_safe) / (eta1_safe * gamma_term)
+        return J_t
 
-            # Retardation term: J_k * (1 - E_α(-(t/τ_k)^α))
-            z = -jnp.power(t / tau_k_safe, alpha_safe)
-            ml_term = mittag_leffler_e(z, alpha_safe)
-            J_retard = Jk * (1.0 - ml_term)
-
-            # Total creep compliance
-            J_t = J_instant + J_flow + J_retard
-
-            return J_t
-
-        return _compute_creep(t, Jg, eta1, Jk, tau_k)
-
+    @staticmethod
+    @jax.jit
     def _predict_relaxation(
-        self,
         t: jnp.ndarray,
         Jg: float,
         eta1: float,
@@ -228,38 +221,30 @@ class FractionalBurgersModel(BaseModel):
         jnp.ndarray
             Relaxation modulus G(t) (Pa)
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_relaxation(t, Jg, eta1, Jk, tau_k):
-            tau_k_safe = tau_k + epsilon
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-            # Approximate using inverse relationship
-            # G(0) ≈ 1/J_g (instantaneous modulus)
-            G_inst = 1.0 / (Jg + epsilon)
+        tau_k_safe = tau_k + epsilon
+        # Approximate using inverse relationship
+        # G(0) ≈ 1/J_g (instantaneous modulus)
+        G_inst = 1.0 / (Jg + epsilon)
+        # Long-time decay (fractional Maxwell-like)
+        # G(t) ~ t^(-α) at intermediate times
+        G_decay = G_inst * jnp.power(t / tau_k_safe, -alpha_safe)
+        # Smooth transition
+        z = -jnp.power(t / tau_k_safe, alpha_safe)
+        ml_term = mittag_leffler_e(z, alpha=alpha_safe)
+        # Combine terms
+        G_t = G_inst * ml_term + G_decay * (1.0 - ml_term)
 
-            # Long-time decay (fractional Maxwell-like)
-            # G(t) ~ t^(-α) at intermediate times
-            G_decay = G_inst * jnp.power(t / tau_k_safe, -alpha_safe)
+        return G_t
 
-            # Smooth transition
-            z = -jnp.power(t / tau_k_safe, alpha_safe)
-            ml_term = mittag_leffler_e(z, alpha_safe)
-
-            # Combine terms
-            G_t = G_inst * ml_term + G_decay * (1.0 - ml_term)
-
-            return G_t
-
-        return _compute_relaxation(t, Jg, eta1, Jk, tau_k)
-
+    @staticmethod
+    @jax.jit
     def _predict_oscillation(
-        self,
         omega: jnp.ndarray,
         Jg: float,
         eta1: float,
@@ -293,51 +278,38 @@ class FractionalBurgersModel(BaseModel):
         jnp.ndarray
             Complex modulus array with shape (..., 2) where [:, 0] is G' and [:, 1] is G''
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_oscillation(omega, Jg, eta1, Jk, tau_k):
-            tau_k_safe = tau_k + epsilon
-            eta1_safe = eta1 + epsilon
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-            # Instantaneous compliance
-            J_inst = Jg
+        tau_k_safe = tau_k + epsilon
+        eta1_safe = eta1 + epsilon
+        # Instantaneous compliance
+        J_inst = Jg
+        # Fractional viscous term: (iω)^(-α) / (η_1 * Γ(1-α))
+        omega_neg_alpha = jnp.power(omega, -alpha_safe)
+        phase = -jnp.pi * alpha_safe / 2.0
+        i_omega_neg_alpha = omega_neg_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
+        gamma_term = jax_gamma(1.0 - alpha_safe)
+        J_flow = i_omega_neg_alpha / (eta1_safe * gamma_term)
+        # Retardation term: J_k / (1 + (iωτ_k)^α)
+        omega_tau_alpha = jnp.power(omega * tau_k_safe, alpha_safe)
+        phase_alpha = jnp.pi * alpha_safe / 2.0
+        i_omega_tau_alpha = omega_tau_alpha * (
+            jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
+        )
+        J_retard = Jk / (1.0 + i_omega_tau_alpha)
+        # Total complex compliance
+        J_star = J_inst + J_flow + J_retard
+        # Complex modulus (inverse)
+        G_star = 1.0 / (J_star + epsilon)
+        # Extract storage and loss moduli
+        G_prime = jnp.real(G_star)
+        G_double_prime = jnp.imag(G_star)
 
-            # Fractional viscous term: (iω)^(-α) / (η_1 * Γ(1-α))
-            omega_neg_alpha = jnp.power(omega, -alpha_safe)
-            phase = -jnp.pi * alpha_safe / 2.0
-            i_omega_neg_alpha = omega_neg_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
-
-            gamma_term = jax_gamma(1.0 - alpha_safe)
-            J_flow = i_omega_neg_alpha / (eta1_safe * gamma_term)
-
-            # Retardation term: J_k / (1 + (iωτ_k)^α)
-            omega_tau_alpha = jnp.power(omega * tau_k_safe, alpha_safe)
-            phase_alpha = jnp.pi * alpha_safe / 2.0
-            i_omega_tau_alpha = omega_tau_alpha * (
-                jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
-            )
-
-            J_retard = Jk / (1.0 + i_omega_tau_alpha)
-
-            # Total complex compliance
-            J_star = J_inst + J_flow + J_retard
-
-            # Complex modulus (inverse)
-            G_star = 1.0 / (J_star + epsilon)
-
-            # Extract storage and loss moduli
-            G_prime = jnp.real(G_star)
-            G_double_prime = jnp.imag(G_star)
-
-            return jnp.stack([G_prime, G_double_prime], axis=-1)
-
-        return _compute_oscillation(omega, Jg, eta1, Jk, tau_k)
+        return jnp.stack([G_prime, G_double_prime], axis=-1)
 
     def _fit(self, X: jnp.ndarray, y: jnp.ndarray, **kwargs) -> FractionalBurgersModel:
         """Fit model to data using NLSQ TRF optimization.
@@ -476,7 +448,7 @@ class FractionalBurgersModel(BaseModel):
         # Default to creep (primary mode for Burgers)
         return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -499,7 +471,17 @@ class FractionalBurgersModel(BaseModel):
         tau_k = params[4]
 
         # Use test_mode from last fit if available, otherwise default to CREEP
-        test_mode = getattr(self, "_test_mode", TestMode.CREEP)
+        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
+
+        # Fall back to self._test_mode only for backward compatibility
+
+        if test_mode is None:
+
+            test_mode = getattr(self, "_test_mode", TestMode.CREEP)
+
+        # Normalize test_mode to handle both string and TestMode enum
+        if hasattr(test_mode, "value"):
+            test_mode = test_mode.value
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:

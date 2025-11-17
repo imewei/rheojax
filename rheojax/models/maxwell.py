@@ -190,15 +190,20 @@ class Maxwell(BaseModel):
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
         It computes predictions given input X and a parameter array.
 
+        CRITICAL: test_mode is now passed as parameter (NOT read from self._test_mode)
+        to ensure correct posteriors in Bayesian inference (v0.4.0 fix).
+
         Args:
             X: Independent variable (time, frequency, or shear rate)
             params: Array of parameter values [G0, eta]
+            test_mode: Explicit test mode for predictions. If None, falls back
+                to self._test_mode for backward compatibility.
 
         Returns:
             Model predictions as JAX array
@@ -207,8 +212,10 @@ class Maxwell(BaseModel):
         G0 = params[0]
         eta = params[1]
 
-        # Use stored test mode from last fit, or default to RELAXATION
-        test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
+        # Fall back to self._test_mode only for backward compatibility
+        if test_mode is None:
+            test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
 
         # Dispatch to appropriate prediction method
         if test_mode == TestMode.RELAXATION:

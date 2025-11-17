@@ -463,11 +463,11 @@ If you use rheo in your research, please cite:
 
 ```bibtex
 @software{rheo2024,
-  title = {Rheo: JAX-Powered Unified Rheology Package with Bayesian Inference},
-  year = {2024},
+  title = {RheoJAX: JAX-Powered Rheological Analysis with Bayesian Inference},
+  year = {2024-2025},
   author = {Wei Chen},
   url = {https://github.com/imewei/rheojax},
-  version = {0.2.2}
+  version = {0.4.0}
 }
 ```
 

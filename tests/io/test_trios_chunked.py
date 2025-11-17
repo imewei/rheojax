@@ -511,16 +511,14 @@ Variables	Time	Stress
         test_file = tmp_path / "test_compat.txt"
         test_file.write_text(trios_content)
 
-        # Using load_trios with chunk_size should work
+        # Using load_trios with chunk_size should work (v0.4.0+: returns aggregated RheoData)
         result = load_trios(str(test_file), chunk_size=10)
 
-        # For single segment, should return list of chunks
-        assert isinstance(result, list)
-        assert len(result) == 2
-
-        # Each chunk should be RheoData
-        for chunk in result:
-            assert isinstance(chunk, RheoData)
+        # v0.4.0+: Returns single aggregated RheoData (not list of chunks)
+        # This is more user-friendly and consistent with standard load_trios() behavior
+        assert isinstance(result, RheoData)
+        assert len(result.x) == 20  # All data points aggregated
+        assert len(result.y) == 20
 
     def test_chunked_generator_cleanup(self, tmp_path):
         """Test that generator properly cleans up file handles."""

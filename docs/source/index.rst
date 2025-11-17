@@ -149,19 +149,29 @@ Development Status
    - [done] Visualization with matplotlib
 
 **Phase 2 (Complete)**: Models and Transforms [done]
-   - [done] 20 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models)
-   - [done] 5 data transforms (FFT, Mastercurve/TTS, Mutation Number, OWChirp/LAOS, Smooth Derivative)
+   - [done] 21 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models, Generalized Maxwell)
+   - [done] 5 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative)
    - [done] Pipeline API for fluent workflows
-   - [done] 20 tutorial notebooks (basic, transforms, bayesian, advanced)
+   - [done] 27 tutorial notebooks (basic, transforms, bayesian, advanced, GMM)
 
 **Phase 3 (Complete)**: Bayesian Inference [done]
    - [done] NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
    - [done] Uncertainty quantification via credible intervals and posterior distributions
    - [done] ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
    - [done] Model comparison (WAIC/LOO)
-   - [done] BayesianMixin: All 20 models support Bayesian inference
+   - [done] BayesianMixin: All 21 models support Bayesian inference
    - [done] BayesianPipeline with fluent API for NLSQ -> NUTS workflows
    - [done] 5 comprehensive Bayesian inference tutorial notebooks
+
+**Phase 4 (Complete)**: Performance & Correctness [done - v0.3.0-v0.4.0]
+   - [done] **v0.3.0**: Generalized Maxwell Model with transparent element minimization (R²-based)
+   - [done] **v0.3.0**: Automatic shift factors for time-temperature superposition (TTS)
+   - [done] **v0.3.0**: Bayesian prior safety mechanism (tiered hard_failure/suspicious/good)
+   - [done] **v0.3.1**: JAX-native foundation (30-45% improvement) - 5 foundational optimizations
+   - [done] **v0.3.2**: Vectorization optimizations (50-75% cumulative) - intelligent convergence & batching
+   - [done] **v0.4.0**: Mode-aware Bayesian inference (CRITICAL correctness fix for creep/oscillation)
+   - [done] **v0.4.0**: GMM element search optimization (2-5x speedup with warm-start)
+   - [done] **v0.4.0**: TRIOS auto-chunking for large files (50-70% memory reduction)
 
 Technology Stack
 ----------------
@@ -183,28 +193,38 @@ Technology Stack
 Performance
 -----------
 
-JAX provides significant performance improvements:
+RheoJAX delivers exceptional performance through JAX acceleration and systematic optimizations (v0.3.1-v0.3.2):
 
-.. list-table:: Performance Benchmarks
+.. list-table:: Performance Benchmarks (v0.4.0)
    :header-rows: 1
    :widths: 40 20 20 20
 
    * - Operation
-     - NumPy Time
-     - JAX Time
+     - Baseline (NumPy/SciPy)
+     - v0.4.0 (JAX + Optimizations)
      - Speedup
    * - Mittag-Leffler (1000 points)
      - 45 ms
      - 0.8 ms
      - 56x
-   * - Parameter optimization
-     - 2.5 s
-     - 0.15 s
-     - 17x
-   * - Data resampling (10k points)
-     - 120 ms
-     - 3 ms
-     - 40x
+   * - NLSQ Parameter Optimization
+     - 2.5 s (scipy)
+     - 0.08 s (NLSQ)
+     - 30x
+   * - Mastercurve Transform (10 datasets)
+     - 8.5 s
+     - 1.7 s (v0.3.2 vectorization)
+     - 5x
+   * - GMM Element Minimization (N=10)
+     - 50 s (cold-start)
+     - 10 s (v0.4.0 warm-start)
+     - 5x
+   * - TRIOS Large File Load (50k points)
+     - 35 MB peak memory
+     - 11 MB (v0.4.0 auto-chunk)
+     - 68% reduction
+
+**Cumulative Improvements v0.3.1-v0.3.2**: 50-75% end-to-end latency reduction through JAX-native foundation, JIT compilation, vectorization, and intelligent convergence.
 
 Community and Support
 ---------------------
@@ -225,11 +245,11 @@ Community and Support
    .. code-block:: bibtex
 
       @software{rheojax2024,
-        title = {RheoJAX: JAX-Accelerated Rheological Analysis},
-        year = {2024},
+        title = {RheoJAX: JAX-Powered Rheological Analysis with Bayesian Inference},
+        year = {2024-2025},
         author = {Wei Chen},
         url = {https://github.com/imewei/rheojax},
-        version = {0.2.2}
+        version = {0.4.0}
       }
 
 Indices and Tables

@@ -402,7 +402,7 @@ class FractionalZenerSolidSolid(BaseModel):
         # Oscillation should typically use RheoData with domain='frequency'
         return self._predict_relaxation(X, Ge, Gm, alpha, tau_alpha)
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -424,7 +424,17 @@ class FractionalZenerSolidSolid(BaseModel):
         tau_alpha = params[3]
 
         # Use test_mode from last fit if available, otherwise default to RELAXATION
-        test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
+
+        # Fall back to self._test_mode only for backward compatibility
+
+        if test_mode is None:
+
+            test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+
+        # Normalize test_mode to handle both string and TestMode enum
+        if hasattr(test_mode, "value"):
+            test_mode = test_mode.value
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:

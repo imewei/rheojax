@@ -262,11 +262,12 @@ class BaseModel(BayesianMixin, ABC):
     def fit_bayesian(
         self,
         X: ArrayLike,
-        y: ArrayLike,
+        y: ArrayLike | None = None,
         num_warmup: int = 1000,
         num_samples: int = 2000,
         num_chains: int = 1,
         initial_values: dict[str, float] | None = None,
+        test_mode: str | None = None,
         **nuts_kwargs,
     ) -> BayesianResult:
         """Perform Bayesian inference using NumPyro NUTS sampler.
@@ -277,13 +278,17 @@ class BaseModel(BayesianMixin, ABC):
         are automatically used for warm-starting.
 
         Args:
-            X: Independent variable data (input features)
-            y: Dependent variable data (observations to fit)
+            X: Independent variable data (input features) or RheoData object
+            y: Dependent variable data (observations to fit). If X is RheoData,
+                y is ignored and extracted from X.
             num_warmup: Number of warmup/burn-in iterations (default: 1000)
             num_samples: Number of posterior samples to collect (default: 2000)
             num_chains: Number of MCMC chains (default: 1)
             initial_values: Optional dict of initial parameter values for
                 warm-start. If None and model is fitted, uses NLSQ estimates.
+            test_mode: Explicit test mode (e.g., 'relaxation', 'creep', 'oscillation').
+                If None, inferred from RheoData.metadata['test_mode'] or defaults
+                to 'relaxation'. Overrides RheoData metadata if provided.
             **nuts_kwargs: Additional arguments passed to NUTS sampler
 
         Returns:
@@ -292,14 +297,19 @@ class BaseModel(BayesianMixin, ABC):
 
         Example:
             >>> model = Maxwell()
-            >>> # Warm-start from NLSQ
-            >>> model.fit(t, G_data)  # NLSQ optimization
-            >>> result = model.fit_bayesian(t, G_data)  # NUTS with warm-start
+            >>> # Warm-start from NLSQ with explicit mode
+            >>> model.fit(t, G_data, test_mode='relaxation')  # NLSQ optimization
+            >>> result = model.fit_bayesian(t, G_data, test_mode='relaxation')
+            >>>
+            >>> # RheoData with embedded mode (recommended)
+            >>> rheo_data = RheoData(x=omega, y=G_star, metadata={'test_mode': 'oscillation'})
+            >>> result = model.fit_bayesian(rheo_data)
             >>>
             >>> # Or provide explicit initial values
             >>> result = model.fit_bayesian(
             ...     t, G_data,
-            ...     initial_values={'G0': 1e5, 'eta': 1e3}
+            ...     initial_values={'G0': 1e5, 'eta': 1e3},
+            ...     test_mode='creep'
             ... )
         """
         # Store data for model_function access
@@ -313,7 +323,7 @@ class BaseModel(BayesianMixin, ABC):
                 name: self.parameters.get_value(name) for name in self.parameters
             }
 
-        # Call BayesianMixin implementation
+        # Call BayesianMixin implementation with test_mode parameter
         result = super().fit_bayesian(
             X,
             y,
@@ -321,6 +331,7 @@ class BaseModel(BayesianMixin, ABC):
             num_samples=num_samples,
             num_chains=num_chains,
             initial_values=initial_values,
+            test_mode=test_mode,
             **nuts_kwargs,
         )
 

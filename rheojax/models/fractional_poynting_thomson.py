@@ -124,8 +124,14 @@ class FractionalPoyntingThomson(BaseModel):
             description="Retardation time",
         )
 
+    @staticmethod
+    @jax.jit
     def _predict_creep(
-        self, t: jnp.ndarray, Ge: float, Gk: float, alpha: float, tau: float
+        t: jnp.ndarray,
+        Ge: float,
+        Gk: float,
+        alpha: float,
+        tau: float,
     ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
@@ -149,38 +155,34 @@ class FractionalPoyntingThomson(BaseModel):
         jnp.ndarray
             Creep compliance J(t) (1/Pa)
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_creep(t, Ge, Gk, tau):
-            tau_safe = tau + epsilon
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-            # Instantaneous compliance (elastic response)
-            J_inst = 1.0 / (Ge + epsilon)
+        tau_safe = tau + epsilon
+        # Instantaneous compliance (elastic response)
+        J_inst = 1.0 / (Ge + epsilon)
+        # Retarded compliance amplitude
+        J_retard_amp = 1.0 / (Gk + epsilon)
+        # Compute argument: z = -(t/τ)^α
+        z = -jnp.power(t / tau_safe, alpha_safe)
+        # Mittag-Leffler function E_α(z) with concrete alpha
+        ml_term = mittag_leffler_e(z, alpha=alpha_safe)
+        # J(t) = 1/G_e + (1/G_k) * (1 - E_α(-(t/τ)^α))
+        J_t = J_inst + J_retard_amp * (1.0 - ml_term)
 
-            # Retarded compliance amplitude
-            J_retard_amp = 1.0 / (Gk + epsilon)
+        return J_t
 
-            # Compute argument: z = -(t/τ)^α
-            z = -jnp.power(t / tau_safe, alpha_safe)
-
-            # Mittag-Leffler function E_α(z) with concrete alpha
-            ml_term = mittag_leffler_e(z, alpha_safe)
-
-            # J(t) = 1/G_e + (1/G_k) * (1 - E_α(-(t/τ)^α))
-            J_t = J_inst + J_retard_amp * (1.0 - ml_term)
-
-            return J_t
-
-        return _compute_creep(t, Ge, Gk, tau)
-
+    @staticmethod
+    @jax.jit
     def _predict_relaxation(
-        self, t: jnp.ndarray, Ge: float, Gk: float, alpha: float, tau: float
+        t: jnp.ndarray,
+        Ge: float,
+        Gk: float,
+        alpha: float,
+        tau: float,
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
@@ -205,37 +207,34 @@ class FractionalPoyntingThomson(BaseModel):
         jnp.ndarray
             Relaxation modulus G(t) (Pa)
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_relaxation(t, Ge, Gk, tau):
-            tau_safe = tau + epsilon
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-            # Compute transition function
-            z = -jnp.power(t / tau_safe, alpha_safe)
-            ml_term = mittag_leffler_e(z, alpha_safe)
+        tau_safe = tau + epsilon
+        # Compute transition function
+        z = -jnp.power(t / tau_safe, alpha_safe)
+        ml_term = mittag_leffler_e(z, alpha=alpha_safe)
+        # Instantaneous modulus
+        G_inst = Ge
+        # Equilibrium modulus (series combination)
+        G_eq = (Ge * Gk) / (Ge + Gk + epsilon)
+        # Interpolate using Mittag-Leffler decay
+        # G(t) = G_eq + (G_inst - G_eq) * E_α(-(t/τ)^α)
+        G_t = G_eq + (G_inst - G_eq) * ml_term
 
-            # Instantaneous modulus
-            G_inst = Ge
+        return G_t
 
-            # Equilibrium modulus (series combination)
-            G_eq = (Ge * Gk) / (Ge + Gk + epsilon)
-
-            # Interpolate using Mittag-Leffler decay
-            # G(t) = G_eq + (G_inst - G_eq) * E_α(-(t/τ)^α)
-            G_t = G_eq + (G_inst - G_eq) * ml_term
-
-            return G_t
-
-        return _compute_relaxation(t, Ge, Gk, tau)
-
+    @staticmethod
+    @jax.jit
     def _predict_oscillation(
-        self, omega: jnp.ndarray, Ge: float, Gk: float, alpha: float, tau: float
+        omega: jnp.ndarray,
+        Ge: float,
+        Gk: float,
+        alpha: float,
+        tau: float,
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
@@ -261,38 +260,28 @@ class FractionalPoyntingThomson(BaseModel):
         jnp.ndarray
             Complex modulus array with shape (..., 2) where [:, 0] is G' and [:, 1] is G''
         """
-        # Clip alpha BEFORE JIT to make it concrete (not traced)
-        import numpy as np
-
+        # Add small epsilon to prevent issues
         epsilon = 1e-12
-        alpha_safe = float(np.clip(alpha, epsilon, 1.0 - epsilon))
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_oscillation(omega, Ge, Gk, tau):
-            tau_safe = tau + epsilon
+        # Clip alpha to safe range (works with JAX tracers)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-            # Compute (iωτ)^α
-            omega_tau_alpha = jnp.power(omega * tau_safe, alpha_safe)
-            phase = jnp.pi * alpha_safe / 2.0
-            i_omega_tau_alpha = omega_tau_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
+        tau_safe = tau + epsilon
+        # Compute (iωτ)^α
+        omega_tau_alpha = jnp.power(omega * tau_safe, alpha_safe)
+        phase = jnp.pi * alpha_safe / 2.0
+        i_omega_tau_alpha = omega_tau_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
+        # Complex compliance
+        J_inst = 1.0 / (Ge + epsilon)
+        J_kv = (1.0 / (Gk + epsilon)) / (1.0 + i_omega_tau_alpha)
+        J_star = J_inst + J_kv
+        # Complex modulus (inverse of compliance)
+        G_star = 1.0 / (J_star + epsilon)
+        # Extract storage and loss moduli
+        G_prime = jnp.real(G_star)
+        G_double_prime = jnp.imag(G_star)
 
-            # Complex compliance
-            J_inst = 1.0 / (Ge + epsilon)
-            J_kv = (1.0 / (Gk + epsilon)) / (1.0 + i_omega_tau_alpha)
-
-            J_star = J_inst + J_kv
-
-            # Complex modulus (inverse of compliance)
-            G_star = 1.0 / (J_star + epsilon)
-
-            # Extract storage and loss moduli
-            G_prime = jnp.real(G_star)
-            G_double_prime = jnp.imag(G_star)
-
-            return jnp.stack([G_prime, G_double_prime], axis=-1)
-
-        return _compute_oscillation(omega, Ge, Gk, tau)
+        return jnp.stack([G_prime, G_double_prime], axis=-1)
 
     def _fit(
         self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
@@ -428,7 +417,7 @@ class FractionalPoyntingThomson(BaseModel):
         # Default to creep (primary mode for FPT)
         return self._predict_creep(X, Ge, Gk, alpha, tau)
 
-    def model_function(self, X, params):
+    def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -450,7 +439,17 @@ class FractionalPoyntingThomson(BaseModel):
         tau = params[3]
 
         # Use test_mode from last fit if available, otherwise default to CREEP
-        test_mode = getattr(self, "_test_mode", TestMode.CREEP)
+        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
+
+        # Fall back to self._test_mode only for backward compatibility
+
+        if test_mode is None:
+
+            test_mode = getattr(self, "_test_mode", TestMode.CREEP)
+
+        # Normalize test_mode to handle both string and TestMode enum
+        if hasattr(test_mode, "value"):
+            test_mode = test_mode.value
 
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:
