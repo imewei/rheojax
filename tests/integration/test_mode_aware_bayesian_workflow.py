@@ -19,9 +19,9 @@ import pytest
 from rheojax.core.bayesian import BayesianResult
 from rheojax.core.data import RheoData
 from rheojax.core.test_modes import TestMode
-from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
-from rheojax.models.fractional_zener_ll import FractionalZenerLiquidLiquid
 from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
+from rheojax.models.fractional_zener_ll import FractionalZenerLiquidLiquid
+from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
 from rheojax.models.maxwell import Maxwell
 
 
@@ -192,9 +192,7 @@ def test_bayesian_workflow_oscillation_mode():
     """
     # Generate synthetic oscillation data
     np.random.seed(456)
-    frequency = np.array(
-        [0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0]
-    )
+    frequency = np.array([0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0])
     G_s = 1e5
     eta_s = 10.0
     omega = 2 * np.pi * frequency
@@ -371,7 +369,9 @@ def test_mode_aware_posterior_predictive_distributions():
     predictions = model.predict(t_test)
 
     # Verify predictions are reasonable (monotonic decay for relaxation)
-    assert np.all(np.diff(predictions) <= 0), "Relaxation should be monotonically decreasing"
+    assert np.all(
+        np.diff(predictions) <= 0
+    ), "Relaxation should be monotonically decreasing"
 
     # Verify predictions are in reasonable range
     assert np.all(predictions > 0), "Modulus should be positive"

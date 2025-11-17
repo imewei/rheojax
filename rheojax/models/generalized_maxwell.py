@@ -411,6 +411,7 @@ class GeneralizedMaxwell(BaseModel):
 
             try:
                 # Extract warm-start parameters if available
+                initial_params_n: dict | None
                 if best_params is not None:
                     initial_params_n = warm_start_from_n_modes(
                         best_params, n_target=n, modulus_type=self._modulus_type

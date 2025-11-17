@@ -44,8 +44,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 import numpy as np
 
@@ -58,6 +59,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # TRIOS File Generation (Synthetic)
 # =============================================================================
+
 
 def generate_synthetic_trios_file(
     target_size_mb: float = 10.0,
@@ -109,7 +111,9 @@ def generate_synthetic_trios_file(
 
     # Default output path
     if output_path is None:
-        output_path = Path(__file__).parent / f"trios_synthetic_{int(target_size_mb)}mb.txt"
+        output_path = (
+            Path(__file__).parent / f"trios_synthetic_{int(target_size_mb)}mb.txt"
+        )
     else:
         output_path = Path(output_path)
 
@@ -141,8 +145,8 @@ def generate_synthetic_trios_file(
         lines.append(line)
 
     # Write to file
-    with open(output_path, 'w') as f:
-        f.write('\n'.join(lines))
+    with open(output_path, "w") as f:
+        f.write("\n".join(lines))
 
     actual_size_mb = output_path.stat().st_size / 1e6
     logger.info(
@@ -200,6 +204,7 @@ def generate_trios_files_batch(
 # Reference Data Generation (Bayesian Validation)
 # =============================================================================
 
+
 def generate_relaxation_reference_data(
     num_points: int = 1000,
     model_type: str = "maxwell",
@@ -256,7 +261,7 @@ def generate_relaxation_reference_data(
         # Mittag-Leffler function approximation (simplified)
         from rheojax.utils.mittag_leffler import mittag_leffler
 
-        E_alpha = mittag_leffler(-(t ** alpha) / tau, alpha)
+        E_alpha = mittag_leffler(-(t**alpha) / tau, alpha)
         G_t = G_inf + (G_0 - G_inf) * E_alpha
 
     else:
@@ -320,7 +325,7 @@ def generate_creep_reference_data(
         # Simplified Mittag-Leffler approximation
         from rheojax.utils.mittag_leffler import mittag_leffler
 
-        E_alpha = mittag_leffler(-(t ** alpha) / tau, alpha)
+        E_alpha = mittag_leffler(-(t**alpha) / tau, alpha)
         J_0 = 1 / G_0
         J_inf = 1 / G_inf
         J_t = J_0 + (J_inf - J_0) * (1 - E_alpha)
@@ -377,9 +382,9 @@ def generate_oscillation_reference_data(
         G_0 = 1e6  # Pa
         tau = 1.0  # seconds
         wt = omega * tau
-        G_prime = G_0 * (wt ** 2) / (1 + wt ** 2)  # Storage modulus
-        G_double_prime = G_0 * wt / (1 + wt ** 2)  # Loss modulus
-        G_star = np.sqrt(G_prime ** 2 + G_double_prime ** 2)  # Magnitude
+        G_prime = G_0 * (wt**2) / (1 + wt**2)  # Storage modulus
+        G_double_prime = G_0 * wt / (1 + wt**2)  # Loss modulus
+        G_star = np.sqrt(G_prime**2 + G_double_prime**2)  # Magnitude
 
     elif model_type == "fractional_zener":
         # Fractional Zener complex modulus
@@ -406,6 +411,7 @@ def generate_oscillation_reference_data(
 # =============================================================================
 # RheoData Fixture Generation
 # =============================================================================
+
 
 def create_rheo_data_relaxation(
     model_type: str = "maxwell",
@@ -449,7 +455,7 @@ def create_rheo_data_relaxation(
             "material_name": f"Synthetic_{model_type.upper()}_Relaxation",
             "test_mode": "relaxation",
             "model_type": model_type,
-        }
+        },
     )
 
 
@@ -487,7 +493,7 @@ def create_rheo_data_creep(
             "material_name": f"Synthetic_{model_type.upper()}_Creep",
             "test_mode": "creep",
             "model_type": model_type,
-        }
+        },
     )
 
 
@@ -525,13 +531,14 @@ def create_rheo_data_oscillation(
             "material_name": f"Synthetic_{model_type.upper()}_Oscillation",
             "test_mode": "oscillation",
             "model_type": model_type,
-        }
+        },
     )
 
 
 # =============================================================================
 # Fixture Registration for pytest
 # =============================================================================
+
 
 def get_fixture_path(filename: str, create_if_missing: bool = True) -> Path:
     """Get or create path to fixture file.
@@ -576,15 +583,21 @@ if __name__ == "__main__":
     logger.info("Generating reference data fixtures...")
 
     rheo_relax = create_rheo_data_relaxation(model_type="maxwell", num_points=1000)
-    logger.info(f"  Relaxation: {len(rheo_relax.x)} points, range "
-                f"[{rheo_relax.x.min():.2e}, {rheo_relax.x.max():.2e}] s")
+    logger.info(
+        f"  Relaxation: {len(rheo_relax.x)} points, range "
+        f"[{rheo_relax.x.min():.2e}, {rheo_relax.x.max():.2e}] s"
+    )
 
     rheo_creep = create_rheo_data_creep(model_type="maxwell", num_points=1000)
-    logger.info(f"  Creep: {len(rheo_creep.x)} points, range "
-                f"[{rheo_creep.x.min():.2e}, {rheo_creep.x.max():.2e}] s")
+    logger.info(
+        f"  Creep: {len(rheo_creep.x)} points, range "
+        f"[{rheo_creep.x.min():.2e}, {rheo_creep.x.max():.2e}] s"
+    )
 
     rheo_osc = create_rheo_data_oscillation(model_type="maxwell", num_points=1000)
-    logger.info(f"  Oscillation: {len(rheo_osc.x)} points, range "
-                f"[{rheo_osc.x.min():.2e}, {rheo_osc.x.max():.2e}] rad/s")
+    logger.info(
+        f"  Oscillation: {len(rheo_osc.x)} points, range "
+        f"[{rheo_osc.x.min():.2e}, {rheo_osc.x.max():.2e}] rad/s"
+    )
 
     logger.info("Fixture generation complete!")

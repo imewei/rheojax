@@ -6,12 +6,14 @@ early termination, and performance improvements for fractional models.
 """
 
 import pytest
+
 from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
-from rheojax.utils.mittag_leffler import mittag_leffler_e2, mittag_leffler_e
 import numpy as np
+
+from rheojax.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
 
 
 class TestMittagLefflerConvergence:
@@ -38,6 +40,7 @@ class TestMittagLefflerConvergence:
         assert jnp.all(result > 0.0)
 
         from jax.scipy.special import gamma as jax_gamma
+
         expected_approx = 1.0 / jax_gamma(alpha)
         assert jnp.abs(result[-1] - expected_approx) < 1e-3
 

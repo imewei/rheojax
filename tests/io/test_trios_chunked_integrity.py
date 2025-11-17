@@ -69,7 +69,9 @@ def create_synthetic_trios_file(filepath: Path, n_points: int, n_segments: int =
 
             # Generate segment data
             time_start = 0.01 if seg == 0 else 100.0 * (seg + 1)
-            time = np.logspace(np.log10(time_start), np.log10(time_start * 100), n_points)
+            time = np.logspace(
+                np.log10(time_start), np.log10(time_start * 100), n_points
+            )
 
             # Generate realistic stress relaxation data
             stress = 1e5 * np.exp(-time / 10.0)
@@ -164,14 +166,10 @@ class TestChunkingDataIntegrity:
             pytest.skip("load_trios_chunked not available")
 
         # Compare x values (time)
-        np.testing.assert_allclose(
-            full_data.x, chunked_data.x, rtol=1e-10, atol=1e-15
-        )
+        np.testing.assert_allclose(full_data.x, chunked_data.x, rtol=1e-10, atol=1e-15)
 
         # Compare y values (stress)
-        np.testing.assert_allclose(
-            full_data.y, chunked_data.y, rtol=1e-10, atol=1e-15
-        )
+        np.testing.assert_allclose(full_data.y, chunked_data.y, rtol=1e-10, atol=1e-15)
 
     def test_metadata_preservation_chunked(self, synthetic_trios_1mb):
         """Test that metadata is preserved during chunked loading."""
@@ -203,20 +201,16 @@ class TestChunkingDataIntegrity:
             pytest.skip("load_trios_chunked not available")
 
         # Data should have same length
-        assert len(full_data.x) == len(chunked_data.x), (
-            "x length mismatch after concatenation"
-        )
-        assert len(full_data.y) == len(chunked_data.y), (
-            "y length mismatch after concatenation"
-        )
+        assert len(full_data.x) == len(
+            chunked_data.x
+        ), "x length mismatch after concatenation"
+        assert len(full_data.y) == len(
+            chunked_data.y
+        ), "y length mismatch after concatenation"
 
         # Values should match
-        np.testing.assert_allclose(
-            full_data.x, chunked_data.x, rtol=1e-10, atol=1e-15
-        )
-        np.testing.assert_allclose(
-            full_data.y, chunked_data.y, rtol=1e-10, atol=1e-15
-        )
+        np.testing.assert_allclose(full_data.x, chunked_data.x, rtol=1e-10, atol=1e-15)
+        np.testing.assert_allclose(full_data.y, chunked_data.y, rtol=1e-10, atol=1e-15)
 
     def test_array_dtypes_match(self, synthetic_trios_1mb):
         """Test that chunked and full loading produce same dtypes."""
@@ -231,12 +225,12 @@ class TestChunkingDataIntegrity:
             pytest.skip("load_trios_chunked not available")
 
         # Check dtypes
-        assert full_data.x.dtype == chunked_data.x.dtype, (
-            f"x dtype mismatch: {full_data.x.dtype} vs {chunked_data.x.dtype}"
-        )
-        assert full_data.y.dtype == chunked_data.y.dtype, (
-            f"y dtype mismatch: {full_data.y.dtype} vs {chunked_data.y.dtype}"
-        )
+        assert (
+            full_data.x.dtype == chunked_data.x.dtype
+        ), f"x dtype mismatch: {full_data.x.dtype} vs {chunked_data.x.dtype}"
+        assert (
+            full_data.y.dtype == chunked_data.y.dtype
+        ), f"y dtype mismatch: {full_data.y.dtype} vs {chunked_data.y.dtype}"
 
     def test_finite_values_check(self, synthetic_trios_5mb):
         """Test that loaded data contains only finite values."""
@@ -246,12 +240,12 @@ class TestChunkingDataIntegrity:
             pytest.skip("load_trios chunked loading not available")
 
         # All values should be finite (no NaN, inf)
-        assert np.all(np.isfinite(chunked_data.x)), (
-            "Chunked data contains non-finite x values"
-        )
-        assert np.all(np.isfinite(chunked_data.y)), (
-            "Chunked data contains non-finite y values"
-        )
+        assert np.all(
+            np.isfinite(chunked_data.x)
+        ), "Chunked data contains non-finite x values"
+        assert np.all(
+            np.isfinite(chunked_data.y)
+        ), "Chunked data contains non-finite y values"
 
 
 # =============================================================================
@@ -336,9 +330,7 @@ class TestChunkingEdgeCases:
         # Data should be valid
         assert data.x is not None, "Auto-chunked data x is None"
         assert data.y is not None, "Auto-chunked data y is None"
-        assert len(data.x) == len(data.y), (
-            "Auto-chunked x and y length mismatch"
-        )
+        assert len(data.x) == len(data.y), "Auto-chunked x and y length mismatch"
 
     def test_chunk_boundary_handling(self, synthetic_trios_multipart):
         """Test correct handling of chunk boundaries.
@@ -362,9 +354,9 @@ class TestChunkingEdgeCases:
         unique_count = len(np.unique(data.x))
         total_count = len(data.x)
         # Allow 1% tolerance for boundary points
-        assert unique_count >= total_count * 0.99, (
-            f"Too many duplicate time points: {unique_count}/{total_count}"
-        )
+        assert (
+            unique_count >= total_count * 0.99
+        ), f"Too many duplicate time points: {unique_count}/{total_count}"
 
 
 # =============================================================================

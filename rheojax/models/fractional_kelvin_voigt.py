@@ -408,9 +408,7 @@ class FractionalKelvinVoigt(BaseModel):
             test_mode = test_mode.value
 
         # Extract parameter names from function signature
-        params_dict = {
-            name: params[i] for i, name in enumerate(self.parameters.keys())
-        }
+        params_dict = {name: params[i] for i, name in enumerate(self.parameters.keys())}
 
         # Dispatch to appropriate prediction method
         if test_mode == "relaxation":

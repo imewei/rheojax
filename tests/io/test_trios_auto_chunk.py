@@ -85,8 +85,8 @@ def trios_file_factory():
                 G_prime = G_infinity + (G_0 - G_infinity) * (omega * tau) ** 2 / (
                     1 + (omega * tau) ** 2
                 )
-                G_double_prime = (G_0 - G_infinity) * (omega * tau) / (
-                    1 + (omega * tau) ** 2
+                G_double_prime = (
+                    (G_0 - G_infinity) * (omega * tau) / (1 + (omega * tau) ** 2)
                 )
 
                 strain = 1.0  # 1% strain
@@ -269,12 +269,16 @@ def test_auto_chunk_logging_message_format(
 
     # Check logging message contains file size
     auto_chunk_logs = [
-        record.message for record in caplog.records if "auto-chunk" in record.message.lower()
+        record.message
+        for record in caplog.records
+        if "auto-chunk" in record.message.lower()
     ]
 
     if auto_chunk_logs:
         # Verify message format includes file size
-        assert any(f"{file_size_mb:.1f}" in msg or "MB" in msg for msg in auto_chunk_logs)
+        assert any(
+            f"{file_size_mb:.1f}" in msg or "MB" in msg for msg in auto_chunk_logs
+        )
 
 
 # Test 7: Data integrity - chunked vs full loading produces identical results

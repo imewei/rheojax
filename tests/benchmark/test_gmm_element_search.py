@@ -46,9 +46,7 @@ def synthetic_relaxation_data() -> tuple[np.ndarray, np.ndarray]:
     tau_i = np.array([1e-2, 1e-1, 1.0, 1e1, 1e2])
 
     # Compute relaxation modulus
-    G_t = G_inf + np.sum(
-        G_i[:, None] * np.exp(-t[None, :] / tau_i[:, None]), axis=0
-    )
+    G_t = G_inf + np.sum(G_i[:, None] * np.exp(-t[None, :] / tau_i[:, None]), axis=0)
 
     # Add realistic noise (1% relative)
     rng = np.random.default_rng(42)
@@ -129,9 +127,7 @@ def synthetic_creep_data() -> tuple[np.ndarray, np.ndarray]:
 
 @pytest.mark.benchmark
 @pytest.mark.slow
-def test_benchmark_element_search_n5_relaxation(
-    synthetic_relaxation_data, benchmark
-):
+def test_benchmark_element_search_n5_relaxation(synthetic_relaxation_data, benchmark):
     """Benchmark element search for N=5 in relaxation mode.
 
     Baseline (v0.3.1): ~10-15s (cold-start)
@@ -158,9 +154,7 @@ def test_benchmark_element_search_n5_relaxation(
 
 @pytest.mark.benchmark
 @pytest.mark.slow
-def test_benchmark_element_search_n10_relaxation(
-    synthetic_relaxation_data, benchmark
-):
+def test_benchmark_element_search_n10_relaxation(synthetic_relaxation_data, benchmark):
     """Benchmark element search for N=10 in relaxation mode.
 
     Baseline (v0.3.1): ~20-30s (cold-start)
@@ -185,9 +179,7 @@ def test_benchmark_element_search_n10_relaxation(
 
 @pytest.mark.benchmark
 @pytest.mark.slow
-def test_benchmark_element_search_n20_relaxation(
-    synthetic_relaxation_data, benchmark
-):
+def test_benchmark_element_search_n20_relaxation(synthetic_relaxation_data, benchmark):
     """Benchmark element search for N=20 in relaxation mode.
 
     Baseline (v0.3.1): ~40-50s (cold-start)

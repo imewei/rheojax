@@ -84,8 +84,8 @@ def trios_file_factory():
                 G_prime = G_infinity + (G_0 - G_infinity) * (omega * tau) ** 2 / (
                     1 + (omega * tau) ** 2
                 )
-                G_double_prime = (G_0 - G_infinity) * (omega * tau) / (
-                    1 + (omega * tau) ** 2
+                G_double_prime = (
+                    (G_0 - G_infinity) * (omega * tau) / (1 + (omega * tau) ** 2)
                 )
 
                 strain = 1.0  # 1% strain
@@ -177,7 +177,9 @@ def test_memory_reduction_5mb_file(trios_file_factory, cleanup_temp_files):
     _, mem_full, time_full = measure_peak_memory(load_trios, filepath, auto_chunk=False)
 
     # Measure chunked loading memory
-    _, mem_chunked, time_chunked = measure_peak_memory(load_trios, filepath, chunk_size=10000)
+    _, mem_chunked, time_chunked = measure_peak_memory(
+        load_trios, filepath, chunk_size=10000
+    )
 
     # Calculate reduction
     reduction_pct = 100 * (mem_full - mem_chunked) / mem_full
@@ -189,7 +191,9 @@ def test_memory_reduction_5mb_file(trios_file_factory, cleanup_temp_files):
 
     # Target: 50-70% reduction (may be less effective for smaller files)
     # For threshold-sized files, expect at least 30% reduction
-    assert reduction_pct >= 30, f"Expected >= 30% memory reduction, got {reduction_pct:.1f}%"
+    assert (
+        reduction_pct >= 30
+    ), f"Expected >= 30% memory reduction, got {reduction_pct:.1f}%"
 
     # Latency overhead should be acceptable (chunking adds overhead)
     latency_overhead_pct = 100 * (time_chunked - time_full) / time_full
@@ -198,7 +202,9 @@ def test_memory_reduction_5mb_file(trios_file_factory, cleanup_temp_files):
     # Note: Chunked loading trades latency for memory efficiency
     # Allow significant overhead for threshold-sized files (chunking overhead is proportionally higher)
     # The memory reduction (87%+) justifies the latency cost for memory-constrained scenarios
-    assert latency_overhead_pct < 500, f"Latency overhead too high: {latency_overhead_pct:.1f}%"
+    assert (
+        latency_overhead_pct < 500
+    ), f"Latency overhead too high: {latency_overhead_pct:.1f}%"
 
 
 # Test 2: Memory reduction for 10 MB file
@@ -213,7 +219,9 @@ def test_memory_reduction_10mb_file(trios_file_factory, cleanup_temp_files):
     _, mem_full, time_full = measure_peak_memory(load_trios, filepath, auto_chunk=False)
 
     # Measure chunked loading memory
-    _, mem_chunked, time_chunked = measure_peak_memory(load_trios, filepath, chunk_size=10000)
+    _, mem_chunked, time_chunked = measure_peak_memory(
+        load_trios, filepath, chunk_size=10000
+    )
 
     # Calculate reduction
     reduction_pct = 100 * (mem_full - mem_chunked) / mem_full
@@ -224,14 +232,18 @@ def test_memory_reduction_10mb_file(trios_file_factory, cleanup_temp_files):
     print(f"  Memory reduction: {reduction_pct:.1f}%")
 
     # Target: 50-70% reduction for files >= 10 MB
-    assert reduction_pct >= 40, f"Expected >= 40% memory reduction, got {reduction_pct:.1f}%"
+    assert (
+        reduction_pct >= 40
+    ), f"Expected >= 40% memory reduction, got {reduction_pct:.1f}%"
 
     # Latency overhead (chunking trades speed for memory)
     latency_overhead_pct = 100 * (time_chunked - time_full) / time_full
     print(f"  Latency overhead: {latency_overhead_pct:.1f}%")
 
     # Allow up to 400% overhead (chunking is inherently slower but saves memory)
-    assert latency_overhead_pct < 400, f"Latency overhead too high: {latency_overhead_pct:.1f}%"
+    assert (
+        latency_overhead_pct < 400
+    ), f"Latency overhead too high: {latency_overhead_pct:.1f}%"
 
 
 # Test 3: Memory reduction for 50 MB file (large file)
@@ -247,7 +259,9 @@ def test_memory_reduction_50mb_file(trios_file_factory, cleanup_temp_files):
     _, mem_full, time_full = measure_peak_memory(load_trios, filepath, auto_chunk=False)
 
     # Measure chunked loading memory
-    _, mem_chunked, time_chunked = measure_peak_memory(load_trios, filepath, chunk_size=10000)
+    _, mem_chunked, time_chunked = measure_peak_memory(
+        load_trios, filepath, chunk_size=10000
+    )
 
     # Calculate reduction
     reduction_pct = 100 * (mem_full - mem_chunked) / mem_full
@@ -258,14 +272,18 @@ def test_memory_reduction_50mb_file(trios_file_factory, cleanup_temp_files):
     print(f"  Memory reduction: {reduction_pct:.1f}%")
 
     # Target: 50-70% reduction for large files
-    assert reduction_pct >= 50, f"Expected >= 50% memory reduction, got {reduction_pct:.1f}%"
+    assert (
+        reduction_pct >= 50
+    ), f"Expected >= 50% memory reduction, got {reduction_pct:.1f}%"
 
     # Latency overhead (trade-off for memory efficiency)
     latency_overhead_pct = 100 * (time_chunked - time_full) / time_full
     print(f"  Latency overhead: {latency_overhead_pct:.1f}%")
 
     # Allow up to 300% overhead for very large files (amortized overhead is lower)
-    assert latency_overhead_pct < 300, f"Latency overhead too high: {latency_overhead_pct:.1f}%"
+    assert (
+        latency_overhead_pct < 300
+    ), f"Latency overhead too high: {latency_overhead_pct:.1f}%"
 
 
 # Test 4: Auto-chunked loading memory profile (with auto-detection)
@@ -311,7 +329,9 @@ def test_chunk_size_memory_impact(trios_file_factory, cleanup_temp_files):
     results = []
 
     for chunk_size in chunk_sizes:
-        _, mem, elapsed = measure_peak_memory(load_trios, filepath, chunk_size=chunk_size)
+        _, mem, elapsed = measure_peak_memory(
+            load_trios, filepath, chunk_size=chunk_size
+        )
         results.append((chunk_size, mem, elapsed))
 
     print(f"\nChunk Size Impact:")
@@ -324,7 +344,9 @@ def test_chunk_size_memory_impact(trios_file_factory, cleanup_temp_files):
 
     # Smallest chunk should use less memory than largest (generally)
     # Allow some tolerance for overhead
-    assert mem_values[0] <= mem_values[-1] * 1.5, "Expected smaller chunks to use less memory"
+    assert (
+        mem_values[0] <= mem_values[-1] * 1.5
+    ), "Expected smaller chunks to use less memory"
 
 
 # Test 6: Latency overhead measurement
@@ -349,9 +371,13 @@ def test_latency_overhead_detailed(trios_file_factory, cleanup_temp_files):
 
     print(f"\nLatency Overhead Analysis:")
     for size, t_full, t_chunk, overhead in results:
-        print(f"  {size:.0f} MB: {t_full:.3f}s (full), {t_chunk:.3f}s (chunked), {overhead:+.1f}% overhead")
+        print(
+            f"  {size:.0f} MB: {t_full:.3f}s (full), {t_chunk:.3f}s (chunked), {overhead:+.1f}% overhead"
+        )
 
     # Overhead measurements should be reasonable (chunking adds overhead for memory savings)
     # The trade-off is acceptable: memory reduction of 50-87% for 2-4x latency
     for size, _, _, overhead in results:
-        assert overhead < 400, f"{size:.0f} MB file: overhead {overhead:.1f}% exceeds 400%"
+        assert (
+            overhead < 400
+        ), f"{size:.0f} MB file: overhead {overhead:.1f}% exceeds 400%"

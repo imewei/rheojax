@@ -209,7 +209,10 @@ class TestBatchVectorization:
         """Test _stack_datasets helper with padding for variable lengths."""
         datasets = [
             (jnp.array([1.0, 2.0, 3.0]), jnp.array([2.0, 4.0, 6.0])),
-            (jnp.array([1.0, 2.0, 3.0, 4.0, 5.0]), jnp.array([2.0, 4.0, 6.0, 8.0, 10.0])),
+            (
+                jnp.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+                jnp.array([2.0, 4.0, 6.0, 8.0, 10.0]),
+            ),
             (jnp.array([1.0, 2.0]), jnp.array([2.0, 4.0])),
         ]
 
