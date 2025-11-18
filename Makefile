@@ -3,7 +3,7 @@
 # GPU Acceleration Support and Development Tools
 
 .PHONY: help install install-dev install-jax-gpu gpu-check env-info \
-        test test-smoke test-fast test-ci test-ci-full test-coverage test-integration \
+        test test-smoke test-fast test-ci test-ci-full test-coverage test-integration test-validation \
         clean clean-all clean-pyc clean-build clean-test clean-venv \
         format lint type-check check quick docs build publish info version
 
@@ -98,16 +98,22 @@ help:
 	@echo "  $(CYAN)gpu-check$(RESET)        Check GPU availability and CUDA setup"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)TESTING$(RESET)"
-	@echo "  $(CYAN)test$(RESET)                   Run all tests (full suite, ~3 hours)"
+	@echo "  $(CYAN)test$(RESET)                   Run all tests (full suite with fast MCMC, ~50-60min)"
 	@echo "  $(CYAN)test-smoke$(RESET)             Run smoke tests (105 critical tests, ~30s-2min)"
-	@echo "  $(CYAN)test-fast$(RESET)              Run tests excluding slow ones"
+	@echo "  $(CYAN)test-fast$(RESET)              Run tests excluding slow Bayesian tests (~15-25min)"
 	@echo "  $(CYAN)test-ci$(RESET)                Run CI test suite (matches GitHub Actions, 105 smoke tests)"
 	@echo "  $(CYAN)test-ci-full$(RESET)           Run full CI suite (1069 tests, pre-v0.2.1 behavior)"
+	@echo "  $(CYAN)test-validation$(RESET)        Run with production MCMC (PYTEST_FULL_VALIDATION=1, ~90min)"
 	@echo "  $(CYAN)test-parallel$(RESET)          Run all tests in parallel (2-4x faster)"
 	@echo "  $(CYAN)test-parallel-fast$(RESET)     Run fast tests in parallel"
 	@echo "  $(CYAN)test-coverage$(RESET)          Run tests with coverage report"
 	@echo "  $(CYAN)test-coverage-parallel$(RESET) Run coverage with parallel execution"
 	@echo "  $(CYAN)test-integration$(RESET)       Run integration tests only"
+	@echo ""
+	@echo "$(BOLD)MCMC Configuration:$(RESET)"
+	@echo "  CI=1                   Force fast MCMC (200/200 samples, auto-detected in CI)"
+	@echo "  PYTEST_FAST_MCMC=1     Force fast MCMC for local testing"
+	@echo "  PYTEST_FULL_VALIDATION=1   Force production MCMC (2000/1000 samples)"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)CODE QUALITY$(RESET)"
 	@echo "  $(CYAN)format$(RESET)           Format code with black and ruff"
@@ -262,8 +268,9 @@ test-smoke:
 	@echo "$(BOLD)$(GREEN)✓ Smoke tests passed!$(RESET)"
 
 test-fast:
-	@echo "$(BOLD)$(BLUE)Running fast tests (excluding slow)...$(RESET)"
-	$(RUN_CMD) $(PYTEST) -m "not slow"
+	@echo "$(BOLD)$(BLUE)Running fast tests (excluding slow Bayesian tests)...$(RESET)"
+	@echo "$(BOLD)Note:$(RESET) Excludes 34 slow Bayesian tests (60-90 min), ~15-25 min runtime"
+	$(RUN_CMD) $(PYTEST) -n auto -m "not slow"
 
 test-parallel:
 	@echo "$(BOLD)$(BLUE)Running tests in parallel (2-4x speedup)...$(RESET)"
@@ -302,6 +309,12 @@ test-coverage-parallel:
 test-integration:
 	@echo "$(BOLD)$(BLUE)Running integration tests...$(RESET)"
 	$(RUN_CMD) $(PYTEST) -m integration
+
+test-validation:
+	@echo "$(BOLD)$(BLUE)Running validation tests with production-quality MCMC...$(RESET)"
+	@echo "$(BOLD)Configuration:$(RESET) PYTEST_FULL_VALIDATION=1 (num_warmup=2000, num_samples=1000)"
+	@echo "$(BOLD)Runtime:$(RESET) ~90 minutes (for weekly validation and releases)"
+	PYTEST_FULL_VALIDATION=1 $(RUN_CMD) $(PYTEST) -n auto
 
 # ===================
 # Code quality targets

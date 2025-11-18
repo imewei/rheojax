@@ -268,6 +268,7 @@ def check_posterior_accuracy(
 # =============================================================================
 
 
+@pytest.mark.slow
 @pytest.mark.validation
 class TestBayesianRelaxationMode:
     """Bayesian inference validation for relaxation mode."""
@@ -409,6 +410,7 @@ class TestBayesianRelaxationMode:
 # =============================================================================
 
 
+@pytest.mark.slow
 @pytest.mark.validation
 class TestBayesianCreepMode:
     """Bayesian inference validation for creep mode.
@@ -529,6 +531,7 @@ class TestBayesianCreepMode:
 # =============================================================================
 
 
+@pytest.mark.slow
 @pytest.mark.validation
 class TestBayesianOscillationMode:
     """Bayesian inference validation for oscillation mode.
@@ -651,6 +654,7 @@ class TestBayesianOscillationMode:
 # =============================================================================
 
 
+@pytest.mark.slow
 @pytest.mark.validation
 class TestBayesianModeSwitch:
     """Test correct handling when switching between test modes.
@@ -748,6 +752,7 @@ class TestBayesianModeSwitch:
 # =============================================================================
 
 
+@pytest.mark.slow
 @pytest.mark.validation
 class TestBayesianCredibleIntervals:
     """Test credible interval computation and validity."""
@@ -812,6 +817,7 @@ class TestBayesianCredibleIntervals:
 # =============================================================================
 
 
+@pytest.mark.slow
 @pytest.mark.validation
 class TestFractionalModelsRelaxation:
     """Comprehensive tests for all 11 fractional models in relaxation mode."""

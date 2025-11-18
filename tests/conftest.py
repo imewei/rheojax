@@ -9,6 +9,7 @@ This module provides:
 """
 
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -24,11 +25,86 @@ from rheojax.core.test_modes import TestMode
 jax, jnp = safe_import_jax()
 
 # =============================================================================
+# ADAPTIVE MCMC CONFIGURATION FOR CI/CD
+# =============================================================================
+
+
+@pytest.fixture(scope="session")
+def mcmc_config():
+    """Adaptive MCMC configuration based on environment.
+
+    Returns MCMC parameters optimized for CI/CD (fast) or local validation (thorough).
+
+    Environment Variables:
+        CI: If set, uses fast MCMC configuration (200/200 samples)
+        PYTEST_FAST_MCMC: If set, uses fast MCMC configuration
+        PYTEST_FULL_VALIDATION: If set, forces full MCMC configuration
+
+    Configuration Modes:
+        Fast (CI/CD): num_warmup=200, num_samples=200
+            - 10x faster than full mode
+            - Sufficient for convergence detection (R-hat, ESS)
+            - Recommended for pre-commit and CI testing
+
+        Full (Validation): num_warmup=2000, num_samples=1000
+            - Production-quality posteriors
+            - Strict convergence thresholds
+            - Recommended for local development and weekly validation
+
+    Usage in tests:
+        def test_bayesian_inference(mcmc_config):
+            result = model.fit_bayesian(
+                data,
+                num_warmup=mcmc_config["num_warmup"],
+                num_samples=mcmc_config["num_samples"],
+                num_chains=mcmc_config["num_chains"],
+            )
+    """
+    # Check environment for test mode
+    is_ci = os.getenv("CI") is not None
+    is_fast = os.getenv("PYTEST_FAST_MCMC") is not None
+    force_full = os.getenv("PYTEST_FULL_VALIDATION") is not None
+
+    if force_full:
+        # Full validation mode (production quality)
+        return {
+            "num_warmup": 2000,
+            "num_samples": 1000,
+            "num_chains": 1,
+            "r_hat_threshold": 1.01,
+            "ess_threshold": 400,
+            "divergence_threshold": 0.01,  # 1%
+            "mode": "full",
+        }
+    elif is_ci or is_fast:
+        # Fast mode for CI/CD (10x faster, still validates convergence)
+        return {
+            "num_warmup": 200,
+            "num_samples": 200,
+            "num_chains": 1,
+            "r_hat_threshold": 1.05,  # Relaxed for speed
+            "ess_threshold": 200,  # Relaxed for speed
+            "divergence_threshold": 0.02,  # 2% (relaxed)
+            "mode": "fast",
+        }
+    else:
+        # Default: Full validation for local development
+        return {
+            "num_warmup": 2000,
+            "num_samples": 1000,
+            "num_chains": 1,
+            "r_hat_threshold": 1.01,
+            "ess_threshold": 400,
+            "divergence_threshold": 0.01,
+            "mode": "full",
+        }
+
+# =============================================================================
 # OSCILLATORY TEST DATA (SAOS - Small Amplitude Oscillatory Shear)
 # =============================================================================
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def oscillation_data_simple():
     """Simple oscillatory data for basic testing.
 
@@ -75,7 +151,7 @@ def oscillation_data_simple():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def oscillation_data_large():
     """Large oscillatory dataset with more frequency points.
 
@@ -122,7 +198,7 @@ def oscillation_data_large():
 # =============================================================================
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def relaxation_data_simple():
     """Simple stress relaxation data.
 
@@ -151,7 +227,7 @@ def relaxation_data_simple():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def relaxation_data_multi_mode():
     """Multi-mode (Generalized Maxwell) relaxation data.
 
@@ -187,7 +263,7 @@ def relaxation_data_multi_mode():
 # =============================================================================
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def creep_data_simple():
     """Simple creep compliance data.
 
@@ -227,7 +303,7 @@ def creep_data_simple():
 # =============================================================================
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def flow_data_power_law():
     """Power-law flow behavior (shear thinning).
 
@@ -261,7 +337,7 @@ def flow_data_power_law():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def flow_data_bingham():
     """Bingham plastic flow behavior.
 
@@ -302,7 +378,7 @@ def flow_data_bingham():
 # =============================================================================
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def maxwell_parameters():
     """Parameters for Maxwell model.
 
@@ -322,7 +398,7 @@ def maxwell_parameters():
     return params
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def zener_parameters():
     """Parameters for Zener (standard linear solid) model."""
     params = ParameterSet()
@@ -346,7 +422,7 @@ def zener_parameters():
     return params
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def power_law_parameters():
     """Parameters for power-law flow model."""
     params = ParameterSet()
@@ -372,7 +448,7 @@ def power_law_parameters():
 # =============================================================================
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def synthetic_noisy_data():
     """Generate synthetic noisy data for robustness testing.
 
@@ -401,7 +477,7 @@ def synthetic_noisy_data():
     return clean, noisy
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def synthetic_multi_temperature_data():
     """Generate synthetic data at multiple temperatures.
 

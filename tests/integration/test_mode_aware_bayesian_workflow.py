@@ -25,6 +25,7 @@ from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
 from rheojax.models.maxwell import Maxwell
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 def test_bayesian_workflow_relaxation_mode_maxwell():
     """Test complete Bayesian workflow for relaxation mode on Maxwell model.
@@ -112,6 +113,7 @@ def test_bayesian_workflow_relaxation_mode_maxwell():
     ), "Posterior eta mean too far from true"
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 def test_bayesian_workflow_creep_mode():
     """Test Bayesian workflow for creep mode with step-stress input.
@@ -180,6 +182,7 @@ def test_bayesian_workflow_creep_mode():
     assert ess_G0 > 300, f"ESS for G0 is {ess_G0:.0f}, below 300"
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 def test_bayesian_workflow_oscillation_mode():
     """Test Bayesian workflow for oscillation mode with frequency sweep.
@@ -249,6 +252,7 @@ def test_bayesian_workflow_oscillation_mode():
     assert ess_G0 > 300, f"Oscillation ESS too low: {ess_G0:.0f}"
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 def test_bayesian_workflow_fractional_model_relaxation():
     """Test Bayesian workflow for fractional Maxwell model in relaxation mode.
@@ -319,6 +323,7 @@ def test_bayesian_workflow_fractional_model_relaxation():
         assert ess > 300, f"ESS for {param_name} is {ess:.0f}"
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 def test_mode_aware_posterior_predictive_distributions():
     """Test that posterior predictive distributions respect test mode.

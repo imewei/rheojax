@@ -134,7 +134,12 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
+    "--dist=loadscope",  # Distribute tests by scope for better load balancing
+    "--maxfail=10",      # Stop after 10 failures to save time
 ]
+# Performance optimizations
+cache_dir = ".pytest_cache"  # Explicit cache directory
+console_output_style = "progress"  # Cleaner output during parallel execution
 markers = [
     # Test tier markers (for tiered CI strategy)
     "smoke: critical unit tests only (< 2 min target, ~100 tests)",
