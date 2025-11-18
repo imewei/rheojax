@@ -302,10 +302,12 @@ class TestBayesianRelaxationMode:
             warnings.simplefilter("ignore")
 
             # First fit with NLSQ for warm-start
+            # Increased max_iter for complex fractional models
             model.fit(
                 relaxation_fractional_data.x,
                 relaxation_fractional_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
             # Extract NLSQ parameters as initial values for warm-start
@@ -367,6 +369,7 @@ class TestBayesianRelaxationMode:
                 relaxation_maxwell_data.x,
                 relaxation_maxwell_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
             # Extract NLSQ parameters as initial values for warm-start
@@ -440,6 +443,7 @@ class TestBayesianCreepMode:
                 creep_maxwell_data.x,
                 creep_maxwell_data.y,
                 test_mode="creep",
+                max_iter=10000,
             )
 
             # Bayesian inference should use creep mode
@@ -495,6 +499,7 @@ class TestBayesianCreepMode:
                 creep_maxwell_data.x,
                 creep_maxwell_data.y,
                 test_mode="creep",
+                max_iter=10000,
             )
 
             # Extract NLSQ parameters as initial values for warm-start
@@ -561,6 +566,7 @@ class TestBayesianOscillationMode:
                 oscillation_maxwell_data.x,
                 oscillation_maxwell_data.y,
                 test_mode="oscillation",
+                max_iter=10000,
             )
 
             # Bayesian should respect oscillation mode
@@ -618,6 +624,7 @@ class TestBayesianOscillationMode:
                 oscillation_maxwell_data.x,
                 oscillation_maxwell_data.y,
                 test_mode="oscillation",
+                max_iter=10000,
             )
 
             # Extract NLSQ parameters as initial values for warm-start
@@ -681,6 +688,7 @@ class TestBayesianModeSwitch:
                 relaxation_maxwell_data.x,
                 relaxation_maxwell_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
             # Then fit Bayesian in creep mode
@@ -719,6 +727,7 @@ class TestBayesianModeSwitch:
                 oscillation_maxwell_data.x,
                 oscillation_maxwell_data.y,
                 test_mode="oscillation",
+                max_iter=10000,
             )
 
             # Then Bayesian in relaxation mode
@@ -772,6 +781,7 @@ class TestBayesianCredibleIntervals:
                 relaxation_maxwell_data.x,
                 relaxation_maxwell_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
             # Extract NLSQ parameters as initial values for warm-start
@@ -856,6 +866,7 @@ class TestFractionalModelsRelaxation:
                     relaxation_fractional_data.x,
                     relaxation_fractional_data.y,
                     test_mode="relaxation",
+                max_iter=10000,
                 )
 
                 # Extract NLSQ parameters as initial values for warm-start

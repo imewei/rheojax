@@ -509,27 +509,24 @@ class FractionalZenerLiquidLiquid(BaseModel):
         tau = params[5]
 
         # Use test_mode from last fit if available, otherwise default to OSCILLATION
-        # Use explicit test_mode parameter (closure-captured in fit_bayesian)
-
-        # Fall back to self._test_mode only for backward compatibility
-
+        # Get test_mode value BEFORE entering JIT region to avoid tracing issues
         if test_mode is None:
-
             test_mode = getattr(self, "_test_mode", TestMode.OSCILLATION)
 
-        # Normalize test_mode to handle both string and TestMode enum
+        # Convert to string representation for comparison (JAX-safe)
         if hasattr(test_mode, "value"):
-            test_mode = test_mode.value
-
-        # Call appropriate prediction function based on test mode
-        if test_mode == TestMode.RELAXATION:
-            return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
-        elif test_mode == TestMode.CREEP:
-            return self._predict_creep(X, c1, c2, alpha, beta, gamma, tau)
-        elif test_mode == TestMode.OSCILLATION:
-            return self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
+            test_mode_str = test_mode.value
+        elif isinstance(test_mode, str):
+            test_mode_str = test_mode
         else:
-            # Default to oscillation mode for FZLL model
+            test_mode_str = "oscillation"
+
+        # Use string comparison (JAX-safe) instead of enum comparison
+        if test_mode_str == "relaxation":
+            return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
+        elif test_mode_str == "creep":
+            return self._predict_creep(X, c1, c2, alpha, beta, gamma, tau)
+        else:  # Default to oscillation
             return self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
 
 

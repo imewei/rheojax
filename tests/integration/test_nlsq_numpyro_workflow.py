@@ -58,6 +58,7 @@ def test_nlsq_to_nuts_workflow_on_maxwell_model():
     result = model.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=1000,
         num_samples=2000,
         num_chains=1,
@@ -168,6 +169,7 @@ def test_warm_start_vs_cold_start_convergence_speed():
     result_warm = model_warm.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=500,
         num_samples=1000,
         num_chains=1,
@@ -196,6 +198,7 @@ def test_warm_start_vs_cold_start_convergence_speed():
     result_cold = model_cold.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=500,
         num_samples=1000,
         num_chains=1,
@@ -245,6 +248,7 @@ def test_credible_intervals_contain_true_values():
     result = model.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=1000,
         num_samples=2000,
         num_chains=1,
@@ -294,7 +298,12 @@ def test_bayesian_result_stored_in_model():
     # Fit model
     model = Maxwell()
     result = model.fit_bayesian(
-        t, G_true, num_warmup=200, num_samples=400, num_chains=1
+        t,
+        G_true,
+        test_mode='relaxation',
+        num_warmup=200,
+        num_samples=400,
+        num_chains=1,
     )
 
     # Test that result is stored
@@ -371,6 +380,7 @@ def test_robustness_to_outliers():
     result = model.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=1000,
         num_samples=2000,
         num_chains=1,
@@ -415,6 +425,7 @@ def test_robustness_to_ill_conditioned_data():
     result = model.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=1000,
         num_samples=2000,
         num_chains=1,
@@ -468,6 +479,7 @@ def test_robustness_to_high_noise():
     result = model.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=1000,
         num_samples=2000,
         num_chains=1,
@@ -520,6 +532,7 @@ def test_parameter_identifiability_insufficient_data():
     result = model.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=1000,
         num_samples=2000,
         num_chains=1,

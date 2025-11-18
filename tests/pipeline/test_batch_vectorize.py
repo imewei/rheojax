@@ -104,7 +104,6 @@ class TestBatchVectorization:
             format="csv",
             x_col="x",
             y_col="y",
-            batch_vectorize=False,
         )
 
         assert len(batch.results) + len(batch.errors) == len(temp_variable_length_files)
@@ -136,7 +135,6 @@ class TestBatchVectorization:
             format="csv",
             x_col="x",
             y_col="y",
-            batch_vectorize=False,
         )
         time_seq = time.time() - start_seq
 
@@ -236,12 +234,12 @@ class TestBatchVectorizationSmoke:
     """Smoke tests for batch vectorization (quick validation)."""
 
     def test_batch_vectorize_parameter_exists(self):
-        """Test that batch_vectorize parameter is accepted."""
+        """Test that batch processing handles empty file list."""
         template = Pipeline()
         batch = BatchPipeline(template)
 
         try:
-            batch.process_files([], batch_vectorize=False)
+            batch.process_files([])
         except ValueError:
             pass
 

@@ -184,10 +184,16 @@ class BayesianPipeline(Pipeline):
                 for name in self._last_model.parameters
             }
 
+        # Get test_mode from data metadata if available
+        test_mode = None
+        if hasattr(self.data, 'metadata') and self.data.metadata is not None:
+            test_mode = self.data.metadata.get('test_mode')
+
         # Run Bayesian inference
         result = self._last_model.fit_bayesian(
             X,
             y,
+            test_mode=test_mode,
             num_warmup=num_warmup,
             num_samples=num_samples,
             num_chains=1,  # Single chain for now

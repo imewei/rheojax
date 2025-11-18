@@ -140,6 +140,7 @@ class TestMaxwellANSYSRelaxation:
                 ansys_maxwell_relaxation_data.x,
                 ansys_maxwell_relaxation_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
             # Then Bayesian inference
@@ -176,6 +177,7 @@ class TestMaxwellANSYSRelaxation:
                 ansys_maxwell_relaxation_data.x,
                 ansys_maxwell_relaxation_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
         # Get predictions
@@ -258,6 +260,7 @@ class TestMaxwellANSYSCreep:
                 ansys_maxwell_creep_data.x,
                 ansys_maxwell_creep_data.y,
                 test_mode="creep",
+                max_iter=10000,
             )
 
             result = model.fit_bayesian(
@@ -286,6 +289,7 @@ class TestMaxwellANSYSCreep:
                 ansys_maxwell_creep_data.x,
                 ansys_maxwell_creep_data.y,
                 test_mode="creep",
+                max_iter=10000,
             )
 
         predictions = model.predict(ansys_maxwell_creep_data.x)
@@ -358,6 +362,7 @@ class TestFractionalZenerANSYS:
                 ansys_fractional_relaxation_data.x,
                 ansys_fractional_relaxation_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
             result = model.fit_bayesian(
@@ -382,6 +387,7 @@ class TestFractionalZenerANSYS:
                 ansys_fractional_relaxation_data.x,
                 ansys_fractional_relaxation_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
         predictions = model.predict(ansys_fractional_relaxation_data.x)
@@ -480,6 +486,7 @@ class TestParameterEstimation:
                 ansys_maxwell_relaxation_data.x,
                 ansys_maxwell_relaxation_data.y,
                 test_mode="relaxation",
+                max_iter=10000,
             )
 
         # Get fitted parameters

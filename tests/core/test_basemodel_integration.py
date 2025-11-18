@@ -55,6 +55,7 @@ def test_basemodel_fit_uses_nlsq_by_default():
 
 def test_basemodel_fit_bayesian_delegates_to_bayesian_mixin():
     """Test that BaseModel.fit_bayesian() delegates to BayesianMixin."""
+    test_mode='relaxation',
     # Create Maxwell model
     model = Maxwell()
 
@@ -68,7 +69,12 @@ def test_basemodel_fit_bayesian_delegates_to_bayesian_mixin():
     # Fit using Bayesian inference (should delegate to BayesianMixin.fit_bayesian)
     # Use small number of samples for speed
     result = model.fit_bayesian(
-        t, G_true, num_warmup=100, num_samples=200, num_chains=1
+        t,
+        G_true,
+        test_mode='relaxation',
+        num_warmup=100,
+        num_samples=200,
+        num_chains=1,
     )
 
     # Check that result is BayesianResult
@@ -118,6 +124,7 @@ def test_warm_start_workflow_fit_then_fit_bayesian():
     result = model.fit_bayesian(
         t,
         G_true,
+        test_mode='relaxation',
         num_warmup=200,
         num_samples=400,
         num_chains=1,
@@ -202,6 +209,7 @@ def test_end_to_end_nlsq_nuts_workflow_on_maxwell():
     result = model.fit_bayesian(
         t,
         G_data,
+        test_mode='relaxation',
         num_warmup=500,
         num_samples=1000,
         num_chains=1,
@@ -267,7 +275,12 @@ def test_basemodel_stores_optimization_and_bayesian_results():
 
     # Fit with Bayesian inference
     result = model.fit_bayesian(
-        t, G_true, num_warmup=100, num_samples=200, num_chains=1
+        t,
+        G_true,
+        test_mode='relaxation',
+        num_warmup=100,
+        num_samples=200,
+        num_chains=1,
     )
 
     # Check if model stores Bayesian result (if implemented)

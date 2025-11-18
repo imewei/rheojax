@@ -100,6 +100,29 @@ def mcmc_config():
         }
 
 
+@pytest.fixture(scope="session")
+def validation_mcmc_config():
+    """MCMC configuration specifically for validation tests.
+
+    Validation tests always use full MCMC settings regardless of CI/local environment.
+    This ensures accurate convergence testing even in CI pipelines.
+
+    Returns:
+        dict: Full MCMC configuration with production settings
+    """
+    return {
+        "num_warmup": 2000,
+        "num_samples": 1000,
+        "num_chains": 1,
+        "r_hat_threshold": 1.01,
+        "ess_threshold": 400,
+        "divergence_threshold": 0.01,  # 1%
+        "dense_mass": True,
+        "max_tree_depth": 12,
+        "mode": "validation",
+    }
+
+
 # =============================================================================
 # OSCILLATORY TEST DATA (SAOS - Small Amplitude Oscillatory Shear)
 # =============================================================================

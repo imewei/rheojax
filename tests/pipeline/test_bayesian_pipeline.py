@@ -80,7 +80,7 @@ def sample_data():
     # Generate data from known model: y = 5 * exp(-0.5 * t) + noise
     np.random.seed(42)  # For reproducibility
     y = 5.0 * np.exp(-0.5 * t) + np.random.normal(0, 0.1, size=t.shape)
-    return RheoData(x=t, y=y, x_units="s", y_units="Pa", domain="time", validate=False)
+    return RheoData(x=t, y=y, x_units="s", y_units="Pa", domain="time", test_mode='relaxation', validate=False)
 
 
 @pytest.fixture
