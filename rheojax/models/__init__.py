@@ -78,11 +78,11 @@ from rheojax.models.fractional_zener_ll import FZLL, FractionalZenerLiquidLiquid
 # Fractional Zener Family (Task Group 12)
 from rheojax.models.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
 from rheojax.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
-from rheojax.models.herschel_bulkley import HerschelBulkley
-from rheojax.models.maxwell import Maxwell
 
 # Multi-Mode models
 from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+from rheojax.models.herschel_bulkley import HerschelBulkley
+from rheojax.models.maxwell import Maxwell
 
 # Non-Newtonian flow models
 from rheojax.models.power_law import PowerLaw
