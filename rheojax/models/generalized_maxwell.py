@@ -569,10 +569,15 @@ class GeneralizedMaxwell(BaseModel):
         # Standardize input shape to (2, M)
         E_star = np.asarray(E_star)
         if E_star.ndim == 1:
-            # Handle 1D concatenated [G', G"] from element minimization
-            M = len(E_star) // 2
-            E_prime = np.real(E_star[:M])
-            E_double_prime = np.real(E_star[M:])
+            if np.iscomplexobj(E_star):
+                # Handle complex 1D array [G*_1, G*_2, ..., G*_M]
+                E_prime = np.real(E_star)
+                E_double_prime = np.imag(E_star)
+            else:
+                # Handle 1D concatenated [G', G"] from element minimization
+                M = len(E_star) // 2
+                E_prime = np.real(E_star[:M])
+                E_double_prime = np.real(E_star[M:])
         elif E_star.shape[0] == 2:
             # Input is (2, M), extract directly
             E_prime = np.real(E_star[0])
