@@ -150,6 +150,130 @@ JIT Compilation
     z = jnp.linspace(0, 5, 1000)
     result = compute_ml(z)  # Fast computation
 
+Prony Series Functions
+----------------------
+
+.. automodule:: rheojax.utils.prony
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The prony module provides utilities for Prony series representation of multi-mode
+viscoelastic behavior, supporting the Generalized Maxwell Model (GMM).
+
+Functions
+~~~~~~~~~
+
+.. autofunction:: rheojax.utils.prony.create_prony_parameter_set
+   :noindex:
+
+   Creates ParameterSet for N-mode Prony series with dynamic parameter generation.
+
+.. autofunction:: rheojax.utils.prony.select_optimal_n
+   :noindex:
+
+   Element minimization algorithm with warm-start optimization (v0.4.0+).
+   Achieves 2-5x speedup through successive fits and compilation reuse.
+
+.. autofunction:: rheojax.utils.prony.compute_r_squared
+   :noindex:
+
+   Computes R² coefficient of determination for model goodness-of-fit.
+
+.. autofunction:: rheojax.utils.prony.softmax_penalty
+   :noindex:
+
+   Softmax penalty for physical constraints in NLSQ optimization.
+
+Mathematical Background
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The Prony series represents multi-mode relaxation:
+
+.. math::
+
+   E(t) = E_\infty + \sum_{i=1}^{N} E_i \exp(-t/\tau_i)
+
+**Parameters (2N+1 total)**:
+
+- :math:`E_\infty` (or :math:`G_\infty`): Equilibrium modulus
+- :math:`E_i` (or :math:`G_i`): Mode i strength
+- :math:`\tau_i`: Mode i relaxation time
+
+**Element Minimization Algorithm** (v0.4.0):
+
+1. Fit N-mode model with NLSQ optimization
+2. Compute R² for current N
+3. Initialize (N-1)-mode fit from optimal N-mode parameters (warm-start)
+4. Continue until R² degrades below threshold × R²_max
+5. Return optimal N with minimal elements
+
+**Performance Optimization**:
+
+- **Warm-Start**: Each N initialized from N+1 parameters (avoids cold-start overhead)
+- **Compilation Reuse**: Cached residual functions across iterations
+- **Early Termination**: Stops when R² < threshold (default: 1 - 1.5×(1 - R²_max))
+- **Speedup**: 2-5x measured improvement (20-50s → 4-25s for N=10 search)
+
+Examples
+~~~~~~~~
+
+Create Prony Parameter Set
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils.prony import create_prony_parameter_set
+
+    # Create 3-mode Prony series (shear modulus)
+    params = create_prony_parameter_set(n_modes=3, modulus_type='shear')
+    print(list(params.keys()))
+    # ['G_inf', 'G_1', 'G_2', 'G_3', 'tau_1', 'tau_2', 'tau_3']
+
+    # Create 5-mode Prony series (tensile modulus)
+    params_tensile = create_prony_parameter_set(n_modes=5, modulus_type='tensile')
+    print(list(params_tensile.keys()))
+    # ['E_inf', 'E_1', ..., 'E_5', 'tau_1', ..., 'tau_5']
+
+Element Minimization with Warm-Start
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+    import numpy as np
+
+    # Create model with maximum modes
+    model = GeneralizedMaxwell(n_modes=10, modulus_type='shear')
+
+    # Generate relaxation data
+    t = np.logspace(-3, 2, 100)
+    G_data = ...  # Experimental relaxation modulus
+
+    # Fit with automatic element minimization (v0.4.0+ warm-start)
+    model.fit(
+        t, G_data,
+        test_mode='relaxation',
+        optimization_factor=1.5  # R² threshold multiplier
+    )
+
+    # Check optimal number of modes (auto-reduced from 10)
+    print(f"Optimal modes: {model._n_modes}")  # e.g., 3
+
+    # Element minimization uses warm-start for 2-5x speedup:
+    # - Fit N=10: 5.2s
+    # - Fit N=9: 0.8s (warm-started from N=10)
+    # - Fit N=8: 0.7s (warm-started from N=9)
+    # - ...
+    # Total: ~10s vs ~50s cold-start
+
+See Also
+~~~~~~~~
+
+- :doc:`models` - GeneralizedMaxwell model using Prony series
+- :doc:`core` - ParameterSet for parameter management
+- :doc:`../models/multi_mode/generalized_maxwell` - GMM handbook with examples
+
 Optimization
 ------------
 

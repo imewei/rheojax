@@ -69,12 +69,14 @@ class GeneralizedMaxwell(BaseModel):
         J(t) = ε(t)/σ₀ via backward-Euler integration
 
     **Performance Optimization (v0.4.0+):**
+
     Element minimization workflows use warm-start optimization for 2-5x speedup:
-        - Successive fits initialized from optimal N+1 parameters
-        - Compilation reuse across n_modes iterations
-        - Early termination when R² degrades below threshold
-        - Transparent optimization (no API changes required)
-        - Typical speedup: 20-50s → 4-25s for N=10 element search
+
+    - Successive fits initialized from optimal N+1 parameters
+    - Compilation reuse across n_modes iterations
+    - Early termination when R² degrades below threshold
+    - Transparent optimization (no API changes required)
+    - Typical speedup: 20-50s → 4-25s for N=10 element search
 
     Parameters:
         n_modes: Number of relaxation modes (N)

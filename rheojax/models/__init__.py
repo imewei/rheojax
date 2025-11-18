@@ -7,6 +7,9 @@ Classical Models:
     - Zener: Standard Linear Solid (SLS)
     - SpringPot: Fractional power-law element
 
+Multi-Mode Models:
+    - GeneralizedMaxwell: Generalized Maxwell Model (Prony series, N modes)
+
 Fractional Maxwell Family:
     - FractionalMaxwellGel: SpringPot in series with dashpot
     - FractionalMaxwellLiquid: Spring in series with SpringPot
@@ -78,6 +81,9 @@ from rheojax.models.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
 from rheojax.models.herschel_bulkley import HerschelBulkley
 from rheojax.models.maxwell import Maxwell
 
+# Multi-Mode models
+from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+
 # Non-Newtonian flow models
 from rheojax.models.power_law import PowerLaw
 from rheojax.models.springpot import SpringPot
@@ -88,6 +94,8 @@ __all__ = [
     "Maxwell",
     "Zener",
     "SpringPot",
+    # Multi-Mode models
+    "GeneralizedMaxwell",
     # Fractional Maxwell family
     "FractionalMaxwellGel",
     "FractionalMaxwellLiquid",

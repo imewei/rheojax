@@ -99,6 +99,48 @@ Fractional element interpolating between elastic and viscous limits.
    :undoc-members:
    :show-inheritance:
 
+Multi-Mode Models
+-----------------
+
+GeneralizedMaxwell (Prony Series)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.generalized_maxwell.GeneralizedMaxwell` | Handbook: :doc:`/models/multi_mode/generalized_maxwell`
+N-mode Maxwell elements in parallel for complex relaxation spectra.
+
+**v0.3.0+**: Transparent element minimization with R²-based auto-optimization
+**v0.4.0+**: Warm-start optimization for 2-5x speedup in element search workflows
+
+.. list-table:: Parameters (Dynamic: 2N+1 total)
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``G_inf`` (or ``E_inf``)
+     - Pa
+     - [0.001, 1e+09]
+     - Equilibrium modulus (rubbery plateau)
+   * - ``G_i`` (or ``E_i``)
+     - Pa
+     - [0.001, 1e+09]
+     - Mode i strength (i=1...N)
+   * - ``tau_i``
+     - s
+     - [1e-09, 1e+09]
+     - Mode i relaxation time (i=1...N)
+
+**Note**: For ``n_modes=3``, generates 7 parameters: ``G_inf``, ``G_1``, ``G_2``, ``G_3``, ``tau_1``, ``tau_2``, ``tau_3``
+
+**Element Minimization**: Set ``optimization_factor=1.5`` (default) to auto-reduce N until R² degrades
+
+.. autoclass:: rheojax.models.generalized_maxwell.GeneralizedMaxwell
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Fractional Models
 -----------------
 

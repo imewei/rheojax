@@ -27,7 +27,7 @@ Quick Links
 
 **Phase 2 (Models and Transforms)**:
 
-- :doc:`api/models` - All 20 rheological models (classical, fractional, flow)
+- :doc:`api/models` - All 21 rheological models (classical, fractional, flow, multi-mode)
 - :doc:`api/transforms` - All 5 data transforms (FFT, mastercurve, mutation, OWChirp, smoothing)
 - :doc:`api/pipeline` - Pipeline API for high-level workflows
 
@@ -64,7 +64,7 @@ Core Components
 - :class:`rheojax.core.test_modes.TestMode` - Test mode enumeration
 - :func:`rheojax.core.test_modes.detect_test_mode` - Automatic test mode detection
 
-Models (20 total)
+Models (21 total)
 ~~~~~~~~~~~~~~~~~
 
 **Classical Models (3)**:
@@ -72,6 +72,10 @@ Models (20 total)
 - :class:`rheojax.models.Maxwell` - Spring and dashpot in series
 - :class:`rheojax.models.Zener` - Standard Linear Solid (SLS)
 - :class:`rheojax.models.SpringPot` - Fractional power-law element
+
+**Multi-Mode Models (1)**:
+
+- :class:`rheojax.models.GeneralizedMaxwell` - Generalized Maxwell Model (Prony series)
 
 **Fractional Maxwell Family (4)**:
 
@@ -278,7 +282,7 @@ For advanced users:
 Version Information
 -------------------
 
-This documentation covers rheojax version 0.2.0.
+This documentation covers rheojax version 0.4.0.
 
 **Phase 1** (v0.1.0): Core infrastructure, test mode detection, I/O, visualization
 
@@ -286,7 +290,13 @@ This documentation covers rheojax version 0.2.0.
 
 **Phase 3** (v0.2.0): Bayesian inference with NumPyro NUTS, ArviZ diagnostics, BayesianPipeline, all 20 models support Bayesian inference
 
-**Phase 4** (planned): ML model selection, enhanced sensitivity analysis, real-time processing
+**Phase 4** (v0.3.0): Generalized Maxwell Model (GMM) with PyVisco integration, auto shift factors for mastercurves
+
+**Phase 5** (v0.3.1): JAX-native foundation with 30-45% performance improvements
+
+**Phase 6** (v0.3.2): Vectorization and memory optimizations (50-75% cumulative improvement)
+
+**Phase 7** (v0.4.0): Mode-aware Bayesian inference (critical correctness fix), GMM element search optimization (2-5x speedup), TRIOS auto-chunking (50-70% memory reduction)
 
 Support
 -------
