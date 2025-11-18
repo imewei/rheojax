@@ -1,0 +1,83 @@
+--- a/Makefile
++++ b/Makefile
+@@ -46,14 +46,36 @@ format:
+ 	black .
+ 	ruff check --fix .
+
+-# Run quick tests (smoke tests only)
++# =============================================================================
++# TESTING (Tiered Strategy)
++# =============================================================================
++
++# Tier 1: Smoke tests (<3 min)
++# Critical unit tests for fast feedback
+ .PHONY: test-smoke
+ test-smoke:
+-	pytest -n auto -m "smoke"
++	CI=true pytest -m "smoke and not slow" -n auto
+
+-# Run full test suite
++# Tier 2: Fast tests (<15 min)
++# All tests except slow Bayesian validation
++.PHONY: test-fast
++test-fast:
++	CI=true pytest -m "not slow" -n auto
++
++# Tier 3: Standard tests (<25 min)
++# Quick validation with reduced MCMC samples
++.PHONY: test-standard
++test-standard:
++	CI=true pytest -m "not comprehensive" -n auto
++
++# Tier 4: Full test suite (<60 min)
++# All tests with adaptive MCMC settings
+ .PHONY: test
+ test:
+-	pytest -n auto
++	pytest -n auto --maxfail=10
++
++# Tier 5: Comprehensive validation (60-90 min)
++# Full MCMC settings for release validation
++.PHONY: test-validation
++test-validation:
++	CI=false pytest -m "validation or comprehensive" -n auto
+
+ # Run tests with coverage
+@@ -61,13 +83,24 @@ test:
+ test-cov:
+ 	pytest -n auto --cov=rheojax --cov-report=html --cov-report=term-missing
+
+-# Quick iteration loop (format + smoke tests)
++# =============================================================================
++# QUICK ITERATION WORKFLOWS
++# =============================================================================
++
++# Quick iteration loop: format + smoke tests (<3 min)
+ .PHONY: quick
+ quick: format test-smoke
+
+-# CI workflow (format + full tests)
++# Pre-commit: format + fast tests (<20 min)
++.PHONY: pre-commit
++pre-commit: format test-fast
++
++# CI workflow: format + standard tests (<30 min)
+ .PHONY: ci
+-ci: format test
++ci: format test-standard
++
++# Release validation: format + full validation (90 min)
++.PHONY: release
++release: format test-validation
+
+ # =============================================================================
+ # JUPYTER NOTEBOOK UTILITIES
+@@ -122,7 +155,7 @@ build-docs:
+ # =============================================================================
+
+ # Clean all build artifacts
+-# CRITICAL: Does NOT remove .venv/, .claude/, .specify/, agent-os/ directories
++# CRITICAL: Does NOT remove .venv/, .claude/, .specify/, agent-os/, docs/ directories
+ .PHONY: clean
+ clean:
+ 	rm -rf build/

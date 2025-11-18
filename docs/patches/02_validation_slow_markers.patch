@@ -1,0 +1,92 @@
+--- a/tests/validation/test_bayesian_mode_aware.py
++++ b/tests/validation/test_bayesian_mode_aware.py
+@@ -268,7 +268,9 @@ def check_posterior_accuracy(
+ # =============================================================================
+
+
++@pytest.mark.slow
+ @pytest.mark.validation
+ class TestBayesianRelaxationMode:
+     """Bayesian inference validation for relaxation mode."""
++    """Bayesian inference validation for relaxation mode.
++
++    PERFORMANCE: Tests use MCMC sampling (2-5 min each in full mode).
++    CI mode: num_warmup=200, num_samples=200 (5-10x faster)
++    Local mode: num_warmup=2000, num_samples=1000 (full validation)
++    """
+
+     @pytest.mark.parametrize(
+         "model_class",
+@@ -409,7 +411,9 @@ class TestBayesianRelaxationMode:
+ # =============================================================================
+
+
++@pytest.mark.slow
+ @pytest.mark.validation
+ class TestBayesianCreepMode:
+     """Bayesian inference validation for creep mode.
++    """Bayesian inference validation for creep mode.
++
++    PERFORMANCE: MCMC sampling tests (2-5 min each in full mode).
+
+     CRITICAL: These tests detect the bug where model_function reads _test_mode
+     from instance state. If fit() was called in relaxation mode, fit_bayesian()
+@@ -530,7 +534,9 @@ class TestBayesianCreepMode:
+ # =============================================================================
+
+
++@pytest.mark.slow
+ @pytest.mark.validation
+ class TestBayesianOscillationMode:
+     """Bayesian inference validation for oscillation mode.
++    """Bayesian inference validation for oscillation mode.
++
++    PERFORMANCE: MCMC sampling tests (2-5 min each in full mode).
+
+     CRITICAL: These tests are very sensitive to the test_mode bug. In v0.3.1,
+     oscillation Bayesian fits will use relaxation predictions, causing
+@@ -652,7 +658,9 @@ class TestBayesianOscillationMode:
+ # =============================================================================
+
+
++@pytest.mark.slow
+ @pytest.mark.validation
+ class TestBayesianModeSwitch:
+     """Test correct handling when switching between test modes.
++    """Test correct handling when switching between test modes.
++
++    PERFORMANCE: MCMC sampling tests (2-5 min each in full mode).
+
+     These tests validate that successive Bayesian fits in different modes
+     produce correct posteriors without mode contamination.
+@@ -749,7 +757,9 @@ class TestBayesianModeSwitch:
+ # =============================================================================
+
+
++@pytest.mark.slow
+ @pytest.mark.validation
+ class TestBayesianCredibleIntervals:
+     """Test credible interval computation and validity."""
++    """Test credible interval computation and validity.
++
++    PERFORMANCE: MCMC sampling tests (2-5 min each in full mode).
++    """
+
+     def test_credible_interval_contains_truth_relaxation(self, relaxation_maxwell_data):
+         """Test that credible intervals contain true parameter values.
+@@ -813,7 +823,9 @@ class TestBayesianCredibleIntervals:
+ # =============================================================================
+
+
++@pytest.mark.slow
+ @pytest.mark.validation
+ class TestFractionalModelsRelaxation:
+     """Comprehensive tests for all 11 fractional models in relaxation mode."""
++    """Comprehensive tests for all 11 fractional models in relaxation mode.
++
++    PERFORMANCE: Tests all 11 fractional models (30-60 min in full mode).
++    CI mode: Reduced to 3 representative models + reduced MCMC samples.
++    """
+
+     @pytest.mark.parametrize(
+         "model_class",
