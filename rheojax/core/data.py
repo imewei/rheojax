@@ -7,7 +7,7 @@ while adding JAX array support and additional rheological data handling features
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -73,12 +73,27 @@ class RheoData:
     x_units: str | None = None
     y_units: str | None = None
     domain: str = "time"
+    # Optional explicit test mode passed during initialization (e.g., relaxation/creep/oscillation)
+    initial_test_mode: InitVar[str | None] = None
     metadata: dict[str, Any] = field(default_factory=dict)
     validate: bool = True
     _measurement: Any | None = field(default=None, repr=False)
+    _explicit_test_mode: str | None = field(default=None, repr=False, init=False)
 
-    def __post_init__(self):
+    def __post_init__(self, initial_test_mode: str | None):
         """Initialize and validate RheoData."""
+        # Normalize metadata container
+        if self.metadata is None:
+            self.metadata = {}
+
+        # Persist explicitly provided test mode into metadata and internal cache
+        if initial_test_mode is not None:
+            self._explicit_test_mode = initial_test_mode
+            self.metadata.setdefault("test_mode", initial_test_mode)
+            self.metadata.setdefault("detected_test_mode", initial_test_mode)
+        elif self.metadata and "test_mode" in self.metadata:
+            self._explicit_test_mode = self.metadata.get("test_mode")
+
         if self.x is None or self.y is None:
             if self._measurement is None:
                 raise ValueError("x and y data must be provided")
@@ -335,7 +350,7 @@ class RheoData:
         x_data = self.x.tolist() if hasattr(self.x, "tolist") else list(self.x)
         y_data = self.y.tolist() if hasattr(self.y, "tolist") else list(self.y)
 
-        return {
+        data_dict = {
             "x": x_data,
             "y": y_data,
             "x_units": self.x_units,
@@ -343,6 +358,11 @@ class RheoData:
             "domain": self.domain,
             "metadata": self.metadata,
         }
+
+        if self._explicit_test_mode is not None:
+            data_dict["test_mode"] = self._explicit_test_mode
+
+        return data_dict
 
     @classmethod
     def from_dict(cls, data_dict: dict[str, Any]) -> RheoData:
@@ -354,13 +374,17 @@ class RheoData:
         Returns:
             RheoData instance
         """
+        metadata = data_dict.get("metadata", {}) or {}
+        test_mode = data_dict.get("test_mode")
+
         return cls(
             x=np.array(data_dict["x"]),
             y=np.array(data_dict["y"]),
             x_units=data_dict.get("x_units"),
             y_units=data_dict.get("y_units"),
             domain=data_dict.get("domain", "time"),
-            metadata=data_dict.get("metadata", {}),
+            metadata=dict(metadata),
+            initial_test_mode=test_mode,
             validate=False,
         )
 
@@ -519,7 +543,13 @@ class RheoData:
         Returns:
             Test mode string (relaxation, creep, oscillation, rotation, unknown)
         """
-        # Check if already detected and cached
+        # Prefer explicitly provided test mode
+        if self._explicit_test_mode is not None:
+            return self._explicit_test_mode
+
+        # Check if already set in metadata (explicit or previously detected)
+        if "test_mode" in self.metadata:
+            return self.metadata["test_mode"]
         if "detected_test_mode" in self.metadata:
             return self.metadata["detected_test_mode"]
 
@@ -531,6 +561,7 @@ class RheoData:
 
         # Cache the result
         self.metadata["detected_test_mode"] = mode
+        self._explicit_test_mode = mode
 
         return mode
 

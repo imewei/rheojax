@@ -80,7 +80,7 @@ from rheojax.core.data import RheoData
 model = FractionalZenerSolidSolid()
 
 # Option 1: Pass RheoData with test_mode embedded (recommended)
-rheo_data = RheoData(x=omega, y=G_star, test_mode='oscillation')
+rheo_data = RheoData(x=omega, y=G_star, initial_test_mode='oscillation')
 result = model.fit_bayesian(rheo_data)  # Correctly uses oscillation mode
 
 # Option 2: Pass test_mode explicitly (new parameter)

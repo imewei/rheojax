@@ -61,12 +61,23 @@ class Pipeline:
         self.history: list[tuple[Any, ...]] = []
         self._last_model: BaseModel | None = None
 
-    def load(self, file_path: str | Path, format: str = "auto", **kwargs) -> Pipeline:
+    def load(
+        self,
+        file_path: str | Path,
+        format: str = "auto",
+        *,
+        test_mode: str | None = None,
+        initial_test_mode: str | None = None,
+        **kwargs,
+    ) -> Pipeline:
         """Load data from file.
 
         Args:
             file_path: Path to data file
             format: File format ('auto', 'csv', 'excel', 'trios', 'hdf5')
+            test_mode: Optional rheological mode metadata to attach to the
+                resulting RheoData (e.g., 'relaxation', 'creep', 'oscillation')
+            initial_test_mode: Backwards-compatible alias for test_mode
             **kwargs: Additional arguments passed to reader
 
         Returns:
@@ -82,6 +93,8 @@ class Pipeline:
         from rheojax.io import auto_load
 
         path = Path(file_path)
+
+        explicit_mode = test_mode if test_mode is not None else initial_test_mode
 
         if format == "auto":
             result = auto_load(path, **kwargs)
@@ -118,6 +131,7 @@ class Pipeline:
         else:
             self.data = result
 
+        self._apply_test_mode_metadata(self.data, explicit_mode)
         self.history.append(("load", str(path), format))
         return self
 
@@ -157,6 +171,22 @@ class Pipeline:
 
         self.history.append(("transform", transform_name))
         return self
+
+    def _apply_test_mode_metadata(self, data: RheoData | None, mode: str | None) -> None:
+        """Attach explicit test mode information to loaded data."""
+
+        if data is None or mode is None:
+            return
+
+        if data.metadata is None:
+            data.metadata = {}
+
+        data.metadata["test_mode"] = mode
+        data.metadata.setdefault("detected_test_mode", mode)
+
+        # Persist explicit annotation for downstream helpers that rely on it
+        if hasattr(data, "_explicit_test_mode"):
+            data._explicit_test_mode = mode
 
     def fit(
         self,

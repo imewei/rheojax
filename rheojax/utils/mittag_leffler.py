@@ -233,23 +233,22 @@ def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarr
     # Taylor series with Kahan summation for better numerical stability
     # For E_{α,α}(z) = Σ_{k=0}^∞ z^k / Γ(α(k+1))
     # Only use for |z| < threshold to ensure convergence
-    sum_val = jnp.zeros_like(z_f64)
-    compensation = jnp.zeros_like(z_f64)  # For Kahan summation
-
-    # For small |z|, use Taylor series (up to 100 terms)
-    # Fixed number of terms for JIT compilation (dynamic term count incompatible with JAX tracing)
-    for k in range(100):  # Upper bound for JIT
-        # Compute term with float64 precision
+    def taylor_body(k, state):
+        sum_val, compensation, z_power = state
         gamma_val = jax_gamma(alpha * (k + 1))
-        term = (z_f64**k) / gamma_val
-
-        # Kahan summation for numerical stability
+        term = z_power / gamma_val
         y = term - compensation
         t = sum_val + y
         compensation = (t - sum_val) - y
-        sum_val = t
+        z_power = z_power * z_f64
+        return t, compensation, z_power
 
-    result_taylor = sum_val
+    sum_init = jnp.zeros_like(z_f64)
+    comp_init = jnp.zeros_like(z_f64)
+    power_init = jnp.ones_like(z_f64)
+    result_taylor, _, _ = jax.lax.fori_loop(
+        0, 100, taylor_body, (sum_init, comp_init, power_init)
+    )
 
     # For moderate-to-large negative z, use asymptotic formula
     # E_{α,β}(-x) ~ (1/x) * Σ Γ(k - β/α) / (Γ(1 - β/α) * (-x)^k) as x → ∞
@@ -288,124 +287,119 @@ def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarr
     # Blend Taylor and asymptotic results based on |z| threshold
     result_taylor = jnp.where(z_moderate_to_large, result_asymptotic, result_taylor)
 
-    # Compute coefficients for Pade approximation (for alpha != beta)
-    # Two cases: beta > alpha and beta <= alpha
-    # Compute both cases and select with jnp.where for JAX tracing compatibility
+    def _pade_eval(args):
+        z_local, alpha_local, beta_local = args
+        minus_z = -z_local
 
-    # Case 1: beta > alpha
-    g_vals_gt = jnp.array(
-        [
-            jax_gamma(beta - alpha) / jax_gamma(beta),
-            jax_gamma(beta - alpha) / jax_gamma(beta + alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta + 2 * alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta + 3 * alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta + 4 * alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta - 2 * alpha),
-            jax_gamma(beta - alpha) / jax_gamma(beta - 3 * alpha),
-        ],
-        dtype=jnp.float64,
+        g_vals_gt = jnp.array(
+            [
+                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local),
+                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local + alpha_local),
+                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local + 2 * alpha_local),
+                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local + 3 * alpha_local),
+                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local + 4 * alpha_local),
+                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local - 2 * alpha_local),
+                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local - 3 * alpha_local),
+            ],
+            dtype=jnp.float64,
+        )
+
+        A_gt = jnp.array(
+            [
+                [1, 0, 0, -g_vals_gt[0], 0, 0, 0],
+                [0, 1, 0, g_vals_gt[1], -g_vals_gt[0], 0, 0],
+                [0, 0, 1, -g_vals_gt[2], g_vals_gt[1], -g_vals_gt[0], 0],
+                [0, 0, 0, g_vals_gt[3], -g_vals_gt[2], g_vals_gt[1], -g_vals_gt[0]],
+                [0, 0, 0, -g_vals_gt[4], g_vals_gt[3], -g_vals_gt[2], g_vals_gt[1]],
+                [0, 1, 0, 0, 0, -1, g_vals_gt[5]],
+                [0, 0, 1, 0, 0, 0, -1],
+            ],
+            dtype=jnp.float64,
+        )
+
+        b_gt = jnp.array(
+            [0, 0, 0, -1, g_vals_gt[0], g_vals_gt[6], -g_vals_gt[5]], dtype=jnp.float64
+        )
+
+        coeffs_gt = jnp.linalg.solve(A_gt, b_gt)
+        p_gt = coeffs_gt[:3]
+        q_gt = coeffs_gt[3:]
+
+        numerator_gt = (1 / jax_gamma(beta_local - alpha_local)) * (
+            p_gt[0] + p_gt[1] * minus_z + p_gt[2] * minus_z**2 + minus_z**3
+        )
+        denominator_gt = (
+            q_gt[0]
+            + q_gt[1] * minus_z
+            + q_gt[2] * minus_z**2
+            + q_gt[3] * minus_z**3
+            + z_local**4
+        )
+        denominator_gt_safe = jnp.where(
+            jnp.abs(denominator_gt) < 1e-15,
+            jnp.sign(denominator_gt) * 1e-15,
+            denominator_gt,
+        )
+        result_pade_gt = numerator_gt / denominator_gt_safe
+
+        g_vals_le = jnp.array(
+            [
+                jax_gamma(-alpha_local) / jax_gamma(alpha_local),
+                jax_gamma(-alpha_local) / jax_gamma(2 * alpha_local),
+                jax_gamma(-alpha_local) / jax_gamma(3 * alpha_local),
+                jax_gamma(-alpha_local) / jax_gamma(4 * alpha_local),
+                jax_gamma(-alpha_local) / jax_gamma(5 * alpha_local),
+                jax_gamma(-alpha_local) / jax_gamma(-2 * alpha_local),
+                jax_gamma(-alpha_local) / jax_gamma(-3 * alpha_local),
+            ],
+            dtype=jnp.float64,
+        )
+
+        A_le = jnp.array(
+            [
+                [1, 0, g_vals_le[0], 0, 0, 0],
+                [0, 1, -g_vals_le[1], g_vals_le[0], 0, 0],
+                [0, 0, g_vals_le[2], -g_vals_le[1], g_vals_le[0], 0],
+                [0, 0, -g_vals_le[3], g_vals_le[2], -g_vals_le[1], -g_vals_le[0]],
+                [0, 0, g_vals_le[4], -g_vals_le[3], g_vals_le[2], -g_vals_le[1]],
+                [0, 1, 0, 0, 0, -1],
+            ],
+            dtype=jnp.float64,
+        )
+
+        b_le = jnp.array([0, 0, -1, 0, g_vals_le[6], -g_vals_le[5]], dtype=jnp.float64)
+
+        coeffs_le = jnp.linalg.solve(A_le, b_le)
+        p_hat = coeffs_le[:2]
+        q_hat = coeffs_le[2:]
+
+        numerator_le = (-1 / jax_gamma(-alpha_local)) * (
+            p_hat[0] + p_hat[1] * minus_z + minus_z**2
+        )
+        denominator_le = (
+            q_hat[0]
+            + q_hat[1] * minus_z
+            + q_hat[2] * minus_z**2
+            + q_hat[3] * minus_z**3
+            + minus_z**4
+        )
+        denominator_le_safe = jnp.where(
+            jnp.abs(denominator_le) < 1e-15,
+            jnp.sign(denominator_le) * 1e-15,
+            denominator_le,
+        )
+        result_pade_le = numerator_le / denominator_le_safe
+
+        is_beta_gt_alpha = beta_local > alpha_local
+        result_pade = jnp.where(is_beta_gt_alpha, result_pade_gt, result_pade_le)
+        return jnp.maximum(result_pade, 0.0)
+
+    result_final = jax.lax.cond(
+        alpha_equals_beta,
+        lambda _: jnp.maximum(result_taylor, 0.0),
+        lambda args: _pade_eval(args),
+        operand=(z_f64, alpha, beta),
     )
-
-    A_gt = jnp.array(
-        [
-            [1, 0, 0, -g_vals_gt[0], 0, 0, 0],
-            [0, 1, 0, g_vals_gt[1], -g_vals_gt[0], 0, 0],
-            [0, 0, 1, -g_vals_gt[2], g_vals_gt[1], -g_vals_gt[0], 0],
-            [0, 0, 0, g_vals_gt[3], -g_vals_gt[2], g_vals_gt[1], -g_vals_gt[0]],
-            [0, 0, 0, -g_vals_gt[4], g_vals_gt[3], -g_vals_gt[2], g_vals_gt[1]],
-            [0, 1, 0, 0, 0, -1, g_vals_gt[5]],
-            [0, 0, 1, 0, 0, 0, -1],
-        ],
-        dtype=jnp.float64,
-    )
-
-    b_gt = jnp.array(
-        [0, 0, 0, -1, g_vals_gt[0], g_vals_gt[6], -g_vals_gt[5]], dtype=jnp.float64
-    )
-
-    coeffs_gt = jnp.linalg.solve(A_gt, b_gt)
-    p_gt = coeffs_gt[:3]
-    q_gt = coeffs_gt[3:]
-
-    minus_z = -z_f64
-    numerator_gt = (1 / jax_gamma(beta - alpha)) * (
-        p_gt[0] + p_gt[1] * minus_z + p_gt[2] * minus_z**2 + minus_z**3
-    )
-    denominator_gt = (
-        q_gt[0]
-        + q_gt[1] * minus_z
-        + q_gt[2] * minus_z**2
-        + q_gt[3] * minus_z**3
-        + z_f64**4
-    )
-    denominator_gt_safe = jnp.where(
-        jnp.abs(denominator_gt) < 1e-15,
-        jnp.sign(denominator_gt) * 1e-15,
-        denominator_gt,
-    )
-    result_pade_gt = numerator_gt / denominator_gt_safe
-
-    # Case 2: beta <= alpha
-    g_vals_le = jnp.array(
-        [
-            jax_gamma(-alpha) / jax_gamma(alpha),
-            jax_gamma(-alpha) / jax_gamma(2 * alpha),
-            jax_gamma(-alpha) / jax_gamma(3 * alpha),
-            jax_gamma(-alpha) / jax_gamma(4 * alpha),
-            jax_gamma(-alpha) / jax_gamma(5 * alpha),
-            jax_gamma(-alpha) / jax_gamma(-2 * alpha),
-            jax_gamma(-alpha) / jax_gamma(-3 * alpha),
-        ],
-        dtype=jnp.float64,
-    )
-
-    A_le = jnp.array(
-        [
-            [1, 0, g_vals_le[0], 0, 0, 0],
-            [0, 1, -g_vals_le[1], g_vals_le[0], 0, 0],
-            [0, 0, g_vals_le[2], -g_vals_le[1], g_vals_le[0], 0],
-            [0, 0, -g_vals_le[3], g_vals_le[2], -g_vals_le[1], -g_vals_le[0]],
-            [0, 0, g_vals_le[4], -g_vals_le[3], g_vals_le[2], -g_vals_le[1]],
-            [0, 1, 0, 0, 0, -1],
-        ],
-        dtype=jnp.float64,
-    )
-
-    b_le = jnp.array([0, 0, -1, 0, g_vals_le[6], -g_vals_le[5]], dtype=jnp.float64)
-
-    coeffs_le = jnp.linalg.solve(A_le, b_le)
-    p_hat = coeffs_le[:2]
-    q_hat = coeffs_le[2:]
-
-    numerator_le = (-1 / jax_gamma(-alpha)) * (
-        p_hat[0] + p_hat[1] * minus_z + minus_z**2
-    )
-    denominator_le = (
-        q_hat[0]
-        + q_hat[1] * minus_z
-        + q_hat[2] * minus_z**2
-        + q_hat[3] * minus_z**3
-        + minus_z**4
-    )
-    denominator_le_safe = jnp.where(
-        jnp.abs(denominator_le) < 1e-15,
-        jnp.sign(denominator_le) * 1e-15,
-        denominator_le,
-    )
-    result_pade_le = numerator_le / denominator_le_safe
-
-    # Select based on beta > alpha condition
-    is_beta_gt_alpha = beta > alpha
-    result_pade = jnp.where(is_beta_gt_alpha, result_pade_gt, result_pade_le)
-
-    # Choose between Taylor (alpha==beta) and Pade (alpha!=beta) results
-    # Use Taylor series when alpha ≈ beta to avoid numerical issues
-    result_final = jnp.where(alpha_equals_beta, result_taylor, result_pade)
-
-    # Clamp results to physically valid range
-    # For relaxation modulus calculations, we need E_{α,β}(z) > 0 when z < 0
-    # The function should decay to 0 for large negative z, not go negative
-    result_final = jnp.maximum(result_final, 0.0)
 
     # Convert back to original precision (float32 if input was float32)
     if jnp.isrealobj(z):

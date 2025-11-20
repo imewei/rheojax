@@ -99,7 +99,6 @@ class BatchPipeline:
         normalized_paths = [Path(p) for p in file_paths]
 
         if not normalized_paths:
-            warnings.warn("No files provided for processing", stacklevel=2)
             return self
 
         for file_path in normalized_paths:

@@ -29,6 +29,7 @@ References:
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
@@ -90,7 +91,7 @@ class FractionalMaxwellGel(BaseModel):
         self.parameters.add(
             name="alpha",
             value=0.5,
-            bounds=(0.0, 1.0),
+            bounds=FRACTIONAL_ORDER_BOUNDS,
             units="dimensionless",
             description="Power-law exponent",
         )
@@ -416,7 +417,9 @@ class FractionalMaxwellGel(BaseModel):
             RheoData with predicted y values
         """
         # Auto-detect test mode if not provided
-        if test_mode is None:
+        if isinstance(test_mode, property):
+            test_mode = test_mode.fget(rheo_data)
+        if not isinstance(test_mode, str) or not test_mode:
             test_mode = rheo_data.test_mode
 
         # Get parameters

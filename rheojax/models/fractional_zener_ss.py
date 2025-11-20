@@ -42,6 +42,7 @@ References
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
@@ -105,7 +106,7 @@ class FractionalZenerSolidSolid(BaseModel):
         self.parameters.add(
             name="alpha",
             value=0.5,
-            bounds=(0.0, 1.0),
+            bounds=FRACTIONAL_ORDER_BOUNDS,
             units="",
             description="Fractional order",
         )
@@ -314,6 +315,10 @@ class FractionalZenerSolidSolid(BaseModel):
         # Store test mode for model_function
         self._test_mode = test_mode
 
+        # Provide simple data-aware initialization for relaxation fits
+        if test_mode == TestMode.RELAXATION:
+            self._initialize_relaxation_parameters(X, y)
+
         # Smart initialization for oscillation mode (Issue #9)
         if test_mode == TestMode.OSCILLATION:
             try:
@@ -376,6 +381,62 @@ class FractionalZenerSolidSolid(BaseModel):
 
         self.fitted_ = True
         return self
+
+    def _initialize_relaxation_parameters(self, X, y) -> bool:
+        """Derive heuristic starting values from relaxation data."""
+        import logging
+        import numpy as np
+
+        try:
+            t = np.asarray(X, dtype=float).ravel()
+            g = np.asarray(y, dtype=float).ravel()
+            if t.shape != g.shape or t.size < 4:
+                return False
+
+            order = np.argsort(t)
+            t_sorted = t[order]
+            g_sorted = g[order]
+
+            tail = max(3, t_sorted.size // 6)
+            head = max(3, t_sorted.size // 6)
+            ge_guess = float(np.median(g_sorted[-tail:]))
+            gm_guess = float(np.median(g_sorted[:head]) - ge_guess)
+            gm_guess = max(gm_guess, 1e-3)
+
+            ge_bounds = self.parameters.get("Ge").bounds or (1e-3, 1e9)
+            gm_bounds = self.parameters.get("Gm").bounds or (1e-3, 1e9)
+            tau_bounds = self.parameters.get("tau_alpha").bounds or (1e-6, 1e6)
+            alpha_bounds = self.parameters.get("alpha").bounds or FRACTIONAL_ORDER_BOUNDS
+
+            ge_guess = float(np.clip(ge_guess, ge_bounds[0], ge_bounds[1]))
+            gm_guess = float(np.clip(gm_guess, gm_bounds[0], gm_bounds[1]))
+
+            normalized = np.clip(
+                (g_sorted - ge_guess) / (gm_guess + 1e-9), 0.0, 1.0
+            )
+            target = np.exp(-1.0)
+            idx = int(np.argmin(np.abs(normalized - target)))
+            tau_guess = float(
+                np.clip(t_sorted[idx], tau_bounds[0], tau_bounds[1])
+            )
+
+            alpha_guess = float(np.clip(0.6, alpha_bounds[0], alpha_bounds[1]))
+
+            self.parameters.set_value("Ge", ge_guess)
+            self.parameters.set_value("Gm", gm_guess)
+            self.parameters.set_value("tau_alpha", tau_guess)
+            self.parameters.set_value("alpha", alpha_guess)
+            logging.debug(
+                "FZSS relaxation init | Ge=%.3g Gm=%.3g tau_alpha=%.3g alpha=%.2f",
+                ge_guess,
+                gm_guess,
+                tau_guess,
+                alpha_guess,
+            )
+            return True
+        except Exception as exc:  # pragma: no cover - fallback only
+            logging.debug(f"Relaxation initialization failed: {exc}")
+            return False
 
     def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
         """Predict response for given input.

@@ -103,7 +103,6 @@ def ansys_maxwell_relaxation_data():
     G_t = G_infinity + G_0 * np.exp(-time / tau_0)
 
     metadata = {
-        "test_mode": "relaxation",
         "ansys_reference": True,
         "reference_element": "MELAS",
         "G_infinity": G_infinity,
@@ -118,6 +117,7 @@ def ansys_maxwell_relaxation_data():
         y_units="Pa",
         domain="time",
         metadata=metadata,
+        initial_test_mode="relaxation",
     )
 
 
@@ -222,7 +222,6 @@ def ansys_maxwell_creep_data():
     J_t = 1.0 / (G_0[0] + G_infinity) + time / (G_0[0] * tau_0[0])
 
     metadata = {
-        "test_mode": "creep",
         "ansys_reference": True,
         "reference_element": "PRONY_SERIES",
         "n_modes": 2,
@@ -238,6 +237,7 @@ def ansys_maxwell_creep_data():
         y_units="Pa^-1",
         domain="time",
         metadata=metadata,
+        initial_test_mode="creep",
     )
 
 
@@ -328,7 +328,6 @@ def ansys_fractional_relaxation_data():
     G_t = G_infinity + K / (1 + (time / 1.0) ** alpha)
 
     metadata = {
-        "test_mode": "relaxation",
         "ansys_reference": True,
         "reference_element": "UD_MATERIAL",
         "model_type": "FRACTIONAL_MAXWELL",
@@ -344,6 +343,7 @@ def ansys_fractional_relaxation_data():
         y_units="Pa",
         domain="time",
         metadata=metadata,
+        initial_test_mode="relaxation",
     )
 
 

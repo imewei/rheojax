@@ -378,9 +378,12 @@ def test_mode_aware_posterior_predictive_distributions():
         np.diff(predictions) <= 0
     ), "Relaxation should be monotonically decreasing"
 
-    # Verify predictions are in reasonable range
+    # Verify predictions are in reasonable range (compare against observed data)
     assert np.all(predictions > 0), "Modulus should be positive"
-    assert np.max(predictions) > G0_true * 0.1, "Predictions should capture magnitude"
+    observed_peak = float(np.max(G_data))
+    assert np.max(predictions) > observed_peak * 0.8, (
+        "Predictions should match the observed magnitude"
+    )
 
     print(
         f"Posterior predictive validation passed. "

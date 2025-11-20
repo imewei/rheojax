@@ -78,7 +78,15 @@ def sample_data():
     t = np.linspace(0.1, 5, 30)
     np.random.seed(42)
     y = 5.0 * np.exp(-0.5 * t) + np.random.normal(0, 0.1, size=t.shape)
-    return RheoData(x=t, y=y, x_units="s", y_units="Pa", domain="time", test_mode='relaxation', validate=False)
+    return RheoData(
+        x=t,
+        y=y,
+        x_units="s",
+        y_units="Pa",
+        domain="time",
+        initial_test_mode='relaxation',
+        validate=False,
+    )
 
 
 @pytest.fixture

@@ -31,12 +31,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+import logging
 
 import nlsq
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
+
+
+logger = logging.getLogger(__name__)
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
@@ -215,6 +219,7 @@ def nlsq_optimize(
 
     # Get initial values and bounds from ParameterSet
     x0 = parameters.get_values()
+    original_values = np.asarray(x0, dtype=np.float64).copy()
     bounds_list = parameters.get_bounds()
 
     # Ensure float64 precision for initial values
@@ -259,37 +264,96 @@ def nlsq_optimize(
     # Merge with user-provided kwargs
     nlsq_kwargs.update(kwargs)
 
+    def _scipy_fallback(initial_guess: np.ndarray) -> OptimizationResult:
+        """Fallback to SciPy's least_squares when NLSQ fails."""
+        from scipy.optimize import least_squares as scipy_least_squares
+
+        def residual_fn(values: np.ndarray) -> np.ndarray:
+            res = objective(values)
+            if isinstance(res, jnp.ndarray):
+                res = np.asarray(res)
+            return np.asarray(res, dtype=np.float64)
+
+        scipy_result = scipy_least_squares(
+            residual_fn,
+            initial_guess,
+            bounds=nlsq_bounds,
+            ftol=ftol,
+            xtol=xtol,
+            gtol=gtol,
+            max_nfev=max_iter * 10,
+            method="trf",
+        )
+
+        cost_value = getattr(scipy_result, "cost", None)
+
+        result = OptimizationResult(
+            x=np.asarray(scipy_result.x, dtype=np.float64),
+            fun=float(2.0 * scipy_result.cost)
+            if hasattr(scipy_result, "cost")
+            else float(np.sum(residual_fn(scipy_result.x) ** 2)),
+            jac=
+                np.asarray(scipy_result.jac, dtype=np.float64)
+                if scipy_result.jac is not None
+                else None,
+            success=bool(scipy_result.success),
+            message=str(scipy_result.message),
+            nit=int(getattr(scipy_result, "nit", scipy_result.nfev)),
+            nfev=int(scipy_result.nfev),
+            njev=int(getattr(scipy_result, "njev", 0)),
+            optimality=float(getattr(scipy_result, "optimality", np.nan))
+            if getattr(scipy_result, "optimality", None) is not None
+            else None,
+            active_mask=
+                np.asarray(scipy_result.active_mask)
+                if getattr(scipy_result, "active_mask", None) is not None
+                else None,
+            cost=float(cost_value) if cost_value is not None else None,
+        )
+
+        return result
+
     # Create NLSQ optimizer instance and run optimization
     try:
         optimizer = nlsq.LeastSquares()
         nlsq_result = optimizer.least_squares(**nlsq_kwargs)
     except Exception as e:
-        # If NLSQ fails, return a failure result
-        # objective() returns residual vector, so compute RSS = sum(residuals²)
-        residuals = objective(x0)
-        rss = float(jnp.sum(residuals**2))
-        return OptimizationResult(
-            x=x0,
-            fun=rss,
-            success=False,
-            message=f"NLSQ optimization failed: {str(e)}",
-            nit=0,
-            nfev=0,
+        logger.warning(
+            "NLSQ optimization raised %s; falling back to SciPy least_squares.",
+            e,
         )
+        return _scipy_fallback(x0)
 
     # Convert NLSQ result to OptimizationResult
     result = OptimizationResult.from_nlsq(nlsq_result)
 
+    if not result.success and "inner optimization loop exceeded" in result.message.lower():
+        logger.warning(
+            "NLSQ hit inner iteration limit; retrying with SciPy least_squares for stability."
+        )
+        return _scipy_fallback(x0)
+
     # Ensure x is float64
     result.x = np.asarray(result.x, dtype=np.float64)
-
-    # Update ParameterSet with optimal values
-    parameters.set_values(result.x)
 
     # Recompute objective at optimal point
     # objective() now returns residual vector, so compute RSS = sum(residuals²)
     residuals = objective(result.x)
     result.fun = float(jnp.sum(residuals**2))
+
+    # Guard against false "success" with astronomically large residuals
+    residuals_np = np.asarray(residuals)
+    residual_count = residuals_np.size if residuals_np.size else 1
+    mean_squared_error = result.fun / residual_count
+    if not np.isfinite(mean_squared_error) or mean_squared_error > 1e6:
+        parameters.set_values(original_values)
+        raise RuntimeError(
+            "Optimization failed: residual norm remains extremely large. "
+            "Try providing better initial values, looser bounds, or scaling the data."
+        )
+
+    # Update ParameterSet with optimal values
+    parameters.set_values(result.x)
 
     return result
 

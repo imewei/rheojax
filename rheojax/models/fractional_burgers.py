@@ -47,6 +47,7 @@ References
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
@@ -118,7 +119,7 @@ class FractionalBurgersModel(BaseModel):
         self.parameters.add(
             name="alpha",
             value=0.5,
-            bounds=(0.0, 1.0),
+            bounds=FRACTIONAL_ORDER_BOUNDS,
             units="",
             description="Fractional order",
         )

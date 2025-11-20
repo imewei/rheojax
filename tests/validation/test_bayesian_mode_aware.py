@@ -70,7 +70,6 @@ def relaxation_maxwell_data():
     G_t = G0 * np.exp(-time / tau)
 
     metadata = {
-        "test_mode": "relaxation",
         "test_type": "Stress Relaxation",
         "true_params": {"G0": G0, "eta": eta},
     }
@@ -82,6 +81,7 @@ def relaxation_maxwell_data():
         y_units="Pa",
         domain="time",
         metadata=metadata,
+        initial_test_mode="relaxation",
     )
 
 
@@ -98,7 +98,6 @@ def creep_maxwell_data():
     J_t = 1.0 / G0 + time / eta  # Creep compliance
 
     metadata = {
-        "test_mode": "creep",
         "test_type": "Creep Compliance",
         "true_params": {"G0": G0, "eta": eta},
     }
@@ -110,6 +109,7 @@ def creep_maxwell_data():
         y_units="Pa^-1",
         domain="time",
         metadata=metadata,
+        initial_test_mode="creep",
     )
 
 
@@ -132,7 +132,6 @@ def oscillation_maxwell_data():
     G_star = G0 * iw_eta_s / (1 + iw_eta_s)
 
     metadata = {
-        "test_mode": "oscillation",
         "test_type": "SAOS",
         "true_params": {"G0": G0, "eta": eta},
     }
@@ -144,6 +143,7 @@ def oscillation_maxwell_data():
         y_units="Pa",
         domain="frequency",
         metadata=metadata,
+        initial_test_mode="oscillation",
     )
 
 
@@ -164,7 +164,6 @@ def relaxation_fractional_data():
     G_t = G0 / (1 + (time / tau) ** alpha)
 
     metadata = {
-        "test_mode": "relaxation",
         "test_type": "Stress Relaxation",
         "true_params": {"G0": G0, "eta": eta, "alpha": alpha},
     }
@@ -176,6 +175,7 @@ def relaxation_fractional_data():
         y_units="Pa",
         domain="time",
         metadata=metadata,
+        initial_test_mode="relaxation",
     )
 
 

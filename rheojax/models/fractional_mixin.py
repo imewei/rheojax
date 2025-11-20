@@ -16,6 +16,10 @@ import numpy as np
 
 from rheojax.core.test_modes import TestMode
 
+FRACTIONAL_ORDER_EPS = 1e-3
+# Shared bounds for fractional orders (public API remains [0, 1])
+FRACTIONAL_ORDER_BOUNDS = (0.0, 1.0)
+
 if TYPE_CHECKING:
     from rheojax.core.parameters import ParameterSet
 
@@ -223,4 +227,4 @@ class FractionalModelMixin:
                 raise ValueError(f"{param_name} must be positive, got {value}")
 
 
-__all__ = ["FractionalModelMixin"]
+__all__ = ["FractionalModelMixin", "FRACTIONAL_ORDER_BOUNDS", "FRACTIONAL_ORDER_EPS"]

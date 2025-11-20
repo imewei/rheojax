@@ -80,7 +80,15 @@ def sample_data():
     # Generate data from known model: y = 5 * exp(-0.5 * t) + noise
     np.random.seed(42)  # For reproducibility
     y = 5.0 * np.exp(-0.5 * t) + np.random.normal(0, 0.1, size=t.shape)
-    return RheoData(x=t, y=y, x_units="s", y_units="Pa", domain="time", test_mode='relaxation', validate=False)
+    return RheoData(
+        x=t,
+        y=y,
+        x_units="s",
+        y_units="Pa",
+        domain="time",
+        initial_test_mode='relaxation',
+        validate=False,
+    )
 
 
 @pytest.fixture
@@ -221,7 +229,12 @@ class TestBayesianPipelineMethodChaining:
 
         # Test fluent API: load → fit_nlsq → fit_bayesian
         result = (
-            pipeline.load(temp_csv_file, x_col="time", y_col="stress")
+            pipeline.load(
+                temp_csv_file,
+                x_col="time",
+                y_col="stress",
+                initial_test_mode="relaxation",
+            )
             .fit_nlsq(MockBayesianModel())
             .fit_bayesian(num_samples=50, num_warmup=25)
         )

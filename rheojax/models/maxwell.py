@@ -21,6 +21,8 @@ from rheojax.core.jax_config import safe_import_jax
 jax, jnp = safe_import_jax()
 
 
+import numpy as np
+
 from rheojax.core.base import BaseModel
 from rheojax.core.data import RheoData
 from rheojax.core.parameters import ParameterSet
@@ -83,6 +85,7 @@ class Maxwell(BaseModel):
         )
 
         self.fitted_ = False
+        self._relaxation_offset = 0.0
         self._test_mode = TestMode.RELAXATION  # Store test mode for model_function
 
     def _fit(self, X, y, **kwargs):
@@ -102,18 +105,48 @@ class Maxwell(BaseModel):
         )
 
         # Handle RheoData input
+        def _to_array(values):
+            arr = np.asarray(values)
+            if np.iscomplexobj(arr):
+                return arr.astype(np.complex128)
+            return arr.astype(float)
+
         if isinstance(X, RheoData):
             rheo_data = X
-            x_data = jnp.array(rheo_data.x)
-            y_data = jnp.array(rheo_data.y)
+            x_np = np.asarray(rheo_data.x, dtype=float)
+            y_np = _to_array(rheo_data.y)
             test_mode = rheo_data.test_mode
         else:
-            x_data = jnp.array(X)
-            y_data = jnp.array(y)
-            test_mode = kwargs.get("test_mode", TestMode.RELAXATION)
+            x_np = np.asarray(X, dtype=float)
+            y_np = _to_array(y)
+            supplied_mode = kwargs.get("test_mode")
+            if supplied_mode is None and np.iscomplexobj(y_np):
+                test_mode = TestMode.OSCILLATION
+            else:
+                test_mode = supplied_mode or TestMode.RELAXATION
+
+        if isinstance(test_mode, str):
+            try:
+                test_mode = TestMode[test_mode.upper()]
+            except KeyError:
+                test_mode = TestMode.RELAXATION
 
         # Store test mode for model_function
         self._test_mode = test_mode
+        self._relaxation_offset = 0.0
+
+        if test_mode == TestMode.RELAXATION:
+            tail = max(3, y_np.size // 6)
+            offset = float(np.median(y_np[-tail:]))
+            y_np = y_np - offset
+            self._relaxation_offset = offset
+
+        x_data = jnp.array(x_np)
+        y_data = jnp.array(y_np)
+
+        # Provide simple heuristics for relaxation data to improve deterministic fits
+        if test_mode == TestMode.RELAXATION:
+            self._initialize_relaxation_parameters(x_data, y_data)
 
         # Create objective function with stateless predictions
         def model_fn(x, params):
@@ -155,6 +188,70 @@ class Maxwell(BaseModel):
         self.fitted_ = True
         return self
 
+    def _initialize_relaxation_parameters(self, X, y) -> bool:
+        """Estimate G0 and eta from relaxation data for faster convergence."""
+        import logging
+        import numpy as np
+
+        try:
+            t = np.asarray(X, dtype=float).ravel()
+            g = np.asarray(y, dtype=float).ravel()
+            if t.shape != g.shape or t.size < 3:
+                return False
+
+            order = np.argsort(t)
+            t_sorted = t[order]
+            g_sorted = g[order]
+
+            tail = max(3, t_sorted.size // 6)
+            baseline = float(np.median(g_sorted[-tail:]))
+            transient = g_sorted - baseline
+
+            g0_bounds = self.parameters.get("G0").bounds or (1e-3, 1e9)
+            eta_bounds = self.parameters.get("eta").bounds or (1e-6, 1e12)
+
+            # Attempt to estimate parameters from the first two signal-dominant points
+            positive_mask = transient > 0
+            signal_floor = max(float(np.max(transient)), 1e-12) * 1e-3
+            idx_candidates = np.where(positive_mask & (transient > signal_floor))[0]
+            if idx_candidates.size < 2:
+                idx_candidates = np.where(positive_mask)[0]
+            if idx_candidates.size < 2:
+                return False
+
+            i0, i1 = idx_candidates[0], idx_candidates[1]
+            t0, t1 = t_sorted[i0], t_sorted[i1]
+            y0, y1 = transient[i0], transient[i1]
+            if not (y0 > 0 and y1 > 0 and t1 > t0 and y1 != y0):
+                return False
+
+            ratio = y1 / y0
+            if ratio <= 0 or ratio < 1e-3:
+                return False
+            with np.errstate(divide="ignore"):
+                tau_estimate = -(t1 - t0) / np.log(ratio)
+            if not (np.isfinite(tau_estimate) and tau_estimate > 0):
+                return False
+
+            g0_estimate = float(y0 * np.exp(t0 / tau_estimate))
+            g0_guess = float(np.clip(g0_estimate, g0_bounds[0], g0_bounds[1]))
+            eta_guess = float(
+                np.clip(g0_guess * tau_estimate, eta_bounds[0], eta_bounds[1])
+            )
+
+            self.parameters.set_value("G0", g0_guess)
+            self.parameters.set_value("eta", eta_guess)
+            logging.debug(
+                "Maxwell relaxation init | G0=%.3g eta=%.3g tau≈%.3g",
+                g0_guess,
+                eta_guess,
+                tau_estimate,
+            )
+            return True
+        except Exception as exc:  # pragma: no cover - heuristic best effort
+            logging.debug(f"Maxwell relaxation initialization failed: {exc}")
+            return False
+
     def _predict(self, X):
         """Predict response based on input data.
 
@@ -180,7 +277,9 @@ class Maxwell(BaseModel):
 
         # Dispatch to appropriate prediction method
         if test_mode == TestMode.RELAXATION:
-            return self._predict_relaxation(x_data, G0, eta)
+            return self._predict_relaxation(x_data, G0, eta) + getattr(
+                self, "_relaxation_offset", 0.0
+            )
         elif test_mode == TestMode.CREEP:
             return self._predict_creep(x_data, G0, eta)
         elif test_mode == TestMode.OSCILLATION:
@@ -219,7 +318,9 @@ class Maxwell(BaseModel):
 
         # Dispatch to appropriate prediction method
         if test_mode == TestMode.RELAXATION:
-            return self._predict_relaxation(X, G0, eta)
+            return self._predict_relaxation(X, G0, eta) + getattr(
+                self, "_relaxation_offset", 0.0
+            )
         elif test_mode == TestMode.CREEP:
             return self._predict_creep(X, G0, eta)
         elif test_mode == TestMode.OSCILLATION:

@@ -409,7 +409,7 @@ For practical relaxation data:
    t = np.logspace(-2, 4, 100)
    G_t = 1e5 * np.exp(-t / 10.0)  # Exponential relaxation
 
-   data = RheoData(x=t, y=G_t, domain='time', test_mode='relaxation')
+   data = RheoData(x=t, y=G_t, domain='time', initial_test_mode='relaxation')
 
    # Compute mutation number
    mutation = MutationNumber(extrapolate=True)
@@ -665,7 +665,7 @@ Workflow 1: Stress Relaxation → FFT → Fractional Model Fit
    from rheojax.models import FractionalZenerSolidSolid
 
    # 1. Time-domain relaxation
-   G_t_data = RheoData(x=t, y=G_t, domain='time', test_mode='relaxation')
+   G_t_data = RheoData(x=t, y=G_t, domain='time', initial_test_mode='relaxation')
 
    # 2. FFT to frequency domain
    fft = FFTAnalysis(window='hann')
@@ -728,7 +728,7 @@ Workflow 3: Oscillation → Mutation Number → Model Selection
    from rheojax.models import FractionalZenerSolidSolid, FractionalMaxwellLiquid
 
    # 1. Relaxation data
-   G_t_data = RheoData(x=t, y=G_t, domain='time', test_mode='relaxation')
+   G_t_data = RheoData(x=t, y=G_t, domain='time', initial_test_mode='relaxation')
 
    # 2. Compute mutation number
    mutation = MutationNumber()
