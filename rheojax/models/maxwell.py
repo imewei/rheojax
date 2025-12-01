@@ -191,6 +191,7 @@ class Maxwell(BaseModel):
     def _initialize_relaxation_parameters(self, X, y) -> bool:
         """Estimate G0 and eta from relaxation data for faster convergence."""
         import logging
+
         import numpy as np
 
         try:

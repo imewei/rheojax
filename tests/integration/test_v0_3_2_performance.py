@@ -30,6 +30,7 @@ jax, jnp = safe_import_jax()
 if "PYTEST_CURRENT_TEST" in os.environ and "RHEOJAX_PERF_TEST_FAST" not in os.environ:
     os.environ["RHEOJAX_PERF_TEST_FAST"] = "1"
 
+
 def _fast_perf_mode() -> bool:
     return bool(os.environ.get("RHEOJAX_PERF_TEST_FAST"))
 
@@ -222,7 +223,9 @@ class TestV032PerformanceIntegration:
 
             # Should complete reasonably fast (< 5s for 4 datasets)
             max_elapsed = 5.0 if not fast_perf_mode else 2.0
-            assert elapsed < max_elapsed, f"Mastercurve took {elapsed:.3f}s, exceeds threshold"
+            assert (
+                elapsed < max_elapsed
+            ), f"Mastercurve took {elapsed:.3f}s, exceeds threshold"
 
             print(f"\nMastercurve multi-dataset: {elapsed:.3f}s")
             print(f"Shift factors: {shift_factors}")
@@ -269,7 +272,9 @@ class TestV032PerformanceIntegration:
 
         # Sequential processing should stay bounded even in fast mode
         max_total = 7.5 if not fast_perf_mode else 4.0
-        assert total_time < max_total, f"Batch processing took {total_time:.3f}s, exceeds threshold"
+        assert (
+            total_time < max_total
+        ), f"Batch processing took {total_time:.3f}s, exceeds threshold"
 
         print(f"\nBatch processing {n_files} files: {total_time:.3f}s")
         print(f"Per-file average: {total_time / n_files:.3f}s")
@@ -316,7 +321,9 @@ class TestV032PerformanceIntegration:
 
         # Average fit + predict should be reasonably fast
         max_avg = 3.0 if not fast_perf_mode else 2.0
-        assert avg_time < max_avg, f"Average iteration took {avg_time:.3f}s, exceeds threshold"
+        assert (
+            avg_time < max_avg
+        ), f"Average iteration took {avg_time:.3f}s, exceeds threshold"
 
         print(
             f"\nDevice efficiency (3 iterations): {elapsed_total:.3f}s avg: {avg_time:.3f}s"
@@ -439,9 +446,7 @@ class TestV032PerformanceIntegration:
 
             frac_model = FractionalZenerSolidSolid()
             start = time.perf_counter()
-            frac_model.fit(
-                t_frac, G_t_noisy, test_mode="relaxation", use_jax=False
-            )
+            frac_model.fit(t_frac, G_t_noisy, test_mode="relaxation", use_jax=False)
             timings["fractional_fit"] = time.perf_counter() - start
 
             # Benchmark 3: Complete pipeline

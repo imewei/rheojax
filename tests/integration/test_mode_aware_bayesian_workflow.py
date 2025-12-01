@@ -381,9 +381,9 @@ def test_mode_aware_posterior_predictive_distributions():
     # Verify predictions are in reasonable range (compare against observed data)
     assert np.all(predictions > 0), "Modulus should be positive"
     observed_peak = float(np.max(G_data))
-    assert np.max(predictions) > observed_peak * 0.8, (
-        "Predictions should match the observed magnitude"
-    )
+    assert (
+        np.max(predictions) > observed_peak * 0.8
+    ), "Predictions should match the observed magnitude"
 
     print(
         f"Posterior predictive validation passed. "

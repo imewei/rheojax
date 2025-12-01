@@ -21,9 +21,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from rheojax.core.base import BaseModel
-from rheojax.core.bayesian import BayesianMixin, BayesianResult
 from rheojax.core.arviz_utils import import_arviz
+from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.pipeline.base import Pipeline
@@ -188,8 +187,8 @@ class BayesianPipeline(Pipeline):
 
         # Get test_mode from data metadata if available
         test_mode = None
-        if hasattr(self.data, 'metadata') and self.data.metadata is not None:
-            test_mode = self.data.metadata.get('test_mode')
+        if hasattr(self.data, "metadata") and self.data.metadata is not None:
+            test_mode = self.data.metadata.get("test_mode")
 
         # Run Bayesian inference
         result = self._last_model.fit_bayesian(

@@ -26,10 +26,11 @@ References:
 
 from __future__ import annotations
 
-from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 import numpyro.distributions as dist
 from numpyro.distributions import transforms as dist_transforms
+
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
@@ -123,7 +124,9 @@ class FractionalMaxwellLiquid(BaseModel):
             log_low = np.log(low)
             log_high = np.log(high)
             loc = float(np.clip(np.log(target), log_low + 1e-6, log_high - 1e-6))
-            base = dist.TruncatedNormal(loc=loc, scale=scale, low=log_low, high=log_high)
+            base = dist.TruncatedNormal(
+                loc=loc, scale=scale, low=log_low, high=log_high
+            )
             return dist.TransformedDistribution(base, dist_transforms.ExpTransform())
 
         if param_name == "Gm" and "gm_target" in stats:
@@ -543,6 +546,8 @@ class FractionalMaxwellLiquid(BaseModel):
             return self.predict_rheodata(X, test_mode=test_mode)
         else:
             return self._predict(X)
+
+
 def _maybe_python_float(value: float | jnp.ndarray) -> float | jnp.ndarray:
     """Return a Python float when safe, otherwise leave JAX values intact."""
 

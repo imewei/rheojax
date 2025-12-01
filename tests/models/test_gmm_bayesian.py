@@ -107,7 +107,7 @@ class TestGMMBayesianInference:
         result = model.fit_bayesian(
             t,
             G_data,
-            test_mode='relaxation',
+            test_mode="relaxation",
             num_warmup=100,  # Minimal warmup for testing
             num_samples=100,  # Minimal samples for testing
             num_chains=1,
@@ -149,7 +149,7 @@ class TestGMMBayesianInference:
         result = model.fit_bayesian(
             t,
             G_data,
-            test_mode='relaxation',
+            test_mode="relaxation",
             num_warmup=200,
             num_samples=200,
             num_chains=1,
@@ -189,7 +189,7 @@ class TestGMMBayesianInference:
         result = model.fit_bayesian(
             t,
             G_data,
-            test_mode='relaxation',
+            test_mode="relaxation",
             num_warmup=100,
             num_samples=200,
             num_chains=1,

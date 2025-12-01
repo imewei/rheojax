@@ -417,6 +417,7 @@ class FractionalZenerSolidSolid(BaseModel):
     def _initialize_relaxation_parameters(self, X, y) -> bool:
         """Derive heuristic starting values from relaxation data."""
         import logging
+
         import numpy as np
 
         try:
@@ -438,19 +439,17 @@ class FractionalZenerSolidSolid(BaseModel):
             ge_bounds = self.parameters.get("Ge").bounds or (1e-3, 1e9)
             gm_bounds = self.parameters.get("Gm").bounds or (1e-3, 1e9)
             tau_bounds = self.parameters.get("tau_alpha").bounds or (1e-6, 1e6)
-            alpha_bounds = self.parameters.get("alpha").bounds or FRACTIONAL_ORDER_BOUNDS
+            alpha_bounds = (
+                self.parameters.get("alpha").bounds or FRACTIONAL_ORDER_BOUNDS
+            )
 
             ge_guess = float(np.clip(ge_guess, ge_bounds[0], ge_bounds[1]))
             gm_guess = float(np.clip(gm_guess, gm_bounds[0], gm_bounds[1]))
 
-            normalized = np.clip(
-                (g_sorted - ge_guess) / (gm_guess + 1e-9), 0.0, 1.0
-            )
+            normalized = np.clip((g_sorted - ge_guess) / (gm_guess + 1e-9), 0.0, 1.0)
             target = np.exp(-1.0)
             idx = int(np.argmin(np.abs(normalized - target)))
-            tau_guess = float(
-                np.clip(t_sorted[idx], tau_bounds[0], tau_bounds[1])
-            )
+            tau_guess = float(np.clip(t_sorted[idx], tau_bounds[0], tau_bounds[1]))
 
             alpha_guess = float(np.clip(0.6, alpha_bounds[0], alpha_bounds[1]))
 

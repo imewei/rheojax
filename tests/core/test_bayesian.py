@@ -163,7 +163,7 @@ def test_fit_bayesian_basic_functionality():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=50,
         num_samples=100,
         num_chains=1,
@@ -203,7 +203,7 @@ def test_float64_precision_in_nuts_sampling():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=50,
         num_samples=100,
         num_chains=1,
@@ -233,7 +233,7 @@ def test_warm_start_from_nlsq_initial_values():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=50,
         num_samples=100,
         num_chains=1,
@@ -280,7 +280,7 @@ def test_warm_start_multichain_initial_values():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=50,
         num_samples=100,
         num_chains=4,  # Multi-chain with warm-start (the bug scenario)
@@ -325,7 +325,7 @@ def test_convergence_diagnostics_rhat_computation():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=100,
         num_samples=200,
         num_chains=2,  # Multi-chain for R-hat
@@ -370,7 +370,7 @@ def test_convergence_diagnostics_ess_computation():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=100,
         num_samples=num_samples,
         num_chains=1,
@@ -413,7 +413,7 @@ def test_divergence_detection():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=100,
         num_samples=200,
         num_chains=1,
@@ -450,7 +450,7 @@ def test_multi_chain_sampling():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=100,
         num_samples=200,
         num_chains=num_chains,
@@ -489,7 +489,7 @@ def test_error_handling_invalid_bounds():
         model.fit_bayesian(
             X,
             y,
-            test_mode='relaxation',
+            test_mode="relaxation",
             num_warmup=50,
             num_samples=100,
             num_chains=1,
@@ -512,7 +512,7 @@ def test_error_handling_mismatched_data_dimensions():
         model.fit_bayesian(
             X,
             y,
-            test_mode='relaxation',
+            test_mode="relaxation",
             num_warmup=50,
             num_samples=100,
             num_chains=1,
@@ -539,7 +539,7 @@ def test_error_handling_invalid_initial_values():
         result = model.fit_bayesian(
             X,
             y,
-            test_mode='relaxation',
+            test_mode="relaxation",
             num_warmup=50,
             num_samples=100,
             num_chains=1,
@@ -569,7 +569,7 @@ def test_posterior_summary_statistics():
     result = model.fit_bayesian(
         X,
         y,
-        test_mode='relaxation',
+        test_mode="relaxation",
         num_warmup=100,
         num_samples=500,
         num_chains=1,

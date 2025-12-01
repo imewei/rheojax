@@ -28,17 +28,16 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
-import logging
 
 import nlsq
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
-
 
 logger = logging.getLogger(__name__)
 
@@ -289,25 +288,31 @@ def nlsq_optimize(
 
         result = OptimizationResult(
             x=np.asarray(scipy_result.x, dtype=np.float64),
-            fun=float(2.0 * scipy_result.cost)
-            if hasattr(scipy_result, "cost")
-            else float(np.sum(residual_fn(scipy_result.x) ** 2)),
-            jac=
+            fun=(
+                float(2.0 * scipy_result.cost)
+                if hasattr(scipy_result, "cost")
+                else float(np.sum(residual_fn(scipy_result.x) ** 2))
+            ),
+            jac=(
                 np.asarray(scipy_result.jac, dtype=np.float64)
                 if scipy_result.jac is not None
-                else None,
+                else None
+            ),
             success=bool(scipy_result.success),
             message=str(scipy_result.message),
             nit=int(getattr(scipy_result, "nit", scipy_result.nfev)),
             nfev=int(scipy_result.nfev),
             njev=int(getattr(scipy_result, "njev", 0)),
-            optimality=float(getattr(scipy_result, "optimality", np.nan))
-            if getattr(scipy_result, "optimality", None) is not None
-            else None,
-            active_mask=
+            optimality=(
+                float(getattr(scipy_result, "optimality", np.nan))
+                if getattr(scipy_result, "optimality", None) is not None
+                else None
+            ),
+            active_mask=(
                 np.asarray(scipy_result.active_mask)
                 if getattr(scipy_result, "active_mask", None) is not None
-                else None,
+                else None
+            ),
             cost=float(cost_value) if cost_value is not None else None,
         )
 
@@ -327,7 +332,10 @@ def nlsq_optimize(
     # Convert NLSQ result to OptimizationResult
     result = OptimizationResult.from_nlsq(nlsq_result)
 
-    if not result.success and "inner optimization loop exceeded" in result.message.lower():
+    if (
+        not result.success
+        and "inner optimization loop exceeded" in result.message.lower()
+    ):
         logger.warning(
             "NLSQ hit inner iteration limit; retrying with SciPy least_squares for stability."
         )

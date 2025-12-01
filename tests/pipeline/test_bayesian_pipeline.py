@@ -86,7 +86,7 @@ def sample_data():
         x_units="s",
         y_units="Pa",
         domain="time",
-        initial_test_mode='relaxation',
+        initial_test_mode="relaxation",
         validate=False,
     )
 

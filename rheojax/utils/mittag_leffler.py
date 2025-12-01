@@ -294,12 +294,18 @@ def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarr
         g_vals_gt = jnp.array(
             [
                 jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local),
-                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local + alpha_local),
-                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local + 2 * alpha_local),
-                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local + 3 * alpha_local),
-                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local + 4 * alpha_local),
-                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local - 2 * alpha_local),
-                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local - 3 * alpha_local),
+                jax_gamma(beta_local - alpha_local)
+                / jax_gamma(beta_local + alpha_local),
+                jax_gamma(beta_local - alpha_local)
+                / jax_gamma(beta_local + 2 * alpha_local),
+                jax_gamma(beta_local - alpha_local)
+                / jax_gamma(beta_local + 3 * alpha_local),
+                jax_gamma(beta_local - alpha_local)
+                / jax_gamma(beta_local + 4 * alpha_local),
+                jax_gamma(beta_local - alpha_local)
+                / jax_gamma(beta_local - 2 * alpha_local),
+                jax_gamma(beta_local - alpha_local)
+                / jax_gamma(beta_local - 3 * alpha_local),
             ],
             dtype=jnp.float64,
         )

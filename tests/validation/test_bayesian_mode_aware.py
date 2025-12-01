@@ -866,7 +866,7 @@ class TestFractionalModelsRelaxation:
                     relaxation_fractional_data.x,
                     relaxation_fractional_data.y,
                     test_mode="relaxation",
-                max_iter=10000,
+                    max_iter=10000,
                 )
 
                 # Extract NLSQ parameters as initial values for warm-start

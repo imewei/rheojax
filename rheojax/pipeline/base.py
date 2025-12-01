@@ -172,7 +172,9 @@ class Pipeline:
         self.history.append(("transform", transform_name))
         return self
 
-    def _apply_test_mode_metadata(self, data: RheoData | None, mode: str | None) -> None:
+    def _apply_test_mode_metadata(
+        self, data: RheoData | None, mode: str | None
+    ) -> None:
         """Attach explicit test mode information to loaded data."""
 
         if data is None or mode is None:

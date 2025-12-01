@@ -481,7 +481,9 @@ class BayesianMixin:
         def _normalize_bound(value: float | None, default: float) -> float:
             return float(value) if value is not None else default
 
-        def _safe_interval(lower_raw: float | None, upper_raw: float | None) -> tuple[float, float]:
+        def _safe_interval(
+            lower_raw: float | None, upper_raw: float | None
+        ) -> tuple[float, float]:
             lower = _normalize_bound(lower_raw, -np.inf)
             upper = _normalize_bound(upper_raw, np.inf)
 
@@ -499,7 +501,9 @@ class BayesianMixin:
                 return lower_guess, upper - eps
             return -1.0, 1.0
 
-        def _default_midpoint(lower_raw: float | None, upper_raw: float | None) -> float:
+        def _default_midpoint(
+            lower_raw: float | None, upper_raw: float | None
+        ) -> float:
             lower = _normalize_bound(lower_raw, -np.inf)
             upper = _normalize_bound(upper_raw, np.inf)
 
@@ -565,9 +569,7 @@ class BayesianMixin:
                         and upper is not None
                         and 0.0 <= lower < upper <= 1.0
                     ):
-                        beta_base = dist.Beta(
-                            concentration1=2.0, concentration0=2.0
-                        )
+                        beta_base = dist.Beta(concentration1=2.0, concentration0=2.0)
                         if lower == 0.0 and upper == 1.0:
                             params_dict[name] = numpyro.sample(name, beta_base)
                         else:
@@ -663,17 +665,27 @@ class BayesianMixin:
 
         # Provide sensible initial noise scales to avoid near-zero sigma issues
         if is_complex_data:
-            if "sigma_real" not in warm_start_values and y_real_scale_scalar is not None:
+            if (
+                "sigma_real" not in warm_start_values
+                and y_real_scale_scalar is not None
+            ):
                 warm_start_values["sigma_real"] = max(
                     (y_real_scale_scalar or 0.0) * 0.1, 1e-6
                 )
-            if "sigma_imag" not in warm_start_values and y_imag_scale_scalar is not None:
+            if (
+                "sigma_imag" not in warm_start_values
+                and y_imag_scale_scalar is not None
+            ):
                 warm_start_values["sigma_imag"] = max(
                     (y_imag_scale_scalar or 0.0) * 0.1, 1e-6
                 )
         else:
-            data_scale = data_scale_scalar if data_scale_scalar is not None else float(
-                np.std(np.asarray(y_array, dtype=np.float64)) if y_jax.size else 1.0
+            data_scale = (
+                data_scale_scalar
+                if data_scale_scalar is not None
+                else float(
+                    np.std(np.asarray(y_array, dtype=np.float64)) if y_jax.size else 1.0
+                )
             )
             if "sigma" not in warm_start_values:
                 warm_start_values["sigma"] = max(data_scale * 0.1, 1e-6)
