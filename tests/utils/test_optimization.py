@@ -333,6 +333,8 @@ class TestComplexDataHandling:
         """Test fitting complex modulus data directly without manual splitting."""
         from rheojax.utils.optimization import create_least_squares_objective
 
+        np.random.seed(42)
+
         # True Maxwell parameters
         G0_true = 1e5  # Pa
         eta_true = 1e3  # Pa·s

@@ -22,6 +22,8 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.base import BaseModel
+from rheojax.core.bayesian import BayesianMixin, BayesianResult
+from rheojax.core.arviz_utils import import_arviz
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.pipeline.base import Pipeline
@@ -534,11 +536,11 @@ class BayesianPipeline(Pipeline):
             - Multimodal posteriors (multiple clusters)
         """
         try:
-            import arviz as az
-        except ImportError:
+            az = import_arviz(required=("plot_pair",))
+        except ImportError as exc:
             raise ImportError(
                 "ArviZ is required for pair plots. Install it with: pip install arviz"
-            ) from None
+            ) from exc
 
         # Get InferenceData
         idata = self._get_inference_data()
@@ -620,11 +622,11 @@ class BayesianPipeline(Pipeline):
             - Identifying parameters with poor estimation (wide intervals)
         """
         try:
-            import arviz as az
-        except ImportError:
+            az = import_arviz(required=("plot_forest",))
+        except ImportError as exc:
             raise ImportError(
                 "ArviZ is required for forest plots. Install it with: pip install arviz"
-            ) from None
+            ) from exc
 
         # Get InferenceData
         idata = self._get_inference_data()
@@ -692,11 +694,11 @@ class BayesianPipeline(Pipeline):
             Good NUTS sampling shows similar marginal and transition energy distributions.
         """
         try:
-            import arviz as az
-        except ImportError:
+            az = import_arviz(required=("plot_energy",))
+        except ImportError as exc:
             raise ImportError(
                 "ArviZ is required for energy plots. Install it with: pip install arviz"
-            ) from None
+            ) from exc
 
         # Get InferenceData
         idata = self._get_inference_data()
@@ -770,11 +772,11 @@ class BayesianPipeline(Pipeline):
             Goal: autocorrelation drops to ~0 within a few dozen lags.
         """
         try:
-            import arviz as az
-        except ImportError:
+            az = import_arviz(required=("plot_autocorr",))
+        except ImportError as exc:
             raise ImportError(
                 "ArviZ is required for autocorrelation plots. Install it with: pip install arviz"
-            ) from None
+            ) from exc
 
         # Get InferenceData
         idata = self._get_inference_data()
@@ -850,11 +852,11 @@ class BayesianPipeline(Pipeline):
             Goal: uniform histogram across all bins.
         """
         try:
-            import arviz as az
-        except ImportError:
+            az = import_arviz(required=("plot_rank",))
+        except ImportError as exc:
             raise ImportError(
                 "ArviZ is required for rank plots. Install it with: pip install arviz"
-            ) from None
+            ) from exc
 
         # Get InferenceData
         idata = self._get_inference_data()
@@ -933,11 +935,11 @@ class BayesianPipeline(Pipeline):
             Goal: ESS > 400 for bulk and tail estimates.
         """
         try:
-            import arviz as az
-        except ImportError:
+            az = import_arviz(required=("plot_ess",))
+        except ImportError as exc:
             raise ImportError(
                 "ArviZ is required for ESS plots. Install it with: pip install arviz"
-            ) from None
+            ) from exc
 
         # Get InferenceData
         idata = self._get_inference_data()

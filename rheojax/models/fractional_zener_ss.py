@@ -50,6 +50,7 @@ jax, jnp = safe_import_jax()
 from rheojax.core.base import BaseModel
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.utils.compatibility import format_compatibility_message
 from rheojax.utils.mittag_leffler import mittag_leffler_e
 
 
@@ -316,8 +317,24 @@ class FractionalZenerSolidSolid(BaseModel):
         self._test_mode = test_mode
 
         # Provide simple data-aware initialization for relaxation fits
+        compatibility_guard = kwargs.pop("compatibility_guard", False)
+        incompat_confidence = kwargs.pop("compatibility_confidence_threshold", 0.65)
+        compatibility_report = None
+
         if test_mode == TestMode.RELAXATION:
             self._initialize_relaxation_parameters(X, y)
+
+            if compatibility_guard:
+                compatibility_report = _compute_relaxation_compatibility(self, X, y)
+                if compatibility_report and _should_block_relaxation_fit(
+                    compatibility_report, incompat_confidence
+                ):
+                    message = format_compatibility_message(compatibility_report)
+                    raise RuntimeError(
+                        "Optimization failed: data is incompatible with "
+                        "FractionalZenerSolidSolid.\n"
+                        f"Model-data compatibility:\n{message}"
+                    )
 
         # Smart initialization for oscillation mode (Issue #9)
         if test_mode == TestMode.OSCILLATION:
@@ -378,6 +395,21 @@ class FractionalZenerSolidSolid(BaseModel):
                 f"Optimization failed: {result.message}. "
                 f"Try adjusting initial values, bounds, or max_iter."
             )
+
+        # Detect incompatible relaxation data even when optimization converges
+        if test_mode == TestMode.RELAXATION and compatibility_guard:
+            if compatibility_report is None:
+                compatibility_report = _compute_relaxation_compatibility(self, X, y)
+
+            if compatibility_report and _should_block_relaxation_fit(
+                compatibility_report, incompat_confidence
+            ):
+                message = format_compatibility_message(compatibility_report)
+                raise RuntimeError(
+                    "Optimization failed: data is incompatible with "
+                    "FractionalZenerSolidSolid.\n"
+                    f"Model-data compatibility:\n{message}"
+                )
 
         self.fitted_ = True
         return self
@@ -507,6 +539,47 @@ class FractionalZenerSolidSolid(BaseModel):
         else:
             # Default to relaxation mode for FZSS model
             return self._predict_relaxation(X, Ge, Gm, alpha, tau_alpha)
+
+
+def _should_block_relaxation_fit(compat: dict, minimum_confidence: float) -> bool:
+    """Return True when compatibility analysis flags obvious mismatches."""
+
+    if compat.get("compatible", True):
+        return False
+
+    if compat.get("confidence", 0.0) < minimum_confidence:
+        return False
+
+    try:
+        from rheojax.utils.compatibility import DecayType, MaterialType
+    except Exception:  # pragma: no cover - defensive guard
+        return False
+
+    decay_type = compat.get("decay_type")
+    material_type = compat.get("material_type")
+
+    return (
+        decay_type == DecayType.EXPONENTIAL
+        or material_type == MaterialType.VISCOELASTIC_LIQUID
+    )
+
+
+def _compute_relaxation_compatibility(model, X, y) -> dict | None:
+    """Best-effort compatibility evaluation for relaxation data."""
+
+    try:
+        import numpy as np
+
+        from rheojax.utils.compatibility import check_model_compatibility
+
+        return check_model_compatibility(
+            model,
+            t=np.asarray(X, dtype=float),
+            G_t=np.asarray(y, dtype=float),
+            test_mode="relaxation",
+        )
+    except Exception:  # pragma: no cover - compatibility is heuristic
+        return None
 
 
 # Convenience alias

@@ -134,13 +134,15 @@ class BayesianResult:
             return self._inference_data
 
         # Import arviz (lazy import)
+        from rheojax.core.arviz_utils import import_arviz
+
         try:
-            import arviz as az
-        except ImportError:
+            az = import_arviz(required=("from_numpyro",))
+        except ImportError as exc:
             raise ImportError(
                 "ArviZ is required for InferenceData conversion. "
                 "Install it with: pip install arviz"
-            ) from None
+            ) from exc
 
         # Ensure MCMC object is available
         if self.mcmc is None:

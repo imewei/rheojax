@@ -569,8 +569,7 @@ class TestArviZAvailability:
 
         try:
             # Temporarily remove arviz from sys.modules
-            if "arviz" in sys.modules:
-                monkeypatch.setitem(sys.modules, "arviz", None)
+            monkeypatch.setitem(sys.modules, "arviz", None)
 
             # Plotting methods should raise ImportError or informative message
             with pytest.raises((ImportError, RuntimeError)):
@@ -580,6 +579,8 @@ class TestArviZAvailability:
             # Restore arviz if it was available
             if original_arviz is not None:
                 sys.modules["arviz"] = original_arviz
+            else:
+                sys.modules.pop("arviz", None)
 
 
 # Mark all tests to filter deprecation warnings

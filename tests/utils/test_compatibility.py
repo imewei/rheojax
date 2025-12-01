@@ -307,7 +307,13 @@ class TestEnhancedErrorMessaging:
 
         # Should fail with enhanced error message
         with pytest.raises(RuntimeError) as exc_info:
-            model.fit(t, G_t, test_mode="relaxation", max_iter=100)
+            model.fit(
+                t,
+                G_t,
+                test_mode="relaxation",
+                max_iter=100,
+                compatibility_guard=True,
+            )
 
         error_msg = str(exc_info.value)
 

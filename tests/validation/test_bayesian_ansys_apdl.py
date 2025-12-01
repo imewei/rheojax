@@ -30,6 +30,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
 from rheojax.models.maxwell import Maxwell
+from rheojax.utils.mittag_leffler import mittag_leffler_e
 
 jax, jnp = safe_import_jax()
 
@@ -318,22 +319,25 @@ def ansys_fractional_relaxation_data():
     """Synthetic fractional model data matching ANSYS UD material reference."""
     time = np.logspace(-2, 2, 30)
 
-    # ANSYS fractional parameters
-    alpha = 0.5  # Fractional order
-    K = 1e5  # Strength
-    G_infinity = 1e4  # Pa
+    # Fractional Zener parameters chosen to mirror ANSYS UD material tables
+    alpha = 0.5
+    Ge = 1e4  # Equilibrium modulus (Pa)
+    Gm = 9e4  # Maxwell arm modulus (Pa)
+    tau_alpha = 1.5  # Characteristic time (s^α)
 
-    # Generalized fractional relaxation: G(t) = G_∞ + K * Γ(α+1) / t^α
-    # Simplified for testing
-    G_t = G_infinity + K / (1 + (time / 1.0) ** alpha)
+    # Reference relaxation: G(t) = Ge + Gm * E_α(-(t/τ)^α)
+    ml_input = -((jnp.asarray(time) / tau_alpha) ** alpha)
+    ml_values = np.asarray(mittag_leffler_e(ml_input, alpha))
+    G_t = Ge + Gm * ml_values
 
     metadata = {
         "ansys_reference": True,
         "reference_element": "UD_MATERIAL",
         "model_type": "FRACTIONAL_MAXWELL",
         "alpha": alpha,
-        "K": K,
-        "G_infinity": G_infinity,
+        "Ge": Ge,
+        "Gm": Gm,
+        "tau_alpha": tau_alpha,
     }
 
     return RheoData(
