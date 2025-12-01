@@ -417,8 +417,6 @@ class FractionalMaxwellGel(BaseModel):
             RheoData with predicted y values
         """
         # Auto-detect test mode if not provided
-        if isinstance(test_mode, property):
-            test_mode = test_mode.fget(rheo_data)
         if not isinstance(test_mode, str) or not test_mode:
             test_mode = rheo_data.test_mode
 
