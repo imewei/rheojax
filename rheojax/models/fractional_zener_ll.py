@@ -232,23 +232,32 @@ class FractionalZenerLiquidLiquid(BaseModel):
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
-        Note: Analytical relaxation modulus is complex for FZLL.
-        This provides a numerical approximation.
+        Uses a combined power-law and exponential decay form:
+
+        G(t) = c1 / (1 + (t/tau)^alpha) + c2 * exp(-t/tau)
+
+        This form provides liquid-like behavior (G→0 as t→∞) with two
+        distinct contributions:
+        - c1 term: fractional power-law decay controlled by alpha
+        - c2 term: exponential decay for short-time dynamics
+
+        This parameterization avoids the c1/c2 degeneracy that would occur
+        if only the sum (c1 + c2) affected predictions.
 
         Parameters
         ----------
         t : jnp.ndarray
             Time array (s)
         c1 : float
-            First SpringPot constant
+            First SpringPot constant (power-law term)
         c2 : float
-            Second SpringPot constant
+            Second SpringPot constant (exponential term)
         alpha : float
-            First fractional order
+            First fractional order (controls power-law decay)
         beta : float
-            Second fractional order
+            Second fractional order (not used in relaxation)
         gamma : float
-            Third fractional order
+            Third fractional order (not used in relaxation)
         tau : float
             Relaxation time (s)
 
@@ -257,34 +266,31 @@ class FractionalZenerLiquidLiquid(BaseModel):
         jnp.ndarray
             Relaxation modulus G(t) (Pa)
         """
-        # Clip fractional orders BEFORE JIT to make them concrete (not traced)
-
         epsilon = 1e-12
-        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-        gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
 
-        # Compute max/min orders as concrete values
-        max_order = max(alpha_safe, gamma_safe)
-        min(alpha_safe, gamma_safe)
-
-        # JIT-compiled inner function with concrete alpha/gamma
+        # JIT-compiled function with JAX-compatible clipping
         @jax.jit
-        def _compute_relaxation(t, c1, c2, tau):
+        def _compute_relaxation(t, c1, c2, alpha, beta, gamma, tau):
+            # Clip fractional orders using JAX operations (tracer-safe)
+            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
             tau_safe = tau + epsilon
 
-            # Short time: dominated by highest fractional order
-            G_short = (c1 + c2) * jnp.power(t, -max_order)
+            # Use c1 as the main modulus contribution and alpha as the decay exponent
+            # This breaks the c1/c2 degeneracy by using them differently
+            # G(t) = c1 / (1 + (t/tau)^alpha) + c2 * exp(-t/tau)
+            t_tau_ratio = t / tau_safe
 
-            # Long time: power-law decay with characteristic time
-            G_long = c2 * jnp.power(t, -gamma_safe)
+            # Primary power-law decay term from c1
+            term1 = c1 / (1.0 + jnp.power(t_tau_ratio, alpha_safe))
 
-            # Crossover around tau
-            weight = jnp.tanh(t / tau_safe)
-            G_t = G_short * (1.0 - weight) + G_long * weight
+            # Secondary exponential decay term from c2 (simpler decay)
+            term2 = c2 * jnp.exp(-t_tau_ratio)
+
+            G_t = term1 + term2
 
             return G_t
 
-        return _compute_relaxation(t, c1, c2, tau)
+        return _compute_relaxation(t, c1, c2, alpha, beta, gamma, tau)
 
     def _predict_creep(
         self,
@@ -349,6 +355,68 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         return _compute_creep(t, c1, c2, tau)
 
+    def _initialize_relaxation_parameters(self, X, y) -> bool:
+        """Derive heuristic starting values from relaxation data.
+
+        For FZLL, estimates c1, c2, and tau from the data characteristics.
+        """
+        import logging
+
+        import numpy as np
+
+        try:
+            t = np.asarray(X, dtype=float).ravel()
+            g = np.asarray(y, dtype=float).ravel()
+            if t.shape != g.shape or t.size < 4:
+                return False
+
+            order = np.argsort(t)
+            t_sorted = t[order]
+            g_sorted = g[order]
+
+            # For liquid model, G(t→∞) → 0
+            # Formula: G(t) = c1 / (1 + (t/tau)^alpha) + c2 * exp(-t/tau)
+            # At t=0: G(0) ≈ c1 + c2
+
+            # Find where G is at half of its maximum - that gives us tau estimate
+            g_max = float(np.max(g_sorted))
+            g_half = g_max / 2.0
+
+            # At early times, G ≈ c1 / (1 + (t_min/tau)^alpha) + c2 * exp(-t_min/tau)
+            # If t_min = tau: G = c1/2 + c2*exp(-1) ≈ c1/2 + 0.37*c2
+            # So g_max ≈ c1/2 for the case where t_min = tau
+            # Estimate: c1 ≈ 2*g_max, c2 ≈ 0 (small contribution)
+            c1_guess = g_max * 2.0
+            c2_guess = 1.0  # Small contribution from exponential term
+
+            # Find tau from where G decays to half (c1/(1+1) = c1/2 at t=tau)
+            # Since g_max ≈ c1/2, we have t_min ≈ tau
+            tau_guess = float(t_sorted[0])
+
+            # Get bounds
+            c1_bounds = self.parameters.get("c1").bounds or (1e-3, 1e9)
+            c2_bounds = self.parameters.get("c2").bounds or (1e-3, 1e9)
+            tau_bounds = self.parameters.get("tau").bounds or (1e-6, 1e6)
+
+            c1_guess = float(np.clip(c1_guess, c1_bounds[0], c1_bounds[1]))
+            c2_guess = float(np.clip(c2_guess, c2_bounds[0], c2_bounds[1]))
+            tau_guess = float(np.clip(tau_guess, tau_bounds[0], tau_bounds[1]))
+
+            self.parameters.set_value("c1", c1_guess)
+            self.parameters.set_value("c2", c2_guess)
+            self.parameters.set_value("tau", tau_guess)
+            # Keep fractional orders at defaults (0.5)
+            logging.debug(
+                "FZLL relaxation init | c1=%.3g c2=%.3g tau=%.3g",
+                c1_guess,
+                c2_guess,
+                tau_guess,
+            )
+            return True
+        except Exception as exc:
+            logging.debug(f"Relaxation initialization failed: {exc}")
+            return False
+
     def _fit(
         self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
     ) -> FractionalZenerLiquidLiquid:
@@ -390,6 +458,10 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         # Store test mode for model_function
         self._test_mode = test_mode
+
+        # Data-aware initialization for relaxation mode
+        if test_mode == TestMode.RELAXATION:
+            self._initialize_relaxation_parameters(X, y)
 
         # Smart initialization for oscillation mode (Issue #9)
         if test_mode == TestMode.OSCILLATION:

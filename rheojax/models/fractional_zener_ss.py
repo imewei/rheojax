@@ -534,7 +534,11 @@ class FractionalZenerSolidSolid(BaseModel):
         elif test_mode == TestMode.CREEP:
             return self._predict_creep(X, Ge, Gm, alpha, tau_alpha)
         elif test_mode == TestMode.OSCILLATION:
-            return self._predict_oscillation(X, Ge, Gm, alpha, tau_alpha)
+            # _predict_oscillation returns stacked (n, 2) for NLSQ fitting,
+            # but Bayesian inference needs complex array for gradient compatibility
+            stacked = self._predict_oscillation(X, Ge, Gm, alpha, tau_alpha)
+            # Convert [G', G''] stacked array to complex G* = G' + i*G''
+            return stacked[:, 0] + 1j * stacked[:, 1]
         else:
             # Default to relaxation mode for FZSS model
             return self._predict_relaxation(X, Ge, Gm, alpha, tau_alpha)

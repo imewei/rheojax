@@ -222,12 +222,15 @@ def check_ess(diagnostics: dict, threshold: float = 400) -> bool:
     return ess >= threshold
 
 
-def check_divergences(diagnostics: dict, threshold: float = 0.01) -> bool:
+def check_divergences(
+    diagnostics: dict, threshold: float = 0.01, num_samples: int = 1000
+) -> bool:
     """Check NUTS divergence rate diagnostic.
 
     Args:
-        diagnostics: Dictionary with 'divergences' key
+        diagnostics: Dictionary with 'divergences' key (count, not rate)
         threshold: Maximum acceptable divergence rate (default 0.01 = 1%)
+        num_samples: Total number of MCMC samples (default 1000)
 
     Returns:
         True if divergence rate <= threshold
@@ -237,7 +240,9 @@ def check_divergences(diagnostics: dict, threshold: float = 0.01) -> bool:
 
     divergences = diagnostics["divergences"]
     if isinstance(divergences, (int, float)):
-        return divergences <= threshold
+        # Calculate divergence rate from count
+        rate = divergences / num_samples if num_samples > 0 else 0.0
+        return rate <= threshold
     return True  # Can't verify
 
 
@@ -730,10 +735,11 @@ class TestBayesianModeSwitch:
                 max_iter=10000,
             )
 
-            # Then Bayesian in relaxation mode
+            # Then Bayesian in relaxation mode (explicit test_mode required for v0.4.0+)
             result = model.fit_bayesian(
                 relaxation_maxwell_data.x,
                 relaxation_maxwell_data.y,
+                test_mode="relaxation",
                 num_warmup=2000,
                 num_samples=1000,
                 dense_mass=True,
