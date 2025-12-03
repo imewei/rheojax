@@ -558,9 +558,227 @@ class FrequencyToTimePipeline(Pipeline):
         return G_t
 
 
+class SPPAmplitudeSweepPipeline(Pipeline):
+    """Pipeline for SPP analysis of amplitude sweep LAOS data.
+
+    This pipeline performs SPP (Sequence of Physical Processes) analysis
+    on amplitude sweep LAOS data to extract yield stress parameters and
+    nonlinear viscoelastic metrics.
+
+    Workflow:
+        1. Load amplitude sweep data (multiple γ_0 values)
+        2. Apply SPP decomposition at each amplitude
+        3. Extract yield stresses (static and dynamic)
+        4. Fit power-law scaling to yield stress vs amplitude
+        5. Optionally fit Bayesian SPPYieldStress model
+
+    Attributes:
+        omega: Angular frequency of oscillation (rad/s)
+        results: Dictionary of SPP metrics per amplitude
+        model: Fitted SPPYieldStress model (after fit_model)
+
+    Example:
+        >>> pipeline = SPPAmplitudeSweepPipeline(omega=1.0)
+        >>> pipeline.run(amplitude_data_list)
+        >>> pipeline.fit_model(bayesian=True)
+        >>> print(pipeline.get_yield_stresses())
+    """
+
+    def __init__(self, omega: float = 1.0, n_harmonics: int = 5):
+        """Initialize SPP amplitude sweep pipeline.
+
+        Args:
+            omega: Angular frequency in rad/s (default: 1.0)
+            n_harmonics: Number of harmonics for SPP decomposition (default: 5)
+        """
+        super().__init__()
+        self.omega = omega
+        self.n_harmonics = n_harmonics
+        self.results: dict[float, dict] = {}  # gamma_0 -> SPP results
+        self.model = None
+        self._gamma_0_values: list[float] = []
+        self._sigma_sy_values: list[float] = []
+        self._sigma_dy_values: list[float] = []
+
+    def run(
+        self,
+        stress_data: list[RheoData],
+        gamma_0_values: list[float] | None = None,
+    ) -> SPPAmplitudeSweepPipeline:
+        """Execute SPP analysis on amplitude sweep data.
+
+        Args:
+            stress_data: List of RheoData objects, one per amplitude
+            gamma_0_values: Strain amplitudes corresponding to each dataset.
+                           If None, extracted from RheoData metadata.
+
+        Returns:
+            self for method chaining
+
+        Raises:
+            ValueError: If gamma_0_values not provided and not in metadata
+        """
+        from rheojax.transforms.spp_decomposer import SPPDecomposer
+
+        # Extract gamma_0 values if not provided
+        if gamma_0_values is None:
+            gamma_0_values = []
+            for data in stress_data:
+                if "gamma_0" in data.metadata:
+                    gamma_0_values.append(data.metadata["gamma_0"])
+                else:
+                    raise ValueError(
+                        "gamma_0_values must be provided or present in metadata"
+                    )
+
+        if len(stress_data) != len(gamma_0_values):
+            raise ValueError(
+                f"Number of datasets ({len(stress_data)}) must match "
+                f"number of amplitudes ({len(gamma_0_values)})"
+            )
+
+        # Process each amplitude
+        for gamma_0, data in zip(gamma_0_values, stress_data, strict=False):
+            # Apply SPP decomposition
+            decomposer = SPPDecomposer(
+                omega=self.omega,
+                gamma_0=gamma_0,
+                n_harmonics=self.n_harmonics,
+            )
+
+            try:
+                decomposer.transform(data)
+                results = decomposer.get_results()
+                self.results[float(gamma_0)] = results
+
+                self._gamma_0_values.append(float(gamma_0))
+                self._sigma_sy_values.append(results["sigma_sy"])
+                self._sigma_dy_values.append(results["sigma_dy"])
+
+                self.history.append(("spp_analyze", str(gamma_0), "success"))
+
+            except Exception as e:
+                warnings.warn(
+                    f"SPP analysis failed at γ_0 = {gamma_0}: {e}", stacklevel=2
+                )
+                self.history.append(("spp_analyze", str(gamma_0), f"failed: {e}"))
+
+        # Sort by amplitude
+        sort_idx = np.argsort(self._gamma_0_values)
+        self._gamma_0_values = [self._gamma_0_values[i] for i in sort_idx]
+        self._sigma_sy_values = [self._sigma_sy_values[i] for i in sort_idx]
+        self._sigma_dy_values = [self._sigma_dy_values[i] for i in sort_idx]
+
+        return self
+
+    def fit_model(
+        self,
+        bayesian: bool = False,
+        yield_type: str = "static",
+        **fit_kwargs,
+    ) -> SPPAmplitudeSweepPipeline:
+        """Fit SPPYieldStress model to extracted yield stresses.
+
+        Args:
+            bayesian: Whether to use Bayesian inference (default: False)
+            yield_type: Which yield stress to fit ('static' or 'dynamic')
+            **fit_kwargs: Additional arguments passed to fit or fit_bayesian
+
+        Returns:
+            self for method chaining
+        """
+        from rheojax.models.spp_yield_stress import SPPYieldStress
+
+        if not self._gamma_0_values:
+            raise RuntimeError("No data available. Call run() first.")
+
+        gamma_0_array = np.array(self._gamma_0_values)
+        if yield_type == "static":
+            sigma_array = np.array(self._sigma_sy_values)
+        else:
+            sigma_array = np.array(self._sigma_dy_values)
+
+        self.model = SPPYieldStress()
+
+        if bayesian:
+            self.model.fit_bayesian(
+                gamma_0_array,
+                sigma_array,
+                test_mode="oscillation",
+                **fit_kwargs,
+            )
+            self.history.append(("fit_bayesian", yield_type, "complete"))
+        else:
+            self.model.fit(
+                gamma_0_array,
+                sigma_array,
+                test_mode="oscillation",
+                yield_type=yield_type,
+                **fit_kwargs,
+            )
+            self.history.append(("fit_nlsq", yield_type, "complete"))
+
+        return self
+
+    def get_yield_stresses(self) -> dict[str, np.ndarray]:
+        """Get extracted yield stresses from amplitude sweep.
+
+        Returns:
+            Dictionary with:
+            - gamma_0: strain amplitudes
+            - sigma_sy: static yield stresses
+            - sigma_dy: dynamic yield stresses
+        """
+        return {
+            "gamma_0": np.array(self._gamma_0_values),
+            "sigma_sy": np.array(self._sigma_sy_values),
+            "sigma_dy": np.array(self._sigma_dy_values),
+        }
+
+    def get_amplitude_results(self, gamma_0: float) -> dict:
+        """Get full SPP results for a specific amplitude.
+
+        Args:
+            gamma_0: Strain amplitude to retrieve
+
+        Returns:
+            Dictionary of SPP metrics for that amplitude
+
+        Raises:
+            KeyError: If amplitude not in results
+        """
+        if gamma_0 not in self.results:
+            raise KeyError(f"No results for γ_0 = {gamma_0}")
+        return self.results[gamma_0].copy()
+
+    def get_model(self) -> Any:
+        """Get fitted SPPYieldStress model.
+
+        Returns:
+            Fitted model or None if not fitted
+        """
+        return self.model
+
+    def get_nonlinearity_metrics(self) -> dict[float, dict]:
+        """Get nonlinearity metrics (I3/I1, S, T) for each amplitude.
+
+        Returns:
+            Dictionary mapping gamma_0 to nonlinearity metrics
+        """
+        return {
+            gamma_0: {
+                "I3_I1_ratio": results.get("I3_I1_ratio", 0.0),
+                "S_factor": results.get("S_factor", 0.0),
+                "T_factor": results.get("T_factor", 0.0),
+            }
+            for gamma_0, results in self.results.items()
+        }
+
+
 __all__ = [
     "MastercurvePipeline",
     "ModelComparisonPipeline",
     "CreepToRelaxationPipeline",
     "FrequencyToTimePipeline",
+    "SPPAmplitudeSweepPipeline",
 ]

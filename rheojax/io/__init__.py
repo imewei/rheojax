@@ -6,6 +6,7 @@ This module provides readers and writers for various data formats:
 - CSV, Excel
 - HDF5 for large datasets
 - Automatic format detection
+- SPP analysis export (MATLAB-compatible)
 """
 
 from rheojax.io import readers, writers
@@ -24,6 +25,14 @@ from rheojax.io.writers import (
     save_hdf5,
 )
 
+# SPP export functions
+from rheojax.io.spp_export import (
+    export_spp_csv,
+    export_spp_hdf5,
+    export_spp_txt,
+    to_matlab_dict,
+)
+
 __all__ = [
     "readers",
     "writers",
@@ -37,4 +46,9 @@ __all__ = [
     "save_hdf5",
     "load_hdf5",
     "save_excel",
+    # SPP Export
+    "export_spp_txt",
+    "export_spp_hdf5",
+    "export_spp_csv",
+    "to_matlab_dict",
 ]

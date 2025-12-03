@@ -103,6 +103,7 @@ Contents
    api/core
    api/models
    api/transforms
+   api/spp_models
    api/pipeline
    api/utils
    api/io

@@ -61,6 +61,7 @@ from rheojax.pipeline.workflows import (
     FrequencyToTimePipeline,
     MastercurvePipeline,
     ModelComparisonPipeline,
+    SPPAmplitudeSweepPipeline,
 )
 
 __all__ = [
@@ -72,6 +73,7 @@ __all__ = [
     "ModelComparisonPipeline",
     "CreepToRelaxationPipeline",
     "FrequencyToTimePipeline",
+    "SPPAmplitudeSweepPipeline",
     # Builders
     "PipelineBuilder",
     "ConditionalPipelineBuilder",

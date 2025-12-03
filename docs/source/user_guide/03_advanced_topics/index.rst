@@ -36,6 +36,7 @@ Section Contents
    fractional_viscoelasticity_reference
    multi_technique_fitting
    time_temperature_superposition
+   ../spp_analysis
 
 Section Roadmap
 ---------------

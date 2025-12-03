@@ -94,6 +94,9 @@ from rheojax.models.power_law import PowerLaw
 # Soft Glassy Rheology models
 from rheojax.models.sgr_conventional import SGRConventional
 from rheojax.models.sgr_generic import SGRGeneric
+
+# SPP Yield Stress model (LAOS analysis)
+from rheojax.models.spp_yield_stress import SPPYieldStress
 from rheojax.models.springpot import SpringPot
 from rheojax.models.zener import Zener
 
@@ -135,4 +138,6 @@ __all__ = [
     # Soft Glassy Rheology models
     "SGRConventional",
     "SGRGeneric",
+    # SPP Yield Stress model
+    "SPPYieldStress",
 ]

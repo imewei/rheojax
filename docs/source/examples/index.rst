@@ -2,8 +2,8 @@
 Tutorial Notebooks
 ==================
 
-Rheo includes 22 comprehensive tutorial notebooks organized into four learning paths:
-**Basic Model Fitting** (5), **Transform Workflows** (6), **Bayesian Inference** (5), and **Advanced Patterns** (6).
+Rheo includes 23 comprehensive tutorial notebooks organized into four learning paths:
+**Basic Model Fitting** (5), **Transform Workflows** (6), **Bayesian Inference** (6), and **Advanced Patterns** (6).
 
 All notebooks are located in the ``examples/`` directory and demonstrate best practices with
 real-world datasets and synthetic data generation patterns.
@@ -30,7 +30,7 @@ Quick Navigation
      - 5 notebooks
    * - **Bayesian**
      - Bayesian inference and uncertainty quantification
-     - 5 notebooks
+     - 6 notebooks
    * - **Advanced**
      - Production patterns and custom implementations
      - 5 notebooks
@@ -441,12 +441,35 @@ All notebooks use NLSQ -> NUTS warm-start workflow (2-5x faster convergence).
    - Visualize prediction uncertainty
    - Understand sources of uncertainty
 
+16. SPP Analysis for Yield-Stress LAOS
+--------------------------------------
+
+**File**: ``examples/bayesian/08-spp-laos.ipynb``
+
+**Content**:
+   - Sequence of Physical Processes (SPP) framework
+   - Yield-stress material LAOS analysis
+   - Cage modulus and yield stress extraction
+   - Bayesian inference with NLSQ warm-start
+
+**Key Concepts**:
+   - Time-domain LAOS analysis (no Fourier)
+   - Cage modulus G_cage
+   - Static and dynamic yield stress
+   - SPP vs Fourier comparison
+
+**Learning Objectives**:
+   - Apply SPP analysis to yield-stress LAOS data
+   - Extract physical parameters (cage modulus, yield stress)
+   - Quantify uncertainty in SPP parameters
+   - Understand SPP limitations and best practices
+
 Advanced Workflows
 ==================
 
 Production patterns, custom model development, and performance optimization.
 
-16. Multi-Technique Fitting
+17. Multi-Technique Fitting
 ---------------------------
 
 **File**: ``examples/advanced/01-multi-technique-fitting.ipynb``
@@ -468,7 +491,7 @@ Production patterns, custom model development, and performance optimization.
    - Combine different rheological test modes
    - Improve parameter identifiability
 
-17. Batch Processing
+18. Batch Processing
 --------------------
 
 **File**: ``examples/advanced/02-batch-processing.ipynb``
@@ -490,7 +513,7 @@ Production patterns, custom model development, and performance optimization.
    - Automate repetitive analysis tasks
    - Generate batch reports
 
-18. Custom Model Development
+19. Custom Model Development
 ----------------------------
 
 **File**: ``examples/advanced/03-custom-models.ipynb``
@@ -512,7 +535,7 @@ Production patterns, custom model development, and performance optimization.
    - Integrate models into Rheo ecosystem
    - Use model registry for discovery
 
-19. Fractional Models Deep Dive
+20. Fractional Models Deep Dive
 -------------------------------
 
 **File**: ``examples/advanced/04-fractional-models-deep-dive.ipynb``
@@ -534,7 +557,7 @@ Production patterns, custom model development, and performance optimization.
    - Apply Mittag-Leffler functions
    - Select appropriate fractional model
 
-20. Performance Optimization
+21. Performance Optimization
 ----------------------------
 
 **File**: ``examples/advanced/05-performance-optimization.ipynb``
@@ -556,7 +579,7 @@ Production patterns, custom model development, and performance optimization.
    - Use JAX for performance
    - Benchmark optimization methods
 
-21. Frequentist Model Selection
+22. Frequentist Model Selection
 -------------------------------
 
 **File**: ``examples/advanced/06-frequentist-model-selection.ipynb``

@@ -197,7 +197,11 @@ class TestPhysicalConstraints:
     """Property-based tests for physical constraints on SGR model predictions."""
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(deadline=None, max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=50,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_oscillation_moduli_positive(self, x, G0_val, tau0):
         """G' and G'' predictions are positive for all valid parameters."""
         model = SGRConventional()
@@ -384,7 +388,11 @@ class TestNumericalStability:
         assert jnp.isfinite(G_double_prime), f"G''({x}, {omega}) not finite"
 
     @given(x=x_any_valid, G0_val=G0_param, tau0=tau0_param)
-    @settings(deadline=None, max_examples=30, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=30,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_predictions_finite(self, x, G0_val, tau0):
         """All predictions are finite for valid parameter combinations."""
         model = SGRConventional()
@@ -411,7 +419,11 @@ class TestPowerLawScaling:
     """Property-based tests for power-law scaling behavior."""
 
     @given(x=st.floats(min_value=1.2, max_value=1.8, allow_nan=False))
-    @settings(deadline=None, max_examples=30, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=30,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_storage_modulus_positive_slope(self, x):
         """G' exhibits positive slope (increasing with frequency) in power-law regime."""
         model = SGRConventional()
@@ -585,7 +597,11 @@ class TestCrossValidation:
     @given(
         x=x_power_law, G0_val=st.floats(min_value=10.0, max_value=1e4, allow_nan=False)
     )
-    @settings(deadline=None, max_examples=20, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=20,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_oscillation_relaxation_both_positive(self, x, G0_val):
         """Both oscillation and relaxation predictions are positive."""
         model = SGRConventional()
@@ -619,7 +635,11 @@ class TestModelComparison:
     """Property-based tests for consistency between SGRConventional and SGRGeneric."""
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(deadline=None, max_examples=20, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=20,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_conventional_generic_oscillation_match(self, x, G0_val, tau0):
         """SGRConventional and SGRGeneric should give identical oscillation predictions."""
         conv_model = SGRConventional()

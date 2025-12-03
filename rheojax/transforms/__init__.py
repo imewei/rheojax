@@ -14,6 +14,7 @@ from rheojax.transforms.mastercurve import Mastercurve
 from rheojax.transforms.mutation_number import MutationNumber
 from rheojax.transforms.owchirp import OWChirp
 from rheojax.transforms.smooth_derivative import SmoothDerivative
+from rheojax.transforms.spp_decomposer import SPPDecomposer, spp_analyze
 from rheojax.transforms.srfs import (
     SRFS,
     compute_shear_band_coexistence,
@@ -26,6 +27,8 @@ __all__ = [
     "MutationNumber",
     "OWChirp",
     "SmoothDerivative",
+    "SPPDecomposer",
+    "spp_analyze",
     "SRFS",
     "detect_shear_banding",
     "compute_shear_band_coexistence",

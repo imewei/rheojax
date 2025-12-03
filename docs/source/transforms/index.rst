@@ -14,6 +14,7 @@ to quickly compare available transforms and jump to details.
    owchirp
    smooth_derivative
    srfs
+   ../user_guide/spp_analysis
    ../api/transforms
 
 See also
