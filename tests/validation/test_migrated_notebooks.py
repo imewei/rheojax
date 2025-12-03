@@ -30,6 +30,7 @@ Markers:
 import json
 import os
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -133,6 +134,12 @@ def _execute_notebook(notebook_path: Path, timeout: int = 600) -> nbformat.Noteb
     # Read notebook (explicit UTF-8 encoding for Windows compatibility)
     with open(notebook_path, encoding="utf-8") as f:
         nb = nbformat.read(f, as_version=4)
+
+    # Add missing cell IDs to fix MissingIDFieldWarning
+    # (Required for nbformat 5.x compatibility)
+    for cell in nb.cells:
+        if "id" not in cell:
+            cell["id"] = str(uuid.uuid4())[:8]
 
     # Apply fast-path modifications for notebooks with dedicated test modes
     if (
@@ -801,11 +808,15 @@ class TestTransformNotebooks:
         tau_fft = None
         for cell_index, cell in enumerate(nb.cells):
             if cell.cell_type == "code":
-                outputs = _extract_cell_output(nb, cell_index)
-                if "tau_fft" in str(outputs):
-                    # Extract from namespace (if available)
-                    tau_fft = _extract_variable_from_output(outputs, "tau_fft")
-                    break
+                try:
+                    outputs = _extract_cell_output(nb, cell_index)
+                    if "tau_fft" in str(outputs):
+                        # Extract from namespace (if available)
+                        tau_fft = _extract_variable_from_output(outputs, "tau_fft")
+                        break
+                except ValueError:
+                    # Cell has no outputs (e.g., import cell), skip it
+                    continue
 
         # If direct extraction fails, look for printed output
         if tau_fft is None:

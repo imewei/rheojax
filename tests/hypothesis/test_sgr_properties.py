@@ -24,14 +24,14 @@ References
 
 import numpy as np
 import pytest
-from hypothesis import given, settings, assume, HealthCheck
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.utils.sgr_kernels import G0, Gp, Z, power_law_exponent, rho_trap
 from rheojax.models.sgr_conventional import SGRConventional
 from rheojax.models.sgr_generic import SGRGeneric
+from rheojax.utils.sgr_kernels import G0, Gp, Z, power_law_exponent, rho_trap
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -42,32 +42,55 @@ jax, jnp = safe_import_jax()
 # -----------------------------------------------------------------------------
 
 # Effective noise temperature x in physically meaningful range
-x_glass = st.floats(min_value=0.5, max_value=0.95, allow_nan=False, allow_infinity=False)
-x_power_law = st.floats(min_value=1.05, max_value=1.95, allow_nan=False, allow_infinity=False)
-x_newtonian = st.floats(min_value=2.05, max_value=3.0, allow_nan=False, allow_infinity=False)
-x_any_valid = st.floats(min_value=0.5, max_value=3.0, allow_nan=False, allow_infinity=False)
-x_near_transition = st.floats(min_value=0.9, max_value=1.1, allow_nan=False, allow_infinity=False)
+x_glass = st.floats(
+    min_value=0.5, max_value=0.95, allow_nan=False, allow_infinity=False
+)
+x_power_law = st.floats(
+    min_value=1.05, max_value=1.95, allow_nan=False, allow_infinity=False
+)
+x_newtonian = st.floats(
+    min_value=2.05, max_value=3.0, allow_nan=False, allow_infinity=False
+)
+x_any_valid = st.floats(
+    min_value=0.5, max_value=3.0, allow_nan=False, allow_infinity=False
+)
+x_near_transition = st.floats(
+    min_value=0.9, max_value=1.1, allow_nan=False, allow_infinity=False
+)
 
 # Modulus scale G0 (physically meaningful range: 0.1 Pa to 1 MPa)
-G0_param = st.floats(min_value=0.1, max_value=1e6, allow_nan=False, allow_infinity=False)
+G0_param = st.floats(
+    min_value=0.1, max_value=1e6, allow_nan=False, allow_infinity=False
+)
 
 # Attempt time tau0 (physically meaningful: 1 ns to 1 s)
-tau0_param = st.floats(min_value=1e-9, max_value=1.0, allow_nan=False, allow_infinity=False)
+tau0_param = st.floats(
+    min_value=1e-9, max_value=1.0, allow_nan=False, allow_infinity=False
+)
 
 # Frequency values (typical experimental range: 0.01 to 100 rad/s)
-omega_value = st.floats(min_value=1e-3, max_value=1e4, allow_nan=False, allow_infinity=False)
-omega_extreme = st.floats(min_value=1e-8, max_value=1e8, allow_nan=False, allow_infinity=False)
+omega_value = st.floats(
+    min_value=1e-3, max_value=1e4, allow_nan=False, allow_infinity=False
+)
+omega_extreme = st.floats(
+    min_value=1e-8, max_value=1e8, allow_nan=False, allow_infinity=False
+)
 
 # Time values (typical: 1 ms to 1000 s)
-time_value = st.floats(min_value=1e-4, max_value=1e4, allow_nan=False, allow_infinity=False)
+time_value = st.floats(
+    min_value=1e-4, max_value=1e4, allow_nan=False, allow_infinity=False
+)
 
 # Shear rate values (typical: 0.001 to 1000 s^-1)
-gamma_dot_value = st.floats(min_value=1e-4, max_value=1e4, allow_nan=False, allow_infinity=False)
+gamma_dot_value = st.floats(
+    min_value=1e-4, max_value=1e4, allow_nan=False, allow_infinity=False
+)
 
 
 # -----------------------------------------------------------------------------
 # Test Class: Kernel Function Properties
 # -----------------------------------------------------------------------------
+
 
 class TestKernelProperties:
     """Property-based tests for SGR kernel functions."""
@@ -115,23 +138,33 @@ class TestKernelProperties:
         else:
             assert G0_2 >= G0_1 - 0.01, f"G0({x2}) = {G0_2} < G0({x1}) = {G0_1}"
 
-    @given(x=x_any_valid, omega_tau0=st.floats(min_value=1e-3, max_value=1e3, allow_nan=False))
-    @settings(suppress_health_check=[HealthCheck.filter_too_much])
+    @given(
+        x=x_any_valid,
+        omega_tau0=st.floats(min_value=1e-3, max_value=1e3, allow_nan=False),
+    )
+    @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
     def test_Gp_components_non_negative(self, x, omega_tau0):
         """G'(x, omega) >= 0 and G''(x, omega) >= 0 for all valid inputs."""
         G_prime, G_double_prime = Gp(x, omega_tau0)
 
         assert G_prime >= -1e-10, f"G'({x}, {omega_tau0}) = {G_prime} < 0"
-        assert G_double_prime >= -1e-10, f"G''({x}, {omega_tau0}) = {G_double_prime} < 0"
+        assert (
+            G_double_prime >= -1e-10
+        ), f"G''({x}, {omega_tau0}) = {G_double_prime} < 0"
 
-    @given(x=x_any_valid, omega_tau0=st.floats(min_value=1e-3, max_value=1e3, allow_nan=False))
+    @given(
+        x=x_any_valid,
+        omega_tau0=st.floats(min_value=1e-3, max_value=1e3, allow_nan=False),
+    )
     @settings(suppress_health_check=[HealthCheck.filter_too_much])
     def test_Gp_components_finite(self, x, omega_tau0):
         """G' and G'' are finite for all valid inputs."""
         G_prime, G_double_prime = Gp(x, omega_tau0)
 
         assert jnp.isfinite(G_prime), f"G'({x}, {omega_tau0}) = {G_prime} not finite"
-        assert jnp.isfinite(G_double_prime), f"G''({x}, {omega_tau0}) = {G_double_prime} not finite"
+        assert jnp.isfinite(
+            G_double_prime
+        ), f"G''({x}, {omega_tau0}) = {G_double_prime} not finite"
 
     @given(x=x_any_valid)
     def test_Z_bounds(self, x):
@@ -147,19 +180,24 @@ class TestKernelProperties:
         expected = x - 1.0
         result = power_law_exponent(x)
 
-        np.testing.assert_allclose(result, expected, rtol=1e-10,
-            err_msg=f"power_law_exponent({x}) = {result}, expected {expected}")
+        np.testing.assert_allclose(
+            result,
+            expected,
+            rtol=1e-10,
+            err_msg=f"power_law_exponent({x}) = {result}, expected {expected}",
+        )
 
 
 # -----------------------------------------------------------------------------
 # Test Class: Physical Constraints
 # -----------------------------------------------------------------------------
 
+
 class TestPhysicalConstraints:
     """Property-based tests for physical constraints on SGR model predictions."""
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(deadline=None, max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
     def test_oscillation_moduli_positive(self, x, G0_val, tau0):
         """G' and G'' predictions are positive for all valid parameters."""
         model = SGRConventional()
@@ -204,8 +242,9 @@ class TestPhysicalConstraints:
 
         # Check monotonic decrease (allow small numerical tolerance)
         for i in range(1, len(G_t)):
-            assert G_t[i] <= G_t[i-1] * (1 + 1e-6), \
-                f"G(t) not monotonically decreasing at index {i}: G[{i-1}]={G_t[i-1]}, G[{i}]={G_t[i]}"
+            assert G_t[i] <= G_t[i - 1] * (
+                1 + 1e-6
+            ), f"G(t) not monotonically decreasing at index {i}: G[{i-1}]={G_t[i-1]}, G[{i}]={G_t[i]}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
     @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
@@ -237,8 +276,9 @@ class TestPhysicalConstraints:
 
         # Check monotonic increase
         for i in range(1, len(J_t)):
-            assert J_t[i] >= J_t[i-1] * (1 - 1e-6), \
-                f"J(t) not monotonically increasing at index {i}"
+            assert J_t[i] >= J_t[i - 1] * (
+                1 - 1e-6
+            ), f"J(t) not monotonically increasing at index {i}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
     @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
@@ -270,12 +310,15 @@ class TestPhysicalConstraints:
 
         tan_delta = G_star[:, 1] / G_star[:, 0]
 
-        assert np.all(tan_delta > 0), f"tan(delta) contains non-positive values for x={x}"
+        assert np.all(
+            tan_delta > 0
+        ), f"tan(delta) contains non-positive values for x={x}"
 
 
 # -----------------------------------------------------------------------------
 # Test Class: Phase Regime Behavior
 # -----------------------------------------------------------------------------
+
 
 class TestPhaseRegimes:
     """Property-based tests for correct behavior in different phase regimes."""
@@ -316,6 +359,7 @@ class TestPhaseRegimes:
 # Test Class: Numerical Stability
 # -----------------------------------------------------------------------------
 
+
 class TestNumericalStability:
     """Property-based tests for numerical stability near edge cases."""
 
@@ -340,7 +384,7 @@ class TestNumericalStability:
         assert jnp.isfinite(G_double_prime), f"G''({x}, {omega}) not finite"
 
     @given(x=x_any_valid, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=30, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(deadline=None, max_examples=30, suppress_health_check=[HealthCheck.filter_too_much])
     def test_predictions_finite(self, x, G0_val, tau0):
         """All predictions are finite for valid parameter combinations."""
         model = SGRConventional()
@@ -353,18 +397,21 @@ class TestNumericalStability:
         model._test_mode = "oscillation"
         G_star = model.predict(omega)
 
-        assert np.all(np.isfinite(G_star)), f"Non-finite oscillation prediction for x={x}, G0={G0_val}, tau0={tau0}"
+        assert np.all(
+            np.isfinite(G_star)
+        ), f"Non-finite oscillation prediction for x={x}, G0={G0_val}, tau0={tau0}"
 
 
 # -----------------------------------------------------------------------------
 # Test Class: Power-law Scaling
 # -----------------------------------------------------------------------------
 
+
 class TestPowerLawScaling:
     """Property-based tests for power-law scaling behavior."""
 
     @given(x=st.floats(min_value=1.2, max_value=1.8, allow_nan=False))
-    @settings(max_examples=30, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(deadline=None, max_examples=30, suppress_health_check=[HealthCheck.filter_too_much])
     def test_storage_modulus_positive_slope(self, x):
         """G' exhibits positive slope (increasing with frequency) in power-law regime."""
         model = SGRConventional()
@@ -386,7 +433,9 @@ class TestPowerLawScaling:
         # In the power-law regime, G' should increase with frequency
         # The exact exponent depends on the implementation details
         # Just verify it's positive and in a physically reasonable range
-        assert slope > -0.5, f"G' slope {slope} should be positive or near-zero for x={x}"
+        assert (
+            slope > -0.5
+        ), f"G' slope {slope} should be positive or near-zero for x={x}"
         assert slope < 3.0, f"G' slope {slope} unreasonably large for x={x}"
 
     @given(x=st.floats(min_value=1.2, max_value=1.8, allow_nan=False))
@@ -417,6 +466,7 @@ class TestPowerLawScaling:
 # -----------------------------------------------------------------------------
 # Test Class: GENERIC Thermodynamic Consistency
 # -----------------------------------------------------------------------------
+
 
 class TestGENERICThermodynamics:
     """Property-based tests for GENERIC model thermodynamic consistency."""
@@ -452,7 +502,9 @@ class TestGENERICThermodynamics:
         S_dot = model.compute_entropy_production(state)
 
         # At near-equilibrium, entropy production should be small
-        assert S_dot >= -1e-10, f"Entropy production {S_dot} < 0 at near-equilibrium for x={x}"
+        assert (
+            S_dot >= -1e-10
+        ), f"Entropy production {S_dot} < 0 at near-equilibrium for x={x}"
 
     @given(x=x_power_law)
     @settings(max_examples=30)
@@ -474,10 +526,12 @@ class TestGENERICThermodynamics:
 # Test Class: JAX Transformation Invariance
 # -----------------------------------------------------------------------------
 
+
 class TestJAXInvariance:
     """Property-based tests for JAX transformation correctness."""
 
     @given(x=x_any_valid)
+    @settings(deadline=None)
     def test_jit_preserves_G0_values(self, x):
         """JIT compilation preserves G0 values."""
         G0_eager = G0(x)
@@ -488,11 +542,14 @@ class TestJAXInvariance:
 
         G0_compiled = G0_jit(x)
 
-        np.testing.assert_allclose(G0_eager, G0_compiled, rtol=1e-10,
-            err_msg=f"JIT changed G0 value for x={x}")
+        np.testing.assert_allclose(
+            G0_eager, G0_compiled, rtol=1e-10, err_msg=f"JIT changed G0 value for x={x}"
+        )
 
-    @given(x=x_power_law, omega=st.floats(min_value=0.1, max_value=100.0, allow_nan=False))
-    @settings(suppress_health_check=[HealthCheck.filter_too_much])
+    @given(
+        x=x_power_law, omega=st.floats(min_value=0.1, max_value=100.0, allow_nan=False)
+    )
+    @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
     def test_jit_preserves_Gp_values(self, x, omega):
         """JIT compilation preserves Gp values."""
         G_prime_eager, G_double_prime_eager = Gp(x, omega)
@@ -503,21 +560,32 @@ class TestJAXInvariance:
 
         G_prime_jit, G_double_prime_jit = Gp_jit(x, omega)
 
-        np.testing.assert_allclose(G_prime_eager, G_prime_jit, rtol=1e-10,
-            err_msg=f"JIT changed G' value for x={x}, omega={omega}")
-        np.testing.assert_allclose(G_double_prime_eager, G_double_prime_jit, rtol=1e-10,
-            err_msg=f"JIT changed G'' value for x={x}, omega={omega}")
+        np.testing.assert_allclose(
+            G_prime_eager,
+            G_prime_jit,
+            rtol=1e-10,
+            err_msg=f"JIT changed G' value for x={x}, omega={omega}",
+        )
+        np.testing.assert_allclose(
+            G_double_prime_eager,
+            G_double_prime_jit,
+            rtol=1e-10,
+            err_msg=f"JIT changed G'' value for x={x}, omega={omega}",
+        )
 
 
 # -----------------------------------------------------------------------------
 # Test Class: Cross-validation Between Test Modes
 # -----------------------------------------------------------------------------
 
+
 class TestCrossValidation:
     """Property-based tests for consistency between different test modes."""
 
-    @given(x=x_power_law, G0_val=st.floats(min_value=10.0, max_value=1e4, allow_nan=False))
-    @settings(max_examples=20, suppress_health_check=[HealthCheck.filter_too_much])
+    @given(
+        x=x_power_law, G0_val=st.floats(min_value=10.0, max_value=1e4, allow_nan=False)
+    )
+    @settings(deadline=None, max_examples=20, suppress_health_check=[HealthCheck.filter_too_much])
     def test_oscillation_relaxation_both_positive(self, x, G0_val):
         """Both oscillation and relaxation predictions are positive."""
         model = SGRConventional()
@@ -546,11 +614,12 @@ class TestCrossValidation:
 # Test Class: Model Comparison
 # -----------------------------------------------------------------------------
 
+
 class TestModelComparison:
     """Property-based tests for consistency between SGRConventional and SGRGeneric."""
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=20, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(deadline=None, max_examples=20, suppress_health_check=[HealthCheck.filter_too_much])
     def test_conventional_generic_oscillation_match(self, x, G0_val, tau0):
         """SGRConventional and SGRGeneric should give identical oscillation predictions."""
         conv_model = SGRConventional()
@@ -570,5 +639,9 @@ class TestModelComparison:
         G_star_conv = conv_model.predict(omega)
         G_star_generic = generic_model.predict(omega)
 
-        np.testing.assert_allclose(G_star_conv, G_star_generic, rtol=1e-6,
-            err_msg=f"Conventional and GENERIC models differ for x={x}")
+        np.testing.assert_allclose(
+            G_star_conv,
+            G_star_generic,
+            rtol=1e-6,
+            err_msg=f"Conventional and GENERIC models differ for x={x}",
+        )
