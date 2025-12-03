@@ -442,6 +442,298 @@ def load_trios_chunked(
         )
 
 
+# =============================================================================
+# Helper functions for _read_segment_chunked (extracted for complexity reduction)
+# =============================================================================
+
+
+def _extract_step_temperature(line: str) -> float | None:
+    """Extract temperature from step name line.
+
+    Args:
+        line: Line containing step name with temperature
+
+    Returns:
+        Temperature in Kelvin or None if not found
+    """
+    temp_match = re.search(r"(-?\d+\.?\d*)\s*°C", line)
+    if temp_match:
+        temp_c = float(temp_match.group(1))
+        return temp_c + 273.15  # Convert to Kelvin
+    return None  # type: ignore[unreachable]
+
+
+def _parse_total_points(line: str) -> int | None:
+    """Parse total number of points from header line.
+
+    Args:
+        line: Line containing "Number of points\\t12345"
+
+    Returns:
+        Total points or None if parsing fails
+    """
+    parts = line.split("\t")
+    if len(parts) >= 2:
+        try:
+            return int(parts[1].strip())
+        except ValueError:
+            pass
+    return None
+
+
+def _parse_headers_and_units(header_line: str, unit_line: str) -> tuple[list, list]:
+    """Parse column headers and units from header lines.
+
+    Args:
+        header_line: Tab-separated column headers
+        unit_line: Tab-separated unit specifications
+
+    Returns:
+        Tuple of (columns, units) lists
+    """
+    columns = [col.strip() for col in header_line.split("\t")]
+    units = (
+        [u.strip() for u in unit_line.split("\t")] if unit_line else [""] * len(columns)
+    )
+
+    # Ensure same number of units as columns
+    while len(units) < len(columns):
+        units.append("")
+
+    return columns, units
+
+
+def _parse_row_values(values: list[str]) -> list[float]:
+    """Convert tab-separated values to floats, skipping first column.
+
+    Args:
+        values: List of string values from a data row
+
+    Returns:
+        List of floats (np.nan for non-numeric values)
+    """
+    row = []
+    for i, v in enumerate(values):
+        if i == 0:
+            # Skip first column (row label)
+            continue
+        if not v.strip():
+            row.append(np.nan)
+        else:
+            try:
+                row.append(float(v))
+            except ValueError:
+                # Handle hex values (status bits), dates, strings
+                row.append(np.nan)
+    return row
+
+
+def _process_sample_array_complex(
+    sample_array: np.ndarray,
+    x_col: int,
+    y_col: int,
+    y_col2: int,
+    y_units_orig: str,
+    y_units2_orig: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Process sample array for complex modulus data.
+
+    Args:
+        sample_array: Array of sample data
+        x_col: X column index
+        y_col: Y column index (storage modulus)
+        y_col2: Y2 column index (loss modulus)
+        y_units_orig: Original units for storage modulus
+        y_units2_orig: Original units for loss modulus
+
+    Returns:
+        Tuple of (x_chunk, y_chunk) arrays with NaN values removed
+    """
+    x_chunk_array = np.real_if_close(np.asarray(sample_array[:, x_col]))
+
+    # Complex modulus: G* = G' + i*G''
+    y_chunk_real = convert_units(sample_array[:, y_col], y_units_orig, "Pa")
+    y_chunk_imag = convert_units(sample_array[:, y_col2], y_units2_orig, "Pa")
+
+    # Remove NaN values from either component
+    y_chunk_real_array = np.real_if_close(np.asarray(y_chunk_real))
+    y_chunk_imag_array = np.real_if_close(np.asarray(y_chunk_imag))
+
+    valid_mask = ~(
+        np.isnan(x_chunk_array)
+        | np.isnan(y_chunk_real_array)
+        | np.isnan(y_chunk_imag_array)
+    )
+
+    x_chunk = x_chunk_array[valid_mask]
+    y_chunk = (y_chunk_real_array + 1j * y_chunk_imag_array)[valid_mask]
+
+    return x_chunk, y_chunk
+
+
+def _process_sample_array_real(
+    sample_array: np.ndarray, x_col: int, y_col: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Process sample array for real-valued data.
+
+    Args:
+        sample_array: Array of sample data
+        x_col: X column index
+        y_col: Y column index
+
+    Returns:
+        Tuple of (x_chunk, y_chunk) arrays with NaN values removed
+    """
+    x_chunk_array = np.real_if_close(np.asarray(sample_array[:, x_col]))
+    y_chunk_array = np.real_if_close(np.asarray(sample_array[:, y_col]))
+
+    valid_mask = ~(np.isnan(x_chunk_array) | np.isnan(y_chunk_array))
+
+    return x_chunk_array[valid_mask], y_chunk_array[valid_mask]
+
+
+def _add_sample_to_buffers(
+    x_chunk: np.ndarray, y_chunk: np.ndarray, current_x: list, current_y: list
+) -> int:
+    """Add sample data to accumulator buffers.
+
+    Args:
+        x_chunk: X values from sample
+        y_chunk: Y values from sample
+        current_x: X accumulator list
+        current_y: Y accumulator list
+
+    Returns:
+        Number of points added
+    """
+    count = 0
+    for x_val, y_val in zip(x_chunk, y_chunk, strict=True):
+        current_x.append(float(x_val) if np.isreal(x_val) else complex(x_val))
+        current_y.append(float(y_val) if np.isreal(y_val) else complex(y_val))
+        count += 1
+    return count
+
+
+def _process_complex_row(
+    row: list[float],
+    x_col: int,
+    y_col: int,
+    y_col2: int,
+    y_units_orig: str,
+    y_units2_orig: str,
+) -> tuple[float | None, complex | None]:
+    """Process a single row for complex modulus data.
+
+    Args:
+        row: Parsed row values
+        x_col: X column index
+        y_col: Y column index (storage modulus)
+        y_col2: Y2 column index (loss modulus)
+        y_units_orig: Original units for storage modulus
+        y_units2_orig: Original units for loss modulus
+
+    Returns:
+        Tuple of (x_val, y_val) or (None, None) if invalid
+    """
+    x_val = row[x_col]
+    y_val_real = convert_units(row[y_col], y_units_orig, "Pa")
+    y_val_imag = convert_units(row[y_col2], y_units2_orig, "Pa")
+
+    if np.isnan(x_val) or np.isnan(y_val_real) or np.isnan(y_val_imag):
+        return None, None
+
+    return x_val, complex(y_val_real, y_val_imag)
+
+
+def _process_real_row(
+    row: list[float], x_col: int, y_col: int
+) -> tuple[float | None, float | None]:
+    """Process a single row for real-valued data.
+
+    Args:
+        row: Parsed row values
+        x_col: X column index
+        y_col: Y column index
+
+    Returns:
+        Tuple of (x_val, y_val) or (None, None) if invalid
+    """
+    x_val = row[x_col]
+    y_val = row[y_col]
+
+    if np.isnan(x_val) or np.isnan(y_val):
+        return None, None
+
+    return x_val, y_val
+
+
+def _create_rheodata_chunk(
+    current_x: list,
+    current_y: list,
+    x_units: str,
+    y_units: str,
+    domain: str,
+    metadata: dict,
+    validate: bool,
+) -> RheoData:
+    """Create RheoData from accumulated chunk data.
+
+    Args:
+        current_x: X values list
+        current_y: Y values list
+        x_units: X axis units
+        y_units: Y axis units
+        domain: Data domain
+        metadata: Segment metadata
+        validate: Whether to validate data
+
+    Returns:
+        RheoData object
+    """
+    return RheoData(
+        x=np.array(current_x),
+        y=np.array(current_y),
+        x_units=x_units,
+        y_units=y_units,
+        domain=domain,
+        metadata=metadata.copy(),
+        validate=validate,
+    )
+
+
+def _read_sample_rows(
+    file_handle, chunk_size: int, num_columns: int
+) -> tuple[list[list[float]], int]:
+    """Read and parse sample data rows to determine column structure.
+
+    Args:
+        file_handle: Open file handle positioned after header
+        chunk_size: Chunk size to limit sample rows
+        num_columns: Expected number of columns
+
+    Returns:
+        Tuple of (sample_rows, lines_read)
+    """
+    sample_rows = []
+    lines_read = 0
+
+    for _ in range(min(10, chunk_size)):
+        try:
+            line = next(file_handle)
+            lines_read += 1
+            if not line.strip() or line.startswith("["):
+                break
+            values = line.split("\t")
+            if len(values) == num_columns:
+                row = _parse_row_values(values)
+                if row:
+                    sample_rows.append(row)
+        except (StopIteration, ValueError):
+            break
+
+    return sample_rows, lines_read
+
+
 def _read_segment_chunked(
     filepath: Path,
     seg_start: int,
@@ -470,304 +762,312 @@ def _read_segment_chunked(
         for _ in range(seg_start):
             next(f)
 
-        # Parse segment header
-        segment_lines = []
-        step_temperature = None
+        # Phase 1: Parse segment header and find data section
+        header_result = _parse_segment_header(f, seg_start, seg_end)
+        if header_result is None:
+            return
 
-        # Read until we find data start or reach segment end
-        line_num = seg_start
-        for line in f:
-            segment_lines.append(line.rstrip("\n"))
-            line_num += 1
+        step_temperature, line_num, num_points_line = header_result
 
-            # Extract temperature from step name
-            if "Step name" in line and step_temperature is None:
-                # Support negative temperatures with optional minus sign
-                temp_match = re.search(r"(-?\d+\.?\d*)\s*°C", line)
-                if temp_match:
-                    temp_c = float(temp_match.group(1))
-                    step_temperature = temp_c + 273.15  # Convert to Kelvin
+        # Phase 2: Process the data section starting at "Number of points"
+        yield from _process_data_section(
+            f,
+            line_num,
+            seg_end,
+            step_temperature,
+            num_points_line,
+            metadata,
+            chunk_size,
+            validate_data,
+            progress_callback,
+        )
 
-            # Check if we've reached segment end
-            if seg_end is not None and line_num >= seg_end:
-                break
 
-            # Check if we found "Number of points" (data section starts next)
-            if line.startswith("Number of points"):
-                # Extract total number of points for progress tracking
-                total_points = None
-                if progress_callback is not None:
-                    # Parse "Number of points\t12345" format
-                    parts = line.split("\t")
-                    if len(parts) >= 2:
-                        try:
-                            total_points = int(parts[1].strip())
-                        except ValueError:
-                            pass  # Couldn't parse, progress tracking won't work
+def _parse_segment_header(file_handle, seg_start: int, seg_end: int | None):
+    """Parse segment header to find data section start.
 
-                # Read column headers and units
-                header_line = next(f).rstrip("\n")
-                segment_lines.append(header_line)
-                unit_line = next(f).rstrip("\n")
-                segment_lines.append(unit_line)
-                line_num += 2
+    Args:
+        file_handle: Open file handle
+        seg_start: Segment start line number
+        seg_end: Segment end line number
 
-                # Parse headers
-                columns = [col.strip() for col in header_line.split("\t")]
-                units = (
-                    [u.strip() for u in unit_line.split("\t")]
-                    if unit_line
-                    else [""] * len(columns)
+    Returns:
+        Tuple of (step_temperature, line_num, num_points_line) or None
+    """
+    step_temperature = None
+    line_num = seg_start
+
+    for line in file_handle:
+        line_num += 1
+
+        # Extract temperature from step name
+        if "Step name" in line and step_temperature is None:
+            step_temperature = _extract_step_temperature(line)
+
+        # Check if we've reached segment end
+        if seg_end is not None and line_num >= seg_end:
+            return None
+
+        # Check if we found "Number of points" (data section starts next)
+        if line.startswith("Number of points"):
+            return step_temperature, line_num, line
+
+    return None
+
+
+def _process_data_section(
+    file_handle,
+    line_num: int,
+    seg_end: int | None,
+    step_temperature: float | None,
+    num_points_line: str,
+    metadata: dict,
+    chunk_size: int,
+    validate_data: bool,
+    progress_callback: Callable | None,
+):
+    """Process the data section of a segment.
+
+    Args:
+        file_handle: Open file handle positioned at data section
+        line_num: Current line number
+        seg_end: Segment end line number
+        step_temperature: Temperature in Kelvin
+        num_points_line: Line containing number of points
+        metadata: File metadata
+        chunk_size: Chunk size
+        validate_data: Whether to validate data
+        progress_callback: Progress callback
+
+    Yields:
+        RheoData chunks
+    """
+    # Parse total points for progress tracking
+    total_points = _parse_total_points(num_points_line) if progress_callback else None
+
+    # Read column headers and units
+    header_line = next(file_handle).rstrip("\n")
+    unit_line = next(file_handle).rstrip("\n")
+    line_num += 2
+
+    columns, units = _parse_headers_and_units(header_line, unit_line)
+
+    # Read sample rows to determine column structure
+    sample_rows, lines_read = _read_sample_rows(file_handle, chunk_size, len(columns))
+    line_num += lines_read
+
+    if not sample_rows:
+        return  # No data in segment
+
+    sample_array = np.array(sample_rows)
+
+    # Adjust column indices since we skipped column 0
+    columns = columns[1:]
+    units = units[1:]
+
+    # Determine x/y columns
+    col_info = _determine_xy_columns(columns, units, sample_array)
+    x_col, x_units, y_col, y_units, y_col2, y_units2 = col_info
+
+    if x_col is None or y_col is None:
+        warnings.warn(f"Could not determine x/y columns from: {columns}", stacklevel=2)
+        return
+
+    # Build segment metadata
+    domain, test_mode = _infer_domain_and_mode(
+        columns[x_col], columns[y_col], x_units, y_units
+    )
+    segment_metadata = _build_segment_metadata(
+        metadata, test_mode, columns, units, step_temperature
+    )
+
+    # Track complex vs real data
+    is_complex = y_col2 is not None
+    y_units_orig = y_units
+    y_units2_orig = y_units2 if is_complex else None
+
+    # Process sample array
+    if is_complex:
+        x_chunk, y_chunk = _process_sample_array_complex(
+            sample_array, x_col, y_col, y_col2, y_units_orig, y_units2_orig
+        )
+        y_units = "Pa"  # Standardized after conversion
+    else:
+        x_chunk, y_chunk = _process_sample_array_real(sample_array, x_col, y_col)
+
+    # Initialize accumulators and progress tracking
+    current_x: list = []
+    current_y: list = []
+    total_points_read = _add_sample_to_buffers(x_chunk, y_chunk, current_x, current_y)
+
+    progress_interval = max(1, total_points // 20) if total_points else chunk_size
+
+    # Process remaining data rows
+    yield from _process_remaining_rows(
+        file_handle,
+        line_num,
+        seg_end,
+        columns,
+        x_col,
+        y_col,
+        y_col2,
+        is_complex,
+        y_units_orig,
+        y_units2_orig,
+        current_x,
+        current_y,
+        total_points_read,
+        total_points,
+        progress_interval,
+        progress_callback,
+        x_units,
+        y_units,
+        domain,
+        segment_metadata,
+        chunk_size,
+        validate_data,
+    )
+
+
+def _build_segment_metadata(
+    base_metadata: dict,
+    test_mode: str,
+    columns: list,
+    units: list,
+    step_temperature: float | None,
+) -> dict:
+    """Build segment metadata dictionary.
+
+    Args:
+        base_metadata: Base file metadata
+        test_mode: Detected test mode
+        columns: Column names
+        units: Column units
+        step_temperature: Temperature in Kelvin
+
+    Returns:
+        Segment metadata dictionary
+    """
+    segment_metadata = base_metadata.copy()
+    segment_metadata["test_mode"] = test_mode
+    segment_metadata["columns"] = columns
+    segment_metadata["units"] = units
+
+    if step_temperature is not None:
+        segment_metadata["temperature"] = step_temperature
+
+    return segment_metadata
+
+
+def _process_remaining_rows(
+    file_handle,
+    line_num: int,
+    seg_end: int | None,
+    columns: list,
+    x_col: int,
+    y_col: int,
+    y_col2: int | None,
+    is_complex: bool,
+    y_units_orig: str,
+    y_units2_orig: str | None,
+    current_x: list,
+    current_y: list,
+    total_points_read: int,
+    total_points: int | None,
+    progress_interval: int,
+    progress_callback: Callable | None,
+    x_units: str,
+    y_units: str,
+    domain: str,
+    segment_metadata: dict,
+    chunk_size: int,
+    validate_data: bool,
+):
+    """Process remaining data rows after sample rows.
+
+    Args:
+        Various state and configuration parameters
+
+    Yields:
+        RheoData chunks
+    """
+    last_progress_report = 0
+    expected_columns = len(columns) + 1  # +1 for the row label we skip
+    max_col_needed = max(x_col, y_col, y_col2 if y_col2 is not None else 0)
+
+    for line in file_handle:
+        line_num += 1
+
+        # Check segment boundary
+        if seg_end is not None and line_num >= seg_end:
+            break
+
+        if not line.strip() or line.startswith("["):
+            break
+
+        values = line.split("\t")
+        if len(values) != expected_columns:
+            continue
+
+        try:
+            row = _parse_row_values(values)
+            if len(row) <= max_col_needed:
+                continue
+
+            # Process row based on data type
+            if is_complex:
+                x_val, y_val = _process_complex_row(
+                    row, x_col, y_col, y_col2, y_units_orig, y_units2_orig
                 )
+            else:
+                x_val, y_val = _process_real_row(row, x_col, y_col)
 
-                # Ensure same number of units as columns
-                while len(units) < len(columns):
-                    units.append("")
+            if x_val is not None:
+                current_x.append(x_val)
+                current_y.append(y_val)
+                total_points_read += 1
 
-                # Determine x/y columns (need dummy data to call function)
-                # We'll create a small sample to determine columns
-                sample_rows = []
-
-                for _ in range(min(10, chunk_size)):
-                    try:
-                        line = next(f)
-                        line_num += 1
-                        if not line.strip() or line.startswith("["):
-                            break
-                        values = line.split("\t")
-                        if len(values) == len(columns):
-                            # Skip first column (row label like "Data point")
-                            # Convert remaining columns, using np.nan for non-numeric values
-                            row = []
-                            for i, v in enumerate(values):
-                                if i == 0:
-                                    # Skip first column (row label)
-                                    continue
-                                if not v.strip():
-                                    row.append(np.nan)
-                                else:
-                                    try:
-                                        row.append(float(v))
-                                    except ValueError:
-                                        # Handle hex values (status bits), dates, strings
-                                        row.append(np.nan)
-                            if row:
-                                sample_rows.append(row)
-                    except (StopIteration, ValueError):
-                        break
-
-                if not sample_rows:
-                    return  # No data in segment
-
-                sample_array = np.array(sample_rows)
-
-                # Adjust column indices since we skipped column 0
-                columns = columns[1:]  # Remove first column ("Variables" or similar)
-                units = units[1:]  # Remove first unit
-
-                # Determine x/y columns
-                x_col, x_units, y_col, y_units, y_col2, y_units2 = (
-                    _determine_xy_columns(columns, units, sample_array)
-                )
-
-                if x_col is None or y_col is None:
-                    warnings.warn(
-                        f"Could not determine x/y columns from: {columns}", stacklevel=2
-                    )
-                    return
-
-                # Determine domain and test mode
-                domain, test_mode = _infer_domain_and_mode(
-                    columns[x_col], columns[y_col], x_units, y_units
-                )
-
-                # Update metadata
-                segment_metadata = metadata.copy()
-                segment_metadata["test_mode"] = test_mode
-                segment_metadata["columns"] = columns
-                segment_metadata["units"] = units
-
-                # Add temperature if found
-                if step_temperature is not None:
-                    segment_metadata["temperature"] = step_temperature
-
-                # Track whether we're constructing complex modulus
-                is_complex = y_col2 is not None
-
-                # Save original units before conversion (needed for processing remaining rows)
-                y_units_orig = y_units
-                y_units2_orig = y_units2 if y_col2 is not None else None
-
-                # Start accumulating data from sample rows
-                x_chunk = sample_array[:, x_col]
-
-                x_chunk_array: np.ndarray = np.real_if_close(np.asarray(x_chunk))
-
-                if is_complex:
-                    # Complex modulus: G* = G' + i*G''
-                    y_chunk_real = sample_array[:, y_col]  # Storage modulus
-                    y_chunk_imag = sample_array[:, y_col2]  # Loss modulus
-
-                    # Apply unit conversions
-                    y_chunk_real = convert_units(y_chunk_real, y_units_orig, "Pa")
-                    y_chunk_imag = convert_units(y_chunk_imag, y_units2_orig, "Pa")
-                    y_units = "Pa"  # Standardize for output
-
-                    # Construct complex modulus
-                    y_chunk = y_chunk_real + 1j * y_chunk_imag
-
-                    # Remove NaN values from either component
-                    y_chunk_real_array = np.real_if_close(np.asarray(y_chunk_real))
-                    y_chunk_imag_array = np.real_if_close(np.asarray(y_chunk_imag))
-
-                    valid_mask = ~(
-                        np.isnan(x_chunk_array)
-                        | np.isnan(y_chunk_real_array)
-                        | np.isnan(y_chunk_imag_array)
-                    )
-
-                    y_chunk = (y_chunk_real_array + 1j * y_chunk_imag_array)[valid_mask]
-                else:
-                    y_chunk = sample_array[:, y_col]
-
-                    # Remove NaN values
-                    y_chunk_array = np.real_if_close(np.asarray(y_chunk))
-                    valid_mask = ~(np.isnan(x_chunk_array) | np.isnan(y_chunk_array))
-
-                    y_chunk = y_chunk_array[valid_mask]
-
-                x_chunk = x_chunk_array[valid_mask]
-
-                # Initialize chunk buffers and progress tracking
-                current_x = []
-                current_y = []
-                total_points_read = 0
-                last_progress_report = 0
-                progress_report_interval = (
-                    max(1, total_points // 20) if total_points else chunk_size
-                )  # Report every 5% or chunk_size
-
-                # Add sample data to buffers
-                for x_val, y_val in zip(x_chunk, y_chunk, strict=True):
-                    current_x.append(
-                        float(x_val) if np.isreal(x_val) else complex(x_val)
-                    )
-                    current_y.append(
-                        float(y_val) if np.isreal(y_val) else complex(y_val)
-                    )
-                    total_points_read += 1
-
-                for line in f:
-                    line_num += 1
-
-                    # Check segment boundary
-                    if seg_end is not None and line_num >= seg_end:
-                        break
-
-                    if not line.strip() or line.startswith("["):
-                        break
-
-                    values = line.split("\t")
-                    # Account for skipped first column
-                    expected_columns = len(columns) + 1  # +1 for the row label we skip
-                    if len(values) == expected_columns:
-                        try:
-                            # Skip first column and convert remaining with nan for non-numeric
-                            row = []
-                            for i, v in enumerate(values):
-                                if i == 0:
-                                    continue
-                                if not v.strip():
-                                    row.append(np.nan)
-                                else:
-                                    try:
-                                        row.append(float(v))
-                                    except ValueError:
-                                        row.append(np.nan)
-
-                            max_col_needed = max(
-                                x_col, y_col, y_col2 if y_col2 is not None else 0
-                            )
-                            if len(row) > max_col_needed:
-                                x_val = row[x_col]
-
-                                if is_complex:
-                                    # Complex modulus construction
-                                    y_val_real = row[y_col]  # G'
-                                    y_val_imag = row[y_col2]  # G''
-
-                                    # Apply unit conversions using ORIGINAL units
-                                    y_val_real = convert_units(
-                                        y_val_real, y_units_orig, "Pa"
-                                    )
-                                    y_val_imag = convert_units(
-                                        y_val_imag, y_units2_orig, "Pa"
-                                    )
-
-                                    # Skip NaN values
-                                    if not (
-                                        np.isnan(x_val)
-                                        or np.isnan(y_val_real)
-                                        or np.isnan(y_val_imag)
-                                    ):
-                                        y_val = complex(y_val_real, y_val_imag)
-                                        current_x.append(x_val)
-                                        current_y.append(y_val)
-                                        total_points_read += 1
-                                else:
-                                    y_val = row[y_col]
-
-                                    # Skip NaN values
-                                    if not (np.isnan(x_val) or np.isnan(y_val)):
-                                        current_x.append(x_val)
-                                        current_y.append(y_val)
-                                        total_points_read += 1
-
-                                # Report progress periodically (every 5-10%)
-                                if (
-                                    progress_callback is not None
-                                    and total_points is not None
-                                    and total_points_read - last_progress_report
-                                    >= progress_report_interval
-                                ):
-                                    progress_callback(total_points_read, total_points)
-                                    last_progress_report = total_points_read
-
-                                # Yield chunk when size reached
-                                if len(current_x) >= chunk_size:
-                                    yield RheoData(
-                                        x=np.array(current_x),
-                                        y=np.array(current_y),
-                                        x_units=x_units,
-                                        y_units=y_units,
-                                        domain=domain,
-                                        metadata=segment_metadata.copy(),
-                                        validate=validate_data,
-                                    )
-                                    # Reset for next chunk
-                                    current_x = []
-                                    current_y = []
-
-                        except (ValueError, IndexError):
-                            continue
-
-                # Yield remaining data as final chunk
-                if len(current_x) > 0:
-                    yield RheoData(
-                        x=np.array(current_x),
-                        y=np.array(current_y),
-                        x_units=x_units,
-                        y_units=y_units,
-                        domain=domain,
-                        metadata=segment_metadata.copy(),
-                        validate=validate_data,
-                    )
-
-                # Final progress report (100% complete)
-                if progress_callback is not None and total_points is not None:
+                # Report progress periodically
+                if (
+                    progress_callback is not None
+                    and total_points is not None
+                    and total_points_read - last_progress_report >= progress_interval
+                ):
                     progress_callback(total_points_read, total_points)
+                    last_progress_report = total_points_read
 
-                break  # Done with this segment
+                # Yield chunk when size reached
+                if len(current_x) >= chunk_size:
+                    yield _create_rheodata_chunk(
+                        current_x,
+                        current_y,
+                        x_units,
+                        y_units,
+                        domain,
+                        segment_metadata,
+                        validate_data,
+                    )
+                    current_x.clear()
+                    current_y.clear()
+
+        except (ValueError, IndexError):
+            continue
+
+    # Yield remaining data as final chunk
+    if current_x:
+        yield _create_rheodata_chunk(
+            current_x,
+            current_y,
+            x_units,
+            y_units,
+            domain,
+            segment_metadata,
+            validate_data,
+        )
+
+    # Final progress report
+    if progress_callback is not None and total_points is not None:
+        progress_callback(total_points_read, total_points)
 
 
 def _extract_metadata(lines: list[str]) -> dict:

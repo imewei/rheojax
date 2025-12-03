@@ -55,6 +55,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import TestMode
 from rheojax.utils.sgr_kernels import G0, Gp
 
 # Safe JAX import (enforces float64)
@@ -224,7 +225,7 @@ class SGRConventional(BaseModel):
         self._t_trajectory: np.ndarray | None = None
 
         # Store test mode for mode-aware Bayesian inference
-        self._test_mode: str | None = None
+        self._test_mode: TestMode | str | None = None
 
         # LAOS attributes
         self._gamma_0: float | None = None
@@ -1017,7 +1018,7 @@ class SGRConventional(BaseModel):
         gamma_dot_dim = gamma_dot * tau0
 
         # Steady-state: x_ss = x_eq + A * (gamma_dot * tau0)^n
-        x_ss = x_eq + A * (gamma_dot_dim ** n)
+        x_ss = x_eq + A * (gamma_dot_dim**n)
 
         return float(x_ss)
 
@@ -1632,9 +1633,7 @@ class SGRConventional(BaseModel):
             >>> lambda_t = model.evolve_lambda(t, gamma_dot, lambda_initial=1.0)
         """
         if not getattr(self, "_thixotropy_enabled", False):
-            raise ValueError(
-                "Thixotropy not enabled. Call enable_thixotropy() first."
-            )
+            raise ValueError("Thixotropy not enabled. Call enable_thixotropy() first.")
 
         if t.shape != gamma_dot.shape:
             raise ValueError(
@@ -1655,10 +1654,10 @@ class SGRConventional(BaseModel):
 
         for i in range(1, len(t)):
             dlambda_dt = (
-                k_build * (1.0 - lambda_t[i-1])
-                - k_break * gamma_dot[i] * lambda_t[i-1]
+                k_build * (1.0 - lambda_t[i - 1])
+                - k_break * gamma_dot[i] * lambda_t[i - 1]
             )
-            lambda_t[i] = lambda_t[i-1] + dlambda_dt * dt[i]
+            lambda_t[i] = lambda_t[i - 1] + dlambda_dt * dt[i]
             # Clamp to [0, 1]
             lambda_t[i] = np.clip(lambda_t[i], 0.0, 1.0)
 
@@ -1696,9 +1695,7 @@ class SGRConventional(BaseModel):
             >>> sigma = model.predict_thixotropic_stress(t, gamma_dot)
         """
         if not getattr(self, "_thixotropy_enabled", False):
-            raise ValueError(
-                "Thixotropy not enabled. Call enable_thixotropy() first."
-            )
+            raise ValueError("Thixotropy not enabled. Call enable_thixotropy() first.")
 
         # Compute lambda trajectory if not provided
         if lambda_t is None:

@@ -380,7 +380,6 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
             # Find where G is at half of its maximum - that gives us tau estimate
             g_max = float(np.max(g_sorted))
-            g_half = g_max / 2.0
 
             # At early times, G ≈ c1 / (1 + (t_min/tau)^alpha) + c2 * exp(-t_min/tau)
             # If t_min = tau: G = c1/2 + c2*exp(-1) ≈ c1/2 + 0.37*c2

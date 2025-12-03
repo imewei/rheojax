@@ -168,7 +168,7 @@ class SRFS(BaseTransform):
         # a(gamma_dot) = (gamma_dot * tau0)^m / (gamma_dot_ref * tau0)^m
         #              = (gamma_dot / gamma_dot_ref)^m
         ratio = gamma_dot / self.reference_gamma_dot
-        a_gamma_dot = ratio ** m
+        a_gamma_dot = ratio**m
 
         return float(a_gamma_dot)
 
@@ -206,17 +206,19 @@ class SRFS(BaseTransform):
         a_gamma_dot = self.compute_shift_factor(gamma_dot_ref, x, tau0)
 
         # Apply horizontal shift to shear rate axis
-        x_shifted = data.x * a_gamma_dot
+        x_shifted = jnp.asarray(data.x) * a_gamma_dot
 
         # Create shifted dataset
         new_metadata = data.metadata.copy()
-        new_metadata.update({
-            "transform": "srfs",
-            "reference_gamma_dot_master": self.reference_gamma_dot,
-            "shift_factor": float(a_gamma_dot),
-            "sgr_x": x,
-            "sgr_tau0": tau0,
-        })
+        new_metadata.update(
+            {
+                "transform": "srfs",
+                "reference_gamma_dot_master": self.reference_gamma_dot,
+                "shift_factor": float(a_gamma_dot),
+                "sgr_x": x,
+                "sgr_tau0": tau0,
+            }
+        )
 
         return RheoData(
             x=x_shifted,
@@ -234,7 +236,7 @@ class SRFS(BaseTransform):
         x: float | None = None,
         tau0: float | None = None,
         return_shifts: bool = False,
-    ) -> RheoData | tuple[RheoData, dict[float, float]]:
+    ) -> RheoData | list[RheoData] | tuple[RheoData, dict[float, float]]:
         """Apply SRFS transformation.
 
         Parameters
@@ -273,7 +275,7 @@ class SRFS(BaseTransform):
         x: float | None = None,
         tau0: float | None = None,
         return_shifts: bool = False,
-    ) -> RheoData | tuple[RheoData, dict[float, float]]:
+    ) -> RheoData | list[RheoData] | tuple[RheoData, dict[float, float]]:
         """Apply SRFS transformation (public interface).
 
         Parameters
@@ -441,9 +443,9 @@ class SRFS(BaseTransform):
             gamma_dots_arr = np.array(gamma_dots)
             sort_idx = np.argsort(gamma_dots_arr)
             gamma_dots_arr = gamma_dots_arr[sort_idx]
-            shifts_arr = np.array([
-                self.compute_shift_factor(float(gd), x, tau0) for gd in gamma_dots_arr
-            ])
+            shifts_arr = np.array(
+                [self.compute_shift_factor(float(gd), x, tau0) for gd in gamma_dots_arr]
+            )
 
         return gamma_dots_arr, shifts_arr
 
@@ -547,7 +549,10 @@ def detect_shear_banding(
         "gamma_dot_high": float(gamma_dot_high),
         "sigma_low": float(sigma_low),
         "sigma_high": float(sigma_high),
-        "sigma_range": (float(min(sigma_low, sigma_high)), float(max(sigma_low, sigma_high))),
+        "sigma_range": (
+            float(min(sigma_low, sigma_high)),
+            float(max(sigma_low, sigma_high)),
+        ),
         "negative_slope_fraction": float(neg_fraction),
     }
 
@@ -615,7 +620,10 @@ def compute_shear_band_coexistence(
     gamma_dot_high_bound = banding_info["gamma_dot_high"]
 
     # Check if applied shear rate is in banding region
-    if gamma_dot_applied < gamma_dot_low_bound or gamma_dot_applied > gamma_dot_high_bound:
+    if (
+        gamma_dot_applied < gamma_dot_low_bound
+        or gamma_dot_applied > gamma_dot_high_bound
+    ):
         return None
 
     # Find stress plateau using simplified approach
@@ -631,7 +639,7 @@ def compute_shear_band_coexistence(
     high_idx = np.searchsorted(gamma_dot_sorted, gamma_dot_high_bound)
 
     # Estimate stress plateau as average in banding region
-    stress_plateau = np.mean(sigma_sorted[low_idx:high_idx+1])
+    stress_plateau = np.mean(sigma_sorted[low_idx : high_idx + 1])
 
     # Find coexisting shear rates at stress plateau
     # These are the intersections of horizontal line at stress_plateau
@@ -778,9 +786,9 @@ def evolve_thixotropy_lambda(
 
     for i in range(1, len(t)):
         dlambda_dt = thixotropy_lambda_derivative(
-            lambda_t[i-1], gamma_dot[i], k_build, k_break
+            lambda_t[i - 1], gamma_dot[i], k_build, k_break
         )
-        lambda_t[i] = lambda_t[i-1] + dlambda_dt * dt[i]
+        lambda_t[i] = lambda_t[i - 1] + dlambda_dt * dt[i]
         # Clamp to [0, 1]
         lambda_t[i] = np.clip(lambda_t[i], 0.0, 1.0)
 

@@ -14,9 +14,11 @@ from rheojax.transforms.mastercurve import Mastercurve
 from rheojax.transforms.mutation_number import MutationNumber
 from rheojax.transforms.owchirp import OWChirp
 from rheojax.transforms.smooth_derivative import SmoothDerivative
-from rheojax.transforms.srfs import SRFS
-from rheojax.transforms.srfs import detect_shear_banding
-from rheojax.transforms.srfs import compute_shear_band_coexistence
+from rheojax.transforms.srfs import (
+    SRFS,
+    compute_shear_band_coexistence,
+    detect_shear_banding,
+)
 
 __all__ = [
     "FFTAnalysis",

@@ -63,6 +63,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import TestMode
 from rheojax.utils.sgr_kernels import G0, Gp
 
 # Safe JAX import (enforces float64)
@@ -165,7 +166,7 @@ class SGRGeneric(BaseModel):
         )
 
         # Store test mode for mode-aware Bayesian inference
-        self._test_mode: str | None = None
+        self._test_mode: TestMode | str | None = None
 
         # Storage for entropy production tracking
         self._cumulative_entropy_production: float = 0.0
@@ -227,7 +228,7 @@ class SGRGeneric(BaseModel):
         G_eff = G0_val * G0_dim * lam
 
         # Elastic energy: U = sigma^2 / (2 * G_eff)
-        U = sigma ** 2 / (2.0 * G_eff + 1e-20)
+        U = sigma**2 / (2.0 * G_eff + 1e-20)
 
         return U
 
@@ -281,7 +282,7 @@ class SGRGeneric(BaseModel):
         dU_dsigma = sigma / (G_eff + 1e-20)
 
         # dU/d(lambda) = -sigma^2 / (2 * G_eff^2) * G0_val * G0_dim
-        dU_dlam = -sigma ** 2 / (2.0 * (G_eff + 1e-20) ** 2) * G0_val * G0_dim
+        dU_dlam = -(sigma**2) / (2.0 * (G_eff + 1e-20) ** 2) * G0_val * G0_dim
 
         # dS/d(lambda) = -ln(lambda) + ln(1-lambda) = ln((1-lambda)/lambda)
         dS_dlam = np.log((1.0 - lam) / lam)
@@ -331,10 +332,7 @@ class SGRGeneric(BaseModel):
         L_12 = G_eff / tau0
 
         # Antisymmetric Poisson bracket
-        L = np.array([
-            [0.0, L_12],
-            [-L_12, 0.0]
-        ])
+        L = np.array([[0.0, L_12], [-L_12, 0.0]])
 
         return L
 
@@ -391,10 +389,7 @@ class SGRGeneric(BaseModel):
         M_12 = alpha * np.sqrt(M_11 * M_22 + 1e-20)
 
         # Symmetric friction matrix
-        M = np.array([
-            [M_11, M_12],
-            [M_12, M_22]
-        ])
+        M = np.array([[M_11, M_12], [M_12, M_22]])
 
         return M
 
@@ -566,12 +561,14 @@ class SGRGeneric(BaseModel):
         results["entropy_production"] = W
 
         # 5. Overall consistency
-        results["thermodynamically_consistent"] = all([
-            results["poisson_antisymmetric"],
-            results["friction_symmetric"],
-            results["friction_positive_semidefinite"],
-            results["entropy_production_nonnegative"],
-        ])
+        results["thermodynamically_consistent"] = all(
+            [
+                results["poisson_antisymmetric"],
+                results["friction_symmetric"],
+                results["friction_positive_semidefinite"],
+                results["entropy_production_nonnegative"],
+            ]
+        )
 
         return results
 

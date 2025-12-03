@@ -6,7 +6,7 @@ to quantify the degree of time-dependence in viscoelastic materials.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -18,6 +18,9 @@ from rheojax.core.test_modes import TestMode, detect_test_mode
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+if TYPE_CHECKING:
+    from jax import Array
 
 
 IntegrationMethod = Literal["trapz", "simpson", "cumulative"]
@@ -205,6 +208,217 @@ class MutationNumber(BaseTransform):
         else:
             raise ValueError(f"Unknown extrapolation model: {self.extrapolation_model}")
 
+    def _validate_and_prepare_data(self, rheo_data: RheoData) -> tuple:
+        """Validate relaxation data and prepare arrays.
+
+        Parameters
+        ----------
+        rheo_data : RheoData
+            Relaxation modulus data
+
+        Returns
+        -------
+        tuple
+            (t, G_t, G_0) - time array, modulus array, initial modulus
+
+        Raises
+        ------
+        ValueError
+            If data is not valid relaxation data
+        """
+        mode = detect_test_mode(rheo_data)
+        if mode != TestMode.RELAXATION:
+            raise ValueError(
+                f"Mutation number requires RELAXATION data, got {mode}. "
+                f"Ensure data is monotonically decreasing in time domain."
+            )
+
+        t = rheo_data.x
+        G_t = rheo_data.y
+
+        # Convert to JAX arrays
+        if not isinstance(t, jnp.ndarray):
+            t = jnp.array(t)
+        if not isinstance(G_t, jnp.ndarray):
+            G_t = jnp.array(G_t)
+
+        # Handle complex data
+        if jnp.iscomplexobj(G_t):
+            G_t = jnp.real(G_t)
+
+        G_0 = G_t[0]
+        if G_0 <= 0:
+            raise ValueError("Initial modulus G(0) must be positive")
+
+        return t, G_t, G_0
+
+    def _estimate_equilibrium_modulus(self, G_t: Array) -> float:
+        """Estimate equilibrium modulus from tail of data.
+
+        Parameters
+        ----------
+        G_t : jnp.ndarray
+            Relaxation modulus data
+
+        Returns
+        -------
+        float
+            Estimated equilibrium modulus G_eq
+        """
+        n_tail = max(10, len(G_t) // 10)
+        return float(jnp.mean(G_t[-n_tail:]))
+
+    def _should_extrapolate(self, G_relax: Array, G_0_relax: float) -> bool:
+        """Check if extrapolation should be applied.
+
+        Parameters
+        ----------
+        G_relax : jnp.ndarray
+            Relaxing modulus component
+        G_0_relax : float
+            Initial relaxing modulus
+
+        Returns
+        -------
+        bool
+            Whether extrapolation conditions are met
+        """
+        if not self.extrapolate:
+            return False
+
+        n_check = min(10, len(G_relax) // 4)
+        tail_values = G_relax[-n_check:]
+        tail_mean = float(jnp.mean(tail_values))
+        tail_positive = float(jnp.min(tail_values)) > 0
+
+        # Only extrapolate if tail is positive and > 1% of initial relaxing modulus
+        return tail_positive and tail_mean > 0.01 * G_0_relax
+
+    def _extrapolate_tG_integral(self, t: Array, G_relax: Array) -> float:
+        """Extrapolate the ∫t×G_relax(t)dt integral contribution.
+
+        Parameters
+        ----------
+        t : jnp.ndarray
+            Time data
+        G_relax : jnp.ndarray
+            Relaxing modulus component
+
+        Returns
+        -------
+        float
+            Extrapolated tail contribution (0 if extrapolation fails)
+        """
+        t_max = t[-1]
+        G_relax_tail = G_relax[-1]
+
+        n_fit = min(10, len(t) // 4)
+        if len(t) < n_fit or G_relax_tail <= 0:
+            return 0.0
+
+        # Fit exponential decay to estimate tau
+        t_fit = t[-n_fit:]
+        G_relax_fit = G_relax[-n_fit:]
+        log_G = jnp.log(G_relax_fit + 1e-10)
+
+        t_mean = jnp.mean(t_fit)
+        log_G_mean = jnp.mean(log_G)
+        slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / (
+            jnp.sum((t_fit - t_mean) ** 2) + 1e-10
+        )
+        tau = -1.0 / (slope + 1e-10)
+
+        # Reasonable tau bounds
+        if tau <= 0 or tau >= 1e6:
+            return 0.0
+
+        # Compute tail integral: ∫[t_max to ∞] t×A×exp(-t/tau)dt
+        A = G_relax_tail * jnp.exp(t_max / tau)
+        tail_tG = A * tau * (tau + t_max) * jnp.exp(-t_max / tau)
+
+        if jnp.isnan(tail_tG) or jnp.isinf(tail_tG) or tail_tG <= 0:
+            return 0.0
+
+        return float(tail_tG)
+
+    def _apply_extrapolation(
+        self,
+        t: Array,
+        G_relax: Array,
+        G_0_relax: float,
+        integral_G: float,
+        integral_tG: float,
+    ) -> tuple[float, float]:
+        """Apply tail extrapolation to integrals.
+
+        Parameters
+        ----------
+        t : jnp.ndarray
+            Time data
+        G_relax : jnp.ndarray
+            Relaxing modulus component
+        G_0_relax : float
+            Initial relaxing modulus
+        integral_G : float
+            Current ∫G_relax dt integral
+        integral_tG : float
+            Current ∫t×G_relax dt integral
+
+        Returns
+        -------
+        tuple
+            Updated (integral_G, integral_tG) with extrapolation
+        """
+        if integral_tG <= 0 or not self._should_extrapolate(G_relax, G_0_relax):
+            return integral_G, integral_tG
+
+        try:
+            tail_G = self._extrapolate_tail(t, G_relax)
+            if not jnp.isnan(tail_G) and not jnp.isinf(tail_G) and tail_G > 0:
+                integral_G += tail_G
+                integral_tG += self._extrapolate_tG_integral(t, G_relax)
+        except (ValueError, RuntimeWarning, ZeroDivisionError):
+            pass  # Extrapolation failed, continue without it
+
+        return integral_G, integral_tG
+
+    def _compute_mutation_number(
+        self,
+        G_0: float,
+        G_eq: float,
+        G_0_relax: float,
+        integral_G: float,
+        integral_tG: float,
+    ) -> float:
+        """Compute mutation number from integrals.
+
+        Parameters
+        ----------
+        G_0 : float
+            Initial modulus
+        G_eq : float
+            Equilibrium modulus
+        G_0_relax : float
+            Initial relaxing modulus
+        integral_G : float
+            ∫G_relax dt integral
+        integral_tG : float
+            ∫t×G_relax dt integral
+
+        Returns
+        -------
+        float
+            Mutation number clamped to [0, 1]
+        """
+        if G_0_relax <= 0 or integral_tG <= 0:
+            # Fallback estimate: Δ ≈ 1 - G_eq/G_0
+            delta = (1.0 - G_eq / G_0) if G_0 > 0 else 0.0
+        else:
+            # Δ = [∫G_relax(t)dt]² / [G_0_relax × ∫t×G_relax(t)dt]
+            delta = (integral_G**2) / (G_0_relax * integral_tG)
+
+        return float(jnp.clip(delta, 0.0, 1.0))
+
     def calculate(self, rheo_data: RheoData) -> float:
         """Calculate mutation number from relaxation data.
 
@@ -223,53 +437,13 @@ class MutationNumber(BaseTransform):
         ValueError
             If data is not relaxation mode
         """
-        # Validate test mode
-        mode = detect_test_mode(rheo_data)
-        if mode != TestMode.RELAXATION:
-            raise ValueError(
-                f"Mutation number requires RELAXATION data, got {mode}. "
-                f"Ensure data is monotonically decreasing in time domain."
-            )
+        # Phase 1: Validate and prepare data
+        t, G_t, G_0 = self._validate_and_prepare_data(rheo_data)
 
-        # Get time and modulus data
-        t = rheo_data.x
-        G_t = rheo_data.y
+        # Phase 2: Estimate equilibrium modulus
+        G_eq = self._estimate_equilibrium_modulus(G_t)
 
-        # Convert to JAX arrays
-        if not isinstance(t, jnp.ndarray):
-            t = jnp.array(t)
-        if not isinstance(G_t, jnp.ndarray):
-            G_t = jnp.array(G_t)
-
-        # Handle complex data
-        if jnp.iscomplexobj(G_t):
-            G_t = jnp.real(G_t)
-
-        # Get initial modulus
-        G_0 = G_t[0]
-
-        if G_0 <= 0:
-            raise ValueError("Initial modulus G(0) must be positive")
-
-        # Estimate equilibrium modulus (average of last 10% of data)
-        n_tail = max(10, len(G_t) // 10)
-        G_eq = float(jnp.mean(G_t[-n_tail:]))
-
-        # REMOVED BROKEN EXTRAPOLATION LOGIC FOR G_eq
-        # The iterative refinement was incorrectly estimating G_eq = 0 for plateaued materials
-        # For accurate G_eq estimation, use sufficient measurement time (t_max >> tau)
-        # or more sophisticated methods (multi-exponential fitting, relaxation spectrum)
-
-        # Calculate mutation number using correct rheological formula:
-        # Δ = [∫G_relax(t)dt]² / [G_0_relax × ∫t×G_relax(t)dt]
-        # where G_relax(t) = G(t) - G_eq (the relaxing part)
-        #
-        # Physical interpretation:
-        # - Δ → 0: Elastic solid (minimal relaxation, G(t) ≈ G_eq)
-        # - Δ → 1: Viscous fluid (complete relaxation, G_eq ≈ 0)
-        # - 0 < Δ < 1: Viscoelastic material
-
-        # Calculate relaxing part: G_relax = G(t) - G_eq
+        # Phase 3: Calculate relaxing component
         G_relax = G_t - G_eq
         G_0_relax = G_0 - G_eq
 
@@ -277,83 +451,19 @@ class MutationNumber(BaseTransform):
         if G_0_relax <= 0:
             return 0.0
 
-        # Calculate required integrals of relaxing part
-        # ∫G_relax(t)dt
+        # Phase 4: Compute base integrals
         integral_G = self._integrate(t, G_relax)
-
-        # ∫t×G_relax(t)dt - first moment of relaxing modulus
         integral_tG = self._integrate(t, t * G_relax)
 
-        # Add extrapolation if requested (for relaxing part)
-        if self.extrapolate and integral_tG > 0:
-            # Check if tail values are positive and significant
-            n_check = min(10, len(G_relax) // 4)
-            tail_values = G_relax[-n_check:]
-            tail_mean = float(jnp.mean(tail_values))
-            tail_positive = float(jnp.min(tail_values)) > 0
+        # Phase 5: Apply extrapolation if requested
+        integral_G, integral_tG = self._apply_extrapolation(
+            t, G_relax, G_0_relax, integral_G, integral_tG
+        )
 
-            # Only extrapolate if tail is positive and > 1% of initial relaxing modulus
-            if tail_positive and tail_mean > 0.01 * G_0_relax:
-                try:
-                    # Extrapolate tail contribution to both integrals
-                    tail_G = self._extrapolate_tail(t, G_relax)
-                    if not jnp.isnan(tail_G) and not jnp.isinf(tail_G) and tail_G > 0:
-                        integral_G += tail_G
-
-                        # For ∫t×G_relax(t)dt tail, use: ∫[t_max to ∞] t×G_relax(t)dt
-                        # For exponential: G_relax(t) = A*exp(-t/tau)
-                        # ∫t×A×exp(-t/tau)dt = A×tau×(tau + t)×exp(-t/tau)
-                        t_max = t[-1]
-                        G_relax_tail = G_relax[-1]
-
-                        # Estimate tau from tail decay of G_relax
-                        n_fit = min(10, len(t) // 4)
-                        if len(t) >= n_fit and G_relax_tail > 0:
-                            t_fit = t[-n_fit:]
-                            G_relax_fit = G_relax[-n_fit:]
-                            log_G = jnp.log(G_relax_fit + 1e-10)
-                            t_mean = jnp.mean(t_fit)
-                            log_G_mean = jnp.mean(log_G)
-                            slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / (
-                                jnp.sum((t_fit - t_mean) ** 2) + 1e-10
-                            )
-                            tau = -1.0 / (slope + 1e-10)
-
-                            if tau > 0 and tau < 1e6:  # Reasonable tau
-                                A = G_relax_tail * jnp.exp(t_max / tau)
-                                tail_tG = (
-                                    A * tau * (tau + t_max) * jnp.exp(-t_max / tau)
-                                )
-                                if (
-                                    not jnp.isnan(tail_tG)
-                                    and not jnp.isinf(tail_tG)
-                                    and tail_tG > 0
-                                ):
-                                    integral_tG += tail_tG
-                except (ValueError, RuntimeWarning, ZeroDivisionError):
-                    # Extrapolation failed, continue without it
-                    pass
-
-        # Check for valid integrals
-        if G_0_relax <= 0 or integral_tG <= 0:
-            # Cannot compute mutation number
-            # Fall back to simple estimate: Δ ≈ 1 - G_eq/G_0
-            if G_0 > 0:
-                delta = 1.0 - (G_eq / G_0)
-            else:
-                delta = 0.0
-        else:
-            # Calculate mutation number using correct formula
-            # Δ = [∫G_relax(t)dt]² / [G_0_relax × ∫t×G_relax(t)dt]
-            numerator = integral_G**2
-            denominator = G_0_relax * integral_tG
-            delta = numerator / denominator
-
-        # Clamp to physical range [0, 1]
-        # Values outside this range indicate numerical issues or insufficient data quality
-        delta = float(jnp.clip(delta, 0.0, 1.0))
-
-        return delta
+        # Phase 6: Compute final mutation number
+        return self._compute_mutation_number(
+            G_0, G_eq, G_0_relax, integral_G, integral_tG
+        )
 
     def _transform(self, data: RheoData) -> RheoData:
         """Transform relaxation data to mutation number.

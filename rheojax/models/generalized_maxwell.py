@@ -32,6 +32,7 @@ import numpy as np
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import TestMode
 from rheojax.utils.optimization import OptimizationResult
 from rheojax.utils.prony import (
     compute_r_squared,
@@ -119,7 +120,7 @@ class GeneralizedMaxwell(BaseModel):
 
         self._n_modes = n_modes
         self._modulus_type = modulus_type
-        self._test_mode: str | None = None
+        self._test_mode: TestMode | str | None = None
 
         # Create Prony parameter set
         self.parameters = create_prony_parameter_set(n_modes, modulus_type)

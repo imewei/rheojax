@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpyro
@@ -35,6 +35,11 @@ from rheojax.core.test_modes import TestMode, detect_test_mode
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
+
+if TYPE_CHECKING:
+    from jax import Array
+
+    from rheojax.core.parameters import ParameterSet
 
 
 @dataclass
@@ -196,6 +201,346 @@ class BayesianMixin:
         >>> result = model.fit_bayesian(X, y)
     """
 
+    # Type hints for attributes that must be provided by implementing class
+    parameters: ParameterSet
+    _test_mode: TestMode | str | None
+
+    # =========================================================================
+    # Helper methods for fit_bayesian (extracted for reduced complexity)
+    # =========================================================================
+
+    def _validate_bayesian_requirements(self) -> None:
+        """Validate that required attributes exist for Bayesian inference."""
+        if not hasattr(self, "parameters"):
+            raise AttributeError(
+                "Class must have 'parameters' attribute (ParameterSet)"
+            )
+        if not hasattr(self, "model_function"):
+            raise AttributeError(
+                "Class must define 'model_function(X, params, test_mode)' method"
+            )
+
+    def _validate_parameter_bounds(self) -> None:
+        """Validate that all parameter bounds are valid (lower < upper)."""
+        for name in self.parameters.keys():
+            param = self.parameters.get(name)
+            if param is None:
+                continue
+            bounds = getattr(param, "bounds", None)
+            if (
+                bounds is not None
+                and bounds[0] is not None
+                and bounds[1] is not None
+                and bounds[0] >= bounds[1]
+            ):
+                raise ValueError(
+                    f"Invalid bounds for parameter '{name}': {bounds}. "
+                    "Lower bound must be strictly less than upper bound."
+                )
+
+    def _resolve_test_mode(
+        self,
+        X: np.ndarray | RheoData,
+        test_mode: str | TestMode | None,
+    ) -> tuple[np.ndarray, np.ndarray | None, TestMode]:
+        """Resolve test_mode and extract data arrays from input.
+
+        Returns:
+            Tuple of (X_array, y_array, resolved_test_mode)
+        """
+        if isinstance(X, RheoData):
+            rheo_data = X
+            X_array = rheo_data.x
+            y_array = rheo_data.y
+
+            if test_mode is None:
+                test_mode = detect_test_mode(rheo_data)
+        else:
+            X_array = X
+            y_array = None  # Will be set from y parameter
+
+            if test_mode is None:
+                stored_mode = getattr(self, "_test_mode", None)
+                if stored_mode is not None:
+                    test_mode = stored_mode
+                else:
+                    test_mode = TestMode.RELAXATION
+                    warnings.warn(
+                        "test_mode not specified. Defaulting to 'relaxation'. "
+                        "For correct posteriors, pass RheoData with metadata['test_mode'] "
+                        "or specify test_mode explicitly.",
+                        UserWarning,
+                        stacklevel=3,
+                    )
+
+        # Normalize to TestMode enum
+        if isinstance(test_mode, str):
+            test_mode = TestMode(test_mode.lower())
+
+        return X_array, y_array, test_mode
+
+    def _prepare_jax_data(
+        self, X_array: np.ndarray, y_array: np.ndarray
+    ) -> dict[str, Any]:
+        """Prepare JAX arrays and scale information for Bayesian inference.
+
+        Returns:
+            Dictionary with keys: X_jax, y_jax, is_complex, scale_info
+        """
+        X_jax = jnp.asarray(X_array, dtype=jnp.float64)
+        is_complex = jnp.iscomplexobj(y_array)
+
+        scale_info: dict[str, float | None] = {
+            "data_scale": None,
+            "y_real_scale": None,
+            "y_imag_scale": None,
+        }
+
+        if is_complex:
+            y_complex_np = np.asarray(y_array, dtype=np.complex128)
+            y_real_np = np.real(y_complex_np)
+            y_imag_np = np.imag(y_complex_np)
+            scale_info["y_real_scale"] = (
+                float(np.std(y_real_np)) if y_real_np.size else 0.0
+            )
+            scale_info["y_imag_scale"] = (
+                float(np.std(y_imag_np)) if y_imag_np.size else 0.0
+            )
+
+            y_complex = jnp.asarray(y_array, dtype=jnp.complex128)
+            y_real = jnp.real(y_complex)
+            y_imag = jnp.imag(y_complex)
+            y_jax = jnp.concatenate([y_real, y_imag])
+        else:
+            y_np = np.asarray(y_array, dtype=np.float64)
+            scale_info["data_scale"] = float(np.std(y_np)) if y_np.size else 0.0
+            y_jax = jnp.asarray(y_np, dtype=jnp.float64)
+
+        return {
+            "X_jax": X_jax,
+            "y_jax": y_jax,
+            "is_complex": is_complex,
+            "scale_info": scale_info,
+        }
+
+    def _get_parameter_bounds(
+        self,
+        X_array: np.ndarray,
+        y_array: np.ndarray,
+        test_mode: TestMode,
+    ) -> dict[str, tuple[float | None, float | None]]:
+        """Get parameter bounds, applying any model-specific overrides."""
+        param_names = list(self.parameters)
+        param_bounds: dict[str, tuple[float | None, float | None]] = {}
+
+        for name in param_names:
+            param = self.parameters.get(name)
+            if param.bounds is None:
+                raise ValueError(
+                    f"Parameter '{name}' must have bounds for Bayesian inference"
+                )
+            param_bounds[name] = param.bounds
+
+        bounds_override = getattr(self, "bayesian_parameter_bounds", None)
+        if callable(bounds_override):
+            param_bounds = bounds_override(
+                param_bounds.copy(),
+                np.asarray(X_array),
+                np.asarray(y_array),
+                test_mode,
+            )
+
+        return param_bounds
+
+    @staticmethod
+    def _compute_safe_interval(
+        lower_raw: float | None, upper_raw: float | None
+    ) -> tuple[float, float]:
+        """Compute safe interval for initialization within bounds."""
+        lower = float(lower_raw) if lower_raw is not None else -np.inf
+        upper = float(upper_raw) if upper_raw is not None else np.inf
+
+        eps = 1e-9
+        if np.isfinite(lower) and np.isfinite(upper):
+            span = max(upper - lower, eps * 10)
+            half_span = max(span / 2.0 - eps, eps)
+            pad = min(max(span * 1e-12, eps), half_span)
+            return lower + pad, upper - pad
+        if np.isfinite(lower):
+            upper_guess = lower + max(abs(lower) * 2.0, 1.0)
+            return lower + eps, upper_guess
+        if np.isfinite(upper):
+            lower_guess = upper - max(abs(upper) * 2.0, 1.0)
+            return lower_guess, upper - eps
+        return -1.0, 1.0
+
+    @staticmethod
+    def _compute_default_midpoint(
+        lower_raw: float | None, upper_raw: float | None
+    ) -> float:
+        """Compute default midpoint for parameter initialization."""
+        lower = float(lower_raw) if lower_raw is not None else -np.inf
+        upper = float(upper_raw) if upper_raw is not None else np.inf
+
+        if np.isfinite(lower) and np.isfinite(upper):
+            if lower > 0 and upper > 0:
+                return float(np.exp((np.log(lower) + np.log(upper)) / 2.0))
+            return float(0.5 * (lower + upper))
+        if np.isfinite(lower):
+            return float(lower + max(abs(lower) * 0.5, 1.0))
+        if np.isfinite(upper):
+            return float(upper - max(abs(upper) * 0.5, 1.0))
+        return 0.0
+
+    def _build_warm_start_values(
+        self,
+        param_names: list[str],
+        param_bounds: dict[str, tuple[float | None, float | None]],
+        initial_values: dict[str, float] | None,
+        scale_info: dict[str, float | None],
+        is_complex: bool,
+    ) -> dict[str, float]:
+        """Build sanitized warm-start initialization values."""
+        init_intervals = {
+            name: self._compute_safe_interval(*param_bounds[name])
+            for name in param_names
+        }
+
+        def sanitize_value(name: str, raw_value: float | None) -> float:
+            lower_raw, upper_raw = param_bounds[name]
+            safe_lower, safe_upper = init_intervals[name]
+            value = raw_value
+            if value is None or not np.isfinite(value):
+                value = self._compute_default_midpoint(lower_raw, upper_raw)
+            if np.isfinite(safe_lower):
+                value = max(value, safe_lower)
+            if np.isfinite(safe_upper):
+                value = min(value, safe_upper)
+            return float(value)
+
+        warm_start: dict[str, float] = {}
+        for name in param_names:
+            candidate = None
+            if initial_values and name in initial_values:
+                candidate = initial_values[name]
+            else:
+                candidate = self.parameters.get_value(name)
+            warm_start[name] = sanitize_value(name, candidate)
+
+        # Add noise scale initial values
+        if is_complex:
+            y_real_scale = scale_info.get("y_real_scale") or 0.0
+            y_imag_scale = scale_info.get("y_imag_scale") or 0.0
+            if "sigma_real" not in warm_start:
+                warm_start["sigma_real"] = max(y_real_scale * 0.1, 1e-6)
+            if "sigma_imag" not in warm_start:
+                warm_start["sigma_imag"] = max(y_imag_scale * 0.1, 1e-6)
+        else:
+            data_scale = scale_info.get("data_scale") or 1.0
+            if "sigma" not in warm_start:
+                warm_start["sigma"] = max(data_scale * 0.1, 1e-6)
+
+        return warm_start
+
+    def _run_nuts_sampling(
+        self,
+        numpyro_model,
+        X_jax: Array,
+        y_jax: Array,
+        warm_start_values: dict[str, float],
+        num_warmup: int,
+        num_samples: int,
+        num_chains: int,
+        nuts_kwargs: dict[str, Any],
+    ) -> MCMC:
+        """Run NUTS sampling with fallback to uniform initialization."""
+        try:
+            init_strategy = init_to_value(values=warm_start_values)
+        except Exception as exc:
+            warnings.warn(
+                "Warm-start initialization failed; falling back to uniform init. "
+                "Reason: " + str(exc),
+                RuntimeWarning,
+                stacklevel=3,
+            )
+            init_strategy = init_to_uniform()
+
+        def run_mcmc(strategy):
+            kernel = NUTS(numpyro_model, init_strategy=strategy, **nuts_kwargs)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="There are not enough devices to run parallel chains",
+                    category=UserWarning,
+                )
+                sampler = MCMC(
+                    kernel,
+                    num_warmup=num_warmup,
+                    num_samples=num_samples,
+                    num_chains=num_chains,
+                )
+            rng_key = jax.random.PRNGKey(0)
+            sampler.run(rng_key, X_jax, y_jax)
+            return sampler
+
+        try:
+            return run_mcmc(init_strategy)
+        except RuntimeError as e:
+            if "Cannot find valid initial parameters" in str(e):
+                warnings.warn(
+                    "Warm-started NUTS initialization failed; retrying with uniform init.",
+                    RuntimeWarning,
+                    stacklevel=3,
+                )
+                try:
+                    return run_mcmc(init_to_uniform())
+                except Exception as final_exc:
+                    raise RuntimeError(
+                        f"NUTS sampling failed: {str(final_exc)}"
+                    ) from final_exc
+            raise RuntimeError(f"NUTS sampling failed: {str(e)}") from e
+
+    def _process_mcmc_results(
+        self,
+        mcmc: MCMC,
+        param_names: list[str],
+        num_samples: int,
+        num_chains: int,
+    ) -> BayesianResult:
+        """Process MCMC results into BayesianResult."""
+        samples = mcmc.get_samples()
+
+        # Convert to numpy arrays (model parameters only)
+        posterior_samples = {}
+        for name in param_names:
+            if name in samples:
+                posterior_samples[name] = np.asarray(samples[name], dtype=np.float64)
+
+        # Compute summary statistics
+        summary = {}
+        for name, sample_array in posterior_samples.items():
+            summary[name] = {
+                "mean": float(np.mean(sample_array)),
+                "std": float(np.std(sample_array)),
+                "median": float(np.median(sample_array)),
+                "q05": float(np.percentile(sample_array, 5)),
+                "q25": float(np.percentile(sample_array, 25)),
+                "q75": float(np.percentile(sample_array, 75)),
+                "q95": float(np.percentile(sample_array, 95)),
+            }
+
+        diagnostics = self._compute_diagnostics(mcmc, posterior_samples)
+
+        return BayesianResult(
+            posterior_samples=posterior_samples,
+            summary=summary,
+            diagnostics=diagnostics,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            mcmc=mcmc,
+            model_comparison={},
+        )
+
     def sample_prior(self, num_samples: int = 1000) -> dict[str, np.ndarray]:
         """Sample from prior distributions over parameter bounds.
 
@@ -314,12 +659,8 @@ class BayesianMixin:
         parameters. Supports warm-starting from NLSQ point estimates for faster
         convergence. Uses uniform priors over parameter bounds.
 
-        The method constructs a NumPyro probabilistic model, runs NUTS sampling,
-        and returns posterior samples with convergence diagnostics.
-
         CRITICAL: test_mode is captured in model_function closure to ensure
         correct posteriors for all test modes (relaxation, creep, oscillation).
-        This fixes the v0.3.1 bug where model_function read global state.
 
         Args:
             X: Independent variable data (input features) or RheoData object
@@ -336,208 +677,42 @@ class BayesianMixin:
             **nuts_kwargs: Additional arguments passed to NUTS sampler
 
         Returns:
-            BayesianResult containing:
-                - posterior_samples: Dict of parameter samples
-                - summary: Statistics (mean, std, quantiles)
-                - diagnostics: R-hat, ESS, divergences
-                - model_comparison: Placeholder dict
-
-        Raises:
-            AttributeError: If required attributes missing
-            RuntimeError: If NUTS sampling fails
+            BayesianResult containing posterior_samples, summary, diagnostics.
 
         Example:
-            >>> # Basic usage with explicit mode
             >>> result = model.fit_bayesian(X, y, test_mode='oscillation')
-            >>>
-            >>> # RheoData with embedded mode (recommended)
-            >>> rheo_data = RheoData(x=omega, y=G_star, metadata={'test_mode': 'oscillation'})
-            >>> result = model.fit_bayesian(rheo_data)
-            >>>
-            >>> # With warm-start from NLSQ
-            >>> nlsq_result = model.fit(X, y)
-            >>> initial = {name: p.value for name, p in model.parameters._parameters.items()}
-            >>> result = model.fit_bayesian(rheo_data, initial_values=initial)
-            >>>
-            >>> # Check convergence
             >>> print(result.diagnostics["r_hat"])  # Should be < 1.01
-            >>> print(result.diagnostics["ess"])    # Should be > 400
         """
-        # Validate required attributes
-        if not hasattr(self, "parameters"):
-            raise AttributeError(
-                "Class must have 'parameters' attribute (ParameterSet)"
-            )
+        # Phase 1: Validation
+        self._validate_bayesian_requirements()
+        self._validate_parameter_bounds()
 
-        if not hasattr(self, "model_function"):
-            raise AttributeError(
-                "Class must define 'model_function(X, params, test_mode)' method"
-            )
+        # Phase 2: Resolve test_mode and extract data
+        X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
+        y_array = y_from_rheo if y_from_rheo is not None else y
+        self._test_mode = test_mode  # Cache for future calls
 
-        # Validate parameter bounds before attempting warm-start or sampling
-        for name in self.parameters.keys():
-            param = self.parameters.get(name)
-            if param is None:
-                continue
-            bounds = getattr(param, "bounds", None)
-            if (
-                bounds is not None
-                and bounds[0] is not None
-                and bounds[1] is not None
-                and bounds[0] >= bounds[1]
-            ):
-                raise ValueError(
-                    f"Invalid bounds for parameter '{name}': {bounds}. "
-                    "Lower bound must be strictly less than upper bound."
-                )
+        # Phase 3: Prepare JAX data
+        jax_data = self._prepare_jax_data(X_array, y_array)
+        X_jax = jax_data["X_jax"]
+        y_jax = jax_data["y_jax"]
+        is_complex_data = jax_data["is_complex"]
+        scale_info = jax_data["scale_info"]
 
-        # Handle RheoData input and infer test_mode
-        if isinstance(X, RheoData):
-            rheo_data = X
-            X_array = rheo_data.x
-            y_array = rheo_data.y
-
-            # Infer test_mode from RheoData if not explicitly provided
-            if test_mode is None:
-                inferred_mode = detect_test_mode(rheo_data)
-                test_mode = inferred_mode
-        else:
-            # Plain array input
-            X_array = X
-            y_array = y
-
-            # If test_mode not provided, reuse mode from latest fit if available
-            if test_mode is None:
-                stored_mode = getattr(self, "_test_mode", None)
-                if stored_mode is not None:
-                    test_mode = stored_mode
-                else:
-                    test_mode = TestMode.RELAXATION
-                    warnings.warn(
-                        "test_mode not specified. Defaulting to 'relaxation'. "
-                        "For correct posteriors, pass RheoData with metadata['test_mode'] "
-                        "or specify test_mode explicitly.",
-                        UserWarning,
-                        stacklevel=2,
-                    )
-
-        # Normalize test_mode to TestMode enum
-        if isinstance(test_mode, str):
-            test_mode = TestMode(test_mode.lower())
-
-        # Cache resolved mode so future Bayesian/ predict calls stay in sync
-        self._test_mode = test_mode
-
-        # Convert data to JAX arrays with float64 precision
-        X_jax = jnp.asarray(X_array, dtype=jnp.float64)
-
-        # Handle complex data (e.g., G* = G' + iG" for oscillatory shear)
-        # JAX's grad requires real-valued outputs, so we decompose complex data
-        is_complex_data = jnp.iscomplexobj(y_array)
-        data_scale_scalar: float | None = None
-        y_real_scale_scalar: float | None = None
-        y_imag_scale_scalar: float | None = None
-
-        if is_complex_data:
-            # Store original complex data for scale computation using NumPy to keep
-            # host-side scalars that can be safely captured inside the NumPyro model.
-            y_complex_np = np.asarray(y_array, dtype=np.complex128)
-            y_real_np = np.real(y_complex_np)
-            y_imag_np = np.imag(y_complex_np)
-            y_real_scale_scalar = float(np.std(y_real_np)) if y_real_np.size else 0.0
-            y_imag_scale_scalar = float(np.std(y_imag_np)) if y_imag_np.size else 0.0
-
-            y_complex = jnp.asarray(y_array, dtype=jnp.complex128)
-            y_real = jnp.real(y_complex)
-            y_imag = jnp.imag(y_complex)
-            # Stack real and imaginary parts as [real_part, imag_part]
-            y_jax = jnp.concatenate([y_real, y_imag])
-        else:
-            y_np = np.asarray(y_array, dtype=np.float64)
-            data_scale_scalar = float(np.std(y_np)) if y_np.size else 0.0
-            y_jax = jnp.asarray(y_np, dtype=jnp.float64)
-
-        # Get parameter information
+        # Phase 4: Get parameter bounds
         param_names = list(self.parameters)
-        param_bounds: dict[str, tuple[float | None, float | None]] = {}
-        for name in param_names:
-            param = self.parameters.get(name)
-            if param.bounds is None:
-                raise ValueError(
-                    f"Parameter '{name}' must have bounds for Bayesian inference"
-                )
-            param_bounds[name] = param.bounds
+        param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
 
-        bounds_override = getattr(self, "bayesian_parameter_bounds", None)
-        if callable(bounds_override):
-            param_bounds = bounds_override(
-                param_bounds.copy(),
-                np.asarray(X_array),
-                np.asarray(y_array),
-                test_mode,
-            )
+        # Phase 5: Build NumPyro model (closure captures test_mode)
+        numpyro_model = self._build_numpyro_model(
+            param_names=param_names,
+            param_bounds=param_bounds,
+            test_mode=test_mode,
+            is_complex_data=is_complex_data,
+            scale_info=scale_info,
+        )
 
-        # Helper utilities to build safe initialization seeds within bounds
-        def _normalize_bound(value: float | None, default: float) -> float:
-            return float(value) if value is not None else default
-
-        def _safe_interval(
-            lower_raw: float | None, upper_raw: float | None
-        ) -> tuple[float, float]:
-            lower = _normalize_bound(lower_raw, -np.inf)
-            upper = _normalize_bound(upper_raw, np.inf)
-
-            eps = 1e-9
-            if np.isfinite(lower) and np.isfinite(upper):
-                span = max(upper - lower, eps * 10)
-                half_span = max(span / 2.0 - eps, eps)
-                pad = min(max(span * 1e-12, eps), half_span)
-                return lower + pad, upper - pad
-            if np.isfinite(lower):
-                upper_guess = lower + max(abs(lower) * 2.0, 1.0)
-                return lower + eps, upper_guess
-            if np.isfinite(upper):
-                lower_guess = upper - max(abs(upper) * 2.0, 1.0)
-                return lower_guess, upper - eps
-            return -1.0, 1.0
-
-        def _default_midpoint(
-            lower_raw: float | None, upper_raw: float | None
-        ) -> float:
-            lower = _normalize_bound(lower_raw, -np.inf)
-            upper = _normalize_bound(upper_raw, np.inf)
-
-            if np.isfinite(lower) and np.isfinite(upper):
-                if lower > 0 and upper > 0:
-                    return float(np.exp((np.log(lower) + np.log(upper)) / 2.0))
-                return float(0.5 * (lower + upper))
-            if np.isfinite(lower):
-                return float(lower + max(abs(lower) * 0.5, 1.0))
-            if np.isfinite(upper):
-                return float(upper - max(abs(upper) * 0.5, 1.0))
-            return 0.0
-
-        init_intervals = {
-            name: _safe_interval(*param_bounds[name]) for name in param_names
-        }
-
-        def _sanitize_initial_value(name: str, raw_value: float | None) -> float:
-            lower_raw, upper_raw = param_bounds[name]
-            safe_lower, safe_upper = init_intervals[name]
-            value = raw_value
-            if value is None or not np.isfinite(value):
-                value = _default_midpoint(lower_raw, upper_raw)
-            if np.isfinite(safe_lower):
-                value = max(value, safe_lower)
-            if np.isfinite(safe_upper):
-                value = min(value, safe_upper)
-            return float(value)
-
-        # Define NumPyro probabilistic model with test_mode captured in closure
-        # CRITICAL: test_mode is captured here, not read from self._test_mode
-        # This ensures correct posteriors for all test modes (fixes v0.3.1 bug)
-        prior_factory = getattr(self, "bayesian_prior_factory", None)
-
+        # Phase 6: Apply NUTS kwargs overrides
         nuts_overrides = getattr(self, "bayesian_nuts_kwargs", None)
         if callable(nuts_overrides):
             overrides = nuts_overrides()
@@ -545,12 +720,51 @@ class BayesianMixin:
                 for key, value in overrides.items():
                     nuts_kwargs.setdefault(key, value)
 
-        def numpyro_model(X, y=None):
-            """NumPyro model with uniform priors over parameter bounds.
+        # Phase 7: Build warm-start values
+        warm_start_values = self._build_warm_start_values(
+            param_names=param_names,
+            param_bounds=param_bounds,
+            initial_values=initial_values,
+            scale_info=scale_info,
+            is_complex=is_complex_data,
+        )
 
-            test_mode is captured in closure from fit_bayesian() scope, ensuring
-            model_function uses the correct mode throughout MCMC sampling.
-            """
+        # Phase 8: Run NUTS sampling
+        mcmc = self._run_nuts_sampling(
+            numpyro_model=numpyro_model,
+            X_jax=X_jax,
+            y_jax=y_jax,
+            warm_start_values=warm_start_values,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            nuts_kwargs=nuts_kwargs,
+        )
+
+        # Phase 9: Process results
+        return self._process_mcmc_results(mcmc, param_names, num_samples, num_chains)
+
+    def _build_numpyro_model(
+        self,
+        param_names: list[str],
+        param_bounds: dict[str, tuple[float | None, float | None]],
+        test_mode: TestMode,
+        is_complex_data: bool,
+        scale_info: dict[str, float | None],
+    ):
+        """Build the NumPyro probabilistic model function.
+
+        Returns a callable model function with test_mode captured in closure.
+        """
+        prior_factory = getattr(self, "bayesian_prior_factory", None)
+
+        # Extract scale values for likelihood
+        y_real_scale = scale_info.get("y_real_scale") or 0.0
+        y_imag_scale = scale_info.get("y_imag_scale") or 0.0
+        data_scale = scale_info.get("data_scale") or 0.0
+
+        def numpyro_model(X, y=None):
+            """NumPyro model with test_mode captured in closure."""
             # Sample parameters from priors
             params_dict = {}
             for name in param_names:
@@ -561,72 +775,50 @@ class BayesianMixin:
 
                 if custom_dist is not None:
                     params_dict[name] = numpyro.sample(name, custom_dist)
-                else:
+                elif (
+                    name.lower().endswith("alpha")
+                    and lower is not None
+                    and upper is not None
+                    and 0.0 <= lower < upper <= 1.0
+                ):
                     # Weakly-informative Beta prior for fractional orders
-                    if (
-                        name.lower().endswith("alpha")
-                        and lower is not None
-                        and upper is not None
-                        and 0.0 <= lower < upper <= 1.0
-                    ):
-                        beta_base = dist.Beta(concentration1=2.0, concentration0=2.0)
-                        if lower == 0.0 and upper == 1.0:
-                            params_dict[name] = numpyro.sample(name, beta_base)
-                        else:
-                            scale = upper - lower
-                            beta_trans = dist_transforms.AffineTransform(
-                                loc=lower, scale=scale
-                            )
-                            params_dict[name] = numpyro.sample(
-                                name,
-                                dist.TransformedDistribution(beta_base, beta_trans),
-                            )
+                    beta_base = dist.Beta(concentration1=2.0, concentration0=2.0)
+                    if lower == 0.0 and upper == 1.0:
+                        params_dict[name] = numpyro.sample(name, beta_base)
                     else:
-                        params_dict[name] = numpyro.sample(
-                            name, dist.Uniform(low=lower, high=upper)
+                        scale = upper - lower
+                        beta_trans = dist_transforms.AffineTransform(
+                            loc=lower, scale=scale
                         )
+                        params_dict[name] = numpyro.sample(
+                            name,
+                            dist.TransformedDistribution(beta_base, beta_trans),
+                        )
+                else:
+                    params_dict[name] = numpyro.sample(
+                        name, dist.Uniform(low=lower, high=upper)
+                    )
 
-            # Convert to array for model_function
+            # Convert to array and compute predictions
             params_array = jnp.array([params_dict[name] for name in param_names])
-
-            # Compute predictions with test_mode from closure (NOT self._test_mode)
-            # Pass test_mode explicitly to ensure correct mode-aware predictions
             predictions_raw = self.model_function(X, params_array, test_mode)
 
-            # Handle complex predictions (convert to stacked real for JAX grad compatibility)
+            # Handle complex vs real predictions
             if is_complex_data:
-                # predictions_raw is complex, decompose to [real_part, imag_part]
                 pred_real = jnp.real(predictions_raw)
                 pred_imag = jnp.imag(predictions_raw)
+                n = len(y) // 2
+                y_real_obs, y_imag_obs = y[:n], y[n:]
 
-                # Split observations into real and imaginary parts
-                n = len(y) // 2  # y is stacked [real, imag]
-                y_real_obs = y[:n]
-                y_imag_obs = y[n:]
-                predictions = jnp.concatenate([pred_real, pred_imag])
-            else:
-                predictions = predictions_raw
-
-            # Likelihood: Use appropriate noise model for real or complex data
-            if is_complex_data:
-                # For complex data, use separate noise for real and imaginary parts
-                # Use weakly informative Exponential priors (heavier tails than HalfNormal)
-                # Mean scale is intentionally inflated (×5) to avoid spuriously tight
-                # likelihoods that previously caused FractionalMaxwellLiquid warm-starts
-                # to be rejected before NUTS could adapt.
-                real_scale = max(y_real_scale_scalar or 0.0, 1e-9)
-                imag_scale = max(y_imag_scale_scalar or 0.0, 1e-9)
-                sigma_real_scale = max(real_scale * 5.0, 1e-9)
-                sigma_imag_scale = max(imag_scale * 5.0, 1e-9)
+                # Exponential priors on noise (inflated scale for robustness)
+                sigma_real_scale = max(y_real_scale * 5.0, 1e-9)
+                sigma_imag_scale = max(y_imag_scale * 5.0, 1e-9)
                 sigma_real = numpyro.sample(
                     "sigma_real", dist.Exponential(rate=1.0 / sigma_real_scale)
                 )
                 sigma_imag = numpyro.sample(
                     "sigma_imag", dist.Exponential(rate=1.0 / sigma_imag_scale)
                 )
-
-                # Use pred_real and pred_imag already computed above (don't re-split!)
-                # Separate likelihoods for real and imaginary components
                 numpyro.sample(
                     "obs_real",
                     dist.Normal(loc=pred_real, scale=sigma_real),
@@ -638,143 +830,15 @@ class BayesianMixin:
                     obs=y_imag_obs,
                 )
             else:
-                # Real data: weakly informative Exponential prior on noise.
-                # Inflate the mean scale (×5) to keep the prior permissive enough
-                # for challenging fractional models (e.g., FractionalMaxwellLiquid).
-                base_scale = max(data_scale_scalar or 0.0, 1e-9)
-                sigma_scale = max(base_scale * 5.0, 1e-9)
+                sigma_scale = max(data_scale * 5.0, 1e-9)
                 sigma = numpyro.sample(
                     "sigma", dist.Exponential(rate=1.0 / sigma_scale)
                 )
-                numpyro.sample("obs", dist.Normal(loc=predictions, scale=sigma), obs=y)
-
-        # Build sanitized initialization dictionary regardless of warm-start input
-        def _build_warm_start(source: dict[str, float] | None) -> dict[str, float]:
-            warm_start: dict[str, float] = {}
-            for name in param_names:
-                candidate = None
-                if source and name in source:
-                    candidate = source[name]
-                else:
-                    candidate = self.parameters.get_value(name)
-                warm_start[name] = _sanitize_initial_value(name, candidate)
-            return warm_start
-
-        init_source = initial_values if initial_values is not None else None
-        warm_start_values = _build_warm_start(init_source)
-
-        # Provide sensible initial noise scales to avoid near-zero sigma issues
-        if is_complex_data:
-            if (
-                "sigma_real" not in warm_start_values
-                and y_real_scale_scalar is not None
-            ):
-                warm_start_values["sigma_real"] = max(
-                    (y_real_scale_scalar or 0.0) * 0.1, 1e-6
+                numpyro.sample(
+                    "obs", dist.Normal(loc=predictions_raw, scale=sigma), obs=y
                 )
-            if (
-                "sigma_imag" not in warm_start_values
-                and y_imag_scale_scalar is not None
-            ):
-                warm_start_values["sigma_imag"] = max(
-                    (y_imag_scale_scalar or 0.0) * 0.1, 1e-6
-                )
-        else:
-            data_scale = (
-                data_scale_scalar
-                if data_scale_scalar is not None
-                else float(
-                    np.std(np.asarray(y_array, dtype=np.float64)) if y_jax.size else 1.0
-                )
-            )
-            if "sigma" not in warm_start_values:
-                warm_start_values["sigma"] = max(data_scale * 0.1, 1e-6)
 
-        # Set up NUTS sampler with robust initialization strategy
-        try:
-            init_strategy = init_to_value(values=warm_start_values)
-        except Exception as exc:
-            warnings.warn(
-                "Warm-start initialization failed; falling back to uniform init. "
-                "Reason: " + str(exc),
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            init_strategy = init_to_uniform()
-
-        def _run_mcmc(strategy):
-            kernel = NUTS(numpyro_model, init_strategy=strategy, **nuts_kwargs)
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    message="There are not enough devices to run parallel chains",
-                    category=UserWarning,
-                )
-                sampler = MCMC(
-                    kernel,
-                    num_warmup=num_warmup,
-                    num_samples=num_samples,
-                    num_chains=num_chains,
-                )
-            rng_key = jax.random.PRNGKey(0)
-            sampler.run(rng_key, X_jax, y_jax)
-            return sampler
-
-        try:
-            mcmc = _run_mcmc(init_strategy)
-        except RuntimeError as e:
-            if "Cannot find valid initial parameters" in str(e):
-                warnings.warn(
-                    "Warm-started NUTS initialization failed; retrying with uniform init.",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-                try:
-                    mcmc = _run_mcmc(init_to_uniform())
-                except Exception as final_exc:  # pragma: no cover - defensive
-                    raise RuntimeError(
-                        f"NUTS sampling failed: {str(final_exc)}"
-                    ) from final_exc
-            else:
-                raise RuntimeError(f"NUTS sampling failed: {str(e)}") from e
-
-        # Extract posterior samples
-        samples = mcmc.get_samples()
-
-        # Convert to numpy arrays (exclude sigma, keep only model parameters)
-        posterior_samples = {}
-        for name in param_names:
-            if name in samples:
-                posterior_samples[name] = np.asarray(samples[name], dtype=np.float64)
-
-        # Compute summary statistics
-        summary = {}
-        for name, sample_array in posterior_samples.items():
-            summary[name] = {
-                "mean": float(np.mean(sample_array)),
-                "std": float(np.std(sample_array)),
-                "median": float(np.median(sample_array)),
-                "q05": float(np.percentile(sample_array, 5)),
-                "q25": float(np.percentile(sample_array, 25)),
-                "q75": float(np.percentile(sample_array, 75)),
-                "q95": float(np.percentile(sample_array, 95)),
-            }
-
-        # Compute convergence diagnostics
-        diagnostics = self._compute_diagnostics(mcmc, posterior_samples)
-
-        # Create BayesianResult with MCMC object for ArviZ conversion
-        result = BayesianResult(
-            posterior_samples=posterior_samples,
-            summary=summary,
-            diagnostics=diagnostics,
-            num_samples=num_samples,
-            num_chains=num_chains,
-            mcmc=mcmc,  # Store MCMC object for ArviZ InferenceData conversion
-            model_comparison={},  # Placeholder for future WAIC/LOO
-        )
-
-        return result
+        return numpyro_model
 
     def _compute_diagnostics(
         self, mcmc: MCMC, posterior_samples: dict[str, np.ndarray]

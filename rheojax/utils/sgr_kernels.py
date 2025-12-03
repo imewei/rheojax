@@ -31,12 +31,16 @@ References
 """
 
 from functools import partial
+from typing import TYPE_CHECKING
 
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 # Float64 precision is critical for accurate numerical integration
 jax, jnp = safe_import_jax()
+
+if TYPE_CHECKING:
+    from jax import Array
 
 
 # ============================================================================
@@ -45,7 +49,7 @@ jax, jnp = safe_import_jax()
 
 
 @jax.jit
-def rho_trap(E: float | jnp.ndarray) -> float | jnp.ndarray:
+def rho_trap(E: "float | Array") -> "float | Array":
     """
     Exponential trap distribution for SGR model.
 
@@ -154,7 +158,7 @@ def _G0_compute(x: float, n_points: int = 128, E_max: float = 20.0) -> float:
 
 
 @jax.jit
-def G0(x: float | jnp.ndarray) -> float | jnp.ndarray:
+def G0(x: "float | Array") -> "float | Array":
     """
     Equilibrium modulus for SGR model.
 
@@ -322,9 +326,7 @@ def _Gp_quadrature(
 
 
 @jax.jit
-def Gp(
-    x: float | jnp.ndarray, omega_tau0: float | jnp.ndarray
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]":
     """
     Frequency-dependent complex modulus for SGR model.
 
@@ -425,7 +427,7 @@ def Gp(
 
 
 @jax.jit
-def Z(x: float, omega_tau0: float | jnp.ndarray) -> float | jnp.ndarray:
+def Z(x: float, omega_tau0: "float | Array") -> "float | Array":
     """
     Partition function for SGR model normalization.
 
