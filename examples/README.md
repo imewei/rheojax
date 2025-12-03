@@ -10,14 +10,15 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - JAX-accelerated numerical optimization (5-270x speedup)
 - Bayesian inference with full convergence diagnostics
 - Flexible API design (Pipeline, Modular, Core layers)
-- All 20 rheological models with examples
-- Advanced transforms for experimental data analysis
+- All 23 rheological models with examples (including SGR)
+- Advanced transforms for experimental data analysis (including SRFS)
+- **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**22 Tutorial Notebooks** (all complete ✅) organized into 4 learning paths:
+**29 Tutorial Notebooks** (all complete ✅) organized into 4 learning paths:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
-- **Transform Workflows** (6 notebooks ✅) - Data analysis techniques
-- **Bayesian Inference** (5 notebooks ✅) - Uncertainty quantification
-- **Advanced Workflows** (6 notebooks ✅) - Production patterns
+- **Transform Workflows** (7 notebooks ✅) - Data analysis techniques (+ SRFS)
+- **Bayesian Inference** (7 notebooks ✅) - Uncertainty quantification
+- **Advanced Workflows** (9 notebooks ✅) - Production patterns (+ SGR)
 
 ## Prerequisites
 
@@ -87,6 +88,8 @@ Learn how to preprocess data, extract frequency-domain information, construct ma
 | **[03-mutation-number.ipynb](transforms/03-mutation-number.ipynb)** | Mutation Number | Material Classification | 30 min | Viscoelastic character Δ, gel point detection, integration methods |
 | **[04-owchirp-laos-analysis.ipynb](transforms/04-owchirp-laos-analysis.ipynb)** | OWChirp/LAOS | Nonlinear Analysis | 40 min | Harmonic extraction, Lissajous curves, nonlinearity quantification |
 | **[05-smooth-derivative.ipynb](transforms/05-smooth-derivative.ipynb)** | Savitzky-Golay | Noise-Robust Differentiation | 25 min | Local polynomial fitting, noise amplification, parameter optimization |
+| **[06-mastercurve_auto_shift.ipynb](transforms/06-mastercurve_auto_shift.ipynb)** | Mastercurve | Automatic Shift Factors | 30 min | Power-law intersection, no WLF parameters required |
+| **[07-srfs-strain-rate-superposition.ipynb](transforms/07-srfs-strain-rate-superposition.ipynb)** | SRFS | Strain-Rate Superposition | 35 min | Flow curve collapse, shift factors, shear banding detection, thixotropy |
 
 **Recommended Learning Path:**
 1. Start with **01-fft-analysis** - fundamental time↔frequency conversion for all rheologists
@@ -94,6 +97,7 @@ Learn how to preprocess data, extract frequency-domain information, construct ma
 3. Try **02b-mastercurve-wlf-validation** - validate WLF extraction with known parameters
 4. Choose **03-mutation-number** (gelation studies) OR **04-owchirp-laos** (nonlinear behavior) based on application
 5. Complete with **05-smooth-derivative** - practical tool for noisy data analysis
+6. Try **07-srfs-strain-rate-superposition** for flow curve analysis with SGR connection
 
 **Prerequisites:**
 - Phase 1 basic/ notebooks (understand model fitting workflow)
@@ -101,7 +105,7 @@ Learn how to preprocess data, extract frequency-domain information, construct ma
 - Complex modulus concepts (G', G", tan δ)
 - Basic understanding of viscoelastic materials
 
-**Total Time Investment:** 3-3.5 hours for all 6 notebooks
+**Total Time Investment:** 4-4.5 hours for all 8 notebooks
 
 **Learning Outcomes:**
 - Master FFT-based frequency-domain analysis from time-domain data
@@ -112,6 +116,8 @@ Learn how to preprocess data, extract frequency-domain information, construct ma
 - Chain multiple transforms in analysis workflows
 - Interpret Cole-Cole plots, Lissajous curves, and shift factor plots
 - Validate transform quality with diagnostic metrics (R², overlap error, harmonics)
+- Apply SRFS to collapse flow curves and extract SGR noise temperature
+- Detect shear banding and thixotropy in complex fluids
 
 ### Phase 3: Bayesian Inference Focus
 
@@ -178,6 +184,9 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 | **[04-fractional-models-deep-dive.ipynb](advanced/04-fractional-models-deep-dive.ipynb)** | Fractional Calculus | 55-60 min | ✅ Complete | All 11 fractional models, Mittag-Leffler functions, model comparison (AIC/BIC), parameter interpretation, validation |
 | **[05-performance-optimization.ipynb](advanced/05-performance-optimization.ipynb)** | GPU & JIT | 55-60 min | ✅ Complete | JAX JIT compilation, CPU vs GPU benchmarks, memory optimization, NLSQ vs scipy (5-270x), vmap vectorization, real case study |
 | **[06-frequentist-model-selection.ipynb](advanced/06-frequentist-model-selection.ipynb)** | Frequentist Selection | 45 min | ✅ Complete | ModelComparisonPipeline, AIC/BIC information criteria, AIC weights, evidence ratios, complexity trade-offs |
+| **[07-trios_chunked_reading_example.ipynb](advanced/07-trios_chunked_reading_example.ipynb)** | Large File I/O | 30 min | ✅ Complete | TRIOS auto-chunking, memory optimization, progress callbacks |
+| **[08-generalized_maxwell_fitting.ipynb](advanced/08-generalized_maxwell_fitting.ipynb)** | Generalized Maxwell | 45 min | ✅ Complete | Multi-mode Prony series, element minimization, GMM optimization |
+| **[09-sgr-soft-glassy-rheology.ipynb](advanced/09-sgr-soft-glassy-rheology.ipynb)** | SGR Models | 45 min | ✅ Complete | SGRConventional, SGRGeneric, noise temperature x, material classification, Bayesian inference |
 
 **Recommended Learning Path:**
 1. Start with **01-multi-technique-fitting** - builds on Phase 1 Maxwell/Zener knowledge
@@ -185,7 +194,8 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 3. Explore **03-custom-models** - learn model development workflow
 4. Study **04-fractional-models-deep-dive** - comprehensive fractional model coverage
 5. Try **06-frequentist-model-selection** - compare with Bayesian model comparison from Phase 3
-6. Complete with **05-performance-optimization** - GPU acceleration and scaling
+6. Learn **09-sgr-soft-glassy-rheology** - SGR models for soft glassy materials
+7. Complete with **05-performance-optimization** - GPU acceleration and scaling
 
 **Prerequisites:**
 - Phase 1 basic/ notebooks (model fitting fundamentals)
@@ -194,7 +204,7 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 - Understanding of JAX acceleration concepts
 - For notebook 05: GPU installation (Linux + CUDA only, optional)
 
-**Total Time Investment:** ~5-5.5 hours for all 6 notebooks
+**Total Time Investment:** ~7-8 hours for all 9 notebooks
 
 **Learning Outcomes:**
 - Master multi-technique constrained fitting for parameter consistency
@@ -204,6 +214,8 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 - Optimize computational performance using GPU and JIT compilation
 - Scale analyses to 10K+ data points efficiently
 - Integrate Rheo into production workflows
+- Apply SGR models to soft glassy materials (foams, emulsions, pastes)
+- Interpret noise temperature x and classify material regimes
 
 **GPU Requirements (Notebook 05):**
 - **Linux + CUDA 12.1-12.9 only** (GPU acceleration not available on macOS/Windows)
@@ -227,16 +239,24 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 | Mutation Number | [transforms/03-mutation-number](transforms/03-mutation-number.ipynb) | Transforms | ✅ Complete |
 | OWChirp LAOS | [transforms/04-owchirp-laos-analysis](transforms/04-owchirp-laos-analysis.ipynb) | Transforms | ✅ Complete |
 | Smooth Derivative | [transforms/05-smooth-derivative](transforms/05-smooth-derivative.ipynb) | Transforms | ✅ Complete |
+| Auto Shift Factors | [transforms/06-mastercurve_auto_shift](transforms/06-mastercurve_auto_shift.ipynb) | Transforms | ✅ Complete |
+| SRFS Transform | [transforms/07-srfs-strain-rate-superposition](transforms/07-srfs-strain-rate-superposition.ipynb) | Transforms | ✅ Complete |
 | Bayesian Basics | [bayesian/01-bayesian-basics](bayesian/01-bayesian-basics.ipynb) | Bayesian | ✅ Complete |
 | Prior Selection | [bayesian/02-prior-selection](bayesian/02-prior-selection.ipynb) | Bayesian | ✅ Complete |
 | Diagnostics | [bayesian/03-convergence-diagnostics](bayesian/03-convergence-diagnostics.ipynb) | Bayesian | ✅ Complete |
 | Model Comparison | [bayesian/04-model-comparison](bayesian/04-model-comparison.ipynb) | Bayesian | ✅ Complete |
 | Uncertainty Propagation | [bayesian/05-uncertainty-propagation](bayesian/05-uncertainty-propagation.ipynb) | Bayesian | ✅ Complete |
+| Bayesian Workflow Demo | [bayesian/06-bayesian_workflow_demo](bayesian/06-bayesian_workflow_demo.ipynb) | Bayesian | ✅ Complete |
+| GMM Bayesian | [bayesian/07-gmm_bayesian_workflow](bayesian/07-gmm_bayesian_workflow.ipynb) | Bayesian | ✅ Complete |
 | Multi-Technique | [advanced/01-multi-technique-fitting](advanced/01-multi-technique-fitting.ipynb) | Advanced | ✅ Complete |
 | Batch Processing | [advanced/02-batch-processing](advanced/02-batch-processing.ipynb) | Advanced | ✅ Complete |
 | Custom Models | [advanced/03-custom-models](advanced/03-custom-models.ipynb) | Advanced | ✅ Complete |
 | Fractional Models | [advanced/04-fractional-models-deep-dive](advanced/04-fractional-models-deep-dive.ipynb) | Advanced | ✅ Complete |
 | Performance | [advanced/05-performance-optimization](advanced/05-performance-optimization.ipynb) | Advanced | ✅ Complete |
+| Model Selection | [advanced/06-frequentist-model-selection](advanced/06-frequentist-model-selection.ipynb) | Advanced | ✅ Complete |
+| TRIOS Chunking | [advanced/07-trios_chunked_reading_example](advanced/07-trios_chunked_reading_example.ipynb) | Advanced | ✅ Complete |
+| Generalized Maxwell | [advanced/08-generalized_maxwell_fitting](advanced/08-generalized_maxwell_fitting.ipynb) | Advanced | ✅ Complete |
+| SGR Models | [advanced/09-sgr-soft-glassy-rheology](advanced/09-sgr-soft-glassy-rheology.ipynb) | Advanced | ✅ Complete |
 
 ### By API Level
 
@@ -246,7 +266,21 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 
 ## How to Run Notebooks
 
-### Option 1: Jupyter Lab (Recommended)
+### Option 1: Google Colab (Easiest - No Installation Required!)
+
+All notebooks are Colab-compatible and include automatic setup:
+
+1. Go to [Google Colab](https://colab.research.google.com/)
+2. File → Upload notebook (or use GitHub integration)
+3. Run the first code cell (Colab setup - installs rheojax automatically)
+4. Continue with the rest of the notebook
+
+The setup cell automatically:
+- Installs rheojax and all dependencies
+- Enables float64 precision for numerical stability
+- Skips when running locally
+
+### Option 2: Jupyter Lab (Recommended for Local)
 
 ```bash
 cd /Users/b80985/Projects/rheojax/examples

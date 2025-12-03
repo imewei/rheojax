@@ -1,7 +1,7 @@
 Models Summary & Selection Guide
 ==================================
 
-This page serves as a comprehensive quick-reference guide for all 20 rheological models in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
+This page serves as a comprehensive quick-reference guide for all 23 rheological models in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
 
 .. contents:: Page Contents
    :local:
@@ -207,6 +207,24 @@ The table below provides a comprehensive overview of all models across key chara
      - ★★☆☆☆
      - N/A
      - Linear viscoplastic (yield stress + constant viscosity)
+   * - :doc:`SGR Conventional </models/sgr/sgr_conventional>`
+     - SGR
+     - 3
+     - R, C, O
+     - Soft Glass
+     - No (flows)
+     - ★★★★☆
+     - x: 0.5-3
+     - Foams, emulsions, pastes, colloidal suspensions (Sollich 1998)
+   * - :doc:`SGR GENERIC </models/sgr/sgr_generic>`
+     - SGR
+     - 3
+     - R, C, O
+     - Soft Glass
+     - No (flows)
+     - ★★★★★
+     - x: 0.5-3
+     - Thermodynamically consistent SGR (Fuereder & Ilg 2013)
 
 **Legend:**
 
@@ -354,6 +372,52 @@ Flow Models (6 models)
 
 **When to use:** Steady shear flow, viscosity vs shear rate, non-Newtonian fluids, process design.
 
+
+Soft Glassy Rheology Models (2 models)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**When to use:** Soft glassy materials (foams, emulsions, pastes, colloidal suspensions), aging systems, power-law fluids near glass transition.
+
+**Advantages:**
+
+* Statistical mechanics foundation (trap model)
+* Single noise temperature parameter x captures material state
+* Natural aging dynamics for x < 1
+* Power-law rheology emerges from microscopic physics
+* Bayesian inference support for uncertainty quantification
+
+**Noise temperature (x) interpretation:**
+
+.. list-table:: Noise Temperature Interpretation Guide
+   :header-rows: 1
+   :widths: 15 25 60
+
+   * - x Value
+     - Physical Meaning
+     - Material Examples
+   * - x < 1
+     - Glass (aging)
+     - Aged colloidal suspensions, dense pastes (non-ergodic)
+   * - x ≈ 1
+     - Glass transition
+     - Critical point, rheological singularity
+   * - 1 < x < 2
+     - Power-law fluid
+     - Foams, emulsions, soft gels (SGM regime)
+   * - x ≥ 2
+     - Newtonian liquid
+     - Dilute suspensions, simple fluids
+
+**Model selection within SGR family:**
+
+* **SGR Conventional** (Sollich 1998): Standard trap model, simpler formulation
+* **SGR GENERIC** (Fuereder & Ilg 2013): Thermodynamically consistent, better stability near x → 1
+
+**Connection to SRFS Transform:**
+
+The noise temperature x from SGR models directly relates to SRFS shift factors:
+a(γ̇) ~ (γ̇)^(2-x), enabling complementary analysis of oscillatory and flow data.
+
 **Non-Newtonian classification:**
 
 1. **Shear-thinning (pseudoplastic):** Viscosity decreases with shear rate
@@ -434,6 +498,15 @@ By Material Type
    * - Viscoplastic Materials
      - Bingham, Herschel-Bulkley
      - Yield stress present; toothpaste, gels, slurries
+   * - Foams/Emulsions
+     - SGR Conventional, SGR GENERIC
+     - Soft glassy materials; x parameter captures state
+   * - Colloidal Suspensions
+     - SGR Conventional, FZSS
+     - Aging systems (x<1) or power-law fluids (1<x<2)
+   * - Pastes/Dense Suspensions
+     - SGR GENERIC, Herschel-Bulkley
+     - Near glass transition; use GENERIC for x→1
 
 By Application
 ~~~~~~~~~~~~~~
@@ -535,7 +608,7 @@ Parameter Count Comparison
 Bayesian Inference Support
 ---------------------------
 
-**All 20 models support complete Bayesian workflows** via NumPyro NUTS sampling:
+**All 23 models support complete Bayesian workflows** via NumPyro NUTS sampling:
 
 * `.fit()` - Fast NLSQ point estimation
 * `.fit_bayesian()` - Full posterior sampling with MCMC
@@ -554,6 +627,8 @@ Next Steps
 * **Multi-technique fitting:** :doc:`/user_guide/multi_technique_fitting`
 * **Model selection workflow:** :doc:`/user_guide/model_selection`
 * **Compatibility checking:** :doc:`/user_guide/core_concepts` (automatic detection of model-data mismatches)
-* **Example notebooks:** 24 examples in ``examples/`` directory
+* **SGR models:** :doc:`/models/sgr/sgr_conventional` and :doc:`/models/sgr/sgr_generic`
+* **SRFS transform:** :doc:`/transforms/srfs` for strain-rate frequency superposition
+* **Example notebooks:** 27 examples in ``examples/`` directory
 
 **Need a model not listed?** Open an issue via :doc:`/developer/contributing`.

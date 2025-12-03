@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Soft Glassy Rheology (SGR) Models
+**Phase 5: Statistical Mechanics Models for Soft Glassy Materials**
+
+Two new SGR models for foams, emulsions, pastes, and colloidal suspensions:
+
+#### SGR Conventional (Sollich 1998)
+- **Added** `rheojax/models/sgr_conventional.py` (~1863 lines)
+  - Trap model with exponential density of states: ρ(E) = exp(-E)
+  - Three parameters: x (noise temperature), G0 (modulus), τ0 (attempt time)
+  - Material classification via noise temperature:
+    - x < 1: glass (aging, non-ergodic)
+    - 1 < x < 2: power-law fluid (SGM regime)
+    - x ≥ 2: Newtonian liquid
+  - Oscillation mode: G*(ω) via Fourier transform of memory function
+  - Relaxation mode: G(t) via Mittag-Leffler-type decay
+  - Creep mode: J(t) with optional yield stress
+  - Full Bayesian inference support with NumPyro
+
+#### SGR GENERIC (Fuereder & Ilg 2013)
+- **Added** `rheojax/models/sgr_generic.py` (~945 lines)
+  - Thermodynamically consistent GENERIC framework implementation
+  - Dissipation potential satisfies Onsager reciprocal relations
+  - Enhanced stability for near-glass transition (x → 1)
+  - Automatic fallback to Conventional SGR when appropriate
+  - Same parameter interface as Conventional for easy comparison
+
+#### SGR Kernel Functions
+- **Added** `rheojax/utils/sgr_kernels.py` (~539 lines)
+  - `sgr_memory_kernel()`: Memory function K(t) for relaxation dynamics
+  - `sgr_modulus_fourier()`: Complex modulus G*(ω) via numerical Fourier transform
+  - `sgr_yield_stress()`: Dynamic yield stress prediction
+  - `sgr_aging_exponent()`: Aging dynamics μ(x) calculation
+  - All functions JAX-compatible with automatic differentiation
+
+### Added - SRFS Transform (Strain-Rate Frequency Superposition)
+**Collapse Flow Curves Analogous to Time-Temperature Superposition**
+
+- **Added** `rheojax/transforms/srfs.py` (~846 lines)
+  - Power-law shift factor calculation: a(γ̇) ~ (γ̇)^(2-x)
+  - Automatic shift factor determination via optimization
+  - Manual and reference shear rate specification
+  - Thixotropy detection via hysteresis analysis
+  - Shear banding detection and coexistence curve computation
+- **Added** `detect_shear_banding()`: Identifies flow instabilities from stress plateau
+- **Added** `compute_shear_band_coexistence()`: Calculates coexisting shear rates
+
+### Added - Comprehensive SGR Documentation
+- **Added** `docs/source/models/sgr/sgr_conventional.rst` (532 lines)
+  - Complete theoretical background with governing equations
+  - Parameter interpretation guide with material classification
+  - Usage examples for all test modes
+  - Troubleshooting section for convergence issues
+- **Added** `docs/source/models/sgr/sgr_generic.rst` (416 lines)
+  - GENERIC framework explanation
+  - Comparison with Conventional SGR
+  - When to use each variant
+- **Added** `docs/source/transforms/srfs.rst` (237 lines)
+  - SRFS theory and applications
+  - Connection to SGR noise temperature
+  - Shear banding analysis tutorial
+
+### Testing
+- **Added** 1890 lines of new tests across 5 test files:
+  - `tests/models/test_sgr_conventional.py` (1109 lines): 45+ unit tests
+  - `tests/models/test_sgr_generic.py` (407 lines): 25+ unit tests
+  - `tests/utils/test_sgr_kernels.py` (417 lines): Kernel function validation
+  - `tests/transforms/test_srfs.py` (460 lines): Transform verification
+  - `tests/integration/test_sgr_integration.py` (316 lines): End-to-end workflows
+  - `tests/hypothesis/test_sgr_properties.py` (574 lines): Property-based tests
+
+### Model Count Update
+- **Updated** Total models: 21 → 23 (added SGRConventional, SGRGeneric)
+- **Updated** Total transforms: 5 → 6 (added SRFS)
+- **Updated** Bayesian support: All 23 models support NumPyro NUTS sampling
+
 ---
 
 ## [0.4.0] - 2025-11-16

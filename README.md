@@ -6,17 +6,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 21 rheological models, 5 data transforms, Bayesian inference via NumPyro, and 27 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 23 rheological models (including SGR), 6 data transforms (including SRFS), Bayesian inference via NumPyro, and 27 tutorial notebooks.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **21 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models), Multi-Mode (Generalized Maxwell)
-- **5 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative
+- **23 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models), Multi-Mode (Generalized Maxwell), SGR (2 models)
+- **6 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition)
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
-- **Bayesian Inference**: All 21 models support NumPyro NUTS sampling with NLSQ warm-start
+- **Bayesian Inference**: All 23 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
@@ -348,6 +348,38 @@ temps, shifts = mc.get_shift_factors_array()
 # Mutation number (viscoelastic character)
 mn = MutationNumber()
 delta = mn.calculate(data)  # 0=elastic, 1=viscous
+```
+
+### Soft Glassy Rheology (SGR) Models
+
+```python
+from rheojax.models import SGRConventional, SGRGeneric
+
+# Conventional SGR model (Sollich 1998)
+# For soft glassy materials: foams, emulsions, pastes, colloidal suspensions
+sgr = SGRConventional()
+sgr.fit(omega, G_star, test_mode='oscillation')
+# Parameters: x (noise temp 0.5-3), G0 (modulus), tau0 (attempt time)
+# x < 1: glass, 1 < x < 2: power-law fluid, x >= 2: Newtonian
+
+# GENERIC framework SGR (thermodynamically consistent, Fuereder & Ilg 2013)
+sgr_gen = SGRGeneric()
+sgr_gen.fit(omega, G_star, test_mode='oscillation')
+```
+
+### Strain-Rate Frequency Superposition (SRFS)
+
+```python
+from rheojax.transforms import SRFS
+
+# Collapse flow curves at different shear rates (analogous to TTS)
+srfs = SRFS(reference_gamma_dot=1.0, auto_shift=True)
+master_curve, shifts = srfs.transform(datasets)
+
+# Power-law shift: a(γ̇) ~ (γ̇)^(2-x)
+# Includes thixotropy detection and shear banding analysis
+from rheojax.transforms import detect_shear_banding, compute_shear_band_coexistence
+is_banding = detect_shear_banding(flow_curve)
 ```
 
 ## Tutorial Notebooks
