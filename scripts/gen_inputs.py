@@ -40,10 +40,20 @@ def write_csv(path: Path, t: np.ndarray, gamma: np.ndarray, sigma: np.ndarray):
     np.savetxt(path, data, delimiter=",", header=header, comments="")
 
 
-def main():
+def main(argv: list[str] | None = None):
+    """Generate golden data inputs.
+
+    Args:
+        argv: Command line arguments. If None, uses sys.argv.
+              Pass [] to use defaults when calling programmatically.
+    """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--outdir", type=Path, default=Path("golden_data/input"))
-    args = parser.parse_args()
+    # Default path is relative to script location for portability
+    script_dir = Path(__file__).parent
+    parser.add_argument(
+        "--outdir", type=Path, default=script_dir / "golden_data" / "input"
+    )
+    args = parser.parse_args(argv)
 
     outdir: Path = args.outdir
     outdir.mkdir(parents=True, exist_ok=True)

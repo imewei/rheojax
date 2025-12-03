@@ -58,8 +58,14 @@ def run_dataset(dataset: str, input_dir: Path, output_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", type=Path, default=Path("golden_data/input"))
-    parser.add_argument("--output_dir", type=Path, default=Path("golden_data/outputs/rheojax"))
+    # Default paths are relative to script location for portability
+    script_dir = Path(__file__).parent
+    parser.add_argument(
+        "--input_dir", type=Path, default=script_dir / "golden_data" / "input"
+    )
+    parser.add_argument(
+        "--output_dir", type=Path, default=script_dir / "golden_data" / "outputs" / "rheojax"
+    )
     parser.add_argument("datasets", nargs="*", default=["sin_fundamental", "sin_noisy"])
     args = parser.parse_args()
 
