@@ -35,11 +35,15 @@ Non-Newtonian Flow Models (ROTATION test mode):
     - HerschelBulkley: Power-law with yield stress
     - Bingham: Linear viscoplastic (yield stress + constant viscosity)
 
+Soft Glassy Rheology Models:
+    - SGRConventional: Soft Glassy Rheology model (Sollich 1998)
+
 Usage:
     >>> from rheojax.models import Maxwell, Zener, SpringPot
     >>> from rheojax.models import FractionalMaxwellGel, FractionalMaxwellLiquid
     >>> from rheojax.models import FractionalZenerSolidLiquid, FractionalBurgersModel
     >>> from rheojax.models import PowerLaw, Carreau, HerschelBulkley
+    >>> from rheojax.models import SGRConventional
     >>> from rheojax.core.registry import ModelRegistry
     >>>
     >>> # Direct instantiation
@@ -86,6 +90,10 @@ from rheojax.models.maxwell import Maxwell
 
 # Non-Newtonian flow models
 from rheojax.models.power_law import PowerLaw
+
+# Soft Glassy Rheology models
+from rheojax.models.sgr_conventional import SGRConventional
+from rheojax.models.sgr_generic import SGRGeneric
 from rheojax.models.springpot import SpringPot
 from rheojax.models.zener import Zener
 
@@ -124,4 +132,7 @@ __all__ = [
     "Cross",
     "HerschelBulkley",
     "Bingham",
+    # Soft Glassy Rheology models
+    "SGRConventional",
+    "SGRGeneric",
 ]

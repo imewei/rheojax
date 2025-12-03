@@ -57,3 +57,10 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    :caption: Multi-Mode Models
 
    multi_mode/generalized_maxwell
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Soft Glassy Rheology (SGR)
+
+   sgr/sgr_conventional
+   sgr/sgr_generic
