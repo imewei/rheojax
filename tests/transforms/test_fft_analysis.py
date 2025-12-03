@@ -14,6 +14,7 @@ jax, jnp = safe_import_jax()
 class TestFFTAnalysis:
     """Test suite for FFT Analysis transform."""
 
+    @pytest.mark.smoke
     def test_basic_initialization(self):
         """Test basic FFT transform initialization."""
         fft = FFTAnalysis()
@@ -21,6 +22,7 @@ class TestFFTAnalysis:
         assert fft.detrend is True
         assert fft.return_psd is False
 
+    @pytest.mark.smoke
     def test_custom_initialization(self):
         """Test FFT with custom parameters."""
         fft = FFTAnalysis(window="hamming", detrend=False, return_psd=True)
@@ -28,6 +30,7 @@ class TestFFTAnalysis:
         assert fft.detrend is False
         assert fft.return_psd is True
 
+    @pytest.mark.smoke
     def test_single_frequency_signal(self):
         """Test FFT of single-frequency sinusoid."""
         # Create pure sine wave

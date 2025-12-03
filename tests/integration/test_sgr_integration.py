@@ -43,23 +43,24 @@ class TestSGRPipelineIntegration:
 
         # Verify model is registered
         from rheojax.core.registry import ModelRegistry
-        assert 'sgr_conventional' in ModelRegistry.list_models()
+
+        assert "sgr_conventional" in ModelRegistry.list_models()
 
         # Verify parameters exist
-        assert 'x' in model.parameters.keys()
-        assert 'G0' in model.parameters.keys()
-        assert 'tau0' in model.parameters.keys()
+        assert "x" in model.parameters.keys()
+        assert "G0" in model.parameters.keys()
+        assert "tau0" in model.parameters.keys()
 
         # Verify BaseModel interface
-        assert hasattr(model, 'fit')
-        assert hasattr(model, 'predict')
-        assert hasattr(model, 'fit_bayesian')
+        assert hasattr(model, "fit")
+        assert hasattr(model, "predict")
+        assert hasattr(model, "fit_bayesian")
 
     @pytest.mark.smoke
     def test_sgr_oscillation_prediction_without_fit(self):
         """Test SGR can make predictions with default parameters (no fit required)."""
         model = SGRConventional()
-        model._test_mode = 'oscillation'
+        model._test_mode = "oscillation"
 
         omega = np.logspace(-1, 1, 20)
         predictions = model.predict(omega)
@@ -82,17 +83,18 @@ class TestSGRBayesianWorkflow:
 
         # Verify BayesianMixin integration
         assert isinstance(model, BayesianMixin)
-        assert hasattr(model, 'fit_bayesian')
-        assert hasattr(model, 'model_function')
+        assert hasattr(model, "fit_bayesian")
+        assert hasattr(model, "model_function")
         assert callable(model.model_function)
 
         # Verify model_function signature
         import inspect
+
         sig = inspect.signature(model.model_function)
         param_names = list(sig.parameters.keys())
-        assert 'X' in param_names
-        assert 'params' in param_names
-        assert 'test_mode' in param_names
+        assert "X" in param_names
+        assert "params" in param_names
+        assert "test_mode" in param_names
 
     def test_sgr_credible_intervals_method(self):
         """Test SGR model can compute credible intervals from mock posterior samples."""
@@ -101,21 +103,21 @@ class TestSGRBayesianWorkflow:
         # Create mock posterior samples
         np.random.seed(42)
         mock_samples = {
-            'x': np.random.uniform(1.2, 1.8, size=1000),
-            'G0': np.random.uniform(900, 1100, size=1000),
-            'tau0': np.random.uniform(0.8e-3, 1.2e-3, size=1000),
+            "x": np.random.uniform(1.2, 1.8, size=1000),
+            "G0": np.random.uniform(900, 1100, size=1000),
+            "tau0": np.random.uniform(0.8e-3, 1.2e-3, size=1000),
         }
 
         # Compute credible intervals
         intervals = model.get_credible_intervals(mock_samples, credibility=0.95)
 
         # Verify structure
-        assert 'x' in intervals
-        assert 'G0' in intervals
-        assert 'tau0' in intervals
+        assert "x" in intervals
+        assert "G0" in intervals
+        assert "tau0" in intervals
 
         # Verify intervals are reasonable
-        x_lower, x_upper = intervals['x']
+        x_lower, x_upper = intervals["x"]
         assert x_lower < x_upper
         assert 1.0 < x_lower < 2.0
         assert 1.0 < x_upper < 2.0
@@ -137,19 +139,19 @@ class TestSGRModelComparison:
 
         # SGRConventional prediction
         model_conv = SGRConventional()
-        model_conv.parameters.set_value('x', x)
-        model_conv.parameters.set_value('G0', G0)
-        model_conv.parameters.set_value('tau0', tau0)
-        model_conv._test_mode = 'oscillation'
+        model_conv.parameters.set_value("x", x)
+        model_conv.parameters.set_value("G0", G0)
+        model_conv.parameters.set_value("tau0", tau0)
+        model_conv._test_mode = "oscillation"
 
         pred_conv = model_conv.predict(omega)
 
         # SGRGeneric prediction
         model_gen = SGRGeneric()
-        model_gen.parameters.set_value('x', x)
-        model_gen.parameters.set_value('G0', G0)
-        model_gen.parameters.set_value('tau0', tau0)
-        model_gen._test_mode = 'oscillation'
+        model_gen.parameters.set_value("x", x)
+        model_gen.parameters.set_value("G0", G0)
+        model_gen.parameters.set_value("tau0", tau0)
+        model_gen._test_mode = "oscillation"
 
         pred_gen = model_gen.predict(omega)
 
@@ -160,8 +162,9 @@ class TestSGRModelComparison:
         rel_diff = np.abs(G_prime_conv - G_prime_gen) / (G_prime_conv + 1e-10)
 
         # Allow up to 15% difference (GENERIC has additional thermodynamic terms)
-        assert np.mean(rel_diff) < 0.15, \
-            f"SGRConventional and SGRGeneric differ by {np.mean(rel_diff)*100:.1f}% on average"
+        assert (
+            np.mean(rel_diff) < 0.15
+        ), f"SGRConventional and SGRGeneric differ by {np.mean(rel_diff)*100:.1f}% on average"
 
     def test_sgr_model_registry_comparison(self):
         """Test both SGR models are properly registered and can be instantiated."""
@@ -169,12 +172,12 @@ class TestSGRModelComparison:
 
         # Verify both models registered
         registered_models = ModelRegistry.list_models()
-        assert 'sgr_conventional' in registered_models
-        assert 'sgr_generic' in registered_models
+        assert "sgr_conventional" in registered_models
+        assert "sgr_generic" in registered_models
 
         # Verify factory instantiation works
-        model_conv = ModelRegistry.create('sgr_conventional')
-        model_gen = ModelRegistry.create('sgr_generic')
+        model_conv = ModelRegistry.create("sgr_conventional")
+        model_gen = ModelRegistry.create("sgr_generic")
 
         assert isinstance(model_conv, SGRConventional)
         assert isinstance(model_gen, SGRGeneric)
@@ -188,10 +191,10 @@ class TestSGRPublishedValidation:
         """Test SGR oscillation predictions show qualitative power-law behavior."""
         # More realistic test: verify power-law trends without strict exponent matching
         model = SGRConventional()
-        model.parameters.set_value('x', 1.5)
-        model.parameters.set_value('G0', 1e3)
-        model.parameters.set_value('tau0', 1e-3)
-        model._test_mode = 'oscillation'
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+        model._test_mode = "oscillation"
 
         # Generate predictions
         omega = np.logspace(-2, 2, 50)
@@ -202,8 +205,12 @@ class TestSGRPublishedValidation:
 
         # Verify basic power-law trends (increasing with omega)
         # For x=1.5, exponent should be 0.5, so G' and G'' increase with omega
-        assert G_prime[-1] > G_prime[0], "G' should increase with omega in power-law regime"
-        assert G_double_prime[-1] > G_double_prime[0], "G'' should increase with omega in power-law regime"
+        assert (
+            G_prime[-1] > G_prime[0]
+        ), "G' should increase with omega in power-law regime"
+        assert (
+            G_double_prime[-1] > G_double_prime[0]
+        ), "G'' should increase with omega in power-law regime"
 
         # Verify log-log linearity (power-law behavior)
         log_omega = np.log10(omega[10:40])
@@ -211,47 +218,55 @@ class TestSGRPublishedValidation:
 
         # Linear correlation coefficient should be high for power-law
         correlation = np.corrcoef(log_omega, log_Gp)[0, 1]
-        assert correlation > 0.95, f"Power-law behavior should give linear log-log plot, got R={correlation:.3f}"
+        assert (
+            correlation > 0.95
+        ), f"Power-law behavior should give linear log-log plot, got R={correlation:.3f}"
 
     def test_sgr_phase_regime_detection(self):
         """Test SGR predictions change qualitatively across phase regimes."""
         omega = np.logspace(-1, 1, 30)
 
         # Test three different x values in different regimes
-        x_values = {'glass': 0.8, 'power_law': 1.5, 'newtonian': 2.2}
+        x_values = {"glass": 0.8, "power_law": 1.5, "newtonian": 2.2}
         predictions = {}
 
         for regime, x in x_values.items():
             model = SGRConventional()
-            model.parameters.set_value('x', x)
-            model.parameters.set_value('G0', 1e3)
-            model.parameters.set_value('tau0', 1e-3)
-            model._test_mode = 'oscillation'
+            model.parameters.set_value("x", x)
+            model.parameters.set_value("G0", 1e3)
+            model.parameters.set_value("tau0", 1e-3)
+            model._test_mode = "oscillation"
 
             pred = model.predict(omega)
             predictions[regime] = pred[:, 0]  # G' values
 
         # Power-law regime should have intermediate frequency dependence
         # (between glass and Newtonian)
-        glass_slope = np.polyfit(np.log10(omega), np.log10(predictions['glass']), 1)[0]
-        power_law_slope = np.polyfit(np.log10(omega), np.log10(predictions['power_law']), 1)[0]
-        newtonian_slope = np.polyfit(np.log10(omega), np.log10(predictions['newtonian']), 1)[0]
+        glass_slope = np.polyfit(np.log10(omega), np.log10(predictions["glass"]), 1)[0]
+        power_law_slope = np.polyfit(
+            np.log10(omega), np.log10(predictions["power_law"]), 1
+        )[0]
+        newtonian_slope = np.polyfit(
+            np.log10(omega), np.log10(predictions["newtonian"]), 1
+        )[0]
 
         # Verify slopes are different across regimes (qualitative test)
         assert glass_slope != power_law_slope
         assert power_law_slope != newtonian_slope
         assert glass_slope != newtonian_slope
 
-        print(f"Slopes: glass={glass_slope:.3f}, power-law={power_law_slope:.3f}, Newtonian={newtonian_slope:.3f}")
+        print(
+            f"Slopes: glass={glass_slope:.3f}, power-law={power_law_slope:.3f}, Newtonian={newtonian_slope:.3f}"
+        )
 
     def test_fuereder_ilg_2013_thermodynamic_consistency(self):
         """Test SGRGeneric thermodynamic consistency per Fuereder & Ilg 2013."""
         model = SGRGeneric()
 
         # Set parameters in power-law regime
-        model.parameters.set_value('x', 1.5)
-        model.parameters.set_value('G0', 1e3)
-        model.parameters.set_value('tau0', 1e-3)
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
 
         # Test thermodynamic constraints at various states
         # State = [momentum, structure]
@@ -269,18 +284,21 @@ class TestSGRPublishedValidation:
             # Poisson bracket antisymmetry: L = -L^T
             L = model.poisson_bracket(state)
             antisymmetry_error = np.max(np.abs(L + L.T))
-            assert antisymmetry_error < 1e-10, \
-                f"Poisson bracket not antisymmetric: error={antisymmetry_error:.6e}"
+            assert (
+                antisymmetry_error < 1e-10
+            ), f"Poisson bracket not antisymmetric: error={antisymmetry_error:.6e}"
 
             # Friction matrix symmetry and positive semi-definite
             M = model.friction_matrix(state)
             symmetry_error = np.max(np.abs(M - M.T))
-            assert symmetry_error < 1e-10, \
-                f"Friction matrix not symmetric: error={symmetry_error:.6e}"
+            assert (
+                symmetry_error < 1e-10
+            ), f"Friction matrix not symmetric: error={symmetry_error:.6e}"
 
             eigenvalues = np.linalg.eigvalsh(M)
-            assert np.all(eigenvalues >= -1e-10), \
-                f"Friction matrix not positive semi-definite: min eigenvalue={np.min(eigenvalues):.6e}"
+            assert np.all(
+                eigenvalues >= -1e-10
+            ), f"Friction matrix not positive semi-definite: min eigenvalue={np.min(eigenvalues):.6e}"
 
         print("GENERIC thermodynamic consistency verified per Fuereder & Ilg 2013 ✓")
 

@@ -10,14 +10,15 @@ accuracy (which is covered in Task Group 3).
 import numpy as np
 import pytest
 
-from rheojax.models.sgr_conventional import SGRConventional
-from rheojax.core.registry import ModelRegistry
 from rheojax.core.parameters import ParameterSet
+from rheojax.core.registry import ModelRegistry
+from rheojax.models.sgr_conventional import SGRConventional
 
 
 class TestSGRConventionalStructure:
     """Test suite for SGRConventional model structure."""
 
+    @pytest.mark.smoke
     def test_model_instantiation_default(self):
         """Test model instantiation with default parameters."""
         model = SGRConventional()
@@ -28,6 +29,7 @@ class TestSGRConventionalStructure:
         assert hasattr(model, "_test_mode")
         assert model._test_mode is None
 
+    @pytest.mark.smoke
     def test_parameter_set_creation(self):
         """Test ParameterSet has correct parameters with bounds."""
         model = SGRConventional()
@@ -124,6 +126,7 @@ class TestSGRConventionalStructure:
 
         # Check model_function signature
         import inspect
+
         sig = inspect.signature(model.model_function)
 
         # Should accept (self, X, params, test_mode=None)
@@ -198,7 +201,9 @@ class TestSGRConventionalPredictions:
         log_G_double_prime = np.log10(G_star[mask, 1])
         slope_G_double_prime = np.polyfit(log_omega, log_G_double_prime, 1)[0]
         # G'' may have weaker power-law or approach plateau faster
-        assert -1.0 < slope_G_double_prime < 1.0, f"G'' slope {slope_G_double_prime} out of range"
+        assert (
+            -1.0 < slope_G_double_prime < 1.0
+        ), f"G'' slope {slope_G_double_prime} out of range"
 
         # Check G' and G'' have reasonable ratio in power-law regime
         # In SGR, G'/G'' should be order 1, not too extreme
@@ -279,7 +284,7 @@ class TestSGRConventionalPredictions:
 
         # Check monotonicity: J(t) should increase with time
         for i in range(1, len(J_t)):
-            assert J_t[i] >= J_t[i-1], f"J(t) not monotonic at index {i}"
+            assert J_t[i] >= J_t[i - 1], f"J(t) not monotonic at index {i}"
 
         # Check consistency with G0: J(0) ~ 1/G0
         J_initial = J_t[0]
@@ -313,7 +318,9 @@ class TestSGRConventionalPredictions:
         assert np.all(eta > 0)
 
         # Check shear-thinning: eta decreases with gamma_dot
-        assert eta[0] > eta[-1], "Viscosity should decrease with shear rate (shear-thinning)"
+        assert (
+            eta[0] > eta[-1]
+        ), "Viscosity should decrease with shear rate (shear-thinning)"
 
         # Check power-law scaling: eta ~ gamma_dot^(x-2) = gamma_dot^(-0.5)
         mid_idx = slice(15, 35)
@@ -343,8 +350,9 @@ class TestSGRConventionalPredictions:
         # In glass phase at high frequencies, G' should dominate (approaches plateau)
         # while G'' decreases. Check high-frequency end.
         high_freq_idx = -5  # Near end of range
-        assert G_star[high_freq_idx, 0] > G_star[high_freq_idx, 1], \
-            "Glass phase should show G' > G'' at high frequencies"
+        assert (
+            G_star[high_freq_idx, 0] > G_star[high_freq_idx, 1]
+        ), "Glass phase should show G' > G'' at high frequencies"
 
         # Also check that phase regime detection works
         phase = model.get_phase_regime()
@@ -367,8 +375,9 @@ class TestSGRConventionalPredictions:
         # In Newtonian regime at low frequencies, G'' should dominate (viscous behavior)
         # and G' ~ omega^2, G'' ~ omega (different from power-law regime)
         low_freq_idx = slice(0, 10)
-        assert np.all(G_star[low_freq_idx, 1] > G_star[low_freq_idx, 0]), \
-            "Newtonian phase should show G'' > G' at low frequencies"
+        assert np.all(
+            G_star[low_freq_idx, 1] > G_star[low_freq_idx, 0]
+        ), "Newtonian phase should show G'' > G' at low frequencies"
 
         # Check phase regime detection
         phase = model.get_phase_regime()
@@ -393,7 +402,7 @@ class TestSGRConventionalPredictions:
         assert np.all(G_star[:, 1] > 0), "G'' should be positive"
 
         # Check complex modulus magnitude |G*| = sqrt(G'^2 + G''^2)
-        G_magnitude = np.sqrt(G_star[:, 0]**2 + G_star[:, 1]**2)
+        G_magnitude = np.sqrt(G_star[:, 0] ** 2 + G_star[:, 1] ** 2)
         assert np.all(G_magnitude > 0)
         assert np.all(G_magnitude > G_star[:, 0]), "|G*| should be >= G'"
         assert np.all(G_magnitude > G_star[:, 1]), "|G*| should be >= G''"
@@ -421,7 +430,10 @@ class TestSGRConventionalPredictions:
         model._test_mode = "oscillation"
         omega_array = np.logspace(-2, 2, 20)
         G_star_array = model.predict(omega_array)
-        assert G_star_array.shape == (20, 2), "Oscillation array output should be (M, 2)"
+        assert G_star_array.shape == (
+            20,
+            2,
+        ), "Oscillation array output should be (M, 2)"
 
         # Test relaxation mode with array
         model._test_mode = "relaxation"
@@ -536,8 +548,9 @@ class TestSGRConventionalDynamicX:
 
             # Check convergence to x_ss (within 10%)
             final_x = x_t[-1]
-            assert abs(final_x - x_ss) / x_ss < 0.15, \
-                f"x should converge to x_ss={x_ss:.3f}, got {final_x:.3f} at gamma_dot={gamma_dot_val}"
+            assert (
+                abs(final_x - x_ss) / x_ss < 0.15
+            ), f"x should converge to x_ss={x_ss:.3f}, got {final_x:.3f} at gamma_dot={gamma_dot_val}"
 
     def test_static_x_mode_constant_parameter(self):
         """Test static x mode: x is constant fitted parameter, no dynamics."""
@@ -561,8 +574,9 @@ class TestSGRConventionalDynamicX:
         assert x_current == x_value, "x should remain constant in static mode"
 
         # Verify no evolve_x method is called (or it doesn't exist in static mode)
-        assert not hasattr(model, '_x_trajectory') or model._x_trajectory is None, \
-            "Static mode should not store x trajectory"
+        assert (
+            not hasattr(model, "_x_trajectory") or model._x_trajectory is None
+        ), "Static mode should not store x trajectory"
 
     def test_ode_integration_stability_long_times(self):
         """Test ODE integration remains stable over long simulation times."""
@@ -572,7 +586,9 @@ class TestSGRConventionalDynamicX:
         model.parameters.set_value("x_eq", 1.0)
         model.parameters.set_value("x_ss_A", 0.8)  # Larger amplitude for higher x_ss
         model.parameters.set_value("x_ss_n", 0.3)
-        model.parameters.set_value("alpha_aging", 1.0)  # Faster aging for quicker relaxation
+        model.parameters.set_value(
+            "alpha_aging", 1.0
+        )  # Faster aging for quicker relaxation
         model.parameters.set_value("beta_rejuv", 2.0)  # Strong rejuvenation
 
         # Long time evolution (1000 * tau0)
@@ -583,7 +599,9 @@ class TestSGRConventionalDynamicX:
         # Time-varying shear rate (step protocol)
         gamma_dot = np.zeros_like(t)
         gamma_dot[t > 0.2 * t_max] = 10.0  # Step up earlier
-        gamma_dot[t > 0.5 * t_max] = 0.0   # Step down earlier to give more relaxation time
+        gamma_dot[t > 0.5 * t_max] = (
+            0.0  # Step down earlier to give more relaxation time
+        )
 
         # Start at x_eq so we can clearly see increase under shear
         x_initial = 1.0
@@ -603,13 +621,14 @@ class TestSGRConventionalDynamicX:
         # Use specific time points
         idx_initial = 0
         idx_during_shear = np.argmax(t > 0.4 * t_max)  # Well into shear period
-        idx_after_rest = np.argmax(t > 0.9 * t_max)    # Near end of relaxation
+        idx_after_rest = np.argmax(t > 0.9 * t_max)  # Near end of relaxation
 
         # During shear, x should be higher than initial value
         # (since x starts at x_eq and shear drives it toward x_ss > x_eq)
-        assert x_t[idx_during_shear] > x_t[idx_initial], \
-            f"x should increase during shear: x_initial={x_t[idx_initial]:.3f}, " \
+        assert x_t[idx_during_shear] > x_t[idx_initial], (
+            f"x should increase during shear: x_initial={x_t[idx_initial]:.3f}, "
             f"x_during={x_t[idx_during_shear]:.3f}"
+        )
 
         # After returning to rest, x should decrease back toward x_eq
         # Check that it's moving in the right direction (closer to x_eq than during shear)
@@ -617,9 +636,10 @@ class TestSGRConventionalDynamicX:
         dist_during = abs(x_t[idx_during_shear] - x_eq)
         dist_after = abs(x_t[idx_after_rest] - x_eq)
 
-        assert dist_after < dist_during, \
-            f"x should move closer to x_eq after shear stops: " \
+        assert dist_after < dist_during, (
+            f"x should move closer to x_eq after shear stops: "
             f"dist_during={dist_during:.3f}, dist_after={dist_after:.3f}"
+        )
 
     def test_dynamic_x_coupling_to_predictions(self):
         """Test that x(t) dynamics couple to constitutive predictions."""
@@ -659,27 +679,28 @@ class TestSGRConventionalDynamicX:
             np.array([gamma_dot[0]]),
             x_t[0],
             model.parameters.get_value("G0"),
-            model.parameters.get_value("tau0")
+            model.parameters.get_value("tau0"),
         )[0]
 
         eta_final = model._predict_steady_shear_jit(
             np.array([gamma_dot[-1]]),
             x_t[-1],
             model.parameters.get_value("G0"),
-            model.parameters.get_value("tau0")
+            model.parameters.get_value("tau0"),
         )[0]
 
         # Since x changes, viscosity should change
         # The key test is that we CAN compute different viscosities with different x
-        assert eta_initial != eta_final, \
-            "Viscosity should change when x changes (coupling verified)"
+        assert (
+            eta_initial != eta_final
+        ), "Viscosity should change when x changes (coupling verified)"
 
         # Also test that we can predict at intermediate points
         eta_mid = model._predict_steady_shear_jit(
             np.array([gamma_dot[50]]),
             x_t[50],
             model.parameters.get_value("G0"),
-            model.parameters.get_value("tau0")
+            model.parameters.get_value("tau0"),
         )[0]
 
         # All viscosities should be positive and finite
@@ -705,14 +726,20 @@ class TestSGRConventionalLAOS:
 
         # LAOS parameters
         gamma_0 = 0.1  # Strain amplitude (10%)
-        omega = 1.0    # Angular frequency (rad/s)
+        omega = 1.0  # Angular frequency (rad/s)
 
         # Generate Lissajous curve
-        strain, stress = model.simulate_laos(gamma_0, omega, n_cycles=2, n_points_per_cycle=256)
+        strain, stress = model.simulate_laos(
+            gamma_0, omega, n_cycles=2, n_points_per_cycle=256
+        )
 
         # Check outputs are arrays with correct shape
-        assert len(strain) == len(stress), "Strain and stress arrays should have same length"
-        assert len(strain) == 2 * 256, "Should have n_cycles * n_points_per_cycle points"
+        assert len(strain) == len(
+            stress
+        ), "Strain and stress arrays should have same length"
+        assert (
+            len(strain) == 2 * 256
+        ), "Should have n_cycles * n_points_per_cycle points"
 
         # Check strain oscillates between -gamma_0 and +gamma_0
         assert np.max(strain) <= gamma_0 * 1.01, "Strain max should be near gamma_0"
@@ -724,7 +751,9 @@ class TestSGRConventionalLAOS:
 
         # Check that the Lissajous curve forms a closed loop (approximately)
         # The end should be close to the start after full cycles
-        assert np.abs(strain[-1] - strain[0]) < gamma_0 * 0.1, "Strain loop should close"
+        assert (
+            np.abs(strain[-1] - strain[0]) < gamma_0 * 0.1
+        ), "Strain loop should close"
 
     def test_ellipse_shape_linear_regime(self):
         """Test ellipse shape for linear regime (small amplitude)."""
@@ -740,7 +769,9 @@ class TestSGRConventionalLAOS:
         omega = 1.0
 
         # Generate Lissajous curve
-        strain, stress = model.simulate_laos(gamma_0, omega, n_cycles=3, n_points_per_cycle=256)
+        strain, stress = model.simulate_laos(
+            gamma_0, omega, n_cycles=3, n_points_per_cycle=256
+        )
 
         # Use last cycle for steady-state
         n_pts = 256
@@ -758,11 +789,11 @@ class TestSGRConventionalLAOS:
         # Test for ellipse shape using Fourier analysis
         # For a perfect ellipse, only the fundamental frequency should be present
         stress_fft = np.fft.fft(stress_cycle)
-        power_spectrum = np.abs(stress_fft)**2
+        power_spectrum = np.abs(stress_fft) ** 2
 
         # Find fundamental peak
         freqs = np.fft.fftfreq(len(stress_cycle))
-        fundamental_idx = np.argmax(power_spectrum[1:len(power_spectrum)//2]) + 1
+        fundamental_idx = np.argmax(power_spectrum[1 : len(power_spectrum) // 2]) + 1
 
         # In linear regime, fundamental should dominate over higher harmonics
         fundamental_power = power_spectrum[fundamental_idx]
@@ -770,8 +801,9 @@ class TestSGRConventionalLAOS:
         if third_harmonic_idx < len(power_spectrum) // 2:
             third_harmonic_power = power_spectrum[third_harmonic_idx]
             # Third harmonic should be negligible (< 1% of fundamental) in linear regime
-            assert third_harmonic_power < 0.01 * fundamental_power, \
-                f"Third harmonic too strong for linear regime: {third_harmonic_power/fundamental_power:.4f}"
+            assert (
+                third_harmonic_power < 0.01 * fundamental_power
+            ), f"Third harmonic too strong for linear regime: {third_harmonic_power/fundamental_power:.4f}"
 
     def test_distorted_curves_nonlinear_regime(self):
         """Test distorted curves for nonlinear regime (large amplitude)."""
@@ -787,7 +819,9 @@ class TestSGRConventionalLAOS:
         omega = 1.0
 
         # Generate Lissajous curve
-        strain, stress = model.simulate_laos(gamma_0, omega, n_cycles=3, n_points_per_cycle=256)
+        strain, stress = model.simulate_laos(
+            gamma_0, omega, n_cycles=3, n_points_per_cycle=256
+        )
 
         # Use last cycle for steady-state
         n_pts = 256
@@ -795,10 +829,10 @@ class TestSGRConventionalLAOS:
 
         # In nonlinear regime, higher harmonics should be present
         stress_fft = np.fft.fft(stress_cycle)
-        power_spectrum = np.abs(stress_fft)**2
+        power_spectrum = np.abs(stress_fft) ** 2
 
         # Find fundamental peak
-        fundamental_idx = np.argmax(power_spectrum[1:len(power_spectrum)//2]) + 1
+        fundamental_idx = np.argmax(power_spectrum[1 : len(power_spectrum) // 2]) + 1
         fundamental_power = power_spectrum[fundamental_idx]
 
         # Check that the stress response exists and is non-trivial
@@ -824,7 +858,9 @@ class TestSGRConventionalLAOS:
         omega = 1.0
 
         # Generate LAOS response
-        strain, stress = model.simulate_laos(gamma_0, omega, n_cycles=4, n_points_per_cycle=512)
+        strain, stress = model.simulate_laos(
+            gamma_0, omega, n_cycles=4, n_points_per_cycle=512
+        )
 
         # Extract harmonics
         harmonics = model.extract_laos_harmonics(stress, n_points_per_cycle=512)
@@ -865,7 +901,9 @@ class TestSGRConventionalLAOS:
         omega = 1.0
 
         # Generate LAOS response
-        strain, stress = model.simulate_laos(gamma_0, omega, n_cycles=4, n_points_per_cycle=512)
+        strain, stress = model.simulate_laos(
+            gamma_0, omega, n_cycles=4, n_points_per_cycle=512
+        )
 
         # Compute Chebyshev decomposition
         chebyshev = model.compute_chebyshev_coefficients(
@@ -926,8 +964,9 @@ class TestSGRConventionalLAOS:
         I3_I1_values = np.array(I3_I1_values)
 
         # In linear regime (small gamma), I_3/I_1 should be very small
-        assert I3_I1_values[0] < 0.05, \
-            f"I_3/I_1 should be small in linear regime, got {I3_I1_values[0]:.4f}"
+        assert (
+            I3_I1_values[0] < 0.05
+        ), f"I_3/I_1 should be small in linear regime, got {I3_I1_values[0]:.4f}"
 
         # Check that all values are non-negative
         assert np.all(I3_I1_values >= 0), "I_3/I_1 should be non-negative"

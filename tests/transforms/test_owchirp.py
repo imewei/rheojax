@@ -14,6 +14,7 @@ jax, jnp = safe_import_jax()
 class TestOWChirp:
     """Test suite for OWChirp transform."""
 
+    @pytest.mark.smoke
     def test_basic_initialization(self):
         """Test basic OWChirp initialization."""
         ow = OWChirp()
@@ -22,6 +23,7 @@ class TestOWChirp:
         assert ow.wavelet_width == 5.0
         assert ow.extract_harmonics is True
 
+    @pytest.mark.smoke
     def test_custom_initialization(self):
         """Test OWChirp with custom parameters."""
         ow = OWChirp(
@@ -37,6 +39,7 @@ class TestOWChirp:
         assert ow.extract_harmonics is False
         assert ow.max_harmonic == 5
 
+    @pytest.mark.smoke
     def test_single_frequency_signal(self):
         """Test OWChirp on single-frequency oscillation."""
         # Create pure sine wave

@@ -25,8 +25,8 @@ Physics Background:
 import numpy as np
 import pytest
 
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -35,6 +35,7 @@ jax, jnp = safe_import_jax()
 class TestSRFSShiftFactor:
     """Test suite for SRFS shift factor computation."""
 
+    @pytest.mark.smoke
     def test_srfs_shift_factor_computation(self):
         """Test SRFS shift factor a_gamma_dot from SGR theory."""
         from rheojax.transforms.srfs import SRFS
@@ -55,11 +56,14 @@ class TestSRFSShiftFactor:
 
             # At reference gamma_dot, shift should be 1.0
             if abs(gamma_dot - srfs.reference_gamma_dot) < 1e-10:
-                assert abs(a_gamma_dot - 1.0) < 1e-6, \
-                    f"Shift at reference should be 1.0, got {a_gamma_dot}"
+                assert (
+                    abs(a_gamma_dot - 1.0) < 1e-6
+                ), f"Shift at reference should be 1.0, got {a_gamma_dot}"
 
             # Shift factor should be positive
-            assert a_gamma_dot > 0, f"Shift factor should be positive, got {a_gamma_dot}"
+            assert (
+                a_gamma_dot > 0
+            ), f"Shift factor should be positive, got {a_gamma_dot}"
 
         # Check power-law scaling: a ~ gamma_dot^m where m depends on x
         # For x = 1.5, exponent m = 2 - x = 0.5
@@ -74,10 +78,11 @@ class TestSRFSShiftFactor:
         # Accept slope within reasonable range for SGR theory
         assert abs(slope) < 1.5, f"Shift exponent {slope} unreasonable for SGR"
 
+    @pytest.mark.smoke
     def test_srfs_mastercurve_collapse(self):
         """Test SRFS mastercurve collapse of flow curves."""
-        from rheojax.transforms.srfs import SRFS
         from rheojax.models.sgr_conventional import SGRConventional
+        from rheojax.transforms.srfs import SRFS
 
         # Create SGR model
         model = SGRConventional()
@@ -103,7 +108,7 @@ class TestSRFSShiftFactor:
                 x=gamma_dots,
                 y=eta,
                 domain="shear_rate",
-                metadata={"reference_gamma_dot": gamma_dot_ref}
+                metadata={"reference_gamma_dot": gamma_dot_ref},
             )
             datasets.append(data)
 
@@ -115,10 +120,7 @@ class TestSRFSShiftFactor:
         tau0 = model.parameters.get_value("tau0")
 
         mastercurve, shift_factors = srfs.transform(
-            datasets,
-            x=x,
-            tau0=tau0,
-            return_shifts=True
+            datasets, x=x, tau0=tau0, return_shifts=True
         )
 
         # Mastercurve should have combined data
@@ -143,7 +145,7 @@ class TestThixotropyKinetics:
         model = SGRConventional(dynamic_x=True)
 
         # Set thixotropy parameters (add them to model)
-        if not hasattr(model, '_lambda_trajectory'):
+        if not hasattr(model, "_lambda_trajectory"):
             model._lambda_trajectory = None
 
         # Add thixotropy kinetics parameters
@@ -151,19 +153,19 @@ class TestThixotropyKinetics:
             name="k_build",
             value=0.1,
             bounds=(0.0, 10.0),
-            description="Structure build-up rate (1/s)"
+            description="Structure build-up rate (1/s)",
         )
         model.parameters.add(
             name="k_break",
             value=0.5,
             bounds=(0.0, 10.0),
-            description="Structure breakdown rate (dimensionless)"
+            description="Structure breakdown rate (dimensionless)",
         )
         model.parameters.add(
             name="n_struct",
             value=2.0,
             bounds=(0.1, 5.0),
-            description="Structural coupling exponent"
+            description="Structural coupling exponent",
         )
 
         # Define time and shear rate arrays
@@ -184,8 +186,11 @@ class TestThixotropyKinetics:
         lambda_t[0] = lambda_initial
 
         for i in range(1, len(t)):
-            dlambda_dt = k_build * (1 - lambda_t[i-1]) - k_break * gamma_dot[i] * lambda_t[i-1]
-            lambda_t[i] = lambda_t[i-1] + dlambda_dt * dt
+            dlambda_dt = (
+                k_build * (1 - lambda_t[i - 1])
+                - k_break * gamma_dot[i] * lambda_t[i - 1]
+            )
+            lambda_t[i] = lambda_t[i - 1] + dlambda_dt * dt
             # Clamp to [0, 1]
             lambda_t[i] = np.clip(lambda_t[i], 0, 1)
 
@@ -198,8 +203,9 @@ class TestThixotropyKinetics:
 
         # Check convergence to steady state
         lambda_ss = k_build / (k_build + k_break * gamma_dot[-1])
-        assert abs(lambda_t[-1] - lambda_ss) < 0.1, \
-            f"Lambda should converge to steady state {lambda_ss:.3f}, got {lambda_t[-1]:.3f}"
+        assert (
+            abs(lambda_t[-1] - lambda_ss) < 0.1
+        ), f"Lambda should converge to steady state {lambda_ss:.3f}, got {lambda_t[-1]:.3f}"
 
     def test_thixotropy_step_up_stress_overshoot(self):
         """Test thixotropy step-up protocol produces stress overshoot."""
@@ -233,8 +239,11 @@ class TestThixotropyKinetics:
         lambda_t[0] = 0.95  # Start near equilibrium at low shear
 
         for i in range(1, len(t)):
-            dlambda_dt = k_build * (1 - lambda_t[i-1]) - k_break * gamma_dot[i] * lambda_t[i-1]
-            lambda_t[i] = np.clip(lambda_t[i-1] + dlambda_dt * dt, 0, 1)
+            dlambda_dt = (
+                k_build * (1 - lambda_t[i - 1])
+                - k_break * gamma_dot[i] * lambda_t[i - 1]
+            )
+            lambda_t[i] = np.clip(lambda_t[i - 1] + dlambda_dt * dt, 0, 1)
 
         # Compute stress: sigma = G_eff * gamma_dot = G0 * lambda^n * eta_effective
         # Simplified: sigma proportional to G0 * lambda^n * viscosity_factor
@@ -257,8 +266,9 @@ class TestThixotropyKinetics:
         # then structure breaks down, reducing stress
         # So we expect overshoot behavior
         # Note: exact behavior depends on parameters; test for reasonableness
-        assert max_stress_after >= final_stress * 0.9, \
-            "Stress after step-up should not drop too far below peak"
+        assert (
+            max_stress_after >= final_stress * 0.9
+        ), "Stress after step-up should not drop too far below peak"
 
     def test_thixotropy_step_down_stress_undershoot(self):
         """Test thixotropy step-down protocol produces stress undershoot."""
@@ -292,8 +302,11 @@ class TestThixotropyKinetics:
         lambda_t[0] = k_build / (k_build + k_break * gamma_dot[0])
 
         for i in range(1, len(t)):
-            dlambda_dt = k_build * (1 - lambda_t[i-1]) - k_break * gamma_dot[i] * lambda_t[i-1]
-            lambda_t[i] = np.clip(lambda_t[i-1] + dlambda_dt * dt, 0, 1)
+            dlambda_dt = (
+                k_build * (1 - lambda_t[i - 1])
+                - k_break * gamma_dot[i] * lambda_t[i - 1]
+            )
+            lambda_t[i] = np.clip(lambda_t[i - 1] + dlambda_dt * dt, 0, 1)
 
         # Compute stress
         G_eff = G0 * np.power(lambda_t, n_struct)
@@ -316,8 +329,9 @@ class TestThixotropyKinetics:
         final_stress = sigma[-1]
 
         # Final stress should be higher than initial minimum (structure rebuilds)
-        assert final_stress >= min_stress_initial * 0.5, \
-            "Stress should recover as structure rebuilds after step-down"
+        assert (
+            final_stress >= min_stress_initial * 0.5
+        ), "Stress should recover as structure rebuilds after step-down"
 
 
 class TestShearBanding:
@@ -331,20 +345,22 @@ class TestShearBanding:
         gamma_dot = np.logspace(-2, 2, 100)
 
         # Monotonic case: should NOT detect shear banding
-        sigma_monotonic = gamma_dot ** 0.5  # Simple power-law
+        sigma_monotonic = gamma_dot**0.5  # Simple power-law
 
         is_banding_mono, _ = detect_shear_banding(gamma_dot, sigma_monotonic)
         assert not is_banding_mono, "Monotonic curve should not show shear banding"
 
         # Non-monotonic case: should detect shear banding
         # Create stress with a dip (non-monotonic region)
-        sigma_nonmono = gamma_dot ** 0.5
+        sigma_nonmono = gamma_dot**0.5
         # Add a dip in the middle
         mid_idx = len(gamma_dot) // 2
         dip_width = 10
-        sigma_nonmono[mid_idx-dip_width:mid_idx+dip_width] *= 0.7
+        sigma_nonmono[mid_idx - dip_width : mid_idx + dip_width] *= 0.7
 
-        is_banding_nonmono, banding_info = detect_shear_banding(gamma_dot, sigma_nonmono)
+        is_banding_nonmono, banding_info = detect_shear_banding(
+            gamma_dot, sigma_nonmono
+        )
         assert is_banding_nonmono, "Non-monotonic curve should show shear banding"
 
         # Check banding info contains expected fields
@@ -353,21 +369,19 @@ class TestShearBanding:
 
     def test_shear_banding_warning_generation(self):
         """Test shear banding warning is generated for non-monotonic curves."""
-        from rheojax.transforms.srfs import detect_shear_banding
         import warnings
+
+        from rheojax.transforms.srfs import detect_shear_banding
 
         # Create clearly non-monotonic flow curve
         gamma_dot = np.linspace(0.1, 10, 100)
         # N-shaped curve (classic shear banding signature)
-        sigma = gamma_dot * (1 - 0.5 * np.exp(-((gamma_dot - 5)**2) / 2))
+        sigma = gamma_dot * (1 - 0.5 * np.exp(-((gamma_dot - 5) ** 2) / 2))
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
 
-            is_banding, info = detect_shear_banding(
-                gamma_dot, sigma,
-                warn=True
-            )
+            is_banding, info = detect_shear_banding(gamma_dot, sigma, warn=True)
 
             # If shear banding detected, warning should be generated
             if is_banding:
@@ -383,9 +397,11 @@ class TestShearBanding:
 
         # N-shaped curve with clear non-monotonic region
         # sigma increases, then decreases, then increases again
-        sigma = (gamma_dot
-                 - 0.3 * gamma_dot * np.exp(-((gamma_dot - 3)**2) / 0.5)
-                 + 0.5 * gamma_dot * np.exp(-((gamma_dot - 7)**2) / 0.5))
+        sigma = (
+            gamma_dot
+            - 0.3 * gamma_dot * np.exp(-((gamma_dot - 3) ** 2) / 0.5)
+            + 0.5 * gamma_dot * np.exp(-((gamma_dot - 7) ** 2) / 0.5)
+        )
 
         # Find the stress plateau (common stress in banding regime)
         # For an applied shear rate in the banding regime, material splits into bands
@@ -407,15 +423,17 @@ class TestShearBanding:
             # Lever rule: fractions should sum to 1
             f_low = coexistence["fraction_low"]
             f_high = coexistence["fraction_high"]
-            assert abs(f_low + f_high - 1.0) < 1e-6, \
-                f"Band fractions should sum to 1, got {f_low + f_high}"
+            assert (
+                abs(f_low + f_high - 1.0) < 1e-6
+            ), f"Band fractions should sum to 1, got {f_low + f_high}"
 
             # Average shear rate should equal applied shear rate
             gamma_low = coexistence["gamma_dot_low"]
             gamma_high = coexistence["gamma_dot_high"]
             gamma_avg = f_low * gamma_low + f_high * gamma_high
-            assert abs(gamma_avg - gamma_dot_applied) < 0.5, \
-                f"Average shear rate {gamma_avg} should equal applied {gamma_dot_applied}"
+            assert (
+                abs(gamma_avg - gamma_dot_applied) < 0.5
+            ), f"Average shear rate {gamma_avg} should equal applied {gamma_dot_applied}"
 
 
 class TestSRFSMastercurveIntegration:
@@ -423,8 +441,8 @@ class TestSRFSMastercurveIntegration:
 
     def test_srfs_mastercurve_integration(self):
         """Test SRFS integrates with existing Mastercurve transform pattern."""
-        from rheojax.transforms.srfs import SRFS
         from rheojax.transforms.mastercurve import Mastercurve
+        from rheojax.transforms.srfs import SRFS
 
         # Both should inherit from BaseTransform
         srfs = SRFS(reference_gamma_dot=1.0)

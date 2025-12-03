@@ -15,12 +15,14 @@ jax, jnp = safe_import_jax()
 class TestMutationNumber:
     """Test suite for Mutation Number transform."""
 
+    @pytest.mark.smoke
     def test_basic_initialization(self):
         """Test basic mutation number initialization."""
         mn = MutationNumber()
         assert mn.integration_method == "trapz"
         assert mn.extrapolate is False
 
+    @pytest.mark.smoke
     def test_custom_initialization(self):
         """Test mutation number with custom parameters."""
         mn = MutationNumber(
@@ -32,6 +34,7 @@ class TestMutationNumber:
         assert mn.extrapolate is True
         assert mn.extrapolation_model == "powerlaw"
 
+    @pytest.mark.smoke
     def test_exponential_relaxation(self):
         """Test mutation number for exponential relaxation."""
         # G(t) = G_0 * exp(-t/tau)

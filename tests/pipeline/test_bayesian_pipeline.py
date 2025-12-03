@@ -110,6 +110,7 @@ def temp_csv_file(sample_data):
 class TestBayesianPipelineFitNLSQ:
     """Test BayesianPipeline.fit_nlsq() method."""
 
+    @pytest.mark.smoke
     def test_fit_nlsq_with_model_instance(self, sample_data):
         """Test fit_nlsq with model instance."""
         pipeline = BayesianPipeline(data=sample_data)
@@ -130,6 +131,7 @@ class TestBayesianPipelineFitNLSQ:
         # NLSQ result should be stored
         assert pipeline._nlsq_result is not None
 
+    @pytest.mark.smoke
     def test_fit_nlsq_stores_result(self, sample_data):
         """Test that fit_nlsq stores NLSQ result."""
         pipeline = BayesianPipeline(data=sample_data)
