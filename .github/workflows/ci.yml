@@ -37,6 +37,54 @@ jobs:
     - name: Run MyPy
       run: mypy rheojax --ignore-missing-imports --no-strict-optional
 
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        cache-dependency-path: 'requirements-dev.txt'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install radon>=6.0.0
+
+    - name: Check cyclomatic complexity (max D-rating allowed)
+      run: |
+        echo "Checking for high complexity functions (D or worse)..."
+        # Count D-rated or worse functions (lines starting with M/F/C for methods/functions/classes)
+        HIGH_COMPLEXITY=$(radon cc rheojax -nb --min D 2>/dev/null | grep -E "^    [MFC]" | wc -l || echo "0")
+        echo "Found $HIGH_COMPLEXITY high-complexity functions"
+        # Allow up to 10 D-rated functions during transition period
+        if [ "$HIGH_COMPLEXITY" -gt 10 ]; then
+          echo "::error::Too many high-complexity functions ($HIGH_COMPLEXITY > 10)"
+          radon cc rheojax -nb --min D
+          exit 1
+        fi
+        echo "✅ Complexity check passed"
+
+    - name: Check maintainability index (min B-rating)
+      run: |
+        echo "Checking maintainability index..."
+        # Count files with C or worse maintainability
+        LOW_MI=$(radon mi rheojax -s 2>/dev/null | grep -E '\- [CD]' | grep -c "^" || echo "0")
+        echo "Found $LOW_MI files with low maintainability"
+        if [ "$LOW_MI" -gt 2 ]; then
+          echo "::error::Too many low-maintainability files ($LOW_MI > 2)"
+          radon mi rheojax -s | grep -E '\- [CD]'
+          exit 1
+        fi
+        echo "✅ Maintainability check passed"
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -63,12 +111,31 @@ jobs:
         pip install -r requirements-dev.txt
         pip install -e .
 
-    - name: Run smoke tests (105 critical tests, ~2-5 min per job)
+    - name: Run smoke tests (117 critical tests, ~2-5 min per job)
       run: |
         pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing -m "smoke"
-        # Note: Only smoke tests (105/1154 tests) run on every commit
-        # Fast tier (1069 tests): pytest -n auto -m "not slow and not validation and not benchmark and not notebook_comprehensive"
+        # Note: Only smoke tests (117/1475 tests) run on every commit
+        # Fast tier (~1200 tests): pytest -n auto -m "not slow and not validation and not benchmark and not notebook_comprehensive"
         # Full validation suite: pytest -n auto (run locally before releases)
+
+    - name: Check minimum coverage threshold
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+      run: |
+        # Extract coverage percentage from pytest output
+        COVERAGE=$(python -c "
+        import xml.etree.ElementTree as ET
+        tree = ET.parse('coverage.xml')
+        root = tree.getroot()
+        line_rate = float(root.attrib.get('line-rate', 0))
+        print(int(line_rate * 100))
+        ")
+        echo "Current smoke test coverage: ${COVERAGE}%"
+        # Minimum threshold: 30% for smoke tests (target: 50% by end of sprint)
+        if [ "$COVERAGE" -lt 30 ]; then
+          echo "::error::Coverage ${COVERAGE}% is below minimum threshold of 30%"
+          exit 1
+        fi
+        echo "✅ Coverage check passed (${COVERAGE}% >= 30%)"
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

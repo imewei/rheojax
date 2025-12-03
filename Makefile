@@ -460,6 +460,8 @@ clean-test:
 	rm -rf coverage.xml
 
 clean: clean-build clean-pyc clean-test
+	@echo "$(BOLD)$(BLUE)Removing temporary work directories...$(RESET)"
+	rm -rf fix-imports/ 2>/dev/null || true
 	@echo "$(BOLD)$(GREEN)✓ Cleaned!$(RESET)"
 	@echo "$(BOLD)Protected directories preserved:$(RESET) .venv/, venv/, .claude/, .specify/, agent-os/"
 

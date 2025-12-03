@@ -273,3 +273,8 @@ commit_*_review.json
 commit_*_breaking_changes.json
 git_workflow_summary_*.md
 code_quality_fixes_summary.md
+
+# ----------------------------------------------------------------------------
+# Temporary / Work-in-Progress Directories
+# ----------------------------------------------------------------------------
+fix-imports/
