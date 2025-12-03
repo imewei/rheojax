@@ -19,6 +19,38 @@ Fourier/Chebyshev decomposition methods, SPP operates entirely in the time domai
 extracting transient elastic modulus and dynamic viscosity without the need for harmonic
 decomposition.
 
+.. tip:: Rogers-parity defaults (RheoJAX)
+
+   Unless otherwise specified, RheoJAX SPP components use MATLAB/Rogers-aligned defaults:
+   ``n_harmonics=39`` (odd), ``step_size=8``, ``num_mode=2`` (periodic/looped), and wrapped
+   strain-rate inference when rate is absent.
+
+Current Defaults
+================
+
+.. list-table:: Rogers-parity defaults (RheoJAX)
+   :widths: 25 15 60
+   :header-rows: 1
+
+   * - Parameter
+     - Default
+     - Notes
+   * - ``n_harmonics``
+     - 39 (odd)
+     - Matches SPPplus v2.1 parity
+   * - ``step_size``
+     - 8
+     - 8-point 4th-order stencil
+   * - ``num_mode``
+     - 2
+     - Periodic/looped differentiation
+   * - ``wrap_strain_rate``
+     - True
+     - Infers γ̇ with periodic wrap when rate missing
+   * - ``yield_tolerance``
+     - 0.02
+     - Static/dynamic yield detection tolerance
+
 .. admonition:: Key Insight
    :class: tip
 
@@ -274,8 +306,37 @@ SPP excels at characterizing yield-stress materials under LAOS:
 
 1. **Pre-yield**: High G\ :sub:`cage`, low δ\ :sub:`t` (elastic solid)
 2. **Yielding**: Rapid drop in G\ :sub:`cage`, increasing δ\ :sub:`t`
-3. **Post-yield**: Power-law flow, δ\ :sub:`t` → 90°
-4. **Recovery**: G\ :sub:`cage` rebuilds during strain reversal
+    3. **Post-yield**: Power-law flow, δ\ :sub:`t` → 90°
+    4. **Recovery**: G\ :sub:`cage` rebuilds during strain reversal
+
+SPP vs Fourier/Chebyshev (at a glance)
+--------------------------------------
+
+.. list-table::
+   :widths: 24 38 38
+   :header-rows: 1
+
+   * - Topic
+     - SPP (Rogers)
+     - Fourier/Chebyshev
+   * - Domain
+     - Time-domain
+     - Frequency-domain
+   * - Phase alignment
+     - Delta shift from strain fundamental
+     - Phase from harmonic phases
+   * - Harmonic content
+     - Odd harmonics implicit (up to 39)
+     - Explicit truncation (often <15)
+   * - Noise sensitivity
+     - Better near crest/trough; less division near γ≈0
+     - Sensitive near γ≈0 (division)
+   * - Thixotropy
+     - Weakly thixotropic OK
+     - Same; both struggle if strong
+   * - Outputs
+     - G_cage, σ_sy/σ_dy, S/T, power-law K/n
+     - G′/G″, I3/I1, Chebyshev coeffs
 
 This provides direct insight into yielding dynamics inaccessible to Fourier methods.
 

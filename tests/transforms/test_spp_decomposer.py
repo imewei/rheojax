@@ -244,3 +244,27 @@ def test_step_size_parameter():
 
     # k=3 should have lower variance (more smoothing)
     assert var_k3 <= var_k1 * 1.1  # Allow some tolerance
+
+
+def test_rogers_defaults_and_delta_present():
+    omega = 2.0
+    gamma_0 = 0.5
+    t = jnp.linspace(0, 2 * jnp.pi / omega, 600)
+    stress = 100.0 * jnp.sin(omega * t)
+    strain = gamma_0 * jnp.sin(omega * t)
+
+    data = RheoData(
+        x=t,
+        y=stress,
+        domain="time",
+        metadata={"omega": omega, "gamma_0": gamma_0, "strain": strain},
+    )
+
+    decomposer = SPPDecomposer(omega=omega, gamma_0=gamma_0)
+    decomposer.transform(data)
+
+    assert decomposer.step_size == 8
+    assert decomposer.num_mode == 2
+    assert decomposer.n_harmonics == 39
+    assert "Delta" in decomposer.results_
+    assert decomposer.results_["spp_params"][1] == 39

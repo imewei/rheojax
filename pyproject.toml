@@ -111,6 +111,9 @@ all = [
     "rheojax[core,dev,ml,io]",
 ]
 
+[project.scripts]
+rheojax = "rheojax.cli.main:main"
+
 [project.urls]
 "Homepage" = "https://github.com/imewei/rheojax"
 "Bug Tracker" = "https://github.com/imewei/rheojax/issues"

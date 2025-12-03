@@ -584,16 +584,32 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         >>> print(pipeline.get_yield_stresses())
     """
 
-    def __init__(self, omega: float = 1.0, n_harmonics: int = 5):
+    def __init__(
+        self,
+        omega: float = 1.0,
+        n_harmonics: int = 39,
+        step_size: int = 8,
+        num_mode: int = 2,
+        wrap_strain_rate: bool = True,
+        use_numerical_method: bool | None = None,
+    ):
         """Initialize SPP amplitude sweep pipeline.
 
         Args:
             omega: Angular frequency in rad/s (default: 1.0)
-            n_harmonics: Number of harmonics for SPP decomposition (default: 5)
+            n_harmonics: Number of harmonics for SPP decomposition (default: 39)
+            step_size: Differentiation step size k (default: 8, Rogers parity)
+            num_mode: Numerical differentiation mode (default: 2 periodic)
+            wrap_strain_rate: Whether to use wrapped differentiation when rate missing
+            use_numerical_method: Force numerical path; None keeps default from transform
         """
         super().__init__()
         self.omega = omega
         self.n_harmonics = n_harmonics
+        self.step_size = step_size
+        self.num_mode = num_mode
+        self.wrap_strain_rate = wrap_strain_rate
+        self.use_numerical_method = use_numerical_method
         self.results: dict[float, dict] = {}  # gamma_0 -> SPP results
         self.model = None
         self._gamma_0_values: list[float] = []
@@ -639,11 +655,25 @@ class SPPAmplitudeSweepPipeline(Pipeline):
 
         # Process each amplitude
         for gamma_0, data in zip(gamma_0_values, stress_data, strict=False):
+            # Ensure required metadata is present for downstream transforms/models
+            if data.metadata is None:
+                data.metadata = {}
+            data.metadata.setdefault("test_mode", "oscillation")
+            data.metadata.setdefault("gamma_0", gamma_0)
+            data.metadata.setdefault("omega", self.omega)
+
             # Apply SPP decomposition
             decomposer = SPPDecomposer(
                 omega=self.omega,
                 gamma_0=gamma_0,
                 n_harmonics=self.n_harmonics,
+                step_size=self.step_size,
+                num_mode=self.num_mode,
+                wrap_strain_rate=self.wrap_strain_rate,
+                use_numerical_method=
+                    self.use_numerical_method
+                    if self.use_numerical_method is not None
+                    else False,
             )
 
             try:

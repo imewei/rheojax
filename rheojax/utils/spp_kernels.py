@@ -214,7 +214,7 @@ def dynamic_yield_stress(
 def harmonic_reconstruction(
     stress: "Array",
     omega: float,
-    n_harmonics: int = 5,
+    n_harmonics: int = 39,
     dt: float | None = None,
 ) -> tuple["Array", "Array", "Array"]:
     """
@@ -375,7 +375,7 @@ def harmonic_reconstruction_full(
     strain_rate: "Array",
     stress: "Array",
     omega: float,
-    n_harmonics: int = 15,
+    n_harmonics: int = 39,
     n_cycles: int = 1,
     W_int: int | None = None,
 ) -> dict:
@@ -540,7 +540,7 @@ def spp_fourier_analysis(
     stress: "Array",
     omega: float,
     dt: float,
-    n_harmonics: int = 15,
+    n_harmonics: int = 39,
     n_cycles: int = 1,
 ) -> dict:
     """
@@ -603,8 +603,10 @@ def spp_fourier_analysis(
     p = int(n_cycles)
     W_int = int(round(L / (2 * p)))
 
-    # Compute strain rate from strain
-    strain_rate = numerical_derivative_periodic(strain_arr, dt, step_size=1)[0]
+    # Compute strain rate from strain (wrapped 8-point stencil)
+    strain_rate = differentiate_rate_from_strain(
+        strain_arr, dt, step_size=8, looped=True
+    )
 
     # Get phase-aligned reconstruction with concrete W
     fourier_result = harmonic_reconstruction_full(
@@ -1497,10 +1499,10 @@ def numerical_derivative_periodic(
 def spp_numerical_analysis(
     strain: "Array",
     stress: "Array",
-    omega: float,
+    omega: float | jnp.ndarray,
     dt: float,
-    step_size: int = 1,
-    num_mode: int = 1,
+    step_size: int = 8,
+    num_mode: int = 2,
 ) -> dict:
     """
     Perform full SPP analysis using numerical differentiation (MATLAB-compatible).
@@ -1508,8 +1510,8 @@ def spp_numerical_analysis(
     Implements the numerical SPP workflow from SPPplus_numerical_v2.m:
     1. Compute strain rate from strain (or use provided)
     2. Compute derivatives of [strain, rate, stress] trajectory
-    3. Calculate instantaneous G'_t, G''_t via cross-product formula
-    4. Extract tan(δ)_t, phase angle, and displacement stress
+    3. Calculate instantaneous ``G'_t`` and ``G''_t`` via cross-product formula
+    4. Extract ``tan(δ)_t``, phase angle, and displacement stress
 
     Parameters
     ----------
@@ -1517,14 +1519,14 @@ def spp_numerical_analysis(
         Strain signal γ(t) (dimensionless)
     stress : Array
         Stress signal σ(t) (Pa)
-    omega : float
-        Angular frequency ω (rad/s)
+    omega : float | Array
+        Angular frequency ω (rad/s). Can be scalar or per-sample array.
     dt : float
         Time step between samples (s)
     step_size : int, optional
-        Finite difference step size k (default: 1)
+        Finite difference step size k (default: 8 for Rogers parity)
     num_mode : int, optional
-        1 = edge-aware (forward/backward + centered); 2 = periodic/looped.
+        1 = edge-aware (forward/backward + centered); 2 = periodic/looped (default).
 
     Returns
     -------
@@ -1557,17 +1559,29 @@ def spp_numerical_analysis(
     Notes
     -----
     - Matches MATLAB SPPplus cross-product formulation
-    - G'_t = -rd_x_rdd[:,0] / rd_x_rdd[:,2]
-    - G''_t = -rd_x_rdd[:,1] / rd_x_rdd[:,2]
+    - ``G'_t = -rd_x_rdd[:,0] / rd_x_rdd[:,2]``
+    - ``G''_t = -rd_x_rdd[:,1] / rd_x_rdd[:,2]``
     - Works directly with raw experimental data (no Fourier decomposition)
     """
     strain_arr = jnp.atleast_1d(jnp.asarray(strain, dtype=jnp.float64))
     stress_arr = jnp.atleast_1d(jnp.asarray(stress, dtype=jnp.float64))
-    omega_val = jnp.float64(omega)
+
+    # Handle scalar vs per-sample omega
+    omega_arr = jnp.asarray(omega, dtype=jnp.float64)
+    if omega_arr.ndim == 0:
+        omega_arr = jnp.full_like(strain_arr, omega_arr)
+    else:
+        if omega_arr.shape[0] != strain_arr.shape[0]:
+            raise ValueError(
+                "omega array length must match strain length for numerical SPP"
+            )
+    omega_scalar = jnp.mean(omega_arr)
 
     # Compute strain rate (normalize by omega as in MATLAB)
-    strain_rate = numerical_derivative(strain_arr, dt, order=1, step_size=step_size)
-    strain_rate_normalized = strain_rate / omega_val
+    strain_rate = differentiate_rate_from_strain(
+        strain_arr, dt, step_size=step_size, looped=(num_mode == 2)
+    )
+    strain_rate_normalized = strain_rate / omega_arr
 
     # Build response wave: [strain, rate/omega, stress]
     resp_wave = jnp.stack([strain_arr, strain_rate_normalized, stress_arr], axis=1)
@@ -1651,9 +1665,9 @@ def spp_numerical_analysis(
 
     # Phase angle rate (MATLAB formula)
     # Normalize derivatives by omega for delta_t_dot calculation
-    rd_tn = rd / omega_val
-    rdd_tn = rdd / omega_val**2
-    rddd_tn = rddd / omega_val**3
+    rd_tn = rd / omega_scalar
+    rdd_tn = rdd / omega_scalar**2
+    rddd_tn = rddd / omega_scalar**3
     delta_t_dot = -rd_tn[:, 2] * (rddd_tn[:, 2] + rd_tn[:, 2]) / (
         jnp.maximum(rdd_tn[:, 2] ** 2 + rd_tn[:, 2] ** 2, eps)
     )
@@ -1775,7 +1789,9 @@ def yield_from_displacement_stress(
     Gp_t_arr = jnp.atleast_1d(jnp.asarray(Gp_t, dtype=jnp.float64))
     delta_t_arr = jnp.atleast_1d(jnp.asarray(delta_t, dtype=jnp.float64))
     gamma_0 = jnp.float64(strain_amplitude)
-    rate_0 = jnp.float64(rate_amplitude)
+    # rate_amplitude is received but not used in current yield extraction methods
+    # Reserved for future rate-dependent yield criteria
+    _ = rate_amplitude  # Explicitly acknowledge unused parameter
 
     eps = 1e-10
 
@@ -1891,11 +1907,11 @@ def frenet_serret_frame(
     N_vec : Array
         Principal normal vector (direction of curvature)
     B_vec : Array
-        Binormal vector (T × N)
+        Binormal vector (``T × N``)
     curvature : Array
-        Local curvature κ = |rd × rdd| / |rd|³
+        Local curvature ``κ = |rd × rdd| / |rd|^3``
     torsion : Array
-        Local torsion τ (requires third derivative, returns zeros)
+        Local torsion ``τ`` (requires third derivative, returns zeros)
 
     Notes
     -----
@@ -2007,17 +2023,19 @@ def build_spp_exports(
 # ============================================================================
 
 
-@jax.jit
+@partial(jax.jit, static_argnames=("step_size", "looped"))
 def differentiate_rate_from_strain(
     strain: "Array",
     dt: float,
-    step_size: int = 1,
+    step_size: int = 8,
+    looped: bool = True,
 ) -> "Array":
     """
     Compute strain rate from strain via numerical differentiation.
 
-    For experimental data where only strain (not rate) is measured, this
-    function computes the strain rate using 4th-order finite differences.
+    Provides a wrapped (periodic) 8-point stencil path to mirror the
+    MATLAB/Rogers SPPplus implementation, while keeping the prior finite
+    difference fallback for non-periodic data.
 
     Parameters
     ----------
@@ -2026,7 +2044,9 @@ def differentiate_rate_from_strain(
     dt : float
         Time step (s)
     step_size : int
-        Finite difference step size (default: 1)
+        Finite difference step size ``k`` (default: 8, Rogers parity)
+    looped : bool
+        If True, use periodic derivative (wrapped); otherwise edge-aware.
 
     Returns
     -------
@@ -2035,8 +2055,13 @@ def differentiate_rate_from_strain(
 
     Notes
     -----
-    Matches MATLAB SPPplus option `var_loc[3] = 0` for differentiating rate.
+    - looped=True + step_size=8 matches SPPplus v2.1 wrapped 8-point rate
+      inference when the rate column is absent.
+    - looped=False preserves the previous 4th-order finite-difference path.
     """
+    if looped:
+        d1, _, _ = numerical_derivative_periodic(strain, dt, step_size=step_size)
+        return d1
     return numerical_derivative_4th_order(strain, dt, order=1, step_size=step_size)
 
 

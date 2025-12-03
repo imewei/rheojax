@@ -189,6 +189,7 @@ class SPPYieldStress(BaseModel):
         self._test_mode = TestMode.OSCILLATION
         self._omega = 1.0  # Default angular frequency
         self._amplitude_data: dict = {}  # Store per-amplitude SPP results
+        self._yield_type = "static"
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> SPPYieldStress:
         """Fit SPP yield stress model to data.
@@ -237,6 +238,7 @@ class SPPYieldStress(BaseModel):
 
         self._test_mode = test_mode
         yield_type = kwargs.get("yield_type", "static")
+        self._yield_type = yield_type
 
         if test_mode == TestMode.OSCILLATION:
             self._fit_oscillation(X_array, y_array, yield_type)
@@ -412,12 +414,17 @@ class SPPYieldStress(BaseModel):
         sigma_sy_scale = params[1]
         sigma_sy_exp = params[2]
         sigma_dy_scale = params[3]
-        params[4]
+        sigma_dy_exp = params[4]
         eta_inf = params[5]
         n_power_law = params[6]
         # noise = params[7]  # Used only in likelihood
 
         if test_mode == TestMode.OSCILLATION:
+            yield_type = getattr(self, "_yield_type", "static")
+            if yield_type == "dynamic":
+                return self._predict_dynamic_yield(
+                    X, sigma_dy_scale, sigma_dy_exp
+                )
             return self._predict_oscillation(
                 X, G_cage, sigma_sy_scale, sigma_sy_exp, eta_inf
             )
@@ -460,6 +467,19 @@ class SPPYieldStress(BaseModel):
         # Power-law scaling
         sigma_sy = sigma_sy_scale * jnp.power(jnp.abs(gamma_0), sigma_sy_exp)
         return sigma_sy
+
+    @staticmethod
+    @jax.jit
+    def _predict_dynamic_yield(
+        gamma_0: Array,
+        sigma_dy_scale: float,
+        sigma_dy_exp: float,
+    ) -> Array:
+        """Predict dynamic yield stress for amplitude sweep.
+
+        σ_dy(γ_0) = sigma_dy_scale * γ_0^sigma_dy_exp
+        """
+        return sigma_dy_scale * jnp.power(jnp.abs(gamma_0), sigma_dy_exp)
 
     @staticmethod
     @jax.jit
@@ -537,25 +557,24 @@ class SPPYieldStress(BaseModel):
 
         # Exponent parameters: Beta priors on [0, 2]
         elif name == "sigma_sy_exp":
-            # Exponent typically near 1 for linear scaling
-            # Beta(2, 2) centered at 0.5, scaled to [0, 2]
+            # Exponent bounded [0,1]; time-domain yield often linear/sublinear
             return dist.TransformedDistribution(
                 dist.Beta(2.0, 2.0),
-                dist.transforms.AffineTransform(loc=0.0, scale=2.0),
+                dist.transforms.AffineTransform(loc=0.0, scale=1.0),
             )
 
         elif name == "sigma_dy_exp":
-            # Often sublinear scaling (exp < 1)
+            # Often sublinear scaling (exp < 1) bounded [0,1]
             return dist.TransformedDistribution(
                 dist.Beta(2.0, 3.0),  # Skewed toward lower values
-                dist.transforms.AffineTransform(loc=0.0, scale=2.0),
+                dist.transforms.AffineTransform(loc=0.0, scale=1.0),
             )
 
         elif name == "n_power_law":
             # Power-law index: often 0.3-0.8 for yield stress fluids
             return dist.TransformedDistribution(
                 dist.Beta(2.0, 2.0),
-                dist.transforms.AffineTransform(loc=0.01, scale=1.99),
+                dist.transforms.AffineTransform(loc=0.01, scale=0.99),
             )
 
         elif name == "noise":

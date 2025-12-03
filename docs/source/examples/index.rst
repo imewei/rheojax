@@ -464,6 +464,26 @@ All notebooks use NLSQ -> NUTS warm-start workflow (2-5x faster convergence).
    - Quantify uncertainty in SPP parameters
    - Understand SPP limitations and best practices
 
+17. SPP LAOS Workflow (Rogers Defaults, NLSQ→NUTS)
+--------------------------------------------------
+
+**File**: ``examples/bayesian/09-spp-rheojax-workflow.ipynb``
+
+**Content**:
+   - Rogers-parity defaults (M=39, k=8, num_mode=2, wrapped rate)
+   - SPPDecomposer on synthetic LAOS amplitude sweep
+   - NLSQ warm-start and NumPyro NUTS posterior diagnostics
+
+**Key Concepts**:
+   - Phase-aligned time-domain SPP extraction
+   - Warm-started Bayesian inference for yield parameters
+   - Practical parameter defaults and when to override
+
+**Learning Objectives**:
+   - Run the end-to-end SPP pipeline with recommended defaults
+   - Interpret posterior means/credible intervals for σ_sy and exponents
+   - Compare SPP outputs against Fourier assumptions
+
 Advanced Workflows
 ==================
 

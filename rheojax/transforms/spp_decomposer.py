@@ -154,7 +154,8 @@ class SPPDecomposer(BaseTransform):
         end_cycle: int | None = None,
         use_numerical_method: bool = False,
         step_size: int = 8,
-        num_mode: int = 1,
+        num_mode: int = 2,
+        wrap_strain_rate: bool = True,
     ):
         """Initialize SPP decomposer transform.
 
@@ -177,7 +178,9 @@ class SPPDecomposer(BaseTransform):
         step_size : int, optional
             Step size k for numerical differentiation (default: 8)
         num_mode : int, optional
-            Numerical differentiation mode (1=edge-aware, 2=periodic). Default: 1.
+            Numerical differentiation mode (1=edge-aware, 2=periodic). Default: 2.
+        wrap_strain_rate : bool, optional
+            If True, infer strain rate with periodic wrapping when missing (default: True)
         """
         super().__init__()
         self.omega = float(omega)
@@ -190,12 +193,13 @@ class SPPDecomposer(BaseTransform):
         self.use_numerical_method = use_numerical_method
         self.step_size = step_size
         self.num_mode = num_mode
+        self.wrap_strain_rate = wrap_strain_rate
         self.results_: dict = {}
 
     def _get_cycle_mask(
         self,
-        t: "jnp.ndarray",
-    ) -> tuple["jnp.ndarray", int, int]:
+        t: jnp.ndarray,
+    ) -> tuple[jnp.ndarray, int, int]:
         """Compute mask for selected cycles from time series data.
 
         Parameters
@@ -259,13 +263,14 @@ class SPPDecomposer(BaseTransform):
         from rheojax.core.data import RheoData
         from rheojax.utils.spp_kernels import (
             apparent_cage_modulus,
+            build_spp_exports,
+            differentiate_rate_from_strain,
             dynamic_yield_stress,
             harmonic_reconstruction,
             lissajous_metrics,
             power_law_fit,
-            build_spp_exports,
-            spp_numerical_analysis,
             spp_fourier_analysis,
+            spp_numerical_analysis,
             spp_stress_decomposition,
             static_yield_stress,
         )
@@ -288,20 +293,34 @@ class SPPDecomposer(BaseTransform):
         if jnp.iscomplexobj(stress_jax):
             stress_jax = jnp.real(stress_jax)
 
+        # Resolve omega (scalar or per-sample) from metadata if provided
+        omega_meta = data.metadata.get("omega", self.omega) if data.metadata else self.omega
+        omega_jax = jnp.asarray(omega_meta, dtype=jnp.float64)
+        if omega_jax.ndim == 0:
+            omega_jax = jnp.full_like(t_jax, omega_jax)
+        omega_scalar = float(jnp.mean(omega_jax))
+
         # Get or compute strain and strain rate
         if "strain" in data.metadata:
             strain_jax = jnp.asarray(data.metadata["strain"], dtype=jnp.float64)
         else:
-            # Generate strain from sinusoidal assumption
-            strain_jax = self.gamma_0 * jnp.sin(self.omega * t_jax)
+            # Generate strain from sinusoidal assumption using mean omega
+            strain_jax = self.gamma_0 * jnp.sin(omega_scalar * t_jax)
 
         if "strain_rate" in data.metadata:
             strain_rate_jax = jnp.asarray(
                 data.metadata["strain_rate"], dtype=jnp.float64
             )
         else:
-            # Compute strain rate as derivative
-            strain_rate_jax = self.gamma_0 * self.omega * jnp.cos(self.omega * t_jax)
+            # Compute strain rate via wrapped differentiation (Rogers parity)
+            strain_rate_jax = differentiate_rate_from_strain(
+                strain_jax,
+                float(t_jax[1] - t_jax[0]) if len(t_jax) > 1 else 0.001,
+                step_size=self.step_size,
+                looped=self.wrap_strain_rate,
+            )
+
+        self.gamma_dot_0 = omega_scalar * self.gamma_0
 
         # =====================================================================
         # Cycle Selection
@@ -334,13 +353,20 @@ class SPPDecomposer(BaseTransform):
         spp_params = None
 
         # Number of cycles observed (after masking)
-        n_cycles_obs = max(1, int(jnp.round((float(t_jax[-1]) - float(t_jax[0])) / (2 * jnp.pi / self.omega))))
+        n_cycles_obs = max(
+            1,
+            int(
+                jnp.round(
+                    (float(t_jax[-1]) - float(t_jax[0])) / (2 * jnp.pi / omega_scalar)
+                )
+            ),
+        )
 
         if self.use_numerical_method:
             core_results = spp_numerical_analysis(
                 strain_jax,
                 stress_jax,
-                self.omega,
+                omega_jax,
                 dt,
                 step_size=self.step_size,
                 num_mode=self.num_mode,
@@ -354,7 +380,7 @@ class SPPDecomposer(BaseTransform):
             core_results = spp_fourier_analysis(
                 strain_jax,
                 stress_jax,
-                self.omega,
+                omega_scalar,
                 dt,
                 n_harmonics=self.n_harmonics,
                 n_cycles=n_cycles_obs,
@@ -363,7 +389,7 @@ class SPPDecomposer(BaseTransform):
             ft_out = core_results.get("ft_out")
             W = int(round(len(strain_jax) / (2 * n_cycles_obs)))
             spp_params = np.array(
-                [float(self.omega), int(self.n_harmonics), int(n_cycles_obs), W, np.nan, np.nan]
+                [omega_scalar, int(self.n_harmonics), int(n_cycles_obs), W, np.nan, np.nan]
             )
 
         # 1. Apparent cage modulus
@@ -468,6 +494,8 @@ class SPPDecomposer(BaseTransform):
                 ]
                 if k in core_results
             }
+            if "Delta" in core_results:
+                self.results_["Delta"] = float(core_results["Delta"])
             self.results_["core"] = core_block
             self.results_["spp_params"] = spp_params
             if fsf_data_out is not None:
@@ -479,7 +507,7 @@ class SPPDecomposer(BaseTransform):
             spp_export = build_spp_exports(
                 np.array(core_results.get("time_new", t_jax)),
                 np.array(core_results.get("strain_recon", strain_jax)),
-                np.array(core_results.get("rate_recon", strain_rate_jax / self.omega)),
+                np.array(core_results.get("rate_recon", strain_rate_jax)),
                 np.array(core_results.get("stress_recon", stress_jax)),
                 core_results,
                 fsf_data_out,

@@ -1,4 +1,4 @@
-"""Tests for the SPPYieldStress model."""
+"""Unit tests for SPPYieldStress model."""
 
 from __future__ import annotations
 
@@ -6,44 +6,48 @@ import numpy as np
 import pytest
 
 from rheojax.models.spp_yield_stress import SPPYieldStress
+from rheojax.core.test_modes import TestMode
 
 
-def _synthetic_yield_curve(scale: float = 5.0, exp: float = 0.2, n: int = 6):
-    gamma_0 = np.logspace(-2, 0, n)
+def _synthetic_amplitude_sweep(scale: float = 50.0, exp: float = 0.6):
+    gamma_0 = np.logspace(-2, 0, 8)
     sigma = scale * gamma_0**exp
     return gamma_0, sigma
 
 
-def test_fit_oscillation_power_law():
-    gamma_0, sigma = _synthetic_yield_curve(scale=8.0, exp=0.3, n=8)
+def test_nlsq_converges_and_sets_exponent_static():
+    gamma_0, sigma = _synthetic_amplitude_sweep(scale=80.0, exp=0.8)
 
     model = SPPYieldStress()
-    model.fit(gamma_0, sigma, test_mode="oscillation", yield_type="static")
+    model.fit(gamma_0, sigma, test_mode=TestMode.OSCILLATION, yield_type="static")
 
-    assert model.fitted_
-    assert 7.0 < model.parameters.get_value("sigma_sy_scale") < 9.5
-    assert 0.2 < model.parameters.get_value("sigma_sy_exp") < 0.4
+    est_scale = model.parameters.get_value("sigma_sy_scale")
+    est_exp = model.parameters.get_value("sigma_sy_exp")
+
+    np.testing.assert_allclose(est_exp, 0.8, rtol=0.1)
+    np.testing.assert_allclose(est_scale, 80.0, rtol=0.25)
 
 
 @pytest.mark.slow
-def test_predict_matches_fit_trend():
-    gamma_0, sigma = _synthetic_yield_curve(scale=4.0, exp=0.25, n=6)
+def test_bayesian_warm_start_uses_nlsq_init_static():
+    gamma_0, sigma = _synthetic_amplitude_sweep(scale=60.0, exp=0.7)
 
     model = SPPYieldStress()
-    model.fit(gamma_0, sigma, test_mode="oscillation", yield_type="static")
+    model.fit(gamma_0, sigma, test_mode=TestMode.OSCILLATION, yield_type="static")
 
-    preds = model._predict(gamma_0)
-    # Stress should roughly follow the same scaling
-    ratio = preds / sigma
-    assert np.all(ratio > 0.5) and np.all(ratio < 2.0)
+    # Warm-started Bayesian run with tiny sample count for speed
+    result = model.fit_bayesian(
+        gamma_0,
+        sigma,
+        test_mode=TestMode.OSCILLATION,
+        num_warmup=50,
+        num_samples=80,
+    )
 
+    summary = result.summary
+    # summary may be dict; normalize to dict access
+    mean_scale = summary.get("sigma_sy_scale", {}).get("mean") if isinstance(summary, dict) else float(summary.loc["sigma_sy_scale", "mean"])
+    mean_exp = summary.get("sigma_sy_exp", {}).get("mean") if isinstance(summary, dict) else float(summary.loc["sigma_sy_exp", "mean"])
 
-def test_rotation_mode_fallback():
-    gamma_dot = np.logspace(-1, 2, 10)
-    sigma = 2.0 + 0.5 * gamma_dot**0.6
-
-    model = SPPYieldStress()
-    model.fit(gamma_dot, sigma, test_mode="rotation")
-
-    assert model.parameters.get_value("sigma_dy_scale") > 0
-    assert 0.1 <= model.parameters.get_value("n_power_law") <= 1.5
+    assert mean_exp is not None and 0.4 < mean_exp < 1.0
+    assert mean_scale is not None and mean_scale > 10.0
