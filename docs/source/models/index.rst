@@ -64,3 +64,10 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
 
    sgr/sgr_conventional
    sgr/sgr_generic
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Sequence of Physical Processes (SPP)
+
+   spp/spp_decomposer
+   spp/spp_yield_stress

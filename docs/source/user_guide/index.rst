@@ -217,6 +217,15 @@ For labs processing many samples:
 3. :doc:`04_practical_guides/batch_processing` — Process multiple datasets
 4. :doc:`05_appendices/troubleshooting` — Handle edge cases
 
+**Path 5: Soft Glassy & LAOS Analysis (4 weeks)**
+
+For researchers working with yield stress fluids, gels, and nonlinear rheology:
+
+1. :doc:`01_fundamentals/material_classification` — Understanding soft materials
+2. :doc:`03_advanced_topics/sgr_analysis` — SGR framework for soft glassy materials
+3. :doc:`03_advanced_topics/spp_analysis` — SPP for LAOS yield stress extraction
+4. :doc:`03_advanced_topics/bayesian_inference` — Uncertainty in SGR/SPP parameters
+
 Related Documentation
 ---------------------
 

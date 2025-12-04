@@ -2,8 +2,8 @@
 Tutorial Notebooks
 ==================
 
-Rheo includes 23 comprehensive tutorial notebooks organized into four learning paths:
-**Basic Model Fitting** (5), **Transform Workflows** (6), **Bayesian Inference** (6), and **Advanced Patterns** (6).
+RheoJAX includes 33 comprehensive tutorial notebooks organized into five learning paths:
+**Basic Model Fitting** (5), **Transform Workflows** (8), **Bayesian Inference** (9), **Advanced Patterns** (10), and **I/O** (1).
 
 All notebooks are located in the ``examples/`` directory and demonstrate best practices with
 real-world datasets and synthetic data generation patterns.
@@ -26,14 +26,17 @@ Quick Navigation
      - Fundamental rheological model fitting
      - 5 notebooks
    * - **Transforms**
-     - Data analysis workflows (FFT, TTS, LAOS)
-     - 5 notebooks
+     - Data analysis workflows (FFT, TTS, LAOS, SRFS)
+     - 8 notebooks
    * - **Bayesian**
-     - Bayesian inference and uncertainty quantification
-     - 6 notebooks
+     - Bayesian inference and uncertainty quantification (including SPP)
+     - 9 notebooks
    * - **Advanced**
-     - Production patterns and custom implementations
-     - 5 notebooks
+     - Production patterns, SGR, and SPP implementations
+     - 10 notebooks
+   * - **I/O**
+     - Data I/O demonstrations
+     - 1 notebook
 
 Basic Model Fitting
 ===================
@@ -625,6 +628,90 @@ Production patterns, custom model development, and performance optimization.
    - Understand DeltaAIC thresholds (2, 4, 7, 10)
    - Compare frequentist vs Bayesian model selection
 
+23. TRIOS Chunked Reading
+-------------------------
+
+**File**: ``examples/advanced/07-trios_chunked_reading_example.ipynb``
+
+**Content**:
+   - Large TRIOS file handling with auto-chunking
+   - Memory-efficient loading for files > 5 MB
+   - Progress callbacks and memory monitoring
+
+**Key Concepts**:
+   - Auto-chunking for large datasets
+   - Memory optimization (50-70% reduction)
+   - TRIOS file format handling
+
+**Learning Objectives**:
+   - Load large TRIOS files efficiently
+   - Monitor memory usage during loading
+   - Configure chunking parameters
+
+24. Generalized Maxwell Fitting
+-------------------------------
+
+**File**: ``examples/advanced/08-generalized_maxwell_fitting.ipynb``
+
+**Content**:
+   - Multi-mode Maxwell model fitting
+   - Automatic element minimization (R²-based)
+   - Prony series representation
+
+**Key Concepts**:
+   - Generalized Maxwell Model (GMM)
+   - Element search with warm-start optimization
+   - Model complexity selection
+
+**Learning Objectives**:
+   - Fit multi-mode relaxation spectra
+   - Understand R²-based element selection
+   - Interpret Prony series parameters
+
+25. Soft Glassy Rheology (SGR)
+------------------------------
+
+**File**: ``examples/advanced/09-sgr-soft-glassy-rheology.ipynb``
+
+**Content**:
+   - SGRConventional model for soft glassy materials
+   - Effective noise temperature (x) interpretation
+   - SGRGeneric thermodynamic framework
+   - Material phase classification (glass vs fluid)
+
+**Key Concepts**:
+   - Soft Glassy Rheology (SGR) theory
+   - Effective noise temperature x
+   - Power-law rheology from trap dynamics
+   - Thixotropy and aging
+
+**Learning Objectives**:
+   - Fit SGR models to soft glassy materials
+   - Interpret effective temperature x for phase behavior
+   - Distinguish glass, power-law fluid, and Newtonian regimes
+
+26. SPP LAOS Tutorial
+---------------------
+
+**File**: ``examples/advanced/10-spp-laos-tutorial.ipynb``
+
+**Content**:
+   - Sequence of Physical Processes (SPP) framework
+   - Time-domain LAOS analysis (no Fourier)
+   - Cage modulus and yield stress extraction
+   - Comparison with Fourier/Chebyshev methods
+
+**Key Concepts**:
+   - SPP framework (Rogers 2012)
+   - Cage modulus G_cage
+   - Static and dynamic yield stress
+   - Phase angle evolution in LAOS
+
+**Learning Objectives**:
+   - Apply SPP analysis to yield-stress LAOS
+   - Extract physical parameters from LAOS cycles
+   - Understand SPP vs Fourier trade-offs
+
 Running the Notebooks
 =====================
 
@@ -799,7 +886,7 @@ Additional Resources
 
 **Example Data**
    - ``examples/data/README.md`` - Dataset catalog and loading instructions
-   - ``examples/README.md`` - Overview of all 22 notebooks
+   - ``examples/README.md`` - Overview of all 33 notebooks
 
 **External Resources**
    - JAX Documentation: https://jax.readthedocs.io/

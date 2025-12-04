@@ -150,19 +150,19 @@ Development Status
    - [done] Visualization with matplotlib
 
 **Phase 2 (Complete)**: Models and Transforms [done]
-   - [done] 23 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models, Generalized Maxwell, 2 SGR models)
-   - [done] 6 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS)
+   - [done] 25 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models, Generalized Maxwell, 2 SGR models, SPP yield stress)
+   - [done] 7 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer)
    - [done] Pipeline API for fluent workflows
-   - [done] 27 tutorial notebooks (basic, transforms, bayesian, advanced, GMM)
+   - [done] 33 tutorial notebooks (basic, transforms, bayesian, advanced, SGR, SPP)
 
 **Phase 3 (Complete)**: Bayesian Inference [done]
    - [done] NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
    - [done] Uncertainty quantification via credible intervals and posterior distributions
    - [done] ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
    - [done] Model comparison (WAIC/LOO)
-   - [done] BayesianMixin: All 23 models support Bayesian inference
+   - [done] BayesianMixin: All 25 models support Bayesian inference
    - [done] BayesianPipeline with fluent API for NLSQ -> NUTS workflows
-   - [done] 5 comprehensive Bayesian inference tutorial notebooks
+   - [done] 9 Bayesian inference tutorial notebooks (including SPP LAOS)
 
 **Phase 4 (Complete)**: Performance & Correctness [done - v0.3.0-v0.4.0]
    - [done] **v0.3.0**: Generalized Maxwell Model with transparent element minimization (R²-based)
@@ -174,13 +174,16 @@ Development Status
    - [done] **v0.4.0**: GMM element search optimization (2-5x speedup with warm-start)
    - [done] **v0.4.0**: TRIOS auto-chunking for large files (50-70% memory reduction)
 
-**Phase 5 (Complete)**: Soft Glassy Rheology [done - v0.5.0]
+**Phase 5 (Complete)**: Soft Glassy Rheology & SPP [done - v0.5.0]
    - [done] SGRConventional model (Sollich 1998) for soft glassy materials
    - [done] SGRGeneric model (GENERIC thermodynamic framework, Fuereder & Ilg 2013)
    - [done] SGR kernel functions (Fourier transforms, yield stress, aging dynamics)
    - [done] SRFS transform (Strain-Rate Frequency Superposition for flow curves)
    - [done] Shear banding detection and coexistence analysis utilities
-   - [done] Comprehensive Sphinx documentation for all SGR features
+   - [done] SPPDecomposer transform (Sequence of Physical Processes for LAOS)
+   - [done] SPPYieldStress model with Bayesian inference support
+   - [done] SPPAmplitudeSweepPipeline for amplitude sweep workflows
+   - [done] Comprehensive Sphinx documentation for all SGR and SPP features
 
 Technology Stack
 ----------------

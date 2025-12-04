@@ -15,7 +15,7 @@ primary objects:
 - :class:`rheojax.pipeline.workflows.SPPAmplitudeSweepPipeline` — convenience pipeline
   for amplitude-sweep LAOS workflows.
 
-For conceptual background see :doc:`/user_guide/spp_analysis`.
+For conceptual background see :doc:`/user_guide/03_advanced_topics/spp_analysis`.
 
 .. contents:: Page Contents
    :local:
