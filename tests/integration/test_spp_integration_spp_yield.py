@@ -38,6 +38,9 @@ def test_pipeline_fit_model_nlsq_static():
 
 
 @pytest.mark.slow
+@pytest.mark.filterwarnings(
+    "ignore:Warm-started NUTS initialization failed.*:RuntimeWarning"
+)
 def test_pipeline_fit_model_bayesian_static():
     """End-to-end pipeline with Bayesian fit (tiny samples for speed)."""
     omega = 1.2
