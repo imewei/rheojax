@@ -208,11 +208,16 @@ def run_analyze(args: Namespace) -> int:
 
     # Load data
     try:
-        rheo_data = load_data(
+        loaded = load_data(
             str(args.input_file),
             x_col=args.x_col,
             y_col=args.y_col,
         )
+        # Handle potential list return (take first dataset if list)
+        if isinstance(loaded, list):
+            rheo_data = loaded[0]
+        else:
+            rheo_data = loaded
     except Exception as e:
         print(f"Error loading data: {e}", file=sys.stderr)
         return 1
@@ -268,7 +273,7 @@ def run_analyze(args: Namespace) -> int:
         print(f"\nSaving results to {output_path}...")
 
     try:
-        _save_results(results, output_path, args.export_matlab)
+        _save_results(results, output_path, args.export_matlab, omega=args.omega)
     except Exception as e:
         print(f"Error saving results: {e}", file=sys.stderr)
         return 1
@@ -337,7 +342,12 @@ def run_batch(args: Namespace) -> int:
         print(f"[{i}/{len(files)}] Processing {file_path.name}...", end=" ")
 
         try:
-            rheo_data = load_data(str(file_path))
+            loaded = load_data(str(file_path))
+            # Handle potential list return (take first dataset if list)
+            if isinstance(loaded, list):
+                rheo_data = loaded[0]
+            else:
+                rheo_data = loaded
             rheo_data.metadata["omega"] = args.omega
             rheo_data.metadata["test_mode"] = "oscillation"
 
@@ -354,7 +364,7 @@ def run_batch(args: Namespace) -> int:
             results = spp.get_results()
 
             output_path = output_dir / f"{file_path.stem}_spp.csv"
-            _save_results(results, output_path, matlab_format=False)
+            _save_results(results, output_path, matlab_format=False, omega=args.omega)
 
             print(f"σ_sy={results['sigma_sy']:.1f} Pa")
             success_count += 1
@@ -372,15 +382,16 @@ def _save_results(
     results: dict,
     output_path: Path,
     matlab_format: bool = False,
+    omega: float = 1.0,
 ) -> None:
     """Save SPP results to file."""
     import pandas as pd
 
     if matlab_format:
         # MATLAB-compatible spp_data_out format
-        from rheojax.io.spp_export import export_spp_matlab
+        from rheojax.io.spp_export import export_spp_txt
 
-        export_spp_matlab(results, str(output_path))
+        export_spp_txt(str(output_path), results, omega)
     else:
         # Standard CSV format
         # Extract scalar metrics

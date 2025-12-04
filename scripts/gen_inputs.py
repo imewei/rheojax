@@ -19,7 +19,9 @@ def make_sin_fundamental(n_cycles: int = 3, pts_per_cycle: int = 256):
     omega = 2 * np.pi  # rad/s
     gamma_0 = 1.0
     h3 = 0.15
-    t = np.linspace(0, n_cycles * 2 * np.pi / omega, n_cycles * pts_per_cycle, endpoint=False)
+    t = np.linspace(
+        0, n_cycles * 2 * np.pi / omega, n_cycles * pts_per_cycle, endpoint=False
+    )
     gamma = gamma_0 * np.sin(omega * t) + h3 * np.sin(3 * omega * t)
     sigma = 50.0 * gamma  # simple linear-ish stress
     return t, gamma, sigma

@@ -13,8 +13,8 @@ from pathlib import Path
 
 import numpy as np
 
-from rheojax.transforms.spp_decomposer import SPPDecomposer
 from rheojax.core.data import RheoData
+from rheojax.transforms.spp_decomposer import SPPDecomposer
 
 
 def load_input(path: Path):
@@ -35,7 +35,12 @@ def run_dataset(dataset: str, input_dir: Path, output_dir: Path):
         x=t,
         y=sigma,
         domain="time",
-        metadata={"omega": omega, "gamma_0": gamma_0, "strain": gamma, "test_mode": "oscillation"},
+        metadata={
+            "omega": omega,
+            "gamma_0": gamma_0,
+            "strain": gamma,
+            "test_mode": "oscillation",
+        },
     )
 
     decomposer = SPPDecomposer(omega=omega, gamma_0=gamma_0, n_harmonics=39)
@@ -45,11 +50,15 @@ def run_dataset(dataset: str, input_dir: Path, output_dir: Path):
     out_base.parent.mkdir(parents=True, exist_ok=True)
 
     spp = decomposer.results_["spp_data_out"]
-    np.savetxt(out_base.with_name(out_base.name + "_spp_data_out.csv"), spp, delimiter=",")
+    np.savetxt(
+        out_base.with_name(out_base.name + "_spp_data_out.csv"), spp, delimiter=","
+    )
 
     fsf = decomposer.results_.get("fsf_data_out")
     if fsf is not None:
-        np.savetxt(out_base.with_name(out_base.name + "_fsf_data_out.csv"), fsf, delimiter=",")
+        np.savetxt(
+            out_base.with_name(out_base.name + "_fsf_data_out.csv"), fsf, delimiter=","
+        )
 
     ft = decomposer.results_.get("ft_out")
     if ft is not None:
@@ -64,7 +73,9 @@ def main():
         "--input_dir", type=Path, default=script_dir / "golden_data" / "input"
     )
     parser.add_argument(
-        "--output_dir", type=Path, default=script_dir / "golden_data" / "outputs" / "rheojax"
+        "--output_dir",
+        type=Path,
+        default=script_dir / "golden_data" / "outputs" / "rheojax",
     )
     parser.add_argument("datasets", nargs="*", default=["sin_fundamental", "sin_noisy"])
     args = parser.parse_args()
