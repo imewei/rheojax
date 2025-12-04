@@ -6,17 +6,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 23 rheological models (including SGR), 6 data transforms (including SRFS), Bayesian inference via NumPyro, and 27 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 25 rheological models (including SGR and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **23 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models), Multi-Mode (Generalized Maxwell), SGR (2 models)
-- **6 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition)
+- **25 Rheological Models**: Classical (Maxwell, Zener, SpringPot), Fractional (11 variants), Flow (6 models), Multi-Mode (Generalized Maxwell), SGR (2 models), SPP (SPPYieldStress)
+- **7 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition), SPP (Sequence of Physical Processes)
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
-- **Bayesian Inference**: All 23 models support NumPyro NUTS sampling with NLSQ warm-start
+- **Bayesian Inference**: All 25 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
@@ -32,12 +32,12 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Plugin System**: Support for custom models and transforms
 
 ### Tutorial Notebooks & Examples
-- **27 Tutorial Notebooks**: Organized in 4 categories
+- **33 Tutorial Notebooks**: Organized in 5 categories
   - `examples/basic/` - 5 notebooks covering fundamental models
-  - `examples/transforms/` - 7 notebooks for data transforms and analysis
-  - `examples/bayesian/` - 7 notebooks for Bayesian inference workflows
-  - `examples/advanced/` - 8 notebooks for production patterns
-- **I/O Examples**: TRIOS complex modulus handling and plotting
+  - `examples/transforms/` - 8 notebooks for data transforms and analysis (including SRFS)
+  - `examples/bayesian/` - 9 notebooks for Bayesian inference workflows (including SPP LAOS)
+  - `examples/advanced/` - 10 notebooks for production patterns (including SGR and SPP)
+  - `examples/io/` - 1 notebook for TRIOS complex modulus handling
 
 ## Installation
 
@@ -382,9 +382,34 @@ from rheojax.transforms import detect_shear_banding, compute_shear_band_coexiste
 is_banding = detect_shear_banding(flow_curve)
 ```
 
+### Sequence of Physical Processes (SPP) for LAOS Analysis
+
+```python
+from rheojax.transforms import SPPDecomposer
+from rheojax.models import SPPYieldStress
+
+# Time-domain LAOS analysis (no Fourier decomposition)
+spp = SPPDecomposer(
+    omega=1.0,          # Angular frequency (rad/s)
+    gamma_0=1.0,        # Strain amplitude
+    n_harmonics=39,     # Rogers-parity default
+)
+result = spp.transform(rheo_data)
+
+# Extract SPP quantities
+G_cage = result.cage_modulus           # Cage modulus
+sigma_y_static = result.static_yield   # Static yield stress
+sigma_y_dynamic = result.dynamic_yield # Dynamic yield stress
+
+# Fit yield stress model with Bayesian inference
+model = SPPYieldStress()
+model.fit(gamma_0_array, sigma_y_data, test_mode='oscillation')
+bayes_result = model.fit_bayesian(gamma_0_array, sigma_y_data, num_samples=2000)
+```
+
 ## Tutorial Notebooks
 
-27 tutorial notebooks organized by topic:
+33 tutorial notebooks organized by topic:
 
 ```
 examples/
@@ -394,23 +419,26 @@ examples/
 │   ├── 03-springpot-fitting.ipynb
 │   ├── 04-bingham-fitting.ipynb
 │   └── 05-power-law-fitting.ipynb
-├── transforms/                  # 7 notebooks: Data analysis workflows
+├── transforms/                  # 8 notebooks: Data analysis workflows
 │   ├── 01-fft-analysis.ipynb
 │   ├── 02-mastercurve-tts.ipynb
 │   ├── 02b-mastercurve-wlf-validation.ipynb
 │   ├── 03-mutation-number.ipynb
 │   ├── 04-owchirp-laos-analysis.ipynb
 │   ├── 05-smooth-derivative.ipynb
-│   └── 07-mastercurve_auto_shift.ipynb
-├── bayesian/                    # 7 notebooks: Bayesian inference
+│   ├── 06-mastercurve_auto_shift.ipynb
+│   └── 07-srfs-strain-rate-superposition.ipynb
+├── bayesian/                    # 9 notebooks: Bayesian inference (including SPP)
 │   ├── 01-bayesian-basics.ipynb
 │   ├── 02-prior-selection.ipynb
 │   ├── 03-convergence-diagnostics.ipynb
 │   ├── 04-model-comparison.ipynb
 │   ├── 05-uncertainty-propagation.ipynb
 │   ├── 06-bayesian_workflow_demo.ipynb
-│   └── 07-gmm_bayesian_workflow.ipynb
-├── advanced/                    # 8 notebooks: Production patterns
+│   ├── 07-gmm_bayesian_workflow.ipynb
+│   ├── 08-spp-laos.ipynb                    # SPP LAOS analysis
+│   └── 09-spp-rheojax-workflow.ipynb        # SPP Bayesian workflow
+├── advanced/                    # 10 notebooks: Production patterns (including SGR)
 │   ├── 01-multi-technique-fitting.ipynb
 │   ├── 02-batch-processing.ipynb
 │   ├── 03-custom-models.ipynb
@@ -418,8 +446,10 @@ examples/
 │   ├── 05-performance-optimization.ipynb
 │   ├── 06-frequentist-model-selection.ipynb
 │   ├── 07-trios_chunked_reading_example.ipynb
-│   └── 08-generalized_maxwell_fitting.ipynb
-└── io/                          # I/O demonstrations
+│   ├── 08-generalized_maxwell_fitting.ipynb
+│   ├── 09-sgr-soft-glassy-rheology.ipynb    # SGR models
+│   └── 10-spp-laos-tutorial.ipynb           # SPP tutorial
+└── io/                          # 1 notebook: I/O demonstrations
     └── plot_trios_complex_modulus.ipynb
 ```
 
@@ -433,11 +463,18 @@ Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 
 - [Getting Started](https://rheojax.readthedocs.io/user_guide/getting_started.html) - Installation and basic usage
 - [Core Concepts](https://rheojax.readthedocs.io/user_guide/core_concepts.html) - RheoData, Parameters, Test Modes
-- [Bayesian Inference](https://rheojax.readthedocs.io/user_guide/bayesian_inference.html) - NLSQ → NUTS workflow, ArviZ diagnostics
+- [Bayesian Inference](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/bayesian_inference.html) - NLSQ → NUTS workflow, ArviZ diagnostics
+- [SGR Analysis](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/sgr_analysis.html) - Soft Glassy Rheology framework
+- [SPP Analysis](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/spp_analysis.html) - Sequence of Physical Processes for LAOS
 - [Pipeline API](https://rheojax.readthedocs.io/user_guide/pipeline_api.html) - High-level workflows
 - [I/O Guide](https://rheojax.readthedocs.io/user_guide/io_guide.html) - Reading and writing data
 - [Visualization Guide](https://rheojax.readthedocs.io/user_guide/visualization_guide.html) - Creating plots
 - [API Reference](https://rheojax.readthedocs.io/api_reference.html) - API documentation
+
+### Model Handbooks
+
+- [SGR Models](https://rheojax.readthedocs.io/models/sgr/sgr_conventional.html) - SGR Conventional and GENERIC models
+- [SPP Models](https://rheojax.readthedocs.io/models/spp/spp_decomposer.html) - SPP Decomposer and Yield Stress models
 
 ## Performance
 
