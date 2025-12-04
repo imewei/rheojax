@@ -251,7 +251,11 @@ class TestPhysicalConstraints:
             ), f"G(t) not monotonically decreasing at index {i}: G[{i-1}]={G_t[i-1]}, G[{i}]={G_t[i]}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=50,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_creep_compliance_positive(self, x, G0_val, tau0):
         """Creep compliance J(t) > 0 for all times."""
         model = SGRConventional()

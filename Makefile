@@ -4,6 +4,7 @@
 
 .PHONY: help install install-dev install-jax-gpu gpu-check env-info \
         test test-smoke test-fast test-ci test-ci-full test-coverage test-integration test-validation \
+        test-parallel test-all-parallel test-parallel-fast test-coverage-parallel \
         clean clean-all clean-pyc clean-build clean-test clean-venv \
         format lint type-check check quick docs build publish info version
 
@@ -105,6 +106,7 @@ help:
 	@echo "  $(CYAN)test-ci-full$(RESET)           Run full CI suite (1069 tests, pre-v0.2.1 behavior)"
 	@echo "  $(CYAN)test-validation$(RESET)        Run with production MCMC (PYTEST_FULL_VALIDATION=1, ~90min)"
 	@echo "  $(CYAN)test-parallel$(RESET)          Run all tests in parallel (2-4x faster)"
+	@echo "  $(CYAN)test-all-parallel$(RESET)      Run full test suite in parallel (~1245 tests)"
 	@echo "  $(CYAN)test-parallel-fast$(RESET)     Run fast tests in parallel"
 	@echo "  $(CYAN)test-coverage$(RESET)          Run tests with coverage report"
 	@echo "  $(CYAN)test-coverage-parallel$(RESET) Run coverage with parallel execution"
@@ -275,6 +277,12 @@ test-fast:
 test-parallel:
 	@echo "$(BOLD)$(BLUE)Running tests in parallel (2-4x speedup)...$(RESET)"
 	$(RUN_CMD) $(PYTEST) -n auto
+
+test-all-parallel:
+	@echo "$(BOLD)$(BLUE)Running full test suite in parallel (~1245 tests)...$(RESET)"
+	@echo "$(BOLD)Note:$(RESET) Includes all tests (slow Bayesian, integration, etc.)"
+	$(RUN_CMD) $(PYTEST) -n auto
+	@echo "$(BOLD)$(GREEN)✓ Full test suite passed!$(RESET)"
 
 test-parallel-fast:
 	@echo "$(BOLD)$(BLUE)Running fast tests in parallel...$(RESET)"
