@@ -340,11 +340,14 @@ class BaseModel(BayesianMixin, ABC):
 
         return result
 
-    def predict(self, X: ArrayLike) -> ArrayLike:
+    def predict(self, X: ArrayLike, test_mode: str | None = None) -> ArrayLike:
         """Make predictions.
 
         Args:
             X: Input features
+            test_mode: Optional test mode ('oscillation', 'relaxation', 'creep', 'flow').
+                      If provided, sets model's test_mode before prediction.
+                      Useful for data generation without fitting.
 
         Returns:
             Model predictions
@@ -354,6 +357,10 @@ class BaseModel(BayesianMixin, ABC):
             if not any(p.value is None for p in self.parameters._parameters.values()):
                 # Parameters are set, consider it fitted
                 self.fitted_ = True
+
+        # Set test_mode if provided (for data generation without fitting)
+        if test_mode is not None and hasattr(self, "_test_mode"):
+            self._test_mode = test_mode
 
         return self._predict(X)
 

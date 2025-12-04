@@ -74,6 +74,9 @@ dependencies = [
 
     # Bayesian visualization and diagnostics
     "arviz>=0.22.0,<1.0.0",
+    "arviz-base>=0.2.0",
+    "arviz-stats>=0.3.0",
+    "arviz-plots>=0.3.0",
 ]
 
 [project.optional-dependencies]

@@ -396,21 +396,28 @@ class ParameterSet:
             values.append(param.value if param.value is not None else 0.0)
         return np.array(values)
 
-    def set_values(self, values: ArrayLike):
-        """Set all parameter values from array.
+    def set_values(self, values: ArrayLike | dict[str, float]):
+        """Set parameter values from array or dictionary.
 
         Args:
-            values: Array of values in order
+            values: Array of values in order, or dict mapping names to values
 
         Raises:
-            ValueError: If wrong number of values
+            ValueError: If wrong number of values (array) or unknown parameter (dict)
         """
-        values = np.atleast_1d(values)
-        if len(values) != len(self._order):
-            raise ValueError(f"Expected {len(self._order)} values, got {len(values)}")
-
-        for name, value in zip(self._order, values, strict=False):
-            self.set_value(name, float(value))
+        if isinstance(values, dict):
+            for name, value in values.items():
+                if name not in self._parameters:
+                    raise ValueError(f"Unknown parameter: {name}")
+                self.set_value(name, float(value))
+        else:
+            values = np.atleast_1d(values)
+            if len(values) != len(self._order):
+                raise ValueError(
+                    f"Expected {len(self._order)} values, got {len(values)}"
+                )
+            for name, value in zip(self._order, values, strict=False):
+                self.set_value(name, float(value))
 
     def get_bounds(self) -> list[tuple[float | None, float | None]]:
         """Get bounds for all parameters.
