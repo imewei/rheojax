@@ -13,9 +13,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from scripts.run_rheojax import run_dataset as run_rheojax_dataset
 from scripts.gen_inputs import main as gen_inputs_main
-
+from scripts.run_rheojax import run_dataset as run_rheojax_dataset
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = ROOT / "scripts"
@@ -64,7 +63,17 @@ def _load_data(path: Path):
     else:
         # CSV format (R or RheoJAX)
         first_line = lines[0] if lines else ""
-        skip = 1 if first_line and not first_line[0].lstrip('-').replace('.', '').replace('e', '').replace('+', '').isdigit() else 0
+        skip = (
+            1
+            if first_line
+            and not first_line[0]
+            .lstrip("-")
+            .replace(".", "")
+            .replace("e", "")
+            .replace("+", "")
+            .isdigit()
+            else 0
+        )
         return np.loadtxt(path, delimiter=",", skiprows=skip)
 
 
@@ -73,9 +82,13 @@ def _maybe_skip(m_path: Path, r_path: Path):
     if m_path.exists():
         return m_path
     if not r_path.exists():
-        pytest.skip("No MATLAB golden output available; run scripts/run_sppplus_v2p1.m in MATLAB")
+        pytest.skip(
+            "No MATLAB golden output available; run scripts/run_sppplus_v2p1.m in MATLAB"
+        )
     # R goldens exist but MATLAB preferred - skip with note
-    pytest.skip("MATLAB golden not available (R golden exists but may have issues); run scripts/run_sppplus_v2p1.m")
+    pytest.skip(
+        "MATLAB golden not available (R golden exists but may have issues); run scripts/run_sppplus_v2p1.m"
+    )
 
 
 @pytest.mark.parametrize("dataset", DATASETS)
@@ -110,4 +123,3 @@ def test_fsf_columns_present(dataset):
         pytest.skip("FSF output not present for RheoJAX run")
     arr = _load_data(path)
     assert arr.shape[1] == 9
-

@@ -45,15 +45,15 @@ def _make_mock_spp_results(n_points: int = 500) -> dict:
         "delta_t_dot": np.zeros(n_points),
         "Delta": 0.0,
         # Frenet-Serret frame
-        "T_vec": np.column_stack([
-            np.ones(n_points), np.zeros(n_points), np.zeros(n_points)
-        ]),
-        "N_vec": np.column_stack([
-            np.zeros(n_points), np.ones(n_points), np.zeros(n_points)
-        ]),
-        "B_vec": np.column_stack([
-            np.zeros(n_points), np.zeros(n_points), np.ones(n_points)
-        ]),
+        "T_vec": np.column_stack(
+            [np.ones(n_points), np.zeros(n_points), np.zeros(n_points)]
+        ),
+        "N_vec": np.column_stack(
+            [np.zeros(n_points), np.ones(n_points), np.zeros(n_points)]
+        ),
+        "B_vec": np.column_stack(
+            [np.zeros(n_points), np.zeros(n_points), np.ones(n_points)]
+        ),
     }
 
 
@@ -99,9 +99,23 @@ class TestExportSppTxt:
             lines = main_file.read_text().split("\r\n")
 
             # Find first data line (after headers)
-            data_lines = [ln for ln in lines if ln and not any(
-                x in ln for x in ["Data calculated", "Frequency", "Number", "Step", "Time", "[s]", "differentiation"]
-            )]
+            data_lines = [
+                ln
+                for ln in lines
+                if ln
+                and not any(
+                    x in ln
+                    for x in [
+                        "Data calculated",
+                        "Frequency",
+                        "Number",
+                        "Step",
+                        "Time",
+                        "[s]",
+                        "differentiation",
+                    ]
+                )
+            ]
             if data_lines:
                 first_data = data_lines[0].split("\t")
                 assert len(first_data) == 15
@@ -131,9 +145,14 @@ class TestExportSppTxt:
         with tempfile.TemporaryDirectory() as tmpdir:
             filepath = Path(tmpdir) / "test_sample"
             export_spp_txt(
-                filepath, results, omega=1.5,
-                n_harmonics=39, n_cycles=2, step_size=8, num_mode=1,
-                analysis_type="NUMERICAL"
+                filepath,
+                results,
+                omega=1.5,
+                n_harmonics=39,
+                n_cycles=2,
+                step_size=8,
+                num_mode=1,
+                analysis_type="NUMERICAL",
             )
 
             main_file = Path(tmpdir) / "test_sample_SPP_NUMERICAL.txt"
@@ -165,7 +184,7 @@ class TestExportSppHdf5:
 
     @pytest.mark.skipif(
         not pytest.importorskip("h5py", reason="h5py not installed"),
-        reason="h5py required"
+        reason="h5py required",
     )
     def test_creates_hdf5_file(self):
         """Test that HDF5 file is created."""
@@ -178,11 +197,12 @@ class TestExportSppHdf5:
 
     @pytest.mark.skipif(
         not pytest.importorskip("h5py", reason="h5py not installed"),
-        reason="h5py required"
+        reason="h5py required",
     )
     def test_hdf5_contains_expected_groups(self):
         """Test that HDF5 file contains expected data groups."""
         import h5py
+
         results = _make_mock_spp_results()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -197,11 +217,12 @@ class TestExportSppHdf5:
 
     @pytest.mark.skipif(
         not pytest.importorskip("h5py", reason="h5py not installed"),
-        reason="h5py required"
+        reason="h5py required",
     )
     def test_hdf5_metadata_attributes(self):
         """Test that HDF5 metadata contains expected attributes."""
         import h5py
+
         results = _make_mock_spp_results()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -341,8 +362,7 @@ class TestToMatlabDict:
         """Test that optional parameters are included when provided."""
         results = _make_mock_spp_results()
         mat_dict = to_matlab_dict(
-            results, omega=1.0,
-            n_harmonics=39, n_cycles=2, step_size=8, num_mode=1
+            results, omega=1.0, n_harmonics=39, n_cycles=2, step_size=8, num_mode=1
         )
 
         info = mat_dict["out_spp"]["info"]

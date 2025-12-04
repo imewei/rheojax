@@ -41,4 +41,3 @@ def test_spp_pipeline_uses_rogers_defaults_and_sets_metadata():
     for g in gamma_levels:
         assert g in pipeline.results
         assert "sigma_sy" in pipeline.results[g]
-

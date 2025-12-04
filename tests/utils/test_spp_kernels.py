@@ -146,9 +146,15 @@ def test_numerical_derivative_periodic_matches_analytic():
     expected_d3 = -(omega**3) * jnp.cos(omega * t)
 
     # Use atol for near-zero comparisons (numerical precision limits)
-    np.testing.assert_allclose(np.array(d1), np.array(expected_d1), rtol=0.02, atol=1e-10)
-    np.testing.assert_allclose(np.array(d2), np.array(expected_d2), rtol=0.05, atol=1e-10)
-    np.testing.assert_allclose(np.array(d3), np.array(expected_d3), rtol=0.1, atol=1e-10)
+    np.testing.assert_allclose(
+        np.array(d1), np.array(expected_d1), rtol=0.02, atol=1e-10
+    )
+    np.testing.assert_allclose(
+        np.array(d2), np.array(expected_d2), rtol=0.05, atol=1e-10
+    )
+    np.testing.assert_allclose(
+        np.array(d3), np.array(expected_d3), rtol=0.1, atol=1e-10
+    )
 
 
 @pytest.mark.smoke
@@ -163,10 +169,7 @@ def test_spp_numerical_analysis_linear_material():
     t = jnp.linspace(0, 2 * jnp.pi / omega, 1000, endpoint=False)
     dt = float(t[1] - t[0])
     strain = gamma_0 * jnp.sin(omega * t)
-    stress = (
-        G_prime * strain
-        + G_double_prime * gamma_0 * jnp.cos(omega * t)
-    )
+    stress = G_prime * strain + G_double_prime * gamma_0 * jnp.cos(omega * t)
 
     result = ks.spp_numerical_analysis(strain, stress, omega, dt, step_size=1)
 
@@ -211,8 +214,12 @@ def test_spp_numerical_analysis_num_mode_toggle():
     strain = gamma_0 * jnp.sin(omega * t)
     stress = 50.0 * strain
 
-    res_edge = ks.spp_numerical_analysis(strain, stress, omega, dt, step_size=2, num_mode=1)
-    res_loop = ks.spp_numerical_analysis(strain, stress, omega, dt, step_size=2, num_mode=2)
+    res_edge = ks.spp_numerical_analysis(
+        strain, stress, omega, dt, step_size=2, num_mode=1
+    )
+    res_loop = ks.spp_numerical_analysis(
+        strain, stress, omega, dt, step_size=2, num_mode=2
+    )
 
     # Both modes recover modulus ~50 Pa
     np.testing.assert_allclose(float(jnp.nanmean(res_edge["Gp_t"])), 50.0, rtol=5e-3)
@@ -240,7 +247,9 @@ def test_numerical_derivative_4th_order_first_derivative():
     # 4th order should be accurate in interior (avoid boundary artifacts)
     # Use atol for near-zero comparisons
     interior = slice(10, -10)
-    np.testing.assert_allclose(np.array(d1[interior]), np.array(expected[interior]), rtol=0.01, atol=1e-10)
+    np.testing.assert_allclose(
+        np.array(d1[interior]), np.array(expected[interior]), rtol=0.01, atol=1e-10
+    )
 
 
 def test_numerical_derivative_4th_order_second_derivative():
@@ -256,7 +265,9 @@ def test_numerical_derivative_4th_order_second_derivative():
     # Check interior region (avoid boundary effects)
     # Use atol for near-zero comparisons
     interior = slice(20, -20)
-    np.testing.assert_allclose(np.array(d2[interior]), np.array(expected[interior]), rtol=0.02, atol=1e-8)
+    np.testing.assert_allclose(
+        np.array(d2[interior]), np.array(expected[interior]), rtol=0.02, atol=1e-8
+    )
 
 
 def test_numerical_derivative_4th_order_third_derivative():
@@ -272,7 +283,9 @@ def test_numerical_derivative_4th_order_third_derivative():
     # Check interior region (avoid boundary effects and near-zero values)
     # Use atol for near-zero comparisons
     interior = slice(50, -50)
-    np.testing.assert_allclose(np.array(d3[interior]), np.array(expected[interior]), rtol=0.05, atol=1e-10)
+    np.testing.assert_allclose(
+        np.array(d3[interior]), np.array(expected[interior]), rtol=0.05, atol=1e-10
+    )
 
 
 # ============================================================================
@@ -519,8 +532,13 @@ def test_yield_from_displacement_stress_basic():
     disp_stress = jnp.zeros_like(t)
 
     result = ks.yield_from_displacement_stress(
-        disp_stress, strain, strain_rate, Gp_t, delta_t,
-        strain_amplitude=gamma_0, rate_amplitude=gamma_0 * omega
+        disp_stress,
+        strain,
+        strain_rate,
+        Gp_t,
+        delta_t,
+        strain_amplitude=gamma_0,
+        rate_amplitude=gamma_0 * omega,
     )
 
     assert "sigma_sy_disp" in result
@@ -547,7 +565,9 @@ def test_differentiate_rate_from_strain():
     # Check interior to avoid boundary effects
     # Use atol for near-zero comparisons
     interior = slice(20, -20)
-    np.testing.assert_allclose(np.array(rate[interior]), np.array(expected[interior]), rtol=0.02, atol=1e-10)
+    np.testing.assert_allclose(
+        np.array(rate[interior]), np.array(expected[interior]), rtol=0.02, atol=1e-10
+    )
 
 
 def test_convert_units_strain():

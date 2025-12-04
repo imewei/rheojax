@@ -343,7 +343,9 @@ class TestMittagLefflerPerformance:
         execution_time = min(times)
 
         # Should be fast (< 50ms for 100 points) - increased threshold for CI/different hardware
-        assert execution_time < 0.05, f"Execution took {execution_time:.3f}s (min of 5 runs)"
+        assert (
+            execution_time < 0.05
+        ), f"Execution took {execution_time:.3f}s (min of 5 runs)"
         assert jnp.all(jnp.isfinite(result))
 
     def test_ml_e_large_array_performance(self):

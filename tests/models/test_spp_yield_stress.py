@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rheojax.models.spp_yield_stress import SPPYieldStress
 from rheojax.core.test_modes import TestMode
+from rheojax.models.spp_yield_stress import SPPYieldStress
 
 
 def _synthetic_amplitude_sweep(scale: float = 50.0, exp: float = 0.6):
@@ -46,8 +46,16 @@ def test_bayesian_warm_start_uses_nlsq_init_static():
 
     summary = result.summary
     # summary may be dict; normalize to dict access
-    mean_scale = summary.get("sigma_sy_scale", {}).get("mean") if isinstance(summary, dict) else float(summary.loc["sigma_sy_scale", "mean"])
-    mean_exp = summary.get("sigma_sy_exp", {}).get("mean") if isinstance(summary, dict) else float(summary.loc["sigma_sy_exp", "mean"])
+    mean_scale = (
+        summary.get("sigma_sy_scale", {}).get("mean")
+        if isinstance(summary, dict)
+        else float(summary.loc["sigma_sy_scale", "mean"])
+    )
+    mean_exp = (
+        summary.get("sigma_sy_exp", {}).get("mean")
+        if isinstance(summary, dict)
+        else float(summary.loc["sigma_sy_exp", "mean"])
+    )
 
     assert mean_exp is not None and 0.4 < mean_exp < 1.0
     assert mean_scale is not None and mean_scale > 10.0
