@@ -199,8 +199,8 @@ class SPPDecomposer(BaseTransform):
 
     def _get_cycle_mask(
         self,
-        t: "Array",
-    ) -> "tuple[Array, int, int]":
+        t: Array,
+    ) -> tuple[Array, int, int]:
         """Compute mask for selected cycles from time series data.
 
         Parameters
