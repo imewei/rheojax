@@ -29,6 +29,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+from jax import Array
 
 from rheojax.core.base import BaseTransform
 from rheojax.core.jax_config import safe_import_jax
@@ -198,8 +199,8 @@ class SPPDecomposer(BaseTransform):
 
     def _get_cycle_mask(
         self,
-        t: jnp.ndarray,
-    ) -> tuple[jnp.ndarray, int, int]:
+        t: Array,
+    ) -> tuple[Array, int, int]:
         """Compute mask for selected cycles from time series data.
 
         Parameters
@@ -294,7 +295,9 @@ class SPPDecomposer(BaseTransform):
             stress_jax = jnp.real(stress_jax)
 
         # Resolve omega (scalar or per-sample) from metadata if provided
-        omega_meta = data.metadata.get("omega", self.omega) if data.metadata else self.omega
+        omega_meta = (
+            data.metadata.get("omega", self.omega) if data.metadata else self.omega
+        )
         omega_jax = jnp.asarray(omega_meta, dtype=jnp.float64)
         if omega_jax.ndim == 0:
             omega_jax = jnp.full_like(t_jax, omega_jax)
@@ -373,7 +376,14 @@ class SPPDecomposer(BaseTransform):
             )
             fsf_data_out = core_results["fsf_data_out"]
             spp_params = np.array(
-                [float(self.omega), np.nan, np.nan, np.nan, float(self.step_size), float(self.num_mode)]
+                [
+                    float(self.omega),
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    float(self.step_size),
+                    float(self.num_mode),
+                ]
             )
             ft_out = None
         else:
@@ -389,7 +399,14 @@ class SPPDecomposer(BaseTransform):
             ft_out = core_results.get("ft_out")
             W = int(round(len(strain_jax) / (2 * n_cycles_obs)))
             spp_params = np.array(
-                [omega_scalar, int(self.n_harmonics), int(n_cycles_obs), W, np.nan, np.nan]
+                [
+                    omega_scalar,
+                    int(self.n_harmonics),
+                    int(n_cycles_obs),
+                    W,
+                    np.nan,
+                    np.nan,
+                ]
             )
 
         # 1. Apparent cage modulus

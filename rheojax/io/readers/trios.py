@@ -460,7 +460,7 @@ def _extract_step_temperature(line: str) -> float | None:
     if temp_match:
         temp_c = float(temp_match.group(1))
         return temp_c + 273.15  # Convert to Kelvin
-    return None  # type: ignore[unreachable]
+    return None
 
 
 def _parse_total_points(line: str) -> int | None:

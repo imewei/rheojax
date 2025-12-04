@@ -646,10 +646,18 @@ def spp_fourier_analysis(
                 fd = fd - n_omega * An[idx] * sin_term + n_omega * Bn[idx] * cos_term
 
                 # f''(t) = -n²ω²*An*cos(nωt) - n²ω²*Bn*sin(nωt)
-                fdd = fdd - n_omega**2 * An[idx] * cos_term - n_omega**2 * Bn[idx] * sin_term
+                fdd = (
+                    fdd
+                    - n_omega**2 * An[idx] * cos_term
+                    - n_omega**2 * Bn[idx] * sin_term
+                )
 
                 # f'''(t) = n³ω³*An*sin(nωt) - n³ω³*Bn*cos(nωt)
-                fddd = fddd + n_omega**3 * An[idx] * sin_term - n_omega**3 * Bn[idx] * cos_term
+                fddd = (
+                    fddd
+                    + n_omega**3 * An[idx] * sin_term
+                    - n_omega**3 * Bn[idx] * cos_term
+                )
 
         return f, fd, fdd, fddd
 
@@ -700,8 +708,16 @@ def spp_fourier_analysis(
     mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1))
 
     # Instantaneous moduli (MATLAB formula)
-    Gp_t = -rd_x_rdd[:, 0] / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps) * jnp.sign(rd_x_rdd[:, 2])
-    Gpp_t = -rd_x_rdd[:, 1] / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps) * jnp.sign(rd_x_rdd[:, 2])
+    Gp_t = (
+        -rd_x_rdd[:, 0]
+        / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps)
+        * jnp.sign(rd_x_rdd[:, 2])
+    )
+    Gpp_t = (
+        -rd_x_rdd[:, 1]
+        / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps)
+        * jnp.sign(rd_x_rdd[:, 2])
+    )
 
     # Moduli rates (MATLAB formula)
     # Gp_t_dot = -rd[:,1] * (rddd · rd_x_rdd) / rd_x_rdd[:,2]²
@@ -722,8 +738,10 @@ def spp_fourier_analysis(
     rd_tn = rd / omega
     rdd_tn = rdd / omega**2
     rddd_tn = rddd / omega**3
-    delta_t_dot = -rd_tn[:, 2] * (rddd_tn[:, 2] + rd_tn[:, 2]) / (
-        jnp.maximum(rdd_tn[:, 2] ** 2 + rd_tn[:, 2] ** 2, eps)
+    delta_t_dot = (
+        -rd_tn[:, 2]
+        * (rddd_tn[:, 2] + rd_tn[:, 2])
+        / (jnp.maximum(rdd_tn[:, 2] ** 2 + rd_tn[:, 2] ** 2, eps))
     )
 
     # Displacement stress
@@ -1499,7 +1517,7 @@ def numerical_derivative_periodic(
 def spp_numerical_analysis(
     strain: "Array",
     stress: "Array",
-    omega: float | jnp.ndarray,
+    omega: float | Array,
     dt: float,
     step_size: int = 8,
     num_mode: int = 2,
@@ -1595,17 +1613,35 @@ def spp_numerical_analysis(
         rd_stress, rdd_stress, rddd_stress = deriv_func(resp_wave[:, 2], dt, step_size)
     else:
         # Edge-aware mode: compute derivatives separately using finite differences
-        rd_strain = numerical_derivative(resp_wave[:, 0], dt, order=1, step_size=step_size)
-        rdd_strain = numerical_derivative(resp_wave[:, 0], dt, order=2, step_size=step_size)
-        rddd_strain = numerical_derivative(resp_wave[:, 0], dt, order=3, step_size=step_size)
+        rd_strain = numerical_derivative(
+            resp_wave[:, 0], dt, order=1, step_size=step_size
+        )
+        rdd_strain = numerical_derivative(
+            resp_wave[:, 0], dt, order=2, step_size=step_size
+        )
+        rddd_strain = numerical_derivative(
+            resp_wave[:, 0], dt, order=3, step_size=step_size
+        )
 
-        rd_rate = numerical_derivative(resp_wave[:, 1], dt, order=1, step_size=step_size)
-        rdd_rate = numerical_derivative(resp_wave[:, 1], dt, order=2, step_size=step_size)
-        rddd_rate = numerical_derivative(resp_wave[:, 1], dt, order=3, step_size=step_size)
+        rd_rate = numerical_derivative(
+            resp_wave[:, 1], dt, order=1, step_size=step_size
+        )
+        rdd_rate = numerical_derivative(
+            resp_wave[:, 1], dt, order=2, step_size=step_size
+        )
+        rddd_rate = numerical_derivative(
+            resp_wave[:, 1], dt, order=3, step_size=step_size
+        )
 
-        rd_stress = numerical_derivative(resp_wave[:, 2], dt, order=1, step_size=step_size)
-        rdd_stress = numerical_derivative(resp_wave[:, 2], dt, order=2, step_size=step_size)
-        rddd_stress = numerical_derivative(resp_wave[:, 2], dt, order=3, step_size=step_size)
+        rd_stress = numerical_derivative(
+            resp_wave[:, 2], dt, order=1, step_size=step_size
+        )
+        rdd_stress = numerical_derivative(
+            resp_wave[:, 2], dt, order=2, step_size=step_size
+        )
+        rddd_stress = numerical_derivative(
+            resp_wave[:, 2], dt, order=3, step_size=step_size
+        )
 
     # Stack into 3-column arrays
     rd = jnp.stack([rd_strain, rd_rate, rd_stress], axis=1)
@@ -1640,11 +1676,15 @@ def spp_numerical_analysis(
     # Instantaneous moduli from cross-product (MATLAB formula)
     # G'_t = -rd_x_rdd[:,0] / rd_x_rdd[:,2]
     # G''_t = -rd_x_rdd[:,1] / rd_x_rdd[:,2]
-    Gp_t = -rd_x_rdd[:, 0] / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps) * jnp.sign(
-        rd_x_rdd[:, 2]
+    Gp_t = (
+        -rd_x_rdd[:, 0]
+        / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps)
+        * jnp.sign(rd_x_rdd[:, 2])
     )
-    Gpp_t = -rd_x_rdd[:, 1] / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps) * jnp.sign(
-        rd_x_rdd[:, 2]
+    Gpp_t = (
+        -rd_x_rdd[:, 1]
+        / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps)
+        * jnp.sign(rd_x_rdd[:, 2])
     )
 
     # Moduli rates (MATLAB formula - Gap 4)
@@ -1668,8 +1708,10 @@ def spp_numerical_analysis(
     rd_tn = rd / omega_scalar
     rdd_tn = rdd / omega_scalar**2
     rddd_tn = rddd / omega_scalar**3
-    delta_t_dot = -rd_tn[:, 2] * (rddd_tn[:, 2] + rd_tn[:, 2]) / (
-        jnp.maximum(rdd_tn[:, 2] ** 2 + rd_tn[:, 2] ** 2, eps)
+    delta_t_dot = (
+        -rd_tn[:, 2]
+        * (rddd_tn[:, 2] + rd_tn[:, 2])
+        / (jnp.maximum(rdd_tn[:, 2] ** 2 + rd_tn[:, 2] ** 2, eps))
     )
 
     # Displacement stress (MATLAB formula)
@@ -1810,7 +1852,9 @@ def yield_from_displacement_stress(
     stress_at_Gp_min = jnp.where(near_Gp_min, jnp.abs(disp_stress_arr), 0.0)
     count_sy = jnp.sum(near_Gp_min)
     sigma_sy = jnp.where(
-        count_sy > 0, jnp.sum(stress_at_Gp_min) / count_sy, jnp.max(jnp.abs(disp_stress_arr))
+        count_sy > 0,
+        jnp.sum(stress_at_Gp_min) / count_sy,
+        jnp.max(jnp.abs(disp_stress_arr)),
     )
 
     # Find strain at static yield

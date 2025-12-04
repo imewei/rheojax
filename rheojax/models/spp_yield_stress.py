@@ -186,8 +186,8 @@ class SPPYieldStress(BaseModel):
         )
 
         # Internal state
-        self._test_mode = TestMode.OSCILLATION
-        self._omega = 1.0  # Default angular frequency
+        self._test_mode: TestMode = TestMode.OSCILLATION
+        self._omega: float = 1.0  # Default angular frequency
         self._amplitude_data: dict = {}  # Store per-amplitude SPP results
         self._yield_type = "static"
 
@@ -422,9 +422,7 @@ class SPPYieldStress(BaseModel):
         if test_mode == TestMode.OSCILLATION:
             yield_type = getattr(self, "_yield_type", "static")
             if yield_type == "dynamic":
-                return self._predict_dynamic_yield(
-                    X, sigma_dy_scale, sigma_dy_exp
-                )
+                return self._predict_dynamic_yield(X, sigma_dy_scale, sigma_dy_exp)
             return self._predict_oscillation(
                 X, G_cage, sigma_sy_scale, sigma_sy_exp, eta_inf
             )

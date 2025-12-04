@@ -106,7 +106,9 @@ def export_spp_txt(
     Gp_t = np.asarray(spp_results["Gp_t"])
     Gpp_t = np.asarray(spp_results["Gpp_t"])
     G_star_t = np.asarray(spp_results.get("G_star_t", np.sqrt(Gp_t**2 + Gpp_t**2)))
-    tan_delta_t = np.asarray(spp_results.get("tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12)))
+    tan_delta_t = np.asarray(
+        spp_results.get("tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12))
+    )
     delta_t = np.asarray(spp_results.get("delta_t", np.arctan(tan_delta_t)))
     disp_stress = np.asarray(spp_results.get("disp_stress", np.zeros(len(time))))
     eq_strain_est = np.asarray(spp_results.get("eq_strain_est", np.zeros(len(time))))
@@ -116,23 +118,25 @@ def export_spp_txt(
     delta_t_dot = np.asarray(spp_results.get("delta_t_dot", np.zeros(len(time))))
 
     # Build 15-column data matrix matching MATLAB format
-    spp_data_out = np.column_stack([
-        time,           # 1 - time [s]
-        strain,         # 2 - strain [-]
-        rate,           # 3 - rate [1/s]
-        stress,         # 4 - stress [Pa]
-        Gp_t,           # 5 - G'_t [Pa]
-        Gpp_t,          # 6 - G''_t [Pa]
-        G_star_t,       # 7 - |G*_t| [Pa]
-        tan_delta_t,    # 8 - tan(delta_t) []
-        delta_t,        # 9 - delta_t [rad]
-        disp_stress,    # 10 - displacement stress [Pa]
-        eq_strain_est,  # 11 - est. equilibrium strain [-]
-        Gp_t_dot,       # 12 - dG'_t/dt [Pa/s]
-        Gpp_t_dot,      # 13 - dG''_t/dt [Pa/s]
-        G_speed,        # 14 - Speed of G*_t [Pa/s]
-        delta_t_dot,    # 15 - norm. PAV []
-    ])
+    spp_data_out = np.column_stack(
+        [
+            time,  # 1 - time [s]
+            strain,  # 2 - strain [-]
+            rate,  # 3 - rate [1/s]
+            stress,  # 4 - stress [Pa]
+            Gp_t,  # 5 - G'_t [Pa]
+            Gpp_t,  # 6 - G''_t [Pa]
+            G_star_t,  # 7 - |G*_t| [Pa]
+            tan_delta_t,  # 8 - tan(delta_t) []
+            delta_t,  # 9 - delta_t [rad]
+            disp_stress,  # 10 - displacement stress [Pa]
+            eq_strain_est,  # 11 - est. equilibrium strain [-]
+            Gp_t_dot,  # 12 - dG'_t/dt [Pa/s]
+            Gpp_t_dot,  # 13 - dG''_t/dt [Pa/s]
+            G_speed,  # 14 - Speed of G*_t [Pa/s]
+            delta_t_dot,  # 15 - norm. PAV []
+        ]
+    )
 
     # Write main SPP data file
     main_filename = filepath.parent / f"{base_name}_SPP_{analysis_type}.txt"
@@ -154,11 +158,19 @@ def export_spp_txt(
         N_vec = np.asarray(spp_results["N_vec"])
         B_vec = np.asarray(spp_results["B_vec"])
 
-        fsf_data_out = np.column_stack([
-            T_vec[:, 0], T_vec[:, 1], T_vec[:, 2],  # T_x, T_y, T_z
-            N_vec[:, 0], N_vec[:, 1], N_vec[:, 2],  # N_x, N_y, N_z
-            B_vec[:, 0], B_vec[:, 1], B_vec[:, 2],  # B_x, B_y, B_z
-        ])
+        fsf_data_out = np.column_stack(
+            [
+                T_vec[:, 0],
+                T_vec[:, 1],
+                T_vec[:, 2],  # T_x, T_y, T_z
+                N_vec[:, 0],
+                N_vec[:, 1],
+                N_vec[:, 2],  # N_x, N_y, N_z
+                B_vec[:, 0],
+                B_vec[:, 1],
+                B_vec[:, 2],  # B_x, B_y, B_z
+            ]
+        )
 
         fsf_filename = filepath.parent / f"{base_name}_SPP_{analysis_type}_FSFRAME.txt"
         _write_spp_fsf_txt(
@@ -210,14 +222,38 @@ def _write_spp_main_txt(
 
         # Write column headers (matching MATLAB exactly)
         headers1 = [
-            "Time", "Strain", "Rate", "Stress", "G'_t", 'G"_t', "|G*_t|",
-            "tan(delta_t)", "delta_t", "displacement stress",
-            "est. elastic stress", "dG'_{t}/dt", 'dG"_{t}/dt', "Speed",
-            "norm. PAV"
+            "Time",
+            "Strain",
+            "Rate",
+            "Stress",
+            "G'_t",
+            'G"_t',
+            "|G*_t|",
+            "tan(delta_t)",
+            "delta_t",
+            "displacement stress",
+            "est. elastic stress",
+            "dG'_{t}/dt",
+            'dG"_{t}/dt',
+            "Speed",
+            "norm. PAV",
         ]
         headers2 = [
-            "[s]", "[-]", "[1/s]", "[Pa]", "[Pa]", "[Pa]", "[Pa]", "[]",
-            "[rad]", "[Pa]", "[Pa]", "[Pa/s]", "[Pa/s]", "[Pa/s]", "[]"
+            "[s]",
+            "[-]",
+            "[1/s]",
+            "[Pa]",
+            "[Pa]",
+            "[Pa]",
+            "[Pa]",
+            "[]",
+            "[rad]",
+            "[Pa]",
+            "[Pa]",
+            "[Pa/s]",
+            "[Pa/s]",
+            "[Pa/s]",
+            "[]",
         ]
         f.write("\t".join(headers1) + "\r\n")
         f.write("\t".join(headers2) + "\r\n")
@@ -264,14 +300,26 @@ def _write_spp_fsf_txt(
 
         # Write column headers (matching MATLAB exactly)
         headers1 = [
-            "Tangent(x)", "Tangent(y)", "Tangent(z)",
-            "Normal(x)", "Normal(y)", "Normal(z)",
-            "Binormal(x)", "Binormal(y)", "Binormal(z)"
+            "Tangent(x)",
+            "Tangent(y)",
+            "Tangent(z)",
+            "Normal(x)",
+            "Normal(y)",
+            "Normal(z)",
+            "Binormal(x)",
+            "Binormal(y)",
+            "Binormal(z)",
         ]
         headers2 = [
-            "[-]", "[1/s]", "[Pa]",
-            "[-]", "[1/s]", "[Pa]",
-            "[-]", "[1/s]", "[Pa]"
+            "[-]",
+            "[1/s]",
+            "[Pa]",
+            "[-]",
+            "[1/s]",
+            "[Pa]",
+            "[-]",
+            "[1/s]",
+            "[Pa]",
         ]
         f.write("\t".join(headers1) + "\r\n")
         f.write("\t".join(headers2) + "\r\n")
@@ -350,9 +398,19 @@ def export_spp_hdf5(
 
         # Main SPP data group
         spp_data = f.create_group("spp_data")
-        for key in ["Gp_t", "Gpp_t", "G_star_t", "tan_delta_t", "delta_t",
-                    "disp_stress", "eq_strain_est", "Gp_t_dot", "Gpp_t_dot",
-                    "G_speed", "delta_t_dot"]:
+        for key in [
+            "Gp_t",
+            "Gpp_t",
+            "G_star_t",
+            "tan_delta_t",
+            "delta_t",
+            "disp_stress",
+            "eq_strain_est",
+            "Gp_t_dot",
+            "Gpp_t_dot",
+            "G_speed",
+            "delta_t_dot",
+        ]:
             if key in spp_results:
                 spp_data.create_dataset(key, data=np.asarray(spp_results[key]))
 
@@ -407,10 +465,22 @@ def export_spp_csv(
     time = np.asarray(spp_results.get("time_new", np.arange(len(spp_results["Gp_t"]))))
     columns["time"] = time
 
-    for key in ["strain_recon", "rate_recon", "stress_recon",
-                "Gp_t", "Gpp_t", "G_star_t", "tan_delta_t", "delta_t",
-                "disp_stress", "eq_strain_est", "Gp_t_dot", "Gpp_t_dot",
-                "G_speed", "delta_t_dot"]:
+    for key in [
+        "strain_recon",
+        "rate_recon",
+        "stress_recon",
+        "Gp_t",
+        "Gpp_t",
+        "G_star_t",
+        "tan_delta_t",
+        "delta_t",
+        "disp_stress",
+        "eq_strain_est",
+        "Gp_t_dot",
+        "Gpp_t_dot",
+        "G_speed",
+        "delta_t_dot",
+    ]:
         if key in spp_results:
             columns[key] = np.asarray(spp_results[key])
 
@@ -499,7 +569,9 @@ def to_matlab_dict(
     Gp_t = np.asarray(spp_results["Gp_t"])
     Gpp_t = np.asarray(spp_results["Gpp_t"])
     G_star_t = np.asarray(spp_results.get("G_star_t", np.sqrt(Gp_t**2 + Gpp_t**2)))
-    tan_delta_t = np.asarray(spp_results.get("tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12)))
+    tan_delta_t = np.asarray(
+        spp_results.get("tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12))
+    )
     delta_t = np.asarray(spp_results.get("delta_t", np.arctan(tan_delta_t)))
     disp_stress = np.asarray(spp_results.get("disp_stress", np.zeros(len(time))))
     eq_strain_est = np.asarray(spp_results.get("eq_strain_est", np.zeros(len(time))))
@@ -509,14 +581,28 @@ def to_matlab_dict(
     delta_t_dot = np.asarray(spp_results.get("delta_t_dot", np.zeros(len(time))))
 
     # Build 15-column data matrix
-    spp_data_out = np.column_stack([
-        time, strain, rate, stress, Gp_t, Gpp_t, G_star_t,
-        tan_delta_t, delta_t, disp_stress, eq_strain_est,
-        Gp_t_dot, Gpp_t_dot, G_speed, delta_t_dot
-    ])
+    spp_data_out = np.column_stack(
+        [
+            time,
+            strain,
+            rate,
+            stress,
+            Gp_t,
+            Gpp_t,
+            G_star_t,
+            tan_delta_t,
+            delta_t,
+            disp_stress,
+            eq_strain_est,
+            Gp_t_dot,
+            Gpp_t_dot,
+            G_speed,
+            delta_t_dot,
+        ]
+    )
 
     # Build info struct
-    info = {"frequency": omega}
+    info: dict[str, str | float | int] = {"frequency": omega}
     if analysis_type == "numerical":
         info["data_calc"] = "Data calculated via numerical differentiation"
     else:
@@ -528,16 +614,50 @@ def to_matlab_dict(
     if step_size is not None:
         info["diff_step_size"] = step_size
     if num_mode is not None:
-        info["diff_type"] = "Standard differentiation" if num_mode == 1 else "Looped differentiation"
+        info["diff_type"] = (
+            "Standard differentiation" if num_mode == 1 else "Looped differentiation"
+        )
 
     # Headers matching MATLAB format
-    headers = np.array([
-        ["Time", "Strain", "Rate", "Stress", "G'_t", 'G"_t', "|G*_t|",
-         "tan(delta_t)", "delta_t", "displacement stress",
-         "est. elastic stress", "dG'_{t}/dt", 'dG"_{t}/dt', "Speed", "norm. PAV"],
-        ["[s]", "[-]", "[1/s]", "[Pa]", "[Pa]", "[Pa]", "[Pa]", "[]",
-         "[rad]", "[Pa]", "[Pa]", "[Pa/s]", "[Pa/s]", "[Pa/s]", "[]"]
-    ], dtype=object)
+    headers = np.array(
+        [
+            [
+                "Time",
+                "Strain",
+                "Rate",
+                "Stress",
+                "G'_t",
+                'G"_t',
+                "|G*_t|",
+                "tan(delta_t)",
+                "delta_t",
+                "displacement stress",
+                "est. elastic stress",
+                "dG'_{t}/dt",
+                'dG"_{t}/dt',
+                "Speed",
+                "norm. PAV",
+            ],
+            [
+                "[s]",
+                "[-]",
+                "[1/s]",
+                "[Pa]",
+                "[Pa]",
+                "[Pa]",
+                "[Pa]",
+                "[]",
+                "[rad]",
+                "[Pa]",
+                "[Pa]",
+                "[Pa/s]",
+                "[Pa/s]",
+                "[Pa/s]",
+                "[]",
+            ],
+        ],
+        dtype=object,
+    )
 
     # Main output structure
     out_spp = {
@@ -554,18 +674,47 @@ def to_matlab_dict(
         N_vec = np.asarray(spp_results["N_vec"])
         B_vec = np.asarray(spp_results["B_vec"])
 
-        fsf_data_out = np.column_stack([
-            T_vec[:, 0], T_vec[:, 1], T_vec[:, 2],
-            N_vec[:, 0], N_vec[:, 1], N_vec[:, 2],
-            B_vec[:, 0], B_vec[:, 1], B_vec[:, 2],
-        ])
+        fsf_data_out = np.column_stack(
+            [
+                T_vec[:, 0],
+                T_vec[:, 1],
+                T_vec[:, 2],
+                N_vec[:, 0],
+                N_vec[:, 1],
+                N_vec[:, 2],
+                B_vec[:, 0],
+                B_vec[:, 1],
+                B_vec[:, 2],
+            ]
+        )
 
-        fsf_headers = np.array([
-            ["Tangent(x)", "Tangent(y)", "Tangent(z)",
-             "Normal(x)", "Normal(y)", "Normal(z)",
-             "Binormal(x)", "Binormal(y)", "Binormal(z)"],
-            ["[-]", "[1/s]", "[Pa]", "[-]", "[1/s]", "[Pa]", "[-]", "[1/s]", "[Pa]"]
-        ], dtype=object)
+        fsf_headers = np.array(
+            [
+                [
+                    "Tangent(x)",
+                    "Tangent(y)",
+                    "Tangent(z)",
+                    "Normal(x)",
+                    "Normal(y)",
+                    "Normal(z)",
+                    "Binormal(x)",
+                    "Binormal(y)",
+                    "Binormal(z)",
+                ],
+                [
+                    "[-]",
+                    "[1/s]",
+                    "[Pa]",
+                    "[-]",
+                    "[1/s]",
+                    "[Pa]",
+                    "[-]",
+                    "[1/s]",
+                    "[Pa]",
+                ],
+            ],
+            dtype=object,
+        )
 
         out_fsf = {
             "info": info,

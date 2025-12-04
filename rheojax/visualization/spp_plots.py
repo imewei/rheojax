@@ -49,10 +49,10 @@ def plot_lissajous(
     stress: np.ndarray,
     gamma_0: float | None = None,
     omega: float | None = None,
-    ax: "Axes | tuple[Axes, Axes] | None" = None,
+    ax: Axes | tuple[Axes, Axes] | None = None,
     style: str = "publication",
     **kwargs,
-) -> "Figure":
+) -> Figure:
     """
     Create Lissajous-Bowditch plots (stress vs strain and stress vs strain rate).
 
@@ -118,7 +118,11 @@ def plot_lissajous(
     # Plot σ vs γ̇ (viscous Lissajous)
     ax2.plot(rate_plot, stress_plot, linewidth=linewidth, **kwargs)
     ax2.set_xlabel(
-        r"$\dot{\gamma}/\dot{\gamma}_0$" if (gamma_0 and omega) else r"$\dot{\gamma}$ (1/s)",
+        (
+            r"$\dot{\gamma}/\dot{\gamma}_0$"
+            if (gamma_0 and omega)
+            else r"$\dot{\gamma}$ (1/s)"
+        ),
         fontsize=fontsize,
     )
     ax2.set_ylabel(r"$\sigma$ (Pa)", fontsize=fontsize)
@@ -134,11 +138,11 @@ def plot_cole_cole(
     Gp_t: np.ndarray,
     Gpp_t: np.ndarray,
     time: np.ndarray | None = None,
-    ax: "Axes | None" = None,
+    ax: Axes | None = None,
     colormap: str = "viridis",
     show_trajectory: bool = True,
     **kwargs,
-) -> "Figure":
+) -> Figure:
     """
     Create Cole-Cole diagram (G'' vs G') with optional time coloring.
 
@@ -212,9 +216,9 @@ def plot_moduli_evolution(
     Gpp_t: np.ndarray,
     delta_t: np.ndarray | None = None,
     G_speed: np.ndarray | None = None,
-    ax: "Axes | tuple | None" = None,
+    ax: Axes | tuple | None = None,
     **kwargs,
-) -> "Figure":
+) -> Figure:
     """
     Plot time-resolved moduli evolution (G'(t), G''(t), δ(t) vs t).
 
@@ -273,7 +277,9 @@ def plot_moduli_evolution(
 
     # δ(t) plot
     if delta_t is not None and idx < len(axes):
-        axes[idx].plot(time, np.degrees(delta_t), "g-", linewidth=1.5, label=r"$\delta(t)$")
+        axes[idx].plot(
+            time, np.degrees(delta_t), "g-", linewidth=1.5, label=r"$\delta(t)$"
+        )
         axes[idx].set_ylabel(r"$\delta(t)$ (°)", color="g")
         axes[idx].tick_params(axis="y", labelcolor="g")
         axes[idx].axhline(45, color="gray", linestyle=":", linewidth=0.5)
@@ -297,9 +303,9 @@ def plot_harmonic_spectrum(
     amplitudes: np.ndarray,
     n_harmonics: int | None = None,
     normalize: bool = True,
-    ax: "Axes | None" = None,
+    ax: Axes | None = None,
     **kwargs,
-) -> "Figure":
+) -> Figure:
     """
     Plot harmonic spectrum bar chart (I_n/I_1 vs harmonic number).
 
@@ -349,7 +355,7 @@ def plot_harmonic_spectrum(
     ax.set_xticks(harmonics)
 
     # Add value labels on bars
-    for bar, amp in zip(bars, amps):
+    for bar, amp in zip(bars, amps, strict=False):
         height = bar.get_height()
         ax.annotate(
             f"{amp:.3f}",
@@ -372,11 +378,11 @@ def plot_3d_trajectory(
     T_vec: np.ndarray | None = None,
     N_vec: np.ndarray | None = None,
     B_vec: np.ndarray | None = None,
-    ax: "Axes | None" = None,
+    ax: Axes | None = None,
     show_frame: bool = False,
     frame_scale: float = 0.1,
     **kwargs,
-) -> "Figure":
+) -> Figure:
     """
     Plot 3D (γ, γ̇/ω, σ) trajectory with optional Frenet-Serret frame.
 
@@ -407,7 +413,6 @@ def plot_3d_trajectory(
         Matplotlib figure object
     """
     plt = _ensure_matplotlib()
-    from mpl_toolkits.mplot3d import Axes3D
 
     if ax is None:
         fig = plt.figure(figsize=(10, 8))
@@ -422,8 +427,12 @@ def plot_3d_trajectory(
     ax.plot(strain, rate_normalized, stress, linewidth=1.5, **kwargs)
 
     # Add start/end markers
-    ax.scatter([strain[0]], [rate_normalized[0]], [stress[0]], color="g", s=100, label="Start")
-    ax.scatter([strain[-1]], [rate_normalized[-1]], [stress[-1]], color="r", s=100, label="End")
+    ax.scatter(
+        [strain[0]], [rate_normalized[0]], [stress[0]], color="g", s=100, label="Start"
+    )
+    ax.scatter(
+        [strain[-1]], [rate_normalized[-1]], [stress[-1]], color="r", s=100, label="End"
+    )
 
     # Show Frenet-Serret frame at selected points
     if show_frame and T_vec is not None:
@@ -439,7 +448,9 @@ def plot_3d_trajectory(
             if T_vec is not None:
                 ax.quiver(*pos, *T_vec[i] * scale, color="red", arrow_length_ratio=0.3)
             if N_vec is not None:
-                ax.quiver(*pos, *N_vec[i] * scale, color="green", arrow_length_ratio=0.3)
+                ax.quiver(
+                    *pos, *N_vec[i] * scale, color="green", arrow_length_ratio=0.3
+                )
             if B_vec is not None:
                 ax.quiver(*pos, *B_vec[i] * scale, color="blue", arrow_length_ratio=0.3)
 
@@ -457,10 +468,10 @@ def plot_pipkin_diagram(
     omega_values: np.ndarray,
     metric_values: np.ndarray,
     metric_name: str = "I_3/I_1",
-    ax: "Axes | None" = None,
+    ax: Axes | None = None,
     cmap: str = "viridis",
     **kwargs,
-) -> "Figure":
+) -> Figure:
     """
     Create Pipkin diagram (γ_0 vs ω map) colored by a nonlinearity metric.
 
@@ -497,7 +508,9 @@ def plot_pipkin_diagram(
     Omega, Gamma = np.meshgrid(omega_values, gamma_0_values)
 
     # Plot as heatmap
-    mesh = ax.pcolormesh(Omega, Gamma, metric_values, cmap=cmap, shading="auto", **kwargs)
+    mesh = ax.pcolormesh(
+        Omega, Gamma, metric_values, cmap=cmap, shading="auto", **kwargs
+    )
     cbar = fig.colorbar(mesh, ax=ax)
     cbar.set_label(metric_name, fontsize=12)
 
@@ -518,7 +531,7 @@ def create_spp_report(
     gamma_0: float,
     save_path: str | None = None,
     **kwargs,
-) -> "Figure":
+) -> Figure:
     """
     Create comprehensive SPP analysis report figure.
 
@@ -568,7 +581,9 @@ def create_spp_report(
     delta_t = np.asarray(spp_results["delta_t"])
 
     # Compute strain rate
-    strain_rate = gamma_0 * omega * np.cos(omega * np.linspace(0, 2 * np.pi / omega, len(strain)))
+    strain_rate = (
+        gamma_0 * omega * np.cos(omega * np.linspace(0, 2 * np.pi / omega, len(strain)))
+    )
     if "strain_rate_normalized" in spp_results:
         strain_rate = np.asarray(spp_results["strain_rate_normalized"]) * omega
 

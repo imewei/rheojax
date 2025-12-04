@@ -19,11 +19,6 @@ from rheojax.io.readers import (
     load_excel,
     load_trios,
 )
-from rheojax.io.writers import (
-    load_hdf5,
-    save_excel,
-    save_hdf5,
-)
 
 # SPP export functions
 from rheojax.io.spp_export import (
@@ -31,6 +26,11 @@ from rheojax.io.spp_export import (
     export_spp_hdf5,
     export_spp_txt,
     to_matlab_dict,
+)
+from rheojax.io.writers import (
+    load_hdf5,
+    save_excel,
+    save_hdf5,
 )
 
 __all__ = [

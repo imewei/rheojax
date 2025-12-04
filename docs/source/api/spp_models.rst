@@ -58,4 +58,3 @@ These JAX-first kernels are re-exported for completeness; see
 .. automodule:: rheojax.utils.spp_kernels
    :members:
    :undoc-members:
-

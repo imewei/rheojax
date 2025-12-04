@@ -13,7 +13,7 @@ Example:
 from __future__ import annotations
 
 import warnings
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -21,6 +21,9 @@ from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.pipeline.base import Pipeline
+
+if TYPE_CHECKING:
+    from rheojax.models.spp_yield_stress import SPPYieldStress
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -611,7 +614,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         self.wrap_strain_rate = wrap_strain_rate
         self.use_numerical_method = use_numerical_method
         self.results: dict[float, dict] = {}  # gamma_0 -> SPP results
-        self.model = None
+        self.model: SPPYieldStress | None = None
         self._gamma_0_values: list[float] = []
         self._sigma_sy_values: list[float] = []
         self._sigma_dy_values: list[float] = []
@@ -670,10 +673,11 @@ class SPPAmplitudeSweepPipeline(Pipeline):
                 step_size=self.step_size,
                 num_mode=self.num_mode,
                 wrap_strain_rate=self.wrap_strain_rate,
-                use_numerical_method=
+                use_numerical_method=(
                     self.use_numerical_method
                     if self.use_numerical_method is not None
-                    else False,
+                    else False
+                ),
             )
 
             try:
