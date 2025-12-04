@@ -7,7 +7,7 @@ Number of harmonics used:	39
 Number of cycles in input:	3
 
 Tangent(x)	Tangent(y)	Tangent(z)	Normal(x)	Normal(y)	Normal(z)	Binormal(x)	Binormal(y)	Binormal(z)
-[-]	[1/s]	[Pa]	[-]	[1/s]	[Pa]	[-]	[1/s]	[Pa]	
+[-]	[1/s]	[Pa]	[-]	[1/s]	[Pa]	[-]	[1/s]	[Pa]
 
 6.2831853	0.0000000	455.5309348	0.0000000	-1.0000000	-0.0000000	0.9999049	0.0000000	-0.0137918
 6.2829750	-0.0514036	455.4778426	0.0202985	-0.9997939	-0.0003928	0.9996988	0.0203020	-0.0137878

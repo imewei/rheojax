@@ -7,7 +7,7 @@ Step size for numerical diff.:	8
 Looped differentiation
 
 Tangent(x)	Tangent(y)	Tangent(z)	Normal(x)	Normal(y)	Normal(z)	Binormal(x)	Binormal(y)	Binormal(z)
-[-]	[1/s]	[Pa]	[-]	[1/s]	[Pa]	[-]	[1/s]	[Pa]	
+[-]	[1/s]	[Pa]	[-]	[1/s]	[Pa]	[-]	[1/s]	[Pa]
 
 9.0994213	-0.0000000	454.9710649	-0.0000000	-1.0000000	-0.0000000	0.9998001	-0.0000000	-0.0199960
 9.0898975	-0.7757834	454.4948731	-0.0000341	-0.9999985	-0.0017062	0.9998001	-0.0000000	-0.0199960
