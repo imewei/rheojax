@@ -8,13 +8,13 @@
 pytest>=9.0.0
 pytest-cov>=7.0.0
 pytest-xdist>=3.8.0
-hypothesis>=6.145.0
+hypothesis>=6.148.0
 
 # Code quality
 black>=25.11.0
-ruff>=0.14.5
-mypy>=1.18.2
-pre-commit>=4.3.0
+ruff>=0.14.8
+mypy>=1.19.0
+pre-commit>=4.5.0
 
 # Documentation
 sphinx>=8.2.0
@@ -22,7 +22,7 @@ sphinx-rtd-theme>=3.0.0
 sphinx-autodoc-typehints>=3.5.0
 
 # Development tools
-ipython>=9.6.0
+ipython>=9.8.0
 jupyter>=1.1.0
 
 # Optional dependencies for full development

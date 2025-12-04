@@ -1,5 +1,5 @@
-# Rheo Package Makefile
-# =====================
+# RheoJAX Package Makefile
+# ========================
 # GPU Acceleration Support and Development Tools
 
 .PHONY: help install install-dev install-jax-gpu gpu-check env-info \
@@ -11,8 +11,8 @@
 # Configuration
 PYTHON := python
 PYTEST := pytest
-PACKAGE_NAME := rheo
-SRC_DIR := rheo
+PACKAGE_NAME := rheojax
+SRC_DIR := rheojax
 TEST_DIR := tests
 DOCS_DIR := docs
 VENV := .venv

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rheojax"
-version = "0.4.0"
+version = "0.5.0"
 description = "Unified rheological analysis framework with JAX acceleration"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -54,15 +54,15 @@ requires-python = ">=3.12"
 # ============================================================================
 dependencies = [
     # Core scientific computing
-    "numpy>=2.0.0,<3.0.0",
+    "numpy>=2.3.0,<3.0.0",
     "scipy>=1.16.0,<2.0.0",
-    "pandas>=2.0.0,<3.0.0",
+    "pandas>=2.3.0,<3.0.0",
     "matplotlib>=3.10.0,<4.0.0",
 
     # GPU-accelerated optimization (CRITICAL: must be imported before JAX)
-    # NLSQ v0.2.1+ uses float32 by default with automatic precision fallback
+    # NLSQ v0.3.0+ uses float32 by default with automatic precision fallback
     # RheoJAX explicitly enables float64 via jax.config.update("jax_enable_x64", True)
-    "nlsq>=0.2.1",
+    "nlsq>=0.3.0",
 
     # JAX ecosystem (CPU-only - works on all platforms)
     # GPU users: see installation instructions above
@@ -74,9 +74,9 @@ dependencies = [
 
     # Bayesian visualization and diagnostics
     "arviz>=0.22.0,<1.0.0",
-    "arviz-base>=0.2.0",
-    "arviz-stats>=0.3.0",
-    "arviz-plots>=0.3.0",
+    "arviz-base>=0.7.0",
+    "arviz-stats>=0.7.0",
+    "arviz-plots>=0.7.0",
 ]
 
 [project.optional-dependencies]
@@ -88,12 +88,12 @@ dev = [
     "pytest>=9.0.0",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
-    "hypothesis>=6.145.0",
+    "hypothesis>=6.148.0",
     "black>=25.11.0",
-    "ruff>=0.14.5",
-    "mypy>=1.18.2",
-    "pre-commit>=4.3.0",
-    "ipython>=9.6.0",
+    "ruff>=0.14.8",
+    "mypy>=1.19.0",
+    "pre-commit>=4.5.0",
+    "ipython>=9.8.0",
     "jupyter>=1.1.0",
     "sphinx>=8.2.0",
     "sphinx-rtd-theme>=3.0.0",
@@ -164,6 +164,10 @@ markers = [
 
     # I/O tests
     "io: file I/O tests",
+
+    # Model-specific tests
+    "sgr: SGR (Soft Glassy Rheology) model tests",
+    "spp: SPP (Sequence of Physical Processes) model/transform tests",
 ]
 filterwarnings = [
     # Expected warnings from tests
@@ -253,7 +257,7 @@ ignore = [
 "rheojax/utils/mittag_leffler.py" = ["E402"]  # safe_import_jax() must precede JAX imports
 "rheojax/transforms/*.py" = ["E402"]  # safe_import_jax() may precede other imports
 "rheojax/utils/initialization/*.py" = ["E402"]  # initialization modules
-"examples/**/*.ipynb" = ["B", "E", "F", "W"]  # Example notebooks have looser style requirements
+"examples/**/*.ipynb" = ["B", "C", "E", "F", "W"]  # Example notebooks have looser style requirements
 "docs/source/conf.py" = ["F401"]  # Sphinx config checks imports for availability
 
 [tool.mypy]
