@@ -1517,7 +1517,7 @@ def numerical_derivative_periodic(
 def spp_numerical_analysis(
     strain: "Array",
     stress: "Array",
-    omega: float | Array,
+    omega: "float | Array",
     dt: float,
     step_size: int = 8,
     num_mode: int = 2,
