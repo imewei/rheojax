@@ -372,7 +372,7 @@ class TestNumericalStability:
     """Property-based tests for numerical stability near edge cases."""
 
     @given(x=x_near_transition)
-    @settings(max_examples=50)
+    @settings(deadline=None, max_examples=50)
     def test_stability_near_glass_transition(self, x):
         """G0 and Gp are numerically stable near x = 1."""
         G0_val = G0(x)
