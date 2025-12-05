@@ -26,49 +26,64 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# Model category display names and icons
+from rheojax.gui.utils.icons import IconProvider
+
+# Initialize icon provider (uses ASCII icons, safe on all platforms)
+_icon_provider = IconProvider(allow_emoji=False)
+
+# Model category display names and descriptions
+# Icons are provided by IconProvider to ensure platform safety
+# (emoji causes CoreText/ImageIO crashes on macOS)
 CATEGORY_INFO = {
     "classical": {
         "name": "Classical Models",
-        "icon": "🔵",
         "description": "Standard viscoelastic models (Maxwell, Zener, SpringPot)",
     },
     "fractional_maxwell": {
         "name": "Fractional Maxwell",
-        "icon": "🟣",
         "description": "Fractional Maxwell variants for gel and liquid behavior",
     },
     "fractional_zener": {
         "name": "Fractional Zener",
-        "icon": "🟠",
         "description": "Fractional Zener models for solid-liquid transitions",
     },
     "fractional_advanced": {
         "name": "Fractional Advanced",
-        "icon": "🔴",
         "description": "Complex fractional models (Burgers, Poynting-Thomson, Jeffreys)",
     },
     "flow": {
         "name": "Flow Models",
-        "icon": "🟢",
         "description": "Non-Newtonian flow models (Power Law, Carreau, Herschel-Bulkley)",
     },
     "multi_mode": {
         "name": "Multi-Mode",
-        "icon": "🟡",
         "description": "Generalized Maxwell with automatic mode selection",
     },
     "sgr": {
         "name": "Soft Glassy Rheology",
-        "icon": "⚫",
         "description": "SGR models for foams, emulsions, and colloidal suspensions",
     },
     "other": {
         "name": "Other Models",
-        "icon": "⚪",
         "description": "Additional rheological models",
     },
 }
+
+
+def get_category_icon(category: str) -> str:
+    """Get platform-safe icon for a category.
+
+    Parameters
+    ----------
+    category : str
+        Category name
+
+    Returns
+    -------
+    str
+        ASCII icon string (safe on all platforms including macOS)
+    """
+    return _icon_provider.get_category_icon(category)
 
 # Model display names
 MODEL_DISPLAY_NAMES = {
@@ -258,8 +273,9 @@ class ModelBrowser(QWidget):
 
             # Create category item
             cat_info = CATEGORY_INFO.get(category, CATEGORY_INFO["other"])
+            cat_icon = get_category_icon(category)
             cat_item = QTreeWidgetItem()
-            cat_item.setText(0, f"{cat_info['icon']} {cat_info['name']}")
+            cat_item.setText(0, f"{cat_icon} {cat_info['name']}")
             cat_item.setToolTip(0, cat_info["description"])
             cat_item.setData(0, Qt.ItemDataRole.UserRole, {"type": "category", "name": category})
             cat_item.setFlags(

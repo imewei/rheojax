@@ -60,7 +60,9 @@ class StatusBar(QStatusBar):
         self.addPermanentWidget(self.memory_label)
 
         # Float64 indicator
-        self.float64_label = QLabel("Float64: ✗")
+        # Note: Using ASCII characters to avoid potential CoreText/ImageIO
+        # crashes on macOS when rendering Unicode symbols in Qt widgets
+        self.float64_label = QLabel("Float64: [X]")
         self.float64_label.setStyleSheet("QLabel { padding: 0 10px; }")
         self.addPermanentWidget(self.float64_label)
 
@@ -126,12 +128,12 @@ class StatusBar(QStatusBar):
         # Update memory usage
         self.memory_label.setText(f"Memory: {int(memory_used)}/{int(memory_total)} MB")
 
-        # Update float64 indicator
+        # Update float64 indicator (ASCII to avoid macOS rendering issues)
         if float64_enabled:
-            self.float64_label.setText("Float64: ✓")
+            self.float64_label.setText("Float64: [OK]")
             self.float64_label.setStyleSheet("QLabel { padding: 0 10px; color: green; }")
         else:
-            self.float64_label.setText("Float64: ✗")
+            self.float64_label.setText("Float64: [X]")
             self.float64_label.setStyleSheet("QLabel { padding: 0 10px; color: orange; }")
 
     def update_memory(self, used_mb: float, total_mb: float) -> None:
@@ -164,9 +166,10 @@ class StatusBar(QStatusBar):
         enabled : bool
             Whether float64 is enabled
         """
+        # ASCII characters to avoid macOS CoreText rendering issues
         if enabled:
-            self.float64_label.setText("Float64: ✓")
+            self.float64_label.setText("Float64: [OK]")
             self.float64_label.setStyleSheet("QLabel { padding: 0 10px; color: green; }")
         else:
-            self.float64_label.setText("Float64: ✗")
+            self.float64_label.setText("Float64: [X]")
             self.float64_label.setStyleSheet("QLabel { padding: 0 10px; color: orange; }")

@@ -96,48 +96,58 @@ class ParameterTable(QTableWidget):
             Dictionary mapping parameter names to ParameterState objects
         """
         # Disconnect signal temporarily to avoid triggering during setup
-        self.itemChanged.disconnect(self._on_item_changed)
+        # Use try/finally to ensure signal is reconnected even if exception occurs
+        try:
+            self.itemChanged.disconnect(self._on_item_changed)
+        except (TypeError, RuntimeError):
+            # Signal may not be connected yet
+            pass
 
-        # Clear existing rows
-        self.setRowCount(0)
-        self._original_values.clear()
-        self._parameter_states = parameters.copy()
+        try:
+            # Clear existing rows
+            self.setRowCount(0)
+            self._original_values.clear()
+            self._parameter_states = parameters.copy()
 
-        # Add parameters
-        for row, (param_name, param_state) in enumerate(parameters.items()):
-            self.insertRow(row)
+            # Add parameters
+            for row, (param_name, param_state) in enumerate(parameters.items()):
+                self.insertRow(row)
 
-            # Column 0: Parameter name (read-only)
-            name_item = QTableWidgetItem(param_name)
-            name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
-            if param_state.description:
-                name_item.setToolTip(param_state.description)
-            self.setItem(row, 0, name_item)
+                # Column 0: Parameter name (read-only)
+                name_item = QTableWidgetItem(param_name)
+                name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                if param_state.description:
+                    name_item.setToolTip(param_state.description)
+                self.setItem(row, 0, name_item)
 
-            # Column 1: Value (editable)
-            value_item = QTableWidgetItem(f"{param_state.value:.6g}")
-            self.setItem(row, 1, value_item)
+                # Column 1: Value (editable)
+                value_item = QTableWidgetItem(f"{param_state.value:.6g}")
+                self.setItem(row, 1, value_item)
 
-            # Column 2: Min bound (editable)
-            min_item = QTableWidgetItem(f"{param_state.min_bound:.6g}")
-            self.setItem(row, 2, min_item)
+                # Column 2: Min bound (editable)
+                min_item = QTableWidgetItem(f"{param_state.min_bound:.6g}")
+                self.setItem(row, 2, min_item)
 
-            # Column 3: Max bound (editable)
-            max_item = QTableWidgetItem(f"{param_state.max_bound:.6g}")
-            self.setItem(row, 3, max_item)
+                # Column 3: Max bound (editable)
+                max_item = QTableWidgetItem(f"{param_state.max_bound:.6g}")
+                self.setItem(row, 3, max_item)
 
-            # Column 4: Fixed checkbox
-            checkbox_widget = self._create_checkbox_widget(param_state.fixed, param_name)
-            self.setCellWidget(row, 4, checkbox_widget)
+                # Column 4: Fixed checkbox
+                checkbox_widget = self._create_checkbox_widget(param_state.fixed, param_name)
+                self.setCellWidget(row, 4, checkbox_widget)
 
-            # Store original value
-            self._original_values[param_name] = param_state.value
+                # Store original value
+                self._original_values[param_name] = param_state.value
 
-            # Apply styling based on state
-            self._update_row_styling(row, param_state)
-
-        # Reconnect signal
-        self.itemChanged.connect(self._on_item_changed)
+                # Apply styling based on state
+                self._update_row_styling(row, param_state)
+        finally:
+            # Always reconnect signal, even if exception occurred
+            try:
+                self.itemChanged.connect(self._on_item_changed)
+            except (TypeError, RuntimeError):
+                # Signal may already be connected
+                pass
 
     def get_parameters(self) -> dict[str, ParameterState]:
         """Get current parameter values and states.
@@ -180,19 +190,26 @@ class ParameterTable(QTableWidget):
 
     def reset_to_defaults(self) -> None:
         """Reset all parameters to their original values."""
-        self.itemChanged.disconnect(self._on_item_changed)
+        try:
+            self.itemChanged.disconnect(self._on_item_changed)
+        except (TypeError, RuntimeError):
+            pass
 
-        for row in range(self.rowCount()):
-            param_name = self.item(row, 0).text()
-            if param_name in self._original_values:
-                original_value = self._original_values[param_name]
-                self.item(row, 1).setText(f"{original_value:.6g}")
+        try:
+            for row in range(self.rowCount()):
+                param_name = self.item(row, 0).text()
+                if param_name in self._original_values:
+                    original_value = self._original_values[param_name]
+                    self.item(row, 1).setText(f"{original_value:.6g}")
 
-                # Reset styling
-                if param_name in self._parameter_states:
-                    self._update_row_styling(row, self._parameter_states[param_name])
-
-        self.itemChanged.connect(self._on_item_changed)
+                    # Reset styling
+                    if param_name in self._parameter_states:
+                        self._update_row_styling(row, self._parameter_states[param_name])
+        finally:
+            try:
+                self.itemChanged.connect(self._on_item_changed)
+            except (TypeError, RuntimeError):
+                pass
 
     def _create_checkbox_widget(self, checked: bool, param_name: str) -> QWidget:
         """Create centered checkbox widget for Fixed column.

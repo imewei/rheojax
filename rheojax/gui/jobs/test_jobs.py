@@ -39,7 +39,7 @@ def test_cancellation_token():
     assert not token.is_cancelled(), "Token should be reset"
     assert token.get_error() is None, "Error should be cleared"
 
-    print("✓ CancellationToken tests passed")
+    print("[OK] CancellationToken tests passed")
 
 
 def test_cancellation_workflow():
@@ -67,7 +67,7 @@ def test_cancellation_workflow():
     except CancellationError:
         assert iterations == 11, f"Should have done 11 iterations, got {iterations}"
 
-    print(f"✓ Cancelled after {iterations} iterations")
+    print(f"[OK] Cancelled after {iterations} iterations")
 
 
 def test_error_handling():
@@ -90,7 +90,7 @@ def test_error_handling():
     token.reset()
     assert token.get_error() is None
 
-    print("✓ Error handling tests passed")
+    print("[OK] Error handling tests passed")
 
 
 def test_wait_timeout():
@@ -117,7 +117,7 @@ def test_wait_timeout():
     assert result, "Should return immediately when cancelled"
     assert elapsed < 0.1, f"Should return immediately, got {elapsed}"
 
-    print("✓ Wait timeout tests passed")
+    print("[OK] Wait timeout tests passed")
 
 
 def test_fit_result_structure():
@@ -144,7 +144,7 @@ def test_fit_result_structure():
     assert result.r_squared == 0.95
     assert result.success is True
 
-    print("✓ FitResult structure tests passed")
+    print("[OK] FitResult structure tests passed")
 
 
 def test_bayesian_result_structure():
@@ -187,7 +187,7 @@ def test_bayesian_result_structure():
     assert result.num_chains == 4
     assert result.diagnostics["divergences"] == 0
 
-    print("✓ BayesianResult structure tests passed")
+    print("[OK] BayesianResult structure tests passed")
 
 
 if __name__ == "__main__":
@@ -203,5 +203,5 @@ if __name__ == "__main__":
     test_bayesian_result_structure()
 
     print("\n" + "=" * 60)
-    print("All tests passed! ✓")
+    print("All tests passed! [OK]")
     print("=" * 60)
