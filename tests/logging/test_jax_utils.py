@@ -79,7 +79,10 @@ class TestLogArrayStats:
     def test_detects_inf(self):
         """Test that Inf is detected."""
         arr = np.array([1.0, np.inf, 3.0])
-        info = log_array_stats(arr, "test")
+        # Suppress warning from np.std when array contains inf
+        with np.testing.suppress_warnings() as sup:
+            sup.filter(RuntimeWarning, "invalid value encountered")
+            info = log_array_stats(arr, "test")
         assert info["test_has_inf"] is True
 
     def test_logs_immediately_if_logger_provided(self):
