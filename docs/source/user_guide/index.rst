@@ -178,6 +178,27 @@ to fitting problems.
 - Troubleshooting guide
 - Glossary of rheological terms
 
+Section 6: GUI Reference
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Graphical user interface for interactive analysis**
+
+Learn to use the optional RheoJAX GUI for visual data exploration, interactive
+model fitting, and Bayesian inference with ArviZ diagnostics.
+
+.. toctree::
+   :maxdepth: 2
+
+   06_gui/index
+
+**GUI Topics:**
+
+- Getting started with the GUI
+- Data loading and visualization
+- Interactive model fitting
+- Bayesian inference and diagnostics
+- Transforms and exporting
+
 Alternative Learning Paths
 ---------------------------
 
