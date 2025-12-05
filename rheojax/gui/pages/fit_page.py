@@ -20,9 +20,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from rheojax.gui.jobs.fit_worker import FitWorker
+from rheojax.gui.jobs.fit_worker import FitResult, FitWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
-from rheojax.gui.services.model_service import FitResult, ModelService
+from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.state.actions import (
     fitting_completed,
     fitting_failed,
@@ -337,30 +337,30 @@ class FitPage(QWidget):
         self._current_worker = FitWorker(
             model_name=model_name,
             data=dataset,
-            params=param_dict,
-            test_mode=test_mode,
-            model_service=self._model_service,
+            initial_params=param_dict,
         )
-        self._current_worker.progress.connect(self._on_fit_progress)
-        self._current_worker.finished.connect(self._on_fit_finished)
-        self._current_worker.error.connect(self._on_fit_error)
+        self._current_worker.signals.progress.connect(self._on_fit_progress)
+        self._current_worker.signals.completed.connect(self._on_fit_finished)
+        self._current_worker.signals.failed.connect(self._on_fit_error)
 
-        self._worker_pool.start(self._current_worker)
+        self._worker_pool.submit(self._current_worker)
         self.fit_requested.emit(model_name, dataset.id)
 
-    @Slot(int, str)
-    def _on_fit_progress(self, percent: int, message: str) -> None:
+    @Slot(int, float, str)
+    def _on_fit_progress(self, iteration: int, loss: float, message: str) -> None:
         """Handle fit progress update.
 
         Parameters
         ----------
-        percent : int
-            Progress percentage
+        iteration : int
+            Current optimization iteration
+        loss : float
+            Current loss value
         message : str
             Status message
         """
-        self._store.dispatch(update_fit_progress(percent))
-        self._results_text.setText(f"Fitting... {percent}%\n{message}")
+        self._store.dispatch(update_fit_progress(iteration))
+        self._results_text.setText(f"Fitting... Iteration {iteration}\nLoss: {loss:.6e}\n{message}")
 
     @Slot(object)
     def _on_fit_finished(self, result: FitResult) -> None:
@@ -369,7 +369,7 @@ class FitPage(QWidget):
         Parameters
         ----------
         result : FitResult
-            Fitting result
+            Fitting result from FitWorker
         """
         self._current_worker = None
 
@@ -385,26 +385,19 @@ class FitPage(QWidget):
 
             # Update results text
             chi_sq = result.chi_squared
-            text = f"Fit successful!\n\nChi-squared: {chi_sq:.4g}\n\nParameters:\n"
+            text = f"Fit successful!\n\nR²: {result.r_squared:.4f}\n"
+            text += f"Chi-squared: {chi_sq:.4g}\n"
+            text += f"MPE: {result.mpe:.2f}%\n"
+            text += f"Time: {result.fit_time:.2f}s\n\nParameters:\n"
             for name, value in result.parameters.items():
                 text += f"  {name}: {value:.4g}\n"
             self._results_text.setText(text)
 
-            # Plot fit
-            self._plot_fit(result)
-
-            # Update residuals
-            dataset = self._store.get_active_dataset()
-            if dataset is not None:
-                y_true = np.asarray(dataset.y)
-                self._residuals_panel.plot_residuals(
-                    y_true, result.y_fit, result.x_fit
-                )
-
             self.fit_completed.emit(result)
         else:
-            self._store.dispatch(fitting_failed(result.message))
-            self._results_text.setText(f"Fit failed:\n{result.message}")
+            error_msg = f"Fit did not converge (iterations: {result.n_iterations})"
+            self._store.dispatch(fitting_failed(error_msg))
+            self._results_text.setText(f"Fit failed:\n{error_msg}")
 
     @Slot(str)
     def _on_fit_error(self, error_msg: str) -> None:

@@ -260,8 +260,13 @@ class BayesianPage(QWidget):
         diag_layout = QVBoxLayout()
         self._rhat_label = QLabel("R-hat: --")
         self._ess_label = QLabel("ESS: --")
-        self._rhat_label.setStyleSheet("font-family: monospace;")
-        self._ess_label.setStyleSheet("font-family: monospace;")
+        # Use specific monospace fonts with fallbacks to avoid Qt font lookup warning
+        self._rhat_label.setStyleSheet(
+            'font-family: "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;'
+        )
+        self._ess_label.setStyleSheet(
+            'font-family: "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;'
+        )
         diag_layout.addWidget(self._rhat_label)
         diag_layout.addWidget(self._ess_label)
         layout.addLayout(diag_layout)
@@ -495,7 +500,10 @@ class BayesianPage(QWidget):
             status = "OK" if max_rhat < 1.01 else "WARNING"
             color = "green" if max_rhat < 1.01 else "orange"
             self._rhat_label.setText(f"R-hat (max): {max_rhat:.4f} [{status}]")
-            self._rhat_label.setStyleSheet(f"color: {color}; font-family: monospace;")
+            self._rhat_label.setStyleSheet(
+                f'color: {color}; font-family: "SF Mono", "Menlo", "Consolas", '
+                '"DejaVu Sans Mono", monospace;'
+            )
         else:
             self._rhat_label.setText("R-hat: --")
 
@@ -506,7 +514,10 @@ class BayesianPage(QWidget):
             status = "OK" if min_ess > 400 else "LOW"
             color = "green" if min_ess > 400 else "orange"
             self._ess_label.setText(f"ESS (min): {min_ess:.0f} [{status}]")
-            self._ess_label.setStyleSheet(f"color: {color}; font-family: monospace;")
+            self._ess_label.setStyleSheet(
+                f'color: {color}; font-family: "SF Mono", "Menlo", "Consolas", '
+                '"DejaVu Sans Mono", monospace;'
+            )
         else:
             self._ess_label.setText("ESS: --")
 

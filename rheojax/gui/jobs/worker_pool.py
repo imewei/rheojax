@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 class WorkerPool(QObject):
     """Manages background workers using QThreadPool.
 
+    This is a singleton class - all pages share the same WorkerPool instance
+    to avoid resource duplication and ensure consistent job tracking.
+
     Features:
         - PySide6 QThreadPool-based execution
         - Job tracking with unique IDs
@@ -44,6 +47,7 @@ class WorkerPool(QObject):
         - Cancellation support
         - Error handling and recovery
         - Automatic cleanup
+        - Singleton pattern for resource efficiency
 
     Signals:
         job_started(str): Emitted when a job starts (job_id)
@@ -54,11 +58,15 @@ class WorkerPool(QObject):
 
     Example
     -------
-    >>> pool = WorkerPool(max_threads=4)  # doctest: +SKIP
+    >>> pool = WorkerPool.instance()  # doctest: +SKIP
     >>> worker = FitWorker(...)  # doctest: +SKIP
     >>> job_id = pool.submit(worker)  # doctest: +SKIP
     >>> pool.cancel(job_id)  # doctest: +SKIP
     """
+
+    # Singleton instance
+    _instance: "WorkerPool | None" = None
+    _initialized: bool = False
 
     # Signals
     job_started = Signal(str)  # job_id
@@ -66,6 +74,38 @@ class WorkerPool(QObject):
     job_completed = Signal(str, object)  # job_id, result
     job_failed = Signal(str, str)  # job_id, error_message
     job_cancelled = Signal(str)  # job_id
+
+    def __new__(cls, max_threads: int = 4) -> "WorkerPool":
+        """Create or return singleton instance."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    @classmethod
+    def instance(cls, max_threads: int = 4) -> "WorkerPool":
+        """Get the singleton WorkerPool instance.
+
+        Parameters
+        ----------
+        max_threads : int, default=4
+            Maximum number of concurrent worker threads (only used on first call)
+
+        Returns
+        -------
+        WorkerPool
+            The singleton WorkerPool instance
+        """
+        if cls._instance is None:
+            cls._instance = cls(max_threads)
+        return cls._instance
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset the singleton instance (useful for testing)."""
+        if cls._instance is not None:
+            cls._instance.shutdown(wait=False)
+        cls._instance = None
+        cls._initialized = False
 
     def __init__(self, max_threads: int = 4):
         """Initialize worker pool.
@@ -75,6 +115,10 @@ class WorkerPool(QObject):
         max_threads : int, default=4
             Maximum number of concurrent worker threads
         """
+        # Skip re-initialization for singleton
+        if WorkerPool._initialized:
+            return
+
         if not HAS_PYSIDE6:
             raise ImportError(
                 "PySide6 is required for WorkerPool. "
@@ -87,6 +131,7 @@ class WorkerPool(QObject):
         self._active_jobs: dict[str, CancellationToken] = {}
         self._job_lock = Lock()
 
+        WorkerPool._initialized = True
         logger.info(f"WorkerPool initialized with {max_threads} threads")
 
     def submit(self, worker: QRunnable) -> str:
@@ -126,22 +171,25 @@ class WorkerPool(QObject):
             worker.job_id = job_id  # type: ignore[attr-defined]
 
             # Connect completion/failure/cancellation signals
+            # IMPORTANT: Use default arguments to capture job_id by value, not by reference.
+            # Without this, rapid job submissions could cause the wrong job_id to be used
+            # when the signal is emitted (closure would capture the last job_id value).
             if hasattr(worker.signals, 'completed'):
                 worker.signals.completed.connect(
-                    lambda result: self._on_job_completed(job_id, result)
+                    lambda result, jid=job_id: self._on_job_completed(jid, result)
                 )
             if hasattr(worker.signals, 'failed'):
                 worker.signals.failed.connect(
-                    lambda error: self._on_job_failed(job_id, error)
+                    lambda error, jid=job_id: self._on_job_failed(jid, error)
                 )
             if hasattr(worker.signals, 'cancelled'):
                 worker.signals.cancelled.connect(
-                    lambda: self._on_job_cancelled(job_id)
+                    lambda jid=job_id: self._on_job_cancelled(jid)
                 )
             if hasattr(worker.signals, 'progress'):
                 worker.signals.progress.connect(
-                    lambda current, total, msg: self._on_job_progress(
-                        job_id, current, total, msg
+                    lambda current, total, msg, jid=job_id: self._on_job_progress(
+                        jid, current, total, msg
                     )
                 )
 

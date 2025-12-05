@@ -2,6 +2,12 @@
 
 This module implements a singleton state store with immutable state updates
 and signal-based reactivity for the Qt GUI.
+
+Thread Safety
+-------------
+The StateStore uses a threading.RLock to ensure thread-safe access when
+background workers update state from worker threads. All public methods
+that read or modify state are protected by the lock.
 """
 
 import copy
@@ -10,6 +16,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
+from threading import RLock
 from typing import Any, Optional
 
 
@@ -214,6 +221,12 @@ class StateStore:
     This store implements immutable state updates with signals for reactive UI.
     All state modifications go through update_state() which creates a new state
     object and notifies subscribers.
+
+    Thread Safety
+    -------------
+    All public methods are protected by an RLock to ensure safe access from
+    background worker threads. The lock is reentrant to allow nested calls
+    (e.g., a subscriber callback that reads state during an update).
     """
 
     _instance: Optional["StateStore"] = None
@@ -225,6 +238,7 @@ class StateStore:
     _undo_stack: list[AppState]
     _redo_stack: list[AppState]
     _max_undo_size: int
+    _lock: RLock
 
     def __new__(cls) -> "StateStore":
         if cls._instance is None:
@@ -235,6 +249,7 @@ class StateStore:
             cls._instance._undo_stack = []
             cls._instance._redo_stack = []
             cls._instance._max_undo_size = 50
+            cls._instance._lock = RLock()  # Thread safety lock
         return cls._instance
 
     @classmethod
@@ -243,8 +258,12 @@ class StateStore:
         cls._instance = None
 
     def get_state(self) -> AppState:
-        """Get the current application state (read-only)."""
-        return self._state
+        """Get the current application state (read-only).
+
+        Thread-safe: Protected by RLock.
+        """
+        with self._lock:
+            return self._state
 
     def set_signals(self, signals: Any) -> None:
         """Set the Qt signals object for state change notifications.
@@ -336,6 +355,8 @@ class StateStore:
     ) -> None:
         """Update state immutably with undo tracking.
 
+        Thread-safe: Protected by RLock.
+
         Parameters
         ----------
         updater : Callable
@@ -345,14 +366,18 @@ class StateStore:
         emit_signal : bool
             Whether to emit state_changed signal
         """
-        if track_undo and len(self._undo_stack) < self._max_undo_size:
-            self._undo_stack.append(self._state.clone())
-            self._redo_stack.clear()  # Clear redo on new action
+        with self._lock:
+            if track_undo and len(self._undo_stack) < self._max_undo_size:
+                self._undo_stack.append(self._state.clone())
+                self._redo_stack.clear()  # Clear redo on new action
 
-        self._state = updater(self._state)
+            self._state = updater(self._state)
 
-        # Notify subscribers
-        for subscriber in self._subscribers:
+            # Copy subscribers list to avoid modification during iteration
+            subscribers = list(self._subscribers)
+
+        # Notify subscribers outside the lock to prevent deadlocks
+        for subscriber in subscribers:
             subscriber(self._state)
 
         # Emit Qt signal if available
@@ -362,44 +387,56 @@ class StateStore:
     def subscribe(self, callback: Callable[[AppState], None]) -> None:
         """Subscribe to state changes.
 
+        Thread-safe: Protected by RLock.
+
         Parameters
         ----------
         callback : Callable
             Function called with new state on every update
         """
-        if callback not in self._subscribers:
-            self._subscribers.append(callback)
+        with self._lock:
+            if callback not in self._subscribers:
+                self._subscribers.append(callback)
 
     def unsubscribe(self, callback: Callable[[AppState], None]) -> None:
         """Unsubscribe from state changes.
+
+        Thread-safe: Protected by RLock.
 
         Parameters
         ----------
         callback : Callable
             Previously subscribed callback
         """
-        if callback in self._subscribers:
-            self._subscribers.remove(callback)
+        with self._lock:
+            if callback in self._subscribers:
+                self._subscribers.remove(callback)
 
     def undo(self) -> bool:
         """Undo the last state change.
+
+        Thread-safe: Protected by RLock.
 
         Returns
         -------
         bool
             True if undo was successful, False if nothing to undo
         """
-        if not self._undo_stack:
-            return False
+        with self._lock:
+            if not self._undo_stack:
+                return False
 
-        # Push current state to redo
-        self._redo_stack.append(self._state.clone())
+            # Push current state to redo
+            self._redo_stack.append(self._state.clone())
 
-        # Restore previous state
-        self._state = self._undo_stack.pop()
+            # Restore previous state
+            self._state = self._undo_stack.pop()
 
-        # Notify subscribers
-        for subscriber in self._subscribers:
+            # Copy subscribers list
+            subscribers = list(self._subscribers)
+
+        # Notify subscribers outside the lock
+        for subscriber in subscribers:
             subscriber(self._state)
 
         if self._signals is not None:
@@ -410,22 +447,28 @@ class StateStore:
     def redo(self) -> bool:
         """Redo the last undone state change.
 
+        Thread-safe: Protected by RLock.
+
         Returns
         -------
         bool
             True if redo was successful, False if nothing to redo
         """
-        if not self._redo_stack:
-            return False
+        with self._lock:
+            if not self._redo_stack:
+                return False
 
-        # Push current state to undo
-        self._undo_stack.append(self._state.clone())
+            # Push current state to undo
+            self._undo_stack.append(self._state.clone())
 
-        # Restore next state
-        self._state = self._redo_stack.pop()
+            # Restore next state
+            self._state = self._redo_stack.pop()
 
-        # Notify subscribers
-        for subscriber in self._subscribers:
+            # Copy subscribers list
+            subscribers = list(self._subscribers)
+
+        # Notify subscribers outside the lock
+        for subscriber in subscribers:
             subscriber(self._state)
 
         if self._signals is not None:
@@ -434,22 +477,27 @@ class StateStore:
         return True
 
     def can_undo(self) -> bool:
-        """Check if undo is available."""
-        return bool(self._undo_stack)
+        """Check if undo is available. Thread-safe."""
+        with self._lock:
+            return bool(self._undo_stack)
 
     def can_redo(self) -> bool:
-        """Check if redo is available."""
-        return bool(self._redo_stack)
+        """Check if redo is available. Thread-safe."""
+        with self._lock:
+            return bool(self._redo_stack)
 
     def clear_history(self) -> None:
-        """Clear undo/redo history."""
-        self._undo_stack.clear()
-        self._redo_stack.clear()
+        """Clear undo/redo history. Thread-safe."""
+        with self._lock:
+            self._undo_stack.clear()
+            self._redo_stack.clear()
 
     def batch_update(
         self, updaters: list[Callable[[AppState], AppState]], track_undo: bool = True
     ) -> None:
         """Apply multiple state updates in a single transaction.
+
+        Thread-safe: Protected by RLock.
 
         This is more efficient than multiple update_state() calls as it only
         emits one signal at the end.
@@ -461,16 +509,20 @@ class StateStore:
         track_undo : bool
             Whether to track this batch as one undo action
         """
-        if track_undo and len(self._undo_stack) < self._max_undo_size:
-            self._undo_stack.append(self._state.clone())
-            self._redo_stack.clear()
+        with self._lock:
+            if track_undo and len(self._undo_stack) < self._max_undo_size:
+                self._undo_stack.append(self._state.clone())
+                self._redo_stack.clear()
 
-        # Apply all updates
-        for updater in updaters:
-            self._state = updater(self._state)
+            # Apply all updates
+            for updater in updaters:
+                self._state = updater(self._state)
 
-        # Single notification at the end
-        for subscriber in self._subscribers:
+            # Copy subscribers list
+            subscribers = list(self._subscribers)
+
+        # Notify subscribers outside the lock
+        for subscriber in subscribers:
             subscriber(self._state)
 
         if self._signals is not None:
