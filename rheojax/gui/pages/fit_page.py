@@ -198,17 +198,24 @@ class FitPage(QWidget):
         model_info = self._model_service.get_model_info(model_name)
         params = model_info.get("parameters", {})
 
-        # Convert to list format for parameter table
-        param_list = []
-        for name, details in params.items():
-            param_list.append({
-                "name": name,
-                "value": details.get("default", 1.0),
-                "bounds": details.get("bounds", (0.0, float("inf"))),
-                "units": details.get("units", ""),
-            })
+        # Import ParameterState for table format
+        from rheojax.gui.state.store import ParameterState
 
-        self._parameter_table.set_parameters(param_list)
+        # Convert to dict[str, ParameterState] format for parameter table
+        param_states: dict[str, ParameterState] = {}
+        for name, details in params.items():
+            bounds = details.get("bounds", (0.0, float("inf")))
+            param_states[name] = ParameterState(
+                name=name,
+                value=details.get("default", 1.0),
+                min_bound=bounds[0] if bounds[0] is not None else 0.0,
+                max_bound=bounds[1] if bounds[1] is not None else float("inf"),
+                fixed=False,
+                unit=details.get("units", ""),
+                description=details.get("description", ""),
+            )
+
+        self._parameter_table.set_parameters(param_states)
 
         # Check compatibility with active dataset
         self._check_compatibility(model_name)
@@ -377,11 +384,20 @@ class FitPage(QWidget):
             self._store.dispatch(fitting_completed(result))
 
             # Update parameter table with fitted values
-            params = [
-                {"name": name, "value": value, "bounds": (0, float("inf")), "units": ""}
-                for name, value in result.parameters.items()
-            ]
-            self._parameter_table.set_parameters(params)
+            from rheojax.gui.state.store import ParameterState
+
+            param_states: dict[str, ParameterState] = {}
+            for name, value in result.parameters.items():
+                param_states[name] = ParameterState(
+                    name=name,
+                    value=value,
+                    min_bound=0.0,
+                    max_bound=float("inf"),
+                    fixed=False,
+                    unit="",
+                    description="",
+                )
+            self._parameter_table.set_parameters(param_states)
 
             # Update results text
             chi_sq = result.chi_squared

@@ -78,7 +78,7 @@ class BayesianService:
             Format: {'param_name': {'dist': 'uniform', 'args': [lower, upper]}}
         """
         try:
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             priors = {}
             for param_name, param in model.parameters.items():
@@ -138,7 +138,7 @@ class BayesianService:
         """
         try:
             # Create model instance
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             # Set initial values if provided
             if warm_start:
@@ -400,7 +400,7 @@ class BayesianService:
         warnings = []
 
         try:
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             for param_name in model.parameters:
                 if param_name not in priors:

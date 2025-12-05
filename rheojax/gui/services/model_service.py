@@ -178,7 +178,7 @@ class ModelService:
         """
         try:
             # Create model instance
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             # Get parameter info
             params_info = {}
@@ -244,7 +244,7 @@ class ModelService:
         """
         try:
             # Create model instance
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             # Extract x, y
             x = np.asarray(data.x)
@@ -309,7 +309,7 @@ class ModelService:
         """
         try:
             # Create model instance
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             # Check if model has smart initialization
             if hasattr(model, "smart_initial_guess"):
@@ -331,7 +331,7 @@ class ModelService:
             logger.warning(f"Smart initialization failed, using defaults: {e}")
             # Return default values on failure
             try:
-                model = self._registry.create(model_name, plugin_type="model")
+                model = self._registry.create_instance(model_name, plugin_type="model")
                 return {name: param.value for name, param in model.parameters.items()}
             except Exception:
                 return {}
@@ -369,7 +369,7 @@ class ModelService:
         """
         try:
             # Create model instance
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             # Set initial parameter values if provided
             if params:
@@ -481,7 +481,7 @@ class ModelService:
         """
         try:
             # Create model instance
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             # Set parameters
             for name, value in parameters.items():
@@ -512,7 +512,7 @@ class ModelService:
             LaTeX equation string
         """
         try:
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
             if hasattr(model, "equation"):
                 return model.equation
             return "Equation not available"
@@ -539,7 +539,7 @@ class ModelService:
         warnings = []
 
         try:
-            model = self._registry.create(model_name, plugin_type="model")
+            model = self._registry.create_instance(model_name, plugin_type="model")
 
             for name, value in parameters.items():
                 if name not in model.parameters:
