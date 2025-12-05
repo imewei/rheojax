@@ -107,15 +107,25 @@ io = [
     "openpyxl>=3.1.0",
     "xlrd>=2.0.0",
 ]
+gui = [
+    "PySide6>=6.6.0",
+    "matplotlib>=3.8.0",
+    "qasync>=0.27.0",
+]
+gui-dev = [
+    "pytest-qt>=4.2.0",
+    "pytest-image-diff>=0.0.11",
+]
 # NOTE: No gpu extra - GPU installation must be done manually to avoid conflicts.
 # See GPU ACCELERATION section above for installation instructions.
 # Use: make install-jax-gpu (from repository) or manual pip commands.
 all = [
-    "rheojax[core,dev,ml,io]",
+    "rheojax[core,dev,ml,io,gui,gui-dev]",
 ]
 
 [project.scripts]
 rheojax = "rheojax.cli.main:main"
+rheojax-gui = "rheojax.gui.main:main"
 
 [project.urls]
 "Homepage" = "https://github.com/imewei/rheojax"
