@@ -286,18 +286,29 @@ class StateStore:
         """
         return self._signals
 
-    def dispatch(self, action: Any) -> None:
+    def dispatch(self, action: Any, payload: Any | None = None) -> None:
         """Dispatch an action to update state.
 
-        This is a convenience method for Redux-style action dispatching.
-        Actions can be dicts with a 'type' key, or any other value.
+        Supports two call patterns:
+        - dispatch({"type": "SET_THEME", "theme": "dark"})
+        - dispatch("SET_THEME", {"theme": "dark"})
 
         Parameters
         ----------
         action : Any
             Action to dispatch. If dict with 'type' key, processes as action.
-            Otherwise, treated as a simple state notification.
+            If str, combined with payload into an action dict.
+        payload : Any, optional
+            Optional payload when using string-based dispatch.
         """
+        if isinstance(action, str):
+            if isinstance(payload, dict):
+                action = {"type": action, **payload}
+            elif payload is None:
+                action = {"type": action}
+            else:
+                action = {"type": action, "payload": payload}
+
         if isinstance(action, dict) and "type" in action:
             action_type = action["type"]
 
