@@ -46,6 +46,11 @@ def load_stylesheet(theme: Literal["light", "dark"] = "light") -> str:
     return qss
 
 
+def available_plot_styles() -> list[str]:
+    """Return the list of bundled matplotlib style names."""
+    return [p.stem for p in PLOT_STYLES_DIR.glob("*.mplstyle")]
+
+
 def load_plot_style(name: str = "default") -> str:
     """Load a matplotlib style file bundled with the GUI.
 
@@ -65,7 +70,11 @@ def load_plot_style(name: str = "default") -> str:
     style_file = PLOT_STYLES_DIR / f"{name}.mplstyle"
     if not style_file.exists():
         style_file = PLOT_STYLES_DIR / "default.mplstyle"
-    return style_file.read_text(encoding="utf-8")
+    try:
+        return style_file.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        # Graceful fallback: empty style string so callers can continue
+        return ""
 
 
 def get_icon_path(name: str) -> Path:

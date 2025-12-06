@@ -125,6 +125,9 @@ class QuickFitStrip(QToolBar):
     fit_clicked = Signal()
     plot_clicked = Signal()
     export_clicked = Signal()
+    save_clicked = Signal()
+    model_changed = Signal(str)
+    mode_changed = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize quick fit strip.
@@ -155,6 +158,7 @@ class QuickFitStrip(QToolBar):
         self.mode_combo.addItems(["oscillation", "relaxation", "creep", "rotation"])
         self.mode_combo.setToolTip("Select test mode")
         self.mode_combo.setMinimumWidth(120)
+        self.mode_combo.currentTextChanged.connect(self.mode_changed)
         self.addWidget(self.mode_combo)
 
         # Arrow
@@ -163,9 +167,13 @@ class QuickFitStrip(QToolBar):
         # Model dropdown
         self.addWidget(QLabel("Model:"))
         self.model_combo = QComboBox(self)
+        self.model_combo.setEditable(True)
+        self.model_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.model_combo.lineEdit().setPlaceholderText("Search models...")
         self._populate_models()
         self.model_combo.setToolTip("Select rheological model")
         self.model_combo.setMinimumWidth(180)
+        self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         self.addWidget(self.model_combo)
 
         # Arrow
@@ -198,6 +206,21 @@ class QuickFitStrip(QToolBar):
         self.export_button.setToolTip("Export results")
         self.export_button.clicked.connect(self.export_clicked.emit)
         self.addWidget(self.export_button)
+
+        # Arrow
+        self.addWidget(self._create_arrow_label())
+
+        # Save button
+        self.save_button = QToolButton(self)
+        self.save_button.setText("Save")
+        self.save_button.setToolTip("Save project/results")
+        self.save_button.clicked.connect(self.save_clicked.emit)
+        self.addWidget(self.save_button)
+
+        # Status label
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: #666; margin-left: 8px;")
+        self.addWidget(self.status_label)
 
     def _create_arrow_label(self) -> QLabel:
         """Create arrow label for visual flow.
@@ -262,6 +285,10 @@ class QuickFitStrip(QToolBar):
                 item = model.item(i)
                 if item:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable & ~Qt.ItemFlag.ItemIsEnabled)
+        # Refresh completer to include visible text
+        if self.model_combo.completer():
+            self.model_combo.completer().setFilterMode(Qt.MatchFlag.MatchContains)
+            self.model_combo.completer().setCaseSensitivity(Qt.CaseInsensitive)
 
     def get_mode(self) -> str:
         """Get selected test mode.
@@ -293,7 +320,9 @@ class QuickFitStrip(QToolBar):
         """
         index = self.mode_combo.findText(mode)
         if index >= 0:
+            was_blocked = self.mode_combo.blockSignals(True)
             self.mode_combo.setCurrentIndex(index)
+            self.mode_combo.blockSignals(was_blocked)
 
     def set_model(self, model_id: str) -> None:
         """Set model by identifier.
@@ -305,5 +334,30 @@ class QuickFitStrip(QToolBar):
         """
         for i in range(self.model_combo.count()):
             if self.model_combo.itemData(i) == model_id:
+                was_blocked = self.model_combo.blockSignals(True)
                 self.model_combo.setCurrentIndex(i)
+                self.model_combo.blockSignals(was_blocked)
                 break
+
+    def set_busy(self, busy: bool) -> None:
+        """Toggle busy state during background work."""
+        self.fit_button.setEnabled(not busy)
+        self.plot_button.setEnabled(not busy)
+        self.export_button.setEnabled(not busy)
+        self.save_button.setEnabled(not busy)
+        self.mode_combo.setEnabled(not busy)
+        self.model_combo.setEnabled(not busy)
+        if busy:
+            self.set_status("Working...")
+        else:
+            self.set_status("")
+
+    def set_status(self, message: str) -> None:
+        """Display a short status message on the strip."""
+        self.status_label.setText(message)
+
+    def _on_model_changed(self, index: int) -> None:
+        """Emit model_changed when a real model is selected."""
+        model_id = self.model_combo.itemData(index)
+        if model_id:
+            self.model_changed.emit(model_id)

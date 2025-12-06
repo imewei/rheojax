@@ -7,14 +7,19 @@ Service for generating rheological plots with matplotlib.
 
 from __future__ import annotations
 
+import io
 import logging
+import os
+import tempfile
 from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import rc_params_from_file
 from matplotlib.figure import Figure
 
 from rheojax.core.data import RheoData
+from rheojax.gui.resources import available_plot_styles, load_plot_style
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +47,9 @@ class PlotService:
             "default": self._apply_default_style,
             "publication": self._apply_publication_style,
             "presentation": self._apply_presentation_style,
+            "dark": self._apply_dark_style,
         }
+        self._style_cache = {name: load_plot_style(name) for name in available_plot_styles()}
 
         # Wong colorblind-safe palette
         self._colorblind_palette = [
@@ -54,6 +61,15 @@ class PlotService:
             "#D55E00",  # Vermillion
             "#CC79A7",  # Reddish Purple
         ]
+        self._dark_palette = [
+            "#8ab4f8",  # light blue
+            "#f28b82",  # salmon
+            "#81c995",  # green
+            "#fdd663",  # yellow
+            "#a78bfa",  # purple
+            "#ffb2f2",  # pink
+            "#5ad1fa",  # cyan
+        ]
 
     def get_available_styles(self) -> list[str]:
         """Get available plot styles.
@@ -63,7 +79,7 @@ class PlotService:
         list[str]
             Style names
         """
-        return list(self._styles.keys())
+        return sorted(set(self._styles.keys()) | set(self._style_cache.keys()))
 
     def get_colorblind_palette(self) -> list[str]:
         """Get Wong colorblind-safe palette.
@@ -74,6 +90,10 @@ class PlotService:
             Hex color codes
         """
         return self._colorblind_palette.copy()
+
+    def get_dark_palette(self) -> list[str]:
+        """Get dark-theme-friendly palette."""
+        return self._dark_palette.copy()
 
     def apply_style(self, fig: Figure, style: str) -> None:
         """Apply matplotlib style to figure.
@@ -137,6 +157,19 @@ class PlotService:
             # Grid
             ax.grid(True, alpha=0.4)
 
+    def _apply_dark_style(self, fig: Figure) -> None:
+        """Apply dark-theme adjustments after RC params."""
+        for ax in fig.get_axes():
+            ax.tick_params(colors="#e8eaed")
+            ax.xaxis.label.set_color("#e8eaed")
+            ax.yaxis.label.set_color("#e8eaed")
+            ax.title.set_color("#e8eaed")
+            ax.grid(True, color="#3c4043", alpha=0.6, linestyle="--", linewidth=0.8)
+            for line, color in zip(ax.get_lines(), self._dark_palette):
+                line.set_color(color)
+            for spine in ax.spines.values():
+                spine.set_color("#e8eaed")
+
     def create_fit_plot(
         self,
         data: RheoData,
@@ -162,7 +195,9 @@ class PlotService:
         Figure
             Matplotlib figure
         """
+        self._apply_style_context(style)
         fig, ax = plt.subplots(figsize=(8, 6))
+        palette = self._get_palette(style) if (style or "").lower() == "dark" else None
 
         x = np.asarray(data.x)
         y = np.asarray(data.y)
@@ -181,35 +216,35 @@ class PlotService:
                 G_prime_fit = np.real(y_fit)
                 G_double_prime_fit = np.imag(y_fit)
 
-                ax.loglog(x, G_prime, "o", label="G' (data)", color=self._colorblind_palette[0])
-                ax.loglog(x, G_double_prime, "s", label='G" (data)', color=self._colorblind_palette[1])
-                ax.loglog(x, G_prime_fit, "-", label="G' (fit)", color=self._colorblind_palette[0])
-                ax.loglog(x, G_double_prime_fit, "-", label='G" (fit)', color=self._colorblind_palette[1])
+                ax.loglog(x, G_prime, "o", label="G' (data)", color=palette[0] if palette else None)
+                ax.loglog(x, G_double_prime, "s", label='G" (data)', color=palette[1] if palette else None)
+                ax.loglog(x, G_prime_fit, "-", label="G' (fit)", color=palette[0] if palette else None)
+                ax.loglog(x, G_double_prime_fit, "-", label='G" (fit)', color=palette[1] if palette else None)
 
                 ax.set_xlabel("Frequency (rad/s)")
                 ax.set_ylabel("Modulus (Pa)")
             else:
                 # Complex modulus magnitude
-                ax.loglog(x, y, "o", label="Data")
-                ax.loglog(x, y_fit, "-", label="Fit")
+                ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
+                ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
                 ax.set_xlabel("Frequency (rad/s)")
                 ax.set_ylabel("|G*| (Pa)")
 
         elif test_mode == "relaxation":
-            ax.loglog(x, y, "o", label="Data")
-            ax.loglog(x, y_fit, "-", label="Fit")
+            ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
+            ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Relaxation Modulus G(t) (Pa)")
 
         elif test_mode == "creep":
-            ax.loglog(x, y, "o", label="Data")
-            ax.loglog(x, y_fit, "-", label="Fit")
+            ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
+            ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Creep Compliance J(t) (1/Pa)")
 
         elif test_mode == "flow":
-            ax.loglog(x, y, "o", label="Data")
-            ax.loglog(x, y_fit, "-", label="Fit")
+            ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
+            ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
             ax.set_xlabel("Shear Rate (1/s)")
             ax.set_ylabel("Viscosity (Pa·s)")
 
@@ -225,6 +260,7 @@ class PlotService:
         self,
         data: RheoData,
         fit_result: Any,
+        style: str = "default",
     ) -> Figure:
         """Create residual plot.
 
@@ -240,19 +276,21 @@ class PlotService:
         Figure
             Matplotlib figure
         """
+        self._apply_style_context(style)
+        palette = self._get_palette(style)
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
 
         x = np.asarray(data.x)
         residuals = fit_result.residuals
 
         # Residuals vs x
-        ax1.semilogx(x, residuals, "o", color=self._colorblind_palette[0])
+        ax1.semilogx(x, residuals, "o", color=palette[0])
         ax1.axhline(0, color="k", linestyle="--", alpha=0.5)
         ax1.set_ylabel("Residuals")
         ax1.set_title("Residual Analysis")
 
         # Residual histogram
-        ax2.hist(residuals, bins=30, color=self._colorblind_palette[1], alpha=0.7, edgecolor="black")
+        ax2.hist(residuals, bins=30, color=palette[1], alpha=0.7, edgecolor="black")
         ax2.set_xlabel("Residual Value")
         ax2.set_ylabel("Frequency")
         ax2.set_title("Residual Distribution")
@@ -264,6 +302,7 @@ class PlotService:
         self,
         result: Any,
         plot_type: str,
+        style: str = "default",
         **kwargs: Any,
     ) -> Figure:
         """Create ArviZ diagnostic plot.
@@ -282,6 +321,7 @@ class PlotService:
         Figure
             Matplotlib figure
         """
+        self._apply_style_context(style)
         try:
             import arviz as az
 
@@ -353,6 +393,8 @@ class PlotService:
         Figure
             Matplotlib figure
         """
+        self._apply_style_context(style)
+        palette = self._get_palette(style)
         fig, ax = plt.subplots(figsize=(8, 6))
 
         x = np.asarray(data.x)
@@ -365,12 +407,12 @@ class PlotService:
         if np.iscomplexobj(y):
             G_prime = np.real(y)
             G_double_prime = np.imag(y)
-            ax.loglog(x, G_prime, "o", label="G'", color=self._colorblind_palette[0])
-            ax.loglog(x, G_double_prime, "s", label='G"', color=self._colorblind_palette[1])
+            ax.loglog(x, G_prime, "o", label="G'", color=palette[0])
+            ax.loglog(x, G_double_prime, "s", label='G"', color=palette[1])
             ax.set_xlabel(data.x_units or "Frequency (rad/s)")
             ax.set_ylabel(data.y_units or "Modulus (Pa)")
         else:
-            ax.loglog(x, y, "o", color=self._colorblind_palette[0])
+            ax.loglog(x, y, "o", color=palette[0])
             ax.set_xlabel(data.x_units or "X")
             ax.set_ylabel(data.y_units or "Y")
 
@@ -380,3 +422,33 @@ class PlotService:
 
         self.apply_style(fig, style)
         return fig
+
+    def _apply_style_context(self, style: str) -> None:
+        """Apply RC params from bundled styles if available."""
+        style_name = style or "default"
+        if style_name == "default":
+            plt.rcParams.update(plt.rcParamsDefault)
+            return
+        style_text = self._style_cache.get(style_name, "")
+        if style_text:
+            plt.rcParams.update(plt.rcParamsDefault)
+            # rc_params_from_file expects a path; write to temp file
+            with tempfile.NamedTemporaryFile("w", suffix=".mplstyle", delete=False) as tmp:
+                tmp.write(style_text)
+                tmp_path = tmp.name
+            try:
+                rc = rc_params_from_file(tmp_path)
+                plt.rcParams.update(rc)
+            finally:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+        else:
+            plt.style.use("default")
+
+    def _get_palette(self, style: str) -> list[str]:
+        """Return palette respecting style."""
+        if (style or "").lower() == "dark":
+            return self._dark_palette
+        return self._colorblind_palette

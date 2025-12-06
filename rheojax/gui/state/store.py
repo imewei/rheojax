@@ -520,7 +520,10 @@ class StateStore:
             path = Path(action.get("file_path")) if action.get("file_path") else None
 
             def updater(state: AppState) -> AppState:
-                return replace(state, project_path=path, project_name=path.name if path else state.project_name)
+                recent = list(state.recent_projects)
+                if path and path not in recent:
+                    recent = [path] + recent[:9]
+                return replace(state, project_path=path, project_name=path.name if path else state.project_name, recent_projects=recent)
 
             return updater
 
@@ -531,13 +534,22 @@ class StateStore:
 
             return updater
 
+        if action_type == "UNDO":
+            self.undo()
+            return None
+
+        if action_type == "REDO":
+            self.redo()
+            return None
+
         if action_type == "IMPORT_DATA":
             config = action.get("payload", action)
 
             def updater(state: AppState) -> AppState:
-                # Placeholder: mark pipeline as active
+                # Mark pipeline as active for load step
                 pipeline = state.pipeline_state.clone()
-                pipeline.steps[PipelineStep.LOAD] = StepStatus.COMPLETE
+                pipeline.steps[PipelineStep.LOAD] = StepStatus.ACTIVE
+                pipeline.current_step = PipelineStep.LOAD
                 return replace(state, pipeline_state=pipeline, is_modified=True)
 
             return updater
@@ -577,6 +589,18 @@ class StateStore:
 
             return updater
 
+        if action_type == "IMPORT_DATA_FAILED":
+            error = action.get("error")
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.LOAD] = StepStatus.ERROR
+                pipeline.error_message = error or pipeline.error_message
+                pipeline.current_step = PipelineStep.LOAD
+                return replace(state, pipeline_state=pipeline, is_modified=True)
+
+            return updater
+
         if action_type == "SET_ACTIVE_DATASET":
 
             def updater(state: AppState) -> AppState:
@@ -603,7 +627,24 @@ class StateStore:
                 pipeline = state.pipeline_state.clone()
                 pipeline.steps[PipelineStep.TRANSFORM] = StepStatus.COMPLETE
                 pipeline.current_step = PipelineStep.TRANSFORM
-                return replace(state, pipeline_state=pipeline)
+                history = list(state.transform_history)
+                transform_name = action.get("transform_id") or action.get("transform")
+                source = action.get("source_dataset_id")
+                target = action.get("target_dataset_id")
+                params = action.get("parameters", {})
+                seed = action.get("seed")
+                if transform_name and source and target:
+                    history.append(
+                        TransformRecord(
+                            timestamp=datetime.now(),
+                            source_dataset_id=str(source),
+                            target_dataset_id=str(target),
+                            transform_name=str(transform_name),
+                            parameters=params,
+                            seed=seed,
+                        )
+                    )
+                return replace(state, pipeline_state=pipeline, transform_history=history)
 
             return updater
 
@@ -616,6 +657,124 @@ class StateStore:
                 pipeline.current_step = PipelineStep.EXPORT
                 last_export_dir = Path(export_path).parent if export_path else state.last_export_dir
                 return replace(state, pipeline_state=pipeline, last_export_dir=last_export_dir)
+
+            return updater
+
+        if action_type == "SAVE_PROJECT":
+            file_path = action.get("file_path")
+
+            def updater(state: AppState) -> AppState:
+                project_path = Path(file_path) if file_path else state.project_path
+                recent = list(state.recent_projects)
+                if project_path and project_path not in recent:
+                    recent = [project_path] + recent[:9]
+                return replace(
+                    state,
+                    project_path=project_path,
+                    project_name=project_path.name if project_path else state.project_name,
+                    is_modified=False,
+                    recent_projects=recent,
+                )
+
+            return updater
+
+        if action_type == "RECORD_PROVENANCE":
+            payload = action.get("payload", action)
+            record = payload.get("record")
+
+            def updater(state: AppState) -> AppState:
+                if not isinstance(record, TransformRecord):
+                    return state
+                history = list(state.transform_history)
+                history.append(record.clone())
+                return replace(state, transform_history=history, is_modified=True)
+
+            return updater
+
+        if action_type == "STORE_FIT_RESULT":
+            payload = action.get("payload", action)
+            model_name = payload.get("model_name")
+            dataset_id = payload.get("dataset_id")
+            result = payload.get("result")
+
+            def updater(state: AppState) -> AppState:
+                if not model_name or not dataset_id or result is None:
+                    return state
+
+                fit_state = result if isinstance(result, FitResult) else FitResult(
+                    model_name=model_name,
+                    dataset_id=str(dataset_id),
+                    parameters=getattr(result, "parameters", {}),
+                    r_squared=float(getattr(result, "r_squared", 0.0)),
+                    mpe=float(getattr(result, "mpe", 0.0)),
+                    chi_squared=float(getattr(result, "chi_squared", 0.0)),
+                    fit_time=float(getattr(result, "fit_time", 0.0)),
+                    timestamp=getattr(result, "timestamp", datetime.now()),
+                    num_iterations=getattr(result, "num_iterations", getattr(result, "n_iterations", 0) or 0),
+                    convergence_message=getattr(result, "message", ""),
+                    x_fit=getattr(result, "x_fit", None),
+                    y_fit=getattr(result, "y_fit", None),
+                    residuals=getattr(result, "residuals", None),
+                )
+                fits = state.fit_results.copy()
+                key = f"{model_name}_{dataset_id}"
+                fits[key] = fit_state
+
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.FIT] = StepStatus.COMPLETE
+                pipeline.current_step = PipelineStep.FIT
+
+                return replace(
+                    state,
+                    fit_results=fits,
+                    active_dataset_id=dataset_id,
+                    active_model_name=model_name,
+                    pipeline_state=pipeline,
+                    is_modified=True,
+                )
+
+            return updater
+
+        if action_type == "STORE_BAYESIAN_RESULT":
+            payload = action.get("payload", action)
+            model_name = payload.get("model_name")
+            dataset_id = payload.get("dataset_id")
+            result = payload.get("result")
+
+            def updater(state: AppState) -> AppState:
+                if not model_name or not dataset_id or result is None:
+                    return state
+
+                bayes_state = result if isinstance(result, BayesianResult) else BayesianResult(
+                    model_name=model_name,
+                    dataset_id=str(dataset_id),
+                    posterior_samples=getattr(result, "posterior_samples", {}),
+                    r_hat=getattr(result, "r_hat", {}),
+                    ess=getattr(result, "ess", {}),
+                    divergences=int(getattr(result, "divergences", 0)),
+                    credible_intervals=getattr(result, "credible_intervals", {}),
+                    mcmc_time=float(getattr(result, "mcmc_time", getattr(result, "sampling_time", 0.0))),
+                    timestamp=getattr(result, "timestamp", datetime.now()),
+                    num_warmup=int(getattr(result, "num_warmup", 0)),
+                    num_samples=int(getattr(result, "num_samples", 0)),
+                )
+
+                bayes = state.bayesian_results.copy()
+                key = f"{model_name}_{dataset_id}"
+                bayes[key] = bayes_state
+
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.BAYESIAN] = StepStatus.COMPLETE
+                pipeline.current_step = PipelineStep.BAYESIAN
+
+                return replace(
+                    state,
+                    bayesian_results=bayes,
+                    active_dataset_id=dataset_id,
+                    active_model_name=model_name,
+                    pipeline_state=pipeline,
+                    is_modified=True,
+                )
 
             return updater
 
@@ -821,3 +980,25 @@ class StateStore:
             Bayesian result or None if not found
         """
         return self._state.bayesian_results.get(key)
+
+    def get_active_fit_result(self) -> FitResult | None:
+        """Return the fit result for the active model/dataset combo."""
+
+        state = self._state
+        if not state.active_model_name or not state.active_dataset_id:
+            return None
+        key = f"{state.active_model_name}_{state.active_dataset_id}"
+        return state.fit_results.get(key)
+
+    def get_active_bayesian_result(self) -> BayesianResult | None:
+        """Return the Bayesian result for the active model/dataset combo."""
+
+        state = self._state
+        if not state.active_model_name or not state.active_dataset_id:
+            return None
+        key = f"{state.active_model_name}_{state.active_dataset_id}"
+        return state.bayesian_results.get(key)
+
+    def get_pipeline_state(self) -> PipelineState:
+        """Return the current pipeline state."""
+        return self._state.pipeline_state

@@ -16,7 +16,7 @@ from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.pipeline_chips import PipelineChips
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.widgets.priors_editor import PriorsEditor
-from rheojax.gui.widgets.quick_fit_strip import QuickFitStrip
+from rheojax.gui.app.toolbar import QuickFitStrip
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 
 __all__ = [

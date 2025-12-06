@@ -115,6 +115,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.worker_pool: WorkerPool | None = None
         self._job_types: dict[str, str] = {}
         self.model_service = ModelService()
+        self._plot_style: str = "default"
 
         # Setup UI components
         self.setup_ui()
@@ -258,6 +259,15 @@ class RheoJAXMainWindow(QMainWindow):
         self.quick_fit_strip.fit_clicked.connect(self._on_quick_fit)
         self.quick_fit_strip.plot_clicked.connect(self._on_plot)
         self.quick_fit_strip.export_clicked.connect(self._on_export)
+        self.quick_fit_strip.save_clicked.connect(self._on_save_file)
+        self.quick_fit_strip.mode_changed.connect(self._on_set_test_mode)
+        self.quick_fit_strip.model_changed.connect(self._on_select_model)
+        # Feedback signals from worker pool to quick-fit strip
+        if self.worker_pool:
+            self.worker_pool.job_started.connect(lambda *_: self.quick_fit_strip.set_busy(True))
+            self.worker_pool.job_completed.connect(lambda *_1, **_2: self.quick_fit_strip.set_busy(False))
+            self.worker_pool.job_failed.connect(lambda *_1, **_2: self.quick_fit_strip.set_busy(False))
+            self.worker_pool.job_cancelled.connect(lambda *_: self.quick_fit_strip.set_busy(False))
 
         # Pipeline chips navigation
         self.pipeline_chips.step_clicked.connect(lambda step: self.navigate_to(step.name.lower()))
@@ -798,6 +808,17 @@ class RheoJAXMainWindow(QMainWindow):
             app.setStyleSheet(load_stylesheet(chosen))
         except Exception as exc:  # pragma: no cover - GUI runtime
             self.log(f"Failed to apply theme {theme}: {exc}")
+        else:
+            # Persist theme selection into state
+            self.store.dispatch("SET_THEME", {"theme": chosen})
+            self._plot_style = self._select_plot_style(chosen)
+
+    def _select_plot_style(self, theme: str) -> str:
+        """Map UI theme to default plot style."""
+        theme_lower = (theme or "light").lower()
+        if theme_lower == "dark":
+            return "dark"
+        return "default"
 
     def _on_pipeline_step_changed(self, step: str, status: str) -> None:
         """Update pipeline chips when state changes."""
@@ -838,6 +859,12 @@ class RheoJAXMainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_job_started(self, job_id: str) -> None:
+        job_type = self._job_types.get(job_id, "")
+        if job_type:
+            step = "fit" if job_type == "fit" else "bayesian"
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": step, "status": "ACTIVE"})
+            self.pipeline_chips.set_step_status(getattr(PipelineStep, step.upper()), StepStatus.ACTIVE)
+            self.quick_fit_strip.set_status(f"{job_type.capitalize()} running...")
         self.status_bar.show_message(f"Job started: {job_id}", 1000)
 
     def _on_job_progress(self, job_id: str, current: int, total: int, message: str) -> None:
@@ -854,58 +881,41 @@ class RheoJAXMainWindow(QMainWindow):
         job_type = self._job_types.pop(job_id, "")
         self.status_bar.hide_progress()
         if job_type == "fit":
+            # Persist result in state and refresh UI
+            state = self.store.get_state()
+            self.store.dispatch(
+                "STORE_FIT_RESULT",
+                {
+                    "result": result,
+                    "dataset_id": state.active_dataset_id,
+                    "model_name": state.active_model_name,
+                },
+            )
+            stored = self.store.get_active_fit_result()
+            if stored:
+                self.results_panel.set_fit_result(stored)
+                self._update_fit_plot(stored)
             self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"})
             self.status_bar.show_message("Fit complete", 3000)
-            try:
-                state = self.store.get_state()
-                key = f"{getattr(result, 'model_name', state.active_model_name)}_{state.active_dataset_id or ''}"
-                fit_result = FitResult(
-                    model_name=getattr(result, "model_name", state.active_model_name or ""),
-                    dataset_id=state.active_dataset_id or "",
-                    parameters=getattr(result, "parameters", {}),
-                    r_squared=float(getattr(result, "r_squared", 0.0)),
-                    mpe=float(getattr(result, "mpe", 0.0)),
-                    chi_squared=float(getattr(result, "chi_squared", 0.0)),
-                    fit_time=float(getattr(result, "fit_time", 0.0)),
-                    timestamp=getattr(result, "timestamp", datetime.now()),
-                    num_iterations=getattr(result, "n_iterations", 0) or 0,
-                    convergence_message=getattr(result, "message", ""),
-                    x_fit=getattr(result, "x_fit", None),
-                    y_fit=getattr(result, "y_fit", None),
-                    residuals=getattr(result, "residuals", None),
-                )
-                current = state.fit_results.copy()
-                current[key] = fit_result
-                self.store.update_state(lambda s: replace(s, fit_results=current))
-                self.results_panel.set_fit_result(fit_result)
-                self._update_fit_plot(fit_result)
-            except Exception as exc:
-                self.log(f"Failed to record fit result: {exc}")
+            self._auto_save_if_enabled()
         elif job_type == "bayesian":
+            state = self.store.get_state()
+            self.store.dispatch(
+                "STORE_BAYESIAN_RESULT",
+                {
+                    "result": result,
+                    "dataset_id": state.active_dataset_id,
+                    "model_name": state.active_model_name,
+                },
+            )
+            stored = self.store.get_active_bayesian_result()
+            if stored:
+                self.results_panel.set_bayesian_result(stored)
             self.store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"})
             self.status_bar.show_message("Bayesian inference complete", 3000)
-            try:
-                state = self.store.get_state()
-                key = f"{getattr(result, 'model_name', state.active_model_name)}_{state.active_dataset_id or ''}"
-                bayes_result = BayesianResult(
-                    model_name=getattr(result, "model_name", state.active_model_name or ""),
-                    dataset_id=state.active_dataset_id or "",
-                    posterior_samples=getattr(result, "posterior_samples", {}),
-                    summary=getattr(result, "summary", {}),
-                    diagnostics=getattr(result, "diagnostics", {}),
-                    num_samples=int(getattr(result, "num_samples", 0)),
-                    num_chains=int(getattr(result, "num_chains", 0)),
-                    sampling_time=float(getattr(result, "sampling_time", 0.0)),
-                    timestamp=getattr(result, "timestamp", datetime.now()),
-                    credible_intervals=getattr(result, "credible_intervals", None),
-                )
-                current = state.bayesian_results.copy()
-                current[key] = bayes_result
-                self.store.update_state(lambda s: replace(s, bayesian_results=current))
-                self.results_panel.set_bayesian_result(bayes_result)
-            except Exception as exc:
-                self.log(f"Failed to record Bayesian result: {exc}")
+            self._auto_save_if_enabled()
         self.log(f"Job {job_id} completed ({job_type})")
+        self.quick_fit_strip.set_status("Idle")
 
     def _on_job_failed(self, job_id: str, error: str) -> None:
         job_type = self._job_types.pop(job_id, "")
@@ -914,6 +924,7 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"})
         self.log(f"Job {job_id} failed: {error}")
         self.status_bar.show_message(f"Job failed: {error}", 5000)
+        self.quick_fit_strip.set_status("Failed")
 
     def _on_job_cancelled(self, job_id: str) -> None:
         job_type = self._job_types.pop(job_id, "")
@@ -922,6 +933,7 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "WARNING"})
         self.log(f"Job {job_id} cancelled")
         self.status_bar.show_message("Job cancelled", 2000)
+        self.quick_fit_strip.set_status("Cancelled")
 
     def _update_fit_plot(self, fit_result: FitResult) -> None:
         """Render fit plot and residuals on fit page using PlotService."""
@@ -945,7 +957,7 @@ class RheoJAXMainWindow(QMainWindow):
             fig = plot_service.create_fit_plot(
                 rheo_data,
                 fit_result,
-                style="default",
+                style=self._plot_style,
                 test_mode=dataset.test_mode,
             )
             self.fit_page.set_plot_figure(fig)
@@ -1286,6 +1298,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.store.dispatch("SET_TEST_MODE", {"test_mode": mode})
         self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model})
         self.navigate_to("fit")
+        self._on_fit()
 
     @Slot()
     def _on_plot(self) -> None:
@@ -1294,12 +1307,15 @@ class RheoJAXMainWindow(QMainWindow):
         self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
         self.navigate_to("fit")
         self.status_bar.show_message("Generating plot preview...", 2000)
+        self.quick_fit_strip.set_status("Plotting...")
 
         fit_result = self.store.get_active_fit_result()
         if fit_result:
             self._update_fit_plot(fit_result)
+            self.status_bar.show_message("Plot ready", 2000)
         else:
             self.status_bar.show_message("Run a fit before plotting.", 3000)
+        self.quick_fit_strip.set_status("Idle")
 
     def _update_jax_status(self) -> None:
         """Update JAX device and memory status in status bar."""
@@ -1324,3 +1340,76 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.update_jax_status(device_name, memory_used, memory_total, float64_enabled)
         except Exception as e:
             self.log(f"Failed to update JAX status: {e}")
+
+    def _auto_save_if_enabled(self) -> None:
+        """Auto-save project if a path is set and auto-save is enabled."""
+        try:
+            state = self.store.get_state()
+            if state.auto_save_enabled and state.project_path:
+                project_path = state.project_path
+                self.store.dispatch("SAVE_PROJECT", {"file_path": str(project_path)})
+
+                # Export artifacts: parameters, plot, and Bayesian posterior if available
+                fit_result = self.store.get_active_fit_result()
+                bayes_result = self.store.get_active_bayesian_result()
+                if fit_result or bayes_result:
+                    from rheojax.gui.services.export_service import ExportService
+                    from rheojax.gui.services.plot_service import PlotService
+                    export_service = ExportService()
+                    plot_service = PlotService()
+
+                    if fit_result:
+                        params_path = project_path.with_suffix(".fit_params.json")
+                        fig_path = project_path.with_suffix(".fit_plot.png")
+
+                        try:
+                            export_service.export_parameters(fit_result, params_path)
+                        except Exception as exc:
+                            self.log(f"Auto-export params failed: {exc}")
+
+                        try:
+                            dataset = self.store.get_active_dataset()
+                            if dataset:
+                                from rheojax.core.data import RheoData
+
+                                rheo_data = RheoData(
+                                    x=dataset.x_data,
+                                    y=dataset.y_data,
+                                    metadata=dataset.metadata,
+                                    initial_test_mode=dataset.test_mode,
+                                )
+                                fig = plot_service.create_fit_plot(
+                                    rheo_data, fit_result, style=self._plot_style, test_mode=dataset.test_mode
+                                )
+                                export_service.export_figure(fig, fig_path)
+                        except Exception as exc:
+                            self.log(f"Auto-export plot failed: {exc}")
+
+                    if bayes_result:
+                        post_path = project_path.with_suffix(".bayes_posterior.h5")
+                        diag_path = project_path.with_suffix(".bayes_diagnostics.png")
+                        forest_path = project_path.with_suffix(".bayes_forest.png")
+                        energy_path = project_path.with_suffix(".bayes_energy.png")
+                        try:
+                            export_service.export_posterior(bayes_result, post_path)
+                        except Exception as exc:
+                            self.log(f"Auto-export posterior failed: {exc}")
+                        try:
+                            fig = plot_service.create_arviz_plot(bayes_result, plot_type="trace", style=self._plot_style)
+                            export_service.export_figure(fig, diag_path)
+                        except Exception as exc:
+                            self.log(f"Auto-export diagnostics failed: {exc}")
+                        try:
+                            fig = plot_service.create_arviz_plot(bayes_result, plot_type="forest", style=self._plot_style)
+                            export_service.export_figure(fig, forest_path)
+                        except Exception as exc:
+                            self.log(f"Auto-export forest failed: {exc}")
+                        try:
+                            fig = plot_service.create_arviz_plot(bayes_result, plot_type="energy", style=self._plot_style)
+                            export_service.export_figure(fig, energy_path)
+                        except Exception as exc:
+                            self.log(f"Auto-export energy failed: {exc}")
+
+                self.status_bar.show_message(f"Auto-saved to {project_path.name}", 2000)
+        except Exception as exc:
+            self.log(f"Auto-save skipped: {exc}")
