@@ -194,12 +194,15 @@ dmypy.json
 .claude/
 .code/
 .specify/
+.codex/
+.gemini/
 agent-os/
 .cursor/
 .cursorignore
 .cursorindexingignore
 AGENTS.md
 CLAUDE.md
+GEMINI.md
 
 # ----------------------------------------------------------------------------
 # Operating System
