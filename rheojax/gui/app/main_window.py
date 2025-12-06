@@ -7,6 +7,7 @@ Central window coordinating pages, state, and services with dock-based layout.
 
 
 import webbrowser
+from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QCloseEvent
@@ -209,6 +210,13 @@ class RheoJAXMainWindow(QMainWindow):
         self.quick_fit_strip.fit_clicked.connect(self._on_quick_fit)
         self.quick_fit_strip.plot_clicked.connect(self._on_plot)
         self.quick_fit_strip.export_clicked.connect(self._on_export)
+
+        # Connect home page shortcuts/links
+        self.home_page.open_project_requested.connect(self._on_open_file)
+        self.home_page.import_data_requested.connect(self._on_import)
+        self.home_page.new_project_requested.connect(self._on_new_file)
+        self.home_page.example_selected.connect(self._on_open_example)
+        self.home_page.recent_project_opened.connect(self._on_open_recent_project)
 
     def _connect_file_menu(self) -> None:
         """Connect File menu actions."""
@@ -519,6 +527,50 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.dispatch("SAVE_PROJECT", {"file_path": file_path})
             self.status_bar.show_message(f"Saved as: {file_path}", 3000)
             self._has_unsaved_changes = False
+
+    @Slot(Path)
+    def _on_open_recent_project(self, project_path: Path) -> None:
+        """Handle opening a recent project from the home page."""
+        path = Path(project_path)
+        if not path.exists():
+            QMessageBox.warning(
+                self,
+                "Project Not Found",
+                f"Recent project is missing:\n{path}",
+            )
+            return
+
+        self.log(f"Opening recent project: {path}")
+        self.store.dispatch("LOAD_PROJECT", {"file_path": str(path)})
+        self.navigate_to("data")
+        self.status_bar.show_message(f"Opened: {path.name}", 3000)
+
+    @Slot(str)
+    def _on_open_example(self, example_name: str) -> None:
+        """Handle example selection from the home page."""
+        repo_root = Path(__file__).resolve().parents[3]
+        examples_dir = repo_root / "examples"
+        example_map = {
+            "oscillation": examples_dir / "basic" / "02-zener-fitting.ipynb",
+            "relaxation": examples_dir / "basic" / "01-maxwell-fitting.ipynb",
+            "creep": examples_dir / "basic" / "03-springpot-fitting.ipynb",
+            "flow": examples_dir / "basic" / "04-bingham-fitting.ipynb",
+            "sgr": examples_dir / "advanced" / "09-sgr-soft-glassy-rheology.ipynb",
+            "tts": examples_dir / "transforms" / "02-mastercurve-tts.ipynb",
+            "bayesian": examples_dir / "bayesian",
+        }
+
+        target = example_map.get(example_name.lower(), examples_dir / "README.md")
+        if not target.exists():
+            target = examples_dir / "README.md"
+
+        try:
+            webbrowser.open(target.as_uri())
+            self.log(f"Opening example: {target.name}")
+            self.status_bar.show_message(f"Opening {example_name} example...", 2000)
+        except Exception:
+            webbrowser.open("https://github.com/RheoJAX/rheojax/tree/main/examples")
+            self.log("Falling back to examples repository link")
 
     @Slot()
     def _on_import(self) -> None:
