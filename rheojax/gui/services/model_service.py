@@ -106,6 +106,7 @@ class ModelService:
             "flow": [],
             "multi_mode": [],
             "sgr": [],
+            "spp_laos": [],
             "other": [],
         }
 
@@ -137,6 +138,7 @@ class ModelService:
         ]
         multi_mode = ["generalized_maxwell"]
         sgr = ["sgr_conventional", "sgr_generic"]
+        spp_laos = ["spp_yield_stress"]
 
         for model_name in all_models:
             if model_name in classical:
@@ -153,6 +155,8 @@ class ModelService:
                 categories["multi_mode"].append(model_name)
             elif model_name in sgr:
                 categories["sgr"].append(model_name)
+            elif model_name in spp_laos:
+                categories["spp_laos"].append(model_name)
             else:
                 categories["other"].append(model_name)
 
@@ -200,6 +204,8 @@ class ModelService:
                 for flow in ["power_law", "carreau", "herschel", "bingham", "cross"]
             ):
                 supported_modes = ["flow"]
+            elif "spp" in model_name.lower():
+                supported_modes = ["oscillation", "rotation"]
 
             return {
                 "name": model_name,

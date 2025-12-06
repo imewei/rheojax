@@ -20,6 +20,7 @@ from rheojax.transforms import (
     MutationNumber,
     OWChirp,
     SmoothDerivative,
+    SPPDecomposer,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class TransformService:
             "owchirp": OWChirp,
             "derivative": SmoothDerivative,
             "mutation_number": MutationNumber,
+            "spp": SPPDecomposer,
         }
 
     def get_available_transforms(self) -> list[str]:
@@ -139,6 +141,38 @@ class TransformService:
                     "type": "float",
                     "default": 1.0,
                     "description": "Reference frequency (rad/s)",
+                },
+            },
+            "spp": {
+                "omega": {
+                    "type": "float",
+                    "default": 1.0,
+                    "description": "Angular frequency (rad/s)",
+                },
+                "gamma_0": {
+                    "type": "float",
+                    "default": 1.0,
+                    "description": "Strain amplitude (dimensionless)",
+                },
+                "n_harmonics": {
+                    "type": "int",
+                    "default": 39,
+                    "description": "Number of harmonics to extract",
+                },
+                "yield_tolerance": {
+                    "type": "float",
+                    "default": 0.02,
+                    "description": "Tolerance for yield point detection",
+                },
+                "start_cycle": {
+                    "type": "int",
+                    "default": 0,
+                    "description": "First cycle to analyze (skip transients)",
+                },
+                "use_numerical_method": {
+                    "type": "bool",
+                    "default": False,
+                    "description": "Use numerical differentiation (MATLAB-compatible)",
                 },
             },
         }
@@ -243,6 +277,34 @@ class TransformService:
 
                 logger.info("Calculated mutation number")
                 return result
+
+            elif name == "spp":
+                # SPP decomposition for LAOS yield stress extraction
+                omega = params.get("omega", 1.0)
+                gamma_0 = params.get("gamma_0", 1.0)
+                n_harmonics = params.get("n_harmonics", 39)
+                yield_tolerance = params.get("yield_tolerance", 0.02)
+                start_cycle = params.get("start_cycle", 0)
+                end_cycle = params.get("end_cycle", None)
+                use_numerical_method = params.get("use_numerical_method", False)
+
+                spp = SPPDecomposer(
+                    omega=omega,
+                    gamma_0=gamma_0,
+                    n_harmonics=n_harmonics,
+                    yield_tolerance=yield_tolerance,
+                    start_cycle=start_cycle,
+                    end_cycle=end_cycle,
+                    use_numerical_method=use_numerical_method,
+                )
+                result = spp.transform(data)
+                spp_results = spp.get_results()
+
+                logger.info(
+                    f"SPP analysis: σ_sy={spp_results['sigma_sy']:.2f} Pa, "
+                    f"σ_dy={spp_results['sigma_dy']:.2f} Pa"
+                )
+                return result, {"spp_results": spp_results}
 
             else:
                 raise ValueError(f"Transform {name} not implemented")
@@ -350,5 +412,19 @@ class TransformService:
             if name in ["derivative", "mutation_number"]:
                 if not np.all(np.diff(data.x) > 0):
                     warnings.append("Data must be monotonically increasing")
+
+            # SPP requires time-domain LAOS data
+            if name == "spp":
+                if data.domain != "time":
+                    warnings.append("SPP requires time-domain stress waveform data")
+                if len(data.x) < 100:
+                    warnings.append(
+                        "SPP typically requires at least 100 points per cycle"
+                    )
+                test_mode = data.metadata.get("test_mode", "")
+                if test_mode and test_mode != "oscillation":
+                    warnings.append(
+                        f"SPP is for oscillatory (LAOS) data, got {test_mode}"
+                    )
 
         return warnings

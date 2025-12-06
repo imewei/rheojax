@@ -63,6 +63,10 @@ CATEGORY_INFO = {
         "name": "Soft Glassy Rheology",
         "description": "SGR models for foams, emulsions, and colloidal suspensions",
     },
+    "spp_laos": {
+        "name": "SPP / LAOS",
+        "description": "Yield stress extraction from Large Amplitude Oscillatory Shear",
+    },
     "other": {
         "name": "Other Models",
         "description": "Additional rheological models",
@@ -110,6 +114,7 @@ MODEL_DISPLAY_NAMES = {
     "generalized_maxwell": "Generalized Maxwell",
     "sgr_conventional": "SGR Conventional",
     "sgr_generic": "SGR GENERIC",
+    "spp_yield_stress": "SPP Yield Stress (LAOS)",
 }
 
 

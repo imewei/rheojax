@@ -58,6 +58,7 @@ class TransformPage(QWidget):
             ("Mutation Number", "Calculate mutation number", "#9C27B0"),
             ("OW Chirp", "Optimally-windowed chirp analysis", "#FF9800"),
             ("Derivatives", "Calculate numerical derivatives", "#607D8B"),
+            ("SPP Analysis", "LAOS yield stress and cage modulus extraction", "#E91E63"),
         ]
 
         for i, (name, desc, color) in enumerate(transforms):
@@ -188,6 +189,39 @@ class TransformPage(QWidget):
             combo = QComboBox()
             combo.addItems(["Hann", "Hamming", "Blackman", "None"])
             self._config_layout.addWidget(combo)
+
+        elif name == "SPP Analysis":
+            self._config_layout.addWidget(QLabel("Angular Frequency (rad/s):"))
+            spin_omega = QDoubleSpinBox()
+            spin_omega.setRange(0.001, 1000)
+            spin_omega.setValue(1.0)
+            spin_omega.setDecimals(3)
+            self._config_layout.addWidget(spin_omega)
+
+            self._config_layout.addWidget(QLabel("Strain Amplitude:"))
+            spin_gamma = QDoubleSpinBox()
+            spin_gamma.setRange(0.001, 100)
+            spin_gamma.setValue(1.0)
+            spin_gamma.setDecimals(3)
+            self._config_layout.addWidget(spin_gamma)
+
+            self._config_layout.addWidget(QLabel("Number of Harmonics:"))
+            spin_harmonics = QDoubleSpinBox()
+            spin_harmonics.setRange(1, 99)
+            spin_harmonics.setValue(39)
+            spin_harmonics.setDecimals(0)
+            self._config_layout.addWidget(spin_harmonics)
+
+            self._config_layout.addWidget(QLabel("Start Cycle (skip transients):"))
+            spin_start = QDoubleSpinBox()
+            spin_start.setRange(0, 100)
+            spin_start.setValue(0)
+            spin_start.setDecimals(0)
+            self._config_layout.addWidget(spin_start)
+
+            check_numerical = QCheckBox("Use numerical method (MATLAB-compatible)")
+            check_numerical.setChecked(False)
+            self._config_layout.addWidget(check_numerical)
 
         self._config_layout.addStretch()
 

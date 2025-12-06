@@ -1,12 +1,15 @@
 """Data analysis transforms for rheological data.
 
-This module provides JAX-accelerated implementations of:
-- FFT-based frequency analysis
-- Time-temperature superposition (mastercurves)
-- Strain-rate frequency superposition (SRFS)
-- Mutation number analysis
-- OWChirp transform for LAOS analysis
-- Smooth noise-robust differentiation
+This package contains 7 data transforms for rheological analysis:
+
+Transforms (7):
+    - FFTAnalysis: FFT-based frequency spectrum analysis
+    - Mastercurve: Time-temperature superposition (TTS) mastercurves
+    - SRFS: Strain-rate frequency superposition (analogous to TTS)
+    - MutationNumber: Viscoelastic character analysis (0=elastic, 1=viscous)
+    - OWChirp: OWChirp transform for LAOS analysis
+    - SmoothDerivative: Smooth noise-robust differentiation
+    - SPPDecomposer: Sequence of Physical Processes (SPP) for LAOS analysis
 """
 
 from rheojax.transforms.fft_analysis import FFTAnalysis

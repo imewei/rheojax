@@ -1,33 +1,30 @@
 """Rheological models package.
 
-This package contains implementations of classical, fractional, and flow rheological models.
+This package contains 24 rheological models organized into 8 categories.
 
-Classical Models:
+Classical Models (3):
     - Maxwell: Spring and dashpot in series
     - Zener: Standard Linear Solid (SLS)
     - SpringPot: Fractional power-law element
 
-Multi-Mode Models:
-    - GeneralizedMaxwell: Generalized Maxwell Model (Prony series, N modes)
-
-Fractional Maxwell Family:
+Fractional Maxwell Family (4):
     - FractionalMaxwellGel: SpringPot in series with dashpot
     - FractionalMaxwellLiquid: Spring in series with SpringPot
     - FractionalMaxwellModel: Two SpringPots in series (most general)
     - FractionalKelvinVoigt: Spring and SpringPot in parallel
 
-Fractional Zener Family (Task Group 12):
+Fractional Zener Family (4):
     - FractionalZenerSolidLiquid: Fractional Maxwell + spring in parallel
     - FractionalZenerSolidSolid: Two springs + SpringPot
     - FractionalZenerLiquidLiquid: Most general fractional Zener
     - FractionalKelvinVoigtZener: FKV + spring in series
 
-Advanced Fractional Models (Task Group 12):
+Fractional Advanced Models (3):
     - FractionalBurgersModel: Maxwell + FKV in series
     - FractionalPoyntingThomson: FKV + spring in series (alternate formulation)
     - FractionalJeffreysModel: Two dashpots + SpringPot
 
-Non-Newtonian Flow Models (ROTATION test mode):
+Non-Newtonian Flow Models (6, ROTATION test mode):
     - PowerLaw: Simple power-law model (K*γ̇^n)
     - Carreau: Smooth transition from Newtonian to power-law
     - CarreauYasuda: Extended Carreau with transition parameter
@@ -35,8 +32,15 @@ Non-Newtonian Flow Models (ROTATION test mode):
     - HerschelBulkley: Power-law with yield stress
     - Bingham: Linear viscoplastic (yield stress + constant viscosity)
 
-Soft Glassy Rheology Models:
+Multi-Mode Models (1):
+    - GeneralizedMaxwell: Generalized Maxwell Model (Prony series, N modes)
+
+Soft Glassy Rheology Models (2):
     - SGRConventional: Soft Glassy Rheology model (Sollich 1998)
+    - SGRGeneric: GENERIC framework SGR (thermodynamically consistent)
+
+SPP LAOS Models (1):
+    - SPPYieldStress: Yield stress model for SPP LAOS analysis
 
 Usage:
     >>> from rheojax.models import Maxwell, Zener, SpringPot
