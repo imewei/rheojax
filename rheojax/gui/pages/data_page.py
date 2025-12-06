@@ -350,7 +350,7 @@ class DataPage(QWidget):
             from rheojax.gui.services.data_service import DataService
 
             service = DataService()
-            service.load_file(
+            rheo_data = service.load_file(
                 file_path=self._current_file_path,
                 x_col=x_col,
                 y_col=y_col,
@@ -358,7 +358,23 @@ class DataPage(QWidget):
                 test_mode=test_mode
             )
 
+            # Register dataset in state store
+            store = StateStore()
+            store.dispatch(
+                "IMPORT_DATA_SUCCESS",
+                {
+                    "file_path": str(self._current_file_path),
+                    "name": self._current_file_path.stem,
+                    "test_mode": test_mode or "unknown",
+                    "x_data": rheo_data.x,
+                    "y_data": rheo_data.y,
+                    "y2_data": getattr(rheo_data, "y2", None),
+                    "metadata": getattr(rheo_data, "metadata", {}),
+                },
+            )
+
             self.apply_mapping.emit()
+            self._store.dispatch("SET_TAB", {"tab": "transform"})
 
         except Exception as e:
             self._file_name_label.setText(f"Import error: {str(e)}")

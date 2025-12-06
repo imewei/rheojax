@@ -242,7 +242,6 @@ class BayesianWorker(QRunnable):
             # Create progress callback
             def progress_callback(stage: str, chain: int, iteration: int, total: int):
                 """Progress callback for MCMC sampling."""
-                # Check for cancellation
                 self.cancel_token.check()
 
                 # Update stage if changed
@@ -251,12 +250,14 @@ class BayesianWorker(QRunnable):
                     self.signals.stage_changed.emit(stage)
                     logger.debug(f"MCMC stage: {stage}")
 
-                # Calculate progress
+                # Calculate progress percent
                 samples_per_chain = self._num_warmup + self._num_samples
-                total_samples = self._num_chains * samples_per_chain
+                total_samples = max(self._num_chains * samples_per_chain, 1)
+                percent = min(int(iteration / total_samples * 100), 100)
+                message = f"{stage.capitalize()} chain {chain}: {iteration}/{total_samples}"
 
-                # Emit progress signal
-                self.signals.progress.emit(chain, iteration, total_samples)
+                # Emit progress signal normalized to percent
+                self.signals.progress.emit(percent, 100, message)
 
             # Emit warmup stage start
             self.signals.stage_changed.emit("warmup")

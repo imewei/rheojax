@@ -171,9 +171,6 @@ class WorkerPool(QObject):
             worker.job_id = job_id  # type: ignore[attr-defined]
 
             # Connect completion/failure/cancellation signals
-            # IMPORTANT: Use default arguments to capture job_id by value, not by reference.
-            # Without this, rapid job submissions could cause the wrong job_id to be used
-            # when the signal is emitted (closure would capture the last job_id value).
             if hasattr(worker.signals, 'completed'):
                 worker.signals.completed.connect(
                     lambda result, jid=job_id: self._on_job_completed(jid, result)
@@ -187,11 +184,21 @@ class WorkerPool(QObject):
                     lambda jid=job_id: self._on_job_cancelled(jid)
                 )
             if hasattr(worker.signals, 'progress'):
-                worker.signals.progress.connect(
-                    lambda current, total, msg, jid=job_id: self._on_job_progress(
-                        jid, current, total, msg
-                    )
-                )
+                def _progress_adapter(*args, jid=job_id):
+                    """Map varying progress signal signatures to a common shape."""
+                    current = args[0] if len(args) > 0 else 0
+                    if len(args) == 3:
+                        total = args[1]
+                        msg = args[2]
+                    elif len(args) == 2:
+                        total = 0
+                        msg = args[1]
+                    else:
+                        total = 0
+                        msg = ""
+                    self._on_job_progress(jid, current, total, msg)
+
+                worker.signals.progress.connect(_progress_adapter)
 
         # Submit to thread pool
         self._pool.start(worker)

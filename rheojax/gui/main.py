@@ -24,6 +24,7 @@ import logging
 import sys
 from pathlib import Path
 
+from rheojax.gui.utils.logging import install_gui_log_handler
 
 def setup_logging(verbose: bool = False) -> None:
     """Configure application logging.
@@ -44,50 +45,44 @@ def setup_logging(verbose: bool = False) -> None:
 
 
 def check_dependencies() -> tuple[bool, list[str]]:
-    """Verify all required dependencies are available.
+    """Verify all GUI dependencies are available.
 
     Returns
     -------
     tuple[bool, list[str]]
         (success, missing_dependencies)
-        success is True if all dependencies are available
-        missing_dependencies is a list of missing package names
     """
-    missing = []
 
-    # Check PySide6
+    missing: list[str] = []
+
     try:
         import PySide6  # noqa: F401
     except ImportError:
-        missing.append("PySide6>=6.7.0")
+        missing.append("PySide6>=6.6.0")
 
-    # Check matplotlib
     try:
         import matplotlib  # noqa: F401
     except ImportError:
         missing.append("matplotlib>=3.8.0")
 
-    # Check rheojax core (includes JAX)
     try:
         from rheojax.core.jax_config import safe_import_jax
 
         safe_import_jax()
-    except ImportError as e:
-        missing.append(f"rheojax-core ({e})")
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        missing.append(f"rheojax-core ({exc})")
 
-    # Check NumPyro for Bayesian
     try:
         import numpyro  # noqa: F401
     except ImportError:
         missing.append("numpyro>=0.19.0")
 
-    # Check ArviZ for diagnostics
     try:
         import arviz  # noqa: F401
     except ImportError:
         missing.append("arviz>=0.22.0")
 
-    return len(missing) == 0, missing
+    return not missing, missing
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -181,21 +176,12 @@ def main(argv: list[str] | None = None) -> int:
     logger.debug("Checking dependencies...")
     deps_ok, missing = check_dependencies()
     if not deps_ok:
-        print(
-            "\nERROR: Missing required dependencies:",
-            file=sys.stderr,
-        )
+        print("\nERROR: Missing required dependencies:", file=sys.stderr)
         for dep in missing:
             print(f"  - {dep}", file=sys.stderr)
-        print(
-            "\nInstall all GUI dependencies with:",
-            file=sys.stderr,
-        )
+        print("\nInstall all GUI dependencies with:", file=sys.stderr)
         print("  pip install rheojax[gui]", file=sys.stderr)
-        print(
-            "\nOr install the full development environment:",
-            file=sys.stderr,
-        )
+        print("\nOr install the full development environment:", file=sys.stderr)
         print("  pip install rheojax[dev,gui]", file=sys.stderr)
         return 1
 
@@ -218,22 +204,31 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    # Import Qt after dependency check
+    # Import JAX early (configures float64) and Qt after dependency check
+    try:
+        from rheojax.core.jax_config import safe_import_jax
+
+        safe_import_jax()
+    except Exception as exc:  # pragma: no cover - environment dependent
+        logger.error(f"Failed to import JAX: {exc}")
+        print(f"ERROR: Failed to import JAX: {exc}", file=sys.stderr)
+        return 1
+
     logger.debug("Initializing Qt application...")
     try:
         from PySide6.QtCore import Qt
+        from PySide6.QtGui import QIcon
         from PySide6.QtWidgets import QApplication
-    except ImportError as e:
-        logger.error(f"Failed to import PySide6: {e}")
-        print(
-            f"ERROR: Failed to import PySide6: {e}",
-            file=sys.stderr,
-        )
+    except ImportError as exc:
+        logger.error(f"Failed to import PySide6: {exc}")
+        print(f"ERROR: Failed to import PySide6: {exc}", file=sys.stderr)
         return 1
 
     # Configure Qt application attributes before instantiation
-    # Note: These must be set before QApplication is created
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
 
     # Create Qt application
     if argv is None:
@@ -246,8 +241,11 @@ def main(argv: list[str] | None = None) -> int:
     app.setOrganizationName("RheoJAX")
     app.setOrganizationDomain("github.com/imewei/rheojax")
 
-    # Set application style (Fusion for cross-platform consistency)
+    # Apply stylesheet from resources
+    from rheojax.gui.resources import load_stylesheet, get_icon_path
+
     app.setStyle("Fusion")
+    app.setStyleSheet(load_stylesheet("light"))
 
     logger.debug("Qt application initialized")
 
@@ -266,6 +264,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         logger.debug("Creating main window...")
         window = RheoJAXMainWindow()
+        gui_handler = install_gui_log_handler(
+            window.log,
+            level=logging.DEBUG if args.verbose else logging.INFO,
+        )
+        logger.debug("GUI log handler attached")
+        window.destroyed.connect(lambda *_: logging.getLogger().removeHandler(gui_handler))
+        app.setWindowIcon(QIcon(str(get_icon_path("load"))))
         window.show()
         logger.info("RheoJAX GUI ready")
     except Exception as e:

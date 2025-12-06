@@ -163,6 +163,26 @@ class ModelService:
         # Remove empty categories
         return {k: v for k, v in categories.items() if v}
 
+    def get_parameter_defaults(self, model_name: str) -> dict[str, "ParameterState"]:
+        """Return ParameterState mapping for a model using registry defaults."""
+
+        from rheojax.gui.state.store import ParameterState
+
+        model = self._registry.create_instance(model_name, plugin_type="model")
+        defaults: dict[str, ParameterState] = {}
+        for name, param in model.parameters.items():
+            bounds = getattr(param, "bounds", (float("-inf"), float("inf")))
+            defaults[name] = ParameterState(
+                name=name,
+                value=float(getattr(param, "value", 0.0)),
+                min_bound=float(bounds[0]),
+                max_bound=float(bounds[1]),
+                fixed=False,
+                unit=getattr(param, "unit", ""),
+                description=getattr(param, "description", ""),
+            )
+        return defaults
+
     def get_model_info(self, model_name: str) -> dict[str, Any]:
         """Get model parameters, bounds, and description.
 

@@ -7,7 +7,10 @@ Central window coordinating pages, state, and services with dock-based layout.
 
 
 import webbrowser
+from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
+import uuid
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QCloseEvent
@@ -18,10 +21,16 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QTabWidget,
+    QVBoxLayout,
     QTextEdit,
+    QToolBar,
     QWidget,
 )
 
+from rheojax.gui.jobs.bayesian_worker import BayesianWorker
+from rheojax.gui.jobs.fit_worker import FitWorker
+from rheojax.gui.jobs.worker_pool import WorkerPool
+from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.app.menu_bar import MenuBar
 from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.app.toolbar import MainToolBar, QuickFitStrip
@@ -32,12 +41,25 @@ from rheojax.gui.pages.export_page import ExportPage
 from rheojax.gui.pages.fit_page import FitPage
 from rheojax.gui.pages.home_page import HomePage
 from rheojax.gui.pages.transform_page import TransformPage
-from rheojax.gui.state.store import AppState, StateStore
+from rheojax.gui.resources import load_stylesheet
+from rheojax.gui.state.signals import StateSignals
+from rheojax.gui.state.store import (
+    AppState,
+    BayesianResult,
+    DatasetState,
+    FitResult,
+    ParameterState,
+    PipelineStep,
+    StateStore,
+    StepStatus,
+)
 from rheojax.gui.dialogs.about import AboutDialog
 from rheojax.gui.dialogs.import_wizard import ImportWizard
 from rheojax.gui.dialogs.preferences import PreferencesDialog
 from rheojax.gui.widgets.dataset_tree import DatasetTree
 from rheojax.gui.widgets.parameter_table import ParameterTable
+from rheojax.gui.widgets.pipeline_chips import PipelineChips
+from rheojax.gui.widgets.results_panel import ResultsPanel
 
 
 class RheoJAXMainWindow(QMainWindow):
@@ -87,7 +109,12 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Initialize state store
         self.store = StateStore()
+        # Wire Qt signals for state changes
+        self.store.set_signals(self.store.signals or StateSignals())
         self._has_unsaved_changes = False
+        self.worker_pool: WorkerPool | None = None
+        self._job_types: dict[str, str] = {}
+        self.model_service = ModelService()
 
         # Setup UI components
         self.setup_ui()
@@ -96,6 +123,8 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Connect signals
         self.connect_signals()
+        self._connect_state_signals()
+        self._init_worker_pool()
 
         # Initial status
         self.status_bar.show_message("Ready", 3000)
@@ -118,6 +147,11 @@ class RheoJAXMainWindow(QMainWindow):
         self.quick_fit_strip = QuickFitStrip(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.quick_fit_strip)
 
+        # Pipeline chips under toolbars
+        self.pipeline_chips = PipelineChips(self)
+        self.addToolBarBreak(Qt.ToolBarArea.TopToolBarArea)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._wrap_widget_in_toolbar(self.pipeline_chips))
+
         # Status bar
         self.status_bar = StatusBar(self)
         self.setStatusBar(self.status_bar)
@@ -137,8 +171,15 @@ class RheoJAXMainWindow(QMainWindow):
         # Right dock: Parameter/Results panel
         self.param_dock = QDockWidget("Parameters & Results", self)
         self.param_dock.setObjectName("ParamDock")
+        param_container = QWidget(self)
+        param_layout = QVBoxLayout(param_container)
+        param_layout.setContentsMargins(4, 4, 4, 4)
+        param_layout.setSpacing(6)
         self.param_table = ParameterTable(self)
-        self.param_dock.setWidget(self.param_table)
+        self.results_panel = ResultsPanel(self)
+        param_layout.addWidget(self.param_table)
+        param_layout.addWidget(self.results_panel)
+        self.param_dock.setWidget(param_container)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.param_dock)
 
         # Bottom dock: Log panel (collapsible)
@@ -177,6 +218,13 @@ class RheoJAXMainWindow(QMainWindow):
         self.tabs.addTab(self.diagnostics_page, "Diagnostics")
         self.tabs.addTab(self.export_page, "Export")
 
+    def _wrap_widget_in_toolbar(self, widget: QWidget) -> 'QToolBar':
+        """Place an arbitrary widget inside a non-movable toolbar."""
+        toolbar = QToolBar(self)
+        toolbar.setMovable(False)
+        toolbar.addWidget(widget)
+        return toolbar
+
     def connect_signals(self) -> None:
         """Connect state signals to UI updates."""
         # Subscribe to store updates
@@ -211,12 +259,48 @@ class RheoJAXMainWindow(QMainWindow):
         self.quick_fit_strip.plot_clicked.connect(self._on_plot)
         self.quick_fit_strip.export_clicked.connect(self._on_export)
 
+        # Pipeline chips navigation
+        self.pipeline_chips.step_clicked.connect(lambda step: self.navigate_to(step.name.lower()))
+
+        # Dataset tree selection
+        self.data_tree.dataset_selected.connect(self._on_dataset_selected)
+
+        # Transform page callbacks
+        self.transform_page.transform_applied.connect(self._on_transform_applied_from_page)
+
         # Connect home page shortcuts/links
         self.home_page.open_project_requested.connect(self._on_open_file)
         self.home_page.import_data_requested.connect(self._on_import)
         self.home_page.new_project_requested.connect(self._on_new_file)
         self.home_page.example_selected.connect(self._on_open_example)
         self.home_page.recent_project_opened.connect(self._on_open_recent_project)
+
+    def _connect_state_signals(self) -> None:
+        """Connect store signals to UI updates (theme, pipeline, datasets)."""
+
+        signals = self.store.signals
+        if signals is None:
+            return
+
+        signals.theme_changed.connect(self._apply_theme)
+        signals.dataset_added.connect(lambda dataset_id: self.status_bar.show_message(f"Dataset added: {dataset_id}", 2000))
+        signals.dataset_added.connect(self._on_dataset_added)
+        signals.pipeline_step_changed.connect(self._on_pipeline_step_changed)
+
+    def _init_worker_pool(self) -> None:
+        """Create and connect WorkerPool if PySide6 is available."""
+
+        try:
+            self.worker_pool = WorkerPool.instance()
+        except Exception as exc:
+            self.log(f"Worker pool unavailable: {exc}")
+            return
+
+        self.worker_pool.job_started.connect(self._on_job_started)
+        self.worker_pool.job_progress.connect(self._on_job_progress)
+        self.worker_pool.job_completed.connect(self._on_job_completed)
+        self.worker_pool.job_failed.connect(self._on_job_failed)
+        self.worker_pool.job_cancelled.connect(self._on_job_cancelled)
 
     def _connect_file_menu(self) -> None:
         """Connect File menu actions."""
@@ -401,6 +485,7 @@ class RheoJAXMainWindow(QMainWindow):
 
         if page_name.lower() in page_map:
             self.tabs.setCurrentIndex(page_map[page_name.lower()])
+            self.store.dispatch("SET_TAB", {"tab": page_name.lower()})
             self.log(f"Navigated to {page_name.capitalize()} page")
 
     def log(self, message: str) -> None:
@@ -466,6 +551,9 @@ class RheoJAXMainWindow(QMainWindow):
         if state.is_modified != self._has_unsaved_changes:
             self._has_unsaved_changes = state.is_modified
             self.state_dirty.emit(self._has_unsaved_changes)
+
+        # Sync pipeline chips
+        self._update_pipeline_chips_from_state(state)
 
     # -------------------------------------------------------------------------
     # File Menu Handlers
@@ -590,6 +678,22 @@ class RheoJAXMainWindow(QMainWindow):
         self.navigate_to("export")
         self.status_bar.show_message("Configure export options", 2000)
 
+        # Quick export of current fit parameters if available
+        try:
+            from PySide6.QtWidgets import QFileDialog
+            from rheojax.gui.services.export_service import ExportService
+
+            fit_result = self.store.get_active_fit_result()
+            if fit_result:
+                path, _ = QFileDialog.getSaveFileName(
+                    self, "Export Fit Parameters", "", "CSV (*.csv);;JSON (*.json)"
+                )
+                if path:
+                    ExportService().export_parameters(fit_result, path)
+                    self.status_bar.show_message(f"Exported fit parameters to {Path(path).name}", 3000)
+        except Exception as exc:
+            self.log(f"Export not available: {exc}")
+
     # -------------------------------------------------------------------------
     # Edit Menu Handlers
     # -------------------------------------------------------------------------
@@ -679,8 +783,181 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.theme_dark_action.setChecked(theme == "dark")
         self.menu_bar.theme_auto_action.setChecked(theme == "auto")
         self.store.dispatch("SET_THEME", {"theme": theme})
+        self._apply_theme(theme)
         self.log(f"Theme changed to: {theme}")
         self.status_bar.show_message(f"Theme: {theme.capitalize()}", 2000)
+
+    def _apply_theme(self, theme: str) -> None:
+        """Apply QSS theme to the QApplication."""
+
+        app = QApplication.instance()
+        if app is None:
+            return
+        chosen = "light" if theme == "auto" else theme
+        try:
+            app.setStyleSheet(load_stylesheet(chosen))
+        except Exception as exc:  # pragma: no cover - GUI runtime
+            self.log(f"Failed to apply theme {theme}: {exc}")
+
+    def _on_pipeline_step_changed(self, step: str, status: str) -> None:
+        """Update pipeline chips when state changes."""
+
+        step_enum = step.upper()
+        status_enum = status.upper()
+        try:
+            step_val = PipelineStep[step_enum]
+            status_val = StepStatus[status_enum]
+        except Exception:
+            return
+        self.pipeline_chips.set_step_status(step_val, status_val)
+
+    def _update_pipeline_chips_from_state(self, state: AppState) -> None:
+        """Sync chip statuses from the current pipeline state."""
+
+        for step, status in state.pipeline_state.steps.items():
+            self.pipeline_chips.set_step_status(step, status)
+
+    def _on_dataset_added(self, dataset_id: str) -> None:
+        """Add dataset to the tree when state signals dataset addition."""
+
+        dataset = self.store.get_dataset(dataset_id)
+        if isinstance(dataset, DatasetState):
+            self.data_tree.add_dataset(dataset)
+            self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
+            self.results_panel.set_fit_result(None)
+            self.results_panel.set_bayesian_result(None)
+
+    @Slot(str)
+    def _on_dataset_selected(self, dataset_id: str) -> None:
+        """Update active dataset when selected from tree."""
+
+        self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
+
+    # ------------------------------------------------------------------
+    # Worker pool callbacks
+    # ------------------------------------------------------------------
+
+    def _on_job_started(self, job_id: str) -> None:
+        self.status_bar.show_message(f"Job started: {job_id}", 1000)
+
+    def _on_job_progress(self, job_id: str, current: int, total: int, message: str) -> None:
+        job_type = self._job_types.get(job_id, "")
+        max_value = int(total) if isinstance(total, (int, float)) and 0 < total <= 100 else 0
+        msg_text = str(message) if message is not None else f"{job_type} running..."
+        self.status_bar.show_progress(int(current), max_value, msg_text)
+        if job_type == "fit":
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
+        elif job_type == "bayesian":
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "ACTIVE"})
+
+    def _on_job_completed(self, job_id: str, result: object) -> None:
+        job_type = self._job_types.pop(job_id, "")
+        self.status_bar.hide_progress()
+        if job_type == "fit":
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"})
+            self.status_bar.show_message("Fit complete", 3000)
+            try:
+                state = self.store.get_state()
+                key = f"{getattr(result, 'model_name', state.active_model_name)}_{state.active_dataset_id or ''}"
+                fit_result = FitResult(
+                    model_name=getattr(result, "model_name", state.active_model_name or ""),
+                    dataset_id=state.active_dataset_id or "",
+                    parameters=getattr(result, "parameters", {}),
+                    r_squared=float(getattr(result, "r_squared", 0.0)),
+                    mpe=float(getattr(result, "mpe", 0.0)),
+                    chi_squared=float(getattr(result, "chi_squared", 0.0)),
+                    fit_time=float(getattr(result, "fit_time", 0.0)),
+                    timestamp=getattr(result, "timestamp", datetime.now()),
+                    num_iterations=getattr(result, "n_iterations", 0) or 0,
+                    convergence_message=getattr(result, "message", ""),
+                    x_fit=getattr(result, "x_fit", None),
+                    y_fit=getattr(result, "y_fit", None),
+                    residuals=getattr(result, "residuals", None),
+                )
+                current = state.fit_results.copy()
+                current[key] = fit_result
+                self.store.update_state(lambda s: replace(s, fit_results=current))
+                self.results_panel.set_fit_result(fit_result)
+                self._update_fit_plot(fit_result)
+            except Exception as exc:
+                self.log(f"Failed to record fit result: {exc}")
+        elif job_type == "bayesian":
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"})
+            self.status_bar.show_message("Bayesian inference complete", 3000)
+            try:
+                state = self.store.get_state()
+                key = f"{getattr(result, 'model_name', state.active_model_name)}_{state.active_dataset_id or ''}"
+                bayes_result = BayesianResult(
+                    model_name=getattr(result, "model_name", state.active_model_name or ""),
+                    dataset_id=state.active_dataset_id or "",
+                    posterior_samples=getattr(result, "posterior_samples", {}),
+                    summary=getattr(result, "summary", {}),
+                    diagnostics=getattr(result, "diagnostics", {}),
+                    num_samples=int(getattr(result, "num_samples", 0)),
+                    num_chains=int(getattr(result, "num_chains", 0)),
+                    sampling_time=float(getattr(result, "sampling_time", 0.0)),
+                    timestamp=getattr(result, "timestamp", datetime.now()),
+                    credible_intervals=getattr(result, "credible_intervals", None),
+                )
+                current = state.bayesian_results.copy()
+                current[key] = bayes_result
+                self.store.update_state(lambda s: replace(s, bayesian_results=current))
+                self.results_panel.set_bayesian_result(bayes_result)
+            except Exception as exc:
+                self.log(f"Failed to record Bayesian result: {exc}")
+        self.log(f"Job {job_id} completed ({job_type})")
+
+    def _on_job_failed(self, job_id: str, error: str) -> None:
+        job_type = self._job_types.pop(job_id, "")
+        self.status_bar.hide_progress()
+        if job_type:
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"})
+        self.log(f"Job {job_id} failed: {error}")
+        self.status_bar.show_message(f"Job failed: {error}", 5000)
+
+    def _on_job_cancelled(self, job_id: str) -> None:
+        job_type = self._job_types.pop(job_id, "")
+        self.status_bar.hide_progress()
+        if job_type:
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "WARNING"})
+        self.log(f"Job {job_id} cancelled")
+        self.status_bar.show_message("Job cancelled", 2000)
+
+    def _update_fit_plot(self, fit_result: FitResult) -> None:
+        """Render fit plot and residuals on fit page using PlotService."""
+
+        dataset = self.store.get_active_dataset()
+        if dataset is None:
+            return
+
+        try:
+            import numpy as np
+            from rheojax.core.data import RheoData
+            from rheojax.gui.services.plot_service import PlotService
+
+            rheo_data = RheoData(
+                x=dataset.x_data,
+                y=dataset.y_data,
+                metadata=dataset.metadata,
+                initial_test_mode=dataset.test_mode,
+            )
+            plot_service = PlotService()
+            fig = plot_service.create_fit_plot(
+                rheo_data,
+                fit_result,
+                style="default",
+                test_mode=dataset.test_mode,
+            )
+            self.fit_page.set_plot_figure(fig)
+
+            if fit_result.residuals is not None and fit_result.x_fit is not None:
+                self.fit_page.plot_residuals(
+                    x=np.asarray(fit_result.x_fit),
+                    residuals=np.asarray(fit_result.residuals),
+                    y_pred=np.asarray(fit_result.y_fit) if fit_result.y_fit is not None else None,
+                )
+        except Exception as exc:
+            self.log(f"Failed to update fit plot: {exc}")
 
     # -------------------------------------------------------------------------
     # Data Menu Handlers
@@ -726,8 +1003,16 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_select_model(self, model_id: str) -> None:
         """Handle model selection."""
-        self.store.dispatch("SELECT_MODEL", {"model_id": model_id})
+        self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model_id})
         self.quick_fit_strip.set_model(model_id)
+        # Pull parameter defaults from registry via ModelService
+        try:
+            defaults = self.model_service.get_parameter_defaults(model_id)
+            self.param_table.set_parameters(defaults)
+            # Persist parameters into state
+            self.store.update_state(lambda s: replace(s, model_params=defaults))
+        except Exception as exc:
+            self.log(f"Unable to load parameters for {model_id}: {exc}")
         self.navigate_to("fit")
         self.log(f"Selected model: {model_id}")
         self.status_bar.show_message(f"Model: {model_id}", 2000)
@@ -736,12 +1021,75 @@ class RheoJAXMainWindow(QMainWindow):
     # Transforms Menu Handlers
     # -------------------------------------------------------------------------
 
-    def _on_apply_transform(self, transform_id: str) -> None:
+    def _on_apply_transform(self, transform_id: str, params: dict | None = None) -> None:
         """Handle transform application."""
         self.store.dispatch("APPLY_TRANSFORM", {"transform_id": transform_id})
-        self.navigate_to("transform")
-        self.log(f"Applying transform: {transform_id}")
-        self.status_bar.show_message(f"Transform: {transform_id}", 2000)
+        dataset = self.store.get_active_dataset()
+        if dataset is None:
+            self.status_bar.show_message("Load data before applying transform", 3000)
+            return
+
+        try:
+            from rheojax.core.data import RheoData
+            from rheojax.gui.services.transform_service import TransformService
+
+            rheo_data = RheoData(
+                x=dataset.x_data,
+                y=dataset.y_data,
+                metadata=dataset.metadata,
+                initial_test_mode=dataset.test_mode,
+            )
+            transform_service = TransformService()
+            # Use provided params or defaults from service
+            if params is None:
+                param_specs = transform_service.get_transform_params(transform_id)
+                params = {
+                    name: spec.get("default")
+                    for name, spec in param_specs.items()
+                    if isinstance(spec, dict) and "default" in spec
+                }
+            result = transform_service.apply_transform(transform_id, rheo_data, params=params or {})
+
+            # Handle tuple return (data, extras)
+            transformed = result[0] if isinstance(result, tuple) else result
+            new_id = str(uuid.uuid4())
+            self.store.dispatch(
+                "IMPORT_DATA_SUCCESS",
+                {
+                    "dataset_id": new_id,
+                    "file_path": None,
+                    "name": f"{dataset.name}-{transform_id}",
+                    "test_mode": dataset.test_mode,
+                    "x_data": getattr(transformed, "x", None),
+                    "y_data": getattr(transformed, "y", None),
+                    "metadata": getattr(transformed, "metadata", {}),
+                },
+            )
+            self.store.dispatch("TRANSFORM_COMPLETED", {"transform_id": transform_id})
+            self.status_bar.show_message(f"Transform applied: {transform_id}", 2000)
+            self.log(f"Applied transform {transform_id} -> dataset {new_id}")
+            self.navigate_to("transform")
+        except Exception as exc:
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": "transform", "status": "ERROR"})
+            self.status_bar.show_message(f"Transform failed: {exc}", 4000)
+            self.log(f"Transform failed: {exc}")
+
+    def _on_transform_applied_from_page(self, transform_name: str, dataset_id: str) -> None:
+        """Handle transform requests originating from TransformPage."""
+        name_map = {
+            "fft": "fft",
+            "mastercurve": "mastercurve",
+            "srfs": "srfs",
+            "mutation number": "mutation_number",
+            "ow chirp": "owchirp",
+            "derivatives": "derivative",
+            "spp analysis": "spp",
+        }
+        transform_id = name_map.get(transform_name.lower(), transform_name.lower())
+        params = self.transform_page.get_selected_params()
+        # Activate selected dataset
+        self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
+        self._on_apply_transform(transform_id, params=params)
 
     # -------------------------------------------------------------------------
     # Analysis Menu Handlers
@@ -752,14 +1100,76 @@ class RheoJAXMainWindow(QMainWindow):
         """Handle fit action."""
         self.log("Starting NLSQ fit...")
         self.navigate_to("fit")
-        self.status_bar.show_message("Fitting model...", 0)
+
+        dataset = self.store.get_active_dataset()
+        model_name = self.store.get_state().active_model_name
+        if dataset is None or model_name is None:
+            self.status_bar.show_message("Select data and model before fitting", 4000)
+            return
+
+        # Build RheoData from state
+        try:
+            from rheojax.core.data import RheoData
+
+            rheo_data = RheoData(
+                x=dataset.x_data,
+                y=dataset.y_data,
+                metadata=dataset.metadata,
+                initial_test_mode=dataset.test_mode,
+            )
+        except Exception as exc:
+            self.log(f"Cannot start fit: {exc}")
+            self.status_bar.show_message("Unable to build dataset for fit", 4000)
+            return
+
+        # Dispatch pipeline state
+        self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
+        self.status_bar.show_progress(0, 0, "Fitting model...")
+
+        if not self.worker_pool:
+            self.status_bar.show_message("Worker pool unavailable", 3000)
+            return
+
+        worker = FitWorker(model_name=model_name, data=rheo_data, initial_params=None, options={})
+        job_id = self.worker_pool.submit(worker)
+        self._job_types[job_id] = "fit"
 
     @Slot()
     def _on_bayesian(self) -> None:
         """Handle bayesian fit action."""
         self.log("Starting Bayesian inference...")
         self.navigate_to("bayesian")
-        self.status_bar.show_message("Running Bayesian inference...", 0)
+
+        dataset = self.store.get_active_dataset()
+        model_name = self.store.get_state().active_model_name
+        if dataset is None or model_name is None:
+            self.status_bar.show_message("Select data and model before Bayesian run", 4000)
+            return
+
+        try:
+            from rheojax.core.data import RheoData
+
+            rheo_data = RheoData(
+                x=dataset.x_data,
+                y=dataset.y_data,
+                metadata=dataset.metadata,
+                initial_test_mode=dataset.test_mode,
+            )
+        except Exception as exc:
+            self.log(f"Cannot start Bayesian: {exc}")
+            self.status_bar.show_message("Unable to build dataset for Bayesian", 4000)
+            return
+
+        self.store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "ACTIVE"})
+        self.status_bar.show_progress(0, 0, "Running Bayesian inference...")
+
+        if not self.worker_pool:
+            self.status_bar.show_message("Worker pool unavailable", 3000)
+            return
+
+        worker = BayesianWorker(model_name=model_name, data=rheo_data)
+        job_id = self.worker_pool.submit(worker)
+        self._job_types[job_id] = "bayesian"
 
     @Slot()
     def _on_batch_fit(self) -> None:
@@ -787,6 +1197,8 @@ class RheoJAXMainWindow(QMainWindow):
         """Handle stop action."""
         self.store.dispatch("CANCEL_JOBS")
         self.log("Stopping current operation...")
+        if self.worker_pool:
+            self.worker_pool.cancel_all()
         self.status_bar.show_message("Operation stopped", 3000)
 
     # -------------------------------------------------------------------------
@@ -872,14 +1284,22 @@ class RheoJAXMainWindow(QMainWindow):
         model = self.quick_fit_strip.get_model()
         self.log(f"Quick fit: {model} in {mode} mode")
         self.store.dispatch("SET_TEST_MODE", {"test_mode": mode})
-        self.store.dispatch("SELECT_MODEL", {"model_id": model})
+        self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model})
         self.navigate_to("fit")
 
     @Slot()
     def _on_plot(self) -> None:
         """Handle plot action."""
         self.log("Generating plot...")
+        self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
         self.navigate_to("fit")
+        self.status_bar.show_message("Generating plot preview...", 2000)
+
+        fit_result = self.store.get_active_fit_result()
+        if fit_result:
+            self._update_fit_plot(fit_result)
+        else:
+            self.status_bar.show_message("Run a fit before plotting.", 3000)
 
     def _update_jax_status(self) -> None:
         """Update JAX device and memory status in status bar."""

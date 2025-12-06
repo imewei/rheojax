@@ -176,6 +176,22 @@ def is_fit_available() -> bool:
     return get_active_fit_result() is not None
 
 
+# Pipeline selectors
+
+
+def get_pipeline_state():
+    """Return the current pipeline state object."""
+
+    return StateStore().get_state().pipeline_state
+
+
+def get_pipeline_step_status(step: PipelineStep) -> StepStatus:
+    """Return status for a specific pipeline step."""
+
+    pipeline = get_pipeline_state()
+    return pipeline.steps.get(step, StepStatus.PENDING)
+
+
 # Bayesian Result Selectors
 
 

@@ -1,0 +1,29 @@
+# Default matplotlib style for RheoJAX GUI plots
+figure.figsize: 8, 5
+figure.dpi: 120
+figure.facecolor: white
+
+axes.prop_cycle: cycler('color', ['1f77b4', 'ff7f0e', '2ca02c', 'd62728', '9467bd', '8c564b'])
+axes.facecolor: white
+axes.edgecolor: 333333
+axes.linewidth: 0.8
+axes.grid: True
+axes.grid.axis: both
+grid.color: e5e7eb
+grid.linestyle: --
+grid.linewidth: 0.5
+
+lines.linewidth: 2.0
+lines.markersize: 6
+lines.markeredgewidth: 0.5
+
+font.family: sans-serif
+font.sans-serif: DejaVu Sans, Arial, Helvetica, sans-serif
+font.size: 10
+
+legend.frameon: True
+legend.framealpha: 0.9
+legend.fancybox: True
+
+savefig.dpi: 150
+savefig.bbox: tight

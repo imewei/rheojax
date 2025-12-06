@@ -35,6 +35,7 @@ from rheojax.gui.widgets.model_browser import ModelBrowser
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
+from matplotlib.figure import Figure
 
 
 class FitPage(QWidget):
@@ -574,3 +575,19 @@ class FitPage(QWidget):
         """
         # Residuals are already shown in the residuals panel
         pass
+
+    # External hooks from MainWindow
+    def set_plot_figure(self, fig: Figure) -> None:
+        """Replace the plot canvas figure."""
+        # Swap the FigureCanvas content
+        self._plot_canvas.figure = fig
+        self._plot_canvas.canvas.figure = fig
+        self._plot_canvas.axes = fig.gca()
+        self._plot_canvas.canvas.draw_idle()
+
+    def plot_residuals(self, x: np.ndarray, residuals: np.ndarray, y_pred: np.ndarray | None = None) -> None:
+        """Forward residuals to the residuals panel."""
+        if y_pred is not None:
+            self._residuals_panel.plot_residuals(y_true=y_pred + residuals, y_pred=y_pred, x=x)
+        else:
+            self._residuals_panel.set_residuals(residuals)

@@ -11,6 +11,7 @@ that read or modify state are protected by the lock.
 """
 
 import copy
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -18,6 +19,8 @@ from enum import Enum, auto
 from pathlib import Path
 from threading import RLock
 from typing import Any, Optional
+
+from rheojax.gui.state.signals import StateSignals
 
 
 class PipelineStep(Enum):
@@ -97,10 +100,19 @@ class FitResult:
     timestamp: datetime
     num_iterations: int = 0
     convergence_message: str = ""
+    x_fit: Any | None = None
+    y_fit: Any | None = None
+    residuals: Any | None = None
 
     def clone(self) -> "FitResult":
         """Create a deep copy of this fit result."""
-        return replace(self, parameters=copy.deepcopy(self.parameters))
+        return replace(
+            self,
+            parameters=copy.deepcopy(self.parameters),
+            x_fit=self.x_fit,
+            y_fit=self.y_fit,
+            residuals=self.residuals,
+        )
 
 
 @dataclass
@@ -244,7 +256,7 @@ class StateStore:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._state = AppState()
-            cls._instance._signals = None  # Will be set by GUI
+            cls._instance._signals = StateSignals()
             cls._instance._subscribers = []
             cls._instance._undo_stack = []
             cls._instance._redo_stack = []
@@ -311,8 +323,11 @@ class StateStore:
 
         if isinstance(action, dict) and "type" in action:
             action_type = action["type"]
+            reducer = self._reduce_action(action_type, action)
+            if reducer is not None:
+                self.update_state(reducer, emit_signal=True)
 
-            # Handle specific action types
+            # Emit relevant signals for UI reactivity
             if action_type == "SET_ACTIVE_MODEL":
                 model_name = action.get("model_name", "")
                 if self._signals:
@@ -358,6 +373,29 @@ class StateStore:
                 if self._signals:
                     self._signals.bayesian_failed.emit("", "", error)
 
+            elif action_type == "SET_THEME":
+                theme = action.get("theme", "light")
+                if self._signals:
+                    self._signals.theme_changed.emit(theme)
+
+            elif action_type == "SET_PIPELINE_STEP":
+                step = action.get("step", "")
+                status = action.get("status", "")
+                if self._signals:
+                    self._signals.pipeline_step_changed.emit(step, status)
+
+            elif action_type == "TRANSFORM_APPLIED":
+                transform = action.get("transform", "")
+                dataset_id = action.get("dataset_id", "")
+                if self._signals:
+                    self._signals.transform_applied.emit(transform, dataset_id)
+
+            elif action_type == "IMPORT_DATA_SUCCESS":
+                dataset_id = action.get("dataset_id")
+                if self._signals and dataset_id:
+                    self._signals.dataset_added.emit(dataset_id)
+                    self._signals.dataset_selected.emit(dataset_id)
+
     def update_state(
         self,
         updater: Callable[[AppState], AppState],
@@ -394,6 +432,194 @@ class StateStore:
         # Emit Qt signal if available
         if emit_signal and self._signals is not None:
             self._signals.state_changed.emit()
+
+    def _reduce_action(self, action_type: str, action: dict[str, Any]) -> Callable[[AppState], AppState] | None:
+        """Translate an action into a state updater.
+
+        Only a minimal set of actions are implemented here to keep the GUI
+        responsive while the full reducer pattern is built out.
+        """
+
+        if action_type == "SET_THEME":
+            theme = action.get("theme", "light")
+
+            def updater(state: AppState) -> AppState:
+                if state.theme == theme:
+                    return state
+                return replace(state, theme=theme, is_modified=True)
+
+            return updater
+
+        if action_type == "SET_TEST_MODE":
+            mode = action.get("test_mode", "oscillation")
+
+            def updater(state: AppState) -> AppState:
+                return replace(state, current_tab="data")
+
+            return updater
+
+        if action_type == "SET_ACTIVE_MODEL":
+            model_name = action.get("model_name")
+
+            def updater(state: AppState) -> AppState:
+                return replace(state, active_model_name=model_name, is_modified=True)
+
+            return updater
+
+        if action_type == "SET_TAB" or action_type == "NAVIGATE_TAB":
+            default_tab = getattr(self, "_state", AppState()).current_tab
+            tab = action.get("tab", default_tab)
+
+            def updater(state: AppState) -> AppState:
+                return replace(state, current_tab=tab)
+
+            return updater
+
+        if action_type == "SET_PIPELINE_STEP":
+            step = action.get("step")
+            status = action.get("status")
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                try:
+                    step_enum = PipelineStep[step.upper()] if step else None
+                except Exception:
+                    step_enum = None
+                try:
+                    status_enum = StepStatus[status.upper()] if status else None
+                except Exception:
+                    status_enum = None
+                if step_enum and status_enum:
+                    pipeline.steps[step_enum] = status_enum
+                    pipeline.current_step = step_enum
+                return replace(state, pipeline_state=pipeline)
+
+            return updater
+
+        if action_type == "START_FITTING":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.FIT] = StepStatus.ACTIVE
+                pipeline.current_step = PipelineStep.FIT
+                return replace(state, pipeline_state=pipeline)
+
+            return updater
+
+        if action_type == "START_BAYESIAN":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.BAYESIAN] = StepStatus.ACTIVE
+                pipeline.current_step = PipelineStep.BAYESIAN
+                return replace(state, pipeline_state=pipeline)
+
+            return updater
+
+        if action_type == "LOAD_PROJECT":
+            path = Path(action.get("file_path")) if action.get("file_path") else None
+
+            def updater(state: AppState) -> AppState:
+                return replace(state, project_path=path, project_name=path.name if path else state.project_name)
+
+            return updater
+
+        if action_type == "NEW_PROJECT":
+
+            def updater(state: AppState) -> AppState:
+                return AppState()
+
+            return updater
+
+        if action_type == "IMPORT_DATA":
+            config = action.get("payload", action)
+
+            def updater(state: AppState) -> AppState:
+                # Placeholder: mark pipeline as active
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.LOAD] = StepStatus.COMPLETE
+                return replace(state, pipeline_state=pipeline, is_modified=True)
+
+            return updater
+
+        if action_type == "IMPORT_DATA_SUCCESS":
+            config = action.get("payload", action)
+            dataset_id = config.get("dataset_id") or str(uuid.uuid4())
+            name = config.get("name", "Dataset")
+            test_mode = config.get("test_mode", "oscillation")
+            file_path = Path(config.get("file_path")) if config.get("file_path") else None
+
+            dataset = DatasetState(
+                id=dataset_id,
+                name=name,
+                file_path=file_path,
+                test_mode=test_mode,
+                x_data=config.get("x_data"),
+                y_data=config.get("y_data"),
+                y2_data=config.get("y2_data"),
+                metadata=config.get("metadata", {}),
+                is_modified=False,
+            )
+
+            def updater(state: AppState) -> AppState:
+                datasets = state.datasets.copy()
+                datasets[dataset_id] = dataset
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.LOAD] = StepStatus.COMPLETE
+                pipeline.current_step = PipelineStep.LOAD
+                return replace(
+                    state,
+                    datasets=datasets,
+                    active_dataset_id=dataset_id,
+                    pipeline_state=pipeline,
+                    is_modified=True,
+                )
+
+            return updater
+
+        if action_type == "SET_ACTIVE_DATASET":
+
+            def updater(state: AppState) -> AppState:
+                dataset_id = action.get("dataset_id")
+                if dataset_id in state.datasets:
+                    return replace(state, active_dataset_id=dataset_id)
+                return state
+
+            return updater
+
+        if action_type == "APPLY_TRANSFORM":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.TRANSFORM] = StepStatus.ACTIVE
+                pipeline.current_step = PipelineStep.TRANSFORM
+                return replace(state, pipeline_state=pipeline, is_modified=True)
+
+            return updater
+
+        if action_type == "TRANSFORM_COMPLETED":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.TRANSFORM] = StepStatus.COMPLETE
+                pipeline.current_step = PipelineStep.TRANSFORM
+                return replace(state, pipeline_state=pipeline)
+
+            return updater
+
+        if action_type == "EXPORT_RESULTS":
+            export_path = action.get("file_path")
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.EXPORT] = StepStatus.COMPLETE
+                pipeline.current_step = PipelineStep.EXPORT
+                last_export_dir = Path(export_path).parent if export_path else state.last_export_dir
+                return replace(state, pipeline_state=pipeline, last_export_dir=last_export_dir)
+
+            return updater
+
+        return None
 
     def subscribe(self, callback: Callable[[AppState], None]) -> None:
         """Subscribe to state changes.

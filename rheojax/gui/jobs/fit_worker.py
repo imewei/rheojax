@@ -68,6 +68,9 @@ class FitResult:
     timestamp: datetime
     n_iterations: int | None = None
     success: bool = True
+    x_fit: Any | None = None
+    y_fit: Any | None = None
+    residuals: Any | None = None
 
 
 class FitWorkerSignals(QObject):
@@ -167,82 +170,47 @@ class FitWorker(QRunnable):
             logger.info(f"Starting fit for model: {self._model_name}")
             start_time = time.perf_counter()
 
-            # Import model from registry
-            # Import inside run() to avoid JAX initialization issues
-            from rheojax.models import ModelRegistry
-
-            model_class = ModelRegistry.get(self._model_name)
-            if model_class is None:
-                raise ValueError(f"Model '{self._model_name}' not found in registry")
-
-            model = model_class()
-
-            # Set initial parameters if provided
-            for name, value in self._initial_params.items():
-                if name in model.parameters:
-                    model.parameters[name].value = value
-                else:
-                    logger.warning(
-                        f"Parameter '{name}' not found in model {self._model_name}"
-                    )
-
             # Prepare fitting options
             fit_kwargs = self._options.copy()
+            max_iter = int(fit_kwargs.get("max_iter", 100)) or 100
 
-            # Add progress callback that checks cancellation
+            # Add progress callback that checks cancellation and emits percentage
             def progress_callback(iteration: int, loss: float, **kwargs):
                 """Progress callback for NLSQ optimization."""
-                # Check for cancellation
                 self.cancel_token.check()
-
-                # Update progress (emit signal)
                 self._last_iteration = iteration
                 self._last_loss = loss
+                percent = min(int(iteration / max_iter * 100), 100)
                 message = f"Iteration {iteration}: loss = {loss:.6e}"
-                self.signals.progress.emit(iteration, loss, message)
+                self.signals.progress.emit(percent, 100, message)
 
             fit_kwargs['callback'] = progress_callback
 
-            # Get test mode from data
-            test_mode = getattr(self._data, 'test_mode', None)
-            if test_mode is None:
-                # Try to detect from metadata
-                if hasattr(self._data, 'metadata'):
-                    test_mode = self._data.metadata.get('test_mode', 'oscillation')
-                else:
-                    test_mode = 'oscillation'
-                    logger.warning(f"No test_mode found, defaulting to {test_mode}")
+            # Delegate to ModelService for fitting
+            from rheojax.gui.services.model_service import ModelService
 
-            # Execute fitting
-            logger.debug(f"Fitting {self._model_name} with test_mode={test_mode}")
-            model.fit(
-                self._data.x,
-                self._data.y,
-                test_mode=test_mode,
-                **fit_kwargs
+            service = ModelService()
+            logger.debug(f"Fitting {self._model_name} with ModelService")
+            result = service.fit(
+                self._model_name,
+                self._data,
+                params=self._initial_params,
+                progress_callback=progress_callback,
+                **fit_kwargs,
             )
 
             fit_time = time.perf_counter() - start_time
 
-            # Extract fitted parameters
-            fitted_params = {}
-            for name, param in model.parameters.items():
-                fitted_params[name] = float(param.value)
+            # Extract fitted parameters and metrics from service result
+            fitted_params = result.parameters
+            metadata = getattr(result, "metadata", {}) or {}
+            r_squared = metadata.get("r_squared", 0.0)
+            mpe = metadata.get("mpe", 0.0)
+            chi_squared = float(getattr(result, "chi_squared", 0.0))
+            n_iterations = metadata.get("n_iterations", self._last_iteration)
+            success = getattr(result, "success", True)
 
-            # Get goodness of fit metrics
-            r_squared = getattr(model, 'r_squared', 0.0)
-            mpe = getattr(model, 'mpe', 0.0)
-            chi_squared = getattr(model, 'chi_squared', 0.0)
-
-            # Get iteration count from NLSQ result if available
-            n_iterations = None
-            success = True
-            if hasattr(model, '_nlsq_result') and model._nlsq_result is not None:
-                nlsq_result = model._nlsq_result
-                n_iterations = getattr(nlsq_result, 'nit', self._last_iteration)
-                success = getattr(nlsq_result, 'success', True)
-
-            # Create result
+            # Create worker-level result
             result = FitResult(
                 model_name=self._model_name,
                 parameters=fitted_params,
@@ -253,6 +221,9 @@ class FitWorker(QRunnable):
                 timestamp=datetime.now(),
                 n_iterations=n_iterations,
                 success=success,
+                x_fit=getattr(result, "x_fit", None),
+                y_fit=getattr(result, "y_fit", None),
+                residuals=getattr(result, "residuals", None),
             )
 
             logger.info(
