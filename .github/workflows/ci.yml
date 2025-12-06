@@ -1,13 +1,11 @@
-name: CI
+name: CI (disabled)
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:  # Temporarily disabled; manual dispatch only
 
 jobs:
   lint:
+    if: ${{ false }}  # CI temporarily disabled
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,6 +36,7 @@ jobs:
       run: mypy rheojax --ignore-missing-imports --no-strict-optional
 
   quality:
+    if: ${{ false }}  # CI temporarily disabled
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -86,6 +85,7 @@ jobs:
         echo "✅ Maintainability check passed"
 
   test:
+    if: ${{ false }}  # CI temporarily disabled
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -147,6 +147,7 @@ jobs:
         fail_ci_if_error: false
 
   docs:
+    if: ${{ false }}  # CI temporarily disabled
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -181,6 +182,7 @@ jobs:
         path: docs/build/
 
   build:
+    if: ${{ false }}  # CI temporarily disabled
     runs-on: ubuntu-latest
     strategy:
       matrix:

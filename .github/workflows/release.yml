@@ -1,8 +1,7 @@
-name: Release to PyPI
+name: Release to PyPI (disabled)
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:  # Temporarily disabled; manual dispatch only
 
 permissions:
   contents: read
@@ -10,6 +9,7 @@ permissions:
 jobs:
   # Run full test suite before publishing
   test:
+    if: ${{ false }}  # Release pipeline temporarily disabled
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true  # Stop on first failure for releases
@@ -44,6 +44,7 @@ jobs:
 
   # Run linting checks
   lint:
+    if: ${{ false }}  # Release pipeline temporarily disabled
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -71,6 +72,7 @@ jobs:
 
   # Build documentation to ensure it works
   docs:
+    if: ${{ false }}  # Release pipeline temporarily disabled
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -97,6 +99,7 @@ jobs:
   # Build and publish to PyPI (only after all tests pass)
   publish:
     name: Publish to PyPI
+    if: ${{ false }}  # Release pipeline temporarily disabled
     needs: [test, lint, docs]
     runs-on: ubuntu-latest
     environment:
