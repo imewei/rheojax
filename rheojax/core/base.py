@@ -74,6 +74,135 @@ class BaseModel(BayesianMixin, ABC):
         """
         pass
 
+    def _detect_optimization_strategy(
+        self,
+        X: ArrayLike,
+        use_log_residuals: bool | None,
+        use_multi_start: bool | None,
+        n_starts: int,
+    ) -> tuple[bool, bool]:
+        """Auto-detect optimization strategy based on data range.
+
+        Args:
+            X: Input data
+            use_log_residuals: User-specified setting or None for auto-detect
+            use_multi_start: User-specified setting or None for auto-detect
+            n_starts: Number of starts for multi-start optimization
+
+        Returns:
+            Tuple of (use_log_residuals, use_multi_start) with defaults applied
+        """
+        import logging
+
+        if use_log_residuals is not None and use_multi_start is not None:
+            return use_log_residuals, use_multi_start
+
+        try:
+            from rheojax.core.data import RheoData
+            from rheojax.utils.data_quality import detect_data_range_decades
+
+            x_array = X.x if isinstance(X, RheoData) else X
+            decades = detect_data_range_decades(x_array)
+
+            if use_log_residuals is None:
+                if decades > 8.0:
+                    use_log_residuals = True
+                    logging.info(
+                        f"Auto-enabling log-residuals for wide range ({decades:.1f} decades)"
+                    )
+                else:
+                    use_log_residuals = False
+
+            if use_multi_start is None:
+                if decades > 10.0:
+                    use_multi_start = True
+                    logging.info(
+                        f"Auto-enabling multi-start optimization for very wide range "
+                        f"({decades:.1f} decades, {n_starts} starts)"
+                    )
+                else:
+                    use_multi_start = False
+
+        except Exception as e:
+            logging.debug(f"Range detection failed: {e}")
+            use_log_residuals = use_log_residuals if use_log_residuals is not None else False
+            use_multi_start = use_multi_start if use_multi_start is not None else False
+
+        return use_log_residuals, use_multi_start
+
+    def _check_compatibility(
+        self,
+        X: ArrayLike,
+        y: ArrayLike,
+        test_mode: str | None,
+    ) -> dict | None:
+        """Check model-data compatibility and return result.
+
+        Args:
+            X: Input data
+            y: Target data
+            test_mode: Test mode ('relaxation', 'oscillation', etc.)
+
+        Returns:
+            Compatibility dict if check succeeds, None otherwise
+        """
+        try:
+            from rheojax.utils.compatibility import check_model_compatibility
+
+            return check_model_compatibility(
+                model=self,
+                t=X if test_mode == "relaxation" else None,
+                G_t=y if test_mode == "relaxation" else None,
+                omega=X if test_mode == "oscillation" else None,
+                G_star=y if test_mode == "oscillation" else None,
+                test_mode=test_mode,
+            )
+        except Exception:
+            return None
+
+    def _enhance_error_with_compatibility(
+        self,
+        error: RuntimeError,
+        X: ArrayLike,
+        y: ArrayLike,
+        test_mode: str | None,
+    ) -> RuntimeError:
+        """Enhance optimization error with compatibility information.
+
+        Args:
+            error: Original RuntimeError
+            X: Input data
+            y: Target data
+            test_mode: Test mode
+
+        Returns:
+            Enhanced RuntimeError or original if enhancement fails
+        """
+        error_msg = str(error)
+
+        if "Optimization failed" not in error_msg and "did not converge" not in error_msg:
+            return error
+
+        compatibility = self._check_compatibility(X, y, test_mode)
+        if compatibility is None or compatibility.get("compatible", True):
+            return error
+
+        try:
+            from rheojax.utils.compatibility import format_compatibility_message
+
+            compat_msg = format_compatibility_message(compatibility)
+            enhanced_msg = (
+                f"{error_msg}\n\n"
+                f"Model-data compatibility issue detected:\n"
+                f"{compat_msg}\n\n"
+                f"Note: This model may not be appropriate for your data. "
+                f"In model comparison pipelines, it's normal for some models "
+                f"to fail when their underlying physics doesn't match the material behavior."
+            )
+            return RuntimeError(enhanced_msg)
+        except Exception:
+            return error
+
     def fit(
         self,
         X: ArrayLike,
@@ -132,47 +261,10 @@ class BaseModel(BayesianMixin, ABC):
         self.X_data = X
         self.y_data = y
 
-        # Auto-detect wide frequency ranges and configure optimization strategy
-        if use_log_residuals is None or use_multi_start is None:
-            try:
-                from rheojax.core.data import RheoData
-                from rheojax.utils.data_quality import detect_data_range_decades
-
-                # Extract x array from RheoData if needed
-                if isinstance(X, RheoData):
-                    x_array = X.x
-                else:
-                    x_array = X
-
-                decades = detect_data_range_decades(x_array)
-
-                # Auto-enable log-residuals for wide ranges (>8 decades)
-                if use_log_residuals is None:
-                    if decades > 8.0:
-                        use_log_residuals = True
-                        logging.info(
-                            f"Auto-enabling log-residuals for wide range ({decades:.1f} decades)"
-                        )
-                    else:
-                        use_log_residuals = False
-
-                # Auto-enable multi-start for very wide ranges (>10 decades)
-                if use_multi_start is None:
-                    if decades > 10.0:
-                        use_multi_start = True
-                        logging.info(
-                            f"Auto-enabling multi-start optimization for very wide range "
-                            f"({decades:.1f} decades, {n_starts} starts)"
-                        )
-                    else:
-                        use_multi_start = False
-
-            except Exception as e:
-                logging.debug(f"Range detection failed: {e}")
-                if use_log_residuals is None:
-                    use_log_residuals = False
-                if use_multi_start is None:
-                    use_multi_start = False
+        # Auto-detect optimization strategy
+        use_log_residuals, use_multi_start = self._detect_optimization_strategy(
+            X, use_log_residuals, use_multi_start, n_starts
+        )
 
         # Pass optimization strategy to _fit via kwargs
         kwargs["use_log_residuals"] = use_log_residuals
@@ -180,83 +272,29 @@ class BaseModel(BayesianMixin, ABC):
         kwargs["n_starts"] = n_starts
         kwargs["perturb_factor"] = perturb_factor
 
-        # Optional compatibility check
+        # Optional compatibility check before fitting
+        test_mode = kwargs.get("test_mode", None)
         if check_compatibility:
-            try:
-                from rheojax.utils.compatibility import (
-                    check_model_compatibility,
-                    format_compatibility_message,
-                )
+            compatibility = self._check_compatibility(X, y, test_mode)
+            if compatibility and not compatibility.get("compatible", True):
+                try:
+                    from rheojax.utils.compatibility import format_compatibility_message
 
-                # Determine test mode if not provided
-                test_mode = kwargs.get("test_mode", None)
-
-                # Check compatibility
-                compatibility = check_model_compatibility(
-                    model=self,
-                    t=X if test_mode == "relaxation" else None,
-                    G_t=y if test_mode == "relaxation" else None,
-                    omega=X if test_mode == "oscillation" else None,
-                    G_star=y if test_mode == "oscillation" else None,
-                    test_mode=test_mode,
-                )
-
-                # Log compatibility results
-                if not compatibility["compatible"]:
                     message = format_compatibility_message(compatibility)
                     logging.warning(f"Model compatibility check:\n{message}")
-
-            except Exception as e:
-                logging.debug(f"Compatibility check failed: {e}")
+                except Exception:
+                    pass
 
         # Call subclass implementation (which uses NLSQ via optimization module)
         try:
             self._fit(X, y, method=method, **kwargs)
             self.fitted_ = True
         except RuntimeError as e:
-            # Enhance error message with compatibility information
-            error_msg = str(e)
-
-            # Check if this is an optimization failure
-            if "Optimization failed" in error_msg or "did not converge" in error_msg:
-                # Try to provide more context
-                try:
-                    from rheojax.utils.compatibility import (
-                        check_model_compatibility,
-                        format_compatibility_message,
-                    )
-
-                    test_mode = kwargs.get("test_mode", None)
-                    compatibility = check_model_compatibility(
-                        model=self,
-                        t=X if test_mode == "relaxation" else None,
-                        G_t=y if test_mode == "relaxation" else None,
-                        omega=X if test_mode == "oscillation" else None,
-                        G_star=y if test_mode == "oscillation" else None,
-                        test_mode=test_mode,
-                    )
-
-                    if not compatibility["compatible"]:
-                        # Provide enhanced error message
-                        compat_msg = format_compatibility_message(compatibility)
-                        enhanced_msg = (
-                            f"{error_msg}\n\n"
-                            f"Model-data compatibility issue detected:\n"
-                            f"{compat_msg}\n\n"
-                            f"Note: This model may not be appropriate for your data. "
-                            f"In model comparison pipelines, it's normal for some models "
-                            f"to fail when their underlying physics doesn't match the material behavior."
-                        )
-                        raise RuntimeError(enhanced_msg) from e
-                except Exception:
-                    # If compatibility check fails, just raise original error
-                    pass
-
-            # Re-raise original error if not enhanced
+            enhanced = self._enhance_error_with_compatibility(e, X, y, test_mode)
+            if enhanced is not e:
+                raise enhanced from e
             raise
 
-        # Note: _nlsq_result would be set by subclass _fit implementation
-        # if it explicitly stores the OptimizationResult
         return self
 
     def fit_bayesian(
