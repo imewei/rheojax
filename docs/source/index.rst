@@ -150,7 +150,7 @@ Development Status
    - [done] Visualization with matplotlib
 
 **Phase 2 (Complete)**: Models and Transforms [done]
-   - [done] 25 rheological models (Maxwell, Zener, 11 fractional variants, 6 flow models, Generalized Maxwell, 2 SGR models, SPP yield stress)
+   - [done] 24 rheological models (Classical: 3, Fractional Maxwell: 4, Fractional Zener: 4, Fractional Advanced: 3, Flow: 6, Multi-Mode: 1, SGR: 2, SPP LAOS: 1)
    - [done] 7 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer)
    - [done] Pipeline API for fluent workflows
    - [done] 33 tutorial notebooks (basic, transforms, bayesian, advanced, SGR, SPP)
@@ -160,7 +160,7 @@ Development Status
    - [done] Uncertainty quantification via credible intervals and posterior distributions
    - [done] ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
    - [done] Model comparison (WAIC/LOO)
-   - [done] BayesianMixin: All 25 models support Bayesian inference
+   - [done] BayesianMixin: All 24 models support Bayesian inference
    - [done] BayesianPipeline with fluent API for NLSQ -> NUTS workflows
    - [done] 9 Bayesian inference tutorial notebooks (including SPP LAOS)
 
@@ -207,7 +207,7 @@ Performance
 
 RheoJAX delivers exceptional performance through JAX acceleration and systematic optimizations (v0.3.1-v0.3.2):
 
-.. list-table:: Performance Benchmarks (v0.4.0)
+.. list-table:: Performance Benchmarks (v0.5.0)
    :header-rows: 1
    :widths: 40 20 20 20
 
@@ -261,7 +261,7 @@ Community and Support
         year = {2024-2025},
         author = {Wei Chen},
         url = {https://github.com/imewei/rheojax},
-        version = {0.4.0}
+        version = {0.6.0}
       }
 
 Indices and Tables

@@ -536,7 +536,7 @@ If you use rheo in your research, please cite:
   year = {2024-2025},
   author = {Wei Chen},
   url = {https://github.com/imewei/rheojax},
-  version = {0.4.0}
+  version = {0.6.0}
 }
 ```
 

@@ -742,3 +742,120 @@ Yield stress and constant plastic viscosity.
    :members:
    :undoc-members:
    :show-inheritance:
+
+Soft Glassy Rheology (SGR) Models
+---------------------------------
+
+SGR Conventional
+~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.sgr_conventional.SGRConventional` | Handbook: :doc:`/models/sgr/sgr_conventional`
+Statistical mechanics model for soft glassy materials (Sollich 1998).
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``x``
+     - dimensionless
+     - [0.5, 3.0]
+     - Noise temperature (x<1: glass, 1<x<2: SGM, x≥2: Newtonian)
+   * - ``G0``
+     - Pa
+     - [0.001, 1e+09]
+     - Characteristic modulus
+   * - ``tau0``
+     - s
+     - [1e-09, 1e+06]
+     - Microscopic attempt time
+
+**Material Classification by Noise Temperature:**
+
+- **x < 1**: Glass (aging, non-ergodic, yield stress)
+- **1 < x < 2**: Soft Glassy Material (power-law rheology)
+- **x ≥ 2**: Newtonian liquid (no memory effects)
+
+.. autoclass:: rheojax.models.sgr_conventional.SGRConventional
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+SGR Generic (GENERIC Framework)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.sgr_generic.SGRGeneric` | Handbook: :doc:`/models/sgr/sgr_generic`
+Thermodynamically consistent SGR using GENERIC framework (Fuereder & Ilg 2013).
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``x``
+     - dimensionless
+     - [0.5, 3.0]
+     - Noise temperature
+   * - ``G0``
+     - Pa
+     - [0.001, 1e+09]
+     - Characteristic modulus
+   * - ``tau0``
+     - s
+     - [1e-09, 1e+06]
+     - Microscopic attempt time
+
+**Advantages over Conventional SGR:**
+
+- Satisfies Onsager reciprocal relations
+- Enhanced numerical stability near glass transition (x → 1)
+- Consistent thermodynamic framework
+
+.. autoclass:: rheojax.models.sgr_generic.SGRGeneric
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+SPP LAOS Models
+---------------
+
+SPP Yield Stress
+~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.spp_yield_stress.SPPYieldStress` | Handbook: :doc:`/models/spp/spp_yield_stress`
+Yield stress model for Sequence of Physical Processes (SPP) LAOS analysis.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``sigma_y``
+     - Pa
+     - [0, 1e+06]
+     - Static yield stress
+   * - ``G_cage``
+     - Pa
+     - [0.001, 1e+09]
+     - Cage modulus
+   * - ``n``
+     - dimensionless
+     - [0.01, 2]
+     - Power-law exponent
+
+**Note**: Use with :class:`rheojax.transforms.spp_decomposer.SPPDecomposer` for
+complete LAOS analysis. See :doc:`/api/spp_models` for the full SPP API reference.
+
+.. autoclass:: rheojax.models.spp_yield_stress.SPPYieldStress
+   :members:
+   :undoc-members:
+   :show-inheritance:

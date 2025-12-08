@@ -16,7 +16,7 @@ def test_rheojax_import():
 
     assert rheojax is not None
     assert hasattr(rheojax, "__version__")
-    assert rheojax.__version__ == "0.4.0"
+    assert rheojax.__version__ == "0.6.0"
 
 
 def test_submodule_imports():
