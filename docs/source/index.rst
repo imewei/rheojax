@@ -200,7 +200,6 @@ Technology Stack
 
 **Optional Dependencies**
    - CUDA 12.1-12.9 for GPU acceleration (Linux only)
-   - piblin for enhanced data management
 
 Performance
 -----------

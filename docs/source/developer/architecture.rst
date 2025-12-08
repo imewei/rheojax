@@ -54,27 +54,6 @@ Models follow scikit-learn conventions:
     predictions = model.predict(time)
     r2 = model.score(time, stress)
 
-Piblin Integration
-~~~~~~~~~~~~~~~~~~
-
-Full compatibility with piblin.Measurement:
-
-- RheoData wraps piblin.Measurement
-- Maintains all piblin methods
-- Adds JAX support and rheology-specific features
-
-.. code-block:: python
-
-    import piblin
-    from rheojax.core import RheoData
-
-    # From piblin
-    measurement = piblin.Measurement.from_file("data.h5")
-    rheo_data = RheoData.from_piblin(measurement)
-
-    # Back to piblin
-    measurement = rheo_data.to_piblin()
-
 Core Architecture
 -----------------
 
