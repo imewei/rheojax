@@ -1,7 +1,7 @@
-"""RheoData class - piblin-jax Measurement wrapper with JAX support.
+"""RheoData class - JAX-native rheological data container.
 
-This module provides the RheoData abstraction that wraps piblin_jax.Measurement
-while adding JAX array support and additional rheological data handling features.
+This module provides the RheoData abstraction for rheological data that supports
+both NumPy and JAX arrays with additional features for rheological analysis.
 """
 
 from __future__ import annotations
@@ -23,18 +23,6 @@ from rheojax.core.jax_config import safe_import_jax
 jax, jnp = safe_import_jax()
 HAS_JAX = True
 
-try:
-    import piblin_jax as piblin
-
-    HAS_PIBLIN = True
-except ImportError:
-    HAS_PIBLIN = False
-    warnings.warn(
-        "piblin-jax is not installed. Some features may be limited.",
-        ImportWarning,
-        stacklevel=2,
-    )
-
 
 type ArrayLike = np.ndarray | jnp_typing.ndarray | list | tuple
 
@@ -52,11 +40,12 @@ def _coerce_ndarray(data: ArrayLike | jnp_typing.ndarray | None) -> np.ndarray:
 
 @dataclass
 class RheoData:
-    """Wrapper around piblin_jax.Measurement with JAX support and rheological features.
+    """JAX-native container for rheological data with NumPy/JAX array support.
 
-    This class provides a unified interface for rheological data that maintains
-    full compatibility with piblin_jax.Measurement while adding support for JAX arrays
-    and additional features needed for rheological analysis.
+    This class provides a unified interface for rheological data that supports
+    both NumPy and JAX arrays with additional features needed for rheological
+    analysis including automatic test mode detection, data validation, and
+    domain-specific operations.
 
     Attributes:
         x: Independent variable data (e.g., time, frequency)
@@ -77,7 +66,6 @@ class RheoData:
     initial_test_mode: InitVar[str | None] = None
     metadata: dict[str, Any] = field(default_factory=dict)
     validate: bool = True
-    _measurement: Any | None = field(default=None, repr=False)
     _explicit_test_mode: str | None = field(default=None, repr=False, init=False)
 
     def __post_init__(self, initial_test_mode: str | None):
@@ -95,32 +83,7 @@ class RheoData:
             self._explicit_test_mode = self.metadata.get("test_mode")
 
         if self.x is None or self.y is None:
-            if self._measurement is None:
-                raise ValueError("x and y data must be provided")
-            else:
-                # Extract from piblin-jax measurement (first dataset)
-                dataset = self._measurement[0] if len(self._measurement) > 0 else None
-                if dataset is None:
-                    raise ValueError("piblin-jax Measurement contains no datasets")
-
-                self.x = np.array(dataset.independent_variable_data)
-                self.y = np.array(dataset.dependent_variable_data)
-
-                # Extract units from dataset details
-                if hasattr(dataset, "details") and dataset.details:
-                    if "x_units" in dataset.details and self.x_units is None:
-                        self.x_units = dataset.details["x_units"]
-                    if "y_units" in dataset.details and self.y_units is None:
-                        self.y_units = dataset.details["y_units"]
-
-                # Extract metadata from both dataset and measurement
-                if hasattr(dataset, "conditions") and dataset.conditions:
-                    self.metadata.update(dataset.conditions)
-                if (
-                    hasattr(self._measurement, "conditions")
-                    and self._measurement.conditions
-                ):
-                    self.metadata.update(self._measurement.conditions)
+            raise ValueError("x and y data must be provided")
 
         # Convert to arrays
         self.x = self._ensure_array(self.x)
@@ -138,10 +101,6 @@ class RheoData:
         # Validate data if requested
         if self.validate:
             self._validate_data()
-
-        # Create piblin-jax measurement if not provided
-        if self._measurement is None and HAS_PIBLIN:
-            self._create_piblin_measurement()
 
     def _ensure_array(self, data: ArrayLike) -> np.ndarray:
         """Ensure data is a proper array."""
@@ -204,83 +163,6 @@ class RheoData:
                         UserWarning,
                         stacklevel=2,
                     )
-
-    def _create_piblin_measurement(self):
-        """Create internal piblin-jax Measurement."""
-        if HAS_PIBLIN:
-            # Convert to numpy for piblin-jax (handles both JAX and NumPy internally)
-            x_np = np.array(self.x) if isinstance(self.x, jnp.ndarray) else self.x
-            y_np = np.array(self.y) if isinstance(self.y, jnp.ndarray) else self.y
-
-            # Create a OneDimensionalDataset
-            from piblin_jax.data.datasets import OneDimensionalDataset
-
-            # Store units in details
-            details = {}
-            if self.x_units:
-                details["x_units"] = self.x_units
-            if self.y_units:
-                details["y_units"] = self.y_units
-
-            dataset = OneDimensionalDataset(
-                independent_variable_data=x_np,
-                dependent_variable_data=y_np,
-                conditions=self.metadata,
-                details=details,
-            )
-
-            # Wrap in a Measurement with single dataset
-            self._measurement = piblin.Measurement(
-                datasets=[dataset], conditions=self.metadata
-            )
-
-    @classmethod
-    def from_piblin(cls, measurement: Any) -> RheoData:
-        """Create RheoData from piblin-jax Measurement.
-
-        Args:
-            measurement: piblin_jax.Measurement object
-
-        Returns:
-            RheoData instance wrapping the measurement
-        """
-        return cls(_measurement=measurement)
-
-    def to_piblin(self) -> Any:
-        """Convert to piblin-jax Measurement.
-
-        Returns:
-            piblin_jax.Measurement object
-        """
-        if self._measurement is not None:
-            return self._measurement
-
-        if not HAS_PIBLIN:
-            raise ImportError("piblin-jax is required for this operation")
-
-        # Convert to numpy for piblin-jax (handles both JAX and NumPy internally)
-        x_np = np.array(self.x) if isinstance(self.x, jnp.ndarray) else self.x
-        y_np = np.array(self.y) if isinstance(self.y, jnp.ndarray) else self.y
-
-        # Create a OneDimensionalDataset
-        from piblin_jax.data.datasets import OneDimensionalDataset
-
-        # Store units in details
-        details = {}
-        if self.x_units:
-            details["x_units"] = self.x_units
-        if self.y_units:
-            details["y_units"] = self.y_units
-
-        dataset = OneDimensionalDataset(
-            independent_variable_data=x_np,
-            dependent_variable_data=y_np,
-            conditions=self.metadata,
-            details=details,
-        )
-
-        # Wrap in a Measurement with single dataset
-        return piblin.Measurement(datasets=[dataset], conditions=self.metadata)
 
     def to_jax(self) -> RheoData:
         """Convert arrays to JAX arrays.
@@ -823,9 +705,9 @@ class RheoData:
             "Time domain conversion will be implemented with transforms"
         )
 
-    # piblin compatibility methods
+    # Data slicing methods
     def slice(self, start: float | None = None, end: float | None = None) -> RheoData:
-        """Slice data between x values (piblin compatibility).
+        """Slice data between x values.
 
         Args:
             start: Start x value

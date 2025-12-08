@@ -2,7 +2,7 @@
 
 This module provides:
 - Base classes for models and transforms
-- RheoData wrapper around piblin Measurement
+- RheoData container for rheological data
 - Parameter management system
 - Plugin registry for extensibility
 """

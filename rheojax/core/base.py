@@ -27,7 +27,7 @@ class BaseModel(BayesianMixin, ABC):
     """Abstract base class for all rheological models.
 
     This class defines the standard interface that all models must implement,
-    supporting JAX arrays, multiple API styles (fluent, scikit-learn, piblin),
+    supporting JAX arrays, scikit-learn style APIs,
     and Bayesian inference via NumPyro NUTS.
 
     All models inherit Bayesian capabilities from BayesianMixin, including:

@@ -51,7 +51,7 @@ def test_version_info():
     assert "minor" in version_info
     assert "patch" in version_info
     assert version_info["major"] == 0
-    assert version_info["minor"] == 4
+    assert version_info["minor"] == 6
     assert version_info["patch"] == 0
     # Python 3.12+ is required (specified in pyproject.toml and CLAUDE.md)
     assert version_info["python_requires"] == ">=3.12"

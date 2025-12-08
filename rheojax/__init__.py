@@ -2,7 +2,7 @@
 
 A comprehensive rheological analysis package integrating pyRheo's constitutive
 models with hermes-rheo's data analysis transforms, providing JAX-accelerated
-computations with multiple API styles and full piblin compatibility.
+computations with scikit-learn style APIs.
 
 Float64 Precision Enforcement:
     This package enforces float64 precision for JAX operations by:
