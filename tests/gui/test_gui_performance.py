@@ -343,37 +343,6 @@ class TestWidgetPerformance:
 
         table.close()
 
-    def test_model_browser_population_performance(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
-        """Benchmark model browser population performance.
-
-        Target: <200ms to populate all models
-        """
-        import time
-
-        from rheojax.gui.services.model_service import ModelService
-        from rheojax.gui.widgets.model_browser import ModelBrowser
-
-        browser = ModelBrowser()
-        qtbot.addWidget(browser)
-
-        service = ModelService()
-        models = service.get_available_models()
-
-        start = time.perf_counter()
-        for _ in range(10):
-            browser._tree.clear()  # Clear tree directly
-            browser.set_models(models)
-        elapsed = time.perf_counter() - start
-
-        avg_time = elapsed / 10 * 1000  # ms
-        print(f"Model browser population: {avg_time:.2f}ms avg")
-
-        assert browser._tree.topLevelItemCount() > 0
-        assert avg_time < 200, f"Model browser population too slow: {avg_time:.2f}ms"
-
-        browser.close()
 
 
 # =============================================================================

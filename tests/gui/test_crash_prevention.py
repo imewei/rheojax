@@ -14,9 +14,8 @@ characters in Qt widgets (especially QTreeWidget) cause bus errors
 
 Background
 ----------
-The original crash was caused by emoji icons in the model browser's
-CATEGORY_INFO dict. When Qt tried to render these emoji in a
-QTreeWidget, macOS's CoreText framework would crash in:
+The original crash was caused by emoji icons in Qt widgets. When Qt
+tried to render these emoji, macOS's CoreText framework would crash in:
 
     CopyEmojiImage -> CGImageSourceCreateImageAtIndex -> IIOReadPlugin
 
@@ -95,22 +94,6 @@ class TestEmojiCrashPrevention:
         assert emoji_checker("[OK]") is False
         assert emoji_checker("Hello World") is False
         assert emoji_checker("") is False
-
-    def test_model_browser_uses_safe_icons(self, ascii_checker):
-        """Verify model browser CATEGORY_INFO uses ASCII-safe values."""
-        from rheojax.gui.widgets.model_browser import CATEGORY_INFO, get_category_icon
-
-        for category, info in CATEGORY_INFO.items():
-            # Check info dict values
-            for key, value in info.items():
-                if isinstance(value, str):
-                    assert ascii_checker(value), (
-                        f"CATEGORY_INFO[{category}][{key}] has non-ASCII: {value}"
-                    )
-
-            # Check icon from function
-            icon = get_category_icon(category)
-            assert ascii_checker(icon), f"get_category_icon({category}) non-ASCII: {icon}"
 
     def test_status_bar_uses_ascii_indicators(self, ascii_checker):
         """Verify status bar uses ASCII status indicators."""
@@ -192,24 +175,6 @@ class TestWidgetRenderingSafety:
         assert table.item(0, 0).text() == "G0"
 
     @pytest.mark.gui
-    def test_model_browser_widget_creates_safely(self, qapp):
-        """Verify ModelBrowser widget creates without crash."""
-        from rheojax.gui.widgets.model_browser import ModelBrowser
-
-        browser = ModelBrowser()
-        browser.show()
-
-        # Set some models
-        models = {
-            "classical": ["maxwell", "zener", "springpot"],
-            "flow": ["power_law", "carreau"],
-        }
-        browser.set_models(models)
-
-        # Verify tree was populated
-        assert browser._tree.topLevelItemCount() == 2
-
-    @pytest.mark.gui
     def test_parameter_table_creates_safely(self, qapp):
         """Verify ParameterTable creates without crash."""
         from rheojax.gui.state.store import ParameterState
@@ -249,60 +214,6 @@ class TestSubprocessCrashDetection:
             f"GUI launch crashed with {result.signal_name or result.return_code}. "
             f"stderr: {result.stderr}"
         )
-
-    def test_model_browser_creation_no_crash(self, subprocess_runner):
-        """Verify ModelBrowser creation doesn't crash."""
-        code = textwrap.dedent("""
-            from PySide6.QtWidgets import QApplication
-            from rheojax.gui.widgets.model_browser import ModelBrowser
-
-            app = QApplication([])
-            browser = ModelBrowser()
-            browser.set_models({
-                "classical": ["maxwell", "zener"],
-                "flow": ["power_law"],
-            })
-            print("SUCCESS")
-        """)
-
-        result = subprocess_runner(code, timeout=10.0)
-
-        assert not result.crashed, (
-            f"ModelBrowser crashed with {result.signal_name or result.return_code}. "
-            f"stderr: {result.stderr}"
-        )
-        assert "SUCCESS" in result.stdout
-
-    def test_model_browser_tree_expansion_no_crash(self, subprocess_runner):
-        """Verify expanding tree items doesn't crash (original bug location)."""
-        code = textwrap.dedent("""
-            from PySide6.QtWidgets import QApplication
-            from rheojax.gui.widgets.model_browser import ModelBrowser
-
-            app = QApplication([])
-            browser = ModelBrowser()
-            browser.set_models({
-                "classical": ["maxwell", "zener", "springpot"],
-                "fractional_maxwell": ["fractional_maxwell_gel"],
-                "flow": ["power_law", "carreau"],
-                "sgr": ["sgr_conventional"],
-            })
-
-            # Expand and collapse all categories
-            browser.expand_all()
-            browser.collapse_all()
-            browser.expand_all()
-
-            print("SUCCESS")
-        """)
-
-        result = subprocess_runner(code, timeout=10.0)
-
-        assert not result.crashed, (
-            f"Tree expansion crashed with {result.signal_name or result.return_code}. "
-            f"stderr: {result.stderr}"
-        )
-        assert "SUCCESS" in result.stdout
 
     def test_parameter_table_creation_no_crash(self, subprocess_runner):
         """Verify ParameterTable creation doesn't crash."""
@@ -404,65 +315,6 @@ class TestSubprocessCrashDetection:
 class TestRegressionCrashPrevention:
     """Regression tests for specific crash bugs that were fixed."""
 
-    def test_fit_tab_click_regression(self, subprocess_runner):
-        """Regression test for original Fit tab crash (emoji in QTreeWidget).
-
-        This test verifies the fix for the bus error that occurred when
-        clicking the Fit tab, which was caused by emoji icons in the
-        model browser's QTreeWidget crashing macOS CoreText.
-        """
-        code = textwrap.dedent("""
-            from PySide6.QtWidgets import QApplication
-            from rheojax.gui.widgets.model_browser import (
-                ModelBrowser,
-                CATEGORY_INFO,
-                get_category_icon,
-            )
-
-            app = QApplication([])
-
-            # Verify no emoji in category info
-            for cat, info in CATEGORY_INFO.items():
-                for key, val in info.items():
-                    if isinstance(val, str):
-                        for c in val:
-                            if ord(c) > 127:
-                                raise ValueError(f"Non-ASCII in CATEGORY_INFO: {val}")
-
-            # Verify icons are ASCII
-            for cat in CATEGORY_INFO.keys():
-                icon = get_category_icon(cat)
-                for c in icon:
-                    if ord(c) > 127:
-                        raise ValueError(f"Non-ASCII icon for {cat}: {icon}")
-
-            # Create and populate browser (where crash occurred)
-            browser = ModelBrowser()
-            browser.set_models({
-                "classical": ["maxwell", "zener", "springpot"],
-                "fractional_maxwell": ["fractional_maxwell_gel", "fractional_maxwell_liquid"],
-                "fractional_zener": ["fractional_zener_sl", "fractional_zener_ss"],
-                "fractional_advanced": ["fractional_burgers"],
-                "flow": ["power_law", "carreau", "cross"],
-                "multi_mode": ["generalized_maxwell"],
-                "sgr": ["sgr_conventional", "sgr_generic"],
-            })
-
-            # Select a model (triggers info panel update)
-            browser.select_model("maxwell")
-
-            print("SUCCESS - No crash")
-        """)
-
-        result = subprocess_runner(code, timeout=15.0)
-
-        assert not result.crashed, (
-            f"Fit tab regression crashed with {result.signal_name or result.return_code}. "
-            f"This indicates the emoji crash fix may have regressed. "
-            f"stderr: {result.stderr}"
-        )
-        assert "SUCCESS" in result.stdout
-
     def test_status_bar_checkmark_regression(self, subprocess_runner):
         """Regression test for Unicode checkmarks in status bar.
 
@@ -540,25 +392,6 @@ class TestWidgetLifecycleSafety:
 
         assert tree.topLevelItemCount() == 100
 
-    @pytest.mark.gui
-    def test_model_browser_repeated_set_models(self, qapp):
-        """Test repeatedly setting models doesn't cause issues."""
-        from rheojax.gui.widgets.model_browser import ModelBrowser
-
-        browser = ModelBrowser()
-
-        # Repeatedly set different models
-        for _ in range(20):
-            browser.set_models({"classical": ["maxwell"]})
-            browser.set_models({"flow": ["power_law", "carreau"]})
-            browser.set_models({
-                "classical": ["maxwell", "zener"],
-                "sgr": ["sgr_conventional"],
-            })
-            browser.clear_selection()
-
-        # Process events
-        qapp.processEvents()
 
 
 class TestUnicodeEdgeCases:

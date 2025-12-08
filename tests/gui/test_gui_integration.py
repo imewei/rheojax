@@ -289,9 +289,6 @@ class TestWorkflowIntegration:
         page = FitPage()
         qtbot.addWidget(page)
 
-        # Page should have model browser with models
-        assert page._model_browser is not None
-
         # Should have parameter table
         assert page._parameter_table is not None
 
@@ -402,25 +399,6 @@ class TestWidgetIntegration:
             app = QApplication([])
         return app
 
-    def test_model_browser_selection(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
-        """Test ModelBrowser can load and select models."""
-        from rheojax.gui.services.model_service import ModelService
-        from rheojax.gui.widgets.model_browser import ModelBrowser
-
-        browser = ModelBrowser()
-        qtbot.addWidget(browser)
-
-        # Load models
-        service = ModelService()
-        models = service.get_available_models()
-        browser.set_models(models)
-
-        # Should have models loaded
-        assert browser._tree.topLevelItemCount() > 0
-
-        browser.close()
 
     def test_parameter_table_set_parameters(
         self, qapp: QApplication, qtbot: Any

@@ -162,30 +162,6 @@ class TestDeviceMemoryOptimization:
         # Verify it completes in reasonable time
         assert avg_time < 1.0, f"Pipeline took {avg_time:.3f}s, expected <1s"
 
-    @pytest.mark.skip(reason="keep_on_device feature deprecated in v0.4.0")
-    def test_keep_on_device_option(self, sample_data):
-        """Test 5: Test keep_on_device=True option."""
-        jax_data = RheoData(
-            x=jnp.array(sample_data.x),
-            y=jnp.array(sample_data.y),
-            x_units=sample_data.x_units,
-            y_units=sample_data.y_units,
-            domain=sample_data.domain,
-            metadata=sample_data.metadata,
-        )
-
-        pipeline = Pipeline(data=jax_data, keep_on_device=True)
-
-        assert pipeline.keep_on_device is True
-        assert isinstance(pipeline.data.x, jnp.ndarray)
-        assert isinstance(pipeline.data.y, jnp.ndarray)
-
-        pipeline.fit("simple_test_model")
-
-        # Data should remain on device
-        assert isinstance(pipeline.data.x, jnp.ndarray)
-        assert isinstance(pipeline.data.y, jnp.ndarray)
-
     def test_backward_compatibility_numpy_inputs(self, sample_data):
         """Test 6: Backward compatibility with NumPy inputs."""
         pipeline = Pipeline(data=sample_data)
@@ -199,51 +175,6 @@ class TestDeviceMemoryOptimization:
 
         assert predictions is not None
         assert pipeline._last_model is not None
-
-    @pytest.mark.skip(reason="keep_on_device feature deprecated in v0.4.0")
-    def test_device_cache_between_stages(self, sample_data):
-        """Test 7: Test device cache between pipeline stages."""
-        jax_data = RheoData(
-            x=jnp.array(sample_data.x),
-            y=jnp.array(sample_data.y),
-            x_units=sample_data.x_units,
-            y_units=sample_data.y_units,
-            domain=sample_data.domain,
-            metadata=sample_data.metadata,
-        )
-
-        pipeline = Pipeline(data=jax_data, keep_on_device=True)
-        assert len(pipeline._device_cache) == 0
-
-        pipeline.fit("simple_test_model")
-
-        # Cache should contain fit data
-        if "fit_data" in pipeline._device_cache:
-            cached_data = pipeline._device_cache["fit_data"]
-            assert isinstance(cached_data, tuple)
-
-        predictions = pipeline.predict()
-
-        # Cache should contain predictions
-        if "predictions" in pipeline._device_cache:
-            cached_preds = pipeline._device_cache["predictions"]
-            assert cached_preds is not None
-
-    @pytest.mark.skip(reason="keep_on_device feature deprecated in v0.4.0")
-    def test_cache_cleared_on_new_load(self, sample_csv_file):
-        """Test 8: Verify cache is cleared when new data is loaded."""
-        pipeline = Pipeline(keep_on_device=True)
-
-        pipeline.load(sample_csv_file, x_col="time", y_col="stress")
-        pipeline.fit("simple_test_model")
-
-        # Load new dataset - cache should be cleared
-        pipeline.load(sample_csv_file, x_col="time", y_col="stress")
-        assert len(pipeline._device_cache) == 0, "Cache should be cleared on new load"
-
-        # Re-fit and verify cache works again
-        pipeline.fit("simple_test_model")
-        assert len(pipeline._device_cache) >= 0
 
 
 class TestEnsureNumpyHelper:

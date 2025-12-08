@@ -210,42 +210,6 @@ class TestStandardIcon:
             assert hasattr(StandardIcon, name), f"Missing StandardIcon.{name}"
 
 
-class TestModelBrowserIntegration:
-    """Integration tests for model_browser using icons."""
-
-    def test_model_browser_get_category_icon(self):
-        """Test model_browser get_category_icon function."""
-        from rheojax.gui.widgets.model_browser import get_category_icon
-
-        # All categories should return ASCII icons
-        categories = [
-            "classical",
-            "fractional_maxwell",
-            "fractional_zener",
-            "fractional_advanced",
-            "flow",
-            "multi_mode",
-            "sgr",
-            "other",
-        ]
-
-        for category in categories:
-            icon = get_category_icon(category)
-            # Verify ASCII only
-            assert all(ord(c) < 128 for c in icon), f"Non-ASCII icon for {category}"
-
-    def test_model_browser_category_info_no_emoji(self):
-        """Test CATEGORY_INFO dict has no emoji in values."""
-        from rheojax.gui.widgets.model_browser import CATEGORY_INFO
-
-        for category, info in CATEGORY_INFO.items():
-            for key, value in info.items():
-                if isinstance(value, str):
-                    # Check no emoji (characters above U+1F000 are typically emoji)
-                    has_emoji = any(ord(c) > 0x1F000 for c in value)
-                    assert not has_emoji, f"Emoji found in CATEGORY_INFO[{category}][{key}]"
-
-
 class TestNoEmojiInQtWidgets:
     """Tests to ensure no emoji leaks into Qt widget text."""
 
