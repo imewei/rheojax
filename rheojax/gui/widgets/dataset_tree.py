@@ -56,6 +56,7 @@ class DatasetTree(QTreeWidget):
 
         # Configure tree
         self.setHeaderLabels(["Name", "Type", "Status"])
+        self.setStyleSheet("QTreeWidget { font-size: 11pt; } QHeaderView::section { font-size: 11pt; }")
         self.setColumnWidth(0, 250)
         self.setColumnWidth(1, 100)
         self.setColumnWidth(2, 80)

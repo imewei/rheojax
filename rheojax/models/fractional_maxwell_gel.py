@@ -468,19 +468,19 @@ class FractionalMaxwellGel(BaseModel):
             return self.predict_rheodata(X, test_mode=test_mode)
         else:
             # Get parameters
-            c1 = self.parameters.get_value("c1")
+            c_alpha = self.parameters.get_value("c_alpha")
             alpha = self.parameters.get_value("alpha")
-            tau = self.parameters.get_value("tau")
+            eta = self.parameters.get_value("eta")
             x = jnp.asarray(X)
 
             # Route to appropriate prediction method based on test_mode
             mode = test_mode or "relaxation"
             if mode == "relaxation":
-                result = self._predict_relaxation_jax(x, c1, alpha, tau)
+                result = self._predict_relaxation_jax(x, c_alpha, alpha, eta)
             elif mode == "creep":
-                result = self._predict_creep_jax(x, c1, alpha, tau)
+                result = self._predict_creep_jax(x, c_alpha, alpha, eta)
             elif mode == "oscillation":
-                result = self._predict_oscillation_jax(x, c1, alpha, tau)
+                result = self._predict_oscillation_jax(x, c_alpha, alpha, eta)
             else:
                 raise ValueError(
                     f"Unknown test mode: {mode}. "

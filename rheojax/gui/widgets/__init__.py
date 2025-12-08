@@ -10,7 +10,6 @@ from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas, ArvizCanvas
 from rheojax.gui.widgets.dataset_tree import DatasetTree
 from rheojax.gui.widgets.jax_status import JAXStatusWidget
-from rheojax.gui.widgets.model_browser import ModelBrowser
 from rheojax.gui.widgets.multi_view import MultiView
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.pipeline_chips import PipelineChips
@@ -27,7 +26,6 @@ __all__ = [
     "PipelineStep",
     "StepStatus",
     "JAXStatusWidget",
-    "ModelBrowser",
     "QuickFitStrip",
     "ArvizCanvas",
     "ArviZCanvas",

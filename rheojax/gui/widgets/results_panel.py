@@ -22,14 +22,18 @@ class ResultsPanel(QWidget):
         layout.setSpacing(4)
 
         self.fit_label = QLabel("Fit Results")
+        self.fit_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         self.fit_text = QTextEdit()
         self.fit_text.setReadOnly(True)
         self.fit_text.setMaximumHeight(120)
+        self.fit_text.setStyleSheet("font-size: 11pt;")
 
         self.bayes_label = QLabel("Bayesian Results")
+        self.bayes_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         self.bayes_text = QTextEdit()
         self.bayes_text.setReadOnly(True)
         self.bayes_text.setMaximumHeight(140)
+        self.bayes_text.setStyleSheet("font-size: 11pt;")
 
         layout.addWidget(self.fit_label)
         layout.addWidget(self.fit_text)

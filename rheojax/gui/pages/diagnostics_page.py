@@ -28,6 +28,7 @@ class DiagnosticsPage(QWidget):
 
     plot_requested = Signal(str, str)  # plot_type, model_id
     export_requested = Signal(str)  # plot_type
+    show_requested = Signal()  # ask main window to refresh diagnostics
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -37,6 +38,12 @@ class DiagnosticsPage(QWidget):
 
     def setup_ui(self) -> None:
         main_layout = QVBoxLayout(self)
+
+        # Top CTA
+        btn_show = QPushButton("Show Diagnostics")
+        btn_show.setStyleSheet("QPushButton { font-weight: bold; padding: 8px 12px; }")
+        btn_show.clicked.connect(self.show_requested.emit)
+        main_layout.addWidget(btn_show, 0, Qt.AlignmentFlag.AlignLeft)
 
         # Plot type tabs
         self._plot_tabs = QTabWidget()

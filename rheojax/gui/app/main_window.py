@@ -13,11 +13,12 @@ from pathlib import Path
 import uuid
 
 from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut, QFont
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
     QFileDialog,
+    QInputDialog,
     QMainWindow,
     QMessageBox,
     QTabWidget,
@@ -33,7 +34,6 @@ from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.app.menu_bar import MenuBar
 from rheojax.gui.app.status_bar import StatusBar
-from rheojax.gui.app.toolbar import MainToolBar, QuickFitStrip
 from rheojax.gui.pages.bayesian_page import BayesianPage
 from rheojax.gui.pages.data_page import DataPage
 from rheojax.gui.pages.diagnostics_page import DiagnosticsPage
@@ -78,10 +78,6 @@ class RheoJAXMainWindow(QMainWindow):
         Central state management
     menu_bar : MenuBar
         Application menu bar
-    toolbar : MainToolBar
-        Main toolbar with common actions
-    quick_fit_strip : QuickFitStrip
-        Quick fit workflow toolbar
     status_bar : StatusBar
         Status bar with progress and system indicators
     tabs : QTabWidget
@@ -136,22 +132,22 @@ class RheoJAXMainWindow(QMainWindow):
         self.setWindowTitle("RheoJAX - Rheological Analysis")
         self.resize(1400, 900)
 
+        # Bump global font size for readability
+        app = QApplication.instance()
+        if app is not None:
+            base_font: QFont = app.font()
+            if base_font.pointSize() > 0:
+                base_font.setPointSize(max(base_font.pointSize() + 2, 12))
+            else:
+                base_font.setPointSize(12)
+            app.setFont(base_font)
+
         # Menu bar
         self.menu_bar = MenuBar(self)
         self.setMenuBar(self.menu_bar)
 
-        # Main toolbar
-        self.toolbar = MainToolBar(self)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
-
-        # Quick fit strip
-        self.quick_fit_strip = QuickFitStrip(self)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.quick_fit_strip)
-
-        # Pipeline chips under toolbars
+        # Pipeline chips (kept for status wiring but not shown as a toolbar)
         self.pipeline_chips = PipelineChips(self)
-        self.addToolBarBreak(Qt.ToolBarArea.TopToolBarArea)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._wrap_widget_in_toolbar(self.pipeline_chips))
 
         # Status bar
         self.status_bar = StatusBar(self)
@@ -159,6 +155,7 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Update JAX status on startup
         self._update_jax_status()
+        self._setup_shortcuts()
 
     def setup_docks(self) -> None:
         """Create dock widgets for data panel, parameter panel, and log panel."""
@@ -199,6 +196,15 @@ class RheoJAXMainWindow(QMainWindow):
     def setup_tabs(self) -> None:
         """Create tab pages for main content area."""
         self.tabs = QTabWidget(self)
+        # Enlarge tab font for visibility
+        self.tabs.setStyleSheet(
+            """
+            QTabBar::tab {
+                font-size: 12pt;
+                padding: 8px 16px;
+            }
+            """
+        )
         self.setCentralWidget(self.tabs)
 
         # Create pages
@@ -242,33 +248,6 @@ class RheoJAXMainWindow(QMainWindow):
         self._connect_tools_menu()
         self._connect_help_menu()
 
-        # Connect toolbar actions
-        self.toolbar.open_action.triggered.connect(self._on_open_file)
-        self.toolbar.save_action.triggered.connect(self._on_save_file)
-        self.toolbar.fit_action.triggered.connect(self._on_fit)
-        self.toolbar.bayesian_action.triggered.connect(self._on_bayesian)
-        self.toolbar.stop_action.triggered.connect(self._on_stop)
-        self.toolbar.import_action.triggered.connect(self._on_import)
-        self.toolbar.zoom_in_action.triggered.connect(self._on_zoom_in)
-        self.toolbar.zoom_out_action.triggered.connect(self._on_zoom_out)
-        self.toolbar.reset_zoom_action.triggered.connect(self._on_reset_zoom)
-        self.toolbar.settings_action.triggered.connect(self._on_preferences)
-
-        # Connect quick fit strip
-        self.quick_fit_strip.load_clicked.connect(self._on_import)
-        self.quick_fit_strip.fit_clicked.connect(self._on_quick_fit)
-        self.quick_fit_strip.plot_clicked.connect(self._on_plot)
-        self.quick_fit_strip.export_clicked.connect(self._on_export)
-        self.quick_fit_strip.save_clicked.connect(self._on_save_file)
-        self.quick_fit_strip.mode_changed.connect(self._on_set_test_mode)
-        self.quick_fit_strip.model_changed.connect(self._on_select_model)
-        # Feedback signals from worker pool to quick-fit strip
-        if self.worker_pool:
-            self.worker_pool.job_started.connect(lambda *_: self.quick_fit_strip.set_busy(True))
-            self.worker_pool.job_completed.connect(lambda *_1, **_2: self.quick_fit_strip.set_busy(False))
-            self.worker_pool.job_failed.connect(lambda *_1, **_2: self.quick_fit_strip.set_busy(False))
-            self.worker_pool.job_cancelled.connect(lambda *_: self.quick_fit_strip.set_busy(False))
-
         # Pipeline chips navigation
         self.pipeline_chips.step_clicked.connect(lambda step: self.navigate_to(step.name.lower()))
 
@@ -284,6 +263,9 @@ class RheoJAXMainWindow(QMainWindow):
         self.home_page.new_project_requested.connect(self._on_new_file)
         self.home_page.example_selected.connect(self._on_open_example)
         self.home_page.recent_project_opened.connect(self._on_open_recent_project)
+
+        # Diagnostics CTA
+        self.diagnostics_page.show_requested.connect(self._on_show_diagnostics)
 
     def _connect_state_signals(self) -> None:
         """Connect store signals to UI updates (theme, pipeline, datasets)."""
@@ -864,7 +846,6 @@ class RheoJAXMainWindow(QMainWindow):
             step = "fit" if job_type == "fit" else "bayesian"
             self.store.dispatch("SET_PIPELINE_STEP", {"step": step, "status": "ACTIVE"})
             self.pipeline_chips.set_step_status(getattr(PipelineStep, step.upper()), StepStatus.ACTIVE)
-            self.quick_fit_strip.set_status(f"{job_type.capitalize()} running...")
         self.status_bar.show_message(f"Job started: {job_id}", 1000)
 
     def _on_job_progress(self, job_id: str, current: int, total: int, message: str) -> None:
@@ -915,7 +896,6 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.show_message("Bayesian inference complete", 3000)
             self._auto_save_if_enabled()
         self.log(f"Job {job_id} completed ({job_type})")
-        self.quick_fit_strip.set_status("Idle")
 
     def _on_job_failed(self, job_id: str, error: str) -> None:
         job_type = self._job_types.pop(job_id, "")
@@ -924,7 +904,6 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"})
         self.log(f"Job {job_id} failed: {error}")
         self.status_bar.show_message(f"Job failed: {error}", 5000)
-        self.quick_fit_strip.set_status("Failed")
 
     def _on_job_cancelled(self, job_id: str) -> None:
         job_type = self._job_types.pop(job_id, "")
@@ -933,7 +912,6 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "WARNING"})
         self.log(f"Job {job_id} cancelled")
         self.status_bar.show_message("Job cancelled", 2000)
-        self.quick_fit_strip.set_status("Cancelled")
 
     def _update_fit_plot(self, fit_result: FitResult) -> None:
         """Render fit plot and residuals on fit page using PlotService."""
@@ -998,7 +976,6 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_set_test_mode(self, mode: str) -> None:
         """Handle set test mode action."""
         self.store.dispatch("SET_TEST_MODE", {"test_mode": mode})
-        self.quick_fit_strip.set_mode(mode)
         self.log(f"Test mode set to: {mode}")
         self.status_bar.show_message(f"Test mode: {mode}", 2000)
 
@@ -1016,7 +993,6 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_select_model(self, model_id: str) -> None:
         """Handle model selection."""
         self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model_id})
-        self.quick_fit_strip.set_model(model_id)
         # Pull parameter defaults from registry via ModelService
         try:
             defaults = self.model_service.get_parameter_defaults(model_id)
@@ -1028,6 +1004,37 @@ class RheoJAXMainWindow(QMainWindow):
         self.navigate_to("fit")
         self.log(f"Selected model: {model_id}")
         self.status_bar.show_message(f"Model: {model_id}", 2000)
+
+    def _setup_shortcuts(self) -> None:
+        """Register application-wide shortcuts and command palette."""
+        QShortcut(QKeySequence("Ctrl+O"), self, self._on_open_file)
+        QShortcut(QKeySequence("Ctrl+S"), self, self._on_save_file)
+        QShortcut(QKeySequence("Ctrl+I"), self, self._on_import)
+        QShortcut(QKeySequence("Ctrl+F"), self, self._on_fit)
+        QShortcut(QKeySequence("Ctrl+B"), self, self._on_bayesian)
+        QShortcut(QKeySequence("Ctrl+D"), self, lambda: self.navigate_to("diagnostics"))
+        QShortcut(QKeySequence("Ctrl+E"), self, self._on_export)
+        QShortcut(QKeySequence("Ctrl+K"), self, self._open_command_palette)
+
+    def _open_command_palette(self) -> None:
+        """Simple command palette to trigger common actions."""
+        actions: dict[str, callable] = {
+            "Open Project": self._on_open_file,
+            "Import Data": self._on_import,
+            "Run Fit": self._on_fit,
+            "Run Bayesian": self._on_bayesian,
+            "Show Diagnostics": lambda: self.navigate_to("diagnostics"),
+            "Go to Data": lambda: self.navigate_to("data"),
+            "Go to Transform": lambda: self.navigate_to("transform"),
+            "Go to Fit": lambda: self.navigate_to("fit"),
+            "Go to Bayesian": lambda: self.navigate_to("bayesian"),
+            "Go to Export": lambda: self.navigate_to("export"),
+            "Export Results": self._on_export,
+        }
+        labels = sorted(actions.keys())
+        selected, ok = QInputDialog.getItem(self, "Command Palette", "Action:", labels, 0, False)
+        if ok and selected in actions:
+            actions[selected]()
 
     # -------------------------------------------------------------------------
     # Transforms Menu Handlers
@@ -1184,6 +1191,17 @@ class RheoJAXMainWindow(QMainWindow):
         self._job_types[job_id] = "bayesian"
 
     @Slot()
+    def _on_show_diagnostics(self) -> None:
+        """Navigate to diagnostics and refresh the current model plots."""
+        self.navigate_to("diagnostics")
+        state = self.store.get_state()
+        model_name = state.active_model_name
+        if model_name:
+            self.diagnostics_page.show_diagnostics(model_name)
+        else:
+            self.status_bar.show_message("Select a model to view diagnostics", 3000)
+
+    @Slot()
     def _on_batch_fit(self) -> None:
         """Handle batch fit action."""
         self.log("Opening batch fit dialog...")
@@ -1266,7 +1284,8 @@ class RheoJAXMainWindow(QMainWindow):
 <tr><td><b>Ctrl+E</b></td><td>Export Results</td></tr>
 <tr><td><b>Ctrl+F</b></td><td>Fit Model (NLSQ)</td></tr>
 <tr><td><b>Ctrl+B</b></td><td>Bayesian Inference</td></tr>
-<tr><td><b>Ctrl+D</b></td><td>Auto-detect Test Mode</td></tr>
+<tr><td><b>Ctrl+D</b></td><td>Open Diagnostics</td></tr>
+<tr><td><b>Ctrl+K</b></td><td>Command Palette</td></tr>
 <tr><td><b>Ctrl++</b></td><td>Zoom In</td></tr>
 <tr><td><b>Ctrl+-</b></td><td>Zoom Out</td></tr>
 <tr><td><b>Ctrl+0</b></td><td>Reset Zoom</td></tr>
@@ -1284,38 +1303,6 @@ class RheoJAXMainWindow(QMainWindow):
         dialog = AboutDialog(self)
         dialog.exec()
         self.log("Displayed About dialog")
-
-    # -------------------------------------------------------------------------
-    # Quick Fit Strip Handlers
-    # -------------------------------------------------------------------------
-
-    @Slot()
-    def _on_quick_fit(self) -> None:
-        """Handle quick fit from quick fit strip."""
-        mode = self.quick_fit_strip.get_mode()
-        model = self.quick_fit_strip.get_model()
-        self.log(f"Quick fit: {model} in {mode} mode")
-        self.store.dispatch("SET_TEST_MODE", {"test_mode": mode})
-        self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model})
-        self.navigate_to("fit")
-        self._on_fit()
-
-    @Slot()
-    def _on_plot(self) -> None:
-        """Handle plot action."""
-        self.log("Generating plot...")
-        self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
-        self.navigate_to("fit")
-        self.status_bar.show_message("Generating plot preview...", 2000)
-        self.quick_fit_strip.set_status("Plotting...")
-
-        fit_result = self.store.get_active_fit_result()
-        if fit_result:
-            self._update_fit_plot(fit_result)
-            self.status_bar.show_message("Plot ready", 2000)
-        else:
-            self.status_bar.show_message("Run a fit before plotting.", 3000)
-        self.quick_fit_strip.set_status("Idle")
 
     def _update_jax_status(self) -> None:
         """Update JAX device and memory status in status bar."""

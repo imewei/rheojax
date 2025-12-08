@@ -69,6 +69,10 @@ class ParameterTable(QTableWidget):
         # Configure table
         self.setColumnCount(5)
         self.setHorizontalHeaderLabels(["Parameter", "Value", "Min", "Max", "Fixed"])
+        self.setStyleSheet(
+            "QTableWidget { font-size: 11pt; } "
+            "QHeaderView::section { font-size: 11pt; }"
+        )
 
         # Column widths
         self.setColumnWidth(0, 120)

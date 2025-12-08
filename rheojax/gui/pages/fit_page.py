@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import (
+    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -31,7 +32,6 @@ from rheojax.gui.state.actions import (
     update_fit_progress,
 )
 from rheojax.gui.state.store import StateStore
-from rheojax.gui.widgets.model_browser import ModelBrowser
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
@@ -75,10 +75,8 @@ class FitPage(QWidget):
         """Set up the user interface."""
         main_layout = QHBoxLayout(self)
 
-        # Left: Model browser (30%)
-        self._model_browser = ModelBrowser()
-        self._model_browser.setMinimumWidth(250)
-        main_layout.addWidget(self._model_browser, 1)
+        # Left: Model browser (removed to avoid duplication; selection via context controls)
+        self._model_browser = None
 
         # Center: Visualization (40%)
         center_panel = self._create_center_panel()
@@ -107,6 +105,22 @@ class FitPage(QWidget):
         """Create right panel with parameters and controls."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
+
+        # Context selectors (mode + quick model)
+        context_group = QGroupBox("Context")
+        context_layout = QHBoxLayout(context_group)
+        context_layout.addWidget(QLabel("Mode:"))
+        self._mode_combo = QComboBox()
+        self._mode_combo.addItems(["oscillation", "relaxation", "creep", "rotation"])
+        self._mode_combo.currentTextChanged.connect(self._on_mode_changed)
+        context_layout.addWidget(self._mode_combo)
+        context_layout.addWidget(QLabel("Model:"))
+        self._quick_model_combo = QComboBox()
+        self._quick_model_combo.setEditable(True)
+        self._quick_model_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._quick_model_combo.currentIndexChanged.connect(self._on_quick_model_changed)
+        context_layout.addWidget(self._quick_model_combo, 1)
+        layout.addWidget(context_group)
 
         # Compatibility status
         compat_group = QGroupBox("Compatibility")
@@ -165,10 +179,6 @@ class FitPage(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect internal signals."""
-        # Model browser signals
-        self._model_browser.model_selected.connect(self._on_model_selected)
-        self._model_browser.model_double_clicked.connect(self._on_model_double_clicked)
-
         # Store signals (only if signals are set)
         if self._store.signals is not None:
             self._store.signals.dataset_selected.connect(self._on_dataset_changed)
@@ -178,10 +188,17 @@ class FitPage(QWidget):
     def _load_models(self) -> None:
         """Load available models into browser."""
         models = self._model_service.get_available_models()
-        self._model_browser.set_models(models)
-        self._model_browser.set_model_info_callback(
-            self._model_service.get_model_info
-        )
+        self._populate_quick_model_selector(models)
+
+    def _populate_quick_model_selector(self, models: dict[str, list[str]]) -> None:
+        """Populate quick model selector with available models."""
+        self._quick_model_combo.blockSignals(True)
+        self._quick_model_combo.clear()
+        self._quick_model_combo.addItem("Select model...", None)
+        for category in models.values():
+            for model_name in category:
+                self._quick_model_combo.addItem(model_name, model_name)
+        self._quick_model_combo.blockSignals(False)
 
     @Slot(str)
     def _on_model_selected(self, model_name: str) -> None:
@@ -225,6 +242,13 @@ class FitPage(QWidget):
         dataset = self._store.get_active_dataset()
         self._btn_fit.setEnabled(dataset is not None)
 
+        # Sync quick selector
+        idx = self._quick_model_combo.findData(model_name)
+        if idx >= 0:
+            was_blocked = self._quick_model_combo.blockSignals(True)
+            self._quick_model_combo.setCurrentIndex(idx)
+            self._quick_model_combo.blockSignals(was_blocked)
+
     @Slot(str)
     def _on_model_double_clicked(self, model_name: str) -> None:
         """Handle model double-click (quick fit).
@@ -242,11 +266,18 @@ class FitPage(QWidget):
     def _on_dataset_changed(self) -> None:
         """Handle active dataset change."""
         dataset = self._store.get_active_dataset()
-        model_name = self._model_browser.get_selected()
+        model_name = None
 
         if dataset is not None:
             # Plot data
             self._plot_data(dataset)
+            # Update mode indicator
+            if dataset.test_mode:
+                idx = self._mode_combo.findText(dataset.test_mode)
+                if idx >= 0:
+                    was_blocked = self._mode_combo.blockSignals(True)
+                    self._mode_combo.setCurrentIndex(idx)
+                    self._mode_combo.blockSignals(was_blocked)
 
             # Check compatibility
             if model_name:
@@ -254,6 +285,21 @@ class FitPage(QWidget):
                 self._btn_fit.setEnabled(True)
         else:
             self._btn_fit.setEnabled(False)
+            self._compat_label.setText("Select a dataset to enable fitting")
+            self._compat_label.setStyleSheet("color: gray;")
+
+    def _on_mode_changed(self, mode: str) -> None:
+        """Update store test mode from selector."""
+        if mode:
+            self._store.dispatch("SET_TEST_MODE", {"test_mode": mode})
+            self._compat_label.setText(f"Mode set to {mode}")
+            self._compat_label.setStyleSheet("color: #555;")
+
+    def _on_quick_model_changed(self, index: int) -> None:
+        """Handle quick model combo changes."""
+        model_name = self._quick_model_combo.itemData(index)
+        if model_name:
+            self._on_model_selected(model_name)
 
     def _check_compatibility(self, model_name: str) -> None:
         """Check model-data compatibility.
