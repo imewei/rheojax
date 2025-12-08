@@ -460,7 +460,8 @@ class FractionalMaxwellModel(BaseModel):
 
         Args:
             X: RheoData object or array of x-values
-            test_mode: Test mode for prediction
+            test_mode: Test mode for prediction ('relaxation', 'creep', 'oscillation')
+                       Required when X is a raw array. If None, defaults to 'relaxation'.
 
         Returns:
             Predicted values (RheoData if input is RheoData, else array)
@@ -468,4 +469,24 @@ class FractionalMaxwellModel(BaseModel):
         if isinstance(X, RheoData):
             return self.predict_rheodata(X, test_mode=test_mode)
         else:
-            return self._predict(X)
+            # Get parameters
+            c1 = self.parameters.get_value("c1")
+            alpha = self.parameters.get_value("alpha")
+            beta = self.parameters.get_value("beta")
+            tau = self.parameters.get_value("tau")
+            x = jnp.asarray(X)
+
+            # Route to appropriate prediction method based on test_mode
+            mode = test_mode or "relaxation"
+            if mode == "relaxation":
+                result = self._predict_relaxation_jax(x, c1, alpha, beta, tau)
+            elif mode == "creep":
+                result = self._predict_creep_jax(x, c1, alpha, beta, tau)
+            elif mode == "oscillation":
+                result = self._predict_oscillation_jax(x, c1, alpha, beta, tau)
+            else:
+                raise ValueError(
+                    f"Unknown test mode: {mode}. "
+                    f"Must be 'relaxation', 'creep', or 'oscillation'"
+                )
+            return np.array(result)
