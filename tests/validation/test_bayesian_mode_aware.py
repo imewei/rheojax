@@ -239,9 +239,16 @@ def check_divergences(
         return True  # No diagnostic available
 
     divergences = diagnostics["divergences"]
+    total_samples = diagnostics.get("total_samples")
+    if total_samples is None:
+        chains = diagnostics.get("num_chains") or 1
+        per_chain = diagnostics.get("num_samples_per_chain") or num_samples
+        total_samples = per_chain * chains
+
     if isinstance(divergences, (int, float)):
         # Calculate divergence rate from count
-        rate = divergences / num_samples if num_samples > 0 else 0.0
+        total = total_samples if total_samples and total_samples > 0 else num_samples
+        rate = divergences / total if total else 0.0
         return rate <= threshold
     return True  # Can't verify
 

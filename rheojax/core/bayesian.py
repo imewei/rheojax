@@ -497,6 +497,9 @@ class BayesianMixin:
         # Use provided seed or default to 0 for reproducibility
         rng_seed = seed if seed is not None else 0
 
+        # Encourage higher acceptance to reduce divergences in stiff fractional models.
+        nuts_kwargs.setdefault("target_accept_prob", 0.99)
+
         def run_mcmc(strategy):
             kernel = NUTS(numpyro_model, init_strategy=strategy, **nuts_kwargs)
             chain_method = _select_chain_method()
@@ -563,7 +566,12 @@ class BayesianMixin:
                 "q95": float(np.percentile(sample_array, 95)),
             }
 
-        diagnostics = self._compute_diagnostics(mcmc, posterior_samples)
+        diagnostics = self._compute_diagnostics(
+            mcmc,
+            posterior_samples,
+            num_samples=num_samples,
+            num_chains=num_chains,
+        )
 
         return BayesianResult(
             posterior_samples=posterior_samples,
@@ -860,8 +868,8 @@ class BayesianMixin:
                 y_real_obs, y_imag_obs = y[:n], y[n:]
 
                 # Exponential priors on noise (inflated scale for robustness)
-                sigma_real_scale = max(y_real_scale * 5.0, 1e-9)
-                sigma_imag_scale = max(y_imag_scale * 5.0, 1e-9)
+                sigma_real_scale = max(y_real_scale * 10.0, 1e-9)
+                sigma_imag_scale = max(y_imag_scale * 10.0, 1e-9)
                 sigma_real = numpyro.sample(
                     "sigma_real", dist.Exponential(rate=1.0 / sigma_real_scale)
                 )
@@ -879,7 +887,7 @@ class BayesianMixin:
                     obs=y_imag_obs,
                 )
             else:
-                sigma_scale = max(data_scale * 5.0, 1e-9)
+                sigma_scale = max(data_scale * 10.0, 1e-9)
                 sigma = numpyro.sample(
                     "sigma", dist.Exponential(rate=1.0 / sigma_scale)
                 )
@@ -890,7 +898,11 @@ class BayesianMixin:
         return numpyro_model
 
     def _compute_diagnostics(
-        self, mcmc: MCMC, posterior_samples: dict[str, np.ndarray]
+        self,
+        mcmc: MCMC,
+        posterior_samples: dict[str, np.ndarray],
+        num_samples: int,
+        num_chains: int,
     ) -> dict[str, Any]:
         """Compute convergence diagnostics from MCMC samples.
 
@@ -951,6 +963,9 @@ class BayesianMixin:
                 num_divergences = 0
 
             diagnostics["divergences"] = num_divergences
+            diagnostics["total_samples"] = int(num_samples * num_chains)
+            diagnostics["num_chains"] = int(num_chains)
+            diagnostics["num_samples_per_chain"] = int(num_samples)
 
         except Exception as e:
             # If diagnostics computation fails, return minimal info
@@ -959,6 +974,9 @@ class BayesianMixin:
                 name: float(len(samples)) for name, samples in posterior_samples.items()
             }
             diagnostics["divergences"] = 0
+            diagnostics["total_samples"] = int(num_samples * num_chains)
+            diagnostics["num_chains"] = int(num_chains)
+            diagnostics["num_samples_per_chain"] = int(num_samples)
             diagnostics["error"] = str(e)
 
         return diagnostics
