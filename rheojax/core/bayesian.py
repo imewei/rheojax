@@ -135,8 +135,45 @@ class BayesianResult:
             The MCMC object must be present (automatically stored by fit_bayesian).
         """
         # Return cached version if available
+        def _ensure_energy(idata):
+            """Guarantee energy diagnostic exists for ArviZ energy plots."""
+            sample_stats = getattr(idata, "sample_stats", None)
+            if sample_stats is None or hasattr(sample_stats, "energy"):
+                return idata
+
+            try:
+                extra_fields = self.mcmc.get_extra_fields(group_by_chain=True)
+            except TypeError:
+                # Older NumPyro versions may not support group_by_chain kwarg.
+                extra_fields = self.mcmc.get_extra_fields()
+            except Exception:
+                return idata
+            energy_field = None
+            if isinstance(extra_fields, dict):
+                energy_field = extra_fields.get("energy") or extra_fields.get(
+                    "potential_energy"
+                )
+
+            if energy_field is None:
+                return idata
+
+            import xarray as xr
+
+            energy_array = np.asarray(energy_field)
+            # ArviZ expects shape (chain, draw) for sample_stats variables.
+            try:
+                energy_array = energy_array.reshape(self.num_chains, -1)
+            except ValueError:
+                # Fallback to adding a singleton chain dimension if reshape fails.
+                energy_array = np.expand_dims(energy_array, axis=0)
+
+            idata.sample_stats = sample_stats.assign(
+                energy=xr.DataArray(energy_array, dims=("chain", "draw"))
+            )
+            return idata
+
         if self._inference_data is not None:
-            return self._inference_data
+            return _ensure_energy(self._inference_data)
 
         # Import arviz (lazy import)
         from rheojax.core.arviz_utils import import_arviz
@@ -162,7 +199,7 @@ class BayesianResult:
         # log_likelihood=True computes pointwise log-likelihood for WAIC/LOO model comparison
         self._inference_data = az.from_numpyro(self.mcmc, log_likelihood=True)
 
-        return self._inference_data
+        return _ensure_energy(self._inference_data)
 
 
 class BayesianMixin:

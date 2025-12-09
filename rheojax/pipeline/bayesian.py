@@ -716,6 +716,14 @@ class BayesianPipeline(Pipeline):
         # Get InferenceData
         idata = self._get_inference_data()
 
+        sample_stats = getattr(idata, "sample_stats", None)
+        if sample_stats is None or not hasattr(sample_stats, "energy"):
+            raise RuntimeError(
+                "Energy diagnostic is missing from InferenceData.sample_stats. "
+                "Ensure NumPyro was run with NUTS and that energy/potential_energy "
+                "fields are available for conversion to ArviZ."
+            )
+
         # Create energy plot
         axes = az.plot_energy(idata, **plot_kwargs)
 
