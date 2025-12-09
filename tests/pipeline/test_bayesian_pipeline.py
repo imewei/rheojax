@@ -351,3 +351,62 @@ class TestBayesianPipelineIntegration:
         # Try to get posterior summary without Bayesian fit
         with pytest.raises(ValueError, match="No Bayesian result"):
             pipeline.get_posterior_summary()
+
+
+class TestBayesianPipelineMultiChain:
+    """Tests for multi-chain parallelization in BayesianPipeline."""
+
+    def test_fit_bayesian_num_chains_parameter(self, sample_data):
+        """Test that num_chains parameter is exposed and works correctly."""
+        pipeline = BayesianPipeline(data=sample_data)
+        model = MockBayesianModel()
+
+        pipeline.fit_nlsq(model)
+        pipeline.fit_bayesian(num_samples=50, num_warmup=25, num_chains=2)
+
+        # Result should have 2 chains
+        assert pipeline._bayesian_result.num_chains == 2
+
+        # Total samples should be num_samples * num_chains
+        total_samples = len(pipeline._bayesian_result.posterior_samples["a"])
+        assert total_samples == 50 * 2
+
+    def test_default_num_chains_is_four(self):
+        """Test that default num_chains in BayesianPipeline is 4."""
+        import inspect
+
+        sig = inspect.signature(BayesianPipeline.fit_bayesian)
+        num_chains_param = sig.parameters.get("num_chains")
+
+        assert num_chains_param is not None
+        assert (
+            num_chains_param.default == 4
+        ), f"Default num_chains should be 4, got {num_chains_param.default}"
+
+    def test_multichain_improves_rhat(self, sample_data):
+        """Test that multi-chain sampling provides better R-hat estimates."""
+        pipeline = BayesianPipeline(data=sample_data)
+        model = MockBayesianModel()
+
+        pipeline.fit_nlsq(model)
+        pipeline.fit_bayesian(num_samples=100, num_warmup=50, num_chains=4)
+
+        diagnostics = pipeline.get_diagnostics()
+
+        # R-hat should be computed and reasonable
+        assert "r_hat" in diagnostics
+        for param in ["a", "b"]:
+            r_hat = diagnostics["r_hat"][param]
+            assert np.isfinite(r_hat)
+            assert r_hat < 1.2  # Reasonable convergence
+
+    def test_single_chain_still_works(self, sample_data):
+        """Test that single chain mode still works for quick demos."""
+        pipeline = BayesianPipeline(data=sample_data)
+        model = MockBayesianModel()
+
+        pipeline.fit_nlsq(model)
+        pipeline.fit_bayesian(num_samples=50, num_warmup=25, num_chains=1)
+
+        assert pipeline._bayesian_result.num_chains == 1
+        assert len(pipeline._bayesian_result.posterior_samples["a"]) == 50

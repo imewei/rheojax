@@ -41,15 +41,23 @@ def mcmc_config():
         PYTEST_FULL_VALIDATION: If set, forces full MCMC configuration
 
     Configuration Modes:
-        Fast (CI/CD): num_warmup=200, num_samples=200
+        Fast (CI/CD): num_warmup=200, num_samples=200, num_chains=1
             - 10x faster than full mode
             - Sufficient for convergence detection (R-hat, ESS)
             - Recommended for pre-commit and CI testing
+            - Uses num_chains=1 for speed (production default is 4)
 
-        Full (Validation): num_warmup=2000, num_samples=1000
+        Full (Validation): num_warmup=2000, num_samples=1000, num_chains=1
             - Production-quality posteriors
             - Strict convergence thresholds
             - Recommended for local development and weekly validation
+            - Uses num_chains=1 for speed; multi-chain tests use explicit num_chains=4
+
+    Note:
+        The production API default is num_chains=4, but tests use num_chains=1
+        for speed. Multi-chain functionality is tested explicitly in
+        test_bayesian.py::TestBayesianPipelineMultiChain and
+        tests/core/test_bayesian.py::test_multichain_* tests.
 
     Usage in tests:
         def test_bayesian_inference(mcmc_config):
@@ -70,7 +78,7 @@ def mcmc_config():
         return {
             "num_warmup": 2000,
             "num_samples": 1000,
-            "num_chains": 1,
+            "num_chains": 1,  # Use 1 for speed; multi-chain tested separately
             "r_hat_threshold": 1.01,
             "ess_threshold": 400,
             "divergence_threshold": 0.01,  # 1%
@@ -81,7 +89,7 @@ def mcmc_config():
         return {
             "num_warmup": 200,
             "num_samples": 200,
-            "num_chains": 1,
+            "num_chains": 1,  # Use 1 for speed; multi-chain tested separately
             "r_hat_threshold": 1.05,  # Relaxed for speed
             "ess_threshold": 200,  # Relaxed for speed
             "divergence_threshold": 0.02,  # 2% (relaxed)
@@ -92,7 +100,7 @@ def mcmc_config():
         return {
             "num_warmup": 2000,
             "num_samples": 1000,
-            "num_chains": 1,
+            "num_chains": 1,  # Use 1 for speed; multi-chain tested separately
             "r_hat_threshold": 1.01,
             "ess_threshold": 400,
             "divergence_threshold": 0.01,
@@ -107,13 +115,17 @@ def validation_mcmc_config():
     Validation tests always use full MCMC settings regardless of CI/local environment.
     This ensures accurate convergence testing even in CI pipelines.
 
+    Note:
+        Uses num_chains=1 for speed. The production API default is num_chains=4,
+        which is tested explicitly in multi-chain specific tests.
+
     Returns:
         dict: Full MCMC configuration with production settings
     """
     return {
         "num_warmup": 2000,
         "num_samples": 1000,
-        "num_chains": 1,
+        "num_chains": 1,  # Use 1 for speed; multi-chain tested separately
         "r_hat_threshold": 1.01,
         "ess_threshold": 400,
         "divergence_threshold": 0.01,  # 1%

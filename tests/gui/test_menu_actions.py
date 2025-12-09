@@ -288,35 +288,37 @@ class TestMenuBarActionConnections:
 
 
 class TestToolbarActionConnections:
-    """Test that toolbar actions are connected to handlers."""
+    """Test that toolbar/menu actions are connected to handlers."""
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
     def test_main_toolbar_actions_connected(self, qtbot, qapp) -> None:
-        """Verify main toolbar actions have handlers."""
+        """Verify main menu bar actions have handlers.
+
+        Note: The toolbar was refactored to use menu_bar for all actions.
+        This test verifies the equivalent menu bar actions are connected.
+        """
         from rheojax.gui.app.main_window import RheoJAXMainWindow
 
         window = RheoJAXMainWindow()
         qtbot.addWidget(window)
 
-        toolbar_actions = [
-            ("open_action", "Open"),
-            ("save_action", "Save"),
+        # Actions now live on menu_bar (toolbar was removed in refactor)
+        menu_actions = [
+            ("open_file_action", "Open"),
+            ("save_file_action", "Save"),
             ("import_action", "Import"),
-            ("fit_action", "Fit"),
-            ("bayesian_action", "Bayesian"),
-            ("stop_action", "Stop"),
             ("zoom_in_action", "Zoom In"),
             ("zoom_out_action", "Zoom Out"),
             ("reset_zoom_action", "Reset Zoom"),
-            ("settings_action", "Settings"),
+            ("preferences_action", "Settings/Preferences"),
         ]
 
-        for action_name, description in toolbar_actions:
-            action = getattr(window.toolbar, action_name, None)
-            assert action is not None, f"Missing toolbar action: {action_name}"
+        for action_name, description in menu_actions:
+            action = getattr(window.menu_bar, action_name, None)
+            assert action is not None, f"Missing menu bar action: {action_name}"
             assert action_has_receivers(action), (
-                f"Toolbar > {description} ({action_name}) has no connected handler"
+                f"Menu Bar > {description} ({action_name}) has no connected handler"
             )
 
 

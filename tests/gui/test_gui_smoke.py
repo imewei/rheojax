@@ -808,5 +808,107 @@ class TestEdgeCases:
         assert ds.metadata["key"] == "value", "Should be able to modify metadata"
 
 
+# =============================================================================
+# Test JAX Utils (Home Page Dependencies)
+# =============================================================================
+
+
+class TestJaxUtils:
+    """Test JAX utility functions used by HomePage.
+
+    These tests verify the get_jax_info function returns the correct
+    structure expected by HomePage._update_jax_status().
+    """
+
+    @pytest.mark.smoke
+    def test_get_jax_info_import(self) -> None:
+        """Test get_jax_info function can be imported."""
+        from rheojax.gui.utils.jax_utils import get_jax_info
+
+        assert callable(get_jax_info), "get_jax_info should be callable"
+
+    @pytest.mark.smoke
+    def test_get_jax_info_returns_expected_keys(self) -> None:
+        """Test get_jax_info returns all keys expected by HomePage."""
+        from rheojax.gui.utils.jax_utils import get_jax_info
+
+        info = get_jax_info()
+
+        expected_keys = [
+            "devices",
+            "default_device",
+            "memory_used_mb",
+            "memory_total_mb",
+            "float64_enabled",
+            "jit_cache_count",
+        ]
+
+        for key in expected_keys:
+            assert key in info, f"get_jax_info should return '{key}'"
+
+    @pytest.mark.smoke
+    def test_get_jax_info_devices_is_list(self) -> None:
+        """Test get_jax_info returns devices as list."""
+        from rheojax.gui.utils.jax_utils import get_jax_info
+
+        info = get_jax_info()
+
+        assert isinstance(info["devices"], list), "devices should be a list"
+        assert len(info["devices"]) > 0, "devices should not be empty"
+        assert all(
+            isinstance(d, str) for d in info["devices"]
+        ), "devices should contain strings"
+
+    @pytest.mark.smoke
+    def test_get_jax_info_default_device_is_string(self) -> None:
+        """Test get_jax_info returns default_device as string."""
+        from rheojax.gui.utils.jax_utils import get_jax_info
+
+        info = get_jax_info()
+
+        assert isinstance(
+            info["default_device"], str
+        ), "default_device should be a string"
+
+    @pytest.mark.smoke
+    def test_get_jax_info_memory_values_are_numeric(self) -> None:
+        """Test get_jax_info returns numeric memory values."""
+        from rheojax.gui.utils.jax_utils import get_jax_info
+
+        info = get_jax_info()
+
+        assert isinstance(
+            info["memory_used_mb"], (int, float)
+        ), "memory_used_mb should be numeric"
+        assert isinstance(
+            info["memory_total_mb"], (int, float)
+        ), "memory_total_mb should be numeric"
+
+    @pytest.mark.smoke
+    def test_get_jax_info_float64_is_bool(self) -> None:
+        """Test get_jax_info returns float64_enabled as bool."""
+        from rheojax.gui.utils.jax_utils import get_jax_info
+
+        info = get_jax_info()
+
+        assert isinstance(
+            info["float64_enabled"], bool
+        ), "float64_enabled should be bool"
+
+    @pytest.mark.smoke
+    def test_get_jax_device_info_still_works(self) -> None:
+        """Test original get_jax_device_info function still works."""
+        from rheojax.gui.utils.jax_utils import get_jax_device_info
+
+        info = get_jax_device_info()
+
+        # Original function returns nested structure
+        assert "memory" in info, "get_jax_device_info should return 'memory'"
+        assert "backend" in info, "get_jax_device_info should return 'backend'"
+        assert (
+            "float64_enabled" in info
+        ), "get_jax_device_info should return 'float64_enabled'"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

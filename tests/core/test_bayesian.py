@@ -650,14 +650,16 @@ def test_credible_intervals_coverage():
     assert intervals["a"][0] < true_mean_a < intervals["a"][1]
 
 
-def test_reproducibility_with_seed():
+def test_reproducibility_with_seed_legacy():
     """Test that Bayesian inference is reproducible with random seed.
 
-    Note: Skipped because NumPyro's fit_bayesian() doesn't expose rng_seed parameter.
-    Reproducibility can be achieved by manually setting JAX random key, but that's
-    not part of the public API.
+    Note: This test is now superseded by test_seed_parameter_reproducibility()
+    which uses the new seed parameter added in v0.6.0. Keeping for backward
+    compatibility documentation.
     """
-    pytest.skip("rng_seed parameter not supported in fit_bayesian() API")
+    pytest.skip(
+        "Superseded by test_seed_parameter_reproducibility() - seed parameter now supported"
+    )
 
 
 def test_warm_start_complex_data_nuts_convergence():
@@ -851,6 +853,131 @@ def test_cold_start_vs_warm_start_comparison():
     for param in ["Ge", "Gm", "eta"]:
         assert result_warm.diagnostics["r_hat"][param] < 1.1
         assert result_cold.diagnostics["r_hat"][param] < 1.1
+
+
+def test_chain_method_auto_selection():
+    """Test that chain_method is automatically selected based on num_chains and devices."""
+    model = SimpleBayesianModel()
+
+    np.random.seed(42)
+    X = np.linspace(0, 10, 20)
+    y = 2.0 * X + 3.0 + np.random.normal(0, 0.5, 20)
+
+    model.X_data = X
+    model.y_data = y
+
+    # Single chain should use sequential
+    result_single = model.fit_bayesian(
+        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1
+    )
+    assert result_single.num_chains == 1
+
+    # Multi-chain should use vectorized on single-device (or parallel on multi-GPU)
+    result_multi = model.fit_bayesian(
+        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=4
+    )
+    assert result_multi.num_chains == 4
+
+    # Total samples should be num_samples * num_chains
+    assert len(result_multi.posterior_samples["a"]) == 50 * 4
+
+
+def test_seed_parameter_reproducibility():
+    """Test that seed parameter produces reproducible results."""
+    model1 = SimpleBayesianModel()
+    model2 = SimpleBayesianModel()
+
+    np.random.seed(42)
+    X = np.linspace(0, 10, 20)
+    y = 2.0 * X + 3.0 + np.random.normal(0, 0.5, 20)
+
+    model1.X_data = X
+    model1.y_data = y
+    model2.X_data = X
+    model2.y_data = y
+
+    # Same seed should produce same results
+    result1 = model1.fit_bayesian(
+        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1, seed=42
+    )
+    result2 = model2.fit_bayesian(
+        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1, seed=42
+    )
+
+    # Results should be identical with same seed
+    np.testing.assert_allclose(
+        result1.posterior_samples["a"], result2.posterior_samples["a"], rtol=1e-10
+    )
+
+
+def test_seed_parameter_different_seeds():
+    """Test that different seeds produce different results."""
+    model1 = SimpleBayesianModel()
+    model2 = SimpleBayesianModel()
+
+    np.random.seed(42)
+    X = np.linspace(0, 10, 20)
+    y = 2.0 * X + 3.0 + np.random.normal(0, 0.5, 20)
+
+    model1.X_data = X
+    model1.y_data = y
+    model2.X_data = X
+    model2.y_data = y
+
+    # Different seeds should produce different results
+    result1 = model1.fit_bayesian(
+        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1, seed=1
+    )
+    result2 = model2.fit_bayesian(
+        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1, seed=2
+    )
+
+    # Results should be different with different seeds
+    assert not np.allclose(result1.posterior_samples["a"], result2.posterior_samples["a"])
+
+
+def test_default_num_chains_is_four():
+    """Test that default num_chains is 4 for production-ready diagnostics."""
+    import inspect
+
+    from rheojax.core.bayesian import BayesianMixin
+
+    # Check the signature of fit_bayesian
+    sig = inspect.signature(BayesianMixin.fit_bayesian)
+    num_chains_param = sig.parameters.get("num_chains")
+
+    assert num_chains_param is not None
+    assert num_chains_param.default == 4, f"Default num_chains should be 4, got {num_chains_param.default}"
+
+
+def test_multichain_rhat_computation():
+    """Test that multi-chain sampling enables proper R-hat computation."""
+    model = SimpleBayesianModel()
+
+    np.random.seed(42)
+    X = np.linspace(0, 10, 30)
+    y = 2.0 * X + 3.0 + np.random.normal(0, 0.5, 30)
+
+    model.X_data = X
+    model.y_data = y
+
+    # Run with 4 chains for robust R-hat
+    result = model.fit_bayesian(
+        X, y, test_mode="relaxation", num_warmup=100, num_samples=200, num_chains=4
+    )
+
+    # R-hat should be close to 1.0 for converged chains
+    assert "r_hat" in result.diagnostics
+    for param in ["a", "b"]:
+        r_hat = result.diagnostics["r_hat"][param]
+        assert r_hat < 1.1, f"R-hat for {param} should be < 1.1, got {r_hat}"
+
+    # ESS should be reasonable for multi-chain
+    assert "ess" in result.diagnostics
+    for param in ["a", "b"]:
+        ess = result.diagnostics["ess"][param]
+        # With 4 chains x 200 samples = 800 total, ESS should be meaningful
+        assert ess > 50, f"ESS for {param} should be > 50, got {ess}"
 
 
 # Mark tests that require NumPyro
