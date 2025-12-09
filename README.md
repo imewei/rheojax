@@ -211,11 +211,13 @@ G_data = 1e5 * np.exp(-t / 0.01) + np.random.normal(0, 1e3, 50)
 model.fit(t, G_data)
 print(f"NLSQ: G0={model.parameters.get_value('G0'):.3e}")
 
-# Step 2: Bayesian inference with warm-start
+# Step 2: Bayesian inference with warm-start (4 chains by default)
 result = model.fit_bayesian(
     t, G_data,
     num_warmup=1000,
-    num_samples=2000
+    num_samples=2000,
+    # num_chains=4 (default), use num_chains=1 for quick demos
+    # seed=42 for reproducibility
 )
 
 # Step 3: Analyze results
@@ -238,7 +240,7 @@ pipeline = BayesianPipeline()
 (pipeline
     .load('data.csv', x_col='time', y_col='stress')
     .fit_nlsq('maxwell')
-    .fit_bayesian(num_samples=2000, num_warmup=1000)
+    .fit_bayesian(num_samples=2000, num_warmup=1000)  # num_chains=4 by default
     .plot_posterior()
     .plot_trace()
     .save('results.hdf5'))
@@ -455,6 +457,38 @@ examples/
 
 See `examples/README.md` for learning path guide.
 
+## Graphical User Interface (GUI)
+
+RheoJAX includes an optional GUI built with PySide6/Qt6 for interactive analysis:
+
+### Installation
+
+```bash
+pip install rheojax[gui]
+```
+
+### Launching
+
+```bash
+# From command line
+rheojax-gui
+
+# Or from Python
+from rheojax.gui import main
+main()
+```
+
+### Features
+
+- **Data Loading**: Import CSV, Excel, TRIOS, and Anton Paar formats with preview
+- **Model Fitting**: Interactive NLSQ curve fitting with real-time visualization
+- **Bayesian Inference**: MCMC sampling with progress tracking
+- **Diagnostics**: ArviZ plots (trace, forest, pair, energy, ESS, rank, autocorr)
+- **Transforms**: Apply mastercurve, FFT, and derivative transforms
+- **Export**: Save results, figures, and reports in multiple formats
+
+See [GUI Reference Guide](https://rheojax.readthedocs.io/user_guide/06_gui/index.html) for detailed documentation.
+
 ## Documentation
 
 Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
@@ -466,6 +500,7 @@ Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 - [Bayesian Inference](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/bayesian_inference.html) - NLSQ → NUTS workflow, ArviZ diagnostics
 - [SGR Analysis](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/sgr_analysis.html) - Soft Glassy Rheology framework
 - [SPP Analysis](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/spp_analysis.html) - Sequence of Physical Processes for LAOS
+- [GUI Reference](https://rheojax.readthedocs.io/user_guide/06_gui/index.html) - Graphical user interface
 - [Pipeline API](https://rheojax.readthedocs.io/user_guide/pipeline_api.html) - High-level workflows
 - [I/O Guide](https://rheojax.readthedocs.io/user_guide/io_guide.html) - Reading and writing data
 - [Visualization Guide](https://rheojax.readthedocs.io/user_guide/visualization_guide.html) - Creating plots

@@ -15,6 +15,7 @@ for interactive rheological analysis workflows.
    data_loading
    model_fitting
    bayesian_inference
+   diagnostics
    transforms
    exporting
    keyboard_shortcuts
@@ -70,7 +71,8 @@ Key Components
 
 - ``DataPage``: Data import and preview
 - ``FitPage``: Model selection and NLSQ fitting
-- ``BayesianPage``: MCMC configuration and ArviZ diagnostics
+- ``BayesianPage``: MCMC configuration and sampling
+- ``DiagnosticsPage``: MCMC diagnostics and ArviZ plots
 - ``TransformPage``: Data transformation workflows
 - ``ExportPage``: Results export and report generation
 

@@ -13,6 +13,7 @@ This page contains the complete API reference for all public modules, classes, a
    api/pipeline
    api/io
    api/utils
+   api/logging
    api/visualization
 
 Quick Links
@@ -22,13 +23,14 @@ Quick Links
 
 - :doc:`api/core` - Base classes, data structures, parameters, Bayesian inference, JAX configuration
 - :doc:`api/io` - File readers and writers (TRIOS, CSV, Excel, HDF5)
-- :doc:`api/utils` - Utilities (optimization, Mittag-Leffler functions)
+- :doc:`api/utils` - Utilities (optimization, Mittag-Leffler functions, compatibility checking)
+- :doc:`api/logging` - Comprehensive logging system with JAX-safe utilities
 - :doc:`api/visualization` - Plotting functions and templates
 
 **Phase 2 (Models and Transforms)**:
 
-- :doc:`api/models` - All 21 rheological models (classical, fractional, flow, multi-mode)
-- :doc:`api/transforms` - All 5 data transforms (FFT, mastercurve, mutation, OWChirp, smoothing)
+- :doc:`api/models` - All 24 rheological models (classical, fractional, flow, multi-mode, SGR, SPP)
+- :doc:`api/transforms` - All 7 data transforms (FFT, mastercurve, mutation, OWChirp, smoothing, SRFS, SPP)
 - :doc:`api/pipeline` - Pipeline API for high-level workflows
 
 **Phase 3 (Bayesian Inference)**:
@@ -282,7 +284,7 @@ For advanced users:
 Version Information
 -------------------
 
-This documentation covers rheojax version 0.4.0.
+This documentation covers rheojax version 0.6.0.
 
 **Phase 1** (v0.1.0): Core infrastructure, test mode detection, I/O, visualization
 
@@ -297,6 +299,10 @@ This documentation covers rheojax version 0.4.0.
 **Phase 6** (v0.3.2): Vectorization and memory optimizations (50-75% cumulative improvement)
 
 **Phase 7** (v0.4.0): Mode-aware Bayesian inference (critical correctness fix), GMM element search optimization (2-5x speedup), TRIOS auto-chunking (50-70% memory reduction)
+
+**Phase 8** (v0.5.0): SGR models (Soft Glassy Rheology), SRFS transform, shear banding detection, SPP LAOS analysis
+
+**Phase 9** (v0.6.0): GUI improvements (Diagnostics, Export pages), comprehensive logging system, piblin-jax removal
 
 Support
 -------

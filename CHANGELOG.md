@@ -7,8 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - Unreleased
 
+### Changed - Multi-Chain Parallelization (Production Default)
+**Bayesian inference now defaults to 4 chains for production-ready diagnostics**
+
+- **Changed** `BayesianMixin.fit_bayesian()` default: `num_chains=1` → `num_chains=4`
+- **Changed** `BaseModel.fit_bayesian()` default: `num_chains=1` → `num_chains=4`
+- **Added** `num_chains` parameter to `BayesianPipeline.fit_bayesian()` (was hardcoded to 1)
+- **Added** `seed` parameter to `fit_bayesian()` for reproducibility control
+  - `seed=None` (default) uses `seed=0` for deterministic results
+  - Set different seeds for independent runs
+
+**Chain method auto-selection** (unchanged but documented):
+- `sequential`: Single chain or user override
+- `parallel`: Multi-chain on multi-GPU (fastest)
+- `vectorized`: Multi-chain on single device (uses vmap)
+
+**Migration Notes:**
+- Existing code with explicit `num_chains=1` continues to work unchanged
+- Code relying on default `num_chains=1` will now run 4 chains (4x samples)
+- For quick demos, explicitly set `num_chains=1`
+- For production, use default `num_chains=4` for reliable R-hat/ESS
+
+### Added
+- 6 new tests for multi-chain functionality in `tests/core/test_bayesian.py`
+- 4 new tests in `tests/pipeline/test_bayesian_pipeline.py` (`TestBayesianPipelineMultiChain`)
+
 ### Changed
 - Version bump to 0.6.0
+- Removed piblin-jax integration from RheoData
 
 ---
 
