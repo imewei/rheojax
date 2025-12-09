@@ -203,13 +203,22 @@ class TransformPage(QWidget):
             self._param_controls.setdefault("fft", []).append(("window", combo_window))
 
         elif name == "Mutation Number":
-            self._config_layout.addWidget(QLabel("Reference Frequency (rad/s):"))
-            spin_ref = QDoubleSpinBox()
-            spin_ref.setRange(0.0001, 1e6)
-            spin_ref.setValue(1.0)
-            spin_ref.setDecimals(4)
-            self._config_layout.addWidget(spin_ref)
-            self._param_controls.setdefault("mutation_number", []).append(("reference_frequency", spin_ref))
+            self._config_layout.addWidget(QLabel("Integration Method:"))
+            combo_method = QComboBox()
+            combo_method.addItems(["trapz", "simpson", "romberg"])
+            self._config_layout.addWidget(combo_method)
+            self._param_controls.setdefault("mutation_number", []).append(("integration_method", combo_method))
+
+            check_extrap = QCheckBox("Extrapolate data")
+            check_extrap.setChecked(False)
+            self._config_layout.addWidget(check_extrap)
+            self._param_controls.setdefault("mutation_number", []).append(("extrapolate", check_extrap))
+
+            self._config_layout.addWidget(QLabel("Extrapolation Model:"))
+            combo_extrap = QComboBox()
+            combo_extrap.addItems(["exponential", "power_law", "linear"])
+            self._config_layout.addWidget(combo_extrap)
+            self._param_controls.setdefault("mutation_number", []).append(("extrapolation_model", combo_extrap))
 
         elif name == "OW Chirp":
             self._config_layout.addWidget(QLabel("Min Frequency (rad/s):"))
@@ -364,10 +373,125 @@ class TransformPage(QWidget):
         return f"#{int(r*0.9):02x}{int(g*0.9):02x}{int(b*0.9):02x}"
 
     def apply_transform(self, transform_name: str, dataset_ids: list[str], params: dict[str, Any] | None = None) -> None:
-        pass  # Delegated to service
+        """Apply transform to datasets via signal emission.
+
+        This method triggers the transform_applied signal which is handled
+        by MainWindow to delegate to TransformService.
+
+        Parameters
+        ----------
+        transform_name : str
+            Name of the transform to apply
+        dataset_ids : list[str]
+            IDs of datasets to transform
+        params : dict, optional
+            Transform parameters (uses current UI values if not provided)
+        """
+        if not dataset_ids:
+            return
+
+        # Use provided params or get from current UI
+        if params is None:
+            params = self.get_selected_params()
+
+        # Set the selected transform for signal emission
+        self._selected_transform = transform_name
+
+        # Emit signal for first dataset (MainWindow handles the rest)
+        self.transform_applied.emit(transform_name, dataset_ids[0])
 
     def show_transform_preview(self, transform_name: str, params: dict[str, Any]) -> None:
-        pass  # Updates preview canvases
+        """Update preview canvases with before/after visualization.
+
+        Parameters
+        ----------
+        transform_name : str
+            Name of the transform to preview
+        params : dict
+            Transform parameters
+        """
+        import numpy as np
+
+        # Get active dataset for preview
+        dataset = self._store.get_active_dataset()
+        if dataset is None:
+            return
+
+        # Update "Before" canvas with original data
+        try:
+            self._before_canvas.plot(
+                dataset.x,
+                dataset.y,
+                label="Original",
+                xlabel=dataset.x_units or "x",
+                ylabel=dataset.y_units or "y",
+                title="Before Transform",
+            )
+        except Exception:
+            # If plot fails, clear the canvas
+            self._before_canvas.clear()
+
+        # For "After" canvas, we'd need to actually compute the transform
+        # which requires the TransformService. For now, show placeholder.
+        # The actual preview is computed when MainWindow calls TransformService.preview_transform()
+        self._after_canvas.clear()
 
     def get_available_transforms(self) -> list[dict[str, Any]]:
-        return []
+        """Return list of available transforms with metadata.
+
+        Returns
+        -------
+        list[dict]
+            Transform definitions with name, description, color, and key
+        """
+        return [
+            {
+                "name": "FFT",
+                "key": "fft",
+                "description": "Fast Fourier Transform for frequency analysis",
+                "color": "#FF5722",
+                "requires_multiple": False,
+            },
+            {
+                "name": "Mastercurve",
+                "key": "mastercurve",
+                "description": "Time-Temperature Superposition",
+                "color": "#2196F3",
+                "requires_multiple": True,
+            },
+            {
+                "name": "SRFS",
+                "key": "srfs",
+                "description": "Strain-Rate Frequency Superposition",
+                "color": "#4CAF50",
+                "requires_multiple": True,
+            },
+            {
+                "name": "Mutation Number",
+                "key": "mutation_number",
+                "description": "Calculate mutation number",
+                "color": "#9C27B0",
+                "requires_multiple": False,
+            },
+            {
+                "name": "OW Chirp",
+                "key": "owchirp",
+                "description": "Optimally-windowed chirp analysis",
+                "color": "#FF9800",
+                "requires_multiple": False,
+            },
+            {
+                "name": "Derivatives",
+                "key": "derivative",
+                "description": "Calculate numerical derivatives",
+                "color": "#607D8B",
+                "requires_multiple": False,
+            },
+            {
+                "name": "SPP Analysis",
+                "key": "spp",
+                "description": "LAOS yield stress and cage modulus extraction",
+                "color": "#E91E63",
+                "requires_multiple": False,
+            },
+        ]

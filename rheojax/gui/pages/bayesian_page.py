@@ -361,20 +361,38 @@ class BayesianPage(QWidget):
         # Update state
         self._store.dispatch(start_bayesian(model_name, dataset.id))
 
-        # Create and run worker
+        # Handle warm_start: convert bool to dict (get NLSQ params) or None
+        warm_start_dict: dict[str, float] | None = None
+        if config.get("warm_start", False):
+            # Try to get NLSQ fitted parameters from state
+            state = self._store.get_state()
+            if state.fit_results:
+                # Get most recent fit result
+                latest_key = list(state.fit_results.keys())[-1]
+                fit_result = state.fit_results[latest_key]
+                if hasattr(fit_result, "parameters"):
+                    warm_start_dict = fit_result.parameters
+                    self._status_text.append(f"Using NLSQ warm-start: {warm_start_dict}")
+
+        # Create and run worker (only pass args BayesianWorker accepts)
         self._current_worker = BayesianWorker(
             model_name=model_name,
             data=dataset,
-            test_mode=test_mode,
-            bayesian_service=self._bayesian_service,
-            **config,
+            num_warmup=config.get("num_warmup", 1000),
+            num_samples=config.get("num_samples", 2000),
+            num_chains=config.get("num_chains", 4),
+            warm_start=warm_start_dict,
         )
-        self._current_worker.progress.connect(self._on_progress)
-        self._current_worker.chain_progress.connect(self._on_chain_progress)
-        self._current_worker.finished.connect(self._on_finished)
-        self._current_worker.error.connect(self._on_error)
 
-        self._worker_pool.start(self._current_worker)
+        # Connect signals properly (worker.signals.X, not worker.X)
+        self._current_worker.signals.progress.connect(self._on_worker_progress)
+        self._current_worker.signals.stage_changed.connect(self._on_stage_changed)
+        self._current_worker.signals.completed.connect(self._on_finished)
+        self._current_worker.signals.failed.connect(self._on_error)
+        self._current_worker.signals.divergence_detected.connect(self._on_divergence)
+
+        # Use submit() method, not start()
+        self._worker_pool.submit(self._current_worker)
 
         self._is_running = True
         self._btn_run.setEnabled(False)
@@ -392,7 +410,7 @@ class BayesianPage(QWidget):
 
     @Slot(int, str)
     def _on_progress(self, percent: int, message: str) -> None:
-        """Handle overall progress update.
+        """Handle overall progress update (legacy slot for compatibility).
 
         Parameters
         ----------
@@ -405,9 +423,64 @@ class BayesianPage(QWidget):
         self._status_text.append(message)
         self._store.dispatch(update_bayesian_progress(percent))
 
+    @Slot(int, int, str)
+    def _on_worker_progress(self, percent: int, total: int, message: str) -> None:
+        """Handle progress update from BayesianWorker.
+
+        BayesianWorker emits: progress(percent, total, message)
+
+        Parameters
+        ----------
+        percent : int
+            Current progress value
+        total : int
+            Total value (usually 100)
+        message : str
+            Status message
+        """
+        # Normalize to percentage
+        progress_pct = int(percent / max(total, 1) * 100) if total > 0 else percent
+        self._overall_progress.setValue(progress_pct)
+        self._status_text.append(message)
+        self._store.dispatch(update_bayesian_progress(progress_pct))
+
+    @Slot(str)
+    def _on_stage_changed(self, stage: str) -> None:
+        """Handle MCMC stage change (warmup/sampling).
+
+        Parameters
+        ----------
+        stage : str
+            Current stage ('warmup' or 'sampling')
+        """
+        self._status_text.append(f"Stage: {stage}")
+        # Update chain progress bars based on stage
+        if stage == "warmup":
+            # During warmup, show warmup progress
+            for bar in self._chain_progress_bars:
+                bar.setFormat("Warmup: %p%")
+        else:
+            # During sampling, show sampling progress
+            for bar in self._chain_progress_bars:
+                bar.setFormat("Sampling: %p%")
+
+    @Slot(int)
+    def _on_divergence(self, count: int) -> None:
+        """Handle divergence detection.
+
+        Parameters
+        ----------
+        count : int
+            Number of divergent transitions detected
+        """
+        self._divergence_label.setText(f"Divergences: {count}")
+        if count > 0:
+            self._divergence_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            self._status_text.append(f"WARNING: {count} divergent transitions detected")
+
     @Slot(int, int)
     def _on_chain_progress(self, chain_idx: int, percent: int) -> None:
-        """Handle per-chain progress update.
+        """Handle per-chain progress update (legacy slot).
 
         Parameters
         ----------
@@ -420,38 +493,62 @@ class BayesianPage(QWidget):
             self._chain_progress_bars[chain_idx].setValue(percent)
 
     @Slot(object)
-    def _on_finished(self, result: BayesianResult) -> None:
+    def _on_finished(self, result: Any) -> None:
         """Handle Bayesian inference completion.
 
         Parameters
         ----------
-        result : BayesianResult
-            Inference result
+        result : BayesianResult (from bayesian_worker.py)
+            Inference result with posterior_samples, summary, diagnostics, etc.
         """
         self._current_worker = None
         self._is_running = False
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
 
-        if result.success:
+        # BayesianWorker's BayesianResult has .success bool (default True)
+        success = getattr(result, "success", True)
+
+        if success:
             self._store.dispatch(bayesian_completed(result))
 
-            # Update diagnostics
+            # Update diagnostics display
             self._update_diagnostics(result)
 
-            # Update ArviZ canvas
-            if result.inference_data is not None:
+            # Update ArviZ canvas if inference_data is available
+            # Note: BayesianWorker result may not have inference_data
+            if hasattr(result, "inference_data") and result.inference_data is not None:
                 self._arviz_canvas.set_inference_data(result.inference_data)
+            elif hasattr(result, "posterior_samples") and result.posterior_samples:
+                # Create ArviZ InferenceData from posterior samples
+                try:
+                    import arviz as az
+                    idata_dict = {}
+                    for param_name, samples in result.posterior_samples.items():
+                        if hasattr(samples, "ndim"):
+                            if samples.ndim == 1:
+                                idata_dict[param_name] = samples.reshape(1, -1)
+                            else:
+                                idata_dict[param_name] = samples
+                        else:
+                            idata_dict[param_name] = samples
+                    idata = az.from_dict(idata_dict)
+                    self._arviz_canvas.set_inference_data(idata)
+                except Exception:
+                    pass  # ArviZ visualization optional
 
             # Update credible intervals table
             self._update_intervals_table(result)
 
             self._status_text.append("Bayesian inference completed successfully!")
+            self._status_text.append(f"Sampling time: {result.sampling_time:.2f}s")
             self.run_completed.emit(result)
         else:
-            self._store.dispatch(bayesian_failed(result.message))
-            self._status_text.append(f"Bayesian inference failed: {result.message}")
-            QMessageBox.warning(self, "Inference Failed", result.message)
+            # Get message if available, otherwise use generic
+            message = getattr(result, "message", "Inference did not converge")
+            self._store.dispatch(bayesian_failed(message))
+            self._status_text.append(f"Bayesian inference failed: {message}")
+            QMessageBox.warning(self, "Inference Failed", message)
 
     @Slot(str)
     def _on_error(self, error_msg: str) -> None:

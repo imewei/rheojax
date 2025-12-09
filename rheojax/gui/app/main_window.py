@@ -264,8 +264,15 @@ class RheoJAXMainWindow(QMainWindow):
         self.home_page.example_selected.connect(self._on_open_example)
         self.home_page.recent_project_opened.connect(self._on_open_recent_project)
 
-        # Diagnostics CTA
+        # Diagnostics page signals
         self.diagnostics_page.show_requested.connect(self._on_show_diagnostics)
+        self.diagnostics_page.plot_requested.connect(self._on_diagnostics_plot_requested)
+        self.diagnostics_page.export_requested.connect(self._on_diagnostics_export_requested)
+
+        # Export page signals
+        self.export_page.export_requested.connect(self._on_export_requested)
+        self.export_page.export_completed.connect(self._on_export_completed)
+        self.export_page.export_failed.connect(self._on_export_failed)
 
     def _connect_state_signals(self) -> None:
         """Connect store signals to UI updates (theme, pipeline, datasets)."""
@@ -658,6 +665,8 @@ class RheoJAXMainWindow(QMainWindow):
         wizard = ImportWizard(self)
         if wizard.exec():
             config = wizard.get_result()
+            # Pre-generate dataset_id for consistent state tracking
+            config["dataset_id"] = str(uuid.uuid4())
             self.log(f"Importing data from: {config['file_path']}")
             self.store.dispatch("IMPORT_DATA", config)
             self.navigate_to("data")
@@ -1200,6 +1209,69 @@ class RheoJAXMainWindow(QMainWindow):
             self.diagnostics_page.show_diagnostics(model_name)
         else:
             self.status_bar.show_message("Select a model to view diagnostics", 3000)
+
+    @Slot(str, str)
+    def _on_diagnostics_plot_requested(self, plot_type: str, model_id: str) -> None:
+        """Handle diagnostics plot request.
+
+        Parameters
+        ----------
+        plot_type : str
+            Type of plot (Trace, Forest, Pair, etc.)
+        model_id : str
+            Model name/ID
+        """
+        self.log(f"Diagnostics: generating {plot_type} plot for {model_id}")
+        self.status_bar.show_message(f"Generating {plot_type} plot...", 2000)
+
+    @Slot(str)
+    def _on_diagnostics_export_requested(self, plot_type: str) -> None:
+        """Handle diagnostics export request.
+
+        Parameters
+        ----------
+        plot_type : str
+            Type of plot being exported
+        """
+        self.log(f"Diagnostics: exporting {plot_type} plot")
+        self.status_bar.show_message(f"Exporting {plot_type} plot...", 2000)
+
+    @Slot(dict)
+    def _on_export_requested(self, config: dict) -> None:
+        """Handle export request from export page.
+
+        Parameters
+        ----------
+        config : dict
+            Export configuration
+        """
+        output_dir = config.get("output_dir", "")
+        self.log(f"Export: starting export to {output_dir}")
+        self.status_bar.show_message("Export in progress...", 0)
+
+    @Slot(str)
+    def _on_export_completed(self, output_path: str) -> None:
+        """Handle export completion.
+
+        Parameters
+        ----------
+        output_path : str
+            Path where files were exported
+        """
+        self.log(f"Export: completed to {output_path}")
+        self.status_bar.show_message(f"Export completed: {output_path}", 5000)
+
+    @Slot(str)
+    def _on_export_failed(self, error_msg: str) -> None:
+        """Handle export failure.
+
+        Parameters
+        ----------
+        error_msg : str
+            Error message
+        """
+        self.log(f"Export: failed - {error_msg}")
+        self.status_bar.show_message(f"Export failed: {error_msg}", 5000)
 
     @Slot()
     def _on_batch_fit(self) -> None:

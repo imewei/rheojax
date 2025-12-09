@@ -144,7 +144,8 @@ class ColumnMappingPage(QWizardPage):
         x_layout = QHBoxLayout()
         x_layout.addWidget(QLabel("X (Frequency/Time):"))
         self.x_combo = QComboBox()
-        self.x_combo.currentTextChanged.connect(self.completeChanged.emit)
+        # Ignore the emitted text; we only care that completion state may have changed
+        self.x_combo.currentTextChanged.connect(lambda _text: self.completeChanged.emit())
         x_layout.addWidget(self.x_combo, 1)
         mapping_layout.addLayout(x_layout)
 
@@ -152,7 +153,7 @@ class ColumnMappingPage(QWizardPage):
         y_layout = QHBoxLayout()
         y_layout.addWidget(QLabel("Y (Modulus/Viscosity):"))
         self.y_combo = QComboBox()
-        self.y_combo.currentTextChanged.connect(self.completeChanged.emit)
+        self.y_combo.currentTextChanged.connect(lambda _text: self.completeChanged.emit())
         y_layout.addWidget(self.y_combo, 1)
         mapping_layout.addLayout(y_layout)
 

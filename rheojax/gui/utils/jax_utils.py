@@ -220,6 +220,49 @@ def get_jax_device_info() -> dict[str, Any]:
     }
 
 
+def get_jax_info() -> dict[str, Any]:
+    """Get JAX configuration info for HomePage display.
+
+    This function returns a flat structure with keys expected by
+    the HomePage._update_jax_status() method.
+
+    Returns
+    -------
+    dict[str, Any]
+        JAX configuration with keys:
+        - devices: List of device name strings
+        - default_device: Current default device name
+        - memory_used_mb: Memory used in MB (float)
+        - memory_total_mb: Total memory in MB (float)
+        - float64_enabled: Whether float64 is enabled
+        - jit_cache_count: Number of JIT-compiled functions (always 0, not exposed by JAX)
+
+    Example
+    -------
+    >>> info = get_jax_info()
+    >>> print(info["default_device"])
+    'TFRT_CPU_0'
+    """
+    utils = JaxUtils()
+    devices = utils.get_devices()
+    memory = utils.get_memory_usage()
+
+    # Build device name list
+    device_names = [d.get("name", "cpu") for d in devices] if devices else ["cpu"]
+
+    # Get default device name
+    default_device = devices[0].get("name", "cpu") if devices else "cpu"
+
+    return {
+        "devices": device_names,
+        "default_device": default_device,
+        "memory_used_mb": memory.get("used_mb", 0.0),
+        "memory_total_mb": memory.get("total_mb", 0.0),
+        "float64_enabled": utils.verify_float64(),
+        "jit_cache_count": 0,  # JAX doesn't expose JIT cache count directly
+    }
+
+
 def format_memory_usage(memory: dict[str, float]) -> str:
     """Format memory usage for display.
 

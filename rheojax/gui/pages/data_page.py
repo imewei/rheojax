@@ -102,13 +102,16 @@ class DataPage(QWidget):
 
         # File info
         info_group = QGroupBox("File Information")
+        info_group.setStyleSheet("QGroupBox { font-size: 11pt; font-weight: bold; }")
         info_layout = QVBoxLayout(info_group)
 
         self._file_name_label = QLabel("No file selected")
         self._file_name_label.setWordWrap(True)
+        self._file_name_label.setStyleSheet("font-size: 11pt; font-weight: 500;")
         info_layout.addWidget(self._file_name_label)
 
         self._file_size_label = QLabel("")
+        self._file_size_label.setStyleSheet("font-size: 10pt; color: #444;")
         info_layout.addWidget(self._file_size_label)
 
         layout.addWidget(info_group)
@@ -267,9 +270,15 @@ class DataPage(QWidget):
             service = DataService()
             preview_result = service.preview_file(self._current_file_path, max_rows=100)
 
-            self._preview_data = preview_result["data"]
+            self._preview_data = preview_result.get("data", [])
             headers = preview_result.get("headers", [])
             metadata = preview_result.get("metadata", {})
+
+            if not self._preview_data:
+                self._preview_table.clear()
+                self._file_name_label.setText("File loaded but no previewable rows")
+                self._metadata_text.clear()
+                return
 
             # Update table
             self._preview_table.clear()
@@ -294,9 +303,14 @@ class DataPage(QWidget):
             if metadata:
                 metadata_text = "\n".join([f"{k}: {v}" for k, v in metadata.items()])
                 self._metadata_text.setText(metadata_text)
+            else:
+                self._metadata_text.clear()
 
         except Exception as e:
             self._file_name_label.setText(f"Error loading file: {str(e)}")
+            self._file_size_label.setText("")
+            self._preview_table.clear()
+            self._metadata_text.clear()
 
     def _update_column_mappers(self, columns: list[str]) -> None:
         """Update column mapper dropdowns."""
@@ -334,6 +348,8 @@ class DataPage(QWidget):
 
     def _apply_import(self) -> None:
         """Apply column mapping and import data."""
+        import uuid
+
         if not self._current_file_path:
             return
 
@@ -358,11 +374,19 @@ class DataPage(QWidget):
                 test_mode=test_mode
             )
 
+            # Auto-detect test mode if not specified
+            if test_mode is None:
+                test_mode = service.detect_test_mode(rheo_data)
+
+            # Generate dataset_id before dispatch to ensure signal emission
+            dataset_id = str(uuid.uuid4())
+
             # Register dataset in state store
             store = StateStore()
             store.dispatch(
                 "IMPORT_DATA_SUCCESS",
                 {
+                    "dataset_id": dataset_id,
                     "file_path": str(self._current_file_path),
                     "name": self._current_file_path.stem,
                     "test_mode": test_mode or "unknown",

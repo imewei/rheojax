@@ -204,6 +204,6 @@ styles/
 ## Notes
 
 - Stylesheets reference icon files via `url(:/icons/...)` - ensure icons are available in resources
-- Font family uses system fonts: "Segoe UI" (Windows), "San Francisco" (macOS), fallback to sans-serif
+- Font family uses system fonts: "Segoe UI" (Windows), "SF Pro Text"/"SF Pro Display" (macOS), fallback to sans-serif
 - All colors use hex values for consistency and performance
 - Border-radius and padding values are carefully tuned for visual harmony

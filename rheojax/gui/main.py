@@ -217,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     logger.debug("Initializing Qt application...")
     try:
         from PySide6.QtCore import Qt
-        from PySide6.QtGui import QIcon
+        from PySide6.QtGui import QFont, QIcon
         from PySide6.QtWidgets import QApplication
     except ImportError as exc:
         logger.error(f"Failed to import PySide6: {exc}")
@@ -229,6 +229,19 @@ def main(argv: list[str] | None = None) -> int:
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
+
+    def _adaptive_font_size(app: QApplication) -> float:
+        """Compute a font size that scales with screen DPI."""
+
+        screen = app.primaryScreen()
+        if not screen:
+            return 12.0
+
+        # 96 DPI is the typical desktop baseline; scale relative to it.
+        base_size = 12.0
+        dpi_scale = max(screen.logicalDotsPerInch() / 96.0, 1.0)
+        # Cap scaling to avoid excessively large fonts on very high DPI setups.
+        return min(base_size * dpi_scale, 16.0)
 
     # Create Qt application
     if argv is None:
@@ -245,7 +258,17 @@ def main(argv: list[str] | None = None) -> int:
     from rheojax.gui.resources import load_stylesheet, get_icon_path
 
     app.setStyle("Fusion")
-    app.setStyleSheet(load_stylesheet("light"))
+
+    # Apply adaptive base font before the stylesheet so the theme inherits it
+    base_font_size = _adaptive_font_size(app)
+    base_font = QFont("SF Pro Text")
+    base_font.setPointSizeF(base_font_size)
+    app.setFont(base_font)
+
+    # Append a global rule to bump widget font sizes while keeping the theme
+    stylesheet = load_stylesheet("light")
+    stylesheet += f"\n* {{ font-size: {base_font_size:.1f}pt; }}\n"
+    app.setStyleSheet(stylesheet)
 
     logger.debug("Qt application initialized")
 

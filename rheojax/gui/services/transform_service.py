@@ -99,6 +99,27 @@ class TransformService:
                     "default": "forward",
                     "description": "Transform direction",
                 },
+                "window": {
+                    "type": "choice",
+                    "choices": ["hann", "hamming", "blackman", "bartlett", "rectangular"],
+                    "default": "hann",
+                    "description": "Window function (rectangular = none)",
+                },
+                "detrend": {
+                    "type": "bool",
+                    "default": True,
+                    "description": "Remove linear trend before FFT",
+                },
+                "return_psd": {
+                    "type": "bool",
+                    "default": False,
+                    "description": "Return power spectral density instead of magnitude",
+                },
+                "normalize": {
+                    "type": "bool",
+                    "default": True,
+                    "description": "Normalize FFT output",
+                },
             },
             "srfs": {
                 "reference_gamma_dot": {
@@ -123,6 +144,26 @@ class TransformService:
                     "default": 100.0,
                     "description": "Maximum frequency (rad/s)",
                 },
+                "n_frequencies": {
+                    "type": "int",
+                    "default": 100,
+                    "description": "Number of frequency points",
+                },
+                "wavelet_width": {
+                    "type": "float",
+                    "default": 5.0,
+                    "description": "Width parameter for wavelet",
+                },
+                "extract_harmonics": {
+                    "type": "bool",
+                    "default": True,
+                    "description": "Extract harmonic components",
+                },
+                "max_harmonic": {
+                    "type": "int",
+                    "default": 7,
+                    "description": "Maximum harmonic to extract",
+                },
             },
             "derivative": {
                 "order": {
@@ -133,14 +174,52 @@ class TransformService:
                 "window_length": {
                     "type": "int",
                     "default": 11,
-                    "description": "Savitzky-Golay window length",
+                    "description": "Savitzky-Golay window length (must be odd)",
+                },
+                "poly_order": {
+                    "type": "int",
+                    "default": 3,
+                    "description": "Polynomial order for Savitzky-Golay (must be < window_length)",
+                },
+                "method": {
+                    "type": "choice",
+                    "choices": ["savgol", "finite_diff", "spline", "total_variation"],
+                    "default": "savgol",
+                    "description": "Differentiation method",
+                },
+                "smooth_before": {
+                    "type": "bool",
+                    "default": False,
+                    "description": "Apply smoothing before differentiation",
+                },
+                "smooth_after": {
+                    "type": "bool",
+                    "default": False,
+                    "description": "Apply smoothing after differentiation",
+                },
+                "validate_window": {
+                    "type": "bool",
+                    "default": True,
+                    "description": "Force odd window length",
                 },
             },
             "mutation_number": {
-                "reference_frequency": {
-                    "type": "float",
-                    "default": 1.0,
-                    "description": "Reference frequency (rad/s)",
+                "integration_method": {
+                    "type": "choice",
+                    "choices": ["trapz", "simpson", "romberg"],
+                    "default": "trapz",
+                    "description": "Numerical integration method",
+                },
+                "extrapolate": {
+                    "type": "bool",
+                    "default": False,
+                    "description": "Extrapolate data outside measured range",
+                },
+                "extrapolation_model": {
+                    "type": "choice",
+                    "choices": ["exponential", "power_law", "linear"],
+                    "default": "exponential",
+                    "description": "Model for data extrapolation",
                 },
             },
             "spp": {
@@ -222,12 +301,25 @@ class TransformService:
             elif name == "fft":
                 # FFT transform
                 direction = params.get("direction", "forward")
-                fft = FFTAnalysis()
+                # Map 'rectangular' to 'none' for window parameter
+                window = params.get("window", "hann")
+                if window == "rectangular":
+                    window = "none"
+                detrend = params.get("detrend", True)
+                return_psd = params.get("return_psd", False)
+                normalize = params.get("normalize", True)
+
+                fft = FFTAnalysis(
+                    window=window,
+                    detrend=detrend,
+                    return_psd=return_psd,
+                    normalize=normalize,
+                )
 
                 if direction == "forward":
-                    result = fft.time_to_frequency(data)
+                    result = fft.transform(data)
                 else:
-                    result = fft.frequency_to_time(data)
+                    result = fft.inverse_transform(data)
 
                 logger.info(f"Applied FFT transform ({direction})")
                 return result
@@ -248,10 +340,21 @@ class TransformService:
 
             elif name == "owchirp":
                 # OWChirp transform
+                # Note: OWChirp uses n_frequencies, frequency_range, wavelet_width, etc.
                 min_freq = params.get("min_frequency", 0.01)
                 max_freq = params.get("max_frequency", 100.0)
+                n_frequencies = params.get("n_frequencies", 100)
+                wavelet_width = params.get("wavelet_width", 5.0)
+                extract_harmonics = params.get("extract_harmonics", True)
+                max_harmonic = params.get("max_harmonic", 7)
 
-                owchirp = OWChirp(min_frequency=min_freq, max_frequency=max_freq)
+                owchirp = OWChirp(
+                    n_frequencies=n_frequencies,
+                    frequency_range=(min_freq, max_freq),
+                    wavelet_width=wavelet_width,
+                    extract_harmonics=extract_harmonics,
+                    max_harmonic=max_harmonic,
+                )
                 result = owchirp.transform(data)
 
                 logger.info("Applied OWChirp transform")
@@ -259,20 +362,41 @@ class TransformService:
 
             elif name == "derivative":
                 # Smooth derivative
-                order = params.get("order", 1)
-                window_length = params.get("window_length", 11)
+                # Map 'order' from Page to 'deriv' for SmoothDerivative
+                deriv_order = int(params.get("order", 1))
+                window_length = int(params.get("window_length", 11))
+                # Map 'poly_order' from Page to 'polyorder' for SmoothDerivative
+                polyorder = int(params.get("poly_order", params.get("polyorder", 3)))
+                method = params.get("method", "savgol")
+                smooth_before = params.get("smooth_before", False)
+                smooth_after = params.get("smooth_after", False)
 
-                deriv = SmoothDerivative(order=order, window_length=window_length)
+                deriv = SmoothDerivative(
+                    method=method,
+                    window_length=window_length,
+                    polyorder=polyorder,
+                    deriv=deriv_order,
+                    smooth_before=smooth_before,
+                    smooth_after=smooth_after,
+                )
                 result = deriv.transform(data)
 
-                logger.info(f"Applied {order}-order derivative")
+                logger.info(f"Applied {deriv_order}-order derivative")
                 return result
 
             elif name == "mutation_number":
                 # Mutation number
-                ref_freq = params.get("reference_frequency", 1.0)
+                # Note: MutationNumber doesn't take reference_frequency as __init__ param
+                # It uses integration_method, extrapolate, extrapolation_model
+                integration_method = params.get("integration_method", "trapz")
+                extrapolate = params.get("extrapolate", False)
+                extrapolation_model = params.get("extrapolation_model", "exponential")
 
-                mn = MutationNumber(reference_frequency=ref_freq)
+                mn = MutationNumber(
+                    integration_method=integration_method,
+                    extrapolate=extrapolate,
+                    extrapolation_model=extrapolation_model,
+                )
                 result = mn.transform(data)
 
                 logger.info("Calculated mutation number")
@@ -282,10 +406,12 @@ class TransformService:
                 # SPP decomposition for LAOS yield stress extraction
                 omega = params.get("omega", 1.0)
                 gamma_0 = params.get("gamma_0", 1.0)
-                n_harmonics = params.get("n_harmonics", 39)
+                n_harmonics = int(params.get("n_harmonics", 39))
                 yield_tolerance = params.get("yield_tolerance", 0.02)
-                start_cycle = params.get("start_cycle", 0)
-                end_cycle = params.get("end_cycle", None)
+                start_cycle = int(params.get("start_cycle", 0))
+                # Page defaults to 0, but 0 means "use all cycles" so convert to None
+                end_cycle_raw = params.get("end_cycle", None)
+                end_cycle = None if end_cycle_raw in (None, 0, 0.0) else int(end_cycle_raw)
                 use_numerical_method = params.get("use_numerical_method", False)
 
                 spp = SPPDecomposer(

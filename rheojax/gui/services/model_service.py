@@ -436,20 +436,35 @@ class ModelService:
             if np.iscomplexobj(y):
                 # For complex data, use magnitude of residuals
                 residuals = np.abs(y - y_pred)
+                y_real = np.abs(y)
             else:
                 residuals = y - y_pred
+                y_real = y
 
             # Calculate chi-squared
             chi_squared = float(np.sum(residuals**2))
 
+            # Calculate R-squared (coefficient of determination)
+            ss_res = np.sum(residuals**2)
+            ss_tot = np.sum((y_real - np.mean(y_real))**2)
+            r_squared = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+
+            # Calculate MPE (Mean Percentage Error)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                pct_errors = np.abs(residuals / y_real) * 100
+                pct_errors = pct_errors[np.isfinite(pct_errors)]
+                mpe = float(np.mean(pct_errors)) if len(pct_errors) > 0 else 0.0
+
             # Get fitted parameters
             fitted_params = {name: param.value for name, param in model.parameters.items()}
 
-            # Get metadata
+            # Get metadata with R² and MPE included
             metadata = {
                 "test_mode": test_mode,
                 "n_iterations": getattr(model, "_n_iterations", None),
                 "convergence": getattr(model, "_convergence", None),
+                "r_squared": r_squared,
+                "mpe": mpe,
             }
 
             # Add NLSQ result if available

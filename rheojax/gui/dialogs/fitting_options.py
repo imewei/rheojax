@@ -56,7 +56,8 @@ class FittingOptionsDialog(QDialog):
         """
         super().__init__(parent)
 
-        self.current_options = current_options or {}
+        # Guard against non-dict inputs (e.g., accidental widget objects)
+        self.current_options = current_options if isinstance(current_options, dict) else {}
 
         self.setWindowTitle("Fitting Options")
         self.setMinimumSize(500, 400)

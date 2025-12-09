@@ -66,6 +66,17 @@ class FitPage(QWidget):
         self._model_service = ModelService()
         self._worker_pool = WorkerPool()
         self._current_worker: FitWorker | None = None
+        # Persist user-selected fitting options; start with dialog defaults
+        self._fit_options: dict[str, Any] = {
+            "algorithm": "NLSQ",
+            "max_iter": 5000,
+            "ftol": 1e-8,
+            "xtol": 1e-8,
+            "multistart": False,
+            "num_starts": 5,
+            "use_bounds": True,
+            "verbose": False,
+        }
 
         self._setup_ui()
         self._connect_signals()
@@ -371,7 +382,8 @@ class FitPage(QWidget):
 
     def _on_fit_clicked(self) -> None:
         """Handle fit button click."""
-        model_name = self._model_browser.get_selected()
+        # Get model from quick selector (model browser was removed)
+        model_name = self._quick_model_combo.currentData()
         dataset = self._store.get_active_dataset()
 
         if not model_name or not dataset:
@@ -392,6 +404,7 @@ class FitPage(QWidget):
             model_name=model_name,
             data=dataset,
             initial_params=param_dict,
+            options=self._fit_options,
         )
         self._current_worker.signals.progress.connect(self._on_fit_progress)
         self._current_worker.signals.completed.connect(self._on_fit_finished)
@@ -514,8 +527,9 @@ class FitPage(QWidget):
     def _show_fit_options(self) -> None:
         """Show fitting options dialog."""
         from rheojax.gui.dialogs.fitting_options import FittingOptionsDialog
-        dialog = FittingOptionsDialog(self)
-        dialog.exec()
+        dialog = FittingOptionsDialog(current_options=self._fit_options, parent=self)
+        if dialog.exec() == dialog.DialogCode.Accepted:
+            self._fit_options = dialog.get_options()
 
     def fit_model(
         self,
@@ -537,16 +551,30 @@ class FitPage(QWidget):
         initial_params : dict, optional
             Initial parameter values
         """
-        # Select model
-        self._model_browser.select_model(model_name)
+        # Select model via quick selector (model browser was removed)
+        idx = self._quick_model_combo.findData(model_name)
+        if idx >= 0:
+            self._quick_model_combo.setCurrentIndex(idx)
+        else:
+            # Model not in combo, trigger selection directly
+            self._on_model_selected(model_name)
 
         # Set initial params if provided
         if initial_params:
-            params = [
-                {"name": name, "value": value, "bounds": (0, float("inf")), "units": ""}
-                for name, value in initial_params.items()
-            ]
-            self._parameter_table.set_parameters(params)
+            from rheojax.gui.state.store import ParameterState
+
+            param_states: dict[str, ParameterState] = {}
+            for name, value in initial_params.items():
+                param_states[name] = ParameterState(
+                    name=name,
+                    value=value,
+                    min_bound=0.0,
+                    max_bound=float("inf"),
+                    fixed=False,
+                    unit="",
+                    description="",
+                )
+            self._parameter_table.set_parameters(param_states)
 
         # Trigger fit
         self._on_fit_clicked()

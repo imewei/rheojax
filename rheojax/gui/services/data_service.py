@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from rheojax.core.data import RheoData
 from rheojax.io import auto_load
@@ -54,6 +55,7 @@ class DataService:
         file_path: str | Path,
         x_col: str | None = None,
         y_col: str | None = None,
+        y2_col: str | None = None,
         test_mode: str | None = None,
         **kwargs: Any,
     ) -> RheoData:
@@ -67,6 +69,8 @@ class DataService:
             X-axis column name (for CSV/Excel files)
         y_col : str, optional
             Y-axis column name (for CSV/Excel files)
+        y2_col : str, optional
+            Secondary Y-axis column name (e.g., G'' for oscillatory data)
         test_mode : str, optional
             Test mode ('relaxation', 'creep', 'oscillation', 'flow')
         **kwargs
@@ -100,6 +104,8 @@ class DataService:
             if x_col and y_col:
                 kwargs["x_col"] = x_col
                 kwargs["y_col"] = y_col
+            if y2_col:
+                kwargs["y2_col"] = y2_col
 
             data = auto_load(str(file_path), **kwargs)
 
@@ -122,11 +128,73 @@ class DataService:
             logger.error(f"Failed to load file {file_path}: {e}")
             raise ValueError(f"Failed to load file: {e}") from e
 
+    def preview_file(self, file_path: str | Path, max_rows: int = 100) -> dict[str, Any]:
+        """Return a lightweight preview of a data file.
+
+        The preview keeps parsing simple to avoid the heavier auto_load path and
+        trims rows to keep UI rendering responsive.
+        """
+
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        suffix = file_path.suffix.lower()
+        data: list[list[Any]]
+        headers: list[str]
+        metadata: dict[str, Any] = {}
+
+        try:
+            if suffix in {".csv", ".txt", ".dat"}:
+                df = pd.read_csv(file_path, nrows=max_rows)
+                headers = [str(col) for col in df.columns]
+                data = df.fillna("").values.tolist()
+                metadata["rows"] = len(df.index)
+                metadata["columns"] = len(df.columns)
+            elif suffix in {".xlsx", ".xls"}:
+                df = pd.read_excel(file_path, nrows=max_rows)
+                headers = [str(col) for col in df.columns]
+                data = df.fillna("").values.tolist()
+                metadata["rows"] = len(df.index)
+                metadata["columns"] = len(df.columns)
+            else:
+                # Fallback: use auto_load and build a simple table from RheoData
+                data_obj = auto_load(str(file_path))
+                if not isinstance(data_obj, RheoData):
+                    raise ValueError("Unsupported preview format")
+
+                headers = ["x", "y"]
+                rows = min(max_rows, len(data_obj.x))
+                if hasattr(data_obj, "y2") and getattr(data_obj, "y2") is not None:
+                    headers.append("y2")
+                    data = [
+                        [data_obj.x[i], data_obj.y[i], data_obj.y2[i]]
+                        for i in range(rows)
+                    ]
+                else:
+                    data = [[data_obj.x[i], data_obj.y[i]] for i in range(rows)]
+
+                metadata.update({"rows": len(data_obj.x), "columns": len(headers)})
+
+            return {"data": data, "headers": headers, "metadata": metadata}
+
+        except Exception as e:
+            logger.error(f"Failed to preview file {file_path}: {e}")
+            raise
+
     def detect_test_mode(self, data: RheoData) -> str:
         """Auto-detect test mode from data characteristics.
 
         Analyzes column names, data ranges, and characteristics to determine
         the most likely test mode.
+
+        Detection priority:
+        1. Explicit metadata
+        2. Domain indicator (frequency → oscillation)
+        3. Complex data (oscillation)
+        4. Monotonic trends (relaxation/creep) - checked BEFORE flow
+        5. Power-law relationship (flow)
+        6. Log-spaced x-axis (oscillation frequency sweep)
 
         Parameters
         ----------
@@ -154,45 +222,64 @@ class DataService:
         if np.iscomplexobj(y):
             return "oscillation"
 
-        # Check x-axis characteristics
+        # Get basic statistics
         x_min, x_max = np.min(x), np.max(x)
-        x_range = x_max - x_min
 
-        # Very small values suggest frequency (rad/s or Hz)
-        if x_min > 0.01 and x_max < 1000 and x_range > 1:
-            # Could be frequency sweep
-            if len(x) > 10:
-                # Check if logarithmically spaced (typical for frequency sweeps)
-                log_x = np.log10(x[x > 0])
-                if len(log_x) > 5:
-                    log_spacing = np.diff(log_x)
-                    if np.std(log_spacing) < 0.5:  # Relatively uniform in log space
-                        return "oscillation"
+        # Check y-axis trends FIRST (before flow detection)
+        # This prevents exponential decay from being misclassified as flow
+        y_diff = np.diff(y)
 
-        # Check y-axis trends
-        # Relaxation: decreasing modulus over time
-        if np.all(np.diff(y) <= 0):  # Monotonically decreasing
-            if x_min >= 0 and x_max > 1:  # Time-like
-                return "relaxation"
+        # Relaxation: decreasing modulus over time (monotonically decreasing)
+        # Typical: G(t) = G0 * exp(-t/tau)
+        if len(y) > 3 and np.all(y_diff <= 0):
+            if x_min >= 0:  # Time-like x-axis (non-negative)
+                # Additional check: y values should span significant range
+                y_range_ratio = np.max(y) / (np.min(y) + 1e-10)
+                if y_range_ratio > 2:  # At least 2x decay
+                    logger.debug(f"Detected relaxation: monotonic decrease, ratio={y_range_ratio:.1f}")
+                    return "relaxation"
 
-        # Creep: increasing strain over time
-        if np.all(np.diff(y) >= 0):  # Monotonically increasing
-            if x_min >= 0 and x_max > 1:  # Time-like
-                return "creep"
+        # Creep: increasing compliance/strain over time (monotonically increasing)
+        # Typical: J(t) = J0 * (1 - exp(-t/tau))
+        if len(y) > 3 and np.all(y_diff >= 0):
+            if x_min >= 0:  # Time-like x-axis (non-negative)
+                # Additional check: y values should show significant growth
+                y_range_ratio = np.max(y) / (np.min(y) + 1e-10)
+                if y_range_ratio > 1.5:  # At least 50% growth
+                    logger.debug(f"Detected creep: monotonic increase, ratio={y_range_ratio:.1f}")
+                    return "creep"
 
-        # Flow: shear rate vs viscosity/stress
-        # Typically shows power-law or plateau behavior
+        # Flow: shear rate vs viscosity/stress (power-law relationship)
+        # Only check if data is NOT monotonic (already handled above)
         if x_min > 0 and len(x) > 5:
-            # Check for power-law relationship
+            # Check for power-law relationship in log-log space
             try:
-                log_x = np.log10(x[x > 0])
-                log_y = np.log10(y[y > 0])
-                if len(log_x) == len(log_y) and len(log_x) > 5:
+                # Filter positive values for log
+                mask = (x > 0) & (y > 0)
+                if np.sum(mask) > 5:
+                    log_x = np.log10(x[mask])
+                    log_y = np.log10(y[mask])
                     correlation = np.corrcoef(log_x, log_y)[0, 1]
-                    if abs(correlation) > 0.9:  # Strong log-log correlation
+                    # Only classify as flow if there's variation in y (not monotonic)
+                    if abs(correlation) > 0.9 and not (np.all(y_diff >= 0) or np.all(y_diff <= 0)):
+                        logger.debug(f"Detected flow: power-law correlation={correlation:.3f}")
                         return "flow"
             except Exception:
                 pass
+
+        # Oscillation: frequency sweep with log-spaced x-axis
+        if x_min > 0.001 and x_max < 10000:
+            if len(x) > 10:
+                # Check if logarithmically spaced (typical for frequency sweeps)
+                try:
+                    log_x = np.log10(x[x > 0])
+                    if len(log_x) > 5:
+                        log_spacing = np.diff(log_x)
+                        if np.std(log_spacing) < 0.3:  # Uniform in log space
+                            logger.debug("Detected oscillation: log-spaced x-axis")
+                            return "oscillation"
+                except Exception:
+                    pass
 
         logger.warning("Could not auto-detect test mode, defaulting to 'unknown'")
         return "unknown"
@@ -276,11 +363,45 @@ class DataService:
         Returns
         -------
         dict
-            Dictionary with 'x_suggestions' and 'y_suggestions' lists
+            Dictionary with 'x_suggestions', 'y_suggestions', and 'y2_suggestions' lists
         """
         import pandas as pd
+        import re
 
-        suggestions = {"x_suggestions": [], "y_suggestions": []}
+        suggestions = {"x_suggestions": [], "y_suggestions": [], "y2_suggestions": []}
+
+        def normalize_col(col: str) -> str:
+            """Normalize column name for pattern matching."""
+            # Convert to lowercase, remove underscores/spaces, handle primes
+            normalized = col.lower()
+            normalized = normalized.replace("_", "").replace(" ", "").replace("-", "")
+            # Handle prime notation: G' -> gprime, G'' -> gdoubleprime
+            normalized = normalized.replace("''", "doubleprime").replace("'", "prime")
+            return normalized
+
+        def matches_pattern(col: str, patterns: list[str], exclude_patterns: list[str] | None = None) -> bool:
+            """Check if column matches any pattern (with word boundaries for short patterns)."""
+            col_norm = normalize_col(col)
+            col_lower = col.lower()
+
+            # Check exclusions first
+            if exclude_patterns:
+                for excl in exclude_patterns:
+                    if excl in col_norm:
+                        return False
+
+            for pattern in patterns:
+                pattern_norm = pattern.lower().replace("_", "").replace(" ", "")
+                # For very short patterns (1-2 chars), use word boundary matching
+                if len(pattern) <= 2:
+                    # Match at word boundaries or start/end
+                    if re.search(rf'(^|[^a-z]){re.escape(pattern_norm)}($|[^a-z])', col_lower):
+                        return True
+                else:
+                    # For longer patterns, substring match is fine
+                    if pattern_norm in col_norm:
+                        return True
+            return False
 
         try:
             # Try to read first few rows
@@ -293,43 +414,46 @@ class DataService:
 
             columns = df.columns.tolist()
 
-            # Common x-axis patterns
+            # X-axis patterns (frequency, time, rate)
+            # Exclude temperature which contains 't'
             x_patterns = [
-                "time",
-                "t",
-                "freq",
-                "frequency",
-                "omega",
-                "angular",
-                "shear_rate",
-                "rate",
-                "strain",
+                "time", "freq", "frequency", "omega", "angular",
+                "shear_rate", "shearrate", "rate", "strain", "rad/s", "hz",
             ]
+            x_exclude = ["temp", "temperature"]
 
-            # Common y-axis patterns
+            # Y-axis patterns (storage modulus, stress, viscosity)
+            # Exclude loss modulus patterns
             y_patterns = [
-                "stress",
-                "modulus",
-                "g_prime",
-                "g_double_prime",
-                "g*",
-                "viscosity",
-                "eta",
-                "compliance",
+                "stress", "modulus", "gprime", "g_prime", "g'", "gp",
+                "storage", "viscosity", "eta", "compliance", "j",
+            ]
+            y_exclude = ["doubleprime", "loss", "g''", "gpp", "gdouble"]
+
+            # Y2-axis patterns (loss modulus G'')
+            y2_patterns = [
+                "gdoubleprime", "g_double_prime", "g''", "gpp", "gdouble",
+                "loss", "lossy",
             ]
 
-            # Match patterns (case-insensitive)
+            # Match columns to patterns
             for col in columns:
-                col_lower = col.lower()
-                for pattern in x_patterns:
-                    if pattern in col_lower:
+                # Check X patterns (exclude temperature)
+                if matches_pattern(col, x_patterns, x_exclude):
+                    if col not in suggestions["x_suggestions"]:
                         suggestions["x_suggestions"].append(col)
-                        break
+                    continue  # Don't check Y patterns if matched X
 
-                for pattern in y_patterns:
-                    if pattern in col_lower:
+                # Check Y2 patterns first (more specific than Y)
+                if matches_pattern(col, y2_patterns):
+                    if col not in suggestions["y2_suggestions"]:
+                        suggestions["y2_suggestions"].append(col)
+                    continue
+
+                # Check Y patterns (exclude loss modulus)
+                if matches_pattern(col, y_patterns, y_exclude):
+                    if col not in suggestions["y_suggestions"]:
                         suggestions["y_suggestions"].append(col)
-                        break
 
         except Exception as e:
             logger.warning(f"Failed to read column headers: {e}")

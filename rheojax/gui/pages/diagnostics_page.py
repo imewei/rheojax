@@ -7,9 +7,12 @@ MCMC diagnostics and posterior analysis with ArviZ integration.
 
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+import numpy as np
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
+    QFileDialog,
     QGroupBox,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QTableWidget,
@@ -19,7 +22,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from rheojax.gui.state.store import StateStore
+from rheojax.gui.services.bayesian_service import BayesianService
+from rheojax.gui.state.store import BayesianResult, StateStore
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas
 
 
@@ -33,8 +37,11 @@ class DiagnosticsPage(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._store = StateStore()
+        self._bayesian_service = BayesianService()
         self._current_model_id: str | None = None
+        self._current_inference_data: Any | None = None
         self.setup_ui()
+        self._connect_state_signals()
 
     def setup_ui(self) -> None:
         main_layout = QVBoxLayout(self)
@@ -64,6 +71,14 @@ class DiagnosticsPage(QWidget):
         bottom_splitter.setSizes([500, 500])
         main_layout.addWidget(bottom_splitter)
 
+    def _connect_state_signals(self) -> None:
+        """Connect to state change signals."""
+        signals = self._store.signals
+        if signals:
+            # Subscribe to bayesian completion
+            if hasattr(signals, "bayesian_completed"):
+                signals.bayesian_completed.connect(self._on_bayesian_completed)
+
     def _create_plot_tab(self, plot_type: str) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
@@ -90,21 +105,22 @@ class DiagnosticsPage(QWidget):
         self._gof_table.setHorizontalHeaderLabels(["Metric", "Value"])
         self._gof_table.setAlternatingRowColors(True)
 
-        metrics = [
-            ("R-squared", "--"),
-            ("Chi-squared", "--"),
-            ("MPE (%)", "--"),
-            ("WAIC", "--"),
-            ("LOO", "--"),
-            ("Effective Sample Size (min)", "--"),
-            ("R-hat (max)", "--"),
-            ("Divergences", "--"),
+        # Metric names (values will be updated dynamically)
+        self._metric_names = [
+            "R-squared",
+            "Chi-squared",
+            "MPE (%)",
+            "WAIC",
+            "LOO",
+            "Effective Sample Size (min)",
+            "R-hat (max)",
+            "Divergences",
         ]
 
-        self._gof_table.setRowCount(len(metrics))
-        for i, (metric, value) in enumerate(metrics):
+        self._gof_table.setRowCount(len(self._metric_names))
+        for i, metric in enumerate(self._metric_names):
             self._gof_table.setItem(i, 0, QTableWidgetItem(metric))
-            self._gof_table.setItem(i, 1, QTableWidgetItem(value))
+            self._gof_table.setItem(i, 1, QTableWidgetItem("--"))
 
         layout.addWidget(self._gof_table)
 
@@ -129,30 +145,335 @@ class DiagnosticsPage(QWidget):
         return panel
 
     def _on_tab_changed(self, index: int) -> None:
+        """Handle plot tab change - refresh the plot for current model."""
         plot_type = self._plot_tabs.tabText(index)
         if self._current_model_id:
+            self._update_plot(plot_type.lower())
             self.plot_requested.emit(plot_type, self._current_model_id)
 
     def _export_plot(self, plot_type: str) -> None:
+        """Export current plot to file."""
+        canvas_attr = f"_{plot_type.lower()}_canvas"
+        canvas = getattr(self, canvas_attr, None)
+
+        if canvas is None:
+            return
+
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            f"Export {plot_type} Plot",
+            f"{plot_type.lower()}_plot.png",
+            "PNG Files (*.png);;PDF Files (*.pdf);;SVG Files (*.svg);;All Files (*)",
+        )
+
+        if filepath:
+            try:
+                canvas.export_figure(filepath)
+                QMessageBox.information(self, "Export Successful", f"Plot saved to {filepath}")
+            except Exception as e:
+                QMessageBox.warning(self, "Export Failed", f"Failed to export plot: {e}")
+
         self.export_requested.emit(plot_type)
 
     def _refresh_comparison(self) -> None:
-        # Refresh model comparison table
-        pass
+        """Refresh model comparison table with all bayesian results."""
+        state = self._store.get_state()
+        bayesian_results = state.bayesian_results
+
+        if not bayesian_results:
+            self._comparison_table.setRowCount(0)
+            return
+
+        # Prepare results for comparison
+        results_list = list(bayesian_results.values())
+        self._comparison_table.setRowCount(len(results_list))
+
+        for i, result in enumerate(results_list):
+            model_name = result.model_name
+            self._comparison_table.setItem(i, 0, QTableWidgetItem(model_name))
+
+            # Try to calculate WAIC/LOO if we have posterior samples
+            waic_val = "--"
+            loo_val = "--"
+            elpd_val = "--"
+            weight_val = "--"
+
+            try:
+                # Get inference data for this result
+                if hasattr(result, "posterior_samples") and result.posterior_samples:
+                    import arviz as az
+
+                    idata = self._get_inference_data(result)
+                    if idata is not None:
+                        # Note: WAIC/LOO require log_likelihood which may not be available
+                        # These will show "--" if not computable
+                        pass
+            except Exception:
+                pass
+
+            self._comparison_table.setItem(i, 1, QTableWidgetItem(waic_val))
+            self._comparison_table.setItem(i, 2, QTableWidgetItem(loo_val))
+            self._comparison_table.setItem(i, 3, QTableWidgetItem(elpd_val))
+            self._comparison_table.setItem(i, 4, QTableWidgetItem(weight_val))
+
+    @Slot(object)
+    def _on_bayesian_completed(self, result: Any) -> None:
+        """Handle bayesian inference completion from state."""
+        if hasattr(result, "model_name"):
+            self.show_diagnostics(result.model_name)
 
     def show_diagnostics(self, model_id: str) -> None:
+        """Show diagnostics for specified model.
+
+        Parameters
+        ----------
+        model_id : str
+            Model name/ID to show diagnostics for
+        """
         self._current_model_id = model_id
+
+        # Get Bayesian result from state
+        state = self._store.get_state()
+        bayesian_result = state.bayesian_results.get(model_id)
+
+        if bayesian_result is None:
+            QMessageBox.information(
+                self,
+                "No Bayesian Results",
+                f"No Bayesian inference results found for model '{model_id}'.\n"
+                "Run Bayesian inference first from the Bayesian tab.",
+            )
+            return
+
+        # Build inference data from posterior samples
+        self._current_inference_data = self._get_inference_data(bayesian_result)
+
+        # Update metrics table
+        self._update_metrics_table(bayesian_result)
+
+        # Update current plot
         current_plot = self._plot_tabs.tabText(self._plot_tabs.currentIndex())
+        self._update_plot(current_plot.lower())
+
         self.plot_requested.emit(current_plot, model_id)
 
+    def _get_inference_data(self, result: BayesianResult) -> Any:
+        """Convert BayesianResult to ArviZ InferenceData.
+
+        Parameters
+        ----------
+        result : BayesianResult
+            Bayesian result from state
+
+        Returns
+        -------
+        arviz.InferenceData or None
+        """
+        try:
+            import arviz as az
+
+            posterior_samples = result.posterior_samples
+            if posterior_samples is None:
+                return None
+
+            # If already InferenceData, return directly
+            if hasattr(posterior_samples, "posterior"):
+                return posterior_samples
+
+            # Convert dict of samples to InferenceData
+            idata_dict = {}
+            for param_name, samples in posterior_samples.items():
+                if isinstance(samples, np.ndarray):
+                    if samples.ndim == 1:
+                        # Single chain: reshape to (1, n_samples)
+                        idata_dict[param_name] = samples.reshape(1, -1)
+                    else:
+                        idata_dict[param_name] = samples
+                else:
+                    # Convert to array
+                    arr = np.asarray(samples)
+                    if arr.ndim == 1:
+                        idata_dict[param_name] = arr.reshape(1, -1)
+                    else:
+                        idata_dict[param_name] = arr
+
+            return az.from_dict(idata_dict)
+
+        except Exception:
+            return None
+
+    def _update_metrics_table(self, result: BayesianResult) -> None:
+        """Update GOF metrics table with Bayesian result.
+
+        Parameters
+        ----------
+        result : BayesianResult
+            Bayesian result from state
+        """
+        # Map metric names to values
+        values = {
+            "R-squared": "--",
+            "Chi-squared": "--",
+            "MPE (%)": "--",
+            "WAIC": "--",
+            "LOO": "--",
+            "Effective Sample Size (min)": "--",
+            "R-hat (max)": "--",
+            "Divergences": "--",
+        }
+
+        # Get R-hat max
+        if result.r_hat:
+            max_rhat = max(result.r_hat.values())
+            values["R-hat (max)"] = f"{max_rhat:.4f}"
+            # Color code: green if <1.01, yellow if <1.1, red otherwise
+            if max_rhat > 1.1:
+                self._set_table_value_color(6, "#F44336")  # Red
+            elif max_rhat > 1.01:
+                self._set_table_value_color(6, "#FFC107")  # Yellow
+            else:
+                self._set_table_value_color(6, "#4CAF50")  # Green
+
+        # Get ESS min
+        if result.ess:
+            min_ess = min(result.ess.values())
+            values["Effective Sample Size (min)"] = f"{min_ess:.0f}"
+            # Color code: green if >400, yellow if >100, red otherwise
+            if min_ess < 100:
+                self._set_table_value_color(5, "#F44336")  # Red
+            elif min_ess < 400:
+                self._set_table_value_color(5, "#FFC107")  # Yellow
+            else:
+                self._set_table_value_color(5, "#4CAF50")  # Green
+
+        # Get divergences
+        values["Divergences"] = str(result.divergences)
+        if result.divergences > 0:
+            self._set_table_value_color(7, "#F44336")  # Red
+        else:
+            self._set_table_value_color(7, "#4CAF50")  # Green
+
+        # Update table
+        for i, metric in enumerate(self._metric_names):
+            value_item = self._gof_table.item(i, 1)
+            if value_item:
+                value_item.setText(values.get(metric, "--"))
+
+    def _set_table_value_color(self, row: int, color: str) -> None:
+        """Set background color for a table value cell.
+
+        Parameters
+        ----------
+        row : int
+            Row index
+        color : str
+            Hex color code
+        """
+        from PySide6.QtGui import QColor
+
+        item = self._gof_table.item(row, 1)
+        if item:
+            item.setBackground(QColor(color))
+
+    def _update_plot(self, plot_type: str) -> None:
+        """Update the specified plot with current inference data.
+
+        Parameters
+        ----------
+        plot_type : str
+            Plot type (trace, forest, pair, etc.)
+        """
+        if self._current_inference_data is None:
+            return
+
+        canvas_attr = f"_{plot_type}_canvas"
+        canvas = getattr(self, canvas_attr, None)
+
+        if canvas is None:
+            return
+
+        # Set inference data on canvas and let it render
+        canvas.set_inference_data(self._current_inference_data)
+        canvas.set_plot_type(plot_type)
+
     def plot_trace(self, model_id: str) -> None:
-        pass
+        """Generate trace plot for model.
+
+        Parameters
+        ----------
+        model_id : str
+            Model name/ID
+        """
+        self._current_model_id = model_id
+        self._plot_tabs.setCurrentIndex(0)  # Trace tab
+        self.show_diagnostics(model_id)
 
     def plot_pair(self, model_id: str, show_divergences: bool = True) -> None:
-        pass
+        """Generate pair plot for model.
+
+        Parameters
+        ----------
+        model_id : str
+            Model name/ID
+        show_divergences : bool
+            Whether to show divergences on plot
+        """
+        self._current_model_id = model_id
+        self._plot_tabs.setCurrentIndex(2)  # Pair tab
+        self.show_diagnostics(model_id)
 
     def plot_forest(self, model_id: str, hdi_prob: float = 0.95) -> None:
-        pass
+        """Generate forest plot for model.
+
+        Parameters
+        ----------
+        model_id : str
+            Model name/ID
+        hdi_prob : float
+            HDI probability for credible intervals
+        """
+        self._current_model_id = model_id
+        self._plot_tabs.setCurrentIndex(1)  # Forest tab
+
+        # Set HDI probability on the forest canvas
+        if hasattr(self, "_forest_canvas"):
+            self._forest_canvas.set_hdi_prob(hdi_prob)
+
+        self.show_diagnostics(model_id)
 
     def get_diagnostic_summary(self, model_id: str) -> dict[str, Any]:
-        return {}
+        """Get diagnostic summary for model.
+
+        Parameters
+        ----------
+        model_id : str
+            Model name/ID
+
+        Returns
+        -------
+        dict
+            Diagnostic summary including R-hat, ESS, divergences
+        """
+        state = self._store.get_state()
+        result = state.bayesian_results.get(model_id)
+
+        if result is None:
+            return {}
+
+        return {
+            "model_name": result.model_name,
+            "r_hat": result.r_hat,
+            "ess": result.ess,
+            "divergences": result.divergences,
+            "credible_intervals": result.credible_intervals,
+            "num_warmup": result.num_warmup,
+            "num_samples": result.num_samples,
+            "mcmc_time": result.mcmc_time,
+            "max_r_hat": max(result.r_hat.values()) if result.r_hat else None,
+            "min_ess": min(result.ess.values()) if result.ess else None,
+            "converged": (
+                max(result.r_hat.values()) < 1.1 if result.r_hat else False
+            ) and (
+                min(result.ess.values()) > 400 if result.ess else False
+            ) and result.divergences == 0,
+        }
