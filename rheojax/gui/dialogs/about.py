@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax import __version__
+
 
 class AboutDialog(QDialog):
     """About dialog with version info.
@@ -69,7 +71,7 @@ class AboutDialog(QDialog):
         title_layout.addWidget(app_name)
 
         # Version
-        version_label = QLabel("Version 0.5.0")
+        version_label = QLabel(f"Version {__version__}")
         version_font = QFont()
         version_font.setPointSize(12)
         version_label.setFont(version_font)

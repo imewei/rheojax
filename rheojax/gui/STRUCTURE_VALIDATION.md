@@ -1,7 +1,7 @@
 # RheoJAX GUI Package Structure Validation
 
 **Date Created:** 2025-12-05  
-**Version:** 0.5.0 (stub implementation)  
+**Version:** 0.6.0  
 **Status:** ✅ All structure created and validated
 
 ## Package Statistics
@@ -125,7 +125,7 @@ utils/
 
 ```python
 ✓ rheojax.gui imports successfully
-  Version: 0.5.0
+  Version: 0.6.0
 ✓ rheojax.gui.state imports successfully
 ✓ rheojax.gui.services imports successfully
 ✓ rheojax.gui.jobs imports successfully

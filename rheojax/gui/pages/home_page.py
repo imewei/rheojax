@@ -143,7 +143,7 @@ class HomePage(QWidget):
             from rheojax import __version__
             version_text = f"Version {__version__}"
         except ImportError:
-            version_text = "Version 0.5.0"
+            version_text = "Version 0.6.0"
 
         version = QLabel(version_text)
         version.setAlignment(Qt.AlignCenter)
@@ -334,6 +334,7 @@ class HomePage(QWidget):
             ("Creep", "Creep compliance data", "#FF5722"),
             ("Flow", "Steady shear flow curve data", "#E91E63"),
             ("SGR", "Soft Glassy Rheology example", "#9C27B0"),
+            ("SPP", "Sequence of Physical Processes (LAOS)", "#00BCD4"),
             ("TTS", "Time-Temperature Superposition data", "#FFC107"),
             ("Bayesian", "Dataset for Bayesian inference demo", "#607D8B"),
         ]

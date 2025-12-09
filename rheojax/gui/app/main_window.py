@@ -425,6 +425,11 @@ class RheoJAXMainWindow(QMainWindow):
             lambda: self._on_select_model("sgr_generic")
         )
 
+        # SPP LAOS models
+        self.menu_bar.model_spp_yield_stress.triggered.connect(
+            lambda: self._on_select_model("spp_yield_stress")
+        )
+
     def _connect_transforms_menu(self) -> None:
         """Connect Transforms menu actions."""
         self.menu_bar.transform_fft.triggered.connect(lambda: self._on_apply_transform("fft"))
@@ -441,6 +446,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.transform_derivatives.triggered.connect(
             lambda: self._on_apply_transform("derivatives")
         )
+        self.menu_bar.transform_spp.triggered.connect(lambda: self._on_apply_transform("spp"))
 
     def _connect_analysis_menu(self) -> None:
         """Connect Analysis menu actions."""
@@ -634,29 +640,42 @@ class RheoJAXMainWindow(QMainWindow):
 
     @Slot(str)
     def _on_open_example(self, example_name: str) -> None:
-        """Handle example selection from the home page."""
-        repo_root = Path(__file__).resolve().parents[3]
-        examples_dir = repo_root / "examples"
-        example_map = {
-            "oscillation": examples_dir / "basic" / "02-zener-fitting.ipynb",
-            "relaxation": examples_dir / "basic" / "01-maxwell-fitting.ipynb",
-            "creep": examples_dir / "basic" / "03-springpot-fitting.ipynb",
-            "flow": examples_dir / "basic" / "04-bingham-fitting.ipynb",
-            "sgr": examples_dir / "advanced" / "09-sgr-soft-glassy-rheology.ipynb",
-            "tts": examples_dir / "transforms" / "02-mastercurve-tts.ipynb",
-            "bayesian": examples_dir / "bayesian",
+        """Handle example selection from the home page.
+
+        Opens the corresponding notebook in Google Colab for interactive use.
+        """
+        # Map example names to their relative paths in the repository
+        example_paths = {
+            "oscillation": "examples/basic/02-zener-fitting.ipynb",
+            "relaxation": "examples/basic/01-maxwell-fitting.ipynb",
+            "creep": "examples/basic/03-springpot-fitting.ipynb",
+            "flow": "examples/basic/04-bingham-fitting.ipynb",
+            "sgr": "examples/advanced/09-sgr-soft-glassy-rheology.ipynb",
+            "spp": "examples/advanced/10-spp-laos-tutorial.ipynb",
+            "tts": "examples/transforms/02-mastercurve-tts.ipynb",
+            "bayesian": "examples/bayesian",
         }
 
-        target = example_map.get(example_name.lower(), examples_dir / "README.md")
-        if not target.exists():
-            target = examples_dir / "README.md"
+        COLAB_BASE = "https://colab.research.google.com/github/imewei/rheojax/blob/main"
+        GITHUB_BASE = "https://github.com/imewei/rheojax/tree/main"
+
+        rel_path = example_paths.get(example_name.lower())
+        if rel_path is None:
+            # Unknown example, open examples directory
+            url = f"{GITHUB_BASE}/examples"
+        elif rel_path.endswith(".ipynb"):
+            # Notebook - open in Colab
+            url = f"{COLAB_BASE}/{rel_path}"
+        else:
+            # Directory - open on GitHub
+            url = f"{GITHUB_BASE}/{rel_path}"
 
         try:
-            webbrowser.open(target.as_uri())
-            self.log(f"Opening example: {target.name}")
-            self.status_bar.show_message(f"Opening {example_name} example...", 2000)
+            webbrowser.open(url)
+            self.log(f"Opening example: {rel_path or example_name}")
+            self.status_bar.show_message(f"Opening {example_name} example in Colab...", 2000)
         except Exception:
-            webbrowser.open("https://github.com/RheoJAX/rheojax/tree/main/examples")
+            webbrowser.open(f"{GITHUB_BASE}/examples")
             self.log("Falling back to examples repository link")
 
     @Slot()

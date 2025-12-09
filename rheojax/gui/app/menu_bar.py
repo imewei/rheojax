@@ -327,6 +327,11 @@ class MenuBar(QMenuBar):
         self.model_sgr_generic = QAction("SGR GENERIC", self)
         sgr_menu.addAction(self.model_sgr_generic)
 
+        # SPP LAOS Models submenu
+        spp_menu = models_menu.addMenu("S&PP (LAOS)")
+        self.model_spp_yield_stress = QAction("SPP Yield Stress", self)
+        spp_menu.addAction(self.model_spp_yield_stress)
+
     def _create_transforms_menu(self) -> None:
         """Create Transforms menu."""
         transforms_menu = self.addMenu("&Transforms")
@@ -362,6 +367,13 @@ class MenuBar(QMenuBar):
         self.transform_derivatives = QAction("&Derivatives", self)
         self.transform_derivatives.setStatusTip("Calculate numerical derivatives")
         transforms_menu.addAction(self.transform_derivatives)
+
+        transforms_menu.addSeparator()
+
+        # SPP Analysis
+        self.transform_spp = QAction("S&PP (LAOS Analysis)", self)
+        self.transform_spp.setStatusTip("Sequence of Physical Processes yield stress extraction")
+        transforms_menu.addAction(self.transform_spp)
 
     def _create_analysis_menu(self) -> None:
         """Create Analysis menu."""

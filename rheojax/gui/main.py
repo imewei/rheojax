@@ -24,6 +24,7 @@ import logging
 import sys
 from pathlib import Path
 
+from rheojax import __version__
 from rheojax.gui.utils.logging import install_gui_log_handler
 
 def setup_logging(verbose: bool = False) -> None:
@@ -140,7 +141,7 @@ For more information, visit: https://github.com/imewei/rheojax
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.5.0",
+        version=f"%(prog)s {__version__}",
     )
 
     return parser.parse_args(argv)
@@ -170,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     # Setup logging
     setup_logging(args.verbose)
     logger = logging.getLogger(__name__)
-    logger.info("Starting RheoJAX GUI v0.5.0...")
+    logger.info(f"Starting RheoJAX GUI v{__version__}...")
 
     # Check dependencies
     logger.debug("Checking dependencies...")
@@ -250,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         app = QApplication(argv or ["rheojax-gui"])
 
     app.setApplicationName("RheoJAX")
-    app.setApplicationVersion("0.5.0")
+    app.setApplicationVersion(__version__)
     app.setOrganizationName("RheoJAX")
     app.setOrganizationDomain("github.com/imewei/rheojax")
 

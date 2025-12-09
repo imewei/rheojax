@@ -160,7 +160,7 @@ model = model_service.fit_model('maxwell', rheo_data, test_mode='relaxation')
 
 ## Development Status
 
-**Current Version**: 0.5.0 (stubs)
+**Current Version**: 0.6.0
 
 All modules are currently **stub implementations** with:
 - Complete docstrings
