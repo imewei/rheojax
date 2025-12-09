@@ -129,7 +129,11 @@ class BayesianPipeline(Pipeline):
         return self
 
     def fit_bayesian(
-        self, num_samples: int = 2000, num_warmup: int = 1000, **nuts_kwargs
+        self,
+        num_samples: int = 2000,
+        num_warmup: int = 1000,
+        num_chains: int = 4,
+        **nuts_kwargs,
     ) -> BayesianPipeline:
         """Perform Bayesian inference using NumPyro NUTS sampler.
 
@@ -138,10 +142,19 @@ class BayesianPipeline(Pipeline):
         the NLSQ point estimates are automatically used for warm-starting
         the sampler, leading to faster convergence.
 
+        Multi-chain sampling is enabled by default (num_chains=4) to provide
+        reliable convergence diagnostics (R-hat, ESS) and parallel execution
+        on multi-GPU systems.
+
         Args:
-            num_samples: Number of posterior samples to collect (default: 2000)
+            num_samples: Number of posterior samples per chain (default: 2000)
             num_warmup: Number of warmup/burn-in iterations (default: 1000)
+            num_chains: Number of MCMC chains (default: 4). Multiple chains
+                enable proper R-hat computation and parallel execution.
+                Chain method is auto-selected: 'parallel' on multi-GPU,
+                'vectorized' on single GPU/CPU.
             **nuts_kwargs: Additional arguments passed to NUTS sampler
+                (e.g., target_accept_prob, chain_method)
 
         Returns:
             self for method chaining
@@ -155,6 +168,7 @@ class BayesianPipeline(Pipeline):
             >>> pipeline.fit_bayesian(
             ...     num_samples=3000,
             ...     num_warmup=1500,
+            ...     num_chains=4,
             ...     target_accept_prob=0.9
             ... )
         """
@@ -190,14 +204,14 @@ class BayesianPipeline(Pipeline):
         if hasattr(self.data, "metadata") and self.data.metadata is not None:
             test_mode = self.data.metadata.get("test_mode")
 
-        # Run Bayesian inference
+        # Run Bayesian inference with multi-chain parallelization
         result = self._last_model.fit_bayesian(
             X,
             y,
             test_mode=test_mode,
             num_warmup=num_warmup,
             num_samples=num_samples,
-            num_chains=1,  # Single chain for now
+            num_chains=num_chains,
             initial_values=initial_values,
             **nuts_kwargs,
         )

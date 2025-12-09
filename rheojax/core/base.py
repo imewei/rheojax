@@ -303,9 +303,10 @@ class BaseModel(BayesianMixin, ABC):
         y: ArrayLike | None = None,
         num_warmup: int = 1000,
         num_samples: int = 2000,
-        num_chains: int = 1,
+        num_chains: int = 4,
         initial_values: dict[str, float] | None = None,
         test_mode: str | None = None,
+        seed: int | None = None,
         **nuts_kwargs,
     ) -> BayesianResult:
         """Perform Bayesian inference using NumPyro NUTS sampler.
@@ -315,19 +316,29 @@ class BaseModel(BayesianMixin, ABC):
         the model has been previously fitted with fit(), the NLSQ point estimates
         are automatically used for warm-starting.
 
+        Multi-chain sampling is enabled by default (num_chains=4) to provide
+        reliable convergence diagnostics (R-hat, ESS) and parallel execution
+        on multi-GPU systems.
+
         Args:
             X: Independent variable data (input features) or RheoData object
             y: Dependent variable data (observations to fit). If X is RheoData,
                 y is ignored and extracted from X.
             num_warmup: Number of warmup/burn-in iterations (default: 1000)
-            num_samples: Number of posterior samples to collect (default: 2000)
-            num_chains: Number of MCMC chains (default: 1)
+            num_samples: Number of posterior samples per chain (default: 2000)
+            num_chains: Number of MCMC chains (default: 4). Multiple chains
+                enable proper R-hat computation and parallel execution.
+                Chain method is auto-selected: 'parallel' on multi-GPU,
+                'vectorized' on single GPU/CPU.
             initial_values: Optional dict of initial parameter values for
                 warm-start. If None and model is fitted, uses NLSQ estimates.
             test_mode: Explicit test mode (e.g., 'relaxation', 'creep', 'oscillation').
                 If None, inferred from RheoData.metadata['test_mode'] or defaults
                 to 'relaxation'. Overrides RheoData metadata if provided.
+            seed: Random seed for reproducibility. If None, uses seed=0 for
+                deterministic results. Set to different values for independent runs.
             **nuts_kwargs: Additional arguments passed to NUTS sampler
+                (e.g., target_accept_prob, chain_method)
 
         Returns:
             BayesianResult containing posterior samples, summary statistics,
@@ -361,7 +372,7 @@ class BaseModel(BayesianMixin, ABC):
                 name: self.parameters.get_value(name) for name in self.parameters
             }
 
-        # Call BayesianMixin implementation with test_mode parameter
+        # Call BayesianMixin implementation with multi-chain parallelization
         result = super().fit_bayesian(
             X,
             y,
@@ -370,6 +381,7 @@ class BaseModel(BayesianMixin, ABC):
             num_chains=num_chains,
             initial_values=initial_values,
             test_mode=test_mode,
+            seed=seed,
             **nuts_kwargs,
         )
 

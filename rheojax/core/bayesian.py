@@ -452,8 +452,15 @@ class BayesianMixin:
         num_samples: int,
         num_chains: int,
         nuts_kwargs: dict[str, Any],
+        seed: int | None = None,
     ) -> MCMC:
-        """Run NUTS sampling with fallback to uniform initialization."""
+        """Run NUTS sampling with fallback to uniform initialization.
+
+        Args:
+            seed: Random seed for reproducibility. If None, uses 0.
+        """
+        user_chain_method = nuts_kwargs.pop("chain_method", None)
+
         try:
             init_strategy = init_to_value(values=warm_start_values)
         except Exception as exc:
@@ -465,8 +472,34 @@ class BayesianMixin:
             )
             init_strategy = init_to_uniform()
 
+        def _select_chain_method() -> str:
+            """Prefer parallel/vectorized chains when multiple chains requested.
+
+            Auto-selects optimal chain execution method:
+            - 'sequential': Single chain or user override
+            - 'parallel': Multi-chain on multi-GPU (fastest)
+            - 'vectorized': Multi-chain on single device (uses vmap)
+
+            Logs info about chain method selection for transparency.
+            """
+            if user_chain_method:
+                return user_chain_method
+            if num_chains <= 1:
+                return "sequential"
+
+            device_count = jax.device_count()
+            if device_count >= num_chains:
+                return "parallel"
+            # Fall back to vectorized on single-device setups for speed over sequential.
+            # Vectorized uses vmap for efficient parallel execution on single device.
+            return "vectorized"
+
+        # Use provided seed or default to 0 for reproducibility
+        rng_seed = seed if seed is not None else 0
+
         def run_mcmc(strategy):
             kernel = NUTS(numpyro_model, init_strategy=strategy, **nuts_kwargs)
+            chain_method = _select_chain_method()
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
@@ -478,8 +511,9 @@ class BayesianMixin:
                     num_warmup=num_warmup,
                     num_samples=num_samples,
                     num_chains=num_chains,
+                    chain_method=chain_method,
                 )
-            rng_key = jax.random.PRNGKey(0)
+            rng_key = jax.random.PRNGKey(rng_seed)
             sampler.run(rng_key, X_jax, y_jax)
             return sampler
 
@@ -648,9 +682,10 @@ class BayesianMixin:
         y: np.ndarray | None = None,
         num_warmup: int = 1000,
         num_samples: int = 2000,
-        num_chains: int = 1,
+        num_chains: int = 4,
         initial_values: dict[str, float] | None = None,
         test_mode: str | TestMode | None = None,
+        seed: int | None = None,
         **nuts_kwargs,
     ) -> BayesianResult:
         """Perform Bayesian inference using NumPyro NUTS sampler.
@@ -658,6 +693,10 @@ class BayesianMixin:
         Runs NUTS (No-U-Turn Sampler) to obtain posterior samples for model
         parameters. Supports warm-starting from NLSQ point estimates for faster
         convergence. Uses uniform priors over parameter bounds.
+
+        Multi-chain sampling is enabled by default (num_chains=4) to provide
+        reliable convergence diagnostics (R-hat, ESS) and parallel execution
+        on multi-GPU systems.
 
         CRITICAL: test_mode is captured in model_function closure to ensure
         correct posteriors for all test modes (relaxation, creep, oscillation).
@@ -667,14 +706,20 @@ class BayesianMixin:
             y: Dependent variable data (observations to fit). If X is RheoData,
                 y is ignored and extracted from X.
             num_warmup: Number of warmup/burn-in iterations (default: 1000)
-            num_samples: Number of posterior samples to collect (default: 2000)
-            num_chains: Number of MCMC chains (default: 1, multi-chain deferred)
+            num_samples: Number of posterior samples per chain (default: 2000)
+            num_chains: Number of MCMC chains (default: 4). Multiple chains
+                enable proper R-hat computation and parallel execution.
+                Chain method is auto-selected: 'parallel' on multi-GPU,
+                'vectorized' on single GPU/CPU.
             initial_values: Optional dict of initial parameter values for
                 warm-start (e.g., from NLSQ). Keys are parameter names.
             test_mode: Explicit test mode (e.g., 'relaxation', 'creep', 'oscillation').
                 If None, inferred from RheoData.metadata['test_mode'] or defaults
                 to 'relaxation'. Overrides RheoData metadata if provided.
+            seed: Random seed for reproducibility. If None, uses seed=0 for
+                deterministic results. Set to different values for independent runs.
             **nuts_kwargs: Additional arguments passed to NUTS sampler
+                (e.g., target_accept_prob, chain_method)
 
         Returns:
             BayesianResult containing posterior_samples, summary, diagnostics.
@@ -682,6 +727,9 @@ class BayesianMixin:
         Example:
             >>> result = model.fit_bayesian(X, y, test_mode='oscillation')
             >>> print(result.diagnostics["r_hat"])  # Should be < 1.01
+            >>>
+            >>> # For production: use num_chains=4 (default)
+            >>> result = model.fit_bayesian(X, y, num_chains=4)
         """
         # Phase 1: Validation
         self._validate_bayesian_requirements()
@@ -729,7 +777,7 @@ class BayesianMixin:
             is_complex=is_complex_data,
         )
 
-        # Phase 8: Run NUTS sampling
+        # Phase 8: Run NUTS sampling with multi-chain parallelization
         mcmc = self._run_nuts_sampling(
             numpyro_model=numpyro_model,
             X_jax=X_jax,
@@ -739,6 +787,7 @@ class BayesianMixin:
             num_samples=num_samples,
             num_chains=num_chains,
             nuts_kwargs=nuts_kwargs,
+            seed=seed,
         )
 
         # Phase 9: Process results
