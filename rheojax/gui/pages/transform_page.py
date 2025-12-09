@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QScrollArea,
     QSplitter,
     QVBoxLayout,
@@ -58,8 +59,8 @@ class TransformPage(QWidget):
             ("SRFS", "Strain-Rate Frequency Superposition", "#4CAF50"),
             ("Mutation Number", "Calculate mutation number", "#9C27B0"),
             ("OW Chirp", "Optimally-windowed chirp analysis", "#FF9800"),
-            ("Derivatives", "Calculate numerical derivatives", "#607D8B"),
             ("SPP Analysis", "LAOS yield stress and cage modulus extraction", "#E91E63"),
+            ("Derivatives", "Calculate numerical derivatives", "#607D8B"),
         ]
 
         for i, (name, desc, color) in enumerate(transforms):
@@ -79,6 +80,9 @@ class TransformPage(QWidget):
     def _create_transform_card(self, name: str, desc: str, color: str) -> QWidget:
         card = QFrame()
         card.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+        # Let height adapt to content but stay compact in the grid.
+        card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        card.setMaximumHeight(200)
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: {color};
@@ -92,14 +96,12 @@ class TransformPage(QWidget):
         card.setCursor(Qt.PointingHandCursor)
 
         layout = QVBoxLayout(card)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
         name_label = QLabel(name)
         name_label.setStyleSheet("color: white; font-size: 13pt; font-weight: bold;")
-        desc_label = QLabel(desc)
-        desc_label.setStyleSheet("color: white; font-size: 9pt;")
-        desc_label.setWordWrap(True)
 
         layout.addWidget(name_label)
-        layout.addWidget(desc_label)
         layout.addStretch()
 
         btn = QPushButton("Configure")
@@ -481,17 +483,17 @@ class TransformPage(QWidget):
                 "requires_multiple": False,
             },
             {
-                "name": "Derivatives",
-                "key": "derivative",
-                "description": "Calculate numerical derivatives",
-                "color": "#607D8B",
-                "requires_multiple": False,
-            },
-            {
                 "name": "SPP Analysis",
                 "key": "spp",
                 "description": "LAOS yield stress and cage modulus extraction",
                 "color": "#E91E63",
+                "requires_multiple": False,
+            },
+            {
+                "name": "Derivatives",
+                "key": "derivative",
+                "description": "Calculate numerical derivatives",
+                "color": "#607D8B",
                 "requires_multiple": False,
             },
         ]

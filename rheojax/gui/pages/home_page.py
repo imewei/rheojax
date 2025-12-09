@@ -461,24 +461,31 @@ class HomePage(QWidget):
 
         resources = [
             ("Documentation", "https://rheojax.readthedocs.io"),
-            ("Examples", "https://github.com/RheoJAX/rheojax/tree/main/examples"),
-            ("Tutorials", "https://github.com/RheoJAX/rheojax/tree/main/notebooks"),
-            ("Report Issues", "https://github.com/RheoJAX/rheojax/issues"),
+            ("Tutorials", "https://github.com/imewei/rheojax/tree/main/examples"),
+            ("Report Issues", "https://github.com/imewei/rheojax/issues"),
         ]
 
         for title, url in resources:
             btn = QPushButton(title)
             btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #f5f5f5;
-                    border: 2px solid #ddd;
-                    border-radius: 5px;
-                    padding: 10px;
-                    font-size: 10pt;
+                    background-color: #E8ECF5;
+                    color: #0F172A;
+                    border: 2px solid #CBD5E1;
+                    border-radius: 6px;
+                    padding: 12px;
+                    font-size: 12pt;
+                    font-weight: 600;
                 }
                 QPushButton:hover {
-                    background-color: #e8e8e8;
-                    border-color: #2196F3;
+                    background-color: #DBEAFE;
+                    border-color: #2563EB;
+                    color: #0B1C3A;
+                }
+                QPushButton:pressed {
+                    background-color: #C7DBFC;
+                    border-color: #1D4ED8;
+                    color: #0B1C3A;
                 }
             """)
             btn.clicked.connect(lambda checked, u=url: self._open_url(u))

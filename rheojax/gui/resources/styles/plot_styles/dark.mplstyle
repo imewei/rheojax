@@ -18,7 +18,8 @@ grid.alpha: 0.6
 lines.linewidth: 2.0
 lines.markersize: 6
 
-font.family: sans-serif
+font.family: DejaVu Sans
+font.sans-serif: DejaVu Sans, Arial, Helvetica
 font.size: 10
 text.color: #e8eaed
 

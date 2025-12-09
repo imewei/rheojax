@@ -19,7 +19,8 @@ grid.alpha: 0.5
 lines.linewidth: 2.5
 lines.markersize: 10
 
-font.family: sans-serif
+font.family: DejaVu Sans
+font.sans-serif: DejaVu Sans, Arial, Helvetica
 font.size: 12
 
 legend.frameon: True

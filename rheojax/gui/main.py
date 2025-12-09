@@ -260,9 +260,22 @@ def main(argv: list[str] | None = None) -> int:
 
     app.setStyle("Fusion")
 
+    # Map missing font aliases to installed families to avoid fallback scans
+    QFont.insertSubstitution("Sans-serif", "DejaVu Sans")
+    QFont.insertSubstitution("Sans Serif", "DejaVu Sans")
+    QFont.insertSubstitution("sans-serif", "DejaVu Sans")
+
     # Apply adaptive base font before the stylesheet so the theme inherits it
-    base_font_size = _adaptive_font_size(app)
-    base_font = QFont("SF Pro Text")
+    # Bump all fonts by +2pt for better readability.
+    base_font_size = _adaptive_font_size(app) + 2.0
+    base_font = QFont()
+    base_font.setFamilies([
+        "Segoe UI",
+        "Helvetica Neue",
+        "Helvetica",
+        "Arial",
+        "DejaVu Sans",
+    ])
     base_font.setPointSizeF(base_font_size)
     app.setFont(base_font)
 
