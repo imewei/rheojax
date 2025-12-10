@@ -2,7 +2,7 @@
 Toolbars
 ========
 
-Main toolbar and quick fit strip for common actions and workflow.
+Main toolbar and related utilities.
 """
 
 
@@ -91,4 +91,3 @@ class MainToolBar(QToolBar):
         self.settings_action = QAction("Settings", self)
         self.settings_action.setToolTip("Settings")
         self.addAction(self.settings_action)
-
