@@ -19,6 +19,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.gui.services.model_service import normalize_model_name
+
 # Quick-access models with display names and categories
 QUICK_MODELS = [
     ("maxwell", "Maxwell", "Classical viscoelastic model"),
@@ -187,9 +189,9 @@ class QuickFitStrip(QWidget):
         model_name : str
             Name of clicked model
         """
-        self._selected_model = model_name
+        self._selected_model = normalize_model_name(model_name)
         self._fit_btn.setEnabled(True)
-        self._status_label.setText(f"Selected: {model_name}")
+        self._status_label.setText(f"Selected: {self._selected_model}")
 
     def _on_fit_clicked(self) -> None:
         """Handle fit button click."""
@@ -287,9 +289,10 @@ class QuickFitStrip(QWidget):
         bool
             True if model was found and selected
         """
-        if model_name in self._model_buttons:
-            self._model_buttons[model_name].setChecked(True)
-            self._selected_model = model_name
+        normalized = normalize_model_name(model_name)
+        if normalized in self._model_buttons:
+            self._model_buttons[normalized].setChecked(True)
+            self._selected_model = normalized
             self._fit_btn.setEnabled(True)
             return True
         return False

@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from rheojax.gui.jobs.fit_worker import FitResult, FitWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.services.model_service import ModelService
+from rheojax.gui.services.model_service import normalize_model_name
 from rheojax.gui.state.actions import (
     fitting_completed,
     fitting_failed,
@@ -77,6 +78,7 @@ class FitPage(QWidget):
             "use_bounds": True,
             "verbose": False,
         }
+        self._current_model: str | None = None
 
         self._setup_ui()
         self._connect_signals()
@@ -134,6 +136,7 @@ class FitPage(QWidget):
         self._quick_model_combo.setEditable(True)
         self._quick_model_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._quick_model_combo.currentIndexChanged.connect(self._on_quick_model_changed)
+        self._quick_model_combo.lineEdit().editingFinished.connect(self._on_quick_model_edited)
         context_layout.addWidget(self._quick_model_combo, 1)
         layout.addWidget(context_group)
 
@@ -195,6 +198,7 @@ class FitPage(QWidget):
         # Store signals (only if signals are set)
         if self._store.signals is not None:
             self._store.signals.dataset_selected.connect(self._on_dataset_changed)
+            self._store.signals.model_selected.connect(self._on_external_model_selected)
             self._store.signals.fit_started.connect(self._on_fitting_started)
             self._store.signals.fit_completed.connect(self._on_fitting_completed)
 
@@ -213,26 +217,26 @@ class FitPage(QWidget):
                 self._quick_model_combo.addItem(model_name, model_name)
         self._quick_model_combo.blockSignals(False)
 
-    @Slot(str)
-    def _on_model_selected(self, model_name: str) -> None:
-        """Handle model selection.
+    def _apply_model_selection(self, model_name: str, dispatch: bool) -> None:
+        """Load model details and parameters, optionally dispatching to the store."""
+        model_name = normalize_model_name(model_name)
+        if not model_name:
+            return
 
-        Parameters
-        ----------
-        model_name : str
-            Selected model name
-        """
-        # Update state
-        self._store.dispatch(set_active_model(model_name))
+        if not dispatch and model_name == self._current_model:
+            return
+
+        if dispatch:
+            self._store.dispatch(set_active_model(model_name))
+
+        self._current_model = model_name
 
         # Load model parameters
         model_info = self._model_service.get_model_info(model_name)
         params = model_info.get("parameters", {})
 
-        # Import ParameterState for table format
         from rheojax.gui.state.store import ParameterState
 
-        # Convert to dict[str, ParameterState] format for parameter table
         param_states: dict[str, ParameterState] = {}
         for name, details in params.items():
             bounds = details.get("bounds", (0.0, float("inf")))
@@ -255,12 +259,12 @@ class FitPage(QWidget):
         dataset = self._store.get_active_dataset()
         self._btn_fit.setEnabled(dataset is not None)
 
-        # Sync quick selector
-        idx = self._quick_model_combo.findData(model_name)
-        if idx >= 0:
-            was_blocked = self._quick_model_combo.blockSignals(True)
-            self._quick_model_combo.setCurrentIndex(idx)
-            self._quick_model_combo.blockSignals(was_blocked)
+        self._sync_quick_model_selection(model_name)
+
+    @Slot(str)
+    def _on_model_selected(self, model_name: str) -> None:
+        """Handle model selection from within the fit page."""
+        self._apply_model_selection(normalize_model_name(model_name), dispatch=True)
 
     @Slot(str)
     def _on_model_double_clicked(self, model_name: str) -> None:
@@ -271,9 +275,22 @@ class FitPage(QWidget):
         model_name : str
             Double-clicked model name
         """
-        self._on_model_selected(model_name)
+        self._apply_model_selection(normalize_model_name(model_name), dispatch=True)
         if self._btn_fit.isEnabled():
             self._on_fit_clicked()
+
+    @Slot(str)
+    def _on_external_model_selected(self, model_name: str) -> None:
+        """Apply model selection coming from outside the Fit page."""
+        self._apply_model_selection(normalize_model_name(model_name), dispatch=False)
+
+    def _sync_quick_model_selection(self, model_name: str) -> None:
+        """Synchronize the quick model combo without emitting signals."""
+        idx = self._quick_model_combo.findData(model_name)
+        if idx >= 0:
+            was_blocked = self._quick_model_combo.blockSignals(True)
+            self._quick_model_combo.setCurrentIndex(idx)
+            self._quick_model_combo.blockSignals(was_blocked)
 
     @Slot()
     def _on_dataset_changed(self) -> None:
@@ -312,7 +329,41 @@ class FitPage(QWidget):
         """Handle quick model combo changes."""
         model_name = self._quick_model_combo.itemData(index)
         if model_name:
-            self._on_model_selected(model_name)
+            self._apply_model_selection(model_name, dispatch=True)
+
+    def _on_quick_model_edited(self) -> None:
+        """Handle aliases typed into the quick model combo."""
+        text = self._quick_model_combo.currentText().strip()
+        if not text:
+            return
+
+        normalized = normalize_model_name(text)
+        current_index = self._quick_model_combo.currentIndex()
+        current_slug = self._quick_model_combo.itemData(current_index) or ""
+
+        match_index = -1
+        for i in range(self._quick_model_combo.count()):
+            data = self._quick_model_combo.itemData(i)
+            if data == normalized:
+                match_index = i
+                break
+            label = (self._quick_model_combo.itemText(i) or "").strip()
+            if label.lower() == text.lower():
+                match_index = i
+                normalized = data or normalized
+                break
+
+        if match_index >= 0:
+            if normalized and normalized == current_slug and match_index == current_index:
+                return
+            was_blocked = self._quick_model_combo.blockSignals(True)
+            self._quick_model_combo.setCurrentIndex(match_index)
+            self._quick_model_combo.blockSignals(was_blocked)
+            self._apply_model_selection(normalized, dispatch=True)
+        else:
+            if normalized == current_slug:
+                return
+            self._apply_model_selection(normalized, dispatch=True)
 
     def _check_compatibility(self, model_name: str) -> None:
         """Check model-data compatibility.

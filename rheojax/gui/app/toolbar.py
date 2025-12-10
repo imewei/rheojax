@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QComboBox, QLabel, QToolBar, QToolButton, QWidget
 
+from rheojax.gui.services.model_service import normalize_model_name
+
 
 class MainToolBar(QToolBar):
     """Main application toolbar with common actions.
@@ -174,6 +176,7 @@ class QuickFitStrip(QToolBar):
         self.model_combo.setToolTip("Select rheological model")
         self.model_combo.setMinimumWidth(180)
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
+        self.model_combo.lineEdit().editingFinished.connect(self._on_model_edited)
         self.addWidget(self.model_combo)
 
         # Arrow
@@ -332,6 +335,7 @@ class QuickFitStrip(QToolBar):
         model_id : str
             Model identifier
         """
+        model_id = normalize_model_name(model_id)
         for i in range(self.model_combo.count()):
             if self.model_combo.itemData(i) == model_id:
                 was_blocked = self.model_combo.blockSignals(True)
@@ -360,4 +364,42 @@ class QuickFitStrip(QToolBar):
         """Emit model_changed when a real model is selected."""
         model_id = self.model_combo.itemData(index)
         if model_id:
+            self.set_status(f"Model: {model_id}")
             self.model_changed.emit(model_id)
+
+    def _on_model_edited(self) -> None:
+        """Handle typed model aliases in the editable combo line edit."""
+        text = self.model_combo.currentText().strip()
+        if not text:
+            return
+
+        normalized = normalize_model_name(text)
+        cleaned_input = "".join(text.lower().split())
+        current_index = self.model_combo.currentIndex()
+        current_slug = self.model_combo.itemData(current_index) or ""
+
+        # Try to find matching item by data (slug) or visible text (case-insensitive)
+        match_index = -1
+        for i in range(self.model_combo.count()):
+            data = self.model_combo.itemData(i)
+            if data and data == normalized:
+                match_index = i
+                break
+            if not data:
+                continue
+            label = (self.model_combo.itemText(i) or "").strip()
+            cleaned_label = "".join(label.lower().split())
+            if cleaned_label == cleaned_input:
+                match_index = i
+                normalized = data
+                break
+
+        if match_index >= 0:
+            if normalized and normalized == current_slug and match_index == current_index:
+                return
+            was_blocked = self.model_combo.blockSignals(True)
+            self.model_combo.setCurrentIndex(match_index)
+            self.model_combo.blockSignals(was_blocked)
+            if normalized:
+                self.set_status(f"Model: {normalized}")
+                self.model_changed.emit(normalized)

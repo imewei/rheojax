@@ -34,6 +34,7 @@ from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.app.menu_bar import MenuBar
 from rheojax.gui.app.status_bar import StatusBar
+from rheojax.gui.app.toolbar import QuickFitStrip
 from rheojax.gui.pages.bayesian_page import BayesianPage
 from rheojax.gui.pages.data_page import DataPage
 from rheojax.gui.pages.diagnostics_page import DiagnosticsPage
@@ -155,6 +156,10 @@ class RheoJAXMainWindow(QMainWindow):
         # Pipeline chips (kept for status wiring but not shown as a toolbar)
         self.pipeline_chips = PipelineChips(self)
 
+        # Quick fit toolbar (model + mode shortcuts)
+        self.quick_fit_strip = QuickFitStrip(self)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.quick_fit_strip)
+
         # Status bar
         self.status_bar = StatusBar(self)
         self.setStatusBar(self.status_bar)
@@ -275,6 +280,15 @@ class RheoJAXMainWindow(QMainWindow):
         self.diagnostics_page.plot_requested.connect(self._on_diagnostics_plot_requested)
         self.diagnostics_page.export_requested.connect(self._on_diagnostics_export_requested)
 
+        # Quick fit strip signals
+        self.quick_fit_strip.model_changed.connect(self._on_toolbar_model_selected)
+        self.quick_fit_strip.mode_changed.connect(self._on_set_test_mode)
+        self.quick_fit_strip.load_clicked.connect(self._on_import)
+        self.quick_fit_strip.fit_clicked.connect(self._on_fit)
+        self.quick_fit_strip.plot_clicked.connect(lambda: self.navigate_to("fit"))
+        self.quick_fit_strip.export_clicked.connect(self._on_export)
+        self.quick_fit_strip.save_clicked.connect(self._on_save_file)
+
         # Export page signals
         self.export_page.export_requested.connect(self._on_export_requested)
         self.export_page.export_completed.connect(self._on_export_completed)
@@ -291,6 +305,7 @@ class RheoJAXMainWindow(QMainWindow):
         signals.dataset_added.connect(lambda dataset_id: self.status_bar.show_message(f"Dataset added: {dataset_id}", 2000))
         signals.dataset_added.connect(self._on_dataset_added)
         signals.pipeline_step_changed.connect(self._on_pipeline_step_changed)
+        signals.model_selected.connect(self._on_active_model_selected)
 
     def _init_worker_pool(self) -> None:
         """Create and connect WorkerPool if PySide6 is available."""
@@ -1083,18 +1098,38 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_select_model(self, model_id: str) -> None:
         """Handle model selection."""
-        self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model_id})
-        # Pull parameter defaults from registry via ModelService
+        from rheojax.gui.services.model_service import normalize_model_name
+
+        normalized = normalize_model_name(model_id)
+        self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": normalized})
+        self._apply_active_model(normalized)
+        self.navigate_to("fit")
+        self.log(f"Selected model: {normalized}")
+        self.status_bar.show_message(f"Model: {normalized}", 2000)
+
+    @Slot(str)
+    def _on_toolbar_model_selected(self, model_id: str) -> None:
+        """Handle model change from the quick-fit toolbar."""
+        if model_id:
+            self._on_select_model(model_id)
+
+    @Slot(str)
+    def _on_active_model_selected(self, model_id: str) -> None:
+        """Update UI when the active model changes in the store."""
+        if model_id:
+            self._apply_active_model(model_id)
+
+    def _apply_active_model(self, model_id: str) -> None:
+        """Sync parameter table and toolbar selection with the active model."""
         try:
             defaults = self.model_service.get_parameter_defaults(model_id)
             self.param_table.set_parameters(defaults)
-            # Persist parameters into state
             self.store.update_state(lambda s: replace(s, model_params=defaults))
         except Exception as exc:
             self.log(f"Unable to load parameters for {model_id}: {exc}")
-        self.navigate_to("fit")
-        self.log(f"Selected model: {model_id}")
-        self.status_bar.show_message(f"Model: {model_id}", 2000)
+        if hasattr(self, "quick_fit_strip"):
+            self.quick_fit_strip.set_model(model_id)
+            self.quick_fit_strip.set_status(f"Model: {model_id}")
 
     def _setup_shortcuts(self) -> None:
         """Register application-wide shortcuts and command palette."""

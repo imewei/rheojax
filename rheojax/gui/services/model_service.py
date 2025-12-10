@@ -12,6 +12,25 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+
+def normalize_model_name(model_name: str) -> str:
+    """Normalize user-entered model identifiers to registry slugs.
+
+    Accepts case-insensitive aliases (e.g., "GMM" → "generalized_maxwell") and
+    trims whitespace so editable combos can safely map typed text.
+    """
+
+    key = model_name.strip()
+    alias_map = {
+        "gmm": "generalized_maxwell",
+        "generalized maxwell": "generalized_maxwell",
+    }
+
+    if key in alias_map.values():
+        return key
+
+    return alias_map.get(key.lower(), key)
+
 import numpy as np
 
 from rheojax.core.data import RheoData
@@ -79,6 +98,10 @@ class ModelService:
         """Initialize model service."""
         self._registry = Registry.get_instance()
         self._model_cache = {}
+
+    def _normalize_model_name(self, model_name: str) -> str:
+        """Map friendly aliases to registered model slugs."""
+        return normalize_model_name(model_name)
 
     def get_available_models(self) -> dict[str, list[str]]:
         """Get models grouped by category from ModelRegistry.
@@ -166,6 +189,8 @@ class ModelService:
     def get_parameter_defaults(self, model_name: str) -> dict[str, "ParameterState"]:
         """Return ParameterState mapping for a model using registry defaults."""
 
+        model_name = self._normalize_model_name(model_name)
+
         from rheojax.gui.state.store import ParameterState
 
         model = self._registry.create_instance(model_name, plugin_type="model")
@@ -201,6 +226,7 @@ class ModelService:
             - supported_test_modes: list[str]
         """
         try:
+            model_name = self._normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
 
@@ -269,6 +295,7 @@ class ModelService:
             - recommendations: list[str]
         """
         try:
+            model_name = self._normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
 
@@ -334,6 +361,7 @@ class ModelService:
             Initial parameter values
         """
         try:
+            model_name = self._normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
 
@@ -394,6 +422,7 @@ class ModelService:
             Fitting result with parameters, residuals, and goodness of fit
         """
         try:
+            model_name = self._normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
 
@@ -526,7 +555,9 @@ class ModelService:
         """
         try:
             # Create model instance
-            model = self._registry.create_instance(model_name, plugin_type="model")
+            model = self._registry.create_instance(
+                self._normalize_model_name(model_name), plugin_type="model"
+            )
 
             # Set parameters
             for name, value in parameters.items():

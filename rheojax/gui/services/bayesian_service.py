@@ -16,6 +16,7 @@ import numpy as np
 
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
+from rheojax.gui.services.model_service import normalize_model_name
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ class BayesianService:
             Format: {'param_name': {'dist': 'uniform', 'args': [lower, upper]}}
         """
         try:
+            model_name = normalize_model_name(model_name)
             model = self._registry.create_instance(model_name, plugin_type="model")
 
             priors = {}
@@ -137,6 +139,7 @@ class BayesianService:
             Posterior samples and diagnostics
         """
         try:
+            model_name = normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
 
@@ -418,6 +421,7 @@ class BayesianService:
         warnings = []
 
         try:
+            model_name = normalize_model_name(model_name)
             model = self._registry.create_instance(model_name, plugin_type="model")
 
             for param_name in model.parameters:
