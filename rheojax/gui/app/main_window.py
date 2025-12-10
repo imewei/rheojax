@@ -34,7 +34,7 @@ from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.app.menu_bar import MenuBar
 from rheojax.gui.app.status_bar import StatusBar
-from rheojax.gui.app.toolbar import QuickFitStrip
+from rheojax.gui.app.toolbar import MainToolBar
 from rheojax.gui.pages.bayesian_page import BayesianPage
 from rheojax.gui.pages.data_page import DataPage
 from rheojax.gui.pages.diagnostics_page import DiagnosticsPage
@@ -156,9 +156,7 @@ class RheoJAXMainWindow(QMainWindow):
         # Pipeline chips (kept for status wiring but not shown as a toolbar)
         self.pipeline_chips = PipelineChips(self)
 
-        # Quick fit toolbar (model + mode shortcuts)
-        self.quick_fit_strip = QuickFitStrip(self)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.quick_fit_strip)
+        # (Quick fit strip removed)
 
         # Status bar
         self.status_bar = StatusBar(self)

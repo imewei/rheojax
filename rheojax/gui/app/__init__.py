@@ -9,7 +9,6 @@ __all__ = [
     "RheoJAXMainWindow",
     "MenuBar",
     "MainToolBar",
-    "QuickFitStrip",
     "StatusBar",
 ]
 
