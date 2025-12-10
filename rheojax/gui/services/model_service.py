@@ -40,6 +40,16 @@ from rheojax.utils.compatibility import check_model_compatibility
 logger = logging.getLogger(__name__)
 
 
+def _is_placeholder_model(model_name: str | None) -> bool:
+    """Return True when the incoming name is a UI placeholder or empty."""
+
+    if model_name is None:
+        return True
+
+    key = model_name.strip().lower()
+    return key == "" or key.startswith("select model")
+
+
 @dataclass
 class FitResult:
     """Result from model fitting.
@@ -188,6 +198,8 @@ class ModelService:
 
     def get_parameter_defaults(self, model_name: str) -> dict[str, "ParameterState"]:
         """Return ParameterState mapping for a model using registry defaults."""
+        if _is_placeholder_model(model_name):
+            return {}
 
         model_name = self._normalize_model_name(model_name)
 
@@ -226,6 +238,14 @@ class ModelService:
             - supported_test_modes: list[str]
         """
         try:
+            if _is_placeholder_model(model_name):
+                return {
+                    "name": model_name or "",
+                    "description": "No model selected",
+                    "parameters": {},
+                    "supported_test_modes": [],
+                }
+
             model_name = self._normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
@@ -295,6 +315,15 @@ class ModelService:
             - recommendations: list[str]
         """
         try:
+            if _is_placeholder_model(model_name):
+                return {
+                    "compatible": False,
+                    "decay_type": "unknown",
+                    "material_type": "unknown",
+                    "warnings": ["No model selected"],
+                    "recommendations": [],
+                }
+
             model_name = self._normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
@@ -503,7 +532,7 @@ class ModelService:
             # Add NLSQ result if available
             if hasattr(model, "_nlsq_result") and model._nlsq_result:
                 metadata["nlsq_result"] = {
-                    "success": model._nlsq_result.converged,
+                    "success": getattr(model._nlsq_result, "success", False),
                     "nfev": model._nlsq_result.nfev,
                     "njev": model._nlsq_result.njev,
                 }
