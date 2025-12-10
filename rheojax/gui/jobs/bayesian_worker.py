@@ -198,15 +198,14 @@ class BayesianWorker(QRunnable):
             )
             start_time = time.perf_counter()
 
-            # Import model from registry
+            # Import model from registry (core registry is authoritative)
             # Import inside run() to avoid JAX initialization issues
-            from rheojax.models import ModelRegistry
+            from rheojax.core.registry import ModelRegistry
 
-            model_class = ModelRegistry.get(self._model_name)
-            if model_class is None:
+            try:
+                model = ModelRegistry.create(self._model_name)
+            except KeyError:
                 raise ValueError(f"Model '{self._model_name}' not found in registry")
-
-            model = model_class()
 
             # Apply warm start if provided
             if self._warm_start:
