@@ -127,9 +127,10 @@ class ArvizCanvas(QWidget):
         layout.addWidget(self._nav_toolbar)
         layout.addWidget(self._canvas, 1)
 
-        # Status label
-        self._status_label = QLabel("No data loaded")
-        self._status_label.setStyleSheet("color: gray; padding: 4px;")
+        # Status / empty label
+        self._status_label = QLabel("No diagnostics yet. Run Bayesian inference to view plots.")
+        self._status_label.setAlignment(Qt.AlignCenter)
+        self._status_label.setStyleSheet("color: #94A3B8; padding: 6px;")
         layout.addWidget(self._status_label)
 
     def _connect_signals(self) -> None:
@@ -156,7 +157,10 @@ class ArvizCanvas(QWidget):
     def _refresh_plot(self) -> None:
         """Refresh the current plot."""
         if self._inference_data is None:
+            self._status_label.show()
             return
+
+        self._status_label.hide()
 
         # Clear figure
         self._figure.clear()
@@ -178,13 +182,18 @@ class ArvizCanvas(QWidget):
             try:
                 func()
                 self._status_label.setText(f"Showing: {self._current_plot_type}")
+                self._status_label.hide()
             except Exception as e:
                 self._status_label.setText(f"Error: {e}")
+                self._status_label.show()
                 ax = self._figure.add_subplot(111)
                 ax.text(
                     0.5, 0.5, f"Error generating plot:\n{e}",
                     ha="center", va="center", transform=ax.transAxes
                 )
+        else:
+            self._status_label.setText("Unsupported plot type")
+            self._status_label.show()
 
         self._canvas.draw()
 

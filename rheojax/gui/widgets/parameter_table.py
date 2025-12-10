@@ -5,6 +5,7 @@ Parameter Table Widget
 Interactive table for model parameter editing.
 """
 
+import logging
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QBrush, QColor
@@ -66,6 +67,8 @@ class ParameterTable(QTableWidget):
         """
         super().__init__(parent)
 
+        self._logger = logging.getLogger(__name__)
+
         # Configure table
         self.setColumnCount(5)
         self.setHorizontalHeaderLabels(["Parameter", "Value", "Min", "Max", "Fixed"])
@@ -105,7 +108,7 @@ class ParameterTable(QTableWidget):
             self.itemChanged.disconnect(self._on_item_changed)
         except (TypeError, RuntimeError):
             # Signal may not be connected yet
-            pass
+            self._logger.debug("itemChanged disconnect skipped; not connected")
 
         try:
             # Clear existing rows
@@ -150,8 +153,7 @@ class ParameterTable(QTableWidget):
             try:
                 self.itemChanged.connect(self._on_item_changed)
             except (TypeError, RuntimeError):
-                # Signal may already be connected
-                pass
+                self._logger.debug("itemChanged reconnect skipped; already connected")
 
     def get_parameters(self) -> dict[str, ParameterState]:
         """Get current parameter values and states.
@@ -197,7 +199,7 @@ class ParameterTable(QTableWidget):
         try:
             self.itemChanged.disconnect(self._on_item_changed)
         except (TypeError, RuntimeError):
-            pass
+            self._logger.debug("itemChanged disconnect skipped during reset")
 
         try:
             for row in range(self.rowCount()):
@@ -213,7 +215,7 @@ class ParameterTable(QTableWidget):
             try:
                 self.itemChanged.connect(self._on_item_changed)
             except (TypeError, RuntimeError):
-                pass
+                self._logger.debug("itemChanged reconnect skipped during reset")
 
     def _create_checkbox_widget(self, checked: bool, param_name: str) -> QWidget:
         """Create centered checkbox widget for Fixed column.
@@ -304,7 +306,13 @@ class ParameterTable(QTableWidget):
                     value_item.setForeground(QBrush(QColor(0, 0, 0)))
 
         except ValueError:
-            # Invalid number - reset to previous value
+            # Invalid number - reset to previous value without cascading signals
+            self._logger.warning("Invalid value for %s at column %s: %s", param_name, col, item.text())
+            try:
+                self.itemChanged.disconnect(self._on_item_changed)
+            except (TypeError, RuntimeError):
+                pass
+
             if param_name in self._parameter_states:
                 param_state = self._parameter_states[param_name]
                 if col == 1:
@@ -313,6 +321,17 @@ class ParameterTable(QTableWidget):
                     item.setText(f"{param_state.min_bound:.6g}")
                 elif col == 3:
                     item.setText(f"{param_state.max_bound:.6g}")
+
+                # Restore default styling
+                font = item.font()
+                font.setBold(False)
+                item.setFont(font)
+                item.setForeground(QBrush(QColor(0, 0, 0)))
+
+            try:
+                self.itemChanged.connect(self._on_item_changed)
+            except (TypeError, RuntimeError):
+                pass
 
     def _on_fixed_toggled(self, param_name: str, is_fixed: bool) -> None:
         """Handle fixed checkbox toggle.

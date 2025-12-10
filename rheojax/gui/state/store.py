@@ -275,7 +275,7 @@ class StateStore:
         Thread-safe: Protected by RLock.
         """
         with self._lock:
-            return self._state
+            return self._state.clone()
 
     def set_signals(self, signals: Any) -> None:
         """Set the Qt signals object for state change notifications.
@@ -452,9 +452,70 @@ class StateStore:
 
         if action_type == "SET_TEST_MODE":
             mode = action.get("test_mode", "oscillation")
+            target_id = action.get("dataset_id")
 
             def updater(state: AppState) -> AppState:
-                return replace(state, current_tab="data")
+                dataset_id = target_id or state.active_dataset_id
+                datasets = state.datasets.copy()
+                if dataset_id and dataset_id in datasets:
+                    ds = datasets[dataset_id].clone()
+                    ds.test_mode = mode
+                    ds.metadata = {**ds.metadata, "test_mode": mode}
+                    ds.is_modified = True
+                    datasets[dataset_id] = ds
+                return replace(state, datasets=datasets, current_tab="data", is_modified=True)
+
+            return updater
+
+        if action_type == "AUTO_DETECT_TEST_MODE":
+
+            def updater(state: AppState) -> AppState:
+                dataset_id = state.active_dataset_id
+                if not dataset_id or dataset_id not in state.datasets:
+                    return state
+
+                ds = state.datasets[dataset_id].clone()
+                if ds.x_data is None or ds.y_data is None:
+                    return state
+                try:
+                    from rheojax.gui.services.data_service import DataService
+                    from rheojax.core.data import RheoData
+
+                    svc = DataService()
+                    inferred = svc.detect_test_mode(
+                        RheoData(
+                            x=ds.x_data,
+                            y=ds.y_data,
+                            y_units=None,
+                            x_units=None,
+                            domain=ds.metadata.get("domain", "time"),
+                            metadata=ds.metadata,
+                            validate=False,
+                        )
+                    )
+                    if inferred:
+                        ds.test_mode = inferred
+                        ds.metadata = {**ds.metadata, "test_mode": inferred}
+                        ds.is_modified = True
+                except Exception:
+                    # Leave dataset unchanged on failure
+                    return state
+
+                datasets = state.datasets.copy()
+                datasets[dataset_id] = ds
+                return replace(state, datasets=datasets, current_tab="data", is_modified=True)
+
+            return updater
+
+        if action_type == "CANCEL_JOBS":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                if pipeline.current_step:
+                    pipeline.steps[pipeline.current_step] = StepStatus.WARNING
+                pipeline.error_message = "Cancelled by user"
+                pipeline.current_step = None
+                return replace(state, pipeline_state=pipeline, is_modified=True)
 
             return updater
 

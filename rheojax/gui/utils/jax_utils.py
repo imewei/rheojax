@@ -61,8 +61,8 @@ class JaxUtils:
                             device_info["memory_used_mb"] = (
                                 stats.get("bytes_in_use", 0) / (1024 * 1024)
                             )
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("GPU memory stats unavailable: %s", exc)
 
                 devices.append(device_info)
         except Exception as e:
@@ -130,8 +130,8 @@ class JaxUtils:
                         result["used_mb"] = used / (1024 * 1024)
                         if total > 0:
                             result["percent"] = (used / total) * 100
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("GPU memory stats unavailable: %s", exc)
             else:
                 # For CPU, try to get system memory info
                 try:
@@ -141,7 +141,7 @@ class JaxUtils:
                     result["used_mb"] = mem.used / (1024 * 1024)
                     result["percent"] = mem.percent
                 except ImportError:
-                    pass
+                    logger.debug("psutil not installed; skipping CPU memory stats")
 
         except Exception as e:
             logger.warning(f"Failed to get memory usage: {e}")

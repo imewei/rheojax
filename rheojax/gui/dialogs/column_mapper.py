@@ -155,12 +155,18 @@ class ColumnMapperDialog(QDialog):
 
             # Read file to get columns
             if path.suffix.lower() in [".csv", ".txt"]:
-                self.df_preview = pd.read_csv(self.file_path, nrows=5)
+                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                delimiter = detect_csv_delimiter(self.file_path)
+                self.df_preview = pd.read_csv(self.file_path, sep=delimiter, nrows=5)
             elif path.suffix.lower() in [".xlsx", ".xls"]:
                 self.df_preview = pd.read_excel(self.file_path, nrows=5)
             else:
                 # Try CSV as fallback
-                self.df_preview = pd.read_csv(self.file_path, nrows=5)
+                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                delimiter = detect_csv_delimiter(self.file_path)
+                self.df_preview = pd.read_csv(self.file_path, sep=delimiter, nrows=5)
 
             self.columns = list(self.df_preview.columns)
 

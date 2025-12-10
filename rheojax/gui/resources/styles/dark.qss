@@ -18,6 +18,40 @@
 
 /* ========== Base Widgets ========== */
 
+QWidget {
+    font-family: "Helvetica Neue", "Arial", sans-serif;
+}
+
+/* Button variants */
+QPushButton[variant="primary"] {
+    background-color: #3B82F6;
+    color: #F8FAFC;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-weight: 600;
+}
+QPushButton[variant="primary"]:hover {
+    background-color: #2563EB;
+}
+QPushButton[variant="primary"]:pressed {
+    background-color: #1D4ED8;
+}
+QPushButton[variant="secondary"] {
+    background-color: #1E293B;
+    color: #E2E8F0;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-weight: 500;
+}
+QPushButton[variant="secondary"]:hover {
+    background-color: #273449;
+}
+QPushButton[variant="secondary"]:pressed {
+    background-color: #1f2a3a;
+}
+
 QMainWindow {
     background-color: #0F172A;
 }

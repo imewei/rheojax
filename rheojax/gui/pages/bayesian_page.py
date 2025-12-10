@@ -8,6 +8,8 @@ Bayesian inference interface with prior specification and MCMC monitoring.
 import json
 from pathlib import Path
 from typing import Any
+import uuid
+import numpy as np
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
@@ -41,6 +43,7 @@ from rheojax.gui.state.actions import (
 )
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
+from rheojax.gui.services.data_service import DataService
 
 
 class BayesianPage(QWidget):
@@ -73,6 +76,10 @@ class BayesianPage(QWidget):
         self._worker_pool = WorkerPool()
         self._current_worker: BayesianWorker | None = None
         self._is_running = False
+        self._current_preset: str = "custom"
+        self._preset_priors: dict[str, dict[str, Any]] | None = None
+        self._preset_dataset_path: str | None = None
+        self._data_service = DataService()
 
         self._setup_ui()
         self._connect_signals()
@@ -112,41 +119,66 @@ class BayesianPage(QWidget):
         layout.addWidget(self._model_label)
 
         # Sampler selection
-        layout.addWidget(QLabel("Sampler:"))
+        sampler_label = QLabel("Sampler:")
+        layout.addWidget(sampler_label)
         self._sampler_combo = QComboBox()
         self._sampler_combo.addItems(["NUTS (No U-Turn Sampler)"])
+        self._sampler_combo.setToolTip("Select the MCMC sampler (NUTS recommended)")
         layout.addWidget(self._sampler_combo)
 
         # Warmup samples
-        layout.addWidget(QLabel("Warmup Samples:"))
+        warm_label = QLabel("Warmup Samples:")
+        layout.addWidget(warm_label)
         self._warmup_spin = QSpinBox()
         self._warmup_spin.setRange(100, 10000)
         self._warmup_spin.setValue(1000)
         self._warmup_spin.setSingleStep(100)
+        self._warmup_spin.setToolTip("Number of burn-in iterations before sampling")
         layout.addWidget(self._warmup_spin)
 
         # Posterior samples
-        layout.addWidget(QLabel("Posterior Samples:"))
+        samples_label = QLabel("Posterior Samples:")
+        layout.addWidget(samples_label)
         self._samples_spin = QSpinBox()
         self._samples_spin.setRange(100, 10000)
         self._samples_spin.setValue(2000)
         self._samples_spin.setSingleStep(100)
+        self._samples_spin.setToolTip("Number of draws per chain after warmup")
         layout.addWidget(self._samples_spin)
 
         # Number of chains
-        layout.addWidget(QLabel("Number of Chains:"))
+        chains_label = QLabel("Number of Chains:")
+        layout.addWidget(chains_label)
         self._chains_spin = QSpinBox()
         self._chains_spin.setRange(1, 8)
         self._chains_spin.setValue(4)
         self._chains_spin.valueChanged.connect(self._update_chain_progress_bars)
+        self._chains_spin.setToolTip("Parallel chains improve convergence diagnostics")
         layout.addWidget(self._chains_spin)
 
         # HDI probability
-        layout.addWidget(QLabel("HDI Probability:"))
+        hdi_label = QLabel("HDI Probability:")
+        layout.addWidget(hdi_label)
         self._hdi_combo = QComboBox()
         self._hdi_combo.addItems(["0.90", "0.94", "0.95", "0.99"])
         self._hdi_combo.setCurrentText("0.94")
+        self._hdi_combo.setToolTip("Credible interval probability for summaries")
         layout.addWidget(self._hdi_combo)
+
+        # Presets from example notebooks
+        preset_label = QLabel("Sampler Preset:")
+        layout.addWidget(preset_label)
+        self._preset_combo = QComboBox()
+        self._preset_combo.addItems([
+            "Custom",
+            "Bayesian Demo (chains=4, 1000/2000)",
+            "GMM Quick (chains=1, 500/1000)",
+            "SPP LAOS (chains=4, 1000/2000)",
+            "SPP Dense (chains=4, 2000/2000)",
+        ])
+        self._preset_combo.currentTextChanged.connect(self._apply_preset)
+        self._preset_combo.setToolTip("Quickly apply sampler settings and suggested priors")
+        layout.addWidget(self._preset_combo)
 
         # Warm start
         self._warmstart_check = QCheckBox("Use NLSQ warm-start (recommended)")
@@ -158,6 +190,7 @@ class BayesianPage(QWidget):
 
         # Priors editor button
         btn_priors = QPushButton("Edit Priors...")
+        btn_priors.setToolTip("View or edit prior distributions used for this run")
         btn_priors.clicked.connect(self._edit_priors)
         layout.addWidget(btn_priors)
 
@@ -247,6 +280,13 @@ class BayesianPage(QWidget):
         self._arviz_canvas.export_requested.connect(self._export_diagnostic_plot)
         layout.addWidget(self._arviz_canvas)
 
+        # Empty state message when no diagnostics available
+        empty_label = QLabel("No diagnostics yet. Run inference to see ArviZ plots.")
+        empty_label.setAlignment(Qt.AlignCenter)
+        empty_label.setStyleSheet("color: #666; padding: 6px;")
+        layout.addWidget(empty_label)
+        self._empty_diag_label = empty_label
+
         return panel
 
     def _create_results_panel(self) -> QWidget:
@@ -260,6 +300,9 @@ class BayesianPage(QWidget):
         diag_layout = QVBoxLayout()
         self._rhat_label = QLabel("R-hat: --")
         self._ess_label = QLabel("ESS: --")
+        warning_label = QLabel("Diagnostics: awaiting run")
+        warning_label.setStyleSheet("color: #e65100; padding: 2px;")
+        self._diag_warning = warning_label
         # Use specific monospace fonts with fallbacks to avoid Qt font lookup warning
         self._rhat_label.setStyleSheet(
             'font-family: "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;'
@@ -269,6 +312,7 @@ class BayesianPage(QWidget):
         )
         diag_layout.addWidget(self._rhat_label)
         diag_layout.addWidget(self._ess_label)
+        diag_layout.addWidget(warning_label)
         layout.addLayout(diag_layout)
 
         # Credible intervals table
@@ -353,7 +397,49 @@ class BayesianPage(QWidget):
             "num_chains": self._chains_spin.value(),
             "warm_start": self._warmstart_check.isChecked(),
             "hdi_prob": float(self._hdi_combo.currentText()),
+            "target_accept_prob": 0.9,
+            "max_tree_depth": 10,
         }
+
+        # Preset-specific tweaks
+        if getattr(self, "_current_preset", "") == "gmm":
+            config["prior_mode"] = "warn"
+            config["allow_fallback_priors"] = True
+            config["max_tree_depth"] = 8
+            config["target_accept_prob"] = 0.9
+        elif getattr(self, "_current_preset", "") in ("spp", "spp_dense"):
+            config["target_accept_prob"] = 0.99
+            config["max_tree_depth"] = 12 if self._current_preset == "spp_dense" else 10
+
+        # Attach preset priors if defined
+        if self._preset_priors:
+            config["priors"] = self._preset_priors
+
+        # If no dataset loaded, try preset dataset path
+        if dataset is None and self._preset_dataset_path:
+            try:
+                rheo_data = self._data_service.load_file(self._preset_dataset_path)
+                dataset_id = str(uuid.uuid4())
+                self._store.dispatch(
+                    "IMPORT_DATA_SUCCESS",
+                    {
+                        "dataset_id": dataset_id,
+                        "file_path": self._preset_dataset_path,
+                        "name": Path(self._preset_dataset_path).stem,
+                        "test_mode": rheo_data.metadata.get("test_mode", "oscillation"),
+                        "x_data": rheo_data.x,
+                        "y_data": rheo_data.y,
+                        "y2_data": getattr(rheo_data, "y2", None),
+                        "metadata": getattr(rheo_data, "metadata", {}),
+                    },
+                )
+                dataset = self._store.get_dataset(dataset_id)
+            except Exception:
+                dataset = None
+
+        if dataset is None:
+            QMessageBox.warning(self, "No Data", "Please load a dataset first.")
+            return
 
         # Get test mode from dataset
         test_mode = dataset.metadata.get("test_mode", "oscillation")
@@ -364,15 +450,9 @@ class BayesianPage(QWidget):
         # Handle warm_start: convert bool to dict (get NLSQ params) or None
         warm_start_dict: dict[str, float] | None = None
         if config.get("warm_start", False):
-            # Try to get NLSQ fitted parameters from state
-            state = self._store.get_state()
-            if state.fit_results:
-                # Get most recent fit result
-                latest_key = list(state.fit_results.keys())[-1]
-                fit_result = state.fit_results[latest_key]
-                if hasattr(fit_result, "parameters"):
-                    warm_start_dict = fit_result.parameters
-                    self._status_text.append(f"Using NLSQ warm-start: {warm_start_dict}")
+            warm_start_dict = self._select_warm_start_params(model_name, dataset.id)
+            if warm_start_dict:
+                self._status_text.append(f"Using NLSQ warm-start: {warm_start_dict}")
 
         # Create and run worker (only pass args BayesianWorker accepts)
         self._current_worker = BayesianWorker(
@@ -399,6 +479,15 @@ class BayesianPage(QWidget):
         self._btn_cancel.setEnabled(True)
 
         self.run_requested.emit(model_name, dataset.id, config)
+
+    def _select_warm_start_params(self, model_name: str, dataset_id: str) -> dict[str, float] | None:
+        """Pick warm-start parameters that match the current model/dataset."""
+        state = self._store.get_state()
+        key = f"{model_name}_{dataset_id}"
+        fit_result = state.fit_results.get(key)
+        if fit_result and hasattr(fit_result, "parameters"):
+            return dict(getattr(fit_result, "parameters"))
+        return None
 
     def _on_cancel_clicked(self) -> None:
         """Handle cancel button click."""
@@ -581,6 +670,7 @@ class BayesianPage(QWidget):
     def _on_bayesian_completed(self) -> None:
         """Handle Bayesian completed signal from state."""
         self._overall_progress.setValue(100)
+        self._diag_warning.setText("Diagnostics available below")
 
     def _update_diagnostics(self, result: BayesianResult) -> None:
         """Update convergence diagnostics display.
@@ -623,9 +713,12 @@ class BayesianPage(QWidget):
         if divergences > 0:
             self._divergence_label.setText(f"Divergences: {divergences}")
             self._divergence_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            self._diag_warning.setText("Warning: Divergences detected; consider higher target_accept")
         else:
             self._divergence_label.setText("Divergences: 0")
             self._divergence_label.setStyleSheet("color: green; font-weight: bold;")
+            if "OK" in self._rhat_label.text() and "OK" in self._ess_label.text():
+                self._diag_warning.setText("Diagnostics look good")
 
     def _update_intervals_table(self, result: BayesianResult) -> None:
         """Update credible intervals table.
@@ -666,8 +759,81 @@ class BayesianPage(QWidget):
         """Show priors editor dialog."""
         from rheojax.gui.dialogs.bayesian_options import BayesianOptionsDialog
 
-        dialog = BayesianOptionsDialog(self)
+        dialog = BayesianOptionsDialog(
+            current_options={
+                "priors": self._preset_priors,
+            },
+            parent=self,
+        )
         dialog.exec()
+
+    def _apply_preset(self, name: str) -> None:
+        """Apply sampler/prior presets derived from example notebooks."""
+        self._current_preset = "custom"
+        self._preset_priors = None
+        self._preset_dataset_path = None
+        if name.startswith("Bayesian Demo"):
+            self._warmup_spin.setValue(1000)
+            self._samples_spin.setValue(2000)
+            self._chains_spin.setValue(4)
+            self._hdi_combo.setCurrentText("0.94")
+            self._warmstart_check.setChecked(True)
+            self._current_preset = "demo"
+        elif name.startswith("GMM Quick"):
+            self._warmup_spin.setValue(500)
+            self._samples_spin.setValue(1000)
+            self._chains_spin.setValue(1)
+            self._hdi_combo.setCurrentText("0.90")
+            self._warmstart_check.setChecked(True)
+            self._current_preset = "gmm"
+            fixture_path = Path("tests/fixtures/bayesian_multi_technique.csv")
+            self._preset_dataset_path = (
+                str(fixture_path)
+                if fixture_path.exists()
+                else "examples/data/experimental/multi_technique.txt"
+            )
+        elif name.startswith("SPP LAOS (chains=4, 1000/2000)"):
+            self._warmup_spin.setValue(1000)
+            self._samples_spin.setValue(2000)
+            self._chains_spin.setValue(4)
+            self._hdi_combo.setCurrentText("0.95")
+            self._warmstart_check.setChecked(True)
+            self._current_preset = "spp"
+            fixture_path = Path("tests/fixtures/bayesian_owchirp_tts.csv")
+            self._preset_dataset_path = (
+                str(fixture_path)
+                if fixture_path.exists()
+                else "examples/data/experimental/owchirp_tts.txt"
+            )
+            self._preset_priors = {
+                "G_cage": {"dist": "lognormal", "loc": float(np.log(5000)), "scale": 1.0},
+                "sigma_y_static": {"dist": "lognormal", "loc": float(np.log(500)), "scale": 1.0},
+                "sigma_y_dynamic": {"dist": "lognormal", "loc": float(np.log(500)), "scale": 1.0},
+                "sigma_G": {"dist": "halfnormal", "scale": 500.0},
+                "sigma_static": {"dist": "halfnormal", "scale": 100.0},
+                "sigma_dynamic": {"dist": "halfnormal", "scale": 100.0},
+            }
+        elif name.startswith("SPP Dense"):
+            self._warmup_spin.setValue(2000)
+            self._samples_spin.setValue(2000)
+            self._chains_spin.setValue(4)
+            self._hdi_combo.setCurrentText("0.95")
+            self._warmstart_check.setChecked(True)
+            self._current_preset = "spp_dense"
+            fixture_path = Path("tests/fixtures/bayesian_owchirp_tts.csv")
+            self._preset_dataset_path = (
+                str(fixture_path)
+                if fixture_path.exists()
+                else "examples/data/experimental/owchirp_tts.txt"
+            )
+            self._preset_priors = {
+                "G_cage": {"dist": "lognormal", "loc": float(np.log(5000)), "scale": 1.0},
+                "sigma_y_static": {"dist": "lognormal", "loc": float(np.log(500)), "scale": 1.0},
+                "sigma_y_dynamic": {"dist": "lognormal", "loc": float(np.log(500)), "scale": 1.0},
+                "sigma_G": {"dist": "halfnormal", "scale": 500.0},
+                "sigma_static": {"dist": "halfnormal", "scale": 100.0},
+                "sigma_dynamic": {"dist": "halfnormal", "scale": 100.0},
+            }
 
     def _export_diagnostic_plot(self) -> None:
         """Export current diagnostic plot."""

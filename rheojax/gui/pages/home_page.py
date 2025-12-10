@@ -210,25 +210,9 @@ class HomePage(QWidget):
     def _create_action_button(self, title: str, description: str, color: str) -> QPushButton:
         """Create a styled action button."""
         btn = QPushButton(f"{title}\n\n{description}")
-        btn.setMinimumHeight(100)
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color};
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 15px;
-                font-size: 12pt;
-                font-weight: bold;
-                text-align: center;
-            }}
-            QPushButton:hover {{
-                background-color: {self._darken_color(color)};
-            }}
-            QPushButton:pressed {{
-                background-color: {self._darken_color(color, 0.3)};
-            }}
-        """)
+        btn.setMinimumHeight(110)
+        btn.setProperty("variant", "primary")
+        btn.setStyleSheet("text-align: left; padding: 16px;")
         return btn
 
     def _darken_color(self, hex_color: str, factor: float = 0.1) -> str:
@@ -326,7 +310,10 @@ class HomePage(QWidget):
 
         layout = QGridLayout(group)
         layout.setContentsMargins(15, 25, 15, 15)
-        layout.setSpacing(10)
+        layout.setHorizontalSpacing(12)
+        layout.setVerticalSpacing(12)
+        self._examples_layout = layout
+        self._example_cards: list[QWidget] = []
 
         examples = [
             ("Oscillation", "Frequency sweep data for SAOS analysis", "#3F51B5"),
@@ -339,13 +326,39 @@ class HomePage(QWidget):
             ("Bayesian", "Dataset for Bayesian inference demo", "#607D8B"),
         ]
 
-        for i, (name, description, color) in enumerate(examples):
-            row = i // 2
-            col = i % 2
+        for name, description, color in examples:
             card = self._create_example_card(name, description, color)
-            layout.addWidget(card, row, col)
+            self._example_cards.append(card)
+
+        self._relayout_examples()
 
         return group
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._relayout_examples()
+
+    def _relayout_examples(self) -> None:
+        if not hasattr(self, "_examples_layout"):
+            return
+        layout = self._examples_layout
+        # Clear layout
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+
+        if not self._example_cards:
+            return
+
+        # Determine columns based on available width
+        width = self.width()
+        cols = 3 if width > 1100 else 2 if width > 720 else 1
+
+        for idx, card in enumerate(self._example_cards):
+            row = idx // cols
+            col = idx % cols
+            layout.addWidget(card, row, col)
 
     def _create_example_card(self, name: str, description: str, color: str) -> QWidget:
         """Create an example dataset card."""

@@ -50,8 +50,10 @@ def log_array_info(
             devices = arr.devices()
             if devices:
                 info[f"{name}_device"] = str(list(devices)[0])
-        except Exception:
-            pass  # Silently skip if device info unavailable
+        except Exception as exc:
+            logging.getLogger(__name__).debug(
+                "Could not read device info for %s: %s", name, exc
+            )
 
     return info
 
@@ -141,10 +143,12 @@ def jax_safe_log(
                 sublevel = cur_sublevel_fn()
                 if hasattr(sublevel, "level") and sublevel.level > 0:
                     return  # Skip logging during tracing
-            except (RuntimeError, AttributeError):
-                pass  # cur_sublevel may not be available in all contexts
+            except (RuntimeError, AttributeError) as exc:
+                logging.getLogger(__name__).debug(
+                    "cur_sublevel unavailable during jax tracing check: %s", exc
+                )
     except ImportError:
-        pass  # Not using JAX, proceed with logging
+        logging.getLogger(__name__).debug("JAX not available; proceeding with standard logging")
 
     logger.log(level, msg, **kwargs)
 
@@ -225,8 +229,8 @@ def log_jax_config(logger: logging.Logger | None = None) -> dict[str, Any]:
         # Get platform info (using non-deprecated API)
         try:
             config_info["platform"] = str(jax.devices()[0].platform)
-        except Exception:
-            pass
+        except Exception as exc:
+            logging.getLogger(__name__).debug("JAX platform lookup failed: %s", exc)
 
     except ImportError:
         config_info["jax_available"] = False
@@ -322,8 +326,10 @@ def log_device_transfer(
             devices = arr.devices()
             if devices:
                 source = str(list(devices)[0])
-        except Exception:
-            pass
+        except Exception as exc:
+            logging.getLogger(__name__).debug(
+                "Could not resolve device source for %s: %s", name, exc
+            )
 
     logger.debug(
         "Device transfer",

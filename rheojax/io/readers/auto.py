@@ -6,7 +6,7 @@ import warnings
 from pathlib import Path
 
 from rheojax.core.data import RheoData
-from rheojax.io.readers.csv_reader import load_csv
+from rheojax.io.readers.csv_reader import detect_csv_delimiter, load_csv
 from rheojax.io.readers.excel_reader import load_excel
 from rheojax.io.readers.trios import load_trios
 
@@ -53,7 +53,7 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
         return _try_csv(filepath, **kwargs)
 
     else:
-        # Unknown extension - try readers in sequence
+        # Unknown extension - try readers in sequence (CSV then Excel)
         return _try_all_readers(filepath, **kwargs)
 
 
@@ -96,7 +96,8 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
         import pandas as pd
 
         try:
-            df = pd.read_csv(filepath)
+            delimiter = detect_csv_delimiter(filepath)
+            df = pd.read_csv(filepath, sep=delimiter)
             columns_lower = [c.lower() for c in df.columns]
 
             # Try to find time/frequency column
@@ -175,6 +176,7 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
     readers = [
         ("TRIOS", lambda: load_trios(filepath, **kwargs)),
         ("CSV", lambda: _try_csv(filepath, **kwargs)),
+        ("EXCEL", lambda: _try_excel(filepath, **kwargs)),
     ]
 
     errors = []

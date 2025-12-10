@@ -179,7 +179,9 @@ class FittingOptionsDialog(QDialog):
         # Algorithm
         if "algorithm" in self.current_options:
             algo = self.current_options["algorithm"]
-            idx = self.algo_combo.findText(algo, flags=0)
+            from PySide6.QtCore import Qt
+
+            idx = self.algo_combo.findText(algo, flags=Qt.MatchFlag.MatchExactly)
             if idx >= 0:
                 self.algo_combo.setCurrentIndex(idx)
 

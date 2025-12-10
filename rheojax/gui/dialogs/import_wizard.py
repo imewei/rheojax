@@ -202,12 +202,18 @@ class ColumnMappingPage(QWizardPage):
             # Read file to get columns
             path = Path(file_path)
             if path.suffix.lower() in [".csv", ".txt"]:
-                df = pd.read_csv(file_path, nrows=5)
+                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                delimiter = detect_csv_delimiter(file_path)
+                df = pd.read_csv(file_path, sep=delimiter, nrows=5)
             elif path.suffix.lower() in [".xlsx", ".xls"]:
                 df = pd.read_excel(file_path, nrows=5)
             else:
                 # For TRIOS or other formats, try CSV first
-                df = pd.read_csv(file_path, nrows=5)
+                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                delimiter = detect_csv_delimiter(file_path)
+                df = pd.read_csv(file_path, sep=delimiter, nrows=5)
 
             columns = list(df.columns)
 
@@ -401,11 +407,17 @@ class PreviewConfirmPage(QWizardPage):
         try:
             path = Path(file_path)
             if path.suffix.lower() in [".csv", ".txt"]:
-                df = pd.read_csv(file_path, nrows=10)
+                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                delimiter = detect_csv_delimiter(file_path)
+                df = pd.read_csv(file_path, sep=delimiter, nrows=10)
             elif path.suffix.lower() in [".xlsx", ".xls"]:
                 df = pd.read_excel(file_path, nrows=10)
             else:
-                df = pd.read_csv(file_path, nrows=10)
+                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                delimiter = detect_csv_delimiter(file_path)
+                df = pd.read_csv(file_path, sep=delimiter, nrows=10)
 
             # Select relevant columns
             cols = [x_col, y_col]

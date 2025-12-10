@@ -426,6 +426,10 @@ class ModelService:
             # Add test_mode to fit_kwargs
             fit_kwargs["test_mode"] = test_mode
 
+            # Inject progress callback if provided and not already set
+            if progress_callback and "callback" not in fit_kwargs:
+                fit_kwargs["callback"] = progress_callback
+
             # Fit (this uses NLSQ by default)
             model.fit(x, y, **fit_kwargs)
 

@@ -123,6 +123,11 @@ class ResidualsPanel(QWidget):
         layout.addWidget(self._nav_toolbar)
         layout.addWidget(self._canvas, 1)
 
+        self._empty_label = QLabel("No residuals yet. Run a fit to view diagnostics.")
+        self._empty_label.setAlignment(Qt.AlignCenter)
+        self._empty_label.setStyleSheet("color: #94A3B8; padding: 6px;")
+        layout.addWidget(self._empty_label)
+
     def _connect_signals(self) -> None:
         """Connect internal signals."""
         self._type_combo.currentIndexChanged.connect(self._on_type_changed)
@@ -187,6 +192,7 @@ class ResidualsPanel(QWidget):
 
         self._update_statistics()
         self._refresh_plot()
+        self._empty_label.hide()
 
     def _update_statistics(self) -> None:
         """Update statistics display."""
@@ -205,7 +211,10 @@ class ResidualsPanel(QWidget):
     def _refresh_plot(self) -> None:
         """Refresh the current plot."""
         if self._residuals is None:
+            self._empty_label.show()
             return
+
+        self._empty_label.hide()
 
         self._figure.clear()
 
@@ -228,6 +237,11 @@ class ResidualsPanel(QWidget):
                     0.5, 0.5, f"Error generating plot:\n{e}",
                     ha="center", va="center", transform=ax.transAxes
                 )
+                self._empty_label.setText(f"Plot error: {e}")
+                self._empty_label.show()
+        else:
+            self._empty_label.setText("Unsupported residual plot")
+            self._empty_label.show()
 
         self._canvas.draw()
 
@@ -252,8 +266,8 @@ class ResidualsPanel(QWidget):
                     self._residuals[sorted_idx], size=max(5, len(self._residuals) // 20)
                 )
                 ax.plot(fitted[sorted_idx], smoothed, "r-", alpha=0.5, linewidth=2)
-            except ImportError:
-                pass
+            except ImportError as exc:
+                logging.getLogger(__name__).debug("uniform_filter1d unavailable: %s", exc)
 
         ax.set_xlabel("Fitted Values")
         ax.set_ylabel("Residuals")
@@ -274,7 +288,8 @@ class ResidualsPanel(QWidget):
             # Q-Q plot
             stats.probplot(standardized, dist="norm", plot=ax)
             ax.set_title("Normal Q-Q Plot")
-        except ImportError:
+        except ImportError as exc:
+            logging.getLogger(__name__).debug("scipy.stats unavailable for QQ plot: %s", exc)
             # Fallback without scipy
             sorted_res = np.sort(self._residuals)
             n = len(sorted_res)
@@ -303,8 +318,8 @@ class ResidualsPanel(QWidget):
             x = np.linspace(bins[0], bins[-1], 100)
             ax.plot(x, stats.norm.pdf(x, mu, std), "r-", linewidth=2, label="Normal fit")
             ax.legend()
-        except ImportError:
-            pass
+        except ImportError as exc:
+            logging.getLogger(__name__).debug("scipy.stats unavailable for histogram fit: %s", exc)
 
         ax.set_xlabel("Residual Value")
         ax.set_ylabel("Density")
@@ -332,8 +347,8 @@ class ResidualsPanel(QWidget):
                     sqrt_abs_res[sorted_idx], size=max(5, len(self._residuals) // 20)
                 )
                 ax.plot(fitted[sorted_idx], smoothed, "r-", alpha=0.5, linewidth=2)
-            except ImportError:
-                pass
+            except ImportError as exc:
+                logging.getLogger(__name__).debug("uniform_filter1d unavailable: %s", exc)
 
         ax.set_xlabel("Fitted Values")
         ax.set_ylabel("√|Residuals|")
@@ -462,6 +477,7 @@ class ResidualsPanel(QWidget):
         self._stats_label.setText("")
         self._figure.clear()
         self._canvas.draw()
+        self._empty_label.show()
 
     def get_figure(self) -> Figure:
         """Get matplotlib figure.

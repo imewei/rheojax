@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QGroupBox,
+    QLabel,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -48,7 +49,8 @@ class DiagnosticsPage(QWidget):
 
         # Top CTA
         btn_show = QPushButton("Show Diagnostics")
-        btn_show.setStyleSheet("QPushButton { font-weight: bold; padding: 8px 12px; }")
+        btn_show.setProperty("variant", "primary")
+        btn_show.setToolTip("Refresh diagnostics from the latest Bayesian run")
         btn_show.clicked.connect(self.show_requested.emit)
         main_layout.addWidget(btn_show, 0, Qt.AlignmentFlag.AlignLeft)
 
@@ -104,6 +106,7 @@ class DiagnosticsPage(QWidget):
         self._gof_table.setColumnCount(2)
         self._gof_table.setHorizontalHeaderLabels(["Metric", "Value"])
         self._gof_table.setAlternatingRowColors(True)
+        self._gof_table.setToolTip("Key diagnostics from the last Bayesian run")
 
         # Metric names (values will be updated dynamically)
         self._metric_names = [
@@ -135,7 +138,15 @@ class DiagnosticsPage(QWidget):
         self._comparison_table.setColumnCount(5)
         self._comparison_table.setHorizontalHeaderLabels(["Model", "WAIC", "LOO", "ELPD", "Weight"])
         self._comparison_table.setAlternatingRowColors(True)
+        self._comparison_table.setToolTip("Model comparison metrics; populate by running multiple models")
         layout.addWidget(self._comparison_table)
+
+        # Empty state
+        empty_label = QLabel("No diagnostics yet. Run Bayesian inference to populate metrics.")
+        empty_label.setAlignment(Qt.AlignCenter)
+        empty_label.setStyleSheet("color: #666; padding: 6px;")
+        layout.addWidget(empty_label)
+        self._empty_label = empty_label
 
         # Refresh button
         btn_refresh = QPushButton("Refresh Comparison")
@@ -182,11 +193,15 @@ class DiagnosticsPage(QWidget):
 
         if not bayesian_results:
             self._comparison_table.setRowCount(0)
+            if hasattr(self, "_empty_label"):
+                self._empty_label.show()
             return
 
         # Prepare results for comparison
         results_list = list(bayesian_results.values())
         self._comparison_table.setRowCount(len(results_list))
+        if hasattr(self, "_empty_label"):
+            self._empty_label.hide()
 
         for i, result in enumerate(results_list):
             model_name = result.model_name
@@ -196,19 +211,34 @@ class DiagnosticsPage(QWidget):
             waic_val = "--"
             loo_val = "--"
             elpd_val = "--"
-            weight_val = "--"
+            weight_val = "--"  # Weighting requires multi-model compare; keep placeholder
 
             try:
-                # Get inference data for this result
                 if hasattr(result, "posterior_samples") and result.posterior_samples:
                     import arviz as az
 
                     idata = self._get_inference_data(result)
                     if idata is not None:
-                        # Note: WAIC/LOO require log_likelihood which may not be available
-                        # These will show "--" if not computable
-                        pass
+                        try:
+                            waic_res = az.waic(idata, scale="deviance")
+                            waic_val = f"{float(waic_res.waic):.2f}"
+                            # elpd_waic available on ArviZ >=0.17
+                            if hasattr(waic_res, "elpd_waic"):
+                                elpd_val = f"{float(waic_res.elpd_waic):.2f}"
+                            elif hasattr(waic_res, "elpd"):
+                                elpd_val = f"{float(waic_res.elpd):.2f}"
+                        except Exception:
+                            pass
+
+                        try:
+                            loo_res = az.loo(idata, scale="deviance")
+                            loo_val = f"{float(loo_res.loo):.2f}"
+                            if hasattr(loo_res, "elpd_loo"):
+                                elpd_val = f"{float(loo_res.elpd_loo):.2f}"
+                        except Exception:
+                            pass
             except Exception:
+                # Leave display as graceful '--'
                 pass
 
             self._comparison_table.setItem(i, 1, QTableWidgetItem(waic_val))

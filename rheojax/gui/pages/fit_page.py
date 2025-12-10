@@ -8,7 +8,7 @@ Model fitting interface with parameter controls and residual analysis.
 from typing import Any
 
 import numpy as np
-from PySide6.QtCore import Signal, Slot
+from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -105,6 +105,10 @@ class FitPage(QWidget):
         # Plot canvas
         self._plot_canvas = PlotCanvas()
         layout.addWidget(self._plot_canvas, 3)
+        self._plot_placeholder = QLabel("No fit plot yet. Run a fit to see results.")
+        self._plot_placeholder.setAlignment(Qt.AlignCenter)
+        self._plot_placeholder.setStyleSheet("color: #94A3B8; padding: 6px;")
+        layout.addWidget(self._plot_placeholder)
 
         # Residuals panel
         self._residuals_panel = ResidualsPanel()
@@ -147,32 +151,25 @@ class FitPage(QWidget):
         self._parameter_table = ParameterTable()
         self._parameter_table.parameter_changed.connect(self._on_parameter_changed)
         param_layout.addWidget(self._parameter_table)
+        empty_label = QLabel("No model loaded. Select a model to edit parameters.")
+        empty_label.setAlignment(Qt.AlignCenter)
+        empty_label.setStyleSheet("color: #666; padding: 6px;")
+        param_layout.addWidget(empty_label)
+        self._empty_label = empty_label
         layout.addWidget(param_group)
 
         # Fit button and options
         btn_layout = QHBoxLayout()
         btn_options = QPushButton("Options...")
+        btn_options.setProperty("variant", "secondary")
         btn_options.clicked.connect(self._show_fit_options)
         btn_layout.addWidget(btn_options)
 
         self._btn_fit = QPushButton("Fit Model")
-        self._btn_fit.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                font-weight: bold;
-                padding: 10px;
-                font-size: 12pt;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-            QPushButton:disabled {
-                background-color: #BDBDBD;
-            }
-        """)
+        self._btn_fit.setProperty("variant", "primary")
         self._btn_fit.clicked.connect(self._on_fit_clicked)
         self._btn_fit.setEnabled(False)
+        self._btn_fit.setToolTip("Run the selected model with the current dataset and parameters")
         btn_layout.addWidget(self._btn_fit, 2)
 
         layout.addLayout(btn_layout)
@@ -184,6 +181,11 @@ class FitPage(QWidget):
         self._results_text.setReadOnly(True)
         self._results_text.setMaximumHeight(150)
         results_layout.addWidget(self._results_text)
+
+        self._empty_results = QLabel("No fit has been run yet. Configure parameters and click Fit.")
+        self._empty_results.setAlignment(Qt.AlignCenter)
+        self._empty_results.setStyleSheet("color: #94A3B8; padding: 8px;")
+        results_layout.addWidget(self._empty_results)
         layout.addWidget(results_group)
 
         return panel
@@ -326,8 +328,9 @@ class FitPage(QWidget):
             self._compat_label.setStyleSheet("color: gray;")
             return
 
+        rheo_data = self._to_rheodata(dataset)
         result = self._model_service.check_compatibility(
-            model_name, dataset, dataset.metadata.get("test_mode")
+            model_name, rheo_data, rheo_data.metadata.get("test_mode")
         )
 
         if result.get("compatible", True):
@@ -343,30 +346,82 @@ class FitPage(QWidget):
     def _plot_data(self, dataset: Any) -> None:
         """Plot dataset on canvas.
 
-        Parameters
-        ----------
-        dataset : RheoData
-            Dataset to plot
+        Accepts either a RheoData object or a DatasetState from the store.
         """
+        if dataset is None:
+            return
+
+        # Support both RheoData and DatasetState
+        x = getattr(dataset, "x", None)
+        y = getattr(dataset, "y", None)
+        metadata = getattr(dataset, "metadata", {}) or {}
+
+        if x is None or y is None:
+            x = getattr(dataset, "x_data", None)
+            y = getattr(dataset, "y_data", None)
+
+        if x is None or y is None:
+            return
+
+        x = np.asarray(x)
+        y = np.asarray(y)
+
+        if x.size == 0 or y.size == 0:
+            return
+
         self._plot_canvas.clear()
         ax = self._plot_canvas.get_axes()
 
-        x = np.asarray(dataset.x)
-        y = np.asarray(dataset.y)
-
         if np.iscomplexobj(y):
-            # Plot both G' and G''
             ax.loglog(x, np.real(y), "o", label="G' (Storage)")
             ax.loglog(x, np.abs(np.imag(y)), "s", label="G'' (Loss)")
             ax.legend()
         else:
             ax.loglog(x, y, "o", label="Data")
 
-        ax.set_xlabel(dataset.metadata.get("x_label", "x"))
-        ax.set_ylabel(dataset.metadata.get("y_label", "y"))
-        ax.set_title(dataset.metadata.get("name", "Data"))
+        x_label = metadata.get("x_label") or metadata.get("x_column") or "x"
+        y_label = metadata.get("y_label") or metadata.get("y_column") or "y"
+        title = metadata.get("name") or metadata.get("file")
+        if not title and getattr(dataset, "file_path", None):
+            title = getattr(dataset, "file_path").name
+        if not title:
+            title = "Data"
+
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+        ax.set_title(title)
 
         self._plot_canvas.refresh()
+
+    def _to_rheodata(self, dataset) -> Any:
+        """Convert DatasetState or RheoData into RheoData for services/workers."""
+        from rheojax.core.data import RheoData
+
+        # Already RheoData-like
+        if hasattr(dataset, "x") and hasattr(dataset, "y"):
+            return dataset
+
+        x = getattr(dataset, "x_data", None)
+        y = getattr(dataset, "y_data", None)
+        if x is None or y is None:
+            raise ValueError("Dataset is missing x/y data for fitting")
+
+        metadata = dict(getattr(dataset, "metadata", {}) or {})
+        if getattr(dataset, "file_path", None) and "file" not in metadata:
+            metadata["file"] = str(dataset.file_path)
+        if getattr(dataset, "name", None):
+            metadata.setdefault("name", dataset.name)
+        metadata.setdefault("test_mode", getattr(dataset, "test_mode", "unknown"))
+
+        return RheoData(
+            x=x,
+            y=y,
+            x_units=metadata.get("x_units"),
+            y_units=metadata.get("y_units"),
+            domain=metadata.get("domain", "time"),
+            metadata=metadata,
+            validate=False,
+        )
 
     def _on_parameter_changed(self, param_name: str, value: float) -> None:
         """Handle parameter value change.
@@ -391,7 +446,7 @@ class FitPage(QWidget):
 
         # Get current parameter values
         params = self._parameter_table.get_parameters()
-        param_dict = {p["name"]: p["value"] for p in params}
+        param_dict = {name: state.value for name, state in params.items()}
 
         # Determine test mode
         test_mode = dataset.metadata.get("test_mode", "oscillation")
@@ -402,7 +457,7 @@ class FitPage(QWidget):
         # Create and run fit worker
         self._current_worker = FitWorker(
             model_name=model_name,
-            data=dataset,
+            data=self._to_rheodata(dataset),
             initial_params=param_dict,
             options=self._fit_options,
         )
@@ -428,6 +483,8 @@ class FitPage(QWidget):
         """
         self._store.dispatch(update_fit_progress(iteration))
         self._results_text.setText(f"Fitting... Iteration {iteration}\nLoss: {loss:.6e}\n{message}")
+        if hasattr(self, "_empty_results"):
+            self._empty_results.hide()
 
     @Slot(object)
     def _on_fit_finished(self, result: FitResult) -> None:
@@ -468,12 +525,16 @@ class FitPage(QWidget):
             for name, value in result.parameters.items():
                 text += f"  {name}: {value:.4g}\n"
             self._results_text.setText(text)
+            if hasattr(self, "_empty_results"):
+                self._empty_results.hide()
 
             self.fit_completed.emit(result)
         else:
             error_msg = f"Fit did not converge (iterations: {result.n_iterations})"
             self._store.dispatch(fitting_failed(error_msg))
             self._results_text.setText(f"Fit failed:\n{error_msg}")
+            if hasattr(self, "_empty_results"):
+                self._empty_results.hide()
 
     @Slot(str)
     def _on_fit_error(self, error_msg: str) -> None:
@@ -487,6 +548,8 @@ class FitPage(QWidget):
         self._current_worker = None
         self._store.dispatch(fitting_failed(error_msg))
         self._results_text.setText(f"Fit error:\n{error_msg}")
+        if hasattr(self, "_empty_results"):
+            self._empty_results.hide()
         QMessageBox.warning(self, "Fit Error", error_msg)
 
     @Slot()
@@ -647,8 +710,22 @@ class FitPage(QWidget):
         model_id : str
             Model identifier
         """
-        # Residuals are already shown in the residuals panel
-        pass
+        state = self._store.get_state()
+        result = state.fit_results.get(model_id)
+        if result is None or getattr(result, "residuals", None) is None:
+            QMessageBox.information(
+                self,
+                "No Residuals",
+                "Residuals not available for the selected model.",
+            )
+            return
+
+        x_vals = getattr(result, "x_fit", None)
+        residuals = getattr(result, "residuals", None)
+        y_pred = getattr(result, "y_fit", None)
+
+        if x_vals is not None and residuals is not None:
+            self.plot_residuals(x_vals, residuals, y_pred)
 
     # External hooks from MainWindow
     def set_plot_figure(self, fig: Figure) -> None:
@@ -658,6 +735,8 @@ class FitPage(QWidget):
         self._plot_canvas.canvas.figure = fig
         self._plot_canvas.axes = fig.gca()
         self._plot_canvas.canvas.draw_idle()
+        if hasattr(self, "_plot_placeholder"):
+            self._plot_placeholder.hide()
 
     def plot_residuals(self, x: np.ndarray, residuals: np.ndarray, y_pred: np.ndarray | None = None) -> None:
         """Forward residuals to the residuals panel."""

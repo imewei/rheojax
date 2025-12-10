@@ -9,6 +9,7 @@ import logging
 import uuid
 from threading import Lock
 from typing import Any
+from collections.abc import Callable
 
 try:
     from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
@@ -17,7 +18,43 @@ except ImportError:
     HAS_PYSIDE6 = False
     # Provide stub classes for type checking when PySide6 not available
     class QObject:  # type: ignore
-        pass
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+
+    class Signal:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            self._slots = []
+
+        def connect(self, slot):
+            self._slots.append(slot)
+
+        def emit(self, *args, **kwargs):
+            for slot in list(self._slots):
+                try:
+                    slot(*args, **kwargs)
+                except Exception:
+                    # Best-effort stub; ignore downstream errors
+                    continue
+
+    class QRunnable:  # type: ignore
+        def run(self):  # pragma: no cover - stub
+            return None
+
+    class QThreadPool:  # type: ignore
+        @staticmethod
+        def globalInstance():
+            return QThreadPool()
+
+        def start(self, runnable):
+            # Run immediately in current thread as fallback
+            if hasattr(runnable, "run"):
+                runnable.run()
+
+    def Slot(*args, **kwargs):  # type: ignore
+        def decorator(fn):
+            return fn
+
+        return decorator
     class QThreadPool:  # type: ignore
         pass
     class QRunnable:  # type: ignore
@@ -134,7 +171,7 @@ class WorkerPool(QObject):
         WorkerPool._initialized = True
         logger.info(f"WorkerPool initialized with {max_threads} threads")
 
-    def submit(self, worker: QRunnable) -> str:
+    def submit(self, worker: QRunnable, on_job_registered: Callable[[str], None] | None = None) -> str:
         """Submit a worker to the pool.
 
         Parameters
@@ -164,6 +201,12 @@ class WorkerPool(QObject):
         # Register job
         with self._job_lock:
             self._active_jobs[job_id] = worker.cancel_token  # type: ignore[attr-defined]
+
+        if on_job_registered is not None:
+            try:
+                on_job_registered(job_id)
+            except Exception as exc:
+                logger.warning(f"on_job_registered hook failed: {exc}")
 
         # Connect worker signals to pool signals
         if hasattr(worker, 'signals'):

@@ -688,8 +688,46 @@ class RheoJAXMainWindow(QMainWindow):
             config["dataset_id"] = str(uuid.uuid4())
             self.log(f"Importing data from: {config['file_path']}")
             self.store.dispatch("IMPORT_DATA", config)
-            self.navigate_to("data")
-            self.status_bar.show_message("Data imported successfully", 3000)
+
+            # Perform the actual load immediately (synchronous import).
+            try:
+                from rheojax.gui.services.data_service import DataService
+
+                service = DataService()
+                rheo_data = service.load_file(
+                    file_path=config["file_path"],
+                    x_col=config.get("x_column"),
+                    y_col=config.get("y_column"),
+                    y2_col=config.get("y2_column"),
+                    test_mode=config.get("test_mode"),
+                )
+
+                # Auto-detect test mode if requested
+                test_mode = config.get("test_mode")
+                if config.get("auto_detect_mode"):
+                    test_mode = service.detect_test_mode(rheo_data)
+
+                self.store.dispatch(
+                    "IMPORT_DATA_SUCCESS",
+                    {
+                        "dataset_id": config["dataset_id"],
+                        "file_path": str(config["file_path"]),
+                        "name": Path(config["file_path"]).stem,
+                        "test_mode": test_mode or "unknown",
+                        "x_data": rheo_data.x,
+                        "y_data": rheo_data.y,
+                        "y2_data": getattr(rheo_data, "y2", None),
+                        "metadata": getattr(rheo_data, "metadata", {}),
+                    },
+                )
+                self.navigate_to("data")
+                self.status_bar.show_message("Data imported successfully", 3000)
+            except Exception as exc:
+                self.log(f"Import failed: {exc}")
+                self.store.dispatch(
+                    "IMPORT_DATA_FAILED", {"error": str(exc), **config}
+                )
+                self.status_bar.show_message(f"Import failed: {exc}", 5000)
 
     @Slot()
     def _on_export(self) -> None:
@@ -855,6 +893,11 @@ class RheoJAXMainWindow(QMainWindow):
         if isinstance(dataset, DatasetState):
             self.data_tree.add_dataset(dataset)
             self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
+            # Reflect the loaded dataset in the Data page preview
+            try:
+                self.data_page.show_dataset(dataset_id)
+            except Exception as exc:
+                self.log(f"Could not update Data page preview: {exc}")
             self.results_panel.set_fit_result(None)
             self.results_panel.set_bayesian_result(None)
 
@@ -863,6 +906,10 @@ class RheoJAXMainWindow(QMainWindow):
         """Update active dataset when selected from tree."""
 
         self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
+        try:
+            self.data_page.show_dataset(dataset_id)
+        except Exception as exc:
+            self.log(f"Could not update Data page preview: {exc}")
 
     # ------------------------------------------------------------------
     # Worker pool callbacks
@@ -1011,8 +1058,18 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_auto_detect_mode(self) -> None:
         """Handle auto-detect test mode action."""
         self.store.dispatch("AUTO_DETECT_TEST_MODE")
-        self.log("Auto-detecting test mode...")
-        self.status_bar.show_message("Auto-detecting test mode...", 2000)
+        # Refresh the Data page preview with any inferred mode
+        active = self.store.get_state().active_dataset_id
+        if active:
+            try:
+                self.data_page.show_dataset(active)
+                inferred_mode = self.store.get_state().datasets.get(active).test_mode
+                self.status_bar.show_message(f"Auto-detected test mode: {inferred_mode}", 2500)
+            except Exception as exc:
+                self.log(f"Auto-detect test mode failed: {exc}")
+                self.status_bar.show_message("Auto-detect test mode failed", 2500)
+        else:
+            self.status_bar.show_message("No active dataset to auto-detect", 2000)
 
     # -------------------------------------------------------------------------
     # Models Menu Handlers
@@ -1175,11 +1232,16 @@ class RheoJAXMainWindow(QMainWindow):
 
         if not self.worker_pool:
             self.status_bar.show_message("Worker pool unavailable", 3000)
+            self.store.dispatch("CANCEL_JOBS")
             return
 
         worker = FitWorker(model_name=model_name, data=rheo_data, initial_params=None, options={})
-        job_id = self.worker_pool.submit(worker)
-        self._job_types[job_id] = "fit"
+        job_id = self.worker_pool.submit(
+            worker,
+            on_job_registered=lambda jid: self._job_types.__setitem__(jid, "fit"),
+        )
+        # Ensure pipeline UI reacts even if job_started races
+        self._on_job_started(job_id)
 
     @Slot()
     def _on_bayesian(self) -> None:
@@ -1212,11 +1274,15 @@ class RheoJAXMainWindow(QMainWindow):
 
         if not self.worker_pool:
             self.status_bar.show_message("Worker pool unavailable", 3000)
+            self.store.dispatch("CANCEL_JOBS")
             return
 
         worker = BayesianWorker(model_name=model_name, data=rheo_data)
-        job_id = self.worker_pool.submit(worker)
-        self._job_types[job_id] = "bayesian"
+        job_id = self.worker_pool.submit(
+            worker,
+            on_job_registered=lambda jid: self._job_types.__setitem__(jid, "bayesian"),
+        )
+        self._on_job_started(job_id)
 
     @Slot()
     def _on_show_diagnostics(self) -> None:

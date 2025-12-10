@@ -262,22 +262,25 @@ class BayesianWorker(QRunnable):
             # Emit warmup stage start
             self.signals.stage_changed.emit("warmup")
 
-            # Execute Bayesian inference
+            # Execute Bayesian inference via service to honor progress/cancel
             logger.debug(
                 f"Running NUTS sampling: "
                 f"warmup={self._num_warmup}, samples={self._num_samples}, "
                 f"chains={self._num_chains}, test_mode={test_mode}"
             )
 
-            # Note: fit_bayesian doesn't currently support progress_callback
-            # This is a placeholder for when that functionality is added
-            bayesian_result = model.fit_bayesian(
-                self._data.x,
-                self._data.y,
-                test_mode=test_mode,
+            from rheojax.gui.services.bayesian_service import BayesianService
+
+            svc = BayesianService()
+            bayesian_result = svc.run_mcmc(
+                self._model_name,
+                self._data,
                 num_warmup=self._num_warmup,
                 num_samples=self._num_samples,
                 num_chains=self._num_chains,
+                warm_start=self._warm_start,
+                test_mode=test_mode,
+                progress_callback=progress_callback,
                 rng_key=jax.random.PRNGKey(self._seed),
             )
 

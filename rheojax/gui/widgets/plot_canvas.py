@@ -72,6 +72,14 @@ class PlotCanvas(QWidget):
         # Annotation for tooltips
         self._annotation = None
 
+    def get_axes(self):
+        """Return the primary matplotlib Axes for compatibility."""
+        return self.axes
+
+    def refresh(self) -> None:
+        """Redraw the canvas (compat helper)."""
+        self.canvas.draw_idle()
+
     def plot_data(
         self,
         x: np.ndarray,

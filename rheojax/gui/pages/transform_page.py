@@ -55,8 +55,8 @@ class TransformPage(QWidget):
 
         transforms = [
             ("FFT", "Fast Fourier Transform for frequency analysis", "#FF5722"),
-            ("Mastercurve", "Time-Temperature Superposition", "#2196F3"),
-            ("SRFS", "Strain-Rate Frequency Superposition", "#4CAF50"),
+            ("Mastercurve", "Time-temperature superposition", "#2196F3"),
+            ("SRFS", "Strain-rate frequency superposition", "#4CAF50"),
             ("Mutation Number", "Calculate mutation number", "#9C27B0"),
             ("OW Chirp", "Optimally-windowed chirp analysis", "#FF9800"),
             ("SPP Analysis", "LAOS yield stress and cage modulus extraction", "#E91E63"),
@@ -117,7 +117,9 @@ class TransformPage(QWidget):
 
         self._config_widget = QWidget()
         self._config_layout = QVBoxLayout(self._config_widget)
-        self._config_layout.addWidget(QLabel("Select a transform to configure"))
+        placeholder = QLabel("Select a transform to configure")
+        placeholder.setStyleSheet("color: #666;")
+        self._config_layout.addWidget(placeholder)
         layout.addWidget(self._config_widget)
 
         layout.addStretch()
@@ -183,6 +185,13 @@ class TransformPage(QWidget):
             self._config_layout.addWidget(check)
             self._param_controls.setdefault("mastercurve", []).append(("auto_shift", check))
 
+            self._config_layout.addWidget(QLabel("Shift Method:"))
+            combo_shift = QComboBox()
+            combo_shift.addItems(["wlf", "arrhenius", "manual"])
+            combo_shift.setCurrentText("wlf")
+            self._config_layout.addWidget(combo_shift)
+            self._param_controls.setdefault("mastercurve", []).append(("shift_method", combo_shift))
+
         elif name == "SRFS":
             self._config_layout.addWidget(QLabel("Reference Shear Rate (1/s):"))
             spin = QDoubleSpinBox()
@@ -190,6 +199,11 @@ class TransformPage(QWidget):
             spin.setValue(1.0)
             self._config_layout.addWidget(spin)
             self._param_controls.setdefault("srfs", []).append(("reference_gamma_dot", spin))
+
+            auto_shift = QCheckBox("Auto-detect shift factors")
+            auto_shift.setChecked(True)
+            self._config_layout.addWidget(auto_shift)
+            self._param_controls.setdefault("srfs", []).append(("auto_shift", auto_shift))
 
         elif name == "FFT":
             self._config_layout.addWidget(QLabel("Direction:"))
@@ -203,6 +217,21 @@ class TransformPage(QWidget):
             combo_window.addItems(["hann", "hamming", "blackman", "rectangular"])
             self._config_layout.addWidget(combo_window)
             self._param_controls.setdefault("fft", []).append(("window", combo_window))
+
+            check_detrend = QCheckBox("Detrend (remove DC)")
+            check_detrend.setChecked(True)
+            self._config_layout.addWidget(check_detrend)
+            self._param_controls.setdefault("fft", []).append(("detrend", check_detrend))
+
+            check_norm = QCheckBox("Normalize amplitude")
+            check_norm.setChecked(True)
+            self._config_layout.addWidget(check_norm)
+            self._param_controls.setdefault("fft", []).append(("normalize", check_norm))
+
+            check_psd = QCheckBox("Return PSD")
+            check_psd.setChecked(False)
+            self._config_layout.addWidget(check_psd)
+            self._param_controls.setdefault("fft", []).append(("return_psd", check_psd))
 
         elif name == "Mutation Number":
             self._config_layout.addWidget(QLabel("Integration Method:"))
@@ -238,6 +267,35 @@ class TransformPage(QWidget):
             spin_max.setDecimals(4)
             self._config_layout.addWidget(spin_max)
             self._param_controls.setdefault("owchirp", []).append(("max_frequency", spin_max))
+
+            self._config_layout.addWidget(QLabel("# Frequencies:"))
+            spin_n = QDoubleSpinBox()
+            spin_n.setRange(4, 5000)
+            spin_n.setDecimals(0)
+            spin_n.setValue(100)
+            self._config_layout.addWidget(spin_n)
+            self._param_controls.setdefault("owchirp", []).append(("n_frequencies", spin_n))
+
+            self._config_layout.addWidget(QLabel("Wavelet Width:"))
+            spin_w = QDoubleSpinBox()
+            spin_w.setRange(1.0, 20.0)
+            spin_w.setDecimals(2)
+            spin_w.setValue(5.0)
+            self._config_layout.addWidget(spin_w)
+            self._param_controls.setdefault("owchirp", []).append(("wavelet_width", spin_w))
+
+            check_harm = QCheckBox("Extract harmonics")
+            check_harm.setChecked(True)
+            self._config_layout.addWidget(check_harm)
+            self._param_controls.setdefault("owchirp", []).append(("extract_harmonics", check_harm))
+
+            self._config_layout.addWidget(QLabel("Max Harmonic:"))
+            spin_h = QDoubleSpinBox()
+            spin_h.setRange(1, 99)
+            spin_h.setDecimals(0)
+            spin_h.setValue(7)
+            self._config_layout.addWidget(spin_h)
+            self._param_controls.setdefault("owchirp", []).append(("max_harmonic", spin_h))
 
         elif name == "Derivatives":
             self._config_layout.addWidget(QLabel("Order:"))

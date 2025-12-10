@@ -630,7 +630,9 @@ class SGRConventional(BaseModel):
             "SGR LAOS mode fitting not yet fully implemented. "
             "Using default parameter values."
         )
-        pass
+        # Explicitly mark as not fitted to avoid silently continuing.
+        self.fitted_ = False
+        return
 
     @staticmethod
     @jax.jit

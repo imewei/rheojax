@@ -81,12 +81,12 @@ class LogExporter(ABC):
         Returns:
             True if export succeeded, False otherwise.
         """
-        pass
+        raise NotImplementedError("LogExporter.export must be implemented by subclasses")
 
     @abstractmethod
     def shutdown(self) -> None:
         """Shutdown the exporter and flush any pending entries."""
-        pass
+        raise NotImplementedError("LogExporter.shutdown must be implemented by subclasses")
 
 
 class OpenTelemetryLogExporter(LogExporter):
@@ -359,7 +359,20 @@ class BatchingExporter(LogExporter):
                 break
 
         if entries:
-            self._inner.export(entries)
+            try:
+                success = self._inner.export(entries)
+            except Exception as exc:  # pragma: no cover - defensive
+                logging.getLogger(__name__).error(f"Batch export failed: {exc}")
+                # best-effort requeue
+                for entry in entries:
+                    try:
+                        self._queue.put_nowait(entry)
+                    except queue.Full:
+                        break
+                return
+
+            if success is False:
+                logging.getLogger(__name__).warning("Inner exporter reported failure during batch flush")
 
     def export(self, entries: list[LogEntry]) -> bool:
         """Add entries to the batch queue.
@@ -376,19 +389,25 @@ class BatchingExporter(LogExporter):
             except queue.Full:
                 # Queue full, force flush
                 self._flush()
-                self._queue.put(entry, block=True, timeout=1.0)
+                try:
+                    self._queue.put(entry, block=True, timeout=1.0)
+                except queue.Full:
+                    logging.getLogger(__name__).error("BatchingExporter queue is full; dropping entry")
+                    return False
 
         # Flush if batch size reached
         if self._queue.qsize() >= self._batch_size:
             self._flush()
 
-        return True
+        return not self._queue.full()
 
     def shutdown(self) -> None:
         """Shutdown the batching exporter."""
         self._shutdown_event.set()
         self._flush_thread.join(timeout=5.0)
         self._flush()  # Final flush
+        if self._flush_thread.is_alive():
+            logging.getLogger(__name__).warning("BatchingExporter flush thread did not terminate cleanly")
         self._inner.shutdown()
 
 
@@ -455,7 +474,7 @@ class ExportingHandler(logging.Handler):
                     format(ctx.span_id, "016x"),
                 )
         except ImportError:
-            pass
+            logging.getLogger(__name__).debug("OpenTelemetry not installed; skipping trace context")
 
         return None, None
 
@@ -466,10 +485,39 @@ class ExportingHandler(logging.Handler):
             record: Python LogRecord to export.
         """
         try:
-            # Build attributes from extra fields
+            # Build attributes from extra fields (include non-standard record attrs)
             attributes = {}
             if hasattr(record, "extra") and record.extra:
                 attributes.update(record.extra)
+
+            for key, value in record.__dict__.items():
+                if key.startswith("_"):
+                    continue
+                if key in {
+                    "name",
+                    "msg",
+                    "args",
+                    "levelname",
+                    "levelno",
+                    "pathname",
+                    "filename",
+                    "module",
+                    "exc_info",
+                    "exc_text",
+                    "stack_info",
+                    "lineno",
+                    "funcName",
+                    "created",
+                    "msecs",
+                    "relativeCreated",
+                    "thread",
+                    "threadName",
+                    "processName",
+                    "process",
+                    "message",
+                }:
+                    continue
+                attributes.setdefault(key, value)
 
             # Add standard attributes
             attributes["module"] = record.module
@@ -530,7 +578,7 @@ class CallbackExporter(LogExporter):
 
     def shutdown(self) -> None:
         """No-op shutdown."""
-        pass
+        logging.getLogger(__name__).debug("CallbackExporter.shutdown noop")
 
 
 def create_otel_handler(

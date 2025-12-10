@@ -442,8 +442,8 @@ class PlotService:
             finally:
                 try:
                     os.remove(tmp_path)
-                except OSError:
-                    pass
+                except OSError as exc:
+                    logging.getLogger(__name__).debug("Failed to remove temp style file: %s", exc)
         else:
             plt.style.use("default")
 

@@ -160,6 +160,11 @@ class BayesianService:
             )
 
             # Run Bayesian inference
+            # Emit initial progress
+            if progress_callback:
+                progress_callback(0, 1, "warmup")
+                kwargs.setdefault("progress_callback", progress_callback)
+
             result = model.fit_bayesian(
                 x,
                 y,
@@ -169,6 +174,9 @@ class BayesianService:
                 num_chains=num_chains,
                 **kwargs,
             )
+
+            if progress_callback:
+                progress_callback(100, 100, "complete")
 
             # Extract posterior samples
             posterior_samples = result.posterior_samples
@@ -223,14 +231,24 @@ class BayesianService:
                 return {}
 
             # Convert to ArviZ format
-            # Reshape samples: (n_chains, n_samples, n_params)
+            # Reshape samples: (n_chains, n_draws)
             idata_dict = {}
+            # Try to infer chain count from result metadata when available
+            num_chains = None
+            if isinstance(result, BayesianResult):
+                num_chains = result.metadata.get("num_chains") if result.metadata else None
+            elif hasattr(result, "metadata") and isinstance(result.metadata, dict):
+                num_chains = result.metadata.get("num_chains")
+
             for param_name, samples in posterior_samples.items():
-                if samples.ndim == 1:
-                    # Single chain, reshape to (1, n_samples)
-                    idata_dict[param_name] = samples.reshape(1, -1)
+                arr = np.asarray(samples)
+                if arr.ndim == 1 and num_chains and arr.size % num_chains == 0:
+                    idata_dict[param_name] = arr.reshape(num_chains, -1)
+                elif arr.ndim == 1:
+                    # Fallback: assume single chain
+                    idata_dict[param_name] = arr.reshape(1, -1)
                 else:
-                    idata_dict[param_name] = samples
+                    idata_dict[param_name] = arr
 
             idata = az.from_dict(idata_dict)
 

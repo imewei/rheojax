@@ -13,6 +13,7 @@ from rheojax.io.readers import (
     load_excel,
     load_trios,
 )
+from rheojax.io.readers.csv_reader import detect_csv_delimiter
 
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent / "test_data"
@@ -292,3 +293,24 @@ data point 1	1.0	100
         data = auto_load(str(test_file), x_col="time", y_col="stress")
 
         assert isinstance(data, RheoData)
+
+    def test_detects_tab_delimiter(self, tmp_path):
+        """Tab-separated files should be auto-detected."""
+        tsv_file = tmp_path / "creep.tsv"
+        tsv_file.write_text("Time\tCreep Compliance\n0.5\t0.98\n1.0\t1.10\n")
+
+        delimiter = detect_csv_delimiter(tsv_file)
+        assert delimiter == "\t"
+
+        data = load_csv(tsv_file, x_col="Time", y_col="Creep Compliance")
+        assert np.allclose(data.x, [0.5, 1.0])
+        assert np.allclose(data.y, [0.98, 1.10])
+
+    def test_auto_load_with_tab_delimiter_and_column_names(self, tmp_path):
+        """auto_load should parse tab-separated CSV when columns are provided."""
+        tsv_file = tmp_path / "creep_tab.csv"
+        tsv_file.write_text("Time\tCreep Compliance\n0.5\t0.98\n1.0\t1.10\n")
+
+        data = auto_load(tsv_file, x_col="Time", y_col="Creep Compliance")
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 2

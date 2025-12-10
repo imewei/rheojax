@@ -24,7 +24,9 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QPlainTextEdit,
 )
+import json
 
 
 class BayesianOptionsDialog(QDialog):
@@ -179,6 +181,18 @@ class BayesianOptionsDialog(QDialog):
         self.advanced_group.setLayout(advanced_layout)
         layout.addWidget(self.advanced_group)
 
+        # Priors (JSON editable)
+        self.priors_group = QGroupBox("Priors (JSON editable)")
+        self.priors_group.setCheckable(True)
+        self.priors_group.setChecked(True)
+        priors_layout = QVBoxLayout()
+        self.priors_edit = QPlainTextEdit()
+        self.priors_edit.setPlaceholderText("e.g. {\n  \"G_cage\": {\"dist\": \"lognormal\", \"loc\": 8.5, \"scale\": 1.0}\n}")
+        self.priors_edit.setMinimumHeight(120)
+        priors_layout.addWidget(self.priors_edit)
+        self.priors_group.setLayout(priors_layout)
+        layout.addWidget(self.priors_group)
+
         # Info label
         info_label = QLabel(
             "<b>Note:</b> NLSQ warm-start significantly improves convergence "
@@ -273,6 +287,7 @@ class BayesianOptionsDialog(QDialog):
             - dense_mass: Whether to use dense mass matrix (if advanced enabled)
             - target_accept_prob: Target acceptance probability (if advanced enabled)
             - max_tree_depth: Maximum tree depth (if advanced enabled)
+            - priors: JSON dict of priors (optional)
         """
         options = {
             "sampler": "NUTS",  # Currently only option
@@ -297,6 +312,13 @@ class BayesianOptionsDialog(QDialog):
             options["dense_mass"] = self.dense_mass_check.isChecked()
             options["target_accept_prob"] = self.target_slider.value() / 100.0
             options["max_tree_depth"] = self.max_depth_spin.value()
+
+        priors_text = self.priors_edit.toPlainText().strip()
+        if priors_text:
+            try:
+                options["priors"] = json.loads(priors_text)
+            except Exception:
+                options["priors"] = None
 
         return options
 

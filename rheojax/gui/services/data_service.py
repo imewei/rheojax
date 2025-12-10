@@ -16,6 +16,7 @@ import pandas as pd
 
 from rheojax.core.data import RheoData
 from rheojax.io import auto_load
+from rheojax.io.readers.csv_reader import detect_csv_delimiter
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,8 @@ class DataService:
 
         try:
             if suffix in {".csv", ".txt", ".dat"}:
-                df = pd.read_csv(file_path, nrows=max_rows)
+                delimiter = detect_csv_delimiter(file_path)
+                df = pd.read_csv(file_path, sep=delimiter, nrows=max_rows)
                 headers = [str(col) for col in df.columns]
                 data = df.fillna("").values.tolist()
                 metadata["rows"] = len(df.index)
@@ -264,8 +266,8 @@ class DataService:
                     if abs(correlation) > 0.9 and not (np.all(y_diff >= 0) or np.all(y_diff <= 0)):
                         logger.debug(f"Detected flow: power-law correlation={correlation:.3f}")
                         return "flow"
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Flow detection failed on log-log correlation: %s", exc)
 
         # Oscillation: frequency sweep with log-spaced x-axis
         if x_min > 0.001 and x_max < 10000:
@@ -278,8 +280,8 @@ class DataService:
                         if np.std(log_spacing) < 0.3:  # Uniform in log space
                             logger.debug("Detected oscillation: log-spaced x-axis")
                             return "oscillation"
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Oscillation detection failed: %s", exc)
 
         logger.warning("Could not auto-detect test mode, defaulting to 'unknown'")
         return "unknown"
@@ -406,7 +408,8 @@ class DataService:
         try:
             # Try to read first few rows
             if file_path.suffix.lower() in [".csv", ".txt", ".dat"]:
-                df = pd.read_csv(file_path, nrows=5)
+                delimiter = detect_csv_delimiter(file_path)
+                df = pd.read_csv(file_path, sep=delimiter, nrows=5)
             elif file_path.suffix.lower() in [".xlsx", ".xls"]:
                 df = pd.read_excel(file_path, nrows=5)
             else:

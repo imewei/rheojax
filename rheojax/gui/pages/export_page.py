@@ -54,6 +54,25 @@ class ExportPage(QWidget):
         self._export_service = ExportService()
         self.setup_ui()
 
+    def _dataset_to_rheodata(self, dataset: Any) -> Any:
+        """Convert DatasetState into RheoData for export."""
+        from rheojax.core.data import RheoData
+
+        metadata = dict(getattr(dataset, "metadata", {}) or {})
+        metadata.setdefault("test_mode", getattr(dataset, "test_mode", "oscillation"))
+        if getattr(dataset, "name", None):
+            metadata.setdefault("name", dataset.name)
+        if getattr(dataset, "file_path", None):
+            metadata.setdefault("file", str(dataset.file_path))
+
+        return RheoData(
+            x=dataset.x_data,
+            y=dataset.y_data,
+            metadata=metadata,
+            initial_test_mode=metadata.get("test_mode"),
+            validate=False,
+        )
+
     def setup_ui(self) -> None:
         main_layout = QHBoxLayout(self)
 
@@ -503,9 +522,10 @@ class ExportPage(QWidget):
             if config["include_raw_data"] and state.datasets:
                 progress.setLabelText("Exporting raw data...")
                 for dataset_id, dataset in state.datasets.items():
-                    if dataset.data is not None:
+                    if dataset.x_data is not None and dataset.y_data is not None:
                         filepath = output_dir / f"data_{dataset_id}.{data_format}"
-                        self._export_service.export_data(dataset.data, filepath, data_format)
+                        rheo = self._dataset_to_rheodata(dataset)
+                        self._export_service.export_data(rheo, filepath, data_format)
                         exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
