@@ -93,15 +93,20 @@ class RheoJAXMainWindow(QMainWindow):
     # Custom signals
     state_dirty = Signal(bool)  # Emitted when unsaved changes exist
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, start_maximized: bool = False) -> None:
         """Initialize main window with pages and services.
 
         Parameters
         ----------
         parent : QWidget, optional
             Parent widget
+        start_maximized : bool, optional
+            Skip initial resize when launching maximized to avoid clobbering
+            the requested window state.
         """
         super().__init__(parent)
+
+        self._start_maximized = start_maximized
 
         # Initialize state store
         self.store = StateStore()
@@ -130,7 +135,8 @@ class RheoJAXMainWindow(QMainWindow):
         """Create all UI elements."""
         # Window properties
         self.setWindowTitle("RheoJAX - Rheological Analysis")
-        self.resize(1400, 900)
+        if not getattr(self, "_start_maximized", False):
+            self.resize(1400, 900)
 
         # Bump global font size for readability
         app = QApplication.instance()

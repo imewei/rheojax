@@ -473,6 +473,9 @@ pip install rheojax[gui]
 # From command line
 rheojax-gui
 
+# Start maximized (useful on high-DPI desktops)
+rheojax-gui --maximized
+
 # Or from Python
 from rheojax.gui import main
 main()

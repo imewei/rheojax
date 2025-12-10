@@ -10,6 +10,7 @@ Usage
     rheojax-gui                    # Launch GUI
     rheojax-gui --project FILE     # Open project
     rheojax-gui --import FILE      # Import data file on startup
+    rheojax-gui --maximized        # Start window maximized
     rheojax-gui --verbose          # Enable verbose logging
     rheojax-gui --help             # Show help
 
@@ -21,6 +22,7 @@ Example
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -108,7 +110,8 @@ Examples:
   rheojax-gui                              # Launch GUI
   rheojax-gui --project analysis.rheo     # Open project file
   rheojax-gui --import data.xlsx          # Import data on startup
-  rheojax-gui --verbose                    # Enable verbose logging
+  rheojax-gui --maximized                 # Start maximized (per-window manager)
+  rheojax-gui --verbose                   # Enable verbose logging
 
 For more information, visit: https://github.com/imewei/rheojax
         """,
@@ -136,6 +139,13 @@ For more information, visit: https://github.com/imewei/rheojax
         "-v",
         action="store_true",
         help="Enable verbose (DEBUG) logging",
+    )
+
+    parser.add_argument(
+        "--maximized",
+        "-M",
+        action="store_true",
+        help="Start the main window maximized",
     )
 
     parser.add_argument(
@@ -217,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
 
     logger.debug("Initializing Qt application...")
     try:
-        from PySide6.QtCore import Qt
+        from PySide6.QtCore import Qt, QTimer
         from PySide6.QtGui import QFont, QIcon
         from PySide6.QtWidgets import QApplication
     except ImportError as exc:
@@ -243,6 +253,30 @@ def main(argv: list[str] | None = None) -> int:
         dpi_scale = max(screen.logicalDotsPerInch() / 96.0, 1.0)
         # Cap scaling to avoid excessively large fonts on very high DPI setups.
         return min(base_size * dpi_scale, 16.0)
+
+    def _show_main_window(window: "RheoJAXMainWindow", maximize: bool) -> None:
+        """Show the main window with cross-platform maximize handling."""
+
+        if maximize:
+            window.setWindowState(window.windowState() | Qt.WindowMaximized)
+            window.show()
+            window.showMaximized()
+            window.raise_()
+            window.activateWindow()
+
+            def _ensure_maximized_fullscreen_fallback() -> None:
+                if window.isMaximized():
+                    return
+                # Last-resort nudge for stubborn compositors: fullscreen then back to maximized
+                window.showFullScreen()
+                QTimer.singleShot(0, window.showMaximized)
+
+            # Re-apply after event loop starts; Wayland often needs a later nudge
+            QTimer.singleShot(0, window.showMaximized)
+            QTimer.singleShot(75, _ensure_maximized_fullscreen_fallback)
+            return
+
+        window.show()
 
     # Create Qt application
     if argv is None:
@@ -300,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     # Create main window
     try:
         logger.debug("Creating main window...")
-        window = RheoJAXMainWindow()
+        window = RheoJAXMainWindow(start_maximized=args.maximized)
         gui_handler = install_gui_log_handler(
             window.log,
             level=logging.DEBUG if args.verbose else logging.INFO,
@@ -308,7 +342,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.debug("GUI log handler attached")
         window.destroyed.connect(lambda *_: logging.getLogger().removeHandler(gui_handler))
         app.setWindowIcon(QIcon(str(get_icon_path("load"))))
-        window.show()
+
+        _show_main_window(window, args.maximized)
+
         logger.info("RheoJAX GUI ready")
     except Exception as e:
         logger.exception(f"Failed to create main window: {e}")
