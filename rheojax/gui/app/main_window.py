@@ -161,6 +161,8 @@ class RheoJAXMainWindow(QMainWindow):
         # Status bar
         self.status_bar = StatusBar(self)
         self.setStatusBar(self.status_bar)
+        # Show pipeline chips in status bar for quick navigation/status
+        self.status_bar.addPermanentWidget(self.pipeline_chips)
 
         # Update JAX status on startup
         self._update_jax_status()

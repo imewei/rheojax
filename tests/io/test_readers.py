@@ -226,20 +226,41 @@ class TestExcelReader:
 class TestAntonPaarReader:
     """Tests for Anton Paar reader (7.7)."""
 
-    @pytest.mark.skip(reason="Requires Anton Paar sample files")
-    def test_anton_paar_format_detection(self):
-        """Test Anton Paar format detection."""
-        pass
+    def test_anton_paar_basic_parse(self, tmp_path):
+        """Parse minimal Anton Paar export and extract units/labels."""
 
-    @pytest.mark.skip(reason="Requires Anton Paar sample files")
-    def test_anton_paar_metadata_extraction(self):
-        """Test Anton Paar metadata extraction."""
-        pass
+        file = tmp_path / "ap_export.txt"
+        file.write_text(
+            "# Anton Paar MCR export\n"
+            "Time [s];G' [kPa];G'' [kPa]\n"
+            "0.0;1.0;0.1\n"
+            "1.0;0.8;0.08\n"
+        )
 
-    @pytest.mark.skip(reason="Requires Anton Paar sample files")
-    def test_anton_paar_data_parsing(self):
-        """Test Anton Paar data parsing."""
-        pass
+        data = load_anton_paar(file)
+
+        assert isinstance(data, RheoData)
+        assert data.domain == "time"
+        assert data.x_units == "s"
+        assert data.y_units == "pa"  # kPa normalized
+        assert "y2" in data.metadata
+        assert data.metadata["source"] == "anton_paar"
+        assert len(data.x) == 2
+
+    def test_anton_paar_frequency_units(self, tmp_path):
+        """Hz frequency input is normalized to rad/s."""
+
+        file = tmp_path / "ap_freq.txt"
+        file.write_text(
+            "Frequency [Hz]\tG' [Pa]\tG'' [Pa]\n"
+            "1\t10\t2\n"
+            "2\t12\t3\n"
+        )
+
+        data = load_anton_paar(file)
+
+        assert data.domain == "frequency"
+        assert pytest.approx(data.x[0], rel=1e-6) == 2 * np.pi  # 1 Hz -> 2pi rad/s
 
 
 class TestAutoDetection:

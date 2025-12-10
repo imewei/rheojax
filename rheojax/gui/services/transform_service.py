@@ -284,6 +284,17 @@ class TransformService:
             if name not in self._transforms:
                 raise ValueError(f"Unknown transform: {name}")
 
+            def _with_provenance(result_data: RheoData) -> RheoData:
+                # Attach a simple provenance entry
+                prov_entry = {
+                    "transform": name,
+                    "params": {k: v for k, v in params.items() if isinstance(v, (int, float, str, bool))},
+                }
+                history = list(result_data.metadata.get("provenance", []))
+                history.append(prov_entry)
+                result_data.metadata["provenance"] = history
+                return result_data
+
             if name == "mastercurve":
                 # Mastercurve requires multiple datasets
                 if not isinstance(data, list):
@@ -296,7 +307,7 @@ class TransformService:
                 mastercurve_data, shift_factors = mc.transform(data)
 
                 logger.info(f"Applied mastercurve at T_ref={reference_temp}°C")
-                return mastercurve_data, {"shift_factors": shift_factors}
+                return _with_provenance(mastercurve_data), {"shift_factors": shift_factors}
 
             elif name == "fft":
                 # FFT transform
@@ -322,7 +333,7 @@ class TransformService:
                     result = fft.inverse_transform(data)
 
                 logger.info(f"Applied FFT transform ({direction})")
-                return result
+                return _with_provenance(result)
 
             elif name == "srfs":
                 # SRFS transform
@@ -336,7 +347,7 @@ class TransformService:
                 master_curve, shift_factors = srfs.transform(data)
 
                 logger.info(f"Applied SRFS at γ̇_ref={reference_gamma_dot} 1/s")
-                return master_curve, {"shift_factors": shift_factors}
+                return _with_provenance(master_curve), {"shift_factors": shift_factors}
 
             elif name == "owchirp":
                 # OWChirp transform
@@ -358,7 +369,7 @@ class TransformService:
                 result = owchirp.transform(data)
 
                 logger.info("Applied OWChirp transform")
-                return result
+                return _with_provenance(result)
 
             elif name == "derivative":
                 # Smooth derivative
@@ -382,7 +393,7 @@ class TransformService:
                 result = deriv.transform(data)
 
                 logger.info(f"Applied {deriv_order}-order derivative")
-                return result
+                return _with_provenance(result)
 
             elif name == "mutation_number":
                 # Mutation number
@@ -400,7 +411,7 @@ class TransformService:
                 result = mn.transform(data)
 
                 logger.info("Calculated mutation number")
-                return result
+                return _with_provenance(result)
 
             elif name == "spp":
                 # SPP decomposition for LAOS yield stress extraction
@@ -430,7 +441,7 @@ class TransformService:
                     f"SPP analysis: σ_sy={spp_results['sigma_sy']:.2f} Pa, "
                     f"σ_dy={spp_results['sigma_dy']:.2f} Pa"
                 )
-                return result, {"spp_results": spp_results}
+                return _with_provenance(result), {"spp_results": spp_results}
 
             else:
                 raise ValueError(f"Transform {name} not implemented")

@@ -122,6 +122,9 @@ class DataService:
             if test_mode:
                 data.metadata["test_mode"] = test_mode
 
+            # Light unit conversions for common CSV/Excel cases
+            data = self._convert_units(data)
+
             logger.info(f"Successfully loaded {len(data.x)} data points from {file_path}")
             return data
 
@@ -183,6 +186,48 @@ class DataService:
         except Exception as e:
             logger.error(f"Failed to preview file {file_path}: {e}")
             raise
+
+    def _convert_units(self, data: RheoData) -> RheoData:
+        """Convert common units to canonical values.
+
+        - Frequency: Hz → rad/s
+        - Time: ms/min → s
+        - Modulus: kPa/MPa → Pa
+        """
+
+        x_units = (data.x_units or "").lower()
+        y_units = (data.y_units or "").lower()
+
+        x = np.asarray(data.x)
+        y = np.asarray(data.y)
+
+        if x_units == "hz":
+            x = x * 2 * np.pi
+            x_units = "rad/s"
+        elif x_units == "ms":
+            x = x / 1000.0
+            x_units = "s"
+        elif x_units in ("min", "mins", "minutes"):
+            x = x * 60.0
+            x_units = "s"
+
+        if y_units == "kpa":
+            y = y * 1e3
+            y_units = "pa"
+        elif y_units == "mpa":
+            y = y * 1e6
+            y_units = "pa"
+
+        return RheoData(
+            x=x,
+            y=y,
+            x_units=x_units or None,
+            y_units=y_units or None,
+            domain=data.domain,
+            metadata=data.metadata,
+            initial_test_mode=data.metadata.get("test_mode"),
+            validate=False,
+        )
 
     def detect_test_mode(self, data: RheoData) -> str:
         """Auto-detect test mode from data characteristics.

@@ -128,10 +128,26 @@ class JAXStatusWidget(QWidget):
         jit_layout.addWidget(self._jit_count_label)
         main_layout.addLayout(jit_layout)
 
+        # Compiling indicator
+        compile_layout = QVBoxLayout()
+        compile_layout.setSpacing(2)
+        compile_label = QLabel("Compiling:")
+        compile_label.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        self._compile_indicator = QLabel("Idle")
+        self._compile_indicator.setAlignment(Qt.AlignCenter)
+        self._compile_indicator.setStyleSheet(
+            "padding: 3px 10px; border-radius: 3px; background-color: #e0e0e0;"
+        )
+        compile_layout.addWidget(compile_label)
+        compile_layout.addWidget(self._compile_indicator)
+        main_layout.addLayout(compile_layout)
+
         main_layout.addStretch()
 
         # Initialize state
         self._current_device = "cpu"
+        self.update_jit_cache(0)
+        self.set_compiling(False)
 
     def update_device_list(self, devices: list[str]) -> None:
         """Update the list of available devices.
@@ -268,6 +284,19 @@ class JAXStatusWidget(QWidget):
             color = "#666666"  # Gray for zero
 
         self._jit_count_label.setStyleSheet(f"font-size: 10pt; color: {color}; font-weight: bold;")
+
+    def set_compiling(self, compiling: bool) -> None:
+        """Show compiling indicator."""
+        if compiling:
+            self._compile_indicator.setText("Compiling...")
+            self._compile_indicator.setStyleSheet(
+                "padding:3px 10px; border-radius:3px; background-color:#FFB74D; color:#000;"
+            )
+        else:
+            self._compile_indicator.setText("Idle")
+            self._compile_indicator.setStyleSheet(
+                "padding:3px 10px; border-radius:3px; background-color:#C8E6C9; color:#1B5E20;"
+            )
 
     def _on_device_changed(self, device: str) -> None:
         """Handle device selection change.

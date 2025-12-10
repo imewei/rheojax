@@ -333,46 +333,35 @@ class ExportService:
         template: str,
         path: Path | str,
     ) -> None:
-        """Generate Markdown or PDF report.
+        """Generate Markdown or lightweight PDF report.
 
-        Parameters
-        ----------
-        state : dict
-            Application state with data, results, etc.
-        template : str
-            Report template ('summary', 'detailed', 'bayesian')
-        path : Path or str
-            Output report path
+        If the output path ends with `.pdf`, a simple PDF is produced via
+        matplotlib's PdfPages backend to avoid external dependencies.
+        Otherwise a Markdown report is written.
         """
         path = Path(path)
 
         try:
-            # Generate Markdown report
+            # Generate Markdown content first
             report_lines = []
-
-            # Title
             report_lines.append("# RheoJAX Analysis Report\n")
             report_lines.append(f"**Generated:** {np.datetime64('now')}\n\n")
 
-            # Model info
             if "model_name" in state:
                 report_lines.append(f"## Model: {state['model_name']}\n")
                 report_lines.append(f"**Test Mode:** {state.get('test_mode', 'unknown')}\n\n")
 
-            # Parameters
             if "parameters" in state and state["parameters"]:
                 report_lines.append("## Fitted Parameters\n")
                 report_lines.append("| Parameter | Value |\n")
                 report_lines.append("|-----------|-------|\n")
                 for param, value in state["parameters"].items():
-                    report_lines.append(f"| {param} | {value:.6g} |\n")
+                    report_lines.append(f"| {param} | {float(value):.6g} |\n")
                 report_lines.append("\n")
 
-            # Diagnostics
             if template == "bayesian" and "diagnostics" in state:
                 report_lines.append("## MCMC Diagnostics\n")
                 diag = state["diagnostics"]
-
                 if "rhat" in diag:
                     report_lines.append("### R-hat Statistics\n")
                     report_lines.append("| Parameter | R-hat |\n")
@@ -380,7 +369,6 @@ class ExportService:
                     for param, rhat in diag["rhat"].items():
                         report_lines.append(f"| {param} | {rhat:.4f} |\n")
                     report_lines.append("\n")
-
                 if "ess" in diag:
                     report_lines.append("### Effective Sample Size\n")
                     report_lines.append("| Parameter | ESS |\n")
@@ -389,9 +377,27 @@ class ExportService:
                         report_lines.append(f"| {param} | {ess:.0f} |\n")
                     report_lines.append("\n")
 
-            # Write report
-            with open(path, "w") as f:
-                f.writelines(report_lines)
+            if path.suffix.lower() == ".pdf":
+                # Render a minimal PDF page with text content
+                from matplotlib.backends.backend_pdf import PdfPages
+                import matplotlib.pyplot as plt
+
+                with PdfPages(path) as pdf:
+                    fig, ax = plt.subplots(figsize=(8.5, 11))
+                    ax.axis("off")
+                    y = 1.0
+                    for line in report_lines:
+                        for subline in line.split("\n"):
+                            if not subline:
+                                y -= 0.03
+                                continue
+                            ax.text(0.02, y, subline, ha="left", va="top", fontsize=10)
+                            y -= 0.03
+                    pdf.savefig(fig, bbox_inches="tight")
+                    plt.close(fig)
+            else:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.writelines(report_lines)
 
             logger.info(f"Generated report at {path}")
 

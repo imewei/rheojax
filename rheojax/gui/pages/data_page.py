@@ -297,12 +297,26 @@ class DataPage(QWidget):
 
     def _on_file_dropped(self, file_path: str) -> None:
         """Handle file drop or selection."""
-        self._current_file_path = Path(file_path)
+        path_obj = Path(file_path)
+
+        # Memory guard: warn on large files (>50 MB)
+        size_bytes = path_obj.stat().st_size
+        if size_bytes > 50 * 1024 * 1024:
+            resp = QMessageBox.warning(
+                self,
+                "Large File",
+                "The selected file is larger than 50 MB. Loading may be slow or memory intensive. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if resp == QMessageBox.StandardButton.No:
+                return
+
+        self._current_file_path = path_obj
 
         # Update file info
         self._file_name_label.setText(f"File: {self._current_file_path.name}")
-        file_size = self._current_file_path.stat().st_size
-        self._file_size_label.setText(f"Size: {file_size / 1024:.1f} KB")
+        self._file_size_label.setText(f"Size: {size_bytes / 1024:.1f} KB")
 
         # Load and preview data
         self._load_preview()

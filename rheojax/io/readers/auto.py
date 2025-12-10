@@ -6,6 +6,7 @@ import warnings
 from pathlib import Path
 
 from rheojax.core.data import RheoData
+from rheojax.io.readers.anton_paar import load_anton_paar
 from rheojax.io.readers.csv_reader import detect_csv_delimiter, load_csv
 from rheojax.io.readers.excel_reader import load_excel
 from rheojax.io.readers.trios import load_trios
@@ -40,7 +41,7 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
 
     # Try based on file extension first
     if extension == ".txt":
-        return _try_trios_then_csv(filepath, **kwargs)
+        return _try_trios_then_anton_then_csv(filepath, **kwargs)
 
     elif extension == ".csv":
         return _try_csv(filepath, **kwargs)
@@ -57,8 +58,8 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
         return _try_all_readers(filepath, **kwargs)
 
 
-def _try_trios_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
-    """Try TRIOS reader first, then CSV.
+def _try_trios_then_anton_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
+    """Try TRIOS first, then Anton Paar, then CSV.
 
     Args:
         filepath: File path
@@ -71,13 +72,18 @@ def _try_trios_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
     try:
         return load_trios(filepath, **kwargs)
     except Exception as e:
-        warnings.warn(f"TRIOS reader failed: {e}. Trying CSV reader.", stacklevel=2)
+        warnings.warn(f"TRIOS reader failed: {e}. Trying Anton Paar reader.", stacklevel=2)
+
+    try:
+        return load_anton_paar(filepath, **kwargs)
+    except Exception as e:
+        warnings.warn(f"Anton Paar reader failed: {e}. Trying CSV reader.", stacklevel=2)
 
     # Try CSV as fallback
     try:
         return _try_csv(filepath, **kwargs)
     except Exception as e:
-        raise ValueError(f"Could not parse file as TRIOS or CSV: {e}") from e
+        raise ValueError(f"Could not parse file as TRIOS, Anton Paar, or CSV: {e}") from e
 
 
 def _try_csv(filepath: Path, **kwargs) -> RheoData:
@@ -175,6 +181,7 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
     """
     readers = [
         ("TRIOS", lambda: load_trios(filepath, **kwargs)),
+        ("ANTON_PAAR", lambda: load_anton_paar(filepath, **kwargs)),
         ("CSV", lambda: _try_csv(filepath, **kwargs)),
         ("EXCEL", lambda: _try_excel(filepath, **kwargs)),
     ]

@@ -9,7 +9,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Signal, Slot
+from PySide6.QtCore import Signal, Slot, Qt
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -149,6 +150,10 @@ class ExportPage(QWidget):
         layout.addWidget(QLabel("Figure Format:", styleSheet="font-weight: bold; margin-top: 15px;"))
         self._figure_format_combo = QComboBox()
         self._figure_format_combo.addItems(["PNG", "SVG", "PDF", "EPS"])
+        # EPS path not guaranteed; keep visible but disabled
+        eps_idx = self._figure_format_combo.findText("EPS")
+        if eps_idx >= 0:
+            self._figure_format_combo.model().item(eps_idx).setEnabled(False)
         self._figure_format_combo.currentTextChanged.connect(self._update_preview)
         layout.addWidget(self._figure_format_combo)
 
@@ -220,9 +225,18 @@ class ExportPage(QWidget):
         self._preview_list.setAlternatingRowColors(True)
         layout.addWidget(self._preview_list)
 
+        self._preview_thumb = QLabel("No preview available")
+        self._preview_thumb.setAlignment(Qt.AlignCenter)
+        self._preview_thumb.setMinimumHeight(160)
+        layout.addWidget(self._preview_thumb)
+
         btn_preview = QPushButton("Refresh Preview")
         btn_preview.clicked.connect(self._update_preview)
         layout.addWidget(btn_preview)
+
+        btn_batch = QPushButton("Batch Export Data (all datasets)")
+        btn_batch.clicked.connect(self._batch_export_all_datasets)
+        layout.addWidget(btn_batch)
 
         layout.addStretch()
 
@@ -316,10 +330,68 @@ class ExportPage(QWidget):
         if self._check_metadata.isChecked():
             self._preview_list.addItem(f"{output_dir}/metadata.json")
 
-        if self._template_combo.currentText() == "Markdown Report":
+        if self._template_combo.currentText().lower().startswith("markdown"):
             self._preview_list.addItem(f"{output_dir}/report.md")
-        elif self._template_combo.currentText() == "PDF Report":
+        elif self._template_combo.currentText().lower().startswith("pdf"):
             self._preview_list.addItem(f"{output_dir}/report.pdf")
+
+        # Generate a lightweight thumbnail preview
+        try:
+            from matplotlib.backends.backend_agg import FigureCanvasAgg
+            from matplotlib.figure import Figure
+
+            fig = Figure(figsize=(3.2, 2.2))
+            canvas = FigureCanvasAgg(fig)
+            ax = fig.add_subplot(111)
+            ax.axis("off")
+            ax.text(0.02, 0.90, "Export Preview", fontsize=10, fontweight="bold")
+            ax.text(0.02, 0.75, f"Data: {data_ext.upper()}")
+            ax.text(0.02, 0.62, f"Figures: {fig_ext.upper() if self._check_figures.isChecked() else 'None'}")
+            ax.text(0.02, 0.49, f"Report: {self._template_combo.currentText()}")
+            ax.text(0.02, 0.36, f"Output: {output_dir}", wrap=True)
+            canvas.draw()
+            buf = canvas.buffer_rgba()
+            width, height = canvas.get_width_height()
+            qimg = QImage(buf, width, height, QImage.Format_RGBA8888)
+            self._preview_thumb.setPixmap(QPixmap.fromImage(qimg).scaled(
+                self._preview_thumb.width(),
+                self._preview_thumb.height(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
+            ))
+        except Exception:
+            self._preview_thumb.setText("Preview unavailable")
+
+    def _batch_export_all_datasets(self) -> None:
+        """Export all datasets in state to the selected directory (data format only)."""
+        output_dir = Path(self._output_dir_edit.text()) if self._output_dir_edit.text() else Path("output")
+        data_ext = self._get_data_extension()
+
+        state = self._store.get_state()
+        datasets = getattr(state, "datasets", {}) or {}
+        if not datasets:
+            QMessageBox.information(self, "Batch Export", "No datasets available to export.")
+            return
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        exported = []
+        for name, ds in datasets.items():
+            try:
+                rheo = self._dataset_to_rheodata(ds)
+                file_path = output_dir / f"{name}.{data_ext}"
+                self._export_service.export_data(rheo, file_path, data_ext)
+                exported.append(str(file_path))
+            except Exception as e:
+                logger.error(f"Failed to export dataset {name}: {e}")
+
+        if exported:
+            QMessageBox.information(
+                self,
+                "Batch Export",
+                f"Exported {len(exported)} dataset(s) to {output_dir}",
+            )
+        else:
+            QMessageBox.warning(self, "Batch Export", "No datasets were exported.")
 
     def _validate_export(self) -> tuple[bool, str]:
         """Validate export configuration.

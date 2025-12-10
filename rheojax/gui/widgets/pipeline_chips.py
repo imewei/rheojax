@@ -270,3 +270,15 @@ class PipelineChips(QWidget):
                 # Add spinner
                 spinner_char = spinner_chars[self._spinner_state % len(spinner_chars)]
                 chip.setText(f"{base_text} {spinner_char}")
+            elif status == StepStatus.COMPLETE:
+                # Show a checkmark
+                base_text = chip.text()
+                for char in spinner_chars:
+                    base_text = base_text.replace(f" {char}", "")
+                chip.setText(base_text.replace(" ✔", "") + " ✔")
+            else:
+                # Ensure spinner not shown for other states
+                base_text = chip.text()
+                for char in spinner_chars:
+                    base_text = base_text.replace(f" {char}", "")
+                chip.setText(base_text)
