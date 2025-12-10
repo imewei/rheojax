@@ -27,10 +27,6 @@ def __getattr__(name: str):
         from rheojax.gui.app.toolbar import MainToolBar
 
         return MainToolBar
-    elif name == "QuickFitStrip":
-        from rheojax.gui.app.toolbar import QuickFitStrip
-
-        return QuickFitStrip
     elif name == "StatusBar":
         from rheojax.gui.app.status_bar import StatusBar
 

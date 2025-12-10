@@ -76,7 +76,6 @@ widgets/
 ├── parameter_table.py  # ParameterTable class
 ├── plot_canvas.py      # PlotCanvas class
 ├── multi_view.py       # MultiView class
-├── quick_fit_strip.py  # QuickFitStrip class
 ├── pipeline_chips.py   # PipelineChips class
 ├── jax_status.py       # JaxStatus class
 ├── priors_editor.py    # PriorsEditor class
