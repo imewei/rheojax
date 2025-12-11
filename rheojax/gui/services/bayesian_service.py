@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.data import RheoData
+from rheojax.gui.state.store import DatasetState
 from rheojax.core.registry import Registry
 from rheojax.gui.services.model_service import normalize_model_name
 
@@ -101,13 +102,13 @@ class BayesianService:
     def run_mcmc(
         self,
         model_name: str,
-        data: RheoData,
+        data: RheoData | DatasetState,
         num_warmup: int = 1000,
         num_samples: int = 2000,
         num_chains: int = 4,
         warm_start: dict[str, float] | None = None,
         test_mode: str | None = None,
-        progress_callback: Callable[[int, int, int], None] | None = None,
+        progress_callback: Callable[[str, int, int, int], None] | None = None,
         **kwargs: Any,
     ) -> BayesianResult:
         """Run NUTS sampling for Bayesian inference.
@@ -128,8 +129,8 @@ class BayesianService:
             Initial parameter values (e.g., from NLSQ fit)
         test_mode : str, optional
             Test mode (relaxation, creep, oscillation)
-        progress_callback : Callable[[int, int, int], None], optional
-            Progress callback: callback(chain, iteration, total_iterations)
+        progress_callback : Callable[[str, int, int, int], None], optional
+            Progress callback: callback(stage, chain, iteration, total_iterations)
         **kwargs
             Additional NumPyro MCMC options
 
@@ -142,6 +143,20 @@ class BayesianService:
             model_name = normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
+
+            # Normalize DatasetState -> RheoData
+            if isinstance(data, DatasetState):
+                metadata = dict(getattr(data, "metadata", {}) or {})
+                test_mode = test_mode or metadata.get("test_mode") or getattr(data, "test_mode", None)
+                data = RheoData(
+                    x=np.asarray(data.x_data),
+                    y=np.asarray(data.y_data),
+                    x_units=getattr(data, "x_units", None),
+                    y_units=getattr(data, "y_units", None),
+                    metadata=metadata,
+                    initial_test_mode=test_mode,
+                    validate=False,
+                )
 
             # Set initial values if provided
             if warm_start:
@@ -163,10 +178,15 @@ class BayesianService:
             )
 
             # Run Bayesian inference
-            # Emit initial progress
+            # Wrap progress callback to NumPyro/worker signature (stage, chain, iteration, total)
             if progress_callback:
-                progress_callback(0, 1, "warmup")
-                kwargs.setdefault("progress_callback", progress_callback)
+                total_iterations = max(num_chains * (num_warmup + num_samples), 1)
+
+                def _wrapped_callback(stage: str, chain: int, iteration: int, total: int):
+                    progress_callback(stage, chain, iteration, total)
+
+                progress_callback("warmup", 1, 0, total_iterations)
+                kwargs.setdefault("progress_callback", _wrapped_callback)
 
             result = model.fit_bayesian(
                 x,
@@ -179,7 +199,7 @@ class BayesianService:
             )
 
             if progress_callback:
-                progress_callback(100, 100, "complete")
+                progress_callback("sampling", num_chains, num_samples, max(num_chains * (num_warmup + num_samples), 1))
 
             # Extract posterior samples
             posterior_samples = result.posterior_samples

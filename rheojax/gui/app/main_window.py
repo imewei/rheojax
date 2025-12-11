@@ -280,15 +280,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.diagnostics_page.plot_requested.connect(self._on_diagnostics_plot_requested)
         self.diagnostics_page.export_requested.connect(self._on_diagnostics_export_requested)
 
-        # Quick fit strip signals
-        self.quick_fit_strip.model_changed.connect(self._on_toolbar_model_selected)
-        self.quick_fit_strip.mode_changed.connect(self._on_set_test_mode)
-        self.quick_fit_strip.load_clicked.connect(self._on_import)
-        self.quick_fit_strip.fit_clicked.connect(self._on_fit)
-        self.quick_fit_strip.plot_clicked.connect(lambda: self.navigate_to("fit"))
-        self.quick_fit_strip.export_clicked.connect(self._on_export)
-        self.quick_fit_strip.save_clicked.connect(self._on_save_file)
-
         # Export page signals
         self.export_page.export_requested.connect(self._on_export_requested)
         self.export_page.export_completed.connect(self._on_export_completed)
@@ -1127,9 +1118,6 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.update_state(lambda s: replace(s, model_params=defaults))
         except Exception as exc:
             self.log(f"Unable to load parameters for {model_id}: {exc}")
-        if hasattr(self, "quick_fit_strip"):
-            self.quick_fit_strip.set_model(model_id)
-            self.quick_fit_strip.set_status(f"Model: {model_id}")
 
     def _setup_shortcuts(self) -> None:
         """Register application-wide shortcuts and command palette."""
