@@ -108,7 +108,7 @@ class BayesianService:
         num_chains: int = 4,
         warm_start: dict[str, float] | None = None,
         test_mode: str | None = None,
-        progress_callback: Callable[[int, int, int], None] | None = None,
+        progress_callback: Callable[[str, int, int, int], None] | None = None,
         **kwargs: Any,
     ) -> BayesianResult:
         """Run NUTS sampling for Bayesian inference.
@@ -129,8 +129,8 @@ class BayesianService:
             Initial parameter values (e.g., from NLSQ fit)
         test_mode : str, optional
             Test mode (relaxation, creep, oscillation)
-        progress_callback : Callable[[int, int, int], None], optional
-            Progress callback: callback(chain, iteration, total_iterations)
+        progress_callback : Callable[[str, int, int, int], None], optional
+            Progress callback: callback(stage, chain, iteration, total_iterations)
         **kwargs
             Additional NumPyro MCMC options
 
@@ -178,10 +178,15 @@ class BayesianService:
             )
 
             # Run Bayesian inference
-            # Emit initial progress
+            # Wrap progress callback to NumPyro/worker signature (stage, chain, iteration, total)
             if progress_callback:
-                progress_callback(0, 1, "warmup")
-                kwargs.setdefault("progress_callback", progress_callback)
+                total_iterations = max(num_chains * (num_warmup + num_samples), 1)
+
+                def _wrapped_callback(stage: str, chain: int, iteration: int, total: int):
+                    progress_callback(stage, chain, iteration, total)
+
+                progress_callback("warmup", 1, 0, total_iterations)
+                kwargs.setdefault("progress_callback", _wrapped_callback)
 
             result = model.fit_bayesian(
                 x,
@@ -194,7 +199,7 @@ class BayesianService:
             )
 
             if progress_callback:
-                progress_callback(100, 100, "complete")
+                progress_callback("sampling", num_chains, num_samples, max(num_chains * (num_warmup + num_samples), 1))
 
             # Extract posterior samples
             posterior_samples = result.posterior_samples
