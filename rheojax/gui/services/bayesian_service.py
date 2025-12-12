@@ -32,6 +32,8 @@ class BayesianResult:
         Name of the model
     posterior_samples : dict
         Posterior samples for each parameter
+    summary : dict
+        Summary statistics (mean, std, median, quantiles) for each parameter
     diagnostics : dict
         R-hat, ESS, divergences, etc.
     metadata : dict
@@ -40,6 +42,7 @@ class BayesianResult:
 
     model_name: str
     posterior_samples: dict[str, np.ndarray]
+    summary: dict[str, dict[str, float]]
     diagnostics: dict[str, Any]
     metadata: dict[str, Any]
 
@@ -186,7 +189,7 @@ class BayesianService:
                     progress_callback(stage, chain, iteration, total)
 
                 progress_callback("warmup", 1, 0, total_iterations)
-                kwargs.setdefault("progress_callback", _wrapped_callback)
+                # NumPyro NUTS does not accept a progress_callback arg; keep it GUI-side only.
 
             result = model.fit_bayesian(
                 x,
@@ -220,6 +223,7 @@ class BayesianService:
             return BayesianResult(
                 model_name=model_name,
                 posterior_samples=posterior_samples,
+                summary=result.summary,
                 diagnostics=diagnostics,
                 metadata=metadata,
             )
@@ -262,6 +266,13 @@ class BayesianService:
                 num_chains = result.metadata.get("num_chains") if result.metadata else None
             elif hasattr(result, "metadata") and isinstance(result.metadata, dict):
                 num_chains = result.metadata.get("num_chains")
+
+            # Fall back to core BayesianResult.num_chains when metadata is absent
+            if num_chains is None and hasattr(result, "num_chains"):
+                try:
+                    num_chains = int(getattr(result, "num_chains"))
+                except Exception:
+                    num_chains = None
 
             for param_name, samples in posterior_samples.items():
                 arr = np.asarray(samples)

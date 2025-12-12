@@ -75,8 +75,8 @@ class BayesianWorkerSignals(QObject):
 
     Signals
     -------
-    progress : Signal(int, int, int)
-        Progress update: (chain, sample, total_samples)
+    progress : Signal(int, int, str)
+        Progress update: (percent, total, message)
     stage_changed : Signal(str)
         Sampling stage changed: ('warmup' or 'sampling')
     completed : Signal(BayesianResult)
@@ -89,7 +89,7 @@ class BayesianWorkerSignals(QObject):
         Divergence detected: (count)
     """
 
-    progress = Signal(int, int, int)  # chain, sample, total
+    progress = Signal(int, int, str)  # percent, total, message
     stage_changed = Signal(str)  # 'warmup' or 'sampling'
     completed = Signal(object)  # BayesianResult
     failed = Signal(str)  # error message
@@ -280,7 +280,7 @@ class BayesianWorker(QRunnable):
                 warm_start=self._warm_start,
                 test_mode=test_mode,
                 progress_callback=progress_callback,
-                rng_key=jax.random.PRNGKey(self._seed),
+                seed=self._seed,
             )
 
             sampling_time = time.perf_counter() - start_time

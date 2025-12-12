@@ -122,6 +122,7 @@ class BayesianResult:
     model_name: str
     dataset_id: str
     posterior_samples: Any | None  # ArviZ InferenceData
+    summary: dict[str, dict[str, float]] | None
     r_hat: dict[str, float]
     ess: dict[str, float]
     divergences: int
