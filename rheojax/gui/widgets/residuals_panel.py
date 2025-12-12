@@ -7,6 +7,7 @@ Residual analysis visualization for model fitting diagnostics.
 
 
 import numpy as np
+import logging
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
 from PySide6.QtCore import Qt, Signal

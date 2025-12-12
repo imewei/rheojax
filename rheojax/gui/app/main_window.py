@@ -268,6 +268,9 @@ class RheoJAXMainWindow(QMainWindow):
         # Transform page callbacks
         self.transform_page.transform_applied.connect(self._on_transform_applied_from_page)
 
+        # Fit page requests (run through centralized job pipeline)
+        self.fit_page.fit_requested.connect(self._on_fit_requested_from_page)
+
         # Connect home page shortcuts/links
         self.home_page.open_project_requested.connect(self._on_open_file)
         self.home_page.import_data_requested.connect(self._on_import)
@@ -962,6 +965,7 @@ class RheoJAXMainWindow(QMainWindow):
             stored = self.store.get_active_fit_result()
             if stored:
                 self.results_panel.set_fit_result(stored)
+                self.fit_page.apply_fit_result(stored)
                 self._update_fit_plot(stored)
             self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"})
             self.status_bar.show_message("Fit complete", 3000)
@@ -1223,6 +1227,85 @@ class RheoJAXMainWindow(QMainWindow):
         # Activate selected dataset
         self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
         self._on_apply_transform(transform_id, params=params)
+
+    @Slot(object)
+    def _on_fit_requested_from_page(self, payload: object) -> None:
+        """Handle fit requests originating from FitPage.
+
+        FitPage emits a payload instead of starting a worker directly so we can
+        use the centralized WorkerPool/job pipeline and always run
+        `_update_fit_plot` on completion.
+        """
+
+        if not isinstance(payload, dict):
+            return
+
+        model_name = payload.get("model_name") or self.store.get_state().active_model_name
+        dataset_id = payload.get("dataset_id") or self.store.get_state().active_dataset_id
+        initial_params = payload.get("initial_params")
+        options = payload.get("options") or {}
+
+        if dataset_id:
+            self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": str(dataset_id)})
+        if model_name:
+            self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": str(model_name)})
+
+        dataset = self.store.get_active_dataset()
+        model_name = self.store.get_state().active_model_name
+        if dataset is None or model_name is None:
+            self.status_bar.show_message("Select data and model before fitting", 4000)
+            return
+
+        # Build RheoData from state
+        try:
+            from rheojax.core.data import RheoData
+
+            rheo_data = RheoData(
+                x=dataset.x_data,
+                y=dataset.y_data,
+                metadata=dataset.metadata,
+                initial_test_mode=dataset.test_mode,
+                validate=False,
+            )
+        except Exception as exc:
+            self.log(f"Cannot start fit: {exc}")
+            self.status_bar.show_message("Unable to build dataset for fit", 4000)
+            return
+
+        # Emit state signals for FitPage button/UI reactions
+        self.store.dispatch(
+            "START_FITTING", {"model_name": model_name, "dataset_id": dataset.id}
+        )
+
+        # Dispatch pipeline state
+        self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
+        self.status_bar.show_progress(0, 0, "Fitting model...")
+
+        if not self.worker_pool:
+            self.status_bar.show_message("Worker pool unavailable", 3000)
+            self.store.dispatch("CANCEL_JOBS")
+            return
+
+        # FitWorker expects plain floats for initial params.
+        init_params_dict = None
+        if isinstance(initial_params, dict):
+            init_params_dict = {str(k): float(v) for k, v in initial_params.items()}
+
+        if not isinstance(options, dict):
+            options = {}
+
+        worker = FitWorker(
+            model_name=model_name,
+            data=rheo_data,
+            initial_params=init_params_dict,
+            options=options,
+        )
+        job_id = self.worker_pool.submit(
+            worker,
+            on_job_registered=lambda jid: self._job_types.__setitem__(jid, "fit"),
+        )
+        # Ensure pipeline UI reacts even if job_started races
+        self._on_job_started(job_id)
 
     # -------------------------------------------------------------------------
     # Analysis Menu Handlers

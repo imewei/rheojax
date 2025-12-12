@@ -7,7 +7,7 @@ Displays summary metrics for the latest fit and Bayesian runs.
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QSizePolicy, QTextEdit, QVBoxLayout, QWidget
 
 from rheojax.gui.state.store import BayesianResult, FitResult
 
@@ -25,14 +25,16 @@ class ResultsPanel(QWidget):
         self.fit_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         self.fit_text = QTextEdit()
         self.fit_text.setReadOnly(True)
-        self.fit_text.setMaximumHeight(120)
+        self.fit_text.setPlaceholderText("No fit results yet.")
+        self.fit_text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.fit_text.setStyleSheet("font-size: 11pt;")
 
         self.bayes_label = QLabel("Bayesian Results")
         self.bayes_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
         self.bayes_text = QTextEdit()
         self.bayes_text.setReadOnly(True)
-        self.bayes_text.setMaximumHeight(140)
+        self.bayes_text.setPlaceholderText("No Bayesian results yet.")
+        self.bayes_text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.bayes_text.setStyleSheet("font-size: 11pt;")
 
         layout.addWidget(self.fit_label)
