@@ -301,9 +301,11 @@ class BayesianService:
 
             diagnostics = {
                 "rhat": rhat_dict,
+                "r_hat": rhat_dict,  # alias for GUI/state consumers
                 "ess": ess_dict,
                 "divergences": divergences,
                 "max_rhat": max(rhat_dict.values()) if rhat_dict else None,
+                "max_r_hat": max(rhat_dict.values()) if rhat_dict else None,
                 "min_ess": min(ess_dict.values()) if ess_dict else None,
             }
 

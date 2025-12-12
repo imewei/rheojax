@@ -524,11 +524,13 @@ class BayesianMixin:
             if num_chains <= 1:
                 return "sequential"
 
-            device_count = jax.device_count()
-            if device_count >= num_chains:
+            devices = jax.devices()
+            # Count accelerators only (non-CPU) for true parallel execution.
+            accelerator_count = sum(1 for d in devices if d.platform != "cpu")
+            if accelerator_count >= num_chains:
                 return "parallel"
             # Fall back to vectorized on single-device setups for speed over sequential.
-            # Vectorized uses vmap for efficient parallel execution on single device.
+            # Vectorized uses vmap for efficient multi-chain execution on a single device.
             return "vectorized"
 
         # Use provided seed or default to 0 for reproducibility

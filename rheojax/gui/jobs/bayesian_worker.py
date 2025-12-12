@@ -321,9 +321,11 @@ class BayesianWorker(QRunnable):
             # Log diagnostics
             logger.info(f"Bayesian inference completed in {sampling_time:.2f}s")
             logger.info("Diagnostics:")
+            rhat_dict = diagnostics.get('r_hat') or diagnostics.get('rhat') or {}
+            ess_dict = diagnostics.get('ess', {})
             for param_name in bayesian_result.posterior_samples.keys():
-                r_hat = diagnostics['r_hat'].get(param_name, float('nan'))
-                ess = diagnostics['ess'].get(param_name, float('nan'))
+                r_hat = rhat_dict.get(param_name, float('nan'))
+                ess = ess_dict.get(param_name, float('nan'))
                 logger.info(f"  {param_name}: R-hat={r_hat:.4f}, ESS={ess:.0f}")
 
             # Emit completion signal
