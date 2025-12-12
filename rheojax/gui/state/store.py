@@ -349,12 +349,6 @@ class StateStore:
                 if self._signals:
                     self._signals.fit_completed.emit("", "")
 
-            elif action_type == "STORE_FIT_RESULT":
-                model_name = action.get("model_name", "")
-                dataset_id = action.get("dataset_id", "")
-                if self._signals and model_name and dataset_id:
-                    self._signals.fit_completed.emit(str(model_name), str(dataset_id))
-
             elif action_type == "FITTING_FAILED":
                 error = action.get("error", "")
                 if self._signals:

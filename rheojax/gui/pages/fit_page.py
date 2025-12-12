@@ -19,11 +19,19 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QSizePolicy,
 )
+
+from rheojax.gui.jobs.fit_worker import FitResult, FitWorker
+from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.services.model_service import normalize_model_name
-from rheojax.gui.state.actions import set_active_model
+from rheojax.gui.state.actions import (
+    fitting_completed,
+    fitting_failed,
+    set_active_model,
+    start_fitting,
+    update_fit_progress,
+)
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
@@ -42,12 +50,8 @@ class FitPage(QWidget):
         - Background fitting with progress updates
     """
 
-    # Emitted when the user requests a fit from this page.
-    # Routed through MainWindow so fit results update plots via _update_fit_plot.
-    fit_requested = Signal(object)  # payload: dict[str, Any]
-
-    # Legacy convenience hook (not required by MainWindow pipeline).
-    fit_completed = Signal(object)
+    fit_requested = Signal(str, str)  # model_name, dataset_id
+    fit_completed = Signal(object)  # FitResult
     parameter_changed = Signal(str, float)  # param_name, value
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -61,6 +65,8 @@ class FitPage(QWidget):
         super().__init__(parent)
         self._store = StateStore()
         self._model_service = ModelService()
+        self._worker_pool = WorkerPool()
+        self._current_worker: FitWorker | None = None
         # Persist user-selected fitting options; start with dialog defaults
         self._fit_options: dict[str, Any] = {
             "algorithm": "NLSQ",
@@ -171,24 +177,19 @@ class FitPage(QWidget):
 
         layout.addLayout(btn_layout)
 
-        # Results display (adaptive height; placeholder text when empty)
+        # Results display
         results_group = QGroupBox("Fit Results")
         results_layout = QVBoxLayout(results_group)
         self._results_text = QTextEdit()
         self._results_text.setReadOnly(True)
-        self._results_text.setPlaceholderText(
-            "No fit has been run yet. Configure parameters and click Fit."
-        )
-        self._results_text.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
+        self._results_text.setMaximumHeight(150)
         results_layout.addWidget(self._results_text)
-        layout.addWidget(results_group)
 
-        # Prefer allocating extra vertical space to the parameter table.
-        layout.setStretchFactor(param_group, 3)
-        layout.setStretchFactor(results_group, 1)
-        layout.addStretch(1)
+        self._empty_results = QLabel("No fit has been run yet. Configure parameters and click Fit.")
+        self._empty_results.setAlignment(Qt.AlignCenter)
+        self._empty_results.setStyleSheet("color: #94A3B8; padding: 8px;")
+        results_layout.addWidget(self._empty_results)
+        layout.addWidget(results_group)
 
         return panel
 
@@ -291,8 +292,8 @@ class FitPage(QWidget):
             self._quick_model_combo.setCurrentIndex(idx)
             self._quick_model_combo.blockSignals(was_blocked)
 
-    @Slot(str)
-    def _on_dataset_changed(self, _dataset_id: str) -> None:
+    @Slot()
+    def _on_dataset_changed(self) -> None:
         """Handle active dataset change."""
         dataset = self._store.get_active_dataset()
         model_name = None
@@ -442,8 +443,6 @@ class FitPage(QWidget):
         ax.set_title(title)
 
         self._plot_canvas.refresh()
-        if hasattr(self, "_plot_placeholder"):
-            self._plot_placeholder.hide()
 
     def _to_rheodata(self, dataset) -> Any:
         """Convert DatasetState or RheoData into RheoData for services/workers."""
@@ -503,92 +502,125 @@ class FitPage(QWidget):
         # Determine test mode
         test_mode = dataset.metadata.get("test_mode", "oscillation")
 
-        # Defer actual worker creation/submission to MainWindow so the
-        # centralized job pipeline (and _update_fit_plot) always runs.
-        payload = {
-            "model_name": str(model_name),
-            "dataset_id": str(dataset.id),
-            "initial_params": param_dict,
-            "options": dict(self._fit_options),
-            "test_mode": str(dataset.metadata.get("test_mode", dataset.test_mode or "oscillation")),
-        }
-        self.fit_requested.emit(payload)
+        # Update state
+        self._store.dispatch(start_fitting(model_name, dataset.id))
 
-    def apply_fit_result(self, result: Any) -> None:
-        """Update the Fit page UI from a completed fit result.
+        # Create and run fit worker
+        self._current_worker = FitWorker(
+            model_name=model_name,
+            data=self._to_rheodata(dataset),
+            initial_params=param_dict,
+            options=self._fit_options,
+        )
+        self._current_worker.signals.progress.connect(self._on_fit_progress)
+        self._current_worker.signals.completed.connect(self._on_fit_finished)
+        self._current_worker.signals.failed.connect(self._on_fit_error)
 
-        This is called by MainWindow after it stores fit results and updates plots.
+        self._worker_pool.submit(self._current_worker)
+        self.fit_requested.emit(model_name, dataset.id)
+
+    @Slot(int, float, str)
+    def _on_fit_progress(self, iteration: int, loss: float, message: str) -> None:
+        """Handle fit progress update.
+
+        Parameters
+        ----------
+        iteration : int
+            Current optimization iteration
+        loss : float
+            Current loss value
+        message : str
+            Status message
         """
+        self._store.dispatch(update_fit_progress(iteration))
+        self._results_text.setText(f"Fitting... Iteration {iteration}\nLoss: {loss:.6e}\n{message}")
+        if hasattr(self, "_empty_results"):
+            self._empty_results.hide()
 
-        # Update parameter values while preserving existing bounds/metadata.
-        from rheojax.gui.state.store import ParameterState
+    @Slot(object)
+    def _on_fit_finished(self, result: FitResult) -> None:
+        """Handle fit completion.
 
-        current = self._parameter_table.get_parameters() or {}
-        updated: dict[str, ParameterState] = {}
-        for name, state in current.items():
-            updated[name] = state
-        for name, value in getattr(result, "parameters", {}).items():
-            if name in updated:
-                updated[name] = ParameterState(
-                    name=updated[name].name,
-                    value=float(value),
-                    min_bound=updated[name].min_bound,
-                    max_bound=updated[name].max_bound,
-                    fixed=updated[name].fixed,
-                    unit=updated[name].unit,
-                    description=updated[name].description,
-                )
-            else:
-                updated[name] = ParameterState(
+        Parameters
+        ----------
+        result : FitResult
+            Fitting result from FitWorker
+        """
+        self._current_worker = None
+
+        if result.success:
+            self._store.dispatch(fitting_completed(result))
+
+            # Update parameter table with fitted values
+            from rheojax.gui.state.store import ParameterState
+
+            param_states: dict[str, ParameterState] = {}
+            for name, value in result.parameters.items():
+                param_states[name] = ParameterState(
                     name=name,
-                    value=float(value),
+                    value=value,
                     min_bound=0.0,
                     max_bound=float("inf"),
                     fixed=False,
                     unit="",
                     description="",
                 )
-        if updated:
-            self._parameter_table.set_parameters(updated)
+            self._parameter_table.set_parameters(param_states)
 
-        # Render summary.
-        text = "Fit complete."
-        try:
-            text = (
-                "Fit successful!\n\n"
-                f"R²: {float(getattr(result, 'r_squared', 0.0)):.4f}\n"
-                f"Chi-squared: {float(getattr(result, 'chi_squared', 0.0)):.4g}\n"
-                f"MPE: {float(getattr(result, 'mpe', 0.0)):.2f}%\n"
-                f"Time: {float(getattr(result, 'fit_time', 0.0)):.2f}s\n\n"
-                "Parameters:\n"
-            )
-            for name, value in getattr(result, "parameters", {}).items():
-                text += f"  {name}: {float(value):.4g}\n"
-        except Exception:
-            pass
-        self._results_text.setPlainText(text)
+            # Update results text
+            chi_sq = result.chi_squared
+            text = f"Fit successful!\n\nR²: {result.r_squared:.4f}\n"
+            text += f"Chi-squared: {chi_sq:.4g}\n"
+            text += f"MPE: {result.mpe:.2f}%\n"
+            text += f"Time: {result.fit_time:.2f}s\n\nParameters:\n"
+            for name, value in result.parameters.items():
+                text += f"  {name}: {value:.4g}\n"
+            self._results_text.setText(text)
+            if hasattr(self, "_empty_results"):
+                self._empty_results.hide()
 
-        # Legacy hook for external listeners.
-        self.fit_completed.emit(result)
+            self.fit_completed.emit(result)
+        else:
+            error_msg = f"Fit did not converge (iterations: {result.n_iterations})"
+            self._store.dispatch(fitting_failed(error_msg))
+            self._results_text.setText(f"Fit failed:\n{error_msg}")
+            if hasattr(self, "_empty_results"):
+                self._empty_results.hide()
 
-    @Slot(str, str)
-    def _on_fitting_started(self, _model_name: str, _dataset_id: str) -> None:
+    @Slot(str)
+    def _on_fit_error(self, error_msg: str) -> None:
+        """Handle fit error.
+
+        Parameters
+        ----------
+        error_msg : str
+            Error message
+        """
+        self._current_worker = None
+        self._store.dispatch(fitting_failed(error_msg))
+        self._results_text.setText(f"Fit error:\n{error_msg}")
+        if hasattr(self, "_empty_results"):
+            self._empty_results.hide()
+        QMessageBox.warning(self, "Fit Error", error_msg)
+
+    @Slot()
+    def _on_fitting_started(self) -> None:
         """Handle fitting started signal."""
         self._btn_fit.setEnabled(False)
         self._btn_fit.setText("Fitting...")
 
-    @Slot(str, str)
-    def _on_fitting_completed(self, _model_name: str, _dataset_id: str) -> None:
+    @Slot()
+    def _on_fitting_completed(self) -> None:
         """Handle fitting completed signal."""
         self._btn_fit.setEnabled(True)
         self._btn_fit.setText("Fit Model")
 
-    def _plot_fit(self, result: Any) -> None:
+    def _plot_fit(self, result: FitResult) -> None:
         """Plot fit result on canvas.
 
         Parameters
         ----------
-        result : Any
+        result : FitResult
             Fitting result
         """
         ax = self._plot_canvas.get_axes()

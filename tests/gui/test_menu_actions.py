@@ -102,7 +102,6 @@ class TestMenuBarActionConnections:
             ("zoom_out_action", "Zoom Out"),
             ("reset_zoom_action", "Reset Zoom"),
             ("view_data_dock_action", "Data Panel"),
-            ("view_param_dock_action", "Parameters Panel"),
             ("view_log_dock_action", "Log Panel"),
             ("theme_light_action", "Light Theme"),
             ("theme_dark_action", "Dark Theme"),

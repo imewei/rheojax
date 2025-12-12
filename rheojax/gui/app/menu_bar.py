@@ -186,12 +186,6 @@ class MenuBar(QMenuBar):
         self.view_data_dock_action.setStatusTip("Toggle data panel visibility")
         view_menu.addAction(self.view_data_dock_action)
 
-        self.view_param_dock_action = QAction("&Parameters Panel", self)
-        self.view_param_dock_action.setCheckable(True)
-        self.view_param_dock_action.setChecked(True)
-        self.view_param_dock_action.setStatusTip("Toggle parameters panel visibility")
-        view_menu.addAction(self.view_param_dock_action)
-
         self.view_log_dock_action = QAction("&Log Panel", self)
         self.view_log_dock_action.setCheckable(True)
         self.view_log_dock_action.setChecked(False)
