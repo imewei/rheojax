@@ -728,7 +728,9 @@ class BayesianPage(QWidget):
         result : BayesianResult
             Inference result
         """
-        intervals = result.credible_intervals
+        intervals = result.credible_intervals or {}
+        summary = getattr(result, "summary", {}) or {}
+
         self._intervals_table.setRowCount(len(intervals))
 
         for row, (param_name, values) in enumerate(intervals.items()):
@@ -737,20 +739,32 @@ class BayesianPage(QWidget):
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._intervals_table.setItem(row, 0, name_item)
 
+            # Normalize tuple/list intervals to dict form
+            if isinstance(values, (tuple, list)):
+                if len(values) == 3:
+                    mean, lower, upper = values
+                elif len(values) == 2:
+                    mean = summary.get(param_name, {}).get("mean", 0.0)
+                    lower, upper = values
+                else:
+                    mean = summary.get(param_name, {}).get("mean", 0.0)
+                    lower = upper = 0.0
+                values = {"mean": mean, "lower": lower, "upper": upper}
+
             # Mean
-            mean = values.get("mean", 0)
+            mean = float(values.get("mean", summary.get(param_name, {}).get("mean", 0.0)))
             mean_item = QTableWidgetItem(f"{mean:.4g}")
             mean_item.setFlags(mean_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._intervals_table.setItem(row, 1, mean_item)
 
             # Lower bound
-            lower = values.get("lower", 0)
+            lower = float(values.get("lower", 0.0))
             lower_item = QTableWidgetItem(f"{lower:.4g}")
             lower_item.setFlags(lower_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._intervals_table.setItem(row, 2, lower_item)
 
             # Upper bound
-            upper = values.get("upper", 0)
+            upper = float(values.get("upper", 0.0))
             upper_item = QTableWidgetItem(f"{upper:.4g}")
             upper_item.setFlags(upper_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._intervals_table.setItem(row, 3, upper_item)
