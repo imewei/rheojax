@@ -48,17 +48,15 @@ SGR Models
 Model Selection
 ===============
 
-Using the Model Browser
------------------------
+Using the Fit model panel
+-------------------------
 
 1. Navigate to the **Fit** page
-2. In the **Model Browser** panel (left side):
+2. In the **Fit model** panel (left side):
 
-   - Expand categories by clicking arrows
-   - Click model name to select
-   - Hover for model description tooltip
-
-3. Selected model appears in the **Parameters** panel
+   - Choose the **Mode** (oscillation/relaxation/creep/rotation)
+   - Choose the **Model** from the dropdown (or type an alias, e.g. ``GMM``)
+   - Click **Fit Model**
 
 Model Information
 -----------------
@@ -69,49 +67,14 @@ After selecting a model:
 - **Parameters**: List of model parameters
 - **Compatible modes**: Supported test modes (oscillation, relaxation, etc.)
 
-Parameter Configuration
-=======================
+Initial parameters
+==================
 
-The Parameter Table shows all model parameters:
+The GUI uses initial parameters from the current application state when
+available; otherwise it falls back to model defaults.
 
-Columns
--------
-
-- **Parameter**: Name and description
-- **Value**: Current/initial value
-- **Min**: Lower bound
-- **Max**: Upper bound
-- **Fixed**: Lock parameter (don't optimize)
-- **Unit**: Physical units
-
-Setting Initial Values
-----------------------
-
-Good initial values improve convergence:
-
-1. Click the **Value** cell
-2. Enter your estimate
-3. Press Enter to confirm
-
-Or use **Auto Initialize** button for smart defaults based on data.
-
-Setting Bounds
---------------
-
-Constrain parameters to physically meaningful ranges:
-
-1. Click **Min** or **Max** cell
-2. Enter bound value
-3. Bounds prevent non-physical results
-
-Fixing Parameters
------------------
-
-Hold parameters constant during fitting:
-
-1. Check the **Fixed** checkbox
-2. Parameter won't be optimized
-3. Useful for known values or constraints
+At the moment, the Fit page does not expose an editable parameters table.
+To fully control initial values/bounds/fixed parameters, use the Python API.
 
 Running the Fit
 ===============
@@ -120,17 +83,13 @@ Starting a Fit
 --------------
 
 1. Ensure data is loaded and model selected
-2. Configure parameters (or use defaults)
+2. Configure options (or use defaults)
 3. Click **"Fit Model"** button
 
 Progress
 --------
 
-During fitting:
-
-- Progress bar shows optimization iterations
-- Current parameter values update in real-time
-- Fit quality metrics displayed
+During fitting the application status bar updates with progress.
 
 Stopping a Fit
 --------------
@@ -150,14 +109,10 @@ After fitting completes:
 - **MPE**: Mean percentage error
 - **RMSE**: Root mean square error
 
-Fitted Parameters
+Fitted parameters
 -----------------
 
-The Parameter Table updates with:
-
-- Optimized parameter values
-- Standard errors (if available)
-- Correlation matrix
+Fitted parameter values are listed in the Fit model panel after completion.
 
 Plot Visualization
 ==================
@@ -191,7 +146,7 @@ Compare fits across datasets:
 Residual Analysis
 =================
 
-Open the **Residuals Panel** (View menu):
+The Fit page includes a residuals panel below the main plot.
 
 Available Plots
 ---------------

@@ -289,11 +289,10 @@ class TestWorkflowIntegration:
         page = FitPage()
         qtbot.addWidget(page)
 
-        # Should have parameter table
-        assert page._parameter_table is not None
-
-        # Should have fit button
+        # Should have fit controls
+        assert page._quick_model_combo is not None
         assert page._btn_fit is not None
+        assert page._btn_options is not None
 
         page.close()
 

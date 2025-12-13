@@ -941,6 +941,8 @@ class RheoJAXMainWindow(QMainWindow):
             if stored:
                 self.fit_page.apply_fit_result(stored)
                 self._update_fit_plot(stored)
+            # Re-enable Fit page controls even if downstream UI work fails.
+            self.store.dispatch("FITTING_COMPLETED", {"result": result})
             self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"})
             self.status_bar.show_message("Fit complete", 3000)
             self._auto_save_if_enabled()
@@ -964,6 +966,8 @@ class RheoJAXMainWindow(QMainWindow):
         self.status_bar.hide_progress()
         if job_type:
             self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"})
+        if job_type == "fit":
+            self.store.dispatch("FITTING_FAILED", {"error": str(error)})
         self.log(f"Job {job_id} failed: {error}")
         self.status_bar.show_message(f"Job failed: {error}", 5000)
 
@@ -972,6 +976,8 @@ class RheoJAXMainWindow(QMainWindow):
         self.status_bar.hide_progress()
         if job_type:
             self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "WARNING"})
+        if job_type == "fit":
+            self.store.dispatch("FITTING_FAILED", {"error": "Cancelled"})
         self.log(f"Job {job_id} cancelled")
         self.status_bar.show_message("Job cancelled", 2000)
 
@@ -1228,6 +1234,45 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.show_message("Unable to build dataset for fit", 4000)
             return
 
+        if not self.worker_pool:
+            self.status_bar.show_message("Worker pool unavailable", 3000)
+            self.store.dispatch("FITTING_FAILED", {"error": "Worker pool unavailable"})
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ERROR"})
+            return
+
+        # Normalize initial parameters to a plain float mapping.
+        init_params_dict: dict[str, float] | None = None
+        if isinstance(initial_params, dict):
+            try:
+                init_params_dict = {}
+                for key, value in initial_params.items():
+                    if hasattr(value, "value"):
+                        init_params_dict[str(key)] = float(getattr(value, "value"))
+                    else:
+                        init_params_dict[str(key)] = float(value)
+            except Exception:
+                init_params_dict = None
+        if init_params_dict is None:
+            # Use current state values if present.
+            state_params = self.store.get_state().model_params
+            if state_params:
+                try:
+                    init_params_dict = {name: float(p.value) for name, p in state_params.items()}
+                except Exception:
+                    init_params_dict = None
+        if init_params_dict is None:
+            # Fall back to defaults.
+            try:
+                from rheojax.gui.services.model_service import ModelService
+
+                defaults = ModelService().get_parameter_defaults(model_name)
+                init_params_dict = {name: float(p.value) for name, p in defaults.items()}
+            except Exception:
+                init_params_dict = None
+
+        if not isinstance(options, dict):
+            options = {}
+
         # Emit state signals for FitPage button/UI reactions
         self.store.dispatch(
             "START_FITTING", {"model_name": model_name, "dataset_id": dataset.id}
@@ -1237,29 +1282,24 @@ class RheoJAXMainWindow(QMainWindow):
         self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
         self.status_bar.show_progress(0, 0, "Fitting model...")
 
-        if not self.worker_pool:
-            self.status_bar.show_message("Worker pool unavailable", 3000)
-            self.store.dispatch("CANCEL_JOBS")
-            return
-
-        # FitWorker expects plain floats for initial params.
-        init_params_dict = None
-        if isinstance(initial_params, dict):
-            init_params_dict = {str(k): float(v) for k, v in initial_params.items()}
-
-        if not isinstance(options, dict):
-            options = {}
-
         worker = FitWorker(
             model_name=model_name,
             data=rheo_data,
             initial_params=init_params_dict,
             options=options,
         )
-        job_id = self.worker_pool.submit(
-            worker,
-            on_job_registered=lambda jid: self._job_types.__setitem__(jid, "fit"),
-        )
+        try:
+            job_id = self.worker_pool.submit(
+                worker,
+                on_job_registered=lambda jid: self._job_types.__setitem__(jid, "fit"),
+            )
+        except Exception as exc:
+            self.status_bar.hide_progress()
+            self.store.dispatch("FITTING_FAILED", {"error": str(exc)})
+            self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ERROR"})
+            self.status_bar.show_message(f"Fit failed: {exc}", 5000)
+            return
+
         # Ensure pipeline UI reacts even if job_started races
         self._on_job_started(job_id)
 
@@ -1272,44 +1312,7 @@ class RheoJAXMainWindow(QMainWindow):
         """Handle fit action."""
         self.log("Starting NLSQ fit...")
         self.navigate_to("fit")
-
-        dataset = self.store.get_active_dataset()
-        model_name = self.store.get_state().active_model_name
-        if dataset is None or model_name is None:
-            self.status_bar.show_message("Select data and model before fitting", 4000)
-            return
-
-        # Build RheoData from state
-        try:
-            from rheojax.core.data import RheoData
-
-            rheo_data = RheoData(
-                x=dataset.x_data,
-                y=dataset.y_data,
-                metadata=dataset.metadata,
-                initial_test_mode=dataset.test_mode,
-            )
-        except Exception as exc:
-            self.log(f"Cannot start fit: {exc}")
-            self.status_bar.show_message("Unable to build dataset for fit", 4000)
-            return
-
-        # Dispatch pipeline state
-        self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
-        self.status_bar.show_progress(0, 0, "Fitting model...")
-
-        if not self.worker_pool:
-            self.status_bar.show_message("Worker pool unavailable", 3000)
-            self.store.dispatch("CANCEL_JOBS")
-            return
-
-        worker = FitWorker(model_name=model_name, data=rheo_data, initial_params=None, options={})
-        job_id = self.worker_pool.submit(
-            worker,
-            on_job_registered=lambda jid: self._job_types.__setitem__(jid, "fit"),
-        )
-        # Ensure pipeline UI reacts even if job_started races
-        self._on_job_started(job_id)
+        self._on_fit_requested_from_page({})
 
     @Slot()
     def _on_bayesian(self) -> None:

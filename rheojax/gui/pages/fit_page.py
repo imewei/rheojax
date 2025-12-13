@@ -1,8 +1,12 @@
-"""
-Fit Page
-========
+"""Fit Page.
 
-Model fitting interface with parameter controls and residual analysis.
+Fit model controls + visualization (fit plot + residuals).
+
+Note
+----
+This page intentionally does **not** expose an editable parameters panel.
+Initial parameters come from the centralized state (when present) or model
+defaults; fits are executed by the MainWindow via the shared WorkerPool.
 """
 
 from typing import Any
@@ -14,26 +18,16 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from rheojax.gui.jobs.fit_worker import FitResult, FitWorker
-from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.services.model_service import normalize_model_name
-from rheojax.gui.state.actions import (
-    fitting_completed,
-    fitting_failed,
-    set_active_model,
-    start_fitting,
-    update_fit_progress,
-)
+from rheojax.gui.state.actions import set_active_model
 from rheojax.gui.state.store import StateStore
-from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 from matplotlib.figure import Figure
@@ -50,9 +44,9 @@ class FitPage(QWidget):
         - Background fitting with progress updates
     """
 
-    fit_requested = Signal(str, str)  # model_name, dataset_id
-    fit_completed = Signal(object)  # FitResult
-    parameter_changed = Signal(str, float)  # param_name, value
+    # Emitted to request a fit from the main window.
+    # Payload keys: model_name, dataset_id, options, initial_params
+    fit_requested = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize fit page.
@@ -65,8 +59,6 @@ class FitPage(QWidget):
         super().__init__(parent)
         self._store = StateStore()
         self._model_service = ModelService()
-        self._worker_pool = WorkerPool()
-        self._current_worker: FitWorker | None = None
         # Persist user-selected fitting options; start with dialog defaults
         self._fit_options: dict[str, Any] = {
             "algorithm": "NLSQ",
@@ -79,6 +71,7 @@ class FitPage(QWidget):
             "verbose": False,
         }
         self._current_model: str | None = None
+        self._is_compatible: bool = False
 
         self._setup_ui()
         self._connect_signals()
@@ -88,16 +81,13 @@ class FitPage(QWidget):
         """Set up the user interface."""
         main_layout = QHBoxLayout(self)
 
-        # Left: Model browser (removed to avoid duplication; selection via context controls)
-        self._model_browser = None
+        # Left: Fit model controls (yellow rectangle in reference screenshot)
+        left_panel = self._create_left_panel()
+        main_layout.addWidget(left_panel, 1)
 
-        # Center: Visualization (40%)
+        # Center: Visualization (fit plot + residuals)
         center_panel = self._create_center_panel()
-        main_layout.addWidget(center_panel, 2)
-
-        # Right: Parameters and controls (30%)
-        right_panel = self._create_right_panel()
-        main_layout.addWidget(right_panel, 1)
+        main_layout.addWidget(center_panel, 3)
 
     def _create_center_panel(self) -> QWidget:
         """Create center panel with plot and residuals."""
@@ -118,78 +108,71 @@ class FitPage(QWidget):
 
         return panel
 
-    def _create_right_panel(self) -> QWidget:
-        """Create right panel with parameters and controls."""
+    def _create_left_panel(self) -> QWidget:
+        """Create left panel with fit controls (no parameters panel)."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
 
-        # Context selectors (mode + quick model)
+        # Match the reference screenshot: Context -> Compatibility -> buttons -> Fit Results
         context_group = QGroupBox("Context")
-        context_layout = QHBoxLayout(context_group)
-        context_layout.addWidget(QLabel("Mode:"))
+        context_layout = QVBoxLayout(context_group)
+
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Mode:"))
         self._mode_combo = QComboBox()
         self._mode_combo.addItems(["oscillation", "relaxation", "creep", "rotation"])
         self._mode_combo.currentTextChanged.connect(self._on_mode_changed)
-        context_layout.addWidget(self._mode_combo)
-        context_layout.addWidget(QLabel("Model:"))
+        mode_row.addWidget(self._mode_combo, 1)
+        context_layout.addLayout(mode_row)
+
+        model_row = QHBoxLayout()
+        model_row.addWidget(QLabel("Model:"))
         self._quick_model_combo = QComboBox()
         self._quick_model_combo.setEditable(True)
         self._quick_model_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._quick_model_combo.currentIndexChanged.connect(self._on_quick_model_changed)
-        self._quick_model_combo.lineEdit().editingFinished.connect(self._on_quick_model_edited)
-        context_layout.addWidget(self._quick_model_combo, 1)
+        if self._quick_model_combo.lineEdit() is not None:
+            self._quick_model_combo.lineEdit().editingFinished.connect(self._on_quick_model_edited)
+        model_row.addWidget(self._quick_model_combo, 1)
+        context_layout.addLayout(model_row)
         layout.addWidget(context_group)
 
-        # Compatibility status
         compat_group = QGroupBox("Compatibility")
         compat_layout = QVBoxLayout(compat_group)
         self._compat_label = QLabel("Select a model and dataset")
         self._compat_label.setWordWrap(True)
+        self._compat_label.setStyleSheet("color: gray;")
         compat_layout.addWidget(self._compat_label)
         layout.addWidget(compat_group)
 
-        # Parameter table
-        param_group = QGroupBox("Parameters")
-        param_layout = QVBoxLayout(param_group)
-        self._parameter_table = ParameterTable()
-        self._parameter_table.parameter_changed.connect(self._on_parameter_changed)
-        param_layout.addWidget(self._parameter_table)
-        empty_label = QLabel("No model loaded. Select a model to edit parameters.")
-        empty_label.setAlignment(Qt.AlignCenter)
-        empty_label.setStyleSheet("color: #666; padding: 6px;")
-        param_layout.addWidget(empty_label)
-        self._empty_label = empty_label
-        layout.addWidget(param_group)
-
-        # Fit button and options
         btn_layout = QHBoxLayout()
-        btn_options = QPushButton("Options...")
-        btn_options.setProperty("variant", "secondary")
-        btn_options.clicked.connect(self._show_fit_options)
-        btn_layout.addWidget(btn_options)
+        self._btn_options = QPushButton("Options...")
+        self._btn_options.setProperty("variant", "secondary")
+        self._btn_options.clicked.connect(self._show_fit_options)
+        btn_layout.addWidget(self._btn_options)
 
         self._btn_fit = QPushButton("Fit Model")
         self._btn_fit.setProperty("variant", "primary")
         self._btn_fit.clicked.connect(self._on_fit_clicked)
         self._btn_fit.setEnabled(False)
-        self._btn_fit.setToolTip("Run the selected model with the current dataset and parameters")
+        self._btn_fit.setToolTip("Fit the selected model to the active dataset")
         btn_layout.addWidget(self._btn_fit, 2)
-
         layout.addLayout(btn_layout)
 
-        # Results display
         results_group = QGroupBox("Fit Results")
         results_layout = QVBoxLayout(results_group)
-        self._results_text = QTextEdit()
-        self._results_text.setReadOnly(True)
-        self._results_text.setMaximumHeight(150)
-        results_layout.addWidget(self._results_text)
+        self._status_text = QTextEdit()
+        self._status_text.setReadOnly(True)
+        self._status_text.setMaximumHeight(180)
+        results_layout.addWidget(self._status_text)
 
-        self._empty_results = QLabel("No fit has been run yet. Configure parameters and click Fit.")
+        self._empty_results = QLabel("No fit results yet.")
         self._empty_results.setAlignment(Qt.AlignCenter)
         self._empty_results.setStyleSheet("color: #94A3B8; padding: 8px;")
         results_layout.addWidget(self._empty_results)
         layout.addWidget(results_group)
+
+        layout.addStretch(1)
 
         return panel
 
@@ -201,6 +184,7 @@ class FitPage(QWidget):
             self._store.signals.model_selected.connect(self._on_external_model_selected)
             self._store.signals.fit_started.connect(self._on_fitting_started)
             self._store.signals.fit_completed.connect(self._on_fitting_completed)
+            self._store.signals.fit_failed.connect(self._on_fitting_failed)
 
     def _load_models(self) -> None:
         """Load available models into browser."""
@@ -218,7 +202,7 @@ class FitPage(QWidget):
         self._quick_model_combo.blockSignals(False)
 
     def _apply_model_selection(self, model_name: str, dispatch: bool) -> None:
-        """Load model details and parameters, optionally dispatching to the store."""
+        """Apply model selection and refresh compatibility/controls."""
         model_name = normalize_model_name(model_name)
         if not model_name:
             return
@@ -231,33 +215,11 @@ class FitPage(QWidget):
 
         self._current_model = model_name
 
-        # Load model parameters
-        model_info = self._model_service.get_model_info(model_name)
-        params = model_info.get("parameters", {})
-
-        from rheojax.gui.state.store import ParameterState
-
-        param_states: dict[str, ParameterState] = {}
-        for name, details in params.items():
-            bounds = details.get("bounds", (0.0, float("inf")))
-            param_states[name] = ParameterState(
-                name=name,
-                value=details.get("default", 1.0),
-                min_bound=bounds[0] if bounds[0] is not None else 0.0,
-                max_bound=bounds[1] if bounds[1] is not None else float("inf"),
-                fixed=False,
-                unit=details.get("units", ""),
-                description=details.get("description", ""),
-            )
-
-        self._parameter_table.set_parameters(param_states)
-
         # Check compatibility with active dataset
         self._check_compatibility(model_name)
 
         # Enable fit button if we have data
-        dataset = self._store.get_active_dataset()
-        self._btn_fit.setEnabled(dataset is not None)
+        self._update_fit_enabled()
 
         self._sync_quick_model_selection(model_name)
 
@@ -292,11 +254,11 @@ class FitPage(QWidget):
             self._quick_model_combo.setCurrentIndex(idx)
             self._quick_model_combo.blockSignals(was_blocked)
 
-    @Slot()
-    def _on_dataset_changed(self) -> None:
+    @Slot(str)
+    def _on_dataset_changed(self, _dataset_id: str = "") -> None:
         """Handle active dataset change."""
         dataset = self._store.get_active_dataset()
-        model_name = None
+        model_name = self._current_model
 
         if dataset is not None:
             # Plot data
@@ -312,11 +274,11 @@ class FitPage(QWidget):
             # Check compatibility
             if model_name:
                 self._check_compatibility(model_name)
-                self._btn_fit.setEnabled(True)
         else:
-            self._btn_fit.setEnabled(False)
             self._compat_label.setText("Select a dataset to enable fitting")
             self._compat_label.setStyleSheet("color: gray;")
+
+        self._update_fit_enabled()
 
     def _on_mode_changed(self, mode: str) -> None:
         """Update store test mode from selector."""
@@ -377,6 +339,7 @@ class FitPage(QWidget):
         if dataset is None:
             self._compat_label.setText("No dataset loaded")
             self._compat_label.setStyleSheet("color: gray;")
+            self._is_compatible = False
             return
 
         rheo_data = self._to_rheodata(dataset)
@@ -388,11 +351,15 @@ class FitPage(QWidget):
             text = f"Compatible\nDecay: {result.get('decay_type', 'unknown')}"
             self._compat_label.setText(text)
             self._compat_label.setStyleSheet("color: green;")
+            self._is_compatible = True
         else:
             warnings = result.get("warnings", [])
             text = "Compatibility issues:\n" + "\n".join(f"- {w}" for w in warnings[:3])
             self._compat_label.setText(text)
             self._compat_label.setStyleSheet("color: orange;")
+            self._is_compatible = False
+
+        self._update_fit_enabled()
 
     def _plot_data(self, dataset: Any) -> None:
         """Plot dataset on canvas.
@@ -474,169 +441,61 @@ class FitPage(QWidget):
             validate=False,
         )
 
-    def _on_parameter_changed(self, param_name: str, value: float) -> None:
-        """Handle parameter value change.
-
-        Parameters
-        ----------
-        param_name : str
-            Parameter name
-        value : float
-            New value
-        """
-        self.parameter_changed.emit(param_name, value)
-
     def _on_fit_clicked(self) -> None:
         """Handle fit button click."""
-        # Get model from quick selector (model browser was removed)
         model_name = self._quick_model_combo.currentData()
         dataset = self._store.get_active_dataset()
 
         if not model_name or not dataset:
             return
 
-        # Get current parameter values
-        params = self._parameter_table.get_parameters()
-        param_dict = {name: state.value for name, state in params.items()}
-
-        # Determine test mode
-        test_mode = dataset.metadata.get("test_mode", "oscillation")
-
-        # Update state
-        self._store.dispatch(start_fitting(model_name, dataset.id))
-
-        # Create and run fit worker
-        self._current_worker = FitWorker(
-            model_name=model_name,
-            data=self._to_rheodata(dataset),
-            initial_params=param_dict,
-            options=self._fit_options,
-        )
-        self._current_worker.signals.progress.connect(self._on_fit_progress)
-        self._current_worker.signals.completed.connect(self._on_fit_finished)
-        self._current_worker.signals.failed.connect(self._on_fit_error)
-
-        self._worker_pool.submit(self._current_worker)
-        self.fit_requested.emit(model_name, dataset.id)
-
-    @Slot(int, float, str)
-    def _on_fit_progress(self, iteration: int, loss: float, message: str) -> None:
-        """Handle fit progress update.
-
-        Parameters
-        ----------
-        iteration : int
-            Current optimization iteration
-        loss : float
-            Current loss value
-        message : str
-            Status message
-        """
-        self._store.dispatch(update_fit_progress(iteration))
-        self._results_text.setText(f"Fitting... Iteration {iteration}\nLoss: {loss:.6e}\n{message}")
+        initial_params = self._get_initial_params_for_fit(model_name)
+        payload = {
+            "model_name": str(model_name),
+            "dataset_id": str(dataset.id),
+            "options": dict(self._fit_options),
+            "initial_params": initial_params,
+        }
+        self._status_text.setText("Starting fit...")
         if hasattr(self, "_empty_results"):
             self._empty_results.hide()
+        self.fit_requested.emit(payload)
 
-    @Slot(object)
-    def _on_fit_finished(self, result: FitResult) -> None:
-        """Handle fit completion.
+    def _get_initial_params_for_fit(self, model_name: str) -> dict[str, float] | None:
+        """Return numeric initial params (state values if present else defaults)."""
+        state_params = self._store.get_state().model_params
+        if state_params:
+            try:
+                return {name: float(param.value) for name, param in state_params.items()}
+            except Exception:
+                return None
 
-        Parameters
-        ----------
-        result : FitResult
-            Fitting result from FitWorker
-        """
-        self._current_worker = None
+        defaults = self._model_service.get_parameter_defaults(model_name)
+        if not defaults:
+            return None
+        return {name: float(param.value) for name, param in defaults.items()}
 
-        if result.success:
-            self._store.dispatch(fitting_completed(result))
-
-            # Update parameter table with fitted values
-            from rheojax.gui.state.store import ParameterState
-
-            param_states: dict[str, ParameterState] = {}
-            for name, value in result.parameters.items():
-                param_states[name] = ParameterState(
-                    name=name,
-                    value=value,
-                    min_bound=0.0,
-                    max_bound=float("inf"),
-                    fixed=False,
-                    unit="",
-                    description="",
-                )
-            self._parameter_table.set_parameters(param_states)
-
-            # Update results text
-            chi_sq = result.chi_squared
-            text = f"Fit successful!\n\nR²: {result.r_squared:.4f}\n"
-            text += f"Chi-squared: {chi_sq:.4g}\n"
-            text += f"MPE: {result.mpe:.2f}%\n"
-            text += f"Time: {result.fit_time:.2f}s\n\nParameters:\n"
-            for name, value in result.parameters.items():
-                text += f"  {name}: {value:.4g}\n"
-            self._results_text.setText(text)
-            if hasattr(self, "_empty_results"):
-                self._empty_results.hide()
-
-            self.fit_completed.emit(result)
-        else:
-            error_msg = f"Fit did not converge (iterations: {result.n_iterations})"
-            self._store.dispatch(fitting_failed(error_msg))
-            self._results_text.setText(f"Fit failed:\n{error_msg}")
-            if hasattr(self, "_empty_results"):
-                self._empty_results.hide()
-
-    @Slot(str)
-    def _on_fit_error(self, error_msg: str) -> None:
-        """Handle fit error.
-
-        Parameters
-        ----------
-        error_msg : str
-            Error message
-        """
-        self._current_worker = None
-        self._store.dispatch(fitting_failed(error_msg))
-        self._results_text.setText(f"Fit error:\n{error_msg}")
-        if hasattr(self, "_empty_results"):
-            self._empty_results.hide()
-        QMessageBox.warning(self, "Fit Error", error_msg)
-
-    @Slot()
-    def _on_fitting_started(self) -> None:
+    @Slot(str, str)
+    def _on_fitting_started(self, _model_name: str = "", _dataset_id: str = "") -> None:
         """Handle fitting started signal."""
         self._btn_fit.setEnabled(False)
         self._btn_fit.setText("Fitting...")
 
-    @Slot()
-    def _on_fitting_completed(self) -> None:
+    @Slot(str, str)
+    def _on_fitting_completed(self, _model_name: str = "", _dataset_id: str = "") -> None:
         """Handle fitting completed signal."""
-        self._btn_fit.setEnabled(True)
         self._btn_fit.setText("Fit Model")
+        self._update_fit_enabled()
 
-    def _plot_fit(self, result: FitResult) -> None:
-        """Plot fit result on canvas.
-
-        Parameters
-        ----------
-        result : FitResult
-            Fitting result
-        """
-        ax = self._plot_canvas.get_axes()
-
-        # Plot fit line
-        if np.iscomplexobj(result.y_fit):
-            ax.loglog(result.x_fit, np.real(result.y_fit), "-",
-                     color="C0", linewidth=2, label="G' Fit")
-            ax.loglog(result.x_fit, np.abs(np.imag(result.y_fit)), "-",
-                     color="C1", linewidth=2, label="G'' Fit")
-        else:
-            ax.loglog(result.x_fit, result.y_fit, "-",
-                     color="C0", linewidth=2, label="Fit")
-
-        ax.legend()
-        self._plot_canvas.refresh()
+    @Slot(str, str, str)
+    def _on_fitting_failed(self, _model_name: str, _dataset_id: str, error: str) -> None:
+        """Handle fitting failure signal."""
+        self._btn_fit.setText("Fit Model")
+        self._update_fit_enabled()
+        if error:
+            self._status_text.setText(f"Fit failed:\n{error}")
+            if hasattr(self, "_empty_results"):
+                self._empty_results.hide()
 
     def _show_fit_options(self) -> None:
         """Show fitting options dialog."""
@@ -645,138 +504,39 @@ class FitPage(QWidget):
         if dialog.exec() == dialog.DialogCode.Accepted:
             self._fit_options = dialog.get_options()
 
-    def fit_model(
-        self,
-        model_name: str,
-        dataset_id: str,
-        test_mode: str,
-        initial_params: dict[str, float] | None = None,
-    ) -> None:
-        """Programmatically fit a model.
-
-        Parameters
-        ----------
-        model_name : str
-            Model name
-        dataset_id : str
-            Dataset ID
-        test_mode : str
-            Test mode
-        initial_params : dict, optional
-            Initial parameter values
-        """
-        # Select model via quick selector (model browser was removed)
-        idx = self._quick_model_combo.findData(model_name)
-        if idx >= 0:
-            self._quick_model_combo.setCurrentIndex(idx)
-        else:
-            # Model not in combo, trigger selection directly
-            self._on_model_selected(model_name)
-
-        # Set initial params if provided
-        if initial_params:
-            from rheojax.gui.state.store import ParameterState
-
-            param_states: dict[str, ParameterState] = {}
-            for name, value in initial_params.items():
-                param_states[name] = ParameterState(
-                    name=name,
-                    value=value,
-                    min_bound=0.0,
-                    max_bound=float("inf"),
-                    fixed=False,
-                    unit="",
-                    description="",
-                )
-            self._parameter_table.set_parameters(param_states)
-
-        # Trigger fit
-        self._on_fit_clicked()
-
-    def update_parameter(self, model_id: str, param_name: str, value: float) -> None:
-        """Update a parameter value.
-
-        Parameters
-        ----------
-        model_id : str
-            Model identifier
-        param_name : str
-            Parameter name
-        value : float
-            New value
-        """
-        self._parameter_table.set_parameter_value(param_name, value)
-
-    def compare_models(self, model_ids: list[str]) -> None:
-        """Compare multiple fitted models.
-
-        Parameters
-        ----------
-        model_ids : list[str]
-            List of model IDs to compare
-        """
-        if not model_ids:
-            QMessageBox.warning(self, "No Models", "No models selected for comparison.")
+    def apply_fit_result(self, fit_result: Any) -> None:
+        """Update the Fit page status from a stored FitResult."""
+        try:
+            r2 = getattr(fit_result, "r_squared", None)
+            mpe = getattr(fit_result, "mpe", None)
+            chi2 = getattr(fit_result, "chi_squared", None)
+            fit_time = getattr(fit_result, "fit_time", None)
+            params = getattr(fit_result, "parameters", {}) or {}
+        except Exception:
             return
 
-        # Get fit results from state
-        state = self._store.get_state()
-        results: list[tuple[str, Any]] = []
+        lines: list[str] = ["Fit successful!", ""]
+        if r2 is not None:
+            lines.append(f"R²: {float(r2):.4f}")
+        if chi2 is not None:
+            lines.append(f"Chi-squared: {float(chi2):.6g}")
+        if mpe is not None:
+            lines.append(f"MPE: {float(mpe):.2f}%")
+        if fit_time is not None:
+            lines.append(f"Time: {float(fit_time):.2f}s")
 
-        for model_id in model_ids:
-            if model_id in state.fit_results:
-                results.append((model_id, state.fit_results[model_id]))
+        if params:
+            lines.append("")
+            lines.append("Parameters:")
+            for name, value in sorted(params.items()):
+                try:
+                    lines.append(f"  {name}: {float(value):.6g}")
+                except Exception:
+                    lines.append(f"  {name}: {value}")
 
-        if len(results) < 2:
-            QMessageBox.warning(
-                self,
-                "Insufficient Models",
-                "At least 2 fitted models are required for comparison.",
-            )
-            return
-
-        # Build comparison summary
-        comparison_text = "Model Comparison:\n" + "=" * 40 + "\n\n"
-
-        for _model_id, result in results:
-            comparison_text += f"Model: {result.model_name}\n"
-            comparison_text += f"  R²: {result.r_squared:.6f}\n"
-            comparison_text += f"  MPE: {result.mpe:.4f}%\n"
-            comparison_text += f"  χ²: {result.chi_squared:.6f}\n"
-            comparison_text += f"  Iterations: {result.num_iterations}\n"
-            comparison_text += f"  Fit Time: {result.fit_time:.3f}s\n\n"
-
-        # Find best model by R²
-        best_model = max(results, key=lambda x: x[1].r_squared)
-        comparison_text += "-" * 40 + "\n"
-        comparison_text += f"Best Model (by R²): {best_model[1].model_name}\n"
-
-        QMessageBox.information(self, "Model Comparison", comparison_text)
-
-    def show_residuals(self, model_id: str) -> None:
-        """Show residuals for a fitted model.
-
-        Parameters
-        ----------
-        model_id : str
-            Model identifier
-        """
-        state = self._store.get_state()
-        result = state.fit_results.get(model_id)
-        if result is None or getattr(result, "residuals", None) is None:
-            QMessageBox.information(
-                self,
-                "No Residuals",
-                "Residuals not available for the selected model.",
-            )
-            return
-
-        x_vals = getattr(result, "x_fit", None)
-        residuals = getattr(result, "residuals", None)
-        y_pred = getattr(result, "y_fit", None)
-
-        if x_vals is not None and residuals is not None:
-            self.plot_residuals(x_vals, residuals, y_pred)
+        self._status_text.setText("\n".join(lines))
+        if hasattr(self, "_empty_results"):
+            self._empty_results.hide()
 
     # External hooks from MainWindow
     def set_plot_figure(self, fig: Figure) -> None:
@@ -795,3 +555,10 @@ class FitPage(QWidget):
             self._residuals_panel.plot_residuals(y_true=y_pred + residuals, y_pred=y_pred, x=x)
         else:
             self._residuals_panel.set_residuals(residuals)
+
+    def _update_fit_enabled(self) -> None:
+        dataset = self._store.get_active_dataset()
+        model_name = self._quick_model_combo.currentData()
+        compatible = getattr(self, "_is_compatible", False)
+        enabled = dataset is not None and bool(model_name) and compatible
+        self._btn_fit.setEnabled(enabled)
