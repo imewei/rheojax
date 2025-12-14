@@ -346,6 +346,81 @@ def main(argv: list[str] | None = None) -> int:
         _show_main_window(window, args.maximized)
 
         logger.info("RheoJAX GUI ready")
+
+        # ------------------------------------------------------------------
+        # Optional: headless fit smoke
+        # ------------------------------------------------------------------
+        # Used for local debugging/CI to verify that a basic fit completes
+        # without crashes. Triggered via env var so normal GUI behavior is
+        # unchanged.
+        if os.environ.get("RHEOJAX_GUI_SMOKE_FIT") == "1":
+            logger.info("GUI smoke mode enabled: running one fit then exiting")
+
+            def _smoke_exit(code: int = 0) -> None:
+                try:
+                    app.exit(code)
+                except Exception:
+                    app.quit()
+
+            def _run_smoke_fit() -> None:
+                try:
+                    import numpy as np
+
+                    x = np.logspace(-2, 2, 200)
+                    y = 1e3 * np.exp(-x / 0.5) + 10.0
+                    dataset_id = "smoke"
+
+                    window.store.dispatch(
+                        "IMPORT_DATA_SUCCESS",
+                        {
+                            "dataset_id": dataset_id,
+                            "name": "GUI Smoke Dataset",
+                            "test_mode": "relaxation",
+                            "file_path": None,
+                            "x_data": x,
+                            "y_data": y,
+                            "y2_data": None,
+                            "metadata": {"test_mode": "relaxation", "domain": "time"},
+                        },
+                    )
+                    window.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
+                    model = "maxwell"
+                    window.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model})
+                    window.navigate_to("fit")
+
+                    if getattr(window, "worker_pool", None) is None:
+                        logger.error("Smoke fit failed: worker pool unavailable")
+                        _smoke_exit(2)
+                        return
+
+                    def _on_done(_job_id: str, _result: object) -> None:
+                        try:
+                            window.worker_pool.shutdown(wait=True, timeout_ms=5000)
+                        except Exception:
+                            pass
+                        _smoke_exit(0)
+
+                    def _on_failed(_job_id: str, error: str) -> None:
+                        logger.error("Smoke fit failed: %s", error)
+                        try:
+                            window.worker_pool.shutdown(wait=True, timeout_ms=5000)
+                        except Exception:
+                            pass
+                        _smoke_exit(3)
+
+                    window.worker_pool.job_completed.connect(_on_done)
+                    window.worker_pool.job_failed.connect(_on_failed)
+
+                    window._on_fit_requested_from_page(
+                        {"model_name": model, "dataset_id": dataset_id}
+                    )
+                except Exception as exc:
+                    logger.exception("Smoke fit raised: %s", exc)
+                    _smoke_exit(1)
+
+            timeout_ms = int(os.environ.get("RHEOJAX_GUI_SMOKE_TIMEOUT_MS", "30000"))
+            QTimer.singleShot(0, _run_smoke_fit)
+            QTimer.singleShot(timeout_ms, lambda: _smoke_exit(124))
     except Exception as e:
         logger.exception(f"Failed to create main window: {e}")
         print(

@@ -7,12 +7,12 @@ Thread pool for executing background jobs with progress tracking using PySide6.
 
 import logging
 import uuid
+from collections.abc import Callable
 from threading import Lock
 from typing import Any
-from collections.abc import Callable
 
 try:
-    from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
+    from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot, Qt
     HAS_PYSIDE6 = True
 except ImportError:
     HAS_PYSIDE6 = False
@@ -65,6 +65,9 @@ except ImportError:
         def decorator(func):
             return func
         return decorator
+
+    class Qt:  # type: ignore
+        QueuedConnection = None
 
 from rheojax.gui.jobs.cancellation import CancellationToken
 
@@ -166,6 +169,7 @@ class WorkerPool(QObject):
         self._pool = QThreadPool()
         self._pool.setMaxThreadCount(max_threads)
         self._active_jobs: dict[str, CancellationToken] = {}
+        self._job_signals: dict[str, QObject] = {}
         self._job_lock = Lock()
 
         WorkerPool._initialized = True
@@ -208,40 +212,44 @@ class WorkerPool(QObject):
             except Exception as exc:
                 logger.warning(f"on_job_registered hook failed: {exc}")
 
-        # Connect worker signals to pool signals
-        if hasattr(worker, 'signals'):
-            # Store job_id on worker for signal emission
-            worker.job_id = job_id  # type: ignore[attr-defined]
+        # Connect worker signals to pool signals.
+        #
+        # Workers emit from background threads; always use queued connections into
+        # WorkerPool's thread (GUI thread). Avoid connecting worker signals directly
+        # to ad-hoc Python callables (e.g. lambdas), which can lead to shiboken
+        # EXC_BAD_ACCESS crashes when posted events are delivered.
+        if hasattr(worker, "signals"):
+            signals = worker.signals
+            # Preserve job_id on the worker for debugging.
+            try:
+                worker.job_id = job_id  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            if isinstance(signals, QObject):
+                self._job_signals[job_id] = signals
 
-            # Connect completion/failure/cancellation signals
-            if hasattr(worker.signals, 'completed'):
-                worker.signals.completed.connect(
-                    lambda result, jid=job_id: self._on_job_completed(jid, result)
-                )
-            if hasattr(worker.signals, 'failed'):
-                worker.signals.failed.connect(
-                    lambda error, jid=job_id: self._on_job_failed(jid, error)
-                )
-            if hasattr(worker.signals, 'cancelled'):
-                worker.signals.cancelled.connect(
-                    lambda jid=job_id: self._on_job_cancelled(jid)
-                )
-            if hasattr(worker.signals, 'progress'):
-                def _progress_adapter(*args, jid=job_id):
-                    """Map varying progress signal signatures to a common shape."""
-                    current = args[0] if len(args) > 0 else 0
-                    if len(args) == 3:
-                        total = args[1]
-                        msg = args[2]
-                    elif len(args) == 2:
-                        total = 0
-                        msg = args[1]
-                    else:
-                        total = 0
-                        msg = ""
-                    self._on_job_progress(jid, current, total, msg)
+            conn_type = Qt.QueuedConnection if HAS_PYSIDE6 else None
 
-                worker.signals.progress.connect(_progress_adapter)
+            if hasattr(signals, "completed"):
+                if conn_type is not None:
+                    signals.completed.connect(self._on_worker_completed, conn_type)
+                else:
+                    signals.completed.connect(self._on_worker_completed)
+            if hasattr(signals, "failed"):
+                if conn_type is not None:
+                    signals.failed.connect(self._on_worker_failed, conn_type)
+                else:
+                    signals.failed.connect(self._on_worker_failed)
+            if hasattr(signals, "cancelled"):
+                if conn_type is not None:
+                    signals.cancelled.connect(self._on_worker_cancelled, conn_type)
+                else:
+                    signals.cancelled.connect(self._on_worker_cancelled)
+            if hasattr(signals, "progress"):
+                if conn_type is not None:
+                    signals.progress.connect(self._on_worker_progress, conn_type)
+                else:
+                    signals.progress.connect(self._on_worker_progress)
 
         # Submit to thread pool
         self._pool.start(worker)
@@ -344,6 +352,7 @@ class WorkerPool(QObject):
         # Clear active jobs
         with self._job_lock:
             self._active_jobs.clear()
+            self._job_signals.clear()
 
         logger.info("Worker pool shut down")
 
@@ -380,3 +389,62 @@ class WorkerPool(QObject):
         with self._job_lock:
             if job_id in self._active_jobs:
                 del self._active_jobs[job_id]
+            self._job_signals.pop(job_id, None)
+
+    def _job_id_from_sender(self) -> str | None:
+        """Best-effort reverse lookup for job_id based on Qt sender()."""
+        try:
+            sender = self.sender()
+        except Exception:
+            sender = None
+
+        if sender is None:
+            return None
+
+        for job_id, signals in list(self._job_signals.items()):
+            if signals is sender:
+                return job_id
+        return None
+
+    @Slot(object)
+    def _on_worker_completed(self, result: Any) -> None:
+        job_id = self._job_id_from_sender()
+        if job_id:
+            self._on_job_completed(job_id, result)
+
+    @Slot(str)
+    def _on_worker_failed(self, error_message: str) -> None:
+        job_id = self._job_id_from_sender()
+        if job_id:
+            self._on_job_failed(job_id, error_message)
+
+    @Slot()
+    def _on_worker_cancelled(self) -> None:
+        job_id = self._job_id_from_sender()
+        if job_id:
+            self._on_job_cancelled(job_id)
+
+    def _on_worker_progress(self, *args: object) -> None:
+        """Normalize worker progress signals and route them by sender.
+
+        Workers may emit progress as:
+        - (current, total, message)
+        - (current, message)
+        - (current,)
+        """
+        job_id = self._job_id_from_sender()
+        if not job_id:
+            return
+
+        current = args[0] if len(args) > 0 else 0
+        if len(args) >= 3:
+            total = args[1]
+            message = args[2]
+        elif len(args) == 2:
+            total = 0
+            message = args[1]
+        else:
+            total = 0
+            message = ""
+
+        self._on_job_progress(job_id, int(current), int(total), str(message))
