@@ -241,11 +241,48 @@ class ArvizCanvas(QWidget):
         """
         return self._current_plot_type
 
+    def _copy_arviz_figure(self, arviz_fig: Figure) -> None:
+        """Swap ArviZ-generated figure into our Qt canvas.
+
+        ArviZ plotting functions create their own figures internally and don't
+        accept a figure= parameter. This method swaps the ArviZ figure into
+        our Qt canvas for proper embedding.
+
+        Parameters
+        ----------
+        arviz_fig : Figure
+            The figure created by ArviZ
+        """
+        import matplotlib.pyplot as plt
+
+        # Store reference to old figure for cleanup
+        old_fig = self._figure
+
+        # Update our reference to the ArviZ figure
+        self._figure = arviz_fig
+        self._figure.set_layout_engine("tight")
+
+        # Update the canvas to use the new figure
+        self._canvas.figure = self._figure
+        self._figure.set_canvas(self._canvas)
+
+        # Close the old figure to prevent memory leak
+        plt.close(old_fig)
+
     def _plot_trace(self) -> None:
         """Generate trace plot."""
         try:
             import arviz as az
-            az.plot_trace(self._inference_data, figure=self._figure)
+            import matplotlib.pyplot as plt
+
+            # Close any previous ArviZ figures to avoid memory leaks
+            plt.close("all")
+
+            # Let ArviZ create its own figure (it doesn't accept figure= kwarg)
+            az.plot_trace(self._inference_data)
+
+            # Get the figure ArviZ created and copy to our managed figure
+            self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
 
@@ -253,11 +290,11 @@ class ArvizCanvas(QWidget):
         """Generate pair plot."""
         try:
             import arviz as az
-            az.plot_pair(
-                self._inference_data,
-                divergences=True,
-                figure=self._figure
-            )
+            import matplotlib.pyplot as plt
+
+            plt.close("all")
+            az.plot_pair(self._inference_data, divergences=True)
+            self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
 
@@ -265,12 +302,11 @@ class ArvizCanvas(QWidget):
         """Generate forest plot."""
         try:
             import arviz as az
-            az.plot_forest(
-                self._inference_data,
-                hdi_prob=self._hdi_prob,
-                combined=True,
-                figure=self._figure
-            )
+            import matplotlib.pyplot as plt
+
+            plt.close("all")
+            az.plot_forest(self._inference_data, hdi_prob=self._hdi_prob, combined=True)
+            self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
 
@@ -278,11 +314,11 @@ class ArvizCanvas(QWidget):
         """Generate posterior plot."""
         try:
             import arviz as az
-            az.plot_posterior(
-                self._inference_data,
-                hdi_prob=self._hdi_prob,
-                figure=self._figure
-            )
+            import matplotlib.pyplot as plt
+
+            plt.close("all")
+            az.plot_posterior(self._inference_data, hdi_prob=self._hdi_prob)
+            self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
 
@@ -290,7 +326,11 @@ class ArvizCanvas(QWidget):
         """Generate energy plot."""
         try:
             import arviz as az
-            az.plot_energy(self._inference_data, figure=self._figure)
+            import matplotlib.pyplot as plt
+
+            plt.close("all")
+            az.plot_energy(self._inference_data)
+            self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
 
@@ -298,7 +338,11 @@ class ArvizCanvas(QWidget):
         """Generate rank plot."""
         try:
             import arviz as az
-            az.plot_rank(self._inference_data, figure=self._figure)
+            import matplotlib.pyplot as plt
+
+            plt.close("all")
+            az.plot_rank(self._inference_data)
+            self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
 
@@ -306,7 +350,11 @@ class ArvizCanvas(QWidget):
         """Generate ESS plot."""
         try:
             import arviz as az
-            az.plot_ess(self._inference_data, figure=self._figure)
+            import matplotlib.pyplot as plt
+
+            plt.close("all")
+            az.plot_ess(self._inference_data)
+            self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
 
@@ -314,7 +362,11 @@ class ArvizCanvas(QWidget):
         """Generate autocorrelation plot."""
         try:
             import arviz as az
-            az.plot_autocorr(self._inference_data, figure=self._figure)
+            import matplotlib.pyplot as plt
+
+            plt.close("all")
+            az.plot_autocorr(self._inference_data)
+            self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
 
