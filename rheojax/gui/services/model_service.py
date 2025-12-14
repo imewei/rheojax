@@ -205,7 +205,11 @@ class ModelService:
 
         from rheojax.gui.state.store import ParameterState
 
-        model = self._registry.create_instance(model_name, plugin_type="model")
+        try:
+            model = self._registry.create_instance(model_name, plugin_type="model")
+        except Exception as exc:
+            logger.warning("Could not load parameter defaults for %s: %s", model_name, exc)
+            return {}
         defaults: dict[str, ParameterState] = {}
         for name, param in model.parameters.items():
             bounds = getattr(param, "bounds", (float("-inf"), float("inf")))
@@ -363,7 +367,7 @@ class ModelService:
         except Exception as e:
             logger.error(f"Compatibility check failed: {e}")
             return {
-                "compatible": True,  # Default to compatible if check fails
+                "compatible": False,
                 "decay_type": "unknown",
                 "material_type": "unknown",
                 "warnings": [f"Compatibility check failed: {e}"],

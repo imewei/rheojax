@@ -253,6 +253,70 @@ def update_parameter(name: str, value: float) -> None:
         store._signals.model_params_changed.emit(store._state.active_model_name)
 
 
+def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> None:
+    """Update bounds for a model parameter.
+
+    Parameters
+    ----------
+    name : str
+        Parameter name
+    min_bound : float
+        New minimum bound
+    max_bound : float
+        New maximum bound
+    """
+    store = StateStore()
+
+    def updater(state: AppState) -> AppState:
+        if name not in state.model_params:
+            return state
+
+        param = state.model_params[name]
+        updated_param = ParameterState(
+            **{**param.__dict__, "min_bound": float(min_bound), "max_bound": float(max_bound)}
+        )
+
+        new_params = state.model_params.copy()
+        new_params[name] = updated_param
+
+        return AppState(**{**state.__dict__, "model_params": new_params})
+
+    store.update_state(updater)
+
+    if store._signals and store._state.active_model_name:
+        store._signals.model_params_changed.emit(store._state.active_model_name)
+
+
+def toggle_parameter_fixed(name: str, fixed: bool) -> None:
+    """Toggle fixed state for a model parameter.
+
+    Parameters
+    ----------
+    name : str
+        Parameter name
+    fixed : bool
+        Whether the parameter is fixed
+    """
+    store = StateStore()
+
+    def updater(state: AppState) -> AppState:
+        if name not in state.model_params:
+            return state
+
+        param = state.model_params[name]
+        updated_param = ParameterState(**{**param.__dict__, "fixed": bool(fixed)})
+
+        new_params = state.model_params.copy()
+        new_params[name] = updated_param
+
+        return AppState(**{**state.__dict__, "model_params": new_params})
+
+    store.update_state(updater)
+
+    if store._signals and store._state.active_model_name:
+        store._signals.model_params_changed.emit(store._state.active_model_name)
+
+
 def reset_parameters(default_params: dict[str, ParameterState]) -> None:
     """Reset parameters to default values.
 

@@ -1,19 +1,16 @@
 """Fit Page.
 
 Fit model controls + visualization (fit plot + residuals).
-
-Note
-----
-This page intentionally does **not** expose an editable parameters panel.
-Initial parameters come from the centralized state (when present) or model
-defaults; fits are executed by the MainWindow via the shared WorkerPool.
 """
+
+from dataclasses import replace
 
 from typing import Any
 
 import numpy as np
 from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QGroupBox,
     QHBoxLayout,
@@ -26,8 +23,14 @@ from PySide6.QtWidgets import (
 
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.services.model_service import normalize_model_name
-from rheojax.gui.state.actions import set_active_model
+from rheojax.gui.state.actions import (
+    set_active_model,
+    toggle_parameter_fixed,
+    update_parameter,
+    update_parameter_bounds,
+)
 from rheojax.gui.state.store import StateStore
+from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 from matplotlib.figure import Figure
@@ -72,6 +75,10 @@ class FitPage(QWidget):
         }
         self._current_model: str | None = None
         self._is_compatible: bool = False
+        self._params_model_name: str | None = None
+        self._empty_params_default_text = (
+            "No model loaded. Select a model to edit parameters."
+        )
 
         self._setup_ui()
         self._connect_signals()
@@ -109,7 +116,7 @@ class FitPage(QWidget):
         return panel
 
     def _create_left_panel(self) -> QWidget:
-        """Create left panel with fit controls (no parameters panel)."""
+        """Create left panel with fit controls and parameters."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
 
@@ -144,6 +151,21 @@ class FitPage(QWidget):
         self._compat_label.setStyleSheet("color: gray;")
         compat_layout.addWidget(self._compat_label)
         layout.addWidget(compat_group)
+
+        params_group = QGroupBox("Parameters")
+        params_layout = QVBoxLayout(params_group)
+        self._parameter_table = ParameterTable()
+        self._parameter_table.setEnabled(False)
+        self._parameter_table.parameter_changed.connect(self._on_parameter_value_changed)
+        self._parameter_table.bounds_changed.connect(self._on_parameter_bounds_changed)
+        self._parameter_table.fixed_toggled.connect(self._on_parameter_fixed_toggled)
+        params_layout.addWidget(self._parameter_table)
+
+        self._empty_params = QLabel(self._empty_params_default_text)
+        self._empty_params.setAlignment(Qt.AlignCenter)
+        self._empty_params.setStyleSheet("color: #666; padding: 6px;")
+        params_layout.addWidget(self._empty_params)
+        layout.addWidget(params_group, 2)
 
         btn_layout = QHBoxLayout()
         self._btn_options = QPushButton("Options...")
@@ -182,6 +204,7 @@ class FitPage(QWidget):
         if self._store.signals is not None:
             self._store.signals.dataset_selected.connect(self._on_dataset_changed)
             self._store.signals.model_selected.connect(self._on_external_model_selected)
+            self._store.signals.model_params_changed.connect(self._on_model_params_changed)
             self._store.signals.fit_started.connect(self._on_fitting_started)
             self._store.signals.fit_completed.connect(self._on_fitting_completed)
             self._store.signals.fit_failed.connect(self._on_fitting_failed)
@@ -215,6 +238,9 @@ class FitPage(QWidget):
 
         self._current_model = model_name
 
+        # Load/initialize model parameters for the Parameters section
+        self._load_parameters_for_model(model_name)
+
         # Check compatibility with active dataset
         self._check_compatibility(model_name)
 
@@ -222,6 +248,101 @@ class FitPage(QWidget):
         self._update_fit_enabled()
 
         self._sync_quick_model_selection(model_name)
+
+    def _load_parameters_for_model(self, model_name: str) -> None:
+        """Initialize the parameter table from state or model defaults."""
+        model_name = normalize_model_name(model_name)
+        if not model_name:
+            return
+
+        state = self._store.get_state()
+        current = state.model_params
+        self._empty_params.setText(self._empty_params_default_text)
+
+        # If we already have parameters for the current model, keep them.
+        if self._params_model_name == model_name and current:
+            self._parameter_table.set_parameters(current)
+            self._parameter_table.setEnabled(True)
+            self._empty_params.hide()
+            return
+
+        try:
+            defaults = self._model_service.get_parameter_defaults(model_name)
+        except Exception:
+            defaults = {}
+            self._empty_params.setText(
+                f"Model '{model_name}' is unavailable. Select a different model."
+            )
+        if not defaults:
+            self._parameter_table.setRowCount(0)
+            self._parameter_table.setEnabled(False)
+            self._empty_params.show()
+            self._params_model_name = None
+            self._is_compatible = False
+            self._update_fit_enabled()
+            return
+
+        # If state params already look compatible, prefer them (e.g., switching tabs).
+        params_to_show = defaults
+        if (
+            state.active_model_name == model_name
+            and current
+            and set(current.keys()) == set(defaults.keys())
+        ):
+            params_to_show = current
+
+        # Ensure state has params for fitting (used by FitPage and MainWindow).
+        if not current or set(current.keys()) != set(defaults.keys()):
+
+            def updater(s):
+                return replace(s, model_params={k: v.clone() for k, v in defaults.items()})
+
+            self._store.update_state(updater, track_undo=False, emit_signal=True)
+
+        self._parameter_table.set_parameters(params_to_show)
+        self._parameter_table.setEnabled(True)
+        self._empty_params.hide()
+        self._params_model_name = model_name
+
+    @Slot(str)
+    def _on_model_params_changed(self, model_name: str) -> None:
+        """Refresh the parameter table when state parameters change."""
+        model_name = normalize_model_name(model_name)
+        if not model_name or model_name != (self._current_model or ""):
+            return
+        if not hasattr(self, "_parameter_table"):
+            return
+
+        # Avoid resetting the editor while the user is typing.
+        try:
+            if self._parameter_table.state() == QAbstractItemView.State.EditingState:
+                return
+        except Exception:
+            pass
+
+        params = self._store.get_state().model_params
+        if not params:
+            self._parameter_table.setRowCount(0)
+            self._parameter_table.setEnabled(False)
+            self._empty_params.show()
+            return
+
+        self._parameter_table.set_parameters(params)
+        self._parameter_table.setEnabled(True)
+        self._empty_params.hide()
+        self._params_model_name = model_name
+
+    def _on_parameter_value_changed(self, param_name: str, value: float) -> None:
+        """Update state when the user edits a parameter value."""
+        update_parameter(param_name, float(value))
+
+    def _on_parameter_bounds_changed(self, param_name: str, min_val: float, max_val: float) -> None:
+        """Update state when the user edits parameter bounds."""
+        update_parameter_bounds(param_name, float(min_val), float(max_val))
+
+    def _on_parameter_fixed_toggled(self, param_name: str, is_fixed: bool) -> None:
+        """Update state when the user toggles parameter fixed state."""
+        toggle_parameter_fixed(param_name, bool(is_fixed))
 
     @Slot(str)
     def _on_model_selected(self, model_name: str) -> None:
@@ -470,7 +591,10 @@ class FitPage(QWidget):
             except Exception:
                 return None
 
-        defaults = self._model_service.get_parameter_defaults(model_name)
+        try:
+            defaults = self._model_service.get_parameter_defaults(model_name)
+        except Exception:
+            return None
         if not defaults:
             return None
         return {name: float(param.value) for name, param in defaults.items()}
@@ -533,6 +657,28 @@ class FitPage(QWidget):
                     lines.append(f"  {name}: {float(value):.6g}")
                 except Exception:
                     lines.append(f"  {name}: {value}")
+
+            # Also reflect fitted params in the Parameters table (preserve bounds when possible)
+            try:
+                state_params = self._store.get_state().model_params
+                if state_params:
+                    updated = {k: v.clone() for k, v in state_params.items()}
+                    for name, value in params.items():
+                        if name in updated:
+                            updated[name] = replace(updated[name], value=float(value))
+                    self._parameter_table.set_parameters(updated)
+
+                    def updater(s):
+                        return replace(s, model_params=updated)
+
+                    self._store.update_state(updater, track_undo=False, emit_signal=True)
+                    self._empty_params.hide()
+                    self._parameter_table.setEnabled(True)
+                    self._params_model_name = normalize_model_name(
+                        getattr(fit_result, "model_name", self._current_model or "")
+                    )
+            except Exception:
+                pass
 
         self._status_text.setText("\n".join(lines))
         if hasattr(self, "_empty_results"):
