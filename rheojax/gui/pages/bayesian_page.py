@@ -43,6 +43,7 @@ from rheojax.gui.state.store import BayesianResult as StoredBayesianResult
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.services.data_service import DataService
+from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
 
 class BayesianPage(QWidget):
@@ -799,6 +800,53 @@ class BayesianPage(QWidget):
                 continue
         return means
 
+    def _posterior_draw_indices(
+        self, posterior_samples: dict[str, Any], max_draws: int
+    ) -> np.ndarray:
+        """Select draw indices consistently across parameters."""
+        lengths: list[int] = []
+        for samples in (posterior_samples or {}).values():
+            try:
+                arr = np.asarray(samples).reshape(-1)
+                if arr.size:
+                    lengths.append(int(arr.size))
+            except Exception:
+                continue
+
+        if not lengths:
+            return np.array([], dtype=int)
+
+        total = int(min(lengths))
+        if total <= 0:
+            return np.array([], dtype=int)
+
+        n = int(min(max_draws, total))
+        if n <= 1:
+            return np.array([0], dtype=int)
+
+        # Use evenly spaced indices for determinism and stability.
+        idx = np.linspace(0, total - 1, num=n)
+        return np.unique(idx.astype(int))
+
+    def _posterior_params_at_index(
+        self, posterior_samples: dict[str, Any], index: int
+    ) -> dict[str, float]:
+        """Extract a single posterior draw as parameter dict."""
+        params: dict[str, float] = {}
+        for name, samples in (posterior_samples or {}).items():
+            try:
+                arr = np.asarray(samples).reshape(-1)
+                if arr.size == 0:
+                    continue
+                if index >= arr.size:
+                    continue
+                value = float(arr[index])
+                if np.isfinite(value):
+                    params[name] = value
+            except Exception:
+                continue
+        return params
+
     def _update_fit_plot_from_posterior(self, result: Any) -> None:
         """Render raw data + posterior-representative fitted curve."""
         dataset = self._store.get_active_dataset()
@@ -809,31 +857,150 @@ class BayesianPage(QWidget):
         if not model_name:
             return
 
-        x = np.asarray(dataset.x_data)
-        y = np.asarray(dataset.y_data)
-        test_mode = dataset.test_mode or getattr(dataset, "metadata", {}).get("test_mode")
+        rheo_data = rheodata_from_dataset_state(dataset)
+        x = np.asarray(rheo_data.x)
+        y = np.asarray(rheo_data.y)
+        test_mode = rheo_data.metadata.get("test_mode")
 
         posterior_samples = getattr(result, "posterior_samples", None) or {}
-        params = self._posterior_mean_params(posterior_samples)
-        if not params:
+        # Posterior predictive band is computed by sampling predictions.
+        # Use a small cap for responsiveness in the GUI.
+        draw_indices = self._posterior_draw_indices(posterior_samples, max_draws=200)
+        if draw_indices.size == 0:
             return
 
-        y_fit = self._model_service.predict(model_name, params, x, test_mode=test_mode)
+        y_draws: list[np.ndarray] = []
+        for idx in draw_indices:
+            params = self._posterior_params_at_index(posterior_samples, int(idx))
+            if not params:
+                continue
+            try:
+                y_pred = self._model_service.predict(model_name, params, x, test_mode=test_mode)
+                y_pred_arr = np.asarray(y_pred)
+                if y_pred_arr.shape == x.shape:
+                    y_draws.append(y_pred_arr)
+            except Exception:
+                continue
+
+        if not y_draws:
+            return
+
+        y_stack = np.stack(y_draws, axis=0)
+        is_oscillation = (test_mode or "") == "oscillation"
+        is_complex = np.iscomplexobj(y_stack)
+
+        # Use the HDI probability selection if possible.
+        try:
+            hdi_prob = float(self._hdi_combo.currentText())
+        except Exception:
+            hdi_prob = 0.94
+        alpha = (1.0 - float(hdi_prob)) / 2.0
+        q_lo = float(alpha)
+        q_hi = float(1.0 - alpha)
+
+        if is_oscillation and is_complex:
+            y_re = np.real(y_stack)
+            y_im = np.imag(y_stack)
+            y_center_re = np.nanmean(y_re, axis=0)
+            y_center_im = np.nanmean(y_im, axis=0)
+            y_lower_re = np.nanquantile(y_re, q_lo, axis=0)
+            y_upper_re = np.nanquantile(y_re, q_hi, axis=0)
+            y_lower_im = np.nanquantile(y_im, q_lo, axis=0)
+            y_upper_im = np.nanquantile(y_im, q_hi, axis=0)
+            y_center = y_center_re + 1j * y_center_im
+        else:
+            # For oscillation magnitude (non-complex) or other modes, compute scalar bands.
+            if is_oscillation and np.iscomplexobj(y_stack):
+                y_scalar = np.abs(y_stack)
+            else:
+                y_scalar = y_stack
+            y_center = np.nanmean(y_scalar, axis=0)
+            y_lower = np.nanquantile(y_scalar, q_lo, axis=0)
+            y_upper = np.nanquantile(y_scalar, q_hi, axis=0)
 
         # Reuse the Fit tab plotting style via PlotService.
-        from rheojax.core.data import RheoData
         from types import SimpleNamespace
 
-        rheo_data = RheoData(
-            x=x,
-            y=y,
-            metadata=getattr(dataset, "metadata", {}) or {},
-            initial_test_mode=test_mode,
-            validate=False,
-        )
-        fit_like = SimpleNamespace(model_name=model_name, y_fit=y_fit)
+        fit_like = SimpleNamespace(model_name=model_name, y_fit=y_center)
 
-        fig = PlotService().create_fit_plot(rheo_data, fit_like, style="default", test_mode=test_mode)
+        fig = PlotService().create_fit_plot(
+            rheo_data,
+            fit_like,
+            style="default",
+            test_mode=test_mode,
+        )
+
+        # Overlay the credible interval band(s) using the same axes.
+        try:
+            ax = fig.gca()
+            x_plot = np.asarray(x)
+
+            positive = np.asarray(y)
+            if np.iscomplexobj(positive):
+                positive = np.abs(positive)
+            positive = positive[np.isfinite(positive) & (positive > 0)]
+            eps = float(np.nanmin(positive)) * 1e-3 if positive.size else 1e-12
+
+            pct = int(round(hdi_prob * 100))
+
+            if is_oscillation and is_complex:
+                lines = {line.get_label(): line for line in ax.get_lines()}
+                gprime_color = lines.get("G' (fit)").get_color() if "G' (fit)" in lines else None
+                gdouble_color = lines.get('G" (fit)').get_color() if 'G" (fit)' in lines else None
+
+                lower_re = np.asarray(y_lower_re)
+                upper_re = np.asarray(y_upper_re)
+                # PlotService uses abs(imag) for oscillation; match that convention.
+                lower_im = np.abs(np.asarray(y_lower_im))
+                upper_im = np.abs(np.asarray(y_upper_im))
+
+                if ax.get_xscale() == "log" or ax.get_yscale() == "log":
+                    lower_re = np.maximum(lower_re, eps)
+                    upper_re = np.maximum(upper_re, eps)
+                    lower_im = np.maximum(lower_im, eps)
+                    upper_im = np.maximum(upper_im, eps)
+
+                ax.fill_between(
+                    x_plot,
+                    lower_re,
+                    upper_re,
+                    alpha=0.18,
+                    color=gprime_color,
+                    label=f"G' {pct}% CI",
+                )
+                ax.fill_between(
+                    x_plot,
+                    lower_im,
+                    upper_im,
+                    alpha=0.18,
+                    color=gdouble_color,
+                    label=f"G\" {pct}% CI",
+                )
+            else:
+                line_color = None
+                lines = ax.get_lines()
+                if lines:
+                    line_color = lines[-1].get_color()
+
+                lower_plot = np.asarray(y_lower)
+                upper_plot = np.asarray(y_upper)
+                if ax.get_xscale() == "log" or ax.get_yscale() == "log":
+                    lower_plot = np.maximum(lower_plot, eps)
+                    upper_plot = np.maximum(upper_plot, eps)
+
+                ax.fill_between(
+                    x_plot,
+                    lower_plot,
+                    upper_plot,
+                    alpha=0.18,
+                    color=line_color,
+                    label=f"{pct}% CI",
+                )
+
+            ax.legend()
+        except Exception:
+            pass
+
         self._set_fit_plot_figure(fig)
 
     def _edit_priors(self) -> None:

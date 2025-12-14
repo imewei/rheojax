@@ -16,6 +16,7 @@ import numpy as np
 
 from rheojax.core.data import RheoData
 from rheojax.gui.state.store import DatasetState
+from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 from rheojax.core.registry import Registry
 from rheojax.gui.services.model_service import normalize_model_name
 
@@ -149,17 +150,9 @@ class BayesianService:
 
             # Normalize DatasetState -> RheoData
             if isinstance(data, DatasetState):
-                metadata = dict(getattr(data, "metadata", {}) or {})
-                test_mode = test_mode or metadata.get("test_mode") or getattr(data, "test_mode", None)
-                data = RheoData(
-                    x=np.asarray(data.x_data),
-                    y=np.asarray(data.y_data),
-                    x_units=getattr(data, "x_units", None),
-                    y_units=getattr(data, "y_units", None),
-                    metadata=metadata,
-                    initial_test_mode=test_mode,
-                    validate=False,
-                )
+                data = rheodata_from_dataset_state(data)
+                metadata = dict(data.metadata or {})
+                test_mode = test_mode or metadata.get("test_mode")
 
             # Set initial values if provided
             if warm_start:

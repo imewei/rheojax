@@ -212,9 +212,21 @@ class PlotService:
             # Plot G' and G" for oscillation
             if np.iscomplexobj(y):
                 G_prime = np.real(y)
-                G_double_prime = np.imag(y)
+                # Some datasets/models may use sign conventions; ensure log-safe positivity.
+                G_double_prime = np.abs(np.imag(y))
                 G_prime_fit = np.real(y_fit)
-                G_double_prime_fit = np.imag(y_fit)
+                G_double_prime_fit = np.abs(np.imag(y_fit))
+
+                # Avoid log-scale issues with zeros.
+                positive = np.concatenate([
+                    np.ravel(G_prime[np.isfinite(G_prime) & (G_prime > 0)]),
+                    np.ravel(G_double_prime[np.isfinite(G_double_prime) & (G_double_prime > 0)]),
+                ])
+                eps = float(np.nanmin(positive)) * 1e-12 if positive.size else 1e-30
+                G_prime = np.maximum(G_prime, eps)
+                G_double_prime = np.maximum(G_double_prime, eps)
+                G_prime_fit = np.maximum(G_prime_fit, eps)
+                G_double_prime_fit = np.maximum(G_double_prime_fit, eps)
 
                 ax.loglog(x, G_prime, "o", label="G' (data)", color=palette[0] if palette else None)
                 ax.loglog(x, G_double_prime, "s", label='G" (data)', color=palette[1] if palette else None)
