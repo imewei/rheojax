@@ -6,6 +6,7 @@ Bayesian inference interface with prior specification and MCMC monitoring.
 """
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 import uuid
@@ -35,12 +36,8 @@ from PySide6.QtWidgets import (
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
-from rheojax.gui.state.actions import (
-    bayesian_completed,
-    bayesian_failed,
-    start_bayesian,
-    update_bayesian_progress,
-)
+from rheojax.gui.state.actions import bayesian_failed, start_bayesian, store_bayesian_result, update_bayesian_progress
+from rheojax.gui.state.store import BayesianResult as StoredBayesianResult
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
 from rheojax.gui.services.data_service import DataService
@@ -599,7 +596,31 @@ class BayesianPage(QWidget):
         success = getattr(result, "success", True)
 
         if success:
-            self._store.dispatch(bayesian_completed(result))
+            state = self._store.get_state()
+            model_name = getattr(result, "model_name", None) or state.active_model_name
+            dataset_id = state.active_dataset_id
+
+            if model_name and dataset_id:
+                diagnostics = getattr(result, "diagnostics", {}) or {}
+                stored_result = StoredBayesianResult(
+                    model_name=str(model_name),
+                    dataset_id=str(dataset_id),
+                    posterior_samples=getattr(result, "posterior_samples", {}),
+                    summary=getattr(result, "summary", None),
+                    r_hat=diagnostics.get("r_hat", {}) or getattr(result, "r_hat", {}),
+                    ess=diagnostics.get("ess", {}) or getattr(result, "ess", {}),
+                    divergences=int(diagnostics.get("divergences", getattr(result, "divergences", 0)) or 0),
+                    credible_intervals=getattr(result, "credible_intervals", {}) or {},
+                    mcmc_time=float(getattr(result, "sampling_time", getattr(result, "mcmc_time", 0.0)) or 0.0),
+                    timestamp=getattr(result, "timestamp", datetime.now()),
+                    num_warmup=int(getattr(result, "num_warmup", self._warmup_spin.value()) or 0),
+                    num_samples=int(getattr(result, "num_samples", self._samples_spin.value()) or 0),
+                )
+                store_bayesian_result(stored_result)
+                self._store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"})
+            else:
+                # Fall back to updating pipeline status only.
+                self._store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"})
 
             # Update diagnostics display
             self._update_diagnostics(result)
@@ -666,8 +687,8 @@ class BayesianPage(QWidget):
         self._status_text.clear()
         self._status_text.append("Starting Bayesian inference...")
 
-    @Slot()
-    def _on_bayesian_completed(self) -> None:
+    @Slot(str, str)
+    def _on_bayesian_completed(self, model_name: str, dataset_id: str) -> None:
         """Handle Bayesian completed signal from state."""
         self._overall_progress.setValue(100)
         self._diag_warning.setText("Diagnostics available below")

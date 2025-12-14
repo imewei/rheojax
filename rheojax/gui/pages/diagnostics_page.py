@@ -246,31 +246,67 @@ class DiagnosticsPage(QWidget):
             self._comparison_table.setItem(i, 3, QTableWidgetItem(elpd_val))
             self._comparison_table.setItem(i, 4, QTableWidgetItem(weight_val))
 
-    @Slot(object)
-    def _on_bayesian_completed(self, result: Any) -> None:
-        """Handle bayesian inference completion from state."""
-        if hasattr(result, "model_name"):
-            self.show_diagnostics(result.model_name)
+    @Slot(str, str)
+    def _on_bayesian_completed(self, model_name: str, dataset_id: str) -> None:
+        """Handle Bayesian inference completion from state.
 
-    def show_diagnostics(self, model_id: str) -> None:
+        Parameters
+        ----------
+        model_name : str
+            Model name
+        dataset_id : str
+            Dataset identifier
+        """
+        self.show_diagnostics(model_name=model_name, dataset_id=dataset_id)
+
+    def show_diagnostics(self, model_name: str, dataset_id: str | None = None) -> None:
         """Show diagnostics for specified model.
 
         Parameters
         ----------
-        model_id : str
+        model_name : str
             Model name/ID to show diagnostics for
+        dataset_id : str, optional
+            Dataset identifier. If omitted, uses the active dataset.
         """
-        self._current_model_id = model_id
+        self._current_model_id = model_name
 
         # Get Bayesian result from state
         state = self._store.get_state()
-        bayesian_result = state.bayesian_results.get(model_id)
+        resolved_dataset_id = dataset_id or state.active_dataset_id
+        bayesian_result: BayesianResult | None = None
+
+        # Primary lookup: results are stored as "{model_name}_{dataset_id}".
+        if resolved_dataset_id:
+            key = f"{model_name}_{resolved_dataset_id}"
+            bayesian_result = state.bayesian_results.get(key)
+
+        # Fallback: attempt legacy lookup by model name.
+        if bayesian_result is None:
+            bayesian_result = state.bayesian_results.get(model_name)
+
+        # Fallback: pick the most recent result for this model.
+        if bayesian_result is None:
+            prefix = f"{model_name}_"
+            candidates = [
+                res
+                for key, res in state.bayesian_results.items()
+                if isinstance(key, str) and key.startswith(prefix)
+            ]
+            if candidates:
+                try:
+                    bayesian_result = max(
+                        candidates,
+                        key=lambda r: getattr(r, "timestamp", None) or 0,
+                    )
+                except Exception:
+                    bayesian_result = candidates[0]
 
         if bayesian_result is None:
             QMessageBox.information(
                 self,
                 "No Bayesian Results",
-                f"No Bayesian inference results found for model '{model_id}'.\n"
+                f"No Bayesian inference results found for model '{model_name}'.\n"
                 "Run Bayesian inference first from the Bayesian tab.",
             )
             return
@@ -285,7 +321,7 @@ class DiagnosticsPage(QWidget):
         current_plot = self._plot_tabs.tabText(self._plot_tabs.currentIndex())
         self._update_plot(current_plot.lower())
 
-        self.plot_requested.emit(current_plot, model_id)
+        self.plot_requested.emit(current_plot, model_name)
 
     def _get_inference_data(self, result: BayesianResult) -> Any:
         """Convert BayesianResult to ArviZ InferenceData.
@@ -471,12 +507,12 @@ class DiagnosticsPage(QWidget):
 
         self.show_diagnostics(model_id)
 
-    def get_diagnostic_summary(self, model_id: str) -> dict[str, Any]:
+    def get_diagnostic_summary(self, model_name: str) -> dict[str, Any]:
         """Get diagnostic summary for model.
 
         Parameters
         ----------
-        model_id : str
+        model_name : str
             Model name/ID
 
         Returns
@@ -485,7 +521,12 @@ class DiagnosticsPage(QWidget):
             Diagnostic summary including R-hat, ESS, divergences
         """
         state = self._store.get_state()
-        result = state.bayesian_results.get(model_id)
+        dataset_id = state.active_dataset_id
+        result = None
+        if dataset_id:
+            result = state.bayesian_results.get(f"{model_name}_{dataset_id}")
+        if result is None:
+            result = state.bayesian_results.get(model_name)
 
         if result is None:
             return {}

@@ -374,6 +374,13 @@ class StateStore:
                 if self._signals:
                     self._signals.bayesian_failed.emit("", "", error)
 
+            elif action_type == "STORE_BAYESIAN_RESULT":
+                payload = action.get("payload", action)
+                model_name = payload.get("model_name", "")
+                dataset_id = payload.get("dataset_id", "")
+                if self._signals and model_name and dataset_id:
+                    self._signals.bayesian_completed.emit(str(model_name), str(dataset_id))
+
             elif action_type == "SET_THEME":
                 theme = action.get("theme", "light")
                 if self._signals:

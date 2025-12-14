@@ -1361,8 +1361,9 @@ class RheoJAXMainWindow(QMainWindow):
         self.navigate_to("diagnostics")
         state = self.store.get_state()
         model_name = state.active_model_name
+        dataset_id = state.active_dataset_id
         if model_name:
-            self.diagnostics_page.show_diagnostics(model_name)
+            self.diagnostics_page.show_diagnostics(model_name=model_name, dataset_id=dataset_id)
         else:
             self.status_bar.show_message("Select a model to view diagnostics", 3000)
 
