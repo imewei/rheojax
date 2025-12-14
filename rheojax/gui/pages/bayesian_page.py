@@ -35,11 +35,13 @@ from PySide6.QtWidgets import (
 
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
+from rheojax.gui.services.model_service import ModelService
+from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
 from rheojax.gui.state.actions import bayesian_failed, start_bayesian, store_bayesian_result, update_bayesian_progress
 from rheojax.gui.state.store import BayesianResult as StoredBayesianResult
 from rheojax.gui.state.store import StateStore
-from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
+from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.services.data_service import DataService
 
 
@@ -50,7 +52,7 @@ class BayesianPage(QWidget):
         - MCMC configuration (sampler, warmup, samples, chains)
         - Priors editor for parameter priors
         - Real-time progress monitoring per chain
-        - ArviZ diagnostic plots (trace, pair, forest, etc.)
+        - Raw + fitted data plot (posterior representative)
         - Convergence diagnostics (R-hat, ESS)
         - Credible interval display
     """
@@ -70,6 +72,7 @@ class BayesianPage(QWidget):
         super().__init__(parent)
         self._store = StateStore()
         self._bayesian_service = BayesianService()
+        self._model_service = ModelService()
         self._worker_pool = WorkerPool()
         self._current_worker: BayesianWorker | None = None
         self._is_running = False
@@ -89,14 +92,13 @@ class BayesianPage(QWidget):
         left_panel = self._create_config_panel()
         main_layout.addWidget(left_panel, 1)
 
-        # Center: Progress and Diagnostics (50%)
+        # Center: Progress + Fit Plot (50%)
         center_splitter = QSplitter(Qt.Orientation.Vertical)
 
         progress_panel = self._create_progress_panel()
         center_splitter.addWidget(progress_panel)
 
-        diagnostics_panel = self._create_diagnostics_panel()
-        center_splitter.addWidget(diagnostics_panel)
+        center_splitter.addWidget(self._create_fit_plot_panel())
 
         center_splitter.setSizes([200, 400])
         main_layout.addWidget(center_splitter, 2)
@@ -267,22 +269,23 @@ class BayesianPage(QWidget):
 
         return panel
 
-    def _create_diagnostics_panel(self) -> QWidget:
-        """Create ArviZ diagnostics panel."""
-        panel = QGroupBox("Diagnostics")
+    def _create_fit_plot_panel(self) -> QWidget:
+        """Create the raw + fitted data plot panel.
+
+        This area should mirror the Fit tab plot: raw data + fitted curve.
+        """
+        panel = QGroupBox("Raw + Fitted")
         layout = QVBoxLayout(panel)
 
-        # ArviZ canvas
-        self._arviz_canvas = ArvizCanvas()
-        self._arviz_canvas.export_requested.connect(self._export_diagnostic_plot)
-        layout.addWidget(self._arviz_canvas)
+        self._fit_plot_canvas = PlotCanvas()
+        layout.addWidget(self._fit_plot_canvas, 3)
 
-        # Empty state message when no diagnostics available
-        empty_label = QLabel("No diagnostics yet. Run inference to see ArviZ plots.")
-        empty_label.setAlignment(Qt.AlignCenter)
-        empty_label.setStyleSheet("color: #666; padding: 6px;")
-        layout.addWidget(empty_label)
-        self._empty_diag_label = empty_label
+        self._fit_plot_placeholder = QLabel(
+            "No Bayesian fit plot yet. Run inference to see raw + fitted data."
+        )
+        self._fit_plot_placeholder.setAlignment(Qt.AlignCenter)
+        self._fit_plot_placeholder.setStyleSheet("color: #94A3B8; padding: 6px;")
+        layout.addWidget(self._fit_plot_placeholder)
 
         return panel
 
@@ -625,27 +628,12 @@ class BayesianPage(QWidget):
             # Update diagnostics display
             self._update_diagnostics(result)
 
-            # Update ArviZ canvas if inference_data is available
-            # Note: BayesianWorker result may not have inference_data
-            if hasattr(result, "inference_data") and result.inference_data is not None:
-                self._arviz_canvas.set_inference_data(result.inference_data)
-            elif hasattr(result, "posterior_samples") and result.posterior_samples:
-                # Create ArviZ InferenceData from posterior samples
-                try:
-                    import arviz as az
-                    idata_dict = {}
-                    for param_name, samples in result.posterior_samples.items():
-                        if hasattr(samples, "ndim"):
-                            if samples.ndim == 1:
-                                idata_dict[param_name] = samples.reshape(1, -1)
-                            else:
-                                idata_dict[param_name] = samples
-                        else:
-                            idata_dict[param_name] = samples
-                    idata = az.from_dict(idata_dict)
-                    self._arviz_canvas.set_inference_data(idata)
-                except Exception:
-                    pass  # ArviZ visualization optional
+            # Update raw + fitted plot
+            try:
+                self._update_fit_plot_from_posterior(result)
+            except Exception:
+                # Plotting is best-effort; keep the Bayesian results UI usable.
+                pass
 
             # Update credible intervals table
             self._update_intervals_table(result)
@@ -790,6 +778,64 @@ class BayesianPage(QWidget):
             upper_item.setFlags(upper_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._intervals_table.setItem(row, 3, upper_item)
 
+    def _set_fit_plot_figure(self, fig) -> None:
+        """Replace the Fit Plot canvas figure."""
+        self._fit_plot_canvas.figure = fig
+        self._fit_plot_canvas.canvas.figure = fig
+        self._fit_plot_canvas.axes = fig.gca()
+        self._fit_plot_canvas.canvas.draw_idle()
+        self._fit_plot_placeholder.hide()
+
+    def _posterior_mean_params(self, posterior_samples: dict[str, Any]) -> dict[str, float]:
+        """Compute a representative parameter set from posterior samples."""
+        means: dict[str, float] = {}
+        for name, samples in (posterior_samples or {}).items():
+            try:
+                arr = np.asarray(samples)
+                if arr.size == 0:
+                    continue
+                means[name] = float(np.nanmean(arr.reshape(-1)))
+            except Exception:
+                continue
+        return means
+
+    def _update_fit_plot_from_posterior(self, result: Any) -> None:
+        """Render raw data + posterior-representative fitted curve."""
+        dataset = self._store.get_active_dataset()
+        if dataset is None:
+            return
+
+        model_name = getattr(result, "model_name", None) or self._store.get_state().active_model_name
+        if not model_name:
+            return
+
+        x = np.asarray(dataset.x_data)
+        y = np.asarray(dataset.y_data)
+        test_mode = dataset.test_mode or getattr(dataset, "metadata", {}).get("test_mode")
+
+        posterior_samples = getattr(result, "posterior_samples", None) or {}
+        params = self._posterior_mean_params(posterior_samples)
+        if not params:
+            return
+
+        y_fit = self._model_service.predict(model_name, params, x, test_mode=test_mode)
+
+        # Reuse the Fit tab plotting style via PlotService.
+        from rheojax.core.data import RheoData
+        from types import SimpleNamespace
+
+        rheo_data = RheoData(
+            x=x,
+            y=y,
+            metadata=getattr(dataset, "metadata", {}) or {},
+            initial_test_mode=test_mode,
+            validate=False,
+        )
+        fit_like = SimpleNamespace(model_name=model_name, y_fit=y_fit)
+
+        fig = PlotService().create_fit_plot(rheo_data, fit_like, style="default", test_mode=test_mode)
+        self._set_fit_plot_figure(fig)
+
     def _edit_priors(self) -> None:
         """Show priors editor dialog."""
         from rheojax.gui.dialogs.bayesian_options import BayesianOptionsDialog
@@ -869,20 +915,6 @@ class BayesianPage(QWidget):
                 "sigma_static": {"dist": "halfnormal", "scale": 100.0},
                 "sigma_dynamic": {"dist": "halfnormal", "scale": 100.0},
             }
-
-    def _export_diagnostic_plot(self) -> None:
-        """Export current diagnostic plot."""
-        from PySide6.QtWidgets import QFileDialog
-
-        filepath, _ = QFileDialog.getSaveFileName(
-            self,
-            "Export Diagnostic Plot",
-            "diagnostic_plot.png",
-            "PNG Files (*.png);;PDF Files (*.pdf);;SVG Files (*.svg)",
-        )
-
-        if filepath:
-            self._arviz_canvas.export_figure(filepath)
 
     def _export_results(self) -> None:
         """Export Bayesian results to JSON or HDF5 format."""

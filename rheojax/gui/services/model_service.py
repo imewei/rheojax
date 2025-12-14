@@ -568,7 +568,11 @@ class ModelService:
             )
 
     def predict(
-        self, model_name: str, parameters: dict[str, float], x_values: np.ndarray
+        self,
+        model_name: str,
+        parameters: dict[str, float],
+        x_values: np.ndarray,
+        test_mode: str | None = None,
     ) -> np.ndarray:
         """Generate model predictions.
 
@@ -580,6 +584,8 @@ class ModelService:
             Fitted parameter values
         x_values : np.ndarray
             X values for prediction
+        test_mode : str, optional
+            Optional test mode for prediction (relaxation/oscillation/creep/etc.)
 
         Returns
         -------
@@ -601,7 +607,14 @@ class ModelService:
             model.fitted_ = True
 
             # Predict
-            return model.predict(x_values)
+            if test_mode is None:
+                return model.predict(x_values)
+
+            try:
+                return model.predict(x_values, test_mode=test_mode)
+            except TypeError:
+                # Backward compatibility for model implementations without test_mode.
+                return model.predict(x_values)
 
         except Exception as e:
             logger.error(f"Prediction failed: {e}")
