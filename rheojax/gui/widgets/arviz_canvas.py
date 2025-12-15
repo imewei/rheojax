@@ -5,6 +5,7 @@ ArviZ Canvas Widget
 ArviZ diagnostic plot integration for Bayesian inference visualization.
 """
 
+import logging
 from typing import Any
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
@@ -17,8 +18,11 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
-    QWidget,
 )
+
+from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget, PlotMetrics
+
+logger = logging.getLogger(__name__)
 
 # Available ArviZ plot types
 PLOT_TYPES = [
@@ -33,8 +37,11 @@ PLOT_TYPES = [
 ]
 
 
-class ArvizCanvas(QWidget):
+class ArvizCanvas(BaseArviZWidget):
     """ArviZ diagnostic canvas for Bayesian visualization.
+
+    Inherits from BaseArviZWidget to use the standardized figure swapping
+    protocol with proper cleanup and performance tracking.
 
     Features:
         - All major ArviZ plot types (trace, pair, forest, etc.)
@@ -42,6 +49,7 @@ class ArvizCanvas(QWidget):
         - Plot type selector dropdown
         - Export support (PNG, PDF, SVG)
         - HDI probability control
+        - Performance metrics via PlotMetrics
 
     Signals
     -------
@@ -60,7 +68,7 @@ class ArvizCanvas(QWidget):
     plot_changed = Signal(str)
     export_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: BaseArviZWidget | None = None) -> None:
         """Initialize ArviZ canvas.
 
         Parameters
@@ -114,8 +122,10 @@ class ArvizCanvas(QWidget):
         layout.addLayout(toolbar_layout)
 
         # Create matplotlib figure and canvas
+        # Note: We don't set a layout engine here because ArviZ creates its own
+        # figures which we swap in via _copy_arviz_figure(). The initial figure
+        # is just a placeholder.
         self._figure = Figure(figsize=(8, 6), dpi=100)
-        self._figure.set_layout_engine("tight")
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._canvas.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -155,7 +165,7 @@ class ArvizCanvas(QWidget):
             self._refresh_plot()
 
     def _refresh_plot(self) -> None:
-        """Refresh the current plot."""
+        """Refresh the current plot with performance tracking."""
         if self._inference_data is None:
             self._status_label.show()
             return
@@ -180,10 +190,20 @@ class ArvizCanvas(QWidget):
         func = plot_funcs.get(self._current_plot_type)
         if func:
             try:
-                func()
+                # Use timed_render for performance tracking
+                self.timed_render(self._current_plot_type, func)
                 self._status_label.setText(f"Showing: {self._current_plot_type}")
                 self._status_label.hide()
+
+                logger.debug(
+                    "plot_refresh_complete",
+                    extra={
+                        "plot_type": self._current_plot_type,
+                        "has_inference_data": self._inference_data is not None,
+                    },
+                )
             except Exception as e:
+                logger.warning(f"Plot generation failed: {e}", exc_info=True)
                 self._status_label.setText(f"Error: {e}")
                 self._status_label.show()
                 ax = self._figure.add_subplot(111)
@@ -195,7 +215,17 @@ class ArvizCanvas(QWidget):
             self._status_label.setText("Unsupported plot type")
             self._status_label.show()
 
-        self._canvas.draw()
+        # Sanitize any tab characters before drawing to avoid
+        # "Glyph 9 missing from font" warnings
+        self._sanitize_figure_text(self._figure)
+
+        # Suppress font glyph warnings during draw - ArviZ may generate
+        # text with tabs in tick labels that aren't accessible until draw time
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Glyph.*missing from font")
+            self._canvas.draw()
 
     def set_inference_data(self, idata: Any) -> None:
         """Set ArviZ InferenceData object.
@@ -245,29 +275,74 @@ class ArvizCanvas(QWidget):
         """Swap ArviZ-generated figure into our Qt canvas.
 
         ArviZ plotting functions create their own figures internally and don't
-        accept a figure= parameter. This method swaps the ArviZ figure into
-        our Qt canvas for proper embedding.
+        accept a figure= parameter. This method uses the base class swap_figure
+        protocol for thread-safe figure swapping with proper cleanup.
 
         Parameters
         ----------
         arviz_fig : Figure
             The figure created by ArviZ
         """
-        import matplotlib.pyplot as plt
+        # Sanitize text before swapping to avoid glyph warnings
+        self._sanitize_figure_text(arviz_fig)
 
-        # Store reference to old figure for cleanup
-        old_fig = self._figure
+        # Use base class swap_figure for thread-safe figure replacement
+        # This handles canvas transfer and schedules cleanup on main thread
+        self.swap_figure(arviz_fig)
 
-        # Update our reference to the ArviZ figure
-        self._figure = arviz_fig
-        self._figure.set_layout_engine("tight")
+        logger.debug(
+            "arviz_figure_swapped",
+            extra={
+                "num_axes": len(arviz_fig.get_axes()),
+                "plot_type": self._current_plot_type,
+            },
+        )
 
-        # Update the canvas to use the new figure
-        self._canvas.figure = self._figure
-        self._figure.set_canvas(self._canvas)
+    def _sanitize_figure_text(self, fig: Figure) -> None:
+        """Replace tab characters with spaces in all figure text.
 
-        # Close the old figure to prevent memory leak
-        plt.close(old_fig)
+        ArviZ sometimes uses tab characters in labels which causes
+        "Glyph 9 missing from font" warnings with some fonts.
+
+        Parameters
+        ----------
+        fig : Figure
+            Matplotlib figure to sanitize
+        """
+        for ax in fig.get_axes():
+            # Sanitize title
+            title = ax.get_title()
+            if title and "\t" in title:
+                ax.set_title(title.replace("\t", "  "))
+
+            # Sanitize axis labels
+            xlabel = ax.get_xlabel()
+            if xlabel and "\t" in xlabel:
+                ax.set_xlabel(xlabel.replace("\t", "  "))
+
+            ylabel = ax.get_ylabel()
+            if ylabel and "\t" in ylabel:
+                ax.set_ylabel(ylabel.replace("\t", "  "))
+
+            # Sanitize tick labels
+            for label in ax.get_xticklabels() + ax.get_yticklabels():
+                text = label.get_text()
+                if text and "\t" in text:
+                    label.set_text(text.replace("\t", "  "))
+
+            # Sanitize legend if present
+            legend = ax.get_legend()
+            if legend:
+                for text in legend.get_texts():
+                    label_text = text.get_text()
+                    if label_text and "\t" in label_text:
+                        text.set_text(label_text.replace("\t", "  "))
+
+        # Sanitize suptitle if present
+        if fig._suptitle and fig._suptitle.get_text():
+            suptitle = fig._suptitle.get_text()
+            if "\t" in suptitle:
+                fig.suptitle(suptitle.replace("\t", "  "))
 
     def _plot_trace(self) -> None:
         """Generate trace plot."""
@@ -293,7 +368,17 @@ class ArvizCanvas(QWidget):
             import matplotlib.pyplot as plt
 
             plt.close("all")
-            az.plot_pair(self._inference_data, divergences=True)
+
+            # Check if inference data has sample_stats with diverging info
+            # before requesting divergences plot
+            has_divergences = (
+                self._inference_data is not None
+                and hasattr(self._inference_data, "sample_stats")
+                and self._inference_data.sample_stats is not None
+                and "diverging" in self._inference_data.sample_stats
+            )
+
+            az.plot_pair(self._inference_data, divergences=has_divergences)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")

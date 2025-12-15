@@ -8,6 +8,7 @@ Reusable UI components for the RheoJAX GUI.
 # Export enums from store for convenience
 from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas, ArvizCanvas
+from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget, PlotMetrics
 from rheojax.gui.widgets.dataset_tree import DatasetTree
 from rheojax.gui.widgets.jax_status import JAXStatusWidget
 from rheojax.gui.widgets.multi_view import MultiView
@@ -18,7 +19,9 @@ from rheojax.gui.widgets.priors_editor import PriorsEditor
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 
 __all__ = [
+    "BaseArviZWidget",
     "PlotCanvas",
+    "PlotMetrics",
     "DatasetTree",
     "ParameterTable",
     "PipelineChips",
