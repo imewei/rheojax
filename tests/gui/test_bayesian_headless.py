@@ -26,7 +26,7 @@ def test_bayesian_headless_smoke() -> None:
     if not service.get_default_priors("maxwell"):
         pytest.skip("maxwell model not registered for Bayesian tests")
 
-    progress: list[tuple[int, int, int]] = []
+    progress: list[tuple[str, int, int, int]] = []
     result = service.run_mcmc(
         "maxwell",
         data,
@@ -34,7 +34,7 @@ def test_bayesian_headless_smoke() -> None:
         num_samples=10,
         num_chains=1,
         max_tree_depth=3,
-        progress_callback=lambda c, i, total: progress.append((c, i, total)),
+        progress_callback=lambda stage, chain, iteration, total: progress.append((stage, chain, iteration, total)),
     )
 
     assert isinstance(result, BayesianResult)

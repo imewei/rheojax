@@ -316,8 +316,8 @@ class TestWorkflowIntegration:
         # Should have run button
         assert page._btn_run is not None
 
-        # Should have arviz canvas
-        assert page._arviz_canvas is not None
+        # Should have fit plot canvas (raw + fitted data plot)
+        assert page._fit_plot_canvas is not None
 
         page.close()
 

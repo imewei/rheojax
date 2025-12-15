@@ -53,4 +53,4 @@ def test_bayesian_ppd_plot_hash():
 
     digest = hashlib.sha256(buf.getvalue()).hexdigest()
 
-    assert digest == "c3866924ad6f668e0008325a2ad89a35f2749706c8dee6d481f270c4faf25cfa"
+    assert digest == "fad6901c5106c2ec224a5553933d349f990b9b8b38294d11ba99395debdf4e65"

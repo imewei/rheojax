@@ -394,3 +394,63 @@ def emoji_checker():
         Function to check if text contains emoji
     """
     return contains_emoji
+
+
+@pytest.fixture(autouse=True)
+def reset_state_store():
+    """Reset StateStore singleton between tests.
+
+    This fixture ensures each test starts with a clean StateStore instance,
+    preventing state leakage between tests that could cause flaky failures.
+
+    The fixture:
+    1. Resets the singleton before each test
+    2. Yields control to the test
+    3. Resets again after the test completes
+
+    Notes
+    -----
+    This is an autouse fixture, meaning it runs automatically for every test
+    in the gui test suite without needing to be explicitly requested.
+    """
+    # Reset before test
+    try:
+        from rheojax.gui.state.store import StateStore
+
+        StateStore._instance = None
+    except ImportError:
+        pass  # StateStore not available, skip reset
+
+    yield
+
+    # Reset after test to clean up
+    try:
+        from rheojax.gui.state.store import StateStore
+
+        StateStore._instance = None
+    except ImportError:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def reset_plot_metrics():
+    """Reset PlotMetrics between tests.
+
+    This fixture ensures plot metrics don't accumulate across tests,
+    providing clean performance data for each test run.
+    """
+    try:
+        from rheojax.gui.widgets.base_arviz_widget import PlotMetrics
+
+        PlotMetrics.reset()
+    except ImportError:
+        pass
+
+    yield
+
+    try:
+        from rheojax.gui.widgets.base_arviz_widget import PlotMetrics
+
+        PlotMetrics.reset()
+    except ImportError:
+        pass
