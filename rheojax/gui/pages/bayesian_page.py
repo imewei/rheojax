@@ -6,11 +6,14 @@ Bayesian inference interface with prior specification and MCMC monitoring.
 """
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 import uuid
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
@@ -787,6 +790,14 @@ class BayesianPage(QWidget):
         self._fit_plot_canvas.canvas.draw_idle()
         self._fit_plot_placeholder.hide()
 
+        logger.debug(
+            "fit_plot_figure_set",
+            extra={
+                "page": "bayesian",
+                "num_axes": len(fig.get_axes()),
+            },
+        )
+
     def _posterior_mean_params(self, posterior_samples: dict[str, Any]) -> dict[str, float]:
         """Compute a representative parameter set from posterior samples."""
         means: dict[str, float] = {}
@@ -851,10 +862,12 @@ class BayesianPage(QWidget):
         """Render raw data + posterior-representative fitted curve."""
         dataset = self._store.get_active_dataset()
         if dataset is None:
+            logger.debug("plot_update skipped: no active dataset")
             return
 
         model_name = getattr(result, "model_name", None) or self._store.get_state().active_model_name
         if not model_name:
+            logger.debug("plot_update skipped: no model name")
             return
 
         rheo_data = rheodata_from_dataset_state(dataset)
@@ -862,11 +875,24 @@ class BayesianPage(QWidget):
         y = np.asarray(rheo_data.y)
         test_mode = rheo_data.metadata.get("test_mode")
 
+        logger.debug(
+            "plot_update",
+            extra={
+                "page": "bayesian",
+                "plot_type": "fit",
+                "data_shape": x.shape,
+                "has_posterior": bool(getattr(result, "posterior_samples", None)),
+                "model_name": model_name,
+                "test_mode": test_mode,
+            },
+        )
+
         posterior_samples = getattr(result, "posterior_samples", None) or {}
         # Posterior predictive band is computed by sampling predictions.
         # Use a small cap for responsiveness in the GUI.
         draw_indices = self._posterior_draw_indices(posterior_samples, max_draws=200)
         if draw_indices.size == 0:
+            logger.debug("plot_update skipped: no posterior draw indices")
             return
 
         y_draws: list[np.ndarray] = []

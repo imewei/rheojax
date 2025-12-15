@@ -5,16 +5,19 @@ Diagnostics Page
 MCMC diagnostics and posterior analysis with ArviZ integration.
 """
 
+import logging
 from typing import Any
 
 import numpy as np
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QGroupBox,
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -26,6 +29,8 @@ from PySide6.QtWidgets import (
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, StateStore
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas
+
+logger = logging.getLogger(__name__)
 
 
 class DiagnosticsPage(QWidget):
@@ -85,10 +90,18 @@ class DiagnosticsPage(QWidget):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
+        # Scroll area for the plot canvas
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
         # ArviZ canvas for this plot type
         canvas = ArviZCanvas()
         setattr(self, f"_{plot_type.lower()}_canvas", canvas)
-        layout.addWidget(canvas)
+        scroll_area.setWidget(canvas)
+        layout.addWidget(scroll_area)
 
         # Export button
         btn_export = QPushButton(f"Export {plot_type} Plot")
@@ -450,13 +463,25 @@ class DiagnosticsPage(QWidget):
             Plot type (trace, forest, pair, etc.)
         """
         if self._current_inference_data is None:
+            logger.debug("plot_update skipped: no inference data")
             return
 
         canvas_attr = f"_{plot_type}_canvas"
         canvas = getattr(self, canvas_attr, None)
 
         if canvas is None:
+            logger.debug(f"plot_update skipped: no canvas for {plot_type}")
             return
+
+        logger.debug(
+            "plot_update",
+            extra={
+                "page": "diagnostics",
+                "plot_type": plot_type,
+                "model_id": self._current_model_id,
+                "has_inference_data": self._current_inference_data is not None,
+            },
+        )
 
         # Set inference data on canvas and let it render
         canvas.set_inference_data(self._current_inference_data)

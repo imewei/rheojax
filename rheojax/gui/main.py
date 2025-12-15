@@ -24,7 +24,15 @@ import argparse
 import logging
 import os
 import sys
+import warnings
 from pathlib import Path
+
+# Suppress matplotlib warnings that are harmless in GUI context
+# - Glyph warnings: ArviZ uses tab characters in labels that some fonts don't support
+# - Layout warnings: Complex ArviZ plots may not fit tight/constrained layouts perfectly
+warnings.filterwarnings("ignore", message="Glyph.*missing from font")
+warnings.filterwarnings("ignore", message=".*layout not applied.*")
+warnings.filterwarnings("ignore", message=".*constrained_layout.*collapsed.*")
 
 from rheojax import __version__
 from rheojax.gui.utils.logging import install_gui_log_handler
