@@ -576,7 +576,7 @@ def spp_fourier_analysis(
         Dictionary containing all SPP metrics:
         - Gp_t: Instantaneous G'(t) (Pa)
         - Gpp_t: Instantaneous G''(t) (Pa)
-        - G_star_t: Complex modulus |G*(t)| (Pa)
+        - G_star_t: Complex modulus ``|G*(t)|`` (Pa)
         - tan_delta_t: Loss tangent tan(δ)(t)
         - delta_t: Phase angle δ(t) (radians)
         - disp_stress: Displacement stress (Pa)
@@ -1552,7 +1552,7 @@ def spp_numerical_analysis(
         Dictionary containing:
         - Gp_t: Instantaneous storage modulus G'(t) (Pa)
         - Gpp_t: Instantaneous loss modulus G''(t) (Pa)
-        - G_star_t: Instantaneous complex modulus |G*(t)| (Pa)
+        - G_star_t: Instantaneous complex modulus ``|G*(t)|`` (Pa)
         - tan_delta_t: Instantaneous tan(δ)(t)
         - delta_t: Instantaneous phase angle δ(t) (radians)
         - disp_stress: Displacement stress (Pa)
@@ -1953,13 +1953,14 @@ def frenet_serret_frame(
     B_vec : Array
         Binormal vector (``T × N``)
     curvature : Array
-        Local curvature ``κ = |rd × rdd| / |rd|^3``
+        Local curvature ``κ = |rd × rdd| / |rd|³``
     torsion : Array
         Local torsion ``τ`` (requires third derivative, returns zeros)
 
     Notes
     -----
-    Formulas (matching MATLAB SPPplus):
+    Formulas (matching MATLAB SPPplus)::
+
         T = rd / |rd|
         N = -(rd × (rd × rdd)) / (|rd| × |rd × rdd|)
         B = (rd × rdd) / |rd × rdd|
