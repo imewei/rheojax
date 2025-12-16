@@ -60,8 +60,8 @@ Supported Formats
      - Reader Function
      - Notes
    * - TA Instruments TRIOS
-     - ``read_trios()``
-     - Auto-detects test mode
+     - ``load_trios()``
+     - Auto-detects test mode, auto-chunks large files. See :doc:`trios_format`
    * - Anton Paar
      - ``read_anton_paar()``
      - RheoCompass export
@@ -78,17 +78,21 @@ Supported Formats
 Chunked Reading (Large Files)
 ------------------------------
 
-For TRIOS files > 1GB:
+For TRIOS files > 5 MB, auto-chunking is enabled by default (v0.4.0+):
 
 .. code-block:: python
 
-   from rheojax.io.readers import read_trios_chunked
+   from rheojax.io.readers import load_trios
+   from rheojax.io.readers.trios import load_trios_chunked
 
-   for chunk in read_trios_chunked('large_file.txt', chunk_size=10000):
-       # Process chunk
+   # Auto-chunking for files > 5 MB (default behavior)
+   data = load_trios('large_file.txt')
+
+   # Explicit chunked generator for memory-constrained processing
+   for chunk in load_trios_chunked('large_file.txt', chunk_size=10000):
        process(chunk)
 
-See ``examples/advanced/07-trios_chunked_reading_example.ipynb`` for details.
+See :doc:`trios_format` for detailed chunked reading documentation.
 
 Summary
 -------
@@ -99,4 +103,6 @@ or specific readers for fine control. Save in HDF5 for full fidelity or Excel fo
 Further Reading
 ---------------
 
-- API Reference: :doc:`/api/io`
+- :doc:`trios_format` — Detailed TRIOS file format documentation
+- :doc:`data_formats` — Data format requirements for all analyses
+- :doc:`/api/io` — I/O API reference

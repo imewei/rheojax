@@ -259,21 +259,24 @@ parametrically through the oscillation cycle [2]_:
 
 **Trajectory interpretation legend** (from Rogers 2017, Figure 2):
 
-+---------------------------+-----------------------------+
-| Position/Motion           | Interpretation              |
-+===========================+=============================+
-| :math:`G''_t = 0`         | Purely elastic              |
-+---------------------------+-----------------------------+
-| :math:`G'_t = 0`          | Purely viscous              |
-+---------------------------+-----------------------------+
-| :math:`G''_t > G'_t`      | Predominantly viscous       |
-+---------------------------+-----------------------------+
-| :math:`G'_t > G''_t`      | Predominantly elastic       |
-+---------------------------+-----------------------------+
-| Crossing :math:`G'_t=G''_t` toward viscous | Fluidization |
-+---------------------------+-----------------------------+
-| Crossing :math:`G'_t=G''_t` toward elastic | Reformation  |
-+---------------------------+-----------------------------+
+.. list-table::
+   :header-rows: 1
+   :widths: 55 45
+
+   * - Position/Motion
+     - Interpretation
+   * - :math:`G''_t = 0`
+     - Purely elastic
+   * - :math:`G'_t = 0`
+     - Purely viscous
+   * - :math:`G''_t > G'_t`
+     - Predominantly viscous
+   * - :math:`G'_t > G''_t`
+     - Predominantly elastic
+   * - Crossing :math:`G'_t=G''_t` toward viscous
+     - Fluidization
+   * - Crossing :math:`G'_t=G''_t` toward elastic
+     - Reformation
 
 Time-Domain Phase Angle
 ~~~~~~~~~~~~~~~~~~~~~~~

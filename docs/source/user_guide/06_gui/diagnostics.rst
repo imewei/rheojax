@@ -34,11 +34,6 @@ The Diagnostics page provides seven ArviZ diagnostic plot types via tabbed inter
 Trace Plot
 ----------
 
-.. image:: /_static/gui/trace_plot.png
-   :alt: Trace Plot Example
-   :width: 600px
-   :align: center
-
 **Purpose**: Visualize MCMC chain behavior and posterior distributions.
 
 - **Left panel**: Posterior density (KDE)

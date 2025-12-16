@@ -38,6 +38,7 @@ SPPYieldStress Model
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 
 SPP Amplitude Sweep Pipeline

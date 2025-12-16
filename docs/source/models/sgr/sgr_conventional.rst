@@ -521,12 +521,15 @@ References
    *Physical Review E*, **58**, 738-759 (1998).
    https://doi.org/10.1103/PhysRevE.58.738
 
-.. [3] Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
-   *Physical Review E*, **85**, 031127 (2012).
-   https://doi.org/10.1103/PhysRevE.85.031127
+Further Reading
+~~~~~~~~~~~~~~~
 
-.. [4] Fielding, S. M., Cates, M. E., & Sollich, P. "Shear banding, aging and noise dynamics in
-   soft glassy materials." *Soft Matter*, **5**, 2378-2382 (2009).
+- Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
+  *Physical Review E*, **85**, 031127 (2012).
+  https://doi.org/10.1103/PhysRevE.85.031127
 
-.. [5] Hébraud, P. & Lequeux, F. "Mode-Coupling Theory for the Pasty Rheology of Soft Glassy
-   Materials." *Physical Review Letters*, **81**, 2934 (1998).
+- Fielding, S. M., Cates, M. E., & Sollich, P. "Shear banding, aging and noise dynamics in
+  soft glassy materials." *Soft Matter*, **5**, 2378-2382 (2009).
+
+- Hébraud, P. & Lequeux, F. "Mode-Coupling Theory for the Pasty Rheology of Soft Glassy
+  Materials." *Physical Review Letters*, **81**, 2934 (1998).

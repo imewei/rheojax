@@ -8,8 +8,8 @@ Section 4: Practical Guides (Weeks 13-16)
 .. admonition:: Section Overview
    :class: note
 
-   This section teaches production workflows using Pipeline APIs, data I/O for multiple
-   instrument formats, publication-quality visualization, and batch processing.
+   This section teaches production workflows using Pipeline APIs, data format requirements,
+   data I/O for multiple instrument formats, publication-quality visualization, and batch processing.
 
    **Timeline**: Weeks 13-16 (12-16 hours)
 
@@ -22,9 +22,10 @@ By completing this section, you will be able to:
 
 1. Build fluent analysis pipelines with Pipeline API
 2. Use modular API for low-level control
-3. Load data from TRIOS, Anton Paar, CSV, Excel formats
-4. Create publication-quality visualizations
-5. Process multiple datasets in batch mode
+3. Understand data format requirements for all analysis types
+4. Load data from TRIOS, Anton Paar, CSV, Excel formats
+5. Create publication-quality visualizations
+6. Process multiple datasets in batch mode
 
 Section Contents
 ----------------
@@ -34,6 +35,8 @@ Section Contents
 
    pipeline_api
    modular_api
+   data_formats
+   trios_format
    data_io
    visualization
    batch_processing
@@ -45,8 +48,10 @@ Section Roadmap
 
 - :doc:`pipeline_api` — Fluent workflows (load → fit → plot → save)
 
-**Week 14: Data I/O**
+**Week 14: Data Formats & I/O**
 
+- :doc:`data_formats` — Data format requirements for all analyses (reference)
+- :doc:`trios_format` — TA Instruments TRIOS file format (detailed)
 - :doc:`data_io` — Auto-detect file formats, HDF5 output
 - :doc:`modular_api` — Low-level control
 

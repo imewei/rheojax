@@ -115,13 +115,17 @@ The Four-Step Yielding Sequence
 For yield-stress materials (colloidal glasses, gels, pastes), SPP reveals a characteristic
 four-step sequence within each oscillatory cycle:
 
-.. figure:: /_static/images/spp_four_step_sequence.png
-   :align: center
-   :width: 80%
-   :alt: Four-step yielding sequence in LAOS
+.. admonition:: Four-Step Yielding Sequence
+   :class: note
 
-   The four-step yielding sequence: (1) elastic extension, (2) static yield, (3) viscous flow,
-   (4) cage reformation. Adapted from Rogers et al. (2011).
+   The four-step yielding sequence within each LAOS cycle:
+
+   1. **Elastic extension** (1→2): Stress increases linearly with strain
+   2. **Static yield** (point 2): Maximum stress before cage rupture
+   3. **Viscous flow** (2→3→4): Power-law flow following the steady-state flow curve
+   4. **Cage reformation** (point 4): Stress at zero rate when cages reform
+
+   *Adapted from Rogers et al. (2011).*
 
 **Step 1: Elastic Extension (1→2)**
 
@@ -934,6 +938,7 @@ See Also
 .. |sigma| unicode:: U+03C3
 .. |sigma_sy| replace:: |sigma|\ :sub:`y,static`
 .. |sigma_dy| replace:: |sigma|\ :sub:`y,dynamic`
+.. |sigma_y| replace:: |sigma|\ :sub:`y`
 .. |omega| unicode:: U+03C9
 .. |delta| unicode:: U+03B4
 .. |delta_t| replace:: |delta|\ :sub:`t`

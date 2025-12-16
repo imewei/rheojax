@@ -408,9 +408,12 @@ References
    Development of a general formalism." *Physical Review E*, **56**, 6620 (1997).
    https://doi.org/10.1103/PhysRevE.56.6620
 
-.. [3] Öttinger, H. C. *Beyond Equilibrium Thermodynamics*. Wiley, 2005.
-   Comprehensive treatment of GENERIC and nonequilibrium thermodynamics.
+Further Reading
+~~~~~~~~~~~~~~~
 
-.. [4] Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
-   *Physical Review E*, **85**, 031127 (2012).
-   https://doi.org/10.1103/PhysRevE.85.031127
+- Öttinger, H. C. *Beyond Equilibrium Thermodynamics*. Wiley, 2005.
+  Comprehensive treatment of GENERIC and nonequilibrium thermodynamics.
+
+- Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
+  *Physical Review E*, **85**, 031127 (2012).
+  https://doi.org/10.1103/PhysRevE.85.031127
