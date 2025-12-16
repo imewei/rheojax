@@ -92,8 +92,10 @@ class DiagnosticsPage(QWidget):
 
         # Scroll area for the plot canvas
         scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
+        # Use False to let canvas maintain its natural size for scrolling
+        scroll_area.setWidgetResizable(False)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        # Always show scrollbars when content exceeds viewport
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
@@ -101,7 +103,7 @@ class DiagnosticsPage(QWidget):
         canvas = ArviZCanvas()
         setattr(self, f"_{plot_type.lower()}_canvas", canvas)
         scroll_area.setWidget(canvas)
-        layout.addWidget(scroll_area)
+        layout.addWidget(scroll_area, 1)  # Give scroll area stretch priority
 
         # Export button
         btn_export = QPushButton(f"Export {plot_type} Plot")

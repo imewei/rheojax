@@ -10,7 +10,7 @@ from typing import Any
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -127,9 +127,12 @@ class ArvizCanvas(BaseArviZWidget):
         # is just a placeholder.
         self._figure = Figure(figsize=(8, 6), dpi=100)
         self._canvas = FigureCanvasQTAgg(self._figure)
+        # Use Minimum policy so widget can grow beyond container for scrolling
         self._canvas.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum
         )
+        # Set initial minimum size based on figure dimensions
+        self._update_canvas_size()
 
         # Navigation toolbar
         self._nav_toolbar = NavigationToolbar2QT(self._canvas, self)
@@ -148,6 +151,53 @@ class ArvizCanvas(BaseArviZWidget):
         self._type_combo.currentIndexChanged.connect(self._on_type_changed)
         self._refresh_btn.clicked.connect(self._refresh_plot)
         self._export_btn.clicked.connect(self.export_requested.emit)
+
+    def _update_canvas_size(self) -> None:
+        """Update canvas minimum size based on current figure dimensions.
+
+        This ensures scrollbars appear when the figure is larger than the viewport.
+        """
+        if self._figure is None:
+            return
+
+        # Get figure size in pixels
+        fig_width, fig_height = self._figure.get_size_inches()
+        dpi = self._figure.get_dpi()
+        width_px = int(fig_width * dpi)
+        height_px = int(fig_height * dpi)
+
+        # Set minimum size on canvas to enable scrolling
+        self._canvas.setMinimumSize(width_px, height_px)
+
+        # Update size hints
+        self.updateGeometry()
+
+    def sizeHint(self) -> QSize:
+        """Return recommended size based on figure dimensions.
+
+        Returns
+        -------
+        QSize
+            Recommended widget size
+        """
+        if self._figure is not None:
+            fig_width, fig_height = self._figure.get_size_inches()
+            dpi = self._figure.get_dpi()
+            # Add space for toolbar and status label
+            toolbar_height = 40
+            return QSize(int(fig_width * dpi), int(fig_height * dpi) + toolbar_height)
+        return QSize(800, 640)
+
+    def minimumSizeHint(self) -> QSize:
+        """Return minimum size for the widget.
+
+        Returns
+        -------
+        QSize
+            Minimum widget size (allows scrolling for larger plots)
+        """
+        # Allow widget to shrink to a reasonable minimum
+        return QSize(400, 300)
 
     def _on_type_changed(self, index: int) -> None:
         """Handle plot type change.
@@ -290,6 +340,9 @@ class ArvizCanvas(BaseArviZWidget):
         # This handles canvas transfer and schedules cleanup on main thread
         self.swap_figure(arviz_fig)
 
+        # Update canvas size for scrolling based on new figure dimensions
+        self._update_canvas_size()
+
         logger.debug(
             "arviz_figure_swapped",
             extra={
@@ -408,16 +461,47 @@ class ArvizCanvas(BaseArviZWidget):
             self._plot_fallback("ArviZ not installed")
 
     def _plot_energy(self) -> None:
-        """Generate energy plot."""
+        """Generate energy plot.
+
+        Requires sample_stats group with energy diagnostic from MCMC sampling.
+        Shows fallback message if sample_stats is not available.
+        """
         try:
             import arviz as az
             import matplotlib.pyplot as plt
+
+            # Check if sample_stats exists with energy diagnostic
+            if not self._has_sample_stats_energy():
+                self._plot_fallback(
+                    "Energy plot requires MCMC sample statistics.\n\n"
+                    "The current InferenceData only contains posterior samples.\n"
+                    "To view energy diagnostics, ensure the Bayesian result\n"
+                    "was created with full MCMC diagnostics (via fit_bayesian)."
+                )
+                return
 
             plt.close("all")
             az.plot_energy(self._inference_data)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
             self._plot_fallback("ArviZ not installed")
+
+    def _has_sample_stats_energy(self) -> bool:
+        """Check if InferenceData has sample_stats with energy.
+
+        Returns
+        -------
+        bool
+            True if sample_stats.energy exists, False otherwise
+        """
+        if self._inference_data is None:
+            return False
+
+        sample_stats = getattr(self._inference_data, "sample_stats", None)
+        if sample_stats is None:
+            return False
+
+        return "energy" in sample_stats
 
     def _plot_rank(self) -> None:
         """Generate rank plot."""
