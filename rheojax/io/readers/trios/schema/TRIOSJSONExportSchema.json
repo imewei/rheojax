@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TRIOS JSON Export Schema",
+  "description": "Schema for TA Instruments TRIOS JSON export format",
+  "type": "object",
+  "properties": {
+    "Experiment": {
+      "type": "object",
+      "properties": {
+        "Properties": {
+          "type": "object",
+          "properties": {
+            "Name": { "type": "string" },
+            "Date": { "type": "string" },
+            "Operator": { "type": "string" },
+            "InstrumentName": { "type": "string" },
+            "InstrumentSerialNumber": { "type": "string" }
+          }
+        },
+        "Sample": {
+          "type": "object",
+          "properties": {
+            "Name": { "type": "string" },
+            "Description": { "type": "string" }
+          }
+        },
+        "Procedure": {
+          "type": "object",
+          "properties": {
+            "Name": { "type": "string" },
+            "Steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "Name": { "type": "string" },
+                  "Type": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "Results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "Properties": {
+                "type": "object",
+                "properties": {
+                  "Name": { "type": "string" },
+                  "Step": { "type": "integer" }
+                }
+              },
+              "DataSet": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "Properties": {
+                      "type": "object"
+                    },
+                    "Data": {
+                      "type": "object",
+                      "properties": {
+                        "columns": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": { "type": "string" },
+                              "unit": { "type": "string" },
+                              "type": { "type": "string" }
+                            },
+                            "required": ["name"]
+                          }
+                        },
+                        "values": {
+                          "type": "array",
+                          "items": {
+                            "type": "array"
+                          }
+                        }
+                      },
+                      "required": ["columns", "values"]
+                    }
+                  },
+                  "required": ["Data"]
+                }
+              }
+            },
+            "required": ["DataSet"]
+          }
+        }
+      },
+      "required": ["Results"]
+    }
+  },
+  "required": ["Experiment"]
+}
