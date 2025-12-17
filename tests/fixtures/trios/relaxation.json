@@ -1,0 +1,155 @@
+{
+  "Experiment": {
+    "Properties": {
+      "Name": "Stress Relaxation Test",
+      "Date": "2024-01-17",
+      "Operator": "Test Operator",
+      "InstrumentName": "Discovery HR-2",
+      "InstrumentSerialNumber": "5401234567"
+    },
+    "Sample": {
+      "Name": "PDMS Relaxation Sample",
+      "Description": "Polydimethylsiloxane gel"
+    },
+    "Procedure": {
+      "Name": "Stress Relaxation",
+      "Steps": [
+        {
+          "Name": "Relaxation",
+          "Type": "Stress Relaxation"
+        }
+      ]
+    },
+    "Results": [
+      {
+        "Properties": {
+          "Name": "Relaxation Result",
+          "Step": 1
+        },
+        "DataSet": [
+          {
+            "Properties": {
+              "Description": "Stress relaxation data"
+            },
+            "Data": {
+              "columns": [
+                {
+                  "name": "Time",
+                  "unit": "s",
+                  "type": "float"
+                },
+                {
+                  "name": "Shear Strain",
+                  "unit": "",
+                  "type": "float"
+                },
+                {
+                  "name": "Shear Stress",
+                  "unit": "Pa",
+                  "type": "float"
+                },
+                {
+                  "name": "Relaxation Modulus",
+                  "unit": "Pa",
+                  "type": "float"
+                },
+                {
+                  "name": "Temperature",
+                  "unit": "\u00b0C",
+                  "type": "float"
+                },
+                {
+                  "name": "Step",
+                  "unit": "",
+                  "type": "int"
+                }
+              ],
+              "values": [
+                [
+                  0.01,
+                  0.01,
+                  59.50249168745841,
+                  5950.2491687458405,
+                  25.0,
+                  1
+                ],
+                [
+                  0.02,
+                  0.01,
+                  59.00993366533777,
+                  5900.993366533777,
+                  25.0,
+                  1
+                ],
+                [
+                  0.05,
+                  0.01,
+                  57.5614712250357,
+                  5756.14712250357,
+                  25.0,
+                  1
+                ],
+                [
+                  0.1,
+                  0.01,
+                  55.241870901797974,
+                  5524.187090179797,
+                  25.0,
+                  1
+                ],
+                [
+                  0.2,
+                  0.01,
+                  50.93653765389909,
+                  5093.653765389909,
+                  25.0,
+                  1
+                ],
+                [
+                  0.5,
+                  0.01,
+                  40.32653298563167,
+                  4032.653298563167,
+                  25.0,
+                  1
+                ],
+                [
+                  1.0,
+                  0.01,
+                  28.393972058572118,
+                  2839.3972058572117,
+                  25.0,
+                  1
+                ],
+                [
+                  2.0,
+                  0.01,
+                  16.766764161830636,
+                  1676.6764161830636,
+                  25.0,
+                  1
+                ],
+                [
+                  5.0,
+                  0.01,
+                  10.336897349954274,
+                  1033.6897349954274,
+                  25.0,
+                  1
+                ],
+                [
+                  10.0,
+                  0.01,
+                  10.002269996488124,
+                  1000.2269996488125,
+                  25.0,
+                  1
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

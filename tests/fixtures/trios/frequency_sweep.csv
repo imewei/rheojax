@@ -1,0 +1,16 @@
+Filename	frequency_sweep_sample.tri
+Instrument serial number	5401234567
+Instrument name	Discovery HR-2
+operator	Test Operator
+rundate	2024-01-15
+Sample name	PDMS Sample
+Geometry name	40 mm parallel plate
+Geometry type	Parallel plate
+Number of points	5
+Variables	Angular Frequency	Storage Modulus	Loss Modulus	Step
+	rad/s	Pa	Pa
+Data point	6.28	1000.5	250.3	1
+Data point	12.56	1050.2	275.1	1
+Data point	25.13	1120.8	310.5	1
+Data point	50.27	1200.3	350.2	1
+Data point	100.53	1305.7	400.8	1

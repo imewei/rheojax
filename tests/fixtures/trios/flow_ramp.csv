@@ -1,0 +1,23 @@
+Filename	flow_ramp_sample.tri
+Instrument serial number	5401234567
+Instrument name	Discovery HR-2
+operator	Test Operator
+rundate	2024-01-18
+Sample name	Power-Law Fluid
+Geometry name	40 mm 2° cone
+Geometry type	Cone
+Gap	50 um
+Temperature	25 °C
+Number of points	10
+Variables	Shear Rate	Viscosity	Shear Stress	Torque	Temperature	Step
+	1/s	Pa.s	Pa	µN.m	°C	
+Data point	0.1000	31.6228	3.1623	52.9845	25.00	1
+Data point	0.2154	21.5443	4.6416	77.7706	25.00	1
+Data point	0.4642	14.6780	6.8129	114.1516	25.00	1
+Data point	1.0000	10.0000	10.0000	167.5516	25.00	1
+Data point	2.1544	6.8129	14.6780	245.9321	25.00	1
+Data point	4.6416	4.6416	21.5443	360.9790	25.00	1
+Data point	10.0000	3.1623	31.6228	529.8447	25.00	1
+Data point	21.5443	2.1544	46.4159	777.7057	25.00	1
+Data point	46.4159	1.4678	68.1292	1141.5158	25.00	1
+Data point	100.0000	1.0000	100.0000	1675.5161	25.00	1
