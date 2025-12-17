@@ -198,6 +198,7 @@ dmypy.json
 .codex/
 .gemini/
 agent-os/
+specs/
 .cursor/
 .cursorignore
 .cursorindexingignore
