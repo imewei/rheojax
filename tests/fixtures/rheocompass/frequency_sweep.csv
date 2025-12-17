@@ -1,0 +1,25 @@
+Project:	Test Project
+Test:	Frequency Sweep
+Result:	Sample C
+Date:	2024-01-17
+Operator:	Test User
+Instrument:	MCR 302
+Geometry:	Plate-Plate
+Diameter:	25 mm
+Gap:	1.0 mm
+Temperature:	25.0 °C
+
+Interval and data points:	1	10
+Test Type:	Oscillation
+Interval data:	Angular Frequency	G'	G''	|G*|	η*	δ
+	[rad/s]	[Pa]	[Pa]	[Pa]	[Pa·s]	[°]
+0.1	1000	100	1005	10050	5.71
+0.2	1050	150	1061	5303	8.13
+0.5	1150	280	1184	2367	13.69
+1.0	1300	450	1376	1376	19.09
+2.0	1500	700	1655	828	25.02
+5.0	1850	1200	2205	441	32.96
+10.0	2200	1800	2843	284	39.29
+20.0	2600	2500	3608	180	43.87
+50.0	3000	3500	4610	92	49.40
+100.0	3300	4200	5342	53	51.84

@@ -1,0 +1,39 @@
+Project:	Test Project
+Test:	Temperature Sweep
+Result:	Sample E
+Date:	2024-01-19
+Operator:	Test User
+Instrument:	MCR 302
+Geometry:	Plate-Plate
+Diameter:	25 mm
+Gap:	1.0 mm
+
+Interval and data points:	1	5
+Temperature:	25.0 °C
+Interval data:	Angular Frequency	G'	G''	|G*|
+	[rad/s]	[Pa]	[Pa]	[Pa]
+1.0	1000	100	1005
+2.0	1100	150	1110
+5.0	1250	250	1275
+10.0	1400	400	1456
+20.0	1600	600	1709
+
+Interval and data points:	2	5
+Temperature:	40.0 °C
+Interval data:	Angular Frequency	G'	G''	|G*|
+	[rad/s]	[Pa]	[Pa]	[Pa]
+1.0	800	120	809
+2.0	880	180	898
+5.0	1000	300	1044
+10.0	1150	480	1246
+20.0	1350	700	1521
+
+Interval and data points:	3	5
+Temperature:	60.0 °C
+Interval data:	Angular Frequency	G'	G''	|G*|
+	[rad/s]	[Pa]	[Pa]	[Pa]
+1.0	500	150	522
+2.0	580	220	620
+5.0	720	350	801
+10.0	900	520	1039
+20.0	1150	750	1373

@@ -1,0 +1,25 @@
+Project:	Test Project
+Test:	Stress Relaxation
+Result:	Sample B
+Date:	2024-01-16
+Operator:	Test User
+Instrument:	MCR 302
+Geometry:	Cone-Plate
+Diameter:	50 mm
+Gap:	0.1 mm
+Temperature:	30.0 °C
+
+Interval and data points:	1	10
+Test Type:	Relaxation
+Interval data:	Time	Shear Strain	Shear Stress	Relaxation Modulus
+	[s]	[%]	[Pa]	[Pa]
+0.01	1.0	10000	1.0e6
+0.02	1.0	8500	8.5e5
+0.05	1.0	6500	6.5e5
+0.1	1.0	5000	5.0e5
+0.2	1.0	3800	3.8e5
+0.5	1.0	2500	2.5e5
+1.0	1.0	1800	1.8e5
+2.0	1.0	1200	1.2e5
+5.0	1.0	650	6.5e4
+10.0	1.0	350	3.5e4
