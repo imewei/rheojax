@@ -190,7 +190,7 @@ class HomePage(QWidget):
         # Import Data button
         btn_import = self._create_action_button(
             "Import Data",
-            "Import rheological data from file",
+            "Import TRIOS, Anton Paar, CSV, Excel",
             "#4CAF50"
         )
         btn_import.clicked.connect(self.import_data_requested.emit)
@@ -315,15 +315,27 @@ class HomePage(QWidget):
         self._examples_layout = layout
         self._example_cards: list[QWidget] = []
 
+        # Map example names to actual file paths (relative to project root)
+        self._example_paths = {
+            "Oscillation": "examples/data/pyRheo/chia_pudding/oscillation_chia_data.csv",
+            "Relaxation": "examples/data/experimental/polypropylene_relaxation.csv",
+            "Creep": "examples/data/pyRheo/mucus/creep_mucus_data.csv",
+            "Flow": "examples/data/experimental/cellulose_hydrogel_flow.csv",
+            "SGR": "examples/data/pyRheo/emulsion/emulsions_v2.csv",
+            "SPP": "examples/data/experimental/multi_technique.txt",
+            "TTS": "examples/data/experimental/frequency_sweep_tts.txt",
+            "Bayesian": "examples/data/pyRheo/fish_muscle/stressrelaxation_fishmuscle_data.csv",
+        }
+
         examples = [
-            ("Oscillation", "Frequency sweep data for SAOS analysis", "#3F51B5"),
-            ("Relaxation", "Stress relaxation modulus data", "#009688"),
-            ("Creep", "Creep compliance data", "#FF5722"),
-            ("Flow", "Steady shear flow curve data", "#E91E63"),
-            ("SGR", "Soft Glassy Rheology example", "#9C27B0"),
-            ("SPP", "Sequence of Physical Processes (LAOS)", "#00BCD4"),
-            ("TTS", "Time-Temperature Superposition data", "#FFC107"),
-            ("Bayesian", "Dataset for Bayesian inference demo", "#607D8B"),
+            ("Oscillation", "SAOS frequency sweep (CSV)", "#3F51B5"),
+            ("Relaxation", "Stress relaxation G(t) (CSV)", "#009688"),
+            ("Creep", "Creep compliance J(t) (CSV)", "#FF5722"),
+            ("Flow", "Steady shear flow curve (CSV)", "#E91E63"),
+            ("SGR", "Soft glassy emulsion (CSV)", "#9C27B0"),
+            ("SPP", "Multi-technique TRIOS (TXT)", "#00BCD4"),
+            ("TTS", "Time-Temperature Superposition (TXT)", "#FFC107"),
+            ("Bayesian", "Fish muscle relaxation (CSV)", "#607D8B"),
         ]
 
         for name, description, color in examples:
@@ -539,3 +551,41 @@ class HomePage(QWidget):
             Example identifier
         """
         self.example_selected.emit(example_name)
+
+    def get_example_path(self, example_name: str) -> Path | None:
+        """Get the file path for an example dataset.
+
+        Parameters
+        ----------
+        example_name : str
+            Example identifier (e.g., "Oscillation", "Relaxation")
+
+        Returns
+        -------
+        Path | None
+            Absolute path to the example file, or None if not found
+        """
+        if not hasattr(self, "_example_paths"):
+            return None
+
+        rel_path = self._example_paths.get(example_name)
+        if not rel_path:
+            return None
+
+        # Try resolving from project root (current working directory)
+        path = Path(rel_path)
+        if path.exists():
+            return path.resolve()
+
+        # Try from cwd
+        cwd_path = Path.cwd() / rel_path
+        if cwd_path.exists():
+            return cwd_path.resolve()
+
+        # Try from module location
+        module_dir = Path(__file__).parent.parent.parent.parent
+        module_path = module_dir / rel_path
+        if module_path.exists():
+            return module_path.resolve()
+
+        return None

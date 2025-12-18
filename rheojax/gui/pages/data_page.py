@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QTableWidget,
@@ -285,11 +286,23 @@ class DataPage(QWidget):
 
     def _browse_files(self) -> None:
         """Open file browser dialog."""
+        # Build file filter from DataService supported formats
+        formats = self._data_service.get_supported_formats()
+        ext_list = " ".join(f"*{ext}" for ext in formats)
+        file_filter = (
+            f"Rheological Data ({ext_list});;"
+            "TRIOS Files (*.txt *.csv *.xlsx);;"
+            "Anton Paar RheoCompass (*.csv *.txt);;"
+            "CSV/TSV Files (*.csv *.txt *.dat *.tsv);;"
+            "Excel Files (*.xlsx *.xls);;"
+            "All Files (*)"
+        )
+
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Data File",
             "",
-            "Data Files (*.csv *.txt *.xlsx *.xls *.tri);;All Files (*)"
+            file_filter
         )
 
         if file_path:
@@ -330,11 +343,7 @@ class DataPage(QWidget):
             return
 
         try:
-            # Load data using appropriate loader
-            from rheojax.gui.services.data_service import DataService
-
-            service = DataService()
-            preview_result = service.preview_file(self._current_file_path, max_rows=100)
+            preview_result = self._data_service.preview_file(self._current_file_path, max_rows=100)
 
             self._preview_data = preview_result.get("data", [])
             headers = preview_result.get("headers", [])
@@ -347,6 +356,10 @@ class DataPage(QWidget):
                 if hasattr(self, "_empty_state"):
                     self._empty_state.show()
                 return
+
+            # Detect file format for user feedback
+            detected_format = self._detect_file_format()
+            metadata["format"] = detected_format
 
             # Update table
             self._preview_table.clear()
@@ -367,12 +380,12 @@ class DataPage(QWidget):
             # Update column mappers
             self._update_column_mappers(headers or [f"Col {i+1}" for i in range(len(self._preview_data[0]))])
 
-            # Update metadata
-            if metadata:
-                metadata_text = "\n".join([f"{k}: {v}" for k, v in metadata.items()])
-                self._metadata_text.setText(metadata_text)
-            else:
-                self._metadata_text.clear()
+            # Update metadata display with format info
+            metadata_lines = []
+            if detected_format:
+                metadata_lines.append(f"format: {detected_format}")
+            metadata_lines.extend([f"{k}: {v}" for k, v in metadata.items() if k != "format"])
+            self._metadata_text.setText("\n".join(metadata_lines))
 
             if hasattr(self, "_empty_state"):
                 self._empty_state.hide()
@@ -383,8 +396,54 @@ class DataPage(QWidget):
             self._preview_table.clear()
             self._metadata_text.clear()
 
+    def _detect_file_format(self) -> str:
+        """Detect the file format for user feedback."""
+        if not self._current_file_path:
+            return "Unknown"
+
+        suffix = self._current_file_path.suffix.lower()
+        name_lower = self._current_file_path.name.lower()
+
+        # Check for TRIOS patterns
+        if suffix == ".txt":
+            try:
+                with open(self._current_file_path, encoding="utf-8", errors="ignore") as f:
+                    first_lines = f.read(2000)
+                if "trios" in first_lines.lower() or "[file" in first_lines.lower():
+                    return "TA Instruments TRIOS"
+                if "rheometer" in first_lines.lower() or "rheocompass" in first_lines.lower():
+                    return "Anton Paar RheoCompass"
+            except Exception:
+                pass
+            return "Text/CSV"
+
+        if suffix == ".csv":
+            try:
+                with open(self._current_file_path, encoding="utf-8", errors="ignore") as f:
+                    first_lines = f.read(2000)
+                if "rheometer" in first_lines.lower() or "rheocompass" in first_lines.lower():
+                    return "Anton Paar RheoCompass"
+                if "trios" in first_lines.lower():
+                    return "TA Instruments TRIOS CSV"
+            except Exception:
+                pass
+            return "CSV"
+
+        if suffix in {".xlsx", ".xls"}:
+            if "trios" in name_lower:
+                return "TA Instruments TRIOS Excel"
+            return "Excel"
+
+        if suffix == ".tri":
+            return "TA Instruments TRIOS Binary"
+
+        if suffix in {".rdf", ".dat"}:
+            return "Rheological Data"
+
+        return suffix.upper().lstrip(".")
+
     def _update_column_mappers(self, columns: list[str]) -> None:
-        """Update column mapper dropdowns."""
+        """Update column mapper dropdowns with smart suggestions."""
         # Clear and repopulate
         for combo in [self._x_combo, self._y_combo, self._y2_combo, self._temp_combo]:
             combo.blockSignals(True)
@@ -397,15 +456,68 @@ class DataPage(QWidget):
         self._temp_combo.addItem("None")
         self._temp_combo.addItems(columns)
 
-        # Auto-select common names
+        # Use DataService column suggestions for smarter auto-mapping
+        suggestions = {"x_suggestions": [], "y_suggestions": [], "y2_suggestions": []}
+        if self._current_file_path:
+            try:
+                suggestions = self._data_service.get_column_suggestions(self._current_file_path)
+            except Exception:
+                pass  # Fall back to simple matching
+
+        # Apply suggestions or fallback to simple matching
+        x_suggestions = suggestions.get("x_suggestions", [])
+        y_suggestions = suggestions.get("y_suggestions", [])
+        y2_suggestions = suggestions.get("y2_suggestions", [])
+
+        # Select first suggested X column
+        if x_suggestions:
+            for idx, col in enumerate(columns):
+                if col in x_suggestions:
+                    self._x_combo.setCurrentIndex(idx)
+                    break
+        else:
+            # Fallback: simple matching
+            for idx, col in enumerate(columns):
+                col_lower = col.lower()
+                if any(x in col_lower for x in ["time", "freq", "omega", "angular"]):
+                    self._x_combo.setCurrentIndex(idx)
+                    break
+
+        # Select first suggested Y column
+        if y_suggestions:
+            for idx, col in enumerate(columns):
+                if col in y_suggestions:
+                    self._y_combo.setCurrentIndex(idx)
+                    break
+        else:
+            # Fallback: simple matching (avoid loss modulus)
+            for idx, col in enumerate(columns):
+                col_lower = col.lower()
+                if any(y in col_lower for y in ["g'", "storage", "stress", "modulus"]):
+                    if "loss" not in col_lower and "''" not in col:
+                        self._y_combo.setCurrentIndex(idx)
+                        break
+
+        # Select first suggested Y2 column
+        if y2_suggestions:
+            for idx, col in enumerate(columns):
+                if col in y2_suggestions:
+                    self._y2_combo.setCurrentIndex(idx + 1)  # +1 for "None" option
+                    break
+        else:
+            # Fallback: simple matching for loss modulus
+            for idx, col in enumerate(columns):
+                col_lower = col.lower()
+                if any(y2 in col_lower for y2 in ["g''", "loss", "gdoubleprime"]):
+                    self._y2_combo.setCurrentIndex(idx + 1)
+                    break
+
+        # Temperature column detection
         for idx, col in enumerate(columns):
             col_lower = col.lower()
-            if any(x in col_lower for x in ["time", "freq", "omega", "t", "f", "w"]):
-                self._x_combo.setCurrentIndex(idx)
-            if any(y in col_lower for y in ["g'", "storage", "stress", "modulus"]):
-                self._y_combo.setCurrentIndex(idx)
-            if any(y2 in col_lower for y2 in ["g''", "loss"]):
-                self._y2_combo.setCurrentIndex(idx + 1)  # +1 for "None" option
+            if any(t in col_lower for t in ["temp", "temperature"]):
+                self._temp_combo.setCurrentIndex(idx + 1)  # +1 for "None" option
+                break
 
         for combo in [self._x_combo, self._y_combo, self._y2_combo, self._temp_combo]:
             combo.blockSignals(False)
@@ -421,6 +533,8 @@ class DataPage(QWidget):
         """Apply column mapping and import data."""
         import uuid
 
+        from rheojax.io import auto_load
+
         if not self._current_file_path:
             return
 
@@ -434,39 +548,60 @@ class DataPage(QWidget):
 
         # Import via service
         try:
-            from rheojax.gui.services.data_service import DataService
+            # Use auto_load directly to handle both single and multi-segment files
+            load_kwargs = {}
+            if x_col:
+                load_kwargs["x_col"] = x_col
+            if y_col:
+                load_kwargs["y_col"] = y_col
+            if y2_col:
+                load_kwargs["y2_col"] = y2_col
 
-            service = DataService()
-            rheo_data = service.load_file(
-                file_path=self._current_file_path,
-                x_col=x_col,
-                y_col=y_col,
-                y2_col=y2_col,
-                test_mode=test_mode
-            )
+            result = auto_load(str(self._current_file_path), **load_kwargs)
 
-            # Auto-detect test mode if not specified
-            if test_mode is None:
-                test_mode = service.detect_test_mode(rheo_data)
+            # Handle multi-segment files (TRIOS can return list[RheoData])
+            if isinstance(result, list):
+                datasets = result
+            else:
+                datasets = [result]
 
-            # Generate dataset_id before dispatch to ensure signal emission
-            dataset_id = str(uuid.uuid4())
-
-            # Register dataset in state store
             store = StateStore()
-            store.dispatch(
-                "IMPORT_DATA_SUCCESS",
-                {
-                    "dataset_id": dataset_id,
-                    "file_path": str(self._current_file_path),
-                    "name": self._current_file_path.stem,
-                    "test_mode": test_mode or "unknown",
-                    "x_data": rheo_data.x,
-                    "y_data": rheo_data.y,
-                    "y2_data": getattr(rheo_data, "y2", None),
-                    "metadata": getattr(rheo_data, "metadata", {}),
-                },
-            )
+
+            for idx, rheo_data in enumerate(datasets):
+                # Auto-detect test mode if not specified
+                detected_mode = test_mode
+                if detected_mode is None:
+                    detected_mode = self._data_service.detect_test_mode(rheo_data)
+
+                # Generate dataset_id
+                dataset_id = str(uuid.uuid4())
+
+                # Segment name for multi-segment files
+                if len(datasets) > 1:
+                    name = f"{self._current_file_path.stem}_segment_{idx + 1}"
+                else:
+                    name = self._current_file_path.stem
+
+                # Register dataset in state store
+                store.dispatch(
+                    "IMPORT_DATA_SUCCESS",
+                    {
+                        "dataset_id": dataset_id,
+                        "file_path": str(self._current_file_path),
+                        "name": name,
+                        "test_mode": detected_mode or "unknown",
+                        "x_data": rheo_data.x,
+                        "y_data": rheo_data.y,
+                        "y2_data": getattr(rheo_data, "y2", None),
+                        "metadata": getattr(rheo_data, "metadata", {}),
+                    },
+                )
+
+            # Notify user if multiple segments were imported
+            if len(datasets) > 1:
+                self._file_name_label.setText(
+                    f"Imported {len(datasets)} segments from {self._current_file_path.name}"
+                )
 
             self.apply_mapping.emit()
             self._store.dispatch("SET_TAB", {"tab": "transform"})
