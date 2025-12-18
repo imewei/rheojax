@@ -45,6 +45,7 @@ from rheojax.io.readers.trios.common import (
 # TXT reader (original functionality)
 from rheojax.io.readers.trios.txt import load_trios as load_trios_txt
 from rheojax.io.readers.trios.txt import load_trios_chunked
+from rheojax.io.readers.trios.txt import convert_units
 
 # CSV reader
 from rheojax.io.readers.trios.csv import load_trios_csv, parse_trios_csv
@@ -230,6 +231,7 @@ __all__ = [
     "map_columns_to_canonical",
     "select_xy_columns",
     "convert_unit",
+    "convert_units",
     "detect_step_column",
     "split_by_step",
     "construct_complex_modulus",
