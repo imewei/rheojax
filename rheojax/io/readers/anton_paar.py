@@ -20,6 +20,7 @@ import re
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -152,6 +153,15 @@ COLUMN_MAPPINGS: dict[str, tuple[list[str], str, list[str]]] = {
     ),
 }
 
+# Pre-compiled patterns for column mapping (performance optimization)
+_COLUMN_PATTERNS_COMPILED: dict[str, list[re.Pattern]] = {
+    canonical: [re.compile(p, re.IGNORECASE) for p in patterns]
+    for canonical, (patterns, _, _) in COLUMN_MAPPINGS.items()
+}
+
+# Pre-compiled pattern for unit extraction
+_UNIT_EXTRACTION_PATTERN = re.compile(r"^(.*?)[\[(](.*?)[\])]")
+
 
 # =============================================================================
 # Unit Conversions (T009)
@@ -208,6 +218,21 @@ def _detect_encoding(filepath: Path) -> str:
     # Last resort: latin-1 with error replacement
     logger.warning("Could not detect encoding, using latin-1 with error replacement")
     return "latin-1"
+
+
+@lru_cache(maxsize=128)
+def _detect_encoding_cached(filepath_str: str) -> str:
+    """Cached encoding detection by file path string.
+
+    This wrapper enables caching for repeated file access during batch operations.
+
+    Args:
+        filepath_str: File path as string (for hashability)
+
+    Returns:
+        Detected encoding string
+    """
+    return _detect_encoding(Path(filepath_str))
 
 
 # =============================================================================
@@ -339,8 +364,8 @@ def _extract_unit(column_name: str) -> tuple[str, str | None]:
     Returns:
         Tuple of (base_name, unit) where unit may be None
     """
-    # Match [unit] or (unit)
-    match = re.search(r"^(.*?)[\[(](.*?)[\])]", column_name)
+    # Match [unit] or (unit) using pre-compiled pattern
+    match = _UNIT_EXTRACTION_PATTERN.search(column_name)
     if match:
         base = match.group(1).strip()
         unit = match.group(2).strip()
@@ -494,9 +519,9 @@ def parse_rheocompass_intervals(
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
 
-    # Detect encoding
+    # Detect encoding (using cached version for repeated file access)
     if encoding is None:
-        encoding = _detect_encoding(filepath)
+        encoding = _detect_encoding_cached(str(filepath))
 
     # Read entire file
     with open(filepath, encoding=encoding, errors="replace") as f:
@@ -554,9 +579,10 @@ def _map_column_to_canonical(column_name: str) -> str | None:
     base_name, _ = _extract_unit(column_name)
     base_lower = base_name.lower().strip()
 
-    for canonical, (patterns, _, _) in COLUMN_MAPPINGS.items():
+    # Use pre-compiled patterns for performance
+    for canonical, patterns in _COLUMN_PATTERNS_COMPILED.items():
         for pattern in patterns:
-            if re.match(pattern, base_lower, re.IGNORECASE):
+            if pattern.match(base_lower):
                 return canonical
     return None
 

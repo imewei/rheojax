@@ -133,6 +133,19 @@ def load_csv(
     except FileNotFoundError:
         raise
 
+    # Build list of columns to load (memory optimization for wide files)
+    # Only use usecols when all column specifiers are strings (not indices)
+    usecols = None
+    if isinstance(x_col, str):
+        cols_needed = [x_col]
+        if y_col is not None and isinstance(y_col, str):
+            cols_needed.append(y_col)
+        elif y_cols is not None:
+            cols_needed.extend([c for c in y_cols if isinstance(c, str)])
+        # Only set usecols if all columns are strings
+        if len(cols_needed) == (1 + (1 if y_col is not None else len(y_cols or []))):
+            usecols = cols_needed
+
     # Read CSV file with tolerant encoding/dialect handling
     read_kwargs = dict(
         sep=delimiter,
@@ -140,6 +153,7 @@ def load_csv(
         encoding=default_encoding,
         encoding_errors="replace",
         engine="python",
+        usecols=usecols,
         **kwargs,
     )
     tried_utf16 = False
@@ -191,13 +205,15 @@ def load_csv(
     if not is_complex:
         y_data = _to_float(y_data)
 
-    # Remove NaN values
+    # Remove NaN values in single pass (avoid intermediate copies)
     if is_complex:
-        valid_mask = ~(np.isnan(x_data) | np.isnan(y_data.real) | np.isnan(y_data.imag))
+        valid_idx = np.flatnonzero(
+            ~(np.isnan(x_data) | np.isnan(y_data.real) | np.isnan(y_data.imag))
+        )
     else:
-        valid_mask = ~(np.isnan(x_data) | np.isnan(y_data))
-    x_data = x_data[valid_mask]
-    y_data = y_data[valid_mask]
+        valid_idx = np.flatnonzero(~(np.isnan(x_data) | np.isnan(y_data)))
+    x_data = np.take(x_data, valid_idx)
+    y_data = np.take(y_data, valid_idx)
 
     if len(x_data) == 0:
         raise ValueError("No valid data points after removing NaN values")

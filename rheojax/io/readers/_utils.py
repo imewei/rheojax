@@ -61,13 +61,28 @@ TRANSFORM_REQUIREMENTS: dict[str, dict] = {
     "derivative": {"required": [], "domain": None},
 }
 
-# Pattern matching for test mode detection
-_TEST_MODE_PATTERNS: dict[str, list[str]] = {
-    "oscillation": [r"G['\"]", r"G\*", r"omega", r"frequency", r"angular"],
-    "relaxation": [r"G\s*\(\s*t\s*\)", r"relaxation"],
-    "creep": [r"J\s*\(\s*t\s*\)", r"compliance", r"creep"],
-    "rotation": [r"shear\s*[-_]?\s*rate", r"viscosity", r"eta", r"γ̇", r"gamma[-_]?dot"],
+# Pre-compiled patterns for test mode detection (performance optimization)
+_TEST_MODE_PATTERNS: dict[str, list[re.Pattern]] = {
+    "oscillation": [
+        re.compile(p, re.IGNORECASE)
+        for p in [r"G['\"]", r"G\*", r"omega", r"frequency", r"angular"]
+    ],
+    "relaxation": [
+        re.compile(p, re.IGNORECASE)
+        for p in [r"G\s*\(\s*t\s*\)", r"relaxation"]
+    ],
+    "creep": [
+        re.compile(p, re.IGNORECASE)
+        for p in [r"J\s*\(\s*t\s*\)", r"compliance", r"creep"]
+    ],
+    "rotation": [
+        re.compile(p, re.IGNORECASE)
+        for p in [r"shear\s*[-_]?\s*rate", r"viscosity", r"eta", r"γ̇", r"gamma[-_]?dot"]
+    ],
 }
+
+# Pre-compiled pattern for G'/G'' detection in domain detection
+_MODULUS_PATTERN = re.compile(r"G['\"]", re.IGNORECASE)
 
 # Unit pattern for extraction
 _UNIT_PATTERN = re.compile(r"^(.+?)\s*\(([^)]+)\)$")
@@ -162,7 +177,7 @@ def detect_domain(
     # Check y_headers for oscillation indicators (G', G'')
     if y_headers:
         for yh in y_headers:
-            if re.search(r"G['\"]", yh):
+            if _MODULUS_PATTERN.search(yh):
                 return "frequency"
 
     # Default to time domain
@@ -200,10 +215,10 @@ def detect_test_mode_from_columns(
     all_headers = [x_header] + y_headers
     all_text = " ".join(all_headers).lower()
 
-    # Check each test mode's patterns
+    # Check each test mode's patterns (uses pre-compiled regex)
     for mode, patterns in _TEST_MODE_PATTERNS.items():
         for pattern in patterns:
-            if re.search(pattern, all_text, re.IGNORECASE):
+            if pattern.search(all_text):
                 return mode
 
     # Additional unit-based detection
