@@ -349,7 +349,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         logger.debug("GUI log handler attached")
         window.destroyed.connect(lambda *_: logging.getLogger().removeHandler(gui_handler))
-        app.setWindowIcon(QIcon(str(get_icon_path("load"))))
+        app.setWindowIcon(QIcon(str(get_icon_path("rheojax"))))
 
         _show_main_window(window, args.maximized)
 
