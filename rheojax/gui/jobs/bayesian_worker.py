@@ -57,6 +57,8 @@ class BayesianResult:
         When the sampling was completed
     credible_intervals : dict, optional
         Credible intervals for each parameter
+    inference_data : Any, optional
+        Full ArviZ InferenceData with sample_stats for energy plots
     """
 
     model_name: str
@@ -68,6 +70,7 @@ class BayesianResult:
     sampling_time: float
     timestamp: datetime
     credible_intervals: dict[str, tuple[float, float]] | None = None
+    inference_data: Any | None = None
 
 
 class BayesianWorkerSignals(QObject):
@@ -316,6 +319,7 @@ class BayesianWorker(QRunnable):
                 sampling_time=sampling_time,
                 timestamp=datetime.now(),
                 credible_intervals=credible_intervals,
+                inference_data=getattr(bayesian_result, 'inference_data', None),
             )
 
             # Log diagnostics

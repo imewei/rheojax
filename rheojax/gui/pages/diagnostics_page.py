@@ -92,8 +92,8 @@ class DiagnosticsPage(QWidget):
 
         # Scroll area for the plot canvas
         scroll_area = QScrollArea()
-        # Use False to let canvas maintain its natural size for scrolling
-        scroll_area.setWidgetResizable(False)
+        # Use True to let canvas resize with container while still allowing scrolling
+        scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         # Always show scrollbars when content exceeds viewport
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -352,6 +352,13 @@ class DiagnosticsPage(QWidget):
         """
         try:
             import arviz as az
+
+            # Use stored InferenceData if available (has sample_stats for energy plot)
+            inference_data = getattr(result, "inference_data", None)
+            if inference_data is not None:
+                # Verify it has the expected structure
+                if hasattr(inference_data, "posterior"):
+                    return inference_data
 
             posterior_samples = result.posterior_samples
             if posterior_samples is None:

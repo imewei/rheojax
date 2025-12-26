@@ -573,6 +573,7 @@ class ModelService:
         parameters: dict[str, float],
         x_values: np.ndarray,
         test_mode: str | None = None,
+        model_kwargs: dict | None = None,
     ) -> np.ndarray:
         """Generate model predictions.
 
@@ -586,6 +587,8 @@ class ModelService:
             X values for prediction
         test_mode : str, optional
             Optional test mode for prediction (relaxation/oscillation/creep/etc.)
+        model_kwargs : dict, optional
+            Model initialization kwargs (e.g., n_modes for GeneralizedMaxwell)
 
         Returns
         -------
@@ -593,9 +596,10 @@ class ModelService:
             Predicted y values
         """
         try:
-            # Create model instance
+            # Create model instance with optional configuration
+            model_kwargs = model_kwargs or {}
             model = self._registry.create_instance(
-                self._normalize_model_name(model_name), plugin_type="model"
+                self._normalize_model_name(model_name), plugin_type="model", **model_kwargs
             )
 
             # Set parameters

@@ -155,7 +155,6 @@ class BayesianPage(QWidget):
         self._chains_spin = QSpinBox()
         self._chains_spin.setRange(1, 8)
         self._chains_spin.setValue(4)
-        self._chains_spin.valueChanged.connect(self._update_chain_progress_bars)
         self._chains_spin.setToolTip("Parallel chains improve convergence diagnostics")
         layout.addWidget(self._chains_spin)
 
@@ -238,27 +237,11 @@ class BayesianPage(QWidget):
         self._overall_progress.setTextVisible(True)
         layout.addWidget(self._overall_progress)
 
-        # Per-chain progress
-        layout.addWidget(QLabel("Chain Progress:"))
-
-        self._chain_progress_bars: list[QProgressBar] = []
-        self._chain_labels: list[QLabel] = []
-        for i in range(4):
-            chain_layout = QHBoxLayout()
-            label = QLabel(f"Chain {i + 1}:")
-            chain_layout.addWidget(label)
-            progress_bar = QProgressBar()
-            progress_bar.setTextVisible(True)
-            chain_layout.addWidget(progress_bar, 1)
-            layout.addLayout(chain_layout)
-            self._chain_progress_bars.append(progress_bar)
-            self._chain_labels.append(label)
-
         # Status info
         layout.addWidget(QLabel("Status:"))
         self._status_text = QTextEdit()
         self._status_text.setReadOnly(True)
-        self._status_text.setMaximumHeight(100)
+        self._status_text.setMaximumHeight(120)
         layout.addWidget(self._status_text)
 
         # ETA and divergences
@@ -349,21 +332,6 @@ class BayesianPage(QWidget):
             self._store.signals.model_selected.connect(self._on_model_changed)
             self._store.signals.bayesian_started.connect(self._on_bayesian_started)
             self._store.signals.bayesian_completed.connect(self._on_bayesian_completed)
-
-    def _update_chain_progress_bars(self, num_chains: int) -> None:
-        """Update visibility of chain progress bars.
-
-        Parameters
-        ----------
-        num_chains : int
-            Number of chains
-        """
-        for i, (bar, label) in enumerate(
-            zip(self._chain_progress_bars, self._chain_labels, strict=False)
-        ):
-            visible = i < num_chains
-            bar.setVisible(visible)
-            label.setVisible(visible)
 
     @Slot()
     def _on_model_changed(self) -> None:
@@ -547,15 +515,6 @@ class BayesianPage(QWidget):
             Current stage ('warmup' or 'sampling')
         """
         self._status_text.append(f"Stage: {stage}")
-        # Update chain progress bars based on stage
-        if stage == "warmup":
-            # During warmup, show warmup progress
-            for bar in self._chain_progress_bars:
-                bar.setFormat("Warmup: %p%")
-        else:
-            # During sampling, show sampling progress
-            for bar in self._chain_progress_bars:
-                bar.setFormat("Sampling: %p%")
 
     @Slot(int)
     def _on_divergence(self, count: int) -> None:
@@ -570,20 +529,6 @@ class BayesianPage(QWidget):
         if count > 0:
             self._divergence_label.setStyleSheet("color: #F44336; font-weight: bold;")
             self._status_text.append(f"WARNING: {count} divergent transitions detected")
-
-    @Slot(int, int)
-    def _on_chain_progress(self, chain_idx: int, percent: int) -> None:
-        """Handle per-chain progress update (legacy slot).
-
-        Parameters
-        ----------
-        chain_idx : int
-            Chain index (0-based)
-        percent : int
-            Progress percentage
-        """
-        if 0 <= chain_idx < len(self._chain_progress_bars):
-            self._chain_progress_bars[chain_idx].setValue(percent)
 
     @Slot(object)
     def _on_finished(self, result: Any) -> None:
@@ -622,6 +567,7 @@ class BayesianPage(QWidget):
                     timestamp=getattr(result, "timestamp", datetime.now()),
                     num_warmup=int(getattr(result, "num_warmup", self._warmup_spin.value()) or 0),
                     num_samples=int(getattr(result, "num_samples", self._samples_spin.value()) or 0),
+                    inference_data=getattr(result, "inference_data", None),
                 )
                 store_bayesian_result(stored_result)
                 self._store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"})
@@ -674,8 +620,6 @@ class BayesianPage(QWidget):
     def _on_bayesian_started(self) -> None:
         """Handle Bayesian started signal from state."""
         self._overall_progress.setValue(0)
-        for bar in self._chain_progress_bars:
-            bar.setValue(0)
         self._status_text.clear()
         self._status_text.append("Starting Bayesian inference...")
 
@@ -811,6 +755,45 @@ class BayesianPage(QWidget):
                 continue
         return means
 
+    def _infer_model_kwargs(self, model_name: str, param_names: list[str]) -> dict[str, Any]:
+        """Infer model initialization kwargs from parameter names.
+
+        For models like GeneralizedMaxwell that require n_modes during init,
+        we count the numbered parameters to determine the correct configuration.
+
+        Parameters
+        ----------
+        model_name : str
+            Name of the model
+        param_names : list[str]
+            List of parameter names from posterior samples
+
+        Returns
+        -------
+        dict
+            Model initialization kwargs (e.g., {"n_modes": 4})
+        """
+        import re
+
+        model_kwargs: dict[str, Any] = {}
+
+        # Handle GeneralizedMaxwell: count G_i or tau_i parameters
+        if "maxwell" in model_name.lower() and "generalized" in model_name.lower():
+            # Count G_i parameters (excluding G_inf)
+            g_pattern = re.compile(r"^G_(\d+)$")
+            g_indices = []
+            for name in param_names:
+                match = g_pattern.match(name)
+                if match:
+                    g_indices.append(int(match.group(1)))
+
+            if g_indices:
+                n_modes = max(g_indices)
+                model_kwargs["n_modes"] = n_modes
+                logger.debug(f"Inferred n_modes={n_modes} for {model_name}")
+
+        return model_kwargs
+
     def _posterior_draw_indices(
         self, posterior_samples: dict[str, Any], max_draws: int
     ) -> np.ndarray:
@@ -895,13 +878,18 @@ class BayesianPage(QWidget):
             logger.debug("plot_update skipped: no posterior draw indices")
             return
 
+        # Infer model kwargs from parameter names (e.g., n_modes for GeneralizedMaxwell)
+        model_kwargs = self._infer_model_kwargs(model_name, list(posterior_samples.keys()))
+
         y_draws: list[np.ndarray] = []
         for idx in draw_indices:
             params = self._posterior_params_at_index(posterior_samples, int(idx))
             if not params:
                 continue
             try:
-                y_pred = self._model_service.predict(model_name, params, x, test_mode=test_mode)
+                y_pred = self._model_service.predict(
+                    model_name, params, x, test_mode=test_mode, model_kwargs=model_kwargs
+                )
                 y_pred_arr = np.asarray(y_pred)
                 if y_pred_arr.shape == x.shape:
                     y_draws.append(y_pred_arr)

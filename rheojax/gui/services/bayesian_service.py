@@ -39,6 +39,8 @@ class BayesianResult:
         R-hat, ESS, divergences, etc.
     metadata : dict
         MCMC configuration and metadata
+    inference_data : Any, optional
+        Full ArviZ InferenceData with sample_stats for energy plots
     """
 
     model_name: str
@@ -46,6 +48,7 @@ class BayesianResult:
     summary: dict[str, dict[str, float]]
     diagnostics: dict[str, Any]
     metadata: dict[str, Any]
+    inference_data: Any | None = None
 
 
 class BayesianService:
@@ -203,6 +206,13 @@ class BayesianService:
             # Calculate diagnostics
             diagnostics = self.get_diagnostics(result)
 
+            # Get full InferenceData with sample_stats for energy plots
+            inference_data = None
+            try:
+                inference_data = result.to_inference_data()
+            except Exception as e:
+                logger.warning(f"Could not get InferenceData: {e}")
+
             # Metadata
             metadata = {
                 "model_name": model_name,
@@ -219,6 +229,7 @@ class BayesianService:
                 summary=result.summary,
                 diagnostics=diagnostics,
                 metadata=metadata,
+                inference_data=inference_data,
             )
 
         except Exception as e:

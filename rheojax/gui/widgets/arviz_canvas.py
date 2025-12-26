@@ -127,12 +127,10 @@ class ArvizCanvas(BaseArviZWidget):
         # is just a placeholder.
         self._figure = Figure(figsize=(8, 6), dpi=100)
         self._canvas = FigureCanvasQTAgg(self._figure)
-        # Use Minimum policy so widget can grow beyond container for scrolling
+        # Use Expanding policy so widget can both grow and shrink with container
         self._canvas.setSizePolicy(
-            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        # Set initial minimum size based on figure dimensions
-        self._update_canvas_size()
 
         # Navigation toolbar
         self._nav_toolbar = NavigationToolbar2QT(self._canvas, self)
@@ -153,24 +151,16 @@ class ArvizCanvas(BaseArviZWidget):
         self._export_btn.clicked.connect(self.export_requested.emit)
 
     def _update_canvas_size(self) -> None:
-        """Update canvas minimum size based on current figure dimensions.
+        """Update canvas size hints based on current figure dimensions.
 
-        This ensures scrollbars appear when the figure is larger than the viewport.
+        Uses size hints instead of fixed minimum size to allow proper resizing.
         """
         if self._figure is None:
             return
 
-        # Get figure size in pixels
-        fig_width, fig_height = self._figure.get_size_inches()
-        dpi = self._figure.get_dpi()
-        width_px = int(fig_width * dpi)
-        height_px = int(fig_height * dpi)
-
-        # Set minimum size on canvas to enable scrolling
-        self._canvas.setMinimumSize(width_px, height_px)
-
-        # Update size hints
+        # Trigger layout update without forcing a fixed minimum size
         self.updateGeometry()
+        self._canvas.updateGeometry()
 
     def sizeHint(self) -> QSize:
         """Return recommended size based on figure dimensions.

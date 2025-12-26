@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.services.export_service import ExportService
+from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.store import StateStore
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class ExportPage(QWidget):
         super().__init__(parent)
         self._store = StateStore()
         self._export_service = ExportService()
+        self._plot_service = PlotService()
         self.setup_ui()
 
     def _dataset_to_rheodata(self, dataset: Any) -> Any:
@@ -561,7 +563,85 @@ class ExportPage(QWidget):
                 progress.setLabelText("Exporting figures...")
                 figures_dir = output_dir / "figures"
                 figures_dir.mkdir(exist_ok=True)
-                # Figures would be exported from plot service/canvas - placeholder
+
+                fig_format = config.get("figure_format", "png")
+                fig_dpi = config.get("dpi", 300)
+                fig_style = config.get("style", "default")
+
+                # Export fit plots for each dataset/result pair
+                for result_id, fit_result in state.fit_results.items():
+                    # Find associated dataset
+                    dataset = None
+                    dataset_id = getattr(fit_result, "dataset_id", None)
+                    if dataset_id and dataset_id in state.datasets:
+                        dataset = state.datasets[dataset_id]
+                    elif state.datasets:
+                        # Fall back to first dataset if no specific association
+                        dataset = next(iter(state.datasets.values()))
+
+                    if dataset and dataset.x_data is not None and dataset.y_data is not None:
+                        try:
+                            rheo_data = self._dataset_to_rheodata(dataset)
+
+                            # Create and export fit plot
+                            fit_fig = self._plot_service.create_fit_plot(
+                                rheo_data, fit_result, style=fig_style,
+                                test_mode=dataset.test_mode
+                            )
+                            fit_path = figures_dir / f"fit_plot_{result_id}.{fig_format}"
+                            self._export_service.export_figure(fit_fig, fit_path, dpi=fig_dpi)
+                            exported_files.append(str(fit_path))
+
+                            # Close figure to free memory
+                            import matplotlib.pyplot as plt
+                            plt.close(fit_fig)
+
+                            # Create and export residuals plot
+                            residuals_fig = self._plot_service.create_residual_plot(
+                                rheo_data, fit_result, style=fig_style
+                            )
+                            residuals_path = figures_dir / f"residuals_{result_id}.{fig_format}"
+                            self._export_service.export_figure(residuals_fig, residuals_path, dpi=fig_dpi)
+                            exported_files.append(str(residuals_path))
+                            plt.close(residuals_fig)
+
+                        except Exception as e:
+                            logger.warning(f"Failed to export fit plots for {result_id}: {e}")
+
+                # Export Bayesian diagnostic plots
+                for result_id, bayes_result in state.bayesian_results.items():
+                    try:
+                        # Trace plot
+                        trace_fig = self._plot_service.create_arviz_plot(
+                            bayes_result, plot_type="trace", style=fig_style
+                        )
+                        trace_path = figures_dir / f"trace_{result_id}.{fig_format}"
+                        self._export_service.export_figure(trace_fig, trace_path, dpi=fig_dpi)
+                        exported_files.append(str(trace_path))
+                        import matplotlib.pyplot as plt
+                        plt.close(trace_fig)
+
+                        # Forest plot
+                        forest_fig = self._plot_service.create_arviz_plot(
+                            bayes_result, plot_type="forest", style=fig_style
+                        )
+                        forest_path = figures_dir / f"forest_{result_id}.{fig_format}"
+                        self._export_service.export_figure(forest_fig, forest_path, dpi=fig_dpi)
+                        exported_files.append(str(forest_path))
+                        plt.close(forest_fig)
+
+                        # Pair plot
+                        pair_fig = self._plot_service.create_arviz_plot(
+                            bayes_result, plot_type="pair", style=fig_style
+                        )
+                        pair_path = figures_dir / f"pair_{result_id}.{fig_format}"
+                        self._export_service.export_figure(pair_fig, pair_path, dpi=fig_dpi)
+                        exported_files.append(str(pair_path))
+                        plt.close(pair_fig)
+
+                    except Exception as e:
+                        logger.warning(f"Failed to export Bayesian plots for {result_id}: {e}")
+
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
 

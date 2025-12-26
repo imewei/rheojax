@@ -121,7 +121,7 @@ class BayesianResult:
 
     model_name: str
     dataset_id: str
-    posterior_samples: Any | None  # ArviZ InferenceData
+    posterior_samples: Any | None  # Dict of posterior samples
     summary: dict[str, dict[str, float]] | None
     r_hat: dict[str, float]
     ess: dict[str, float]
@@ -131,6 +131,7 @@ class BayesianResult:
     timestamp: datetime
     num_warmup: int = 1000
     num_samples: int = 2000
+    inference_data: Any | None = None  # Full ArviZ InferenceData with sample_stats
 
     def clone(self) -> "BayesianResult":
         """Create a deep copy of this Bayesian result."""
@@ -140,6 +141,7 @@ class BayesianResult:
             ess=copy.deepcopy(self.ess),
             credible_intervals=copy.deepcopy(self.credible_intervals),
             posterior_samples=self.posterior_samples,  # Keep reference
+            inference_data=self.inference_data,  # Keep reference
         )
 
 
