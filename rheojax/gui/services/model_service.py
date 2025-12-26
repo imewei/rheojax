@@ -276,6 +276,8 @@ class ModelService:
                 supported_modes = ["flow"]
             elif "spp" in model_name.lower():
                 supported_modes = ["oscillation", "rotation"]
+            elif "sgr" in model_name.lower():
+                supported_modes = ["oscillation", "relaxation"]
 
             return {
                 "name": model_name,
@@ -481,6 +483,15 @@ class ModelService:
             # Determine test mode
             if test_mode is None:
                 test_mode = data.metadata.get("test_mode", "oscillation")
+
+            # Validate test mode is supported by this model
+            model_info = self.get_model_info(model_name)
+            supported_modes = model_info.get("supported_test_modes", [])
+            if supported_modes and test_mode not in supported_modes:
+                raise ValueError(
+                    f"Model '{model_name}' does not support test_mode='{test_mode}'. "
+                    f"Supported modes: {supported_modes}"
+                )
 
             # Fit model
             logger.info(f"Fitting {model_name} model with test_mode={test_mode}")

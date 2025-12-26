@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from rheojax.gui.state.store import StateStore
+from rheojax.gui.state.store import StateStore, WorkflowMode
 from rheojax.gui.widgets.jax_status import JAXStatusWidget
 
 
@@ -59,6 +59,7 @@ class HomePage(QWidget):
     new_project_requested = Signal()
     example_selected = Signal(str)
     recent_project_opened = Signal(Path)
+    workflow_selected = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize home page.
@@ -93,6 +94,9 @@ class HomePage(QWidget):
         # Quick Start section
         content_layout.addWidget(self._create_quick_start())
 
+        # Workflow Selector
+        content_layout.addWidget(self._create_workflow_selector())
+
         # Two-column layout for Recent Projects and Examples
         two_col_layout = QHBoxLayout()
         two_col_layout.setSpacing(20)
@@ -115,6 +119,74 @@ class HomePage(QWidget):
 
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll)
+
+    def _create_workflow_selector(self) -> QWidget:
+        """Create workflow selection section."""
+        group = QGroupBox("Select Workflow")
+        group.setStyleSheet("""
+            QGroupBox {
+                font-size: 14pt;
+                font-weight: bold;
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+        """)
+
+        layout = QHBoxLayout(group)
+        layout.setSpacing(20)
+        layout.setContentsMargins(15, 25, 15, 15)
+
+        # Fitting Workflow Card
+        fit_card = self._create_workflow_card(
+            "Fitting Workflow",
+            "Data -> Fit -> Bayesian -> Diagnostics -> Export",
+            "#2196F3",
+            "fitting"
+        )
+        layout.addWidget(fit_card)
+
+        # Transform Workflow Card
+        transform_card = self._create_workflow_card(
+            "Transform Workflow",
+            "Data -> Transforms (FFT, TTS, SPP) -> Export",
+            "#4CAF50",
+            "transform"
+        )
+        layout.addWidget(transform_card)
+
+        return group
+
+    def _create_workflow_card(self, title: str, description: str, color: str, mode: str) -> QPushButton:
+        """Create a workflow selection card."""
+        btn = QPushButton(f"{title}\n\n{description}")
+        btn.setMinimumHeight(120)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {color};
+                color: white;
+                border: none;
+                border-radius: 8px;
+                text-align: left;
+                padding: 16px;
+                font-size: 12pt;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {self._darken_color(color)};
+            }}
+        """)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(lambda: self._select_workflow(mode))
+        return btn
+
+    def _select_workflow(self, mode: str) -> None:
+        """Handle workflow selection."""
+        self._store.dispatch("SET_WORKFLOW_MODE", {"mode": mode})
+        self.workflow_selected.emit(mode)
+        # Navigate to data tab to start work
+        self._store.dispatch("NAVIGATE_TAB", {"tab": "data"})
 
     def _create_header(self) -> QWidget:
         """Create header with logo and title."""

@@ -33,6 +33,14 @@ class PipelineStep(Enum):
     EXPORT = auto()
 
 
+
+class WorkflowMode(Enum):
+    """Application workflow modes."""
+
+    FITTING = auto()
+    TRANSFORM = auto()
+
+
 class StepStatus(Enum):
     """Status of each pipeline step."""
 
@@ -210,6 +218,7 @@ class AppState:
     transform_history: list[TransformRecord] = field(default_factory=list)
 
     # Settings
+    workflow_mode: WorkflowMode = WorkflowMode.FITTING
     current_seed: int = 42
     auto_save_enabled: bool = True
     theme: str = "light"
@@ -457,6 +466,17 @@ class StateStore:
                 if state.theme == theme:
                     return state
                 return replace(state, theme=theme, is_modified=True)
+
+            return updater
+
+        if action_type == "SET_WORKFLOW_MODE":
+            mode = action.get("mode")
+
+            def updater(state: AppState) -> AppState:
+                new_mode = WorkflowMode[mode.upper()] if isinstance(mode, str) else mode
+                if isinstance(new_mode, WorkflowMode):
+                    return replace(state, workflow_mode=new_mode)
+                return state
 
             return updater
 

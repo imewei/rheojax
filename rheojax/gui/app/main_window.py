@@ -51,6 +51,7 @@ from rheojax.gui.state.store import (
     PipelineStep,
     StateStore,
     StepStatus,
+    WorkflowMode,
 )
 from rheojax.gui.dialogs.about import AboutDialog
 from rheojax.gui.dialogs.import_wizard import ImportWizard
@@ -113,6 +114,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.worker_pool: WorkerPool | None = None
         self._job_types: dict[str, str] = {}
         self._plot_style: str = "default"
+        self._current_workflow_mode: WorkflowMode = WorkflowMode.FITTING
 
         # Setup UI components
         self.setup_ui()
@@ -216,6 +218,28 @@ class RheoJAXMainWindow(QMainWindow):
         self.tabs.addTab(self.bayesian_page, "Bayesian")
         self.tabs.addTab(self.diagnostics_page, "Diagnostics")
         self.tabs.addTab(self.export_page, "Export")
+
+        # Set initial visibility based on default mode
+        self._update_tabs_visibility(self._current_workflow_mode)
+
+    def _update_tabs_visibility(self, mode: WorkflowMode) -> None:
+        """Update tab visibility based on workflow mode.
+
+        Parameters
+        ----------
+        mode : WorkflowMode
+            Active workflow mode
+        """
+        # Define visible tabs for each mode by page index
+        # 0: Home, 1: Data, 2: Transform, 3: Fit, 4: Bayesian, 5: Diagnostics, 6: Export
+        visible_indices = {
+            WorkflowMode.FITTING: {0, 1, 3, 4, 5, 6},
+            WorkflowMode.TRANSFORM: {0, 1, 2, 6},
+        }
+
+        indices = visible_indices.get(mode, set())
+        for i in range(self.tabs.count()):
+            self.tabs.setTabVisible(i, i in indices)
 
     def _wrap_widget_in_toolbar(self, widget: QWidget) -> 'QToolBar':
         """Place an arbitrary widget inside a non-movable toolbar."""
@@ -551,6 +575,12 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Sync pipeline chips
         self._update_pipeline_chips_from_state(state)
+
+        # Update workflow mode
+        if state.workflow_mode != self._current_workflow_mode:
+            self._current_workflow_mode = state.workflow_mode
+            self._update_tabs_visibility(self._current_workflow_mode)
+            self.log(f"Switched to {self._current_workflow_mode.name.title()} Workflow")
 
     # -------------------------------------------------------------------------
     # File Menu Handlers
