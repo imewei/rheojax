@@ -72,6 +72,8 @@ class FitResult:
         X values for fitted curve
     y_fit : np.ndarray
         Y values for fitted curve
+    pcov : np.ndarray, optional
+        Parameter covariance matrix (n_params x n_params) for uncertainty bands
     metadata : dict
         Additional metadata (convergence info, etc.)
     """
@@ -84,7 +86,8 @@ class FitResult:
     message: str
     x_fit: np.ndarray
     y_fit: np.ndarray
-    metadata: dict[str, Any]
+    pcov: np.ndarray | None = None
+    metadata: dict[str, Any] = None
 
 
 class ModelService:
@@ -544,8 +547,10 @@ class ModelService:
                 "mpe": mpe,
             }
 
-            # Add NLSQ result if available
+            # Extract pcov (parameter covariance) from NLSQ result for uncertainty bands
+            pcov = None
             if hasattr(model, "_nlsq_result") and model._nlsq_result:
+                pcov = getattr(model._nlsq_result, "pcov", None)
                 metadata["nlsq_result"] = {
                     "success": getattr(model._nlsq_result, "success", False),
                     "nfev": model._nlsq_result.nfev,
@@ -561,6 +566,7 @@ class ModelService:
                 message="Fit successful",
                 x_fit=x,
                 y_fit=y_pred,
+                pcov=pcov,
                 metadata=metadata,
             )
 
@@ -575,8 +581,10 @@ class ModelService:
                 message=f"Fit failed: {e}",
                 x_fit=np.array([]),
                 y_fit=np.array([]),
+                pcov=None,
                 metadata={"error": str(e)},
             )
+
 
     def predict(
         self,
