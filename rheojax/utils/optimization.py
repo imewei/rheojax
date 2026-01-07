@@ -48,6 +48,65 @@ jax, jnp = safe_import_jax()
 type ArrayLike = np.ndarray | list | float
 
 
+def compute_covariance_from_jacobian(
+    jac: np.ndarray,
+    residuals: np.ndarray | None = None,
+    n_data: int | None = None,
+) -> np.ndarray | None:
+    """Compute parameter covariance matrix from Jacobian via SVD.
+
+    Uses SVD-based Moore-Penrose pseudo-inverse for numerical stability:
+        pcov = VT.T @ diag(1/s²) @ VT
+
+    Scaled by residual variance when residuals provided:
+        pcov *= RSS / (n_data - n_params)
+
+    Args:
+        jac: Jacobian matrix (m x n), where m = data points, n = parameters
+        residuals: Optional residual vector for scaling
+        n_data: Number of data points (default: inferred from jac.shape[0])
+
+    Returns:
+        Covariance matrix (n x n), or None if computation fails
+    """
+    if jac is None or jac.size == 0:
+        return None
+
+    try:
+        jac = np.asarray(jac, dtype=np.float64)
+        m, n = jac.shape  # m = data points, n = parameters
+
+        # SVD of Jacobian: J = U @ S @ VT
+        U, s, VT = np.linalg.svd(jac, full_matrices=False)
+
+        # Filter near-zero singular values
+        threshold = np.finfo(np.float64).eps * max(m, n) * s[0]
+        s_inv_sq = np.where(s > threshold, 1.0 / (s ** 2), 0.0)
+
+        # Compute covariance: (J.T @ J)^-1 = VT.T @ diag(1/s²) @ VT
+        pcov = VT.T @ np.diag(s_inv_sq) @ VT
+
+        # Scale by residual variance if available
+        if residuals is not None:
+            residuals = np.asarray(residuals, dtype=np.float64).ravel()
+            rss = np.sum(residuals ** 2)
+            n_data_actual = n_data if n_data is not None else m
+            dof = n_data_actual - n  # degrees of freedom
+            if dof > 0:
+                pcov = pcov * (rss / dof)
+
+        # Validate result
+        if not np.all(np.isfinite(pcov)):
+            logger.warning("Covariance matrix contains inf/nan, returning None")
+            return None
+
+        return pcov
+
+    except Exception as e:
+        logger.warning(f"Failed to compute covariance from Jacobian: {e}")
+        return None
+
+
 @dataclass
 class OptimizationResult:
     """Result from optimization.
@@ -60,6 +119,7 @@ class OptimizationResult:
         x: Optimal parameter values (float64 array)
         fun: Objective function value at optimum
         jac: Jacobian (gradient) at optimum
+        pcov: Parameter covariance matrix (n_params x n_params)
         success: Whether optimization converged successfully
         message: Status message from optimizer
         nit: Number of iterations
@@ -75,6 +135,7 @@ class OptimizationResult:
     x: np.ndarray
     fun: float
     jac: np.ndarray | None = None
+    pcov: np.ndarray | None = None
     success: bool = True
     message: str = ""
     nit: int = 0
@@ -87,11 +148,14 @@ class OptimizationResult:
     nlsq_result: dict[str, Any] | None = field(default=None, repr=False)
 
     @classmethod
-    def from_nlsq(cls, nlsq_result: dict[str, Any]) -> OptimizationResult:
+    def from_nlsq(
+        cls, nlsq_result: dict[str, Any], residuals: np.ndarray | None = None
+    ) -> "OptimizationResult":
         """Create OptimizationResult from NLSQ result dictionary.
 
         Args:
             nlsq_result: Result dictionary from nlsq.LeastSquares.least_squares
+            residuals: Optional residual vector for covariance scaling
 
         Returns:
             OptimizationResult instance with fields extracted from NLSQ result
@@ -124,10 +188,16 @@ class OptimizationResult:
         # Note: NLSQ uses 'nfev' for iterations in some contexts
         nit = int(nlsq_result.get("nit", nlsq_result.get("nfev", 0)))
 
+        # Compute covariance from Jacobian
+        pcov = None
+        if jac is not None:
+            pcov = compute_covariance_from_jacobian(jac, residuals)
+
         return cls(
             x=x,
             fun=fun,
             jac=jac,
+            pcov=pcov,
             success=success,
             message=message,
             nit=nit,
@@ -285,6 +355,14 @@ def nlsq_optimize(
         )
 
         cost_value = getattr(scipy_result, "cost", None)
+        
+        # Extract Jacobian and compute covariance
+        jac = None
+        pcov = None
+        if scipy_result.jac is not None:
+            jac = np.asarray(scipy_result.jac, dtype=np.float64)
+            residuals = residual_fn(scipy_result.x)
+            pcov = compute_covariance_from_jacobian(jac, residuals)
 
         result = OptimizationResult(
             x=np.asarray(scipy_result.x, dtype=np.float64),
@@ -293,11 +371,8 @@ def nlsq_optimize(
                 if hasattr(scipy_result, "cost")
                 else float(np.sum(residual_fn(scipy_result.x) ** 2))
             ),
-            jac=(
-                np.asarray(scipy_result.jac, dtype=np.float64)
-                if scipy_result.jac is not None
-                else None
-            ),
+            jac=jac,
+            pcov=pcov,
             success=bool(scipy_result.success),
             message=str(scipy_result.message),
             nit=int(getattr(scipy_result, "nit", scipy_result.nfev)),
@@ -318,6 +393,7 @@ def nlsq_optimize(
 
         return result
 
+
     # Create NLSQ optimizer instance and run optimization
     try:
         optimizer = nlsq.LeastSquares()
@@ -329,8 +405,13 @@ def nlsq_optimize(
         )
         return _scipy_fallback(x0)
 
-    # Convert NLSQ result to OptimizationResult
-    result = OptimizationResult.from_nlsq(nlsq_result)
+    # Compute residuals at optimal point for covariance scaling
+    x_opt = np.asarray(nlsq_result.get("x", x0), dtype=np.float64)
+    residuals = objective(x_opt)
+    residuals_np = np.asarray(residuals, dtype=np.float64)
+
+    # Convert NLSQ result to OptimizationResult (with residuals for covariance)
+    result = OptimizationResult.from_nlsq(nlsq_result, residuals=residuals_np)
 
     if (
         not result.success
@@ -344,10 +425,9 @@ def nlsq_optimize(
     # Ensure x is float64
     result.x = np.asarray(result.x, dtype=np.float64)
 
-    # Recompute objective at optimal point
-    # objective() now returns residual vector, so compute RSS = sum(residuals²)
-    residuals = objective(result.x)
+    # Compute RSS = sum(residuals²)
     result.fun = float(jnp.sum(residuals**2))
+
 
     # Guard against false "success" with astronomically large residuals
     residuals_np = np.asarray(residuals)
