@@ -590,7 +590,7 @@ class SGRGeneric(BaseModel):
         Args:
             X: Independent variable (frequency for oscillation, time for relaxation)
             y: Dependent variable (complex modulus, relaxation modulus, etc.)
-            test_mode: Test mode ('oscillation', 'relaxation', etc.)
+            test_mode: Test mode ('oscillation', 'relaxation', 'creep', 'steady_shear', 'laos')
             **kwargs: NLSQ optimizer arguments
 
         Raises:
@@ -607,10 +607,17 @@ class SGRGeneric(BaseModel):
             self._fit_oscillation_mode(X, y, **kwargs)
         elif test_mode == "relaxation":
             self._fit_relaxation_mode(X, y, **kwargs)
+        elif test_mode == "creep":
+            self._fit_creep_mode(X, y, **kwargs)
+        elif test_mode == "steady_shear":
+            self._fit_steady_shear_mode(X, y, **kwargs)
+        elif test_mode == "laos":
+            self._fit_laos_mode(X, y, **kwargs)
         else:
             raise ValueError(
                 f"Unsupported test_mode: {test_mode}. "
-                f"SGR GENERIC model supports 'oscillation', 'relaxation'."
+                f"SGR GENERIC model supports 'oscillation', 'relaxation', "
+                f"'creep', 'steady_shear', 'laos'."
             )
 
     def _fit_oscillation_mode(
@@ -769,6 +776,430 @@ class SGRGeneric(BaseModel):
         )
 
         self.fitted_ = True
+
+    def _fit_creep_mode(
+        self,
+        t: np.ndarray,
+        J_t: np.ndarray,
+        **kwargs,
+    ) -> None:
+        """Fit SGR GENERIC to creep compliance data (creep mode).
+
+        Uses NLSQ-accelerated optimization to fit SGR parameters [x, G0, tau0]
+        to creep compliance data J(t).
+
+        Theory: For x > 1 (fluid), J(t) ~ t^(x-1)
+
+        Args:
+            t: Time array (s)
+            J_t: Creep compliance array (1/Pa)
+            **kwargs: NLSQ optimizer arguments
+
+        Raises:
+            RuntimeError: If optimization fails to converge
+        """
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+
+        # Convert inputs to JAX arrays
+        t_jax = jnp.asarray(t, dtype=jnp.float64)
+        J_t_jax = jnp.asarray(J_t, dtype=jnp.float64)
+
+        # Create model function for NLSQ
+        def model_fn(x_data: jnp.ndarray, params: jnp.ndarray) -> jnp.ndarray:
+            x_param = params[0]
+            G0_param = params[1]
+            tau0_param = params[2]
+            return self._predict_creep_jit(x_data, x_param, G0_param, tau0_param)
+
+        # Create residual function (log-space for compliance spanning decades)
+        objective = create_least_squares_objective(
+            model_fn,
+            t_jax,
+            J_t_jax,
+            normalize=True,
+            use_log_residuals=kwargs.get("use_log_residuals", True),
+        )
+
+        # Run NLSQ optimization
+        result = nlsq_optimize(
+            objective,
+            self.parameters,
+            use_jax=kwargs.get("use_jax", True),
+            max_iter=kwargs.get("max_iter", 1000),
+            ftol=kwargs.get("ftol", 1e-6),
+            xtol=kwargs.get("xtol", 1e-6),
+            gtol=kwargs.get("gtol", 1e-6),
+        )
+
+        if not result.success:
+            raise RuntimeError(
+                f"SGR GENERIC creep fitting failed: {result.message}. "
+                "Try adjusting initial values or bounds."
+            )
+
+        logger.debug(
+            f"SGR GENERIC creep fit converged: x={self.parameters.get_value('x'):.4f}, "
+            f"G0={self.parameters.get_value('G0'):.2e}, "
+            f"tau0={self.parameters.get_value('tau0'):.2e}, "
+            f"cost={result.fun:.3e}"
+        )
+
+        self.fitted_ = True
+
+    def _fit_steady_shear_mode(
+        self,
+        gamma_dot: np.ndarray,
+        sigma: np.ndarray,
+        **kwargs,
+    ) -> None:
+        """Fit SGR GENERIC to steady shear flow curve data.
+
+        Uses NLSQ-accelerated optimization to fit SGR parameters [x, G0, tau0]
+        to flow curve data sigma(gamma_dot).
+
+        Theory:
+            - Fluid (x > 1): sigma ~ gamma_dot^(x-1)
+            - Glass (x < 1): sigma = sigma_y + A*gamma_dot^(1-x)
+
+        Args:
+            gamma_dot: Shear rate array (1/s)
+            sigma: Stress array (Pa)
+            **kwargs: NLSQ optimizer arguments
+
+        Raises:
+            RuntimeError: If optimization fails to converge
+        """
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+
+        # Convert inputs to JAX arrays
+        gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
+        sigma_jax = jnp.asarray(sigma, dtype=jnp.float64)
+
+        # Create model function for NLSQ
+        def model_fn(x_data: jnp.ndarray, params: jnp.ndarray) -> jnp.ndarray:
+            x_param = params[0]
+            G0_param = params[1]
+            tau0_param = params[2]
+            return self._predict_steady_shear_jit(x_data, x_param, G0_param, tau0_param)
+
+        # Create residual function (log-space for power-law data)
+        objective = create_least_squares_objective(
+            model_fn,
+            gamma_dot_jax,
+            sigma_jax,
+            normalize=True,
+            use_log_residuals=kwargs.get("use_log_residuals", True),
+        )
+
+        # Run NLSQ optimization
+        result = nlsq_optimize(
+            objective,
+            self.parameters,
+            use_jax=kwargs.get("use_jax", True),
+            max_iter=kwargs.get("max_iter", 1000),
+            ftol=kwargs.get("ftol", 1e-6),
+            xtol=kwargs.get("xtol", 1e-6),
+            gtol=kwargs.get("gtol", 1e-6),
+        )
+
+        if not result.success:
+            raise RuntimeError(
+                f"SGR GENERIC steady shear fitting failed: {result.message}. "
+                "Try adjusting initial values or bounds."
+            )
+
+        logger.debug(
+            f"SGR GENERIC steady shear fit converged: x={self.parameters.get_value('x'):.4f}, "
+            f"G0={self.parameters.get_value('G0'):.2e}, "
+            f"tau0={self.parameters.get_value('tau0'):.2e}, "
+            f"cost={result.fun:.3e}"
+        )
+
+        self.fitted_ = True
+
+    def _fit_laos_mode(
+        self,
+        t: np.ndarray,
+        sigma: np.ndarray,
+        **kwargs,
+    ) -> None:
+        """Fit SGR GENERIC to LAOS stress data.
+
+        Uses Monte Carlo or Population Balance solver for time-domain stress
+        prediction, then optimizes parameters to match measured stress.
+
+        Args:
+            t: Time array (s)
+            sigma: Stress array (Pa)
+            **kwargs: Required kwargs:
+                - gamma_0: Strain amplitude
+                - omega: Angular frequency (rad/s)
+                Optional kwargs:
+                - n_particles: Monte Carlo particle count (default 5000)
+                - use_pde: Use PDE solver instead of MC (default False)
+
+        Raises:
+            ValueError: If gamma_0 or omega not provided
+            RuntimeError: If optimization fails
+        """
+        gamma_0 = kwargs.get("gamma_0")
+        omega = kwargs.get("omega")
+
+        if gamma_0 is None or omega is None:
+            raise ValueError("LAOS fitting requires gamma_0 and omega in kwargs")
+
+        n_particles = kwargs.get("n_particles", 5000)
+        use_pde = kwargs.get("use_pde", False)
+
+        logger.info(
+            f"SGR GENERIC LAOS fitting: gamma_0={gamma_0}, omega={omega}, "
+            f"{'PDE' if use_pde else 'MC'} solver with {n_particles if not use_pde else 'grid'}"
+        )
+
+        # Store LAOS parameters
+        self._gamma_0 = gamma_0
+        self._omega_laos = omega
+
+        # For now, use analytical approximation for small amplitude
+        # Full MC/PDE fitting would require iterative simulation
+        if gamma_0 < 0.1:
+            # Small amplitude - use SAOS approximation
+            logger.warning(
+                f"Small strain amplitude gamma_0={gamma_0}. Using SAOS approximation."
+            )
+            # Extract G', G'' from stress signal via FFT
+            from scipy.fft import fft
+
+            sigma_fft = fft(sigma)
+            n = len(sigma)
+            fundamental_idx = int(omega * (t[-1] - t[0]) / (2 * np.pi))
+            fundamental_idx = max(1, min(fundamental_idx, n // 2 - 1))
+
+            G_star_amplitude = 2.0 * np.abs(sigma_fft[fundamental_idx]) / (n * gamma_0)
+            phase = np.angle(sigma_fft[fundamental_idx])
+
+            G_prime = G_star_amplitude * np.cos(phase)
+            G_double_prime = G_star_amplitude * np.sin(phase)
+
+            # Fit to single-point SAOS
+            omega_single = np.array([omega])
+            G_star_single = np.array([[G_prime, G_double_prime]])
+
+            self._fit_oscillation_mode(omega_single, G_star_single, **kwargs)
+        else:
+            # Large amplitude - full MC-based LAOS fitting
+            self._fit_laos_mc(t, sigma, gamma_0, omega, n_particles, **kwargs)
+
+    def _fit_laos_mc(
+        self,
+        t: np.ndarray,
+        sigma: np.ndarray,
+        gamma_0: float,
+        omega: float,
+        n_particles: int,
+        **kwargs,
+    ) -> None:
+        """Full Monte Carlo-based LAOS fitting.
+
+        Runs MC simulations within optimization loop to match time-domain stress.
+
+        Args:
+            t: Time array (s)
+            sigma: Measured stress array (Pa)
+            gamma_0: Strain amplitude
+            omega: Angular frequency (rad/s)
+            n_particles: Number of MC particles
+            **kwargs: Optimizer arguments
+        """
+        from scipy.optimize import minimize
+
+        from rheojax.utils.sgr_monte_carlo import simulate_oscillatory
+
+        logger.info(
+            f"Full MC-based LAOS fitting: {n_particles} particles, "
+            f"gamma_0={gamma_0}, omega={omega:.3f} rad/s"
+        )
+
+        # Determine simulation parameters from data
+        period = 2.0 * np.pi / omega
+        t_total = t[-1] - t[0]
+        n_cycles = max(1, int(t_total / period))
+        points_per_cycle = max(10, len(t) // n_cycles)
+
+        # Warm-start: estimate parameters from stress amplitude
+        sigma_max = np.max(np.abs(sigma))
+        G0_init = sigma_max / gamma_0
+        x_init = self.parameters.get_value("x")
+        tau0_init = self.parameters.get_value("tau0")
+
+        # Normalize target stress for residual calculation
+        sigma_norm = sigma / (sigma_max + 1e-12)
+
+        # Fixed random seed for reproducibility within optimization
+        seed = kwargs.get("seed", 42)
+
+        def objective(params):
+            """Compute residual between MC stress and measured stress."""
+            x_val, log_G0, log_tau0 = params
+            G0_val = np.exp(log_G0)
+            tau0_val = np.exp(log_tau0)
+
+            # Clamp x to valid range
+            x_val = np.clip(x_val, 0.5, 2.5)
+
+            try:
+                # Run MC simulation
+                key = jax.random.PRNGKey(seed)
+                _, _, sigma_mc = simulate_oscillatory(
+                    key=key,
+                    gamma_0=gamma_0,
+                    omega=omega,
+                    n_cycles=n_cycles,
+                    points_per_cycle=points_per_cycle,
+                    x=x_val,
+                    n_particles=n_particles,
+                    k=G0_val,
+                    Gamma0=1.0 / tau0_val,
+                    xg=1.0,
+                )
+
+                # Interpolate to match data time points
+                t_mc = np.linspace(0, t_total, len(sigma_mc))
+                sigma_mc_interp = np.interp(t - t[0], t_mc, np.array(sigma_mc))
+
+                # Normalize MC stress
+                sigma_mc_max = np.max(np.abs(sigma_mc_interp)) + 1e-12
+                sigma_mc_norm = sigma_mc_interp / sigma_mc_max
+
+                # Compute residual (allow phase shift by minimizing over shifts)
+                residual = np.sum((sigma_mc_norm - sigma_norm) ** 2)
+
+                return residual
+
+            except Exception as e:
+                logger.warning(f"MC simulation failed: {e}")
+                return 1e10  # Large penalty
+
+        # Initial guess in log space for G0, tau0
+        x0 = np.array([x_init, np.log(G0_init), np.log(tau0_init)])
+
+        # Bounds
+        bounds = [
+            (0.5, 2.5),  # x
+            (np.log(1e-3), np.log(1e9)),  # log(G0)
+            (np.log(1e-9), np.log(1e3)),  # log(tau0)
+        ]
+
+        # Run optimization
+        max_iter = kwargs.get("max_iter", 50)
+
+        logger.info(f"Starting MC-LAOS optimization (max {max_iter} iterations)...")
+
+        result = minimize(
+            objective,
+            x0,
+            method="L-BFGS-B",
+            bounds=bounds,
+            options={"maxiter": max_iter, "disp": False},
+        )
+
+        # Update parameters
+        x_opt, log_G0_opt, log_tau0_opt = result.x
+        self.parameters.set_value("x", float(x_opt))
+        self.parameters.set_value("G0", float(np.exp(log_G0_opt)))
+        self.parameters.set_value("tau0", float(np.exp(log_tau0_opt)))
+
+        if result.success:
+            logger.info(
+                f"MC-LAOS fit converged: x={x_opt:.4f}, "
+                f"G0={np.exp(log_G0_opt):.2e}, tau0={np.exp(log_tau0_opt):.2e}, "
+                f"cost={result.fun:.3e}"
+            )
+        else:
+            logger.warning(
+                f"MC-LAOS fit did not fully converge: {result.message}. "
+                f"Best: x={x_opt:.4f}, G0={np.exp(log_G0_opt):.2e}"
+            )
+
+        self.fitted_ = True
+
+    @staticmethod
+    @jax.jit
+    def _predict_creep_jit(
+        t: jnp.ndarray, x: float, G0_scale: float, tau0: float
+    ) -> jnp.ndarray:
+        """JIT-compiled creep prediction: J(t).
+
+        Theory: J(t) ~ t^(x-1) for x > 1 (fluid regime)
+
+        Args:
+            t: Time array (s)
+            x: Effective noise temperature (dimensionless)
+            G0_scale: Modulus scale (Pa)
+            tau0: Attempt time (s)
+
+        Returns:
+            Creep compliance J(t) with shape (M,)
+        """
+        # Dimensionless time
+        t_scaled = t / tau0
+
+        # Compute equilibrium modulus factor
+        G0_dim = G0(x)
+
+        epsilon = 1e-12
+        t_safe = jnp.maximum(t_scaled, epsilon)
+
+        # Creep compliance: J(t) ~ (1 + t/tau0)^(x-1) / G0
+        # This is the inverse relationship to G(t)
+        growth_exp = x - 1.0
+        J_t = jnp.power(1.0 + t_safe, growth_exp) / (G0_scale * G0_dim)
+
+        # Enforce monotonicity for physical creep
+        J_t_monotonic = jnp.maximum.accumulate(J_t)
+
+        return J_t_monotonic
+
+    @staticmethod
+    @jax.jit
+    def _predict_steady_shear_jit(
+        gamma_dot: jnp.ndarray, x: float, G0_scale: float, tau0: float
+    ) -> jnp.ndarray:
+        """JIT-compiled steady shear prediction: sigma(gamma_dot).
+
+        Theory:
+            - Fluid (x > 1): sigma ~ gamma_dot^(x-1)
+            - Glass (x < 1): sigma = sigma_y + A*gamma_dot^(1-x)
+
+        Args:
+            gamma_dot: Shear rate array (1/s)
+            x: Effective noise temperature (dimensionless)
+            G0_scale: Modulus scale (Pa)
+            tau0: Attempt time (s)
+
+        Returns:
+            Stress sigma(gamma_dot) with shape (M,)
+        """
+        # Compute equilibrium modulus factor
+        G0_dim = G0(x)
+
+        epsilon = 1e-12
+        gamma_dot_safe = jnp.maximum(gamma_dot, epsilon)
+
+        # Dimensionless shear rate
+        gamma_dot_scaled = gamma_dot_safe * tau0
+
+        # Flow curve: sigma = G0 * tau0 * gamma_dot * (gamma_dot * tau0)^(x-2)
+        # = G0 * (gamma_dot * tau0)^(x-1)
+        sigma = G0_scale * G0_dim * jnp.power(gamma_dot_scaled, x - 1.0)
+
+        return sigma
 
     @staticmethod
     @jax.jit

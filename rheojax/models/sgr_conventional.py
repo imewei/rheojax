@@ -609,30 +609,185 @@ class SGRConventional(BaseModel):
     ) -> None:
         """Fit SGR to LAOS data.
 
-        Args:
-            X: Time or strain array
-            y: Stress array
-            **kwargs: NLSQ optimizer arguments including gamma_0, omega
+        Uses Monte Carlo simulation for time-domain stress prediction,
+        then optimizes parameters to match measured stress.
 
-        Note:
-            LAOS fitting requires strain amplitude and frequency.
+        Args:
+            X: Time array (s)
+            y: Stress array (Pa)
+            **kwargs: Required kwargs:
+                - gamma_0: Strain amplitude
+                - omega: Angular frequency (rad/s)
+                Optional kwargs:
+                - n_particles: Monte Carlo particle count (default 5000)
+                - max_iter: Optimizer max iterations (default 50)
+                - seed: Random seed for reproducibility (default 42)
+
+        Raises:
+            ValueError: If gamma_0 or omega not provided
         """
-        # Extract LAOS parameters from kwargs
-        gamma_0 = kwargs.get("gamma_0", None)
-        omega = kwargs.get("omega", None)
+        gamma_0 = kwargs.get("gamma_0")
+        omega = kwargs.get("omega")
+
+        if gamma_0 is None or omega is None:
+            raise ValueError("LAOS fitting requires gamma_0 and omega in kwargs")
 
         if gamma_0 is not None:
             self._gamma_0 = gamma_0
         if omega is not None:
             self._omega_laos = omega
 
-        logger.warning(
-            "SGR LAOS mode fitting not yet fully implemented. "
-            "Using default parameter values."
+        n_particles = kwargs.get("n_particles", 5000)
+
+        # Use SAOS approximation for small amplitude
+        if gamma_0 < 0.1:
+            logger.info(
+                f"Small strain amplitude gamma_0={gamma_0}. Using SAOS approximation."
+            )
+            from scipy.fft import fft
+
+            sigma = y
+            t = X
+            sigma_fft = fft(sigma)
+            n = len(sigma)
+            fundamental_idx = int(omega * (t[-1] - t[0]) / (2 * np.pi))
+            fundamental_idx = max(1, min(fundamental_idx, n // 2 - 1))
+
+            G_star_amplitude = 2.0 * np.abs(sigma_fft[fundamental_idx]) / (n * gamma_0)
+            phase = np.angle(sigma_fft[fundamental_idx])
+
+            G_prime = G_star_amplitude * np.cos(phase)
+            G_double_prime = G_star_amplitude * np.sin(phase)
+
+            omega_single = np.array([omega])
+            G_star_single = np.array([[G_prime, G_double_prime]])
+
+            self._fit_oscillation_mode(omega_single, G_star_single, **kwargs)
+        else:
+            # Full MC-based LAOS fitting
+            self._fit_laos_mc(X, y, gamma_0, omega, n_particles, **kwargs)
+
+    def _fit_laos_mc(
+        self,
+        t: np.ndarray,
+        sigma: np.ndarray,
+        gamma_0: float,
+        omega: float,
+        n_particles: int,
+        **kwargs,
+    ) -> None:
+        """Full Monte Carlo-based LAOS fitting.
+
+        Runs MC simulations within optimization loop to match time-domain stress.
+
+        Args:
+            t: Time array (s)
+            sigma: Measured stress array (Pa)
+            gamma_0: Strain amplitude
+            omega: Angular frequency (rad/s)
+            n_particles: Number of MC particles
+            **kwargs: Optimizer arguments
+        """
+        from scipy.optimize import minimize
+
+        from rheojax.utils.sgr_monte_carlo import simulate_oscillatory
+
+        logger.info(
+            f"Full MC-based LAOS fitting: {n_particles} particles, "
+            f"gamma_0={gamma_0}, omega={omega:.3f} rad/s"
         )
-        # Explicitly mark as not fitted to avoid silently continuing.
-        self.fitted_ = False
-        return
+
+        # Determine simulation parameters from data
+        period = 2.0 * np.pi / omega
+        t_total = t[-1] - t[0]
+        n_cycles = max(1, int(t_total / period))
+        points_per_cycle = max(10, len(t) // n_cycles)
+
+        # Warm-start: estimate parameters from stress amplitude
+        sigma_max = np.max(np.abs(sigma))
+        G0_init = sigma_max / gamma_0
+        x_init = self.parameters.get_value("x")
+        tau0_init = self.parameters.get_value("tau0")
+
+        # Normalize target stress for residual calculation
+        sigma_norm = sigma / (sigma_max + 1e-12)
+
+        # Fixed random seed for reproducibility
+        seed = kwargs.get("seed", 42)
+
+        def objective(params):
+            """Compute residual between MC stress and measured stress."""
+            x_val, log_G0, log_tau0 = params
+            G0_val = np.exp(log_G0)
+            tau0_val = np.exp(log_tau0)
+
+            x_val = np.clip(x_val, 0.5, 2.5)
+
+            try:
+                key = jax.random.PRNGKey(seed)
+                _, _, sigma_mc = simulate_oscillatory(
+                    key=key,
+                    gamma_0=gamma_0,
+                    omega=omega,
+                    n_cycles=n_cycles,
+                    points_per_cycle=points_per_cycle,
+                    x=x_val,
+                    n_particles=n_particles,
+                    k=G0_val,
+                    Gamma0=1.0 / tau0_val,
+                    xg=1.0,
+                )
+
+                t_mc = np.linspace(0, t_total, len(sigma_mc))
+                sigma_mc_interp = np.interp(t - t[0], t_mc, np.array(sigma_mc))
+
+                sigma_mc_max = np.max(np.abs(sigma_mc_interp)) + 1e-12
+                sigma_mc_norm = sigma_mc_interp / sigma_mc_max
+
+                residual = np.sum((sigma_mc_norm - sigma_norm) ** 2)
+                return residual
+
+            except Exception as e:
+                logger.warning(f"MC simulation failed: {e}")
+                return 1e10
+
+        x0 = np.array([x_init, np.log(G0_init), np.log(tau0_init)])
+
+        bounds = [
+            (0.5, 2.5),
+            (np.log(1e-3), np.log(1e9)),
+            (np.log(1e-9), np.log(1e3)),
+        ]
+
+        max_iter = kwargs.get("max_iter", 50)
+        logger.info(f"Starting MC-LAOS optimization (max {max_iter} iterations)...")
+
+        result = minimize(
+            objective,
+            x0,
+            method="L-BFGS-B",
+            bounds=bounds,
+            options={"maxiter": max_iter, "disp": False},
+        )
+
+        x_opt, log_G0_opt, log_tau0_opt = result.x
+        self.parameters.set_value("x", float(x_opt))
+        self.parameters.set_value("G0", float(np.exp(log_G0_opt)))
+        self.parameters.set_value("tau0", float(np.exp(log_tau0_opt)))
+
+        if result.success:
+            logger.info(
+                f"MC-LAOS fit converged: x={x_opt:.4f}, "
+                f"G0={np.exp(log_G0_opt):.2e}, tau0={np.exp(log_tau0_opt):.2e}, "
+                f"cost={result.fun:.3e}"
+            )
+        else:
+            logger.warning(
+                f"MC-LAOS fit did not fully converge: {result.message}. "
+                f"Best: x={x_opt:.4f}, G0={np.exp(log_G0_opt):.2e}"
+            )
+
+        self.fitted_ = True
 
     @staticmethod
     @jax.jit
