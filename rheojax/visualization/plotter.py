@@ -573,10 +573,10 @@ def compute_uncertainty_band(
     x_pred = np.asarray(x_pred, dtype=np.float64)
     popt = np.asarray(popt, dtype=np.float64)
     pcov = np.asarray(pcov, dtype=np.float64)
-    
+
     # Compute y_fit
     y_fit = np.asarray(model_fn(x_pred, popt), dtype=np.float64)
-    
+
     # Handle complex output (e.g., G* = G' + iG'')
     if np.iscomplexobj(y_fit):
         # Return None for complex - uncertainty bands are harder to interpret
@@ -587,17 +587,17 @@ def compute_uncertainty_band(
     n_points = len(x_pred)
     n_params = len(popt)
     jac = np.zeros((n_points, n_params), dtype=np.float64)
-    
+
     eps = np.sqrt(np.finfo(np.float64).eps)
     for j in range(n_params):
         params_plus = popt.copy()
         params_plus[j] += eps * max(abs(popt[j]), 1.0)
         y_plus = np.asarray(model_fn(x_pred, params_plus), dtype=np.float64)
-        
+
         params_minus = popt.copy()
         params_minus[j] -= eps * max(abs(popt[j]), 1.0)
         y_minus = np.asarray(model_fn(x_pred, params_minus), dtype=np.float64)
-        
+
         jac[:, j] = (y_plus - y_minus) / (2 * eps * max(abs(popt[j]), 1.0))
 
     # Compute variance: var_y = diag(J @ pcov @ J.T)
@@ -610,7 +610,7 @@ def compute_uncertainty_band(
 
     # Compute z-score for confidence interval
     z = norm.ppf(1 - (1 - confidence) / 2)
-    
+
     y_lower = y_fit - z * sigma_y
     y_upper = y_fit + z * sigma_y
 
@@ -683,26 +683,25 @@ def plot_fit_with_uncertainty(
     x_fit = _ensure_numpy(x_fit)
     y_fit = _ensure_numpy(y_fit)
 
+    def scatter_fn(x, y, **kw):
+        return ax.scatter(x, y, **kw)
+
     # Determine plot functions based on log scales
     if log_x and log_y:
         plot_fn = ax.loglog
-        scatter_fn = lambda x, y, **kw: ax.scatter(x, y, **kw)
         # Filter positive values for log scale
         x_data_plot, y_data_plot = _filter_positive(x_data, y_data)
         x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
     elif log_x:
         plot_fn = ax.semilogx
-        scatter_fn = lambda x, y, **kw: ax.scatter(x, y, **kw)
         x_data_plot, y_data_plot = x_data, y_data
         x_fit_plot, y_fit_plot = x_fit, y_fit
     elif log_y:
         plot_fn = ax.semilogy
-        scatter_fn = lambda x, y, **kw: ax.scatter(x, y, **kw)
         x_data_plot, y_data_plot = _filter_positive(x_data, y_data)
         x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
     else:
         plot_fn = ax.plot
-        scatter_fn = lambda x, y, **kw: ax.scatter(x, y, **kw)
         x_data_plot, y_data_plot = x_data, y_data
         x_fit_plot, y_fit_plot = x_fit, y_fit
 
@@ -714,28 +713,46 @@ def plot_fit_with_uncertainty(
             # Filter positive for log scale
             mask = (y_lower > 0) & (y_upper > 0) & (x_fit > 0)
             ax.fill_between(
-                x_fit[mask], y_lower[mask], y_upper[mask],
-                alpha=0.3, color="C0", label=band_label, zorder=1
+                x_fit[mask],
+                y_lower[mask],
+                y_upper[mask],
+                alpha=0.3,
+                color="C0",
+                label=band_label,
+                zorder=1,
             )
         else:
             ax.fill_between(
-                x_fit, y_lower, y_upper,
-                alpha=0.3, color="C0", label=band_label, zorder=1
+                x_fit,
+                y_lower,
+                y_upper,
+                alpha=0.3,
+                color="C0",
+                label=band_label,
+                zorder=1,
             )
 
     # Plot fitted curve
     plot_fn(
-        x_fit_plot, y_fit_plot, "-",
+        x_fit_plot,
+        y_fit_plot,
+        "-",
         linewidth=style_params["lines.linewidth"],
-        color="C0", label=fit_label, zorder=2
+        color="C0",
+        label=fit_label,
+        zorder=2,
     )
 
     # Plot data points
     scatter_fn(
-        x_data_plot, y_data_plot,
+        x_data_plot,
+        y_data_plot,
         s=style_params["lines.markersize"] ** 2,
-        facecolors="none", edgecolors="C1",
-        linewidths=1.5, label=data_label, zorder=3
+        facecolors="none",
+        edgecolors="C1",
+        linewidths=1.5,
+        label=data_label,
+        zorder=3,
     )
 
     # Labels and legend

@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 import math
 import re
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -437,7 +436,7 @@ def select_xy_columns(
 
     # Get x candidates for this test mode
     x_candidates = []
-    for name, mapping in column_mappings.items():
+    for _name, mapping in column_mappings.items():
         if mapping.is_x_candidate and test_mode in mapping.applicable_modes:
             for pattern in mapping.patterns:
                 for i, col in enumerate(columns_lower):

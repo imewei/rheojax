@@ -17,9 +17,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 import re
-import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -30,16 +28,14 @@ import pandas as pd
 from rheojax.core.data import RheoData
 from rheojax.io.readers.trios.common import (
     DataSegment,
-    TRIOS_COLUMN_MAPPINGS,
-    TRIOS_UNIT_CONVERSIONS,
     TRIOSFile,
     TRIOSTable,
     construct_complex_modulus,
     convert_unit,
     detect_step_column,
     detect_test_type,
-    select_xy_columns,
     segment_to_rheodata,
+    select_xy_columns,
     split_by_step,
 )
 
@@ -519,7 +515,11 @@ def load_trios_csv(
 
         # Check for step column and split if needed
         step_col = detect_step_column(df)
-        segments = [df] if not step_col or not return_all_segments else split_by_step(df, step_col)
+        segments = (
+            [df]
+            if not step_col or not return_all_segments
+            else split_by_step(df, step_col)
+        )
 
         for seg_idx, seg_df in enumerate(segments):
             # Select x/y columns
@@ -559,15 +559,16 @@ def load_trios_csv(
                 is_complex = False
 
             # Convert x units (e.g., Hz to rad/s)
-            x_target_unit = TRIOS_COLUMN_MAPPINGS.get(
-                "angular_frequency", TRIOS_COLUMN_MAPPINGS["time"]
-            ).si_unit
             if detected_mode == "oscillation":
                 x_data, x_units = convert_unit(x_data, x_units, "rad/s")
 
             # Remove NaN values
             if is_complex:
-                valid_mask = ~(np.isnan(x_data) | np.isnan(np.real(y_data)) | np.isnan(np.imag(y_data)))
+                valid_mask = ~(
+                    np.isnan(x_data)
+                    | np.isnan(np.real(y_data))
+                    | np.isnan(np.imag(y_data))
+                )
             else:
                 valid_mask = ~(np.isnan(x_data) | np.isnan(y_data))
 

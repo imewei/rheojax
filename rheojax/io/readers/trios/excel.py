@@ -25,12 +25,12 @@ import numpy as np
 import pandas as pd
 
 try:
-    import openpyxl
     from openpyxl import load_workbook
 
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
+    load_workbook = None  # type: ignore[misc,assignment]
 
 try:
     import xlrd
@@ -42,15 +42,14 @@ except ImportError:
 from rheojax.core.data import RheoData
 from rheojax.io.readers.trios.common import (
     DataSegment,
-    TRIOS_COLUMN_MAPPINGS,
     TRIOSFile,
     TRIOSTable,
     construct_complex_modulus,
     convert_unit,
     detect_step_column,
     detect_test_type,
-    select_xy_columns,
     segment_to_rheodata,
+    select_xy_columns,
     split_by_step,
 )
 
@@ -79,8 +78,7 @@ def _check_excel_dependencies(filepath: Path) -> None:
 
     if suffix == ".xls" and not HAS_XLRD:
         raise ImportError(
-            "xlrd is required to read .xls files. "
-            "Install it with: pip install xlrd"
+            "xlrd is required to read .xls files. " "Install it with: pip install xlrd"
         )
 
 
@@ -568,7 +566,9 @@ def load_trios_excel(
         # Check for step column and split if needed
         step_col = detect_step_column(df)
         segments = (
-            [df] if not step_col or not return_all_segments else split_by_step(df, step_col)
+            [df]
+            if not step_col or not return_all_segments
+            else split_by_step(df, step_col)
         )
 
         for seg_idx, seg_df in enumerate(segments):
@@ -616,7 +616,9 @@ def load_trios_excel(
             # Remove NaN values
             if is_complex:
                 valid_mask = ~(
-                    np.isnan(x_data) | np.isnan(np.real(y_data)) | np.isnan(np.imag(y_data))
+                    np.isnan(x_data)
+                    | np.isnan(np.real(y_data))
+                    | np.isnan(np.imag(y_data))
                 )
             else:
                 valid_mask = ~(np.isnan(x_data) | np.isnan(y_data))

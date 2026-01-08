@@ -9,11 +9,10 @@ import json
 import logging
 import queue
 import threading
-import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -81,12 +80,16 @@ class LogExporter(ABC):
         Returns:
             True if export succeeded, False otherwise.
         """
-        raise NotImplementedError("LogExporter.export must be implemented by subclasses")
+        raise NotImplementedError(
+            "LogExporter.export must be implemented by subclasses"
+        )
 
     @abstractmethod
     def shutdown(self) -> None:
         """Shutdown the exporter and flush any pending entries."""
-        raise NotImplementedError("LogExporter.shutdown must be implemented by subclasses")
+        raise NotImplementedError(
+            "LogExporter.shutdown must be implemented by subclasses"
+        )
 
 
 class OpenTelemetryLogExporter(LogExporter):
@@ -147,8 +150,10 @@ class OpenTelemetryLogExporter(LogExporter):
     def _check_otel_available(self) -> bool:
         """Check if OpenTelemetry packages are available."""
         try:
-            from opentelemetry.sdk._logs import LoggerProvider
-            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+            from opentelemetry.sdk._logs import LoggerProvider  # noqa: F401
+            from opentelemetry.sdk._logs.export import (
+                BatchLogRecordProcessor,
+            )  # noqa: F401
 
             return True
         except ImportError:
@@ -157,12 +162,12 @@ class OpenTelemetryLogExporter(LogExporter):
     def _setup_otel(self) -> None:
         """Set up OpenTelemetry logger provider."""
         try:
-            from opentelemetry.sdk._logs import LoggerProvider
-            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-            from opentelemetry.sdk.resources import Resource
             from opentelemetry.exporter.otlp.proto.grpc._log_exporter import (
                 OTLPLogExporter,
             )
+            from opentelemetry.sdk._logs import LoggerProvider
+            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+            from opentelemetry.sdk.resources import Resource
 
             # Create resource with service info
             resource = Resource.create(
@@ -212,8 +217,8 @@ class OpenTelemetryLogExporter(LogExporter):
             return True
 
         try:
-            from opentelemetry.sdk._logs import LogRecord
             from opentelemetry._logs.severity import SeverityNumber
+            from opentelemetry.sdk._logs import LogRecord
 
             severity_map = {
                 "DEBUG": SeverityNumber.DEBUG,
@@ -275,7 +280,9 @@ class ConsoleExporter(LogExporter):
         self.format = format
         self.output = output
         self.include_resource = include_resource
-        self._stream = __import__("sys").stderr if output == "stderr" else __import__("sys").stdout
+        self._stream = (
+            __import__("sys").stderr if output == "stderr" else __import__("sys").stdout
+        )
 
     def export(self, entries: list[LogEntry]) -> bool:
         """Export log entries to console.
@@ -372,7 +379,9 @@ class BatchingExporter(LogExporter):
                 return
 
             if success is False:
-                logging.getLogger(__name__).warning("Inner exporter reported failure during batch flush")
+                logging.getLogger(__name__).warning(
+                    "Inner exporter reported failure during batch flush"
+                )
 
     def export(self, entries: list[LogEntry]) -> bool:
         """Add entries to the batch queue.
@@ -392,7 +401,9 @@ class BatchingExporter(LogExporter):
                 try:
                     self._queue.put(entry, block=True, timeout=1.0)
                 except queue.Full:
-                    logging.getLogger(__name__).error("BatchingExporter queue is full; dropping entry")
+                    logging.getLogger(__name__).error(
+                        "BatchingExporter queue is full; dropping entry"
+                    )
                     return False
 
         # Flush if batch size reached
@@ -407,7 +418,9 @@ class BatchingExporter(LogExporter):
         self._flush_thread.join(timeout=5.0)
         self._flush()  # Final flush
         if self._flush_thread.is_alive():
-            logging.getLogger(__name__).warning("BatchingExporter flush thread did not terminate cleanly")
+            logging.getLogger(__name__).warning(
+                "BatchingExporter flush thread did not terminate cleanly"
+            )
         self._inner.shutdown()
 
 
@@ -474,7 +487,9 @@ class ExportingHandler(logging.Handler):
                     format(ctx.span_id, "016x"),
                 )
         except ImportError:
-            logging.getLogger(__name__).debug("OpenTelemetry not installed; skipping trace context")
+            logging.getLogger(__name__).debug(
+                "OpenTelemetry not installed; skipping trace context"
+            )
 
         return None, None
 
@@ -529,7 +544,9 @@ class ExportingHandler(logging.Handler):
 
             # Create log entry
             entry = LogEntry(
-                timestamp=datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat().replace("+00:00", "Z"),
+                timestamp=datetime.fromtimestamp(record.created, tz=UTC)
+                .isoformat()
+                .replace("+00:00", "Z"),
                 level=record.levelname,
                 logger=record.name,
                 message=record.getMessage(),
