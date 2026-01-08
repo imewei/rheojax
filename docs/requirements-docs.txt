@@ -6,7 +6,7 @@
 
 # Core Sphinx and theme (exact versions from uv.lock)
 sphinx==8.2.3
-sphinx-rtd-theme==3.0.2
+furo>=2024.0.0
 sphinx-autodoc-typehints==3.5.2
 
 # Sphinx contrib packages (exact versions from uv.lock)

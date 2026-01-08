@@ -473,7 +473,7 @@ C1, C2 = mc.get_wlf_parameters()
 
 ### Prerequisites
 ```bash
-pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+pip install sphinx furo sphinx-autodoc-typehints
 ```
 
 ### Build HTML

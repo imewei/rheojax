@@ -137,18 +137,15 @@ intersphinx_mapping = {
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 # html_static_path = ['../_static']  # Commented out - directory does not exist
 html_logo = None
 html_favicon = None
 
 # Theme options
 html_theme_options = {
-    "navigation_depth": 4,
-    "collapse_navigation": False,
-    "sticky_navigation": True,
-    "includehidden": True,
-    "titles_only": False,
+    # Furo-specific options can be added here
+    # "sidebar_hide_name": True,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
