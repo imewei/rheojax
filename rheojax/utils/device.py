@@ -189,11 +189,11 @@ def _print_gpu_warning(
     cuda_major: int | None,
 ) -> None:
     """Print warning about GPU acceleration availability."""
-    print(f"\nGPU ACCELERATION AVAILABLE")
-    print(f"===========================")
+    print("\nGPU ACCELERATION AVAILABLE")
+    print("===========================")
     print(f"GPU: {gpu_name} (SM {sm_version})")
     print(f"System CUDA: {cuda_version or 'Not found'}")
-    print(f"JAX backend: CPU-only")
+    print("JAX backend: CPU-only")
     print()
 
     if cuda_major is None:
@@ -203,14 +203,14 @@ def _print_gpu_warning(
         print("  3. Run: make install-jax-gpu")
     else:
         pkg = f"jax[cuda{cuda_major}-local]"
-        print(f"Enable 20-100x speedup:")
-        print(f"  make install-jax-gpu")
+        print("Enable 20-100x speedup:")
+        print("  make install-jax-gpu")
         print()
-        print(f"Or manually:")
-        print(f"  pip uninstall -y jax jaxlib")
+        print("Or manually:")
+        print("  pip uninstall -y jax jaxlib")
         print(f'  pip install "{pkg}"')
 
-    print(f"\nSee README.md for details.\n")
+    print("\nSee README.md for details.\n")
 
 
 def get_device_info() -> dict:

@@ -5,9 +5,9 @@ Data Page
 Data loading, visualization, and preprocessing interface.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
-import logging
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
@@ -28,8 +28,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from rheojax.gui.state.store import StateStore
 from rheojax.gui.services.data_service import DataService
+from rheojax.gui.state.store import StateStore
 
 
 class DataPage(QWidget):
@@ -109,7 +109,9 @@ class DataPage(QWidget):
 
         # Example datasets dropdown
         example_group = QGroupBox("Load Example Dataset")
-        example_group.setStyleSheet("QGroupBox { font-size: 10.5pt; font-weight: bold; }")
+        example_group.setStyleSheet(
+            "QGroupBox { font-size: 10.5pt; font-weight: bold; }"
+        )
         example_layout = QHBoxLayout(example_group)
         self._example_combo = QComboBox()
         self._example_combo.setPlaceholderText("Select an example dataset")
@@ -180,7 +182,9 @@ class DataPage(QWidget):
         # Table
         self._preview_table = QTableWidget()
         self._preview_table.setAlternatingRowColors(True)
-        self._preview_table.setToolTip("Preview of the loaded dataset. Shows up to 100 rows.")
+        self._preview_table.setToolTip(
+            "Preview of the loaded dataset. Shows up to 100 rows."
+        )
         layout.addWidget(self._preview_table)
 
         # Empty state
@@ -242,13 +246,9 @@ class DataPage(QWidget):
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(QLabel("Test Mode:"))
         self._test_mode_combo = QComboBox()
-        self._test_mode_combo.addItems([
-            "Auto-detect",
-            "oscillation",
-            "relaxation",
-            "creep",
-            "rotation"
-        ])
+        self._test_mode_combo.addItems(
+            ["Auto-detect", "oscillation", "relaxation", "creep", "rotation"]
+        )
         mode_layout.addWidget(self._test_mode_combo)
         layout.addLayout(mode_layout)
 
@@ -299,10 +299,7 @@ class DataPage(QWidget):
         )
 
         file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Data File",
-            "",
-            file_filter
+            self, "Select Data File", "", file_filter
         )
 
         if file_path:
@@ -343,7 +340,9 @@ class DataPage(QWidget):
             return
 
         try:
-            preview_result = self._data_service.preview_file(self._current_file_path, max_rows=100)
+            preview_result = self._data_service.preview_file(
+                self._current_file_path, max_rows=100
+            )
 
             self._preview_data = preview_result.get("data", [])
             headers = preview_result.get("headers", [])
@@ -364,12 +363,16 @@ class DataPage(QWidget):
             # Update table
             self._preview_table.clear()
             self._preview_table.setRowCount(len(self._preview_data))
-            self._preview_table.setColumnCount(len(headers) if headers else len(self._preview_data[0]))
+            self._preview_table.setColumnCount(
+                len(headers) if headers else len(self._preview_data[0])
+            )
 
             if headers:
                 self._preview_table.setHorizontalHeaderLabels(headers)
             else:
-                self._preview_table.setHorizontalHeaderLabels([f"Col {i+1}" for i in range(len(self._preview_data[0]))])
+                self._preview_table.setHorizontalHeaderLabels(
+                    [f"Col {i+1}" for i in range(len(self._preview_data[0]))]
+                )
 
             # Populate data
             for row_idx, row_data in enumerate(self._preview_data):
@@ -378,13 +381,17 @@ class DataPage(QWidget):
                     self._preview_table.setItem(row_idx, col_idx, item)
 
             # Update column mappers
-            self._update_column_mappers(headers or [f"Col {i+1}" for i in range(len(self._preview_data[0]))])
+            self._update_column_mappers(
+                headers or [f"Col {i+1}" for i in range(len(self._preview_data[0]))]
+            )
 
             # Update metadata display with format info
             metadata_lines = []
             if detected_format:
                 metadata_lines.append(f"format: {detected_format}")
-            metadata_lines.extend([f"{k}: {v}" for k, v in metadata.items() if k != "format"])
+            metadata_lines.extend(
+                [f"{k}: {v}" for k, v in metadata.items() if k != "format"]
+            )
             self._metadata_text.setText("\n".join(metadata_lines))
 
             if hasattr(self, "_empty_state"):
@@ -407,11 +414,16 @@ class DataPage(QWidget):
         # Check for TRIOS patterns
         if suffix == ".txt":
             try:
-                with open(self._current_file_path, encoding="utf-8", errors="ignore") as f:
+                with open(
+                    self._current_file_path, encoding="utf-8", errors="ignore"
+                ) as f:
                     first_lines = f.read(2000)
                 if "trios" in first_lines.lower() or "[file" in first_lines.lower():
                     return "TA Instruments TRIOS"
-                if "rheometer" in first_lines.lower() or "rheocompass" in first_lines.lower():
+                if (
+                    "rheometer" in first_lines.lower()
+                    or "rheocompass" in first_lines.lower()
+                ):
                     return "Anton Paar RheoCompass"
             except Exception:
                 pass
@@ -419,9 +431,14 @@ class DataPage(QWidget):
 
         if suffix == ".csv":
             try:
-                with open(self._current_file_path, encoding="utf-8", errors="ignore") as f:
+                with open(
+                    self._current_file_path, encoding="utf-8", errors="ignore"
+                ) as f:
                     first_lines = f.read(2000)
-                if "rheometer" in first_lines.lower() or "rheocompass" in first_lines.lower():
+                if (
+                    "rheometer" in first_lines.lower()
+                    or "rheocompass" in first_lines.lower()
+                ):
                     return "Anton Paar RheoCompass"
                 if "trios" in first_lines.lower():
                     return "TA Instruments TRIOS CSV"
@@ -460,7 +477,9 @@ class DataPage(QWidget):
         suggestions = {"x_suggestions": [], "y_suggestions": [], "y2_suggestions": []}
         if self._current_file_path:
             try:
-                suggestions = self._data_service.get_column_suggestions(self._current_file_path)
+                suggestions = self._data_service.get_column_suggestions(
+                    self._current_file_path
+                )
             except Exception:
                 pass  # Fall back to simple matching
 
@@ -525,8 +544,10 @@ class DataPage(QWidget):
     def _reset_mapping(self) -> None:
         """Reset column mapping to defaults."""
         if self._preview_data:
-            headers = [self._preview_table.horizontalHeaderItem(i).text()
-                      for i in range(self._preview_table.columnCount())]
+            headers = [
+                self._preview_table.horizontalHeaderItem(i).text()
+                for i in range(self._preview_table.columnCount())
+            ]
             self._update_column_mappers(headers)
 
     def _apply_import(self) -> None:
@@ -541,7 +562,9 @@ class DataPage(QWidget):
         # Get mapping
         x_col = self._x_combo.currentText()
         y_col = self._y_combo.currentText()
-        y2_col = self._y2_combo.currentText() if self._y2_combo.currentIndex() > 0 else None
+        y2_col = (
+            self._y2_combo.currentText() if self._y2_combo.currentIndex() > 0 else None
+        )
         test_mode = self._test_mode_combo.currentText()
         if test_mode == "Auto-detect":
             test_mode = None  # Let service auto-detect
@@ -663,8 +686,14 @@ class DataPage(QWidget):
 
         # Update metadata text with validation info
         validation = self.validate_dataset(dataset_id)
-        warnings = validation.get("warnings", []) if isinstance(validation, dict) else []
-        inferred_mode = validation.get("test_mode") if isinstance(validation, dict) else dataset.test_mode
+        warnings = (
+            validation.get("warnings", []) if isinstance(validation, dict) else []
+        )
+        inferred_mode = (
+            validation.get("test_mode")
+            if isinstance(validation, dict)
+            else dataset.test_mode
+        )
 
         metadata_lines = [
             f"rows: {len(x_vals)}",
@@ -759,7 +788,6 @@ class DataPage(QWidget):
             logging.getLogger(__name__).warning("Preprocessing failed: %s", exc)
 
 
-
 class DropZone(QFrame):
     """Drag-and-drop zone for file import."""
 
@@ -770,7 +798,8 @@ class DropZone(QFrame):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QFrame {
                 background-color: #f9f9f9;
                 border: 2px dashed #ccc;
@@ -780,7 +809,8 @@ class DropZone(QFrame):
                 border-color: #2196F3;
                 background-color: #f0f7ff;
             }
-        """)
+        """
+        )
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignCenter)

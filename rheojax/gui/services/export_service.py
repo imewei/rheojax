@@ -76,7 +76,9 @@ class ExportService:
                 params = result.parameters
             elif hasattr(result, "posterior_samples"):
                 # For Bayesian results, use posterior means
-                params = {k: float(np.mean(v)) for k, v in result.posterior_samples.items()}
+                params = {
+                    k: float(np.mean(v)) for k, v in result.posterior_samples.items()
+                }
             else:
                 raise ValueError("Result does not contain parameters")
 
@@ -88,7 +90,10 @@ class ExportService:
 
             elif format == "json":
                 # Convert numpy types to Python types
-                params_json = {k: float(v) if isinstance(v, np.ndarray) else v for k, v in params.items()}
+                params_json = {
+                    k: float(v) if isinstance(v, np.ndarray) else v
+                    for k, v in params.items()
+                }
                 with open(path, "w") as f:
                     json.dump(params_json, f, indent=2)
 
@@ -196,14 +201,20 @@ class ExportService:
                 import pandas as pd
 
                 # Flatten samples to 2D
-                data = {k: v.flatten() if v.ndim > 1 else v for k, v in posterior_samples.items()}
+                data = {
+                    k: v.flatten() if v.ndim > 1 else v
+                    for k, v in posterior_samples.items()
+                }
                 df = pd.DataFrame(data)
                 df.to_excel(path, index=False)
 
             elif format == "csv":
                 import pandas as pd
 
-                data = {k: v.flatten() if v.ndim > 1 else v for k, v in posterior_samples.items()}
+                data = {
+                    k: v.flatten() if v.ndim > 1 else v
+                    for k, v in posterior_samples.items()
+                }
                 df = pd.DataFrame(data)
                 df.to_csv(path, index=False)
 
@@ -259,7 +270,10 @@ class ExportService:
                 # Save parameters as JSON
                 if "parameters" in state and state["parameters"]:
                     params_path = tmpdir_path / "parameters.json"
-                    params_json = {k: float(v) if isinstance(v, np.ndarray) else v for k, v in state["parameters"].items()}
+                    params_json = {
+                        k: float(v) if isinstance(v, np.ndarray) else v
+                        for k, v in state["parameters"].items()
+                    }
                     with open(params_path, "w") as f:
                         json.dump(params_json, f, indent=2)
 
@@ -349,7 +363,9 @@ class ExportService:
 
             if "model_name" in state:
                 report_lines.append(f"## Model: {state['model_name']}\n")
-                report_lines.append(f"**Test Mode:** {state.get('test_mode', 'unknown')}\n\n")
+                report_lines.append(
+                    f"**Test Mode:** {state.get('test_mode', 'unknown')}\n\n"
+                )
 
             if "parameters" in state and state["parameters"]:
                 report_lines.append("## Fitted Parameters\n")
@@ -379,8 +395,8 @@ class ExportService:
 
             if path.suffix.lower() == ".pdf":
                 # Render a minimal PDF page with text content
-                from matplotlib.backends.backend_pdf import PdfPages
                 import matplotlib.pyplot as plt
+                from matplotlib.backends.backend_pdf import PdfPages
 
                 with PdfPages(path) as pdf:
                     fig, ax = plt.subplots(figsize=(8.5, 11))
@@ -435,11 +451,13 @@ class ExportService:
                 import pandas as pd
 
                 if np.iscomplexobj(y):
-                    df = pd.DataFrame({
-                        "x": x,
-                        "y_real": np.real(y),
-                        "y_imag": np.imag(y),
-                    })
+                    df = pd.DataFrame(
+                        {
+                            "x": x,
+                            "y_real": np.real(y),
+                            "y_imag": np.imag(y),
+                        }
+                    )
                 else:
                     df = pd.DataFrame({"x": x, "y": y})
 
@@ -454,10 +472,14 @@ class ExportService:
             elif format == "json":
                 export_dict = {
                     "x": x.tolist(),
-                    "y": y.tolist() if not np.iscomplexobj(y) else {
-                        "real": np.real(y).tolist(),
-                        "imag": np.imag(y).tolist(),
-                    },
+                    "y": (
+                        y.tolist()
+                        if not np.iscomplexobj(y)
+                        else {
+                            "real": np.real(y).tolist(),
+                            "imag": np.imag(y).tolist(),
+                        }
+                    ),
                     "metadata": data.metadata,
                 }
                 with open(path, "w") as f:

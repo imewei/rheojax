@@ -125,14 +125,18 @@ class DataService:
             # Light unit conversions for common CSV/Excel cases
             data = self._convert_units(data)
 
-            logger.info(f"Successfully loaded {len(data.x)} data points from {file_path}")
+            logger.info(
+                f"Successfully loaded {len(data.x)} data points from {file_path}"
+            )
             return data
 
         except Exception as e:
             logger.error(f"Failed to load file {file_path}: {e}")
             raise ValueError(f"Failed to load file: {e}") from e
 
-    def preview_file(self, file_path: str | Path, max_rows: int = 100) -> dict[str, Any]:
+    def preview_file(
+        self, file_path: str | Path, max_rows: int = 100
+    ) -> dict[str, Any]:
         """Return a lightweight preview of a data file.
 
         The preview keeps parsing simple to avoid the heavier auto_load path and
@@ -170,7 +174,7 @@ class DataService:
 
                 headers = ["x", "y"]
                 rows = min(max_rows, len(data_obj.x))
-                if hasattr(data_obj, "y2") and getattr(data_obj, "y2") is not None:
+                if hasattr(data_obj, "y2") and data_obj.y2 is not None:
                     headers.append("y2")
                     data = [
                         [data_obj.x[i], data_obj.y[i], data_obj.y2[i]]
@@ -283,7 +287,9 @@ class DataService:
                 # Additional check: y values should span significant range
                 y_range_ratio = np.max(y) / (np.min(y) + 1e-10)
                 if y_range_ratio > 2:  # At least 2x decay
-                    logger.debug(f"Detected relaxation: monotonic decrease, ratio={y_range_ratio:.1f}")
+                    logger.debug(
+                        f"Detected relaxation: monotonic decrease, ratio={y_range_ratio:.1f}"
+                    )
                     return "relaxation"
 
         # Creep: increasing compliance/strain over time (monotonically increasing)
@@ -293,7 +299,9 @@ class DataService:
                 # Additional check: y values should show significant growth
                 y_range_ratio = np.max(y) / (np.min(y) + 1e-10)
                 if y_range_ratio > 1.5:  # At least 50% growth
-                    logger.debug(f"Detected creep: monotonic increase, ratio={y_range_ratio:.1f}")
+                    logger.debug(
+                        f"Detected creep: monotonic increase, ratio={y_range_ratio:.1f}"
+                    )
                     return "creep"
 
         # Flow: shear rate vs viscosity/stress (power-law relationship)
@@ -308,8 +316,12 @@ class DataService:
                     log_y = np.log10(y[mask])
                     correlation = np.corrcoef(log_x, log_y)[0, 1]
                     # Only classify as flow if there's variation in y (not monotonic)
-                    if abs(correlation) > 0.9 and not (np.all(y_diff >= 0) or np.all(y_diff <= 0)):
-                        logger.debug(f"Detected flow: power-law correlation={correlation:.3f}")
+                    if abs(correlation) > 0.9 and not (
+                        np.all(y_diff >= 0) or np.all(y_diff <= 0)
+                    ):
+                        logger.debug(
+                            f"Detected flow: power-law correlation={correlation:.3f}"
+                        )
                         return "flow"
             except Exception as exc:
                 logger.debug("Flow detection failed on log-log correlation: %s", exc)
@@ -363,7 +375,9 @@ class DataService:
 
         # Check for sufficient data points
         if len(x) < 5:
-            warnings.append(f"Insufficient data points: {len(x)} (recommend at least 5)")
+            warnings.append(
+                f"Insufficient data points: {len(x)} (recommend at least 5)"
+            )
 
         # Check for duplicates
         if len(np.unique(x)) < len(x):
@@ -371,9 +385,13 @@ class DataService:
 
         # Check for zero values (can cause log issues)
         if np.any(x == 0):
-            warnings.append("X-axis contains zero values (may cause issues with log plots)")
+            warnings.append(
+                "X-axis contains zero values (may cause issues with log plots)"
+            )
         if np.any(y == 0):
-            warnings.append("Y-axis contains zero values (may cause issues with log plots)")
+            warnings.append(
+                "Y-axis contains zero values (may cause issues with log plots)"
+            )
 
         # Check data range
         x_range = np.ptp(x)
@@ -412,8 +430,9 @@ class DataService:
         dict
             Dictionary with 'x_suggestions', 'y_suggestions', and 'y2_suggestions' lists
         """
-        import pandas as pd
         import re
+
+        import pandas as pd
 
         suggestions = {"x_suggestions": [], "y_suggestions": [], "y2_suggestions": []}
 
@@ -426,7 +445,9 @@ class DataService:
             normalized = normalized.replace("''", "doubleprime").replace("'", "prime")
             return normalized
 
-        def matches_pattern(col: str, patterns: list[str], exclude_patterns: list[str] | None = None) -> bool:
+        def matches_pattern(
+            col: str, patterns: list[str], exclude_patterns: list[str] | None = None
+        ) -> bool:
             """Check if column matches any pattern (with word boundaries for short patterns)."""
             col_norm = normalize_col(col)
             col_lower = col.lower()
@@ -442,7 +463,9 @@ class DataService:
                 # For very short patterns (1-2 chars), use word boundary matching
                 if len(pattern) <= 2:
                     # Match at word boundaries or start/end
-                    if re.search(rf'(^|[^a-z]){re.escape(pattern_norm)}($|[^a-z])', col_lower):
+                    if re.search(
+                        rf"(^|[^a-z]){re.escape(pattern_norm)}($|[^a-z])", col_lower
+                    ):
                         return True
                 else:
                     # For longer patterns, substring match is fine
@@ -465,23 +488,46 @@ class DataService:
             # X-axis patterns (frequency, time, rate)
             # Exclude temperature which contains 't'
             x_patterns = [
-                "time", "freq", "frequency", "omega", "angular",
-                "shear_rate", "shearrate", "rate", "strain", "rad/s", "hz",
+                "time",
+                "freq",
+                "frequency",
+                "omega",
+                "angular",
+                "shear_rate",
+                "shearrate",
+                "rate",
+                "strain",
+                "rad/s",
+                "hz",
             ]
             x_exclude = ["temp", "temperature"]
 
             # Y-axis patterns (storage modulus, stress, viscosity)
             # Exclude loss modulus patterns
             y_patterns = [
-                "stress", "modulus", "gprime", "g_prime", "g'", "gp",
-                "storage", "viscosity", "eta", "compliance", "j",
+                "stress",
+                "modulus",
+                "gprime",
+                "g_prime",
+                "g'",
+                "gp",
+                "storage",
+                "viscosity",
+                "eta",
+                "compliance",
+                "j",
             ]
             y_exclude = ["doubleprime", "loss", "g''", "gpp", "gdouble"]
 
             # Y2-axis patterns (loss modulus G'')
             y2_patterns = [
-                "gdoubleprime", "g_double_prime", "g''", "gpp", "gdouble",
-                "loss", "lossy",
+                "gdoubleprime",
+                "g_double_prime",
+                "g''",
+                "gpp",
+                "gdouble",
+                "loss",
+                "lossy",
             ]
 
             # Match columns to patterns
@@ -550,7 +596,9 @@ class DataService:
         # Convert y-axis
         if y_units and data.y_units and y_units != data.y_units:
             if data.y_units in pressure_conversions and y_units in pressure_conversions:
-                factor = pressure_conversions[data.y_units] / pressure_conversions[y_units]
+                factor = (
+                    pressure_conversions[data.y_units] / pressure_conversions[y_units]
+                )
                 y = y * factor
                 logger.info(f"Converted y-axis from {data.y_units} to {y_units}")
 

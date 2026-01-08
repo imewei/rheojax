@@ -5,6 +5,7 @@ Bayesian Options Dialog
 Configure NUTS sampling parameters.
 """
 
+import json
 import random
 from typing import Any
 
@@ -19,14 +20,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QPushButton,
     QSlider,
     QSpinBox,
     QVBoxLayout,
     QWidget,
-    QPlainTextEdit,
 )
-import json
 
 
 class BayesianOptionsDialog(QDialog):
@@ -187,7 +187,9 @@ class BayesianOptionsDialog(QDialog):
         self.priors_group.setChecked(True)
         priors_layout = QVBoxLayout()
         self.priors_edit = QPlainTextEdit()
-        self.priors_edit.setPlaceholderText("e.g. {\n  \"G_cage\": {\"dist\": \"lognormal\", \"loc\": 8.5, \"scale\": 1.0}\n}")
+        self.priors_edit.setPlaceholderText(
+            'e.g. {\n  "G_cage": {"dist": "lognormal", "loc": 8.5, "scale": 1.0}\n}'
+        )
         self.priors_edit.setMinimumHeight(120)
         priors_layout.addWidget(self.priors_edit)
         self.priors_group.setLayout(priors_layout)

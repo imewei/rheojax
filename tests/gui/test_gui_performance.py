@@ -344,7 +344,6 @@ class TestWidgetPerformance:
         table.close()
 
 
-
 # =============================================================================
 # NLSQ/MCMC Performance Baselines
 # =============================================================================
@@ -417,7 +416,8 @@ class TestFittingPerformanceBaseline:
 
         start = time.perf_counter()
         result = model.fit_bayesian(
-            t, G_t,
+            t,
+            G_t,
             test_mode="relaxation",
             num_warmup=100,  # Reduced for test speed
             num_samples=100,

@@ -114,7 +114,10 @@ def load_csv(
         )
 
     # Validate intended_transform if provided
-    if intended_transform is not None and intended_transform.lower() not in VALID_TRANSFORMS:
+    if (
+        intended_transform is not None
+        and intended_transform.lower() not in VALID_TRANSFORMS
+    ):
         raise ValueError(
             f"Invalid intended_transform '{intended_transform}'. "
             f"Valid options: {sorted(VALID_TRANSFORMS)}"
@@ -128,7 +131,11 @@ def load_csv(
     default_encoding = "utf-8-sig"
     try:
         head_bytes = filepath.read_bytes()[:4]
-        if b"\xff\xfe" in head_bytes or b"\xfe\xff" in head_bytes or b"\x00" in head_bytes:
+        if (
+            b"\xff\xfe" in head_bytes
+            or b"\xfe\xff" in head_bytes
+            or b"\x00" in head_bytes
+        ):
             default_encoding = "utf-16"
     except FileNotFoundError:
         raise
@@ -310,10 +317,12 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
 def _detect_delimiter(filepath: Path) -> str:
     """Auto-detect CSV delimiter using csv.Sniffer with fallbacks."""
     try:
-        with open(filepath, "r", encoding="utf-8-sig", errors="replace") as f:
+        with open(filepath, encoding="utf-8-sig", errors="replace") as f:
             sample = f.read(4096)
             try:
-                dialect = csv.Sniffer().sniff(sample, delimiters=[",", "\t", ";", "|", " "])
+                dialect = csv.Sniffer().sniff(
+                    sample, delimiters=[",", "\t", ";", "|", " "]
+                )
                 return dialect.delimiter
             except Exception:
                 pass

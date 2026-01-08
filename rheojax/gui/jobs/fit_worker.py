@@ -14,15 +14,21 @@ from typing import Any
 
 try:
     from PySide6.QtCore import QObject, QRunnable, Signal
+
     HAS_PYSIDE6 = True
 except ImportError:
     HAS_PYSIDE6 = False
+
     class QObject:  # type: ignore
         pass
+
     class QRunnable:  # type: ignore
         pass
+
     class Signal:  # type: ignore
-        def __init__(self, *args): pass
+        def __init__(self, *args):
+            pass
+
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.gui.jobs.cancellation import CancellationError, CancellationToken
@@ -157,7 +163,7 @@ class FitWorker(QRunnable):
 
         # Track progress
         self._last_iteration = 0
-        self._last_loss = float('inf')
+        self._last_loss = float("inf")
 
     def run(self) -> None:
         """Execute fitting in background thread.
@@ -184,7 +190,7 @@ class FitWorker(QRunnable):
                 message = f"Iteration {iteration}: loss = {loss:.6e}"
                 self.signals.progress.emit(percent, 100, message)
 
-            fit_kwargs['callback'] = progress_callback
+            fit_kwargs["callback"] = progress_callback
 
             # Delegate to ModelService for fitting
             from rheojax.gui.services.model_service import ModelService

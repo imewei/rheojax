@@ -44,6 +44,16 @@ from rheojax.logging.context import (
     log_pipeline_stage,
     log_transform,
 )
+from rheojax.logging.exporters import (
+    BatchingExporter,
+    CallbackExporter,
+    ConsoleExporter,
+    ExportingHandler,
+    LogEntry,
+    LogExporter,
+    OpenTelemetryLogExporter,
+    create_otel_handler,
+)
 from rheojax.logging.formatters import (
     DetailedFormatter,
     JSONFormatter,
@@ -77,16 +87,6 @@ from rheojax.logging.metrics import (
     IterationLogger,
     log_memory,
     timed,
-)
-from rheojax.logging.exporters import (
-    BatchingExporter,
-    CallbackExporter,
-    ConsoleExporter,
-    ExportingHandler,
-    LogEntry,
-    LogExporter,
-    OpenTelemetryLogExporter,
-    create_otel_handler,
 )
 
 __all__ = [

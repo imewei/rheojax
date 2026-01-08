@@ -5,7 +5,6 @@ Residuals Panel Widget
 Residual analysis visualization for model fitting diagnostics.
 """
 
-
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
@@ -204,9 +203,7 @@ class ResidualsPanel(QWidget):
         std = np.std(self._residuals)
         n = len(self._residuals)
 
-        self._stats_label.setText(
-            f"n={n} | mean={mean:.3g} | std={std:.3g}"
-        )
+        self._stats_label.setText(f"n={n} | mean={mean:.3g} | std={std:.3g}")
 
     def _refresh_plot(self) -> None:
         """Refresh the current plot."""
@@ -234,8 +231,12 @@ class ResidualsPanel(QWidget):
             except Exception as e:
                 ax = self._figure.add_subplot(111)
                 ax.text(
-                    0.5, 0.5, f"Error generating plot:\n{e}",
-                    ha="center", va="center", transform=ax.transAxes
+                    0.5,
+                    0.5,
+                    f"Error generating plot:\n{e}",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
                 )
                 self._empty_label.setText(f"Plot error: {e}")
                 self._empty_label.show()
@@ -261,13 +262,16 @@ class ResidualsPanel(QWidget):
         if len(self._residuals) > 10:
             try:
                 from scipy.ndimage import uniform_filter1d
+
                 sorted_idx = np.argsort(fitted)
                 smoothed = uniform_filter1d(
                     self._residuals[sorted_idx], size=max(5, len(self._residuals) // 20)
                 )
                 ax.plot(fitted[sorted_idx], smoothed, "r-", alpha=0.5, linewidth=2)
             except ImportError as exc:
-                logging.getLogger(__name__).debug("uniform_filter1d unavailable: %s", exc)
+                logging.getLogger(__name__).debug(
+                    "uniform_filter1d unavailable: %s", exc
+                )
 
         ax.set_xlabel("Fitted Values")
         ax.set_ylabel("Residuals")
@@ -289,7 +293,9 @@ class ResidualsPanel(QWidget):
             stats.probplot(standardized, dist="norm", plot=ax)
             ax.set_title("Normal Q-Q Plot")
         except ImportError as exc:
-            logging.getLogger(__name__).debug("scipy.stats unavailable for QQ plot: %s", exc)
+            logging.getLogger(__name__).debug(
+                "scipy.stats unavailable for QQ plot: %s", exc
+            )
             # Fallback without scipy
             sorted_res = np.sort(self._residuals)
             n = len(sorted_res)
@@ -316,10 +322,14 @@ class ResidualsPanel(QWidget):
 
             mu, std = np.mean(self._residuals), np.std(self._residuals)
             x = np.linspace(bins[0], bins[-1], 100)
-            ax.plot(x, stats.norm.pdf(x, mu, std), "r-", linewidth=2, label="Normal fit")
+            ax.plot(
+                x, stats.norm.pdf(x, mu, std), "r-", linewidth=2, label="Normal fit"
+            )
             ax.legend()
         except ImportError as exc:
-            logging.getLogger(__name__).debug("scipy.stats unavailable for histogram fit: %s", exc)
+            logging.getLogger(__name__).debug(
+                "scipy.stats unavailable for histogram fit: %s", exc
+            )
 
         ax.set_xlabel("Residual Value")
         ax.set_ylabel("Density")
@@ -342,13 +352,16 @@ class ResidualsPanel(QWidget):
         if len(self._residuals) > 10:
             try:
                 from scipy.ndimage import uniform_filter1d
+
                 sorted_idx = np.argsort(fitted)
                 smoothed = uniform_filter1d(
                     sqrt_abs_res[sorted_idx], size=max(5, len(self._residuals) // 20)
                 )
                 ax.plot(fitted[sorted_idx], smoothed, "r-", alpha=0.5, linewidth=2)
             except ImportError as exc:
-                logging.getLogger(__name__).debug("uniform_filter1d unavailable: %s", exc)
+                logging.getLogger(__name__).debug(
+                    "uniform_filter1d unavailable: %s", exc
+                )
 
         ax.set_xlabel("Fitted Values")
         ax.set_ylabel("√|Residuals|")
@@ -377,8 +390,12 @@ class ResidualsPanel(QWidget):
         n = len(self._residuals)
         if n < 10:
             ax.text(
-                0.5, 0.5, "Not enough data points for autocorrelation",
-                ha="center", va="center", transform=ax.transAxes
+                0.5,
+                0.5,
+                "Not enough data points for autocorrelation",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
             )
             return
 
@@ -387,9 +404,9 @@ class ResidualsPanel(QWidget):
         autocorr = np.correlate(
             self._residuals - np.mean(self._residuals),
             self._residuals - np.mean(self._residuals),
-            mode="full"
+            mode="full",
         )
-        autocorr = autocorr[n - 1:n - 1 + max_lag]
+        autocorr = autocorr[n - 1 : n - 1 + max_lag]
         autocorr = autocorr / autocorr[0]  # Normalize
 
         lags = np.arange(max_lag)

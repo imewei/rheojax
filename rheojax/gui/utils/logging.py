@@ -9,7 +9,7 @@ in headless environments.
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 try:  # Delay Qt dependency for environments without PySide6
     from PySide6.QtCore import QObject, Signal

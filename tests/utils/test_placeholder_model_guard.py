@@ -16,4 +16,3 @@ def test_model_service_placeholders_are_ignored():
     compat = svc.check_compatibility("Select model...", data=None, test_mode=None)  # type: ignore[arg-type]
     assert compat["compatible"] is False
     assert "No model selected" in compat["warnings"][0]
-

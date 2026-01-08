@@ -111,9 +111,7 @@ def save_golden_image(figure: Any, path: Path) -> None:
     figure.savefig(path, dpi=100, bbox_inches="tight")
 
 
-def compare_figures(
-    actual: Any, expected_path: Path, threshold: float = 0.01
-) -> bool:
+def compare_figures(actual: Any, expected_path: Path, threshold: float = 0.01) -> bool:
     """Compare figure against golden image.
 
     Parameters
@@ -130,11 +128,11 @@ def compare_figures(
     bool
         True if images match within threshold
     """
-    import matplotlib.pyplot as plt
-    from matplotlib.testing.compare import compare_images
-
     # Save actual to temp file
     import tempfile
+
+    import matplotlib.pyplot as plt
+    from matplotlib.testing.compare import compare_images
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         actual_path = Path(f.name)

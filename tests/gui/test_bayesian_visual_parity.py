@@ -4,14 +4,13 @@ Uses bundled owchirp TTS fixture to generate a posterior predictive-style plot
 and asserts the PNG SHA-256 matches a stored golden hash. Avoids binary assets.
 """
 
+import csv
 import hashlib
 import io
-import csv
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-
 
 pytestmark = [pytest.mark.smoke]
 
@@ -43,7 +42,7 @@ def test_bayesian_ppd_plot_hash():
     plt.xscale("log")
     plt.yscale("log")
     plt.xlabel("freq (rad/s)")
-    plt.ylabel("G\" (Pa)")
+    plt.ylabel('G" (Pa)')
     plt.legend(loc="lower right")
     plt.tight_layout()
 

@@ -41,8 +41,8 @@ class SGRMCState(NamedTuple):
         time: Current simulation time (scalar)
     """
 
-    E: "Array"
-    ell: "Array"
+    E: Array
+    ell: Array
     time: float
 
 
@@ -52,7 +52,7 @@ class SGRMCState(NamedTuple):
 
 
 def initialize_equilibrium(
-    key: "Array",
+    key: Array,
     n_particles: int,
     x: float,
     xg: float = 1.0,
@@ -93,7 +93,7 @@ def initialize_equilibrium(
 
 @jax.jit
 def step_mc(
-    key: "Array",
+    key: Array,
     state: SGRMCState,
     gamma_dot: float,
     dt: float,
@@ -187,7 +187,7 @@ def step_mc(
 
 
 def simulate_constant_rate(
-    key: "Array",
+    key: Array,
     gamma_dot: float,
     t_total: float,
     dt: float,
@@ -196,7 +196,7 @@ def simulate_constant_rate(
     k: float = 1.0,
     Gamma0: float = 1.0,
     xg: float = 1.0,
-) -> tuple["Array", "Array"]:
+) -> tuple[Array, Array]:
     """Simulate steady shear at constant rate.
 
     Parameters
@@ -244,7 +244,7 @@ def simulate_constant_rate(
 
 
 def simulate_step_strain(
-    key: "Array",
+    key: Array,
     gamma_0: float,
     t_total: float,
     dt: float,
@@ -253,7 +253,7 @@ def simulate_step_strain(
     k: float = 1.0,
     Gamma0: float = 1.0,
     xg: float = 1.0,
-) -> tuple["Array", "Array"]:
+) -> tuple[Array, Array]:
     """Simulate stress relaxation after step strain.
 
     Parameters
@@ -303,7 +303,7 @@ def simulate_step_strain(
 
 
 def simulate_oscillatory(
-    key: "Array",
+    key: Array,
     gamma_0: float,
     omega: float,
     n_cycles: int,
@@ -313,7 +313,7 @@ def simulate_oscillatory(
     k: float = 1.0,
     Gamma0: float = 1.0,
     xg: float = 1.0,
-) -> tuple["Array", "Array", "Array"]:
+) -> tuple[Array, Array, Array]:
     """Simulate oscillatory shear (LAOS or SAOS).
 
     Parameters

@@ -5,7 +5,6 @@ Menu Bar
 Application menu bar with File, Edit, View, Data, Models, Transforms, Analysis, Tools, and Help menus.
 """
 
-
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QMenuBar, QWidget
 
@@ -244,7 +243,9 @@ class MenuBar(QMenuBar):
         # Auto-detect Test Mode
         self.auto_detect_mode_action = QAction("&Auto-detect Test Mode", self)
         self.auto_detect_mode_action.setShortcut(QKeySequence("Ctrl+D"))
-        self.auto_detect_mode_action.setStatusTip("Automatically detect test mode from data")
+        self.auto_detect_mode_action.setStatusTip(
+            "Automatically detect test mode from data"
+        )
         data_menu.addAction(self.auto_detect_mode_action)
 
     def _create_models_menu(self) -> None:
@@ -341,7 +342,9 @@ class MenuBar(QMenuBar):
         transforms_menu.addAction(self.transform_mastercurve)
 
         # SRFS
-        self.transform_srfs = QAction("&SRFS (Strain-Rate Frequency Superposition)", self)
+        self.transform_srfs = QAction(
+            "&SRFS (Strain-Rate Frequency Superposition)", self
+        )
         self.transform_srfs.setStatusTip("Strain-Rate Frequency Superposition")
         transforms_menu.addAction(self.transform_srfs)
 
@@ -366,7 +369,9 @@ class MenuBar(QMenuBar):
 
         # SPP Analysis
         self.transform_spp = QAction("S&PP (LAOS Analysis)", self)
-        self.transform_spp.setStatusTip("Sequence of Physical Processes yield stress extraction")
+        self.transform_spp.setStatusTip(
+            "Sequence of Physical Processes yield stress extraction"
+        )
         transforms_menu.addAction(self.transform_spp)
 
     def _create_analysis_menu(self) -> None:
@@ -382,7 +387,9 @@ class MenuBar(QMenuBar):
         # Fit Bayesian
         self.analysis_fit_bayesian = QAction("Fit &Bayesian (NUTS)", self)
         self.analysis_fit_bayesian.setShortcut(QKeySequence("Ctrl+B"))
-        self.analysis_fit_bayesian.setStatusTip("Fit model using Bayesian inference with NUTS")
+        self.analysis_fit_bayesian.setStatusTip(
+            "Fit model using Bayesian inference with NUTS"
+        )
         analysis_menu.addAction(self.analysis_fit_bayesian)
 
         analysis_menu.addSeparator()

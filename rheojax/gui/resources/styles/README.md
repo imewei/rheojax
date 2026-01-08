@@ -73,12 +73,12 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.current_theme = "light"
         self._apply_theme()
-    
+
     def _apply_theme(self):
         """Apply current theme."""
         stylesheet = get_stylesheet(self.current_theme)
         self.setStyleSheet(stylesheet)
-    
+
     def toggle_theme(self):
         """Toggle between light and dark themes."""
         self.current_theme = "dark" if self.current_theme == "light" else "light"

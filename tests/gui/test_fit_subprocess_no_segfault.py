@@ -94,4 +94,3 @@ if __name__ == "__main__":
         timeout=30,
     )
     assert completed.returncode == 0
-

@@ -1,17 +1,15 @@
 """Config-level checks for Bayesian presets without running MCMC."""
 
-import os
 import json
+import os
 from pathlib import Path
 
 import numpy as np
 import pytest
-
 from PySide6.QtWidgets import QApplication
 
-from rheojax.gui.pages.bayesian_page import BayesianPage
 from rheojax.gui.dialogs.bayesian_options import BayesianOptionsDialog
-
+from rheojax.gui.pages.bayesian_page import BayesianPage
 
 pytestmark = [pytest.mark.smoke]
 

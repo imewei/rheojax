@@ -1,6 +1,6 @@
 /COM,ANSYS RELEASE 2020 R1           BUILD 20.1      UP20191203       15:40:39
 /NOP
-/COM,Internal UNITS set at file creation time = UNDF      
+/COM,Internal UNITS set at file creation time = UNDF
 TBDEL,ALL,_MATL
 MPDEL,ALL,_MATL
 TB,PRON,_MATL   ,   1,  27,SHEA

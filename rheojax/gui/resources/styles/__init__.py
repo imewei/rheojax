@@ -80,9 +80,7 @@ def get_stylesheet(theme: str = "light") -> str:
     >>> app.setStyleSheet(stylesheet)
     """
     if theme not in ("light", "dark"):
-        raise ValueError(
-            f"Invalid theme '{theme}'. Must be 'light' or 'dark'."
-        )
+        raise ValueError(f"Invalid theme '{theme}'. Must be 'light' or 'dark'.")
 
     if theme == "dark":
         return get_dark_stylesheet()

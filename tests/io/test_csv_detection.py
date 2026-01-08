@@ -52,7 +52,7 @@ def test_auto_load_excel_fallback_on_dat(tmp_path: Path):
 
 def test_load_csv_quoted_semicolon_with_preamble(tmp_path: Path):
     csv_path = tmp_path / "quoted.csv"
-    content = "# header line\n# second\n\"Time (s)\";\"Stress [Pa]\"\n\"1,000\";\"10,5\"\n"
+    content = '# header line\n# second\n"Time (s)";"Stress [Pa]"\n"1,000";"10,5"\n'
     _write(csv_path, content, encoding="cp1252")
 
     data = load_csv(csv_path, x_col=0, y_col=1, delimiter=None, header=2)

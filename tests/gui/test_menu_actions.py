@@ -14,6 +14,7 @@ pytestmark = pytest.mark.gui
 
 try:
     from PySide6.QtWidgets import QApplication
+
     HAS_PYSIDE6 = True
 except ImportError:
     HAS_PYSIDE6 = False
@@ -59,9 +60,9 @@ class TestMenuBarActionConnections:
         for action_name, description in file_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"File > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"File > {description} ({action_name}) has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
@@ -84,9 +85,9 @@ class TestMenuBarActionConnections:
         for action_name, description in edit_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"Edit > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"Edit > {description} ({action_name}) has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
@@ -111,9 +112,9 @@ class TestMenuBarActionConnections:
         for action_name, description in view_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"View > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"View > {description} ({action_name}) has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
@@ -137,9 +138,9 @@ class TestMenuBarActionConnections:
         for action_name, description in data_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"Data > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"Data > {description} ({action_name}) has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
@@ -186,9 +187,9 @@ class TestMenuBarActionConnections:
         for action_name, description in model_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"Models > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"Models > {description} ({action_name}) has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
@@ -211,9 +212,9 @@ class TestMenuBarActionConnections:
         for action_name, description in transform_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"Transforms > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"Transforms > {description} ({action_name}) has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
@@ -235,9 +236,9 @@ class TestMenuBarActionConnections:
         for action_name, description in analysis_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"Analysis > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"Analysis > {description} ({action_name}) has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
@@ -258,9 +259,9 @@ class TestMenuBarActionConnections:
         for action_name, description in tools_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"Tools > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"Tools > {description} ({action_name}) has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
@@ -281,9 +282,9 @@ class TestMenuBarActionConnections:
         for action_name, description in help_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing action: {action_name}"
-            assert action_has_receivers(action), (
-                f"Help > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"Help > {description} ({action_name}) has no connected handler"
 
 
 class TestToolbarActionConnections:
@@ -316,9 +317,9 @@ class TestToolbarActionConnections:
         for action_name, description in menu_actions:
             action = getattr(window.menu_bar, action_name, None)
             assert action is not None, f"Missing menu bar action: {action_name}"
-            assert action_has_receivers(action), (
-                f"Menu Bar > {description} ({action_name}) has no connected handler"
-            )
+            assert action_has_receivers(
+                action
+            ), f"Menu Bar > {description} ({action_name}) has no connected handler"
 
 
 class TestDialogIntegration:
@@ -369,6 +370,7 @@ class TestActionCountConsistency:
         This test catches new actions that might be added without being wired up.
         """
         from PySide6.QtGui import QAction
+
         from rheojax.gui.app.main_window import RheoJAXMainWindow
 
         window = RheoJAXMainWindow()
@@ -384,6 +386,6 @@ class TestActionCountConsistency:
                 if not action_has_receivers(attr):
                     unconnected.append(attr_name)
 
-        assert len(unconnected) == 0, (
-            f"Found {len(unconnected)} unconnected menu actions: {unconnected}"
-        )
+        assert (
+            len(unconnected) == 0
+        ), f"Found {len(unconnected)} unconnected menu actions: {unconnected}"

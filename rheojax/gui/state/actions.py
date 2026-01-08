@@ -273,7 +273,11 @@ def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> No
 
         param = state.model_params[name]
         updated_param = ParameterState(
-            **{**param.__dict__, "min_bound": float(min_bound), "max_bound": float(max_bound)}
+            **{
+                **param.__dict__,
+                "min_bound": float(min_bound),
+                "max_bound": float(max_bound),
+            }
         )
 
         new_params = state.model_params.copy()
@@ -497,7 +501,11 @@ def start_bayesian(model_name: str, dataset_id: str) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "START_BAYESIAN", "model_name": model_name, "dataset_id": dataset_id}
+    return {
+        "type": "START_BAYESIAN",
+        "model_name": model_name,
+        "dataset_id": dataset_id,
+    }
 
 
 def store_bayesian_result(result: BayesianResult) -> None:
@@ -612,7 +620,9 @@ def set_pipeline_step(step: PipelineStep, status: StepStatus) -> None:
         new_steps[step] = status
 
         new_pipeline = PipelineState(
-            steps=new_steps, current_step=step, error_message=state.pipeline_state.error_message
+            steps=new_steps,
+            current_step=step,
+            error_message=state.pipeline_state.error_message,
         )
 
         return AppState(**{**state.__dict__, "pipeline_state": new_pipeline})

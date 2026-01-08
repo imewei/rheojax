@@ -15,10 +15,10 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.data import RheoData
-from rheojax.gui.state.store import DatasetState
-from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 from rheojax.core.registry import Registry
 from rheojax.gui.services.model_service import normalize_model_name
+from rheojax.gui.state.store import DatasetState
+from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,9 @@ class BayesianService:
             if progress_callback:
                 total_iterations = max(num_chains * (num_warmup + num_samples), 1)
 
-                def _wrapped_callback(stage: str, chain: int, iteration: int, total: int):
+                def _wrapped_callback(
+                    stage: str, chain: int, iteration: int, total: int
+                ):
                     progress_callback(stage, chain, iteration, total)
 
                 progress_callback("warmup", 1, 0, total_iterations)
@@ -198,7 +200,12 @@ class BayesianService:
             )
 
             if progress_callback:
-                progress_callback("sampling", num_chains, num_samples, max(num_chains * (num_warmup + num_samples), 1))
+                progress_callback(
+                    "sampling",
+                    num_chains,
+                    num_samples,
+                    max(num_chains * (num_warmup + num_samples), 1),
+                )
 
             # Extract posterior samples
             posterior_samples = result.posterior_samples
@@ -267,14 +274,16 @@ class BayesianService:
             # Try to infer chain count from result metadata when available
             num_chains = None
             if isinstance(result, BayesianResult):
-                num_chains = result.metadata.get("num_chains") if result.metadata else None
+                num_chains = (
+                    result.metadata.get("num_chains") if result.metadata else None
+                )
             elif hasattr(result, "metadata") and isinstance(result.metadata, dict):
                 num_chains = result.metadata.get("num_chains")
 
             # Fall back to core BayesianResult.num_chains when metadata is absent
             if num_chains is None and hasattr(result, "num_chains"):
                 try:
-                    num_chains = int(getattr(result, "num_chains"))
+                    num_chains = int(result.num_chains)
                 except Exception:
                     num_chains = None
 
@@ -316,7 +325,9 @@ class BayesianService:
             # Add warnings
             warnings = []
             if diagnostics["max_rhat"] and diagnostics["max_rhat"] > 1.1:
-                warnings.append(f"High R-hat detected: {diagnostics['max_rhat']:.3f} > 1.1")
+                warnings.append(
+                    f"High R-hat detected: {diagnostics['max_rhat']:.3f} > 1.1"
+                )
             if diagnostics["min_ess"] and diagnostics["min_ess"] < 400:
                 warnings.append(f"Low ESS detected: {diagnostics['min_ess']:.0f} < 400")
             if divergences > 0:
@@ -477,9 +488,13 @@ class BayesianService:
                     lower = prior.get("lower")
                     upper = prior.get("upper")
                     if lower is None or upper is None:
-                        warnings.append(f"Uniform prior for {param_name} missing bounds")
+                        warnings.append(
+                            f"Uniform prior for {param_name} missing bounds"
+                        )
                     elif lower >= upper:
-                        warnings.append(f"Invalid bounds for {param_name}: {lower} >= {upper}")
+                        warnings.append(
+                            f"Invalid bounds for {param_name}: {lower} >= {upper}"
+                        )
 
         except Exception as e:
             warnings.append(f"Prior validation failed: {e}")

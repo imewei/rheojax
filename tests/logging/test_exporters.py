@@ -228,7 +228,9 @@ class TestBatchingExporter:
     def test_batches_entries(self):
         """Test that entries are batched."""
         received_batches = []
-        inner = CallbackExporter(lambda entries: (received_batches.append(entries), True)[1])
+        inner = CallbackExporter(
+            lambda entries: (received_batches.append(entries), True)[1]
+        )
 
         exporter = BatchingExporter(
             inner_exporter=inner,

@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Signal, Slot, Qt
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -149,7 +149,9 @@ class ExportPage(QWidget):
         layout.addWidget(self._data_format_combo)
 
         # Figure format
-        layout.addWidget(QLabel("Figure Format:", styleSheet="font-weight: bold; margin-top: 15px;"))
+        layout.addWidget(
+            QLabel("Figure Format:", styleSheet="font-weight: bold; margin-top: 15px;")
+        )
         self._figure_format_combo = QComboBox()
         self._figure_format_combo.addItems(["PNG", "SVG", "PDF", "EPS"])
         # EPS path not guaranteed; keep visible but disabled
@@ -170,7 +172,9 @@ class ExportPage(QWidget):
         layout.addLayout(dpi_layout)
 
         # Style preset
-        layout.addWidget(QLabel("Plot Style:", styleSheet="font-weight: bold; margin-top: 15px;"))
+        layout.addWidget(
+            QLabel("Plot Style:", styleSheet="font-weight: bold; margin-top: 15px;")
+        )
         self._style_combo = QComboBox()
         self._style_combo.addItems(["Publication", "Presentation", "Default"])
         layout.addWidget(self._style_combo)
@@ -191,7 +195,11 @@ class ExportPage(QWidget):
         layout.addLayout(size_layout)
 
         # Report template
-        layout.addWidget(QLabel("Report Template:", styleSheet="font-weight: bold; margin-top: 15px;"))
+        layout.addWidget(
+            QLabel(
+                "Report Template:", styleSheet="font-weight: bold; margin-top: 15px;"
+            )
+        )
         self._template_combo = QComboBox()
         self._template_combo.addItems(["None", "Markdown Report", "PDF Report"])
         self._template_combo.currentTextChanged.connect(self._update_preview)
@@ -221,7 +229,9 @@ class ExportPage(QWidget):
         layout.addLayout(dir_layout)
 
         # Preview
-        layout.addWidget(QLabel("Export Preview:", styleSheet="font-weight: bold; margin-top: 20px;"))
+        layout.addWidget(
+            QLabel("Export Preview:", styleSheet="font-weight: bold; margin-top: 20px;")
+        )
 
         self._preview_list = QListWidget()
         self._preview_list.setAlternatingRowColors(True)
@@ -244,7 +254,8 @@ class ExportPage(QWidget):
 
         # Export button
         self._btn_export = QPushButton("Export")
-        self._btn_export.setStyleSheet("""
+        self._btn_export.setStyleSheet(
+            """
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
@@ -259,7 +270,8 @@ class ExportPage(QWidget):
                 background-color: #cccccc;
                 color: #666666;
             }
-        """)
+        """
+        )
         self._btn_export.clicked.connect(self._on_export_clicked)
         layout.addWidget(self._btn_export)
 
@@ -267,30 +279,38 @@ class ExportPage(QWidget):
 
     def _select_all(self) -> None:
         for checkbox in [
-            self._check_parameters, self._check_intervals, self._check_posteriors,
-            self._check_figures, self._check_diagnostics, self._check_raw_data,
-            self._check_metadata
+            self._check_parameters,
+            self._check_intervals,
+            self._check_posteriors,
+            self._check_figures,
+            self._check_diagnostics,
+            self._check_raw_data,
+            self._check_metadata,
         ]:
             checkbox.setChecked(True)
         self._update_preview()
 
     def _select_none(self) -> None:
         for checkbox in [
-            self._check_parameters, self._check_intervals, self._check_posteriors,
-            self._check_figures, self._check_diagnostics, self._check_raw_data,
-            self._check_metadata
+            self._check_parameters,
+            self._check_intervals,
+            self._check_posteriors,
+            self._check_figures,
+            self._check_diagnostics,
+            self._check_raw_data,
+            self._check_metadata,
         ]:
             checkbox.setChecked(False)
         self._update_preview()
 
     def _browse_output_dir(self) -> None:
         state = self._store.get_state()
-        initial_dir = str(state.last_export_dir) if state.last_export_dir else str(Path.home())
+        initial_dir = (
+            str(state.last_export_dir) if state.last_export_dir else str(Path.home())
+        )
 
         directory = QFileDialog.getExistingDirectory(
-            self,
-            "Select Output Directory",
-            initial_dir
+            self, "Select Output Directory", initial_dir
         )
         if directory:
             self._output_dir_edit.setText(directory)
@@ -305,7 +325,11 @@ class ExportPage(QWidget):
         """Update export preview list with files to be created."""
         self._preview_list.clear()
 
-        output_dir = Path(self._output_dir_edit.text()) if self._output_dir_edit.text() else Path("output")
+        output_dir = (
+            Path(self._output_dir_edit.text())
+            if self._output_dir_edit.text()
+            else Path("output")
+        )
         data_ext = self._get_data_extension()
         fig_ext = self._figure_format_combo.currentText().lower()
 
@@ -348,31 +372,43 @@ class ExportPage(QWidget):
             ax.axis("off")
             ax.text(0.02, 0.90, "Export Preview", fontsize=10, fontweight="bold")
             ax.text(0.02, 0.75, f"Data: {data_ext.upper()}")
-            ax.text(0.02, 0.62, f"Figures: {fig_ext.upper() if self._check_figures.isChecked() else 'None'}")
+            ax.text(
+                0.02,
+                0.62,
+                f"Figures: {fig_ext.upper() if self._check_figures.isChecked() else 'None'}",
+            )
             ax.text(0.02, 0.49, f"Report: {self._template_combo.currentText()}")
             ax.text(0.02, 0.36, f"Output: {output_dir}", wrap=True)
             canvas.draw()
             buf = canvas.buffer_rgba()
             width, height = canvas.get_width_height()
             qimg = QImage(buf, width, height, QImage.Format_RGBA8888)
-            self._preview_thumb.setPixmap(QPixmap.fromImage(qimg).scaled(
-                self._preview_thumb.width(),
-                self._preview_thumb.height(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation,
-            ))
+            self._preview_thumb.setPixmap(
+                QPixmap.fromImage(qimg).scaled(
+                    self._preview_thumb.width(),
+                    self._preview_thumb.height(),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+            )
         except Exception:
             self._preview_thumb.setText("Preview unavailable")
 
     def _batch_export_all_datasets(self) -> None:
         """Export all datasets in state to the selected directory (data format only)."""
-        output_dir = Path(self._output_dir_edit.text()) if self._output_dir_edit.text() else Path("output")
+        output_dir = (
+            Path(self._output_dir_edit.text())
+            if self._output_dir_edit.text()
+            else Path("output")
+        )
         data_ext = self._get_data_extension()
 
         state = self._store.get_state()
         datasets = getattr(state, "datasets", {}) or {}
         if not datasets:
-            QMessageBox.information(self, "Batch Export", "No datasets available to export.")
+            QMessageBox.information(
+                self, "Batch Export", "No datasets available to export."
+            )
             return
 
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -416,15 +452,17 @@ class ExportPage(QWidget):
                 return False, f"Cannot create output directory: {e}"
 
         # Check at least one content type is selected
-        any_selected = any([
-            self._check_parameters.isChecked(),
-            self._check_intervals.isChecked(),
-            self._check_posteriors.isChecked(),
-            self._check_figures.isChecked(),
-            self._check_diagnostics.isChecked(),
-            self._check_raw_data.isChecked(),
-            self._check_metadata.isChecked(),
-        ])
+        any_selected = any(
+            [
+                self._check_parameters.isChecked(),
+                self._check_intervals.isChecked(),
+                self._check_posteriors.isChecked(),
+                self._check_figures.isChecked(),
+                self._check_diagnostics.isChecked(),
+                self._check_raw_data.isChecked(),
+                self._check_metadata.isChecked(),
+            ]
+        )
         if not any_selected:
             return False, "Please select at least one content type to export."
 
@@ -434,8 +472,11 @@ class ExportPage(QWidget):
         if self._check_parameters.isChecked() and not state.fit_results:
             return False, "No fit results available. Run fitting first."
 
-        if (self._check_intervals.isChecked() or self._check_posteriors.isChecked() or
-                self._check_diagnostics.isChecked()) and not state.bayesian_results:
+        if (
+            self._check_intervals.isChecked()
+            or self._check_posteriors.isChecked()
+            or self._check_diagnostics.isChecked()
+        ) and not state.bayesian_results:
             return False, "No Bayesian results available. Run Bayesian inference first."
 
         if self._check_raw_data.isChecked() and not state.datasets:
@@ -499,16 +540,18 @@ class ExportPage(QWidget):
 
         try:
             exported_files = []
-            total_steps = sum([
-                config["include_parameters"],
-                config["include_intervals"],
-                config["include_posteriors"],
-                config["include_figures"],
-                config["include_diagnostics"],
-                config["include_raw_data"],
-                config["include_metadata"],
-                config["template"] != "None",
-            ])
+            total_steps = sum(
+                [
+                    config["include_parameters"],
+                    config["include_intervals"],
+                    config["include_posteriors"],
+                    config["include_figures"],
+                    config["include_diagnostics"],
+                    config["include_raw_data"],
+                    config["include_metadata"],
+                    config["template"] != "None",
+                ]
+            )
             current_step = 0
 
             # Export parameters
@@ -516,7 +559,9 @@ class ExportPage(QWidget):
                 progress.setLabelText("Exporting parameters...")
                 for result_id, result in state.fit_results.items():
                     filepath = output_dir / f"parameters_{result_id}.{data_format}"
-                    self._export_service.export_parameters(result, filepath, data_format)
+                    self._export_service.export_parameters(
+                        result, filepath, data_format
+                    )
                     exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
@@ -528,10 +573,13 @@ class ExportPage(QWidget):
             if config["include_intervals"] and state.bayesian_results:
                 progress.setLabelText("Exporting credible intervals...")
                 for result_id, result in state.bayesian_results.items():
-                    filepath = output_dir / f"credible_intervals_{result_id}.{data_format}"
+                    filepath = (
+                        output_dir / f"credible_intervals_{result_id}.{data_format}"
+                    )
                     # Export intervals as parameters-like structure
                     if result.credible_intervals:
                         import json
+
                         intervals_dict = {
                             k: {"lower": v[0], "upper": v[1]}
                             for k, v in result.credible_intervals.items()
@@ -549,7 +597,9 @@ class ExportPage(QWidget):
             if config["include_posteriors"] and state.bayesian_results:
                 progress.setLabelText("Exporting posterior samples...")
                 for result_id, result in state.bayesian_results.items():
-                    filepath = output_dir / f"posterior_samples_{result_id}.{data_format}"
+                    filepath = (
+                        output_dir / f"posterior_samples_{result_id}.{data_format}"
+                    )
                     self._export_service.export_posterior(result, filepath, data_format)
                     exported_files.append(str(filepath))
                 current_step += 1
@@ -579,34 +629,51 @@ class ExportPage(QWidget):
                         # Fall back to first dataset if no specific association
                         dataset = next(iter(state.datasets.values()))
 
-                    if dataset and dataset.x_data is not None and dataset.y_data is not None:
+                    if (
+                        dataset
+                        and dataset.x_data is not None
+                        and dataset.y_data is not None
+                    ):
                         try:
                             rheo_data = self._dataset_to_rheodata(dataset)
 
                             # Create and export fit plot
                             fit_fig = self._plot_service.create_fit_plot(
-                                rheo_data, fit_result, style=fig_style,
-                                test_mode=dataset.test_mode
+                                rheo_data,
+                                fit_result,
+                                style=fig_style,
+                                test_mode=dataset.test_mode,
                             )
-                            fit_path = figures_dir / f"fit_plot_{result_id}.{fig_format}"
-                            self._export_service.export_figure(fit_fig, fit_path, dpi=fig_dpi)
+                            fit_path = (
+                                figures_dir / f"fit_plot_{result_id}.{fig_format}"
+                            )
+                            self._export_service.export_figure(
+                                fit_fig, fit_path, dpi=fig_dpi
+                            )
                             exported_files.append(str(fit_path))
 
                             # Close figure to free memory
                             import matplotlib.pyplot as plt
+
                             plt.close(fit_fig)
 
                             # Create and export residuals plot
                             residuals_fig = self._plot_service.create_residual_plot(
                                 rheo_data, fit_result, style=fig_style
                             )
-                            residuals_path = figures_dir / f"residuals_{result_id}.{fig_format}"
-                            self._export_service.export_figure(residuals_fig, residuals_path, dpi=fig_dpi)
+                            residuals_path = (
+                                figures_dir / f"residuals_{result_id}.{fig_format}"
+                            )
+                            self._export_service.export_figure(
+                                residuals_fig, residuals_path, dpi=fig_dpi
+                            )
                             exported_files.append(str(residuals_path))
                             plt.close(residuals_fig)
 
                         except Exception as e:
-                            logger.warning(f"Failed to export fit plots for {result_id}: {e}")
+                            logger.warning(
+                                f"Failed to export fit plots for {result_id}: {e}"
+                            )
 
                 # Export Bayesian diagnostic plots
                 for result_id, bayes_result in state.bayesian_results.items():
@@ -616,9 +683,12 @@ class ExportPage(QWidget):
                             bayes_result, plot_type="trace", style=fig_style
                         )
                         trace_path = figures_dir / f"trace_{result_id}.{fig_format}"
-                        self._export_service.export_figure(trace_fig, trace_path, dpi=fig_dpi)
+                        self._export_service.export_figure(
+                            trace_fig, trace_path, dpi=fig_dpi
+                        )
                         exported_files.append(str(trace_path))
                         import matplotlib.pyplot as plt
+
                         plt.close(trace_fig)
 
                         # Forest plot
@@ -626,7 +696,9 @@ class ExportPage(QWidget):
                             bayes_result, plot_type="forest", style=fig_style
                         )
                         forest_path = figures_dir / f"forest_{result_id}.{fig_format}"
-                        self._export_service.export_figure(forest_fig, forest_path, dpi=fig_dpi)
+                        self._export_service.export_figure(
+                            forest_fig, forest_path, dpi=fig_dpi
+                        )
                         exported_files.append(str(forest_path))
                         plt.close(forest_fig)
 
@@ -635,12 +707,16 @@ class ExportPage(QWidget):
                             bayes_result, plot_type="pair", style=fig_style
                         )
                         pair_path = figures_dir / f"pair_{result_id}.{fig_format}"
-                        self._export_service.export_figure(pair_fig, pair_path, dpi=fig_dpi)
+                        self._export_service.export_figure(
+                            pair_fig, pair_path, dpi=fig_dpi
+                        )
                         exported_files.append(str(pair_path))
                         plt.close(pair_fig)
 
                     except Exception as e:
-                        logger.warning(f"Failed to export Bayesian plots for {result_id}: {e}")
+                        logger.warning(
+                            f"Failed to export Bayesian plots for {result_id}: {e}"
+                        )
 
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
@@ -652,6 +728,7 @@ class ExportPage(QWidget):
             if config["include_diagnostics"] and state.bayesian_results:
                 progress.setLabelText("Exporting diagnostics...")
                 import json
+
                 for result_id, result in state.bayesian_results.items():
                     filepath = output_dir / f"diagnostics_{result_id}.json"
                     diagnostics = {
@@ -688,8 +765,9 @@ class ExportPage(QWidget):
             # Export metadata
             if config["include_metadata"]:
                 progress.setLabelText("Exporting metadata...")
-                import json
                 import datetime
+                import json
+
                 metadata = {
                     "export_timestamp": datetime.datetime.now().isoformat(),
                     "project_name": state.project_name,
@@ -721,7 +799,13 @@ class ExportPage(QWidget):
                 # Build state dict for report
                 report_state = {
                     "model_name": state.active_model_name,
-                    "test_mode": state.datasets[list(state.datasets.keys())[0]].metadata.get("test_mode") if state.datasets else None,
+                    "test_mode": (
+                        state.datasets[list(state.datasets.keys())[0]].metadata.get(
+                            "test_mode"
+                        )
+                        if state.datasets
+                        else None
+                    ),
                 }
 
                 # Add parameters from latest fit
@@ -737,7 +821,9 @@ class ExportPage(QWidget):
                         "ess": latest_bayes.ess,
                     }
 
-                self._export_service.generate_report(report_state, template_type, filepath)
+                self._export_service.generate_report(
+                    report_state, template_type, filepath
+                )
                 exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(100)
@@ -748,11 +834,13 @@ class ExportPage(QWidget):
             QMessageBox.information(
                 self,
                 "Export Complete",
-                f"Successfully exported {len(exported_files)} files to:\n{output_dir}"
+                f"Successfully exported {len(exported_files)} files to:\n{output_dir}",
             )
 
             self.export_completed.emit(str(output_dir))
-            logger.info(f"Export completed: {len(exported_files)} files to {output_dir}")
+            logger.info(
+                f"Export completed: {len(exported_files)} files to {output_dir}"
+            )
 
         except Exception as e:
             progress.close()
@@ -766,7 +854,7 @@ class ExportPage(QWidget):
         item_ids: list[str],
         file_path: str,
         format: str | None = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """Export specific results to file.
 
@@ -799,11 +887,7 @@ class ExportPage(QWidget):
                 self._export_service.export_posterior(result, path, format)
 
     def export_plot(
-        self,
-        plot_id: str,
-        file_path: str,
-        dpi: int = 300,
-        **kwargs: Any
+        self, plot_id: str, file_path: str, dpi: int = 300, **kwargs: Any
     ) -> None:
         """Export plot to file.
 
@@ -821,11 +905,7 @@ class ExportPage(QWidget):
         # Get figure from plot service (would need integration with PlotService)
         logger.info(f"Export plot {plot_id} to {file_path} at {dpi} DPI")
 
-    def preview_export(
-        self,
-        item_ids: list[str],
-        format: str
-    ) -> dict[str, Any]:
+    def preview_export(self, item_ids: list[str], format: str) -> dict[str, Any]:
         """Preview export without writing files.
 
         Parameters
@@ -844,7 +924,10 @@ class ExportPage(QWidget):
         self._update_preview()
 
         return {
-            "files": [self._preview_list.item(i).text() for i in range(self._preview_list.count())],
+            "files": [
+                self._preview_list.item(i).text()
+                for i in range(self._preview_list.count())
+            ],
             "format": format,
             "output_dir": str(config["output_dir"]),
         }

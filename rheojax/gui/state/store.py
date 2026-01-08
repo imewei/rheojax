@@ -33,7 +33,6 @@ class PipelineStep(Enum):
     EXPORT = auto()
 
 
-
 class WorkflowMode(Enum):
     """Application workflow modes."""
 
@@ -390,7 +389,9 @@ class StateStore:
                 model_name = payload.get("model_name", "")
                 dataset_id = payload.get("dataset_id", "")
                 if self._signals and model_name and dataset_id:
-                    self._signals.bayesian_completed.emit(str(model_name), str(dataset_id))
+                    self._signals.bayesian_completed.emit(
+                        str(model_name), str(dataset_id)
+                    )
 
             elif action_type == "SET_THEME":
                 theme = action.get("theme", "light")
@@ -452,7 +453,9 @@ class StateStore:
         if emit_signal and self._signals is not None:
             self._signals.state_changed.emit()
 
-    def _reduce_action(self, action_type: str, action: dict[str, Any]) -> Callable[[AppState], AppState] | None:
+    def _reduce_action(
+        self, action_type: str, action: dict[str, Any]
+    ) -> Callable[[AppState], AppState] | None:
         """Translate an action into a state updater.
 
         Only a minimal set of actions are implemented here to keep the GUI
@@ -493,7 +496,9 @@ class StateStore:
                     ds.metadata = {**ds.metadata, "test_mode": mode}
                     ds.is_modified = True
                     datasets[dataset_id] = ds
-                return replace(state, datasets=datasets, current_tab="data", is_modified=True)
+                return replace(
+                    state, datasets=datasets, current_tab="data", is_modified=True
+                )
 
             return updater
 
@@ -508,8 +513,8 @@ class StateStore:
                 if ds.x_data is None or ds.y_data is None:
                     return state
                 try:
-                    from rheojax.gui.services.data_service import DataService
                     from rheojax.core.data import RheoData
+                    from rheojax.gui.services.data_service import DataService
 
                     svc = DataService()
                     inferred = svc.detect_test_mode(
@@ -533,7 +538,9 @@ class StateStore:
 
                 datasets = state.datasets.copy()
                 datasets[dataset_id] = ds
-                return replace(state, datasets=datasets, current_tab="data", is_modified=True)
+                return replace(
+                    state, datasets=datasets, current_tab="data", is_modified=True
+                )
 
             return updater
 
@@ -614,7 +621,12 @@ class StateStore:
                 recent = list(state.recent_projects)
                 if path and path not in recent:
                     recent = [path] + recent[:9]
-                return replace(state, project_path=path, project_name=path.name if path else state.project_name, recent_projects=recent)
+                return replace(
+                    state,
+                    project_path=path,
+                    project_name=path.name if path else state.project_name,
+                    recent_projects=recent,
+                )
 
             return updater
 
@@ -650,7 +662,9 @@ class StateStore:
             dataset_id = config.get("dataset_id") or str(uuid.uuid4())
             name = config.get("name", "Dataset")
             test_mode = config.get("test_mode", "oscillation")
-            file_path = Path(config.get("file_path")) if config.get("file_path") else None
+            file_path = (
+                Path(config.get("file_path")) if config.get("file_path") else None
+            )
 
             dataset = DatasetState(
                 id=dataset_id,
@@ -735,7 +749,9 @@ class StateStore:
                             seed=seed,
                         )
                     )
-                return replace(state, pipeline_state=pipeline, transform_history=history)
+                return replace(
+                    state, pipeline_state=pipeline, transform_history=history
+                )
 
             return updater
 
@@ -746,8 +762,12 @@ class StateStore:
                 pipeline = state.pipeline_state.clone()
                 pipeline.steps[PipelineStep.EXPORT] = StepStatus.COMPLETE
                 pipeline.current_step = PipelineStep.EXPORT
-                last_export_dir = Path(export_path).parent if export_path else state.last_export_dir
-                return replace(state, pipeline_state=pipeline, last_export_dir=last_export_dir)
+                last_export_dir = (
+                    Path(export_path).parent if export_path else state.last_export_dir
+                )
+                return replace(
+                    state, pipeline_state=pipeline, last_export_dir=last_export_dir
+                )
 
             return updater
 
@@ -762,7 +782,9 @@ class StateStore:
                 return replace(
                     state,
                     project_path=project_path,
-                    project_name=project_path.name if project_path else state.project_name,
+                    project_name=(
+                        project_path.name if project_path else state.project_name
+                    ),
                     is_modified=False,
                     recent_projects=recent,
                 )
@@ -792,20 +814,28 @@ class StateStore:
                 if not model_name or not dataset_id or result is None:
                     return state
 
-                fit_state = result if isinstance(result, FitResult) else FitResult(
-                    model_name=model_name,
-                    dataset_id=str(dataset_id),
-                    parameters=getattr(result, "parameters", {}),
-                    r_squared=float(getattr(result, "r_squared", 0.0)),
-                    mpe=float(getattr(result, "mpe", 0.0)),
-                    chi_squared=float(getattr(result, "chi_squared", 0.0)),
-                    fit_time=float(getattr(result, "fit_time", 0.0)),
-                    timestamp=getattr(result, "timestamp", datetime.now()),
-                    num_iterations=getattr(result, "num_iterations", getattr(result, "n_iterations", 0) or 0),
-                    convergence_message=getattr(result, "message", ""),
-                    x_fit=getattr(result, "x_fit", None),
-                    y_fit=getattr(result, "y_fit", None),
-                    residuals=getattr(result, "residuals", None),
+                fit_state = (
+                    result
+                    if isinstance(result, FitResult)
+                    else FitResult(
+                        model_name=model_name,
+                        dataset_id=str(dataset_id),
+                        parameters=getattr(result, "parameters", {}),
+                        r_squared=float(getattr(result, "r_squared", 0.0)),
+                        mpe=float(getattr(result, "mpe", 0.0)),
+                        chi_squared=float(getattr(result, "chi_squared", 0.0)),
+                        fit_time=float(getattr(result, "fit_time", 0.0)),
+                        timestamp=getattr(result, "timestamp", datetime.now()),
+                        num_iterations=getattr(
+                            result,
+                            "num_iterations",
+                            getattr(result, "n_iterations", 0) or 0,
+                        ),
+                        convergence_message=getattr(result, "message", ""),
+                        x_fit=getattr(result, "x_fit", None),
+                        y_fit=getattr(result, "y_fit", None),
+                        residuals=getattr(result, "residuals", None),
+                    )
                 )
                 fits = state.fit_results.copy()
                 key = f"{model_name}_{dataset_id}"
@@ -836,18 +866,28 @@ class StateStore:
                 if not model_name or not dataset_id or result is None:
                     return state
 
-                bayes_state = result if isinstance(result, BayesianResult) else BayesianResult(
-                    model_name=model_name,
-                    dataset_id=str(dataset_id),
-                    posterior_samples=getattr(result, "posterior_samples", {}),
-                    r_hat=getattr(result, "r_hat", {}),
-                    ess=getattr(result, "ess", {}),
-                    divergences=int(getattr(result, "divergences", 0)),
-                    credible_intervals=getattr(result, "credible_intervals", {}),
-                    mcmc_time=float(getattr(result, "mcmc_time", getattr(result, "sampling_time", 0.0))),
-                    timestamp=getattr(result, "timestamp", datetime.now()),
-                    num_warmup=int(getattr(result, "num_warmup", 0)),
-                    num_samples=int(getattr(result, "num_samples", 0)),
+                bayes_state = (
+                    result
+                    if isinstance(result, BayesianResult)
+                    else BayesianResult(
+                        model_name=model_name,
+                        dataset_id=str(dataset_id),
+                        posterior_samples=getattr(result, "posterior_samples", {}),
+                        r_hat=getattr(result, "r_hat", {}),
+                        ess=getattr(result, "ess", {}),
+                        divergences=int(getattr(result, "divergences", 0)),
+                        credible_intervals=getattr(result, "credible_intervals", {}),
+                        mcmc_time=float(
+                            getattr(
+                                result,
+                                "mcmc_time",
+                                getattr(result, "sampling_time", 0.0),
+                            )
+                        ),
+                        timestamp=getattr(result, "timestamp", datetime.now()),
+                        num_warmup=int(getattr(result, "num_warmup", 0)),
+                        num_samples=int(getattr(result, "num_samples", 0)),
+                    )
                 )
 
                 bayes = state.bayesian_results.copy()

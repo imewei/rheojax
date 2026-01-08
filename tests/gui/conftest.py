@@ -11,23 +11,25 @@ Provides shared fixtures for GUI testing, including:
 import os
 import subprocess
 import sys
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
 # Check if PySide6 is available and display is present
 try:
-    from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QFont
+    from PySide6.QtWidgets import QApplication
 
     HAS_PYSIDE6 = True
 except ImportError:
     HAS_PYSIDE6 = False
 
 # Check for display (relevant on CI systems)
-HAS_DISPLAY = os.getenv("DISPLAY") is not None or os.getenv("QT_QPA_PLATFORM") is not None
+HAS_DISPLAY = (
+    os.getenv("DISPLAY") is not None or os.getenv("QT_QPA_PLATFORM") is not None
+)
 
 
 @pytest.fixture(scope="session")

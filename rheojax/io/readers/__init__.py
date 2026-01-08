@@ -20,14 +20,14 @@ from rheojax.io.readers.excel_reader import load_excel
 
 # TRIOS multi-format support
 from rheojax.io.readers.trios import (
+    TRIOSFile,
+    TRIOSTable,
     load_trios,
     load_trios_chunked,
     load_trios_csv,
     load_trios_excel,
     load_trios_json,
     parse_trios_csv,
-    TRIOSFile,
-    TRIOSTable,
 )
 
 __all__ = [

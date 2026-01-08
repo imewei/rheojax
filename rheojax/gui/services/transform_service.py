@@ -101,7 +101,13 @@ class TransformService:
                 },
                 "window": {
                     "type": "choice",
-                    "choices": ["hann", "hamming", "blackman", "bartlett", "rectangular"],
+                    "choices": [
+                        "hann",
+                        "hamming",
+                        "blackman",
+                        "bartlett",
+                        "rectangular",
+                    ],
                     "default": "hann",
                     "description": "Window function (rectangular = none)",
                 },
@@ -288,7 +294,11 @@ class TransformService:
                 # Attach a simple provenance entry
                 prov_entry = {
                     "transform": name,
-                    "params": {k: v for k, v in params.items() if isinstance(v, (int, float, str, bool))},
+                    "params": {
+                        k: v
+                        for k, v in params.items()
+                        if isinstance(v, (int, float, str, bool))
+                    },
                 }
                 history = list(result_data.metadata.get("provenance", []))
                 history.append(prov_entry)
@@ -307,7 +317,9 @@ class TransformService:
                 mastercurve_data, shift_factors = mc.transform(data)
 
                 logger.info(f"Applied mastercurve at T_ref={reference_temp}°C")
-                return _with_provenance(mastercurve_data), {"shift_factors": shift_factors}
+                return _with_provenance(mastercurve_data), {
+                    "shift_factors": shift_factors
+                }
 
             elif name == "fft":
                 # FFT transform
@@ -343,7 +355,9 @@ class TransformService:
                 reference_gamma_dot = params.get("reference_gamma_dot", 1.0)
                 auto_shift = params.get("auto_shift", True)
 
-                srfs = SRFS(reference_gamma_dot=reference_gamma_dot, auto_shift=auto_shift)
+                srfs = SRFS(
+                    reference_gamma_dot=reference_gamma_dot, auto_shift=auto_shift
+                )
                 master_curve, shift_factors = srfs.transform(data)
 
                 logger.info(f"Applied SRFS at γ̇_ref={reference_gamma_dot} 1/s")
@@ -422,7 +436,9 @@ class TransformService:
                 start_cycle = int(params.get("start_cycle", 0))
                 # Page defaults to 0, but 0 means "use all cycles" so convert to None
                 end_cycle_raw = params.get("end_cycle", None)
-                end_cycle = None if end_cycle_raw in (None, 0, 0.0) else int(end_cycle_raw)
+                end_cycle = (
+                    None if end_cycle_raw in (None, 0, 0.0) else int(end_cycle_raw)
+                )
                 use_numerical_method = params.get("use_numerical_method", False)
 
                 spp = SPPDecomposer(

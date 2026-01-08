@@ -5,7 +5,6 @@ Status Bar
 Application status bar with progress indicators, JAX device status, and memory monitoring.
 """
 
-
 from PySide6.QtWidgets import QLabel, QProgressBar, QStatusBar, QWidget
 
 
@@ -107,7 +106,11 @@ class StatusBar(QStatusBar):
         self.progress_bar.setValue(0)
 
     def update_jax_status(
-        self, device: str, memory_used: float, memory_total: float, float64_enabled: bool
+        self,
+        device: str,
+        memory_used: float,
+        memory_total: float,
+        float64_enabled: bool,
     ) -> None:
         """Update JAX device and memory status.
 
@@ -131,10 +134,14 @@ class StatusBar(QStatusBar):
         # Update float64 indicator (ASCII to avoid macOS rendering issues)
         if float64_enabled:
             self.float64_label.setText("Float64: [OK]")
-            self.float64_label.setStyleSheet("QLabel { padding: 0 10px; color: green; }")
+            self.float64_label.setStyleSheet(
+                "QLabel { padding: 0 10px; color: green; }"
+            )
         else:
             self.float64_label.setText("Float64: [X]")
-            self.float64_label.setStyleSheet("QLabel { padding: 0 10px; color: orange; }")
+            self.float64_label.setStyleSheet(
+                "QLabel { padding: 0 10px; color: orange; }"
+            )
 
     def update_memory(self, used_mb: float, total_mb: float) -> None:
         """Update memory usage indicator.
@@ -169,7 +176,11 @@ class StatusBar(QStatusBar):
         # ASCII characters to avoid macOS CoreText rendering issues
         if enabled:
             self.float64_label.setText("Float64: [OK]")
-            self.float64_label.setStyleSheet("QLabel { padding: 0 10px; color: green; }")
+            self.float64_label.setStyleSheet(
+                "QLabel { padding: 0 10px; color: green; }"
+            )
         else:
             self.float64_label.setText("Float64: [X]")
-            self.float64_label.setStyleSheet("QLabel { padding: 0 10px; color: orange; }")
+            self.float64_label.setStyleSheet(
+                "QLabel { padding: 0 10px; color: orange; }"
+            )

@@ -32,7 +32,9 @@ class FailingExporter:
 def test_batching_exporter_recovers_from_inner_failure(caplog):
     caplog.set_level(logging.ERROR)
     inner = FailingExporter()
-    exporter = BatchingExporter(inner_exporter=inner, batch_size=2, flush_interval=0.01, max_queue_size=10)
+    exporter = BatchingExporter(
+        inner_exporter=inner, batch_size=2, flush_interval=0.01, max_queue_size=10
+    )
 
     entry1 = LogEntry("t1", "INFO", "l", "m1")
     entry2 = LogEntry("t2", "INFO", "l", "m2")
@@ -65,7 +67,9 @@ def test_batching_exporter_returns_false_on_inner_false(caplog):
             return None
 
     inner = FalseExporter()
-    exporter = BatchingExporter(inner_exporter=inner, batch_size=2, flush_interval=0.01, max_queue_size=10)
+    exporter = BatchingExporter(
+        inner_exporter=inner, batch_size=2, flush_interval=0.01, max_queue_size=10
+    )
 
     entry1 = LogEntry("t1", "INFO", "l", "m1")
     ok = exporter.export([entry1])
@@ -137,4 +141,7 @@ def test_batching_exporter_queue_full_logs_and_drops(caplog):
 
     # When full, exporter returns False and logs the drop
     assert ok is False
-    assert "queue is full; dropping entry" in caplog.text or "BatchingExporter queue is full" in caplog.text
+    assert (
+        "queue is full; dropping entry" in caplog.text
+        or "BatchingExporter queue is full" in caplog.text
+    )

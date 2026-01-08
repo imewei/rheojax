@@ -10,9 +10,7 @@ from typing import Any
 
 
 def log_array_info(
-    arr: Any,
-    name: str = "array",
-    include_device: bool = True
+    arr: Any, name: str = "array", include_device: bool = True
 ) -> dict[str, Any]:
     """Extract loggable info from JAX/NumPy array without device transfer.
 
@@ -62,7 +60,7 @@ def log_array_stats(
     arr: Any,
     name: str = "array",
     logger: logging.Logger | None = None,
-    level: int = logging.DEBUG
+    level: int = logging.DEBUG,
 ) -> dict[str, Any]:
     """Compute and log full array statistics.
 
@@ -91,14 +89,16 @@ def log_array_stats(
         # Convert to numpy (forces transfer)
         arr_np = np.asarray(arr)
 
-        info.update({
-            f"{name}_min": float(np.min(arr_np)),
-            f"{name}_max": float(np.max(arr_np)),
-            f"{name}_mean": float(np.mean(arr_np)),
-            f"{name}_std": float(np.std(arr_np)),
-            f"{name}_has_nan": bool(np.any(np.isnan(arr_np))),
-            f"{name}_has_inf": bool(np.any(np.isinf(arr_np))),
-        })
+        info.update(
+            {
+                f"{name}_min": float(np.min(arr_np)),
+                f"{name}_max": float(np.max(arr_np)),
+                f"{name}_mean": float(np.mean(arr_np)),
+                f"{name}_std": float(np.std(arr_np)),
+                f"{name}_has_nan": bool(np.any(np.isnan(arr_np))),
+                f"{name}_has_inf": bool(np.any(np.isinf(arr_np))),
+            }
+        )
     except Exception as e:
         info[f"{name}_stats_error"] = str(e)
 
@@ -109,12 +109,7 @@ def log_array_stats(
     return info
 
 
-def jax_safe_log(
-    logger: logging.Logger,
-    level: int,
-    msg: str,
-    **kwargs
-) -> None:
+def jax_safe_log(logger: logging.Logger, level: int, msg: str, **kwargs) -> None:
     """Log only if not inside JAX JIT tracing.
 
     This function checks if we're currently being traced by JAX JIT
@@ -148,16 +143,15 @@ def jax_safe_log(
                     "cur_sublevel unavailable during jax tracing check: %s", exc
                 )
     except ImportError:
-        logging.getLogger(__name__).debug("JAX not available; proceeding with standard logging")
+        logging.getLogger(__name__).debug(
+            "JAX not available; proceeding with standard logging"
+        )
 
     logger.log(level, msg, **kwargs)
 
 
 def jax_debug_log(
-    logger: logging.Logger,
-    msg: str,
-    *values: Any,
-    level: int = logging.DEBUG
+    logger: logging.Logger, msg: str, *values: Any, level: int = logging.DEBUG
 ) -> None:
     """Use jax.debug.callback for logging inside JIT-compiled functions.
 
@@ -242,10 +236,7 @@ def log_jax_config(logger: logging.Logger | None = None) -> dict[str, Any]:
 
 
 def log_numerical_issue(
-    logger: logging.Logger,
-    arr: Any,
-    name: str = "array",
-    context: str = ""
+    logger: logging.Logger, arr: Any, name: str = "array", context: str = ""
 ) -> bool:
     """Check for and log numerical issues (NaN, Inf) in arrays.
 
@@ -287,7 +278,7 @@ def log_numerical_issue(
                     "context": context,
                     "has_nan": has_nan,
                     "has_inf": has_inf,
-                }
+                },
             )
             return True
 
@@ -298,10 +289,7 @@ def log_numerical_issue(
 
 
 def log_device_transfer(
-    logger: logging.Logger,
-    arr: Any,
-    name: str = "array",
-    target: str = "host"
+    logger: logging.Logger, arr: Any, name: str = "array", target: str = "host"
 ) -> None:
     """Log when a device transfer occurs.
 
@@ -339,5 +327,5 @@ def log_device_transfer(
             "target": target,
             "size_mb": round(size_mb, 2),
             "shape": getattr(arr, "shape", "unknown"),
-        }
+        },
     )

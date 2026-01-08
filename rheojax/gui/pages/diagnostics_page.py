@@ -151,13 +151,19 @@ class DiagnosticsPage(QWidget):
         # Model comparison table
         self._comparison_table = QTableWidget()
         self._comparison_table.setColumnCount(5)
-        self._comparison_table.setHorizontalHeaderLabels(["Model", "WAIC", "LOO", "ELPD", "Weight"])
+        self._comparison_table.setHorizontalHeaderLabels(
+            ["Model", "WAIC", "LOO", "ELPD", "Weight"]
+        )
         self._comparison_table.setAlternatingRowColors(True)
-        self._comparison_table.setToolTip("Model comparison metrics; populate by running multiple models")
+        self._comparison_table.setToolTip(
+            "Model comparison metrics; populate by running multiple models"
+        )
         layout.addWidget(self._comparison_table)
 
         # Empty state
-        empty_label = QLabel("No diagnostics yet. Run Bayesian inference to populate metrics.")
+        empty_label = QLabel(
+            "No diagnostics yet. Run Bayesian inference to populate metrics."
+        )
         empty_label.setAlignment(Qt.AlignCenter)
         empty_label.setStyleSheet("color: #666; padding: 6px;")
         layout.addWidget(empty_label)
@@ -195,9 +201,13 @@ class DiagnosticsPage(QWidget):
         if filepath:
             try:
                 canvas.export_figure(filepath)
-                QMessageBox.information(self, "Export Successful", f"Plot saved to {filepath}")
+                QMessageBox.information(
+                    self, "Export Successful", f"Plot saved to {filepath}"
+                )
             except Exception as e:
-                QMessageBox.warning(self, "Export Failed", f"Failed to export plot: {e}")
+                QMessageBox.warning(
+                    self, "Export Failed", f"Failed to export plot: {e}"
+                )
 
         self.export_requested.emit(plot_type)
 
@@ -226,7 +236,9 @@ class DiagnosticsPage(QWidget):
             waic_val = "--"
             loo_val = "--"
             elpd_val = "--"
-            weight_val = "--"  # Weighting requires multi-model compare; keep placeholder
+            weight_val = (
+                "--"  # Weighting requires multi-model compare; keep placeholder
+            )
 
             try:
                 if hasattr(result, "posterior_samples") and result.posterior_samples:
@@ -576,9 +588,7 @@ class DiagnosticsPage(QWidget):
             "mcmc_time": result.mcmc_time,
             "max_r_hat": max(result.r_hat.values()) if result.r_hat else None,
             "min_ess": min(result.ess.values()) if result.ess else None,
-            "converged": (
-                max(result.r_hat.values()) < 1.1 if result.r_hat else False
-            ) and (
-                min(result.ess.values()) > 400 if result.ess else False
-            ) and result.divergences == 0,
+            "converged": (max(result.r_hat.values()) < 1.1 if result.r_hat else False)
+            and (min(result.ess.values()) > 400 if result.ess else False)
+            and result.divergences == 0,
         }

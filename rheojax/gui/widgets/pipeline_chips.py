@@ -5,7 +5,6 @@ Pipeline Chips Widget
 Visual pipeline representation with status indicators.
 """
 
-
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
@@ -194,7 +193,8 @@ class PipelineChips(QWidget):
             border_color = "#cccccc"
 
         # Apply stylesheet
-        chip.setStyleSheet(f"""
+        chip.setStyleSheet(
+            f"""
             QPushButton {{
                 background-color: {bg_color};
                 color: {text_color};
@@ -210,7 +210,8 @@ class PipelineChips(QWidget):
             QPushButton:pressed {{
                 background-color: {self._darken_color(bg_color)};
             }}
-        """)
+        """
+        )
 
         # Store status for spinner animation
         chip.setProperty("status", status)

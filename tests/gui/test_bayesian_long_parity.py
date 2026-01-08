@@ -4,23 +4,24 @@ Enable via env: RHEOJAX_LONG_BAYES=1
 Runs a modest SPP-like Bayesian inference and checks diagnostics + PPD hash.
 """
 
-import os
+import csv
 import hashlib
 import io
-import csv
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
 from rheojax.core.data import RheoData
-from rheojax.gui.services.bayesian_service import BayesianService, BayesianResult
-
+from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
 
 pytestmark = [pytest.mark.smoke]
 
 
-@pytest.mark.skipif(os.environ.get("RHEOJAX_LONG_BAYES") != "1", reason="long bayes opt-in")
+@pytest.mark.skipif(
+    os.environ.get("RHEOJAX_LONG_BAYES") != "1", reason="long bayes opt-in"
+)
 def test_bayesian_long_parity_relaxation_fixture():
     pytest.importorskip("jax")
 
@@ -63,7 +64,9 @@ def test_bayesian_long_parity_relaxation_fixture():
     if not result.posterior_samples:
         pytest.xfail("long bayes unstable (no posterior samples)")
 
-    y_mean = np.array(result.posterior_samples[list(result.posterior_samples.keys())[0]].mean(axis=-1)).flatten()
+    y_mean = np.array(
+        result.posterior_samples[list(result.posterior_samples.keys())[0]].mean(axis=-1)
+    ).flatten()
     x_plot = t[: len(y_mean)]
     plt.figure(figsize=(4, 3), dpi=100)
     plt.plot(t, y, "k.", label="data")

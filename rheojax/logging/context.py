@@ -19,7 +19,7 @@ def log_operation(
     logger: logging.Logger | RheoJAXLogger,
     operation: str,
     level: int = logging.INFO,
-    **context
+    **context,
 ) -> Generator[dict[str, Any], None, None]:
     """Context manager for logging operation start/end with timing.
 
@@ -56,11 +56,7 @@ def log_operation(
     logger.log(
         level,
         f"{operation} started",
-        extra={
-            "operation": operation,
-            "phase": "start",
-            **context
-        }
+        extra={"operation": operation, "phase": "start", **context},
     )
 
     try:
@@ -77,8 +73,8 @@ def log_operation(
                 "elapsed_seconds": round(elapsed, 4),
                 "status": "success",
                 **context,
-                **completion_context
-            }
+                **completion_context,
+            },
         )
 
     except Exception as e:
@@ -95,8 +91,8 @@ def log_operation(
                 "error_type": type(e).__name__,
                 "error_message": str(e),
                 **context,
-                **completion_context
-            }
+                **completion_context,
+            },
         )
         raise
 
@@ -108,7 +104,7 @@ def log_fit(
     data_shape: tuple[int, ...] | None = None,
     test_mode: str = "unknown",
     level: int = logging.INFO,
-    **kwargs
+    **kwargs,
 ) -> Generator[dict[str, Any], None, None]:
     """Context manager for model fitting operations.
 
@@ -131,11 +127,7 @@ def log_fit(
         ...     ctx["R2"] = result.r_squared
         ...     ctx["n_iterations"] = result.iterations
     """
-    context = {
-        "model": model,
-        "test_mode": test_mode,
-        **kwargs
-    }
+    context = {"model": model, "test_mode": test_mode, **kwargs}
     if data_shape is not None:
         context["data_shape"] = data_shape
 
@@ -151,7 +143,7 @@ def log_bayesian(
     num_samples: int,
     num_chains: int = 1,
     level: int = logging.INFO,
-    **kwargs
+    **kwargs,
 ) -> Generator[dict[str, Any], None, None]:
     """Context manager for Bayesian inference operations.
 
@@ -181,7 +173,7 @@ def log_bayesian(
         "num_warmup": num_warmup,
         "num_samples": num_samples,
         "num_chains": num_chains,
-        **kwargs
+        **kwargs,
     }
 
     with log_operation(logger, "bayesian_inference", level=level, **context) as ctx:
@@ -194,7 +186,7 @@ def log_transform(
     transform: str,
     input_shape: tuple[int, ...] | None = None,
     level: int = logging.INFO,
-    **kwargs
+    **kwargs,
 ) -> Generator[dict[str, Any], None, None]:
     """Context manager for transform operations.
 
@@ -216,10 +208,7 @@ def log_transform(
         ...     ctx["output_shape"] = result.shape
         ...     ctx["shift_factors"] = len(shift_factors)
     """
-    context = {
-        "transform": transform,
-        **kwargs
-    }
+    context = {"transform": transform, **kwargs}
     if input_shape is not None:
         context["input_shape"] = input_shape
 
@@ -233,7 +222,7 @@ def log_io(
     operation: str,
     filepath: str | None = None,
     level: int = logging.INFO,
-    **kwargs
+    **kwargs,
 ) -> Generator[dict[str, Any], None, None]:
     """Context manager for I/O operations.
 
@@ -255,10 +244,7 @@ def log_io(
         ...     ctx["records"] = len(data)
         ...     ctx["columns"] = list(data.columns)
     """
-    context = {
-        "io_operation": operation,
-        **kwargs
-    }
+    context = {"io_operation": operation, **kwargs}
     if filepath is not None:
         context["filepath"] = str(filepath)
 
@@ -272,7 +258,7 @@ def log_pipeline_stage(
     stage: str,
     pipeline_id: str | None = None,
     level: int = logging.INFO,
-    **kwargs
+    **kwargs,
 ) -> Generator[dict[str, Any], None, None]:
     """Context manager for pipeline stage execution.
 
@@ -291,10 +277,7 @@ def log_pipeline_stage(
         ...     result = pipeline.fit()
         ...     ctx["model"] = result.model_name
     """
-    context = {
-        "stage": stage,
-        **kwargs
-    }
+    context = {"stage": stage, **kwargs}
     if pipeline_id is not None:
         context["pipeline_id"] = pipeline_id
 

@@ -14,7 +14,11 @@ def test_gmm_alias_normalization():
 
 
 def test_gmm_compatibility_alias():
-    data = RheoData(x=np.array([0.0, 1.0]), y=np.array([1.0, 0.5]), metadata={"test_mode": "relaxation"})
+    data = RheoData(
+        x=np.array([0.0, 1.0]),
+        y=np.array([1.0, 0.5]),
+        metadata={"test_mode": "relaxation"},
+    )
     report = ModelService().check_compatibility("GMM", data, "relaxation")
     # Should return a dict with compatibility keys even when using alias
     assert "compatible" in report
@@ -25,4 +29,3 @@ def test_bayesian_service_accepts_gmm_alias():
     assert isinstance(priors, dict)
     # The generalized_maxwell model has parameters; ensure some are returned
     assert len(priors) > 0
-

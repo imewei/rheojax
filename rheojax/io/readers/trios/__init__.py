@@ -25,11 +25,11 @@ from typing import Any
 
 from rheojax.core.data import RheoData
 from rheojax.io.readers.trios.common import (
-    ColumnMapping,
-    DataSegment,
     STEP_COLUMN_CANDIDATES,
     TRIOS_COLUMN_MAPPINGS,
     TRIOS_UNIT_CONVERSIONS,
+    ColumnMapping,
+    DataSegment,
     TRIOSFile,
     TRIOSTable,
     construct_complex_modulus,
@@ -42,11 +42,6 @@ from rheojax.io.readers.trios.common import (
     split_by_step,
 )
 
-# TXT reader (original functionality)
-from rheojax.io.readers.trios.txt import load_trios as load_trios_txt
-from rheojax.io.readers.trios.txt import load_trios_chunked
-from rheojax.io.readers.trios.txt import convert_units
-
 # CSV reader
 from rheojax.io.readers.trios.csv import load_trios_csv, parse_trios_csv
 
@@ -56,6 +51,10 @@ from rheojax.io.readers.trios.excel import load_trios_excel, parse_trios_excel
 # JSON reader
 from rheojax.io.readers.trios.json import load_trios_json
 from rheojax.io.readers.trios.schema import TRIOSExperiment
+from rheojax.io.readers.trios.txt import convert_units, load_trios_chunked
+
+# TXT reader (original functionality)
+from rheojax.io.readers.trios.txt import load_trios as load_trios_txt
 
 logger = logging.getLogger(__name__)
 

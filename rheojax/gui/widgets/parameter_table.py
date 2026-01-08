@@ -140,7 +140,9 @@ class ParameterTable(QTableWidget):
                 self.setItem(row, 3, max_item)
 
                 # Column 4: Fixed checkbox
-                checkbox_widget = self._create_checkbox_widget(param_state.fixed, param_name)
+                checkbox_widget = self._create_checkbox_widget(
+                    param_state.fixed, param_name
+                )
                 self.setCellWidget(row, 4, checkbox_widget)
 
                 # Store original value
@@ -210,7 +212,9 @@ class ParameterTable(QTableWidget):
 
                     # Reset styling
                     if param_name in self._parameter_states:
-                        self._update_row_styling(row, self._parameter_states[param_name])
+                        self._update_row_styling(
+                            row, self._parameter_states[param_name]
+                        )
         finally:
             try:
                 self.itemChanged.connect(self._on_item_changed)
@@ -273,7 +277,9 @@ class ParameterTable(QTableWidget):
                 else:
                     # In bounds - check if modified
                     if param_name in self._original_values:
-                        is_modified = abs(value - self._original_values[param_name]) > 1e-10
+                        is_modified = (
+                            abs(value - self._original_values[param_name]) > 1e-10
+                        )
                         if is_modified:
                             # Modified - bold
                             font = item.font()
@@ -307,7 +313,9 @@ class ParameterTable(QTableWidget):
 
         except ValueError:
             # Invalid number - reset to previous value without cascading signals
-            self._logger.warning("Invalid value for %s at column %s: %s", param_name, col, item.text())
+            self._logger.warning(
+                "Invalid value for %s at column %s: %s", param_name, col, item.text()
+            )
             try:
                 self.itemChanged.disconnect(self._on_item_changed)
             except (TypeError, RuntimeError):

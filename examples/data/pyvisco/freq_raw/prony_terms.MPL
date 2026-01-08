@@ -1,6 +1,6 @@
 /COM,ANSYS RELEASE Release 19.2      BUILD 19.2      UP20180808       09:26:27
 /NOP
-/COM,Internal UNITS set at file creation time = UNDF      
+/COM,Internal UNITS set at file creation time = UNDF
 TBDEL,ALL,_MATL
 MPDEL,ALL,_MATL
 TB,PRON,_MATL   ,   1,  34,SHEA

@@ -57,29 +57,38 @@ def __getattr__(name: str):
     """
     if name == "CancellationToken":
         from rheojax.gui.jobs.cancellation import CancellationToken
+
         return CancellationToken
     elif name == "CancellationError":
         from rheojax.gui.jobs.cancellation import CancellationError
+
         return CancellationError
     elif name == "WorkerPool":
         from rheojax.gui.jobs.worker_pool import WorkerPool
+
         return WorkerPool
     elif name == "FitWorker":
         from rheojax.gui.jobs.fit_worker import FitWorker
+
         return FitWorker
     elif name == "FitWorkerSignals":
         from rheojax.gui.jobs.fit_worker import FitWorkerSignals
+
         return FitWorkerSignals
     elif name == "FitResult":
         from rheojax.gui.jobs.fit_worker import FitResult
+
         return FitResult
     elif name == "BayesianWorker":
         from rheojax.gui.jobs.bayesian_worker import BayesianWorker
+
         return BayesianWorker
     elif name == "BayesianWorkerSignals":
         from rheojax.gui.jobs.bayesian_worker import BayesianWorkerSignals
+
         return BayesianWorkerSignals
     elif name == "BayesianResult":
         from rheojax.gui.jobs.bayesian_worker import BayesianResult
+
         return BayesianResult
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

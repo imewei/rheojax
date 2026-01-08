@@ -81,7 +81,7 @@ def compute_covariance_from_jacobian(
 
         # Filter near-zero singular values
         threshold = np.finfo(np.float64).eps * max(m, n) * s[0]
-        s_inv_sq = np.where(s > threshold, 1.0 / (s ** 2), 0.0)
+        s_inv_sq = np.where(s > threshold, 1.0 / (s**2), 0.0)
 
         # Compute covariance: (J.T @ J)^-1 = VT.T @ diag(1/s²) @ VT
         pcov = VT.T @ np.diag(s_inv_sq) @ VT
@@ -89,7 +89,7 @@ def compute_covariance_from_jacobian(
         # Scale by residual variance if available
         if residuals is not None:
             residuals = np.asarray(residuals, dtype=np.float64).ravel()
-            rss = np.sum(residuals ** 2)
+            rss = np.sum(residuals**2)
             n_data_actual = n_data if n_data is not None else m
             dof = n_data_actual - n  # degrees of freedom
             if dof > 0:
@@ -150,7 +150,7 @@ class OptimizationResult:
     @classmethod
     def from_nlsq(
         cls, nlsq_result: dict[str, Any], residuals: np.ndarray | None = None
-    ) -> "OptimizationResult":
+    ) -> OptimizationResult:
         """Create OptimizationResult from NLSQ result dictionary.
 
         Args:
@@ -355,7 +355,7 @@ def nlsq_optimize(
         )
 
         cost_value = getattr(scipy_result, "cost", None)
-        
+
         # Extract Jacobian and compute covariance
         jac = None
         pcov = None
@@ -393,7 +393,6 @@ def nlsq_optimize(
 
         return result
 
-
     # Create NLSQ optimizer instance and run optimization
     try:
         optimizer = nlsq.LeastSquares()
@@ -427,7 +426,6 @@ def nlsq_optimize(
 
     # Compute RSS = sum(residuals²)
     result.fun = float(jnp.sum(residuals**2))
-
 
     # Guard against false "success" with astronomically large residuals
     residuals_np = np.asarray(residuals)

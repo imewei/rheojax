@@ -15,21 +15,22 @@ from rheojax.logging.config import LogFormat
 # ANSI color codes for terminal output
 class Colors:
     """ANSI color codes for terminal output."""
+
     RESET = "\033[0m"
     BOLD = "\033[1m"
     DIM = "\033[2m"
 
     # Log level colors
-    DEBUG = "\033[36m"     # Cyan
-    INFO = "\033[32m"      # Green
-    WARNING = "\033[33m"   # Yellow
-    ERROR = "\033[31m"     # Red
+    DEBUG = "\033[36m"  # Cyan
+    INFO = "\033[32m"  # Green
+    WARNING = "\033[33m"  # Yellow
+    ERROR = "\033[31m"  # Red
     CRITICAL = "\033[35m"  # Magenta
 
     # Component colors
     TIMESTAMP = "\033[90m"  # Gray
-    LOGGER = "\033[34m"     # Blue
-    MESSAGE = "\033[0m"     # Default
+    LOGGER = "\033[34m"  # Blue
+    MESSAGE = "\033[0m"  # Default
 
 
 LEVEL_COLORS = {
@@ -74,8 +75,7 @@ class StandardFormatter(logging.Formatter):
         message = record.getMessage()
         if hasattr(record, "extra") and record.extra:
             extra_str = " | ".join(
-                f"{k}={self._format_value(v)}"
-                for k, v in record.extra.items()
+                f"{k}={self._format_value(v)}" for k, v in record.extra.items()
             )
             message = f"{message} | {extra_str}"
 
@@ -159,8 +159,7 @@ class DetailedFormatter(logging.Formatter):
         message = record.getMessage()
         if hasattr(record, "extra") and record.extra:
             extra_str = " | ".join(
-                f"{k}={self._format_value(v)}"
-                for k, v in record.extra.items()
+                f"{k}={self._format_value(v)}" for k, v in record.extra.items()
             )
             message = f"{message} | {extra_str}"
 
@@ -269,10 +268,7 @@ class ScientificFormatter(DetailedFormatter):
         return str(value)
 
 
-def get_formatter(
-    format_type: LogFormat,
-    colorize: bool = True
-) -> logging.Formatter:
+def get_formatter(format_type: LogFormat, colorize: bool = True) -> logging.Formatter:
     """Get the appropriate formatter for the given format type.
 
     Args:

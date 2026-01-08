@@ -6,8 +6,7 @@ import numpy as np
 import pytest
 
 from rheojax.core.data import RheoData
-from rheojax.gui.services.bayesian_service import BayesianService, BayesianResult
-
+from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
 
 pytestmark = [pytest.mark.smoke]
 
@@ -43,4 +42,3 @@ def test_bayesian_integration_short_with_fixture():
     diagnostics = result.diagnostics or {}
     assert diagnostics.get("divergences", 0) <= 5
     assert diagnostics.get("ess") is not None
-

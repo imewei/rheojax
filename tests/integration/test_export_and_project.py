@@ -34,7 +34,11 @@ def test_export_parameters_and_data(tmp_path: Path):
     exporter.export_parameters(result, json_path, "json")
     exporter.export_data(data, h5_path, "hdf5")
     exporter.generate_report(
-        {"model_name": "maxwell", "parameters": result.parameters, "test_mode": "relaxation"},
+        {
+            "model_name": "maxwell",
+            "parameters": result.parameters,
+            "test_mode": "relaxation",
+        },
         template="summary",
         path=pdf_report,
     )

@@ -310,7 +310,9 @@ def get_compatible_test_modes(model_name: str) -> list[TestMode]:
         modes = [TestMode.OSCILLATION, TestMode.RELAXATION]
 
         # Check for creep support
-        if hasattr(model_cls, "_fit_creep_mode") or hasattr(model_cls, "_predict_creep"):
+        if hasattr(model_cls, "_fit_creep_mode") or hasattr(
+            model_cls, "_predict_creep"
+        ):
             modes.append(TestMode.CREEP)
 
         # Check for rotation/steady shear support
@@ -358,7 +360,13 @@ def suggest_models_for_test_mode(test_mode: TestMode) -> list[str]:
     # If we found compatible models, return them
     if compatible:
         # Prioritize common models
-        priority = ["maxwell", "zener", "sgr_conventional", "herschel_bulkley", "power_law"]
+        priority = [
+            "maxwell",
+            "zener",
+            "sgr_conventional",
+            "herschel_bulkley",
+            "power_law",
+        ]
         sorted_models = sorted(
             compatible,
             key=lambda m: priority.index(m.lower()) if m.lower() in priority else 100,
@@ -374,7 +382,12 @@ def _static_recommendations() -> dict[TestMode, list[str]]:
     return {
         TestMode.RELAXATION: ["maxwell", "zener", "fractional_maxwell_gel"],
         TestMode.CREEP: ["zener", "fractional_kelvin_voigt"],
-        TestMode.OSCILLATION: ["maxwell", "zener", "sgr_conventional", "fractional_maxwell_gel"],
+        TestMode.OSCILLATION: [
+            "maxwell",
+            "zener",
+            "sgr_conventional",
+            "fractional_maxwell_gel",
+        ],
         TestMode.ROTATION: ["power_law", "herschel_bulkley", "carreau", "cross"],
         TestMode.UNKNOWN: [],
     }

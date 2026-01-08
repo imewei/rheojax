@@ -12,16 +12,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 
 import numpy as np
 import pytest
 from PIL import Image
 
+from rheojax.core.data import RheoData
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.store import FitResult
-from rheojax.core.data import RheoData
-
 
 GOLDEN_DIR = Path(__file__).parent / "golden_images"
 GOLDEN_FIT = GOLDEN_DIR / "fit_plot.png"
@@ -92,7 +92,9 @@ def _generate_fit_plot(path: Path) -> None:
         y_fit=y_fit,
         residuals=y - y_fit,
     )
-    fig = plot_service.create_fit_plot(data, fit_result, style="default", test_mode="oscillation")
+    fig = plot_service.create_fit_plot(
+        data, fit_result, style="default", test_mode="oscillation"
+    )
     fig.savefig(path, dpi=150)
     matplotlib.pyplot.close(fig)
 

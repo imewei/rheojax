@@ -23,9 +23,7 @@ class RheoJAXLogger(logging.LoggerAdapter):
     """
 
     def __init__(
-        self,
-        logger: logging.Logger,
-        extra: dict[str, Any] | None = None
+        self, logger: logging.Logger, extra: dict[str, Any] | None = None
     ) -> None:
         """Initialize the logger adapter.
 
@@ -36,9 +34,7 @@ class RheoJAXLogger(logging.LoggerAdapter):
         super().__init__(logger, extra if extra is not None else {})
 
     def process(
-        self,
-        msg: str,
-        kwargs: MutableMapping[str, Any]
+        self, msg: str, kwargs: MutableMapping[str, Any]
     ) -> tuple[str, MutableMapping[str, Any]]:
         """Process the log message and kwargs.
 

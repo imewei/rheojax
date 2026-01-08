@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 
@@ -62,7 +61,9 @@ class TRIOSDataSet:
         if not self.columns or not self.values:
             return pd.DataFrame()
 
-        column_names = [col.get("name", f"col_{i}") for i, col in enumerate(self.columns)]
+        column_names = [
+            col.get("name", f"col_{i}") for i, col in enumerate(self.columns)
+        ]
 
         df = pd.DataFrame(self.values, columns=column_names)
 

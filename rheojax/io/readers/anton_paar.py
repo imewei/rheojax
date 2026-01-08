@@ -394,7 +394,9 @@ def _parse_single_interval(
         r"Interval and data points:\s*(\d+)(?:\s+(\d+))?", interval_lines[0]
     )
     interval_idx = int(header_match.group(1)) if header_match else 1
-    n_points = int(header_match.group(2)) if header_match and header_match.group(2) else None
+    n_points = (
+        int(header_match.group(2)) if header_match and header_match.group(2) else None
+    )
 
     # Find "Interval data:" line with column headers
     data_start_idx = None
@@ -411,13 +413,16 @@ def _parse_single_interval(
             break
 
     if data_start_idx is None or not column_headers:
-        raise ValueError(f"Could not find 'Interval data:' header in interval {interval_idx}")
+        raise ValueError(
+            f"Could not find 'Interval data:' header in interval {interval_idx}"
+        )
 
     # Check for units line (starts with tab and contains [unit])
     if data_start_idx < len(interval_lines):
         potential_units_line = interval_lines[data_start_idx]
         if potential_units_line.strip().startswith("[") or (
-            "\t[" in potential_units_line and not potential_units_line.strip()[0].isdigit()
+            "\t[" in potential_units_line
+            and not potential_units_line.strip()[0].isdigit()
         ):
             # Parse units - skip empty first part if line starts with tab
             unit_parts = potential_units_line.split("\t")
@@ -895,7 +900,10 @@ def _extract_auxiliary_columns(
 
 
 def _interval_to_rheodata_creep(
-    block: IntervalBlock, global_meta: dict[str, Any], mapped_df: pd.DataFrame, mapped_units: dict[str, str]
+    block: IntervalBlock,
+    global_meta: dict[str, Any],
+    mapped_df: pd.DataFrame,
+    mapped_units: dict[str, str],
 ) -> RheoData:
     """Convert interval block to RheoData for creep test.
 
@@ -912,7 +920,11 @@ def _interval_to_rheodata_creep(
     mapped_df = _compute_compliance(mapped_df)
 
     # Extract x (time) and y (compliance)
-    x = mapped_df["time"].values if "time" in mapped_df.columns else np.arange(len(mapped_df))
+    x = (
+        mapped_df["time"].values
+        if "time" in mapped_df.columns
+        else np.arange(len(mapped_df))
+    )
 
     # Prefer compliance over raw strain
     if "compliance" in mapped_df.columns:
@@ -949,7 +961,10 @@ def _interval_to_rheodata_creep(
 
 
 def _interval_to_rheodata_relaxation(
-    block: IntervalBlock, global_meta: dict[str, Any], mapped_df: pd.DataFrame, mapped_units: dict[str, str]
+    block: IntervalBlock,
+    global_meta: dict[str, Any],
+    mapped_df: pd.DataFrame,
+    mapped_units: dict[str, str],
 ) -> RheoData:
     """Convert interval block to RheoData for relaxation test.
 
@@ -966,7 +981,11 @@ def _interval_to_rheodata_relaxation(
     mapped_df = _compute_relaxation_modulus(mapped_df)
 
     # Extract x (time) and y (G(t))
-    x = mapped_df["time"].values if "time" in mapped_df.columns else np.arange(len(mapped_df))
+    x = (
+        mapped_df["time"].values
+        if "time" in mapped_df.columns
+        else np.arange(len(mapped_df))
+    )
 
     # Prefer relaxation_modulus, then shear_stress, fallback to first y-like column
     if "relaxation_modulus" in mapped_df.columns:
@@ -1012,7 +1031,10 @@ def _interval_to_rheodata_relaxation(
 
 
 def _interval_to_rheodata_oscillation(
-    block: IntervalBlock, global_meta: dict[str, Any], mapped_df: pd.DataFrame, mapped_units: dict[str, str]
+    block: IntervalBlock,
+    global_meta: dict[str, Any],
+    mapped_df: pd.DataFrame,
+    mapped_units: dict[str, str],
 ) -> RheoData:
     """Convert interval block to RheoData for oscillatory test.
 
@@ -1026,7 +1048,11 @@ def _interval_to_rheodata_oscillation(
         RheoData configured for oscillatory analysis with complex G*
     """
     # Extract x (frequency)
-    x = mapped_df["angular_frequency"].values if "angular_frequency" in mapped_df.columns else np.arange(len(mapped_df))
+    x = (
+        mapped_df["angular_frequency"].values
+        if "angular_frequency" in mapped_df.columns
+        else np.arange(len(mapped_df))
+    )
 
     # Compute complex modulus G* = G' + i*G''
     g_star = _compute_complex_modulus(mapped_df)
@@ -1036,7 +1062,11 @@ def _interval_to_rheodata_oscillation(
         y = mapped_df["complex_modulus"].values
     else:
         # Fallback to storage modulus only
-        y = mapped_df["storage_modulus"].values if "storage_modulus" in mapped_df.columns else np.zeros(len(mapped_df))
+        y = (
+            mapped_df["storage_modulus"].values
+            if "storage_modulus" in mapped_df.columns
+            else np.zeros(len(mapped_df))
+        )
 
     x_units = mapped_units.get("angular_frequency", "rad/s")
     y_units = "Pa"  # Complex modulus in Pa
@@ -1066,7 +1096,10 @@ def _interval_to_rheodata_oscillation(
 
 
 def _interval_to_rheodata_rotation(
-    block: IntervalBlock, global_meta: dict[str, Any], mapped_df: pd.DataFrame, mapped_units: dict[str, str]
+    block: IntervalBlock,
+    global_meta: dict[str, Any],
+    mapped_df: pd.DataFrame,
+    mapped_units: dict[str, str],
 ) -> RheoData:
     """Convert interval block to RheoData for rotational/flow test.
 
@@ -1080,7 +1113,11 @@ def _interval_to_rheodata_rotation(
         RheoData configured for flow analysis
     """
     # Extract x (shear rate) and y (viscosity)
-    x = mapped_df["shear_rate"].values if "shear_rate" in mapped_df.columns else np.arange(len(mapped_df))
+    x = (
+        mapped_df["shear_rate"].values
+        if "shear_rate" in mapped_df.columns
+        else np.arange(len(mapped_df))
+    )
 
     if "viscosity" in mapped_df.columns:
         y = mapped_df["viscosity"].values
@@ -1161,9 +1198,7 @@ def load_anton_paar(
             index out of range
     """
     # Parse raw intervals
-    global_meta, blocks = parse_rheocompass_intervals(
-        filepath, encoding=encoding
-    )
+    global_meta, blocks = parse_rheocompass_intervals(filepath, encoding=encoding)
 
     if not blocks:
         raise ValueError("No interval blocks found in file")
@@ -1212,13 +1247,21 @@ def load_anton_paar(
 
         # Convert to RheoData using appropriate converter
         if detected_mode == "creep":
-            rheo_data = _interval_to_rheodata_creep(block, global_meta, mapped_df, mapped_units)
+            rheo_data = _interval_to_rheodata_creep(
+                block, global_meta, mapped_df, mapped_units
+            )
         elif detected_mode == "relaxation":
-            rheo_data = _interval_to_rheodata_relaxation(block, global_meta, mapped_df, mapped_units)
+            rheo_data = _interval_to_rheodata_relaxation(
+                block, global_meta, mapped_df, mapped_units
+            )
         elif detected_mode == "oscillation":
-            rheo_data = _interval_to_rheodata_oscillation(block, global_meta, mapped_df, mapped_units)
+            rheo_data = _interval_to_rheodata_oscillation(
+                block, global_meta, mapped_df, mapped_units
+            )
         elif detected_mode == "rotation":
-            rheo_data = _interval_to_rheodata_rotation(block, global_meta, mapped_df, mapped_units)
+            rheo_data = _interval_to_rheodata_rotation(
+                block, global_meta, mapped_df, mapped_units
+            )
         else:
             raise ValueError(f"Unknown test mode: {detected_mode}")
 
@@ -1349,35 +1392,45 @@ def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:
     # Add per-interval summary
     for i, rheo_data in enumerate(rheo_data_list, start=1):
         interval_idx = rheo_data.metadata.get("interval_index", i)
-        rows.append({
-            "Property": f"Interval {interval_idx} - Test Mode",
-            "Value": rheo_data.test_mode,
-            "Interval": str(interval_idx),
-        })
-        rows.append({
-            "Property": f"Interval {interval_idx} - Points",
-            "Value": str(len(rheo_data.x)),
-            "Interval": str(interval_idx),
-        })
-        rows.append({
-            "Property": f"Interval {interval_idx} - X Units",
-            "Value": rheo_data.x_units or "",
-            "Interval": str(interval_idx),
-        })
-        rows.append({
-            "Property": f"Interval {interval_idx} - Y Units",
-            "Value": rheo_data.y_units or "",
-            "Interval": str(interval_idx),
-        })
+        rows.append(
+            {
+                "Property": f"Interval {interval_idx} - Test Mode",
+                "Value": rheo_data.test_mode,
+                "Interval": str(interval_idx),
+            }
+        )
+        rows.append(
+            {
+                "Property": f"Interval {interval_idx} - Points",
+                "Value": str(len(rheo_data.x)),
+                "Interval": str(interval_idx),
+            }
+        )
+        rows.append(
+            {
+                "Property": f"Interval {interval_idx} - X Units",
+                "Value": rheo_data.x_units or "",
+                "Interval": str(interval_idx),
+            }
+        )
+        rows.append(
+            {
+                "Property": f"Interval {interval_idx} - Y Units",
+                "Value": rheo_data.y_units or "",
+                "Interval": str(interval_idx),
+            }
+        )
 
         # Add temperature if available
         temp = rheo_data.metadata.get("temperature")
         if temp:
-            rows.append({
-                "Property": f"Interval {interval_idx} - Temperature",
-                "Value": str(temp),
-                "Interval": str(interval_idx),
-            })
+            rows.append(
+                {
+                    "Property": f"Interval {interval_idx} - Temperature",
+                    "Value": str(temp),
+                    "Interval": str(interval_idx),
+                }
+            )
 
     return pd.DataFrame(rows)
 

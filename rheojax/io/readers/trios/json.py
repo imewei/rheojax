@@ -17,12 +17,10 @@ from __future__ import annotations
 
 import json
 import logging
-import warnings
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
 
 try:
     import jsonschema
@@ -34,15 +32,12 @@ except ImportError:
 from rheojax.core.data import RheoData
 from rheojax.io.readers.trios.common import (
     DataSegment,
-    TRIOS_COLUMN_MAPPINGS,
-    TRIOSFile,
-    TRIOSTable,
     construct_complex_modulus,
     convert_unit,
     detect_step_column,
     detect_test_type,
-    select_xy_columns,
     segment_to_rheodata,
+    select_xy_columns,
     split_by_step,
 )
 from rheojax.io.readers.trios.schema import TRIOSExperiment
@@ -206,9 +201,7 @@ def load_trios_json(
         >>> print(data.y_units)  # 'Pa' (relaxation modulus)
     """
     # Parse JSON file
-    experiment, base_metadata = parse_trios_json(
-        filepath, validate=validate_schema
-    )
+    experiment, base_metadata = parse_trios_json(filepath, validate=validate_schema)
 
     if experiment.n_results == 0:
         raise ValueError(f"No results found in {filepath}")

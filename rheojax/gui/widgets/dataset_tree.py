@@ -56,7 +56,9 @@ class DatasetTree(QTreeWidget):
 
         # Configure tree
         self.setHeaderLabels(["Name", "Type", "Status"])
-        self.setStyleSheet("QTreeWidget { font-size: 11pt; } QHeaderView::section { font-size: 11pt; }")
+        self.setStyleSheet(
+            "QTreeWidget { font-size: 11pt; } QHeaderView::section { font-size: 11pt; }"
+        )
         self.setColumnWidth(0, 250)
         self.setColumnWidth(1, 100)
         self.setColumnWidth(2, 80)
@@ -104,8 +106,7 @@ class DatasetTree(QTreeWidget):
 
         # Create dataset item
         dataset_item = QTreeWidgetItem(
-            self._project_item,
-            [dataset_state.name, dataset_state.test_mode, "loaded"]
+            self._project_item, [dataset_state.name, dataset_state.test_mode, "loaded"]
         )
         dataset_item.setData(0, Qt.UserRole, dataset_state.id)
         dataset_item.setExpanded(False)
@@ -167,10 +168,7 @@ class DatasetTree(QTreeWidget):
         dataset_item = self._dataset_items[dataset_id]
 
         # Create file item
-        file_item = QTreeWidgetItem(
-            dataset_item,
-            [file_path.name, "File", ""]
-        )
+        file_item = QTreeWidgetItem(dataset_item, [file_path.name, "File", ""])
         file_item.setData(0, Qt.UserRole, str(file_path))
         file_item.setForeground(0, QBrush(QColor(120, 120, 120)))
 
@@ -202,8 +200,8 @@ class DatasetTree(QTreeWidget):
             Status string
         """
         color_map = {
-            "loaded": QColor(100, 150, 255),    # Blue
-            "fitted": QColor(100, 200, 100),    # Green
+            "loaded": QColor(100, 150, 255),  # Blue
+            "fitted": QColor(100, 200, 100),  # Green
             "bayesian": QColor(150, 100, 255),  # Purple
         }
 

@@ -14,15 +14,21 @@ from typing import Any
 
 try:
     from PySide6.QtCore import QObject, QRunnable, Signal
+
     HAS_PYSIDE6 = True
 except ImportError:
     HAS_PYSIDE6 = False
+
     class QObject:  # type: ignore
         pass
+
     class QRunnable:  # type: ignore
         pass
+
     class Signal:  # type: ignore
-        def __init__(self, *args): pass
+        def __init__(self, *args):
+            pass
+
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.gui.jobs.cancellation import CancellationError, CancellationToken
@@ -228,17 +234,15 @@ class BayesianWorker(QRunnable):
                     if name in model.parameters:
                         model.parameters[name].prior = prior
                     else:
-                        logger.warning(
-                            f"Prior parameter '{name}' not found in model"
-                        )
+                        logger.warning(f"Prior parameter '{name}' not found in model")
 
             # Get test mode from data
-            test_mode = getattr(self._data, 'test_mode', None)
+            test_mode = getattr(self._data, "test_mode", None)
             if test_mode is None:
-                if hasattr(self._data, 'metadata'):
-                    test_mode = self._data.metadata.get('test_mode', 'oscillation')
+                if hasattr(self._data, "metadata"):
+                    test_mode = self._data.metadata.get("test_mode", "oscillation")
                 else:
-                    test_mode = 'oscillation'
+                    test_mode = "oscillation"
                     logger.warning(f"No test_mode found, defaulting to {test_mode}")
 
             # Create progress callback
@@ -256,7 +260,9 @@ class BayesianWorker(QRunnable):
                 samples_per_chain = self._num_warmup + self._num_samples
                 total_samples = max(self._num_chains * samples_per_chain, 1)
                 percent = min(int(iteration / total_samples * 100), 100)
-                message = f"{stage.capitalize()} chain {chain}: {iteration}/{total_samples}"
+                message = (
+                    f"{stage.capitalize()} chain {chain}: {iteration}/{total_samples}"
+                )
 
                 # Emit progress signal normalized to percent
                 self.signals.progress.emit(percent, 100, message)
@@ -295,7 +301,7 @@ class BayesianWorker(QRunnable):
             diagnostics = bayesian_result.diagnostics
 
             # Check for divergences
-            num_divergences = diagnostics.get('divergences', 0)
+            num_divergences = diagnostics.get("divergences", 0)
             if num_divergences > 0:
                 self.signals.divergence_detected.emit(num_divergences)
                 logger.warning(f"Detected {num_divergences} divergent transitions")
@@ -319,17 +325,17 @@ class BayesianWorker(QRunnable):
                 sampling_time=sampling_time,
                 timestamp=datetime.now(),
                 credible_intervals=credible_intervals,
-                inference_data=getattr(bayesian_result, 'inference_data', None),
+                inference_data=getattr(bayesian_result, "inference_data", None),
             )
 
             # Log diagnostics
             logger.info(f"Bayesian inference completed in {sampling_time:.2f}s")
             logger.info("Diagnostics:")
-            rhat_dict = diagnostics.get('r_hat') or diagnostics.get('rhat') or {}
-            ess_dict = diagnostics.get('ess', {})
+            rhat_dict = diagnostics.get("r_hat") or diagnostics.get("rhat") or {}
+            ess_dict = diagnostics.get("ess", {})
             for param_name in bayesian_result.posterior_samples.keys():
-                r_hat = rhat_dict.get(param_name, float('nan'))
-                ess = ess_dict.get(param_name, float('nan'))
+                r_hat = rhat_dict.get(param_name, float("nan"))
+                ess = ess_dict.get(param_name, float("nan"))
                 logger.info(f"  {param_name}: R-hat={r_hat:.4f}, ESS={ess:.0f}")
 
             # Emit completion signal
@@ -340,9 +346,7 @@ class BayesianWorker(QRunnable):
             self.signals.cancelled.emit()
 
         except Exception as e:
-            error_msg = (
-                f"Bayesian inference failed for {self._model_name}: {str(e)}"
-            )
+            error_msg = f"Bayesian inference failed for {self._model_name}: {str(e)}"
             logger.error(error_msg)
             logger.debug(traceback.format_exc())
 

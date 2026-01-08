@@ -55,24 +55,26 @@ class JaxUtils:
                     try:
                         stats = device.memory_stats()
                         if stats:
-                            device_info["memory_total_mb"] = (
-                                stats.get("bytes_limit", 0) / (1024 * 1024)
-                            )
-                            device_info["memory_used_mb"] = (
-                                stats.get("bytes_in_use", 0) / (1024 * 1024)
-                            )
+                            device_info["memory_total_mb"] = stats.get(
+                                "bytes_limit", 0
+                            ) / (1024 * 1024)
+                            device_info["memory_used_mb"] = stats.get(
+                                "bytes_in_use", 0
+                            ) / (1024 * 1024)
                     except Exception as exc:
                         logger.debug("GPU memory stats unavailable: %s", exc)
 
                 devices.append(device_info)
         except Exception as e:
             logger.warning(f"Failed to enumerate devices: {e}")
-            devices.append({
-                "id": 0,
-                "platform": "cpu",
-                "device_kind": "cpu",
-                "name": "CPU (default)",
-            })
+            devices.append(
+                {
+                    "id": 0,
+                    "platform": "cpu",
+                    "device_kind": "cpu",
+                    "name": "CPU (default)",
+                }
+            )
 
         return devices
 
@@ -136,6 +138,7 @@ class JaxUtils:
                 # For CPU, try to get system memory info
                 try:
                     import psutil
+
                     mem = psutil.virtual_memory()
                     result["total_mb"] = mem.total / (1024 * 1024)
                     result["used_mb"] = mem.used / (1024 * 1024)

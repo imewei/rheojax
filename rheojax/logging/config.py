@@ -20,6 +20,7 @@ from pathlib import Path
 
 class LogFormat(Enum):
     """Available log output formats."""
+
     STANDARD = "standard"
     DETAILED = "detailed"
     JSON = "json"
@@ -58,6 +59,7 @@ class LogConfig:
         include_thread: Include thread name in log output
         colorize: Enable colored console output
     """
+
     level: str = "INFO"
     format: LogFormat | str = LogFormat.STANDARD
     console: bool = True
@@ -187,7 +189,7 @@ def configure_logging(
     format: str = "standard",
     file: str | None = None,
     colorize: bool = True,
-    **kwargs
+    **kwargs,
 ) -> LogConfig:
     """Configure the RheoJAX logging system.
 
@@ -216,7 +218,7 @@ def configure_logging(
         format=LogFormat(format.lower()) if isinstance(format, str) else format,
         file=Path(file) if file else None,
         colorize=colorize,
-        **kwargs
+        **kwargs,
     )
 
     # Apply configuration to logging system
@@ -244,7 +246,11 @@ def _apply_config(config: LogConfig) -> None:
 
     # Create and add handlers
     handlers = create_handlers(config)
-    log_format = config.format if isinstance(config.format, LogFormat) else LogFormat(config.format)
+    log_format = (
+        config.format
+        if isinstance(config.format, LogFormat)
+        else LogFormat(config.format)
+    )
     for handler in handlers:
         formatter = get_formatter(log_format, colorize=config.colorize)
         handler.setFormatter(formatter)

@@ -238,7 +238,16 @@ class ColumnMapperDialog(QDialog):
         """Auto-detect column mapping based on common patterns."""
         # Common column name patterns
         x_patterns = ["freq", "frequency", "omega", "time", "t", "w", "rate", "shear"]
-        y_patterns = ["g'", "gp", "storage", "modulus", "eta", "viscosity", "stress", "g*"]
+        y_patterns = [
+            "g'",
+            "gp",
+            "storage",
+            "modulus",
+            "eta",
+            "viscosity",
+            "stress",
+            "g*",
+        ]
         y2_patterns = ["g''", "gpp", "loss"]
         temp_patterns = ["temp", "temperature"]
 

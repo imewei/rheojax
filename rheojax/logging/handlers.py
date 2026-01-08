@@ -21,11 +21,7 @@ class RheoJAXStreamHandler(logging.StreamHandler):
     buffered output for batch processing.
     """
 
-    def __init__(
-        self,
-        stream=None,
-        immediate_flush: bool = True
-    ) -> None:
+    def __init__(self, stream=None, immediate_flush: bool = True) -> None:
         """Initialize the handler.
 
         Args:
@@ -60,7 +56,7 @@ class RheoJAXRotatingFileHandler(RotatingFileHandler):
         filename: Path | str,
         max_bytes: int = 10_000_000,
         backup_count: int = 5,
-        encoding: str = "utf-8"
+        encoding: str = "utf-8",
     ) -> None:
         """Initialize the rotating file handler.
 
@@ -77,7 +73,7 @@ class RheoJAXRotatingFileHandler(RotatingFileHandler):
             filename=str(filename),
             maxBytes=max_bytes,
             backupCount=backup_count,
-            encoding=encoding
+            encoding=encoding,
         )
 
 
@@ -92,7 +88,7 @@ class RheoJAXMemoryHandler(MemoryHandler):
         self,
         capacity: int = 1000,
         flush_level: int = logging.ERROR,
-        target: logging.Handler | None = None
+        target: logging.Handler | None = None,
     ) -> None:
         """Initialize the memory handler.
 
@@ -101,11 +97,7 @@ class RheoJAXMemoryHandler(MemoryHandler):
             flush_level: Level that triggers immediate flush.
             target: Target handler to flush to.
         """
-        super().__init__(
-            capacity=capacity,
-            flushLevel=flush_level,
-            target=target
-        )
+        super().__init__(capacity=capacity, flushLevel=flush_level, target=target)
 
     def shouldFlush(self, record: logging.LogRecord) -> bool:
         """Check if buffer should be flushed.
@@ -116,10 +108,7 @@ class RheoJAXMemoryHandler(MemoryHandler):
         Returns:
             True if buffer should be flushed.
         """
-        return (
-            len(self.buffer) >= self.capacity
-            or record.levelno >= self.flushLevel
-        )
+        return len(self.buffer) >= self.capacity or record.levelno >= self.flushLevel
 
 
 class NullHandler(logging.NullHandler):
@@ -127,6 +116,7 @@ class NullHandler(logging.NullHandler):
 
     Useful for library mode where the user hasn't configured logging.
     """
+
     pass
 
 
@@ -143,10 +133,7 @@ def create_handlers(config: "LogConfig") -> list[logging.Handler]:
 
     # Console handler
     if config.console:
-        console_handler = RheoJAXStreamHandler(
-            stream=sys.stderr,
-            immediate_flush=True
-        )
+        console_handler = RheoJAXStreamHandler(stream=sys.stderr, immediate_flush=True)
         handlers.append(console_handler)
 
     # File handler
@@ -154,7 +141,7 @@ def create_handlers(config: "LogConfig") -> list[logging.Handler]:
         file_handler = RheoJAXRotatingFileHandler(
             filename=config.file,
             max_bytes=config.file_max_bytes,
-            backup_count=config.file_backup_count
+            backup_count=config.file_backup_count,
         )
         handlers.append(file_handler)
 

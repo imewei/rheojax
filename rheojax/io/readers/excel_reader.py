@@ -132,7 +132,10 @@ def load_excel(
         )
 
     # Validate intended_transform if provided
-    if intended_transform is not None and intended_transform.lower() not in VALID_TRANSFORMS:
+    if (
+        intended_transform is not None
+        and intended_transform.lower() not in VALID_TRANSFORMS
+    ):
         raise ValueError(
             f"Invalid intended_transform '{intended_transform}'. "
             f"Valid options: {sorted(VALID_TRANSFORMS)}"
@@ -153,7 +156,9 @@ def load_excel(
 
     # Read Excel file
     try:
-        df = pd.read_excel(filepath, sheet_name=sheet, header=header, usecols=usecols, **kwargs)
+        df = pd.read_excel(
+            filepath, sheet_name=sheet, header=header, usecols=usecols, **kwargs
+        )
     except Exception as e:
         raise ValueError(f"Failed to parse Excel file: {e}") from e
 

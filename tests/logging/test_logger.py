@@ -62,10 +62,7 @@ class TestRheoJAXLogger:
         base_logger = logging.getLogger("test.logger")
         logger = RheoJAXLogger(base_logger)
 
-        msg, kwargs = logger.process(
-            "Test message",
-            {"R2": 0.998, "iterations": 100}
-        )
+        msg, kwargs = logger.process("Test message", {"R2": 0.998, "iterations": 100})
 
         assert msg == "Test message"
         assert "extra" in kwargs

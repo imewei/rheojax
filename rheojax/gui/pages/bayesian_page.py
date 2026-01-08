@@ -7,10 +7,11 @@ Bayesian inference interface with prior specification and MCMC monitoring.
 
 import json
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-import uuid
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -38,15 +39,20 @@ from PySide6.QtWidgets import (
 
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
+from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
+from rheojax.gui.services.data_service import DataService
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.services.plot_service import PlotService
-from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
-from rheojax.gui.state.actions import bayesian_failed, start_bayesian, store_bayesian_result, update_bayesian_progress
+from rheojax.gui.state.actions import (
+    bayesian_failed,
+    start_bayesian,
+    store_bayesian_result,
+    update_bayesian_progress,
+)
 from rheojax.gui.state.store import BayesianResult as StoredBayesianResult
 from rheojax.gui.state.store import StateStore
-from rheojax.gui.widgets.plot_canvas import PlotCanvas
-from rheojax.gui.services.data_service import DataService
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
+from rheojax.gui.widgets.plot_canvas import PlotCanvas
 
 
 class BayesianPage(QWidget):
@@ -171,15 +177,19 @@ class BayesianPage(QWidget):
         preset_label = QLabel("Sampler Preset:")
         layout.addWidget(preset_label)
         self._preset_combo = QComboBox()
-        self._preset_combo.addItems([
-            "Custom",
-            "Bayesian Demo (chains=4, 1000/2000)",
-            "GMM Quick (chains=1, 500/1000)",
-            "SPP LAOS (chains=4, 1000/2000)",
-            "SPP Dense (chains=4, 2000/2000)",
-        ])
+        self._preset_combo.addItems(
+            [
+                "Custom",
+                "Bayesian Demo (chains=4, 1000/2000)",
+                "GMM Quick (chains=1, 500/1000)",
+                "SPP LAOS (chains=4, 1000/2000)",
+                "SPP Dense (chains=4, 2000/2000)",
+            ]
+        )
         self._preset_combo.currentTextChanged.connect(self._apply_preset)
-        self._preset_combo.setToolTip("Quickly apply sampler settings and suggested priors")
+        self._preset_combo.setToolTip(
+            "Quickly apply sampler settings and suggested priors"
+        )
         layout.addWidget(self._preset_combo)
 
         # Warm start
@@ -200,7 +210,8 @@ class BayesianPage(QWidget):
 
         # Run button
         self._btn_run = QPushButton("Run Bayesian Inference")
-        self._btn_run.setStyleSheet("""
+        self._btn_run.setStyleSheet(
+            """
             QPushButton {
                 background-color: #9C27B0;
                 color: white;
@@ -214,7 +225,8 @@ class BayesianPage(QWidget):
             QPushButton:disabled {
                 background-color: #BDBDBD;
             }
-        """)
+        """
+        )
         self._btn_run.clicked.connect(self._on_run_clicked)
         layout.addWidget(self._btn_run)
 
@@ -357,9 +369,7 @@ class BayesianPage(QWidget):
             return
 
         if not dataset:
-            QMessageBox.warning(
-                self, "No Data", "Please load a dataset first."
-            )
+            QMessageBox.warning(self, "No Data", "Please load a dataset first.")
             return
 
         # Get configuration
@@ -452,13 +462,15 @@ class BayesianPage(QWidget):
 
         self.run_requested.emit(model_name, dataset.id, config)
 
-    def _select_warm_start_params(self, model_name: str, dataset_id: str) -> dict[str, float] | None:
+    def _select_warm_start_params(
+        self, model_name: str, dataset_id: str
+    ) -> dict[str, float] | None:
         """Pick warm-start parameters that match the current model/dataset."""
         state = self._store.get_state()
         key = f"{model_name}_{dataset_id}"
         fit_result = state.fit_results.get(key)
         if fit_result and hasattr(fit_result, "parameters"):
-            return dict(getattr(fit_result, "parameters"))
+            return dict(fit_result.parameters)
         return None
 
     def _on_cancel_clicked(self) -> None:
@@ -561,19 +573,37 @@ class BayesianPage(QWidget):
                     summary=getattr(result, "summary", None),
                     r_hat=diagnostics.get("r_hat", {}) or getattr(result, "r_hat", {}),
                     ess=diagnostics.get("ess", {}) or getattr(result, "ess", {}),
-                    divergences=int(diagnostics.get("divergences", getattr(result, "divergences", 0)) or 0),
+                    divergences=int(
+                        diagnostics.get(
+                            "divergences", getattr(result, "divergences", 0)
+                        )
+                        or 0
+                    ),
                     credible_intervals=getattr(result, "credible_intervals", {}) or {},
-                    mcmc_time=float(getattr(result, "sampling_time", getattr(result, "mcmc_time", 0.0)) or 0.0),
+                    mcmc_time=float(
+                        getattr(
+                            result, "sampling_time", getattr(result, "mcmc_time", 0.0)
+                        )
+                        or 0.0
+                    ),
                     timestamp=getattr(result, "timestamp", datetime.now()),
-                    num_warmup=int(getattr(result, "num_warmup", self._warmup_spin.value()) or 0),
-                    num_samples=int(getattr(result, "num_samples", self._samples_spin.value()) or 0),
+                    num_warmup=int(
+                        getattr(result, "num_warmup", self._warmup_spin.value()) or 0
+                    ),
+                    num_samples=int(
+                        getattr(result, "num_samples", self._samples_spin.value()) or 0
+                    ),
                     inference_data=getattr(result, "inference_data", None),
                 )
                 store_bayesian_result(stored_result)
-                self._store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"})
+                self._store.dispatch(
+                    "SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"}
+                )
             else:
                 # Fall back to updating pipeline status only.
-                self._store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"})
+                self._store.dispatch(
+                    "SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"}
+                )
 
             # Update diagnostics display
             self._update_diagnostics(result)
@@ -670,7 +700,9 @@ class BayesianPage(QWidget):
         if divergences > 0:
             self._divergence_label.setText(f"Divergences: {divergences}")
             self._divergence_label.setStyleSheet("color: #F44336; font-weight: bold;")
-            self._diag_warning.setText("Warning: Divergences detected; consider higher target_accept")
+            self._diag_warning.setText(
+                "Warning: Divergences detected; consider higher target_accept"
+            )
         else:
             self._divergence_label.setText("Divergences: 0")
             self._divergence_label.setStyleSheet("color: green; font-weight: bold;")
@@ -709,7 +741,9 @@ class BayesianPage(QWidget):
                 values = {"mean": mean, "lower": lower, "upper": upper}
 
             # Mean
-            mean = float(values.get("mean", summary.get(param_name, {}).get("mean", 0.0)))
+            mean = float(
+                values.get("mean", summary.get(param_name, {}).get("mean", 0.0))
+            )
             mean_item = QTableWidgetItem(f"{mean:.4g}")
             mean_item.setFlags(mean_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._intervals_table.setItem(row, 1, mean_item)
@@ -742,7 +776,9 @@ class BayesianPage(QWidget):
             },
         )
 
-    def _posterior_mean_params(self, posterior_samples: dict[str, Any]) -> dict[str, float]:
+    def _posterior_mean_params(
+        self, posterior_samples: dict[str, Any]
+    ) -> dict[str, float]:
         """Compute a representative parameter set from posterior samples."""
         means: dict[str, float] = {}
         for name, samples in (posterior_samples or {}).items():
@@ -755,7 +791,9 @@ class BayesianPage(QWidget):
                 continue
         return means
 
-    def _infer_model_kwargs(self, model_name: str, param_names: list[str]) -> dict[str, Any]:
+    def _infer_model_kwargs(
+        self, model_name: str, param_names: list[str]
+    ) -> dict[str, Any]:
         """Infer model initialization kwargs from parameter names.
 
         For models like GeneralizedMaxwell that require n_modes during init,
@@ -848,7 +886,10 @@ class BayesianPage(QWidget):
             logger.debug("plot_update skipped: no active dataset")
             return
 
-        model_name = getattr(result, "model_name", None) or self._store.get_state().active_model_name
+        model_name = (
+            getattr(result, "model_name", None)
+            or self._store.get_state().active_model_name
+        )
         if not model_name:
             logger.debug("plot_update skipped: no model name")
             return
@@ -879,7 +920,9 @@ class BayesianPage(QWidget):
             return
 
         # Infer model kwargs from parameter names (e.g., n_modes for GeneralizedMaxwell)
-        model_kwargs = self._infer_model_kwargs(model_name, list(posterior_samples.keys()))
+        model_kwargs = self._infer_model_kwargs(
+            model_name, list(posterior_samples.keys())
+        )
 
         y_draws: list[np.ndarray] = []
         for idx in draw_indices:
@@ -888,7 +931,11 @@ class BayesianPage(QWidget):
                 continue
             try:
                 y_pred = self._model_service.predict(
-                    model_name, params, x, test_mode=test_mode, model_kwargs=model_kwargs
+                    model_name,
+                    params,
+                    x,
+                    test_mode=test_mode,
+                    model_kwargs=model_kwargs,
                 )
                 y_pred_arr = np.asarray(y_pred)
                 if y_pred_arr.shape == x.shape:
@@ -959,8 +1006,12 @@ class BayesianPage(QWidget):
 
             if is_oscillation and is_complex:
                 lines = {line.get_label(): line for line in ax.get_lines()}
-                gprime_color = lines.get("G' (fit)").get_color() if "G' (fit)" in lines else None
-                gdouble_color = lines.get('G" (fit)').get_color() if 'G" (fit)' in lines else None
+                gprime_color = (
+                    lines.get("G' (fit)").get_color() if "G' (fit)" in lines else None
+                )
+                gdouble_color = (
+                    lines.get('G" (fit)').get_color() if 'G" (fit)' in lines else None
+                )
 
                 lower_re = np.asarray(y_lower_re)
                 upper_re = np.asarray(y_upper_re)
@@ -988,7 +1039,7 @@ class BayesianPage(QWidget):
                     upper_im,
                     alpha=0.18,
                     color=gdouble_color,
-                    label=f"G\" {pct}% CI",
+                    label=f'G" {pct}% CI',
                 )
             else:
                 line_color = None
@@ -1068,9 +1119,21 @@ class BayesianPage(QWidget):
                 else "examples/data/experimental/owchirp_tts.txt"
             )
             self._preset_priors = {
-                "G_cage": {"dist": "lognormal", "loc": float(np.log(5000)), "scale": 1.0},
-                "sigma_y_static": {"dist": "lognormal", "loc": float(np.log(500)), "scale": 1.0},
-                "sigma_y_dynamic": {"dist": "lognormal", "loc": float(np.log(500)), "scale": 1.0},
+                "G_cage": {
+                    "dist": "lognormal",
+                    "loc": float(np.log(5000)),
+                    "scale": 1.0,
+                },
+                "sigma_y_static": {
+                    "dist": "lognormal",
+                    "loc": float(np.log(500)),
+                    "scale": 1.0,
+                },
+                "sigma_y_dynamic": {
+                    "dist": "lognormal",
+                    "loc": float(np.log(500)),
+                    "scale": 1.0,
+                },
                 "sigma_G": {"dist": "halfnormal", "scale": 500.0},
                 "sigma_static": {"dist": "halfnormal", "scale": 100.0},
                 "sigma_dynamic": {"dist": "halfnormal", "scale": 100.0},
@@ -1089,9 +1152,21 @@ class BayesianPage(QWidget):
                 else "examples/data/experimental/owchirp_tts.txt"
             )
             self._preset_priors = {
-                "G_cage": {"dist": "lognormal", "loc": float(np.log(5000)), "scale": 1.0},
-                "sigma_y_static": {"dist": "lognormal", "loc": float(np.log(500)), "scale": 1.0},
-                "sigma_y_dynamic": {"dist": "lognormal", "loc": float(np.log(500)), "scale": 1.0},
+                "G_cage": {
+                    "dist": "lognormal",
+                    "loc": float(np.log(5000)),
+                    "scale": 1.0,
+                },
+                "sigma_y_static": {
+                    "dist": "lognormal",
+                    "loc": float(np.log(500)),
+                    "scale": 1.0,
+                },
+                "sigma_y_dynamic": {
+                    "dist": "lognormal",
+                    "loc": float(np.log(500)),
+                    "scale": 1.0,
+                },
                 "sigma_G": {"dist": "halfnormal", "scale": 500.0},
                 "sigma_static": {"dist": "halfnormal", "scale": 100.0},
                 "sigma_dynamic": {"dist": "halfnormal", "scale": 100.0},
@@ -1153,9 +1228,7 @@ class BayesianPage(QWidget):
                     f"Results would be exported to: {filepath}",
                 )
         except Exception as e:
-            QMessageBox.critical(
-                self, "Export Error", f"Failed to export results: {e}"
-            )
+            QMessageBox.critical(self, "Export Error", f"Failed to export results: {e}")
 
     def run_bayesian(
         self,

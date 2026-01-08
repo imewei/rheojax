@@ -33,7 +33,6 @@ For Qt icons:
 
 import sys
 from enum import Enum, auto
-from typing import Optional
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QStyle
@@ -211,14 +210,14 @@ class IconProvider:
 
     # Emoji icons - UNSAFE on macOS, use only when emoji_safe() returns True
     CATEGORY_ICONS_EMOJI: dict[str, str] = {
-        "classical": "\U0001F535",  # Blue circle
-        "fractional_maxwell": "\U0001F7E3",  # Purple circle
-        "fractional_zener": "\U0001F7E0",  # Orange circle
-        "fractional_advanced": "\U0001F7E1",  # Yellow circle
-        "flow": "\U0001F7E2",  # Green circle
-        "multi_mode": "\U0001F7E4",  # Brown circle
-        "sgr": "\U0001F534",  # Red circle
-        "other": "\U000026AA",  # White circle
+        "classical": "\U0001f535",  # Blue circle
+        "fractional_maxwell": "\U0001f7e3",  # Purple circle
+        "fractional_zener": "\U0001f7e0",  # Orange circle
+        "fractional_advanced": "\U0001f7e1",  # Yellow circle
+        "flow": "\U0001f7e2",  # Green circle
+        "multi_mode": "\U0001f7e4",  # Brown circle
+        "sgr": "\U0001f534",  # Red circle
+        "other": "\U000026aa",  # White circle
     }
 
     # Status icons - ASCII
@@ -234,13 +233,13 @@ class IconProvider:
 
     # Status icons - Emoji (UNSAFE on macOS)
     STATUS_ICONS_EMOJI: dict[str, str] = {
-        "pending": "\U000023F3",  # Hourglass
-        "running": "\U0001F504",  # Arrows
+        "pending": "\U000023f3",  # Hourglass
+        "running": "\U0001f504",  # Arrows
         "complete": "\U00002705",  # Check mark
         "success": "\U00002705",  # Check mark
-        "warning": "\U000026A0\U0000FE0F",  # Warning
-        "error": "\U0000274C",  # Cross mark
-        "info": "\U00002139\U0000FE0F",  # Info
+        "warning": "\U000026a0\U0000fe0f",  # Warning
+        "error": "\U0000274c",  # Cross mark
+        "info": "\U00002139\U0000fe0f",  # Info
     }
 
     # File type icons - ASCII
@@ -257,14 +256,14 @@ class IconProvider:
 
     # File type icons - Emoji (UNSAFE on macOS)
     FILE_ICONS_EMOJI: dict[str, str] = {
-        "csv": "\U0001F4C4",  # Page
-        "excel": "\U0001F4CA",  # Chart
-        "hdf5": "\U0001F4BE",  # Floppy
-        "json": "\U0001F4DD",  # Memo
-        "folder": "\U0001F4C1",  # Folder
-        "file": "\U0001F4C4",  # Page
-        "image": "\U0001F5BC\U0000FE0F",  # Frame
-        "data": "\U0001F4C8",  # Chart
+        "csv": "\U0001f4c4",  # Page
+        "excel": "\U0001f4ca",  # Chart
+        "hdf5": "\U0001f4be",  # Floppy
+        "json": "\U0001f4dd",  # Memo
+        "folder": "\U0001f4c1",  # Folder
+        "file": "\U0001f4c4",  # Page
+        "image": "\U0001f5bc\U0000fe0f",  # Frame
+        "data": "\U0001f4c8",  # Chart
     }
 
     def __init__(self, allow_emoji: bool = False) -> None:
@@ -384,7 +383,7 @@ class IconProvider:
 
 
 # Module-level singleton for convenience
-_default_provider: Optional[IconProvider] = None
+_default_provider: IconProvider | None = None
 
 
 def get_icon_provider(allow_emoji: bool = False) -> IconProvider:

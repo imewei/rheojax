@@ -134,6 +134,7 @@ class BayesianResult:
             Requires arviz package: pip install arviz
             The MCMC object must be present (automatically stored by fit_bayesian).
         """
+
         # Return cached version if available
         def _ensure_energy(idata):
             """Guarantee energy diagnostic exists for ArviZ energy plots."""

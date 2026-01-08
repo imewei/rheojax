@@ -37,6 +37,7 @@ warnings.filterwarnings("ignore", message=".*constrained_layout.*collapsed.*")
 from rheojax import __version__
 from rheojax.gui.utils.logging import install_gui_log_handler
 
+
 def setup_logging(verbose: bool = False) -> None:
     """Configure application logging.
 
@@ -298,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     app.setOrganizationDomain("github.com/imewei/rheojax")
 
     # Apply stylesheet from resources
-    from rheojax.gui.resources import load_stylesheet, get_icon_path
+    from rheojax.gui.resources import get_icon_path, load_stylesheet
 
     app.setStyle("Fusion")
 
@@ -311,13 +312,15 @@ def main(argv: list[str] | None = None) -> int:
     # Bump all fonts by +2pt for better readability.
     base_font_size = _adaptive_font_size(app) + 2.0
     base_font = QFont()
-    base_font.setFamilies([
-        "Segoe UI",
-        "Helvetica Neue",
-        "Helvetica",
-        "Arial",
-        "DejaVu Sans",
-    ])
+    base_font.setFamilies(
+        [
+            "Segoe UI",
+            "Helvetica Neue",
+            "Helvetica",
+            "Arial",
+            "DejaVu Sans",
+        ]
+    )
     base_font.setPointSizeF(base_font_size)
     app.setFont(base_font)
 
@@ -348,7 +351,9 @@ def main(argv: list[str] | None = None) -> int:
             level=logging.DEBUG if args.verbose else logging.INFO,
         )
         logger.debug("GUI log handler attached")
-        window.destroyed.connect(lambda *_: logging.getLogger().removeHandler(gui_handler))
+        window.destroyed.connect(
+            lambda *_: logging.getLogger().removeHandler(gui_handler)
+        )
         app.setWindowIcon(QIcon(str(get_icon_path("rheojax"))))
 
         _show_main_window(window, args.maximized)
@@ -391,7 +396,9 @@ def main(argv: list[str] | None = None) -> int:
                             "metadata": {"test_mode": "relaxation", "domain": "time"},
                         },
                     )
-                    window.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
+                    window.store.dispatch(
+                        "SET_ACTIVE_DATASET", {"dataset_id": dataset_id}
+                    )
                     model = "maxwell"
                     window.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model})
                     window.navigate_to("fit")

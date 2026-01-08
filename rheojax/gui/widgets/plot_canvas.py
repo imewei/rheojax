@@ -5,7 +5,6 @@ Plot Canvas Widget
 Matplotlib canvas with interactive controls.
 """
 
-
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
@@ -60,10 +59,10 @@ class PlotCanvas(QWidget):
         self._plot_data: list[tuple[np.ndarray, np.ndarray, str]] = []
 
         # Connect mouse events
-        self.canvas.mpl_connect('scroll_event', self._on_scroll)
-        self.canvas.mpl_connect('motion_notify_event', self._on_mouse_move)
-        self.canvas.mpl_connect('button_press_event', self._on_mouse_press)
-        self.canvas.mpl_connect('button_release_event', self._on_mouse_release)
+        self.canvas.mpl_connect("scroll_event", self._on_scroll)
+        self.canvas.mpl_connect("motion_notify_event", self._on_mouse_move)
+        self.canvas.mpl_connect("button_press_event", self._on_mouse_press)
+        self.canvas.mpl_connect("button_release_event", self._on_mouse_release)
 
         # Pan state
         self._panning = False
@@ -86,7 +85,7 @@ class PlotCanvas(QWidget):
         y: np.ndarray,
         label: str = "",
         color: str | None = None,
-        marker: str = "o"
+        marker: str = "o",
     ) -> None:
         """Plot data points.
 
@@ -104,13 +103,14 @@ class PlotCanvas(QWidget):
             Marker style (default: 'o')
         """
         self.axes.plot(
-            x, y,
+            x,
+            y,
             marker=marker,
-            linestyle='',
+            linestyle="",
             label=label,
             color=color,
             markersize=6,
-            alpha=0.7
+            alpha=0.7,
         )
 
         # Store data for tooltips
@@ -124,7 +124,7 @@ class PlotCanvas(QWidget):
         y: np.ndarray,
         label: str = "",
         color: str | None = None,
-        linestyle: str = "-"
+        linestyle: str = "-",
     ) -> None:
         """Plot fitted curve.
 
@@ -142,12 +142,7 @@ class PlotCanvas(QWidget):
             Line style (default: '-')
         """
         self.axes.plot(
-            x, y,
-            linestyle=linestyle,
-            label=label,
-            color=color,
-            linewidth=2,
-            alpha=0.9
+            x, y, linestyle=linestyle, label=label, color=color, linewidth=2, alpha=0.9
         )
 
         self.canvas.draw_idle()
@@ -158,7 +153,7 @@ class PlotCanvas(QWidget):
         y_lower: np.ndarray,
         y_upper: np.ndarray,
         color: str | None = None,
-        alpha: float = 0.3
+        alpha: float = 0.3,
     ) -> None:
         """Plot confidence band.
 
@@ -176,12 +171,7 @@ class PlotCanvas(QWidget):
             Transparency (default: 0.3)
         """
         self.axes.fill_between(
-            x,
-            y_lower,
-            y_upper,
-            color=color,
-            alpha=alpha,
-            linewidth=0
+            x, y_lower, y_upper, color=color, alpha=alpha, linewidth=0
         )
 
         self.canvas.draw_idle()
@@ -193,12 +183,7 @@ class PlotCanvas(QWidget):
         self._annotation = None
         self.canvas.draw_idle()
 
-    def set_labels(
-        self,
-        xlabel: str = "",
-        ylabel: str = "",
-        title: str = ""
-    ) -> None:
+    def set_labels(self, xlabel: str = "", ylabel: str = "", title: str = "") -> None:
         """Set axis labels and title.
 
         Parameters
@@ -215,7 +200,7 @@ class PlotCanvas(QWidget):
         if ylabel:
             self.axes.set_ylabel(ylabel, fontsize=11)
         if title:
-            self.axes.set_title(title, fontsize=12, fontweight='bold')
+            self.axes.set_title(title, fontsize=12, fontweight="bold")
 
         self.canvas.draw_idle()
 
@@ -237,20 +222,10 @@ class PlotCanvas(QWidget):
         """Add legend to plot."""
         handles, labels = self.axes.get_legend_handles_labels()
         if handles:
-            self.axes.legend(
-                loc='best',
-                frameon=True,
-                framealpha=0.9,
-                fontsize=9
-            )
+            self.axes.legend(loc="best", frameon=True, framealpha=0.9, fontsize=9)
         self.canvas.draw_idle()
 
-    def save_figure(
-        self,
-        path: str,
-        dpi: int = 300,
-        format: str | None = None
-    ) -> None:
+    def save_figure(self, path: str, dpi: int = 300, format: str | None = None) -> None:
         """Save figure to file.
 
         Parameters
@@ -262,12 +237,7 @@ class PlotCanvas(QWidget):
         format : str, optional
             File format (inferred from path if not specified)
         """
-        self.figure.savefig(
-            path,
-            dpi=dpi,
-            format=format,
-            bbox_inches='tight'
-        )
+        self.figure.savefig(path, dpi=dpi, format=format, bbox_inches="tight")
 
     def _on_scroll(self, event) -> None:
         """Handle mouse wheel zoom (log-scale aware)."""
@@ -275,7 +245,7 @@ class PlotCanvas(QWidget):
             return
 
         # Zoom factor
-        zoom_factor = 1.2 if event.button == 'up' else 1 / 1.2
+        zoom_factor = 1.2 if event.button == "up" else 1 / 1.2
 
         # Get current limits
         xlim = self.axes.get_xlim()
@@ -286,34 +256,34 @@ class PlotCanvas(QWidget):
         ydata = event.ydata
 
         # Calculate new limits based on scale type
-        if self.axes.get_xscale() == 'log':
+        if self.axes.get_xscale() == "log":
             # Log scale: zoom in log space
             log_xlim = np.log10(xlim)
             log_xdata = np.log10(xdata)
             new_log_xlim = [
                 log_xdata - (log_xdata - log_xlim[0]) / zoom_factor,
-                log_xdata + (log_xlim[1] - log_xdata) / zoom_factor
+                log_xdata + (log_xlim[1] - log_xdata) / zoom_factor,
             ]
             new_xlim = 10 ** np.array(new_log_xlim)
         else:
             # Linear scale
             new_xlim = [
                 xdata - (xdata - xlim[0]) / zoom_factor,
-                xdata + (xlim[1] - xdata) / zoom_factor
+                xdata + (xlim[1] - xdata) / zoom_factor,
             ]
 
-        if self.axes.get_yscale() == 'log':
+        if self.axes.get_yscale() == "log":
             log_ylim = np.log10(ylim)
             log_ydata = np.log10(ydata)
             new_log_ylim = [
                 log_ydata - (log_ydata - log_ylim[0]) / zoom_factor,
-                log_ydata + (log_ylim[1] - log_ydata) / zoom_factor
+                log_ydata + (log_ylim[1] - log_ydata) / zoom_factor,
             ]
             new_ylim = 10 ** np.array(new_log_ylim)
         else:
             new_ylim = [
                 ydata - (ydata - ylim[0]) / zoom_factor,
-                ydata + (ylim[1] - ydata) / zoom_factor
+                ydata + (ylim[1] - ydata) / zoom_factor,
             ]
 
         self.axes.set_xlim(new_xlim)
@@ -345,7 +315,7 @@ class PlotCanvas(QWidget):
 
         # Handle panning
         if self._panning and self._pan_start is not None:
-            if self.axes.get_xscale() == 'log':
+            if self.axes.get_xscale() == "log":
                 # Log scale panning
                 factor_x = event.xdata / self._pan_start[0]
                 xlim = self.axes.get_xlim()
@@ -355,7 +325,7 @@ class PlotCanvas(QWidget):
                 xlim = self.axes.get_xlim()
                 new_xlim = [xlim[0] - dx, xlim[1] - dx]
 
-            if self.axes.get_yscale() == 'log':
+            if self.axes.get_yscale() == "log":
                 factor_y = event.ydata / self._pan_start[1]
                 ylim = self.axes.get_ylim()
                 new_ylim = [ylim[0] / factor_y, ylim[1] / factor_y]
@@ -378,7 +348,7 @@ class PlotCanvas(QWidget):
             return
 
         # Find nearest point
-        min_dist = float('inf')
+        min_dist = float("inf")
         nearest_point = None
         nearest_label = ""
 
@@ -386,19 +356,25 @@ class PlotCanvas(QWidget):
             # Calculate distance in display coordinates
             for i in range(len(data_x)):
                 # Convert to display coordinates for distance calculation
-                if self.axes.get_xscale() == 'log':
+                if self.axes.get_xscale() == "log":
                     dx = (np.log10(x) - np.log10(data_x[i])) / (
-                        np.log10(self.axes.get_xlim()[1]) - np.log10(self.axes.get_xlim()[0])
+                        np.log10(self.axes.get_xlim()[1])
+                        - np.log10(self.axes.get_xlim()[0])
                     )
                 else:
-                    dx = (x - data_x[i]) / (self.axes.get_xlim()[1] - self.axes.get_xlim()[0])
+                    dx = (x - data_x[i]) / (
+                        self.axes.get_xlim()[1] - self.axes.get_xlim()[0]
+                    )
 
-                if self.axes.get_yscale() == 'log':
+                if self.axes.get_yscale() == "log":
                     dy = (np.log10(y) - np.log10(data_y[i])) / (
-                        np.log10(self.axes.get_ylim()[1]) - np.log10(self.axes.get_ylim()[0])
+                        np.log10(self.axes.get_ylim()[1])
+                        - np.log10(self.axes.get_ylim()[0])
                     )
                 else:
-                    dy = (y - data_y[i]) / (self.axes.get_ylim()[1] - self.axes.get_ylim()[0])
+                    dy = (y - data_y[i]) / (
+                        self.axes.get_ylim()[1] - self.axes.get_ylim()[0]
+                    )
 
                 dist = np.sqrt(dx**2 + dy**2)
 
@@ -416,11 +392,13 @@ class PlotCanvas(QWidget):
                     xytext=(10, 10),
                     textcoords="offset points",
                     bbox={"boxstyle": "round,pad=0.5", "fc": "yellow", "alpha": 0.9},
-                    arrowprops={"arrowstyle": "->", "connectionstyle": "arc3,rad=0"}
+                    arrowprops={"arrowstyle": "->", "connectionstyle": "arc3,rad=0"},
                 )
 
             self._annotation.xy = nearest_point
-            text = f"{nearest_label}\nx={nearest_point[0]:.4g}\ny={nearest_point[1]:.4g}"
+            text = (
+                f"{nearest_label}\nx={nearest_point[0]:.4g}\ny={nearest_point[1]:.4g}"
+            )
             self._annotation.set_text(text)
             self._annotation.set_visible(True)
             self.canvas.draw_idle()

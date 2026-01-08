@@ -251,11 +251,7 @@ class TestAntonPaarReader:
         """Hz frequency input is normalized to rad/s."""
 
         file = tmp_path / "ap_freq.txt"
-        file.write_text(
-            "Frequency [Hz]\tG' [Pa]\tG'' [Pa]\n"
-            "1\t10\t2\n"
-            "2\t12\t3\n"
-        )
+        file.write_text("Frequency [Hz]\tG' [Pa]\tG'' [Pa]\n" "1\t10\t2\n" "2\t12\t3\n")
 
         data = load_anton_paar(file)
 

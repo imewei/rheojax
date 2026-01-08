@@ -44,10 +44,10 @@ class SGRPBGrid(NamedTuple):
         dell: Strain spacing
     """
 
-    E_edges: "Array"
-    ell_edges: "Array"
-    E_centers: "Array"
-    ell_centers: "Array"
+    E_edges: Array
+    ell_edges: Array
+    E_centers: Array
+    ell_centers: Array
     dE: float
     dell: float
 
@@ -60,7 +60,7 @@ class SGRPBState(NamedTuple):
         time: Current simulation time (scalar)
     """
 
-    P: "Array"
+    P: Array
     time: float
 
 
@@ -159,11 +159,11 @@ def initialize_equilibrium(grid: SGRPBGrid, xg: float = 1.0) -> SGRPBState:
 
 @jax.jit
 def advection_operator(
-    P: "Array",
+    P: Array,
     gamma_dot: float,
     dt: float,
     dell: float,
-) -> "Array":
+) -> Array:
     """Advection step: ell -> ell + gamma_dot * dt.
 
     Uses first-order upwind scheme for stability.
@@ -205,13 +205,13 @@ def advection_operator(
 
 @jax.jit
 def yield_operator(
-    P: "Array",
+    P: Array,
     grid: SGRPBGrid,
     dt: float,
     x: float,
     k: float = 1.0,
     Gamma0: float = 1.0,
-) -> tuple["Array", float]:
+) -> tuple[Array, float]:
     """Yielding step: remove mass from traps according to yield rate.
 
     Parameters
@@ -261,11 +261,11 @@ def yield_operator(
 
 @jax.jit
 def renewal_operator(
-    P: "Array",
+    P: Array,
     grid: SGRPBGrid,
     M_yield: float,
     xg: float = 1.0,
-) -> "Array":
+) -> Array:
     """Renewal step: inject yielded mass at ell=0 with trap prior rho(E).
 
     Parameters
@@ -368,7 +368,7 @@ def simulate_constant_rate(
     k: float = 1.0,
     Gamma0: float = 1.0,
     xg: float = 1.0,
-) -> tuple["Array", "Array"]:
+) -> tuple[Array, Array]:
     """Simulate steady shear at constant rate using Population Balance.
 
     Parameters
@@ -416,7 +416,7 @@ def simulate_oscillatory(
     k: float = 1.0,
     Gamma0: float = 1.0,
     xg: float = 1.0,
-) -> tuple["Array", "Array", "Array"]:
+) -> tuple[Array, Array, Array]:
     """Simulate oscillatory shear using Population Balance.
 
     Parameters
@@ -458,9 +458,7 @@ def simulate_oscillatory(
         new_state, sigma = step_pb(state, grid, gamma_dot, dt, x, k, Gamma0, xg)
         return new_state, (t, gamma_t, sigma)
 
-    _, (times, strains, stresses) = jax.lax.scan(
-        scan_fn, state, jnp.arange(n_steps)
-    )
+    _, (times, strains, stresses) = jax.lax.scan(scan_fn, state, jnp.arange(n_steps))
 
     return times, strains, stresses
 

@@ -196,10 +196,7 @@ class TestConvergenceTracker:
         """Test that convergence is detected."""
         logger = mock.MagicMock(spec=logging.Logger)
         tracker = ConvergenceTracker(
-            logger,
-            tolerance=1e-3,  # Looser tolerance
-            patience=3,
-            min_iterations=5
+            logger, tolerance=1e-3, patience=3, min_iterations=5  # Looser tolerance
         )
 
         # Costs with clear convergence pattern - last 4 values are nearly identical
@@ -218,10 +215,7 @@ class TestConvergenceTracker:
         """Test that convergence requires minimum iterations."""
         logger = mock.MagicMock(spec=logging.Logger)
         tracker = ConvergenceTracker(
-            logger,
-            tolerance=1e-4,
-            patience=1,
-            min_iterations=10
+            logger, tolerance=1e-4, patience=1, min_iterations=10
         )
 
         # Same cost for 5 iterations shouldn't converge

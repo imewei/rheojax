@@ -5,9 +5,9 @@ Runs a longer SPP-like Bayesian inference on the bundled multi-technique
 fixture with notebook-like sampler settings and checks convergence + PPD hash.
 """
 
-import os
 import hashlib
 import io
+import os
 
 import arviz as az
 import matplotlib.pyplot as plt
@@ -17,11 +17,12 @@ import pytest
 from rheojax.core.data import RheoData
 from rheojax.gui.services.bayesian_service import BayesianService
 
-
 pytestmark = [pytest.mark.smoke]
 
 
-@pytest.mark.skipif(os.environ.get("RHEOJAX_FULL_PARITY") != "1", reason="full parity opt-in")
+@pytest.mark.skipif(
+    os.environ.get("RHEOJAX_FULL_PARITY") != "1", reason="full parity opt-in"
+)
 def test_bayesian_full_parity_notebook_like_relaxation():
     pytest.importorskip("jax")
 
@@ -58,7 +59,10 @@ def test_bayesian_full_parity_notebook_like_relaxation():
     assert draws_total % chains == 0
     draws_per_chain = draws_total // chains
 
-    posterior = {k: v.reshape(chains, draws_per_chain) for k, v in result.posterior_samples.items()}
+    posterior = {
+        k: v.reshape(chains, draws_per_chain)
+        for k, v in result.posterior_samples.items()
+    }
     idata = az.from_dict(posterior=posterior)
 
     rhat = az.rhat(idata)
@@ -71,7 +75,11 @@ def test_bayesian_full_parity_notebook_like_relaxation():
     assert min_ess > 400
 
     # Posterior predictive-style plot hash for regression evidence.
-    y_level = float(np.array(result.posterior_samples[list(result.posterior_samples.keys())[0]]).mean())
+    y_level = float(
+        np.array(
+            result.posterior_samples[list(result.posterior_samples.keys())[0]]
+        ).mean()
+    )
     y_mean = np.full_like(t, y_level)
     x_plot = t
     plt.figure(figsize=(4, 3), dpi=100)

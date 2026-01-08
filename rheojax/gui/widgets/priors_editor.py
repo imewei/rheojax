@@ -154,8 +154,16 @@ class PriorsEditor(QWidget):
 
         # Create spinboxes for all possible parameters
         self._param_spinboxes: dict[str, QDoubleSpinBox] = {}
-        all_params = ["loc", "scale", "low", "high", "concentration", "rate",
-                      "concentration0", "concentration1"]
+        all_params = [
+            "loc",
+            "scale",
+            "low",
+            "high",
+            "concentration",
+            "rate",
+            "concentration0",
+            "concentration1",
+        ]
         for param in all_params:
             spinbox = QDoubleSpinBox()
             spinbox.setDecimals(6)
@@ -225,7 +233,7 @@ class PriorsEditor(QWidget):
         for param in parameters:
             self._priors[param] = {
                 "distribution": "normal",
-                "params": {"loc": 1.0, "scale": 0.5}
+                "params": {"loc": 1.0, "scale": 0.5},
             }
 
         self._rebuild_table()
@@ -358,8 +366,14 @@ class PriorsEditor(QWidget):
             ax.set_ylabel("Density")
             ax.set_title(f"{dist.title()} Distribution")
         except Exception as e:
-            ax.text(0.5, 0.5, f"Error: {e}", ha="center", va="center",
-                    transform=ax.transAxes)
+            ax.text(
+                0.5,
+                0.5,
+                f"Error: {e}",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+            )
 
         self._preview_figure.tight_layout()
         self._preview_canvas.draw()
@@ -434,10 +448,7 @@ class PriorsEditor(QWidget):
                 break
 
         # Update prior
-        self._priors[self._current_param] = {
-            "distribution": dist,
-            "params": params
-        }
+        self._priors[self._current_param] = {"distribution": dist, "params": params}
 
         # Update table
         self._rebuild_table()
@@ -450,7 +461,7 @@ class PriorsEditor(QWidget):
         for param in self._parameters:
             self._priors[param] = {
                 "distribution": "normal",
-                "params": {"loc": 1.0, "scale": 0.5}
+                "params": {"loc": 1.0, "scale": 0.5},
             }
 
         self._rebuild_table()
@@ -471,10 +482,7 @@ class PriorsEditor(QWidget):
         if param not in self._parameters:
             self._parameters.append(param)
 
-        self._priors[param] = {
-            "distribution": dist,
-            "params": params
-        }
+        self._priors[param] = {"distribution": dist, "params": params}
         self._rebuild_table()
 
     def get_prior(self, param: str) -> dict[str, Any] | None:

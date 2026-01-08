@@ -30,4 +30,3 @@ def test_load_bayesian_smoke_maxwell():
 
     assert result.diagnostics
     assert "num_warmup" in result.metadata
-

@@ -6,23 +6,24 @@ NLSQ fitting, Bayesian inference, and pipeline workflows.
 """
 
 import logging
+
 import numpy as np
 import pytest
 
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import (
+    ConvergenceTracker,
+    IterationLogger,
     configure_logging,
     get_logger,
-    log_fit,
+    log_array_info,
     log_bayesian,
+    log_fit,
+    log_jax_config,
     log_operation,
     reset_config,
     timed,
-    IterationLogger,
-    ConvergenceTracker,
-    log_array_info,
-    log_jax_config,
 )
-from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
@@ -83,7 +84,9 @@ class TestLoggingWithMaxwellModel:
 
         logger = get_logger("rheojax.models.test")
 
-        with log_fit(logger, "Maxwell", data_shape=t.shape, test_mode="relaxation") as ctx:
+        with log_fit(
+            logger, "Maxwell", data_shape=t.shape, test_mode="relaxation"
+        ) as ctx:
             model = Maxwell()
             model.fit(t, G_t, test_mode="relaxation")
             ctx["R2"] = float(model.r_squared) if hasattr(model, "r_squared") else 0.99
@@ -129,7 +132,12 @@ class TestLoggingWithFractionalModels:
 
         logger = get_logger("rheojax.models.fractional")
 
-        with log_fit(logger, "FractionalMaxwellModel", data_shape=omega.shape, test_mode="oscillation") as ctx:
+        with log_fit(
+            logger,
+            "FractionalMaxwellModel",
+            data_shape=omega.shape,
+            test_mode="oscillation",
+        ) as ctx:
             model = FractionalMaxwellModel()
             model.fit(omega, G_star, test_mode="oscillation")
             ctx["alpha"] = float(model.parameters["alpha"].value)
@@ -196,7 +204,7 @@ class TestLoggingJAXOperations:
         with log_operation(logger, "jax_computation") as ctx:
             x = jnp.linspace(0, 10, 1000)
             y = jnp.sin(x) * jnp.exp(-x / 5)
-            result = jnp.sum(y ** 2)
+            result = jnp.sum(y**2)
             ctx["result"] = float(result)
             ctx["array_size"] = len(x)
 
@@ -231,10 +239,7 @@ class TestIterationLoggingWithOptimization:
         """Test ConvergenceTracker with realistic cost sequence."""
         logger = get_logger("rheojax.optimization.test")
         tracker = ConvergenceTracker(
-            logger,
-            tolerance=1e-4,
-            patience=3,
-            min_iterations=5
+            logger, tolerance=1e-4, patience=3, min_iterations=5
         )
 
         # Simulate converging cost sequence
@@ -308,7 +313,7 @@ class TestLoggingConfiguration:
         configure_logging(
             level="WARNING",
             colorize=False,
-            subsystem_levels={"rheojax.models": "DEBUG"}
+            subsystem_levels={"rheojax.models": "DEBUG"},
         )
 
         capture = LogCapture()

@@ -898,10 +898,22 @@ def test_seed_parameter_reproducibility():
 
     # Same seed should produce same results
     result1 = model1.fit_bayesian(
-        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1, seed=42
+        X,
+        y,
+        test_mode="relaxation",
+        num_warmup=30,
+        num_samples=50,
+        num_chains=1,
+        seed=42,
     )
     result2 = model2.fit_bayesian(
-        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1, seed=42
+        X,
+        y,
+        test_mode="relaxation",
+        num_warmup=30,
+        num_samples=50,
+        num_chains=1,
+        seed=42,
     )
 
     # Results should be identical with same seed
@@ -926,14 +938,28 @@ def test_seed_parameter_different_seeds():
 
     # Different seeds should produce different results
     result1 = model1.fit_bayesian(
-        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1, seed=1
+        X,
+        y,
+        test_mode="relaxation",
+        num_warmup=30,
+        num_samples=50,
+        num_chains=1,
+        seed=1,
     )
     result2 = model2.fit_bayesian(
-        X, y, test_mode="relaxation", num_warmup=30, num_samples=50, num_chains=1, seed=2
+        X,
+        y,
+        test_mode="relaxation",
+        num_warmup=30,
+        num_samples=50,
+        num_chains=1,
+        seed=2,
     )
 
     # Results should be different with different seeds
-    assert not np.allclose(result1.posterior_samples["a"], result2.posterior_samples["a"])
+    assert not np.allclose(
+        result1.posterior_samples["a"], result2.posterior_samples["a"]
+    )
 
 
 def test_default_num_chains_is_four():
@@ -947,7 +973,9 @@ def test_default_num_chains_is_four():
     num_chains_param = sig.parameters.get("num_chains")
 
     assert num_chains_param is not None
-    assert num_chains_param.default == 4, f"Default num_chains should be 4, got {num_chains_param.default}"
+    assert (
+        num_chains_param.default == 4
+    ), f"Default num_chains should be 4, got {num_chains_param.default}"
 
 
 def test_multichain_rhat_computation():

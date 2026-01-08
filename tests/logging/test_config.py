@@ -119,18 +119,12 @@ class TestLogConfig:
 
     def test_get_level_exact_match(self):
         """Test get_level with exact subsystem match."""
-        config = LogConfig(
-            level="INFO",
-            subsystem_levels={"rheojax.models": "DEBUG"}
-        )
+        config = LogConfig(level="INFO", subsystem_levels={"rheojax.models": "DEBUG"})
         assert config.get_level("rheojax.models") == logging.DEBUG
 
     def test_get_level_parent_match(self):
         """Test get_level with parent subsystem match."""
-        config = LogConfig(
-            level="INFO",
-            subsystem_levels={"rheojax.models": "DEBUG"}
-        )
+        config = LogConfig(level="INFO", subsystem_levels={"rheojax.models": "DEBUG"})
         assert config.get_level("rheojax.models.maxwell") == logging.DEBUG
 
     def test_get_level_fallback(self):

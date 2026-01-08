@@ -149,7 +149,9 @@ class ExportOptionsDialog(QDialog):
         options_layout = QVBoxLayout()
 
         # Include metadata
-        self.metadata_check = QCheckBox("Include metadata (model parameters, timestamps)")
+        self.metadata_check = QCheckBox(
+            "Include metadata (model parameters, timestamps)"
+        )
         self.metadata_check.setChecked(True)
         options_layout.addWidget(self.metadata_check)
 
@@ -224,9 +226,7 @@ class ExportOptionsDialog(QDialog):
 
         # Provenance
         if "include_provenance" in self.current_options:
-            self.provenance_check.setChecked(
-                self.current_options["include_provenance"]
-            )
+            self.provenance_check.setChecked(self.current_options["include_provenance"])
 
         # Compression
         if "compress" in self.current_options:

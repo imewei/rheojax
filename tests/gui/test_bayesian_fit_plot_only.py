@@ -15,12 +15,7 @@ def setup_function() -> None:
 def test_bayesian_page_shows_fit_plot_only_and_no_arviz(qtbot) -> None:
     store = StateStore()
     x = np.logspace(-3, 1, 12)
-    y = (
-        1.0
-        + 0.8 * np.exp(-x / 0.03)
-        + 0.3 * np.exp(-x / 0.4)
-        + 0.1 * np.exp(-x / 3.0)
-    )
+    y = 1.0 + 0.8 * np.exp(-x / 0.03) + 0.3 * np.exp(-x / 0.4) + 0.1 * np.exp(-x / 3.0)
     ds = DatasetState(
         id="d1",
         name="synthetic",
@@ -81,12 +76,7 @@ def test_bayesian_page_shows_fit_plot_only_and_no_arviz(qtbot) -> None:
 def test_bayesian_fit_plot_includes_credible_band(qtbot, monkeypatch) -> None:
     store = StateStore()
     x = np.logspace(-3, 1, 12)
-    y = (
-        1.0
-        + 0.8 * np.exp(-x / 0.03)
-        + 0.3 * np.exp(-x / 0.4)
-        + 0.1 * np.exp(-x / 3.0)
-    )
+    y = 1.0 + 0.8 * np.exp(-x / 0.03) + 0.3 * np.exp(-x / 0.4) + 0.1 * np.exp(-x / 3.0)
     ds = DatasetState(
         id="d1",
         name="synthetic",
@@ -106,7 +96,12 @@ def test_bayesian_fit_plot_includes_credible_band(qtbot, monkeypatch) -> None:
     qtbot.addWidget(page)
 
     # Keep plotting fast and deterministic: patch model predictions.
-    def _fake_predict(model_name: str, parameters: dict[str, float], x_values: np.ndarray, test_mode=None):
+    def _fake_predict(
+        model_name: str,
+        parameters: dict[str, float],
+        x_values: np.ndarray,
+        test_mode=None,
+    ):
         g0 = float(parameters.get("G0", 1.0))
         tau = float(parameters.get("tau", 1.0))
         return g0 * np.exp(-np.asarray(x_values) / max(tau, 1e-9))
@@ -139,7 +134,9 @@ def test_bayesian_fit_plot_includes_credible_band(qtbot, monkeypatch) -> None:
     assert len(ax.collections) >= 1
 
 
-def test_bayesian_oscillation_complex_includes_component_bands(qtbot, monkeypatch) -> None:
+def test_bayesian_oscillation_complex_includes_component_bands(
+    qtbot, monkeypatch
+) -> None:
     store = StateStore()
     x = np.logspace(0, 2, 12)
     y = (1000 / (1 + x)) + 1j * (300 / (1 + x))
@@ -161,7 +158,12 @@ def test_bayesian_oscillation_complex_includes_component_bands(qtbot, monkeypatc
     page = BayesianPage()
     qtbot.addWidget(page)
 
-    def _fake_predict(model_name: str, parameters: dict[str, float], x_values: np.ndarray, test_mode=None):
+    def _fake_predict(
+        model_name: str,
+        parameters: dict[str, float],
+        x_values: np.ndarray,
+        test_mode=None,
+    ):
         g0 = float(parameters.get("G0", 1.0))
         tau = float(parameters.get("tau", 1.0))
         xv = np.asarray(x_values)
@@ -200,7 +202,7 @@ def test_bayesian_oscillation_complex_includes_component_bands(qtbot, monkeypatc
     assert legend is not None
     labels = [t.get_text() for t in legend.get_texts()]
     assert any("G'" in text for text in labels)
-    assert any('G"' in text or "G\"" in text for text in labels)
+    assert any('G"' in text or 'G"' in text for text in labels)
 
 
 def test_bayesian_oscillation_y_y2_combined_plots_correctly(qtbot, monkeypatch) -> None:
@@ -227,7 +229,12 @@ def test_bayesian_oscillation_y_y2_combined_plots_correctly(qtbot, monkeypatch) 
     page = BayesianPage()
     qtbot.addWidget(page)
 
-    def _fake_predict(model_name: str, parameters: dict[str, float], x_values: np.ndarray, test_mode=None):
+    def _fake_predict(
+        model_name: str,
+        parameters: dict[str, float],
+        x_values: np.ndarray,
+        test_mode=None,
+    ):
         xv = np.asarray(x_values)
         # Return a complex prediction with positive components.
         return (900.0 / (1.0 + xv)) + 1j * (250.0 / (1.0 + xv))

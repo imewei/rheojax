@@ -17,8 +17,9 @@ Run with:
     pytest tests/gui/ -v -m smoke
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 # Mark all tests as GUI tests
 pytestmark = pytest.mark.gui
@@ -26,6 +27,7 @@ pytestmark = pytest.mark.gui
 # Check if PySide6 is available
 try:
     from PySide6.QtWidgets import QApplication
+
     HAS_PYSIDE6 = True
 except ImportError:
     HAS_PYSIDE6 = False
@@ -54,7 +56,9 @@ class TestModuleImports:
         assert callable(main), "main function should be callable"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_gui_state_store_imports_no_qt(self) -> None:
         """Test state store module imports (no Qt required for dataclasses).
 
@@ -64,8 +68,8 @@ class TestModuleImports:
         """
         from rheojax.gui.state.store import (
             AppState,
-            StateStore,
             PipelineStep,
+            StateStore,
             StepStatus,
         )
 
@@ -96,12 +100,12 @@ class TestModuleImports:
         from the services module.
         """
         from rheojax.gui.services import (
-            DataService,
-            ModelService,
             BayesianService,
-            TransformService,
-            PlotService,
+            DataService,
             ExportService,
+            ModelService,
+            PlotService,
+            TransformService,
         )
 
         assert DataService is not None, "DataService should import"
@@ -118,18 +122,14 @@ class TestModuleImports:
         Stylesheet functions should be available without Qt.
         """
         from rheojax.gui.resources.styles import (
-            get_stylesheet,
-            get_light_stylesheet,
             get_dark_stylesheet,
+            get_light_stylesheet,
+            get_stylesheet,
         )
 
         assert callable(get_stylesheet), "get_stylesheet should be callable"
-        assert callable(
-            get_light_stylesheet
-        ), "get_light_stylesheet should be callable"
-        assert callable(
-            get_dark_stylesheet
-        ), "get_dark_stylesheet should be callable"
+        assert callable(get_light_stylesheet), "get_light_stylesheet should be callable"
+        assert callable(get_dark_stylesheet), "get_dark_stylesheet should be callable"
 
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
     def test_gui_app_imports(self) -> None:
@@ -168,21 +168,27 @@ class TestStateManagement:
     """
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_app_state_creation(self) -> None:
         """Test AppState dataclass creation with defaults."""
         from rheojax.gui.state.store import AppState
 
         state = AppState()
 
-        assert state.project_name == "Untitled", "Default project name should be 'Untitled'"
+        assert (
+            state.project_name == "Untitled"
+        ), "Default project name should be 'Untitled'"
         assert state.current_tab == "home", "Default tab should be 'home'"
         assert state.theme == "light", "Default theme should be 'light'"
         assert state.auto_save_enabled is True, "Auto-save should be enabled by default"
         assert state.current_seed == 42, "Default seed should be 42"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_app_state_custom_values(self) -> None:
         """Test AppState creation with custom values."""
         from rheojax.gui.state.store import AppState
@@ -200,7 +206,9 @@ class TestStateManagement:
         assert state.auto_save_enabled is False
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_dataset_state_creation(self) -> None:
         """Test DatasetState creation with required fields."""
         from rheojax.gui.state.store import DatasetState
@@ -220,7 +228,9 @@ class TestStateManagement:
         assert isinstance(ds.metadata, dict), "Metadata should be a dict"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_dataset_state_clone(self) -> None:
         """Test DatasetState cloning creates independent copy."""
         from rheojax.gui.state.store import DatasetState
@@ -237,10 +247,14 @@ class TestStateManagement:
 
         assert cloned.id == original.id, "Cloned ID should match"
         assert cloned is not original, "Clone should be different object"
-        assert cloned.metadata is not original.metadata, "Metadata should be deep copied"
+        assert (
+            cloned.metadata is not original.metadata
+        ), "Metadata should be deep copied"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_pipeline_state_creation(self) -> None:
         """Test PipelineState with step enums."""
         from rheojax.gui.state.store import PipelineState, PipelineStep, StepStatus
@@ -248,16 +262,22 @@ class TestStateManagement:
         pipeline = PipelineState()
 
         assert isinstance(pipeline.steps, dict), "Steps should be a dict"
-        assert len(pipeline.steps) == len(PipelineStep), "Should have all pipeline steps"
+        assert len(pipeline.steps) == len(
+            PipelineStep
+        ), "Should have all pipeline steps"
 
         for step in PipelineStep:
-            assert step in pipeline.steps, f"PipelineStep.{step.name} should be in steps"
+            assert (
+                step in pipeline.steps
+            ), f"PipelineStep.{step.name} should be in steps"
             assert (
                 pipeline.steps[step] == StepStatus.PENDING
             ), f"All steps should start as PENDING"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_pipeline_step_enum_values(self) -> None:
         """Test PipelineStep enum has expected values."""
         from rheojax.gui.state.store import PipelineStep
@@ -268,7 +288,9 @@ class TestStateManagement:
         assert actual_steps == expected_steps, "Pipeline should have all expected steps"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_step_status_enum_values(self) -> None:
         """Test StepStatus enum has expected values."""
         from rheojax.gui.state.store import StepStatus
@@ -281,7 +303,9 @@ class TestStateManagement:
         ), "StepStatus should have all expected values"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_parameter_state_creation(self) -> None:
         """Test ParameterState creation and defaults."""
         from rheojax.gui.state.store import ParameterState
@@ -302,7 +326,9 @@ class TestStateManagement:
         assert param.description == ""
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_parameter_state_with_units(self) -> None:
         """Test ParameterState with unit and description."""
         from rheojax.gui.state.store import ParameterState
@@ -322,11 +348,14 @@ class TestStateManagement:
         assert param.fixed is True
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_fit_result_creation(self) -> None:
         """Test FitResult creation from fit."""
-        from rheojax.gui.state.store import FitResult
         from datetime import datetime
+
+        from rheojax.gui.state.store import FitResult
 
         result = FitResult(
             model_name="Maxwell",
@@ -347,11 +376,14 @@ class TestStateManagement:
         assert result.num_iterations == 42
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_fit_result_clone(self) -> None:
         """Test FitResult cloning creates independent copy."""
-        from rheojax.gui.state.store import FitResult
         from datetime import datetime
+
+        from rheojax.gui.state.store import FitResult
 
         original = FitResult(
             model_name="Zener",
@@ -390,9 +422,7 @@ class TestServiceInstantiation:
         service = DataService()
 
         assert service is not None, "DataService should instantiate"
-        assert hasattr(
-            service, "load_file"
-        ), "DataService should have load_file method"
+        assert hasattr(service, "load_file"), "DataService should have load_file method"
 
     @pytest.mark.smoke
     def test_model_service_instantiation(self) -> None:
@@ -495,20 +525,21 @@ class TestStylesheetLoading:
     @pytest.mark.smoke
     def test_dark_stylesheet_loads(self) -> None:
         """Test dark stylesheet loads and has expected content."""
-        from rheojax.gui.resources.styles import get_dark_stylesheet, get_light_stylesheet
+        from rheojax.gui.resources.styles import (
+            get_dark_stylesheet,
+            get_light_stylesheet,
+        )
 
         css = get_dark_stylesheet()
 
         assert isinstance(css, str), "Stylesheet should be a string"
         assert len(css) > 100, "Stylesheet should be substantial"
-        assert (
-            css != get_light_stylesheet()
-        ), "Dark and light sheets should differ"
+        assert css != get_light_stylesheet(), "Dark and light sheets should differ"
 
     @pytest.mark.smoke
     def test_get_stylesheet_light_default(self) -> None:
         """Test get_stylesheet returns light theme by default."""
-        from rheojax.gui.resources.styles import get_stylesheet, get_light_stylesheet
+        from rheojax.gui.resources.styles import get_light_stylesheet, get_stylesheet
 
         default = get_stylesheet()
         light = get_light_stylesheet()
@@ -518,7 +549,7 @@ class TestStylesheetLoading:
     @pytest.mark.smoke
     def test_get_stylesheet_explicit_light(self) -> None:
         """Test get_stylesheet with explicit light theme."""
-        from rheojax.gui.resources.styles import get_stylesheet, get_light_stylesheet
+        from rheojax.gui.resources.styles import get_light_stylesheet, get_stylesheet
 
         result = get_stylesheet("light")
         expected = get_light_stylesheet()
@@ -528,7 +559,7 @@ class TestStylesheetLoading:
     @pytest.mark.smoke
     def test_get_stylesheet_dark(self) -> None:
         """Test get_stylesheet with dark theme."""
-        from rheojax.gui.resources.styles import get_stylesheet, get_dark_stylesheet
+        from rheojax.gui.resources.styles import get_dark_stylesheet, get_stylesheet
 
         result = get_stylesheet("dark")
         expected = get_dark_stylesheet()
@@ -644,7 +675,9 @@ class TestIntegrationScenarios:
     """
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_state_and_services_work_together(self, app_state_instance) -> None:
         """Test that state management and services can work together."""
         from rheojax.gui.services.model_service import ModelService
@@ -667,11 +700,13 @@ class TestIntegrationScenarios:
             pytest.skip("Registry not fully initialized")
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_stylesheet_selection_matches_state_theme(self) -> None:
         """Test that stylesheet selection matches state theme values."""
-        from rheojax.gui.state.store import AppState
         from rheojax.gui.resources.styles import get_stylesheet
+        from rheojax.gui.state.store import AppState
 
         for theme in ["light", "dark"]:
             state = AppState(theme=theme)
@@ -684,12 +719,12 @@ class TestIntegrationScenarios:
     def test_multiple_services_instantiate(self) -> None:
         """Test all services can be instantiated together."""
         from rheojax.gui.services import (
-            DataService,
-            ModelService,
             BayesianService,
-            TransformService,
-            PlotService,
+            DataService,
             ExportService,
+            ModelService,
+            PlotService,
+            TransformService,
         )
 
         services = {
@@ -716,7 +751,9 @@ class TestEdgeCases:
     """Test edge cases and error handling in GUI components."""
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_parameter_state_with_zero_value(self) -> None:
         """Test ParameterState handles zero value correctly."""
         from rheojax.gui.state.store import ParameterState
@@ -731,7 +768,9 @@ class TestEdgeCases:
         assert param.value == 0.0, "Should handle zero value"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_parameter_state_with_negative_bounds(self) -> None:
         """Test ParameterState handles negative bounds."""
         from rheojax.gui.state.store import ParameterState
@@ -747,7 +786,9 @@ class TestEdgeCases:
         assert param.min_bound == -1000.0, "Should handle negative bounds"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_app_state_with_empty_datasets(self) -> None:
         """Test AppState with empty datasets dict."""
         from rheojax.gui.state.store import AppState
@@ -758,7 +799,9 @@ class TestEdgeCases:
         assert len(state.datasets) == 0, "Datasets should be empty"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_app_state_recent_projects_empty(self) -> None:
         """Test AppState with empty recent projects list."""
         from rheojax.gui.state.store import AppState
@@ -792,7 +835,9 @@ class TestEdgeCases:
         assert len(palette) == len(set(palette)), "All colors should be unique"
 
     @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)")
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
     def test_dataset_state_metadata_is_mutable(self) -> None:
         """Test DatasetState metadata can be modified."""
         from rheojax.gui.state.store import DatasetState

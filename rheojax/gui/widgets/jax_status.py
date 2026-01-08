@@ -5,7 +5,6 @@ JAX Status Widget
 GPU/device status indicator with memory monitoring.
 """
 
-
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
@@ -209,7 +208,8 @@ class JAXStatusWidget(QWidget):
         # Color based on usage
         if used / total > 0.9:
             # Red for >90% usage
-            self._memory_bar.setStyleSheet("""
+            self._memory_bar.setStyleSheet(
+                """
                 QProgressBar {
                     border: 1px solid #ccc;
                     border-radius: 3px;
@@ -218,10 +218,12 @@ class JAXStatusWidget(QWidget):
                 QProgressBar::chunk {
                     background-color: #F44336;
                 }
-            """)
+            """
+            )
         elif used / total > 0.7:
             # Orange for >70% usage
-            self._memory_bar.setStyleSheet("""
+            self._memory_bar.setStyleSheet(
+                """
                 QProgressBar {
                     border: 1px solid #ccc;
                     border-radius: 3px;
@@ -230,10 +232,12 @@ class JAXStatusWidget(QWidget):
                 QProgressBar::chunk {
                     background-color: #FF9800;
                 }
-            """)
+            """
+            )
         else:
             # Green for normal usage
-            self._memory_bar.setStyleSheet("""
+            self._memory_bar.setStyleSheet(
+                """
                 QProgressBar {
                     border: 1px solid #ccc;
                     border-radius: 3px;
@@ -242,7 +246,8 @@ class JAXStatusWidget(QWidget):
                 QProgressBar::chunk {
                     background-color: #4CAF50;
                 }
-            """)
+            """
+            )
 
     def set_float64_enabled(self, enabled: bool) -> None:
         """Set float64 enabled indicator.
@@ -283,7 +288,9 @@ class JAXStatusWidget(QWidget):
         else:
             color = "#666666"  # Gray for zero
 
-        self._jit_count_label.setStyleSheet(f"font-size: 10pt; color: {color}; font-weight: bold;")
+        self._jit_count_label.setStyleSheet(
+            f"font-size: 10pt; color: {color}; font-weight: bold;"
+        )
 
     def set_compiling(self, compiling: bool) -> None:
         """Show compiling indicator."""

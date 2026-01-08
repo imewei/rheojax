@@ -11,7 +11,6 @@ This module provides shared functionality for csv_reader and excel_reader:
 from __future__ import annotations
 
 import re
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -34,22 +33,26 @@ __all__ = [
 # Constants
 # =============================================================================
 
-VALID_TEST_MODES: frozenset[str] = frozenset({
-    "relaxation",
-    "creep",
-    "oscillation",
-    "rotation",
-})
+VALID_TEST_MODES: frozenset[str] = frozenset(
+    {
+        "relaxation",
+        "creep",
+        "oscillation",
+        "rotation",
+    }
+)
 
-VALID_TRANSFORMS: frozenset[str] = frozenset({
-    "mastercurve",
-    "srfs",
-    "owchirp",
-    "spp",
-    "fft",
-    "mutation",
-    "derivative",
-})
+VALID_TRANSFORMS: frozenset[str] = frozenset(
+    {
+        "mastercurve",
+        "srfs",
+        "owchirp",
+        "spp",
+        "fft",
+        "mutation",
+        "derivative",
+    }
+)
 
 TRANSFORM_REQUIREMENTS: dict[str, dict] = {
     "mastercurve": {"required": ["temperature"], "domain": "frequency"},
@@ -68,8 +71,7 @@ _TEST_MODE_PATTERNS: dict[str, list[re.Pattern]] = {
         for p in [r"G['\"]", r"G\*", r"omega", r"frequency", r"angular"]
     ],
     "relaxation": [
-        re.compile(p, re.IGNORECASE)
-        for p in [r"G\s*\(\s*t\s*\)", r"relaxation"]
+        re.compile(p, re.IGNORECASE) for p in [r"G\s*\(\s*t\s*\)", r"relaxation"]
     ],
     "creep": [
         re.compile(p, re.IGNORECASE)
@@ -97,6 +99,7 @@ _TIME_KEYWORDS = {"time", "t"}
 # =============================================================================
 # Unit Extraction
 # =============================================================================
+
 
 def extract_unit_from_header(header: str) -> tuple[str, str | None]:
     """Extract name and unit from 'name (unit)' format.
@@ -127,6 +130,7 @@ def extract_unit_from_header(header: str) -> tuple[str, str | None]:
 # =============================================================================
 # Domain Detection
 # =============================================================================
+
 
 def detect_domain(
     x_header: str,
@@ -188,6 +192,7 @@ def detect_domain(
 # Test Mode Detection
 # =============================================================================
 
+
 def detect_test_mode_from_columns(
     x_header: str,
     y_headers: list[str],
@@ -237,6 +242,7 @@ def detect_test_mode_from_columns(
 # =============================================================================
 # Transform Validation
 # =============================================================================
+
 
 def validate_transform(
     intended_transform: str,
@@ -315,6 +321,7 @@ def validate_transform(
 # =============================================================================
 # Complex Modulus Construction
 # =============================================================================
+
 
 def construct_complex_modulus(
     g_prime: NDArray[np.floating],

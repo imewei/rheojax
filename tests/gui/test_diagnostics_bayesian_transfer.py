@@ -10,10 +10,16 @@ def setup_function() -> None:
     StateStore.reset()
 
 
-def test_diagnostics_resolves_bayesian_result_and_emits_completed(qtbot, monkeypatch) -> None:
+def test_diagnostics_resolves_bayesian_result_and_emits_completed(
+    qtbot, monkeypatch
+) -> None:
     store = StateStore()
     ds = DatasetState(id="d1", name="ds", file_path=None, test_mode="oscillation")
-    store._state = AppState(datasets={"d1": ds}, active_dataset_id="d1", active_model_name="generalized_maxwell")
+    store._state = AppState(
+        datasets={"d1": ds},
+        active_dataset_id="d1",
+        active_model_name="generalized_maxwell",
+    )
 
     result = BayesianResult(
         model_name="generalized_maxwell",
@@ -55,4 +61,3 @@ def test_diagnostics_resolves_bayesian_result_and_emits_completed(qtbot, monkeyp
 
     assert info_calls == []
     assert page._current_model_id == "generalized_maxwell"
-

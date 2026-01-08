@@ -147,9 +147,7 @@ class MultiView(QWidget):
     layout_changed = Signal(str)
     panel_selected = Signal(int)
 
-    def __init__(
-        self, layout: str = "1x1", parent: QWidget | None = None
-    ) -> None:
+    def __init__(self, layout: str = "1x1", parent: QWidget | None = None) -> None:
         """Initialize multi-view.
 
         Parameters
@@ -438,6 +436,7 @@ class MultiView(QWidget):
             Resolution for raster formats
         """
         import os
+
         base, ext = os.path.splitext(base_path)
 
         for i, panel in enumerate(self._panels):

@@ -4,9 +4,9 @@ Enable via env: RHEOJAX_FULL_PARITY_GMM=1
 Uses bundled multi-technique fixture with GMM model if available.
 """
 
-import os
 import hashlib
 import io
+import os
 
 import arviz as az
 import matplotlib.pyplot as plt
@@ -16,11 +16,12 @@ import pytest
 from rheojax.core.data import RheoData
 from rheojax.gui.services.bayesian_service import BayesianService
 
-
 pytestmark = [pytest.mark.smoke]
 
 
-@pytest.mark.skipif(os.environ.get("RHEOJAX_FULL_PARITY_GMM") != "1", reason="full parity opt-in")
+@pytest.mark.skipif(
+    os.environ.get("RHEOJAX_FULL_PARITY_GMM") != "1", reason="full parity opt-in"
+)
 def test_bayesian_full_parity_gmm_like():
     pytest.importorskip("jax")
 
@@ -57,7 +58,10 @@ def test_bayesian_full_parity_gmm_like():
     assert draws_total % chains == 0
     draws_per_chain = draws_total // chains
 
-    posterior = {k: v.reshape(chains, draws_per_chain) for k, v in result.posterior_samples.items()}
+    posterior = {
+        k: v.reshape(chains, draws_per_chain)
+        for k, v in result.posterior_samples.items()
+    }
     idata = az.from_dict(posterior=posterior)
     rhat = az.rhat(idata)
     ess = az.ess(idata)
@@ -67,7 +71,11 @@ def test_bayesian_full_parity_gmm_like():
     # Record diagnostics but do not fail; this test is opt-in and may be noisy
 
     # Posterior predictive-style hash
-    y_level = float(np.array(result.posterior_samples[list(result.posterior_samples.keys())[0]]).mean())
+    y_level = float(
+        np.array(
+            result.posterior_samples[list(result.posterior_samples.keys())[0]]
+        ).mean()
+    )
     y_mean = np.full_like(t, y_level)
     plt.figure(figsize=(4, 3), dpi=100)
     plt.plot(t, y, "k.", label="data")

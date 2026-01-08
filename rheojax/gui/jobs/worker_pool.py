@@ -12,10 +12,12 @@ from threading import Lock
 from typing import Any
 
 try:
-    from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot, Qt
+    from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal, Slot
+
     HAS_PYSIDE6 = True
 except ImportError:
     HAS_PYSIDE6 = False
+
     # Provide stub classes for type checking when PySide6 not available
     class QObject:  # type: ignore
         def __init__(self, *args, **kwargs):
@@ -55,19 +57,26 @@ except ImportError:
             return fn
 
         return decorator
+
     class QThreadPool:  # type: ignore
         pass
+
     class QRunnable:  # type: ignore
         pass
+
     class Signal:  # type: ignore
-        def __init__(self, *args): pass
+        def __init__(self, *args):
+            pass
+
     def Slot(*args):  # type: ignore
         def decorator(func):
             return func
+
         return decorator
 
     class Qt:  # type: ignore
         QueuedConnection = None
+
 
 from rheojax.gui.jobs.cancellation import CancellationToken
 
@@ -175,7 +184,9 @@ class WorkerPool(QObject):
         WorkerPool._initialized = True
         logger.info(f"WorkerPool initialized with {max_threads} threads")
 
-    def submit(self, worker: QRunnable, on_job_registered: Callable[[str], None] | None = None) -> str:
+    def submit(
+        self, worker: QRunnable, on_job_registered: Callable[[str], None] | None = None
+    ) -> str:
         """Submit a worker to the pool.
 
         Parameters
@@ -198,7 +209,7 @@ class WorkerPool(QObject):
         job_id = str(uuid.uuid4())
 
         # Get cancellation token from worker
-        if not hasattr(worker, 'cancel_token'):
+        if not hasattr(worker, "cancel_token"):
             logger.warning(f"Worker {worker} has no cancel_token attribute")
             worker.cancel_token = CancellationToken()  # type: ignore[attr-defined]
 
@@ -345,9 +356,7 @@ class WorkerPool(QObject):
         if wait:
             success = self._pool.waitForDone(timeout_ms)
             if not success:
-                logger.warning(
-                    f"Worker pool shutdown timed out after {timeout_ms}ms"
-                )
+                logger.warning(f"Worker pool shutdown timed out after {timeout_ms}ms")
 
         # Clear active jobs
         with self._job_lock:

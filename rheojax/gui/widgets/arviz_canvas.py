@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget, PlotMetrics
+from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,9 @@ class ArvizCanvas(BaseArviZWidget):
         layout.addWidget(self._canvas, 1)
 
         # Status / empty label
-        self._status_label = QLabel("No diagnostics yet. Run Bayesian inference to view plots.")
+        self._status_label = QLabel(
+            "No diagnostics yet. Run Bayesian inference to view plots."
+        )
         self._status_label.setAlignment(Qt.AlignCenter)
         self._status_label.setStyleSheet("color: #94A3B8; padding: 6px;")
         layout.addWidget(self._status_label)
@@ -248,8 +250,12 @@ class ArvizCanvas(BaseArviZWidget):
                 self._status_label.show()
                 ax = self._figure.add_subplot(111)
                 ax.text(
-                    0.5, 0.5, f"Error generating plot:\n{e}",
-                    ha="center", va="center", transform=ax.transAxes
+                    0.5,
+                    0.5,
+                    f"Error generating plot:\n{e}",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
                 )
         else:
             self._status_label.setText("Unsupported plot type")
@@ -539,9 +545,13 @@ class ArvizCanvas(BaseArviZWidget):
         """
         ax = self._figure.add_subplot(111)
         ax.text(
-            0.5, 0.5, message,
-            ha="center", va="center", fontsize=14,
-            transform=ax.transAxes
+            0.5,
+            0.5,
+            message,
+            ha="center",
+            va="center",
+            fontsize=14,
+            transform=ax.transAxes,
         )
         ax.set_axis_off()
 

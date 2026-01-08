@@ -4,11 +4,11 @@ Fit model controls + visualization (fit plot + residuals).
 """
 
 from dataclasses import replace
-
 from typing import Any
 
 import numpy as np
-from PySide6.QtCore import Signal, Slot, Qt
+from matplotlib.figure import Figure
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -21,8 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from rheojax.gui.services.model_service import ModelService
-from rheojax.gui.services.model_service import normalize_model_name
+from rheojax.gui.services.model_service import ModelService, normalize_model_name
 from rheojax.gui.state.actions import (
     set_active_model,
     toggle_parameter_fixed,
@@ -33,7 +32,6 @@ from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
-from matplotlib.figure import Figure
 
 
 class FitPage(QWidget):
@@ -137,9 +135,13 @@ class FitPage(QWidget):
         self._quick_model_combo = QComboBox()
         self._quick_model_combo.setEditable(True)
         self._quick_model_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self._quick_model_combo.currentIndexChanged.connect(self._on_quick_model_changed)
+        self._quick_model_combo.currentIndexChanged.connect(
+            self._on_quick_model_changed
+        )
         if self._quick_model_combo.lineEdit() is not None:
-            self._quick_model_combo.lineEdit().editingFinished.connect(self._on_quick_model_edited)
+            self._quick_model_combo.lineEdit().editingFinished.connect(
+                self._on_quick_model_edited
+            )
         model_row.addWidget(self._quick_model_combo, 1)
         context_layout.addLayout(model_row)
         layout.addWidget(context_group)
@@ -156,7 +158,9 @@ class FitPage(QWidget):
         params_layout = QVBoxLayout(params_group)
         self._parameter_table = ParameterTable()
         self._parameter_table.setEnabled(False)
-        self._parameter_table.parameter_changed.connect(self._on_parameter_value_changed)
+        self._parameter_table.parameter_changed.connect(
+            self._on_parameter_value_changed
+        )
         self._parameter_table.bounds_changed.connect(self._on_parameter_bounds_changed)
         self._parameter_table.fixed_toggled.connect(self._on_parameter_fixed_toggled)
         params_layout.addWidget(self._parameter_table)
@@ -204,7 +208,9 @@ class FitPage(QWidget):
         if self._store.signals is not None:
             self._store.signals.dataset_selected.connect(self._on_dataset_changed)
             self._store.signals.model_selected.connect(self._on_external_model_selected)
-            self._store.signals.model_params_changed.connect(self._on_model_params_changed)
+            self._store.signals.model_params_changed.connect(
+                self._on_model_params_changed
+            )
             self._store.signals.fit_started.connect(self._on_fitting_started)
             self._store.signals.fit_completed.connect(self._on_fitting_completed)
             self._store.signals.fit_failed.connect(self._on_fitting_failed)
@@ -295,7 +301,9 @@ class FitPage(QWidget):
         if not current or set(current.keys()) != set(defaults.keys()):
 
             def updater(s):
-                return replace(s, model_params={k: v.clone() for k, v in defaults.items()})
+                return replace(
+                    s, model_params={k: v.clone() for k, v in defaults.items()}
+                )
 
             self._store.update_state(updater, track_undo=False, emit_signal=True)
 
@@ -336,7 +344,9 @@ class FitPage(QWidget):
         """Update state when the user edits a parameter value."""
         update_parameter(param_name, float(value))
 
-    def _on_parameter_bounds_changed(self, param_name: str, min_val: float, max_val: float) -> None:
+    def _on_parameter_bounds_changed(
+        self, param_name: str, min_val: float, max_val: float
+    ) -> None:
         """Update state when the user edits parameter bounds."""
         update_parameter_bounds(param_name, float(min_val), float(max_val))
 
@@ -437,7 +447,11 @@ class FitPage(QWidget):
                 break
 
         if match_index >= 0:
-            if normalized and normalized == current_slug and match_index == current_index:
+            if (
+                normalized
+                and normalized == current_slug
+                and match_index == current_index
+            ):
                 return
             was_blocked = self._quick_model_combo.blockSignals(True)
             self._quick_model_combo.setCurrentIndex(match_index)
@@ -522,7 +536,7 @@ class FitPage(QWidget):
         y_label = metadata.get("y_label") or metadata.get("y_column") or "y"
         title = metadata.get("name") or metadata.get("file")
         if not title and getattr(dataset, "file_path", None):
-            title = getattr(dataset, "file_path").name
+            title = dataset.file_path.name
         if not title:
             title = "Data"
 
@@ -587,7 +601,9 @@ class FitPage(QWidget):
         state_params = self._store.get_state().model_params
         if state_params:
             try:
-                return {name: float(param.value) for name, param in state_params.items()}
+                return {
+                    name: float(param.value) for name, param in state_params.items()
+                }
             except Exception:
                 return None
 
@@ -606,13 +622,17 @@ class FitPage(QWidget):
         self._btn_fit.setText("Fitting...")
 
     @Slot(str, str)
-    def _on_fitting_completed(self, _model_name: str = "", _dataset_id: str = "") -> None:
+    def _on_fitting_completed(
+        self, _model_name: str = "", _dataset_id: str = ""
+    ) -> None:
         """Handle fitting completed signal."""
         self._btn_fit.setText("Fit Model")
         self._update_fit_enabled()
 
     @Slot(str, str, str)
-    def _on_fitting_failed(self, _model_name: str, _dataset_id: str, error: str) -> None:
+    def _on_fitting_failed(
+        self, _model_name: str, _dataset_id: str, error: str
+    ) -> None:
         """Handle fitting failure signal."""
         self._btn_fit.setText("Fit Model")
         self._update_fit_enabled()
@@ -624,6 +644,7 @@ class FitPage(QWidget):
     def _show_fit_options(self) -> None:
         """Show fitting options dialog."""
         from rheojax.gui.dialogs.fitting_options import FittingOptionsDialog
+
         dialog = FittingOptionsDialog(current_options=self._fit_options, parent=self)
         if dialog.exec() == dialog.DialogCode.Accepted:
             self._fit_options = dialog.get_options()
@@ -671,7 +692,9 @@ class FitPage(QWidget):
                     def updater(s):
                         return replace(s, model_params=updated)
 
-                    self._store.update_state(updater, track_undo=False, emit_signal=True)
+                    self._store.update_state(
+                        updater, track_undo=False, emit_signal=True
+                    )
                     self._empty_params.hide()
                     self._parameter_table.setEnabled(True)
                     self._params_model_name = normalize_model_name(
@@ -695,10 +718,14 @@ class FitPage(QWidget):
         if hasattr(self, "_plot_placeholder"):
             self._plot_placeholder.hide()
 
-    def plot_residuals(self, x: np.ndarray, residuals: np.ndarray, y_pred: np.ndarray | None = None) -> None:
+    def plot_residuals(
+        self, x: np.ndarray, residuals: np.ndarray, y_pred: np.ndarray | None = None
+    ) -> None:
         """Forward residuals to the residuals panel."""
         if y_pred is not None:
-            self._residuals_panel.plot_residuals(y_true=y_pred + residuals, y_pred=y_pred, x=x)
+            self._residuals_panel.plot_residuals(
+                y_true=y_pred + residuals, y_pred=y_pred, x=x
+            )
         else:
             self._residuals_panel.set_residuals(residuals)
 

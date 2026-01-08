@@ -49,4 +49,3 @@ ax.set_xlabel("Time")
 ax.set_ylabel("Strain")
 ax.legend()
 fig.savefig("mucus_rheos.png")
-

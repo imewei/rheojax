@@ -13,7 +13,13 @@ def test_fft_transform_on_synthetic_dataset(tmp_path) -> None:
     x = np.linspace(0, 10, 200)
     y = np.sin(2 * np.pi * 1.0 * x) + 0.1 * np.random.randn(x.size)
     csv_path = tmp_path / "synthetic_freq.csv"
-    np.savetxt(csv_path, np.column_stack([x, y]), delimiter=",", header="time,signal", comments="")
+    np.savetxt(
+        csv_path,
+        np.column_stack([x, y]),
+        delimiter=",",
+        header="time,signal",
+        comments="",
+    )
 
     data_service = DataService()
     transform_service = TransformService()

@@ -5,15 +5,12 @@ Main Application Window
 Central window coordinating pages, state, and services with dock-based layout.
 """
 
-
-import webbrowser
-from dataclasses import replace
-from datetime import datetime
-from pathlib import Path
 import uuid
+import webbrowser
+from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut, QFont
+from PySide6.QtGui import QCloseEvent, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
@@ -22,18 +19,19 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QTabWidget,
-    QVBoxLayout,
     QTextEdit,
     QToolBar,
     QWidget,
 )
 
+from rheojax.gui.app.menu_bar import MenuBar
+from rheojax.gui.app.status_bar import StatusBar
+from rheojax.gui.dialogs.about import AboutDialog
+from rheojax.gui.dialogs.import_wizard import ImportWizard
+from rheojax.gui.dialogs.preferences import PreferencesDialog
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.fit_worker import FitWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
-from rheojax.gui.app.menu_bar import MenuBar
-from rheojax.gui.app.status_bar import StatusBar
-from rheojax.gui.app.toolbar import MainToolBar
 from rheojax.gui.pages.bayesian_page import BayesianPage
 from rheojax.gui.pages.data_page import DataPage
 from rheojax.gui.pages.diagnostics_page import DiagnosticsPage
@@ -45,7 +43,6 @@ from rheojax.gui.resources import load_stylesheet
 from rheojax.gui.state.signals import StateSignals
 from rheojax.gui.state.store import (
     AppState,
-    BayesianResult,
     DatasetState,
     FitResult,
     PipelineStep,
@@ -53,9 +50,6 @@ from rheojax.gui.state.store import (
     StepStatus,
     WorkflowMode,
 )
-from rheojax.gui.dialogs.about import AboutDialog
-from rheojax.gui.dialogs.import_wizard import ImportWizard
-from rheojax.gui.dialogs.preferences import PreferencesDialog
 from rheojax.gui.widgets.dataset_tree import DatasetTree
 from rheojax.gui.widgets.pipeline_chips import PipelineChips
 
@@ -91,7 +85,9 @@ class RheoJAXMainWindow(QMainWindow):
     # Custom signals
     state_dirty = Signal(bool)  # Emitted when unsaved changes exist
 
-    def __init__(self, parent: QWidget | None = None, start_maximized: bool = False) -> None:
+    def __init__(
+        self, parent: QWidget | None = None, start_maximized: bool = False
+    ) -> None:
         """Initialize main window with pages and services.
 
         Parameters
@@ -241,7 +237,7 @@ class RheoJAXMainWindow(QMainWindow):
         for i in range(self.tabs.count()):
             self.tabs.setTabVisible(i, i in indices)
 
-    def _wrap_widget_in_toolbar(self, widget: QWidget) -> 'QToolBar':
+    def _wrap_widget_in_toolbar(self, widget: QWidget) -> "QToolBar":
         """Place an arbitrary widget inside a non-movable toolbar."""
         toolbar = QToolBar(self)
         toolbar.setMovable(False)
@@ -265,13 +261,17 @@ class RheoJAXMainWindow(QMainWindow):
         self._connect_help_menu()
 
         # Pipeline chips navigation
-        self.pipeline_chips.step_clicked.connect(lambda step: self.navigate_to(step.name.lower()))
+        self.pipeline_chips.step_clicked.connect(
+            lambda step: self.navigate_to(step.name.lower())
+        )
 
         # Dataset tree selection
         self.data_tree.dataset_selected.connect(self._on_dataset_selected)
 
         # Transform page callbacks
-        self.transform_page.transform_applied.connect(self._on_transform_applied_from_page)
+        self.transform_page.transform_applied.connect(
+            self._on_transform_applied_from_page
+        )
 
         # Fit page requests (run through centralized job pipeline)
         self.fit_page.fit_requested.connect(self._on_fit_requested_from_page)
@@ -285,8 +285,12 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Diagnostics page signals
         self.diagnostics_page.show_requested.connect(self._on_show_diagnostics)
-        self.diagnostics_page.plot_requested.connect(self._on_diagnostics_plot_requested)
-        self.diagnostics_page.export_requested.connect(self._on_diagnostics_export_requested)
+        self.diagnostics_page.plot_requested.connect(
+            self._on_diagnostics_plot_requested
+        )
+        self.diagnostics_page.export_requested.connect(
+            self._on_diagnostics_export_requested
+        )
 
         # Export page signals
         self.export_page.export_requested.connect(self._on_export_requested)
@@ -301,7 +305,11 @@ class RheoJAXMainWindow(QMainWindow):
             return
 
         signals.theme_changed.connect(self._apply_theme)
-        signals.dataset_added.connect(lambda dataset_id: self.status_bar.show_message(f"Dataset added: {dataset_id}", 2000))
+        signals.dataset_added.connect(
+            lambda dataset_id: self.status_bar.show_message(
+                f"Dataset added: {dataset_id}", 2000
+            )
+        )
         signals.dataset_added.connect(self._on_dataset_added)
         signals.pipeline_step_changed.connect(self._on_pipeline_step_changed)
 
@@ -345,14 +353,24 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.zoom_out_action.triggered.connect(self._on_zoom_out)
         self.menu_bar.reset_zoom_action.triggered.connect(self._on_reset_zoom)
         self.menu_bar.view_data_dock_action.triggered.connect(
-            lambda: self.data_dock.setVisible(self.menu_bar.view_data_dock_action.isChecked())
+            lambda: self.data_dock.setVisible(
+                self.menu_bar.view_data_dock_action.isChecked()
+            )
         )
         self.menu_bar.view_log_dock_action.triggered.connect(
-            lambda: self.log_dock.setVisible(self.menu_bar.view_log_dock_action.isChecked())
+            lambda: self.log_dock.setVisible(
+                self.menu_bar.view_log_dock_action.isChecked()
+            )
         )
-        self.menu_bar.theme_light_action.triggered.connect(lambda: self._on_theme_changed("light"))
-        self.menu_bar.theme_dark_action.triggered.connect(lambda: self._on_theme_changed("dark"))
-        self.menu_bar.theme_auto_action.triggered.connect(lambda: self._on_theme_changed("auto"))
+        self.menu_bar.theme_light_action.triggered.connect(
+            lambda: self._on_theme_changed("light")
+        )
+        self.menu_bar.theme_dark_action.triggered.connect(
+            lambda: self._on_theme_changed("dark")
+        )
+        self.menu_bar.theme_auto_action.triggered.connect(
+            lambda: self._on_theme_changed("auto")
+        )
 
     def _connect_data_menu(self) -> None:
         """Connect Data menu actions."""
@@ -364,30 +382,48 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.test_mode_relaxation.triggered.connect(
             lambda: self._on_set_test_mode("relaxation")
         )
-        self.menu_bar.test_mode_creep.triggered.connect(lambda: self._on_set_test_mode("creep"))
+        self.menu_bar.test_mode_creep.triggered.connect(
+            lambda: self._on_set_test_mode("creep")
+        )
         self.menu_bar.test_mode_rotation.triggered.connect(
             lambda: self._on_set_test_mode("rotation")
         )
-        self.menu_bar.auto_detect_mode_action.triggered.connect(self._on_auto_detect_mode)
+        self.menu_bar.auto_detect_mode_action.triggered.connect(
+            self._on_auto_detect_mode
+        )
 
     def _connect_models_menu(self) -> None:
         """Connect Models menu actions."""
         # Classical models
-        self.menu_bar.model_maxwell.triggered.connect(lambda: self._on_select_model("maxwell"))
-        self.menu_bar.model_zener.triggered.connect(lambda: self._on_select_model("zener"))
-        self.menu_bar.model_springpot.triggered.connect(lambda: self._on_select_model("springpot"))
+        self.menu_bar.model_maxwell.triggered.connect(
+            lambda: self._on_select_model("maxwell")
+        )
+        self.menu_bar.model_zener.triggered.connect(
+            lambda: self._on_select_model("zener")
+        )
+        self.menu_bar.model_springpot.triggered.connect(
+            lambda: self._on_select_model("springpot")
+        )
 
         # Flow models
-        self.menu_bar.model_power_law.triggered.connect(lambda: self._on_select_model("power_law"))
-        self.menu_bar.model_carreau.triggered.connect(lambda: self._on_select_model("carreau"))
+        self.menu_bar.model_power_law.triggered.connect(
+            lambda: self._on_select_model("power_law")
+        )
+        self.menu_bar.model_carreau.triggered.connect(
+            lambda: self._on_select_model("carreau")
+        )
         self.menu_bar.model_carreau_yasuda.triggered.connect(
             lambda: self._on_select_model("carreau_yasuda")
         )
-        self.menu_bar.model_cross.triggered.connect(lambda: self._on_select_model("cross"))
+        self.menu_bar.model_cross.triggered.connect(
+            lambda: self._on_select_model("cross")
+        )
         self.menu_bar.model_herschel_bulkley.triggered.connect(
             lambda: self._on_select_model("herschel_bulkley")
         )
-        self.menu_bar.model_bingham.triggered.connect(lambda: self._on_select_model("bingham"))
+        self.menu_bar.model_bingham.triggered.connect(
+            lambda: self._on_select_model("bingham")
+        )
 
         # Fractional Maxwell family
         self.menu_bar.model_fmaxwell_gel.triggered.connect(
@@ -448,11 +484,15 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _connect_transforms_menu(self) -> None:
         """Connect Transforms menu actions."""
-        self.menu_bar.transform_fft.triggered.connect(lambda: self._on_apply_transform("fft"))
+        self.menu_bar.transform_fft.triggered.connect(
+            lambda: self._on_apply_transform("fft")
+        )
         self.menu_bar.transform_mastercurve.triggered.connect(
             lambda: self._on_apply_transform("mastercurve")
         )
-        self.menu_bar.transform_srfs.triggered.connect(lambda: self._on_apply_transform("srfs"))
+        self.menu_bar.transform_srfs.triggered.connect(
+            lambda: self._on_apply_transform("srfs")
+        )
         self.menu_bar.transform_mutation.triggered.connect(
             lambda: self._on_apply_transform("mutation_number")
         )
@@ -462,7 +502,9 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.transform_derivatives.triggered.connect(
             lambda: self._on_apply_transform("derivatives")
         )
-        self.menu_bar.transform_spp.triggered.connect(lambda: self._on_apply_transform("spp"))
+        self.menu_bar.transform_spp.triggered.connect(
+            lambda: self._on_apply_transform("spp")
+        )
 
     def _connect_analysis_menu(self) -> None:
         """Connect Analysis menu actions."""
@@ -470,7 +512,9 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.analysis_fit_bayesian.triggered.connect(self._on_bayesian)
         self.menu_bar.analysis_batch_fit.triggered.connect(self._on_batch_fit)
         self.menu_bar.analysis_compare.triggered.connect(self._on_compare_models)
-        self.menu_bar.analysis_compatibility.triggered.connect(self._on_check_compatibility)
+        self.menu_bar.analysis_compatibility.triggered.connect(
+            self._on_check_compatibility
+        )
 
     def _connect_tools_menu(self) -> None:
         """Connect Tools menu actions."""
@@ -695,7 +739,9 @@ class RheoJAXMainWindow(QMainWindow):
         try:
             webbrowser.open(url)
             self.log(f"Opening example: {rel_path or example_name}")
-            self.status_bar.show_message(f"Opening {example_name} example in Colab...", 2000)
+            self.status_bar.show_message(
+                f"Opening {example_name} example in Colab...", 2000
+            )
         except Exception:
             webbrowser.open(f"{GITHUB_BASE}/examples")
             self.log("Falling back to examples repository link")
@@ -746,9 +792,7 @@ class RheoJAXMainWindow(QMainWindow):
                 self.status_bar.show_message("Data imported successfully", 3000)
             except Exception as exc:
                 self.log(f"Import failed: {exc}")
-                self.store.dispatch(
-                    "IMPORT_DATA_FAILED", {"error": str(exc), **config}
-                )
+                self.store.dispatch("IMPORT_DATA_FAILED", {"error": str(exc), **config})
                 self.status_bar.show_message(f"Import failed: {exc}", 5000)
 
     @Slot()
@@ -761,6 +805,7 @@ class RheoJAXMainWindow(QMainWindow):
         # Quick export of current fit parameters if available
         try:
             from PySide6.QtWidgets import QFileDialog
+
             from rheojax.gui.services.export_service import ExportService
 
             fit_result = self.store.get_active_fit_result()
@@ -770,7 +815,9 @@ class RheoJAXMainWindow(QMainWindow):
                 )
                 if path:
                     ExportService().export_parameters(fit_result, path)
-                    self.status_bar.show_message(f"Exported fit parameters to {Path(path).name}", 3000)
+                    self.status_bar.show_message(
+                        f"Exported fit parameters to {Path(path).name}", 3000
+                    )
         except Exception as exc:
             self.log(f"Export not available: {exc}")
 
@@ -940,18 +987,28 @@ class RheoJAXMainWindow(QMainWindow):
         if job_type:
             step = "fit" if job_type == "fit" else "bayesian"
             self.store.dispatch("SET_PIPELINE_STEP", {"step": step, "status": "ACTIVE"})
-            self.pipeline_chips.set_step_status(getattr(PipelineStep, step.upper()), StepStatus.ACTIVE)
+            self.pipeline_chips.set_step_status(
+                getattr(PipelineStep, step.upper()), StepStatus.ACTIVE
+            )
         self.status_bar.show_message(f"Job started: {job_id}", 1000)
 
-    def _on_job_progress(self, job_id: str, current: int, total: int, message: str) -> None:
+    def _on_job_progress(
+        self, job_id: str, current: int, total: int, message: str
+    ) -> None:
         job_type = self._job_types.get(job_id, "")
-        max_value = int(total) if isinstance(total, (int, float)) and 0 < total <= 100 else 0
+        max_value = (
+            int(total) if isinstance(total, (int, float)) and 0 < total <= 100 else 0
+        )
         msg_text = str(message) if message is not None else f"{job_type} running..."
         self.status_bar.show_progress(int(current), max_value, msg_text)
         if job_type == "fit":
-            self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"}
+            )
         elif job_type == "bayesian":
-            self.store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "ACTIVE"})
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": "bayesian", "status": "ACTIVE"}
+            )
 
     def _on_job_completed(self, job_id: str, result: object) -> None:
         job_type = self._job_types.pop(job_id, "")
@@ -973,7 +1030,9 @@ class RheoJAXMainWindow(QMainWindow):
                 self._update_fit_plot(stored)
             # Re-enable Fit page controls even if downstream UI work fails.
             self.store.dispatch("FITTING_COMPLETED", {"result": result})
-            self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"})
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"}
+            )
             self.status_bar.show_message("Fit complete", 3000)
             self._auto_save_if_enabled()
         elif job_type == "bayesian":
@@ -986,7 +1045,9 @@ class RheoJAXMainWindow(QMainWindow):
                     "model_name": state.active_model_name,
                 },
             )
-            self.store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"})
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"}
+            )
             self.status_bar.show_message("Bayesian inference complete", 3000)
             self._auto_save_if_enabled()
         self.log(f"Job {job_id} completed ({job_type})")
@@ -995,7 +1056,9 @@ class RheoJAXMainWindow(QMainWindow):
         job_type = self._job_types.pop(job_id, "")
         self.status_bar.hide_progress()
         if job_type:
-            self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"})
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"}
+            )
         if job_type == "fit":
             self.store.dispatch("FITTING_FAILED", {"error": str(error)})
         self.log(f"Job {job_id} failed: {error}")
@@ -1005,7 +1068,9 @@ class RheoJAXMainWindow(QMainWindow):
         job_type = self._job_types.pop(job_id, "")
         self.status_bar.hide_progress()
         if job_type:
-            self.store.dispatch("SET_PIPELINE_STEP", {"step": job_type, "status": "WARNING"})
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": job_type, "status": "WARNING"}
+            )
         if job_type == "fit":
             self.store.dispatch("FITTING_FAILED", {"error": "Cancelled"})
         self.log(f"Job {job_id} cancelled")
@@ -1020,6 +1085,7 @@ class RheoJAXMainWindow(QMainWindow):
 
         try:
             import numpy as np
+
             from rheojax.core.data import RheoData
             from rheojax.gui.services.plot_service import PlotService
 
@@ -1042,7 +1108,11 @@ class RheoJAXMainWindow(QMainWindow):
                 self.fit_page.plot_residuals(
                     x=np.asarray(fit_result.x_fit),
                     residuals=np.asarray(fit_result.residuals),
-                    y_pred=np.asarray(fit_result.y_fit) if fit_result.y_fit is not None else None,
+                    y_pred=(
+                        np.asarray(fit_result.y_fit)
+                        if fit_result.y_fit is not None
+                        else None
+                    ),
                 )
         except Exception as exc:
             self.log(f"Failed to update fit plot: {exc}")
@@ -1087,7 +1157,9 @@ class RheoJAXMainWindow(QMainWindow):
             try:
                 self.data_page.show_dataset(active)
                 inferred_mode = self.store.get_state().datasets.get(active).test_mode
-                self.status_bar.show_message(f"Auto-detected test mode: {inferred_mode}", 2500)
+                self.status_bar.show_message(
+                    f"Auto-detected test mode: {inferred_mode}", 2500
+                )
             except Exception as exc:
                 self.log(f"Auto-detect test mode failed: {exc}")
                 self.status_bar.show_message("Auto-detect test mode failed", 2500)
@@ -1142,7 +1214,9 @@ class RheoJAXMainWindow(QMainWindow):
             "Export Results": self._on_export,
         }
         labels = sorted(actions.keys())
-        selected, ok = QInputDialog.getItem(self, "Command Palette", "Action:", labels, 0, False)
+        selected, ok = QInputDialog.getItem(
+            self, "Command Palette", "Action:", labels, 0, False
+        )
         if ok and selected in actions:
             actions[selected]()
 
@@ -1150,7 +1224,9 @@ class RheoJAXMainWindow(QMainWindow):
     # Transforms Menu Handlers
     # -------------------------------------------------------------------------
 
-    def _on_apply_transform(self, transform_id: str, params: dict | None = None) -> None:
+    def _on_apply_transform(
+        self, transform_id: str, params: dict | None = None
+    ) -> None:
         """Handle transform application."""
         self.store.dispatch("APPLY_TRANSFORM", {"transform_id": transform_id})
         dataset = self.store.get_active_dataset()
@@ -1177,7 +1253,9 @@ class RheoJAXMainWindow(QMainWindow):
                     for name, spec in param_specs.items()
                     if isinstance(spec, dict) and "default" in spec
                 }
-            result = transform_service.apply_transform(transform_id, rheo_data, params=params or {})
+            result = transform_service.apply_transform(
+                transform_id, rheo_data, params=params or {}
+            )
 
             # Handle tuple return (data, extras)
             transformed = result[0] if isinstance(result, tuple) else result
@@ -1199,11 +1277,15 @@ class RheoJAXMainWindow(QMainWindow):
             self.log(f"Applied transform {transform_id} -> dataset {new_id}")
             self.navigate_to("transform")
         except Exception as exc:
-            self.store.dispatch("SET_PIPELINE_STEP", {"step": "transform", "status": "ERROR"})
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": "transform", "status": "ERROR"}
+            )
             self.status_bar.show_message(f"Transform failed: {exc}", 4000)
             self.log(f"Transform failed: {exc}")
 
-    def _on_transform_applied_from_page(self, transform_name: str, dataset_id: str) -> None:
+    def _on_transform_applied_from_page(
+        self, transform_name: str, dataset_id: str
+    ) -> None:
         """Handle transform requests originating from TransformPage."""
         name_map = {
             "fft": "fft",
@@ -1232,8 +1314,12 @@ class RheoJAXMainWindow(QMainWindow):
         if not isinstance(payload, dict):
             return
 
-        model_name = payload.get("model_name") or self.store.get_state().active_model_name
-        dataset_id = payload.get("dataset_id") or self.store.get_state().active_dataset_id
+        model_name = (
+            payload.get("model_name") or self.store.get_state().active_model_name
+        )
+        dataset_id = (
+            payload.get("dataset_id") or self.store.get_state().active_dataset_id
+        )
         initial_params = payload.get("initial_params")
         options = payload.get("options") or {}
 
@@ -1277,7 +1363,7 @@ class RheoJAXMainWindow(QMainWindow):
                 init_params_dict = {}
                 for key, value in initial_params.items():
                     if hasattr(value, "value"):
-                        init_params_dict[str(key)] = float(getattr(value, "value"))
+                        init_params_dict[str(key)] = float(value.value)
                     else:
                         init_params_dict[str(key)] = float(value)
             except Exception:
@@ -1287,7 +1373,9 @@ class RheoJAXMainWindow(QMainWindow):
             state_params = self.store.get_state().model_params
             if state_params:
                 try:
-                    init_params_dict = {name: float(p.value) for name, p in state_params.items()}
+                    init_params_dict = {
+                        name: float(p.value) for name, p in state_params.items()
+                    }
                 except Exception:
                     init_params_dict = None
         if init_params_dict is None:
@@ -1296,7 +1384,9 @@ class RheoJAXMainWindow(QMainWindow):
                 from rheojax.gui.services.model_service import ModelService
 
                 defaults = ModelService().get_parameter_defaults(model_name)
-                init_params_dict = {name: float(p.value) for name, p in defaults.items()}
+                init_params_dict = {
+                    name: float(p.value) for name, p in defaults.items()
+                }
             except Exception:
                 init_params_dict = None
 
@@ -1353,7 +1443,9 @@ class RheoJAXMainWindow(QMainWindow):
         dataset = self.store.get_active_dataset()
         model_name = self.store.get_state().active_model_name
         if dataset is None or model_name is None:
-            self.status_bar.show_message("Select data and model before Bayesian run", 4000)
+            self.status_bar.show_message(
+                "Select data and model before Bayesian run", 4000
+            )
             return
 
         try:
@@ -1370,7 +1462,9 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.show_message("Unable to build dataset for Bayesian", 4000)
             return
 
-        self.store.dispatch("SET_PIPELINE_STEP", {"step": "bayesian", "status": "ACTIVE"})
+        self.store.dispatch(
+            "SET_PIPELINE_STEP", {"step": "bayesian", "status": "ACTIVE"}
+        )
         self.status_bar.show_progress(0, 0, "Running Bayesian inference...")
 
         if not self.worker_pool:
@@ -1393,7 +1487,9 @@ class RheoJAXMainWindow(QMainWindow):
         model_name = state.active_model_name
         dataset_id = state.active_dataset_id
         if model_name:
-            self.diagnostics_page.show_diagnostics(model_name=model_name, dataset_id=dataset_id)
+            self.diagnostics_page.show_diagnostics(
+                model_name=model_name, dataset_id=dataset_id
+            )
         else:
             self.status_bar.show_message("Select a model to view diagnostics", 3000)
 
@@ -1583,7 +1679,9 @@ class RheoJAXMainWindow(QMainWindow):
             memory_used = 0
             memory_total = 8192  # Placeholder
 
-            self.status_bar.update_jax_status(device_name, memory_used, memory_total, float64_enabled)
+            self.status_bar.update_jax_status(
+                device_name, memory_used, memory_total, float64_enabled
+            )
         except Exception as e:
             self.log(f"Failed to update JAX status: {e}")
 
@@ -1601,6 +1699,7 @@ class RheoJAXMainWindow(QMainWindow):
                 if fit_result or bayes_result:
                     from rheojax.gui.services.export_service import ExportService
                     from rheojax.gui.services.plot_service import PlotService
+
                     export_service = ExportService()
                     plot_service = PlotService()
 
@@ -1625,7 +1724,10 @@ class RheoJAXMainWindow(QMainWindow):
                                     initial_test_mode=dataset.test_mode,
                                 )
                                 fig = plot_service.create_fit_plot(
-                                    rheo_data, fit_result, style=self._plot_style, test_mode=dataset.test_mode
+                                    rheo_data,
+                                    fit_result,
+                                    style=self._plot_style,
+                                    test_mode=dataset.test_mode,
                                 )
                                 export_service.export_figure(fig, fig_path)
                         except Exception as exc:
@@ -1641,17 +1743,23 @@ class RheoJAXMainWindow(QMainWindow):
                         except Exception as exc:
                             self.log(f"Auto-export posterior failed: {exc}")
                         try:
-                            fig = plot_service.create_arviz_plot(bayes_result, plot_type="trace", style=self._plot_style)
+                            fig = plot_service.create_arviz_plot(
+                                bayes_result, plot_type="trace", style=self._plot_style
+                            )
                             export_service.export_figure(fig, diag_path)
                         except Exception as exc:
                             self.log(f"Auto-export diagnostics failed: {exc}")
                         try:
-                            fig = plot_service.create_arviz_plot(bayes_result, plot_type="forest", style=self._plot_style)
+                            fig = plot_service.create_arviz_plot(
+                                bayes_result, plot_type="forest", style=self._plot_style
+                            )
                             export_service.export_figure(fig, forest_path)
                         except Exception as exc:
                             self.log(f"Auto-export forest failed: {exc}")
                         try:
-                            fig = plot_service.create_arviz_plot(bayes_result, plot_type="energy", style=self._plot_style)
+                            fig = plot_service.create_arviz_plot(
+                                bayes_result, plot_type="energy", style=self._plot_style
+                            )
                             export_service.export_figure(fig, energy_path)
                         except Exception as exc:
                             self.log(f"Auto-export energy failed: {exc}")

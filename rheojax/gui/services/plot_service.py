@@ -7,7 +7,6 @@ Service for generating rheological plots with matplotlib.
 
 from __future__ import annotations
 
-import io
 import logging
 import os
 import tempfile
@@ -49,7 +48,9 @@ class PlotService:
             "presentation": self._apply_presentation_style,
             "dark": self._apply_dark_style,
         }
-        self._style_cache = {name: load_plot_style(name) for name in available_plot_styles()}
+        self._style_cache = {
+            name: load_plot_style(name) for name in available_plot_styles()
+        }
 
         # Wong colorblind-safe palette
         self._colorblind_palette = [
@@ -217,7 +218,7 @@ class PlotService:
             if not has_uncertainty:
                 return None, None
             try:
-                from scipy.stats import norm
+
                 # Get Jacobian dimensions from pcov
                 n_params = pcov.shape[0]
                 # Use finite difference on y_fit to approximate band
@@ -225,7 +226,9 @@ class PlotService:
                 # Uncertainty ~ sqrt(diag(pcov)) projected to y space
                 param_std = np.sqrt(np.diag(pcov))
                 # Rough approximation: scale y_fit by relative param uncertainty
-                rel_uncertainty = np.mean(param_std / (np.abs(list(fit_result.parameters.values())) + 1e-10))
+                rel_uncertainty = np.mean(
+                    param_std / (np.abs(list(fit_result.parameters.values())) + 1e-10)
+                )
                 sigma_y = np.abs(y_vals) * rel_uncertainty
                 z = 1.96  # 95% CI
                 return y_vals - z * sigma_y, y_vals + z * sigma_y
@@ -243,33 +246,69 @@ class PlotService:
                 G_double_prime_fit = np.abs(np.imag(y_fit))
 
                 # Avoid log-scale issues with zeros.
-                positive = np.concatenate([
-                    np.ravel(G_prime[np.isfinite(G_prime) & (G_prime > 0)]),
-                    np.ravel(G_double_prime[np.isfinite(G_double_prime) & (G_double_prime > 0)]),
-                ])
+                positive = np.concatenate(
+                    [
+                        np.ravel(G_prime[np.isfinite(G_prime) & (G_prime > 0)]),
+                        np.ravel(
+                            G_double_prime[
+                                np.isfinite(G_double_prime) & (G_double_prime > 0)
+                            ]
+                        ),
+                    ]
+                )
                 eps = float(np.nanmin(positive)) * 1e-12 if positive.size else 1e-30
                 G_prime = np.maximum(G_prime, eps)
                 G_double_prime = np.maximum(G_double_prime, eps)
                 G_prime_fit = np.maximum(G_prime_fit, eps)
                 G_double_prime_fit = np.maximum(G_double_prime_fit, eps)
 
-                ax.loglog(x, G_prime, "o", label="G' (data)", color=palette[0] if palette else None)
-                ax.loglog(x, G_double_prime, "s", label='G" (data)', color=palette[1] if palette else None)
-                ax.loglog(x, G_prime_fit, "-", label="G' (fit)", color=palette[0] if palette else None)
-                ax.loglog(x, G_double_prime_fit, "-", label='G" (fit)', color=palette[1] if palette else None)
+                ax.loglog(
+                    x,
+                    G_prime,
+                    "o",
+                    label="G' (data)",
+                    color=palette[0] if palette else None,
+                )
+                ax.loglog(
+                    x,
+                    G_double_prime,
+                    "s",
+                    label='G" (data)',
+                    color=palette[1] if palette else None,
+                )
+                ax.loglog(
+                    x,
+                    G_prime_fit,
+                    "-",
+                    label="G' (fit)",
+                    color=palette[0] if palette else None,
+                )
+                ax.loglog(
+                    x,
+                    G_double_prime_fit,
+                    "-",
+                    label='G" (fit)',
+                    color=palette[1] if palette else None,
+                )
 
                 ax.set_xlabel("Frequency (rad/s)")
                 ax.set_ylabel("Modulus (Pa)")
             else:
                 # Complex modulus magnitude
-                ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
-                ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
-                
+                ax.loglog(
+                    x, y, "o", label="Data", color=palette[0] if palette else None
+                )
+                ax.loglog(
+                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                )
+
                 # Add uncertainty band
                 y_lo, y_hi = _compute_band(x, y_fit)
                 if y_lo is not None and y_hi is not None:
                     y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                    ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+                    ax.fill_between(
+                        x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                    )
 
                 ax.set_xlabel("Frequency (rad/s)")
                 ax.set_ylabel("|G*| (Pa)")
@@ -277,7 +316,7 @@ class PlotService:
         elif test_mode == "relaxation":
             ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
             ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
-            
+
             # Add uncertainty band
             y_lo, y_hi = _compute_band(x, y_fit)
             if y_lo is not None and y_hi is not None:
@@ -290,7 +329,7 @@ class PlotService:
         elif test_mode == "creep":
             ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
             ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
-            
+
             # Add uncertainty band
             y_lo, y_hi = _compute_band(x, y_fit)
             if y_lo is not None and y_hi is not None:
@@ -303,7 +342,7 @@ class PlotService:
         elif test_mode == "flow":
             ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
             ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
-            
+
             # Add uncertainty band
             y_lo, y_hi = _compute_band(x, y_fit)
             if y_lo is not None and y_hi is not None:
@@ -320,7 +359,6 @@ class PlotService:
         self.apply_style(fig, style)
 
         return fig
-
 
     def create_residual_plot(
         self,
@@ -499,7 +537,9 @@ class PlotService:
         if style_text:
             plt.rcParams.update(plt.rcParamsDefault)
             # rc_params_from_file expects a path; write to temp file
-            with tempfile.NamedTemporaryFile("w", suffix=".mplstyle", delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(
+                "w", suffix=".mplstyle", delete=False
+            ) as tmp:
                 tmp.write(style_text)
                 tmp_path = tmp.name
             try:
@@ -509,7 +549,9 @@ class PlotService:
                 try:
                     os.remove(tmp_path)
                 except OSError as exc:
-                    logging.getLogger(__name__).debug("Failed to remove temp style file: %s", exc)
+                    logging.getLogger(__name__).debug(
+                        "Failed to remove temp style file: %s", exc
+                    )
         else:
             plt.style.use("default")
 

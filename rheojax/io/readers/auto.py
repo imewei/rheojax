@@ -58,7 +58,9 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
         return _try_all_readers(filepath, **kwargs)
 
 
-def _try_trios_then_anton_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
+def _try_trios_then_anton_then_csv(
+    filepath: Path, **kwargs
+) -> RheoData | list[RheoData]:
     """Try TRIOS first, then Anton Paar, then CSV.
 
     Args:
@@ -72,18 +74,24 @@ def _try_trios_then_anton_then_csv(filepath: Path, **kwargs) -> RheoData | list[
     try:
         return load_trios(filepath, **kwargs)
     except Exception as e:
-        warnings.warn(f"TRIOS reader failed: {e}. Trying Anton Paar reader.", stacklevel=2)
+        warnings.warn(
+            f"TRIOS reader failed: {e}. Trying Anton Paar reader.", stacklevel=2
+        )
 
     try:
         return load_anton_paar(filepath, **kwargs)
     except Exception as e:
-        warnings.warn(f"Anton Paar reader failed: {e}. Trying CSV reader.", stacklevel=2)
+        warnings.warn(
+            f"Anton Paar reader failed: {e}. Trying CSV reader.", stacklevel=2
+        )
 
     # Try CSV as fallback
     try:
         return _try_csv(filepath, **kwargs)
     except Exception as e:
-        raise ValueError(f"Could not parse file as TRIOS, Anton Paar, or CSV: {e}") from e
+        raise ValueError(
+            f"Could not parse file as TRIOS, Anton Paar, or CSV: {e}"
+        ) from e
 
 
 def _try_csv(filepath: Path, **kwargs) -> RheoData:

@@ -216,9 +216,7 @@ class TestStateIntegration:
         store = StateStore()
 
         def updater(state: AppState) -> AppState:
-            return AppState(
-                **{**state.__dict__, "project_name": "Test Project"}
-            )
+            return AppState(**{**state.__dict__, "project_name": "Test Project"})
 
         store.update_state(updater)
 
@@ -277,9 +275,7 @@ class TestWorkflowIntegration:
             app = QApplication([])
         return app
 
-    def test_fit_page_workflow(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
+    def test_fit_page_workflow(self, qapp: QApplication, qtbot: Any) -> None:
         """Test FitPage can be instantiated and models loaded."""
         from rheojax.gui.pages.fit_page import FitPage
         from rheojax.gui.state.store import StateStore
@@ -296,9 +292,7 @@ class TestWorkflowIntegration:
 
         page.close()
 
-    def test_bayesian_page_workflow(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
+    def test_bayesian_page_workflow(self, qapp: QApplication, qtbot: Any) -> None:
         """Test BayesianPage can be instantiated."""
         from rheojax.gui.pages.bayesian_page import BayesianPage
         from rheojax.gui.state.store import StateStore
@@ -321,9 +315,7 @@ class TestWorkflowIntegration:
 
         page.close()
 
-    def test_data_page_workflow(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
+    def test_data_page_workflow(self, qapp: QApplication, qtbot: Any) -> None:
         """Test DataPage can be instantiated."""
         from rheojax.gui.pages.data_page import DataPage
         from rheojax.gui.state.store import StateStore
@@ -345,9 +337,7 @@ class TestWorkflowIntegration:
 
         page.close()
 
-    def test_transform_page_workflow(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
+    def test_transform_page_workflow(self, qapp: QApplication, qtbot: Any) -> None:
         """Test TransformPage can be instantiated."""
         from rheojax.gui.pages.transform_page import TransformPage
         from rheojax.gui.state.store import StateStore
@@ -362,9 +352,7 @@ class TestWorkflowIntegration:
 
         page.close()
 
-    def test_export_page_workflow(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
+    def test_export_page_workflow(self, qapp: QApplication, qtbot: Any) -> None:
         """Test ExportPage can be instantiated."""
         from rheojax.gui.pages.export_page import ExportPage
         from rheojax.gui.state.store import StateStore
@@ -398,7 +386,6 @@ class TestWidgetIntegration:
             app = QApplication([])
         return app
 
-
     def test_parameter_table_set_parameters(
         self, qapp: QApplication, qtbot: Any
     ) -> None:
@@ -430,9 +417,7 @@ class TestWidgetIntegration:
 
         table.close()
 
-    def test_plot_canvas_clear_and_plot(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
+    def test_plot_canvas_clear_and_plot(self, qapp: QApplication, qtbot: Any) -> None:
         """Test PlotCanvas can clear and plot data."""
         from rheojax.gui.widgets.plot_canvas import PlotCanvas
 
@@ -449,9 +434,7 @@ class TestWidgetIntegration:
 
         canvas.close()
 
-    def test_arviz_canvas_plot_types(
-        self, qapp: QApplication, qtbot: Any
-    ) -> None:
+    def test_arviz_canvas_plot_types(self, qapp: QApplication, qtbot: Any) -> None:
         """Test ArvizCanvas supports expected plot types."""
         from rheojax.gui.widgets.arviz_canvas import PLOT_TYPES, ArvizCanvas
 

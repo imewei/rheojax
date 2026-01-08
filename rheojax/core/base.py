@@ -125,7 +125,9 @@ class BaseModel(BayesianMixin, ABC):
 
         except Exception as e:
             logging.debug(f"Range detection failed: {e}")
-            use_log_residuals = use_log_residuals if use_log_residuals is not None else False
+            use_log_residuals = (
+                use_log_residuals if use_log_residuals is not None else False
+            )
             use_multi_start = use_multi_start if use_multi_start is not None else False
 
         return use_log_residuals, use_multi_start
@@ -180,7 +182,10 @@ class BaseModel(BayesianMixin, ABC):
         """
         error_msg = str(error)
 
-        if "Optimization failed" not in error_msg and "did not converge" not in error_msg:
+        if (
+            "Optimization failed" not in error_msg
+            and "did not converge" not in error_msg
+        ):
             return error
 
         compatibility = self._check_compatibility(X, y, test_mode)

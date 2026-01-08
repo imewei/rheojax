@@ -34,7 +34,11 @@ def rheodata_from_dataset_state(dataset: DatasetState) -> RheoData:
     x_arr = np.asarray(x)
     y_arr = np.asarray(y)
 
-    if (test_mode or "") == "oscillation" and y2 is not None and not np.iscomplexobj(y_arr):
+    if (
+        (test_mode or "") == "oscillation"
+        and y2 is not None
+        and not np.iscomplexobj(y_arr)
+    ):
         y2_arr = np.asarray(y2)
         # Combine into complex modulus G* = G' + iG''.
         if y2_arr.shape == y_arr.shape:
@@ -60,11 +64,10 @@ def rheodata_from_any(data: Any) -> RheoData:
         return data
     if hasattr(data, "x") and hasattr(data, "y"):
         return RheoData(
-            x=np.asarray(getattr(data, "x")),
-            y=np.asarray(getattr(data, "y")),
+            x=np.asarray(data.x),
+            y=np.asarray(data.y),
             metadata=dict(getattr(data, "metadata", {}) or {}),
             initial_test_mode=getattr(data, "initial_test_mode", None),
             validate=False,
         )
     raise TypeError(f"Unsupported data type for rheodata conversion: {type(data)}")
-

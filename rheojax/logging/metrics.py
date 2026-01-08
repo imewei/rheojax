@@ -19,9 +19,7 @@ LoggerType = logging.Logger | RheoJAXLogger | None
 
 
 def timed(
-    logger: LoggerType = None,
-    level: int = logging.DEBUG,
-    include_args: bool = False
+    logger: LoggerType = None, level: int = logging.DEBUG, include_args: bool = False
 ) -> Callable[[F], F]:
     """Decorator to log function execution time.
 
@@ -42,6 +40,7 @@ def timed(
         ... def fit_model(data):
         ...     return model.fit(data)
     """
+
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -68,8 +67,11 @@ def timed(
                         safe_args.append(type(arg).__name__)
                 extra["args"] = safe_args
                 extra["kwargs"] = {
-                    k: v if isinstance(v, (str, int, float, bool, type(None)))
-                    else type(v).__name__
+                    k: (
+                        v
+                        if isinstance(v, (str, int, float, bool, type(None)))
+                        else type(v).__name__
+                    )
                     for k, v in kwargs.items()
                 }
 
@@ -85,7 +87,7 @@ def timed(
                         "elapsed_seconds": round(elapsed, 6),
                         "elapsed_ms": round(elapsed * 1000, 3),
                         "status": "success",
-                    }
+                    },
                 )
                 return result
 
@@ -98,11 +100,12 @@ def timed(
                         "elapsed_seconds": round(elapsed, 6),
                         "status": "error",
                         "error_type": type(e).__name__,
-                    }
+                    },
                 )
                 raise
 
         return wrapper  # type: ignore
+
     return decorator
 
 
@@ -111,7 +114,7 @@ def log_memory(
     logger: LoggerType = None,
     operation: str = "operation",
     level: int = logging.DEBUG,
-    trace_lines: bool = False
+    trace_lines: bool = False,
 ):
     """Context manager for tracking memory usage.
 
@@ -131,7 +134,9 @@ def log_memory(
         ...     result = compute_large_array()
         DEBUG | rheojax.core | large_computation memory | current_mb=45.2 | peak_mb=128.5
     """
-    actual_logger: logging.Logger | RheoJAXLogger = logger if logger is not None else get_logger("rheojax.metrics")
+    actual_logger: logging.Logger | RheoJAXLogger = (
+        logger if logger is not None else get_logger("rheojax.metrics")
+    )
 
     tracemalloc.start()
     try:
@@ -185,7 +190,7 @@ class IterationLogger:
         logger: LoggerType = None,
         log_every: int = 10,
         level: int = logging.DEBUG,
-        operation: str = "optimization"
+        operation: str = "optimization",
     ) -> None:
         """Initialize the iteration logger.
 
@@ -203,12 +208,7 @@ class IterationLogger:
         self.start_time = time.perf_counter()
         self._last_cost: float | None = None
 
-    def log(
-        self,
-        cost: float | None = None,
-        force: bool = False,
-        **metrics
-    ) -> None:
+    def log(self, cost: float | None = None, force: bool = False, **metrics) -> None:
         """Log iteration if at logging interval.
 
         Args:
@@ -234,11 +234,7 @@ class IterationLogger:
 
             extra.update(metrics)
 
-            self.logger.log(
-                self.level,
-                f"Iteration {self.iteration}",
-                extra=extra
-            )
+            self.logger.log(self.level, f"Iteration {self.iteration}", extra=extra)
 
     def log_final(self, **metrics) -> None:
         """Log final iteration summary.
@@ -260,10 +256,7 @@ class IterationLogger:
 
         extra.update(metrics)
 
-        self.logger.info(
-            f"{self.operation} completed",
-            extra=extra
-        )
+        self.logger.info(f"{self.operation} completed", extra=extra)
 
     def reset(self) -> None:
         """Reset iteration counter and timer."""
@@ -292,7 +285,7 @@ class ConvergenceTracker:
         logger: LoggerType = None,
         tolerance: float = 1e-6,
         patience: int = 5,
-        min_iterations: int = 10
+        min_iterations: int = 10,
     ) -> None:
         """Initialize the convergence tracker.
 
@@ -340,7 +333,7 @@ class ConvergenceTracker:
                         "iterations": len(self.history),
                         "last_improvement": improvement,
                         "tolerance": self.tolerance,
-                    }
+                    },
                 )
                 return True
 

@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 
+from rheojax.gui.pages.bayesian_page import BayesianPage
+from rheojax.gui.pages.export_page import ExportPage
 from rheojax.gui.state.store import (
     AppState,
     DatasetState,
@@ -9,8 +11,6 @@ from rheojax.gui.state.store import (
     StateStore,
     StepStatus,
 )
-from rheojax.gui.pages.export_page import ExportPage
-from rheojax.gui.pages.bayesian_page import BayesianPage
 
 
 def setup_function() -> None:

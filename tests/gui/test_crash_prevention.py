@@ -61,7 +61,9 @@ class TestEmojiCrashPrevention:
         provider = IconProvider(allow_emoji=False)
 
         for category, icon in provider.CATEGORY_ICONS_ASCII.items():
-            assert ascii_checker(icon), f"Category {category} has non-ASCII icon: {icon}"
+            assert ascii_checker(
+                icon
+            ), f"Category {category} has non-ASCII icon: {icon}"
 
     def test_all_status_icons_are_ascii(self, ascii_checker):
         """Verify all status icons contain only ASCII characters."""
@@ -79,15 +81,17 @@ class TestEmojiCrashPrevention:
         provider = IconProvider(allow_emoji=False)
 
         for file_type, icon in provider.FILE_ICONS_ASCII.items():
-            assert ascii_checker(icon), f"File type {file_type} has non-ASCII icon: {icon}"
+            assert ascii_checker(
+                icon
+            ), f"File type {file_type} has non-ASCII icon: {icon}"
 
     def test_emoji_detection_works(self, emoji_checker):
         """Verify emoji detection function correctly identifies emoji."""
         # Should detect emoji
-        assert emoji_checker("\U0001F535") is True  # Blue circle
-        assert emoji_checker("\U0001F7E3") is True  # Purple circle
+        assert emoji_checker("\U0001f535") is True  # Blue circle
+        assert emoji_checker("\U0001f7e3") is True  # Purple circle
         assert emoji_checker("\U00002705") is True  # Check mark
-        assert emoji_checker("Hello \U0001F600 World") is True  # Grinning face
+        assert emoji_checker("Hello \U0001f600 World") is True  # Grinning face
 
         # Should not detect ASCII
         assert emoji_checker("[C]") is False
@@ -203,10 +207,12 @@ class TestSubprocessCrashDetection:
 
     def test_gui_launch_no_crash(self, subprocess_runner):
         """Verify GUI can be imported and initialized without crash."""
-        code = textwrap.dedent("""
+        code = textwrap.dedent(
+            """
             import sys
             sys.exit(0)  # Quick exit after imports
-        """)
+        """
+        )
 
         result = subprocess_runner(code, timeout=5.0)
 
@@ -217,7 +223,8 @@ class TestSubprocessCrashDetection:
 
     def test_parameter_table_creation_no_crash(self, subprocess_runner):
         """Verify ParameterTable creation doesn't crash."""
-        code = textwrap.dedent("""
+        code = textwrap.dedent(
+            """
             from PySide6.QtWidgets import QApplication
             from rheojax.gui.state.store import ParameterState
             from rheojax.gui.widgets.parameter_table import ParameterTable
@@ -237,7 +244,8 @@ class TestSubprocessCrashDetection:
             table.reset_to_defaults()
 
             print("SUCCESS")
-        """)
+        """
+        )
 
         result = subprocess_runner(code, timeout=10.0)
 
@@ -249,7 +257,8 @@ class TestSubprocessCrashDetection:
 
     def test_status_bar_update_no_crash(self, subprocess_runner):
         """Verify StatusBar updates don't crash."""
-        code = textwrap.dedent("""
+        code = textwrap.dedent(
+            """
             from PySide6.QtWidgets import QApplication
             from rheojax.gui.app.status_bar import StatusBar
 
@@ -266,7 +275,8 @@ class TestSubprocessCrashDetection:
             status_bar.hide_progress()
 
             print("SUCCESS")
-        """)
+        """
+        )
 
         result = subprocess_runner(code, timeout=10.0)
 
@@ -278,7 +288,8 @@ class TestSubprocessCrashDetection:
 
     def test_icon_provider_all_icons_no_crash(self, subprocess_runner):
         """Verify IconProvider icon retrieval doesn't crash."""
-        code = textwrap.dedent("""
+        code = textwrap.dedent(
+            """
             from PySide6.QtWidgets import QApplication, QLabel
             from rheojax.gui.utils.icons import IconProvider
 
@@ -300,7 +311,8 @@ class TestSubprocessCrashDetection:
                 label.show()
 
             print("SUCCESS")
-        """)
+        """
+        )
 
         result = subprocess_runner(code, timeout=10.0)
 
@@ -321,7 +333,8 @@ class TestRegressionCrashPrevention:
         Verifies that status bar uses ASCII indicators instead of
         Unicode checkmarks that could potentially cause rendering issues.
         """
-        code = textwrap.dedent("""
+        code = textwrap.dedent(
+            """
             from PySide6.QtWidgets import QApplication
             from rheojax.gui.app.status_bar import StatusBar
 
@@ -341,13 +354,14 @@ class TestRegressionCrashPrevention:
                     raise ValueError(f"Non-ASCII in float64 label: {text}")
 
             print("SUCCESS - No Unicode checkmarks")
-        """)
+        """
+        )
 
         result = subprocess_runner(code, timeout=10.0)
 
-        assert not result.crashed, (
-            f"Status bar regression crashed. stderr: {result.stderr}"
-        )
+        assert (
+            not result.crashed
+        ), f"Status bar regression crashed. stderr: {result.stderr}"
         assert "SUCCESS" in result.stdout
 
 
@@ -393,7 +407,6 @@ class TestWidgetLifecycleSafety:
         assert tree.topLevelItemCount() == 100
 
 
-
 class TestUnicodeEdgeCases:
     """Tests for Unicode edge cases and safety."""
 
@@ -401,11 +414,11 @@ class TestUnicodeEdgeCases:
         """Test that high Unicode codepoints are detected."""
         # Various emoji and special characters
         test_chars = [
-            "\U0001F600",  # Grinning face
-            "\U0001F4CA",  # Bar chart
+            "\U0001f600",  # Grinning face
+            "\U0001f4ca",  # Bar chart
             "\U00002713",  # Check mark
-            "\U0000274C",  # Cross mark
-            "\U000026A0",  # Warning sign
+            "\U0000274c",  # Cross mark
+            "\U000026a0",  # Warning sign
         ]
 
         for char in test_chars:
@@ -437,7 +450,7 @@ class TestUnicodeEdgeCases:
     def test_surrogate_pairs_handled(self):
         """Test that surrogate pairs are handled."""
         # Emoji that require surrogate pairs in UTF-16
-        emoji = "\U0001F600"  # Grinning face
+        emoji = "\U0001f600"  # Grinning face
 
         # Should be a single character in Python 3
         assert len(emoji) == 1

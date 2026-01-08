@@ -1,12 +1,12 @@
 """Minimal headless Bayesian smoke test to verify service wiring."""
 
 import os
+
 import numpy as np
 import pytest
 
 from rheojax.core.data import RheoData
-from rheojax.gui.services.bayesian_service import BayesianService, BayesianResult
-
+from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
 
 pytestmark = [pytest.mark.smoke]
 
@@ -34,7 +34,9 @@ def test_bayesian_headless_smoke() -> None:
         num_samples=10,
         num_chains=1,
         max_tree_depth=3,
-        progress_callback=lambda stage, chain, iteration, total: progress.append((stage, chain, iteration, total)),
+        progress_callback=lambda stage, chain, iteration, total: progress.append(
+            (stage, chain, iteration, total)
+        ),
     )
 
     assert isinstance(result, BayesianResult)

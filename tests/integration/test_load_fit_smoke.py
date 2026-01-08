@@ -19,4 +19,3 @@ def test_load_fit_smoke_maxwell():
 
     assert result.success is True
     assert np.isfinite(result.chi_squared)
-

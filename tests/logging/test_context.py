@@ -14,7 +14,7 @@ from rheojax.logging.context import (
     log_pipeline_stage,
     log_transform,
 )
-from rheojax.logging.logger import get_logger, clear_logger_cache
+from rheojax.logging.logger import clear_logger_cache, get_logger
 
 
 @pytest.fixture(autouse=True)
@@ -114,10 +114,7 @@ class TestLogFit:
         logger.name = "test"
 
         with log_fit(
-            logger,
-            model="Maxwell",
-            data_shape=(100,),
-            test_mode="relaxation"
+            logger, model="Maxwell", data_shape=(100,), test_mode="relaxation"
         ):
             pass
 
@@ -152,11 +149,7 @@ class TestLogBayesian:
         logger.name = "test"
 
         with log_bayesian(
-            logger,
-            model="Maxwell",
-            num_warmup=1000,
-            num_samples=2000,
-            num_chains=4
+            logger, model="Maxwell", num_warmup=1000, num_samples=2000, num_chains=4
         ):
             pass
 
@@ -188,11 +181,7 @@ class TestLogTransform:
         logger = mock.MagicMock(spec=logging.Logger)
         logger.name = "test"
 
-        with log_transform(
-            logger,
-            transform="mastercurve",
-            input_shape=(10, 100)
-        ):
+        with log_transform(logger, transform="mastercurve", input_shape=(10, 100)):
             pass
 
         start_call = logger.log.call_args_list[0]
@@ -209,11 +198,7 @@ class TestLogIO:
         logger = mock.MagicMock(spec=logging.Logger)
         logger.name = "test"
 
-        with log_io(
-            logger,
-            operation="read",
-            filepath="/path/to/file.csv"
-        ):
+        with log_io(logger, operation="read", filepath="/path/to/file.csv"):
             pass
 
         start_call = logger.log.call_args_list[0]
@@ -230,11 +215,7 @@ class TestLogPipelineStage:
         logger = mock.MagicMock(spec=logging.Logger)
         logger.name = "test"
 
-        with log_pipeline_stage(
-            logger,
-            stage="fit",
-            pipeline_id="pipe_001"
-        ):
+        with log_pipeline_stage(logger, stage="fit", pipeline_id="pipe_001"):
             pass
 
         start_call = logger.log.call_args_list[0]

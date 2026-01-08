@@ -154,7 +154,9 @@ class TRIOSExperiment:
             schema_version=schema_version,
         )
 
-    def get_dataframe(self, result_index: int = 0, dataset_index: int = 0) -> pd.DataFrame:
+    def get_dataframe(
+        self, result_index: int = 0, dataset_index: int = 0
+    ) -> pd.DataFrame:
         """Extract DataFrame from specified result set.
 
         Args:
@@ -193,7 +195,9 @@ class TRIOSExperiment:
 
         return step_dfs
 
-    def get_units(self, result_index: int = 0, dataset_index: int = 0) -> dict[str, str]:
+    def get_units(
+        self, result_index: int = 0, dataset_index: int = 0
+    ) -> dict[str, str]:
         """Get units mapping from specified result.
 
         Args:

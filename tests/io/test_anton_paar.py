@@ -575,6 +575,7 @@ class TestExcelExport:
 
         # Verify sheet names
         import pandas as pd
+
         xlsx = pd.ExcelFile(output_path)
         assert "Metadata" in xlsx.sheet_names
         assert "Interval_1" in xlsx.sheet_names
@@ -591,6 +592,7 @@ class TestExcelExport:
 
         # Verify sheet names
         import pandas as pd
+
         xlsx = pd.ExcelFile(output_path)
         assert "Metadata" in xlsx.sheet_names
         assert "Interval_1" in xlsx.sheet_names
@@ -607,6 +609,7 @@ class TestExcelExport:
         save_intervals_to_excel(data_list, output_path)
 
         import pandas as pd
+
         meta_df = pd.read_excel(output_path, sheet_name="Metadata")
 
         # Check global metadata present
@@ -623,6 +626,7 @@ class TestExcelExport:
         save_intervals_to_excel(data, output_path)
 
         import pandas as pd
+
         df = pd.read_excel(output_path, sheet_name="Interval_1")
 
         # Oscillatory data should have G' and G'' columns
@@ -640,6 +644,7 @@ class TestExcelExport:
         save_intervals_to_excel(data, output_path, include_metadata_sheet=False)
 
         import pandas as pd
+
         xlsx = pd.ExcelFile(output_path)
         assert "Metadata" not in xlsx.sheet_names
         assert "Interval_1" in xlsx.sheet_names
@@ -653,6 +658,7 @@ class TestExcelExport:
         save_intervals_to_excel(data, output_path, sheet_prefix="Data")
 
         import pandas as pd
+
         xlsx = pd.ExcelFile(output_path)
         assert "Data_1" in xlsx.sheet_names
 

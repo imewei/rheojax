@@ -205,4 +205,3 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
         img = XLImage(buf)
         img.anchor = "A1"
         sheet.add_image(img)
-

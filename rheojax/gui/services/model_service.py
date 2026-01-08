@@ -31,6 +31,7 @@ def normalize_model_name(model_name: str) -> str:
 
     return alias_map.get(key.lower(), key)
 
+
 import numpy as np
 
 from rheojax.core.data import RheoData
@@ -199,7 +200,7 @@ class ModelService:
         # Remove empty categories
         return {k: v for k, v in categories.items() if v}
 
-    def get_parameter_defaults(self, model_name: str) -> dict[str, "ParameterState"]:
+    def get_parameter_defaults(self, model_name: str) -> dict[str, ParameterState]:
         """Return ParameterState mapping for a model using registry defaults."""
         if _is_placeholder_model(model_name):
             return {}
@@ -211,7 +212,9 @@ class ModelService:
         try:
             model = self._registry.create_instance(model_name, plugin_type="model")
         except Exception as exc:
-            logger.warning("Could not load parameter defaults for %s: %s", model_name, exc)
+            logger.warning(
+                "Could not load parameter defaults for %s: %s", model_name, exc
+            )
             return {}
         defaults: dict[str, ParameterState] = {}
         for name, param in model.parameters.items():
@@ -471,7 +474,8 @@ class ModelService:
                         if isinstance(value, dict):
                             # Handle dict with 'value', 'bounds', etc.
                             model.parameters[name].value = value.get(
-                                "value", value.get("default", model.parameters[name].value)
+                                "value",
+                                value.get("default", model.parameters[name].value),
                             )
                             if "bounds" in value:
                                 model.parameters[name].bounds = value["bounds"]
@@ -526,17 +530,19 @@ class ModelService:
 
             # Calculate R-squared (coefficient of determination)
             ss_res = np.sum(residuals**2)
-            ss_tot = np.sum((y_real - np.mean(y_real))**2)
+            ss_tot = np.sum((y_real - np.mean(y_real)) ** 2)
             r_squared = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
             # Calculate MPE (Mean Percentage Error)
-            with np.errstate(divide='ignore', invalid='ignore'):
+            with np.errstate(divide="ignore", invalid="ignore"):
                 pct_errors = np.abs(residuals / y_real) * 100
                 pct_errors = pct_errors[np.isfinite(pct_errors)]
                 mpe = float(np.mean(pct_errors)) if len(pct_errors) > 0 else 0.0
 
             # Get fitted parameters
-            fitted_params = {name: param.value for name, param in model.parameters.items()}
+            fitted_params = {
+                name: param.value for name, param in model.parameters.items()
+            }
 
             # Get metadata with R² and MPE included
             metadata = {
@@ -585,7 +591,6 @@ class ModelService:
                 metadata={"error": str(e)},
             )
 
-
     def predict(
         self,
         model_name: str,
@@ -618,7 +623,9 @@ class ModelService:
             # Create model instance with optional configuration
             model_kwargs = model_kwargs or {}
             model = self._registry.create_instance(
-                self._normalize_model_name(model_name), plugin_type="model", **model_kwargs
+                self._normalize_model_name(model_name),
+                plugin_type="model",
+                **model_kwargs,
             )
 
             # Set parameters
@@ -695,13 +702,9 @@ class ModelService:
                 lower, upper = param.bounds
 
                 if value < lower:
-                    warnings.append(
-                        f"{name}={value} is below lower bound {lower}"
-                    )
+                    warnings.append(f"{name}={value} is below lower bound {lower}")
                 if value > upper:
-                    warnings.append(
-                        f"{name}={value} is above upper bound {upper}"
-                    )
+                    warnings.append(f"{name}={value} is above upper bound {upper}")
 
         except Exception as e:
             warnings.append(f"Validation failed: {e}")

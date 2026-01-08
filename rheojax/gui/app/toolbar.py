@@ -5,12 +5,8 @@ Toolbars
 Main toolbar and related utilities.
 """
 
-
-from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QComboBox, QLabel, QToolBar, QToolButton, QWidget
-
-from rheojax.gui.services.model_service import normalize_model_name
+from PySide6.QtWidgets import QToolBar, QWidget
 
 
 class MainToolBar(QToolBar):
