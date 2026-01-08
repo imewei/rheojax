@@ -538,25 +538,44 @@ class FrequencyToTimePipeline(Pipeline):
     def _approximate_inverse_transform(
         self, t: np.ndarray, omega: np.ndarray, G_star: np.ndarray
     ) -> np.ndarray:
-        """Approximate inverse Fourier transform.
+        """Inverse Fourier transform from G*(ω) to G(t).
+
+        Uses numerical integration of the inverse Fourier transform:
+        G(t) = (2/π) ∫ G'(ω) cos(ωt) dω
 
         Args:
             t: Time points
             omega: Angular frequency points
-            G_star: Complex modulus
+            G_star: Complex modulus (G' + iG'' or just G')
 
         Returns:
             Relaxation modulus at time points
         """
-        # Very simplified approximation
-        # Proper implementation would use numerical inverse Laplace transform
+        from scipy.integrate import trapezoid
+
+        # Extract real part (storage modulus G')
+        if np.iscomplexobj(G_star):
+            G_prime = np.real(G_star)
+        elif G_star.ndim == 2 and G_star.shape[1] == 2:
+            G_prime = G_star[:, 0]
+        else:
+            G_prime = G_star
+
+        # Sort by frequency for proper integration
+        sort_idx = np.argsort(omega)
+        omega_sorted = omega[sort_idx]
+        G_prime_sorted = G_prime[sort_idx]
+
+        # Compute G(t) via numerical integration of inverse transform
         G_t = np.zeros_like(t)
 
         for i, t_i in enumerate(t):
-            # Approximate G(t) from G*(ω) using cos transform
-            G_t[i] = np.trapezoid(np.real(G_star) * np.cos(omega * t_i), omega) * (
-                2 / np.pi
-            )
+            # G(t) = (2/π) ∫ G'(ω) cos(ωt) dω
+            integrand = G_prime_sorted * np.cos(omega_sorted * t_i)
+            G_t[i] = (2.0 / np.pi) * trapezoid(integrand, omega_sorted)
+
+        # Ensure non-negative (physical constraint)
+        G_t = np.maximum(G_t, 0.0)
 
         return G_t
 

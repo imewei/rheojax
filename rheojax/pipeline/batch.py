@@ -77,39 +77,66 @@ class BatchPipeline:
         Args:
             file_paths: List of file paths to process
             format: File format for loading
-            parallel: Whether to use parallel processing (not implemented)
-            n_workers: Number of parallel workers (not implemented)
+            parallel: Whether to use parallel processing
+            n_workers: Number of parallel workers (default: min(4, cpu_count))
             **load_kwargs: Additional arguments for data loading
 
         Returns:
             self for method chaining
 
         Example:
-            >>> batch.process_files(['data1.csv', 'data2.csv'])
+            >>> batch.process_files(['data1.csv', 'data2.csv'], parallel=True)
         """
+        import os
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         if self.template_pipeline is None:
             raise ValueError("No template pipeline set. Call set_template() first.")
-
-        if parallel:
-            warnings.warn(
-                "Parallel processing not yet implemented. Using sequential.",
-                stacklevel=2,
-            )
 
         normalized_paths = [Path(p) for p in file_paths]
 
         if not normalized_paths:
             return self
 
-        for file_path in normalized_paths:
-            try:
-                result, metrics = self._process_file(
-                    file_path, format=format, **load_kwargs
-                )
-                self.results.append((file_path, result, metrics))
-            except Exception as e:
-                self.errors.append((file_path, e))
-                warnings.warn(f"Failed to process {file_path}: {e}", stacklevel=2)
+        if parallel:
+            # Parallel processing with ThreadPoolExecutor
+            if n_workers is None:
+                n_workers = min(4, os.cpu_count() or 1)
+
+            def process_one(file_path):
+                try:
+                    result, metrics = self._process_file(
+                        file_path, format=format, **load_kwargs
+                    )
+                    return (file_path, result, metrics, None)
+                except Exception as e:
+                    return (file_path, None, None, e)
+
+            with ThreadPoolExecutor(max_workers=n_workers) as executor:
+                futures = {
+                    executor.submit(process_one, fp): fp for fp in normalized_paths
+                }
+
+                for future in as_completed(futures):
+                    file_path, result, metrics, error = future.result()
+                    if error is None:
+                        self.results.append((file_path, result, metrics))
+                    else:
+                        self.errors.append((file_path, error))
+                        warnings.warn(
+                            f"Failed to process {file_path}: {error}", stacklevel=2
+                        )
+        else:
+            # Sequential processing
+            for file_path in normalized_paths:
+                try:
+                    result, metrics = self._process_file(
+                        file_path, format=format, **load_kwargs
+                    )
+                    self.results.append((file_path, result, metrics))
+                except Exception as e:
+                    self.errors.append((file_path, e))
+                    warnings.warn(f"Failed to process {file_path}: {e}", stacklevel=2)
 
         return self
 

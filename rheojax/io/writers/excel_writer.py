@@ -177,12 +177,32 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
         plots: Dictionary of plot names and matplotlib figures
 
     Note:
-        This is a placeholder. Full implementation requires openpyxl
-        image handling and matplotlib figure conversion.
+        Requires openpyxl and matplotlib.
     """
-    # TODO: Implement plot embedding
-    # This requires:
-    # 1. Converting matplotlib figures to images
-    # 2. Using openpyxl to embed images in sheets
-    # See: https://openpyxl.readthedocs.io/en/stable/charts/introduction.html
-    pass
+    import io
+
+    try:
+        from openpyxl.drawing.image import Image as XLImage
+    except ImportError:
+        # openpyxl not available, skip plot embedding
+        return
+
+    workbook = writer.book
+
+    for plot_name, fig in plots.items():
+        # Create sheet for this plot
+        sheet_name = f"Plot_{plot_name[:25]}"  # Excel sheet name limit
+        if sheet_name not in workbook.sheetnames:
+            workbook.create_sheet(sheet_name)
+        sheet = workbook[sheet_name]
+
+        # Save figure to bytes buffer
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+        buf.seek(0)
+
+        # Create and add image to sheet
+        img = XLImage(buf)
+        img.anchor = "A1"
+        sheet.add_image(img)
+
