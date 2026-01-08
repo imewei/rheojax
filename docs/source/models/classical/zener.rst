@@ -12,6 +12,24 @@ Quick Reference
 **Test modes:** Oscillation, relaxation, creep
 **Material examples:** Cross-linked PDMS, vulcanized rubber, hydrogels, biological tissues
 
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 85
+   :header-rows: 1
+
+   * - Symbol
+     - Meaning
+   * - :math:`G_s`
+     - Equilibrium modulus (Pa). Permanent stiffness at infinite time.
+   * - :math:`G_p`
+     - Maxwell arm modulus (Pa). Relaxation strength.
+   * - :math:`\eta_p`
+     - Maxwell arm viscosity (Pa·s). Controls relaxation timescale.
+   * - :math:`\tau`
+     - Relaxation time (s), :math:`\tau = \eta_p/G_p`.
+
 Overview
 --------
 

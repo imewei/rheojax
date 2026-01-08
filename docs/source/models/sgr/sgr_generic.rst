@@ -213,6 +213,207 @@ state (NESS) with constant entropy production:
 where :math:`\sigma` is the steady-state stress. This connects mechanical dissipation
 (:math:`\sigma \dot{\gamma}`) to thermodynamic entropy production.
 
+----
+
+Rheological Analysis Equations
+------------------------------
+
+The GENERIC formulation validates the following constitutive laws for analyzing
+rheometer data. The control parameter is the noise temperature :math:`x`
+(:math:`x=1` is the glass transition).
+
+Measurement Protocols
+~~~~~~~~~~~~~~~~~~~~~
+
+**Steady Rotation (Flow Curve)**:
+
+.. math::
+   \dot{\gamma}(t) = \dot{\gamma} = \text{constant}
+
+**Stress Relaxation (Step Strain)**:
+
+.. math::
+   \gamma(t) = \gamma_0 H(t) \quad (\text{small step strain } \gamma_0)
+
+**Creep (Step Stress)**:
+
+.. math::
+   \sigma(t) = \sigma_0 H(t)
+
+**Oscillatory Shear (SAOS)**:
+
+.. math::
+   \gamma(t) = \gamma_0 e^{i\omega t}
+
+Flow Curve (Rotation)
+~~~~~~~~~~~~~~~~~~~~~
+
+**Fluid Regime** (:math:`1 < x < 2`):
+
+.. math::
+   \sigma = B \cdot \dot{\gamma}^{x-1}
+
+Power-law shear thinning behavior.
+
+**Glass Regime** (:math:`x < 1`):
+
+.. math::
+   \sigma = \sigma_y + A \cdot \dot{\gamma}^{1-x}
+
+Herschel-Bulkley yield stress fluid behavior.
+
+Stress Relaxation
+~~~~~~~~~~~~~~~~~
+
+**Fluid Regime** (:math:`1 < x < 2`):
+
+.. math::
+   G(t) \sim t^{-(x-1)}
+
+Power-law decay with exponent :math:`x-1`.
+
+**Glass Regime** (:math:`x < 1`):
+
+.. math::
+   G(t) \approx G_{\text{plateau}}
+
+Effectively permanent elasticity due to ergodicity breaking.
+
+Creep Compliance
+~~~~~~~~~~~~~~~~
+
+**Fluid Regime** (:math:`1 < x < 2`):
+
+.. math::
+   J(t) \sim t^{x-1}
+
+Power-law growth with exponent :math:`x-1`.
+
+**Glass Regime** (:math:`x < 1`, :math:`\sigma < \sigma_y`):
+
+.. math::
+   J(t) \to \text{constant}
+
+Solid-like response below yield stress.
+
+Oscillatory Shear (SAOS)
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Fluid Regime** (:math:`1 < x < 2`):
+
+.. math::
+   G'(\omega) &\propto \omega^{x-1} \\
+   G''(\omega) &\propto \omega^{x-1} \\
+   \delta &= (x-1)\frac{\pi}{2}
+
+Constant loss angle (phase angle) across frequency.
+
+**Glass Regime** (:math:`x < 1`):
+
+.. math::
+   G'(\omega) &\approx \text{constant} \\
+   G''(\omega) &\ll G'(\omega)
+
+Solid-like dominance with weak dissipation.
+
+Scaling Summary Table
+~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: SGR GENERIC Scaling Predictions
+   :header-rows: 1
+   :widths: 20 20 60
+
+   * - Measurement
+     - Regime
+     - Scaling Prediction
+   * - **Flow Curve**
+     - Fluid (:math:`x > 1`)
+     - :math:`\sigma \sim \dot{\gamma}^{x-1}`
+   * -
+     - Glass (:math:`x < 1`)
+     - :math:`\sigma = \sigma_y + A\dot{\gamma}^{1-x}`
+   * - **Relaxation**
+     - Fluid (:math:`x > 1`)
+     - :math:`G(t) \sim t^{-(x-1)}`
+   * -
+     - Glass (:math:`x < 1`)
+     - :math:`G(t) \approx G_{\text{plateau}}`
+   * - **Creep**
+     - Fluid (:math:`x > 1`)
+     - :math:`J(t) \sim t^{x-1}`
+   * -
+     - Glass (:math:`\sigma < \sigma_y`)
+     - :math:`J(t) \to \text{const}`
+   * - **Oscillation**
+     - Fluid (:math:`x > 1`)
+     - :math:`G', G'' \sim \omega^{x-1}`, :math:`\tan\delta = \tan((x-1)\pi/2)`
+
+----
+
+LAOS Extensions
+---------------
+
+To capture Large Amplitude Oscillatory Shear (LAOS) nonlinearities, the standard
+yielding rate :math:`\Gamma` is modified with strain-dependent extensions.
+
+Extended Master Equation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. math::
+   \frac{\partial P}{\partial t} + \dot{\gamma}\frac{\partial P}{\partial \ell}
+   = -\Gamma_{\text{LAOS}}(E,\ell) P + Y(t)\rho(E)\delta(\ell)
+
+The LAOS yield rate includes a strain-enhancement factor :math:`h(\ell)`:
+
+.. math::
+   \Gamma_{\text{LAOS}}(E, \ell) = \Gamma_0 \, h(\ell) \, \exp\left[ -\frac{E - \frac{1}{2}k\ell^2}{x} \right]
+
+Model A: Strain-Activated Hopping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enhances yielding at large absolute strains. Useful for fitting **stress overshoots**
+in start-up flow:
+
+.. math::
+   h(\ell) = 1 + \left( \frac{|\ell|}{\gamma_c} \right)^\nu
+
+Parameters:
+   - :math:`\gamma_c`: Critical strain (typically 0.1–1.0)
+   - :math:`\nu`: Power-law exponent (typically 1 or 2)
+
+Model B: Mechanical Fluidization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The noise temperature :math:`x` becomes a dynamic variable driven by power input:
+
+.. math::
+   x(t) = x_{\text{thermal}} + \mu \left| \sigma(t) \dot{\gamma}(t) \right|
+
+Parameters:
+   - :math:`\mu`: Fluidization susceptibility
+
+This captures **shear banding** and **viscosity bifurcations**.
+
+LAOS Observables
+~~~~~~~~~~~~~~~~
+
+**Fourier-Chebyshev Coefficients**:
+
+.. math::
+   e_3 \approx \frac{G'_3}{G'_1} \quad \text{(elastic nonlinearity)}
+
+.. math::
+   v_3 \approx \frac{G''_3}{G''_1} \quad \text{(viscous nonlinearity)}
+
+**Lissajous-Bowditch Figures**:
+   - Elastic projection (:math:`\sigma` vs :math:`\gamma`): Ellipse → Parallelogram
+   - Viscous projection (:math:`\sigma` vs :math:`\dot{\gamma}`): Ellipse → Sigmoidal
+
+.. note::
+   For LAOS simulations with strain-dependent extensions, **use the PDE solver**
+   (Population Balance) rather than analytic solutions, which no longer exist in
+   closed form.
+
 Parameters
 ----------
 

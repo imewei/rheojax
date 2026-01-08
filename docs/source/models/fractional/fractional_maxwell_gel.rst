@@ -18,7 +18,32 @@ Quick Reference
 Overview
 --------
 
-The **Fractional Maxwell Gel (FMG)** model consists of a **SpringPot element** (fractional viscoelastic element) in **series** with a **Newtonian dashpot**. This configuration captures the rheological behavior of materials transitioning from **power-law viscoelastic response** at short times to **terminal viscous flow** at long times. The model is particularly effective for describing **polymer solutions, physical gels, and soft materials** exhibiting gel-like characteristics with eventual viscous dissipation—materials that behave as soft solids at short timescales but flow like liquids over extended durations.
+The **Fractional Maxwell Gel (FMG)** model consists of a **SpringPot element** (fractional viscoelastic element) in **series** with a **Newtonian dashpot**. This configuration captures the rheological behavior of materials transitioning from **power-law viscoelastic response** at short times to **terminal viscous flow** at long times.
+
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 85
+   :header-rows: 1
+
+   * - Symbol
+     - Meaning
+   * - :math:`c_\alpha`
+     - SpringPot quasi-property (Pa·s\ :sup:`\alpha`). Controls the elastic stiffness scale.
+   * - :math:`\alpha`
+     - Fractional order (0 < :math:`\alpha` < 1). Controls the relaxation slope (0=solid, 1=liquid).
+   * - :math:`\eta`
+     - Dashpot viscosity (Pa·s). Controls terminal flow at long times.
+   * - :math:`\tau`
+     - Characteristic relaxation time (s), :math:`\tau = \eta / c_\alpha^{1/(1-\alpha)}`.
+   * - :math:`E_{\alpha,\beta}`
+     - Mittag-Leffler function (generalized exponential).
+
+Overview
+--------
+
+The FMG model is particularly effective for describing **polymer solutions, physical gels, and soft materials** exhibiting gel-like characteristics with eventual viscous dissipation—materials that behave as soft solids at short timescales but flow like liquids over extended durations.
 
 The SpringPot element provides fractional-order power-law viscoelasticity characterized by a broad relaxation spectrum, while the series dashpot ensures **terminal flow behavior** (:math:`G(t \to \infty) \to 0`). This combination makes the FMG model especially suitable for materials that exhibit intermediate behavior between pure elastic solids and Newtonian liquids, such as **critical gels** evolving toward sol states, **wormlike micelle solutions**, and **weak polymer networks** undergoing structural rearrangement.
 
@@ -324,25 +349,25 @@ Limiting Behavior
 Troubleshooting
 ---------------
 
-**Issue: Poor fit in terminal regime**
+.. list-table:: Common Fitting Issues
+   :widths: 25 35 40
+   :header-rows: 1
 
-- **Cause**: Insufficient low-frequency data
-- **Solution**: Extend frequency sweep to lower :math:`\omega` or use longer relaxation times
-
-**Issue: :math:`\alpha` close to 1**
-
-- **Cause**: Material exhibits narrow relaxation spectrum (nearly Newtonian)
-- **Solution**: Use classical Maxwell model instead
-
-**Issue: Oscillatory residuals at high frequencies**
-
-- **Cause**: Multiple relaxation modes not captured by FMG
-- **Solution**: Use Fractional Maxwell Model (FMM) with two fractional orders
-
-**Issue: Non-convergence in NLSQ**
-
-- **Cause**: Poor initial guess or parameter correlation
-- **Solution**: Use smart initialization (automatic in v0.2.0) or fit in stages
+   * - Symptom
+     - Possible Cause
+     - Solution
+   * - **Poor fit in terminal regime**
+     - Insufficient low-frequency data
+     - Extend frequency sweep to lower :math:`\omega` or use longer relaxation test.
+   * - **:math:`\alpha` closes to 1**
+     - Material is nearly Maxwellian
+     - Use classical **Maxwell** model instead (narrow spectrum).
+   * - **Oscillatory residuals at high :math:`\omega`**
+     - Multiple relaxation modes
+     - Use **Fractional Maxwell Model (FMM)** which has two fractional orders.
+   * - **Non-convergence**
+     - Poor initial guess or parameter correlation
+     - Use **Smart Initialization** (automatic in v0.2.0) or warm-start with NLSQ.
 
 Tips & Best Practices
 ----------------------

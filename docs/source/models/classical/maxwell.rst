@@ -12,6 +12,22 @@ Quick Reference
 **Test modes:** Oscillation, relaxation
 **Material examples:** Polymer melts (PS, PDMS), viscoelastic liquids, dilute solutions
 
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 85
+   :header-rows: 1
+
+   * - Symbol
+     - Meaning
+   * - :math:`G`
+     - Spring modulus (Pa). Controls instantaneous elasticity.
+   * - :math:`\eta`
+     - Dashpot viscosity (Pa·s). Controls energy dissipation.
+   * - :math:`\tau`
+     - Relaxation time (s), :math:`\tau = \eta/G`.
+
 Overview
 --------
 
