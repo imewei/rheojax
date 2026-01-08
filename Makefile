@@ -2,7 +2,7 @@
 # ========================
 # GPU Acceleration Support and Development Tools
 
-.PHONY: help install install-dev install-jax-gpu gpu-check env-info \
+.PHONY: help install install-dev install-jax-gpu install-jax-gpu-cuda12 install-jax-gpu-cuda13 gpu-check env-info \
         test test-smoke test-fast test-ci test-ci-full test-coverage test-integration test-validation \
         test-parallel test-all-parallel test-parallel-fast test-coverage-parallel \
         clean clean-all clean-pyc clean-build clean-test clean-venv \
@@ -58,11 +58,13 @@ else
     RUN_CMD :=
 endif
 
-# GPU installation command (platform-specific)
+# GPU installation packages (system CUDA - uses -local suffix)
 ifeq ($(PLATFORM),linux)
-    JAX_GPU_PKG := jax[cuda12-local]==0.8.0 jaxlib==0.8.0
+    JAX_GPU_CUDA13_PKG := "jax[cuda13-local]"
+    JAX_GPU_CUDA12_PKG := "jax[cuda12-local]"
 else
-    JAX_GPU_PKG :=
+    JAX_GPU_CUDA13_PKG :=
+    JAX_GPU_CUDA12_PKG :=
 endif
 
 # Colors for output
@@ -91,12 +93,15 @@ help:
 	@echo "  $(CYAN)version$(RESET)          Show package version"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)INSTALLATION$(RESET)"
-	@echo "  $(CYAN)install$(RESET)          Install package in editable mode (CPU-only JAX)"
-	@echo "  $(CYAN)install-dev$(RESET)      Install with development dependencies"
-	@echo "  $(CYAN)install-jax-gpu$(RESET)  Install JAX with GPU support (Linux + CUDA 12+ only)"
+	@echo "  $(CYAN)install$(RESET)               Install package in editable mode (CPU-only JAX)"
+	@echo "  $(CYAN)install-dev$(RESET)           Install with development dependencies"
 	@echo ""
-	@echo "$(BOLD)$(GREEN)GPU COMMANDS$(RESET)"
-	@echo "  $(CYAN)gpu-check$(RESET)        Check GPU availability and CUDA setup"
+	@echo "$(BOLD)$(GREEN)GPU COMMANDS (System CUDA)$(RESET)"
+	@echo "  $(CYAN)install-jax-gpu$(RESET)       Auto-detect system CUDA and install JAX (Linux only)"
+	@echo "  $(CYAN)install-jax-gpu-cuda13$(RESET) Install JAX with system CUDA 13 (requires CUDA 13.x)"
+	@echo "  $(CYAN)install-jax-gpu-cuda12$(RESET) Install JAX with system CUDA 12 (requires CUDA 12.x)"
+	@echo "  $(CYAN)gpu-check$(RESET)             Check GPU availability and CUDA setup"
+	@echo "  $(CYAN)env-info$(RESET)              Show detailed environment information"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)TESTING$(RESET)"
 	@echo "  $(CYAN)test$(RESET)                   Run all tests (full suite with fast MCMC, ~50-60min)"
@@ -157,46 +162,183 @@ install-dev: install
 	@$(INSTALL_CMD) -e ".[dev]"
 	@echo "$(BOLD)$(GREEN)✓ Dev dependencies installed!$(RESET)"
 
-# GPU installation target
+# Auto-detect system CUDA version and install matching JAX package
 install-jax-gpu:
-	@echo "$(BOLD)$(BLUE)Installing JAX with GPU support...$(RESET)"
-	@echo "===================================="
+	@echo "$(BOLD)$(BLUE)Installing JAX with GPU support (system CUDA auto-detect)...$(RESET)"
+	@echo "============================================================"
 	@echo "$(BOLD)Platform:$(RESET) $(PLATFORM)"
 	@echo "$(BOLD)Package manager:$(RESET) $(PKG_MANAGER)"
 	@echo ""
 ifeq ($(PLATFORM),linux)
-	@# Step 1: Uninstall CPU-only JAX
-	@echo "$(BOLD)Step 1/4:$(RESET) Uninstalling CPU-only JAX..."
-	@$(UNINSTALL_CMD) jax jaxlib 2>/dev/null || true
-	@echo "  ✓ CPU JAX uninstalled"
-	@echo ""
-	@# Step 2: Install GPU-enabled JAX
-	@echo "$(BOLD)Step 2/4:$(RESET) Installing GPU-enabled JAX (CUDA 12.1-12.9)..."
-	@echo "  Command: $(INSTALL_CMD) $(JAX_GPU_PKG)"
-	@$(INSTALL_CMD) $(JAX_GPU_PKG)
-	@echo "  ✓ GPU JAX installed"
-	@echo ""
-	@# Step 3: Verify GPU detection
-	@echo "$(BOLD)Step 3/4:$(RESET) Verifying GPU detection..."
-	@$(MAKE) gpu-check
-	@echo ""
-	@# Step 4: Success summary
-	@echo "$(BOLD)Step 4/4:$(RESET) Installation complete!"
-	@echo "$(BOLD)$(GREEN)✓ JAX GPU support installed successfully$(RESET)"
-	@echo ""
-	@echo "$(BOLD)Summary:$(RESET)"
-	@echo "  Package manager: $(PKG_MANAGER)"
-	@echo "  JAX version: 0.8.0 with CUDA 12 support"
-	@echo "  Performance Impact: 20-100x speedup for large datasets (>1M points)"
+	@# Step 1: Detect system CUDA version
+	@CUDA_VERSION=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+' | head -1); \
+	if [ -z "$$CUDA_VERSION" ]; then \
+		echo "$(RED)Error: nvcc not found - CUDA toolkit not installed or not in PATH$(RESET)"; \
+		echo ""; \
+		echo "Please install CUDA toolkit:"; \
+		echo "  Ubuntu/Debian: sudo apt install nvidia-cuda-toolkit"; \
+		echo "  Or download from: https://developer.nvidia.com/cuda-downloads"; \
+		echo ""; \
+		echo "After installation, ensure nvcc is in PATH:"; \
+		echo "  export PATH=/usr/local/cuda/bin:\$$PATH"; \
+		exit 1; \
+	fi; \
+	CUDA_FULL=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+'); \
+	echo "Detected system CUDA version: $$CUDA_FULL (major: $$CUDA_VERSION)"; \
+	echo ""; \
+	\
+	# Step 2: Detect GPU SM version \
+	SM_VERSION=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.'); \
+	SM_DISPLAY=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1); \
+	GPU_NAME=$$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1); \
+	if [ -z "$$SM_VERSION" ]; then \
+		echo "$(RED)Error: Could not detect GPU (nvidia-smi failed)$(RESET)"; \
+		exit 1; \
+	fi; \
+	echo "Detected GPU: $$GPU_NAME (SM $$SM_DISPLAY)"; \
+	echo ""; \
+	\
+	# Step 3: Validate compatibility and install \
+	if [ "$$CUDA_VERSION" = "13" ]; then \
+		if [ "$$SM_VERSION" -ge 75 ]; then \
+			echo "Compatibility: System CUDA 13 + GPU SM $$SM_DISPLAY = Compatible"; \
+			echo "Installing: $(JAX_GPU_CUDA13_PKG)"; \
+			$(MAKE) install-jax-gpu-cuda13; \
+		else \
+			echo "$(RED)Error: GPU SM $$SM_DISPLAY does not support CUDA 13 (requires SM >= 7.5)$(RESET)"; \
+			echo "Your GPU requires CUDA 12. Please install CUDA 12.x toolkit."; \
+			exit 1; \
+		fi; \
+	elif [ "$$CUDA_VERSION" = "12" ]; then \
+		if [ "$$SM_VERSION" -ge 52 ]; then \
+			echo "Compatibility: System CUDA 12 + GPU SM $$SM_DISPLAY = Compatible"; \
+			echo "Installing: $(JAX_GPU_CUDA12_PKG)"; \
+			$(MAKE) install-jax-gpu-cuda12; \
+		else \
+			echo "$(RED)Error: GPU SM $$SM_DISPLAY too old (requires SM >= 5.2)$(RESET)"; \
+			echo "Kepler and older GPUs are not supported by JAX 0.8+"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "$(RED)Error: CUDA $$CUDA_VERSION not supported by JAX 0.8+$(RESET)"; \
+		echo "JAX requires CUDA 12.x or 13.x"; \
+		echo "Please upgrade your CUDA installation."; \
+		exit 1; \
+	fi
 else
-	@echo "$(BOLD)$(RED)✗ GPU acceleration only available on Linux with CUDA 12+$(RESET)"
+	@echo "$(YELLOW)Error: GPU acceleration only available on Linux$(RESET)"
 	@echo "  Current platform: $(PLATFORM)"
 	@echo "  Keeping CPU-only installation"
 	@echo ""
-	@echo "$(BOLD)Platform support:$(RESET)"
-	@echo "  ✅ Linux + CUDA 12.1-12.9: Full GPU acceleration"
-	@echo "  ❌ macOS: CPU-only (no NVIDIA GPU support)"
-	@echo "  ❌ Windows: CPU-only (CUDA support experimental/unstable)"
+	@echo "Platform support:"
+	@echo "  - Linux + NVIDIA GPU + System CUDA: Full GPU acceleration"
+	@echo "  - Windows WSL2: Experimental (use Linux wheels)"
+	@echo "  - macOS: CPU-only (no NVIDIA GPU support)"
+	@echo "  - Windows native: CPU-only (no pre-built wheels)"
+endif
+
+# CUDA 13 installation (requires system CUDA 13.x)
+install-jax-gpu-cuda13:
+	@echo "$(BOLD)$(BLUE)Installing JAX with system CUDA 13...$(RESET)"
+	@echo "======================================"
+	@echo "$(BOLD)Platform:$(RESET) $(PLATFORM)"
+	@echo "$(BOLD)Package manager:$(RESET) $(PKG_MANAGER)"
+	@echo ""
+ifeq ($(PLATFORM),linux)
+	@# Validate system CUDA 13.x is installed
+	@CUDA_VERSION=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+' | head -1); \
+	CUDA_FULL=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+'); \
+	if [ -z "$$CUDA_VERSION" ]; then \
+		echo "$(RED)Error: nvcc not found - CUDA toolkit not installed$(RESET)"; \
+		exit 1; \
+	elif [ "$$CUDA_VERSION" != "13" ]; then \
+		echo "$(RED)Error: System CUDA $$CUDA_FULL detected, but CUDA 13.x required$(RESET)"; \
+		echo "Either:"; \
+		echo "  1. Install CUDA 13.x toolkit"; \
+		echo "  2. Use: make install-jax-gpu-cuda12 (if you have CUDA 12.x)"; \
+		exit 1; \
+	fi; \
+	echo "System CUDA: $$CUDA_FULL"
+	@# Validate GPU supports CUDA 13 (SM >= 7.5)
+	@SM_VERSION=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.'); \
+	SM_DISPLAY=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1); \
+	if [ -z "$$SM_VERSION" ]; then \
+		echo "$(RED)Error: Could not detect GPU$(RESET)"; \
+		exit 1; \
+	elif [ "$$SM_VERSION" -lt 75 ]; then \
+		echo "$(RED)Error: GPU SM $$SM_DISPLAY does not support CUDA 13$(RESET)"; \
+		echo "CUDA 13 requires SM >= 7.5 (Turing or newer)"; \
+		echo "Your GPU requires: make install-jax-gpu-cuda12"; \
+		exit 1; \
+	fi; \
+	echo "GPU SM version: $$SM_DISPLAY (compatible with CUDA 13)"
+	@echo ""
+	@echo "Step 1/2: Uninstalling CPU-only JAX..."
+	@$(UNINSTALL_CMD) jax jaxlib 2>/dev/null || true
+	@echo ""
+	@echo "Step 2/2: Installing JAX with system CUDA 13..."
+	@echo "Command: $(INSTALL_CMD) $(JAX_GPU_CUDA13_PKG)"
+	@$(INSTALL_CMD) $(JAX_GPU_CUDA13_PKG)
+	@echo ""
+	@$(MAKE) gpu-check
+	@echo ""
+	@echo "$(BOLD)$(GREEN)JAX GPU support installed successfully$(RESET)"
+	@echo "  Package: $(JAX_GPU_CUDA13_PKG)"
+	@echo "  Uses: System CUDA 13.x installation"
+else
+	@echo "$(RED)Error: CUDA 13 GPU acceleration only available on Linux$(RESET)"
+endif
+
+# CUDA 12 installation (requires system CUDA 12.x)
+install-jax-gpu-cuda12:
+	@echo "$(BOLD)$(BLUE)Installing JAX with system CUDA 12...$(RESET)"
+	@echo "======================================"
+	@echo "$(BOLD)Platform:$(RESET) $(PLATFORM)"
+	@echo "$(BOLD)Package manager:$(RESET) $(PKG_MANAGER)"
+	@echo ""
+ifeq ($(PLATFORM),linux)
+	@# Validate system CUDA 12.x is installed
+	@CUDA_VERSION=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+' | head -1); \
+	CUDA_FULL=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+'); \
+	if [ -z "$$CUDA_VERSION" ]; then \
+		echo "$(RED)Error: nvcc not found - CUDA toolkit not installed$(RESET)"; \
+		exit 1; \
+	elif [ "$$CUDA_VERSION" != "12" ]; then \
+		echo "$(RED)Error: System CUDA $$CUDA_FULL detected, but CUDA 12.x required$(RESET)"; \
+		echo "Either:"; \
+		echo "  1. Install CUDA 12.x toolkit"; \
+		echo "  2. Use: make install-jax-gpu-cuda13 (if you have CUDA 13.x and SM >= 7.5)"; \
+		exit 1; \
+	fi; \
+	echo "System CUDA: $$CUDA_FULL"
+	@# Validate GPU supports CUDA 12 (SM >= 5.2)
+	@SM_VERSION=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.'); \
+	SM_DISPLAY=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1); \
+	if [ -z "$$SM_VERSION" ]; then \
+		echo "$(RED)Error: Could not detect GPU$(RESET)"; \
+		exit 1; \
+	elif [ "$$SM_VERSION" -lt 52 ]; then \
+		echo "$(RED)Error: GPU SM $$SM_DISPLAY too old$(RESET)"; \
+		echo "CUDA 12 requires SM >= 5.2 (Maxwell or newer)"; \
+		echo "Kepler and older GPUs are not supported."; \
+		exit 1; \
+	fi; \
+	echo "GPU SM version: $$SM_DISPLAY (compatible with CUDA 12)"
+	@echo ""
+	@echo "Step 1/2: Uninstalling CPU-only JAX..."
+	@$(UNINSTALL_CMD) jax jaxlib 2>/dev/null || true
+	@echo ""
+	@echo "Step 2/2: Installing JAX with system CUDA 12..."
+	@echo "Command: $(INSTALL_CMD) $(JAX_GPU_CUDA12_PKG)"
+	@$(INSTALL_CMD) $(JAX_GPU_CUDA12_PKG)
+	@echo ""
+	@$(MAKE) gpu-check
+	@echo ""
+	@echo "$(BOLD)$(GREEN)JAX GPU support installed successfully$(RESET)"
+	@echo "  Package: $(JAX_GPU_CUDA12_PKG)"
+	@echo "  Uses: System CUDA 12.x installation"
+else
+	@echo "$(RED)Error: CUDA 12 GPU acceleration only available on Linux$(RESET)"
 endif
 
 # ===================

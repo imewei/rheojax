@@ -531,6 +531,228 @@ def plot_residuals(
         return fig, ax
 
 
+def compute_uncertainty_band(
+    model_fn: callable,
+    x_pred: np.ndarray,
+    popt: np.ndarray,
+    pcov: np.ndarray,
+    confidence: float = 0.95,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Compute prediction uncertainty band via error propagation.
+
+    Uses the formula: σ_y(x) = sqrt(diag(J @ pcov @ J.T))
+    where J is the Jacobian of the model with respect to parameters.
+
+    For 95% confidence interval, the band is ±1.96 * σ_y(x).
+
+    Args:
+        model_fn: Model function that takes (x, params) and returns predictions.
+            Must be compatible with JAX autodiff for Jacobian computation.
+        x_pred: X values for prediction (n_points,)
+        popt: Optimal parameter values (n_params,)
+        pcov: Parameter covariance matrix (n_params x n_params)
+        confidence: Confidence level (default: 0.95 for 95% CI)
+
+    Returns:
+        Tuple of (y_fit, y_lower, y_upper) where:
+            - y_fit: Fitted values at x_pred
+            - y_lower: Lower bound of confidence interval
+            - y_upper: Upper bound of confidence interval
+
+    Example:
+        >>> def model(x, params):
+        ...     a, b = params
+        ...     return a * x + b
+        >>> x = np.linspace(0, 10, 50)
+        >>> popt = np.array([2.0, 1.0])
+        >>> pcov = np.array([[0.01, 0.0], [0.0, 0.05]])
+        >>> y_fit, y_lo, y_hi = compute_uncertainty_band(model, x, popt, pcov)
+    """
+    from scipy.stats import norm
+
+    x_pred = np.asarray(x_pred, dtype=np.float64)
+    popt = np.asarray(popt, dtype=np.float64)
+    pcov = np.asarray(pcov, dtype=np.float64)
+    
+    # Compute y_fit
+    y_fit = np.asarray(model_fn(x_pred, popt), dtype=np.float64)
+    
+    # Handle complex output (e.g., G* = G' + iG'')
+    if np.iscomplexobj(y_fit):
+        # Return None for complex - uncertainty bands are harder to interpret
+        return y_fit, None, None
+
+    # Compute Jacobian: J[i, j] = ∂y[i] / ∂param[j]
+    # Use finite differences for robustness
+    n_points = len(x_pred)
+    n_params = len(popt)
+    jac = np.zeros((n_points, n_params), dtype=np.float64)
+    
+    eps = np.sqrt(np.finfo(np.float64).eps)
+    for j in range(n_params):
+        params_plus = popt.copy()
+        params_plus[j] += eps * max(abs(popt[j]), 1.0)
+        y_plus = np.asarray(model_fn(x_pred, params_plus), dtype=np.float64)
+        
+        params_minus = popt.copy()
+        params_minus[j] -= eps * max(abs(popt[j]), 1.0)
+        y_minus = np.asarray(model_fn(x_pred, params_minus), dtype=np.float64)
+        
+        jac[:, j] = (y_plus - y_minus) / (2 * eps * max(abs(popt[j]), 1.0))
+
+    # Compute variance: var_y = diag(J @ pcov @ J.T)
+    try:
+        var_y = np.einsum("ij,jk,ik->i", jac, pcov, jac)
+        sigma_y = np.sqrt(np.maximum(var_y, 0.0))
+    except Exception:
+        # Fallback if einsum fails
+        return y_fit, None, None
+
+    # Compute z-score for confidence interval
+    z = norm.ppf(1 - (1 - confidence) / 2)
+    
+    y_lower = y_fit - z * sigma_y
+    y_upper = y_fit + z * sigma_y
+
+    return y_fit, y_lower, y_upper
+
+
+def plot_fit_with_uncertainty(
+    x_data: np.ndarray,
+    y_data: np.ndarray,
+    x_fit: np.ndarray,
+    y_fit: np.ndarray,
+    y_lower: np.ndarray | None = None,
+    y_upper: np.ndarray | None = None,
+    log_x: bool = True,
+    log_y: bool = True,
+    data_label: str = "Data",
+    fit_label: str = "Fit",
+    band_label: str = "95% CI",
+    x_label: str | None = None,
+    y_label: str | None = None,
+    style: str = "default",
+    ax: Axes | None = None,
+    **kwargs: Any,
+) -> tuple[Figure | None, Axes]:
+    """Plot data with fitted curve and optional uncertainty band.
+
+    Creates publication-quality fit plots with:
+    - Scatter data points
+    - Solid fitted curve
+    - Shaded uncertainty band (if y_lower/y_upper provided)
+    - Legend with customizable labels
+
+    Args:
+        x_data: Experimental x values
+        y_data: Experimental y values
+        x_fit: X values for fitted curve (can be denser than data)
+        y_fit: Fitted y values
+        y_lower: Lower bound of uncertainty band (optional)
+        y_upper: Upper bound of uncertainty band (optional)
+        log_x: Use log scale for x-axis (default: True)
+        log_y: Use log scale for y-axis (default: True)
+        data_label: Legend label for data points
+        fit_label: Legend label for fitted curve
+        band_label: Legend label for uncertainty band
+        x_label: X-axis label
+        y_label: Y-axis label
+        style: Plot style ('default', 'publication', 'presentation')
+        ax: Optional existing axes to plot on
+        **kwargs: Additional arguments passed to scatter/plot
+
+    Returns:
+        Tuple of (Figure, Axes). Figure is None if ax was provided.
+
+    Example:
+        >>> x = np.logspace(-1, 2, 20)
+        >>> y = 100 * x ** -0.5 + np.random.randn(20) * 5
+        >>> x_fit = np.logspace(-1, 2, 100)
+        >>> y_fit = 100 * x_fit ** -0.5
+        >>> fig, ax = plot_fit_with_uncertainty(x, y, x_fit, y_fit)
+    """
+    style_params = _apply_style(style)
+
+    # Create figure if no axes provided
+    fig = None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
+
+    x_data = _ensure_numpy(x_data)
+    y_data = _ensure_numpy(y_data)
+    x_fit = _ensure_numpy(x_fit)
+    y_fit = _ensure_numpy(y_fit)
+
+    # Determine plot functions based on log scales
+    if log_x and log_y:
+        plot_fn = ax.loglog
+        scatter_fn = lambda x, y, **kw: ax.scatter(x, y, **kw)
+        # Filter positive values for log scale
+        x_data_plot, y_data_plot = _filter_positive(x_data, y_data)
+        x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
+    elif log_x:
+        plot_fn = ax.semilogx
+        scatter_fn = lambda x, y, **kw: ax.scatter(x, y, **kw)
+        x_data_plot, y_data_plot = x_data, y_data
+        x_fit_plot, y_fit_plot = x_fit, y_fit
+    elif log_y:
+        plot_fn = ax.semilogy
+        scatter_fn = lambda x, y, **kw: ax.scatter(x, y, **kw)
+        x_data_plot, y_data_plot = _filter_positive(x_data, y_data)
+        x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
+    else:
+        plot_fn = ax.plot
+        scatter_fn = lambda x, y, **kw: ax.scatter(x, y, **kw)
+        x_data_plot, y_data_plot = x_data, y_data
+        x_fit_plot, y_fit_plot = x_fit, y_fit
+
+    # Plot uncertainty band first (so it's behind other elements)
+    if y_lower is not None and y_upper is not None:
+        y_lower = _ensure_numpy(y_lower)
+        y_upper = _ensure_numpy(y_upper)
+        if log_y:
+            # Filter positive for log scale
+            mask = (y_lower > 0) & (y_upper > 0) & (x_fit > 0)
+            ax.fill_between(
+                x_fit[mask], y_lower[mask], y_upper[mask],
+                alpha=0.3, color="C0", label=band_label, zorder=1
+            )
+        else:
+            ax.fill_between(
+                x_fit, y_lower, y_upper,
+                alpha=0.3, color="C0", label=band_label, zorder=1
+            )
+
+    # Plot fitted curve
+    plot_fn(
+        x_fit_plot, y_fit_plot, "-",
+        linewidth=style_params["lines.linewidth"],
+        color="C0", label=fit_label, zorder=2
+    )
+
+    # Plot data points
+    scatter_fn(
+        x_data_plot, y_data_plot,
+        s=style_params["lines.markersize"] ** 2,
+        facecolors="none", edgecolors="C1",
+        linewidths=1.5, label=data_label, zorder=3
+    )
+
+    # Labels and legend
+    if x_label:
+        ax.set_xlabel(x_label)
+    if y_label:
+        ax.set_ylabel(y_label)
+
+    ax.legend(loc="best")
+    ax.grid(True, alpha=0.3, linestyle="--")
+
+    if fig is not None:
+        fig.tight_layout()
+
+    return fig, ax
+
+
 def save_figure(
     fig: Figure,
     filepath: str | Path,

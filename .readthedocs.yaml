@@ -6,9 +6,9 @@ version: 2
 
 # Set the OS, Python version and other tools
 build:
-  os: ubuntu-22.04
+  os: ubuntu-24.04
   tools:
-    python: "3.12"
+    python: "3.13"
   jobs:
     # Pre-install commands (if needed for system dependencies)
     pre_install:
@@ -34,7 +34,6 @@ python:
     - method: pip
       path: .
       extra_requirements:
-        - core
         - io
     # Install documentation-specific dependencies
     - requirements: docs/requirements-docs.txt

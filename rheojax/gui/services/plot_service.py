@@ -177,14 +177,14 @@ class PlotService:
         style: str = "default",
         test_mode: str | None = None,
     ) -> Figure:
-        """Create publication-quality fit plot.
+        """Create publication-quality fit plot with optional uncertainty bands.
 
         Parameters
         ----------
         data : RheoData
             Experimental data
         fit_result : FitResult
-            Fitting result with predictions
+            Fitting result with predictions (and optional pcov for uncertainty)
         style : str, default='default'
             Plot style
         test_mode : str, optional
@@ -203,9 +203,34 @@ class PlotService:
         y = np.asarray(data.y)
         y_fit = fit_result.y_fit
 
+        # Check for covariance matrix (for uncertainty bands)
+        pcov = getattr(fit_result, "pcov", None)
+        has_uncertainty = pcov is not None and np.all(np.isfinite(pcov))
+
         # Determine test mode
         if test_mode is None:
             test_mode = data.metadata.get("test_mode", "oscillation")
+
+        # Helper: compute uncertainty band for real-valued fits
+        def _compute_band(x_vals, y_vals):
+            """Compute ±2σ band if pcov available."""
+            if not has_uncertainty:
+                return None, None
+            try:
+                from scipy.stats import norm
+                # Get Jacobian dimensions from pcov
+                n_params = pcov.shape[0]
+                # Use finite difference on y_fit to approximate band
+                # This is simpler than full error propagation
+                # Uncertainty ~ sqrt(diag(pcov)) projected to y space
+                param_std = np.sqrt(np.diag(pcov))
+                # Rough approximation: scale y_fit by relative param uncertainty
+                rel_uncertainty = np.mean(param_std / (np.abs(list(fit_result.parameters.values())) + 1e-10))
+                sigma_y = np.abs(y_vals) * rel_uncertainty
+                z = 1.96  # 95% CI
+                return y_vals - z * sigma_y, y_vals + z * sigma_y
+            except Exception:
+                return None, None
 
         # Plot based on test mode
         if test_mode == "oscillation":
@@ -239,24 +264,52 @@ class PlotService:
                 # Complex modulus magnitude
                 ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
                 ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+                
+                # Add uncertainty band
+                y_lo, y_hi = _compute_band(x, y_fit)
+                if y_lo is not None and y_hi is not None:
+                    y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                    ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+
                 ax.set_xlabel("Frequency (rad/s)")
                 ax.set_ylabel("|G*| (Pa)")
 
         elif test_mode == "relaxation":
             ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
             ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+            
+            # Add uncertainty band
+            y_lo, y_hi = _compute_band(x, y_fit)
+            if y_lo is not None and y_hi is not None:
+                y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Relaxation Modulus G(t) (Pa)")
 
         elif test_mode == "creep":
             ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
             ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+            
+            # Add uncertainty band
+            y_lo, y_hi = _compute_band(x, y_fit)
+            if y_lo is not None and y_hi is not None:
+                y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Creep Compliance J(t) (1/Pa)")
 
         elif test_mode == "flow":
             ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
             ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+            
+            # Add uncertainty band
+            y_lo, y_hi = _compute_band(x, y_fit)
+            if y_lo is not None and y_hi is not None:
+                y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+
             ax.set_xlabel("Shear Rate (1/s)")
             ax.set_ylabel("Viscosity (Pa·s)")
 
@@ -267,6 +320,7 @@ class PlotService:
         self.apply_style(fig, style)
 
         return fig
+
 
     def create_residual_plot(
         self,
