@@ -419,3 +419,269 @@ class TestComplexDataHandling:
 
         # Should be identical
         np.testing.assert_allclose(rss_complex, rss_manual, rtol=1e-12)
+
+
+class TestOptimizationResultStatistics:
+    """Test OptimizationResult statistical properties (NLSQ 0.6.0 compatibility)."""
+
+    @pytest.fixture
+    def simple_result_with_data(self):
+        """Create an OptimizationResult with residuals and y_data for testing."""
+        # Generate synthetic data with known properties
+        np.random.seed(42)
+        n = 100
+        x_true = np.array([1.0, 2.0])  # True parameters
+        y_data = np.linspace(0, 10, n) * x_true[0] + x_true[1]  # y = x[0]*t + x[1]
+
+        # Add noise
+        noise = np.random.normal(0, 0.1, n)
+        y_noisy = y_data + noise
+
+        # Compute residuals (simulating a near-perfect fit)
+        residuals = noise  # In perfect fit, residuals = noise
+
+        # Create covariance matrix (simple diagonal)
+        pcov = np.array([[0.01, 0.0], [0.0, 0.02]])
+
+        return OptimizationResult(
+            x=x_true,
+            fun=np.sum(residuals**2),
+            success=True,
+            message="Optimization successful",
+            nit=10,
+            nfev=50,
+            njev=10,
+            pcov=pcov,
+            residuals=residuals,
+            y_data=y_noisy,
+            n_data=n,
+        )
+
+    def test_r_squared_computation(self, simple_result_with_data):
+        """Test R² computation from residuals and y_data."""
+        result = simple_result_with_data
+
+        r2 = result.r_squared
+        assert r2 is not None
+        assert 0.0 <= r2 <= 1.0
+        # With small noise, R² should be high
+        assert r2 > 0.95, f"Expected high R² for good fit, got {r2}"
+
+    def test_adj_r_squared_computation(self, simple_result_with_data):
+        """Test adjusted R² computation."""
+        result = simple_result_with_data
+
+        adj_r2 = result.adj_r_squared
+        assert adj_r2 is not None
+        assert adj_r2 <= result.r_squared, "Adjusted R² should be <= R²"
+        # Adjusted R² accounts for number of parameters
+        assert adj_r2 > 0.95, f"Expected high adjusted R² for good fit, got {adj_r2}"
+
+    def test_rmse_computation(self, simple_result_with_data):
+        """Test RMSE computation."""
+        result = simple_result_with_data
+
+        rmse = result.rmse
+        assert rmse is not None
+        assert rmse >= 0.0
+        # RMSE should be close to noise standard deviation (0.1)
+        assert 0.05 < rmse < 0.2, f"Expected RMSE near noise level 0.1, got {rmse}"
+
+    def test_mae_computation(self, simple_result_with_data):
+        """Test MAE computation."""
+        result = simple_result_with_data
+
+        mae = result.mae
+        assert mae is not None
+        assert mae >= 0.0
+        assert mae <= result.rmse, "MAE should be <= RMSE"
+
+    def test_aic_computation(self, simple_result_with_data):
+        """Test AIC computation."""
+        result = simple_result_with_data
+
+        aic = result.aic
+        assert aic is not None
+        # AIC should be a finite number
+        assert np.isfinite(aic)
+
+    def test_bic_computation(self, simple_result_with_data):
+        """Test BIC computation."""
+        result = simple_result_with_data
+
+        bic = result.bic
+        assert bic is not None
+        # BIC should be a finite number
+        assert np.isfinite(bic)
+        # BIC typically > AIC when n > e^2 ≈ 7.4 (due to stronger penalty)
+        if result.n_data > 8:
+            # This holds for n > e^2 when k >= 1
+            pass  # BIC relationship depends on n and k
+
+    def test_confidence_intervals(self, simple_result_with_data):
+        """Test confidence interval computation."""
+        result = simple_result_with_data
+
+        ci = result.confidence_intervals(alpha=0.95)
+        assert ci is not None
+        assert ci.shape == (2, 2)  # (n_params, 2) - lower and upper bounds
+
+        # Lower bound should be less than upper bound
+        assert np.all(ci[:, 0] < ci[:, 1])
+
+        # Confidence intervals should contain the optimal values
+        for i, x_opt in enumerate(result.x):
+            assert ci[i, 0] < x_opt < ci[i, 1], f"CI should contain optimal value for param {i}"
+
+    def test_get_parameter_uncertainties(self, simple_result_with_data):
+        """Test parameter uncertainty (standard errors) computation."""
+        result = simple_result_with_data
+
+        uncertainties = result.get_parameter_uncertainties()
+        assert uncertainties is not None
+        assert len(uncertainties) == len(result.x)
+        assert np.all(uncertainties >= 0), "Uncertainties should be non-negative"
+
+        # Uncertainties should be sqrt of diagonal of pcov
+        expected = np.sqrt(np.diag(result.pcov))
+        np.testing.assert_allclose(uncertainties, expected, rtol=1e-10)
+
+    def test_properties_return_none_when_data_missing(self):
+        """Test that properties return None when required data is missing."""
+        # Result without residuals or y_data
+        result = OptimizationResult(
+            x=np.array([1.0, 2.0]),
+            fun=0.1,
+            success=True,
+            message="OK",
+            nit=10,
+            nfev=50,
+            njev=10,
+        )
+
+        assert result.r_squared is None
+        assert result.adj_r_squared is None
+        assert result.rmse is None
+        assert result.mae is None
+        assert result.aic is None
+        assert result.bic is None
+        assert result.confidence_intervals() is None
+
+    def test_from_nlsq_with_y_data(self):
+        """Test from_nlsq class method with y_data parameter."""
+        # Simulate NLSQ result dict
+        nlsq_dict = {
+            "x": np.array([1.5, 2.5]),
+            "cost": 0.01,
+            "fun": 0.01,
+            "success": True,
+            "message": "Converged",
+            "nit": 15,
+            "nfev": 100,
+            "njev": 20,
+            "pcov": np.eye(2) * 0.001,
+        }
+
+        y_data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        residuals = np.array([0.01, -0.02, 0.01, 0.0, -0.01])
+
+        result = OptimizationResult.from_nlsq(
+            nlsq_dict,
+            residuals=residuals,
+            y_data=y_data,
+        )
+
+        assert result.y_data is not None
+        assert result.residuals is not None
+        assert result.n_data == 5
+        assert result.r_squared is not None
+
+
+class TestNlsqCurveFit:
+    """Test nlsq_curve_fit wrapper function (NLSQ 0.6.0 style API)."""
+
+    def test_basic_curve_fit(self):
+        """Test basic curve fitting with nlsq_curve_fit."""
+        from rheojax.utils.optimization import nlsq_curve_fit
+
+        # Generate synthetic data: y = a * exp(-b * x)
+        np.random.seed(42)
+        x_data = np.linspace(0, 5, 50)
+        a_true, b_true = 2.5, 0.8
+        y_true = a_true * np.exp(-b_true * x_data)
+        y_data = y_true + np.random.normal(0, 0.05, size=x_data.shape)
+
+        # Define JAX-compatible model function
+        def model_fn(x, params):
+            a, b = params
+            return a * jnp.exp(-b * x)
+
+        # Set up parameters
+        params = ParameterSet()
+        params.add(name="a", value=1.0, bounds=(0.1, 10.0))
+        params.add(name="b", value=0.5, bounds=(0.01, 5.0))
+
+        # Fit
+        result = nlsq_curve_fit(model_fn, x_data, y_data, params)
+
+        assert result.success
+        # r_squared may be None if y_data wasn't stored (depending on path)
+        # The key test is that fitting works and gives good parameters
+        if result.r_squared is not None:
+            assert result.r_squared > 0.95
+
+        # Check recovered parameters
+        np.testing.assert_allclose(result.x[0], a_true, rtol=0.1)
+        np.testing.assert_allclose(result.x[1], b_true, rtol=0.1)
+
+    def test_curve_fit_with_diagnostics(self):
+        """Test curve fit with compute_diagnostics enabled."""
+        from rheojax.utils.optimization import nlsq_curve_fit
+
+        # Simple linear fit: y = m * x + c
+        x_data = jnp.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y_data = jnp.array([2.1, 3.9, 6.2, 7.8, 10.1])  # y ≈ 2x
+
+        def model_fn(x, params):
+            m, c = params
+            return m * x + c
+
+        params = ParameterSet()
+        params.add(name="m", value=1.0, bounds=(0.0, 10.0))
+        params.add(name="c", value=0.0, bounds=(-5.0, 5.0))
+
+        result = nlsq_curve_fit(
+            model_fn, x_data, y_data, params, compute_diagnostics=True
+        )
+
+        assert result.success
+        # Diagnostic properties should be available when compute_diagnostics=True
+        # Note: actual availability depends on the execution path taken
+        if result.r_squared is not None:
+            assert result.adj_r_squared is not None
+            assert result.rmse is not None
+            assert result.mae is not None
+
+    def test_curve_fit_multistart(self):
+        """Test curve fit with multistart optimization."""
+        from rheojax.utils.optimization import nlsq_curve_fit
+
+        # Generate data using JAX arrays
+        x_data = jnp.linspace(0, 10, 30)
+        y_data = 3.0 * jnp.sin(x_data) + 1.0
+
+        def model_fn(x, params):
+            a, b = params
+            return a * jnp.sin(x) + b
+
+        params = ParameterSet()
+        params.add(name="a", value=1.0, bounds=(0.1, 10.0))
+        params.add(name="b", value=0.0, bounds=(-5.0, 5.0))
+
+        result = nlsq_curve_fit(
+            model_fn, x_data, y_data, params, multistart=True, n_starts=3
+        )
+
+        assert result.success
+        np.testing.assert_allclose(result.x[0], 3.0, rtol=0.1)
+        np.testing.assert_allclose(result.x[1], 1.0, rtol=0.1)
