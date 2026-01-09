@@ -65,20 +65,20 @@ requires-python = ">=3.12"
 # ============================================================================
 dependencies = [
     # Core scientific computing
-    "numpy>=2.3.0,<3.0.0",
-    "scipy>=1.16.0,<2.0.0",
-    "pandas>=2.3.0,<3.0.0",
-    "matplotlib>=3.10.0,<4.0.0",
+    "numpy>=2.3.0,<3.0.0",          # Maintain compatibility with Numba 0.63.1
+    "scipy>=1.16.3,<2.0.0",
+    "pandas>=2.3.3,<3.0.0",
+    "matplotlib>=3.10.8,<4.0.0",
 
     # GPU-accelerated optimization (CRITICAL: must be imported before JAX)
     # NLSQ v0.3.0+ uses float32 by default with automatic precision fallback
     # RheoJAX explicitly enables float64 via jax.config.update("jax_enable_x64", True)
-    "nlsq>=0.6.0",
+    "nlsq>=0.6.2",
 
     # JAX ecosystem (CPU-only - works on all platforms)
     # GPU users: see installation instructions above
-    "jax>=0.8.0",     # JAX 0.8.0+ for CUDA 12/13 support
-    "jaxlib>=0.8.0",  # jaxlib 0.8.0+ - must be compatible with JAX version
+    "jax>=0.8.2",     # JAX 0.8.0+ for CUDA 12/13 support
+    "jaxlib>=0.8.2",  # jaxlib 0.8.0+ - must be compatible with JAX version
 
     # Probabilistic programming
     "numpyro>=0.19.0,<1.0.0",
@@ -92,31 +92,31 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0.0",
+    "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
     "hypothesis>=6.150.0",
     "black>=25.12.0",
-    "ruff>=0.14.10",
-    "mypy>=1.19.0",
-    "pre-commit>=4.5.0",
+    "ruff>=0.14.11",
+    "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
     "ipython>=9.9.0",
-    "jupyter>=1.1.0",
-    "sphinx>=8.2.0",
-    "furo>=2024.8.0",
-    "sphinx-autodoc-typehints>=3.5.0",
+    "jupyter>=1.1.1",
+    "sphinx>=9.1.0",
+    "furo>=2025.12.19",
+    "sphinx-autodoc-typehints>=3.6.2",
 ]
 ml = [
     "scikit-learn>=1.8.0",
 ]
 io = [
-    "h5py>=3.15.0",
-    "openpyxl>=3.1.0",
-    "xlrd>=2.0.0",
+    "h5py>=3.15.1",
+    "openpyxl>=3.1.5",
+    "xlrd>=2.0.2",
 ]
 gui = [
-    "PySide6>=6.6.0",
-    "matplotlib>=3.10.0",
+    "PySide6>=6.10.1",
+    "matplotlib>=3.10.8",
     "qasync>=0.28.0",
 ]
 gui-dev = [
@@ -148,7 +148,7 @@ exclude = ["tests*", "docs*", "examples*"]
 "rheojax" = ["py.typed", "*.json", "*.yaml"]
 
 [tool.pytest.ini_options]
-minversion = "9.0"
+minversion = "9.0.2"
 testpaths = ["tests"]
 addopts = [
     "-v",
