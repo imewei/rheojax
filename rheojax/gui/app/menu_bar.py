@@ -8,6 +8,10 @@ Application menu bar with File, Edit, View, Data, Models, Transforms, Analysis, 
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QMenuBar, QWidget
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class MenuBar(QMenuBar):
     """Application menu bar for RheoJAX GUI.
@@ -38,6 +42,7 @@ class MenuBar(QMenuBar):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         # Create menus
         self._create_file_menu()
@@ -50,20 +55,33 @@ class MenuBar(QMenuBar):
         self._create_tools_menu()
         self._create_help_menu()
 
+        logger.debug(
+            "Menu bar initialized",
+            class_name=self.__class__.__name__,
+            menu_count=len(self.actions()),
+        )
+
     def _create_file_menu(self) -> None:
         """Create File menu."""
+        logger.debug("Creating menu", menu="File")
         file_menu = self.addMenu("&File")
 
         # New
         self.new_file_action = QAction("&New", self)
         self.new_file_action.setShortcut(QKeySequence.StandardKey.New)
         self.new_file_action.setStatusTip("Create a new project")
+        self.new_file_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="new_file", menu="File")
+        )
         file_menu.addAction(self.new_file_action)
 
         # Open
         self.open_file_action = QAction("&Open...", self)
         self.open_file_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_file_action.setStatusTip("Open an existing project")
+        self.open_file_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="open_file", menu="File")
+        )
         file_menu.addAction(self.open_file_action)
 
         file_menu.addSeparator()
@@ -72,12 +90,18 @@ class MenuBar(QMenuBar):
         self.save_file_action = QAction("&Save", self)
         self.save_file_action.setShortcut(QKeySequence.StandardKey.Save)
         self.save_file_action.setStatusTip("Save the current project")
+        self.save_file_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="save_file", menu="File")
+        )
         file_menu.addAction(self.save_file_action)
 
         # Save As
         self.save_as_action = QAction("Save &As...", self)
         self.save_as_action.setShortcut(QKeySequence.StandardKey.SaveAs)
         self.save_as_action.setStatusTip("Save the current project with a new name")
+        self.save_as_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="save_as", menu="File")
+        )
         file_menu.addAction(self.save_as_action)
 
         file_menu.addSeparator()
@@ -86,12 +110,20 @@ class MenuBar(QMenuBar):
         self.import_action = QAction("&Import Data...", self)
         self.import_action.setShortcut(QKeySequence("Ctrl+I"))
         self.import_action.setStatusTip("Import rheological data")
+        self.import_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="import_data", menu="File")
+        )
         file_menu.addAction(self.import_action)
 
         # Export
         self.export_action = QAction("&Export Results...", self)
         self.export_action.setShortcut(QKeySequence("Ctrl+E"))
         self.export_action.setStatusTip("Export analysis results")
+        self.export_action.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="export_results", menu="File"
+            )
+        )
         file_menu.addAction(self.export_action)
 
         file_menu.addSeparator()
@@ -106,10 +138,16 @@ class MenuBar(QMenuBar):
         self.exit_action = QAction("E&xit", self)
         self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
         self.exit_action.setStatusTip("Exit the application")
+        self.exit_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="exit", menu="File")
+        )
         file_menu.addAction(self.exit_action)
+
+        logger.debug("Menu created", menu="File", action_count=file_menu.actions().__len__())
 
     def _create_edit_menu(self) -> None:
         """Create Edit menu."""
+        logger.debug("Creating menu", menu="Edit")
         edit_menu = self.addMenu("&Edit")
 
         # Undo
@@ -117,6 +155,9 @@ class MenuBar(QMenuBar):
         self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
         self.undo_action.setStatusTip("Undo last action")
         self.undo_action.setEnabled(False)
+        self.undo_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="undo", menu="Edit")
+        )
         edit_menu.addAction(self.undo_action)
 
         # Redo
@@ -124,6 +165,9 @@ class MenuBar(QMenuBar):
         self.redo_action.setShortcut(QKeySequence.StandardKey.Redo)
         self.redo_action.setStatusTip("Redo last undone action")
         self.redo_action.setEnabled(False)
+        self.redo_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="redo", menu="Edit")
+        )
         edit_menu.addAction(self.redo_action)
 
         edit_menu.addSeparator()
@@ -132,18 +176,27 @@ class MenuBar(QMenuBar):
         self.cut_action = QAction("Cu&t", self)
         self.cut_action.setShortcut(QKeySequence.StandardKey.Cut)
         self.cut_action.setStatusTip("Cut selection to clipboard")
+        self.cut_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="cut", menu="Edit")
+        )
         edit_menu.addAction(self.cut_action)
 
         # Copy
         self.copy_action = QAction("&Copy", self)
         self.copy_action.setShortcut(QKeySequence.StandardKey.Copy)
         self.copy_action.setStatusTip("Copy selection to clipboard")
+        self.copy_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="copy", menu="Edit")
+        )
         edit_menu.addAction(self.copy_action)
 
         # Paste
         self.paste_action = QAction("&Paste", self)
         self.paste_action.setShortcut(QKeySequence.StandardKey.Paste)
         self.paste_action.setStatusTip("Paste from clipboard")
+        self.paste_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="paste", menu="Edit")
+        )
         edit_menu.addAction(self.paste_action)
 
         edit_menu.addSeparator()
@@ -152,28 +205,43 @@ class MenuBar(QMenuBar):
         self.preferences_action = QAction("&Preferences...", self)
         self.preferences_action.setShortcut(QKeySequence.StandardKey.Preferences)
         self.preferences_action.setStatusTip("Open preferences dialog")
+        self.preferences_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="preferences", menu="Edit")
+        )
         edit_menu.addAction(self.preferences_action)
+
+        logger.debug("Menu created", menu="Edit", action_count=edit_menu.actions().__len__())
 
     def _create_view_menu(self) -> None:
         """Create View menu."""
+        logger.debug("Creating menu", menu="View")
         view_menu = self.addMenu("&View")
 
         # Zoom In
         self.zoom_in_action = QAction("Zoom &In", self)
         self.zoom_in_action.setShortcut(QKeySequence.StandardKey.ZoomIn)
         self.zoom_in_action.setStatusTip("Zoom in on plot")
+        self.zoom_in_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="zoom_in", menu="View")
+        )
         view_menu.addAction(self.zoom_in_action)
 
         # Zoom Out
         self.zoom_out_action = QAction("Zoom &Out", self)
         self.zoom_out_action.setShortcut(QKeySequence.StandardKey.ZoomOut)
         self.zoom_out_action.setStatusTip("Zoom out on plot")
+        self.zoom_out_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="zoom_out", menu="View")
+        )
         view_menu.addAction(self.zoom_out_action)
 
         # Reset Zoom
         self.reset_zoom_action = QAction("&Reset Zoom", self)
         self.reset_zoom_action.setShortcut(QKeySequence("Ctrl+0"))
         self.reset_zoom_action.setStatusTip("Reset plot zoom to default")
+        self.reset_zoom_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="reset_zoom", menu="View")
+        )
         view_menu.addAction(self.reset_zoom_action)
 
         view_menu.addSeparator()
@@ -183,12 +251,28 @@ class MenuBar(QMenuBar):
         self.view_data_dock_action.setCheckable(True)
         self.view_data_dock_action.setChecked(True)
         self.view_data_dock_action.setStatusTip("Toggle data panel visibility")
+        self.view_data_dock_action.triggered.connect(
+            lambda checked: logger.debug(
+                "Action triggered",
+                action="toggle_data_panel",
+                menu="View",
+                checked=checked,
+            )
+        )
         view_menu.addAction(self.view_data_dock_action)
 
         self.view_log_dock_action = QAction("&Log Panel", self)
         self.view_log_dock_action.setCheckable(True)
         self.view_log_dock_action.setChecked(False)
         self.view_log_dock_action.setStatusTip("Toggle log panel visibility")
+        self.view_log_dock_action.triggered.connect(
+            lambda checked: logger.debug(
+                "Action triggered",
+                action="toggle_log_panel",
+                menu="View",
+                checked=checked,
+            )
+        )
         view_menu.addAction(self.view_log_dock_action)
 
         view_menu.addSeparator()
@@ -197,31 +281,53 @@ class MenuBar(QMenuBar):
         self.theme_menu = view_menu.addMenu("&Theme")
         self.theme_light_action = QAction("&Light", self)
         self.theme_light_action.setCheckable(True)
+        self.theme_light_action.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="theme_light", menu="View"
+            )
+        )
         self.theme_menu.addAction(self.theme_light_action)
 
         self.theme_dark_action = QAction("&Dark", self)
         self.theme_dark_action.setCheckable(True)
+        self.theme_dark_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="theme_dark", menu="View")
+        )
         self.theme_menu.addAction(self.theme_dark_action)
 
         self.theme_auto_action = QAction("&Auto (System)", self)
         self.theme_auto_action.setCheckable(True)
         self.theme_auto_action.setChecked(True)
+        self.theme_auto_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="theme_auto", menu="View")
+        )
         self.theme_menu.addAction(self.theme_auto_action)
+
+        logger.debug("Menu created", menu="View", action_count=view_menu.actions().__len__())
 
     def _create_data_menu(self) -> None:
         """Create Data menu."""
+        logger.debug("Creating menu", menu="Data")
         data_menu = self.addMenu("&Data")
 
         # New Dataset
         self.new_dataset_action = QAction("&New Dataset...", self)
         self.new_dataset_action.setShortcut(QKeySequence("Ctrl+Shift+N"))
         self.new_dataset_action.setStatusTip("Create a new dataset")
+        self.new_dataset_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="new_dataset", menu="Data")
+        )
         data_menu.addAction(self.new_dataset_action)
 
         # Delete Dataset
         self.delete_dataset_action = QAction("&Delete Dataset", self)
         self.delete_dataset_action.setShortcut(QKeySequence.StandardKey.Delete)
         self.delete_dataset_action.setStatusTip("Delete selected dataset")
+        self.delete_dataset_action.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="delete_dataset", menu="Data"
+            )
+        )
         data_menu.addAction(self.delete_dataset_action)
 
         data_menu.addSeparator()
@@ -229,15 +335,47 @@ class MenuBar(QMenuBar):
         # Set Test Mode
         self.test_mode_menu = data_menu.addMenu("Set Test &Mode")
         self.test_mode_oscillation = QAction("&Oscillation", self)
+        self.test_mode_oscillation.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Data",
+                action="set_test_mode",
+                mode="oscillation",
+            )
+        )
         self.test_mode_menu.addAction(self.test_mode_oscillation)
 
         self.test_mode_relaxation = QAction("&Relaxation", self)
+        self.test_mode_relaxation.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Data",
+                action="set_test_mode",
+                mode="relaxation",
+            )
+        )
         self.test_mode_menu.addAction(self.test_mode_relaxation)
 
         self.test_mode_creep = QAction("&Creep", self)
+        self.test_mode_creep.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Data",
+                action="set_test_mode",
+                mode="creep",
+            )
+        )
         self.test_mode_menu.addAction(self.test_mode_creep)
 
         self.test_mode_rotation = QAction("R&otation", self)
+        self.test_mode_rotation.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Data",
+                action="set_test_mode",
+                mode="rotation",
+            )
+        )
         self.test_mode_menu.addAction(self.test_mode_rotation)
 
         # Auto-detect Test Mode
@@ -246,34 +384,96 @@ class MenuBar(QMenuBar):
         self.auto_detect_mode_action.setStatusTip(
             "Automatically detect test mode from data"
         )
+        self.auto_detect_mode_action.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="auto_detect_mode", menu="Data"
+            )
+        )
         data_menu.addAction(self.auto_detect_mode_action)
+
+        logger.debug("Menu created", menu="Data", action_count=data_menu.actions().__len__())
 
     def _create_models_menu(self) -> None:
         """Create Models menu with submenus."""
+        logger.debug("Creating menu", menu="Models")
         models_menu = self.addMenu("&Models")
 
         # Classical Models submenu
         classical_menu = models_menu.addMenu("&Classical")
         self.model_maxwell = QAction("Maxwell", self)
+        self.model_maxwell.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected", menu="Models", submenu="Classical", model="Maxwell"
+            )
+        )
         classical_menu.addAction(self.model_maxwell)
         self.model_zener = QAction("Zener (SLS)", self)
+        self.model_zener.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected", menu="Models", submenu="Classical", model="Zener"
+            )
+        )
         classical_menu.addAction(self.model_zener)
         self.model_springpot = QAction("SpringPot", self)
+        self.model_springpot.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Classical",
+                model="SpringPot",
+            )
+        )
         classical_menu.addAction(self.model_springpot)
 
         # Flow Models submenu
         flow_menu = models_menu.addMenu("&Flow (Non-Newtonian)")
         self.model_power_law = QAction("Power Law", self)
+        self.model_power_law.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected", menu="Models", submenu="Flow", model="PowerLaw"
+            )
+        )
         flow_menu.addAction(self.model_power_law)
         self.model_carreau = QAction("Carreau", self)
+        self.model_carreau.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected", menu="Models", submenu="Flow", model="Carreau"
+            )
+        )
         flow_menu.addAction(self.model_carreau)
         self.model_carreau_yasuda = QAction("Carreau-Yasuda", self)
+        self.model_carreau_yasuda.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Flow",
+                model="CarreauYasuda",
+            )
+        )
         flow_menu.addAction(self.model_carreau_yasuda)
         self.model_cross = QAction("Cross", self)
+        self.model_cross.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected", menu="Models", submenu="Flow", model="Cross"
+            )
+        )
         flow_menu.addAction(self.model_cross)
         self.model_herschel_bulkley = QAction("Herschel-Bulkley", self)
+        self.model_herschel_bulkley.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Flow",
+                model="HerschelBulkley",
+            )
+        )
         flow_menu.addAction(self.model_herschel_bulkley)
         self.model_bingham = QAction("Bingham", self)
+        self.model_bingham.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected", menu="Models", submenu="Flow", model="Bingham"
+            )
+        )
         flow_menu.addAction(self.model_bingham)
 
         # Fractional Models submenu
@@ -282,63 +482,198 @@ class MenuBar(QMenuBar):
         # Fractional Maxwell family
         fmaxwell_menu = fractional_menu.addMenu("Maxwell Family")
         self.model_fmaxwell_gel = QAction("Maxwell Gel", self)
+        self.model_fmaxwell_gel.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional/Maxwell",
+                model="MaxwellGel",
+            )
+        )
         fmaxwell_menu.addAction(self.model_fmaxwell_gel)
         self.model_fmaxwell_liquid = QAction("Maxwell Liquid", self)
+        self.model_fmaxwell_liquid.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional/Maxwell",
+                model="MaxwellLiquid",
+            )
+        )
         fmaxwell_menu.addAction(self.model_fmaxwell_liquid)
         self.model_fmaxwell_model = QAction("Maxwell Model", self)
+        self.model_fmaxwell_model.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional/Maxwell",
+                model="MaxwellModel",
+            )
+        )
         fmaxwell_menu.addAction(self.model_fmaxwell_model)
         self.model_fkelvin_voigt = QAction("Kelvin-Voigt", self)
+        self.model_fkelvin_voigt.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional/Maxwell",
+                model="KelvinVoigt",
+            )
+        )
         fmaxwell_menu.addAction(self.model_fkelvin_voigt)
 
         # Fractional Zener family
         fzener_menu = fractional_menu.addMenu("Zener Family")
         self.model_fzener_sl = QAction("Solid-Liquid (FZSL)", self)
+        self.model_fzener_sl.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional/Zener",
+                model="FZSL",
+            )
+        )
         fzener_menu.addAction(self.model_fzener_sl)
         self.model_fzener_ss = QAction("Solid-Solid (FZSS)", self)
+        self.model_fzener_ss.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional/Zener",
+                model="FZSS",
+            )
+        )
         fzener_menu.addAction(self.model_fzener_ss)
         self.model_fzener_ll = QAction("Liquid-Liquid (FZLL)", self)
+        self.model_fzener_ll.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional/Zener",
+                model="FZLL",
+            )
+        )
         fzener_menu.addAction(self.model_fzener_ll)
         self.model_fkv_zener = QAction("KV-Zener (FKVZ)", self)
+        self.model_fkv_zener.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional/Zener",
+                model="FKVZ",
+            )
+        )
         fzener_menu.addAction(self.model_fkv_zener)
 
         # Advanced fractional models
         fractional_menu.addSeparator()
         self.model_fburgers = QAction("Burgers (FBM)", self)
+        self.model_fburgers.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional",
+                model="FBM",
+            )
+        )
         fractional_menu.addAction(self.model_fburgers)
         self.model_fpoynting = QAction("Poynting-Thomson (FPT)", self)
+        self.model_fpoynting.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional",
+                model="FPT",
+            )
+        )
         fractional_menu.addAction(self.model_fpoynting)
         self.model_fjeffreys = QAction("Jeffreys (FJM)", self)
+        self.model_fjeffreys.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fractional",
+                model="FJM",
+            )
+        )
         fractional_menu.addAction(self.model_fjeffreys)
 
         # Multi-Mode Models submenu
         multimode_menu = models_menu.addMenu("&Multi-Mode")
         self.model_gmaxwell = QAction("Generalized Maxwell", self)
+        self.model_gmaxwell.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Multi-Mode",
+                model="GeneralizedMaxwell",
+            )
+        )
         multimode_menu.addAction(self.model_gmaxwell)
 
         # SGR Models submenu
         sgr_menu = models_menu.addMenu("&Soft Glassy Rheology")
         self.model_sgr_conventional = QAction("SGR Conventional", self)
+        self.model_sgr_conventional.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="SGR",
+                model="SGRConventional",
+            )
+        )
         sgr_menu.addAction(self.model_sgr_conventional)
         self.model_sgr_generic = QAction("SGR GENERIC", self)
+        self.model_sgr_generic.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="SGR",
+                model="SGRGeneric",
+            )
+        )
         sgr_menu.addAction(self.model_sgr_generic)
 
         # SPP LAOS Models submenu
         spp_menu = models_menu.addMenu("S&PP (LAOS)")
         self.model_spp_yield_stress = QAction("SPP Yield Stress", self)
+        self.model_spp_yield_stress.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="SPP",
+                model="SPPYieldStress",
+            )
+        )
         spp_menu.addAction(self.model_spp_yield_stress)
+
+        logger.debug(
+            "Menu created", menu="Models", action_count=models_menu.actions().__len__()
+        )
 
     def _create_transforms_menu(self) -> None:
         """Create Transforms menu."""
+        logger.debug("Creating menu", menu="Transforms")
         transforms_menu = self.addMenu("&Transforms")
 
         # FFT
         self.transform_fft = QAction("&FFT (Fourier Transform)", self)
         self.transform_fft.setStatusTip("Apply Fast Fourier Transform")
+        self.transform_fft.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_fft", menu="Transforms"
+            )
+        )
         transforms_menu.addAction(self.transform_fft)
 
         # Mastercurve
         self.transform_mastercurve = QAction("&Mastercurve (TTS)", self)
         self.transform_mastercurve.setStatusTip("Time-Temperature Superposition")
+        self.transform_mastercurve.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_mastercurve", menu="Transforms"
+            )
+        )
         transforms_menu.addAction(self.transform_mastercurve)
 
         # SRFS
@@ -346,6 +681,11 @@ class MenuBar(QMenuBar):
             "&SRFS (Strain-Rate Frequency Superposition)", self
         )
         self.transform_srfs.setStatusTip("Strain-Rate Frequency Superposition")
+        self.transform_srfs.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_srfs", menu="Transforms"
+            )
+        )
         transforms_menu.addAction(self.transform_srfs)
 
         transforms_menu.addSeparator()
@@ -353,16 +693,31 @@ class MenuBar(QMenuBar):
         # Mutation Number
         self.transform_mutation = QAction("Mutation &Number", self)
         self.transform_mutation.setStatusTip("Calculate mutation number")
+        self.transform_mutation.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_mutation", menu="Transforms"
+            )
+        )
         transforms_menu.addAction(self.transform_mutation)
 
         # OWChirp
         self.transform_owchirp = QAction("&OWChirp", self)
         self.transform_owchirp.setStatusTip("Optimally Windowed Chirp transform")
+        self.transform_owchirp.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_owchirp", menu="Transforms"
+            )
+        )
         transforms_menu.addAction(self.transform_owchirp)
 
         # Derivatives
         self.transform_derivatives = QAction("&Derivatives", self)
         self.transform_derivatives.setStatusTip("Calculate numerical derivatives")
+        self.transform_derivatives.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_derivatives", menu="Transforms"
+            )
+        )
         transforms_menu.addAction(self.transform_derivatives)
 
         transforms_menu.addSeparator()
@@ -372,16 +727,33 @@ class MenuBar(QMenuBar):
         self.transform_spp.setStatusTip(
             "Sequence of Physical Processes yield stress extraction"
         )
+        self.transform_spp.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_spp", menu="Transforms"
+            )
+        )
         transforms_menu.addAction(self.transform_spp)
+
+        logger.debug(
+            "Menu created",
+            menu="Transforms",
+            action_count=transforms_menu.actions().__len__(),
+        )
 
     def _create_analysis_menu(self) -> None:
         """Create Analysis menu."""
+        logger.debug("Creating menu", menu="Analysis")
         analysis_menu = self.addMenu("&Analysis")
 
         # Fit NLSQ
         self.analysis_fit_nlsq = QAction("&Fit (NLSQ)", self)
         self.analysis_fit_nlsq.setShortcut(QKeySequence("Ctrl+F"))
         self.analysis_fit_nlsq.setStatusTip("Fit model using non-linear least squares")
+        self.analysis_fit_nlsq.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="fit_nlsq", menu="Analysis"
+            )
+        )
         analysis_menu.addAction(self.analysis_fit_nlsq)
 
         # Fit Bayesian
@@ -390,6 +762,11 @@ class MenuBar(QMenuBar):
         self.analysis_fit_bayesian.setStatusTip(
             "Fit model using Bayesian inference with NUTS"
         )
+        self.analysis_fit_bayesian.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="fit_bayesian", menu="Analysis"
+            )
+        )
         analysis_menu.addAction(self.analysis_fit_bayesian)
 
         analysis_menu.addSeparator()
@@ -397,11 +774,21 @@ class MenuBar(QMenuBar):
         # Batch Fit
         self.analysis_batch_fit = QAction("&Batch Fit...", self)
         self.analysis_batch_fit.setStatusTip("Fit multiple datasets in parallel")
+        self.analysis_batch_fit.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="batch_fit", menu="Analysis"
+            )
+        )
         analysis_menu.addAction(self.analysis_batch_fit)
 
         # Compare Models
         self.analysis_compare = QAction("&Compare Models...", self)
         self.analysis_compare.setStatusTip("Compare multiple model fits")
+        self.analysis_compare.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="compare_models", menu="Analysis"
+            )
+        )
         analysis_menu.addAction(self.analysis_compare)
 
         analysis_menu.addSeparator()
@@ -409,16 +796,33 @@ class MenuBar(QMenuBar):
         # Compatibility Check
         self.analysis_compatibility = QAction("Check &Compatibility", self)
         self.analysis_compatibility.setStatusTip("Check model-data compatibility")
+        self.analysis_compatibility.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="check_compatibility", menu="Analysis"
+            )
+        )
         analysis_menu.addAction(self.analysis_compatibility)
+
+        logger.debug(
+            "Menu created",
+            menu="Analysis",
+            action_count=analysis_menu.actions().__len__(),
+        )
 
     def _create_tools_menu(self) -> None:
         """Create Tools menu."""
+        logger.debug("Creating menu", menu="Tools")
         tools_menu = self.addMenu("&Tools")
 
         # Python Console
         self.tools_console = QAction("&Python Console", self)
         self.tools_console.setShortcut(QKeySequence("Ctrl+Shift+P"))
         self.tools_console.setStatusTip("Open Python console")
+        self.tools_console.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="python_console", menu="Tools"
+            )
+        )
         tools_menu.addAction(self.tools_console)
 
         tools_menu.addSeparator()
@@ -426,11 +830,21 @@ class MenuBar(QMenuBar):
         # JAX Profiler
         self.tools_jax_profiler = QAction("&JAX Profiler", self)
         self.tools_jax_profiler.setStatusTip("Profile JAX performance")
+        self.tools_jax_profiler.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="jax_profiler", menu="Tools"
+            )
+        )
         tools_menu.addAction(self.tools_jax_profiler)
 
         # Memory Monitor
         self.tools_memory_monitor = QAction("&Memory Monitor", self)
         self.tools_memory_monitor.setStatusTip("Monitor memory usage")
+        self.tools_memory_monitor.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="memory_monitor", menu="Tools"
+            )
+        )
         tools_menu.addAction(self.tools_memory_monitor)
 
         tools_menu.addSeparator()
@@ -439,26 +853,49 @@ class MenuBar(QMenuBar):
         self.tools_preferences = QAction("&Preferences...", self)
         self.tools_preferences.setShortcut(QKeySequence.StandardKey.Preferences)
         self.tools_preferences.setStatusTip("Open preferences dialog")
+        self.tools_preferences.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="preferences", menu="Tools"
+            )
+        )
         tools_menu.addAction(self.tools_preferences)
+
+        logger.debug(
+            "Menu created", menu="Tools", action_count=tools_menu.actions().__len__()
+        )
 
     def _create_help_menu(self) -> None:
         """Create Help menu."""
+        logger.debug("Creating menu", menu="Help")
         help_menu = self.addMenu("&Help")
 
         # Documentation
         self.help_docs = QAction("&Documentation", self)
         self.help_docs.setShortcut(QKeySequence.StandardKey.HelpContents)
         self.help_docs.setStatusTip("Open online documentation")
+        self.help_docs.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="documentation", menu="Help"
+            )
+        )
         help_menu.addAction(self.help_docs)
 
         # Tutorials
         self.help_tutorials = QAction("&Tutorials", self)
         self.help_tutorials.setStatusTip("View tutorials")
+        self.help_tutorials.triggered.connect(
+            lambda: logger.debug("Action triggered", action="tutorials", menu="Help")
+        )
         help_menu.addAction(self.help_tutorials)
 
         # Keyboard Shortcuts
         self.help_shortcuts = QAction("&Keyboard Shortcuts", self)
         self.help_shortcuts.setStatusTip("View keyboard shortcuts")
+        self.help_shortcuts.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="keyboard_shortcuts", menu="Help"
+            )
+        )
         help_menu.addAction(self.help_shortcuts)
 
         help_menu.addSeparator()
@@ -466,10 +903,18 @@ class MenuBar(QMenuBar):
         # About
         self.help_about = QAction("&About RheoJAX", self)
         self.help_about.setStatusTip("About RheoJAX")
+        self.help_about.triggered.connect(
+            lambda: logger.debug("Action triggered", action="about", menu="Help")
+        )
         help_menu.addAction(self.help_about)
+
+        logger.debug(
+            "Menu created", menu="Help", action_count=help_menu.actions().__len__()
+        )
 
     def _populate_recent_files(self) -> None:
         """Populate recent files menu (placeholder)."""
+        logger.debug("Populating recent files menu")
         # This will be implemented to load recent files from config
         no_recent = QAction("No recent files", self)
         no_recent.setEnabled(False)

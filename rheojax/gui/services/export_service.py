@@ -8,7 +8,7 @@ Service for exporting results to various formats (HDF5, Excel, CSV, etc.).
 from __future__ import annotations
 
 import json
-import logging
+import os
 from pathlib import Path
 from typing import Any
 from zipfile import ZipFile
@@ -18,8 +18,9 @@ from matplotlib.figure import Figure
 
 from rheojax.core.data import RheoData
 from rheojax.io import save_excel, save_hdf5
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ExportService:
@@ -41,11 +42,16 @@ class ExportService:
 
     def __init__(self) -> None:
         """Initialize export service."""
+        logger.debug("Initializing ExportService")
         self._supported_formats = {
             "data": [".hdf5", ".h5", ".xlsx", ".csv", ".json"],
             "figure": [".png", ".pdf", ".svg", ".eps"],
             "project": [".rheo"],
         }
+        logger.debug(
+            "ExportService initialized",
+            supported_formats=self._supported_formats,
+        )
 
     def export_parameters(
         self,
@@ -65,21 +71,39 @@ class ExportService:
             Export format ('csv', 'json', 'xlsx', 'hdf5')
             Auto-detected from extension if None
         """
+        logger.debug(
+            "Entering export_parameters",
+            path=str(path),
+            format=format,
+        )
         path = Path(path)
 
         if format is None:
             format = path.suffix.lstrip(".")
 
+        logger.info(
+            "Starting export",
+            format=format,
+            filepath=str(path),
+            export_type="parameters",
+        )
+
         try:
             # Extract parameters
             if hasattr(result, "parameters"):
                 params = result.parameters
+                logger.debug("Extracted parameters from result.parameters")
             elif hasattr(result, "posterior_samples"):
                 # For Bayesian results, use posterior means
                 params = {
                     k: float(np.mean(v)) for k, v in result.posterior_samples.items()
                 }
+                logger.debug(
+                    "Extracted parameters from posterior_samples means",
+                    num_params=len(params),
+                )
             else:
+                logger.error("Result does not contain parameters or posterior_samples")
                 raise ValueError("Result does not contain parameters")
 
             if format == "csv":
@@ -87,6 +111,7 @@ class ExportService:
 
                 df = pd.DataFrame([params])
                 df.to_csv(path, index=False)
+                logger.debug("Wrote parameters to CSV")
 
             elif format == "json":
                 # Convert numpy types to Python types
@@ -96,12 +121,14 @@ class ExportService:
                 }
                 with open(path, "w") as f:
                     json.dump(params_json, f, indent=2)
+                logger.debug("Wrote parameters to JSON")
 
             elif format in ["xlsx", "xls"]:
                 import pandas as pd
 
                 df = pd.DataFrame([params])
                 df.to_excel(path, index=False)
+                logger.debug("Wrote parameters to Excel")
 
             elif format in ["hdf5", "h5"]:
                 import h5py
@@ -110,14 +137,30 @@ class ExportService:
                     params_group = f.create_group("parameters")
                     for key, value in params.items():
                         params_group.create_dataset(key, data=value)
+                logger.debug("Wrote parameters to HDF5")
 
             else:
+                logger.error("Unsupported export format", format=format)
                 raise ValueError(f"Unsupported format: {format}")
 
-            logger.info(f"Exported parameters to {path}")
+            file_size = os.path.getsize(path)
+            logger.info(
+                "Export complete",
+                format=format,
+                filepath=str(path),
+                file_size=file_size,
+                export_type="parameters",
+            )
+            logger.debug("Exiting export_parameters successfully")
 
         except Exception as e:
-            logger.error(f"Parameter export failed: {e}")
+            logger.error(
+                "Parameter export failed",
+                format=format,
+                filepath=str(path),
+                error=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(f"Export failed: {e}") from e
 
     def export_figure(
@@ -144,17 +187,45 @@ class ExportService:
         **kwargs
             Additional savefig options
         """
+        logger.debug(
+            "Entering export_figure",
+            path=str(path),
+            dpi=dpi,
+            format=format,
+        )
         path = Path(path)
 
         if format is None:
             format = path.suffix.lstrip(".")
 
+        logger.info(
+            "Starting export",
+            format=format,
+            filepath=str(path),
+            export_type="figure",
+            dpi=dpi,
+        )
+
         try:
             fig.savefig(path, dpi=dpi, format=format, bbox_inches="tight", **kwargs)
-            logger.info(f"Exported figure to {path}")
+            file_size = os.path.getsize(path)
+            logger.info(
+                "Export complete",
+                format=format,
+                filepath=str(path),
+                file_size=file_size,
+                export_type="figure",
+            )
+            logger.debug("Exiting export_figure successfully")
 
         except Exception as e:
-            logger.error(f"Figure export failed: {e}")
+            logger.error(
+                "Figure export failed",
+                format=format,
+                filepath=str(path),
+                error=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(f"Export failed: {e}") from e
 
     def export_posterior(
@@ -174,13 +245,32 @@ class ExportService:
         format : str, default='hdf5'
             Export format ('hdf5', 'xlsx', 'csv')
         """
+        logger.debug(
+            "Entering export_posterior",
+            path=str(path),
+            format=format,
+        )
         path = Path(path)
+
+        logger.info(
+            "Starting export",
+            format=format,
+            filepath=str(path),
+            export_type="posterior",
+        )
 
         try:
             if not hasattr(result, "posterior_samples"):
+                logger.error("Result does not contain posterior samples")
                 raise ValueError("Result does not contain posterior samples")
 
             posterior_samples = result.posterior_samples
+            num_samples = len(next(iter(posterior_samples.values())))
+            logger.debug(
+                "Exporting posterior samples",
+                num_params=len(posterior_samples),
+                num_samples=num_samples,
+            )
 
             if format in ["hdf5", "h5"]:
                 import h5py
@@ -196,6 +286,7 @@ class ExportService:
                         for key, value in result.metadata.items():
                             if isinstance(value, (str, int, float, bool)):
                                 meta_group.attrs[key] = value
+                logger.debug("Wrote posterior samples to HDF5")
 
             elif format in ["xlsx", "xls"]:
                 import pandas as pd
@@ -207,6 +298,7 @@ class ExportService:
                 }
                 df = pd.DataFrame(data)
                 df.to_excel(path, index=False)
+                logger.debug("Wrote posterior samples to Excel")
 
             elif format == "csv":
                 import pandas as pd
@@ -217,14 +309,30 @@ class ExportService:
                 }
                 df = pd.DataFrame(data)
                 df.to_csv(path, index=False)
+                logger.debug("Wrote posterior samples to CSV")
 
             else:
+                logger.error("Unsupported export format", format=format)
                 raise ValueError(f"Unsupported format: {format}")
 
-            logger.info(f"Exported posterior samples to {path}")
+            file_size = os.path.getsize(path)
+            logger.info(
+                "Export complete",
+                format=format,
+                filepath=str(path),
+                file_size=file_size,
+                export_type="posterior",
+            )
+            logger.debug("Exiting export_posterior successfully")
 
         except Exception as e:
-            logger.error(f"Posterior export failed: {e}")
+            logger.error(
+                "Posterior export failed",
+                format=format,
+                filepath=str(path),
+                error=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(f"Export failed: {e}") from e
 
     def save_project(
@@ -241,7 +349,19 @@ class ExportService:
         path : Path or str
             Output .rheo file path
         """
+        logger.debug(
+            "Entering save_project",
+            path=str(path),
+            state_keys=list(state.keys()),
+        )
         path = Path(path)
+
+        logger.info(
+            "Starting export",
+            format="rheo",
+            filepath=str(path),
+            export_type="project",
+        )
 
         try:
             # Create temp files
@@ -261,11 +381,13 @@ class ExportService:
 
                 with open(metadata_path, "w") as f:
                     json.dump(metadata, f, indent=2)
+                logger.debug("Wrote project metadata")
 
                 # Save data as HDF5
                 if "data" in state and state["data"] is not None:
                     data_path = tmpdir_path / "data.hdf5"
                     save_hdf5(state["data"], str(data_path))
+                    logger.debug("Wrote project data to HDF5")
 
                 # Save parameters as JSON
                 if "parameters" in state and state["parameters"]:
@@ -276,16 +398,31 @@ class ExportService:
                     }
                     with open(params_path, "w") as f:
                         json.dump(params_json, f, indent=2)
+                    logger.debug("Wrote project parameters")
 
                 # Create ZIP archive
                 with ZipFile(path, "w") as zipf:
                     for file in tmpdir_path.glob("*"):
                         zipf.write(file, file.name)
+                logger.debug("Created ZIP archive")
 
-            logger.info(f"Saved project to {path}")
+            file_size = os.path.getsize(path)
+            logger.info(
+                "Export complete",
+                format="rheo",
+                filepath=str(path),
+                file_size=file_size,
+                export_type="project",
+            )
+            logger.debug("Exiting save_project successfully")
 
         except Exception as e:
-            logger.error(f"Project save failed: {e}")
+            logger.error(
+                "Project save failed",
+                filepath=str(path),
+                error=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(f"Save failed: {e}") from e
 
     def load_project(self, path: Path | str) -> dict[str, Any]:
@@ -301,7 +438,18 @@ class ExportService:
         dict
             Application state
         """
+        logger.debug(
+            "Entering load_project",
+            path=str(path),
+        )
         path = Path(path)
+
+        logger.info(
+            "Starting load",
+            format="rheo",
+            filepath=str(path),
+            operation="load_project",
+        )
 
         try:
             import tempfile
@@ -314,12 +462,14 @@ class ExportService:
                 # Extract ZIP
                 with ZipFile(path, "r") as zipf:
                     zipf.extractall(tmpdir_path)
+                logger.debug("Extracted ZIP archive")
 
                 # Load metadata
                 metadata_path = tmpdir_path / "metadata.json"
                 if metadata_path.exists():
                     with open(metadata_path) as f:
                         state["metadata"] = json.load(f)
+                    logger.debug("Loaded project metadata")
 
                 # Load data
                 data_path = tmpdir_path / "data.hdf5"
@@ -327,18 +477,36 @@ class ExportService:
                     from rheojax.io import load_hdf5
 
                     state["data"] = load_hdf5(str(data_path))
+                    logger.debug("Loaded project data from HDF5")
 
                 # Load parameters
                 params_path = tmpdir_path / "parameters.json"
                 if params_path.exists():
                     with open(params_path) as f:
                         state["parameters"] = json.load(f)
+                    logger.debug("Loaded project parameters")
 
-            logger.info(f"Loaded project from {path}")
+            file_size = os.path.getsize(path)
+            logger.info(
+                "Load complete",
+                format="rheo",
+                filepath=str(path),
+                file_size=file_size,
+                operation="load_project",
+            )
+            logger.debug(
+                "Exiting load_project successfully",
+                state_keys=list(state.keys()),
+            )
             return state
 
         except Exception as e:
-            logger.error(f"Project load failed: {e}")
+            logger.error(
+                "Project load failed",
+                filepath=str(path),
+                error=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(f"Load failed: {e}") from e
 
     def generate_report(
@@ -353,7 +521,22 @@ class ExportService:
         matplotlib's PdfPages backend to avoid external dependencies.
         Otherwise a Markdown report is written.
         """
+        logger.debug(
+            "Entering generate_report",
+            path=str(path),
+            template=template,
+            state_keys=list(state.keys()),
+        )
         path = Path(path)
+        format = "pdf" if path.suffix.lower() == ".pdf" else "markdown"
+
+        logger.info(
+            "Starting export",
+            format=format,
+            filepath=str(path),
+            export_type="report",
+            template=template,
+        )
 
         try:
             # Generate Markdown content first
@@ -393,6 +576,11 @@ class ExportService:
                         report_lines.append(f"| {param} | {ess:.0f} |\n")
                     report_lines.append("\n")
 
+            logger.debug(
+                "Generated report content",
+                num_lines=len(report_lines),
+            )
+
             if path.suffix.lower() == ".pdf":
                 # Render a minimal PDF page with text content
                 import matplotlib.pyplot as plt
@@ -411,14 +599,30 @@ class ExportService:
                             y -= 0.03
                     pdf.savefig(fig, bbox_inches="tight")
                     plt.close(fig)
+                logger.debug("Wrote report to PDF")
             else:
                 with open(path, "w", encoding="utf-8") as f:
                     f.writelines(report_lines)
+                logger.debug("Wrote report to Markdown")
 
-            logger.info(f"Generated report at {path}")
+            file_size = os.path.getsize(path)
+            logger.info(
+                "Export complete",
+                format=format,
+                filepath=str(path),
+                file_size=file_size,
+                export_type="report",
+            )
+            logger.debug("Exiting generate_report successfully")
 
         except Exception as e:
-            logger.error(f"Report generation failed: {e}")
+            logger.error(
+                "Report generation failed",
+                template=template,
+                filepath=str(path),
+                error=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(f"Report generation failed: {e}") from e
 
     def export_data(
@@ -438,14 +642,32 @@ class ExportService:
         format : str, optional
             Format (auto-detected from extension if None)
         """
+        logger.debug(
+            "Entering export_data",
+            path=str(path),
+            format=format,
+        )
         path = Path(path)
 
         if format is None:
             format = path.suffix.lstrip(".")
 
+        logger.info(
+            "Starting export",
+            format=format,
+            filepath=str(path),
+            export_type="data",
+        )
+
         try:
             x = np.asarray(data.x)
             y = np.asarray(data.y)
+            logger.debug(
+                "Prepared data for export",
+                x_shape=x.shape,
+                y_shape=y.shape,
+                is_complex=np.iscomplexobj(y),
+            )
 
             if format == "csv":
                 import pandas as pd
@@ -462,12 +684,15 @@ class ExportService:
                     df = pd.DataFrame({"x": x, "y": y})
 
                 df.to_csv(path, index=False)
+                logger.debug("Wrote data to CSV")
 
             elif format in ["xlsx", "xls"]:
                 save_excel(data, str(path))
+                logger.debug("Wrote data to Excel")
 
             elif format in ["hdf5", "h5"]:
                 save_hdf5(data, str(path))
+                logger.debug("Wrote data to HDF5")
 
             elif format == "json":
                 export_dict = {
@@ -484,12 +709,28 @@ class ExportService:
                 }
                 with open(path, "w") as f:
                     json.dump(export_dict, f, indent=2)
+                logger.debug("Wrote data to JSON")
 
             else:
+                logger.error("Unsupported export format", format=format)
                 raise ValueError(f"Unsupported format: {format}")
 
-            logger.info(f"Exported data to {path}")
+            file_size = os.path.getsize(path)
+            logger.info(
+                "Export complete",
+                format=format,
+                filepath=str(path),
+                file_size=file_size,
+                export_type="data",
+            )
+            logger.debug("Exiting export_data successfully")
 
         except Exception as e:
-            logger.error(f"Data export failed: {e}")
+            logger.error(
+                "Data export failed",
+                format=format,
+                filepath=str(path),
+                error=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(f"Export failed: {e}") from e

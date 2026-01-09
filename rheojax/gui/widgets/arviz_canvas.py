@@ -5,7 +5,6 @@ ArviZ Canvas Widget
 ArviZ diagnostic plot integration for Bayesian inference visualization.
 """
 
-import logging
 from typing import Any
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
@@ -21,8 +20,9 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Available ArviZ plot types
 PLOT_TYPES = [
@@ -78,12 +78,20 @@ class ArvizCanvas(BaseArviZWidget):
         """
         super().__init__(parent)
 
+        logger.debug("Initializing", class_name=self.__class__.__name__)
+
         self._inference_data: Any | None = None
         self._current_plot_type = "trace"
         self._hdi_prob = 0.94
 
         self._setup_ui()
         self._connect_signals()
+
+        logger.debug(
+            "Initialization complete",
+            class_name=self.__class__.__name__,
+            num_plot_types=len(PLOT_TYPES),
+        )
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -200,7 +208,23 @@ class ArvizCanvas(BaseArviZWidget):
             New combo box index
         """
         plot_type = self._type_combo.currentData()
+        old_plot_type = self._current_plot_type
         self._current_plot_type = plot_type
+
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="plot_type_changed",
+            plot_type=plot_type,
+        )
+
+        logger.info(
+            "Plot type changed",
+            widget=self.__class__.__name__,
+            old_type=old_plot_type,
+            new_type=plot_type,
+        )
+
         self.plot_changed.emit(plot_type)
 
         if self._inference_data is not None:
@@ -208,6 +232,13 @@ class ArvizCanvas(BaseArviZWidget):
 
     def _refresh_plot(self) -> None:
         """Refresh the current plot with performance tracking."""
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="refresh_plot",
+            plot_type=self._current_plot_type,
+        )
+
         if self._inference_data is None:
             self._status_label.show()
             return
@@ -238,14 +269,18 @@ class ArvizCanvas(BaseArviZWidget):
                 self._status_label.hide()
 
                 logger.debug(
-                    "plot_refresh_complete",
-                    extra={
-                        "plot_type": self._current_plot_type,
-                        "has_inference_data": self._inference_data is not None,
-                    },
+                    "Rendering",
+                    widget=self.__class__.__name__,
+                    plot_type=self._current_plot_type,
+                    has_inference_data=self._inference_data is not None,
                 )
             except Exception as e:
-                logger.warning(f"Plot generation failed: {e}", exc_info=True)
+                logger.error(
+                    "Plot generation failed",
+                    widget=self.__class__.__name__,
+                    plot_type=self._current_plot_type,
+                    exc_info=True,
+                )
                 self._status_label.setText(f"Error: {e}")
                 self._status_label.show()
                 ax = self._figure.add_subplot(111)
@@ -281,7 +316,19 @@ class ArvizCanvas(BaseArviZWidget):
         idata : arviz.InferenceData
             Inference data from Bayesian fitting
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="set_inference_data",
+            has_data=idata is not None,
+        )
+
         self._inference_data = idata
+        logger.info(
+            "Inference data updated",
+            widget=self.__class__.__name__,
+            has_data=idata is not None,
+        )
         self._refresh_plot()
 
     def set_hdi_prob(self, prob: float) -> None:
@@ -292,7 +339,21 @@ class ArvizCanvas(BaseArviZWidget):
         prob : float
             HDI probability (0-1), e.g., 0.94 for 94% HDI
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="set_hdi_prob",
+            prob=prob,
+        )
+
+        old_prob = self._hdi_prob
         self._hdi_prob = prob
+        logger.info(
+            "HDI probability changed",
+            widget=self.__class__.__name__,
+            old_prob=old_prob,
+            new_prob=prob,
+        )
         self._refresh_plot()
 
     def set_plot_type(self, plot_type: str) -> None:
@@ -340,11 +401,11 @@ class ArvizCanvas(BaseArviZWidget):
         self._update_canvas_size()
 
         logger.debug(
-            "arviz_figure_swapped",
-            extra={
-                "num_axes": len(arviz_fig.get_axes()),
-                "plot_type": self._current_plot_type,
-            },
+            "Rendering",
+            widget=self.__class__.__name__,
+            action="arviz_figure_swapped",
+            num_axes=len(arviz_fig.get_axes()),
+            plot_type=self._current_plot_type,
         )
 
     def _sanitize_figure_text(self, fig: Figure) -> None:
@@ -408,6 +469,11 @@ class ArvizCanvas(BaseArviZWidget):
             # Get the figure ArviZ created and copy to our managed figure
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
+            logger.error(
+                "ArviZ import failed",
+                widget=self.__class__.__name__,
+                exc_info=True,
+            )
             self._plot_fallback("ArviZ not installed")
 
     def _plot_pair(self) -> None:
@@ -430,6 +496,11 @@ class ArvizCanvas(BaseArviZWidget):
             az.plot_pair(self._inference_data, divergences=has_divergences)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
+            logger.error(
+                "ArviZ import failed",
+                widget=self.__class__.__name__,
+                exc_info=True,
+            )
             self._plot_fallback("ArviZ not installed")
 
     def _plot_forest(self) -> None:
@@ -442,6 +513,11 @@ class ArvizCanvas(BaseArviZWidget):
             az.plot_forest(self._inference_data, hdi_prob=self._hdi_prob, combined=True)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
+            logger.error(
+                "ArviZ import failed",
+                widget=self.__class__.__name__,
+                exc_info=True,
+            )
             self._plot_fallback("ArviZ not installed")
 
     def _plot_posterior(self) -> None:
@@ -454,6 +530,11 @@ class ArvizCanvas(BaseArviZWidget):
             az.plot_posterior(self._inference_data, hdi_prob=self._hdi_prob)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
+            logger.error(
+                "ArviZ import failed",
+                widget=self.__class__.__name__,
+                exc_info=True,
+            )
             self._plot_fallback("ArviZ not installed")
 
     def _plot_energy(self) -> None:
@@ -480,6 +561,11 @@ class ArvizCanvas(BaseArviZWidget):
             az.plot_energy(self._inference_data)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
+            logger.error(
+                "ArviZ import failed",
+                widget=self.__class__.__name__,
+                exc_info=True,
+            )
             self._plot_fallback("ArviZ not installed")
 
     def _has_sample_stats_energy(self) -> bool:
@@ -509,6 +595,11 @@ class ArvizCanvas(BaseArviZWidget):
             az.plot_rank(self._inference_data)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
+            logger.error(
+                "ArviZ import failed",
+                widget=self.__class__.__name__,
+                exc_info=True,
+            )
             self._plot_fallback("ArviZ not installed")
 
     def _plot_ess(self) -> None:
@@ -521,6 +612,11 @@ class ArvizCanvas(BaseArviZWidget):
             az.plot_ess(self._inference_data)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
+            logger.error(
+                "ArviZ import failed",
+                widget=self.__class__.__name__,
+                exc_info=True,
+            )
             self._plot_fallback("ArviZ not installed")
 
     def _plot_autocorr(self) -> None:
@@ -533,6 +629,11 @@ class ArvizCanvas(BaseArviZWidget):
             az.plot_autocorr(self._inference_data)
             self._copy_arviz_figure(plt.gcf())
         except ImportError:
+            logger.error(
+                "ArviZ import failed",
+                widget=self.__class__.__name__,
+                exc_info=True,
+            )
             self._plot_fallback("ArviZ not installed")
 
     def _plot_fallback(self, message: str) -> None:
@@ -587,14 +688,49 @@ class ArvizCanvas(BaseArviZWidget):
         dpi : int, optional
             Resolution for raster formats
         """
-        self._figure.savefig(filepath, dpi=dpi, bbox_inches="tight")
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="export_figure",
+            filepath=filepath,
+            dpi=dpi,
+        )
+
+        try:
+            self._figure.savefig(filepath, dpi=dpi, bbox_inches="tight")
+            logger.info(
+                "Figure exported",
+                widget=self.__class__.__name__,
+                filepath=filepath,
+                dpi=dpi,
+                plot_type=self._current_plot_type,
+            )
+        except Exception:
+            logger.error(
+                "Failed to export figure",
+                widget=self.__class__.__name__,
+                filepath=filepath,
+                exc_info=True,
+            )
+            raise
 
     def clear(self) -> None:
         """Clear the canvas."""
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="clear",
+        )
+
         self._figure.clear()
         self._inference_data = None
         self._status_label.setText("No data loaded")
         self._canvas.draw()
+
+        logger.info(
+            "Canvas cleared",
+            widget=self.__class__.__name__,
+        )
 
     def get_figure(self) -> Figure:
         """Get matplotlib figure.

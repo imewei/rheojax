@@ -13,9 +13,13 @@ import numpy as np
 from rheojax.core.base import BaseTransform
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
+from rheojax.logging import get_logger, log_transform
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+# Module logger
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     import jax.numpy as jnp_typing
@@ -174,79 +178,105 @@ class FFTAnalysis(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
-        # Validate domain
-        if data.domain == "frequency":
-            raise ValueError("FFT analysis requires time-domain data")
+        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
 
-        # Get time and signal data
-        t = data.x
-        y = data.y
+        with log_transform(
+            logger,
+            "fft_analysis",
+            input_shape=input_shape,
+            window=self.window,
+            detrend=self.detrend,
+            return_psd=self.return_psd,
+        ) as ctx:
+            # Validate domain
+            if data.domain == "frequency":
+                logger.error(
+                    "FFT analysis requires time-domain data",
+                    current_domain=data.domain,
+                )
+                raise ValueError("FFT analysis requires time-domain data")
 
-        # Convert to JAX arrays for computation
-        if not isinstance(t, jnp.ndarray):
-            t = jnp.array(t)
-        if not isinstance(y, jnp.ndarray):
-            y = jnp.array(y)
+            # Get time and signal data
+            t = data.x
+            y = data.y
 
-        # Handle complex data by taking real part
-        if jnp.iscomplexobj(y):
-            y = jnp.real(y)
+            # Convert to JAX arrays for computation
+            if not isinstance(t, jnp.ndarray):
+                t = jnp.array(t)
+            if not isinstance(y, jnp.ndarray):
+                y = jnp.array(y)
 
-        # Detrend if requested
-        if self.detrend:
-            y = self._detrend_data(y)
+            logger.debug("Processing FFT input", n_points=len(t), dtype=str(y.dtype))
 
-        # Apply window function
-        window = self._get_window(len(y))
-        y_windowed = y * window
+            # Handle complex data by taking real part
+            if jnp.iscomplexobj(y):
+                logger.debug("Taking real part of complex signal")
+                y = jnp.real(y)
 
-        # Compute FFT
-        # Use rfft for real signals (more efficient)
-        fft_result = jnp.fft.rfft(y_windowed)
+            # Detrend if requested
+            if self.detrend:
+                logger.debug("Applying detrending")
+                y = self._detrend_data(y)
 
-        # Compute frequencies
-        n = len(t)
-        dt = (t[-1] - t[0]) / (n - 1)  # Average sampling interval
-        freqs = jnp.fft.rfftfreq(n, d=dt)
+            # Apply window function
+            logger.debug("Applying window function", window=self.window)
+            window = self._get_window(len(y))
+            y_windowed = y * window
 
-        # Compute magnitude or PSD
-        if self.return_psd:
-            # Power spectral density
-            spectrum = jnp.abs(fft_result) ** 2 / (n * dt)
-        else:
-            # Magnitude spectrum
-            spectrum = jnp.abs(fft_result)
+            # Compute FFT
+            # Use rfft for real signals (more efficient)
+            logger.debug("Computing FFT")
+            fft_result = jnp.fft.rfft(y_windowed)
 
-        # Normalize if requested
-        if self.normalize and not self.return_psd:
-            spectrum = spectrum / jnp.max(spectrum)
+            # Compute frequencies
+            n = len(t)
+            dt = (t[-1] - t[0]) / (n - 1)  # Average sampling interval
+            freqs = jnp.fft.rfftfreq(n, d=dt)
 
-        # Create metadata
-        new_metadata = data.metadata.copy()
-        new_metadata.update(
-            {
-                "transform": "fft",
-                "window": self.window,
-                "detrended": self.detrend,
-                "psd": self.return_psd,
-                "original_domain": "time",
-                "n_points": len(t),
-                "dt": float(dt),
-                # Store complex coefficients for inverse transform
-                "fft_complex": fft_result,
-            }
-        )
+            # Compute magnitude or PSD
+            if self.return_psd:
+                # Power spectral density
+                logger.debug("Computing power spectral density")
+                spectrum = jnp.abs(fft_result) ** 2 / (n * dt)
+            else:
+                # Magnitude spectrum
+                logger.debug("Computing magnitude spectrum")
+                spectrum = jnp.abs(fft_result)
 
-        # Create new RheoData in frequency domain
-        return RheoData(
-            x=freqs,
-            y=spectrum,
-            x_units="Hz" if data.x_units else None,
-            y_units="PSD" if self.return_psd else "magnitude",
-            domain="frequency",
-            metadata=new_metadata,
-            validate=False,
-        )
+            # Normalize if requested
+            if self.normalize and not self.return_psd:
+                logger.debug("Normalizing spectrum")
+                spectrum = spectrum / jnp.max(spectrum)
+
+            # Create metadata
+            new_metadata = data.metadata.copy()
+            new_metadata.update(
+                {
+                    "transform": "fft",
+                    "window": self.window,
+                    "detrended": self.detrend,
+                    "psd": self.return_psd,
+                    "original_domain": "time",
+                    "n_points": len(t),
+                    "dt": float(dt),
+                    # Store complex coefficients for inverse transform
+                    "fft_complex": fft_result,
+                }
+            )
+
+            ctx["output_shape"] = (len(freqs),)
+            ctx["frequency_range"] = (float(freqs[0]), float(freqs[-1]))
+
+            # Create new RheoData in frequency domain
+            return RheoData(
+                x=freqs,
+                y=spectrum,
+                x_units="Hz" if data.x_units else None,
+                y_units="PSD" if self.return_psd else "magnitude",
+                domain="frequency",
+                metadata=new_metadata,
+                validate=False,
+            )
 
     def _inverse_transform(self, data: RheoData) -> RheoData:
         """Apply inverse FFT to return to time domain.
@@ -268,10 +298,20 @@ class FFTAnalysis(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
+        logger.debug("Starting inverse FFT transform")
+
         if data.domain != "frequency":
+            logger.error(
+                "Inverse FFT requires frequency-domain data",
+                current_domain=data.domain,
+            )
             raise ValueError("Inverse FFT requires frequency-domain data")
 
         if "transform" not in data.metadata or data.metadata["transform"] != "fft":
+            logger.error(
+                "Data was not created by FFT transform",
+                metadata_transform=data.metadata.get("transform"),
+            )
             raise ValueError("Data was not created by FFT transform")
 
         # Get original parameters
@@ -280,10 +320,18 @@ class FFTAnalysis(BaseTransform):
         fft_complex = data.metadata.get("fft_complex")
 
         if n_points is None or dt is None:
+            logger.error(
+                "Missing metadata for inverse FFT",
+                has_n_points=n_points is not None,
+                has_dt=dt is not None,
+            )
             raise ValueError("Missing metadata for inverse FFT (n_points, dt)")
 
         if fft_complex is None:
+            logger.error("Missing complex FFT coefficients for inverse transform")
             raise ValueError("Missing complex FFT coefficients for inverse transform")
+
+        logger.debug("Performing inverse FFT", n_points=n_points, dt=dt)
 
         # Use the stored complex coefficients for accurate reconstruction
         # Apply inverse FFT
@@ -295,6 +343,8 @@ class FFTAnalysis(BaseTransform):
         # Create metadata
         new_metadata = data.metadata.copy()
         new_metadata.update({"transform": "ifft", "original_domain": "frequency"})
+
+        logger.debug("Inverse FFT completed", output_points=len(y_reconstructed))
 
         return RheoData(
             x=t,
@@ -327,6 +377,12 @@ class FFTAnalysis(BaseTransform):
         peak_heights : JaxArray
             Heights of detected peaks
         """
+        logger.debug(
+            "Finding peaks in FFT spectrum",
+            prominence=prominence,
+            n_peaks=n_peaks,
+        )
+
         freqs = np.asarray(freq_data.x)
         spectrum = np.asarray(freq_data.y)
 
@@ -341,6 +397,8 @@ class FFTAnalysis(BaseTransform):
             spectrum_norm, prominence=prominence
         )
 
+        logger.debug("Initial peaks found", n_peaks_found=len(peak_indices))
+
         # Sort by prominence and take top n_peaks
         if len(peak_indices) > n_peaks:
             prominences = properties["prominences"]
@@ -349,6 +407,12 @@ class FFTAnalysis(BaseTransform):
 
         peak_freqs = freqs[peak_indices]
         peak_heights = spectrum[peak_indices]
+
+        logger.debug(
+            "Peak detection completed",
+            n_peaks_returned=len(peak_freqs),
+            peak_frequencies=peak_freqs.tolist() if len(peak_freqs) > 0 else [],
+        )
 
         # Convert back to JAX
         return jnp.array(peak_freqs), jnp.array(peak_heights)

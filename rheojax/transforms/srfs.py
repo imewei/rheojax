@@ -37,9 +37,13 @@ from rheojax.core.base import BaseTransform
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
+from rheojax.logging import get_logger, log_transform
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+# Module logger
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     import jax.numpy as jnp_typing
@@ -152,6 +156,14 @@ class SRFS(BaseTransform):
         - For x = 2 (Newtonian), m = 0, shift factor = 1
         - For x < 1 (glass), behavior near yield stress is different
         """
+        logger.debug(
+            "Computing shift factor",
+            gamma_dot=gamma_dot,
+            x=x,
+            tau0=tau0,
+            reference_gamma_dot=self.reference_gamma_dot,
+        )
+
         # Compute shift exponent from SGR theory
         # In power-law regime: a ~ gamma_dot^(2-x)
         # This comes from the scaling of viscosity eta ~ gamma_dot^(x-2)
@@ -162,6 +174,7 @@ class SRFS(BaseTransform):
 
         # Handle special cases
         if abs(gamma_dot - self.reference_gamma_dot) < 1e-12:
+            logger.debug("Shear rate equals reference, shift factor = 1.0")
             return 1.0
 
         # Compute shift factor
@@ -169,6 +182,13 @@ class SRFS(BaseTransform):
         #              = (gamma_dot / gamma_dot_ref)^m
         ratio = gamma_dot / self.reference_gamma_dot
         a_gamma_dot = ratio**m
+
+        logger.debug(
+            "Shift factor computed",
+            exponent_m=m,
+            ratio=ratio,
+            shift_factor=float(a_gamma_dot),
+        )
 
         return float(a_gamma_dot)
 
@@ -196,11 +216,21 @@ class SRFS(BaseTransform):
         """
         # Get reference shear rate from metadata
         if "reference_gamma_dot" not in data.metadata:
+            logger.error(
+                "Missing reference_gamma_dot in metadata",
+                available_keys=list(data.metadata.keys()),
+            )
             raise ValueError(
                 "reference_gamma_dot must be in metadata for SRFS shifting"
             )
 
         gamma_dot_ref = data.metadata["reference_gamma_dot"]
+
+        logger.debug(
+            "Applying SRFS shift to single dataset",
+            gamma_dot_ref=gamma_dot_ref,
+            data_points=len(data.x),
+        )
 
         # Compute shift factor
         a_gamma_dot = self.compute_shift_factor(gamma_dot_ref, x, tau0)
@@ -218,6 +248,13 @@ class SRFS(BaseTransform):
                 "sgr_x": x,
                 "sgr_tau0": tau0,
             }
+        )
+
+        logger.debug(
+            "Single dataset shifted",
+            shift_factor=float(a_gamma_dot),
+            original_x_range=(float(data.x[0]), float(data.x[-1])),
+            shifted_x_range=(float(x_shifted[0]), float(x_shifted[-1])),
         )
 
         return RheoData(
@@ -257,14 +294,26 @@ class SRFS(BaseTransform):
             If data is list and return_shifts=True: (mastercurve, shift_factors)
             If data is list and return_shifts=False: mastercurve
         """
+        is_list = not isinstance(data, RheoData)
+        logger.info(
+            "Starting SRFS transformation",
+            is_list=is_list,
+            n_datasets=len(data) if is_list else 1,
+            reference_gamma_dot=self.reference_gamma_dot,
+            sgr_x=x,
+            sgr_tau0=tau0,
+        )
+
         # Handle single dataset
         if isinstance(data, RheoData):
             if x is None or tau0 is None:
+                logger.error("Missing required SGR parameters for SRFS transformation")
                 raise ValueError("x and tau0 are required for SRFS transformation")
             return self._transform_single(data, x, tau0)
 
         # Handle list of datasets
         if x is None or tau0 is None:
+            logger.error("Missing required SGR parameters for SRFS transformation")
             raise ValueError("x and tau0 are required for SRFS transformation")
 
         return self.create_mastercurve(data, x, tau0, return_shifts=return_shifts)
@@ -324,14 +373,31 @@ class SRFS(BaseTransform):
         RheoData or list or tuple
             Master curve or list of shifted datasets, optionally with shifts
         """
+        logger.info(
+            "Creating SRFS master curve",
+            n_datasets=len(datasets),
+            sgr_x=x,
+            sgr_tau0=tau0,
+            merge=merge,
+        )
+
         # Extract reference shear rates and sort
         ref_gamma_dots = []
         for data in datasets:
             if "reference_gamma_dot" not in data.metadata:
+                logger.error(
+                    "Missing reference_gamma_dot in dataset metadata",
+                    available_keys=list(data.metadata.keys()),
+                )
                 raise ValueError(
                     "All datasets must have 'reference_gamma_dot' in metadata"
                 )
             ref_gamma_dots.append(data.metadata["reference_gamma_dot"])
+
+        logger.debug(
+            "Reference shear rates extracted",
+            ref_gamma_dots=ref_gamma_dots,
+        )
 
         # Sort by reference shear rate
         sorted_indices = np.argsort(ref_gamma_dots)
@@ -339,12 +405,16 @@ class SRFS(BaseTransform):
         ref_gamma_dots = [ref_gamma_dots[i] for i in sorted_indices]
 
         # Compute shift factors
+        logger.debug("Computing shift factors for all datasets")
         shift_factors = {}
         for gamma_dot_ref in ref_gamma_dots:
             a_gamma_dot = self.compute_shift_factor(gamma_dot_ref, x, tau0)
             shift_factors[gamma_dot_ref] = a_gamma_dot
 
+        logger.debug("Shift factors computed", shift_factors=shift_factors)
+
         # Apply shifts
+        logger.debug("Applying shifts to all datasets")
         shifted_datasets = []
         for data, _gamma_dot_ref in zip(datasets, ref_gamma_dots, strict=False):
             shifted = self._transform_single(data, x, tau0)
@@ -354,6 +424,10 @@ class SRFS(BaseTransform):
         self.shift_factors_ = shift_factors
 
         if not merge:
+            logger.info(
+                "SRFS transformation completed (no merge)",
+                n_shifted_datasets=len(shifted_datasets),
+            )
             return shifted_datasets
 
         # Merge all shifted data
@@ -399,6 +473,13 @@ class SRFS(BaseTransform):
             domain=datasets[0].domain if datasets else "shear_rate",
             metadata=mastercurve_metadata,
             validate=False,
+        )
+
+        logger.info(
+            "SRFS master curve created",
+            total_points=len(merged_x),
+            n_datasets=len(datasets),
+            x_range=(float(merged_x[0]), float(merged_x[-1])),
         )
 
         if return_shifts:
@@ -501,6 +582,12 @@ def detect_shear_banding(
     >>> is_banding, info = detect_shear_banding(gamma_dot, sigma_nm)
     >>> print(is_banding)  # True
     """
+    logger.debug(
+        "Detecting shear banding",
+        n_points=len(gamma_dot),
+        threshold=threshold,
+    )
+
     # Sort by shear rate
     sort_idx = np.argsort(gamma_dot)
     gamma_dot = gamma_dot[sort_idx]
@@ -522,6 +609,7 @@ def detect_shear_banding(
     is_banding = np.any(negative_slope_mask)
 
     if not is_banding:
+        logger.debug("No shear banding detected (monotonic flow curve)")
         return False, None
 
     # Find the banding region bounds
@@ -555,6 +643,13 @@ def detect_shear_banding(
         ),
         "negative_slope_fraction": float(neg_fraction),
     }
+
+    logger.info(
+        "Shear banding detected",
+        gamma_dot_low=float(gamma_dot_low),
+        gamma_dot_high=float(gamma_dot_high),
+        negative_slope_fraction=float(neg_fraction),
+    )
 
     if warn:
         warnings.warn(
@@ -609,10 +704,17 @@ def compute_shear_band_coexistence(
     The stress plateau is found by equal area construction (Maxwell rule)
     or by finding the stress at which both bands coexist stably.
     """
+    logger.debug(
+        "Computing shear band coexistence",
+        gamma_dot_applied=gamma_dot_applied,
+        n_points=len(gamma_dot),
+    )
+
     # First detect if banding exists
     is_banding, banding_info = detect_shear_banding(gamma_dot, sigma)
 
     if not is_banding or banding_info is None:
+        logger.debug("No shear banding detected, cannot compute coexistence")
         return None
 
     # Get banding region bounds
@@ -624,6 +726,11 @@ def compute_shear_band_coexistence(
         gamma_dot_applied < gamma_dot_low_bound
         or gamma_dot_applied > gamma_dot_high_bound
     ):
+        logger.debug(
+            "Applied shear rate outside banding region",
+            gamma_dot_applied=gamma_dot_applied,
+            banding_region=(gamma_dot_low_bound, gamma_dot_high_bound),
+        )
         return None
 
     # Find stress plateau using simplified approach
@@ -685,6 +792,15 @@ def compute_shear_band_coexistence(
     # Clamp fractions to [0, 1]
     f_low = np.clip(f_low, 0, 1)
     f_high = np.clip(f_high, 0, 1)
+
+    logger.info(
+        "Shear band coexistence computed",
+        gamma_dot_low=float(gamma_dot_low),
+        gamma_dot_high=float(gamma_dot_high),
+        fraction_low=float(f_low),
+        fraction_high=float(f_high),
+        stress_plateau=float(stress_plateau),
+    )
 
     return {
         "gamma_dot_low": float(gamma_dot_low),
@@ -771,7 +887,20 @@ def evolve_thixotropy_lambda(
     lambda_t : ndarray
         Structural parameter evolution, same shape as t
     """
+    logger.debug(
+        "Evolving thixotropy lambda",
+        n_points=len(t),
+        lambda_initial=lambda_initial,
+        k_build=k_build,
+        k_break=k_break,
+    )
+
     if t.shape != gamma_dot.shape:
+        logger.error(
+            "Shape mismatch between time and shear rate arrays",
+            t_shape=t.shape,
+            gamma_dot_shape=gamma_dot.shape,
+        )
         raise ValueError(
             f"Time and shear rate arrays must have same shape: "
             f"t.shape={t.shape}, gamma_dot.shape={gamma_dot.shape}"
@@ -791,6 +920,13 @@ def evolve_thixotropy_lambda(
         lambda_t[i] = lambda_t[i - 1] + dlambda_dt * dt[i]
         # Clamp to [0, 1]
         lambda_t[i] = np.clip(lambda_t[i], 0.0, 1.0)
+
+    logger.debug(
+        "Thixotropy evolution completed",
+        lambda_final=float(lambda_t[-1]),
+        lambda_min=float(np.min(lambda_t)),
+        lambda_max=float(np.max(lambda_t)),
+    )
 
     return lambda_t
 
@@ -831,6 +967,15 @@ def compute_thixotropic_stress(
     sigma : ndarray
         Stress response (Pa)
     """
+    logger.debug(
+        "Computing thixotropic stress",
+        n_points=len(t),
+        G0=G0,
+        tau0=tau0,
+        x=x,
+        n_struct=n_struct,
+    )
+
     # Effective modulus from structure
     G_eff = G0 * np.power(lambda_t, n_struct)
 
@@ -840,6 +985,12 @@ def compute_thixotropic_stress(
 
     # Stress = G_eff * gamma_dot * tau0 * eta_factor
     sigma = G_eff * gamma_dot * tau0 * eta_factor
+
+    logger.debug(
+        "Thixotropic stress computed",
+        sigma_min=float(np.min(sigma)),
+        sigma_max=float(np.max(sigma)),
+    )
 
     return sigma
 

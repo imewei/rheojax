@@ -10,6 +10,10 @@ import warnings
 
 import numpy as np
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def detect_data_range_decades(x: np.ndarray) -> float:
     """Detect the range of data in decades (log10 scale).
@@ -25,17 +29,31 @@ def detect_data_range_decades(x: np.ndarray) -> float:
         >>> decades = detect_data_range_decades(freq)
         >>> print(f"{decades:.1f} decades")  # 12.0 decades
     """
+    logger.debug(
+        "Detecting data range in decades",
+        input_length=len(x) if hasattr(x, "__len__") else 1,
+    )
+
     x_positive = x[x > 0]  # Filter out non-positive values
     if len(x_positive) == 0:
+        logger.debug("No positive values in data, returning 0 decades")
         return 0.0
 
     x_min = np.min(x_positive)
     x_max = np.max(x_positive)
 
     if x_min <= 0 or x_max <= 0:
+        logger.debug("Invalid min/max after filtering", x_min=x_min, x_max=x_max)
         return 0.0
 
-    return float(np.log10(x_max / x_min))
+    decades = float(np.log10(x_max / x_min))
+    logger.debug(
+        "Data range computed",
+        x_min=x_min,
+        x_max=x_max,
+        decades=decades,
+    )
+    return decades
 
 
 def check_wide_frequency_range(
@@ -75,6 +93,12 @@ def check_wide_frequency_range(
         ...     print(f"Wide range detected: {result['decades']:.1f} decades")
         ...     print(result['recommendation'])
     """
+    logger.debug(
+        "Checking for wide frequency range",
+        threshold_decades=threshold_decades,
+        warn_enabled=warn,
+    )
+
     decades = detect_data_range_decades(x)
     is_wide = decades > threshold_decades
 
@@ -88,12 +112,24 @@ def check_wide_frequency_range(
             f"  X_subset = X[(X > 0.01) & (X < 100)]  # Middle 4 decades"
         )
 
+        logger.info(
+            "Wide frequency range detected",
+            decades=decades,
+            threshold_decades=threshold_decades,
+        )
+
         if warn:
             warnings.warn(
                 recommendation,
                 UserWarning,
                 stacklevel=3,
             )
+    else:
+        logger.debug(
+            "Frequency range within normal bounds",
+            decades=decades,
+            threshold_decades=threshold_decades,
+        )
 
     return {
         "is_wide_range": is_wide,
@@ -132,6 +168,14 @@ def suggest_optimization_strategy(
         >>> strategy = suggest_optimization_strategy(omega, G_star, 'oscillation')
         >>> print(strategy['rationale'])
     """
+    logger.debug(
+        "Analyzing data for optimization strategy",
+        x_length=len(x) if hasattr(x, "__len__") else 1,
+        y_length=len(y) if hasattr(y, "__len__") else 1,
+        test_mode=test_mode,
+        y_is_complex=np.iscomplexobj(y),
+    )
+
     # Check data range
     range_check = check_wide_frequency_range(x, warn=False)
     decades: float = range_check["decades"]  # type: ignore[assignment]
@@ -151,6 +195,11 @@ def suggest_optimization_strategy(
             f"Very wide range ({decades:.1f} decades): Using log-residuals, "
             f"subset initialization, and multi-start optimization for robustness."
         )
+        logger.debug(
+            "Applied very wide range strategy",
+            decades=decades,
+            rule="rule_1_very_wide",
+        )
 
     # Rule 2: Wide range (8-10 decades)
     elif decades > 8:
@@ -160,6 +209,11 @@ def suggest_optimization_strategy(
             f"Wide range ({decades:.1f} decades): Using log-residuals and "
             f"multi-start optimization."
         )
+        logger.debug(
+            "Applied wide range strategy",
+            decades=decades,
+            rule="rule_2_wide",
+        )
 
     # Rule 3: Moderate range (5-8 decades)
     elif decades > 5:
@@ -167,6 +221,11 @@ def suggest_optimization_strategy(
         rationale_parts.append(
             f"Moderate range ({decades:.1f} decades): Using log-residuals "
             f"to balance frequency regions."
+        )
+        logger.debug(
+            "Applied moderate range strategy",
+            decades=decades,
+            rule="rule_3_moderate",
         )
 
     # Rule 4: Oscillation mode with complex data
@@ -176,20 +235,40 @@ def suggest_optimization_strategy(
             rationale_parts.append(
                 "Oscillation mode with complex modulus: Using log-residuals."
             )
+            logger.debug(
+                "Applied oscillation mode strategy",
+                decades=decades,
+                rule="rule_4_oscillation_complex",
+            )
 
     # Default case
     if not rationale_parts:
         rationale_parts.append(
             f"Standard range ({decades:.1f} decades): Using default linear residuals."
         )
+        logger.debug(
+            "Applied standard strategy",
+            decades=decades,
+            rule="default",
+        )
 
-    return {
+    strategy = {
         "use_log_residuals": use_log_residuals,
         "use_multi_start": use_multi_start,
         "use_subset_init": use_subset_init,
         "decades": decades,
         "rationale": " ".join(rationale_parts),
     }
+
+    logger.info(
+        "Optimization strategy suggested",
+        decades=decades,
+        use_log_residuals=use_log_residuals,
+        use_multi_start=use_multi_start,
+        use_subset_init=use_subset_init,
+    )
+
+    return strategy
 
 
 __all__ = [

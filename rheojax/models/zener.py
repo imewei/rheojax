@@ -29,6 +29,10 @@ from rheojax.core.data import RheoData
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("zener")
@@ -128,44 +132,99 @@ class Zener(BaseModel):
         # Store test mode for model_function
         self._test_mode = test_mode
 
-        # Create objective function with stateless predictions
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            Ge, Gm, eta = params[0], params[1], params[2]
+        # Determine test mode string for logging
+        test_mode_str = test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        data_shape = (int(x_data.shape[0]),) if hasattr(x_data, "shape") else None
 
-            # Direct prediction based on test mode (stateless)
-            if test_mode == TestMode.RELAXATION:
-                return self._predict_relaxation(x, Ge, Gm, eta)
-            elif test_mode == TestMode.CREEP:
-                return self._predict_creep(x, Ge, Gm, eta)
-            elif test_mode == TestMode.OSCILLATION:
-                return self._predict_oscillation(x, Ge, Gm, eta)
-            elif test_mode == TestMode.ROTATION:
-                return self._predict_rotation(x, Ge, Gm, eta)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
-
-        objective = create_least_squares_objective(
-            model_fn, x_data, y_data, normalize=True
-        )
-
-        # Optimize
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+        with log_fit(logger, model="Zener", data_shape=data_shape, test_mode=test_mode_str) as ctx:
+            logger.debug(
+                "Starting Zener model fit",
+                test_mode=test_mode_str,
+                n_points=data_shape[0] if data_shape else None,
+                initial_Ge=self.parameters.get_value("Ge"),
+                initial_Gm=self.parameters.get_value("Gm"),
+                initial_eta=self.parameters.get_value("eta"),
             )
 
-        self.fitted_ = True
+            # Create objective function with stateless predictions
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                Ge, Gm, eta = params[0], params[1], params[2]
+
+                # Direct prediction based on test mode (stateless)
+                if test_mode == TestMode.RELAXATION:
+                    return self._predict_relaxation(x, Ge, Gm, eta)
+                elif test_mode == TestMode.CREEP:
+                    return self._predict_creep(x, Ge, Gm, eta)
+                elif test_mode == TestMode.OSCILLATION:
+                    return self._predict_oscillation(x, Ge, Gm, eta)
+                elif test_mode == TestMode.ROTATION:
+                    return self._predict_rotation(x, Ge, Gm, eta)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
+
+            logger.debug("Creating least squares objective", normalize=True)
+            objective = create_least_squares_objective(
+                model_fn, x_data, y_data, normalize=True
+            )
+
+            # Optimize
+            logger.debug(
+                "Starting NLSQ optimization",
+                use_jax=kwargs.get("use_jax", True),
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "Optimization failed",
+                    message=result.message,
+                    test_mode=test_mode_str,
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+
+            # Log fitted parameters
+            fitted_Ge = self.parameters.get_value("Ge")
+            fitted_Gm = self.parameters.get_value("Gm")
+            fitted_eta = self.parameters.get_value("eta")
+            fitted_tau = fitted_eta / fitted_Gm if fitted_Gm > 0 else float("inf")
+
+            logger.debug(
+                "Zener fit completed successfully",
+                fitted_Ge=fitted_Ge,
+                fitted_Gm=fitted_Gm,
+                fitted_eta=fitted_eta,
+                relaxation_time=fitted_tau,
+            )
+
+            ctx["Ge"] = fitted_Ge
+            ctx["Gm"] = fitted_Gm
+            ctx["eta"] = fitted_eta
+            ctx["tau"] = fitted_tau
+
         return self
 
     def _predict(self, X):

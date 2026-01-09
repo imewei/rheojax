@@ -32,6 +32,9 @@ from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class FitPage(QWidget):
@@ -58,6 +61,7 @@ class FitPage(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self._store = StateStore()
         self._model_service = ModelService()
         # Persist user-selected fitting options; start with dialog defaults
@@ -81,6 +85,9 @@ class FitPage(QWidget):
         self._setup_ui()
         self._connect_signals()
         self._load_models()
+        logger.debug(
+            "Initialization complete", class_name=self.__class__.__name__, page="FitPage"
+        )
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -217,8 +224,14 @@ class FitPage(QWidget):
 
     def _load_models(self) -> None:
         """Load available models into browser."""
+        logger.debug("Loading available models", page="FitPage")
         models = self._model_service.get_available_models()
         self._populate_quick_model_selector(models)
+        logger.debug(
+            "Models loaded",
+            page="FitPage",
+            category_count=len(models),
+        )
 
     def _populate_quick_model_selector(self, models: dict[str, list[str]]) -> None:
         """Populate quick model selector with available models."""
@@ -238,6 +251,10 @@ class FitPage(QWidget):
 
         if not dispatch and model_name == self._current_model:
             return
+
+        logger.debug(
+            "Model selection changed", model=model_name, page="FitPage", dispatch=dispatch
+        )
 
         if dispatch:
             self._store.dispatch(set_active_model(model_name))
@@ -275,6 +292,12 @@ class FitPage(QWidget):
         try:
             defaults = self._model_service.get_parameter_defaults(model_name)
         except Exception:
+            logger.error(
+                "Failed to get parameter defaults",
+                model=model_name,
+                page="FitPage",
+                exc_info=True,
+            )
             defaults = {}
             self._empty_params.setText(
                 f"Model '{model_name}' is unavailable. Select a different model."
@@ -342,16 +365,35 @@ class FitPage(QWidget):
 
     def _on_parameter_value_changed(self, param_name: str, value: float) -> None:
         """Update state when the user edits a parameter value."""
+        logger.debug(
+            "Parameter value changed",
+            param_name=param_name,
+            value=value,
+            page="FitPage",
+        )
         update_parameter(param_name, float(value))
 
     def _on_parameter_bounds_changed(
         self, param_name: str, min_val: float, max_val: float
     ) -> None:
         """Update state when the user edits parameter bounds."""
+        logger.debug(
+            "Parameter bounds changed",
+            param_name=param_name,
+            min_val=min_val,
+            max_val=max_val,
+            page="FitPage",
+        )
         update_parameter_bounds(param_name, float(min_val), float(max_val))
 
     def _on_parameter_fixed_toggled(self, param_name: str, is_fixed: bool) -> None:
         """Update state when the user toggles parameter fixed state."""
+        logger.debug(
+            "Parameter fixed toggled",
+            param_name=param_name,
+            is_fixed=is_fixed,
+            page="FitPage",
+        )
         toggle_parameter_fixed(param_name, bool(is_fixed))
 
     @Slot(str)
@@ -368,6 +410,11 @@ class FitPage(QWidget):
         model_name : str
             Double-clicked model name
         """
+        logger.debug(
+            "Model double-clicked",
+            model=model_name,
+            page="FitPage",
+        )
         self._apply_model_selection(normalize_model_name(model_name), dispatch=True)
         if self._btn_fit.isEnabled():
             self._on_fit_clicked()
@@ -388,6 +435,11 @@ class FitPage(QWidget):
     @Slot(str)
     def _on_dataset_changed(self, _dataset_id: str = "") -> None:
         """Handle active dataset change."""
+        logger.debug(
+            "Dataset changed",
+            dataset_id=_dataset_id,
+            page="FitPage",
+        )
         dataset = self._store.get_active_dataset()
         model_name = self._current_model
 
@@ -413,6 +465,11 @@ class FitPage(QWidget):
 
     def _on_mode_changed(self, mode: str) -> None:
         """Update store test mode from selector."""
+        logger.debug(
+            "Mode changed",
+            mode=mode,
+            page="FitPage",
+        )
         if mode:
             self._store.dispatch("SET_TEST_MODE", {"test_mode": mode})
             self._compat_label.setText(f"Mode set to {mode}")
@@ -477,6 +534,11 @@ class FitPage(QWidget):
             self._is_compatible = False
             return
 
+        logger.debug(
+            "Checking compatibility",
+            model=model_name,
+            page="FitPage",
+        )
         rheo_data = self._to_rheodata(dataset)
         result = self._model_service.check_compatibility(
             model_name, rheo_data, rheo_data.metadata.get("test_mode")
@@ -487,12 +549,24 @@ class FitPage(QWidget):
             self._compat_label.setText(text)
             self._compat_label.setStyleSheet("color: green;")
             self._is_compatible = True
+            logger.debug(
+                "Compatibility check passed",
+                model=model_name,
+                decay_type=result.get("decay_type"),
+                page="FitPage",
+            )
         else:
             warnings = result.get("warnings", [])
             text = "Compatibility issues:\n" + "\n".join(f"- {w}" for w in warnings[:3])
             self._compat_label.setText(text)
             self._compat_label.setStyleSheet("color: orange;")
             self._is_compatible = False
+            logger.debug(
+                "Compatibility check failed",
+                model=model_name,
+                warnings=warnings,
+                page="FitPage",
+            )
 
         self._update_fit_enabled()
 
@@ -578,12 +652,25 @@ class FitPage(QWidget):
 
     def _on_fit_clicked(self) -> None:
         """Handle fit button click."""
+        logger.debug("Button clicked", button_id="fit_button", page="FitPage")
         model_name = self._quick_model_combo.currentData()
         dataset = self._store.get_active_dataset()
 
         if not model_name or not dataset:
+            logger.debug(
+                "Fit aborted - missing model or dataset",
+                model=model_name,
+                has_dataset=dataset is not None,
+                page="FitPage",
+            )
             return
 
+        logger.debug(
+            "Fit triggered",
+            model=model_name,
+            dataset_id=str(dataset.id),
+            page="FitPage",
+        )
         initial_params = self._get_initial_params_for_fit(model_name)
         payload = {
             "model_name": str(model_name),
@@ -591,6 +678,13 @@ class FitPage(QWidget):
             "options": dict(self._fit_options),
             "initial_params": initial_params,
         }
+        logger.info(
+            "Requesting fit",
+            model=model_name,
+            dataset_id=str(dataset.id),
+            algorithm=self._fit_options.get("algorithm"),
+            page="FitPage",
+        )
         self._status_text.setText("Starting fit...")
         if hasattr(self, "_empty_results"):
             self._empty_results.hide()
@@ -605,11 +699,23 @@ class FitPage(QWidget):
                     name: float(param.value) for name, param in state_params.items()
                 }
             except Exception:
+                logger.error(
+                    "Failed to extract initial params from state",
+                    model=model_name,
+                    page="FitPage",
+                    exc_info=True,
+                )
                 return None
 
         try:
             defaults = self._model_service.get_parameter_defaults(model_name)
         except Exception:
+            logger.error(
+                "Failed to get parameter defaults for initial params",
+                model=model_name,
+                page="FitPage",
+                exc_info=True,
+            )
             return None
         if not defaults:
             return None
@@ -618,6 +724,12 @@ class FitPage(QWidget):
     @Slot(str, str)
     def _on_fitting_started(self, _model_name: str = "", _dataset_id: str = "") -> None:
         """Handle fitting started signal."""
+        logger.debug(
+            "Fitting started",
+            model=_model_name,
+            dataset_id=_dataset_id,
+            page="FitPage",
+        )
         self._btn_fit.setEnabled(False)
         self._btn_fit.setText("Fitting...")
 
@@ -626,6 +738,12 @@ class FitPage(QWidget):
         self, _model_name: str = "", _dataset_id: str = ""
     ) -> None:
         """Handle fitting completed signal."""
+        logger.info(
+            "Fitting completed",
+            model=_model_name,
+            dataset_id=_dataset_id,
+            page="FitPage",
+        )
         self._btn_fit.setText("Fit Model")
         self._update_fit_enabled()
 
@@ -634,6 +752,13 @@ class FitPage(QWidget):
         self, _model_name: str, _dataset_id: str, error: str
     ) -> None:
         """Handle fitting failure signal."""
+        logger.error(
+            "Fitting failed",
+            model=_model_name,
+            dataset_id=_dataset_id,
+            error=error,
+            page="FitPage",
+        )
         self._btn_fit.setText("Fit Model")
         self._update_fit_enabled()
         if error:
@@ -643,11 +768,18 @@ class FitPage(QWidget):
 
     def _show_fit_options(self) -> None:
         """Show fitting options dialog."""
+        logger.debug("Button clicked", button_id="options_button", page="FitPage")
         from rheojax.gui.dialogs.fitting_options import FittingOptionsDialog
 
         dialog = FittingOptionsDialog(current_options=self._fit_options, parent=self)
         if dialog.exec() == dialog.DialogCode.Accepted:
             self._fit_options = dialog.get_options()
+            logger.debug(
+                "Fit options updated",
+                algorithm=self._fit_options.get("algorithm"),
+                max_iter=self._fit_options.get("max_iter"),
+                page="FitPage",
+            )
 
     def apply_fit_result(self, fit_result: Any) -> None:
         """Update the Fit page status from a stored FitResult."""
@@ -658,7 +790,21 @@ class FitPage(QWidget):
             fit_time = getattr(fit_result, "fit_time", None)
             params = getattr(fit_result, "parameters", {}) or {}
         except Exception:
+            logger.error(
+                "Failed to extract fit result attributes",
+                page="FitPage",
+                exc_info=True,
+            )
             return
+
+        logger.debug(
+            "Applying fit result",
+            r_squared=r2,
+            mpe=mpe,
+            chi_squared=chi2,
+            fit_time=fit_time,
+            page="FitPage",
+        )
 
         lines: list[str] = ["Fit successful!", ""]
         if r2 is not None:
@@ -701,7 +847,11 @@ class FitPage(QWidget):
                         getattr(fit_result, "model_name", self._current_model or "")
                     )
             except Exception:
-                pass
+                logger.error(
+                    "Failed to update parameter table from fit result",
+                    page="FitPage",
+                    exc_info=True,
+                )
 
         self._status_text.setText("\n".join(lines))
         if hasattr(self, "_empty_results"):

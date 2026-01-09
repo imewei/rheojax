@@ -21,6 +21,9 @@ from threading import RLock
 from typing import Any, Optional
 
 from rheojax.gui.state.signals import StateSignals
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PipelineStep(Enum):
@@ -273,11 +276,15 @@ class StateStore:
             cls._instance._redo_stack = []
             cls._instance._max_undo_size = 50
             cls._instance._lock = RLock()  # Thread safety lock
+            logger.debug(
+                "Initializing store", class_name=cls.__name__, max_undo_size=50
+            )
         return cls._instance
 
     @classmethod
     def reset(cls) -> None:
         """Reset the singleton instance (useful for testing)."""
+        logger.debug("Resetting store singleton", class_name=cls.__name__)
         cls._instance = None
 
     def get_state(self) -> AppState:
@@ -296,6 +303,7 @@ class StateStore:
         signals : StateSignals
             StateSignals instance with Qt signals
         """
+        logger.debug("Setting signals object", signals_type=type(signals).__name__)
         self._signals = signals
 
     @property
@@ -334,6 +342,7 @@ class StateStore:
 
         if isinstance(action, dict) and "type" in action:
             action_type = action["type"]
+            logger.debug("Dispatching action", action_type=action_type)
             reducer = self._reduce_action(action_type, action)
             if reducer is not None:
                 self.update_state(reducer, emit_signal=True)
@@ -361,6 +370,12 @@ class StateStore:
 
             elif action_type == "FITTING_FAILED":
                 error = action.get("error", "")
+                logger.error(
+                    "Fitting failed",
+                    action_type=action_type,
+                    error=error,
+                    exc_info=True,
+                )
                 if self._signals:
                     self._signals.fit_failed.emit("", "", error)
 
@@ -381,6 +396,12 @@ class StateStore:
 
             elif action_type == "BAYESIAN_FAILED":
                 error = action.get("error", "")
+                logger.error(
+                    "Bayesian inference failed",
+                    action_type=action_type,
+                    error=error,
+                    exc_info=True,
+                )
                 if self._signals:
                     self._signals.bayesian_failed.emit("", "", error)
 
@@ -416,6 +437,15 @@ class StateStore:
                     self._signals.dataset_added.emit(dataset_id)
                     self._signals.dataset_selected.emit(dataset_id)
 
+            elif action_type == "IMPORT_DATA_FAILED":
+                error = action.get("error", "")
+                logger.error(
+                    "Data import failed",
+                    action_type=action_type,
+                    error=error,
+                    exc_info=True,
+                )
+
     def update_state(
         self,
         updater: Callable[[AppState], AppState],
@@ -436,22 +466,72 @@ class StateStore:
             Whether to emit state_changed signal
         """
         with self._lock:
+            old_state = self._state
             if track_undo and len(self._undo_stack) < self._max_undo_size:
                 self._undo_stack.append(self._state.clone())
                 self._redo_stack.clear()  # Clear redo on new action
 
             self._state = updater(self._state)
 
+            # Compute changed keys for logging
+            changed_keys = self._get_changed_keys(old_state, self._state)
+            if changed_keys:
+                logger.debug(
+                    "State updated",
+                    changed_keys=changed_keys,
+                    track_undo=track_undo,
+                    emit_signal=emit_signal,
+                )
+
             # Copy subscribers list to avoid modification during iteration
             subscribers = list(self._subscribers)
 
         # Notify subscribers outside the lock to prevent deadlocks
         for subscriber in subscribers:
-            subscriber(self._state)
+            try:
+                subscriber(self._state)
+            except Exception:
+                logger.error(
+                    "Subscriber callback failed",
+                    subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                    exc_info=True,
+                )
 
         # Emit Qt signal if available
         if emit_signal and self._signals is not None:
             self._signals.state_changed.emit()
+
+    def _get_changed_keys(self, old_state: AppState, new_state: AppState) -> list[str]:
+        """Compute which top-level keys changed between two states."""
+        changed = []
+        for attr in [
+            "project_path",
+            "project_name",
+            "is_modified",
+            "datasets",
+            "active_dataset_id",
+            "active_model_name",
+            "model_params",
+            "fit_results",
+            "bayesian_results",
+            "current_tab",
+            "pipeline_state",
+            "jax_device",
+            "jax_memory_used",
+            "jax_memory_total",
+            "transform_history",
+            "workflow_mode",
+            "current_seed",
+            "auto_save_enabled",
+            "theme",
+            "last_export_dir",
+            "recent_projects",
+        ]:
+            old_val = getattr(old_state, attr, None)
+            new_val = getattr(new_state, attr, None)
+            if old_val != new_val:
+                changed.append(attr)
+        return changed
 
     def _reduce_action(
         self, action_type: str, action: dict[str, Any]
@@ -533,6 +613,11 @@ class StateStore:
                         ds.metadata = {**ds.metadata, "test_mode": inferred}
                         ds.is_modified = True
                 except Exception:
+                    logger.error(
+                        "Auto-detect test mode failed",
+                        dataset_id=dataset_id,
+                        exc_info=True,
+                    )
                     # Leave dataset unchanged on failure
                     return state
 
@@ -582,10 +667,20 @@ class StateStore:
                 try:
                     step_enum = PipelineStep[step.upper()] if step else None
                 except Exception:
+                    logger.error(
+                        "Invalid pipeline step",
+                        step=step,
+                        exc_info=True,
+                    )
                     step_enum = None
                 try:
                     status_enum = StepStatus[status.upper()] if status else None
                 except Exception:
+                    logger.error(
+                        "Invalid step status",
+                        status=status,
+                        exc_info=True,
+                    )
                     status_enum = None
                 if step_enum and status_enum:
                     pipeline.steps[step_enum] = status_enum
@@ -924,6 +1019,11 @@ class StateStore:
         with self._lock:
             if callback not in self._subscribers:
                 self._subscribers.append(callback)
+                logger.debug(
+                    "Subscriber added",
+                    subscriber=getattr(callback, "__name__", str(callback)),
+                    total_subscribers=len(self._subscribers),
+                )
 
     def unsubscribe(self, callback: Callable[[AppState], None]) -> None:
         """Unsubscribe from state changes.
@@ -938,6 +1038,11 @@ class StateStore:
         with self._lock:
             if callback in self._subscribers:
                 self._subscribers.remove(callback)
+                logger.debug(
+                    "Subscriber removed",
+                    subscriber=getattr(callback, "__name__", str(callback)),
+                    total_subscribers=len(self._subscribers),
+                )
 
     def undo(self) -> bool:
         """Undo the last state change.
@@ -951,6 +1056,7 @@ class StateStore:
         """
         with self._lock:
             if not self._undo_stack:
+                logger.debug("Undo requested but stack is empty")
                 return False
 
             # Push current state to redo
@@ -959,12 +1065,25 @@ class StateStore:
             # Restore previous state
             self._state = self._undo_stack.pop()
 
+            logger.debug(
+                "State undone",
+                undo_stack_size=len(self._undo_stack),
+                redo_stack_size=len(self._redo_stack),
+            )
+
             # Copy subscribers list
             subscribers = list(self._subscribers)
 
         # Notify subscribers outside the lock
         for subscriber in subscribers:
-            subscriber(self._state)
+            try:
+                subscriber(self._state)
+            except Exception:
+                logger.error(
+                    "Subscriber callback failed during undo",
+                    subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                    exc_info=True,
+                )
 
         if self._signals is not None:
             self._signals.state_changed.emit()
@@ -983,6 +1102,7 @@ class StateStore:
         """
         with self._lock:
             if not self._redo_stack:
+                logger.debug("Redo requested but stack is empty")
                 return False
 
             # Push current state to undo
@@ -991,12 +1111,25 @@ class StateStore:
             # Restore next state
             self._state = self._redo_stack.pop()
 
+            logger.debug(
+                "State redone",
+                undo_stack_size=len(self._undo_stack),
+                redo_stack_size=len(self._redo_stack),
+            )
+
             # Copy subscribers list
             subscribers = list(self._subscribers)
 
         # Notify subscribers outside the lock
         for subscriber in subscribers:
-            subscriber(self._state)
+            try:
+                subscriber(self._state)
+            except Exception:
+                logger.error(
+                    "Subscriber callback failed during redo",
+                    subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                    exc_info=True,
+                )
 
         if self._signals is not None:
             self._signals.state_changed.emit()
@@ -1018,6 +1151,7 @@ class StateStore:
         with self._lock:
             self._undo_stack.clear()
             self._redo_stack.clear()
+            logger.debug("Undo/redo history cleared")
 
     def batch_update(
         self, updaters: list[Callable[[AppState], AppState]], track_undo: bool = True
@@ -1036,21 +1170,51 @@ class StateStore:
         track_undo : bool
             Whether to track this batch as one undo action
         """
+        logger.debug(
+            "Starting batch update",
+            num_updaters=len(updaters),
+            track_undo=track_undo,
+        )
         with self._lock:
+            old_state = self._state
             if track_undo and len(self._undo_stack) < self._max_undo_size:
                 self._undo_stack.append(self._state.clone())
                 self._redo_stack.clear()
 
             # Apply all updates
             for updater in updaters:
-                self._state = updater(self._state)
+                try:
+                    self._state = updater(self._state)
+                except Exception:
+                    logger.error(
+                        "Batch updater failed",
+                        updater=getattr(updater, "__name__", str(updater)),
+                        exc_info=True,
+                    )
+                    raise
+
+            # Compute changed keys for logging
+            changed_keys = self._get_changed_keys(old_state, self._state)
+            if changed_keys:
+                logger.debug(
+                    "Batch update completed",
+                    num_updaters=len(updaters),
+                    changed_keys=changed_keys,
+                )
 
             # Copy subscribers list
             subscribers = list(self._subscribers)
 
         # Notify subscribers outside the lock
         for subscriber in subscribers:
-            subscriber(self._state)
+            try:
+                subscriber(self._state)
+            except Exception:
+                logger.error(
+                    "Subscriber callback failed during batch update",
+                    subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                    exc_info=True,
+                )
 
         if self._signals is not None:
             self._signals.state_changed.emit()

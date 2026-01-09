@@ -19,6 +19,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 # Available plot types for residual analysis
 PLOT_TYPES = [
     ("residuals", "Residuals vs Fitted", "Residuals plotted against fitted values"),
@@ -62,6 +66,7 @@ class ResidualsPanel(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self._x_values: np.ndarray | None = None
         self._y_true: np.ndarray | None = None
@@ -71,6 +76,7 @@ class ResidualsPanel(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+        logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -141,6 +147,12 @@ class ResidualsPanel(QWidget):
         """
         plot_type = self._type_combo.currentData()
         self._current_plot_type = plot_type
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="plot_type_changed",
+            plot_type=plot_type,
+        )
         self.plot_changed.emit(plot_type)
 
         if self._residuals is not None:
@@ -163,6 +175,13 @@ class ResidualsPanel(QWidget):
         x : np.ndarray, optional
             X values (independent variable)
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="plot_residuals",
+            y_true_shape=y_true.shape if hasattr(y_true, "shape") else len(y_true),
+            y_pred_shape=y_pred.shape if hasattr(y_pred, "shape") else len(y_pred),
+        )
         self._y_true = np.asarray(y_true).flatten()
         self._y_pred = np.asarray(y_pred).flatten()
         self._x_values = np.asarray(x).flatten() if x is not None else None
@@ -184,6 +203,12 @@ class ResidualsPanel(QWidget):
         residuals : np.ndarray
             Residual values
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_residuals",
+            residuals_shape=residuals.shape if hasattr(residuals, "shape") else len(residuals),
+        )
         self._residuals = np.asarray(residuals).flatten()
         self._y_true = None
         self._y_pred = None
@@ -229,6 +254,13 @@ class ResidualsPanel(QWidget):
             try:
                 func()
             except Exception as e:
+                logger.error(
+                    "Error generating plot",
+                    widget=self.__class__.__name__,
+                    plot_type=self._current_plot_type,
+                    error=str(e),
+                    exc_info=True,
+                )
                 ax = self._figure.add_subplot(111)
                 ax.text(
                     0.5,
@@ -269,8 +301,10 @@ class ResidualsPanel(QWidget):
                 )
                 ax.plot(fitted[sorted_idx], smoothed, "r-", alpha=0.5, linewidth=2)
             except ImportError as exc:
-                logging.getLogger(__name__).debug(
-                    "uniform_filter1d unavailable: %s", exc
+                logger.debug(
+                    "uniform_filter1d unavailable",
+                    widget=self.__class__.__name__,
+                    error=str(exc),
                 )
 
         ax.set_xlabel("Fitted Values")
@@ -293,8 +327,10 @@ class ResidualsPanel(QWidget):
             stats.probplot(standardized, dist="norm", plot=ax)
             ax.set_title("Normal Q-Q Plot")
         except ImportError as exc:
-            logging.getLogger(__name__).debug(
-                "scipy.stats unavailable for QQ plot: %s", exc
+            logger.debug(
+                "scipy.stats unavailable for QQ plot",
+                widget=self.__class__.__name__,
+                error=str(exc),
             )
             # Fallback without scipy
             sorted_res = np.sort(self._residuals)
@@ -327,8 +363,10 @@ class ResidualsPanel(QWidget):
             )
             ax.legend()
         except ImportError as exc:
-            logging.getLogger(__name__).debug(
-                "scipy.stats unavailable for histogram fit: %s", exc
+            logger.debug(
+                "scipy.stats unavailable for histogram fit",
+                widget=self.__class__.__name__,
+                error=str(exc),
             )
 
         ax.set_xlabel("Residual Value")
@@ -359,8 +397,10 @@ class ResidualsPanel(QWidget):
                 )
                 ax.plot(fitted[sorted_idx], smoothed, "r-", alpha=0.5, linewidth=2)
             except ImportError as exc:
-                logging.getLogger(__name__).debug(
-                    "uniform_filter1d unavailable: %s", exc
+                logger.debug(
+                    "uniform_filter1d unavailable",
+                    widget=self.__class__.__name__,
+                    error=str(exc),
                 )
 
         ax.set_xlabel("Fitted Values")
@@ -430,6 +470,12 @@ class ResidualsPanel(QWidget):
         plot_type : str
             Plot type identifier
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="set_plot_type",
+            plot_type=plot_type,
+        )
         idx = self._type_combo.findData(plot_type)
         if idx >= 0:
             self._type_combo.setCurrentIndex(idx)
@@ -483,10 +529,37 @@ class ResidualsPanel(QWidget):
         dpi : int, optional
             Resolution for raster formats
         """
-        self._figure.savefig(filepath, dpi=dpi, bbox_inches="tight")
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="export_figure",
+            filepath=filepath,
+            dpi=dpi,
+        )
+        try:
+            self._figure.savefig(filepath, dpi=dpi, bbox_inches="tight")
+            logger.debug(
+                "Figure exported successfully",
+                widget=self.__class__.__name__,
+                filepath=filepath,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to export figure",
+                widget=self.__class__.__name__,
+                filepath=filepath,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
 
     def clear(self) -> None:
         """Clear the panel."""
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="clear",
+        )
         self._x_values = None
         self._y_true = None
         self._y_pred = None

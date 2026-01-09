@@ -3,6 +3,15 @@ RheoJAX Logging Context Managers.
 
 Context managers for automatically logging operation start/end,
 timing, and exception handling.
+
+Includes specialized context managers for:
+- General operations (log_operation)
+- Model fitting (log_fit)
+- Bayesian inference (log_bayesian)
+- Data transforms (log_transform)
+- File I/O (log_io)
+- Pipeline stages (log_pipeline_stage)
+- GUI user actions (log_gui_action)
 """
 
 import logging
@@ -282,4 +291,47 @@ def log_pipeline_stage(
         context["pipeline_id"] = pipeline_id
 
     with log_operation(logger, f"pipeline_{stage}", level=level, **context) as ctx:
+        yield ctx
+
+
+@contextmanager
+def log_gui_action(
+    logger: logging.Logger | RheoJAXLogger,
+    action: str,
+    widget: str | None = None,
+    page: str | None = None,
+    level: int = logging.DEBUG,
+    **kwargs,
+) -> Generator[dict[str, Any], None, None]:
+    """Context manager for GUI user interaction logging.
+
+    Specialized wrapper for logging user interactions in the GUI.
+    Defaults to DEBUG level since GUI actions are typically verbose.
+
+    Args:
+        logger: Logger instance to use.
+        action: Type of action (click, select, navigate, etc.).
+        widget: Widget identifier or class name.
+        page: Page where action occurred.
+        level: Log level (default DEBUG for GUI actions).
+        **kwargs: Additional context (button_id, value, etc.).
+
+    Yields:
+        Dictionary for adding completion context.
+
+    Example:
+        >>> with log_gui_action(logger, "button_click", widget="FitButton", page="FitPage") as ctx:
+        ...     self._perform_fit()
+        ...     ctx["result"] = "success"
+
+    Example without context manager (for simple actions):
+        >>> logger.debug("Button clicked", action="click", widget="FitButton", page="FitPage")
+    """
+    context = {"action": action, **kwargs}
+    if widget is not None:
+        context["widget"] = widget
+    if page is not None:
+        context["page"] = page
+
+    with log_operation(logger, f"gui_{action}", level=level, **context) as ctx:
         yield ctx

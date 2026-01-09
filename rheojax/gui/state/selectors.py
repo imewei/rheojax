@@ -14,6 +14,9 @@ from rheojax.gui.state.store import (
     StateStore,
     StepStatus,
 )
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Dataset Selectors
 
@@ -26,6 +29,7 @@ def get_active_dataset() -> DatasetState | None:
     DatasetState | None
         Active dataset or None
     """
+    logger.debug("Selector called", selector="get_active_dataset")
     store = StateStore()
     return store.get_active_dataset()
 
@@ -43,6 +47,7 @@ def get_dataset(dataset_id: str) -> DatasetState | None:
     DatasetState | None
         Dataset or None if not found
     """
+    logger.debug("Selector called", selector="get_dataset", dataset_id=dataset_id)
     store = StateStore()
     return store.get_dataset(dataset_id)
 
@@ -55,6 +60,7 @@ def get_all_datasets() -> dict[str, DatasetState]:
     dict[str, DatasetState]
         All datasets
     """
+    logger.debug("Selector called", selector="get_all_datasets")
     store = StateStore()
     return store.get_state().datasets
 
@@ -67,6 +73,7 @@ def get_dataset_count() -> int:
     int
         Dataset count
     """
+    logger.debug("Selector called", selector="get_dataset_count")
     store = StateStore()
     return len(store.get_state().datasets)
 
@@ -82,6 +89,7 @@ def get_active_model_name() -> str | None:
     str | None
         Model name or None
     """
+    logger.debug("Selector called", selector="get_active_model_name")
     store = StateStore()
     return store.get_state().active_model_name
 
@@ -94,6 +102,7 @@ def get_model_param_dict() -> dict[str, float]:
     dict[str, float]
         Parameter name -> value mapping
     """
+    logger.debug("Selector called", selector="get_model_param_dict")
     store = StateStore()
     params = store.get_state().model_params
     return {name: param.value for name, param in params.items()}
@@ -107,6 +116,7 @@ def get_model_param_bounds() -> dict[str, tuple[float, float]]:
     dict[str, tuple[float, float]]
         Parameter name -> (min, max) mapping
     """
+    logger.debug("Selector called", selector="get_model_param_bounds")
     store = StateStore()
     params = store.get_state().model_params
     return {name: (param.min_bound, param.max_bound) for name, param in params.items()}
@@ -123,6 +133,7 @@ def get_active_fit_result() -> FitResult | None:
     FitResult | None
         Fit result or None
     """
+    logger.debug("Selector called", selector="get_active_fit_result")
     store = StateStore()
     state = store.get_state()
 
@@ -148,6 +159,12 @@ def get_fit_result(model_name: str, dataset_id: str) -> FitResult | None:
     FitResult | None
         Fit result or None
     """
+    logger.debug(
+        "Selector called",
+        selector="get_fit_result",
+        model_name=model_name,
+        dataset_id=dataset_id,
+    )
     store = StateStore()
     key = f"{model_name}_{dataset_id}"
     return store.get_state().fit_results.get(key)
@@ -161,6 +178,7 @@ def get_all_fit_results() -> dict[str, FitResult]:
     dict[str, FitResult]
         All fit results
     """
+    logger.debug("Selector called", selector="get_all_fit_results")
     store = StateStore()
     return store.get_state().fit_results
 
@@ -173,6 +191,7 @@ def is_fit_available() -> bool:
     bool
         True if fit available
     """
+    logger.debug("Selector called", selector="is_fit_available")
     return get_active_fit_result() is not None
 
 
@@ -181,15 +200,26 @@ def is_fit_available() -> bool:
 
 def get_pipeline_state():
     """Return the current pipeline state object."""
-
+    logger.debug("Selector called", selector="get_pipeline_state")
     return StateStore().get_state().pipeline_state
 
 
 def get_pipeline_step_status(step: PipelineStep) -> StepStatus:
-    """Return status for a specific pipeline step."""
+    """Get status of a specific pipeline step.
 
-    pipeline = get_pipeline_state()
-    return pipeline.steps.get(step, StepStatus.PENDING)
+    Parameters
+    ----------
+    step : PipelineStep
+        Pipeline step
+
+    Returns
+    -------
+    StepStatus
+        Step status
+    """
+    logger.debug("Selector called", selector="get_pipeline_step_status", step=step)
+    store = StateStore()
+    return store.get_state().pipeline_state.steps.get(step, StepStatus.PENDING)
 
 
 # Bayesian Result Selectors
@@ -203,6 +233,7 @@ def get_active_bayesian_result() -> BayesianResult | None:
     BayesianResult | None
         Bayesian result or None
     """
+    logger.debug("Selector called", selector="get_active_bayesian_result")
     store = StateStore()
     state = store.get_state()
 
@@ -228,6 +259,12 @@ def get_bayesian_result(model_name: str, dataset_id: str) -> BayesianResult | No
     BayesianResult | None
         Bayesian result or None
     """
+    logger.debug(
+        "Selector called",
+        selector="get_bayesian_result",
+        model_name=model_name,
+        dataset_id=dataset_id,
+    )
     store = StateStore()
     key = f"{model_name}_{dataset_id}"
     return store.get_state().bayesian_results.get(key)
@@ -241,6 +278,7 @@ def get_all_bayesian_results() -> dict[str, BayesianResult]:
     dict[str, BayesianResult]
         All Bayesian results
     """
+    logger.debug("Selector called", selector="get_all_bayesian_results")
     store = StateStore()
     return store.get_state().bayesian_results
 
@@ -253,6 +291,7 @@ def is_bayesian_available() -> bool:
     bool
         True if Bayesian result available
     """
+    logger.debug("Selector called", selector="is_bayesian_available")
     return get_active_bayesian_result() is not None
 
 
@@ -267,6 +306,7 @@ def get_pipeline_progress() -> float:
     float
         Progress from 0.0 to 1.0
     """
+    logger.debug("Selector called", selector="get_pipeline_progress")
     store = StateStore()
     state = store.get_state()
 
@@ -280,23 +320,6 @@ def get_pipeline_progress() -> float:
     return completed_steps / total_steps if total_steps > 0 else 0.0
 
 
-def get_pipeline_step_status(step: PipelineStep) -> StepStatus:
-    """Get status of a specific pipeline step.
-
-    Parameters
-    ----------
-    step : PipelineStep
-        Pipeline step
-
-    Returns
-    -------
-    StepStatus
-        Step status
-    """
-    store = StateStore()
-    return store.get_state().pipeline_state.steps.get(step, StepStatus.PENDING)
-
-
 def get_current_pipeline_step() -> PipelineStep | None:
     """Get the current active pipeline step.
 
@@ -305,6 +328,7 @@ def get_current_pipeline_step() -> PipelineStep | None:
     PipelineStep | None
         Current step or None
     """
+    logger.debug("Selector called", selector="get_current_pipeline_step")
     store = StateStore()
     return store.get_state().pipeline_state.current_step
 
@@ -320,6 +344,7 @@ def get_recent_projects() -> list[Path]:
     list[Path]
         Recent project paths (most recent first)
     """
+    logger.debug("Selector called", selector="get_recent_projects")
     store = StateStore()
     return store.get_state().recent_projects
 
@@ -332,6 +357,7 @@ def get_project_name() -> str:
     str
         Project name
     """
+    logger.debug("Selector called", selector="get_project_name")
     store = StateStore()
     return store.get_state().project_name
 
@@ -344,6 +370,7 @@ def is_project_modified() -> bool:
     bool
         True if modified
     """
+    logger.debug("Selector called", selector="is_project_modified")
     store = StateStore()
     return store.get_state().is_modified
 
@@ -359,6 +386,7 @@ def get_jax_device() -> str:
     str
         Device name (cpu, cuda, tpu)
     """
+    logger.debug("Selector called", selector="get_jax_device")
     store = StateStore()
     return store.get_state().jax_device
 
@@ -371,6 +399,7 @@ def get_jax_memory_usage() -> tuple[int, int]:
     tuple[int, int]
         (used_bytes, total_bytes)
     """
+    logger.debug("Selector called", selector="get_jax_memory_usage")
     store = StateStore()
     state = store.get_state()
     return (state.jax_memory_used, state.jax_memory_total)
@@ -384,6 +413,7 @@ def get_jax_memory_percent() -> float:
     float
         Memory usage percentage (0-100)
     """
+    logger.debug("Selector called", selector="get_jax_memory_percent")
     used, total = get_jax_memory_usage()
     if total == 0:
         return 0.0
@@ -401,6 +431,7 @@ def get_theme() -> str:
     str
         Theme name (light, dark)
     """
+    logger.debug("Selector called", selector="get_theme")
     store = StateStore()
     return store.get_state().theme
 
@@ -413,6 +444,7 @@ def get_current_seed() -> int:
     int
         Random seed
     """
+    logger.debug("Selector called", selector="get_current_seed")
     store = StateStore()
     return store.get_state().current_seed
 
@@ -425,6 +457,7 @@ def is_auto_save_enabled() -> bool:
     bool
         True if auto-save enabled
     """
+    logger.debug("Selector called", selector="is_auto_save_enabled")
     store = StateStore()
     return store.get_state().auto_save_enabled
 
@@ -445,6 +478,11 @@ def get_transform_history_for_dataset(dataset_id: str) -> list:
     list[TransformRecord]
         Transform records where this dataset is the target
     """
+    logger.debug(
+        "Selector called",
+        selector="get_transform_history_for_dataset",
+        dataset_id=dataset_id,
+    )
     store = StateStore()
     state = store.get_state()
 
@@ -468,6 +506,9 @@ def get_dataset_lineage(dataset_id: str) -> list[str]:
     list[str]
         List of dataset IDs in lineage (oldest to newest)
     """
+    logger.debug(
+        "Selector called", selector="get_dataset_lineage", dataset_id=dataset_id
+    )
     store = StateStore()
     state = store.get_state()
 
@@ -502,6 +543,7 @@ def can_undo() -> bool:
     bool
         True if undo available
     """
+    logger.debug("Selector called", selector="can_undo")
     store = StateStore()
     return store.can_undo()
 
@@ -514,5 +556,6 @@ def can_redo() -> bool:
     bool
         True if redo available
     """
+    logger.debug("Selector called", selector="can_redo")
     store = StateStore()
     return store.can_redo()

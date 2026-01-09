@@ -9,12 +9,14 @@ Phase 3 of Template Method Refactoring: FractionalModelMixin
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from rheojax.core.test_modes import TestMode
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 FRACTIONAL_ORDER_EPS = 1e-3
 # Shared bounds for fractional orders (public API remains [0, 1])
@@ -99,9 +101,9 @@ class FractionalModelMixin:
         # Get initializer class name
         initializer_name = self._INITIALIZER_MAP.get(class_name)
         if initializer_name is None:
-            logging.warning(
-                f"No initializer mapping for {class_name}. "
-                "Smart initialization skipped."
+            logger.warning(
+                "No initializer mapping for model class, skipping smart initialization",
+                class_name=class_name,
             )
             return False
 
@@ -119,22 +121,35 @@ class FractionalModelMixin:
 
             # Create initializer and run
             initializer = initializer_class()
+            logger.debug(
+                "Attempting smart initialization",
+                class_name=class_name,
+                initializer=initializer_name,
+                data_shape=X.shape,
+            )
             success = initializer.initialize(X, y, parameters)
 
             if success:
-                logging.debug(
-                    f"{class_name}: Smart initialization applied from frequency-domain features"
+                logger.debug(
+                    "Smart initialization applied from frequency-domain features",
+                    class_name=class_name,
                 )
                 return True
             else:
-                logging.debug(
-                    f"{class_name}: Smart initialization failed validation, using defaults"
+                logger.debug(
+                    "Smart initialization failed validation, using defaults",
+                    class_name=class_name,
                 )
                 return False
 
         except Exception as e:
             # Silent fallback to defaults - don't break if initialization fails
-            logging.debug(f"{class_name}: Smart initialization error: {e}")
+            logger.debug(
+                "Smart initialization error, falling back to defaults",
+                class_name=class_name,
+                error=str(e),
+                exc_info=True,
+            )
             return False
 
     @staticmethod
@@ -186,15 +201,30 @@ class FractionalModelMixin:
         ValueError
             If parameters are invalid
         """
+        logger.debug(
+            "Validating fractional parameters",
+            class_name=self.__class__.__name__,
+        )
+
         # Validate alpha parameter if it exists
         alpha_param = parameters.get("alpha")
         if alpha_param is not None and alpha_param.value is not None:
             alpha = alpha_param.value
             if alpha_param.was_clamped:
+                logger.error(
+                    "Fractional order alpha clamped outside valid range",
+                    alpha=alpha,
+                    valid_range="(0, 1)",
+                )
                 raise ValueError(
                     f"Fractional order alpha must be in (0, 1), got {alpha}"
                 )
             if not (0 < alpha < 1):
+                logger.error(
+                    "Fractional order alpha outside valid range",
+                    alpha=alpha,
+                    valid_range="(0, 1)",
+                )
                 raise ValueError(
                     f"Fractional order alpha must be in (0, 1), got {alpha}"
                 )
@@ -204,27 +234,54 @@ class FractionalModelMixin:
         if beta_param is not None and beta_param.value is not None:
             beta = beta_param.value
             if beta_param.was_clamped:
+                logger.error(
+                    "Fractional order beta clamped outside valid range",
+                    beta=beta,
+                    valid_range="(0, 1)",
+                )
                 raise ValueError(f"Fractional order beta must be in (0, 1), got {beta}")
             if not (0 < beta < 1):
+                logger.error(
+                    "Fractional order beta outside valid range",
+                    beta=beta,
+                    valid_range="(0, 1)",
+                )
                 raise ValueError(f"Fractional order beta must be in (0, 1), got {beta}")
 
         # Validate moduli are positive
         for param_name in ["Ge", "Gm", "G0", "Gg"]:
             value = parameters.get_value(param_name)
             if value is not None and value <= 0:
+                logger.error(
+                    "Modulus parameter must be positive",
+                    parameter=param_name,
+                    value=value,
+                )
                 raise ValueError(f"{param_name} must be positive, got {value}")
 
         # Validate compliances are positive
         for param_name in ["Jg", "Jm", "Je"]:
             value = parameters.get_value(param_name)
             if value is not None and value <= 0:
+                logger.error(
+                    "Compliance parameter must be positive",
+                    parameter=param_name,
+                    value=value,
+                )
                 raise ValueError(f"{param_name} must be positive, got {value}")
 
         # Validate time scales are positive
         for param_name in ["tau_alpha", "tau_beta", "tau1", "tau2"]:
             value = parameters.get_value(param_name)
             if value is not None and value <= 0:
+                logger.error(
+                    "Time scale parameter must be positive",
+                    parameter=param_name,
+                    value=value,
+                )
                 raise ValueError(f"{param_name} must be positive, got {value}")
+
+        logger.debug("Fractional parameter validation passed")
 
 
 __all__ = ["FractionalModelMixin", "FRACTIONAL_ORDER_BOUNDS", "FRACTIONAL_ORDER_EPS"]

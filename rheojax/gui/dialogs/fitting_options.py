@@ -23,6 +23,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class FittingOptionsDialog(QDialog):
     """Fitting configuration dialog.
@@ -55,6 +59,7 @@ class FittingOptionsDialog(QDialog):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         # Guard against non-dict inputs (e.g., accidental widget objects)
         self.current_options = (
@@ -77,6 +82,7 @@ class FittingOptionsDialog(QDialog):
 
         self.algo_combo = QComboBox()
         self.algo_combo.addItems(["NLSQ (default)", "L-BFGS-B", "Trust Region"])
+        self.algo_combo.currentTextChanged.connect(self._on_algorithm_changed)
         algo_layout.addRow("Optimization Method:", self.algo_combo)
 
         algo_group.setLayout(algo_layout)
@@ -91,6 +97,9 @@ class FittingOptionsDialog(QDialog):
         self.max_iter_spin.setRange(100, 50000)
         self.max_iter_spin.setValue(5000)
         self.max_iter_spin.setSingleStep(500)
+        self.max_iter_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("max_iter", v)
+        )
         conv_layout.addRow("Max Iterations:", self.max_iter_spin)
 
         # Function tolerance
@@ -100,6 +109,9 @@ class FittingOptionsDialog(QDialog):
         self.ftol_spin.setValue(1e-8)
         self.ftol_spin.setSingleStep(1e-9)
         self.ftol_spin.setStepType(QDoubleSpinBox.StepType.AdaptiveDecimalStepType)
+        self.ftol_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("ftol", v)
+        )
         conv_layout.addRow("Function Tolerance (ftol):", self.ftol_spin)
 
         # Parameter tolerance
@@ -109,6 +121,9 @@ class FittingOptionsDialog(QDialog):
         self.xtol_spin.setValue(1e-8)
         self.xtol_spin.setSingleStep(1e-9)
         self.xtol_spin.setStepType(QDoubleSpinBox.StepType.AdaptiveDecimalStepType)
+        self.xtol_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("xtol", v)
+        )
         conv_layout.addRow("Parameter Tolerance (xtol):", self.xtol_spin)
 
         conv_group.setLayout(conv_layout)
@@ -131,6 +146,9 @@ class FittingOptionsDialog(QDialog):
         self.num_starts_spin.setRange(2, 20)
         self.num_starts_spin.setValue(5)
         self.num_starts_spin.setEnabled(False)
+        self.num_starts_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("num_starts", v)
+        )
         starts_layout.addWidget(self.num_starts_spin)
         starts_layout.addStretch()
         multistart_layout.addLayout(starts_layout)
@@ -145,11 +163,17 @@ class FittingOptionsDialog(QDialog):
         # Use bounds
         self.use_bounds_check = QCheckBox("Use parameter bounds")
         self.use_bounds_check.setChecked(True)
+        self.use_bounds_check.stateChanged.connect(
+            lambda s: self._on_option_changed("use_bounds", s != 0)
+        )
         other_layout.addWidget(self.use_bounds_check)
 
         # Verbose output
         self.verbose_check = QCheckBox("Verbose output")
         self.verbose_check.setChecked(False)
+        self.verbose_check.stateChanged.connect(
+            lambda s: self._on_option_changed("verbose", s != 0)
+        )
         other_layout.addWidget(self.verbose_check)
 
         other_group.setLayout(other_layout)
@@ -167,8 +191,8 @@ class FittingOptionsDialog(QDialog):
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
+        button_box.accepted.connect(self._on_accepted)
+        button_box.rejected.connect(self._on_rejected)
         layout.addWidget(button_box)
 
         self.setLayout(layout)
@@ -214,15 +238,40 @@ class FittingOptionsDialog(QDialog):
         if "verbose" in self.current_options:
             self.verbose_check.setChecked(self.current_options["verbose"])
 
+    def _on_algorithm_changed(self, text: str) -> None:
+        """Handle algorithm combo box change."""
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option="algorithm",
+            value=text,
+        )
+
+    def _on_option_changed(self, option: str, value: Any) -> None:
+        """Handle option change."""
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option=option,
+            value=value,
+        )
+
     def _on_multistart_changed(self, state: int) -> None:
         """Handle multi-start checkbox change."""
         from PySide6.QtCore import Qt
 
         enabled = state == Qt.CheckState.Checked.value
         self.num_starts_spin.setEnabled(enabled)
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option="multistart",
+            value=enabled,
+        )
 
     def _reset_defaults(self) -> None:
         """Reset all options to defaults."""
+        logger.debug("Resetting to defaults", dialog=self.__class__.__name__)
         self.algo_combo.setCurrentIndex(0)  # NLSQ
         self.max_iter_spin.setValue(5000)
         self.ftol_spin.setValue(1e-8)
@@ -231,6 +280,21 @@ class FittingOptionsDialog(QDialog):
         self.num_starts_spin.setValue(5)
         self.use_bounds_check.setChecked(True)
         self.verbose_check.setChecked(False)
+
+    def _on_accepted(self) -> None:
+        """Handle dialog accepted."""
+        logger.debug("Options applied", dialog=self.__class__.__name__)
+        self.accept()
+
+    def _on_rejected(self) -> None:
+        """Handle dialog rejected."""
+        logger.debug("Dialog closed", dialog=self.__class__.__name__)
+        self.reject()
+
+    def showEvent(self, event) -> None:
+        """Handle show event."""
+        super().showEvent(event)
+        logger.debug("Dialog opened", dialog=self.__class__.__name__)
 
     def get_options(self) -> dict[str, Any]:
         """Get fitting options.

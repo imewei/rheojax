@@ -21,6 +21,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class ExportOptionsDialog(QDialog):
     """Export configuration dialog.
@@ -54,6 +58,7 @@ class ExportOptionsDialog(QDialog):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self.current_options = current_options or {}
 
@@ -72,6 +77,7 @@ class ExportOptionsDialog(QDialog):
         data_layout = QVBoxLayout()
 
         self.data_button_group = QButtonGroup()
+        self.data_button_group.idClicked.connect(self._on_data_format_changed)
 
         self.csv_radio = QRadioButton("CSV (Comma-Separated Values)")
         self.csv_radio.setChecked(True)
@@ -98,6 +104,7 @@ class ExportOptionsDialog(QDialog):
         figure_layout = QVBoxLayout()
 
         self.figure_button_group = QButtonGroup()
+        self.figure_button_group.idClicked.connect(self._on_figure_format_changed)
 
         self.png_radio = QRadioButton("PNG (Portable Network Graphics)")
         self.png_radio.setChecked(True)
@@ -125,6 +132,9 @@ class ExportOptionsDialog(QDialog):
         self.dpi_spin.setValue(300)
         self.dpi_spin.setSingleStep(50)
         self.dpi_spin.setSuffix(" dpi")
+        self.dpi_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("dpi", v)
+        )
         settings_layout.addRow("Resolution (DPI):", self.dpi_spin)
 
         # Style preset
@@ -138,6 +148,9 @@ class ExportOptionsDialog(QDialog):
                 "seaborn",
                 "ggplot",
             ]
+        )
+        self.style_combo.currentTextChanged.connect(
+            lambda t: self._on_option_changed("style", t)
         )
         settings_layout.addRow("Style Preset:", self.style_combo)
 
@@ -153,6 +166,9 @@ class ExportOptionsDialog(QDialog):
             "Include metadata (model parameters, timestamps)"
         )
         self.metadata_check.setChecked(True)
+        self.metadata_check.stateChanged.connect(
+            lambda s: self._on_option_changed("include_metadata", s != 0)
+        )
         options_layout.addWidget(self.metadata_check)
 
         # Include provenance
@@ -160,11 +176,17 @@ class ExportOptionsDialog(QDialog):
             "Include provenance information (processing history)"
         )
         self.provenance_check.setChecked(False)
+        self.provenance_check.stateChanged.connect(
+            lambda s: self._on_option_changed("include_provenance", s != 0)
+        )
         options_layout.addWidget(self.provenance_check)
 
         # Compress data
         self.compress_check = QCheckBox("Compress data (for HDF5 and Excel)")
         self.compress_check.setChecked(True)
+        self.compress_check.stateChanged.connect(
+            lambda s: self._on_option_changed("compress", s != 0)
+        )
         options_layout.addWidget(self.compress_check)
 
         options_group.setLayout(options_layout)
@@ -176,8 +198,8 @@ class ExportOptionsDialog(QDialog):
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
+        button_box.accepted.connect(self._on_accepted)
+        button_box.rejected.connect(self._on_rejected)
         layout.addWidget(button_box)
 
         self.setLayout(layout)
@@ -231,6 +253,52 @@ class ExportOptionsDialog(QDialog):
         # Compression
         if "compress" in self.current_options:
             self.compress_check.setChecked(self.current_options["compress"])
+
+    def _on_data_format_changed(self, button_id: int) -> None:
+        """Handle data format radio button change."""
+        data_format_map = {0: "csv", 1: "json", 2: "excel", 3: "hdf5"}
+        data_format = data_format_map.get(button_id, "csv")
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option="data_format",
+            value=data_format,
+        )
+
+    def _on_figure_format_changed(self, button_id: int) -> None:
+        """Handle figure format radio button change."""
+        figure_format_map = {0: "png", 1: "svg", 2: "pdf"}
+        figure_format = figure_format_map.get(button_id, "png")
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option="figure_format",
+            value=figure_format,
+        )
+
+    def _on_option_changed(self, option: str, value: Any) -> None:
+        """Handle option change."""
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option=option,
+            value=value,
+        )
+
+    def _on_accepted(self) -> None:
+        """Handle dialog accepted."""
+        logger.debug("Options applied", dialog=self.__class__.__name__)
+        self.accept()
+
+    def _on_rejected(self) -> None:
+        """Handle dialog rejected."""
+        logger.debug("Dialog closed", dialog=self.__class__.__name__)
+        self.reject()
+
+    def showEvent(self, event) -> None:
+        """Handle show event."""
+        super().showEvent(event)
+        logger.debug("Dialog opened", dialog=self.__class__.__name__)
 
     def get_options(self) -> dict[str, Any]:
         """Get export options.

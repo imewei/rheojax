@@ -12,6 +12,9 @@ from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QMenu, QTreeWidget, QTreeWidgetItem, QWidget
 
 from rheojax.gui.state.store import DatasetState
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class DatasetTree(QTreeWidget):
@@ -54,6 +57,8 @@ class DatasetTree(QTreeWidget):
         """
         super().__init__(parent)
 
+        logger.debug("Initializing", class_name=self.__class__.__name__)
+
         # Configure tree
         self.setHeaderLabels(["Name", "Type", "Status"])
         self.setStyleSheet(
@@ -84,12 +89,20 @@ class DatasetTree(QTreeWidget):
         # Create root project item
         self._create_project_item()
 
+        logger.debug(
+            "Initialization complete",
+            class_name=self.__class__.__name__,
+            column_count=3,
+        )
+
     def _create_project_item(self) -> None:
         """Create the root project item."""
         self._project_item = QTreeWidgetItem(self, ["Project", "Folder", ""])
         self._project_item.setExpanded(True)
         # Set icon (placeholder - would use actual icon file)
         self._project_item.setForeground(0, QBrush(QColor(100, 100, 100)))
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
 
     def add_dataset(self, dataset_state: DatasetState) -> None:
         """Add dataset to tree.
@@ -99,6 +112,14 @@ class DatasetTree(QTreeWidget):
         dataset_state : DatasetState
             Dataset state object containing dataset information
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="add_dataset",
+            dataset_id=dataset_state.id,
+            dataset_name=dataset_state.name,
+        )
+
         if dataset_state.id in self._dataset_items:
             # Update existing item
             self.update_dataset(dataset_state)
@@ -120,6 +141,8 @@ class DatasetTree(QTreeWidget):
 
         self._dataset_items[dataset_state.id] = dataset_item
 
+        logger.debug("Rendering", widget=self.__class__.__name__)
+
     def update_dataset(self, dataset_state: DatasetState) -> None:
         """Update existing dataset in tree.
 
@@ -131,9 +154,18 @@ class DatasetTree(QTreeWidget):
         if dataset_state.id not in self._dataset_items:
             return
 
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="update_dataset",
+            dataset_id=dataset_state.id,
+        )
+
         item = self._dataset_items[dataset_state.id]
         item.setText(0, dataset_state.name)
         item.setText(1, dataset_state.test_mode)
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
 
     def remove_dataset(self, dataset_id: str) -> None:
         """Remove dataset from tree.
@@ -146,11 +178,20 @@ class DatasetTree(QTreeWidget):
         if dataset_id not in self._dataset_items:
             return
 
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="remove_dataset",
+            dataset_id=dataset_id,
+        )
+
         item = self._dataset_items[dataset_id]
         if self._project_item:
             self._project_item.removeChild(item)
 
         del self._dataset_items[dataset_id]
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
 
     def add_file(self, dataset_id: str, file_path: Path) -> None:
         """Add file as child of dataset.
@@ -165,12 +206,22 @@ class DatasetTree(QTreeWidget):
         if dataset_id not in self._dataset_items:
             return
 
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="add_file",
+            dataset_id=dataset_id,
+            file_name=file_path.name,
+        )
+
         dataset_item = self._dataset_items[dataset_id]
 
         # Create file item
         file_item = QTreeWidgetItem(dataset_item, [file_path.name, "File", ""])
         file_item.setData(0, Qt.UserRole, str(file_path))
         file_item.setForeground(0, QBrush(QColor(120, 120, 120)))
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
 
     def update_status(self, dataset_id: str, status: str) -> None:
         """Update dataset status indicator.
@@ -185,9 +236,19 @@ class DatasetTree(QTreeWidget):
         if dataset_id not in self._dataset_items:
             return
 
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="update_status",
+            dataset_id=dataset_id,
+            status=status,
+        )
+
         item = self._dataset_items[dataset_id]
         item.setText(2, status)
         self._set_status_color(item, status)
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
 
     def _set_status_color(self, item: QTreeWidgetItem, status: str) -> None:
         """Set status column color based on status.
@@ -259,6 +320,14 @@ class DatasetTree(QTreeWidget):
         dataset_id = self.get_selected_dataset_id()
         file_path = self.get_selected_file_path()
 
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="selection_changed",
+            dataset_id=dataset_id,
+            file_selected=file_path is not None,
+        )
+
         if file_path:
             # File selected
             self.file_selected.emit(dataset_id or "", file_path)
@@ -278,12 +347,21 @@ class DatasetTree(QTreeWidget):
         if not item:
             return
 
-        menu = QMenu(self)
-
         # Determine item type
         is_project = item == self._project_item
         is_dataset = item.parent() == self._project_item
         is_file = item.parent() and item.parent() != self._project_item
+
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="context_menu",
+            is_project=is_project,
+            is_dataset=is_dataset,
+            is_file=is_file,
+        )
+
+        menu = QMenu(self)
 
         if is_project:
             menu.addAction("Add Dataset...")
@@ -308,4 +386,10 @@ class DatasetTree(QTreeWidget):
         # Show menu and emit signal
         action = menu.exec(self.viewport().mapToGlobal(position))
         if action:
+            logger.debug(
+                "User interaction",
+                widget=self.__class__.__name__,
+                action="context_menu_action",
+                menu_action=action.text(),
+            )
             self.context_menu_requested.emit(position)

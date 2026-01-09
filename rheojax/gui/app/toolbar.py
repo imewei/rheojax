@@ -8,6 +8,10 @@ Main toolbar and related utilities.
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QToolBar, QWidget
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class MainToolBar(QToolBar):
     """Main application toolbar with common actions.
@@ -33,6 +37,7 @@ class MainToolBar(QToolBar):
             Parent widget
         """
         super().__init__("Main Toolbar", parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self.setObjectName("MainToolBar")
         self.setMovable(False)
@@ -40,14 +45,23 @@ class MainToolBar(QToolBar):
         # File operations
         self.open_action = QAction("Open", self)
         self.open_action.setToolTip("Open file (Ctrl+O)")
+        self.open_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="open")
+        )
         self.addAction(self.open_action)
 
         self.save_action = QAction("Save", self)
         self.save_action.setToolTip("Save file (Ctrl+S)")
+        self.save_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="save")
+        )
         self.addAction(self.save_action)
 
         self.import_action = QAction("Import", self)
         self.import_action.setToolTip("Import data (Ctrl+I)")
+        self.import_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="import")
+        )
         self.addAction(self.import_action)
 
         self.addSeparator()
@@ -55,15 +69,24 @@ class MainToolBar(QToolBar):
         # Fitting operations
         self.fit_action = QAction("Fit", self)
         self.fit_action.setToolTip("Fit model (Ctrl+F)")
+        self.fit_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="fit")
+        )
         self.addAction(self.fit_action)
 
         self.bayesian_action = QAction("Bayesian", self)
         self.bayesian_action.setToolTip("Bayesian inference (Ctrl+B)")
+        self.bayesian_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="bayesian")
+        )
         self.addAction(self.bayesian_action)
 
         self.stop_action = QAction("Stop", self)
         self.stop_action.setToolTip("Stop current operation")
         self.stop_action.setEnabled(False)
+        self.stop_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="stop")
+        )
         self.addAction(self.stop_action)
 
         self.addSeparator()
@@ -71,14 +94,23 @@ class MainToolBar(QToolBar):
         # View controls
         self.zoom_in_action = QAction("Zoom In", self)
         self.zoom_in_action.setToolTip("Zoom in (Ctrl++)")
+        self.zoom_in_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="zoom_in")
+        )
         self.addAction(self.zoom_in_action)
 
         self.zoom_out_action = QAction("Zoom Out", self)
         self.zoom_out_action.setToolTip("Zoom out (Ctrl+-)")
+        self.zoom_out_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="zoom_out")
+        )
         self.addAction(self.zoom_out_action)
 
         self.reset_zoom_action = QAction("Reset", self)
         self.reset_zoom_action.setToolTip("Reset zoom (Ctrl+0)")
+        self.reset_zoom_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="reset_zoom")
+        )
         self.addAction(self.reset_zoom_action)
 
         self.addSeparator()
@@ -86,4 +118,7 @@ class MainToolBar(QToolBar):
         # Settings
         self.settings_action = QAction("Settings", self)
         self.settings_action.setToolTip("Settings")
+        self.settings_action.triggered.connect(
+            lambda: logger.debug("Toolbar button clicked", button_id="settings")
+        )
         self.addAction(self.settings_action)

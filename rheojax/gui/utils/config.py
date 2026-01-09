@@ -8,6 +8,10 @@ Application configuration and persistence.
 from pathlib import Path
 from typing import Any
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class Config:
     """Application configuration manager.
@@ -33,6 +37,10 @@ class Config:
         config_path : Path, optional
             Path to config file
         """
+        logger.debug(
+            "Initializing Config manager",
+            config_path=str(config_path) if config_path else None,
+        )
         ...
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -50,6 +58,7 @@ class Config:
         Any
             Configuration value
         """
+        logger.debug("Getting config value", key=key, has_default=default is not None)
         ...
 
     def set(self, key: str, value: Any) -> None:
@@ -62,16 +71,20 @@ class Config:
         value : Any
             Configuration value
         """
+        logger.debug("Setting config value", key=key, value_type=type(value).__name__)
         ...
 
     def save(self) -> None:
         """Save configuration to file."""
+        logger.debug("Saving configuration to file")
         ...
 
     def load(self) -> None:
         """Load configuration from file."""
+        logger.debug("Loading configuration from file")
         ...
 
     def reset(self) -> None:
         """Reset to default configuration."""
+        logger.debug("Resetting configuration to defaults")
         ...

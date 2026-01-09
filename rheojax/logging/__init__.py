@@ -39,6 +39,7 @@ from rheojax.logging.config import (
 from rheojax.logging.context import (
     log_bayesian,
     log_fit,
+    log_gui_action,
     log_io,
     log_operation,
     log_pipeline_stage,
@@ -88,6 +89,12 @@ from rheojax.logging.metrics import (
     log_memory,
     timed,
 )
+from rheojax.logging.templates import (
+    F,
+    Fields,
+    MSG,
+    MessageTemplates,
+)
 
 __all__ = [
     # Configuration
@@ -108,6 +115,7 @@ __all__ = [
     "log_transform",
     "log_io",
     "log_pipeline_stage",
+    "log_gui_action",
     # Formatters
     "StandardFormatter",
     "DetailedFormatter",
@@ -142,4 +150,9 @@ __all__ = [
     "CallbackExporter",
     "ExportingHandler",
     "create_otel_handler",
+    # Message Templates
+    "MSG",
+    "MessageTemplates",
+    "F",
+    "Fields",
 ]

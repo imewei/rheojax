@@ -34,10 +34,13 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 # Float64 precision is critical for accurate numerical integration
 jax, jnp = safe_import_jax()
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from jax import Array

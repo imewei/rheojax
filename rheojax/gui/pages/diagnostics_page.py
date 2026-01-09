@@ -5,7 +5,6 @@ Diagnostics Page
 MCMC diagnostics and posterior analysis with ArviZ integration.
 """
 
-import logging
 from typing import Any
 
 import numpy as np
@@ -29,8 +28,9 @@ from PySide6.QtWidgets import (
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, StateStore
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DiagnosticsPage(QWidget):
@@ -42,6 +42,7 @@ class DiagnosticsPage(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self._store = StateStore()
         self._bayesian_service = BayesianService()
         self._current_model_id: str | None = None
@@ -179,6 +180,9 @@ class DiagnosticsPage(QWidget):
     def _on_tab_changed(self, index: int) -> None:
         """Handle plot tab change - refresh the plot for current model."""
         plot_type = self._plot_tabs.tabText(index)
+        logger.debug(
+            "Diagnostic selected", diagnostic=plot_type, page="DiagnosticsPage"
+        )
         if self._current_model_id:
             self._update_plot(plot_type.lower())
             self.plot_requested.emit(plot_type, self._current_model_id)
@@ -201,10 +205,24 @@ class DiagnosticsPage(QWidget):
         if filepath:
             try:
                 canvas.export_figure(filepath)
+                logger.info(
+                    "Plot exported successfully",
+                    plot_type=plot_type,
+                    filepath=filepath,
+                    page="DiagnosticsPage",
+                )
                 QMessageBox.information(
                     self, "Export Successful", f"Plot saved to {filepath}"
                 )
             except Exception as e:
+                logger.error(
+                    "Failed to export plot",
+                    plot_type=plot_type,
+                    filepath=filepath,
+                    error=str(e),
+                    page="DiagnosticsPage",
+                    exc_info=True,
+                )
                 QMessageBox.warning(
                     self, "Export Failed", f"Failed to export plot: {e}"
                 )
@@ -330,6 +348,12 @@ class DiagnosticsPage(QWidget):
                     bayesian_result = candidates[0]
 
         if bayesian_result is None:
+            logger.debug(
+                "No Bayesian results found",
+                model_name=model_name,
+                dataset_id=resolved_dataset_id,
+                page="DiagnosticsPage",
+            )
             QMessageBox.information(
                 self,
                 "No Bayesian Results",
@@ -347,6 +371,14 @@ class DiagnosticsPage(QWidget):
         # Update current plot
         current_plot = self._plot_tabs.tabText(self._plot_tabs.currentIndex())
         self._update_plot(current_plot.lower())
+
+        logger.info(
+            "Diagnostics displayed",
+            model_name=model_name,
+            dataset_id=resolved_dataset_id,
+            plot_type=current_plot,
+            page="DiagnosticsPage",
+        )
 
         self.plot_requested.emit(current_plot, model_name)
 
@@ -399,7 +431,14 @@ class DiagnosticsPage(QWidget):
 
             return az.from_dict(idata_dict)
 
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "Failed to convert BayesianResult to InferenceData",
+                model_name=result.model_name,
+                error=str(e),
+                page="DiagnosticsPage",
+                exc_info=True,
+            )
             return None
 
     def _update_metrics_table(self, result: BayesianResult) -> None:
@@ -484,24 +523,29 @@ class DiagnosticsPage(QWidget):
             Plot type (trace, forest, pair, etc.)
         """
         if self._current_inference_data is None:
-            logger.debug("plot_update skipped: no inference data")
+            logger.debug(
+                "Plot update skipped: no inference data",
+                plot_type=plot_type,
+                page="DiagnosticsPage",
+            )
             return
 
         canvas_attr = f"_{plot_type}_canvas"
         canvas = getattr(self, canvas_attr, None)
 
         if canvas is None:
-            logger.debug(f"plot_update skipped: no canvas for {plot_type}")
+            logger.debug(
+                "Plot update skipped: no canvas",
+                plot_type=plot_type,
+                page="DiagnosticsPage",
+            )
             return
 
         logger.debug(
-            "plot_update",
-            extra={
-                "page": "diagnostics",
-                "plot_type": plot_type,
-                "model_id": self._current_model_id,
-                "has_inference_data": self._current_inference_data is not None,
-            },
+            "Visualization triggered",
+            diagnostic=plot_type,
+            page="DiagnosticsPage",
+            model_id=self._current_model_id,
         )
 
         # Set inference data on canvas and let it render
@@ -516,6 +560,9 @@ class DiagnosticsPage(QWidget):
         model_id : str
             Model name/ID
         """
+        logger.debug(
+            "Diagnostic selected", diagnostic="trace", page="DiagnosticsPage"
+        )
         self._current_model_id = model_id
         self._plot_tabs.setCurrentIndex(0)  # Trace tab
         self.show_diagnostics(model_id)
@@ -530,6 +577,9 @@ class DiagnosticsPage(QWidget):
         show_divergences : bool
             Whether to show divergences on plot
         """
+        logger.debug(
+            "Diagnostic selected", diagnostic="pair", page="DiagnosticsPage"
+        )
         self._current_model_id = model_id
         self._plot_tabs.setCurrentIndex(2)  # Pair tab
         self.show_diagnostics(model_id)
@@ -544,6 +594,9 @@ class DiagnosticsPage(QWidget):
         hdi_prob : float
             HDI probability for credible intervals
         """
+        logger.debug(
+            "Diagnostic selected", diagnostic="forest", page="DiagnosticsPage"
+        )
         self._current_model_id = model_id
         self._plot_tabs.setCurrentIndex(1)  # Forest tab
 

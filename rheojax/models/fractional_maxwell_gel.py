@@ -39,7 +39,11 @@ import numpy as np
 from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
+from rheojax.logging import get_logger, log_fit
 from rheojax.utils.mittag_leffler import mittag_leffler_e2
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("fractional_maxwell_gel")
@@ -283,67 +287,125 @@ class FractionalMaxwellGel(BaseModel):
             y_data = jnp.array(y)
             test_mode = kwargs.get("test_mode", "relaxation")
 
-        # Smart initialization for oscillation mode (Issue #9)
-        if test_mode == "oscillation":
+        with log_fit(logger, model="FractionalMaxwellGel", data_shape=X.shape) as ctx:
             try:
-                import numpy as np
-
-                from rheojax.utils.initialization import (
-                    initialize_fractional_maxwell_gel,
+                logger.info(
+                    "Starting Fractional Maxwell Gel model fit",
+                    test_mode=test_mode,
+                    n_points=len(X),
                 )
 
-                success = initialize_fractional_maxwell_gel(
-                    np.array(X), np.array(y), self.parameters
+                logger.debug(
+                    "Input data statistics",
+                    x_range=(float(np.min(np.abs(X))), float(np.max(np.abs(X)))),
+                    y_range=(float(np.min(np.abs(y))), float(np.max(np.abs(y)))),
                 )
-                if success:
-                    import logging
 
-                    logging.debug(
-                        "Smart initialization applied from frequency-domain features"
+                ctx["test_mode"] = test_mode
+
+                # Smart initialization for oscillation mode (Issue #9)
+                if test_mode == "oscillation":
+                    try:
+                        from rheojax.utils.initialization import (
+                            initialize_fractional_maxwell_gel,
+                        )
+
+                        success = initialize_fractional_maxwell_gel(
+                            np.array(X), np.array(y), self.parameters
+                        )
+                        if success:
+                            logger.debug(
+                                "Smart initialization applied from frequency-domain features",
+                                c_alpha=self.parameters.get_value("c_alpha"),
+                                alpha=self.parameters.get_value("alpha"),
+                                eta=self.parameters.get_value("eta"),
+                            )
+                    except Exception as e:
+                        # Silent fallback to defaults - don't break if initialization fails
+                        logger.debug(
+                            "Smart initialization failed, using defaults",
+                            error=str(e),
+                        )
+
+                # Create objective function with stateless predictions
+                def model_fn(x, params):
+                    """Model function for optimization (stateless)."""
+                    c_alpha, alpha, eta = params[0], params[1], params[2]
+
+                    # Direct prediction based on test mode (stateless, calls _jax methods)
+                    if test_mode == "relaxation":
+                        return self._predict_relaxation_jax(x, c_alpha, alpha, eta)
+                    elif test_mode == "creep":
+                        return self._predict_creep_jax(x, c_alpha, alpha, eta)
+                    elif test_mode == "oscillation":
+                        return self._predict_oscillation_jax(x, c_alpha, alpha, eta)
+                    else:
+                        raise ValueError(f"Unsupported test mode: {test_mode}")
+
+                objective = create_least_squares_objective(
+                    model_fn, x_data, y_data, normalize=True
+                )
+
+                logger.debug(
+                    "Running NLSQ optimization",
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+
+                # Optimize using NLSQ (JAX enabled by default)
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+
+                # Validate optimization succeeded
+                if not result.success:
+                    logger.error(
+                        "Optimization failed",
+                        message=result.message,
+                        n_iterations=getattr(result, "nfev", None),
                     )
+                    raise RuntimeError(
+                        f"Optimization failed: {result.message}. "
+                        f"Try adjusting initial values, bounds, or max_iter."
+                    )
+
+                # Log final parameters
+                c_alpha_val = self.parameters.get_value("c_alpha")
+                alpha_val = self.parameters.get_value("alpha")
+                eta_val = self.parameters.get_value("eta")
+                tau_val = self._compute_tau(c_alpha_val, alpha_val)
+
+                ctx["c_alpha"] = c_alpha_val
+                ctx["alpha"] = alpha_val
+                ctx["eta"] = eta_val
+                ctx["tau"] = tau_val
+                ctx["cost"] = float(result.fun) if hasattr(result, "fun") else None
+
+                logger.info(
+                    "Fractional Maxwell Gel model fit completed",
+                    c_alpha=c_alpha_val,
+                    alpha=alpha_val,
+                    eta=eta_val,
+                    tau=tau_val,
+                    cost=ctx["cost"],
+                )
+
+                self.fitted_ = True
+                return self
+
             except Exception as e:
-                # Silent fallback to defaults - don't break if initialization fails
-                import logging
-
-                logging.debug(f"Smart initialization failed, using defaults: {e}")
-
-        # Create objective function with stateless predictions
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            c_alpha, alpha, eta = params[0], params[1], params[2]
-
-            # Direct prediction based on test mode (stateless, calls _jax methods)
-            if test_mode == "relaxation":
-                return self._predict_relaxation_jax(x, c_alpha, alpha, eta)
-            elif test_mode == "creep":
-                return self._predict_creep_jax(x, c_alpha, alpha, eta)
-            elif test_mode == "oscillation":
-                return self._predict_oscillation_jax(x, c_alpha, alpha, eta)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
-
-        objective = create_least_squares_objective(
-            model_fn, x_data, y_data, normalize=True
-        )
-
-        # Optimize using NLSQ (JAX enabled by default)
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
-            )
-
-        self.fitted_ = True
-        return self
+                logger.error(
+                    "Fractional Maxwell Gel model fit failed",
+                    test_mode=test_mode,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Internal predict implementation.

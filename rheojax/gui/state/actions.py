@@ -20,6 +20,9 @@ from rheojax.gui.state.store import (
     StepStatus,
     TransformRecord,
 )
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Dataset Actions
 
@@ -414,7 +417,13 @@ def set_active_model(model_name: str) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "SET_ACTIVE_MODEL", "model_name": model_name}
+    action = {"type": "SET_ACTIVE_MODEL", "model_name": model_name}
+    logger.debug(
+        "Action created",
+        action_type="SET_ACTIVE_MODEL",
+        payload_keys=["model_name"],
+    )
+    return action
 
 
 def start_fitting(model_name: str, dataset_id: str) -> dict:
@@ -432,7 +441,13 @@ def start_fitting(model_name: str, dataset_id: str) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "START_FITTING", "model_name": model_name, "dataset_id": dataset_id}
+    action = {"type": "START_FITTING", "model_name": model_name, "dataset_id": dataset_id}
+    logger.debug(
+        "Action created",
+        action_type="START_FITTING",
+        payload_keys=["model_name", "dataset_id"],
+    )
+    return action
 
 
 def update_fit_progress(progress: float) -> dict:
@@ -448,7 +463,13 @@ def update_fit_progress(progress: float) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "FIT_PROGRESS", "progress": progress}
+    action = {"type": "FIT_PROGRESS", "progress": progress}
+    logger.debug(
+        "Action created",
+        action_type="FIT_PROGRESS",
+        payload_keys=["progress"],
+    )
+    return action
 
 
 def fitting_completed(result: FitResult) -> dict:
@@ -464,7 +485,13 @@ def fitting_completed(result: FitResult) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "FITTING_COMPLETED", "result": result}
+    action = {"type": "FITTING_COMPLETED", "result": result}
+    logger.debug(
+        "Action created",
+        action_type="FITTING_COMPLETED",
+        payload_keys=["result"],
+    )
+    return action
 
 
 def fitting_failed(error: str) -> dict:
@@ -480,7 +507,13 @@ def fitting_failed(error: str) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "FITTING_FAILED", "error": error}
+    action = {"type": "FITTING_FAILED", "error": error}
+    logger.debug(
+        "Action created",
+        action_type="FITTING_FAILED",
+        payload_keys=["error"],
+    )
+    return action
 
 
 # Bayesian Actions
@@ -501,11 +534,17 @@ def start_bayesian(model_name: str, dataset_id: str) -> dict:
     dict
         Action dict for dispatch
     """
-    return {
+    action = {
         "type": "START_BAYESIAN",
         "model_name": model_name,
         "dataset_id": dataset_id,
     }
+    logger.debug(
+        "Action created",
+        action_type="START_BAYESIAN",
+        payload_keys=["model_name", "dataset_id"],
+    )
+    return action
 
 
 def store_bayesian_result(result: BayesianResult) -> None:
@@ -563,7 +602,13 @@ def update_bayesian_progress(progress: float) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "BAYESIAN_PROGRESS", "progress": progress}
+    action = {"type": "BAYESIAN_PROGRESS", "progress": progress}
+    logger.debug(
+        "Action created",
+        action_type="BAYESIAN_PROGRESS",
+        payload_keys=["progress"],
+    )
+    return action
 
 
 def bayesian_completed(result: BayesianResult) -> dict:
@@ -579,7 +624,13 @@ def bayesian_completed(result: BayesianResult) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "BAYESIAN_COMPLETED", "result": result}
+    action = {"type": "BAYESIAN_COMPLETED", "result": result}
+    logger.debug(
+        "Action created",
+        action_type="BAYESIAN_COMPLETED",
+        payload_keys=["result"],
+    )
+    return action
 
 
 def bayesian_failed(error: str) -> dict:
@@ -595,7 +646,13 @@ def bayesian_failed(error: str) -> dict:
     dict
         Action dict for dispatch
     """
-    return {"type": "BAYESIAN_FAILED", "error": error}
+    action = {"type": "BAYESIAN_FAILED", "error": error}
+    logger.debug(
+        "Action created",
+        action_type="BAYESIAN_FAILED",
+        payload_keys=["error"],
+    )
+    return action
 
 
 # Pipeline Actions

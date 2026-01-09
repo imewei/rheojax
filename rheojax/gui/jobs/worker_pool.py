@@ -5,7 +5,7 @@ Worker Pool
 Thread pool for executing background jobs with progress tracking using PySide6.
 """
 
-import logging
+import time
 import uuid
 from collections.abc import Callable
 from threading import Lock
@@ -79,8 +79,9 @@ except ImportError:
 
 
 from rheojax.gui.jobs.cancellation import CancellationToken
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class WorkerPool(QObject):
@@ -151,10 +152,12 @@ class WorkerPool(QObject):
     @classmethod
     def reset(cls) -> None:
         """Reset the singleton instance (useful for testing)."""
+        logger.debug("Resetting worker pool singleton")
         if cls._instance is not None:
             cls._instance.shutdown(wait=False)
         cls._instance = None
         cls._initialized = False
+        logger.debug("Worker pool singleton reset complete")
 
     def __init__(self, max_threads: int = 4):
         """Initialize worker pool.
@@ -169,6 +172,7 @@ class WorkerPool(QObject):
             return
 
         if not HAS_PYSIDE6:
+            logger.error("PySide6 not available, cannot initialize WorkerPool")
             raise ImportError(
                 "PySide6 is required for WorkerPool. "
                 "Install with: pip install PySide6"
@@ -179,10 +183,11 @@ class WorkerPool(QObject):
         self._pool.setMaxThreadCount(max_threads)
         self._active_jobs: dict[str, CancellationToken] = {}
         self._job_signals: dict[str, QObject] = {}
+        self._job_start_times: dict[str, float] = {}
         self._job_lock = Lock()
 
         WorkerPool._initialized = True
-        logger.info(f"WorkerPool initialized with {max_threads} threads")
+        logger.info("Worker pool initialized", max_workers=max_threads)
 
     def submit(
         self, worker: QRunnable, on_job_registered: Callable[[str], None] | None = None
@@ -210,18 +215,34 @@ class WorkerPool(QObject):
 
         # Get cancellation token from worker
         if not hasattr(worker, "cancel_token"):
-            logger.warning(f"Worker {worker} has no cancel_token attribute")
+            logger.warning(
+                "Worker missing cancel_token attribute, creating default",
+                job_id=job_id,
+                worker_type=type(worker).__name__,
+            )
             worker.cancel_token = CancellationToken()  # type: ignore[attr-defined]
 
         # Register job
         with self._job_lock:
             self._active_jobs[job_id] = worker.cancel_token  # type: ignore[attr-defined]
+            self._job_start_times[job_id] = time.monotonic()
+            active_count = len(self._active_jobs)
+
+        logger.debug(
+            "Worker utilization",
+            active_jobs=active_count,
+            max_threads=self._pool.maxThreadCount(),
+        )
 
         if on_job_registered is not None:
             try:
                 on_job_registered(job_id)
             except Exception as exc:
-                logger.warning(f"on_job_registered hook failed: {exc}")
+                logger.warning(
+                    "on_job_registered hook failed",
+                    job_id=job_id,
+                    error=str(exc),
+                )
 
         # Connect worker signals to pool signals.
         #
@@ -265,7 +286,7 @@ class WorkerPool(QObject):
         # Submit to thread pool
         self._pool.start(worker)
         self.job_started.emit(job_id)
-        logger.debug(f"Job {job_id} submitted to pool")
+        logger.debug("Job submitted", job_id=job_id)
 
         return job_id
 
@@ -291,10 +312,10 @@ class WorkerPool(QObject):
             if job_id in self._active_jobs:
                 token = self._active_jobs[job_id]
                 token.cancel()
-                logger.info(f"Cancellation requested for job {job_id}")
+                logger.info("Cancellation requested for job", job_id=job_id)
                 return True
 
-        logger.warning(f"Job {job_id} not found for cancellation")
+        logger.warning("Job not found for cancellation", job_id=job_id)
         return False
 
     def cancel_all(self) -> None:
@@ -308,7 +329,7 @@ class WorkerPool(QObject):
         for job_id in job_ids:
             self.cancel(job_id)
 
-        logger.info(f"Cancellation requested for {len(job_ids)} jobs")
+        logger.info("Cancellation requested for all jobs", job_count=len(job_ids))
 
     def is_busy(self) -> bool:
         """Check if any jobs are running.
@@ -347,7 +368,15 @@ class WorkerPool(QObject):
         or the timeout expires. Active jobs will be cancelled
         before waiting.
         """
-        logger.info("Shutting down worker pool")
+        with self._job_lock:
+            active_count = len(self._active_jobs)
+
+        logger.info(
+            "Shutting down worker pool",
+            active_jobs=active_count,
+            wait=wait,
+            timeout_ms=timeout_ms,
+        )
 
         # Cancel all active jobs
         self.cancel_all()
@@ -356,35 +385,56 @@ class WorkerPool(QObject):
         if wait:
             success = self._pool.waitForDone(timeout_ms)
             if not success:
-                logger.warning(f"Worker pool shutdown timed out after {timeout_ms}ms")
+                logger.warning(
+                    "Worker pool shutdown timed out",
+                    timeout_ms=timeout_ms,
+                )
 
         # Clear active jobs
         with self._job_lock:
             self._active_jobs.clear()
             self._job_signals.clear()
+            self._job_start_times.clear()
 
         logger.info("Worker pool shut down")
+
+    def _get_job_elapsed(self, job_id: str) -> float | None:
+        """Get elapsed time for a job in seconds."""
+        with self._job_lock:
+            start_time = self._job_start_times.get(job_id)
+        if start_time is not None:
+            return time.monotonic() - start_time
+        return None
 
     @Slot(str, object)
     def _on_job_completed(self, job_id: str, result: Any) -> None:
         """Handle job completion."""
+        elapsed = self._get_job_elapsed(job_id)
         self._cleanup_job(job_id)
         self.job_completed.emit(job_id, result)
-        logger.debug(f"Job {job_id} completed")
+        logger.debug("Job complete", job_id=job_id, elapsed=elapsed)
 
     @Slot(str, str)
     def _on_job_failed(self, job_id: str, error_message: str) -> None:
         """Handle job failure."""
+        elapsed = self._get_job_elapsed(job_id)
         self._cleanup_job(job_id)
         self.job_failed.emit(job_id, error_message)
-        logger.error(f"Job {job_id} failed: {error_message}")
+        logger.error(
+            "Job failed",
+            job_id=job_id,
+            error=error_message,
+            elapsed=elapsed,
+            exc_info=True,
+        )
 
     @Slot(str)
     def _on_job_cancelled(self, job_id: str) -> None:
         """Handle job cancellation."""
+        elapsed = self._get_job_elapsed(job_id)
         self._cleanup_job(job_id)
         self.job_cancelled.emit(job_id)
-        logger.info(f"Job {job_id} cancelled")
+        logger.info("Job cancelled", job_id=job_id, elapsed=elapsed)
 
     @Slot(str, int, int, str)
     def _on_job_progress(
@@ -399,6 +449,14 @@ class WorkerPool(QObject):
             if job_id in self._active_jobs:
                 del self._active_jobs[job_id]
             self._job_signals.pop(job_id, None)
+            self._job_start_times.pop(job_id, None)
+            remaining_jobs = len(self._active_jobs)
+
+        logger.debug(
+            "Job cleaned up",
+            job_id=job_id,
+            remaining_jobs=remaining_jobs,
+        )
 
     def _job_id_from_sender(self) -> str | None:
         """Best-effort reverse lookup for job_id based on Qt sender()."""

@@ -15,6 +15,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
@@ -120,10 +124,14 @@ def extract_unit_from_header(header: str) -> tuple[str, str | None]:
         >>> extract_unit_from_header("  time (s)  ")
         ('time', 's')
     """
+    logger.debug("Extracting unit from header", header=header)
     header = header.strip()
     match = _UNIT_PATTERN.match(header)
     if match:
-        return match.group(1).strip(), match.group(2).strip()
+        name, unit = match.group(1).strip(), match.group(2).strip()
+        logger.debug("Unit extracted successfully", name=name, unit=unit)
+        return name, unit
+    logger.debug("No unit found in header", name=header)
     return header, None
 
 
@@ -154,37 +162,75 @@ def detect_domain(
     Returns:
         'time' or 'frequency'
     """
+    logger.debug(
+        "Detecting domain from column info",
+        x_header=x_header,
+        x_units=x_units,
+        y_headers=y_headers,
+    )
+
     # Check units first (most reliable)
     if x_units:
         x_units_lower = x_units.lower()
         for freq_unit in _FREQUENCY_UNITS:
             if freq_unit in x_units_lower:
+                logger.debug(
+                    "Domain detected from frequency unit",
+                    domain="frequency",
+                    matched_unit=freq_unit,
+                )
                 return "frequency"
         for time_unit in _TIME_UNITS:
             # Check for exact match or unit at boundary to avoid false positives
             # e.g., "1/s" should not match time domain
             if x_units_lower == time_unit or x_units_lower.endswith(f" {time_unit}"):
+                logger.debug(
+                    "Domain detected from time unit",
+                    domain="time",
+                    matched_unit=time_unit,
+                )
                 return "time"
             # Handle standalone 's' or 'min'
             if time_unit in {"s", "sec", "min", "ms"} and x_units_lower in {time_unit}:
+                logger.debug(
+                    "Domain detected from time unit",
+                    domain="time",
+                    matched_unit=time_unit,
+                )
                 return "time"
 
     # Check column name patterns
     x_header_lower = x_header.lower()
     for freq_keyword in _FREQUENCY_KEYWORDS:
         if freq_keyword in x_header_lower:
+            logger.debug(
+                "Domain detected from header keyword",
+                domain="frequency",
+                matched_keyword=freq_keyword,
+            )
             return "frequency"
     for time_keyword in _TIME_KEYWORDS:
         if time_keyword in x_header_lower:
+            logger.debug(
+                "Domain detected from header keyword",
+                domain="time",
+                matched_keyword=time_keyword,
+            )
             return "time"
 
     # Check y_headers for oscillation indicators (G', G'')
     if y_headers:
         for yh in y_headers:
             if _MODULUS_PATTERN.search(yh):
+                logger.debug(
+                    "Domain detected from y_header modulus pattern",
+                    domain="frequency",
+                    matched_header=yh,
+                )
                 return "frequency"
 
     # Default to time domain
+    logger.debug("Domain defaulting to time (no pattern matched)", domain="time")
     return "time"
 
 
@@ -216,6 +262,14 @@ def detect_test_mode_from_columns(
     Returns:
         Test mode string or None if cannot determine
     """
+    logger.debug(
+        "Detecting test mode from columns",
+        x_header=x_header,
+        y_headers=y_headers,
+        x_units=x_units,
+        y_units=y_units,
+    )
+
     # Combine all headers for pattern matching
     all_headers = [x_header] + y_headers
     all_text = " ".join(all_headers).lower()
@@ -224,18 +278,35 @@ def detect_test_mode_from_columns(
     for mode, patterns in _TEST_MODE_PATTERNS.items():
         for pattern in patterns:
             if pattern.search(all_text):
+                logger.debug(
+                    "Test mode detected from pattern",
+                    test_mode=mode,
+                    matched_pattern=pattern.pattern,
+                )
                 return mode
 
     # Additional unit-based detection
     if x_units:
         x_units_lower = x_units.lower()
         if "rad/s" in x_units_lower or "hz" in x_units_lower:
+            logger.debug(
+                "Test mode detected from x_units",
+                test_mode="oscillation",
+                x_units=x_units,
+            )
             return "oscillation"
         if "1/s" in x_units_lower and y_units:
             y_units_lower = y_units.lower()
             if "pa" in y_units_lower and ("s" in y_units_lower or "*" in y_units_lower):
+                logger.debug(
+                    "Test mode detected from unit combination",
+                    test_mode="rotation",
+                    x_units=x_units,
+                    y_units=y_units,
+                )
                 return "rotation"  # viscosity units like Pa*s or Pa·s
 
+    logger.debug("Test mode could not be determined from columns")
     return None
 
 
@@ -267,6 +338,14 @@ def validate_transform(
     Returns:
         List of warning messages (empty if all valid)
     """
+    logger.debug(
+        "Validating transform requirements",
+        intended_transform=intended_transform,
+        domain=domain,
+        test_mode=test_mode,
+        metadata_keys=list(metadata.keys()),
+    )
+
     warnings_list: list[str] = []
 
     # Validate transform type
@@ -275,6 +354,11 @@ def validate_transform(
         warnings_list.append(
             f"Unknown intended_transform '{intended_transform}'. "
             f"Valid options: {sorted(VALID_TRANSFORMS)}"
+        )
+        logger.debug(
+            "Transform validation failed: unknown transform",
+            intended_transform=intended_transform,
+            valid_transforms=sorted(VALID_TRANSFORMS),
         )
         return warnings_list
 
@@ -287,6 +371,11 @@ def validate_transform(
         warnings_list.append(
             f"intended_transform '{transform_lower}' requires {missing_fields} in metadata"
         )
+        logger.debug(
+            "Transform validation: missing required fields",
+            transform=transform_lower,
+            missing_fields=missing_fields,
+        )
 
     # Check domain compatibility
     required_domain = requirements["domain"]
@@ -294,6 +383,12 @@ def validate_transform(
         warnings_list.append(
             f"intended_transform '{transform_lower}' expects domain='{required_domain}', "
             f"got '{domain}'"
+        )
+        logger.debug(
+            "Transform validation: domain mismatch",
+            transform=transform_lower,
+            expected_domain=required_domain,
+            actual_domain=domain,
         )
 
     # Check test_mode/transform consistency
@@ -314,6 +409,18 @@ def validate_transform(
                 f"test_mode '{test_mode}' may conflict with intended_transform "
                 f"'{transform_lower}' (typically used with '{expected_mode}')"
             )
+            logger.debug(
+                "Transform validation: test_mode conflict",
+                transform=transform_lower,
+                expected_mode=expected_mode,
+                actual_mode=test_mode,
+            )
+
+    if not warnings_list:
+        logger.debug(
+            "Transform validation passed",
+            transform=transform_lower,
+        )
 
     return warnings_list
 
@@ -339,13 +446,30 @@ def construct_complex_modulus(
     Raises:
         ValueError: If arrays have different lengths
     """
+    logger.debug(
+        "Constructing complex modulus",
+        g_prime_shape=getattr(g_prime, "shape", None),
+        g_double_prime_shape=getattr(g_double_prime, "shape", None),
+    )
+
     g_prime = np.asarray(g_prime, dtype=np.float64)
     g_double_prime = np.asarray(g_double_prime, dtype=np.float64)
 
     if g_prime.shape != g_double_prime.shape:
+        logger.error(
+            "Shape mismatch when constructing complex modulus",
+            g_prime_shape=g_prime.shape,
+            g_double_prime_shape=g_double_prime.shape,
+            exc_info=True,
+        )
         raise ValueError(
             f"G' and G'' arrays must have the same shape. "
             f"Got G'.shape={g_prime.shape}, G''.shape={g_double_prime.shape}"
         )
 
+    logger.debug(
+        "Complex modulus constructed successfully",
+        result_shape=g_prime.shape,
+        result_dtype="complex128",
+    )
     return g_prime + 1j * g_double_prime

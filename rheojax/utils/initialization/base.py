@@ -25,7 +25,10 @@ from abc import ABC, abstractmethod
 import numpy as np
 from scipy.signal import savgol_filter
 
+from rheojax.logging import get_logger
 from rheojax.utils.initialization.constants import FEATURE_CONFIG, PARAM_BOUNDS
+
+logger = get_logger(__name__)
 
 
 def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
@@ -61,10 +64,21 @@ def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
     Uses Savitzky-Golay filtering to reduce noise before feature extraction.
     Requires at least 1.5 decades of frequency range for reliable results.
     """
+    logger.debug(
+        "Extracting frequency features",
+        omega_len=len(omega),
+        G_star_len=len(G_star),
+    )
+
     # Handle empty arrays defensively
     if len(omega) == 0 or len(G_star) == 0:
         from rheojax.utils.initialization.constants import DEFAULT_PARAMS
 
+        logger.debug(
+            "Empty array detected, returning defaults",
+            omega_len=len(omega),
+            G_star_len=len(G_star),
+        )
         return {
             "low_plateau": DEFAULT_PARAMS.modulus,
             "high_plateau": DEFAULT_PARAMS.modulus,
@@ -125,13 +139,26 @@ def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
         and plateau_ratio > FEATURE_CONFIG.min_plateau_ratio
     )
 
-    return {
+    features = {
         "low_plateau": float(low_plateau),
         "high_plateau": float(high_plateau),
         "omega_mid": float(omega_mid),
         "alpha_estimate": float(alpha_estimate),
         "valid": bool(valid),
     }
+
+    logger.debug(
+        "Feature extraction complete",
+        low_plateau=features["low_plateau"],
+        high_plateau=features["high_plateau"],
+        omega_mid=features["omega_mid"],
+        alpha_estimate=features["alpha_estimate"],
+        valid=features["valid"],
+        freq_range_decades=float(freq_range),
+        plateau_ratio=float(plateau_ratio),
+    )
+
+    return features
 
 
 class BaseInitializer(ABC):
@@ -190,21 +217,55 @@ class BaseInitializer(ABC):
         4. Clip parameters to bounds (common logic)
         5. Set parameters in ParameterSet via abstract method
         """
+        initializer_name = self.__class__.__name__
+        logger.debug(
+            "Starting parameter initialization",
+            initializer=initializer_name,
+            omega_len=len(omega),
+            G_star_len=len(G_star),
+        )
+
         # Step 1: Extract frequency features (common logic)
         features = extract_frequency_features(omega, G_star)
 
         # Step 2: Validate features (common validation)
         if not self._validate_data(features):
+            logger.debug(
+                "Feature validation failed, falling back to defaults",
+                initializer=initializer_name,
+                valid=features.get("valid", False),
+            )
             return False  # Fall back to defaults
+
+        logger.debug(
+            "Features validated successfully",
+            initializer=initializer_name,
+        )
 
         # Step 3: Estimate model-specific parameters (abstract methods)
         estimated_params = self._estimate_parameters(features)
+        logger.debug(
+            "Parameters estimated",
+            initializer=initializer_name,
+            estimated_params=estimated_params,
+        )
 
         # Step 4: Clip to parameter bounds (common logic)
         clipped_params = self._clip_to_bounds(estimated_params, param_set)
+        logger.debug(
+            "Parameters clipped to bounds",
+            initializer=initializer_name,
+            clipped_params=clipped_params,
+        )
 
         # Step 5: Set parameters in ParameterSet (abstract method)
         self._set_parameters(param_set, clipped_params)
+
+        logger.info(
+            "Parameter initialization complete",
+            initializer=initializer_name,
+            params=clipped_params,
+        )
 
         return True
 
@@ -340,7 +401,18 @@ class BaseInitializer(ABC):
         """
         # Check if parameter exists in ParameterSet (dict check)
         if name not in param_set._parameters:
+            logger.debug(
+                "Parameter not found in ParameterSet, skipping",
+                parameter=name,
+                initializer=self.__class__.__name__,
+            )
             return False
 
         param_set.set_value(name, value)
+        logger.debug(
+            "Parameter set successfully",
+            parameter=name,
+            value=value,
+            initializer=self.__class__.__name__,
+        )
         return True

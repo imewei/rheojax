@@ -36,6 +36,10 @@ warnings.filterwarnings("ignore", message=".*constrained_layout.*collapsed.*")
 
 from rheojax import __version__
 from rheojax.gui.utils.logging import install_gui_log_handler
+from rheojax.logging import configure_logging, get_logger, is_configured
+
+# Module-level logger
+logger = get_logger(__name__)
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -46,14 +50,11 @@ def setup_logging(verbose: bool = False) -> None:
     verbose : bool, optional
         Enable verbose (DEBUG) logging, by default False
     """
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-        ],
-    )
+    # Use RheoJAX logging system if not already configured
+    if not is_configured():
+        level = "DEBUG" if verbose else "INFO"
+        configure_logging(level=level, format="standard", colorize=True)
+        logger.debug("Logging configured", level=level)
 
 
 def check_dependencies() -> tuple[bool, list[str]]:
@@ -189,13 +190,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # Setup logging
     setup_logging(args.verbose)
-    logger = logging.getLogger(__name__)
-    logger.info(f"Starting RheoJAX GUI v{__version__}...")
+    logger.info("RheoJAX GUI starting", version=__version__)
 
     # Check dependencies
-    logger.debug("Checking dependencies...")
+    logger.debug("Checking GUI dependencies")
     deps_ok, missing = check_dependencies()
     if not deps_ok:
+        logger.error("Missing required dependencies", missing=missing)
         print("\nERROR: Missing required dependencies:", file=sys.stderr)
         for dep in missing:
             print(f"  - {dep}", file=sys.stderr)
@@ -205,11 +206,11 @@ def main(argv: list[str] | None = None) -> int:
         print("  pip install rheojax[dev,gui]", file=sys.stderr)
         return 1
 
-    logger.debug("All dependencies found")
+    logger.debug("All dependencies verified")
 
     # Validate file arguments
     if args.project and not args.project.exists():
-        logger.error(f"Project file not found: {args.project}")
+        logger.error("Project file not found", path=str(args.project))
         print(
             f"ERROR: Project file not found: {args.project}",
             file=sys.stderr,
@@ -217,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.import_file and not args.import_file.exists():
-        logger.error(f"Import file not found: {args.import_file}")
+        logger.error("Import file not found", path=str(args.import_file))
         print(
             f"ERROR: Import file not found: {args.import_file}",
             file=sys.stderr,
@@ -225,22 +226,24 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # Import JAX early (configures float64) and Qt after dependency check
+    logger.debug("Importing JAX runtime")
     try:
         from rheojax.core.jax_config import safe_import_jax
 
         safe_import_jax()
+        logger.debug("JAX runtime initialized")
     except Exception as exc:  # pragma: no cover - environment dependent
-        logger.error(f"Failed to import JAX: {exc}")
+        logger.error("Failed to import JAX", error=str(exc), exc_info=True)
         print(f"ERROR: Failed to import JAX: {exc}", file=sys.stderr)
         return 1
 
-    logger.debug("Initializing Qt application...")
+    logger.debug("Initializing Qt application")
     try:
         from PySide6.QtCore import Qt, QTimer
         from PySide6.QtGui import QFont, QIcon
         from PySide6.QtWidgets import QApplication
     except ImportError as exc:
-        logger.error(f"Failed to import PySide6: {exc}")
+        logger.error("Failed to import PySide6", error=str(exc), exc_info=True)
         print(f"ERROR: Failed to import PySide6: {exc}", file=sys.stderr)
         return 1
 
@@ -329,13 +332,14 @@ def main(argv: list[str] | None = None) -> int:
     stylesheet += f"\n* {{ font-size: {base_font_size:.1f}pt; }}\n"
     app.setStyleSheet(stylesheet)
 
-    logger.debug("Qt application initialized")
+    logger.debug("Qt application initialized", font_size=base_font_size)
 
     # Import main window after Qt app is created
+    logger.debug("Importing main window module")
     try:
         from rheojax.gui.app.main_window import RheoJAXMainWindow
     except ImportError as e:
-        logger.error(f"Failed to import main window: {e}")
+        logger.error("Failed to import main window", error=str(e), exc_info=True)
         print(
             f"ERROR: Failed to import main window: {e}",
             file=sys.stderr,
@@ -344,7 +348,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Create main window
     try:
-        logger.debug("Creating main window...")
+        logger.debug("Creating main window", maximized=args.maximized)
         window = RheoJAXMainWindow(start_maximized=args.maximized)
         gui_handler = install_gui_log_handler(
             window.log,
@@ -358,7 +362,7 @@ def main(argv: list[str] | None = None) -> int:
 
         _show_main_window(window, args.maximized)
 
-        logger.info("RheoJAX GUI ready")
+        logger.info("RheoJAX GUI ready", version=__version__)
 
         # ------------------------------------------------------------------
         # Optional: headless fit smoke
@@ -367,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
         # without crashes. Triggered via env var so normal GUI behavior is
         # unchanged.
         if os.environ.get("RHEOJAX_GUI_SMOKE_FIT") == "1":
-            logger.info("GUI smoke mode enabled: running one fit then exiting")
+            logger.info("GUI smoke mode enabled", action="running one fit then exiting")
 
             def _smoke_exit(code: int = 0) -> None:
                 try:
@@ -404,7 +408,9 @@ def main(argv: list[str] | None = None) -> int:
                     window.navigate_to("fit")
 
                     if getattr(window, "worker_pool", None) is None:
-                        logger.error("Smoke fit failed: worker pool unavailable")
+                        logger.error(
+                            "Smoke fit failed", reason="worker pool unavailable"
+                        )
                         _smoke_exit(2)
                         return
 
@@ -416,7 +422,7 @@ def main(argv: list[str] | None = None) -> int:
                         _smoke_exit(0)
 
                     def _on_failed(_job_id: str, error: str) -> None:
-                        logger.error("Smoke fit failed: %s", error)
+                        logger.error("Smoke fit failed", error=error)
                         try:
                             window.worker_pool.shutdown(wait=True, timeout_ms=5000)
                         except Exception:
@@ -430,14 +436,16 @@ def main(argv: list[str] | None = None) -> int:
                         {"model_name": model, "dataset_id": dataset_id}
                     )
                 except Exception as exc:
-                    logger.exception("Smoke fit raised: %s", exc)
+                    logger.error(
+                        "Smoke fit raised exception", error=str(exc), exc_info=True
+                    )
                     _smoke_exit(1)
 
             timeout_ms = int(os.environ.get("RHEOJAX_GUI_SMOKE_TIMEOUT_MS", "30000"))
             QTimer.singleShot(0, _run_smoke_fit)
             QTimer.singleShot(timeout_ms, lambda: _smoke_exit(124))
     except Exception as e:
-        logger.exception(f"Failed to create main window: {e}")
+        logger.error("Failed to create main window", error=str(e), exc_info=True)
         print(
             f"ERROR: Failed to create main window: {e}",
             file=sys.stderr,
@@ -446,33 +454,43 @@ def main(argv: list[str] | None = None) -> int:
 
     # Handle startup arguments
     if args.project:
-        logger.info(f"Loading project: {args.project}")
+        logger.info("Loading project", path=str(args.project))
         try:
             # Project loading will be implemented via file dialog in GUI
             # For now, just log the request
             window.log(f"Project file specified: {args.project}")
             window.log("Note: Project loading from command line not yet implemented")
-            logger.debug("Project loading action logged")
+            logger.debug("Project loading action logged", path=str(args.project))
         except Exception as e:
-            logger.error(f"Failed to load project: {e}")
+            logger.error(
+                "Failed to load project",
+                path=str(args.project),
+                error=str(e),
+                exc_info=True,
+            )
             window.log(f"ERROR: Failed to load project: {e}")
 
     if args.import_file:
-        logger.info(f"Importing data file: {args.import_file}")
+        logger.info("Importing data file", path=str(args.import_file))
         try:
             # This will be implemented when the data loading service is ready
             # For now, just log it
             window.log(f"Data import requested: {args.import_file}")
             window.log("Note: Data import from command line not yet implemented")
-            logger.debug("Data import action logged")
+            logger.debug("Data import action logged", path=str(args.import_file))
         except Exception as e:
-            logger.error(f"Failed to import data: {e}")
+            logger.error(
+                "Failed to import data",
+                path=str(args.import_file),
+                error=str(e),
+                exc_info=True,
+            )
             window.log(f"ERROR: Failed to import data: {e}")
 
     # Run event loop
-    logger.debug("Entering Qt event loop...")
+    logger.debug("Entering Qt event loop")
     exit_code: int = app.exec()
-    logger.info(f"Application exiting with code {exit_code}")
+    logger.info("Application exiting", exit_code=exit_code)
 
     return exit_code
 

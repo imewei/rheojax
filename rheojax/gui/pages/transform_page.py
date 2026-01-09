@@ -26,6 +26,9 @@ from PySide6.QtWidgets import (
 
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class TransformPage(QWidget):
@@ -36,10 +39,16 @@ class TransformPage(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self._store = StateStore()
         self._selected_transform: str | None = None
         self._param_controls: dict[str, list] = {}
         self.setup_ui()
+        logger.debug(
+            "Initialization complete",
+            class_name=self.__class__.__name__,
+            page="TransformPage",
+        )
 
     def setup_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -173,6 +182,7 @@ class TransformPage(QWidget):
         return panel
 
     def _select_transform(self, name: str) -> None:
+        logger.debug("Transform selected", transform=name, page="TransformPage")
         self._selected_transform = name
         self.transform_selected.emit(name)
 
@@ -195,6 +205,14 @@ class TransformPage(QWidget):
             spin = QDoubleSpinBox()
             spin.setRange(-100, 300)
             spin.setValue(25)
+            spin.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="reference_temp",
+                    value=v,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin)
             self._param_controls.setdefault("mastercurve", []).append(
                 ("reference_temp", spin)
@@ -202,6 +220,14 @@ class TransformPage(QWidget):
 
             check = QCheckBox("Auto-detect shift factors")
             check.setChecked(True)
+            check.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="auto_shift",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(check)
             self._param_controls.setdefault("mastercurve", []).append(
                 ("auto_shift", check)
@@ -211,6 +237,14 @@ class TransformPage(QWidget):
             combo_shift = QComboBox()
             combo_shift.addItems(["wlf", "arrhenius", "manual"])
             combo_shift.setCurrentText("wlf")
+            combo_shift.currentTextChanged.connect(
+                lambda t: logger.debug(
+                    "Parameter changed",
+                    parameter="shift_method",
+                    value=t,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(combo_shift)
             self._param_controls.setdefault("mastercurve", []).append(
                 ("shift_method", combo_shift)
@@ -221,6 +255,14 @@ class TransformPage(QWidget):
             spin = QDoubleSpinBox()
             spin.setRange(0.001, 1000)
             spin.setValue(1.0)
+            spin.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="reference_gamma_dot",
+                    value=v,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin)
             self._param_controls.setdefault("srfs", []).append(
                 ("reference_gamma_dot", spin)
@@ -228,6 +270,14 @@ class TransformPage(QWidget):
 
             auto_shift = QCheckBox("Auto-detect shift factors")
             auto_shift.setChecked(True)
+            auto_shift.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="auto_shift",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(auto_shift)
             self._param_controls.setdefault("srfs", []).append(
                 ("auto_shift", auto_shift)
@@ -237,17 +287,41 @@ class TransformPage(QWidget):
             self._config_layout.addWidget(QLabel("Direction:"))
             combo_dir = QComboBox()
             combo_dir.addItems(["forward", "inverse"])
+            combo_dir.currentTextChanged.connect(
+                lambda t: logger.debug(
+                    "Parameter changed",
+                    parameter="direction",
+                    value=t,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(combo_dir)
             self._param_controls.setdefault("fft", []).append(("direction", combo_dir))
 
             self._config_layout.addWidget(QLabel("Window Function:"))
             combo_window = QComboBox()
             combo_window.addItems(["hann", "hamming", "blackman", "rectangular"])
+            combo_window.currentTextChanged.connect(
+                lambda t: logger.debug(
+                    "Parameter changed",
+                    parameter="window",
+                    value=t,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(combo_window)
             self._param_controls.setdefault("fft", []).append(("window", combo_window))
 
             check_detrend = QCheckBox("Detrend (remove DC)")
             check_detrend.setChecked(True)
+            check_detrend.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="detrend",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(check_detrend)
             self._param_controls.setdefault("fft", []).append(
                 ("detrend", check_detrend)
@@ -255,11 +329,27 @@ class TransformPage(QWidget):
 
             check_norm = QCheckBox("Normalize amplitude")
             check_norm.setChecked(True)
+            check_norm.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="normalize",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(check_norm)
             self._param_controls.setdefault("fft", []).append(("normalize", check_norm))
 
             check_psd = QCheckBox("Return PSD")
             check_psd.setChecked(False)
+            check_psd.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="return_psd",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(check_psd)
             self._param_controls.setdefault("fft", []).append(("return_psd", check_psd))
 
@@ -267,6 +357,14 @@ class TransformPage(QWidget):
             self._config_layout.addWidget(QLabel("Integration Method:"))
             combo_method = QComboBox()
             combo_method.addItems(["trapz", "simpson", "romberg"])
+            combo_method.currentTextChanged.connect(
+                lambda t: logger.debug(
+                    "Parameter changed",
+                    parameter="integration_method",
+                    value=t,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(combo_method)
             self._param_controls.setdefault("mutation_number", []).append(
                 ("integration_method", combo_method)
@@ -274,6 +372,14 @@ class TransformPage(QWidget):
 
             check_extrap = QCheckBox("Extrapolate data")
             check_extrap.setChecked(False)
+            check_extrap.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="extrapolate",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(check_extrap)
             self._param_controls.setdefault("mutation_number", []).append(
                 ("extrapolate", check_extrap)
@@ -282,6 +388,14 @@ class TransformPage(QWidget):
             self._config_layout.addWidget(QLabel("Extrapolation Model:"))
             combo_extrap = QComboBox()
             combo_extrap.addItems(["exponential", "power_law", "linear"])
+            combo_extrap.currentTextChanged.connect(
+                lambda t: logger.debug(
+                    "Parameter changed",
+                    parameter="extrapolation_model",
+                    value=t,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(combo_extrap)
             self._param_controls.setdefault("mutation_number", []).append(
                 ("extrapolation_model", combo_extrap)
@@ -293,6 +407,14 @@ class TransformPage(QWidget):
             spin_min.setRange(0.0001, 1e6)
             spin_min.setValue(0.01)
             spin_min.setDecimals(4)
+            spin_min.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="min_frequency",
+                    value=v,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_min)
             self._param_controls.setdefault("owchirp", []).append(
                 ("min_frequency", spin_min)
@@ -303,6 +425,14 @@ class TransformPage(QWidget):
             spin_max.setRange(0.0001, 1e6)
             spin_max.setValue(100.0)
             spin_max.setDecimals(4)
+            spin_max.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="max_frequency",
+                    value=v,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_max)
             self._param_controls.setdefault("owchirp", []).append(
                 ("max_frequency", spin_max)
@@ -313,6 +443,14 @@ class TransformPage(QWidget):
             spin_n.setRange(4, 5000)
             spin_n.setDecimals(0)
             spin_n.setValue(100)
+            spin_n.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="n_frequencies",
+                    value=int(v),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_n)
             self._param_controls.setdefault("owchirp", []).append(
                 ("n_frequencies", spin_n)
@@ -323,6 +461,14 @@ class TransformPage(QWidget):
             spin_w.setRange(1.0, 20.0)
             spin_w.setDecimals(2)
             spin_w.setValue(5.0)
+            spin_w.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="wavelet_width",
+                    value=v,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_w)
             self._param_controls.setdefault("owchirp", []).append(
                 ("wavelet_width", spin_w)
@@ -330,6 +476,14 @@ class TransformPage(QWidget):
 
             check_harm = QCheckBox("Extract harmonics")
             check_harm.setChecked(True)
+            check_harm.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="extract_harmonics",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(check_harm)
             self._param_controls.setdefault("owchirp", []).append(
                 ("extract_harmonics", check_harm)
@@ -340,6 +494,14 @@ class TransformPage(QWidget):
             spin_h.setRange(1, 99)
             spin_h.setDecimals(0)
             spin_h.setValue(7)
+            spin_h.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="max_harmonic",
+                    value=int(v),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_h)
             self._param_controls.setdefault("owchirp", []).append(
                 ("max_harmonic", spin_h)
@@ -351,6 +513,14 @@ class TransformPage(QWidget):
             spin_order.setRange(1, 4)
             spin_order.setDecimals(0)
             spin_order.setValue(1)
+            spin_order.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="order",
+                    value=int(v),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_order)
             self._param_controls.setdefault("derivative", []).append(
                 ("order", spin_order)
@@ -361,6 +531,14 @@ class TransformPage(QWidget):
             spin_window.setRange(3, 201)
             spin_window.setDecimals(0)
             spin_window.setValue(11)
+            spin_window.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="window_length",
+                    value=int(v),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_window)
             self._param_controls.setdefault("derivative", []).append(
                 ("window_length", spin_window)
@@ -371,6 +549,14 @@ class TransformPage(QWidget):
             spin_poly.setRange(1, 10)
             spin_poly.setDecimals(0)
             spin_poly.setValue(3)
+            spin_poly.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="poly_order",
+                    value=int(v),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_poly)
             self._param_controls.setdefault("derivative", []).append(
                 ("poly_order", spin_poly)
@@ -379,6 +565,14 @@ class TransformPage(QWidget):
             self._config_layout.addWidget(QLabel("Mode (padding):"))
             combo_mode = QComboBox()
             combo_mode.addItems(["mirror", "nearest", "constant", "wrap"])
+            combo_mode.currentTextChanged.connect(
+                lambda t: logger.debug(
+                    "Parameter changed",
+                    parameter="mode",
+                    value=t,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(combo_mode)
             self._param_controls.setdefault("derivative", []).append(
                 ("mode", combo_mode)
@@ -387,6 +581,14 @@ class TransformPage(QWidget):
             self._config_layout.addWidget(QLabel("Validate Window Length (odd):"))
             check_validate = QCheckBox("Force odd window length")
             check_validate.setChecked(True)
+            check_validate.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="validate_window",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(check_validate)
             self._param_controls.setdefault("derivative", []).append(
                 ("validate_window", check_validate)
@@ -398,14 +600,30 @@ class TransformPage(QWidget):
             spin_omega.setRange(0.001, 1000)
             spin_omega.setValue(1.0)
             spin_omega.setDecimals(3)
+            spin_omega.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="omega",
+                    value=v,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_omega)
             self._param_controls.setdefault("spp", []).append(("omega", spin_omega))
 
-            self._config_layout.addWidget(QLabel("Strain Amplitude (γ0):"))
+            self._config_layout.addWidget(QLabel("Strain Amplitude (gamma_0):"))
             spin_gamma0 = QDoubleSpinBox()
             spin_gamma0.setRange(0.0001, 100.0)
             spin_gamma0.setValue(1.0)
             spin_gamma0.setDecimals(4)
+            spin_gamma0.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="gamma_0",
+                    value=v,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_gamma0)
             self._param_controls.setdefault("spp", []).append(("gamma_0", spin_gamma0))
 
@@ -414,6 +632,7 @@ class TransformPage(QWidget):
             spin_gamma.setRange(0.001, 100)
             spin_gamma.setValue(1.0)
             spin_gamma.setDecimals(3)
+
             self._config_layout.addWidget(spin_gamma)
 
             self._config_layout.addWidget(QLabel("Number of Harmonics:"))
@@ -421,6 +640,14 @@ class TransformPage(QWidget):
             spin_harmonics.setRange(1, 99)
             spin_harmonics.setValue(39)
             spin_harmonics.setDecimals(0)
+            spin_harmonics.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="n_harmonics",
+                    value=int(v),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_harmonics)
             self._param_controls.setdefault("spp", []).append(
                 ("n_harmonics", spin_harmonics)
@@ -431,6 +658,14 @@ class TransformPage(QWidget):
             spin_start.setRange(0, 100)
             spin_start.setValue(0)
             spin_start.setDecimals(0)
+            spin_start.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="start_cycle",
+                    value=int(v),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_start)
             self._param_controls.setdefault("spp", []).append(
                 ("start_cycle", spin_start)
@@ -441,6 +676,14 @@ class TransformPage(QWidget):
             spin_end.setRange(0, 1000)
             spin_end.setValue(0)
             spin_end.setDecimals(0)
+            spin_end.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="end_cycle",
+                    value=int(v),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_end)
             self._param_controls.setdefault("spp", []).append(("end_cycle", spin_end))
 
@@ -449,6 +692,14 @@ class TransformPage(QWidget):
             spin_tol.setRange(0.0001, 1.0)
             spin_tol.setDecimals(4)
             spin_tol.setValue(0.02)
+            spin_tol.valueChanged.connect(
+                lambda v: logger.debug(
+                    "Parameter changed",
+                    parameter="yield_tolerance",
+                    value=v,
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(spin_tol)
             self._param_controls.setdefault("spp", []).append(
                 ("yield_tolerance", spin_tol)
@@ -456,6 +707,14 @@ class TransformPage(QWidget):
 
             check_numerical = QCheckBox("Use numerical method (MATLAB-compatible)")
             check_numerical.setChecked(False)
+            check_numerical.stateChanged.connect(
+                lambda s: logger.debug(
+                    "Parameter changed",
+                    parameter="use_numerical_method",
+                    value=bool(s),
+                    page="TransformPage",
+                )
+            )
             self._config_layout.addWidget(check_numerical)
             self._param_controls.setdefault("spp", []).append(
                 ("use_numerical_method", check_numerical)
@@ -465,11 +724,33 @@ class TransformPage(QWidget):
 
     def _apply_transform(self) -> None:
         if not self._selected_transform:
+            logger.debug(
+                "Apply transform called with no transform selected",
+                page="TransformPage",
+            )
             return
+
+        logger.debug(
+            "Transform triggered",
+            transform=self._selected_transform,
+            page="TransformPage",
+        )
 
         dataset = self._store.get_active_dataset()
         if dataset:
             self.transform_applied.emit(self._selected_transform, dataset.id)
+            logger.info(
+                "Transform applied",
+                transform=self._selected_transform,
+                dataset_id=dataset.id,
+                page="TransformPage",
+            )
+        else:
+            logger.debug(
+                "No active dataset for transform",
+                transform=self._selected_transform,
+                page="TransformPage",
+            )
 
     def get_selected_params(self) -> dict[str, Any]:
         """Return current parameter values for the selected transform."""
@@ -523,7 +804,19 @@ class TransformPage(QWidget):
             Transform parameters (uses current UI values if not provided)
         """
         if not dataset_ids:
+            logger.debug(
+                "apply_transform called with empty dataset_ids",
+                transform=transform_name,
+                page="TransformPage",
+            )
             return
+
+        logger.debug(
+            "Transform triggered",
+            transform=transform_name,
+            dataset_count=len(dataset_ids),
+            page="TransformPage",
+        )
 
         # Use provided params or get from current UI
         if params is None:
@@ -534,6 +827,12 @@ class TransformPage(QWidget):
 
         # Emit signal for first dataset (MainWindow handles the rest)
         self.transform_applied.emit(transform_name, dataset_ids[0])
+        logger.info(
+            "Transform applied",
+            transform=transform_name,
+            dataset_id=dataset_ids[0],
+            page="TransformPage",
+        )
 
     def show_transform_preview(
         self, transform_name: str, params: dict[str, Any]
@@ -547,10 +846,21 @@ class TransformPage(QWidget):
         params : dict
             Transform parameters
         """
+        logger.debug(
+            "Showing transform preview",
+            transform=transform_name,
+            params=params,
+            page="TransformPage",
+        )
 
         # Get active dataset for preview
         dataset = self._store.get_active_dataset()
         if dataset is None:
+            logger.debug(
+                "No active dataset for preview",
+                transform=transform_name,
+                page="TransformPage",
+            )
             return
 
         # Update "Before" canvas with original data
@@ -563,8 +873,20 @@ class TransformPage(QWidget):
                 ylabel=dataset.y_units or "y",
                 title="Before Transform",
             )
-        except Exception:
+            logger.debug(
+                "Preview before canvas updated",
+                transform=transform_name,
+                page="TransformPage",
+            )
+        except Exception as e:
             # If plot fails, clear the canvas
+            logger.error(
+                "Failed to update before canvas",
+                transform=transform_name,
+                error=str(e),
+                page="TransformPage",
+                exc_info=True,
+            )
             self._before_canvas.clear()
 
         # For "After" canvas, we'd need to actually compute the transform

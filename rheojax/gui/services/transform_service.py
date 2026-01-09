@@ -7,12 +7,12 @@ Service for applying rheological transforms (mastercurve, FFT, SRFS, etc.).
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import numpy as np
 
 from rheojax.core.data import RheoData
+from rheojax.logging import get_logger
 from rheojax.transforms import (
     SRFS,
     FFTAnalysis,
@@ -23,7 +23,7 @@ from rheojax.transforms import (
     SPPDecomposer,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TransformService:
@@ -46,6 +46,7 @@ class TransformService:
 
     def __init__(self) -> None:
         """Initialize transform service."""
+        logger.debug("Initializing TransformService")
         self._transforms = {
             "mastercurve": Mastercurve,
             "fft": FFTAnalysis,
@@ -55,6 +56,10 @@ class TransformService:
             "mutation_number": MutationNumber,
             "spp": SPPDecomposer,
         }
+        logger.debug(
+            "TransformService initialized",
+            available_transforms=list(self._transforms.keys()),
+        )
 
     def get_available_transforms(self) -> list[str]:
         """Get list of available transforms.
@@ -64,6 +69,7 @@ class TransformService:
         list[str]
             Transform names
         """
+        logger.debug("Getting available transforms")
         return list(self._transforms.keys())
 
     def get_transform_params(self, name: str) -> dict[str, Any]:
@@ -79,6 +85,7 @@ class TransformService:
         dict
             Parameter specifications with defaults and descriptions
         """
+        logger.debug("Getting transform parameters", transform=name)
         params_map = {
             "mastercurve": {
                 "reference_temp": {
@@ -286,8 +293,11 @@ class TransformService:
         RheoData or tuple
             Transformed data, optionally with additional results
         """
+        logger.debug("Entering apply_transform", transform=name, params=params)
+        logger.info("Starting transform", transform=name)
         try:
             if name not in self._transforms:
+                logger.error("Unknown transform requested", transform=name)
                 raise ValueError(f"Unknown transform: {name}")
 
             def _with_provenance(result_data: RheoData) -> RheoData:
@@ -308,15 +318,31 @@ class TransformService:
             if name == "mastercurve":
                 # Mastercurve requires multiple datasets
                 if not isinstance(data, list):
+                    logger.error(
+                        "Mastercurve requires list of datasets",
+                        transform=name,
+                        received_type=type(data).__name__,
+                    )
                     raise ValueError("Mastercurve requires list of datasets")
 
                 reference_temp = params.get("reference_temp", 25.0)
                 auto_shift = params.get("auto_shift", True)
 
+                logger.debug(
+                    "Applying mastercurve",
+                    reference_temp=reference_temp,
+                    auto_shift=auto_shift,
+                    n_datasets=len(data),
+                )
                 mc = Mastercurve(reference_temp=reference_temp, auto_shift=auto_shift)
                 mastercurve_data, shift_factors = mc.transform(data)
 
-                logger.info(f"Applied mastercurve at T_ref={reference_temp}°C")
+                logger.info(
+                    "Transform complete",
+                    transform=name,
+                    reference_temp=reference_temp,
+                )
+                logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(mastercurve_data), {
                     "shift_factors": shift_factors
                 }
@@ -332,6 +358,14 @@ class TransformService:
                 return_psd = params.get("return_psd", False)
                 normalize = params.get("normalize", True)
 
+                logger.debug(
+                    "Applying FFT transform",
+                    direction=direction,
+                    window=window,
+                    detrend=detrend,
+                    return_psd=return_psd,
+                    normalize=normalize,
+                )
                 fft = FFTAnalysis(
                     window=window,
                     detrend=detrend,
@@ -344,23 +378,40 @@ class TransformService:
                 else:
                     result = fft.inverse_transform(data)
 
-                logger.info(f"Applied FFT transform ({direction})")
+                logger.info("Transform complete", transform=name, direction=direction)
+                logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(result)
 
             elif name == "srfs":
                 # SRFS transform
                 if not isinstance(data, list):
+                    logger.error(
+                        "SRFS requires list of datasets",
+                        transform=name,
+                        received_type=type(data).__name__,
+                    )
                     raise ValueError("SRFS requires list of datasets")
 
                 reference_gamma_dot = params.get("reference_gamma_dot", 1.0)
                 auto_shift = params.get("auto_shift", True)
 
+                logger.debug(
+                    "Applying SRFS transform",
+                    reference_gamma_dot=reference_gamma_dot,
+                    auto_shift=auto_shift,
+                    n_datasets=len(data),
+                )
                 srfs = SRFS(
                     reference_gamma_dot=reference_gamma_dot, auto_shift=auto_shift
                 )
                 master_curve, shift_factors = srfs.transform(data)
 
-                logger.info(f"Applied SRFS at γ̇_ref={reference_gamma_dot} 1/s")
+                logger.info(
+                    "Transform complete",
+                    transform=name,
+                    reference_gamma_dot=reference_gamma_dot,
+                )
+                logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(master_curve), {"shift_factors": shift_factors}
 
             elif name == "owchirp":
@@ -373,6 +424,15 @@ class TransformService:
                 extract_harmonics = params.get("extract_harmonics", True)
                 max_harmonic = params.get("max_harmonic", 7)
 
+                logger.debug(
+                    "Applying OWChirp transform",
+                    min_frequency=min_freq,
+                    max_frequency=max_freq,
+                    n_frequencies=n_frequencies,
+                    wavelet_width=wavelet_width,
+                    extract_harmonics=extract_harmonics,
+                    max_harmonic=max_harmonic,
+                )
                 owchirp = OWChirp(
                     n_frequencies=n_frequencies,
                     frequency_range=(min_freq, max_freq),
@@ -382,7 +442,8 @@ class TransformService:
                 )
                 result = owchirp.transform(data)
 
-                logger.info("Applied OWChirp transform")
+                logger.info("Transform complete", transform=name)
+                logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(result)
 
             elif name == "derivative":
@@ -396,6 +457,15 @@ class TransformService:
                 smooth_before = params.get("smooth_before", False)
                 smooth_after = params.get("smooth_after", False)
 
+                logger.debug(
+                    "Applying derivative transform",
+                    order=deriv_order,
+                    window_length=window_length,
+                    polyorder=polyorder,
+                    method=method,
+                    smooth_before=smooth_before,
+                    smooth_after=smooth_after,
+                )
                 deriv = SmoothDerivative(
                     method=method,
                     window_length=window_length,
@@ -406,7 +476,10 @@ class TransformService:
                 )
                 result = deriv.transform(data)
 
-                logger.info(f"Applied {deriv_order}-order derivative")
+                logger.info(
+                    "Transform complete", transform=name, derivative_order=deriv_order
+                )
+                logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(result)
 
             elif name == "mutation_number":
@@ -417,6 +490,12 @@ class TransformService:
                 extrapolate = params.get("extrapolate", False)
                 extrapolation_model = params.get("extrapolation_model", "exponential")
 
+                logger.debug(
+                    "Applying mutation number transform",
+                    integration_method=integration_method,
+                    extrapolate=extrapolate,
+                    extrapolation_model=extrapolation_model,
+                )
                 mn = MutationNumber(
                     integration_method=integration_method,
                     extrapolate=extrapolate,
@@ -424,7 +503,8 @@ class TransformService:
                 )
                 result = mn.transform(data)
 
-                logger.info("Calculated mutation number")
+                logger.info("Transform complete", transform=name)
+                logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(result)
 
             elif name == "spp":
@@ -441,6 +521,16 @@ class TransformService:
                 )
                 use_numerical_method = params.get("use_numerical_method", False)
 
+                logger.debug(
+                    "Applying SPP transform",
+                    omega=omega,
+                    gamma_0=gamma_0,
+                    n_harmonics=n_harmonics,
+                    yield_tolerance=yield_tolerance,
+                    start_cycle=start_cycle,
+                    end_cycle=end_cycle,
+                    use_numerical_method=use_numerical_method,
+                )
                 spp = SPPDecomposer(
                     omega=omega,
                     gamma_0=gamma_0,
@@ -454,16 +544,25 @@ class TransformService:
                 spp_results = spp.get_results()
 
                 logger.info(
-                    f"SPP analysis: σ_sy={spp_results['sigma_sy']:.2f} Pa, "
-                    f"σ_dy={spp_results['sigma_dy']:.2f} Pa"
+                    "Transform complete",
+                    transform=name,
+                    sigma_sy=spp_results["sigma_sy"],
+                    sigma_dy=spp_results["sigma_dy"],
                 )
+                logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(result), {"spp_results": spp_results}
 
             else:
+                logger.error("Transform not implemented", transform=name)
                 raise ValueError(f"Transform {name} not implemented")
 
         except Exception as e:
-            logger.error(f"Transform {name} failed: {e}")
+            logger.error(
+                "Transform failed",
+                transform=name,
+                error=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(f"Transform failed: {e}") from e
 
     def preview_transform(
@@ -488,6 +587,7 @@ class TransformService:
         dict
             Preview information (statistics, expected output shape, etc.)
         """
+        logger.debug("Entering preview_transform", transform=name, params=params)
         try:
             preview = {
                 "transform": name,
@@ -514,10 +614,16 @@ class TransformService:
                         "frequency" if data.domain == "time" else "time"
                     )
 
+            logger.debug("Exiting preview_transform", transform=name, preview=preview)
             return preview
 
         except Exception as e:
-            logger.error(f"Preview failed: {e}")
+            logger.error(
+                "Preview failed",
+                transform=name,
+                error=str(e),
+                exc_info=True,
+            )
             return {"error": str(e)}
 
     def validate_transform_input(
@@ -539,6 +645,7 @@ class TransformService:
         list[str]
             Validation warnings
         """
+        logger.debug("Entering validate_transform_input", transform=name)
         warnings = []
 
         # Check if transform requires multiple datasets
@@ -580,4 +687,11 @@ class TransformService:
                         f"SPP is for oscillatory (LAOS) data, got {test_mode}"
                     )
 
+        if warnings:
+            logger.debug(
+                "Validation warnings found",
+                transform=name,
+                warning_count=len(warnings),
+            )
+        logger.debug("Exiting validate_transform_input", transform=name)
         return warnings

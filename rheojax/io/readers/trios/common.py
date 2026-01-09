@@ -9,7 +9,6 @@ trios.py (chunked reading), adapted for the multi-format package structure.
 
 from __future__ import annotations
 
-import logging
 import math
 import re
 from dataclasses import dataclass, field
@@ -20,8 +19,9 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.data import RheoData
+from rheojax.logging import get_logger, log_io
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Type aliases
 FilePath = str | Path
@@ -318,6 +318,12 @@ def detect_test_type(
     Returns:
         Test mode string: "oscillation", "creep", "relaxation", "rotation", "unknown"
     """
+    logger.debug(
+        "Detecting test type from columns",
+        columns=list(df.columns),
+        n_rows=len(df),
+    )
+
     if column_mappings is None:
         column_mappings = TRIOS_COLUMN_MAPPINGS
 
@@ -338,20 +344,24 @@ def detect_test_type(
     if has_column("angular_frequency") and (
         has_column("storage_modulus") or has_column("loss_modulus")
     ):
+        logger.debug("Detected test type: oscillation")
         return "oscillation"
 
     # Check for creep
     if has_column("time") and has_column("compliance"):
+        logger.debug("Detected test type: creep")
         return "creep"
 
     # Check for relaxation
     if has_column("time") and has_column("relaxation_modulus"):
+        logger.debug("Detected test type: relaxation")
         return "relaxation"
 
     # Check for rotation/flow
     if has_column("shear_rate") and (
         has_column("viscosity") or has_column("shear_stress")
     ):
+        logger.debug("Detected test type: rotation")
         return "rotation"
 
     # Fallback: check for modulus with time (relaxation) or stress/strain
@@ -359,8 +369,10 @@ def detect_test_type(
         if has_column("shear_stress") and has_column("shear_strain"):
             # Could be creep or relaxation - check for constant values
             # For now, default to creep if strain is the dependent variable
+            logger.debug("Detected test type: creep (fallback from stress/strain)")
             return "creep"
 
+    logger.debug("Could not detect test type, returning unknown")
     return "unknown"
 
 
@@ -428,6 +440,12 @@ def select_xy_columns(
     Returns:
         Tuple of (x_col, y_col, y2_col) where y2_col is None for non-complex data
     """
+    logger.debug(
+        "Selecting x/y columns",
+        test_mode=test_mode,
+        available_columns=list(df.columns),
+    )
+
     if column_mappings is None:
         column_mappings = TRIOS_COLUMN_MAPPINGS
 
@@ -473,11 +491,24 @@ def select_xy_columns(
         if storage_col and loss_col:
             y_col = storage_col
             y2_col = loss_col
+            logger.debug(
+                "Selected complex modulus columns",
+                x_col=x_col,
+                y_col=y_col,
+                y2_col=y2_col,
+            )
 
     if x_col is None or y_col is None:
         logger.warning(
             f"Could not determine x/y columns for test mode '{test_mode}'. "
             f"Available columns: {columns}"
+        )
+    else:
+        logger.debug(
+            "Selected columns",
+            x_col=x_col,
+            y_col=y_col,
+            y2_col=y2_col,
         )
 
     return x_col, y_col, y2_col
@@ -511,9 +542,20 @@ def convert_unit(
     if source_key in conversions:
         converted_target, factor = conversions[source_key]
         if converted_target == target_unit or target_unit in converted_target:
+            logger.debug(
+                "Converting units",
+                source_unit=source_unit,
+                target_unit=target_unit,
+                factor=factor,
+            )
             return values * factor, target_unit
 
     # No conversion found, return original
+    logger.debug(
+        "No unit conversion found",
+        source_unit=source_unit,
+        target_unit=target_unit,
+    )
     return values, source_unit or target_unit
 
 

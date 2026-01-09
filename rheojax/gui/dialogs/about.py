@@ -19,6 +19,9 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax import __version__
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AboutDialog(QDialog):
@@ -47,11 +50,18 @@ class AboutDialog(QDialog):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self.setWindowTitle("About RheoJAX")
         self.setMinimumSize(550, 600)
 
         self._setup_ui()
+
+        logger.debug(
+            "Dialog initialized",
+            dialog=self.__class__.__name__,
+            version=__version__,
+        )
 
     def _setup_ui(self) -> None:
         """Set up user interface."""
@@ -151,10 +161,20 @@ Built with Python 3.12+, JAX, NumPyro, and Qt6
 
         # Close button
         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        button_box.rejected.connect(self.accept)
+        button_box.rejected.connect(self._on_close)
         layout.addWidget(button_box)
 
         self.setLayout(layout)
+
+    def showEvent(self, event) -> None:
+        """Handle dialog show event."""
+        super().showEvent(event)
+        logger.debug("Dialog opened", dialog=self.__class__.__name__)
+
+    def _on_close(self) -> None:
+        """Handle dialog close."""
+        logger.debug("Dialog closed", dialog=self.__class__.__name__)
+        self.accept()
 
     def _on_link_clicked(self, url) -> None:
         """Handle link clicks.
@@ -165,7 +185,21 @@ Built with Python 3.12+, JAX, NumPyro, and Qt6
             Clicked URL
         """
         url_str = url.toString()
-        webbrowser.open(url_str)
+        logger.debug(
+            "Link clicked",
+            dialog=self.__class__.__name__,
+            url=url_str,
+        )
+        try:
+            webbrowser.open(url_str)
+        except Exception as e:
+            logger.error(
+                "Failed to open link",
+                dialog=self.__class__.__name__,
+                url=url_str,
+                error=str(e),
+                exc_info=True,
+            )
 
 
 # Alias for backward compatibility

@@ -54,7 +54,11 @@ from jax.scipy.special import gamma as jax_gamma
 from rheojax.core.base import BaseModel
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.logging import get_logger, log_fit
 from rheojax.utils.mittag_leffler import mittag_leffler_e2
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("fractional_jeffreys")
@@ -379,69 +383,131 @@ class FractionalJeffreysModel(BaseModel):
         # Store test mode for model_function
         self._test_mode = test_mode
 
-        # Smart initialization for oscillation mode (Issue #9)
-        if test_mode == TestMode.OSCILLATION:
-            try:
-                import numpy as np
+        # Get test mode string for logging
+        test_mode_log = test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        x_arr = jnp.array(X)
+        data_shape = (int(x_arr.shape[0]),) if hasattr(x_arr, "shape") else None
 
-                from rheojax.utils.initialization import (
-                    initialize_fractional_jeffreys,
-                )
-
-                success = initialize_fractional_jeffreys(
-                    np.array(X), np.array(y), self.parameters
-                )
-                if success:
-                    import logging
-
-                    logging.debug(
-                        "Smart initialization applied from frequency-domain features"
-                    )
-            except Exception as e:
-                # Silent fallback to defaults - don't break if initialization fails
-                import logging
-
-                logging.debug(f"Smart initialization failed, using defaults: {e}")
-
-        # Create stateless model function for optimization
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            eta1, eta2, alpha, tau1 = params[0], params[1], params[2], params[3]
-
-            # Direct prediction based on test mode (stateless)
-            if test_mode == TestMode.RELAXATION:
-                return self._predict_relaxation(x, eta1, eta2, alpha, tau1)
-            elif test_mode == TestMode.CREEP:
-                return self._predict_creep(x, eta1, eta2, alpha, tau1)
-            elif test_mode == TestMode.OSCILLATION:
-                return self._predict_oscillation(x, eta1, eta2, alpha, tau1)
-            elif test_mode == TestMode.ROTATION:
-                return self._predict_rotation(x, eta1, eta2, alpha, tau1)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
-
-        # Create objective function
-        objective = create_least_squares_objective(
-            model_fn, jnp.array(X), jnp.array(y), normalize=True
-        )
-
-        # Optimize using NLSQ TRF
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+        with log_fit(logger, model="FractionalJeffreys", data_shape=data_shape, test_mode=test_mode_log) as ctx:
+            logger.debug(
+                "Starting Fractional Jeffreys model fit",
+                test_mode=test_mode_log,
+                n_points=data_shape[0] if data_shape else None,
+                initial_eta1=self.parameters.get_value("eta1"),
+                initial_eta2=self.parameters.get_value("eta2"),
+                initial_alpha=self.parameters.get_value("alpha"),
+                initial_tau1=self.parameters.get_value("tau1"),
             )
 
-        self.fitted_ = True
+            # Smart initialization for oscillation mode (Issue #9)
+            if test_mode == TestMode.OSCILLATION:
+                try:
+                    import numpy as np
+
+                    from rheojax.utils.initialization import (
+                        initialize_fractional_jeffreys,
+                    )
+
+                    success = initialize_fractional_jeffreys(
+                        np.array(X), np.array(y), self.parameters
+                    )
+                    if success:
+                        logger.debug(
+                            "Smart initialization applied from frequency-domain features",
+                            eta1=self.parameters.get_value("eta1"),
+                            eta2=self.parameters.get_value("eta2"),
+                            alpha=self.parameters.get_value("alpha"),
+                            tau1=self.parameters.get_value("tau1"),
+                        )
+                except Exception as e:
+                    # Silent fallback to defaults - don't break if initialization fails
+                    logger.debug(
+                        "Smart initialization failed, using defaults",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                    )
+
+            # Create stateless model function for optimization
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                eta1, eta2, alpha, tau1 = params[0], params[1], params[2], params[3]
+
+                # Direct prediction based on test mode (stateless)
+                if test_mode == TestMode.RELAXATION:
+                    return self._predict_relaxation(x, eta1, eta2, alpha, tau1)
+                elif test_mode == TestMode.CREEP:
+                    return self._predict_creep(x, eta1, eta2, alpha, tau1)
+                elif test_mode == TestMode.OSCILLATION:
+                    return self._predict_oscillation(x, eta1, eta2, alpha, tau1)
+                elif test_mode == TestMode.ROTATION:
+                    return self._predict_rotation(x, eta1, eta2, alpha, tau1)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
+
+            # Create objective function
+            logger.debug("Creating least squares objective", normalize=True)
+            objective = create_least_squares_objective(
+                model_fn, jnp.array(X), jnp.array(y), normalize=True
+            )
+
+            # Optimize using NLSQ TRF
+            logger.debug(
+                "Starting NLSQ optimization",
+                use_jax=kwargs.get("use_jax", True),
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "Optimization failed",
+                    message=result.message,
+                    test_mode=test_mode_log,
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+
+            # Log fitted parameters
+            fitted_eta1 = self.parameters.get_value("eta1")
+            fitted_eta2 = self.parameters.get_value("eta2")
+            fitted_alpha = self.parameters.get_value("alpha")
+            fitted_tau1 = self.parameters.get_value("tau1")
+
+            logger.debug(
+                "Fractional Jeffreys fit completed successfully",
+                fitted_eta1=fitted_eta1,
+                fitted_eta2=fitted_eta2,
+                fitted_alpha=fitted_alpha,
+                fitted_tau1=fitted_tau1,
+            )
+
+            ctx["eta1"] = fitted_eta1
+            ctx["eta2"] = fitted_eta2
+            ctx["alpha"] = fitted_alpha
+            ctx["tau1"] = fitted_tau1
+
         return self
 
     def _predict(self, X: jnp.ndarray) -> jnp.ndarray:

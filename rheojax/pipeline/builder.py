@@ -15,13 +15,18 @@ Example:
 
 from __future__ import annotations
 
+import uuid
 import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from rheojax.core.registry import ModelRegistry, TransformRegistry
+from rheojax.logging import get_logger, log_pipeline_stage
 from rheojax.pipeline.base import Pipeline
+
+# Module-level logger
+logger = get_logger(__name__)
 
 
 class PipelineBuilder:

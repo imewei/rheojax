@@ -28,6 +28,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class BayesianOptionsDialog(QDialog):
     """Bayesian inference configuration.
@@ -61,6 +65,7 @@ class BayesianOptionsDialog(QDialog):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self.current_options = current_options or {}
 
@@ -80,6 +85,7 @@ class BayesianOptionsDialog(QDialog):
 
         self.sampler_combo = QComboBox()
         self.sampler_combo.addItems(["NUTS (No U-Turn Sampler)"])
+        self.sampler_combo.currentTextChanged.connect(self._on_sampler_changed)
         sampler_layout.addRow("Sampling Method:", self.sampler_combo)
 
         sampler_group.setLayout(sampler_layout)
@@ -94,6 +100,9 @@ class BayesianOptionsDialog(QDialog):
         self.warmup_spin.setRange(100, 10000)
         self.warmup_spin.setValue(1000)
         self.warmup_spin.setSingleStep(100)
+        self.warmup_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("num_warmup", v)
+        )
         sampling_layout.addRow("Warmup Samples:", self.warmup_spin)
 
         # Number of samples
@@ -101,12 +110,18 @@ class BayesianOptionsDialog(QDialog):
         self.samples_spin.setRange(100, 20000)
         self.samples_spin.setValue(2000)
         self.samples_spin.setSingleStep(100)
+        self.samples_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("num_samples", v)
+        )
         sampling_layout.addRow("Number of Samples:", self.samples_spin)
 
         # Number of chains
         self.chains_spin = QSpinBox()
         self.chains_spin.setRange(1, 8)
         self.chains_spin.setValue(4)
+        self.chains_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("num_chains", v)
+        )
         sampling_layout.addRow("Number of Chains:", self.chains_spin)
 
         sampling_group.setLayout(sampling_layout)
@@ -121,6 +136,9 @@ class BayesianOptionsDialog(QDialog):
             "Warm-start from NLSQ fit (recommended for faster convergence)"
         )
         self.warmstart_check.setChecked(True)
+        self.warmstart_check.stateChanged.connect(
+            lambda s: self._on_option_changed("warm_start", s != 0)
+        )
         init_layout.addWidget(self.warmstart_check)
 
         # Random seed
@@ -129,6 +147,9 @@ class BayesianOptionsDialog(QDialog):
         self.seed_edit = QLineEdit()
         self.seed_edit.setPlaceholderText("(Optional)")
         self.seed_edit.setMaximumWidth(150)
+        self.seed_edit.textChanged.connect(
+            lambda t: self._on_option_changed("seed", t if t else None)
+        )
         seed_layout.addWidget(self.seed_edit)
 
         generate_seed_button = QPushButton("Generate")
@@ -144,11 +165,17 @@ class BayesianOptionsDialog(QDialog):
         self.advanced_group = QGroupBox("Advanced NUTS Parameters")
         self.advanced_group.setCheckable(True)
         self.advanced_group.setChecked(False)
+        self.advanced_group.toggled.connect(
+            lambda checked: self._on_option_changed("advanced_enabled", checked)
+        )
         advanced_layout = QVBoxLayout()
 
         # Dense mass matrix
         self.dense_mass_check = QCheckBox("Use dense mass matrix")
         self.dense_mass_check.setChecked(False)
+        self.dense_mass_check.stateChanged.connect(
+            lambda s: self._on_option_changed("dense_mass", s != 0)
+        )
         advanced_layout.addWidget(self.dense_mass_check)
 
         # Target accept rate
@@ -175,6 +202,9 @@ class BayesianOptionsDialog(QDialog):
         self.max_depth_spin = QSpinBox()
         self.max_depth_spin.setRange(5, 15)
         self.max_depth_spin.setValue(10)
+        self.max_depth_spin.valueChanged.connect(
+            lambda v: self._on_option_changed("max_tree_depth", v)
+        )
         max_depth_layout.addRow("Max Tree Depth:", self.max_depth_spin)
         advanced_layout.addLayout(max_depth_layout)
 
@@ -191,6 +221,7 @@ class BayesianOptionsDialog(QDialog):
             'e.g. {\n  "G_cage": {"dist": "lognormal", "loc": 8.5, "scale": 1.0}\n}'
         )
         self.priors_edit.setMinimumHeight(120)
+        self.priors_edit.textChanged.connect(self._on_priors_changed)
         priors_layout.addWidget(self.priors_edit)
         self.priors_group.setLayout(priors_layout)
         layout.addWidget(self.priors_group)
@@ -210,8 +241,8 @@ class BayesianOptionsDialog(QDialog):
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
+        button_box.accepted.connect(self._on_accepted)
+        button_box.rejected.connect(self._on_rejected)
         layout.addWidget(button_box)
 
         self.setLayout(layout)
@@ -264,14 +295,69 @@ class BayesianOptionsDialog(QDialog):
             self.max_depth_spin.setValue(self.current_options["max_tree_depth"])
             self.advanced_group.setChecked(True)
 
+    def _on_sampler_changed(self, text: str) -> None:
+        """Handle sampler combo box change."""
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option="sampler",
+            value=text,
+        )
+
+    def _on_option_changed(self, option: str, value: Any) -> None:
+        """Handle option change."""
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option=option,
+            value=value,
+        )
+
     def _on_target_changed(self, value: int) -> None:
         """Handle target accept rate slider change."""
         self.target_label.setText(f"{value / 100:.2f}")
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option="target_accept_prob",
+            value=value / 100.0,
+        )
+
+    def _on_priors_changed(self) -> None:
+        """Handle priors text change."""
+        text = self.priors_edit.toPlainText().strip()
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option="priors",
+            value="(JSON text updated)",
+        )
 
     def _generate_seed(self) -> None:
         """Generate random seed."""
         seed = random.randint(0, 2**31 - 1)
         self.seed_edit.setText(str(seed))
+        logger.debug(
+            "Option changed",
+            dialog=self.__class__.__name__,
+            option="seed",
+            value=seed,
+        )
+
+    def _on_accepted(self) -> None:
+        """Handle dialog accepted."""
+        logger.debug("Options applied", dialog=self.__class__.__name__)
+        self.accept()
+
+    def _on_rejected(self) -> None:
+        """Handle dialog rejected."""
+        logger.debug("Dialog closed", dialog=self.__class__.__name__)
+        self.reject()
+
+    def showEvent(self, event) -> None:
+        """Handle show event."""
+        super().showEvent(event)
+        logger.debug("Dialog opened", dialog=self.__class__.__name__)
 
     def get_options(self) -> dict[str, Any]:
         """Get Bayesian inference options.
@@ -319,7 +405,12 @@ class BayesianOptionsDialog(QDialog):
         if priors_text:
             try:
                 options["priors"] = json.loads(priors_text)
-            except Exception:
+            except Exception as e:
+                logger.error(
+                    "Failed to parse priors JSON",
+                    dialog=self.__class__.__name__,
+                    exc_info=True,
+                )
                 options["priors"] = None
 
         return options

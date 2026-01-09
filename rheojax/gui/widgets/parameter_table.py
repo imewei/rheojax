@@ -5,8 +5,6 @@ Parameter Table Widget
 Interactive table for model parameter editing.
 """
 
-import logging
-
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
@@ -18,6 +16,9 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.state.store import ParameterState
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ParameterTable(QTableWidget):
@@ -66,8 +67,7 @@ class ParameterTable(QTableWidget):
             Parent widget
         """
         super().__init__(parent)
-
-        self._logger = logging.getLogger(__name__)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         # Configure table
         self.setColumnCount(5)
@@ -93,6 +93,7 @@ class ParameterTable(QTableWidget):
 
         # Connect signals
         self.itemChanged.connect(self._on_item_changed)
+        logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def set_parameters(self, parameters: dict[str, ParameterState]) -> None:
         """Update displayed parameters.
@@ -102,13 +103,19 @@ class ParameterTable(QTableWidget):
         parameters : dict[str, ParameterState]
             Dictionary mapping parameter names to ParameterState objects
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_parameters",
+            num_parameters=len(parameters),
+        )
         # Disconnect signal temporarily to avoid triggering during setup
         # Use try/finally to ensure signal is reconnected even if exception occurs
         try:
             self.itemChanged.disconnect(self._on_item_changed)
         except (TypeError, RuntimeError):
             # Signal may not be connected yet
-            self._logger.debug("itemChanged disconnect skipped; not connected")
+            logger.debug("itemChanged disconnect skipped; not connected")
 
         try:
             # Clear existing rows
@@ -155,7 +162,12 @@ class ParameterTable(QTableWidget):
             try:
                 self.itemChanged.connect(self._on_item_changed)
             except (TypeError, RuntimeError):
-                self._logger.debug("itemChanged reconnect skipped; already connected")
+                logger.debug("itemChanged reconnect skipped; already connected")
+        logger.debug(
+            "Parameters loaded",
+            widget=self.__class__.__name__,
+            param_names=list(parameters.keys()),
+        )
 
     def get_parameters(self) -> dict[str, ParameterState]:
         """Get current parameter values and states.
@@ -194,14 +206,24 @@ class ParameterTable(QTableWidget):
                 description=original.description if original else "",
             )
 
+        logger.debug(
+            "Parameters retrieved",
+            widget=self.__class__.__name__,
+            num_parameters=len(parameters),
+        )
         return parameters
 
     def reset_to_defaults(self) -> None:
         """Reset all parameters to their original values."""
+        logger.info(
+            "State changed",
+            widget=self.__class__.__name__,
+            action="reset_to_defaults",
+        )
         try:
             self.itemChanged.disconnect(self._on_item_changed)
         except (TypeError, RuntimeError):
-            self._logger.debug("itemChanged disconnect skipped during reset")
+            logger.debug("itemChanged disconnect skipped during reset")
 
         try:
             for row in range(self.rowCount()):
@@ -219,7 +241,8 @@ class ParameterTable(QTableWidget):
             try:
                 self.itemChanged.connect(self._on_item_changed)
             except (TypeError, RuntimeError):
-                self._logger.debug("itemChanged reconnect skipped during reset")
+                logger.debug("itemChanged reconnect skipped during reset")
+        logger.debug("Parameters reset complete", widget=self.__class__.__name__)
 
     def _create_checkbox_widget(self, checked: bool, param_name: str) -> QWidget:
         """Create centered checkbox widget for Fixed column.
@@ -267,6 +290,13 @@ class ParameterTable(QTableWidget):
             value = float(item.text())
 
             if col == 1:  # Value column
+                logger.debug(
+                    "User interaction",
+                    widget=self.__class__.__name__,
+                    action="value_changed",
+                    param_name=param_name,
+                    value=value,
+                )
                 # Check bounds
                 min_val = float(self.item(row, 2).text())
                 max_val = float(self.item(row, 3).text())
@@ -299,6 +329,14 @@ class ParameterTable(QTableWidget):
             elif col in (2, 3):  # Min/Max columns
                 min_val = float(self.item(row, 2).text())
                 max_val = float(self.item(row, 3).text())
+                logger.debug(
+                    "User interaction",
+                    widget=self.__class__.__name__,
+                    action="bounds_changed",
+                    param_name=param_name,
+                    min_val=min_val,
+                    max_val=max_val,
+                )
 
                 # Emit bounds changed
                 self.bounds_changed.emit(param_name, min_val, max_val)
@@ -313,8 +351,13 @@ class ParameterTable(QTableWidget):
 
         except ValueError:
             # Invalid number - reset to previous value without cascading signals
-            self._logger.warning(
-                "Invalid value for %s at column %s: %s", param_name, col, item.text()
+            logger.error(
+                "Invalid numeric value entered",
+                widget=self.__class__.__name__,
+                param_name=param_name,
+                column=col,
+                invalid_value=item.text(),
+                exc_info=True,
             )
             try:
                 self.itemChanged.disconnect(self._on_item_changed)
@@ -351,6 +394,13 @@ class ParameterTable(QTableWidget):
         is_fixed : bool
             New fixed state
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="fixed_toggled",
+            param_name=param_name,
+            is_fixed=is_fixed,
+        )
         # Find row
         for row in range(self.rowCount()):
             if self.item(row, 0).text() == param_name:

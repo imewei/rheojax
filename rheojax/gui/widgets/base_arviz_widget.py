@@ -6,7 +6,6 @@ Base class for widgets that embed ArviZ/matplotlib figures with proper
 figure swapping and cleanup protocols.
 """
 
-import logging
 import time
 from typing import Any
 
@@ -16,7 +15,9 @@ from matplotlib.figure import Figure
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
-logger = logging.getLogger(__name__)
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PlotMetrics:
@@ -57,11 +58,10 @@ class PlotMetrics:
             cls.render_times[plot_type] = times[-cls._max_samples :]
 
         logger.debug(
-            "plot_render_metric",
-            extra={
-                "plot_type": plot_type,
-                "duration_ms": round(duration * 1000, 2),
-            },
+            "Plot render metric recorded",
+            plot_type=plot_type,
+            duration_ms=round(duration * 1000, 2),
+            sample_count=len(cls.render_times[plot_type]),
         )
 
     @classmethod
@@ -131,9 +131,18 @@ class BaseArviZWidget(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug(
+            "Initializing widget",
+            widget=self.__class__.__name__,
+            has_parent=parent is not None,
+        )
         self._figure: Figure | None = None
         self._canvas: FigureCanvasQTAgg | None = None
         self._pending_cleanup: list[Figure] = []
+        logger.debug(
+            "Widget initialization complete",
+            widget=self.__class__.__name__,
+        )
 
     def swap_figure(self, new_fig: Figure) -> None:
         """Thread-safe figure replacement with proper cleanup.
@@ -150,7 +159,10 @@ class BaseArviZWidget(QWidget):
             The new figure to display
         """
         if self._canvas is None:
-            logger.warning("swap_figure called but _canvas is None")
+            logger.warning(
+                "swap_figure called but canvas is None",
+                widget=self.__class__.__name__,
+            )
             return
 
         old_fig = self._figure
@@ -164,14 +176,17 @@ class BaseArviZWidget(QWidget):
         if old_fig is not None:
             # Store reference to prevent garbage collection before cleanup
             self._pending_cleanup.append(old_fig)
+            logger.debug(
+                "Scheduling old figure cleanup",
+                widget=self.__class__.__name__,
+                pending_cleanup_count=len(self._pending_cleanup),
+            )
             QTimer.singleShot(0, lambda fig=old_fig: self._cleanup_figure(fig))
 
         logger.debug(
-            "figure_swapped",
-            extra={
-                "widget": self.__class__.__name__,
-                "new_fig_axes": len(new_fig.get_axes()),
-            },
+            "Figure swapped successfully",
+            widget=self.__class__.__name__,
+            new_fig_axes=len(new_fig.get_axes()),
         )
 
     def _cleanup_figure(self, fig: Figure) -> None:
@@ -186,8 +201,18 @@ class BaseArviZWidget(QWidget):
             plt.close(fig)
             if fig in self._pending_cleanup:
                 self._pending_cleanup.remove(fig)
+            logger.debug(
+                "Figure cleaned up successfully",
+                widget=self.__class__.__name__,
+                remaining_pending=len(self._pending_cleanup),
+            )
         except Exception as e:
-            logger.debug(f"Figure cleanup warning: {e}")
+            logger.error(
+                "Figure cleanup failed",
+                widget=self.__class__.__name__,
+                error=str(e),
+                exc_info=True,
+            )
 
     def timed_render(self, plot_type: str, render_func: Any) -> Any:
         """Execute a render function with timing.
@@ -204,10 +229,33 @@ class BaseArviZWidget(QWidget):
         Any
             Result of render_func
         """
+        logger.debug(
+            "Starting timed render",
+            widget=self.__class__.__name__,
+            plot_type=plot_type,
+        )
         start = time.perf_counter()
         try:
             result = render_func()
+            duration = time.perf_counter() - start
+            logger.debug(
+                "Render completed",
+                widget=self.__class__.__name__,
+                plot_type=plot_type,
+                duration_ms=round(duration * 1000, 2),
+            )
             return result
+        except Exception as e:
+            duration = time.perf_counter() - start
+            logger.error(
+                "Render failed",
+                widget=self.__class__.__name__,
+                plot_type=plot_type,
+                duration_ms=round(duration * 1000, 2),
+                error=str(e),
+                exc_info=True,
+            )
+            raise
         finally:
             duration = time.perf_counter() - start
             PlotMetrics.track(plot_type, duration)
@@ -218,4 +266,13 @@ class BaseArviZWidget(QWidget):
         Uses draw_idle() for thread-safe, non-blocking updates.
         """
         if self._canvas is not None:
+            logger.debug(
+                "Refreshing canvas",
+                widget=self.__class__.__name__,
+            )
             self._canvas.draw_idle()
+        else:
+            logger.warning(
+                "Cannot refresh canvas - canvas is None",
+                widget=self.__class__.__name__,
+            )

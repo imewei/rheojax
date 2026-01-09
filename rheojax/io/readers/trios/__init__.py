@@ -18,7 +18,6 @@ All loaders return RheoData objects compatible with RheoJAX analysis pipelines.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -55,8 +54,9 @@ from rheojax.io.readers.trios.txt import convert_units, load_trios_chunked
 
 # TXT reader (original functionality)
 from rheojax.io.readers.trios.txt import load_trios as load_trios_txt
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Supported formats and their extensions
 TRIOS_FORMAT_EXTENSIONS: dict[str, str] = {
@@ -141,27 +141,31 @@ def load_trios(
         >>> print(len(data))  # Multiple sheets
     """
     filepath = Path(filepath)
+    logger.info("Opening file", filepath=str(filepath))
 
     if not filepath.exists():
+        logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
     # Detect format from extension
     file_format = detect_trios_format(filepath)
 
-    logger.debug(f"Detected TRIOS format: {file_format} for {filepath}")
+    logger.debug("Detected TRIOS format", format=file_format, filepath=str(filepath))
 
     # Dispatch to appropriate loader
     if file_format == "txt":
-        return load_trios_txt(
+        result = load_trios_txt(
             filepath,
             return_all_segments=return_all_segments,
             auto_chunk=auto_chunk,
             progress_callback=progress_callback,
             **kwargs,
         )
+        _log_parse_result(filepath, result)
+        return result
 
     elif file_format == "csv":
-        return load_trios_csv(
+        result = load_trios_csv(
             filepath,
             return_all_segments=return_all_segments,
             test_mode=test_mode,
@@ -171,11 +175,13 @@ def load_trios(
             progress_callback=progress_callback,
             **kwargs,
         )
+        _log_parse_result(filepath, result)
+        return result
 
     elif file_format == "excel":
         # Excel-specific kwargs
         sheet_name = kwargs.pop("sheet_name", None)
-        return load_trios_excel(
+        result = load_trios_excel(
             filepath,
             sheet_name=sheet_name,
             return_all_segments=return_all_segments,
@@ -183,12 +189,14 @@ def load_trios(
             validate=validate,
             **kwargs,
         )
+        _log_parse_result(filepath, result)
+        return result
 
     elif file_format == "json":
         # JSON-specific kwargs
         result_index = kwargs.pop("result_index", 0)
         validate_schema = kwargs.pop("validate_schema", True)
-        return load_trios_json(
+        result = load_trios_json(
             filepath,
             return_all_segments=return_all_segments,
             test_mode=test_mode,
@@ -197,9 +205,31 @@ def load_trios(
             validate=validate,
             **kwargs,
         )
+        _log_parse_result(filepath, result)
+        return result
 
     else:
+        logger.error("Unsupported TRIOS format", format=file_format)
         raise ValueError(f"Unsupported TRIOS format: {file_format}")
+
+
+def _log_parse_result(filepath: Path, result: RheoData | list[RheoData]) -> None:
+    """Log parse completion with record count."""
+    if isinstance(result, list):
+        total_records = sum(len(r.x) for r in result)
+        logger.info(
+            "File parsed",
+            filepath=str(filepath),
+            n_segments=len(result),
+            n_records=total_records,
+        )
+    else:
+        logger.info(
+            "File parsed",
+            filepath=str(filepath),
+            n_records=len(result.x),
+            test_mode=result.test_mode,
+        )
 
 
 __all__ = [

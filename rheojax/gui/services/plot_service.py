@@ -19,8 +19,9 @@ from matplotlib.figure import Figure
 
 from rheojax.core.data import RheoData
 from rheojax.gui.resources import available_plot_styles, load_plot_style
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PlotService:
@@ -42,6 +43,7 @@ class PlotService:
 
     def __init__(self) -> None:
         """Initialize plot service."""
+        logger.debug("Initializing PlotService")
         self._styles = {
             "default": self._apply_default_style,
             "publication": self._apply_publication_style,
@@ -71,6 +73,7 @@ class PlotService:
             "#ffb2f2",  # pink
             "#5ad1fa",  # cyan
         ]
+        logger.debug("PlotService initialized", available_styles=list(self._styles.keys()))
 
     def get_available_styles(self) -> list[str]:
         """Get available plot styles.
@@ -80,7 +83,10 @@ class PlotService:
         list[str]
             Style names
         """
-        return sorted(set(self._styles.keys()) | set(self._style_cache.keys()))
+        logger.debug("Getting available styles")
+        styles = sorted(set(self._styles.keys()) | set(self._style_cache.keys()))
+        logger.debug("Available styles retrieved", count=len(styles))
+        return styles
 
     def get_colorblind_palette(self) -> list[str]:
         """Get Wong colorblind-safe palette.
@@ -90,10 +96,12 @@ class PlotService:
         list[str]
             Hex color codes
         """
+        logger.debug("Getting colorblind palette")
         return self._colorblind_palette.copy()
 
     def get_dark_palette(self) -> list[str]:
         """Get dark-theme-friendly palette."""
+        logger.debug("Getting dark palette")
         return self._dark_palette.copy()
 
     def apply_style(self, fig: Figure, style: str) -> None:
@@ -106,20 +114,24 @@ class PlotService:
         style : str
             Style name ('default', 'publication', 'presentation')
         """
+        logger.debug("Applying style to figure", style=style)
         if style in self._styles:
             self._styles[style](fig)
+            logger.debug("Style applied successfully", style=style)
         else:
             logger.warning(f"Unknown style: {style}, using default")
             self._apply_default_style(fig)
 
     def _apply_default_style(self, fig: Figure) -> None:
         """Apply default style."""
+        logger.debug("Applying default style")
         for ax in fig.get_axes():
             ax.grid(True, alpha=0.3)
             ax.set_axisbelow(True)
 
     def _apply_publication_style(self, fig: Figure) -> None:
         """Apply publication style (IEEE, Nature, etc.)."""
+        logger.debug("Applying publication style")
         # Set DPI for publication quality
         fig.set_dpi(300)
 
@@ -142,6 +154,7 @@ class PlotService:
 
     def _apply_presentation_style(self, fig: Figure) -> None:
         """Apply presentation style (larger fonts, bold)."""
+        logger.debug("Applying presentation style")
         fig.set_dpi(150)
 
         for ax in fig.get_axes():
@@ -160,6 +173,7 @@ class PlotService:
 
     def _apply_dark_style(self, fig: Figure) -> None:
         """Apply dark-theme adjustments after RC params."""
+        logger.debug("Applying dark style")
         for ax in fig.get_axes():
             ax.tick_params(colors="#e8eaed")
             ax.xaxis.label.set_color("#e8eaed")
@@ -196,169 +210,184 @@ class PlotService:
         Figure
             Matplotlib figure
         """
-        self._apply_style_context(style)
-        fig, ax = plt.subplots(figsize=(8, 6))
-        palette = self._get_palette(style) if (style or "").lower() == "dark" else None
+        logger.debug("create_fit_plot called", style=style, test_mode=test_mode)
+        logger.info("Generating plot", plot_type="fit")
 
-        x = np.asarray(data.x)
-        y = np.asarray(data.y)
-        y_fit = fit_result.y_fit
+        try:
+            self._apply_style_context(style)
+            fig, ax = plt.subplots(figsize=(8, 6))
+            palette = self._get_palette(style) if (style or "").lower() == "dark" else None
 
-        # Check for covariance matrix (for uncertainty bands)
-        pcov = getattr(fit_result, "pcov", None)
-        has_uncertainty = pcov is not None and np.all(np.isfinite(pcov))
+            x = np.asarray(data.x)
+            y = np.asarray(data.y)
+            y_fit = fit_result.y_fit
 
-        # Determine test mode
-        if test_mode is None:
-            test_mode = data.metadata.get("test_mode", "oscillation")
+            # Check for covariance matrix (for uncertainty bands)
+            pcov = getattr(fit_result, "pcov", None)
+            has_uncertainty = pcov is not None and np.all(np.isfinite(pcov))
 
-        # Helper: compute uncertainty band for real-valued fits
-        def _compute_band(x_vals, y_vals):
-            """Compute ±2σ band if pcov available."""
-            if not has_uncertainty:
-                return None, None
-            try:
+            # Determine test mode
+            if test_mode is None:
+                test_mode = data.metadata.get("test_mode", "oscillation")
 
-                # Get Jacobian dimensions from pcov
-                n_params = pcov.shape[0]
-                # Use finite difference on y_fit to approximate band
-                # This is simpler than full error propagation
-                # Uncertainty ~ sqrt(diag(pcov)) projected to y space
-                param_std = np.sqrt(np.diag(pcov))
-                # Rough approximation: scale y_fit by relative param uncertainty
-                rel_uncertainty = np.mean(
-                    param_std / (np.abs(list(fit_result.parameters.values())) + 1e-10)
-                )
-                sigma_y = np.abs(y_vals) * rel_uncertainty
-                z = 1.96  # 95% CI
-                return y_vals - z * sigma_y, y_vals + z * sigma_y
-            except Exception:
-                return None, None
+            logger.debug("Fit plot configuration",
+                        data_shape=x.shape,
+                        has_uncertainty=has_uncertainty,
+                        resolved_test_mode=test_mode)
 
-        # Plot based on test mode
-        if test_mode == "oscillation":
-            # Plot G' and G" for oscillation
-            if np.iscomplexobj(y):
-                G_prime = np.real(y)
-                # Some datasets/models may use sign conventions; ensure log-safe positivity.
-                G_double_prime = np.abs(np.imag(y))
-                G_prime_fit = np.real(y_fit)
-                G_double_prime_fit = np.abs(np.imag(y_fit))
+            # Helper: compute uncertainty band for real-valued fits
+            def _compute_band(x_vals, y_vals):
+                """Compute +/-2sigma band if pcov available."""
+                if not has_uncertainty:
+                    return None, None
+                try:
 
-                # Avoid log-scale issues with zeros.
-                positive = np.concatenate(
-                    [
-                        np.ravel(G_prime[np.isfinite(G_prime) & (G_prime > 0)]),
-                        np.ravel(
-                            G_double_prime[
-                                np.isfinite(G_double_prime) & (G_double_prime > 0)
-                            ]
-                        ),
-                    ]
-                )
-                eps = float(np.nanmin(positive)) * 1e-12 if positive.size else 1e-30
-                G_prime = np.maximum(G_prime, eps)
-                G_double_prime = np.maximum(G_double_prime, eps)
-                G_prime_fit = np.maximum(G_prime_fit, eps)
-                G_double_prime_fit = np.maximum(G_double_prime_fit, eps)
+                    # Get Jacobian dimensions from pcov
+                    n_params = pcov.shape[0]
+                    # Use finite difference on y_fit to approximate band
+                    # This is simpler than full error propagation
+                    # Uncertainty ~ sqrt(diag(pcov)) projected to y space
+                    param_std = np.sqrt(np.diag(pcov))
+                    # Rough approximation: scale y_fit by relative param uncertainty
+                    rel_uncertainty = np.mean(
+                        param_std / (np.abs(list(fit_result.parameters.values())) + 1e-10)
+                    )
+                    sigma_y = np.abs(y_vals) * rel_uncertainty
+                    z = 1.96  # 95% CI
+                    return y_vals - z * sigma_y, y_vals + z * sigma_y
+                except Exception:
+                    return None, None
 
-                ax.loglog(
-                    x,
-                    G_prime,
-                    "o",
-                    label="G' (data)",
-                    color=palette[0] if palette else None,
-                )
-                ax.loglog(
-                    x,
-                    G_double_prime,
-                    "s",
-                    label='G" (data)',
-                    color=palette[1] if palette else None,
-                )
-                ax.loglog(
-                    x,
-                    G_prime_fit,
-                    "-",
-                    label="G' (fit)",
-                    color=palette[0] if palette else None,
-                )
-                ax.loglog(
-                    x,
-                    G_double_prime_fit,
-                    "-",
-                    label='G" (fit)',
-                    color=palette[1] if palette else None,
-                )
+            # Plot based on test mode
+            if test_mode == "oscillation":
+                # Plot G' and G" for oscillation
+                if np.iscomplexobj(y):
+                    G_prime = np.real(y)
+                    # Some datasets/models may use sign conventions; ensure log-safe positivity.
+                    G_double_prime = np.abs(np.imag(y))
+                    G_prime_fit = np.real(y_fit)
+                    G_double_prime_fit = np.abs(np.imag(y_fit))
 
-                ax.set_xlabel("Frequency (rad/s)")
-                ax.set_ylabel("Modulus (Pa)")
-            else:
-                # Complex modulus magnitude
-                ax.loglog(
-                    x, y, "o", label="Data", color=palette[0] if palette else None
-                )
-                ax.loglog(
-                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
-                )
+                    # Avoid log-scale issues with zeros.
+                    positive = np.concatenate(
+                        [
+                            np.ravel(G_prime[np.isfinite(G_prime) & (G_prime > 0)]),
+                            np.ravel(
+                                G_double_prime[
+                                    np.isfinite(G_double_prime) & (G_double_prime > 0)
+                                ]
+                            ),
+                        ]
+                    )
+                    eps = float(np.nanmin(positive)) * 1e-12 if positive.size else 1e-30
+                    G_prime = np.maximum(G_prime, eps)
+                    G_double_prime = np.maximum(G_double_prime, eps)
+                    G_prime_fit = np.maximum(G_prime_fit, eps)
+                    G_double_prime_fit = np.maximum(G_double_prime_fit, eps)
+
+                    ax.loglog(
+                        x,
+                        G_prime,
+                        "o",
+                        label="G' (data)",
+                        color=palette[0] if palette else None,
+                    )
+                    ax.loglog(
+                        x,
+                        G_double_prime,
+                        "s",
+                        label='G" (data)',
+                        color=palette[1] if palette else None,
+                    )
+                    ax.loglog(
+                        x,
+                        G_prime_fit,
+                        "-",
+                        label="G' (fit)",
+                        color=palette[0] if palette else None,
+                    )
+                    ax.loglog(
+                        x,
+                        G_double_prime_fit,
+                        "-",
+                        label='G" (fit)',
+                        color=palette[1] if palette else None,
+                    )
+
+                    ax.set_xlabel("Frequency (rad/s)")
+                    ax.set_ylabel("Modulus (Pa)")
+                else:
+                    # Complex modulus magnitude
+                    ax.loglog(
+                        x, y, "o", label="Data", color=palette[0] if palette else None
+                    )
+                    ax.loglog(
+                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                    )
+
+                    # Add uncertainty band
+                    y_lo, y_hi = _compute_band(x, y_fit)
+                    if y_lo is not None and y_hi is not None:
+                        y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                        ax.fill_between(
+                            x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                        )
+
+                    ax.set_xlabel("Frequency (rad/s)")
+                    ax.set_ylabel("|G*| (Pa)")
+
+            elif test_mode == "relaxation":
+                ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
+                ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
 
                 # Add uncertainty band
                 y_lo, y_hi = _compute_band(x, y_fit)
                 if y_lo is not None and y_hi is not None:
                     y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                    ax.fill_between(
-                        x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
-                    )
+                    ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
 
-                ax.set_xlabel("Frequency (rad/s)")
-                ax.set_ylabel("|G*| (Pa)")
+                ax.set_xlabel("Time (s)")
+                ax.set_ylabel("Relaxation Modulus G(t) (Pa)")
 
-        elif test_mode == "relaxation":
-            ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
-            ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+            elif test_mode == "creep":
+                ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
+                ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
 
-            # Add uncertainty band
-            y_lo, y_hi = _compute_band(x, y_fit)
-            if y_lo is not None and y_hi is not None:
-                y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+                # Add uncertainty band
+                y_lo, y_hi = _compute_band(x, y_fit)
+                if y_lo is not None and y_hi is not None:
+                    y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                    ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
 
-            ax.set_xlabel("Time (s)")
-            ax.set_ylabel("Relaxation Modulus G(t) (Pa)")
+                ax.set_xlabel("Time (s)")
+                ax.set_ylabel("Creep Compliance J(t) (1/Pa)")
 
-        elif test_mode == "creep":
-            ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
-            ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+            elif test_mode == "flow":
+                ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
+                ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
 
-            # Add uncertainty band
-            y_lo, y_hi = _compute_band(x, y_fit)
-            if y_lo is not None and y_hi is not None:
-                y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+                # Add uncertainty band
+                y_lo, y_hi = _compute_band(x, y_fit)
+                if y_lo is not None and y_hi is not None:
+                    y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                    ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
 
-            ax.set_xlabel("Time (s)")
-            ax.set_ylabel("Creep Compliance J(t) (1/Pa)")
+                ax.set_xlabel("Shear Rate (1/s)")
+                ax.set_ylabel("Viscosity (Pa.s)")
 
-        elif test_mode == "flow":
-            ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
-            ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+            ax.legend()
+            ax.set_title(f"{fit_result.model_name} Model Fit")
 
-            # Add uncertainty band
-            y_lo, y_hi = _compute_band(x, y_fit)
-            if y_lo is not None and y_hi is not None:
-                y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+            # Apply style
+            self.apply_style(fig, style)
 
-            ax.set_xlabel("Shear Rate (1/s)")
-            ax.set_ylabel("Viscosity (Pa·s)")
+            logger.info("Plot generated", plot_type="fit")
+            logger.debug("create_fit_plot completed successfully")
+            return fig
 
-        ax.legend()
-        ax.set_title(f"{fit_result.model_name} Model Fit")
-
-        # Apply style
-        self.apply_style(fig, style)
-
-        return fig
+        except Exception as e:
+            logger.error(f"Failed to create fit plot: {e}", exc_info=True)
+            raise
 
     def create_residual_plot(
         self,
@@ -380,27 +409,40 @@ class PlotService:
         Figure
             Matplotlib figure
         """
-        self._apply_style_context(style)
-        palette = self._get_palette(style)
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+        logger.debug("create_residual_plot called", style=style)
+        logger.info("Generating plot", plot_type="residual")
 
-        x = np.asarray(data.x)
-        residuals = fit_result.residuals
+        try:
+            self._apply_style_context(style)
+            palette = self._get_palette(style)
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
 
-        # Residuals vs x
-        ax1.semilogx(x, residuals, "o", color=palette[0])
-        ax1.axhline(0, color="k", linestyle="--", alpha=0.5)
-        ax1.set_ylabel("Residuals")
-        ax1.set_title("Residual Analysis")
+            x = np.asarray(data.x)
+            residuals = fit_result.residuals
 
-        # Residual histogram
-        ax2.hist(residuals, bins=30, color=palette[1], alpha=0.7, edgecolor="black")
-        ax2.set_xlabel("Residual Value")
-        ax2.set_ylabel("Frequency")
-        ax2.set_title("Residual Distribution")
+            logger.debug("Residual plot data", data_points=len(x), residual_shape=residuals.shape)
 
-        fig.tight_layout()
-        return fig
+            # Residuals vs x
+            ax1.semilogx(x, residuals, "o", color=palette[0])
+            ax1.axhline(0, color="k", linestyle="--", alpha=0.5)
+            ax1.set_ylabel("Residuals")
+            ax1.set_title("Residual Analysis")
+
+            # Residual histogram
+            ax2.hist(residuals, bins=30, color=palette[1], alpha=0.7, edgecolor="black")
+            ax2.set_xlabel("Residual Value")
+            ax2.set_ylabel("Frequency")
+            ax2.set_title("Residual Distribution")
+
+            fig.tight_layout()
+
+            logger.info("Plot generated", plot_type="residual")
+            logger.debug("create_residual_plot completed successfully")
+            return fig
+
+        except Exception as e:
+            logger.error(f"Failed to create residual plot: {e}", exc_info=True)
+            raise
 
     def create_arviz_plot(
         self,
@@ -425,6 +467,9 @@ class PlotService:
         Figure
             Matplotlib figure
         """
+        logger.debug("create_arviz_plot called", plot_type=plot_type, style=style)
+        logger.info("Generating plot", plot_type=f"arviz_{plot_type}")
+
         self._apply_style_context(style)
         try:
             import arviz as az
@@ -436,6 +481,8 @@ class PlotService:
                 for k, v in posterior_samples.items()
             }
             idata = az.from_dict(idata_dict)
+
+            logger.debug("ArviZ InferenceData created", parameters=list(posterior_samples.keys()))
 
             # Create plot based on type
             if plot_type == "trace":
@@ -467,12 +514,15 @@ class PlotService:
                 fig = ax.figure if hasattr(ax, "figure") else plt.gcf()
 
             else:
+                logger.error(f"Unknown ArviZ plot type: {plot_type}")
                 raise ValueError(f"Unknown plot type: {plot_type}")
 
+            logger.info("Plot generated", plot_type=f"arviz_{plot_type}")
+            logger.debug("create_arviz_plot completed successfully", plot_type=plot_type)
             return fig
 
         except Exception as e:
-            logger.error(f"ArviZ plot failed: {e}")
+            logger.error(f"ArviZ plot failed: {e}", exc_info=True)
             raise RuntimeError(f"Plot creation failed: {e}") from e
 
     def create_data_plot(
@@ -497,38 +547,55 @@ class PlotService:
         Figure
             Matplotlib figure
         """
-        self._apply_style_context(style)
-        palette = self._get_palette(style)
-        fig, ax = plt.subplots(figsize=(8, 6))
+        logger.debug("create_data_plot called", style=style, test_mode=test_mode)
+        logger.info("Generating plot", plot_type="data")
 
-        x = np.asarray(data.x)
-        y = np.asarray(data.y)
+        try:
+            self._apply_style_context(style)
+            palette = self._get_palette(style)
+            fig, ax = plt.subplots(figsize=(8, 6))
 
-        if test_mode is None:
-            test_mode = data.metadata.get("test_mode", "unknown")
+            x = np.asarray(data.x)
+            y = np.asarray(data.y)
 
-        # Plot based on type
-        if np.iscomplexobj(y):
-            G_prime = np.real(y)
-            G_double_prime = np.imag(y)
-            ax.loglog(x, G_prime, "o", label="G'", color=palette[0])
-            ax.loglog(x, G_double_prime, "s", label='G"', color=palette[1])
-            ax.set_xlabel(data.x_units or "Frequency (rad/s)")
-            ax.set_ylabel(data.y_units or "Modulus (Pa)")
-        else:
-            ax.loglog(x, y, "o", color=palette[0])
-            ax.set_xlabel(data.x_units or "X")
-            ax.set_ylabel(data.y_units or "Y")
+            if test_mode is None:
+                test_mode = data.metadata.get("test_mode", "unknown")
 
-        ax.set_title(f"Rheological Data ({test_mode})")
-        if np.iscomplexobj(y):
-            ax.legend()
+            logger.debug("Data plot configuration",
+                        data_shape=x.shape,
+                        is_complex=np.iscomplexobj(y),
+                        resolved_test_mode=test_mode)
 
-        self.apply_style(fig, style)
-        return fig
+            # Plot based on type
+            if np.iscomplexobj(y):
+                G_prime = np.real(y)
+                G_double_prime = np.imag(y)
+                ax.loglog(x, G_prime, "o", label="G'", color=palette[0])
+                ax.loglog(x, G_double_prime, "s", label='G"', color=palette[1])
+                ax.set_xlabel(data.x_units or "Frequency (rad/s)")
+                ax.set_ylabel(data.y_units or "Modulus (Pa)")
+            else:
+                ax.loglog(x, y, "o", color=palette[0])
+                ax.set_xlabel(data.x_units or "X")
+                ax.set_ylabel(data.y_units or "Y")
+
+            ax.set_title(f"Rheological Data ({test_mode})")
+            if np.iscomplexobj(y):
+                ax.legend()
+
+            self.apply_style(fig, style)
+
+            logger.info("Plot generated", plot_type="data")
+            logger.debug("create_data_plot completed successfully")
+            return fig
+
+        except Exception as e:
+            logger.error(f"Failed to create data plot: {e}", exc_info=True)
+            raise
 
     def _apply_style_context(self, style: str) -> None:
         """Apply RC params from bundled styles if available."""
+        logger.debug("Applying style context", style=style)
         style_name = style or "default"
         if style_name == "default":
             plt.rcParams.update(plt.rcParamsDefault)
@@ -545,18 +612,21 @@ class PlotService:
             try:
                 rc = rc_params_from_file(tmp_path)
                 plt.rcParams.update(rc)
+                logger.debug("Style context applied from cache", style=style_name)
             finally:
                 try:
                     os.remove(tmp_path)
                 except OSError as exc:
-                    logging.getLogger(__name__).debug(
+                    logger.debug(
                         "Failed to remove temp style file: %s", exc
                     )
         else:
             plt.style.use("default")
+            logger.debug("Using default matplotlib style")
 
     def _get_palette(self, style: str) -> list[str]:
         """Return palette respecting style."""
+        logger.debug("Getting palette for style", style=style)
         if (style or "").lower() == "dark":
             return self._dark_palette
         return self._colorblind_palette

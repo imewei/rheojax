@@ -35,9 +35,12 @@ from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from jax import Array

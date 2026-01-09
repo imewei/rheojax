@@ -5,9 +5,9 @@ matching the visualization capabilities of MATLAB SPPplus and R oreo packages.
 
 Key Plots
 ---------
-- Lissajous-Bowditch plots (σ vs γ, σ vs γ̇)
+- Lissajous-Bowditch plots (sigma vs gamma, sigma vs gamma_dot)
 - Cole-Cole diagram (G'' vs G')
-- Time-resolved moduli evolution (G'(t), G''(t), δ(t) vs t)
+- Time-resolved moduli evolution (G'(t), G''(t), delta(t) vs t)
 - Pipkin diagram (amplitude-frequency map)
 - Harmonic spectrum bar charts
 - Frenet-Serret frame 3D trajectory
@@ -25,9 +25,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from rheojax.logging import get_logger
+
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+
+# Module logger
+logger = get_logger(__name__)
 
 
 def _ensure_matplotlib():
@@ -59,11 +64,11 @@ def plot_lissajous(
     Parameters
     ----------
     strain : np.ndarray
-        Strain signal γ(t) (dimensionless)
+        Strain signal gamma(t) (dimensionless)
     strain_rate : np.ndarray
-        Strain rate signal γ̇(t) (1/s)
+        Strain rate signal gamma_dot(t) (1/s)
     stress : np.ndarray
-        Stress signal σ(t) (Pa)
+        Stress signal sigma(t) (Pa)
     gamma_0 : float, optional
         Strain amplitude for normalization
     omega : float, optional
@@ -80,58 +85,72 @@ def plot_lissajous(
     Figure
         Matplotlib figure object
     """
-    plt = _ensure_matplotlib()
+    logger.debug("Generating plot", plot_type="lissajous", style=style)
 
-    if ax is None:
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-    elif isinstance(ax, tuple):
-        fig = ax[0].get_figure()
-        ax1, ax2 = ax
-    else:
-        fig = ax.get_figure()
-        ax1 = ax2 = ax
+    try:
+        plt = _ensure_matplotlib()
 
-    # Normalize if amplitudes provided
-    strain_plot = strain / gamma_0 if gamma_0 else strain
-    rate_plot = strain_rate / (gamma_0 * omega) if (gamma_0 and omega) else strain_rate
-    stress_plot = stress
+        if ax is None:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+        elif isinstance(ax, tuple):
+            fig = ax[0].get_figure()
+            ax1, ax2 = ax
+        else:
+            fig = ax.get_figure()
+            ax1 = ax2 = ax
 
-    # Style settings
-    if style == "publication":
-        linewidth = 1.5
-        fontsize = 12
-    elif style == "presentation":
-        linewidth = 2.5
-        fontsize = 14
-    else:
-        linewidth = 1.0
-        fontsize = 10
+        # Normalize if amplitudes provided
+        strain_plot = strain / gamma_0 if gamma_0 else strain
+        rate_plot = strain_rate / (gamma_0 * omega) if (gamma_0 and omega) else strain_rate
+        stress_plot = stress
 
-    # Plot σ vs γ (elastic Lissajous)
-    ax1.plot(strain_plot, stress_plot, linewidth=linewidth, **kwargs)
-    ax1.set_xlabel(r"$\gamma/\gamma_0$" if gamma_0 else r"$\gamma$", fontsize=fontsize)
-    ax1.set_ylabel(r"$\sigma$ (Pa)", fontsize=fontsize)
-    ax1.set_title("Elastic Lissajous", fontsize=fontsize + 2)
-    ax1.axhline(0, color="gray", linestyle="--", linewidth=0.5)
-    ax1.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+        # Style settings
+        if style == "publication":
+            linewidth = 1.5
+            fontsize = 12
+        elif style == "presentation":
+            linewidth = 2.5
+            fontsize = 14
+        else:
+            linewidth = 1.0
+            fontsize = 10
 
-    # Plot σ vs γ̇ (viscous Lissajous)
-    ax2.plot(rate_plot, stress_plot, linewidth=linewidth, **kwargs)
-    ax2.set_xlabel(
-        (
-            r"$\dot{\gamma}/\dot{\gamma}_0$"
-            if (gamma_0 and omega)
-            else r"$\dot{\gamma}$ (1/s)"
-        ),
-        fontsize=fontsize,
-    )
-    ax2.set_ylabel(r"$\sigma$ (Pa)", fontsize=fontsize)
-    ax2.set_title("Viscous Lissajous", fontsize=fontsize + 2)
-    ax2.axhline(0, color="gray", linestyle="--", linewidth=0.5)
-    ax2.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+        # Plot sigma vs gamma (elastic Lissajous)
+        ax1.plot(strain_plot, stress_plot, linewidth=linewidth, **kwargs)
+        ax1.set_xlabel(r"$\gamma/\gamma_0$" if gamma_0 else r"$\gamma$", fontsize=fontsize)
+        ax1.set_ylabel(r"$\sigma$ (Pa)", fontsize=fontsize)
+        ax1.set_title("Elastic Lissajous", fontsize=fontsize + 2)
+        ax1.axhline(0, color="gray", linestyle="--", linewidth=0.5)
+        ax1.axvline(0, color="gray", linestyle="--", linewidth=0.5)
 
-    plt.tight_layout()
-    return fig
+        # Plot sigma vs gamma_dot (viscous Lissajous)
+        ax2.plot(rate_plot, stress_plot, linewidth=linewidth, **kwargs)
+        ax2.set_xlabel(
+            (
+                r"$\dot{\gamma}/\dot{\gamma}_0$"
+                if (gamma_0 and omega)
+                else r"$\dot{\gamma}$ (1/s)"
+            ),
+            fontsize=fontsize,
+        )
+        ax2.set_ylabel(r"$\sigma$ (Pa)", fontsize=fontsize)
+        ax2.set_title("Viscous Lissajous", fontsize=fontsize + 2)
+        ax2.axhline(0, color="gray", linestyle="--", linewidth=0.5)
+        ax2.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+
+        plt.tight_layout()
+
+        logger.debug("Figure created", plot_type="lissajous")
+        return fig
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate lissajous plot",
+            plot_type="lissajous",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def plot_cole_cole(
@@ -168,46 +187,59 @@ def plot_cole_cole(
     Figure
         Matplotlib figure object
     """
-    plt = _ensure_matplotlib()
+    logger.debug("Generating plot", plot_type="cole_cole", colormap=colormap)
 
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(6, 6))
-    else:
-        fig = ax.get_figure()
+    try:
+        plt = _ensure_matplotlib()
 
-    if time is None:
-        time = np.arange(len(Gp_t))
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(6, 6))
+        else:
+            fig = ax.get_figure()
 
-    if show_trajectory:
-        # Colored line showing trajectory evolution
-        from matplotlib.collections import LineCollection
+        if time is None:
+            time = np.arange(len(Gp_t))
 
-        points = np.array([Gp_t, Gpp_t]).T.reshape(-1, 1, 2)
-        segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        lc = LineCollection(segments, cmap=colormap, linewidth=2)
-        lc.set_array(time[:-1])
-        line = ax.add_collection(lc)
-        fig.colorbar(line, ax=ax, label="Time (s)")
-        ax.autoscale()
-    else:
-        scatter = ax.scatter(Gp_t, Gpp_t, c=time, cmap=colormap, s=10, **kwargs)
-        fig.colorbar(scatter, ax=ax, label="Time (s)")
+        if show_trajectory:
+            # Colored line showing trajectory evolution
+            from matplotlib.collections import LineCollection
 
-    # Add start/end markers
-    ax.plot(Gp_t[0], Gpp_t[0], "go", markersize=10, label="Start", zorder=5)
-    ax.plot(Gp_t[-1], Gpp_t[-1], "rs", markersize=10, label="End", zorder=5)
+            points = np.array([Gp_t, Gpp_t]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            lc = LineCollection(segments, cmap=colormap, linewidth=2)
+            lc.set_array(time[:-1])
+            line = ax.add_collection(lc)
+            fig.colorbar(line, ax=ax, label="Time (s)")
+            ax.autoscale()
+        else:
+            scatter = ax.scatter(Gp_t, Gpp_t, c=time, cmap=colormap, s=10, **kwargs)
+            fig.colorbar(scatter, ax=ax, label="Time (s)")
 
-    ax.set_xlabel(r"$G'(t)$ (Pa)", fontsize=12)
-    ax.set_ylabel(r"$G''(t)$ (Pa)", fontsize=12)
-    ax.set_title("Cole-Cole Diagram", fontsize=14)
-    ax.legend(loc="upper right")
-    ax.set_aspect("equal", adjustable="box")
+        # Add start/end markers
+        ax.plot(Gp_t[0], Gpp_t[0], "go", markersize=10, label="Start", zorder=5)
+        ax.plot(Gp_t[-1], Gpp_t[-1], "rs", markersize=10, label="End", zorder=5)
 
-    # Add reference lines
-    ax.axhline(0, color="gray", linestyle="--", linewidth=0.5)
-    ax.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+        ax.set_xlabel(r"$G'(t)$ (Pa)", fontsize=12)
+        ax.set_ylabel(r"$G''(t)$ (Pa)", fontsize=12)
+        ax.set_title("Cole-Cole Diagram", fontsize=14)
+        ax.legend(loc="upper right")
+        ax.set_aspect("equal", adjustable="box")
 
-    return fig
+        # Add reference lines
+        ax.axhline(0, color="gray", linestyle="--", linewidth=0.5)
+        ax.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+
+        logger.debug("Figure created", plot_type="cole_cole")
+        return fig
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate cole_cole plot",
+            plot_type="cole_cole",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def plot_moduli_evolution(
@@ -220,7 +252,7 @@ def plot_moduli_evolution(
     **kwargs,
 ) -> Figure:
     """
-    Plot time-resolved moduli evolution (G'(t), G''(t), δ(t) vs t).
+    Plot time-resolved moduli evolution (G'(t), G''(t), delta(t) vs t).
 
     Parameters
     ----------
@@ -231,7 +263,7 @@ def plot_moduli_evolution(
     Gpp_t : np.ndarray
         Instantaneous loss modulus G''(t) (Pa)
     delta_t : np.ndarray, optional
-        Instantaneous phase angle δ(t) (radians)
+        Instantaneous phase angle delta(t) (radians)
     G_speed : np.ndarray, optional
         Moduli rate magnitude |dG*/dt| (Pa/s)
     ax : Axes or tuple, optional
@@ -244,59 +276,73 @@ def plot_moduli_evolution(
     Figure
         Matplotlib figure object
     """
-    plt = _ensure_matplotlib()
+    logger.debug("Generating plot", plot_type="moduli_evolution")
 
-    n_plots = 2 + (1 if delta_t is not None else 0) + (1 if G_speed is not None else 0)
+    try:
+        plt = _ensure_matplotlib()
 
-    if ax is None:
-        fig, axes = plt.subplots(n_plots, 1, figsize=(8, 3 * n_plots), sharex=True)
-        if n_plots == 1:
-            axes = [axes]
-    else:
-        if isinstance(ax, tuple):
-            axes = list(ax)
+        n_plots = 2 + (1 if delta_t is not None else 0) + (1 if G_speed is not None else 0)
+
+        if ax is None:
+            fig, axes = plt.subplots(n_plots, 1, figsize=(8, 3 * n_plots), sharex=True)
+            if n_plots == 1:
+                axes = [axes]
         else:
-            axes = [ax]
-        fig = axes[0].get_figure()
+            if isinstance(ax, tuple):
+                axes = list(ax)
+            else:
+                axes = [ax]
+            fig = axes[0].get_figure()
 
-    idx = 0
+        idx = 0
 
-    # G'(t) plot
-    axes[idx].plot(time, Gp_t, "b-", linewidth=1.5, label=r"$G'(t)$")
-    axes[idx].set_ylabel(r"$G'(t)$ (Pa)", color="b")
-    axes[idx].tick_params(axis="y", labelcolor="b")
-    axes[idx].axhline(0, color="gray", linestyle="--", linewidth=0.5)
-    idx += 1
+        # G'(t) plot
+        axes[idx].plot(time, Gp_t, "b-", linewidth=1.5, label=r"$G'(t)$")
+        axes[idx].set_ylabel(r"$G'(t)$ (Pa)", color="b")
+        axes[idx].tick_params(axis="y", labelcolor="b")
+        axes[idx].axhline(0, color="gray", linestyle="--", linewidth=0.5)
+        idx += 1
 
-    # G''(t) plot
-    axes[idx].plot(time, Gpp_t, "r-", linewidth=1.5, label=r"$G''(t)$")
-    axes[idx].set_ylabel(r"$G''(t)$ (Pa)", color="r")
-    axes[idx].tick_params(axis="y", labelcolor="r")
-    axes[idx].axhline(0, color="gray", linestyle="--", linewidth=0.5)
-    idx += 1
+        # G''(t) plot
+        axes[idx].plot(time, Gpp_t, "r-", linewidth=1.5, label=r"$G''(t)$")
+        axes[idx].set_ylabel(r"$G''(t)$ (Pa)", color="r")
+        axes[idx].tick_params(axis="y", labelcolor="r")
+        axes[idx].axhline(0, color="gray", linestyle="--", linewidth=0.5)
+        idx += 1
 
-    # δ(t) plot
-    if delta_t is not None and idx < len(axes):
-        axes[idx].plot(
-            time, np.degrees(delta_t), "g-", linewidth=1.5, label=r"$\delta(t)$"
+        # delta(t) plot
+        if delta_t is not None and idx < len(axes):
+            axes[idx].plot(
+                time, np.degrees(delta_t), "g-", linewidth=1.5, label=r"$\delta(t)$"
+            )
+            axes[idx].set_ylabel(r"$\delta(t)$ (deg)", color="g")
+            axes[idx].tick_params(axis="y", labelcolor="g")
+            axes[idx].axhline(45, color="gray", linestyle=":", linewidth=0.5)
+            axes[idx].axhline(90, color="gray", linestyle="--", linewidth=0.5)
+            idx += 1
+
+        # G_speed plot
+        if G_speed is not None and idx < len(axes):
+            axes[idx].plot(time, G_speed, "m-", linewidth=1.5, label=r"$|\dot{G}^*|$")
+            axes[idx].set_ylabel(r"$|\dot{G}^*|$ (Pa/s)", color="m")
+            axes[idx].tick_params(axis="y", labelcolor="m")
+            idx += 1
+
+        axes[-1].set_xlabel("Time (s)")
+        fig.suptitle("Time-Resolved Moduli Evolution", fontsize=14)
+        plt.tight_layout()
+
+        logger.debug("Figure created", plot_type="moduli_evolution")
+        return fig
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate moduli_evolution plot",
+            plot_type="moduli_evolution",
+            error=str(e),
+            exc_info=True,
         )
-        axes[idx].set_ylabel(r"$\delta(t)$ (°)", color="g")
-        axes[idx].tick_params(axis="y", labelcolor="g")
-        axes[idx].axhline(45, color="gray", linestyle=":", linewidth=0.5)
-        axes[idx].axhline(90, color="gray", linestyle="--", linewidth=0.5)
-        idx += 1
-
-    # G_speed plot
-    if G_speed is not None and idx < len(axes):
-        axes[idx].plot(time, G_speed, "m-", linewidth=1.5, label=r"$|\dot{G}^*|$")
-        axes[idx].set_ylabel(r"$|\dot{G}^*|$ (Pa/s)", color="m")
-        axes[idx].tick_params(axis="y", labelcolor="m")
-        idx += 1
-
-    axes[-1].set_xlabel("Time (s)")
-    fig.suptitle("Time-Resolved Moduli Evolution", fontsize=14)
-    plt.tight_layout()
-    return fig
+        raise
 
 
 def plot_harmonic_spectrum(
@@ -327,47 +373,65 @@ def plot_harmonic_spectrum(
     Figure
         Matplotlib figure object
     """
-    plt = _ensure_matplotlib()
+    logger.debug(
+        "Generating plot",
+        plot_type="harmonic_spectrum",
+        n_harmonics=n_harmonics,
+        normalize=normalize,
+    )
 
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 4))
-    else:
-        fig = ax.get_figure()
+    try:
+        plt = _ensure_matplotlib()
 
-    if n_harmonics is None:
-        n_harmonics = len(amplitudes)
-    else:
-        n_harmonics = min(n_harmonics, len(amplitudes))
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 4))
+        else:
+            fig = ax.get_figure()
 
-    amps = amplitudes[:n_harmonics]
-    harmonics = [2 * i + 1 for i in range(n_harmonics)]  # 1, 3, 5, ...
+        if n_harmonics is None:
+            n_harmonics = len(amplitudes)
+        else:
+            n_harmonics = min(n_harmonics, len(amplitudes))
 
-    if normalize and amps[0] > 0:
-        amps = amps / amps[0]
-        ylabel = r"$I_n/I_1$"
-    else:
-        ylabel = r"$I_n$ (Pa)"
+        amps = amplitudes[:n_harmonics]
+        harmonics = [2 * i + 1 for i in range(n_harmonics)]  # 1, 3, 5, ...
 
-    bars = ax.bar(harmonics, amps, color="steelblue", edgecolor="black", **kwargs)
-    ax.set_xlabel("Harmonic Number n", fontsize=12)
-    ax.set_ylabel(ylabel, fontsize=12)
-    ax.set_title("Fourier Harmonic Spectrum", fontsize=14)
-    ax.set_xticks(harmonics)
+        if normalize and amps[0] > 0:
+            amps = amps / amps[0]
+            ylabel = r"$I_n/I_1$"
+        else:
+            ylabel = r"$I_n$ (Pa)"
 
-    # Add value labels on bars
-    for bar, amp in zip(bars, amps, strict=False):
-        height = bar.get_height()
-        ax.annotate(
-            f"{amp:.3f}",
-            xy=(bar.get_x() + bar.get_width() / 2, height),
-            xytext=(0, 3),
-            textcoords="offset points",
-            ha="center",
-            va="bottom",
-            fontsize=8,
+        bars = ax.bar(harmonics, amps, color="steelblue", edgecolor="black", **kwargs)
+        ax.set_xlabel("Harmonic Number n", fontsize=12)
+        ax.set_ylabel(ylabel, fontsize=12)
+        ax.set_title("Fourier Harmonic Spectrum", fontsize=14)
+        ax.set_xticks(harmonics)
+
+        # Add value labels on bars
+        for bar, amp in zip(bars, amps, strict=False):
+            height = bar.get_height()
+            ax.annotate(
+                f"{amp:.3f}",
+                xy=(bar.get_x() + bar.get_width() / 2, height),
+                xytext=(0, 3),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+        logger.debug("Figure created", plot_type="harmonic_spectrum")
+        return fig
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate harmonic_spectrum plot",
+            plot_type="harmonic_spectrum",
+            error=str(e),
+            exc_info=True,
         )
-
-    return fig
+        raise
 
 
 def plot_3d_trajectory(
@@ -384,16 +448,16 @@ def plot_3d_trajectory(
     **kwargs,
 ) -> Figure:
     """
-    Plot 3D (γ, γ̇/ω, σ) trajectory with optional Frenet-Serret frame.
+    Plot 3D (gamma, gamma_dot/omega, sigma) trajectory with optional Frenet-Serret frame.
 
     Parameters
     ----------
     strain : np.ndarray
-        Strain signal γ(t)
+        Strain signal gamma(t)
     strain_rate : np.ndarray
-        Strain rate signal γ̇(t) (1/s)
+        Strain rate signal gamma_dot(t) (1/s)
     stress : np.ndarray
-        Stress signal σ(t) (Pa)
+        Stress signal sigma(t) (Pa)
     omega : float
         Angular frequency for rate normalization (rad/s)
     T_vec, N_vec, B_vec : np.ndarray, optional
@@ -412,55 +476,68 @@ def plot_3d_trajectory(
     Figure
         Matplotlib figure object
     """
-    plt = _ensure_matplotlib()
+    logger.debug("Generating plot", plot_type="3d_trajectory", show_frame=show_frame)
 
-    if ax is None:
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection="3d")
-    else:
-        fig = ax.get_figure()
+    try:
+        plt = _ensure_matplotlib()
 
-    # Normalize rate by omega
-    rate_normalized = strain_rate / omega
+        if ax is None:
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111, projection="3d")
+        else:
+            fig = ax.get_figure()
 
-    # Plot trajectory
-    ax.plot(strain, rate_normalized, stress, linewidth=1.5, **kwargs)
+        # Normalize rate by omega
+        rate_normalized = strain_rate / omega
 
-    # Add start/end markers
-    ax.scatter(
-        [strain[0]], [rate_normalized[0]], [stress[0]], color="g", s=100, label="Start"
-    )
-    ax.scatter(
-        [strain[-1]], [rate_normalized[-1]], [stress[-1]], color="r", s=100, label="End"
-    )
+        # Plot trajectory
+        ax.plot(strain, rate_normalized, stress, linewidth=1.5, **kwargs)
 
-    # Show Frenet-Serret frame at selected points
-    if show_frame and T_vec is not None:
-        n_arrows = 10  # Number of frame vectors to show
-        indices = np.linspace(0, len(strain) - 1, n_arrows, dtype=int)
+        # Add start/end markers
+        ax.scatter(
+            [strain[0]], [rate_normalized[0]], [stress[0]], color="g", s=100, label="Start"
+        )
+        ax.scatter(
+            [strain[-1]], [rate_normalized[-1]], [stress[-1]], color="r", s=100, label="End"
+        )
 
-        for i in indices:
-            pos = np.array([strain[i], rate_normalized[i], stress[i]])
+        # Show Frenet-Serret frame at selected points
+        if show_frame and T_vec is not None:
+            n_arrows = 10  # Number of frame vectors to show
+            indices = np.linspace(0, len(strain) - 1, n_arrows, dtype=int)
 
-            # Scale vectors for visibility
-            scale = frame_scale * np.max(np.abs(stress))
+            for i in indices:
+                pos = np.array([strain[i], rate_normalized[i], stress[i]])
 
-            if T_vec is not None:
-                ax.quiver(*pos, *T_vec[i] * scale, color="red", arrow_length_ratio=0.3)
-            if N_vec is not None:
-                ax.quiver(
-                    *pos, *N_vec[i] * scale, color="green", arrow_length_ratio=0.3
-                )
-            if B_vec is not None:
-                ax.quiver(*pos, *B_vec[i] * scale, color="blue", arrow_length_ratio=0.3)
+                # Scale vectors for visibility
+                scale = frame_scale * np.max(np.abs(stress))
 
-    ax.set_xlabel(r"$\gamma$")
-    ax.set_ylabel(r"$\dot{\gamma}/\omega$")
-    ax.set_zlabel(r"$\sigma$ (Pa)")
-    ax.set_title("3D Response Trajectory", fontsize=14)
-    ax.legend()
+                if T_vec is not None:
+                    ax.quiver(*pos, *T_vec[i] * scale, color="red", arrow_length_ratio=0.3)
+                if N_vec is not None:
+                    ax.quiver(
+                        *pos, *N_vec[i] * scale, color="green", arrow_length_ratio=0.3
+                    )
+                if B_vec is not None:
+                    ax.quiver(*pos, *B_vec[i] * scale, color="blue", arrow_length_ratio=0.3)
 
-    return fig
+        ax.set_xlabel(r"$\gamma$")
+        ax.set_ylabel(r"$\dot{\gamma}/\omega$")
+        ax.set_zlabel(r"$\sigma$ (Pa)")
+        ax.set_title("3D Response Trajectory", fontsize=14)
+        ax.legend()
+
+        logger.debug("Figure created", plot_type="3d_trajectory")
+        return fig
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate 3d_trajectory plot",
+            plot_type="3d_trajectory",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def plot_pipkin_diagram(
@@ -473,7 +550,7 @@ def plot_pipkin_diagram(
     **kwargs,
 ) -> Figure:
     """
-    Create Pipkin diagram (γ_0 vs ω map) colored by a nonlinearity metric.
+    Create Pipkin diagram (gamma_0 vs omega map) colored by a nonlinearity metric.
 
     Parameters
     ----------
@@ -497,30 +574,43 @@ def plot_pipkin_diagram(
     Figure
         Matplotlib figure object
     """
-    plt = _ensure_matplotlib()
+    logger.debug("Generating plot", plot_type="pipkin_diagram", metric_name=metric_name)
 
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 6))
-    else:
-        fig = ax.get_figure()
+    try:
+        plt = _ensure_matplotlib()
 
-    # Create meshgrid
-    Omega, Gamma = np.meshgrid(omega_values, gamma_0_values)
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 6))
+        else:
+            fig = ax.get_figure()
 
-    # Plot as heatmap
-    mesh = ax.pcolormesh(
-        Omega, Gamma, metric_values, cmap=cmap, shading="auto", **kwargs
-    )
-    cbar = fig.colorbar(mesh, ax=ax)
-    cbar.set_label(metric_name, fontsize=12)
+        # Create meshgrid
+        Omega, Gamma = np.meshgrid(omega_values, gamma_0_values)
 
-    ax.set_xlabel(r"$\omega$ (rad/s)", fontsize=12)
-    ax.set_ylabel(r"$\gamma_0$", fontsize=12)
-    ax.set_title("Pipkin Diagram", fontsize=14)
-    ax.set_xscale("log")
-    ax.set_yscale("log")
+        # Plot as heatmap
+        mesh = ax.pcolormesh(
+            Omega, Gamma, metric_values, cmap=cmap, shading="auto", **kwargs
+        )
+        cbar = fig.colorbar(mesh, ax=ax)
+        cbar.set_label(metric_name, fontsize=12)
 
-    return fig
+        ax.set_xlabel(r"$\omega$ (rad/s)", fontsize=12)
+        ax.set_ylabel(r"$\gamma_0$", fontsize=12)
+        ax.set_title("Pipkin Diagram", fontsize=14)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+
+        logger.debug("Figure created", plot_type="pipkin_diagram")
+        return fig
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate pipkin_diagram plot",
+            plot_type="pipkin_diagram",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def create_spp_report(
@@ -563,80 +653,100 @@ def create_spp_report(
     Figure
         Matplotlib figure object
     """
-    plt = _ensure_matplotlib()
-
-    fig = plt.figure(figsize=(14, 10))
-
-    # Create grid of subplots
-    ax1 = fig.add_subplot(2, 3, 1)  # Elastic Lissajous
-    ax2 = fig.add_subplot(2, 3, 2)  # Viscous Lissajous
-    ax3 = fig.add_subplot(2, 3, 3)  # Cole-Cole
-    ax4 = fig.add_subplot(2, 3, 4)  # G'(t)
-    ax5 = fig.add_subplot(2, 3, 5)  # G''(t)
-    ax6 = fig.add_subplot(2, 3, 6)  # δ(t)
-
-    # Extract results
-    Gp_t = np.asarray(spp_results["Gp_t"])
-    Gpp_t = np.asarray(spp_results["Gpp_t"])
-    delta_t = np.asarray(spp_results["delta_t"])
-
-    # Compute strain rate
-    strain_rate = (
-        gamma_0 * omega * np.cos(omega * np.linspace(0, 2 * np.pi / omega, len(strain)))
+    logger.debug(
+        "Generating plot",
+        plot_type="spp_report",
+        omega=omega,
+        gamma_0=gamma_0,
+        save_path=save_path,
     )
-    if "strain_rate_normalized" in spp_results:
-        strain_rate = np.asarray(spp_results["strain_rate_normalized"]) * omega
 
-    time = np.linspace(0, 2 * np.pi / omega, len(strain))
+    try:
+        plt = _ensure_matplotlib()
 
-    # Lissajous plots
-    ax1.plot(strain / gamma_0, stress, "b-", linewidth=1.5)
-    ax1.set_xlabel(r"$\gamma/\gamma_0$")
-    ax1.set_ylabel(r"$\sigma$ (Pa)")
-    ax1.set_title("Elastic Lissajous")
-    ax1.axhline(0, color="gray", linestyle="--", linewidth=0.5)
-    ax1.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+        fig = plt.figure(figsize=(14, 10))
 
-    ax2.plot(strain_rate / (gamma_0 * omega), stress, "r-", linewidth=1.5)
-    ax2.set_xlabel(r"$\dot{\gamma}/\dot{\gamma}_0$")
-    ax2.set_ylabel(r"$\sigma$ (Pa)")
-    ax2.set_title("Viscous Lissajous")
-    ax2.axhline(0, color="gray", linestyle="--", linewidth=0.5)
-    ax2.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+        # Create grid of subplots
+        ax1 = fig.add_subplot(2, 3, 1)  # Elastic Lissajous
+        ax2 = fig.add_subplot(2, 3, 2)  # Viscous Lissajous
+        ax3 = fig.add_subplot(2, 3, 3)  # Cole-Cole
+        ax4 = fig.add_subplot(2, 3, 4)  # G'(t)
+        ax5 = fig.add_subplot(2, 3, 5)  # G''(t)
+        ax6 = fig.add_subplot(2, 3, 6)  # delta(t)
 
-    # Cole-Cole
-    ax3.plot(Gp_t, Gpp_t, "k-", linewidth=1.5)
-    ax3.plot(Gp_t[0], Gpp_t[0], "go", markersize=8, label="Start")
-    ax3.plot(Gp_t[-1], Gpp_t[-1], "rs", markersize=8, label="End")
-    ax3.set_xlabel(r"$G'(t)$ (Pa)")
-    ax3.set_ylabel(r"$G''(t)$ (Pa)")
-    ax3.set_title("Cole-Cole Diagram")
-    ax3.legend(loc="upper right")
+        # Extract results
+        Gp_t = np.asarray(spp_results["Gp_t"])
+        Gpp_t = np.asarray(spp_results["Gpp_t"])
+        delta_t = np.asarray(spp_results["delta_t"])
 
-    # Time-resolved moduli
-    ax4.plot(time, Gp_t, "b-", linewidth=1.5)
-    ax4.set_xlabel("Time (s)")
-    ax4.set_ylabel(r"$G'(t)$ (Pa)")
-    ax4.set_title(r"Storage Modulus $G'(t)$")
+        # Compute strain rate
+        strain_rate = (
+            gamma_0 * omega * np.cos(omega * np.linspace(0, 2 * np.pi / omega, len(strain)))
+        )
+        if "strain_rate_normalized" in spp_results:
+            strain_rate = np.asarray(spp_results["strain_rate_normalized"]) * omega
 
-    ax5.plot(time, Gpp_t, "r-", linewidth=1.5)
-    ax5.set_xlabel("Time (s)")
-    ax5.set_ylabel(r"$G''(t)$ (Pa)")
-    ax5.set_title(r"Loss Modulus $G''(t)$")
+        time = np.linspace(0, 2 * np.pi / omega, len(strain))
 
-    ax6.plot(time, np.degrees(delta_t), "g-", linewidth=1.5)
-    ax6.set_xlabel("Time (s)")
-    ax6.set_ylabel(r"$\delta(t)$ (°)")
-    ax6.set_title(r"Phase Angle $\delta(t)$")
-    ax6.axhline(45, color="gray", linestyle=":", linewidth=0.5)
-    ax6.axhline(90, color="gray", linestyle="--", linewidth=0.5)
+        # Lissajous plots
+        ax1.plot(strain / gamma_0, stress, "b-", linewidth=1.5)
+        ax1.set_xlabel(r"$\gamma/\gamma_0$")
+        ax1.set_ylabel(r"$\sigma$ (Pa)")
+        ax1.set_title("Elastic Lissajous")
+        ax1.axhline(0, color="gray", linestyle="--", linewidth=0.5)
+        ax1.axvline(0, color="gray", linestyle="--", linewidth=0.5)
 
-    plt.tight_layout()
+        ax2.plot(strain_rate / (gamma_0 * omega), stress, "r-", linewidth=1.5)
+        ax2.set_xlabel(r"$\dot{\gamma}/\dot{\gamma}_0$")
+        ax2.set_ylabel(r"$\sigma$ (Pa)")
+        ax2.set_title("Viscous Lissajous")
+        ax2.axhline(0, color="gray", linestyle="--", linewidth=0.5)
+        ax2.axvline(0, color="gray", linestyle="--", linewidth=0.5)
 
-    if save_path:
-        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        # Cole-Cole
+        ax3.plot(Gp_t, Gpp_t, "k-", linewidth=1.5)
+        ax3.plot(Gp_t[0], Gpp_t[0], "go", markersize=8, label="Start")
+        ax3.plot(Gp_t[-1], Gpp_t[-1], "rs", markersize=8, label="End")
+        ax3.set_xlabel(r"$G'(t)$ (Pa)")
+        ax3.set_ylabel(r"$G''(t)$ (Pa)")
+        ax3.set_title("Cole-Cole Diagram")
+        ax3.legend(loc="upper right")
 
-    return fig
+        # Time-resolved moduli
+        ax4.plot(time, Gp_t, "b-", linewidth=1.5)
+        ax4.set_xlabel("Time (s)")
+        ax4.set_ylabel(r"$G'(t)$ (Pa)")
+        ax4.set_title(r"Storage Modulus $G'(t)$")
+
+        ax5.plot(time, Gpp_t, "r-", linewidth=1.5)
+        ax5.set_xlabel("Time (s)")
+        ax5.set_ylabel(r"$G''(t)$ (Pa)")
+        ax5.set_title(r"Loss Modulus $G''(t)$")
+
+        ax6.plot(time, np.degrees(delta_t), "g-", linewidth=1.5)
+        ax6.set_xlabel("Time (s)")
+        ax6.set_ylabel(r"$\delta(t)$ (deg)")
+        ax6.set_title(r"Phase Angle $\delta(t)$")
+        ax6.axhline(45, color="gray", linestyle=":", linewidth=0.5)
+        ax6.axhline(90, color="gray", linestyle="--", linewidth=0.5)
+
+        plt.tight_layout()
+
+        if save_path:
+            fig.savefig(save_path, dpi=300, bbox_inches="tight")
+            logger.debug("Figure saved", plot_type="spp_report", save_path=save_path)
+
+        logger.debug("Figure created", plot_type="spp_report")
+        return fig
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate spp_report plot",
+            plot_type="spp_report",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 __all__ = [

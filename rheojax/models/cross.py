@@ -30,6 +30,10 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("cross")
@@ -103,49 +107,101 @@ class Cross(BaseModel):
         Returns:
             self for method chaining
         """
-        # Simple heuristic fitting
-        # Sort by shear rate
-        sort_idx = np.argsort(X)
-        X_sorted = X[sort_idx]
-        y_sorted = y[sort_idx]
+        with log_fit(logger, model="Cross", data_shape=X.shape) as ctx:
+            try:
+                logger.debug(
+                    "Starting Cross model fit",
+                    n_points=len(X),
+                    gamma_dot_range=(float(np.min(X)), float(np.max(X))),
+                    viscosity_range=(float(np.min(y)), float(np.max(y))),
+                )
 
-        # Estimate plateaus
-        eta0_est = np.max(y_sorted[: len(y_sorted) // 10 + 1])
-        eta_inf_est = np.min(y_sorted[-len(y_sorted) // 10 :])
+                # Simple heuristic fitting
+                # Sort by shear rate
+                sort_idx = np.argsort(X)
+                X_sorted = X[sort_idx]
+                y_sorted = y[sort_idx]
 
-        # Find characteristic shear rate (midpoint)
-        eta_mid = (eta0_est + eta_inf_est) / 2.0
-        idx_mid = np.argmin(np.abs(y_sorted - eta_mid))
-        lambda_est = 1.0 / X_sorted[idx_mid] if X_sorted[idx_mid] > 0 else 1.0
+                # Estimate plateaus
+                eta0_est = np.max(y_sorted[: len(y_sorted) // 10 + 1])
+                eta_inf_est = np.min(y_sorted[-len(y_sorted) // 10 :])
 
-        # Estimate m from transition steepness
-        # Use the slope in the transition region
-        mid_start = len(X_sorted) // 3
-        mid_end = 2 * len(X_sorted) // 3
-        if mid_end > mid_start + 1:
-            log_gamma = np.log(X_sorted[mid_start:mid_end])
-            log_eta = np.log(y_sorted[mid_start:mid_end] - eta_inf_est + 1e-10)
-            coeffs = np.polyfit(log_gamma, log_eta, 1)
-            m_est = -coeffs[0]  # Negative slope gives m
-        else:
-            m_est = 1.0
+                logger.debug(
+                    "Estimated viscosity plateaus",
+                    eta0_est=float(eta0_est),
+                    eta_inf_est=float(eta_inf_est),
+                )
 
-        # Clip to bounds
-        eta0_est = np.clip(eta0_est, 1e-3, 1e12)
-        eta_inf_est = np.clip(eta_inf_est, 1e-6, 1e6)
-        lambda_est = np.clip(lambda_est, 1e-6, 1e6)
-        m_est = np.clip(m_est, 0.1, 2.0)
+                # Find characteristic shear rate (midpoint)
+                eta_mid = (eta0_est + eta_inf_est) / 2.0
+                idx_mid = np.argmin(np.abs(y_sorted - eta_mid))
+                lambda_est = 1.0 / X_sorted[idx_mid] if X_sorted[idx_mid] > 0 else 1.0
 
-        # Ensure eta0 > eta_inf
-        if eta0_est <= eta_inf_est:
-            eta0_est = eta_inf_est * 10.0
+                logger.debug(
+                    "Estimated time constant from midpoint",
+                    eta_mid=float(eta_mid),
+                    lambda_est=float(lambda_est),
+                )
 
-        self.parameters.set_value("eta0", float(eta0_est))
-        self.parameters.set_value("eta_inf", float(eta_inf_est))
-        self.parameters.set_value("lambda_", float(lambda_est))
-        self.parameters.set_value("m", float(m_est))
+                # Estimate m from transition steepness
+                # Use the slope in the transition region
+                mid_start = len(X_sorted) // 3
+                mid_end = 2 * len(X_sorted) // 3
+                if mid_end > mid_start + 1:
+                    log_gamma = np.log(X_sorted[mid_start:mid_end])
+                    log_eta = np.log(y_sorted[mid_start:mid_end] - eta_inf_est + 1e-10)
+                    coeffs = np.polyfit(log_gamma, log_eta, 1)
+                    m_est = -coeffs[0]  # Negative slope gives m
+                else:
+                    m_est = 1.0
 
-        return self
+                logger.debug(
+                    "Estimated rate constant from slope",
+                    m_est=float(m_est),
+                )
+
+                # Clip to bounds
+                eta0_est = np.clip(eta0_est, 1e-3, 1e12)
+                eta_inf_est = np.clip(eta_inf_est, 1e-6, 1e6)
+                lambda_est = np.clip(lambda_est, 1e-6, 1e6)
+                m_est = np.clip(m_est, 0.1, 2.0)
+
+                # Ensure eta0 > eta_inf
+                if eta0_est <= eta_inf_est:
+                    eta0_est = eta_inf_est * 10.0
+                    logger.debug(
+                        "Adjusted eta0 to ensure eta0 > eta_inf",
+                        eta0_adjusted=float(eta0_est),
+                    )
+
+                self.parameters.set_value("eta0", float(eta0_est))
+                self.parameters.set_value("eta_inf", float(eta_inf_est))
+                self.parameters.set_value("lambda_", float(lambda_est))
+                self.parameters.set_value("m", float(m_est))
+
+                # Add fit results to context for logging
+                ctx["eta0"] = float(eta0_est)
+                ctx["eta_inf"] = float(eta_inf_est)
+                ctx["lambda_"] = float(lambda_est)
+                ctx["m"] = float(m_est)
+
+                logger.info(
+                    "Cross model fit completed",
+                    eta0=float(eta0_est),
+                    eta_inf=float(eta_inf_est),
+                    lambda_=float(lambda_est),
+                    m=float(m_est),
+                )
+
+                return self
+
+            except Exception as e:
+                logger.error(
+                    "Cross model fit failed",
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Predict viscosity for given shear rates.

@@ -34,9 +34,13 @@ from jax import Array
 from rheojax.core.base import BaseTransform
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
+from rheojax.logging import get_logger, log_transform
 
 # Safe JAX import (enforces float64)
 _, jnp = safe_import_jax()
+
+# Module logger
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
 
@@ -276,8 +280,21 @@ class SPPDecomposer(BaseTransform):
             static_yield_stress,
         )
 
+        logger.info(
+            "Starting SPP decomposition",
+            omega=self.omega,
+            gamma_0=self.gamma_0,
+            n_harmonics=self.n_harmonics,
+            use_numerical_method=self.use_numerical_method,
+        )
+
         # Validate domain
         if data.domain != "time":
+            logger.error(
+                "Invalid domain for SPP decomposer",
+                expected="time",
+                got=data.domain,
+            )
             raise ValueError(
                 f"SPP decomposer requires time-domain data, got '{data.domain}'"
             )
@@ -286,12 +303,19 @@ class SPPDecomposer(BaseTransform):
         t = data.x
         stress = data.y
 
+        logger.debug(
+            "Input data extracted",
+            data_points=len(t),
+            domain=data.domain,
+        )
+
         # Convert to JAX arrays
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         stress_jax = jnp.asarray(stress, dtype=jnp.float64)
 
         # Handle complex stress (take real part)
         if jnp.iscomplexobj(stress_jax):
+            logger.debug("Converting complex stress to real part")
             stress_jax = jnp.real(stress_jax)
 
         # Resolve omega (scalar or per-sample) from metadata if provided
@@ -331,6 +355,11 @@ class SPPDecomposer(BaseTransform):
 
         # Apply cycle selection if specified
         if self.start_cycle > 0 or self.end_cycle is not None:
+            logger.debug(
+                "Applying cycle selection",
+                start_cycle=self.start_cycle,
+                end_cycle=self.end_cycle,
+            )
             # Get a single mask and apply to all arrays consistently
             mask, actual_start, actual_end = self._get_cycle_mask(t_jax)
 
@@ -339,6 +368,13 @@ class SPPDecomposer(BaseTransform):
             stress_jax = stress_jax[mask]
             strain_jax = strain_jax[mask]
             strain_rate_jax = strain_rate_jax[mask]
+
+            logger.debug(
+                "Cycle selection applied",
+                actual_start=actual_start,
+                actual_end=actual_end,
+                selected_points=int(jnp.sum(mask)),
+            )
         else:
             actual_start, actual_end = 0, None
 
@@ -366,6 +402,11 @@ class SPPDecomposer(BaseTransform):
         )
 
         if self.use_numerical_method:
+            logger.debug(
+                "Using numerical SPP analysis",
+                step_size=self.step_size,
+                num_mode=self.num_mode,
+            )
             core_results = spp_numerical_analysis(
                 strain_jax,
                 stress_jax,
@@ -387,6 +428,11 @@ class SPPDecomposer(BaseTransform):
             )
             ft_out = None
         else:
+            logger.debug(
+                "Using Fourier SPP analysis",
+                n_harmonics=self.n_harmonics,
+                n_cycles=n_cycles_obs,
+            )
             core_results = spp_fourier_analysis(
                 strain_jax,
                 stress_jax,
@@ -410,14 +456,17 @@ class SPPDecomposer(BaseTransform):
             )
 
         # 1. Apparent cage modulus
+        logger.debug("Computing apparent cage modulus")
         G_cage = apparent_cage_modulus(stress_jax, strain_jax, self.gamma_0)
 
         # 2. Static yield stress (at |γ| ≈ γ_0)
+        logger.debug("Computing static yield stress", tolerance=self.yield_tolerance)
         sigma_sy = static_yield_stress(
             stress_jax, strain_jax, self.gamma_0, tolerance=self.yield_tolerance
         )
 
         # 3. Dynamic yield stress (at |γ̇| ≈ 0)
+        logger.debug("Computing dynamic yield stress", tolerance=self.yield_tolerance)
         sigma_dy = dynamic_yield_stress(
             stress_jax,
             strain_rate_jax,
@@ -426,14 +475,17 @@ class SPPDecomposer(BaseTransform):
         )
 
         # 4. Harmonic reconstruction (for reporting) - stress only
+        logger.debug("Performing harmonic reconstruction", n_harmonics=self.n_harmonics)
         amplitudes, phases, stress_reconstructed = harmonic_reconstruction(
             stress_jax, self.omega, n_harmonics=self.n_harmonics, dt=dt
         )
 
         # 5. Power-law fit
+        logger.debug("Fitting power-law model")
         K, n_power, r_squared_power = power_law_fit(stress_jax, strain_rate_jax)
 
         # 6. Lissajous metrics
+        logger.debug("Computing Lissajous metrics")
         lissajous = lissajous_metrics(
             stress_jax,
             strain_jax,
@@ -443,6 +495,7 @@ class SPPDecomposer(BaseTransform):
         )
 
         # 7. Stress decomposition
+        logger.debug("Performing stress decomposition")
         sigma_elastic, sigma_viscous = spp_stress_decomposition(
             stress_jax,
             strain_jax,
@@ -557,6 +610,17 @@ class SPPDecomposer(BaseTransform):
                 "step_size": self.step_size,
                 "num_mode": self.num_mode,
             }
+        )
+
+        logger.info(
+            "SPP decomposition completed",
+            sigma_sy=float(sigma_sy),
+            sigma_dy=float(sigma_dy),
+            K=float(K),
+            n_power_law=float(n_power),
+            S_factor=float(lissajous["S_factor"]),
+            T_factor=float(lissajous["T_factor"]),
+            cycles_analyzed=(actual_start, actual_end),
         )
 
         # Output: reconstructed stress (or original stress with metrics attached)

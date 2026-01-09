@@ -53,7 +53,6 @@ Reference: Ported from hermes-rheo TriosRheoReader
 
 from __future__ import annotations
 
-import logging
 import os
 import re
 import warnings
@@ -63,9 +62,10 @@ from pathlib import Path
 import numpy as np
 
 from rheojax.core.data import RheoData
+from rheojax.logging import get_logger
 
 # Configure logger for auto-chunking notifications
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Auto-chunking threshold (5 MB)
 AUTO_CHUNK_THRESHOLD_MB = 5.0
@@ -165,7 +165,10 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
         >>> data = load_trios('large_file.txt', progress_callback=progress)
     """
     filepath = Path(filepath)
+    logger.info("Loading TRIOS TXT file", filepath=str(filepath))
+
     if not filepath.exists():
+        logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
     # Check auto-chunking setting (default: True)
@@ -174,12 +177,14 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     # If chunk_size is provided explicitly, delegate to chunked reader
     if "chunk_size" in kwargs:
         chunk_size = kwargs.pop("chunk_size")
+        logger.debug("Using explicit chunked reading", chunk_size=chunk_size)
         # Aggregate chunks on-the-fly
         progress_callback = kwargs.pop("progress_callback", None)
 
         x_parts = []
         y_parts = []
         first_chunk = None
+        chunk_count = 0
 
         for chunk in load_trios_chunked(
             filepath,
@@ -193,6 +198,9 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             # Append chunk data
             x_parts.append(chunk.x)
             y_parts.append(chunk.y)
+            chunk_count += 1
+
+        logger.debug("Chunks aggregated", num_chunks=chunk_count)
 
         # Aggregate chunks into single RheoData object
         if first_chunk is not None:
@@ -211,21 +219,31 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                 validate=kwargs.get("validate_data", True),
             )
 
+            logger.info(
+                "TRIOS TXT load complete (chunked)",
+                filepath=str(filepath),
+                num_points=len(x_combined),
+                num_chunks=chunk_count,
+            )
             return aggregated_data
         else:
+            logger.error("No data chunks returned", filepath=str(filepath))
             raise ValueError("No data chunks returned from chunked reader")
 
     # Auto-detect file size and use chunked loading if above threshold
     if auto_chunk:
         file_size_bytes = os.path.getsize(filepath)
         file_size_mb = file_size_bytes / (1024 * 1024)
+        logger.debug("File size check", file_size_mb=file_size_mb, threshold_mb=AUTO_CHUNK_THRESHOLD_MB)
 
         if file_size_mb > AUTO_CHUNK_THRESHOLD_MB:
             # Log auto-chunking activation
             logger.info(
-                f"Auto-chunking enabled for {file_size_mb:.1f} MB file "
-                f"(threshold: {AUTO_CHUNK_THRESHOLD_MB:.1f} MB). "
-                f"Expected memory reduction: 50-70%."
+                "Auto-chunking enabled",
+                filepath=str(filepath),
+                file_size_mb=round(file_size_mb, 1),
+                threshold_mb=AUTO_CHUNK_THRESHOLD_MB,
+                expected_memory_reduction="50-70%",
             )
 
             # Delegate to chunked reader with default chunk size
@@ -235,6 +253,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             x_parts = []
             y_parts = []
             first_chunk = None
+            chunk_count = 0
 
             for chunk in load_trios_chunked(
                 filepath,
@@ -248,6 +267,9 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                 # Append chunk data (accumulate references, concatenate once at end)
                 x_parts.append(chunk.x)
                 y_parts.append(chunk.y)
+                chunk_count += 1
+
+            logger.debug("Auto-chunking complete", num_chunks=chunk_count)
 
             # Aggregate chunks into single RheoData object
             if first_chunk is not None:
@@ -266,24 +288,36 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                     validate=kwargs.get("validate_data", True),
                 )
 
+                logger.info(
+                    "TRIOS TXT load complete (auto-chunked)",
+                    filepath=str(filepath),
+                    num_points=len(x_combined),
+                    num_chunks=chunk_count,
+                )
                 return aggregated_data
             else:
+                logger.error("No data chunks returned from auto-chunking", filepath=str(filepath))
                 raise ValueError("No data chunks returned from chunked reader")
 
     # Read file contents
+    logger.debug("Reading file in full mode", filepath=str(filepath))
     with open(filepath, encoding="utf-8", errors="replace") as f:
         content = f.read()
 
     # Split into lines
     lines = content.split("\n")
+    logger.debug("File read", num_lines=len(lines), content_bytes=len(content))
 
     # Extract metadata
     metadata = _extract_metadata(lines)
+    logger.debug("Metadata extracted", metadata_fields=len(metadata))
 
     # Find all data segments
     segments = _find_data_segments(lines)
+    logger.debug("Data segments found", num_segments=len(segments))
 
     if not segments:
+        logger.error("No data segments found", filepath=str(filepath))
         raise ValueError("No data segments found in TRIOS file")
 
     # Parse each segment
@@ -293,14 +327,33 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             data = _parse_segment(lines, seg_start, seg_end, metadata)
             if data is not None:
                 rheo_data_list.append(data)
+                logger.debug(
+                    "Segment parsed",
+                    start_line=seg_start,
+                    end_line=seg_end,
+                    num_points=len(data.x),
+                )
         except Exception as e:
+            logger.error(
+                "Failed to parse segment",
+                start_line=seg_start,
+                error=str(e),
+                exc_info=True,
+            )
             warnings.warn(
                 f"Failed to parse segment starting at line {seg_start}: {e}",
                 stacklevel=2,
             )
 
     if not rheo_data_list:
+        logger.error("No valid data segments could be parsed", filepath=str(filepath))
         raise ValueError("No valid data segments could be parsed")
+
+    logger.info(
+        "TRIOS TXT load complete",
+        filepath=str(filepath),
+        num_segments=len(rheo_data_list),
+    )
 
     # Return single RheoData or list
     return_all = kwargs.get("return_all_segments", False)
@@ -383,13 +436,21 @@ def load_trios_chunked(
         load_trios: Standard loading (entire file in memory), auto-chunks for files > 5 MB
     """
     filepath = Path(filepath)
+    logger.info(
+        "Loading TRIOS TXT file (chunked)",
+        filepath=str(filepath),
+        chunk_size=chunk_size,
+    )
+
     if not filepath.exists():
+        logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
     segment_index = kwargs.get("segment_index", None)
     validate_data = kwargs.get("validate_data", True)
 
     # First pass: extract metadata and locate segments without loading all data
+    logger.debug("First pass: scanning for segments", filepath=str(filepath))
     with open(filepath, encoding="utf-8", errors="replace") as f:
         # Read only header portion for metadata (first 100 lines typically sufficient)
         header_lines = []
@@ -400,6 +461,7 @@ def load_trios_chunked(
 
         # Extract metadata from header
         metadata = _extract_metadata(header_lines)
+        logger.debug("Metadata extracted", metadata_fields=len(metadata))
 
         # Reset to beginning for segment detection
         f.seek(0)
@@ -413,21 +475,36 @@ def load_trios_chunked(
             line_num += 1
 
         if not segment_starts:
+            logger.error("No data segments found", filepath=str(filepath))
             raise ValueError("No data segments found in TRIOS file")
+
+    logger.debug("Segments located", num_segments=len(segment_starts))
 
     # Second pass: process each segment in chunks
     target_segments = (
         [segment_index] if segment_index is not None else range(len(segment_starts))
     )
+    logger.debug(
+        "Processing segments",
+        target_segments=list(target_segments),
+        total_segments=len(segment_starts),
+    )
 
     for seg_idx in target_segments:
         if seg_idx >= len(segment_starts):
+            logger.warning("Segment not found", segment_index=seg_idx, total_segments=len(segment_starts))
             warnings.warn(f"Segment {seg_idx} not found in file", stacklevel=2)
             continue
 
         seg_start = segment_starts[seg_idx]
         seg_end = (
             segment_starts[seg_idx + 1] if seg_idx + 1 < len(segment_starts) else None
+        )
+        logger.debug(
+            "Processing segment",
+            segment_index=seg_idx,
+            start_line=seg_start,
+            end_line=seg_end,
         )
 
         # Process this segment in chunks

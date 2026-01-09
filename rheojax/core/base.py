@@ -14,6 +14,10 @@ import numpy as np
 from rheojax.core.bayesian import BayesianMixin, BayesianResult
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import Parameter, ParameterSet
+from rheojax.logging import get_logger
+
+# Module-level logger
+logger = get_logger(__name__)
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -41,6 +45,7 @@ class BaseModel(BayesianMixin, ABC):
 
     def __init__(self):
         """Initialize base model."""
+        logger.debug("Initializing model", model=self.__class__.__name__)
         self.parameters = ParameterSet()
         self.fitted_ = False
         self._nlsq_result = None  # Store NLSQ optimization result
@@ -92,8 +97,6 @@ class BaseModel(BayesianMixin, ABC):
         Returns:
             Tuple of (use_log_residuals, use_multi_start) with defaults applied
         """
-        import logging
-
         if use_log_residuals is not None and use_multi_start is not None:
             return use_log_residuals, use_multi_start
 
@@ -107,8 +110,10 @@ class BaseModel(BayesianMixin, ABC):
             if use_log_residuals is None:
                 if decades > 8.0:
                     use_log_residuals = True
-                    logging.info(
-                        f"Auto-enabling log-residuals for wide range ({decades:.1f} decades)"
+                    logger.info(
+                        "Auto-enabling log-residuals for wide range",
+                        model=self.__class__.__name__,
+                        decades=f"{decades:.1f}",
                     )
                 else:
                     use_log_residuals = False
@@ -116,15 +121,21 @@ class BaseModel(BayesianMixin, ABC):
             if use_multi_start is None:
                 if decades > 10.0:
                     use_multi_start = True
-                    logging.info(
-                        f"Auto-enabling multi-start optimization for very wide range "
-                        f"({decades:.1f} decades, {n_starts} starts)"
+                    logger.info(
+                        "Auto-enabling multi-start optimization for very wide range",
+                        model=self.__class__.__name__,
+                        decades=f"{decades:.1f}",
+                        n_starts=n_starts,
                     )
                 else:
                     use_multi_start = False
 
         except Exception as e:
-            logging.debug(f"Range detection failed: {e}")
+            logger.debug(
+                "Range detection failed",
+                model=self.__class__.__name__,
+                error=str(e),
+            )
             use_log_residuals = (
                 use_log_residuals if use_log_residuals is not None else False
             )
@@ -260,7 +271,14 @@ class BaseModel(BayesianMixin, ABC):
             >>> model.fit(omega, G_star, use_log_residuals=True)  # Force log-residuals
             >>> model.fit(mastercurve, None, use_multi_start=True, n_starts=10)  # Multi-start
         """
-        import logging
+        # Get data shape for logging
+        data_shape = getattr(X, "shape", None) or (len(X),)
+        logger.debug(
+            "Entering fit",
+            model=self.__class__.__name__,
+            data_shape=data_shape,
+            method=method,
+        )
 
         # Store data for potential Bayesian inference
         self.X_data = X
@@ -286,7 +304,11 @@ class BaseModel(BayesianMixin, ABC):
                     from rheojax.utils.compatibility import format_compatibility_message
 
                     message = format_compatibility_message(compatibility)
-                    logging.warning(f"Model compatibility check:\n{message}")
+                    logger.warning(
+                        "Model compatibility check failed",
+                        model=self.__class__.__name__,
+                        message=message,
+                    )
                 except Exception:
                     pass
 
@@ -294,10 +316,45 @@ class BaseModel(BayesianMixin, ABC):
         try:
             self._fit(X, y, method=method, **kwargs)
             self.fitted_ = True
+
+            # Log fit completion with key metrics
+            r2 = None
+            try:
+                r2 = self.score(X, y)
+            except Exception:
+                pass
+
+            logger.info(
+                "Fit completed",
+                model=self.__class__.__name__,
+                fitted=self.fitted_,
+                R2=r2,
+                data_shape=data_shape,
+            )
+            logger.debug(
+                "Exiting fit",
+                model=self.__class__.__name__,
+                parameters=self.get_params(),
+            )
+
         except RuntimeError as e:
+            logger.error(
+                "Fit failed with RuntimeError",
+                model=self.__class__.__name__,
+                error=str(e),
+                exc_info=True,
+            )
             enhanced = self._enhance_error_with_compatibility(e, X, y, test_mode)
             if enhanced is not e:
                 raise enhanced from e
+            raise
+        except Exception as e:
+            logger.error(
+                "Fit failed with unexpected error",
+                model=self.__class__.__name__,
+                error=str(e),
+                exc_info=True,
+            )
             raise
 
         return self
@@ -366,6 +423,18 @@ class BaseModel(BayesianMixin, ABC):
             ...     test_mode='creep'
             ... )
         """
+        # Get data shape for logging
+        data_shape = getattr(X, "shape", None) or (len(X),)
+        logger.debug(
+            "Entering fit_bayesian",
+            model=self.__class__.__name__,
+            data_shape=data_shape,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            test_mode=test_mode,
+        )
+
         # Store data for model_function access
         self.X_data = X
         self.y_data = y
@@ -376,24 +445,57 @@ class BaseModel(BayesianMixin, ABC):
             initial_values = {
                 name: self.parameters.get_value(name) for name in self.parameters
             }
+            logger.debug(
+                "Using NLSQ warm-start for Bayesian inference",
+                model=self.__class__.__name__,
+                initial_values=initial_values,
+            )
 
         # Call BayesianMixin implementation with multi-chain parallelization
-        result = super().fit_bayesian(
-            X,
-            y,
-            num_warmup=num_warmup,
-            num_samples=num_samples,
-            num_chains=num_chains,
-            initial_values=initial_values,
-            test_mode=test_mode,
-            seed=seed,
-            **nuts_kwargs,
-        )
+        try:
+            result = super().fit_bayesian(
+                X,
+                y,
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                num_chains=num_chains,
+                initial_values=initial_values,
+                test_mode=test_mode,
+                seed=seed,
+                **nuts_kwargs,
+            )
 
-        # Store result for later access
-        self._bayesian_result = result
+            # Store result for later access
+            self._bayesian_result = result
 
-        return result
+            # Log completion with diagnostics
+            r_hat = result.diagnostics.get("r_hat") if result.diagnostics else None
+            ess = result.diagnostics.get("ess") if result.diagnostics else None
+            logger.info(
+                "Bayesian fit completed",
+                model=self.__class__.__name__,
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                num_chains=num_chains,
+                r_hat=r_hat,
+                ess=ess,
+            )
+            logger.debug(
+                "Exiting fit_bayesian",
+                model=self.__class__.__name__,
+                diagnostics=result.diagnostics,
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(
+                "Bayesian fit failed",
+                model=self.__class__.__name__,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
 
     def predict(self, X: ArrayLike, test_mode: str | None = None) -> ArrayLike:
         """Make predictions.
@@ -407,6 +509,14 @@ class BaseModel(BayesianMixin, ABC):
         Returns:
             Model predictions
         """
+        x_shape = getattr(X, "shape", None) or (len(X),)
+        logger.debug(
+            "Predict called",
+            model=self.__class__.__name__,
+            x_shape=x_shape,
+            test_mode=test_mode,
+        )
+
         if not self.fitted_ and len(self.parameters) > 0:
             # Check if we have parameters set manually
             if not any(p.value is None for p in self.parameters._parameters.values()):
@@ -417,7 +527,22 @@ class BaseModel(BayesianMixin, ABC):
         if test_mode is not None and hasattr(self, "_test_mode"):
             self._test_mode = test_mode
 
-        return self._predict(X)
+        try:
+            result = self._predict(X)
+            logger.debug(
+                "Predict completed",
+                model=self.__class__.__name__,
+                output_shape=getattr(result, "shape", None),
+            )
+            return result
+        except Exception as e:
+            logger.error(
+                "Predict failed",
+                model=self.__class__.__name__,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
 
     def fit_predict(self, X: ArrayLike, y: ArrayLike, **kwargs) -> ArrayLike:
         """Fit model and return predictions.
@@ -430,6 +555,11 @@ class BaseModel(BayesianMixin, ABC):
         Returns:
             Model predictions on training data
         """
+        logger.debug(
+            "fit_predict called",
+            model=self.__class__.__name__,
+            data_shape=getattr(X, "shape", None) or (len(X),),
+        )
         self.fit(X, y, **kwargs)
         return self.predict(X)
 
@@ -482,6 +612,11 @@ class BaseModel(BayesianMixin, ABC):
         Returns:
             self for method chaining
         """
+        logger.debug(
+            "set_params called",
+            model=self.__class__.__name__,
+            params=params,
+        )
         if hasattr(self, "parameters"):
             for name, value in params.items():
                 if name in self.parameters:
@@ -553,6 +688,11 @@ class BaseModel(BayesianMixin, ABC):
         if "parameters" in data:
             model.parameters = ParameterSet.from_dict(data["parameters"])
         model.fitted_ = data.get("fitted", False)
+        logger.debug(
+            "Model created from dict",
+            model=cls.__name__,
+            fitted=model.fitted_,
+        )
         return model
 
     def __repr__(self) -> str:
@@ -571,6 +711,7 @@ class BaseTransform(ABC):
 
     def __init__(self):
         """Initialize base transform."""
+        logger.debug("Initializing transform", transform=self.__class__.__name__)
         self.fitted_ = False
 
     @abstractmethod
@@ -610,7 +751,36 @@ class BaseTransform(ABC):
         Returns:
             Transformed data
         """
-        return self._transform(data)
+        input_shape = getattr(data, "shape", None)
+        logger.debug(
+            "Entering transform",
+            transform=self.__class__.__name__,
+            input_shape=input_shape,
+        )
+        try:
+            result = self._transform(data)
+            output_shape = getattr(result, "shape", None)
+            logger.info(
+                "Transform completed",
+                transform=self.__class__.__name__,
+                input_shape=input_shape,
+                output_shape=output_shape,
+            )
+            logger.debug(
+                "Exiting transform",
+                transform=self.__class__.__name__,
+                output_shape=output_shape,
+            )
+            return result
+        except Exception as e:
+            logger.error(
+                f"Transform failed: {e}",
+                transform=self.__class__.__name__,
+                input_shape=input_shape,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
 
     def inverse_transform(self, data: ArrayLike) -> ArrayLike:
         """Apply inverse transformation.
@@ -621,7 +791,36 @@ class BaseTransform(ABC):
         Returns:
             Original data
         """
-        return self._inverse_transform(data)
+        input_shape = getattr(data, "shape", None)
+        logger.debug(
+            "Entering inverse_transform",
+            transform=self.__class__.__name__,
+            input_shape=input_shape,
+        )
+        try:
+            result = self._inverse_transform(data)
+            output_shape = getattr(result, "shape", None)
+            logger.info(
+                "Inverse transform completed",
+                transform=self.__class__.__name__,
+                input_shape=input_shape,
+                output_shape=output_shape,
+            )
+            logger.debug(
+                "Exiting inverse_transform",
+                transform=self.__class__.__name__,
+                output_shape=output_shape,
+            )
+            return result
+        except Exception as e:
+            logger.error(
+                f"Inverse transform failed: {e}",
+                transform=self.__class__.__name__,
+                input_shape=input_shape,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
 
     def fit(self, data: ArrayLike) -> BaseTransform:
         """Fit the transform to data (learn parameters if needed).
@@ -632,8 +831,24 @@ class BaseTransform(ABC):
         Returns:
             self for method chaining
         """
+        input_shape = getattr(data, "shape", None)
+        logger.debug(
+            "Entering fit",
+            transform=self.__class__.__name__,
+            input_shape=input_shape,
+        )
         # Default implementation does nothing (stateless transform)
         self.fitted_ = True
+        logger.info(
+            "Transform fit completed",
+            transform=self.__class__.__name__,
+            input_shape=input_shape,
+        )
+        logger.debug(
+            "Exiting fit",
+            transform=self.__class__.__name__,
+            fitted=self.fitted_,
+        )
         return self
 
     def fit_transform(self, data: ArrayLike) -> ArrayLike:
@@ -645,8 +860,27 @@ class BaseTransform(ABC):
         Returns:
             Transformed data
         """
+        input_shape = getattr(data, "shape", None)
+        logger.debug(
+            "Entering fit_transform",
+            transform=self.__class__.__name__,
+            input_shape=input_shape,
+        )
         self.fit(data)
-        return self.transform(data)
+        result = self.transform(data)
+        output_shape = getattr(result, "shape", None)
+        logger.info(
+            "Fit and transform completed",
+            transform=self.__class__.__name__,
+            input_shape=input_shape,
+            output_shape=output_shape,
+        )
+        logger.debug(
+            "Exiting fit_transform",
+            transform=self.__class__.__name__,
+            output_shape=output_shape,
+        )
+        return result
 
     def __add__(self, other: BaseTransform) -> TransformPipeline:
         """Compose transforms using + operator.
@@ -680,6 +914,12 @@ class TransformPipeline(BaseTransform):
         """
         super().__init__()
         self.transforms = transforms
+        logger.debug(
+            "Initializing TransformPipeline",
+            transform="TransformPipeline",
+            n_transforms=len(transforms),
+            transform_names=[t.__class__.__name__ for t in transforms],
+        )
 
     def _transform(self, data: ArrayLike) -> ArrayLike:
         """Apply all transforms in sequence.
@@ -691,7 +931,14 @@ class TransformPipeline(BaseTransform):
             Transformed data after all transforms
         """
         result = data
-        for transform in self.transforms:
+        for i, transform in enumerate(self.transforms):
+            logger.debug(
+                f"Pipeline step {i + 1}/{len(self.transforms)}",
+                transform="TransformPipeline",
+                step=i + 1,
+                total_steps=len(self.transforms),
+                current_transform=transform.__class__.__name__,
+            )
             result = transform.transform(result)
         return result
 
@@ -705,7 +952,14 @@ class TransformPipeline(BaseTransform):
             Original data
         """
         result = data
-        for transform in reversed(self.transforms):
+        for i, transform in enumerate(reversed(self.transforms)):
+            logger.debug(
+                f"Pipeline inverse step {i + 1}/{len(self.transforms)}",
+                transform="TransformPipeline",
+                step=i + 1,
+                total_steps=len(self.transforms),
+                current_transform=transform.__class__.__name__,
+            )
             result = transform.inverse_transform(result)
         return result
 
@@ -718,15 +972,51 @@ class TransformPipeline(BaseTransform):
         Returns:
             self for method chaining
         """
-        current_data = data
-        for transform in self.transforms:
-            current_data = transform.fit_transform(current_data)
-        self.fitted_ = True
-        return self
+        input_shape = getattr(data, "shape", None)
+        logger.debug(
+            "Entering pipeline fit",
+            transform="TransformPipeline",
+            input_shape=input_shape,
+            n_transforms=len(self.transforms),
+        )
+        try:
+            current_data = data
+            for i, transform in enumerate(self.transforms):
+                logger.debug(
+                    f"Fitting pipeline step {i + 1}/{len(self.transforms)}",
+                    transform="TransformPipeline",
+                    step=i + 1,
+                    total_steps=len(self.transforms),
+                    current_transform=transform.__class__.__name__,
+                )
+                current_data = transform.fit_transform(current_data)
+            self.fitted_ = True
+            logger.info(
+                "Pipeline fit completed",
+                transform="TransformPipeline",
+                input_shape=input_shape,
+                n_transforms=len(self.transforms),
+            )
+            logger.debug(
+                "Exiting pipeline fit",
+                transform="TransformPipeline",
+                fitted=self.fitted_,
+            )
+            return self
+        except Exception as e:
+            logger.error(
+                f"Pipeline fit failed: {e}",
+                transform="TransformPipeline",
+                input_shape=input_shape,
+                n_transforms=len(self.transforms),
+                error=str(e),
+                exc_info=True,
+            )
+            raise
 
     def __repr__(self) -> str:
         """String representation of pipeline."""
-        transform_names = " → ".join(t.__class__.__name__ for t in self.transforms)
+        transform_names = " -> ".join(t.__class__.__name__ for t in self.transforms)
         return f"TransformPipeline([{transform_names}])"
 
 

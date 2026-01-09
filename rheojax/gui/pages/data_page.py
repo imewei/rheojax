@@ -30,6 +30,9 @@ from PySide6.QtWidgets import (
 
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.state.store import StateStore
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class DataPage(QWidget):
@@ -67,6 +70,7 @@ class DataPage(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self._store = StateStore()
         self._data_service = DataService()
         self._current_file_path: Path | None = None
@@ -214,6 +218,11 @@ class DataPage(QWidget):
         x_layout = QVBoxLayout()
         x_layout.addWidget(QLabel("X Column:"))
         self._x_combo = QComboBox()
+        self._x_combo.currentTextChanged.connect(
+            lambda text: logger.debug(
+                "Column mapping changed", column="x", mapping=text, page="DataPage"
+            )
+        )
         x_layout.addWidget(self._x_combo)
         mapper_layout.addLayout(x_layout)
 
@@ -221,6 +230,11 @@ class DataPage(QWidget):
         y_layout = QVBoxLayout()
         y_layout.addWidget(QLabel("Y Column:"))
         self._y_combo = QComboBox()
+        self._y_combo.currentTextChanged.connect(
+            lambda text: logger.debug(
+                "Column mapping changed", column="y", mapping=text, page="DataPage"
+            )
+        )
         y_layout.addWidget(self._y_combo)
         mapper_layout.addLayout(y_layout)
 
@@ -229,6 +243,11 @@ class DataPage(QWidget):
         y2_layout.addWidget(QLabel("Y2 Column (optional):"))
         self._y2_combo = QComboBox()
         self._y2_combo.addItem("None")
+        self._y2_combo.currentTextChanged.connect(
+            lambda text: logger.debug(
+                "Column mapping changed", column="y2", mapping=text, page="DataPage"
+            )
+        )
         y2_layout.addWidget(self._y2_combo)
         mapper_layout.addLayout(y2_layout)
 
@@ -237,6 +256,14 @@ class DataPage(QWidget):
         temp_layout.addWidget(QLabel("Temperature:"))
         self._temp_combo = QComboBox()
         self._temp_combo.addItem("None")
+        self._temp_combo.currentTextChanged.connect(
+            lambda text: logger.debug(
+                "Column mapping changed",
+                column="temperature",
+                mapping=text,
+                page="DataPage",
+            )
+        )
         temp_layout.addWidget(self._temp_combo)
         mapper_layout.addLayout(temp_layout)
 
@@ -248,6 +275,14 @@ class DataPage(QWidget):
         self._test_mode_combo = QComboBox()
         self._test_mode_combo.addItems(
             ["Auto-detect", "oscillation", "relaxation", "creep", "rotation"]
+        )
+        self._test_mode_combo.currentTextChanged.connect(
+            lambda text: logger.debug(
+                "Column mapping changed",
+                column="test_mode",
+                mapping=text,
+                page="DataPage",
+            )
         )
         mode_layout.addWidget(self._test_mode_combo)
         layout.addLayout(mode_layout)
@@ -303,10 +338,12 @@ class DataPage(QWidget):
         )
 
         if file_path:
+            logger.debug("File selected", filepath=file_path, page="DataPage")
             self._on_file_dropped(file_path)
 
     def _on_file_dropped(self, file_path: str) -> None:
         """Handle file drop or selection."""
+        logger.debug("Data loading triggered", filepath=file_path, page="DataPage")
         path_obj = Path(file_path)
 
         # Memory guard: warn on large files (>50 MB)
@@ -397,7 +434,23 @@ class DataPage(QWidget):
             if hasattr(self, "_empty_state"):
                 self._empty_state.hide()
 
+            # Log successful data load with record count
+            logger.info(
+                "Data load completed",
+                filepath=str(self._current_file_path),
+                record_count=len(self._preview_data),
+                column_count=len(headers) if headers else len(self._preview_data[0]),
+                page="DataPage",
+            )
+
         except Exception as e:
+            logger.error(
+                "Failed to load data preview",
+                filepath=str(self._current_file_path),
+                error=str(e),
+                page="DataPage",
+                exc_info=True,
+            )
             self._file_name_label.setText(f"Error loading file: {str(e)}")
             self._file_size_label.setText("")
             self._preview_table.clear()
@@ -620,6 +673,15 @@ class DataPage(QWidget):
                     },
                 )
 
+            # Log successful import
+            logger.info(
+                "Data import completed",
+                filepath=str(self._current_file_path),
+                dataset_count=len(datasets),
+                record_count=sum(len(ds.x) for ds in datasets),
+                page="DataPage",
+            )
+
             # Notify user if multiple segments were imported
             if len(datasets) > 1:
                 self._file_name_label.setText(
@@ -630,6 +692,13 @@ class DataPage(QWidget):
             self._store.dispatch("SET_TAB", {"tab": "transform"})
 
         except Exception as e:
+            logger.error(
+                "Failed to import data",
+                filepath=str(self._current_file_path),
+                error=str(e),
+                page="DataPage",
+                exc_info=True,
+            )
             self._file_name_label.setText(f"Import error: {str(e)}")
 
     def load_dataset(self, file_path: str) -> None:
@@ -729,7 +798,13 @@ class DataPage(QWidget):
             warnings = self._data_service.validate_data(rheo_data)
             test_mode = self._data_service.detect_test_mode(rheo_data)
         except Exception as exc:  # Defensive: never raise into UI
-            logging.getLogger(__name__).warning("Dataset validation failed: %s", exc)
+            logger.warning(
+                "Dataset validation failed",
+                dataset_id=dataset_id,
+                error=str(exc),
+                page="DataPage",
+                exc_info=True,
+            )
             return {"warnings": [f"Validation error: {exc}"], "test_mode": "unknown"}
 
         return {"warnings": warnings, "test_mode": test_mode}
@@ -785,7 +860,14 @@ class DataPage(QWidget):
             self.show_dataset(dataset.id)
 
         except Exception as exc:
-            logging.getLogger(__name__).warning("Preprocessing failed: %s", exc)
+            logger.warning(
+                "Preprocessing failed",
+                dataset_id=dataset_id,
+                operations=operations,
+                error=str(exc),
+                page="DataPage",
+                exc_info=True,
+            )
 
 
 class DropZone(QFrame):
@@ -796,6 +878,7 @@ class DropZone(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize drop zone."""
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self.setAcceptDrops(True)
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         self.setStyleSheet(
@@ -835,5 +918,6 @@ class DropZone(QFrame):
         if event.mimeData().hasUrls():
             url = event.mimeData().urls()[0]
             file_path = url.toLocalFile()
+            logger.debug("File selected", filepath=file_path, page="DataPage")
             self.file_dropped.emit(file_path)
             event.acceptProposedAction()

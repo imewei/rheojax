@@ -15,9 +15,13 @@ from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_transform
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+# Module logger
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from jax import Array
@@ -114,6 +118,12 @@ class MutationNumber(BaseTransform):
         float
             Integral value
         """
+        logger.debug(
+            "Performing numerical integration",
+            method=self.integration_method,
+            n_points=len(x),
+        )
+
         if self.integration_method == "trapz":
             # Use trapezoidal rule
             from jax.scipy.integrate import trapezoid
@@ -133,6 +143,10 @@ class MutationNumber(BaseTransform):
 
             return float(trapezoid(y, x))
         else:
+            logger.error(
+                "Unknown integration method",
+                method=self.integration_method,
+            )
             raise ValueError(f"Unknown integration method: {self.integration_method}")
 
     def _extrapolate_tail(self, t, G_t) -> float:
@@ -226,8 +240,15 @@ class MutationNumber(BaseTransform):
         ValueError
             If data is not valid relaxation data
         """
+        logger.debug("Validating and preparing relaxation data")
+
         mode = detect_test_mode(rheo_data)
         if mode != TestMode.RELAXATION:
+            logger.error(
+                "Invalid test mode for mutation number",
+                expected="RELAXATION",
+                got=str(mode),
+            )
             raise ValueError(
                 f"Mutation number requires RELAXATION data, got {mode}. "
                 f"Ensure data is monotonically decreasing in time domain."
@@ -235,6 +256,12 @@ class MutationNumber(BaseTransform):
 
         t = rheo_data.x
         G_t = rheo_data.y
+
+        logger.debug(
+            "Data extracted",
+            data_points=len(t),
+            time_range=(float(t[0]), float(t[-1])),
+        )
 
         # Convert to JAX arrays
         if not isinstance(t, jnp.ndarray):
@@ -244,11 +271,15 @@ class MutationNumber(BaseTransform):
 
         # Handle complex data
         if jnp.iscomplexobj(G_t):
+            logger.debug("Converting complex modulus to real part")
             G_t = jnp.real(G_t)
 
         G_0 = G_t[0]
         if G_0 <= 0:
+            logger.error("Initial modulus is not positive", G_0=float(G_0))
             raise ValueError("Initial modulus G(0) must be positive")
+
+        logger.debug("Initial modulus extracted", G_0=float(G_0))
 
         return t, G_t, G_0
 
@@ -370,15 +401,29 @@ class MutationNumber(BaseTransform):
             Updated (integral_G, integral_tG) with extrapolation
         """
         if integral_tG <= 0 or not self._should_extrapolate(G_relax, G_0_relax):
+            logger.debug("Extrapolation not applied (conditions not met)")
             return integral_G, integral_tG
 
         try:
+            logger.debug(
+                "Applying tail extrapolation",
+                extrapolation_model=self.extrapolation_model,
+            )
             tail_G = self._extrapolate_tail(t, G_relax)
             if not jnp.isnan(tail_G) and not jnp.isinf(tail_G) and tail_G > 0:
                 integral_G += tail_G
                 integral_tG += self._extrapolate_tG_integral(t, G_relax)
-        except (ValueError, RuntimeWarning, ZeroDivisionError):
-            pass  # Extrapolation failed, continue without it
+                logger.debug(
+                    "Extrapolation applied successfully",
+                    tail_G=tail_G,
+                    updated_integral_G=integral_G,
+                    updated_integral_tG=integral_tG,
+                )
+        except (ValueError, RuntimeWarning, ZeroDivisionError) as e:
+            logger.debug(
+                "Extrapolation failed, continuing without it",
+                error=str(e),
+            )
 
         return integral_G, integral_tG
 
@@ -437,33 +482,68 @@ class MutationNumber(BaseTransform):
         ValueError
             If data is not relaxation mode
         """
+        logger.info(
+            "Starting mutation number calculation",
+            integration_method=self.integration_method,
+            extrapolate=self.extrapolate,
+        )
+
         # Phase 1: Validate and prepare data
+        logger.debug("Phase 1: Validating and preparing data")
         t, G_t, G_0 = self._validate_and_prepare_data(rheo_data)
 
         # Phase 2: Estimate equilibrium modulus
+        logger.debug("Phase 2: Estimating equilibrium modulus")
         G_eq = self._estimate_equilibrium_modulus(G_t)
+        logger.debug("Equilibrium modulus estimated", G_eq=G_eq)
 
         # Phase 3: Calculate relaxing component
+        logger.debug("Phase 3: Calculating relaxing component")
         G_relax = G_t - G_eq
         G_0_relax = G_0 - G_eq
+        logger.debug(
+            "Relaxing component calculated",
+            G_0_relax=float(G_0_relax),
+        )
 
         # Check for pure elastic solid (no relaxation)
         if G_0_relax <= 0:
+            logger.info(
+                "Pure elastic solid detected (no relaxation)",
+                mutation_number=0.0,
+            )
             return 0.0
 
         # Phase 4: Compute base integrals
+        logger.debug("Phase 4: Computing base integrals")
         integral_G = self._integrate(t, G_relax)
         integral_tG = self._integrate(t, t * G_relax)
+        logger.debug(
+            "Base integrals computed",
+            integral_G=integral_G,
+            integral_tG=integral_tG,
+        )
 
         # Phase 5: Apply extrapolation if requested
+        logger.debug("Phase 5: Applying extrapolation if requested")
         integral_G, integral_tG = self._apply_extrapolation(
             t, G_relax, G_0_relax, integral_G, integral_tG
         )
 
         # Phase 6: Compute final mutation number
-        return self._compute_mutation_number(
+        logger.debug("Phase 6: Computing final mutation number")
+        delta = self._compute_mutation_number(
             G_0, G_eq, G_0_relax, integral_G, integral_tG
         )
+
+        logger.info(
+            "Mutation number calculation completed",
+            mutation_number=delta,
+            G_0=float(G_0),
+            G_eq=float(G_eq),
+        )
+
+        return delta
 
     def _transform(self, data: RheoData) -> RheoData:
         """Transform relaxation data to mutation number.
@@ -480,6 +560,12 @@ class MutationNumber(BaseTransform):
         RheoData
             Scalar data containing mutation number
         """
+        logger.info(
+            "Starting mutation number transform",
+            integration_method=self.integration_method,
+            extrapolate=self.extrapolate,
+        )
+
         # Calculate mutation number
         delta = self.calculate(data)
 
@@ -492,6 +578,11 @@ class MutationNumber(BaseTransform):
                 "integration_method": self.integration_method,
                 "extrapolated": self.extrapolate,
             }
+        )
+
+        logger.info(
+            "Mutation number transform completed",
+            mutation_number=delta,
         )
 
         # Return scalar RheoData

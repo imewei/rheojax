@@ -10,6 +10,9 @@ from __future__ import annotations
 from PySide6.QtWidgets import QLabel, QTextEdit, QVBoxLayout, QWidget
 
 from rheojax.gui.state.store import BayesianResult, FitResult
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ResultsPanel(QWidget):
@@ -17,6 +20,7 @@ class ResultsPanel(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(4)
@@ -39,9 +43,16 @@ class ResultsPanel(QWidget):
         layout.addWidget(self.fit_text)
         layout.addWidget(self.bayes_label)
         layout.addWidget(self.bayes_text)
+        logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def set_fit_result(self, result: FitResult | None) -> None:
         """Render a fit result summary."""
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_fit_result",
+            has_result=result is not None,
+        )
         if result is None:
             self.fit_text.setText("No fit results yet.")
             return
@@ -56,9 +67,21 @@ class ResultsPanel(QWidget):
             f"Time: {result.fit_time:.2f} s",
         ]
         self.fit_text.setText("\n".join(lines))
+        logger.debug(
+            "Fit result displayed",
+            widget=self.__class__.__name__,
+            model=result.model_name,
+            r_squared=result.r_squared,
+        )
 
     def set_bayesian_result(self, result: BayesianResult | None) -> None:
         """Render a Bayesian result summary."""
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_bayesian_result",
+            has_result=result is not None,
+        )
         if result is None:
             self.bayes_text.setText("No Bayesian results yet.")
             return
@@ -77,3 +100,10 @@ class ResultsPanel(QWidget):
                 sd = stats.get("sd", 0.0)
                 lines.append(f"  {name}: {mean:.4g} ± {sd:.4g}")
         self.bayes_text.setText("\n".join(lines))
+        logger.debug(
+            "Bayesian result displayed",
+            widget=self.__class__.__name__,
+            model=result.model_name,
+            num_samples=result.num_samples,
+            num_chains=result.num_chains,
+        )

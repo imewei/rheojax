@@ -19,6 +19,9 @@ from rheojax.io.readers._utils import (
     extract_unit_from_header,
     validate_transform,
 )
+from rheojax.logging import get_logger, log_io
+
+logger = get_logger(__name__)
 
 # Exported for lightweight preview/loading helpers
 __all__ = ["load_csv", "detect_csv_delimiter"]
@@ -93,7 +96,9 @@ def load_csv(
         )
     """
     filepath = Path(filepath)
+
     if not filepath.exists():
+        logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
     # Validate y_col / y_cols mutual exclusivity
@@ -126,6 +131,7 @@ def load_csv(
     # Auto-detect delimiter if not specified
     if delimiter is None:
         delimiter = detect_csv_delimiter(filepath)
+        logger.debug("Auto-detected delimiter", delimiter=repr(delimiter))
 
     # Choose encoding based on BOM/byte sniffing
     default_encoding = "utf-8-sig"
@@ -137,6 +143,7 @@ def load_csv(
             or b"\x00" in head_bytes
         ):
             default_encoding = "utf-16"
+        logger.debug("Detected encoding", encoding=default_encoding)
     except FileNotFoundError:
         raise
 
@@ -164,22 +171,42 @@ def load_csv(
         **kwargs,
     )
     tried_utf16 = False
-    try:
-        df = pd.read_csv(filepath, **read_kwargs)
-    except UnicodeDecodeError:
-        read_kwargs["encoding"] = "utf-16le"
-        tried_utf16 = True
-        df = pd.read_csv(filepath, **read_kwargs)
-    except Exception as e:
-        # If UTF-8 path failed and we haven't tried utf-16, attempt before giving up
-        if not tried_utf16:
-            try:
-                read_kwargs["encoding"] = "utf-16le"
-                df = pd.read_csv(filepath, **read_kwargs)
-            except Exception:
+
+    with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
+        try:
+            logger.debug("Reading CSV file", encoding=default_encoding)
+            df = pd.read_csv(filepath, **read_kwargs)
+        except UnicodeDecodeError:
+            read_kwargs["encoding"] = "utf-16le"
+            tried_utf16 = True
+            logger.debug("Retrying with UTF-16LE encoding")
+            df = pd.read_csv(filepath, **read_kwargs)
+        except Exception as e:
+            # If UTF-8 path failed and we haven't tried utf-16, attempt before giving up
+            if not tried_utf16:
+                try:
+                    read_kwargs["encoding"] = "utf-16le"
+                    logger.debug("Retrying with UTF-16LE encoding after error")
+                    df = pd.read_csv(filepath, **read_kwargs)
+                except Exception:
+                    logger.error(
+                        "Failed to parse CSV file",
+                        filepath=str(filepath),
+                        exc_info=True,
+                    )
+                    raise ValueError(f"Failed to parse CSV file: {e}") from e
+            else:
+                logger.error(
+                    "Failed to parse CSV file", filepath=str(filepath), exc_info=True
+                )
                 raise ValueError(f"Failed to parse CSV file: {e}") from e
-        else:
-            raise ValueError(f"Failed to parse CSV file: {e}") from e
+
+        io_ctx["rows"] = len(df)
+        io_ctx["columns"] = len(df.columns)
+        io_ctx["encoding"] = read_kwargs.get("encoding", default_encoding)
+        logger.debug(
+            "CSV file read successfully", n_rows=len(df), n_cols=len(df.columns)
+        )
 
     # Get column headers for detection
     x_header = _get_column_header(df, x_col)
@@ -188,6 +215,7 @@ def load_csv(
     try:
         x_data = _get_column_data(df, x_col)
     except (KeyError, IndexError) as e:
+        logger.error("X column not found", x_col=x_col, exc_info=True)
         raise KeyError(f"X column not found: {e}") from e
 
     # Extract y data (single column or complex modulus)
@@ -198,13 +226,16 @@ def load_csv(
             g_prime_data = _get_column_data(df, y_cols[0])
             g_double_prime_data = _get_column_data(df, y_cols[1])
         except (KeyError, IndexError) as e:
+            logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
+        logger.debug("Constructed complex modulus from G' and G''")
     else:
         y_headers = [_get_column_header(df, y_col)]
         try:
             y_data = _get_column_data(df, y_col)
         except (KeyError, IndexError) as e:
+            logger.error("Y column not found", y_col=y_col, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
 
     # Convert to numpy arrays and handle NaN
@@ -223,7 +254,10 @@ def load_csv(
     y_data = np.take(y_data, valid_idx)
 
     if len(x_data) == 0:
+        logger.error("No valid data points after removing NaN values", filepath=str(filepath))
         raise ValueError("No valid data points after removing NaN values")
+
+    logger.debug("Data points after NaN removal", n_points=len(x_data))
 
     # Auto-extract units from headers if not provided
     if x_units is None:
@@ -235,6 +269,7 @@ def load_csv(
     # Auto-detect domain if not provided
     if domain is None:
         domain = detect_domain(x_header, x_units, y_headers)
+        logger.debug("Auto-detected domain", domain=domain)
 
     # Auto-detect test mode if not provided
     detected_test_mode = None
@@ -245,6 +280,7 @@ def load_csv(
         # If y_cols provided, default to oscillation
         if detected_test_mode is None and is_complex:
             detected_test_mode = "oscillation"
+        logger.debug("Auto-detected test mode", test_mode=detected_test_mode)
     else:
         detected_test_mode = test_mode.lower()
 
@@ -278,6 +314,14 @@ def load_csv(
         )
         for msg in warning_messages:
             warnings.warn(msg, UserWarning, stacklevel=2)
+
+    logger.info(
+        "File parsed",
+        filepath=str(filepath),
+        n_records=len(x_data),
+        test_mode=detected_test_mode,
+        domain=domain,
+    )
 
     return RheoData(
         x=x_data,

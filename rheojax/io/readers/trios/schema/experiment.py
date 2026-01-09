@@ -12,6 +12,9 @@ from typing import Any
 import pandas as pd
 
 from rheojax.io.readers.trios.schema.dataset import TRIOSDataSet
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -39,17 +42,33 @@ class TRIOSResult:
         Returns:
             TRIOSResult instance
         """
+        logger.debug("Parsing TRIOSResult from dict", data_keys=list(data.keys()))
+
         properties = data.get("Properties", {})
+        logger.debug(
+            "Parsed result properties",
+            property_count=len(properties),
+            step=properties.get("Step"),
+            name=properties.get("Name"),
+        )
 
         datasets = []
         dataset_list = data.get("DataSet", [])
         if isinstance(dataset_list, dict):
             # Single dataset wrapped in object
+            logger.debug("Single dataset wrapped in object, converting to list")
             dataset_list = [dataset_list]
 
-        for ds_data in dataset_list:
+        logger.debug("Parsing datasets", dataset_count=len(dataset_list))
+        for i, ds_data in enumerate(dataset_list):
+            logger.debug("Parsing dataset", index=i)
             datasets.append(TRIOSDataSet.from_dict(ds_data))
 
+        logger.debug(
+            "TRIOSResult parsed successfully",
+            property_count=len(properties),
+            dataset_count=len(datasets),
+        )
         return cls(properties=properties, datasets=datasets)
 
     def get_dataframe(self, dataset_index: int = 0) -> pd.DataFrame:
@@ -123,28 +142,50 @@ class TRIOSExperiment:
         Raises:
             ValueError: If JSON structure is invalid
         """
+        logger.debug("Parsing TRIOSExperiment from JSON", data_keys=list(data.keys()))
+
         # Handle both wrapped and unwrapped formats
         if "Experiment" in data:
+            logger.debug("Found wrapped Experiment format")
             exp_data = data["Experiment"]
         else:
+            logger.debug("Using unwrapped format")
             exp_data = data
 
         properties = exp_data.get("Properties", {})
         sample = exp_data.get("Sample", {})
         procedure = exp_data.get("Procedure", {})
 
+        logger.debug(
+            "Parsed experiment metadata",
+            experiment_name=properties.get("Name"),
+            sample_name=sample.get("Name"),
+            procedure_name=procedure.get("Name"),
+        )
+
         # Parse results
         results = []
         results_list = exp_data.get("Results", [])
         if isinstance(results_list, dict):
             # Single result wrapped in object
+            logger.debug("Single result wrapped in object, converting to list")
             results_list = [results_list]
 
-        for result_data in results_list:
+        logger.debug("Parsing results", result_count=len(results_list))
+        for i, result_data in enumerate(results_list):
+            logger.debug("Parsing result", index=i)
             results.append(TRIOSResult.from_dict(result_data))
 
         # Get schema version if present
         schema_version = data.get("$schema") or data.get("schemaVersion")
+        logger.debug("Schema version detected", schema_version=schema_version)
+
+        logger.debug(
+            "TRIOSExperiment parsed successfully",
+            experiment_name=properties.get("Name"),
+            result_count=len(results),
+            schema_version=schema_version,
+        )
 
         return cls(
             properties=properties,
@@ -166,7 +207,19 @@ class TRIOSExperiment:
         Returns:
             DataFrame from the specified result/dataset
         """
+        logger.debug(
+            "Extracting DataFrame from experiment",
+            result_index=result_index,
+            dataset_index=dataset_index,
+            total_results=len(self.results),
+        )
+
         if not self.results or result_index >= len(self.results):
+            logger.debug(
+                "No results available or index out of range",
+                result_index=result_index,
+                total_results=len(self.results),
+            )
             return pd.DataFrame()
         return self.results[result_index].get_dataframe(dataset_index)
 
@@ -184,15 +237,31 @@ class TRIOSExperiment:
         Returns:
             Dictionary mapping step number to DataFrame
         """
+        logger.debug(
+            "Splitting DataFrame by step",
+            result_index=result_index,
+            step_col=step_col,
+        )
+
         df = self.get_dataframe(result_index)
 
         if df.empty or step_col not in df.columns:
+            logger.debug(
+                "DataFrame empty or step column missing",
+                df_empty=df.empty,
+                step_col_present=step_col in df.columns if not df.empty else False,
+            )
             return {0: df} if not df.empty else {}
 
         step_dfs = {}
         for step_val, group in df.groupby(step_col, sort=False):
             step_dfs[int(step_val)] = group.reset_index(drop=True)
 
+        logger.debug(
+            "DataFrame split by step completed",
+            step_count=len(step_dfs),
+            steps=list(step_dfs.keys()),
+        )
         return step_dfs
 
     def get_units(
@@ -260,6 +329,8 @@ class TRIOSExperiment:
         Returns:
             Dictionary with all experiment metadata
         """
+        logger.debug("Extracting consolidated metadata from experiment")
+
         metadata = {}
 
         # Add properties
@@ -275,6 +346,11 @@ class TRIOSExperiment:
         if self.procedure:
             metadata["procedure_name"] = self.procedure.get("Name")
 
+        logger.debug(
+            "Metadata extraction completed",
+            metadata_key_count=len(metadata),
+            metadata_keys=list(metadata.keys()),
+        )
         return metadata
 
 

@@ -31,6 +31,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from rheojax.logging import get_logger, log_io
+
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     pass
 
@@ -98,6 +102,13 @@ def export_spp_txt(
     filepath = Path(filepath)
     base_name = filepath.stem
 
+    logger.debug(
+        "Extracting SPP data arrays",
+        base_name=base_name,
+        analysis_type=analysis_type,
+        omega=omega,
+    )
+
     # Extract data arrays
     time = np.asarray(spp_results.get("time_new", np.arange(len(spp_results["Gp_t"]))))
     strain = np.asarray(spp_results.get("strain_recon", np.zeros(len(time))))
@@ -116,6 +127,12 @@ def export_spp_txt(
     Gpp_t_dot = np.asarray(spp_results.get("Gpp_t_dot", np.zeros(len(time))))
     G_speed = np.asarray(spp_results.get("G_speed", np.zeros(len(time))))
     delta_t_dot = np.asarray(spp_results.get("delta_t_dot", np.zeros(len(time))))
+
+    logger.debug(
+        "Building 15-column SPP data matrix",
+        data_points=len(time),
+        num_columns=15,
+    )
 
     # Build 15-column data matrix matching MATLAB format
     spp_data_out = np.column_stack(
@@ -140,20 +157,29 @@ def export_spp_txt(
 
     # Write main SPP data file
     main_filename = filepath.parent / f"{base_name}_SPP_{analysis_type}.txt"
-    _write_spp_main_txt(
-        main_filename,
-        spp_data_out,
-        omega=omega,
-        n_harmonics=n_harmonics,
-        n_cycles=n_cycles,
-        step_size=step_size,
-        num_mode=num_mode,
-        analysis_type=analysis_type,
-        precision=precision,
-    )
+    with log_io(logger, "write", filepath=str(main_filename)) as ctx:
+        _write_spp_main_txt(
+            main_filename,
+            spp_data_out,
+            omega=omega,
+            n_harmonics=n_harmonics,
+            n_cycles=n_cycles,
+            step_size=step_size,
+            num_mode=num_mode,
+            analysis_type=analysis_type,
+            precision=precision,
+        )
+        ctx["data_rows"] = len(spp_data_out)
+        ctx["columns"] = 15
+        ctx["analysis_type"] = analysis_type
 
     # Write Frenet-Serret frame file if requested
     if include_fsf and "T_vec" in spp_results:
+        logger.debug(
+            "Building Frenet-Serret frame data matrix",
+            data_points=len(time),
+            num_columns=9,
+        )
         T_vec = np.asarray(spp_results["T_vec"])
         N_vec = np.asarray(spp_results["N_vec"])
         B_vec = np.asarray(spp_results["B_vec"])
@@ -173,17 +199,21 @@ def export_spp_txt(
         )
 
         fsf_filename = filepath.parent / f"{base_name}_SPP_{analysis_type}_FSFRAME.txt"
-        _write_spp_fsf_txt(
-            fsf_filename,
-            fsf_data_out,
-            omega=omega,
-            n_harmonics=n_harmonics,
-            n_cycles=n_cycles,
-            step_size=step_size,
-            num_mode=num_mode,
-            analysis_type=analysis_type,
-            precision=precision,
-        )
+        with log_io(logger, "write", filepath=str(fsf_filename)) as ctx:
+            _write_spp_fsf_txt(
+                fsf_filename,
+                fsf_data_out,
+                omega=omega,
+                n_harmonics=n_harmonics,
+                n_cycles=n_cycles,
+                step_size=step_size,
+                num_mode=num_mode,
+                analysis_type=analysis_type,
+                precision=precision,
+            )
+            ctx["data_rows"] = len(fsf_data_out)
+            ctx["columns"] = 9
+            ctx["analysis_type"] = analysis_type
 
 
 def _write_spp_main_txt(
@@ -376,6 +406,12 @@ def export_spp_hdf5(
     try:
         import h5py
     except ImportError as e:
+        logger.error(
+            "h5py import failed",
+            error_type="ImportError",
+            suggestion="pip install h5py",
+            exc_info=True,
+        )
         raise ImportError(
             "h5py is required for HDF5 export. Install with: pip install h5py"
         ) from e
@@ -384,48 +420,78 @@ def export_spp_hdf5(
     if not filepath.suffix:
         filepath = filepath.with_suffix(".h5")
 
-    with h5py.File(filepath, "w") as f:
-        # Metadata group
-        meta = f.create_group("metadata")
-        meta.attrs["omega"] = omega
-        meta.attrs["gamma_0"] = gamma_0
-        meta.attrs["analysis_type"] = analysis_type
-        if "Delta" in spp_results:
-            meta.attrs["phase_offset_Delta"] = float(spp_results["Delta"])
-        if metadata:
-            for key, value in metadata.items():
-                meta.attrs[key] = value
+    with log_io(logger, "write", filepath=str(filepath)) as ctx:
+        datasets_written = []
 
-        # Main SPP data group
-        spp_data = f.create_group("spp_data")
-        for key in [
-            "Gp_t",
-            "Gpp_t",
-            "G_star_t",
-            "tan_delta_t",
-            "delta_t",
-            "disp_stress",
-            "eq_strain_est",
-            "Gp_t_dot",
-            "Gpp_t_dot",
-            "G_speed",
-            "delta_t_dot",
-        ]:
-            if key in spp_results:
-                spp_data.create_dataset(key, data=np.asarray(spp_results[key]))
+        with h5py.File(filepath, "w") as f:
+            # Metadata group
+            logger.debug(
+                "Writing metadata group",
+                omega=omega,
+                gamma_0=gamma_0,
+                analysis_type=analysis_type,
+            )
+            meta = f.create_group("metadata")
+            meta.attrs["omega"] = omega
+            meta.attrs["gamma_0"] = gamma_0
+            meta.attrs["analysis_type"] = analysis_type
+            if "Delta" in spp_results:
+                meta.attrs["phase_offset_Delta"] = float(spp_results["Delta"])
+            if metadata:
+                for key, value in metadata.items():
+                    meta.attrs[key] = value
+                logger.debug(
+                    "Custom metadata stored",
+                    metadata_keys=list(metadata.keys()),
+                )
 
-        # Waveforms group
-        waveforms = f.create_group("waveforms")
-        for key in ["time_new", "strain_recon", "rate_recon", "stress_recon"]:
-            if key in spp_results:
-                waveforms.create_dataset(key, data=np.asarray(spp_results[key]))
+            # Main SPP data group
+            logger.debug("Writing spp_data group")
+            spp_data = f.create_group("spp_data")
+            spp_keys_written = []
+            for key in [
+                "Gp_t",
+                "Gpp_t",
+                "G_star_t",
+                "tan_delta_t",
+                "delta_t",
+                "disp_stress",
+                "eq_strain_est",
+                "Gp_t_dot",
+                "Gpp_t_dot",
+                "G_speed",
+                "delta_t_dot",
+            ]:
+                if key in spp_results:
+                    spp_data.create_dataset(key, data=np.asarray(spp_results[key]))
+                    spp_keys_written.append(key)
+            datasets_written.extend(spp_keys_written)
+            logger.debug("SPP data datasets written", datasets=spp_keys_written)
 
-        # Frenet-Serret frame group
-        if "T_vec" in spp_results:
-            fsf = f.create_group("frenet_serret")
-            fsf.create_dataset("T_vec", data=np.asarray(spp_results["T_vec"]))
-            fsf.create_dataset("N_vec", data=np.asarray(spp_results["N_vec"]))
-            fsf.create_dataset("B_vec", data=np.asarray(spp_results["B_vec"]))
+            # Waveforms group
+            logger.debug("Writing waveforms group")
+            waveforms = f.create_group("waveforms")
+            waveform_keys_written = []
+            for key in ["time_new", "strain_recon", "rate_recon", "stress_recon"]:
+                if key in spp_results:
+                    waveforms.create_dataset(key, data=np.asarray(spp_results[key]))
+                    waveform_keys_written.append(key)
+            datasets_written.extend(waveform_keys_written)
+            logger.debug("Waveform datasets written", datasets=waveform_keys_written)
+
+            # Frenet-Serret frame group
+            if "T_vec" in spp_results:
+                logger.debug("Writing frenet_serret group")
+                fsf = f.create_group("frenet_serret")
+                fsf.create_dataset("T_vec", data=np.asarray(spp_results["T_vec"]))
+                fsf.create_dataset("N_vec", data=np.asarray(spp_results["N_vec"]))
+                fsf.create_dataset("B_vec", data=np.asarray(spp_results["B_vec"]))
+                datasets_written.extend(["T_vec", "N_vec", "B_vec"])
+                logger.debug("Frenet-Serret frame datasets written")
+
+        ctx["datasets_written"] = len(datasets_written)
+        ctx["has_fsf"] = "T_vec" in spp_results
+        ctx["analysis_type"] = analysis_type
 
 
 # ============================================================================
@@ -460,6 +526,11 @@ def export_spp_csv(
     if not filepath.suffix:
         filepath = filepath.with_suffix(".csv")
 
+    logger.debug(
+        "Building CSV column structure",
+        include_fsf=include_fsf,
+    )
+
     # Build column dict
     columns = {}
     time = np.asarray(spp_results.get("time_new", np.arange(len(spp_results["Gp_t"]))))
@@ -485,6 +556,7 @@ def export_spp_csv(
             columns[key] = np.asarray(spp_results[key])
 
     if include_fsf and "T_vec" in spp_results:
+        logger.debug("Including Frenet-Serret frame columns")
         T_vec = np.asarray(spp_results["T_vec"])
         N_vec = np.asarray(spp_results["N_vec"])
         B_vec = np.asarray(spp_results["B_vec"])
@@ -498,14 +570,28 @@ def export_spp_csv(
         columns["B_y"] = B_vec[:, 1]
         columns["B_z"] = B_vec[:, 2]
 
-    # Write to CSV
-    with open(filepath, "w") as f:
-        # Header
-        f.write(",".join(columns.keys()) + "\n")
-        # Data
-        data = np.column_stack(list(columns.values()))
-        for row in data:
-            f.write(",".join(f"{val:.7g}" for val in row) + "\n")
+    with log_io(logger, "write", filepath=str(filepath)) as ctx:
+        # Write to CSV
+        with open(filepath, "w") as f:
+            # Header
+            logger.debug(
+                "Writing CSV header",
+                num_columns=len(columns),
+                column_names=list(columns.keys()),
+            )
+            f.write(",".join(columns.keys()) + "\n")
+            # Data
+            data = np.column_stack(list(columns.values()))
+            logger.debug(
+                "Writing CSV data rows",
+                data_shape=data.shape,
+            )
+            for row in data:
+                f.write(",".join(f"{val:.7g}" for val in row) + "\n")
+
+        ctx["data_rows"] = len(data)
+        ctx["columns"] = len(columns)
+        ctx["include_fsf"] = include_fsf
 
 
 # ============================================================================
@@ -561,6 +647,12 @@ def to_matlab_dict(
     >>> mat_data = to_matlab_dict(spp_results, omega=1.0, step_size=8)
     >>> savemat("results.mat", mat_data)
     """
+    logger.debug(
+        "Converting SPP results to MATLAB dict",
+        analysis_type=analysis_type,
+        omega=omega,
+    )
+
     # Extract data arrays
     time = np.asarray(spp_results.get("time_new", np.arange(len(spp_results["Gp_t"]))))
     strain = np.asarray(spp_results.get("strain_recon", np.zeros(len(time))))
@@ -579,6 +671,11 @@ def to_matlab_dict(
     Gpp_t_dot = np.asarray(spp_results.get("Gpp_t_dot", np.zeros(len(time))))
     G_speed = np.asarray(spp_results.get("G_speed", np.zeros(len(time))))
     delta_t_dot = np.asarray(spp_results.get("delta_t_dot", np.zeros(len(time))))
+
+    logger.debug(
+        "Building MATLAB 15-column data matrix",
+        data_points=len(time),
+    )
 
     # Build 15-column data matrix
     spp_data_out = np.column_stack(
@@ -665,11 +762,13 @@ def to_matlab_dict(
         "headers": headers,
         "data": spp_data_out,
     }
+    logger.debug("SPP structure built", data_shape=spp_data_out.shape)
 
     # Build FSF structure if available
     result = {"out_spp": out_spp}
 
     if "T_vec" in spp_results:
+        logger.debug("Building Frenet-Serret frame structure")
         T_vec = np.asarray(spp_results["T_vec"])
         N_vec = np.asarray(spp_results["N_vec"])
         B_vec = np.asarray(spp_results["B_vec"])
@@ -722,7 +821,13 @@ def to_matlab_dict(
             "data": fsf_data_out,
         }
         result["out_fsf"] = out_fsf
+        logger.debug("FSF structure built", data_shape=fsf_data_out.shape)
 
+    logger.debug(
+        "MATLAB dict conversion completed",
+        output_keys=list(result.keys()),
+        has_fsf="out_fsf" in result,
+    )
     return result
 
 

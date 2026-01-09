@@ -49,6 +49,7 @@ References
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger, log_fit
 from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
@@ -58,6 +59,8 @@ from rheojax.core.base import BaseModel
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e
+
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("fractional_poynting_thomson")
@@ -326,67 +329,110 @@ class FractionalPoyntingThomson(BaseModel):
         # Store test mode for model_function
         self._test_mode = test_mode
 
-        # Smart initialization for oscillation mode (Issue #9)
-        if test_mode == TestMode.OSCILLATION:
-            try:
-                import numpy as np
+        logger.info(
+            "Starting FractionalPoyntingThomson fit",
+            test_mode=test_mode.value if hasattr(test_mode, "value") else str(test_mode),
+            data_shape=X.shape,
+        )
 
-                from rheojax.utils.initialization import (
-                    initialize_fractional_poynting_thomson,
-                )
+        with log_fit(
+            logger, model="FractionalPoyntingThomson", data_shape=X.shape
+        ) as ctx:
+            # Smart initialization for oscillation mode (Issue #9)
+            if test_mode == TestMode.OSCILLATION:
+                try:
+                    import numpy as np
 
-                success = initialize_fractional_poynting_thomson(
-                    np.array(X), np.array(y), self.parameters
-                )
-                if success:
-                    import logging
-
-                    logging.debug(
-                        "Smart initialization applied from frequency-domain features"
+                    from rheojax.utils.initialization import (
+                        initialize_fractional_poynting_thomson,
                     )
-            except Exception as e:
-                # Silent fallback to defaults - don't break if initialization fails
-                import logging
 
-                logging.debug(f"Smart initialization failed, using defaults: {e}")
+                    logger.debug(
+                        "Attempting smart initialization for oscillation mode",
+                        data_points=len(X),
+                    )
+                    success = initialize_fractional_poynting_thomson(
+                        np.array(X), np.array(y), self.parameters
+                    )
+                    if success:
+                        logger.debug(
+                            "Smart initialization applied from frequency-domain features",
+                            Ge=self.parameters.get_value("Ge"),
+                            Gk=self.parameters.get_value("Gk"),
+                            alpha=self.parameters.get_value("alpha"),
+                            tau=self.parameters.get_value("tau"),
+                        )
+                except Exception as e:
+                    # Silent fallback to defaults - don't break if initialization fails
+                    logger.debug(
+                        "Smart initialization failed, using defaults",
+                        error=str(e),
+                        exc_info=True,
+                    )
 
-        # Create stateless model function for optimization
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            Ge, Gk, alpha, tau = params[0], params[1], params[2], params[3]
+            # Create stateless model function for optimization
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                Ge, Gk, alpha, tau = params[0], params[1], params[2], params[3]
 
-            # Direct prediction based on test mode (stateless)
-            if test_mode == TestMode.RELAXATION:
-                return self._predict_relaxation(x, Ge, Gk, alpha, tau)
-            elif test_mode == TestMode.CREEP:
-                return self._predict_creep(x, Ge, Gk, alpha, tau)
-            elif test_mode == TestMode.OSCILLATION:
-                return self._predict_oscillation(x, Ge, Gk, alpha, tau)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
+                # Direct prediction based on test mode (stateless)
+                if test_mode == TestMode.RELAXATION:
+                    return self._predict_relaxation(x, Ge, Gk, alpha, tau)
+                elif test_mode == TestMode.CREEP:
+                    return self._predict_creep(x, Ge, Gk, alpha, tau)
+                elif test_mode == TestMode.OSCILLATION:
+                    return self._predict_oscillation(x, Ge, Gk, alpha, tau)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
 
-        # Create objective function
-        objective = create_least_squares_objective(
-            model_fn, jnp.array(X), jnp.array(y), normalize=True
-        )
-
-        # Optimize using NLSQ TRF
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+            # Create objective function
+            logger.debug("Creating least squares objective function")
+            objective = create_least_squares_objective(
+                model_fn, jnp.array(X), jnp.array(y), normalize=True
             )
 
-        self.fitted_ = True
+            # Optimize using NLSQ TRF
+            logger.debug(
+                "Starting NLSQ optimization",
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+            result = nlsq_optimize(
+                objective,
+                self.parameters,
+                use_jax=kwargs.get("use_jax", True),
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "NLSQ optimization failed",
+                    message=result.message,
+                    exc_info=True,
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+            ctx["success"] = True
+            ctx["fitted_params"] = {
+                "Ge": self.parameters.get_value("Ge"),
+                "Gk": self.parameters.get_value("Gk"),
+                "alpha": self.parameters.get_value("alpha"),
+                "tau": self.parameters.get_value("tau"),
+            }
+
+        logger.info(
+            "FractionalPoyntingThomson fit completed",
+            Ge=self.parameters.get_value("Ge"),
+            Gk=self.parameters.get_value("Gk"),
+            alpha=self.parameters.get_value("alpha"),
+            tau=self.parameters.get_value("tau"),
+        )
         return self
 
     def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
@@ -452,15 +498,26 @@ class FractionalPoyntingThomson(BaseModel):
         if hasattr(test_mode, "value"):
             test_mode = test_mode.value
 
+        logger.debug(
+            "model_function evaluation",
+            test_mode=str(test_mode),
+            alpha=float(alpha) if hasattr(alpha, "item") else alpha,
+            input_shape=X.shape if hasattr(X, "shape") else len(X),
+        )
+
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:
+            logger.debug("Computing relaxation modulus with Mittag-Leffler evaluation")
             return self._predict_relaxation(X, Ge, Gk, alpha, tau)
         elif test_mode == TestMode.CREEP:
+            logger.debug("Computing creep compliance with Mittag-Leffler evaluation")
             return self._predict_creep(X, Ge, Gk, alpha, tau)
         elif test_mode == TestMode.OSCILLATION:
+            logger.debug("Computing complex modulus for oscillation mode")
             return self._predict_oscillation(X, Ge, Gk, alpha, tau)
         else:
             # Default to creep mode for FPT model
+            logger.debug("Default to creep mode prediction")
             return self._predict_creep(X, Ge, Gk, alpha, tau)
 
 

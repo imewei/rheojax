@@ -29,6 +29,10 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("power_law")
@@ -86,28 +90,68 @@ class PowerLaw(BaseModel):
         Returns:
             self for method chaining
         """
-        # Use log-log linear regression for initial guess
-        # log(η) = log(K) + (n-1)*log(γ̇) for viscosity
-        # log(σ) = log(K) + n*log(γ̇) for stress
+        data_shape = (len(X),) if hasattr(X, "__len__") else None
 
-        # Assume viscosity data by default
-        log_gamma_dot = np.log(np.abs(X))
-        log_y = np.log(np.abs(y))
+        with log_fit(logger, model="PowerLaw", data_shape=data_shape, test_mode="rotation") as ctx:
+            logger.debug(
+                "Starting Power Law model fit",
+                n_points=data_shape[0] if data_shape else None,
+                initial_K=self.parameters.get_value("K"),
+                initial_n=self.parameters.get_value("n"),
+            )
 
-        # Linear fit: log(y) = a + b*log(γ̇)
-        coeffs = np.polyfit(log_gamma_dot, log_y, 1)
+            try:
+                # Use log-log linear regression for initial guess
+                # log(η) = log(K) + (n-1)*log(γ̇) for viscosity
+                # log(σ) = log(K) + n*log(γ̇) for stress
 
-        # For viscosity: b = n-1, a = log(K)
-        # Assume viscosity data (can be refined with metadata)
-        n_fit = coeffs[0] + 1.0
-        K_fit = np.exp(coeffs[1])
+                # Assume viscosity data by default
+                log_gamma_dot = np.log(np.abs(X))
+                log_y = np.log(np.abs(y))
 
-        # Clip to bounds
-        n_fit = np.clip(n_fit, 0.01, 2.0)
-        K_fit = np.clip(K_fit, 1e-6, 1e6)
+                logger.debug("Performing log-log linear regression")
 
-        self.parameters.set_value("K", float(K_fit))
-        self.parameters.set_value("n", float(n_fit))
+                # Linear fit: log(y) = a + b*log(γ̇)
+                coeffs = np.polyfit(log_gamma_dot, log_y, 1)
+
+                # For viscosity: b = n-1, a = log(K)
+                # Assume viscosity data (can be refined with metadata)
+                n_fit = coeffs[0] + 1.0
+                K_fit = np.exp(coeffs[1])
+
+                logger.debug(
+                    "Log-log regression results",
+                    slope=coeffs[0],
+                    intercept=coeffs[1],
+                    n_raw=n_fit,
+                    K_raw=K_fit,
+                )
+
+                # Clip to bounds
+                n_fit = np.clip(n_fit, 0.01, 2.0)
+                K_fit = np.clip(K_fit, 1e-6, 1e6)
+
+                self.parameters.set_value("K", float(K_fit))
+                self.parameters.set_value("n", float(n_fit))
+
+                logger.debug(
+                    "Power Law fit completed successfully",
+                    fitted_K=float(K_fit),
+                    fitted_n=float(n_fit),
+                    behavior="shear-thinning" if n_fit < 1 else ("shear-thickening" if n_fit > 1 else "Newtonian"),
+                )
+
+                ctx["K"] = float(K_fit)
+                ctx["n"] = float(n_fit)
+
+            except Exception as e:
+                logger.error(
+                    "Power Law fit failed",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
 
         return self
 

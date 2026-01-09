@@ -25,6 +25,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class PreferencesDialog(QDialog):
     """Application preferences dialog.
@@ -56,6 +60,7 @@ class PreferencesDialog(QDialog):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self.current_preferences = current_preferences or {}
 
@@ -64,6 +69,12 @@ class PreferencesDialog(QDialog):
 
         self._setup_ui()
         self._load_current_preferences()
+
+        logger.debug(
+            "Dialog initialized",
+            dialog=self.__class__.__name__,
+            has_current_preferences=bool(current_preferences),
+        )
 
     def _setup_ui(self) -> None:
         """Set up user interface."""
@@ -103,11 +114,26 @@ class PreferencesDialog(QDialog):
         button_box.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(
             self._on_apply
         )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
+        button_box.accepted.connect(self._on_accept)
+        button_box.rejected.connect(self._on_reject)
         layout.addWidget(button_box)
 
         self.setLayout(layout)
+
+    def _on_accept(self) -> None:
+        """Handle dialog accept."""
+        logger.debug("Dialog closed", dialog=self.__class__.__name__, result="accepted")
+        self.accept()
+
+    def _on_reject(self) -> None:
+        """Handle dialog reject."""
+        logger.debug("Dialog closed", dialog=self.__class__.__name__, result="rejected")
+        self.reject()
+
+    def showEvent(self, event) -> None:
+        """Handle dialog show event."""
+        super().showEvent(event)
+        logger.debug("Dialog opened", dialog=self.__class__.__name__)
 
     def _create_general_tab(self) -> QWidget:
         """Create general settings tab."""
@@ -120,6 +146,14 @@ class PreferencesDialog(QDialog):
 
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["Light", "Dark", "System"])
+        self.theme_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="theme",
+                value=value,
+            )
+        )
         theme_layout.addRow("Theme:", self.theme_combo)
 
         theme_group.setLayout(theme_layout)
@@ -140,6 +174,14 @@ class PreferencesDialog(QDialog):
         self.autosave_spin.setRange(1, 60)
         self.autosave_spin.setValue(5)
         self.autosave_spin.setSuffix(" minutes")
+        self.autosave_spin.valueChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="autosave_interval",
+                value=value,
+            )
+        )
         interval_layout.addWidget(self.autosave_spin)
         interval_layout.addStretch()
         autosave_layout.addLayout(interval_layout)
@@ -154,6 +196,14 @@ class PreferencesDialog(QDialog):
         self.recent_count_spin = QSpinBox()
         self.recent_count_spin.setRange(5, 50)
         self.recent_count_spin.setValue(10)
+        self.recent_count_spin.valueChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="recent_count",
+                value=value,
+            )
+        )
         recent_layout.addRow("Number of recent projects:", self.recent_count_spin)
 
         recent_group.setLayout(recent_layout)
@@ -174,6 +224,14 @@ class PreferencesDialog(QDialog):
 
         self.device_combo = QComboBox()
         self.device_combo.addItems(["cpu", "gpu", "tpu"])
+        self.device_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="device",
+                value=value,
+            )
+        )
         device_layout.addRow("Default Device:", self.device_combo)
 
         device_group.setLayout(device_layout)
@@ -187,12 +245,28 @@ class PreferencesDialog(QDialog):
             "Warn when float64 is not enabled (recommended)"
         )
         self.float64_warning_check.setChecked(True)
+        self.float64_warning_check.stateChanged.connect(
+            lambda state: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="float64_warning",
+                value=state == Qt.CheckState.Checked.value,
+            )
+        )
         float64_layout.addWidget(self.float64_warning_check)
 
         self.auto_enable_float64_check = QCheckBox(
             "Automatically enable float64 on startup"
         )
         self.auto_enable_float64_check.setChecked(True)
+        self.auto_enable_float64_check.stateChanged.connect(
+            lambda state: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="auto_enable_float64",
+                value=state == Qt.CheckState.Checked.value,
+            )
+        )
         float64_layout.addWidget(self.auto_enable_float64_check)
 
         float64_group.setLayout(float64_layout)
@@ -209,12 +283,28 @@ class PreferencesDialog(QDialog):
         self.memory_limit_spin.setValue(8192)
         self.memory_limit_spin.setSingleStep(512)
         self.memory_limit_spin.setSuffix(" MB")
+        self.memory_limit_spin.valueChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="memory_limit",
+                value=value,
+            )
+        )
         memory_limit_layout.addWidget(self.memory_limit_spin)
         memory_limit_layout.addStretch()
         memory_layout.addLayout(memory_limit_layout)
 
         self.preallocate_check = QCheckBox("Pre-allocate GPU memory")
         self.preallocate_check.setChecked(False)
+        self.preallocate_check.stateChanged.connect(
+            lambda state: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="preallocate_memory",
+                value=state == Qt.CheckState.Checked.value,
+            )
+        )
         memory_layout.addWidget(self.preallocate_check)
 
         memory_group.setLayout(memory_layout)
@@ -246,6 +336,14 @@ class PreferencesDialog(QDialog):
                 "fivethirtyeight",
             ]
         )
+        self.plot_style_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="plot_style",
+                value=value,
+            )
+        )
         style_layout.addRow("Default Plot Style:", self.plot_style_combo)
 
         self.color_palette_combo = QComboBox()
@@ -260,6 +358,14 @@ class PreferencesDialog(QDialog):
                 "inferno",
                 "magma",
             ]
+        )
+        self.color_palette_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="color_palette",
+                value=value,
+            )
         )
         style_layout.addRow("Default Color Palette:", self.color_palette_combo)
 
@@ -297,14 +403,38 @@ class PreferencesDialog(QDialog):
 
         self.show_grid_check = QCheckBox("Show grid by default")
         self.show_grid_check.setChecked(True)
+        self.show_grid_check.stateChanged.connect(
+            lambda state: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="show_grid",
+                value=state == Qt.CheckState.Checked.value,
+            )
+        )
         display_layout.addWidget(self.show_grid_check)
 
         self.show_legend_check = QCheckBox("Show legend by default")
         self.show_legend_check.setChecked(True)
+        self.show_legend_check.stateChanged.connect(
+            lambda state: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="show_legend",
+                value=state == Qt.CheckState.Checked.value,
+            )
+        )
         display_layout.addWidget(self.show_legend_check)
 
         self.tight_layout_check = QCheckBox("Use tight layout")
         self.tight_layout_check.setChecked(True)
+        self.tight_layout_check.stateChanged.connect(
+            lambda state: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="tight_layout",
+                value=state == Qt.CheckState.Checked.value,
+            )
+        )
         display_layout.addWidget(self.tight_layout_check)
 
         display_group.setLayout(display_layout)
@@ -318,6 +448,12 @@ class PreferencesDialog(QDialog):
         """Load current preferences into UI."""
         if not self.current_preferences:
             return
+
+        logger.debug(
+            "Loading current preferences",
+            dialog=self.__class__.__name__,
+            preference_keys=list(self.current_preferences.keys()),
+        )
 
         # General tab
         if "theme" in self.current_preferences:
@@ -391,10 +527,22 @@ class PreferencesDialog(QDialog):
         """Handle auto-save checkbox change."""
         enabled = state == Qt.CheckState.Checked.value
         self.autosave_spin.setEnabled(enabled)
+        logger.debug(
+            "Value changed",
+            dialog=self.__class__.__name__,
+            field="autosave_enabled",
+            value=enabled,
+        )
 
     def _on_font_size_changed(self, value: int) -> None:
         """Handle font size slider change."""
         self.font_size_label.setText(f"{value} pt")
+        logger.debug(
+            "Value changed",
+            dialog=self.__class__.__name__,
+            field="font_size",
+            value=value,
+        )
 
     def _on_apply(self) -> None:
         """Handle Apply button click.
@@ -402,6 +550,8 @@ class PreferencesDialog(QDialog):
         Applies current preferences without closing the dialog,
         allowing users to see changes before committing.
         """
+        logger.debug("Apply button clicked", dialog=self.__class__.__name__)
+
         # Get current preferences and update internal state
         self.current_preferences = self.get_preferences()
 
@@ -413,6 +563,8 @@ class PreferencesDialog(QDialog):
 
     def _restore_defaults(self) -> None:
         """Restore all preferences to defaults."""
+        logger.debug("Restoring defaults", dialog=self.__class__.__name__)
+
         # General
         self.theme_combo.setCurrentText("Light")
         self.autosave_check.setChecked(True)
@@ -477,6 +629,12 @@ class PreferencesDialog(QDialog):
             "show_legend": self.show_legend_check.isChecked(),
             "tight_layout": self.tight_layout_check.isChecked(),
         }
+
+        logger.debug(
+            "Getting preferences",
+            dialog=self.__class__.__name__,
+            preference_keys=list(preferences.keys()),
+        )
 
         return preferences
 

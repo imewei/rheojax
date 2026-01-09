@@ -39,7 +39,11 @@ from jax.scipy.special import gamma as jax_gamma
 from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
+from rheojax.logging import get_logger, log_fit
 from rheojax.utils.mittag_leffler import mittag_leffler_e
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("fractional_kelvin_voigt")
@@ -302,66 +306,124 @@ class FractionalKelvinVoigt(BaseModel):
             y_data = jnp.array(y)
             test_mode = kwargs.get("test_mode", "relaxation")
 
-        # Smart initialization for oscillation mode (Issue #9)
-        if test_mode == "oscillation":
-            try:
-                import numpy as np
+        # Get test mode string for logging
+        test_mode_str = test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        data_shape = (int(x_data.shape[0]),) if hasattr(x_data, "shape") else None
 
-                from rheojax.utils.initialization import (
-                    initialize_fractional_kelvin_voigt,
-                )
-
-                success = initialize_fractional_kelvin_voigt(
-                    np.array(X), np.array(y), self.parameters
-                )
-                if success:
-                    import logging
-
-                    logging.debug(
-                        "Smart initialization applied from frequency-domain features"
-                    )
-            except Exception as e:
-                # Silent fallback to defaults - don't break if initialization fails
-                import logging
-
-                logging.debug(f"Smart initialization failed, using defaults: {e}")
-
-        # Create objective function with stateless predictions
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            Ge, c_alpha, alpha = params[0], params[1], params[2]
-
-            # Direct prediction based on test mode (stateless, calls _jax methods)
-            if test_mode == "relaxation":
-                return self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
-            elif test_mode == "creep":
-                return self._predict_creep_jax(x, Ge, c_alpha, alpha)
-            elif test_mode == "oscillation":
-                return self._predict_oscillation_jax(x, Ge, c_alpha, alpha)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
-
-        objective = create_least_squares_objective(
-            model_fn, x_data, y_data, normalize=True
-        )
-
-        # Optimize using NLSQ
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+        with log_fit(logger, model="FractionalKelvinVoigt", data_shape=data_shape, test_mode=test_mode_str) as ctx:
+            logger.debug(
+                "Starting Fractional Kelvin-Voigt model fit",
+                test_mode=test_mode_str,
+                n_points=data_shape[0] if data_shape else None,
+                initial_Ge=self.parameters.get_value("Ge"),
+                initial_c_alpha=self.parameters.get_value("c_alpha"),
+                initial_alpha=self.parameters.get_value("alpha"),
             )
 
-        self.fitted_ = True
+            # Smart initialization for oscillation mode (Issue #9)
+            if test_mode == "oscillation":
+                try:
+                    from rheojax.utils.initialization import (
+                        initialize_fractional_kelvin_voigt,
+                    )
+
+                    success = initialize_fractional_kelvin_voigt(
+                        np.array(X), np.array(y), self.parameters
+                    )
+                    if success:
+                        logger.debug(
+                            "Smart initialization applied from frequency-domain features",
+                            Ge=self.parameters.get_value("Ge"),
+                            c_alpha=self.parameters.get_value("c_alpha"),
+                            alpha=self.parameters.get_value("alpha"),
+                        )
+                except Exception as e:
+                    # Silent fallback to defaults - don't break if initialization fails
+                    logger.debug(
+                        "Smart initialization failed, using defaults",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                    )
+
+            # Create objective function with stateless predictions
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                Ge, c_alpha, alpha = params[0], params[1], params[2]
+
+                # Direct prediction based on test mode (stateless, calls _jax methods)
+                if test_mode == "relaxation":
+                    return self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
+                elif test_mode == "creep":
+                    return self._predict_creep_jax(x, Ge, c_alpha, alpha)
+                elif test_mode == "oscillation":
+                    return self._predict_oscillation_jax(x, Ge, c_alpha, alpha)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
+
+            logger.debug("Creating least squares objective", normalize=True)
+            objective = create_least_squares_objective(
+                model_fn, x_data, y_data, normalize=True
+            )
+
+            # Optimize using NLSQ
+            logger.debug(
+                "Starting NLSQ optimization",
+                use_jax=kwargs.get("use_jax", True),
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "Optimization failed",
+                    message=result.message,
+                    test_mode=test_mode_str,
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+
+            # Log fitted parameters
+            fitted_Ge = self.parameters.get_value("Ge")
+            fitted_c_alpha = self.parameters.get_value("c_alpha")
+            fitted_alpha = self.parameters.get_value("alpha")
+
+            # Compute characteristic time
+            tau_epsilon = self._compute_tau_epsilon(fitted_Ge, fitted_c_alpha, fitted_alpha)
+
+            logger.debug(
+                "Fractional Kelvin-Voigt fit completed successfully",
+                fitted_Ge=fitted_Ge,
+                fitted_c_alpha=fitted_c_alpha,
+                fitted_alpha=fitted_alpha,
+                characteristic_time=tau_epsilon,
+            )
+
+            ctx["Ge"] = fitted_Ge
+            ctx["c_alpha"] = fitted_c_alpha
+            ctx["alpha"] = fitted_alpha
+
         return self
 
     def _predict(self, X: np.ndarray) -> np.ndarray:

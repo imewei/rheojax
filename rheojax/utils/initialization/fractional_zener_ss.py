@@ -12,7 +12,10 @@ Extraction strategy:
 
 from __future__ import annotations
 
+from rheojax.logging import get_logger
 from rheojax.utils.initialization.base import BaseInitializer
+
+logger = get_logger(__name__)
 
 
 class FractionalZenerSSInitializer(BaseInitializer):
@@ -31,29 +34,75 @@ class FractionalZenerSSInitializer(BaseInitializer):
         dict
             Estimated parameters: Ge, Gm, alpha, tau_alpha
         """
+        logger.debug(
+            "Estimating FractionalZenerSolidSolid parameters",
+            model="FractionalZenerSolidSolid",
+            low_plateau=features["low_plateau"],
+            high_plateau=features["high_plateau"],
+            omega_mid=features["omega_mid"],
+            alpha_estimate=features["alpha_estimate"],
+        )
+
         epsilon = 1e-12
 
         # Ge: equilibrium modulus from low-frequency plateau
         Ge_init = max(features["low_plateau"], epsilon)
+        logger.debug(
+            "Estimated Ge from low-frequency plateau",
+            Ge=Ge_init,
+            low_plateau=features["low_plateau"],
+        )
 
         # Gm: Maxwell arm modulus from plateau difference
         Gm_init = max(features["high_plateau"] - features["low_plateau"], epsilon)
+        logger.debug(
+            "Estimated Gm from plateau difference",
+            Gm=Gm_init,
+            difference=features["high_plateau"] - features["low_plateau"],
+        )
 
         # tau_alpha: relaxation time from transition frequency
         tau_alpha_init = 1.0 / (features["omega_mid"] + epsilon)
+        logger.debug(
+            "Estimated tau_alpha from transition frequency",
+            tau_alpha=tau_alpha_init,
+            omega_mid=features["omega_mid"],
+        )
 
         # alpha: fractional order from slope or default to 0.5
         if 0.01 <= features["alpha_estimate"] <= 0.99:
             alpha_init = features["alpha_estimate"]
+            logger.debug(
+                "Using alpha from slope estimate",
+                alpha=alpha_init,
+                source="slope_estimate",
+            )
         else:
             alpha_init = 0.5
+            logger.debug(
+                "Using default alpha (slope estimate out of range)",
+                alpha=alpha_init,
+                alpha_estimate=features["alpha_estimate"],
+                source="default",
+            )
 
-        return {
+        estimated = {
             "Ge": Ge_init,
             "Gm": Gm_init,
             "alpha": alpha_init,
             "tau_alpha": tau_alpha_init,
         }
+
+        logger.info(
+            "FractionalZenerSolidSolid initialization complete",
+            model="FractionalZenerSolidSolid",
+            Ge=Ge_init,
+            Gm=Gm_init,
+            alpha=alpha_init,
+            tau_alpha=tau_alpha_init,
+        )
+
+        return estimated
 
     def _set_parameters(self, param_set, clipped_params: dict) -> None:
         """Set FZSS parameters in ParameterSet.
@@ -65,6 +114,14 @@ class FractionalZenerSSInitializer(BaseInitializer):
         clipped_params : dict
             Clipped parameter values
         """
+        logger.debug(
+            "Setting FractionalZenerSolidSolid parameters in ParameterSet",
+            Ge=clipped_params["Ge"],
+            Gm=clipped_params["Gm"],
+            alpha=clipped_params["alpha"],
+            tau_alpha=clipped_params["tau_alpha"],
+        )
+
         self._safe_set_parameter(param_set, "Ge", clipped_params["Ge"])
         self._safe_set_parameter(param_set, "Gm", clipped_params["Gm"])
         self._safe_set_parameter(param_set, "alpha", clipped_params["alpha"])

@@ -30,6 +30,10 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("carreau")
@@ -96,59 +100,122 @@ class Carreau(BaseModel):
         """Fit Carreau parameters to data.
 
         Args:
-            X: Shear rate data (γ̇)
+            X: Shear rate data (gamma_dot)
             y: Viscosity data
             **kwargs: Additional fitting options
 
         Returns:
             self for method chaining
         """
-        # Simple heuristic fitting
-        # eta0: maximum viscosity at low shear rates
-        # eta_inf: minimum viscosity at high shear rates
-        # lambda_: shear rate at which viscosity is halfway between plateaus
-        # n: slope of power-law region
+        with log_fit(
+            logger,
+            self.__class__.__name__,
+            data_shape=X.shape,
+            test_mode="ROTATION",
+        ) as ctx:
+            logger.debug(
+                "Processing input data",
+                gamma_dot_range=(float(X.min()), float(X.max())),
+                viscosity_range=(float(y.min()), float(y.max())),
+                n_points=len(X),
+            )
 
-        # Sort by shear rate
-        sort_idx = np.argsort(X)
-        X_sorted = X[sort_idx]
-        y_sorted = y[sort_idx]
+            # Simple heuristic fitting
+            # eta0: maximum viscosity at low shear rates
+            # eta_inf: minimum viscosity at high shear rates
+            # lambda_: shear rate at which viscosity is halfway between plateaus
+            # n: slope of power-law region
 
-        # Estimate plateaus
-        eta0_est = np.max(y_sorted[: len(y_sorted) // 10 + 1])  # Average low shear
-        eta_inf_est = np.min(y_sorted[-len(y_sorted) // 10 :])  # Average high shear
+            # Sort by shear rate
+            sort_idx = np.argsort(X)
+            X_sorted = X[sort_idx]
+            y_sorted = y[sort_idx]
 
-        # Find characteristic shear rate (midpoint)
-        eta_mid = (eta0_est + eta_inf_est) / 2.0
-        idx_mid = np.argmin(np.abs(y_sorted - eta_mid))
-        lambda_est = 1.0 / X_sorted[idx_mid] if X_sorted[idx_mid] > 0 else 1.0
+            # Estimate plateaus
+            try:
+                eta0_est = np.max(y_sorted[: len(y_sorted) // 10 + 1])  # Average low shear
+                eta_inf_est = np.min(y_sorted[-len(y_sorted) // 10 :])  # Average high shear
 
-        # Estimate n from power-law region slope
-        # Use middle region of data
-        mid_start = len(X_sorted) // 3
-        mid_end = 2 * len(X_sorted) // 3
-        if mid_end > mid_start + 1:
-            log_gamma = np.log(X_sorted[mid_start:mid_end])
-            log_eta = np.log(y_sorted[mid_start:mid_end])
-            coeffs = np.polyfit(log_gamma, log_eta, 1)
-            n_est = coeffs[0] + 1.0  # Slope is n-1
-        else:
-            n_est = 0.5
+                logger.debug(
+                    "Plateau estimates",
+                    eta0_est=eta0_est,
+                    eta_inf_est=eta_inf_est,
+                )
 
-        # Clip to bounds
-        eta0_est = np.clip(eta0_est, 1e-3, 1e12)
-        eta_inf_est = np.clip(eta_inf_est, 1e-6, 1e6)
-        lambda_est = np.clip(lambda_est, 1e-6, 1e6)
-        n_est = np.clip(n_est, 0.01, 1.0)
+                # Find characteristic shear rate (midpoint)
+                eta_mid = (eta0_est + eta_inf_est) / 2.0
+                idx_mid = np.argmin(np.abs(y_sorted - eta_mid))
+                lambda_est = 1.0 / X_sorted[idx_mid] if X_sorted[idx_mid] > 0 else 1.0
 
-        # Ensure eta0 > eta_inf
-        if eta0_est <= eta_inf_est:
-            eta0_est = eta_inf_est * 10.0
+                logger.debug(
+                    "Characteristic time estimate",
+                    eta_mid=eta_mid,
+                    gamma_dot_mid=float(X_sorted[idx_mid]),
+                    lambda_est=lambda_est,
+                )
 
-        self.parameters.set_value("eta0", float(eta0_est))
-        self.parameters.set_value("eta_inf", float(eta_inf_est))
-        self.parameters.set_value("lambda_", float(lambda_est))
-        self.parameters.set_value("n", float(n_est))
+                # Estimate n from power-law region slope
+                # Use middle region of data
+                mid_start = len(X_sorted) // 3
+                mid_end = 2 * len(X_sorted) // 3
+                if mid_end > mid_start + 1:
+                    log_gamma = np.log(X_sorted[mid_start:mid_end])
+                    log_eta = np.log(y_sorted[mid_start:mid_end])
+                    coeffs = np.polyfit(log_gamma, log_eta, 1)
+                    n_est = coeffs[0] + 1.0  # Slope is n-1
+                    logger.debug(
+                        "Power-law index from regression",
+                        slope=coeffs[0],
+                        n_est=n_est,
+                    )
+                else:
+                    n_est = 0.5
+                    logger.debug(
+                        "Using default power-law index (insufficient data for regression)",
+                        n_est=n_est,
+                    )
+            except Exception as e:
+                logger.error(
+                    "Parameter estimation failed",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Clip to bounds
+            eta0_est = np.clip(eta0_est, 1e-3, 1e12)
+            eta_inf_est = np.clip(eta_inf_est, 1e-6, 1e6)
+            lambda_est = np.clip(lambda_est, 1e-6, 1e6)
+            n_est = np.clip(n_est, 0.01, 1.0)
+
+            # Ensure eta0 > eta_inf
+            if eta0_est <= eta_inf_est:
+                logger.debug(
+                    "Adjusting eta0 (was less than or equal to eta_inf)",
+                    eta0_original=eta0_est,
+                    eta_inf=eta_inf_est,
+                )
+                eta0_est = eta_inf_est * 10.0
+
+            self.parameters.set_value("eta0", float(eta0_est))
+            self.parameters.set_value("eta_inf", float(eta_inf_est))
+            self.parameters.set_value("lambda_", float(lambda_est))
+            self.parameters.set_value("n", float(n_est))
+
+            # Log fitted parameters
+            ctx["eta0"] = float(eta0_est)
+            ctx["eta_inf"] = float(eta_inf_est)
+            ctx["lambda_"] = float(lambda_est)
+            ctx["n"] = float(n_est)
+
+            logger.debug(
+                "Fitting completed successfully",
+                eta0=float(eta0_est),
+                eta_inf=float(eta_inf_est),
+                lambda_=float(lambda_est),
+                n=float(n_est),
+            )
 
         return self
 

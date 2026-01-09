@@ -28,6 +28,7 @@ References:
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger, log_fit
 from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
@@ -39,6 +40,9 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("fractional_maxwell_model")
@@ -271,66 +275,106 @@ class FractionalMaxwellModel(BaseModel):
             y_data = jnp.array(y)
             test_mode = kwargs.get("test_mode", "relaxation")
 
-        # Smart initialization for oscillation mode (Issue #9)
-        if test_mode == "oscillation":
-            try:
-                import numpy as np
+        # Determine data shape for logging
+        data_shape = (len(X),) if hasattr(X, "__len__") else None
 
-                from rheojax.utils.initialization import (
-                    initialize_fractional_maxwell_model,
-                )
-
-                success = initialize_fractional_maxwell_model(
-                    np.array(X), np.array(y), self.parameters
-                )
-                if success:
-                    import logging
-
-                    logging.debug(
-                        "Smart initialization applied from frequency-domain features"
-                    )
-            except Exception as e:
-                # Silent fallback to defaults - don't break if initialization fails
-                import logging
-
-                logging.debug(f"Smart initialization failed, using defaults: {e}")
-
-        # Create objective function with stateless predictions
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            c1, alpha, beta, tau = params[0], params[1], params[2], params[3]
-
-            # Direct prediction based on test mode (stateless, calls _jax methods)
-            if test_mode == "relaxation":
-                return self._predict_relaxation_jax(x, c1, alpha, beta, tau)
-            elif test_mode == "creep":
-                return self._predict_creep_jax(x, c1, alpha, beta, tau)
-            elif test_mode == "oscillation":
-                return self._predict_oscillation_jax(x, c1, alpha, beta, tau)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
-
-        objective = create_least_squares_objective(
-            model_fn, x_data, y_data, normalize=True
-        )
-
-        # Optimize using NLSQ (JAX enabled by default)
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+        with log_fit(
+            logger,
+            model="FractionalMaxwellModel",
+            data_shape=data_shape,
+            test_mode=test_mode if isinstance(test_mode, str) else str(test_mode),
+        ) as ctx:
+            logger.debug(
+                "Starting FMM fit",
+                n_points=len(X) if hasattr(X, "__len__") else 1,
+                test_mode=str(test_mode),
+                initial_params=self.parameters.to_dict(),
             )
 
-        self.fitted_ = True
+            # Smart initialization for oscillation mode (Issue #9)
+            if test_mode == "oscillation":
+                try:
+                    from rheojax.utils.initialization import (
+                        initialize_fractional_maxwell_model,
+                    )
+
+                    success = initialize_fractional_maxwell_model(
+                        np.array(X), np.array(y), self.parameters
+                    )
+                    if success:
+                        logger.debug(
+                            "Smart initialization applied from frequency-domain features",
+                            initialized_params=self.parameters.to_dict(),
+                        )
+                except Exception as e:
+                    logger.debug(
+                        "Smart initialization failed, using defaults",
+                        error=str(e),
+                    )
+
+            # Create objective function with stateless predictions
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                c1, alpha, beta, tau = params[0], params[1], params[2], params[3]
+
+                # Direct prediction based on test mode (stateless, calls _jax methods)
+                if test_mode == "relaxation":
+                    return self._predict_relaxation_jax(x, c1, alpha, beta, tau)
+                elif test_mode == "creep":
+                    return self._predict_creep_jax(x, c1, alpha, beta, tau)
+                elif test_mode == "oscillation":
+                    return self._predict_oscillation_jax(x, c1, alpha, beta, tau)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
+
+            logger.debug("Creating least squares objective", normalize=True)
+            objective = create_least_squares_objective(
+                model_fn, x_data, y_data, normalize=True
+            )
+
+            # Optimize using NLSQ (JAX enabled by default)
+            logger.debug(
+                "Starting NLSQ optimization",
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "Optimization failed",
+                    message=result.message,
+                    final_params=self.parameters.to_dict(),
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+            ctx["final_params"] = self.parameters.to_dict()
+            ctx["success"] = True
+            logger.debug(
+                "FMM fit completed successfully",
+                final_params=self.parameters.to_dict(),
+            )
+
         return self
 
     def _predict(self, X: np.ndarray) -> np.ndarray:

@@ -19,9 +19,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+# Module logger
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from jax import Array

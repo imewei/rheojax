@@ -16,7 +16,6 @@ Usage:
 
 from __future__ import annotations
 
-import logging
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -38,8 +37,9 @@ from rheojax.io.readers.trios.common import (
     select_xy_columns,
     split_by_step,
 )
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Encoding cascade for auto-detection
 ENCODING_CASCADE = ["utf-8", "latin-1", "cp1252"]
@@ -62,15 +62,23 @@ def detect_encoding(filepath: Path) -> str:
     Raises:
         UnicodeDecodeError: If none of the encodings work
     """
+    logger.debug("Detecting file encoding", filepath=str(filepath))
     for encoding in ENCODING_CASCADE:
         try:
             with open(filepath, encoding=encoding) as f:
                 # Read first 1KB to check encoding
                 f.read(1024)
+            logger.debug("Encoding detected", encoding=encoding)
             return encoding
         except UnicodeDecodeError:
+            logger.debug("Encoding failed", encoding=encoding)
             continue
 
+    logger.error(
+        "Failed to detect encoding",
+        filepath=str(filepath),
+        tried_encodings=ENCODING_CASCADE,
+    )
     raise UnicodeDecodeError(
         "utf-8",
         b"",
@@ -98,8 +106,16 @@ def detect_delimiter(content: str) -> str:
 
     # Prefer tabs for TRIOS files (typical format)
     if tab_count >= comma_count:
-        return "\t"
-    return ","
+        delimiter = "\t"
+    else:
+        delimiter = ","
+    logger.debug(
+        "Delimiter detected",
+        delimiter=repr(delimiter),
+        tab_count=tab_count,
+        comma_count=comma_count,
+    )
+    return delimiter
 
 
 def parse_metadata_header(
@@ -118,6 +134,7 @@ def parse_metadata_header(
     Returns:
         Tuple of (metadata dict, header row index)
     """
+    logger.debug("Parsing metadata header", num_lines=len(lines))
     metadata: dict[str, Any] = {}
     header_row = 0
 
@@ -147,6 +164,7 @@ def parse_metadata_header(
                 if len(parts) >= 2:
                     value = parts[1].strip()
                     metadata[key] = value
+                    logger.debug("Metadata field extracted", key=key, value=value)
                 is_metadata = True
                 break
 
@@ -159,6 +177,7 @@ def parse_metadata_header(
                 or len([p for p in parts if p.strip() and not p.strip().isdigit()]) >= 3
             ):
                 header_row = i
+                logger.debug("Header row found", header_row=header_row)
                 break
             # Or if it starts with "Number of points" we're close to data
             if parts[0].strip().lower() == "number of points":
@@ -169,8 +188,16 @@ def parse_metadata_header(
                         pass
                 # Header is next line
                 header_row = i + 1
+                logger.debug(
+                    "Header row found after 'Number of points'", header_row=header_row
+                )
                 break
 
+    logger.debug(
+        "Metadata parsing complete",
+        metadata_fields=len(metadata),
+        header_row=header_row,
+    )
     return metadata, header_row
 
 
@@ -189,6 +216,7 @@ def detect_header_row(
     Returns:
         Header row index
     """
+    logger.debug("Detecting header row", start_index=start_index, num_lines=len(lines))
     for i in range(start_index, len(lines)):
         line = lines[i].strip()
         if not line:
@@ -198,10 +226,14 @@ def detect_header_row(
 
         # Check for "Variables" row (TRIOS format)
         if parts[0].strip().lower() == "variables":
+            logger.debug("Header row detected via 'Variables' marker", row=i)
             return i
 
         # Check for "Number of points" - header is next
         if parts[0].strip().lower() == "number of points":
+            logger.debug(
+                "Header row detected via 'Number of points' marker", row=i + 1
+            )
             return i + 1
 
         # Check for multiple non-numeric columns (likely headers)
@@ -211,8 +243,14 @@ def detect_header_row(
                 non_numeric += 1
 
         if non_numeric >= 2:
+            logger.debug(
+                "Header row detected via non-numeric columns",
+                row=i,
+                non_numeric_count=non_numeric,
+            )
             return i
 
+    logger.debug("No header row found, using start_index", start_index=start_index)
     return start_index
 
 
@@ -332,18 +370,23 @@ def parse_trios_csv(
         ValueError: No data tables found
     """
     filepath = Path(filepath)
+    logger.info("Parsing TRIOS CSV file", filepath=str(filepath))
+
     if not filepath.exists():
+        logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
     # Detect or use provided encoding
     if encoding is None:
         encoding = detect_encoding(filepath)
+    logger.debug("Using encoding", encoding=encoding)
 
     # Read file content
     with open(filepath, encoding=encoding, errors="replace") as f:
         content = f.read()
 
     lines = content.split("\n")
+    logger.debug("File read", num_lines=len(lines), content_bytes=len(content))
 
     # Detect delimiter
     if delimiter is None:
@@ -356,6 +399,7 @@ def parse_trios_csv(
     header_row = detect_header_row(lines, delimiter, header_start)
 
     if header_row >= len(lines):
+        logger.error("No data tables found", filepath=str(filepath))
         raise ValueError("No data tables found in TRIOS CSV file")
 
     # Parse header
@@ -414,7 +458,10 @@ def parse_trios_csv(
                 data_rows.append(row)
 
     if not data_rows:
+        logger.error("No data rows found", filepath=str(filepath))
         raise ValueError("No data rows found in TRIOS CSV file")
+
+    logger.debug("Data rows parsed", num_rows=len(data_rows))
 
     # Adjust header to match data (skip first column if it's a label)
     if header[0].lower() == "variables" or header[0].lower().startswith("data"):
@@ -427,12 +474,14 @@ def parse_trios_csv(
 
     # Create DataFrame
     df = pd.DataFrame(data_rows, columns=header[: len(data_rows[0])])
+    logger.debug("DataFrame created", shape=df.shape, columns=list(df.columns))
 
     # Detect step column
     step_col = detect_step_column(df)
     step_values = None
     if step_col:
         step_values = df[step_col].unique().tolist()
+        logger.debug("Step column detected", step_col=step_col, num_steps=len(step_values))
 
     # Create TRIOSTable
     table = TRIOSTable(
@@ -441,6 +490,13 @@ def parse_trios_csv(
         units=units,
         df=df,
         step_values=step_values,
+    )
+
+    logger.info(
+        "TRIOS CSV parsing complete",
+        filepath=str(filepath),
+        num_rows=len(data_rows),
+        num_columns=len(header),
     )
 
     return TRIOSFile(
@@ -495,6 +551,8 @@ def load_trios_csv(
         >>> print(data.test_mode)  # 'oscillation'
         >>> print(np.iscomplexobj(data.y))  # True for G* = G' + iG''
     """
+    logger.info("Loading TRIOS CSV file", filepath=str(filepath))
+
     # Parse CSV file
     trios_file = parse_trios_csv(
         filepath,
@@ -506,12 +564,19 @@ def load_trios_csv(
     # Convert tables to RheoData
     rheo_data_list: list[RheoData] = []
 
-    for table in trios_file.tables:
+    for table_idx, table in enumerate(trios_file.tables):
         df = table.df
         units = table.units
+        logger.debug(
+            "Processing table",
+            table_index=table_idx,
+            shape=df.shape,
+            columns=list(df.columns),
+        )
 
         # Detect or use provided test mode
         detected_mode = test_mode or detect_test_type(df)
+        logger.debug("Test mode", detected_mode=detected_mode, provided=test_mode)
 
         # Check for step column and split if needed
         step_col = detect_step_column(df)
@@ -520,6 +585,11 @@ def load_trios_csv(
             if not step_col or not return_all_segments
             else split_by_step(df, step_col)
         )
+        logger.debug(
+            "Segments identified",
+            step_col=step_col,
+            num_segments=len(segments),
+        )
 
         for seg_idx, seg_df in enumerate(segments):
             # Select x/y columns
@@ -527,10 +597,19 @@ def load_trios_csv(
 
             if x_col is None or y_col is None:
                 logger.warning(
-                    f"Could not determine x/y columns for segment {seg_idx}. "
-                    f"Available columns: {list(seg_df.columns)}"
+                    "Could not determine x/y columns",
+                    segment_index=seg_idx,
+                    available_columns=list(seg_df.columns),
                 )
                 continue
+
+            logger.debug(
+                "Columns selected",
+                segment_index=seg_idx,
+                x_col=x_col,
+                y_col=y_col,
+                y2_col=y2_col,
+            )
 
             # Extract data
             x_data = seg_df[x_col].values.astype(float)
@@ -604,9 +683,23 @@ def load_trios_csv(
 
             rheo_data = segment_to_rheodata(segment, validate=validate)
             rheo_data_list.append(rheo_data)
+            logger.debug(
+                "RheoData created",
+                segment_index=seg_idx,
+                num_points=len(x_data),
+                test_mode=detected_mode,
+                is_complex=is_complex,
+            )
 
     if not rheo_data_list:
+        logger.error("No valid data segments parsed", filepath=str(filepath))
         raise ValueError(f"No valid data segments could be parsed from {filepath}")
+
+    logger.info(
+        "TRIOS CSV load complete",
+        filepath=str(filepath),
+        num_segments=len(rheo_data_list),
+    )
 
     # Return single or list
     if len(rheo_data_list) == 1 and not return_all_segments:

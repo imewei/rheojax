@@ -37,6 +37,10 @@ from enum import Enum, auto
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QStyle
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class StandardIcon(Enum):
     """Standard Qt icons available cross-platform."""
@@ -96,7 +100,10 @@ def is_macos() -> bool:
     bool
         True if running on macOS (darwin)
     """
-    return sys.platform == "darwin"
+    logger.debug("Checking if platform is macOS", platform=sys.platform)
+    result = sys.platform == "darwin"
+    logger.debug("is_macos check complete", result=result)
+    return result
 
 
 def is_macos_arm64() -> bool:
@@ -109,7 +116,14 @@ def is_macos_arm64() -> bool:
     """
     import platform
 
-    return sys.platform == "darwin" and platform.machine() == "arm64"
+    logger.debug(
+        "Checking if platform is macOS ARM64",
+        platform=sys.platform,
+        machine=platform.machine(),
+    )
+    result = sys.platform == "darwin" and platform.machine() == "arm64"
+    logger.debug("is_macos_arm64 check complete", result=result)
+    return result
 
 
 def emoji_safe() -> bool:
@@ -124,9 +138,12 @@ def emoji_safe() -> bool:
     bool
         True if emoji can be safely used in Qt widgets
     """
+    logger.debug("Checking emoji safety for current platform")
     # Disable emoji on all macOS versions to be safe
     # The CoreText issue affects ARM64 but may also affect Intel
-    return not is_macos()
+    result = not is_macos()
+    logger.debug("emoji_safe check complete", safe=result)
+    return result
 
 
 def get_standard_icon(icon: StandardIcon) -> QIcon:
@@ -147,18 +164,23 @@ def get_standard_icon(icon: StandardIcon) -> QIcon:
     >>> icon = get_standard_icon(StandardIcon.FILE)
     >>> tree_item.setIcon(0, icon)
     """
+    logger.debug("Getting standard icon", icon=icon.name)
     app = QApplication.instance()
     if app is None:
+        logger.debug("No QApplication instance available, returning empty icon")
         return QIcon()
 
     style = app.style()
     if style is None:
+        logger.debug("No QStyle available, returning empty icon")
         return QIcon()
 
     pixmap = _ICON_MAPPING.get(icon)
     if pixmap is None:
+        logger.debug("Icon not found in mapping", icon=icon.name)
         return QIcon()
 
+    logger.debug("Standard icon retrieved successfully", icon=icon.name)
     return style.standardIcon(pixmap)
 
 
@@ -274,7 +296,13 @@ class IconProvider:
         allow_emoji : bool, optional
             Allow emoji on supported platforms (default: False)
         """
+        logger.debug("Initializing IconProvider", allow_emoji=allow_emoji)
         self._allow_emoji = allow_emoji and emoji_safe()
+        logger.debug(
+            "IconProvider initialized",
+            allow_emoji_requested=allow_emoji,
+            emoji_enabled=self._allow_emoji,
+        )
 
     @property
     def uses_emoji(self) -> bool:
@@ -300,13 +328,19 @@ class IconProvider:
         str
             Icon text (ASCII or emoji based on settings)
         """
+        logger.debug(
+            "Getting category icon", category=category, uses_emoji=self._allow_emoji
+        )
         if self._allow_emoji:
-            return self.CATEGORY_ICONS_EMOJI.get(
+            icon = self.CATEGORY_ICONS_EMOJI.get(
                 category, self.CATEGORY_ICONS_EMOJI.get("other", "[?]")
             )
-        return self.CATEGORY_ICONS_ASCII.get(
-            category, self.CATEGORY_ICONS_ASCII.get("other", "[?]")
-        )
+        else:
+            icon = self.CATEGORY_ICONS_ASCII.get(
+                category, self.CATEGORY_ICONS_ASCII.get("other", "[?]")
+            )
+        logger.debug("Category icon retrieved", category=category, icon=icon)
+        return icon
 
     def get_status_icon(self, status: str) -> str:
         """Get icon for a status indicator.
@@ -321,9 +355,15 @@ class IconProvider:
         str
             Icon text (ASCII or emoji based on settings)
         """
+        logger.debug(
+            "Getting status icon", status=status, uses_emoji=self._allow_emoji
+        )
         if self._allow_emoji:
-            return self.STATUS_ICONS_EMOJI.get(status, "[?]")
-        return self.STATUS_ICONS_ASCII.get(status, "[?]")
+            icon = self.STATUS_ICONS_EMOJI.get(status, "[?]")
+        else:
+            icon = self.STATUS_ICONS_ASCII.get(status, "[?]")
+        logger.debug("Status icon retrieved", status=status, icon=icon)
+        return icon
 
     def get_file_icon(self, file_type: str) -> str:
         """Get icon for a file type.
@@ -338,9 +378,15 @@ class IconProvider:
         str
             Icon text (ASCII or emoji based on settings)
         """
+        logger.debug(
+            "Getting file icon", file_type=file_type, uses_emoji=self._allow_emoji
+        )
         if self._allow_emoji:
-            return self.FILE_ICONS_EMOJI.get(file_type, "[?]")
-        return self.FILE_ICONS_ASCII.get(file_type, "[?]")
+            icon = self.FILE_ICONS_EMOJI.get(file_type, "[?]")
+        else:
+            icon = self.FILE_ICONS_ASCII.get(file_type, "[?]")
+        logger.debug("File icon retrieved", file_type=file_type, icon=icon)
+        return icon
 
     def format_with_icon(
         self,
@@ -370,6 +416,12 @@ class IconProvider:
         >>> provider.format_with_icon("Fitting complete", "success", "status")
         "[+] Fitting complete"
         """
+        logger.debug(
+            "Formatting text with icon",
+            text=text,
+            icon_type=icon_type,
+            icon_category=icon_category,
+        )
         if icon_category == "status":
             icon = self.get_status_icon(icon_type)
         elif icon_category == "category":
@@ -377,9 +429,12 @@ class IconProvider:
         elif icon_category == "file":
             icon = self.get_file_icon(icon_type)
         else:
+            logger.debug("Unknown icon category, using fallback", icon_category=icon_category)
             icon = "[?]"
 
-        return f"{icon} {text}"
+        result = f"{icon} {text}"
+        logger.debug("Text formatted with icon", result=result)
+        return result
 
 
 # Module-level singleton for convenience
@@ -400,8 +455,12 @@ def get_icon_provider(allow_emoji: bool = False) -> IconProvider:
         Icon provider instance
     """
     global _default_provider
+    logger.debug("Getting icon provider singleton", allow_emoji=allow_emoji)
     if _default_provider is None or _default_provider._allow_emoji != (
         allow_emoji and emoji_safe()
     ):
+        logger.debug("Creating new IconProvider singleton", allow_emoji=allow_emoji)
         _default_provider = IconProvider(allow_emoji=allow_emoji)
+    else:
+        logger.debug("Returning existing IconProvider singleton")
     return _default_provider

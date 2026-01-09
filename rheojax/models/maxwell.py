@@ -28,6 +28,10 @@ from rheojax.core.data import RheoData
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("maxwell")
@@ -131,73 +135,143 @@ class Maxwell(BaseModel):
             except KeyError:
                 test_mode = TestMode.RELAXATION
 
-        # Store test mode for model_function
-        self._test_mode = test_mode
-        self._relaxation_offset = 0.0
+        # Determine test_mode string for logging
+        test_mode_str = test_mode.name if hasattr(test_mode, "name") else str(test_mode)
 
-        if test_mode == TestMode.RELAXATION:
-            tail = max(3, y_np.size // 6)
-            offset = float(np.median(y_np[-tail:]))
-            y_np = y_np - offset
-            self._relaxation_offset = offset
-
-        x_data = jnp.array(x_np)
-        y_data = jnp.array(y_np)
-
-        # Provide simple heuristics for relaxation data to improve deterministic fits
-        if test_mode == TestMode.RELAXATION:
-            self._initialize_relaxation_parameters(x_data, y_data)
-
-        # Create objective function with stateless predictions
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            G0, eta = params[0], params[1]
-
-            # Direct prediction based on test mode (stateless)
-            if test_mode == TestMode.RELAXATION:
-                return self._predict_relaxation(x, G0, eta)
-            elif test_mode == TestMode.CREEP:
-                return self._predict_creep(x, G0, eta)
-            elif test_mode == TestMode.OSCILLATION:
-                return self._predict_oscillation(x, G0, eta)
-            elif test_mode == TestMode.ROTATION:
-                return self._predict_rotation(x, G0, eta)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
-
-        objective = create_least_squares_objective(
-            model_fn, x_data, y_data, normalize=True
-        )
-
-        # Optimize
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+        with log_fit(
+            logger,
+            self.__class__.__name__,
+            data_shape=x_np.shape,
+            test_mode=test_mode_str,
+        ) as ctx:
+            logger.debug(
+                "Processing input data",
+                x_range=(float(x_np.min()), float(x_np.max())),
+                y_range=(float(np.real(y_np).min()), float(np.real(y_np).max())),
+                is_complex=np.iscomplexobj(y_np),
             )
 
-        self.fitted_ = True
+            # Store test mode for model_function
+            self._test_mode = test_mode
+            self._relaxation_offset = 0.0
+
+            if test_mode == TestMode.RELAXATION:
+                tail = max(3, y_np.size // 6)
+                offset = float(np.median(y_np[-tail:]))
+                y_np = y_np - offset
+                self._relaxation_offset = offset
+                logger.debug(
+                    "Applied relaxation offset correction",
+                    offset=offset,
+                    tail_points=tail,
+                )
+
+            x_data = jnp.array(x_np)
+            y_data = jnp.array(y_np)
+
+            # Provide simple heuristics for relaxation data to improve deterministic fits
+            if test_mode == TestMode.RELAXATION:
+                init_success = self._initialize_relaxation_parameters(x_data, y_data)
+                logger.debug(
+                    "Relaxation parameter initialization",
+                    success=init_success,
+                    G0_init=self.parameters.get_value("G0"),
+                    eta_init=self.parameters.get_value("eta"),
+                )
+
+            # Create objective function with stateless predictions
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                G0, eta = params[0], params[1]
+
+                # Direct prediction based on test mode (stateless)
+                if test_mode == TestMode.RELAXATION:
+                    return self._predict_relaxation(x, G0, eta)
+                elif test_mode == TestMode.CREEP:
+                    return self._predict_creep(x, G0, eta)
+                elif test_mode == TestMode.OSCILLATION:
+                    return self._predict_oscillation(x, G0, eta)
+                elif test_mode == TestMode.ROTATION:
+                    return self._predict_rotation(x, G0, eta)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
+
+            objective = create_least_squares_objective(
+                model_fn, x_data, y_data, normalize=True
+            )
+
+            logger.debug(
+                "Starting NLSQ optimization",
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+                use_jax=kwargs.get("use_jax", True),
+            )
+
+            # Optimize
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "Optimization failed",
+                    message=result.message,
+                    iterations=getattr(result, "nit", None),
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+
+            # Log fitted parameters and result metrics
+            G0_fitted = self.parameters.get_value("G0")
+            eta_fitted = self.parameters.get_value("eta")
+            tau_fitted = eta_fitted / G0_fitted
+
+            ctx["G0"] = G0_fitted
+            ctx["eta"] = eta_fitted
+            ctx["tau"] = tau_fitted
+            ctx["iterations"] = getattr(result, "nit", None)
+            ctx["cost"] = getattr(result, "fun", None)
+
+            logger.debug(
+                "Optimization completed successfully",
+                G0=G0_fitted,
+                eta=eta_fitted,
+                tau=tau_fitted,
+                iterations=getattr(result, "nit", None),
+                final_cost=getattr(result, "fun", None),
+            )
+
         return self
 
     def _initialize_relaxation_parameters(self, X, y) -> bool:
         """Estimate G0 and eta from relaxation data for faster convergence."""
-        import logging
-
-        import numpy as np
-
         try:
             t = np.asarray(X, dtype=float).ravel()
             g = np.asarray(y, dtype=float).ravel()
             if t.shape != g.shape or t.size < 3:
+                logger.debug(
+                    "Initialization skipped: insufficient data",
+                    t_shape=t.shape,
+                    g_shape=g.shape,
+                )
                 return False
 
             order = np.argsort(t)
@@ -218,20 +292,39 @@ class Maxwell(BaseModel):
             if idx_candidates.size < 2:
                 idx_candidates = np.where(positive_mask)[0]
             if idx_candidates.size < 2:
+                logger.debug(
+                    "Initialization skipped: insufficient positive transient points",
+                    n_candidates=idx_candidates.size,
+                )
                 return False
 
             i0, i1 = idx_candidates[0], idx_candidates[1]
             t0, t1 = t_sorted[i0], t_sorted[i1]
             y0, y1 = transient[i0], transient[i1]
             if not (y0 > 0 and y1 > 0 and t1 > t0 and y1 != y0):
+                logger.debug(
+                    "Initialization skipped: invalid transient values",
+                    y0=y0,
+                    y1=y1,
+                    t0=t0,
+                    t1=t1,
+                )
                 return False
 
             ratio = y1 / y0
             if ratio <= 0 or ratio < 1e-3:
+                logger.debug(
+                    "Initialization skipped: invalid decay ratio",
+                    ratio=ratio,
+                )
                 return False
             with np.errstate(divide="ignore"):
                 tau_estimate = -(t1 - t0) / np.log(ratio)
             if not (np.isfinite(tau_estimate) and tau_estimate > 0):
+                logger.debug(
+                    "Initialization skipped: invalid tau estimate",
+                    tau_estimate=tau_estimate,
+                )
                 return False
 
             g0_estimate = float(y0 * np.exp(t0 / tau_estimate))
@@ -242,15 +335,21 @@ class Maxwell(BaseModel):
 
             self.parameters.set_value("G0", g0_guess)
             self.parameters.set_value("eta", eta_guess)
-            logging.debug(
-                "Maxwell relaxation init | G0=%.3g eta=%.3g tau≈%.3g",
-                g0_guess,
-                eta_guess,
-                tau_estimate,
+            logger.debug(
+                "Maxwell relaxation initialization successful",
+                G0=g0_guess,
+                eta=eta_guess,
+                tau_estimate=tau_estimate,
+                baseline=baseline,
             )
             return True
         except Exception as exc:  # pragma: no cover - heuristic best effort
-            logging.debug(f"Maxwell relaxation initialization failed: {exc}")
+            logger.debug(
+                "Maxwell relaxation initialization failed",
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+                exc_info=True,
+            )
             return False
 
     def _predict(self, X):

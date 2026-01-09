@@ -7,7 +7,6 @@ Service for loading, validating, and managing rheological data.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +16,9 @@ import pandas as pd
 from rheojax.core.data import RheoData
 from rheojax.io import auto_load
 from rheojax.io.readers.csv_reader import detect_csv_delimiter
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DataService:
@@ -41,6 +41,7 @@ class DataService:
 
     def __init__(self) -> None:
         """Initialize data service."""
+        logger.debug("Initializing DataService")
         self._supported_formats = [
             ".csv",
             ".txt",
@@ -50,6 +51,10 @@ class DataService:
             ".tri",
             ".rdf",
         ]
+        logger.debug(
+            "DataService initialized",
+            supported_formats=self._supported_formats,
+        )
 
     def load_file(
         self,
@@ -89,12 +94,28 @@ class DataService:
         ValueError
             If file format is unsupported or data is invalid
         """
+        logger.debug(
+            "load_file called",
+            file_path=str(file_path),
+            x_col=x_col,
+            y_col=y_col,
+            y2_col=y2_col,
+            test_mode=test_mode,
+        )
         file_path = Path(file_path)
+        logger.info("Loading data", filepath=str(file_path))
 
         if not file_path.exists():
+            logger.error("File not found", filepath=str(file_path))
             raise FileNotFoundError(f"File not found: {file_path}")
 
         if file_path.suffix.lower() not in self._supported_formats:
+            logger.error(
+                "Unsupported file format",
+                filepath=str(file_path),
+                suffix=file_path.suffix,
+                supported_formats=self._supported_formats,
+            )
             raise ValueError(
                 f"Unsupported file format: {file_path.suffix}. "
                 f"Supported formats: {', '.join(self._supported_formats)}"
@@ -108,30 +129,57 @@ class DataService:
             if y2_col:
                 kwargs["y2_col"] = y2_col
 
+            logger.debug("Calling auto_load", filepath=str(file_path), kwargs=kwargs)
             data = auto_load(str(file_path), **kwargs)
 
             # Ensure we have RheoData
             if not isinstance(data, RheoData):
                 # Convert to RheoData if needed
                 if hasattr(data, "x") and hasattr(data, "y"):
+                    logger.debug("Converting loaded data to RheoData")
                     data = RheoData(x=data.x, y=data.y)
                 else:
+                    logger.error(
+                        "Failed to load data as RheoData",
+                        filepath=str(file_path),
+                        data_type=type(data).__name__,
+                    )
                     raise ValueError("Failed to load data as RheoData")
 
             # Set test mode if provided
             if test_mode:
                 data.metadata["test_mode"] = test_mode
+                logger.debug("Test mode set", test_mode=test_mode)
 
             # Light unit conversions for common CSV/Excel cases
             data = self._convert_units(data)
 
+            n_records = len(data.x)
             logger.info(
-                f"Successfully loaded {len(data.x)} data points from {file_path}"
+                "Data loaded",
+                filepath=str(file_path),
+                n_records=n_records,
+            )
+            logger.debug(
+                "load_file completed",
+                filepath=str(file_path),
+                n_records=n_records,
+                x_range=(float(np.min(data.x)), float(np.max(data.x))),
+                y_range=(float(np.min(data.y)), float(np.max(data.y))),
             )
             return data
 
+        except FileNotFoundError:
+            raise
+        except ValueError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to load file {file_path}: {e}")
+            logger.error(
+                "Failed to load file",
+                filepath=str(file_path),
+                error=str(e),
+                exc_info=True,
+            )
             raise ValueError(f"Failed to load file: {e}") from e
 
     def preview_file(
@@ -142,9 +190,15 @@ class DataService:
         The preview keeps parsing simple to avoid the heavier auto_load path and
         trims rows to keep UI rendering responsive.
         """
+        logger.debug(
+            "preview_file called",
+            file_path=str(file_path),
+            max_rows=max_rows,
+        )
 
         file_path = Path(file_path)
         if not file_path.exists():
+            logger.error("File not found for preview", filepath=str(file_path))
             raise FileNotFoundError(f"File not found: {file_path}")
 
         suffix = file_path.suffix.lower()
@@ -154,6 +208,7 @@ class DataService:
 
         try:
             if suffix in {".csv", ".txt", ".dat"}:
+                logger.debug("Previewing CSV/text file", filepath=str(file_path))
                 delimiter = detect_csv_delimiter(file_path)
                 df = pd.read_csv(file_path, sep=delimiter, nrows=max_rows)
                 headers = [str(col) for col in df.columns]
@@ -161,6 +216,7 @@ class DataService:
                 metadata["rows"] = len(df.index)
                 metadata["columns"] = len(df.columns)
             elif suffix in {".xlsx", ".xls"}:
+                logger.debug("Previewing Excel file", filepath=str(file_path))
                 df = pd.read_excel(file_path, nrows=max_rows)
                 headers = [str(col) for col in df.columns]
                 data = df.fillna("").values.tolist()
@@ -168,8 +224,17 @@ class DataService:
                 metadata["columns"] = len(df.columns)
             else:
                 # Fallback: use auto_load and build a simple table from RheoData
+                logger.debug(
+                    "Previewing via auto_load fallback",
+                    filepath=str(file_path),
+                )
                 data_obj = auto_load(str(file_path))
                 if not isinstance(data_obj, RheoData):
+                    logger.error(
+                        "Unsupported preview format",
+                        filepath=str(file_path),
+                        data_type=type(data_obj).__name__,
+                    )
                     raise ValueError("Unsupported preview format")
 
                 headers = ["x", "y"]
@@ -185,19 +250,35 @@ class DataService:
 
                 metadata.update({"rows": len(data_obj.x), "columns": len(headers)})
 
+            logger.debug(
+                "preview_file completed",
+                filepath=str(file_path),
+                n_headers=len(headers),
+                n_rows=len(data),
+            )
             return {"data": data, "headers": headers, "metadata": metadata}
 
         except Exception as e:
-            logger.error(f"Failed to preview file {file_path}: {e}")
+            logger.error(
+                "Failed to preview file",
+                filepath=str(file_path),
+                error=str(e),
+                exc_info=True,
+            )
             raise
 
     def _convert_units(self, data: RheoData) -> RheoData:
         """Convert common units to canonical values.
 
-        - Frequency: Hz → rad/s
-        - Time: ms/min → s
-        - Modulus: kPa/MPa → Pa
+        - Frequency: Hz -> rad/s
+        - Time: ms/min -> s
+        - Modulus: kPa/MPa -> Pa
         """
+        logger.debug(
+            "_convert_units called",
+            x_units=data.x_units,
+            y_units=data.y_units,
+        )
 
         x_units = (data.x_units or "").lower()
         y_units = (data.y_units or "").lower()
@@ -205,23 +286,47 @@ class DataService:
         x = np.asarray(data.x)
         y = np.asarray(data.y)
 
+        x_converted = False
+        y_converted = False
+        original_x_units = x_units
+        original_y_units = y_units
+
         if x_units == "hz":
             x = x * 2 * np.pi
             x_units = "rad/s"
+            x_converted = True
         elif x_units == "ms":
             x = x / 1000.0
             x_units = "s"
+            x_converted = True
         elif x_units in ("min", "mins", "minutes"):
             x = x * 60.0
             x_units = "s"
+            x_converted = True
 
         if y_units == "kpa":
             y = y * 1e3
             y_units = "pa"
+            y_converted = True
         elif y_units == "mpa":
             y = y * 1e6
             y_units = "pa"
+            y_converted = True
 
+        if x_converted:
+            logger.debug(
+                "X-axis units converted",
+                from_units=original_x_units,
+                to_units=x_units,
+            )
+        if y_converted:
+            logger.debug(
+                "Y-axis units converted",
+                from_units=original_y_units,
+                to_units=y_units,
+            )
+
+        logger.debug("_convert_units completed")
         return RheoData(
             x=x,
             y=y,
@@ -241,7 +346,7 @@ class DataService:
 
         Detection priority:
         1. Explicit metadata
-        2. Domain indicator (frequency → oscillation)
+        2. Domain indicator (frequency -> oscillation)
         3. Complex data (oscillation)
         4. Monotonic trends (relaxation/creep) - checked BEFORE flow
         5. Power-law relationship (flow)
@@ -257,12 +362,17 @@ class DataService:
         str
             Test mode ('relaxation', 'creep', 'oscillation', 'flow', 'unknown')
         """
+        logger.debug("detect_test_mode called", n_points=len(data.x))
+
         # Check metadata first
         if data.metadata and "test_mode" in data.metadata:
-            return data.metadata["test_mode"]
+            mode = data.metadata["test_mode"]
+            logger.debug("Test mode found in metadata", test_mode=mode)
+            return mode
 
         # Check domain
         if data.domain == "frequency":
+            logger.debug("Detected oscillation from domain=frequency")
             return "oscillation"
 
         # Analyze data characteristics
@@ -271,6 +381,7 @@ class DataService:
 
         # Check for complex data (oscillation)
         if np.iscomplexobj(y):
+            logger.debug("Detected oscillation from complex y-data")
             return "oscillation"
 
         # Get basic statistics
@@ -288,7 +399,8 @@ class DataService:
                 y_range_ratio = np.max(y) / (np.min(y) + 1e-10)
                 if y_range_ratio > 2:  # At least 2x decay
                     logger.debug(
-                        f"Detected relaxation: monotonic decrease, ratio={y_range_ratio:.1f}"
+                        "Detected relaxation: monotonic decrease",
+                        y_range_ratio=float(y_range_ratio),
                     )
                     return "relaxation"
 
@@ -300,7 +412,8 @@ class DataService:
                 y_range_ratio = np.max(y) / (np.min(y) + 1e-10)
                 if y_range_ratio > 1.5:  # At least 50% growth
                     logger.debug(
-                        f"Detected creep: monotonic increase, ratio={y_range_ratio:.1f}"
+                        "Detected creep: monotonic increase",
+                        y_range_ratio=float(y_range_ratio),
                     )
                     return "creep"
 
@@ -320,11 +433,15 @@ class DataService:
                         np.all(y_diff >= 0) or np.all(y_diff <= 0)
                     ):
                         logger.debug(
-                            f"Detected flow: power-law correlation={correlation:.3f}"
+                            "Detected flow: power-law correlation",
+                            correlation=float(correlation),
                         )
                         return "flow"
             except Exception as exc:
-                logger.debug("Flow detection failed on log-log correlation: %s", exc)
+                logger.debug(
+                    "Flow detection failed on log-log correlation",
+                    error=str(exc),
+                )
 
         # Oscillation: frequency sweep with log-spaced x-axis
         if x_min > 0.001 and x_max < 10000:
@@ -338,7 +455,7 @@ class DataService:
                             logger.debug("Detected oscillation: log-spaced x-axis")
                             return "oscillation"
                 except Exception as exc:
-                    logger.debug("Oscillation detection failed: %s", exc)
+                    logger.debug("Oscillation detection failed", error=str(exc))
 
         logger.warning("Could not auto-detect test mode, defaulting to 'unknown'")
         return "unknown"
@@ -356,6 +473,7 @@ class DataService:
         list[str]
             List of validation warnings/errors
         """
+        logger.debug("validate_data called", n_points=len(data.x))
         warnings = []
 
         x = np.asarray(data.x)
@@ -415,6 +533,11 @@ class DataService:
         if not np.all(np.diff(x) > 0):
             warnings.append("X-axis is not monotonically increasing")
 
+        logger.debug(
+            "validate_data completed",
+            n_warnings=len(warnings),
+            warnings=warnings,
+        )
         return warnings
 
     def get_column_suggestions(self, file_path: Path) -> dict[str, list[str]]:
@@ -430,6 +553,7 @@ class DataService:
         dict
             Dictionary with 'x_suggestions', 'y_suggestions', and 'y2_suggestions' lists
         """
+        logger.debug("get_column_suggestions called", filepath=str(file_path))
         import re
 
         import pandas as pd
@@ -481,9 +605,18 @@ class DataService:
             elif file_path.suffix.lower() in [".xlsx", ".xls"]:
                 df = pd.read_excel(file_path, nrows=5)
             else:
+                logger.debug(
+                    "get_column_suggestions: unsupported format",
+                    filepath=str(file_path),
+                )
                 return suggestions
 
             columns = df.columns.tolist()
+            logger.debug(
+                "Read column headers",
+                filepath=str(file_path),
+                columns=columns,
+            )
 
             # X-axis patterns (frequency, time, rate)
             # Exclude temperature which contains 't'
@@ -549,8 +682,18 @@ class DataService:
                     if col not in suggestions["y_suggestions"]:
                         suggestions["y_suggestions"].append(col)
 
+            logger.debug(
+                "get_column_suggestions completed",
+                filepath=str(file_path),
+                suggestions=suggestions,
+            )
+
         except Exception as e:
-            logger.warning(f"Failed to read column headers: {e}")
+            logger.warning(
+                "Failed to read column headers",
+                filepath=str(file_path),
+                error=str(e),
+            )
 
         return suggestions
 
@@ -578,6 +721,13 @@ class DataService:
         Currently supports basic conversions. More comprehensive unit
         conversion requires pint or similar library.
         """
+        logger.debug(
+            "convert_units called",
+            source_x_units=data.x_units,
+            source_y_units=data.y_units,
+            target_x_units=x_units,
+            target_y_units=y_units,
+        )
         x = np.asarray(data.x)
         y = np.asarray(data.y)
 
@@ -591,7 +741,11 @@ class DataService:
             if data.x_units in time_conversions and x_units in time_conversions:
                 factor = time_conversions[data.x_units] / time_conversions[x_units]
                 x = x * factor
-                logger.info(f"Converted x-axis from {data.x_units} to {x_units}")
+                logger.info(
+                    "Converted x-axis units",
+                    from_units=data.x_units,
+                    to_units=x_units,
+                )
 
         # Convert y-axis
         if y_units and data.y_units and y_units != data.y_units:
@@ -600,8 +754,13 @@ class DataService:
                     pressure_conversions[data.y_units] / pressure_conversions[y_units]
                 )
                 y = y * factor
-                logger.info(f"Converted y-axis from {data.y_units} to {y_units}")
+                logger.info(
+                    "Converted y-axis units",
+                    from_units=data.y_units,
+                    to_units=y_units,
+                )
 
+        logger.debug("convert_units completed")
         # Create new RheoData with converted values
         return RheoData(
             x=x,
@@ -620,6 +779,7 @@ class DataService:
         list[str]
             File extensions (e.g., ['.csv', '.xlsx', '.txt'])
         """
+        logger.debug("get_supported_formats called")
         return self._supported_formats.copy()
 
     def preprocess_data(
@@ -650,6 +810,13 @@ class DataService:
         RheoData
             Preprocessed data
         """
+        logger.debug(
+            "preprocess_data called",
+            n_points=len(data.x),
+            remove_outliers=remove_outliers,
+            smooth=smooth,
+            outlier_threshold=outlier_threshold,
+        )
         x = np.asarray(data.x).copy()
         y = np.asarray(data.y).copy()
 
@@ -665,7 +832,7 @@ class DataService:
                 y = y[mask]
                 removed = np.sum(~mask)
                 if removed > 0:
-                    logger.info(f"Removed {removed} outliers")
+                    logger.info("Removed outliers", n_removed=removed)
 
         # Smooth data
         if smooth:
@@ -680,8 +847,16 @@ class DataService:
 
             if len(y) >= window_length:
                 y = savgol_filter(y, window_length, polyorder)
-                logger.info("Applied Savitzky-Golay smoothing")
+                logger.info(
+                    "Applied Savitzky-Golay smoothing",
+                    window_length=window_length,
+                    polyorder=polyorder,
+                )
 
+        logger.debug(
+            "preprocess_data completed",
+            n_points_out=len(x),
+        )
         return RheoData(
             x=x,
             y=y,

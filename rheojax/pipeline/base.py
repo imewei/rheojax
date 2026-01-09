@@ -17,6 +17,7 @@ Example:
 
 from __future__ import annotations
 
+import uuid
 import warnings
 from pathlib import Path
 from typing import Any
@@ -27,9 +28,13 @@ from rheojax.core.base import BaseModel, BaseTransform
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry, TransformRegistry
+from rheojax.logging import get_logger, log_pipeline_stage
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+# Module-level logger
+logger = get_logger(__name__)
 
 
 class Pipeline:
@@ -60,6 +65,12 @@ class Pipeline:
         self.steps: list[tuple[str, Any]] = []
         self.history: list[tuple[Any, ...]] = []
         self._last_model: BaseModel | None = None
+        self._id = str(uuid.uuid4())[:8]
+        logger.debug(
+            "Pipeline initialized",
+            pipeline_id=self._id,
+            has_initial_data=data is not None,
+        )
 
     def load(
         self,
@@ -96,42 +107,62 @@ class Pipeline:
 
         explicit_mode = test_mode if test_mode is not None else initial_test_mode
 
-        if format == "auto":
-            result = auto_load(path, **kwargs)
-        else:
-            # Format-specific loading
-            if format == "csv":
-                from rheojax.io import load_csv
+        with log_pipeline_stage(
+            logger, "load", pipeline_id=self._id, file_path=str(path), format=format
+        ) as ctx:
+            try:
+                if format == "auto":
+                    result = auto_load(path, **kwargs)
+                else:
+                    # Format-specific loading
+                    if format == "csv":
+                        from rheojax.io import load_csv
 
-                result = load_csv(path, **kwargs)
-            elif format == "excel":
-                from rheojax.io import load_excel
+                        result = load_csv(path, **kwargs)
+                    elif format == "excel":
+                        from rheojax.io import load_excel
 
-                result = load_excel(path, **kwargs)
-            elif format == "trios":
-                from rheojax.io import load_trios
+                        result = load_excel(path, **kwargs)
+                    elif format == "trios":
+                        from rheojax.io import load_trios
 
-                result = load_trios(path, **kwargs)
-            elif format == "hdf5":
-                from rheojax.io import load_hdf5
+                        result = load_trios(path, **kwargs)
+                    elif format == "hdf5":
+                        from rheojax.io import load_hdf5
 
-                result = load_hdf5(path, **kwargs)
-            else:
-                raise ValueError(f"Unknown format: {format}")
+                        result = load_hdf5(path, **kwargs)
+                    else:
+                        raise ValueError(f"Unknown format: {format}")
 
-        # Handle multiple segments (for TRIOS)
-        if isinstance(result, list):
-            if len(result) == 1:
-                self.data = result[0]
-            else:
-                warnings.warn(
-                    f"Loaded {len(result)} segments. Using first segment.", stacklevel=2
+                # Handle multiple segments (for TRIOS)
+                if isinstance(result, list):
+                    if len(result) == 1:
+                        self.data = result[0]
+                    else:
+                        warnings.warn(
+                            f"Loaded {len(result)} segments. Using first segment.",
+                            stacklevel=2,
+                        )
+                        self.data = result[0]
+                    ctx["n_segments"] = len(result)
+                else:
+                    self.data = result
+
+                self._apply_test_mode_metadata(self.data, explicit_mode)
+                ctx["n_points"] = len(self.data.x) if self.data else 0
+                ctx["test_mode"] = explicit_mode
+
+            except Exception as e:
+                logger.error(
+                    "Failed to load data",
+                    pipeline_id=self._id,
+                    file_path=str(path),
+                    format=format,
+                    error=str(e),
+                    exc_info=True,
                 )
-                self.data = result[0]
-        else:
-            self.data = result
+                raise
 
-        self._apply_test_mode_metadata(self.data, explicit_mode)
         self.history.append(("load", str(path), format))
         return self
 
@@ -165,9 +196,29 @@ class Pipeline:
             transform_obj = transform
             transform_name = transform_obj.__class__.__name__
 
-        # Apply transform to x and y data
-        # The transform operates on the y data
-        self.data.y = transform_obj.transform(self.data.y)
+        logger.debug(
+            "Creating transform",
+            pipeline_id=self._id,
+            transform=transform_name,
+        )
+
+        with log_pipeline_stage(
+            logger, "transform", pipeline_id=self._id, transform=transform_name
+        ) as ctx:
+            try:
+                # Apply transform to x and y data
+                # The transform operates on the y data
+                self.data.y = transform_obj.transform(self.data.y)
+                ctx["input_shape"] = len(self.data.x)
+            except Exception as e:
+                logger.error(
+                    "Transform failed",
+                    pipeline_id=self._id,
+                    transform=transform_name,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
         self.history.append(("transform", transform_name))
         return self
@@ -228,6 +279,12 @@ class Pipeline:
             model_obj = model
             model_name = model_obj.__class__.__name__
 
+        logger.debug(
+            "Creating model for fitting",
+            pipeline_id=self._id,
+            model=model_name,
+        )
+
         # Fit using model's fit method
         X = self.data.x
         y = self.data.y
@@ -238,12 +295,31 @@ class Pipeline:
         if isinstance(y, jnp.ndarray):
             y = np.array(y)
 
-        model_obj.fit(X, y, **fit_kwargs)
+        with log_pipeline_stage(
+            logger,
+            "fit",
+            pipeline_id=self._id,
+            model=model_name,
+            data_shape=X.shape,
+        ) as ctx:
+            try:
+                model_obj.fit(X, y, **fit_kwargs)
+                score = model_obj.score(X, y)
+                ctx["r_squared"] = score
 
-        # Store fitted model
-        self._last_model = model_obj
-        self.steps.append(("fit", model_obj))
-        self.history.append(("fit", model_name, model_obj.score(X, y)))
+                # Store fitted model
+                self._last_model = model_obj
+                self.steps.append(("fit", model_obj))
+                self.history.append(("fit", model_name, score))
+            except Exception as e:
+                logger.error(
+                    "Model fitting failed",
+                    pipeline_id=self._id,
+                    model=model_name,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
         return self
 
@@ -279,6 +355,13 @@ class Pipeline:
         # Convert to numpy for prediction
         if isinstance(X, jnp.ndarray):
             X = np.array(X)
+
+        logger.debug(
+            "Generating predictions",
+            pipeline_id=self._id,
+            model=model.__class__.__name__,
+            n_points=len(X),
+        )
 
         predictions = model.predict(X)
 
@@ -320,37 +403,45 @@ class Pipeline:
         if self.data is None:
             raise ValueError("No data loaded. Call load() first.")
 
-        from rheojax.visualization.plotter import plot_rheo_data
+        with log_pipeline_stage(
+            logger,
+            "plot",
+            pipeline_id=self._id,
+            style=style,
+            include_prediction=include_prediction,
+        ) as ctx:
+            from rheojax.visualization.plotter import plot_rheo_data
 
-        fig, ax = plot_rheo_data(self.data, style=style, **plot_kwargs)
+            fig, ax = plot_rheo_data(self.data, style=style, **plot_kwargs)
 
-        # Optionally overlay predictions
-        if include_prediction and self._last_model is not None:
-            predictions = self.predict()
-            import matplotlib.pyplot as plt
+            # Optionally overlay predictions
+            if include_prediction and self._last_model is not None:
+                predictions = self.predict()
+                import matplotlib.pyplot as plt
 
-            # Get the axes (handle both single and multiple axes)
-            if isinstance(ax, np.ndarray):
-                ax_plot = ax[0]
-            else:
-                ax_plot = ax
+                # Get the axes (handle both single and multiple axes)
+                if isinstance(ax, np.ndarray):
+                    ax_plot = ax[0]
+                else:
+                    ax_plot = ax
 
-            ax_plot.plot(
-                predictions.x,
-                predictions.y,
-                "--",
-                label="Model Prediction",
-                linewidth=2,
-            )
-            ax_plot.legend()
+                ax_plot.plot(
+                    predictions.x,
+                    predictions.y,
+                    "--",
+                    label="Model Prediction",
+                    linewidth=2,
+                )
+                ax_plot.legend()
+                ctx["prediction_overlay"] = True
 
-        if show:
-            import matplotlib.pyplot as plt
+            if show:
+                import matplotlib.pyplot as plt
 
-            plt.show()
+                plt.show()
 
-        # Store figure for save_figure() method
-        self._current_figure = fig
+            # Store figure for save_figure() method
+            self._current_figure = fig
 
         self.history.append(("plot", style))
         return self
@@ -374,35 +465,57 @@ class Pipeline:
 
         path = Path(file_path)
 
-        if format == "hdf5":
-            from rheojax.io import save_hdf5
+        with log_pipeline_stage(
+            logger,
+            "save",
+            pipeline_id=self._id,
+            file_path=str(path),
+            format=format,
+        ) as ctx:
+            try:
+                if format == "hdf5":
+                    from rheojax.io import save_hdf5
 
-            save_hdf5(self.data, path, **kwargs)
-        elif format == "excel":
-            from rheojax.io import save_excel
+                    save_hdf5(self.data, path, **kwargs)
+                elif format == "excel":
+                    from rheojax.io import save_excel
 
-            parameters: dict[str, Any] = {}
-            if self.data.x_units:
-                parameters["x_units"] = self.data.x_units
-            if self.data.y_units:
-                parameters["y_units"] = self.data.y_units
-            parameters["domain"] = self.data.domain
-            if self.data.metadata:
-                parameters["metadata"] = self.data.metadata
+                    parameters: dict[str, Any] = {}
+                    if self.data.x_units:
+                        parameters["x_units"] = self.data.x_units
+                    if self.data.y_units:
+                        parameters["y_units"] = self.data.y_units
+                    parameters["domain"] = self.data.domain
+                    if self.data.metadata:
+                        parameters["metadata"] = self.data.metadata
 
-            excel_payload = {
-                "parameters": parameters,
-                "predictions": np.array(self.data.y),
-            }
-            save_excel(excel_payload, path, **kwargs)
-        elif format == "csv":
-            # Simple CSV export
-            import pandas as pd
+                    excel_payload = {
+                        "parameters": parameters,
+                        "predictions": np.array(self.data.y),
+                    }
+                    save_excel(excel_payload, path, **kwargs)
+                elif format == "csv":
+                    # Simple CSV export
+                    import pandas as pd
 
-            df = pd.DataFrame({"x": np.array(self.data.x), "y": np.array(self.data.y)})
-            df.to_csv(path, index=False, **kwargs)
-        else:
-            raise ValueError(f"Unknown format: {format}")
+                    df = pd.DataFrame(
+                        {"x": np.array(self.data.x), "y": np.array(self.data.y)}
+                    )
+                    df.to_csv(path, index=False, **kwargs)
+                else:
+                    raise ValueError(f"Unknown format: {format}")
+
+                ctx["n_points"] = len(self.data.x)
+            except Exception as e:
+                logger.error(
+                    "Failed to save data",
+                    pipeline_id=self._id,
+                    file_path=str(path),
+                    format=format,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
         self.history.append(("save", str(path), format))
         return self
@@ -486,7 +599,27 @@ class Pipeline:
         from rheojax.visualization.plotter import save_figure
 
         path = Path(filepath)
-        save_figure(self._current_figure, path, format=format, dpi=dpi, **kwargs)
+
+        with log_pipeline_stage(
+            logger,
+            "save_figure",
+            pipeline_id=self._id,
+            file_path=str(path),
+            format=format,
+            dpi=dpi,
+        ) as ctx:
+            try:
+                save_figure(self._current_figure, path, format=format, dpi=dpi, **kwargs)
+                ctx["saved"] = True
+            except Exception as e:
+                logger.error(
+                    "Failed to save figure",
+                    pipeline_id=self._id,
+                    file_path=str(path),
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
         self.history.append(("save_figure", str(path)))
         return self
@@ -581,6 +714,11 @@ class Pipeline:
         new_pipeline.steps = self.steps.copy()
         new_pipeline.history = self.history.copy()
         new_pipeline._last_model = self._last_model
+        logger.debug(
+            "Pipeline cloned",
+            original_id=self._id,
+            new_id=new_pipeline._id,
+        )
         return new_pipeline
 
     def reset(self) -> Pipeline:
@@ -592,6 +730,7 @@ class Pipeline:
         Example:
             >>> pipeline.reset()
         """
+        logger.debug("Pipeline reset", pipeline_id=self._id)
         self.data = None
         self.steps = []
         self.history = []

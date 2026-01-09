@@ -22,7 +22,6 @@ References:
 
 from __future__ import annotations
 
-import logging
 import warnings
 from typing import TYPE_CHECKING, cast
 
@@ -33,6 +32,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
+from rheojax.logging import get_logger, log_fit
 from rheojax.utils.optimization import OptimizationResult
 from rheojax.utils.prony import (
     compute_r_squared,
@@ -49,8 +49,8 @@ if TYPE_CHECKING:  # pragma: no cover
 else:
     jnp_typing = np
 
-# Get module logger
-logger = logging.getLogger(__name__)
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("generalized_maxwell")
@@ -153,25 +153,62 @@ class GeneralizedMaxwell(BaseModel):
         """
         # Detect test mode
         if test_mode is None:
+            logger.error("test_mode must be specified for GMM fitting")
             raise ValueError("test_mode must be specified for GMM fitting")
 
         self._test_mode = test_mode
 
-        # Route to appropriate fitting method
-        if test_mode == "relaxation":
-            self._fit_relaxation_mode(
-                X, y, optimization_factor=optimization_factor, **kwargs
+        with log_fit(
+            logger,
+            self.__class__.__name__,
+            data_shape=X.shape,
+            test_mode=test_mode,
+            n_modes=self._n_modes,
+            modulus_type=self._modulus_type,
+        ) as ctx:
+            logger.debug(
+                "Processing GMM input data",
+                x_range=(float(X.min()), float(X.max())),
+                y_range=(float(np.real(y).min()), float(np.real(y).max())),
+                optimization_factor=optimization_factor,
             )
-        elif test_mode == "oscillation":
-            self._fit_oscillation_mode(
-                X, y, optimization_factor=optimization_factor, **kwargs
+
+            # Route to appropriate fitting method
+            try:
+                if test_mode == "relaxation":
+                    self._fit_relaxation_mode(
+                        X, y, optimization_factor=optimization_factor, **kwargs
+                    )
+                elif test_mode == "oscillation":
+                    self._fit_oscillation_mode(
+                        X, y, optimization_factor=optimization_factor, **kwargs
+                    )
+                elif test_mode == "creep":
+                    self._fit_creep_mode(
+                        X, y, optimization_factor=optimization_factor, **kwargs
+                    )
+                else:
+                    logger.error("Unknown test_mode", test_mode=test_mode)
+                    raise ValueError(f"Unknown test_mode: {test_mode}")
+            except Exception as e:
+                logger.error(
+                    "GMM fitting failed",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Log fitted parameters
+            symbol = "E" if self._modulus_type == "tensile" else "G"
+            ctx["n_modes_final"] = self._n_modes
+            ctx[f"{symbol}_inf"] = self.parameters.get_value(f"{symbol}_inf")
+
+            logger.debug(
+                "GMM fitting completed",
+                n_modes_final=self._n_modes,
+                modulus_inf=self.parameters.get_value(f"{symbol}_inf"),
             )
-        elif test_mode == "creep":
-            self._fit_creep_mode(
-                X, y, optimization_factor=optimization_factor, **kwargs
-            )
-        else:
-            raise ValueError(f"Unknown test_mode: {test_mode}")
 
     def _nlsq_fit(
         self, objective, x0, bounds, max_nfev=1000, ftol=1e-6, xtol=1e-6, gtol=1e-6
@@ -190,6 +227,15 @@ class GeneralizedMaxwell(BaseModel):
         Returns:
             OptimizationResult with fitted parameters and diagnostics
         """
+        logger.debug(
+            "Starting NLSQ optimization",
+            n_params=len(x0),
+            max_nfev=max_nfev,
+            ftol=ftol,
+            xtol=xtol,
+            gtol=gtol,
+        )
+
         ls = nlsq.LeastSquares()
 
         try:
@@ -206,6 +252,11 @@ class GeneralizedMaxwell(BaseModel):
             )
         except ValueError as e:
             # Handle infeasible initial guess
+            logger.error(
+                "NLSQ optimization failed with ValueError",
+                error_message=str(e),
+                exc_info=True,
+            )
             raise RuntimeError(
                 f"NLSQ optimization failed with error: {e}\n"
                 "This may indicate:\n"
@@ -237,6 +288,14 @@ class GeneralizedMaxwell(BaseModel):
                 else None
             ),
             nlsq_result=nlsq_result,
+        )
+
+        logger.debug(
+            "NLSQ optimization completed",
+            success=result.success,
+            cost=result.cost,
+            nfev=result.nfev,
+            message=result.message,
         )
 
         return result

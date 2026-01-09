@@ -18,12 +18,15 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.io import auto_load as load_data
+from rheojax.logging import configure_logging, get_logger
 from rheojax.transforms.spp_decomposer import SPPDecomposer
 
 if TYPE_CHECKING:
     from argparse import Namespace
 
 jax, jnp = safe_import_jax()
+
+logger = get_logger(__name__)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -203,11 +206,29 @@ def _add_batch_args(parser: argparse.ArgumentParser) -> None:
 
 def run_analyze(args: Namespace) -> int:
     """Run SPP analysis on a single file."""
+    logger.info(
+        "Running SPP analyze command",
+        command="spp analyze",
+        input_file=str(args.input_file),
+    )
+    logger.debug(
+        "SPP analyze parameters",
+        omega=args.omega,
+        gamma_0=args.gamma_0,
+        n_harmonics=args.n_harmonics,
+        step_size=args.step_size,
+        numerical=args.numerical,
+        bayesian=args.bayesian,
+        x_col=args.x_col,
+        y_col=args.y_col,
+    )
+
     if args.verbose:
         print(f"Loading data from {args.input_file}...")
 
     # Load data
     try:
+        logger.debug("Loading data file", file=str(args.input_file))
         loaded = load_data(
             str(args.input_file),
             x_col=args.x_col,
@@ -218,7 +239,9 @@ def run_analyze(args: Namespace) -> int:
             rheo_data = loaded[0]
         else:
             rheo_data = loaded
+        logger.debug("Data loaded successfully", data_points=len(rheo_data.x))
     except Exception as e:
+        logger.error("Failed to load data", file=str(args.input_file), exc_info=True)
         print(f"Error loading data: {e}", file=sys.stderr)
         return 1
 
@@ -246,9 +269,17 @@ def run_analyze(args: Namespace) -> int:
         print("Running SPP analysis...")
 
     try:
+        logger.debug("Starting SPP transform")
         spp.transform(rheo_data)
         results = spp.get_results()
+        logger.debug(
+            "SPP analysis completed",
+            sigma_sy=results.get("sigma_sy"),
+            sigma_dy=results.get("sigma_dy"),
+            G_cage_mean=results.get("G_cage_mean"),
+        )
     except Exception as e:
+        logger.error("SPP analysis failed", exc_info=True)
         print(f"Error in SPP analysis: {e}", file=sys.stderr)
         return 1
 
@@ -273,8 +304,11 @@ def run_analyze(args: Namespace) -> int:
         print(f"\nSaving results to {output_path}...")
 
     try:
+        logger.debug("Saving results", output_path=str(output_path), matlab_format=args.export_matlab)
         _save_results(results, output_path, args.export_matlab, omega=args.omega)
+        logger.info("Results saved successfully", output_path=str(output_path))
     except Exception as e:
+        logger.error("Failed to save results", output_path=str(output_path), exc_info=True)
         print(f"Error saving results: {e}", file=sys.stderr)
         return 1
 
@@ -284,6 +318,12 @@ def run_analyze(args: Namespace) -> int:
     if args.bayesian:
         if args.verbose:
             print("\nRunning Bayesian inference...")
+
+        logger.info(
+            "Starting Bayesian inference",
+            num_warmup=args.num_warmup,
+            num_samples=args.num_samples,
+        )
 
         try:
             from rheojax.models.spp_yield_stress import SPPYieldStress
@@ -301,12 +341,15 @@ def run_analyze(args: Namespace) -> int:
                 num_samples=args.num_samples,
             )
 
+            logger.debug("Bayesian inference completed successfully")
+
             print("\n=== Bayesian Inference Results ===")
             print(f"Posterior samples: {args.num_samples}")
             if hasattr(bayes_result, "summary"):
                 print(bayes_result.summary)
 
         except Exception as e:
+            logger.error("Bayesian inference failed", exc_info=True)
             print(f"Bayesian inference failed: {e}", file=sys.stderr)
             # Don't fail the whole command if Bayesian fails
 

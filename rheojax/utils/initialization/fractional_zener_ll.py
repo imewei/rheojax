@@ -14,7 +14,10 @@ The optimizer will refine these starting values.
 
 from __future__ import annotations
 
+from rheojax.logging import get_logger
 from rheojax.utils.initialization.base import BaseInitializer
+
+logger = get_logger(__name__)
 
 
 class FractionalZenerLLInitializer(BaseInitializer):
@@ -33,24 +36,62 @@ class FractionalZenerLLInitializer(BaseInitializer):
         dict
             Estimated parameters: c1, c2, alpha, beta, gamma, tau
         """
+        logger.debug(
+            "Estimating FractionalZenerLiquidLiquid parameters",
+            model="FractionalZenerLiquidLiquid",
+            low_plateau=features["low_plateau"],
+            high_plateau=features["high_plateau"],
+            omega_mid=features["omega_mid"],
+            alpha_estimate=features["alpha_estimate"],
+        )
+
         epsilon = 1e-12
 
         # Split the high-frequency modulus between c1 and c2
         total_modulus = max(features["high_plateau"], epsilon)
         c1_init = total_modulus * 0.6  # Allocate more to first term
         c2_init = total_modulus * 0.4
+        logger.debug(
+            "Split modulus between c1 and c2",
+            model="FractionalZenerLiquidLiquid",
+            total_modulus=total_modulus,
+            c1=c1_init,
+            c2=c2_init,
+        )
 
         # Use slope estimate for alpha, defaults for beta and gamma
         if 0.01 <= features["alpha_estimate"] <= 0.99:
             alpha_init = features["alpha_estimate"]
+            logger.debug(
+                "Using estimated alpha from slope",
+                model="FractionalZenerLiquidLiquid",
+                alpha=alpha_init,
+            )
         else:
             alpha_init = 0.5
+            logger.debug(
+                "Alpha estimate out of range, using default",
+                model="FractionalZenerLiquidLiquid",
+                alpha=alpha_init,
+                original_estimate=features["alpha_estimate"],
+            )
 
         beta_init = 0.5  # Default for second fractional order
         gamma_init = 0.5  # Default for third fractional order
+        logger.debug(
+            "Using default fractional orders for beta and gamma",
+            model="FractionalZenerLiquidLiquid",
+            beta=beta_init,
+            gamma=gamma_init,
+        )
 
         # tau from transition frequency
         tau_init = 1.0 / (features["omega_mid"] + epsilon)
+        logger.debug(
+            "Estimated characteristic time tau",
+            model="FractionalZenerLiquidLiquid",
+            tau=tau_init,
+        )
 
         return {
             "c1": c1_init,

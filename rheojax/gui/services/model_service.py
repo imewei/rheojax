@@ -7,18 +7,22 @@ Service for model fitting, prediction, and parameter management.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def normalize_model_name(model_name: str) -> str:
     """Normalize user-entered model identifiers to registry slugs.
 
-    Accepts case-insensitive aliases (e.g., "GMM" → "generalized_maxwell") and
+    Accepts case-insensitive aliases (e.g., "GMM" -> "generalized_maxwell") and
     trims whitespace so editable combos can safely map typed text.
     """
+    logger.debug("Normalizing model name", input_name=model_name)
 
     key = model_name.strip()
     alias_map = {
@@ -27,9 +31,12 @@ def normalize_model_name(model_name: str) -> str:
     }
 
     if key in alias_map.values():
+        logger.debug("Model name already normalized", model_name=key)
         return key
 
-    return alias_map.get(key.lower(), key)
+    result = alias_map.get(key.lower(), key)
+    logger.debug("Model name normalized", input_name=model_name, output_name=result)
+    return result
 
 
 import numpy as np
@@ -37,8 +44,6 @@ import numpy as np
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
 from rheojax.utils.compatibility import check_model_compatibility
-
-logger = logging.getLogger(__name__)
 
 
 def _is_placeholder_model(model_name: str | None) -> bool:
@@ -110,8 +115,10 @@ class ModelService:
 
     def __init__(self) -> None:
         """Initialize model service."""
+        logger.debug("Initializing ModelService")
         self._registry = Registry.get_instance()
         self._model_cache = {}
+        logger.debug("ModelService initialized", registry_available=True)
 
     def _normalize_model_name(self, model_name: str) -> str:
         """Map friendly aliases to registered model slugs."""
@@ -132,7 +139,9 @@ class ModelService:
             - 'multi_mode': GeneralizedMaxwell
             - 'sgr': SGRConventional, SGRGeneric
         """
+        logger.debug("Getting available models from registry")
         all_models = self._registry.get_all_models()
+        logger.debug("Retrieved models from registry", n_models=len(all_models))
 
         # Categorize models
         categories = {
@@ -198,11 +207,16 @@ class ModelService:
                 categories["other"].append(model_name)
 
         # Remove empty categories
-        return {k: v for k, v in categories.items() if v}
+        result = {k: v for k, v in categories.items() if v}
+        logger.debug("Models categorized", n_categories=len(result))
+        return result
 
     def get_parameter_defaults(self, model_name: str) -> dict[str, ParameterState]:
         """Return ParameterState mapping for a model using registry defaults."""
+        logger.debug("Getting parameter defaults", model=model_name)
+
         if _is_placeholder_model(model_name):
+            logger.debug("Placeholder model, returning empty defaults")
             return {}
 
         model_name = self._normalize_model_name(model_name)
@@ -213,7 +227,9 @@ class ModelService:
             model = self._registry.create_instance(model_name, plugin_type="model")
         except Exception as exc:
             logger.warning(
-                "Could not load parameter defaults for %s: %s", model_name, exc
+                "Could not load parameter defaults",
+                model=model_name,
+                error=str(exc),
             )
             return {}
         defaults: dict[str, ParameterState] = {}
@@ -228,6 +244,11 @@ class ModelService:
                 unit=getattr(param, "unit", ""),
                 description=getattr(param, "description", ""),
             )
+        logger.debug(
+            "Parameter defaults retrieved",
+            model=model_name,
+            n_parameters=len(defaults),
+        )
         return defaults
 
     def get_model_info(self, model_name: str) -> dict[str, Any]:
@@ -247,8 +268,11 @@ class ModelService:
             - parameters: dict[str, dict] with 'default', 'bounds', 'units'
             - supported_test_modes: list[str]
         """
+        logger.debug("Getting model info", model=model_name)
+
         try:
             if _is_placeholder_model(model_name):
+                logger.debug("Placeholder model, returning empty info")
                 return {
                     "name": model_name or "",
                     "description": "No model selected",
@@ -285,6 +309,13 @@ class ModelService:
             elif "sgr" in model_name.lower():
                 supported_modes = ["oscillation", "relaxation"]
 
+            logger.debug(
+                "Model info retrieved",
+                model=model_name,
+                n_parameters=len(params_info),
+                supported_modes=supported_modes,
+            )
+
             return {
                 "name": model_name,
                 "description": description.strip(),
@@ -293,7 +324,12 @@ class ModelService:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get model info for {model_name}: {e}")
+            logger.error(
+                "Failed to get model info",
+                model=model_name,
+                error=str(e),
+                exc_info=True,
+            )
             return {
                 "name": model_name,
                 "description": "Error loading model info",
@@ -326,8 +362,16 @@ class ModelService:
             - warnings: list[str]
             - recommendations: list[str]
         """
+        logger.debug(
+            "Checking model-data compatibility",
+            model=model_name,
+            test_mode=test_mode,
+            n_points=len(data.x) if data.x is not None else 0,
+        )
+
         try:
             if _is_placeholder_model(model_name):
+                logger.debug("Placeholder model, returning incompatible")
                 return {
                     "compatible": False,
                     "decay_type": "unknown",
@@ -363,8 +407,18 @@ class ModelService:
 
             result = check_model_compatibility(model=model, **compat_kwargs)
 
+            compatible = result.get("compatible", True)
+            logger.info(
+                "Compatibility check complete",
+                model=model_name,
+                test_mode=test_mode,
+                compatible=compatible,
+                decay_type=result.get("decay_type", "unknown"),
+                material_type=result.get("material_type", "unknown"),
+            )
+
             return {
-                "compatible": result.get("compatible", True),
+                "compatible": compatible,
                 "decay_type": result.get("decay_type", "unknown"),
                 "material_type": result.get("material_type", "unknown"),
                 "warnings": result.get("warnings", []),
@@ -373,7 +427,12 @@ class ModelService:
             }
 
         except Exception as e:
-            logger.error(f"Compatibility check failed: {e}")
+            logger.error(
+                "Compatibility check failed",
+                model=model_name,
+                error=str(e),
+                exc_info=True,
+            )
             return {
                 "compatible": False,
                 "decay_type": "unknown",
@@ -401,6 +460,13 @@ class ModelService:
         dict
             Initial parameter values
         """
+        logger.debug(
+            "Getting smart initialization",
+            model=model_name,
+            test_mode=test_mode,
+            n_points=len(data.x) if data.x is not None else 0,
+        )
+
         try:
             model_name = self._normalize_model_name(model_name)
             # Create model instance
@@ -417,13 +483,31 @@ class ModelService:
 
                 # Get smart initialization
                 init_params = model.smart_initial_guess(x, y, test_mode=test_mode)
+                logger.info(
+                    "Smart initialization computed",
+                    model=model_name,
+                    test_mode=test_mode,
+                    n_params=len(init_params),
+                )
                 return init_params
             else:
                 # Return default values
-                return {name: param.value for name, param in model.parameters.items()}
+                defaults = {
+                    name: param.value for name, param in model.parameters.items()
+                }
+                logger.debug(
+                    "Using default initialization (no smart_initial_guess)",
+                    model=model_name,
+                    n_params=len(defaults),
+                )
+                return defaults
 
         except Exception as e:
-            logger.warning(f"Smart initialization failed, using defaults: {e}")
+            logger.warning(
+                "Smart initialization failed, using defaults",
+                model=model_name,
+                error=str(e),
+            )
             # Return default values on failure
             try:
                 model = self._registry.create_instance(model_name, plugin_type="model")
@@ -462,10 +546,25 @@ class ModelService:
         FitResult
             Fitting result with parameters, residuals, and goodness of fit
         """
+        n_points = len(data.x) if data.x is not None else 0
+        logger.info(
+            "Starting model fit",
+            model=model_name,
+            n_points=n_points,
+            test_mode=test_mode,
+        )
+        logger.debug(
+            "Fit parameters",
+            model=model_name,
+            initial_params=params,
+            fit_kwargs=fit_kwargs,
+        )
+
         try:
             model_name = self._normalize_model_name(model_name)
             # Create model instance
             model = self._registry.create_instance(model_name, plugin_type="model")
+            logger.debug("Model instance created", model=model_name)
 
             # Set initial parameter values if provided
             if params:
@@ -482,6 +581,7 @@ class ModelService:
                         else:
                             # Handle direct value
                             model.parameters[name].value = value
+                logger.debug("Initial parameters set", n_params=len(params))
 
             # Extract data
             x = np.asarray(data.x)
@@ -495,13 +595,25 @@ class ModelService:
             model_info = self.get_model_info(model_name)
             supported_modes = model_info.get("supported_test_modes", [])
             if supported_modes and test_mode not in supported_modes:
-                raise ValueError(
+                error_msg = (
                     f"Model '{model_name}' does not support test_mode='{test_mode}'. "
                     f"Supported modes: {supported_modes}"
                 )
+                logger.error(
+                    "Unsupported test mode",
+                    model=model_name,
+                    test_mode=test_mode,
+                    supported_modes=supported_modes,
+                )
+                raise ValueError(error_msg)
 
             # Fit model
-            logger.info(f"Fitting {model_name} model with test_mode={test_mode}")
+            logger.debug(
+                "Calling model.fit",
+                model=model_name,
+                test_mode=test_mode,
+                n_points=len(x),
+            )
 
             # Add test_mode to fit_kwargs
             fit_kwargs["test_mode"] = test_mode
@@ -512,6 +624,7 @@ class ModelService:
 
             # Fit (this uses NLSQ by default)
             model.fit(x, y, **fit_kwargs)
+            logger.debug("Model fit completed", model=model_name)
 
             # Get fitted values
             y_pred = model.predict(x)
@@ -624,6 +737,16 @@ class ModelService:
                     "njev": model._nlsq_result.njev,
                 }
 
+            logger.info(
+                "Model fit complete",
+                model=model_name,
+                success=True,
+                r_squared=r_squared,
+                chi_squared=chi_squared,
+                rmse=rmse,
+                n_params=len(fitted_params),
+            )
+
             return FitResult(
                 model_name=model_name,
                 parameters=fitted_params,
@@ -638,7 +761,12 @@ class ModelService:
             )
 
         except Exception as e:
-            logger.error(f"Fitting failed for {model_name}: {e}")
+            logger.error(
+                "Fit failed",
+                model=model_name,
+                error=str(e),
+                exc_info=True,
+            )
             return FitResult(
                 model_name=model_name,
                 parameters={},
@@ -680,6 +808,13 @@ class ModelService:
         np.ndarray
             Predicted y values
         """
+        logger.debug(
+            "Starting prediction",
+            model=model_name,
+            n_points=len(x_values),
+            test_mode=test_mode,
+        )
+
         try:
             # Create model instance with optional configuration
             model_kwargs = model_kwargs or {}
@@ -699,16 +834,28 @@ class ModelService:
 
             # Predict
             if test_mode is None:
-                return model.predict(x_values)
+                result = model.predict(x_values)
+            else:
+                try:
+                    result = model.predict(x_values, test_mode=test_mode)
+                except TypeError:
+                    # Backward compatibility for model implementations without test_mode.
+                    result = model.predict(x_values)
 
-            try:
-                return model.predict(x_values, test_mode=test_mode)
-            except TypeError:
-                # Backward compatibility for model implementations without test_mode.
-                return model.predict(x_values)
+            logger.debug(
+                "Prediction complete",
+                model=model_name,
+                n_points=len(result),
+            )
+            return result
 
         except Exception as e:
-            logger.error(f"Prediction failed: {e}")
+            logger.error(
+                "Prediction failed",
+                model=model_name,
+                error=str(e),
+                exc_info=True,
+            )
             raise ValueError(f"Prediction failed: {e}") from e
 
     def get_model_equation(self, model_name: str) -> str:
@@ -724,12 +871,22 @@ class ModelService:
         str
             LaTeX equation string
         """
+        logger.debug("Getting model equation", model=model_name)
+
         try:
             model = self._registry.create_instance(model_name, plugin_type="model")
             if hasattr(model, "equation"):
+                logger.debug("Equation retrieved", model=model_name)
                 return model.equation
+            logger.debug("No equation available", model=model_name)
             return "Equation not available"
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "Failed to get model equation",
+                model=model_name,
+                error=str(e),
+                exc_info=True,
+            )
             return "Error loading equation"
 
     def validate_parameters(
@@ -749,6 +906,12 @@ class ModelService:
         list[str]
             List of validation warnings
         """
+        logger.debug(
+            "Validating parameters",
+            model=model_name,
+            n_params=len(parameters),
+        )
+
         warnings = []
 
         try:
@@ -767,7 +930,23 @@ class ModelService:
                 if value > upper:
                     warnings.append(f"{name}={value} is above upper bound {upper}")
 
+            if warnings:
+                logger.info(
+                    "Parameter validation warnings",
+                    model=model_name,
+                    n_warnings=len(warnings),
+                    warnings=warnings,
+                )
+            else:
+                logger.debug("All parameters valid", model=model_name)
+
         except Exception as e:
+            logger.error(
+                "Parameter validation failed",
+                model=model_name,
+                error=str(e),
+                exc_info=True,
+            )
             warnings.append(f"Validation failed: {e}")
 
         return warnings

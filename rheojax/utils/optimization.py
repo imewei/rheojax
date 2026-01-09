@@ -28,7 +28,6 @@ Example:
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -38,8 +37,9 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
@@ -70,18 +70,37 @@ def compute_covariance_from_jacobian(
         Covariance matrix (n x n), or None if computation fails
     """
     if jac is None or jac.size == 0:
+        logger.debug("Jacobian is None or empty, cannot compute covariance")
         return None
 
     try:
         jac = np.asarray(jac, dtype=np.float64)
         m, n = jac.shape  # m = data points, n = parameters
+        logger.debug(
+            "Computing covariance from Jacobian",
+            jacobian_shape=(m, n),
+            n_data_points=m,
+            n_params=n,
+        )
 
         # SVD of Jacobian: J = U @ S @ VT
         U, s, VT = np.linalg.svd(jac, full_matrices=False)
+        logger.debug(
+            "SVD computed",
+            singular_values_range=(float(s.min()), float(s.max())),
+            condition_number=float(s.max() / s.min()) if s.min() > 0 else float("inf"),
+        )
 
         # Filter near-zero singular values
         threshold = np.finfo(np.float64).eps * max(m, n) * s[0]
         s_inv_sq = np.where(s > threshold, 1.0 / (s**2), 0.0)
+        n_filtered = np.sum(s <= threshold)
+        if n_filtered > 0:
+            logger.debug(
+                "Filtered near-zero singular values",
+                n_filtered=int(n_filtered),
+                threshold=float(threshold),
+            )
 
         # Compute covariance: (J.T @ J)^-1 = VT.T @ diag(1/s²) @ VT
         pcov = VT.T @ np.diag(s_inv_sq) @ VT
@@ -94,16 +113,35 @@ def compute_covariance_from_jacobian(
             dof = n_data_actual - n  # degrees of freedom
             if dof > 0:
                 pcov = pcov * (rss / dof)
+                logger.debug(
+                    "Scaled covariance by residual variance",
+                    rss=float(rss),
+                    degrees_of_freedom=dof,
+                    scale_factor=float(rss / dof),
+                )
 
         # Validate result
         if not np.all(np.isfinite(pcov)):
-            logger.warning("Covariance matrix contains inf/nan, returning None")
+            logger.warning(
+                "Covariance matrix contains inf/nan, returning None",
+                has_inf=bool(np.any(np.isinf(pcov))),
+                has_nan=bool(np.any(np.isnan(pcov))),
+            )
             return None
 
+        logger.debug(
+            "Covariance computation completed",
+            pcov_shape=pcov.shape,
+            pcov_diagonal_range=(float(np.diag(pcov).min()), float(np.diag(pcov).max())),
+        )
         return pcov
 
     except Exception as e:
-        logger.warning(f"Failed to compute covariance from Jacobian: {e}")
+        logger.error(
+            "Failed to compute covariance from Jacobian",
+            error=str(e),
+            exc_info=True,
+        )
         return None
 
 
@@ -570,6 +608,21 @@ def nlsq_optimize(
     original_values = np.asarray(x0, dtype=np.float64).copy()
     bounds_list = parameters.get_bounds()
 
+    logger.info(
+        "Starting NLSQ optimization",
+        n_params=len(x0),
+        method=method,
+        max_iter=max_iter,
+        ftol=ftol,
+        xtol=xtol,
+        gtol=gtol,
+    )
+    logger.debug(
+        "Initial parameter values",
+        x0=x0.tolist() if hasattr(x0, "tolist") else list(x0),
+        bounds=bounds_list,
+    )
+
     # Ensure float64 precision for initial values
     x0 = np.asarray(x0, dtype=np.float64)
 
@@ -614,6 +667,7 @@ def nlsq_optimize(
 
     def _scipy_fallback(initial_guess: np.ndarray) -> OptimizationResult:
         """Fallback to SciPy's least_squares when NLSQ fails."""
+        logger.info("Using SciPy least_squares fallback")
         from scipy.optimize import least_squares as scipy_least_squares
 
         def residual_fn(values: np.ndarray) -> np.ndarray:
@@ -674,12 +728,20 @@ def nlsq_optimize(
 
     # Create NLSQ optimizer instance and run optimization
     try:
+        logger.debug("Creating NLSQ optimizer instance")
         optimizer = nlsq.LeastSquares()
         nlsq_result = optimizer.least_squares(**nlsq_kwargs)
+        logger.debug(
+            "NLSQ optimization completed",
+            success=nlsq_result.get("success", False),
+            nfev=nlsq_result.get("nfev", 0),
+            cost=float(nlsq_result.get("cost", 0.0)),
+        )
     except Exception as e:
         logger.warning(
-            "NLSQ optimization raised %s; falling back to SciPy least_squares.",
-            e,
+            "NLSQ optimization raised exception, falling back to SciPy",
+            error=str(e),
+            exc_info=True,
         )
         return _scipy_fallback(x0)
 
@@ -711,6 +773,12 @@ def nlsq_optimize(
     residual_count = residuals_np.size if residuals_np.size else 1
     mean_squared_error = result.fun / residual_count
     if not np.isfinite(mean_squared_error) or mean_squared_error > 1e6:
+        logger.error(
+            "Optimization failed: residual norm extremely large",
+            mean_squared_error=float(mean_squared_error) if np.isfinite(mean_squared_error) else "inf",
+            residual_count=residual_count,
+            rss=float(result.fun),
+        )
         parameters.set_values(original_values)
         raise RuntimeError(
             "Optimization failed: residual norm remains extremely large. "
@@ -719,6 +787,20 @@ def nlsq_optimize(
 
     # Update ParameterSet with optimal values
     parameters.set_values(result.x)
+
+    logger.info(
+        "Optimization completed successfully",
+        success=result.success,
+        rss=float(result.fun),
+        nfev=result.nfev,
+        nit=result.nit,
+        r_squared=result.r_squared,
+    )
+    logger.debug(
+        "Final parameter values",
+        x_opt=result.x.tolist(),
+        message=result.message,
+    )
 
     return result
 
@@ -774,14 +856,19 @@ def nlsq_multistart_optimize(
         ... )
         >>> print(f"Best cost: {result.fun:.3e}")
     """
-    import logging
-
     # Store original parameter values
     original_values = parameters.get_values()
 
+    logger.info(
+        "Starting multi-start optimization",
+        n_starts=n_starts,
+        perturb_factor=perturb_factor,
+        n_params=len(original_values),
+    )
+
     # First attempt: Use smart initialization values
     if verbose:
-        logging.info("Multi-start optimization: Attempt 1 (smart initialization)")
+        logger.info("Multi-start optimization: Attempt 1 (smart initialization)")
 
     best_result = nlsq_optimize(
         objective,
@@ -796,15 +883,21 @@ def nlsq_multistart_optimize(
     )
     best_cost = best_result.fun
 
+    logger.debug(
+        "First attempt completed",
+        cost=float(best_cost),
+        success=best_result.success,
+    )
     if verbose:
-        logging.info(f"  Cost: {best_cost:.3e}, Success: {best_result.success}")
+        logger.info(f"  Cost: {best_cost:.3e}, Success: {best_result.success}")
 
     # Additional attempts: Random perturbations
     bounds_list = parameters.get_bounds()
 
     for i in range(1, n_starts):
+        logger.debug("Starting multi-start attempt", attempt=i + 1, total=n_starts)
         if verbose:
-            logging.info(
+            logger.info(
                 f"Multi-start optimization: Attempt {i+1} (random perturbation)"
             )
 
@@ -843,26 +936,48 @@ def nlsq_multistart_optimize(
                 **kwargs,
             )
 
+            logger.debug(
+                "Multi-start attempt completed",
+                attempt=i + 1,
+                cost=float(result.fun),
+                success=result.success,
+            )
             if verbose:
-                logging.info(f"  Cost: {result.fun:.3e}, Success: {result.success}")
+                logger.info(f"  Cost: {result.fun:.3e}, Success: {result.success}")
 
             # Keep best result
             if result.success and result.fun < best_cost:
                 best_result = result
                 best_cost = result.fun
+                logger.debug(
+                    "New best result found",
+                    attempt=i + 1,
+                    best_cost=float(best_cost),
+                )
                 if verbose:
-                    logging.info(f"  → New best! Cost: {best_cost:.3e}")
+                    logger.info(f"  -> New best! Cost: {best_cost:.3e}")
 
         except Exception as e:
+            logger.warning(
+                "Multi-start attempt failed",
+                attempt=i + 1,
+                error=str(e),
+            )
             if verbose:
-                logging.warning(f"  Attempt {i+1} failed: {e}")
+                logger.warning(f"  Attempt {i+1} failed: {e}")
             continue
 
     # Restore best parameters
     parameters.set_values(best_result.x)
 
+    logger.info(
+        "Multi-start optimization completed",
+        best_cost=float(best_cost),
+        n_starts=n_starts,
+        final_success=best_result.success,
+    )
     if verbose:
-        logging.info(
+        logger.info(
             f"\nMulti-start completed: Best cost = {best_cost:.3e} "
             f"({n_starts} starts)"
         )
@@ -946,6 +1061,15 @@ def nlsq_curve_fit(
         - Results include all CurveFitResult properties for model comparison
     """
     import nlsq as nlsq_module
+
+    logger.info(
+        "Starting curve fit",
+        n_params=len(parameters),
+        n_data=len(x_data),
+        auto_bounds=auto_bounds,
+        stability=stability,
+        multistart=multistart,
+    )
 
     # Extract p0 and bounds from ParameterSet
     p0 = np.asarray(parameters.get_values(), dtype=np.float64)
@@ -1055,10 +1179,28 @@ def nlsq_curve_fit(
         # Update ParameterSet with optimal values
         parameters.set_values(result.x)
 
+        logger.info(
+            "Curve fit completed successfully",
+            r_squared=result.r_squared,
+            rmse=result.rmse,
+            success=result.success,
+        )
+        logger.debug(
+            "Curve fit results",
+            popt=result.x.tolist(),
+            rss=float(result.fun),
+            aic=result.aic,
+            bic=result.bic,
+        )
+
         return result
 
     except Exception as e:
-        logger.warning(f"nlsq.curve_fit() failed: {e}. Falling back to nlsq_optimize.")
+        logger.warning(
+            "nlsq.curve_fit() failed, falling back to nlsq_optimize",
+            error=str(e),
+            exc_info=True,
+        )
 
         # Fallback to nlsq_optimize with residual-based objective
         objective = create_least_squares_objective(model_fn, x_data_np, y_data_np)

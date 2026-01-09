@@ -23,6 +23,9 @@ from PySide6.QtWidgets import (
 
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.jax_status import JAXStatusWidget
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class HomePage(QWidget):
@@ -70,6 +73,7 @@ class HomePage(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self._store = StateStore()
         self.setup_ui()
 
@@ -189,9 +193,11 @@ class HomePage(QWidget):
 
     def _select_workflow(self, mode: str) -> None:
         """Handle workflow selection."""
+        logger.debug("Quick action triggered", action="select_workflow", page="HomePage", workflow_mode=mode)
         self._store.dispatch("SET_WORKFLOW_MODE", {"mode": mode})
         self.workflow_selected.emit(mode)
         # Navigate to data tab to start work
+        logger.debug("Navigation action", target="data", page="HomePage")
         self._store.dispatch("NAVIGATE_TAB", {"tab": "data"})
 
     def _create_header(self) -> QWidget:
@@ -263,24 +269,39 @@ class HomePage(QWidget):
         btn_open = self._create_action_button(
             "Open Project", "Load an existing RheoJAX project", "#2196F3"
         )
-        btn_open.clicked.connect(self.open_project_requested.emit)
+        btn_open.clicked.connect(self._on_open_project_clicked)
         layout.addWidget(btn_open)
 
         # Import Data button
         btn_import = self._create_action_button(
             "Import Data", "Import TRIOS, Anton Paar, CSV, Excel", "#4CAF50"
         )
-        btn_import.clicked.connect(self.import_data_requested.emit)
+        btn_import.clicked.connect(self._on_import_data_clicked)
         layout.addWidget(btn_import)
 
         # New Project button
         btn_new = self._create_action_button(
             "New Project", "Start a new analysis project", "#FF9800"
         )
-        btn_new.clicked.connect(self.new_project_requested.emit)
+        btn_new.clicked.connect(self._on_new_project_clicked)
         layout.addWidget(btn_new)
 
         return group
+
+    def _on_open_project_clicked(self) -> None:
+        """Handle Open Project button click."""
+        logger.debug("Quick action triggered", action="open_project", page="HomePage")
+        self.open_project_requested.emit()
+
+    def _on_import_data_clicked(self) -> None:
+        """Handle Import Data button click."""
+        logger.debug("Quick action triggered", action="import_data", page="HomePage")
+        self.import_data_requested.emit()
+
+    def _on_new_project_clicked(self) -> None:
+        """Handle New Project button click."""
+        logger.debug("Quick action triggered", action="new_project", page="HomePage")
+        self.new_project_requested.emit()
 
     def _create_action_button(
         self, title: str, description: str, color: str
@@ -376,9 +397,11 @@ class HomePage(QWidget):
         layout.addWidget(path_label)
 
         # Make clickable
-        widget.mousePressEvent = lambda event: self.recent_project_opened.emit(
-            project_path
-        )
+        def on_project_click(event, path=project_path):
+            logger.debug("Quick action triggered", action="open_recent_project", page="HomePage", project_path=str(path))
+            self.recent_project_opened.emit(path)
+
+        widget.mousePressEvent = on_project_click
         widget.setCursor(Qt.PointingHandCursor)
 
         return widget
@@ -495,7 +518,11 @@ class HomePage(QWidget):
         layout.addWidget(desc_label)
 
         # Make clickable
-        card.mousePressEvent = lambda event, n=name: self.example_selected.emit(n)
+        def on_example_click(event, example_name=name):
+            logger.debug("Quick action triggered", action="select_example", page="HomePage", example_name=example_name)
+            self.example_selected.emit(example_name)
+
+        card.mousePressEvent = on_example_click
 
         return card
 
@@ -556,6 +583,7 @@ class HomePage(QWidget):
             self._jax_status.update_jit_cache(jit_cache_count)
 
         except Exception:
+            logger.error("Failed to update JAX status", exc_info=True, page="HomePage")
             # Fallback if JAX info unavailable
             self._jax_status.update_device_list(["cpu"])
             self._jax_status.set_current_device("cpu")
@@ -612,16 +640,17 @@ class HomePage(QWidget):
                 }
             """
             )
-            btn.clicked.connect(lambda checked, u=url: self._open_url(u))
+            btn.clicked.connect(lambda checked, u=url, t=title: self._open_url(u, t))
             layout.addWidget(btn)
 
         return group
 
-    def _open_url(self, url: str) -> None:
+    def _open_url(self, url: str, title: str = "") -> None:
         """Open URL in default browser."""
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
 
+        logger.debug("Navigation action", target=url, page="HomePage", resource=title)
         QDesktopServices.openUrl(QUrl(url))
 
     def load_recent_projects(self) -> list[dict[str, str]]:
@@ -650,6 +679,7 @@ class HomePage(QWidget):
         example_name : str
             Example identifier
         """
+        logger.debug("Quick action triggered", action="open_example", page="HomePage", example_name=example_name)
         self.example_selected.emit(example_name)
 
     def get_example_path(self, example_name: str) -> Path | None:

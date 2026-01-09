@@ -22,7 +22,10 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.data import RheoData
+from rheojax.logging import get_logger, log_fit, log_pipeline_stage
 from rheojax.pipeline.base import Pipeline
+
+logger = get_logger(__name__)
 
 
 class BatchPipeline:
@@ -51,6 +54,10 @@ class BatchPipeline:
         self.template_pipeline = template_pipeline
         self.results: list[tuple[Path, RheoData, dict[str, Any]]] = []
         self.errors: list[tuple[Path, Exception]] = []
+        logger.debug(
+            "BatchPipeline initialized",
+            has_template=template_pipeline is not None,
+        )
 
     def set_template(self, pipeline: Pipeline) -> BatchPipeline:
         """Set template pipeline.
@@ -62,6 +69,7 @@ class BatchPipeline:
             self for method chaining
         """
         self.template_pipeline = pipeline
+        logger.debug("Template pipeline set", pipeline_type=type(pipeline).__name__)
         return self
 
     def process_files(
@@ -91,12 +99,21 @@ class BatchPipeline:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         if self.template_pipeline is None:
+            logger.error("No template pipeline set")
             raise ValueError("No template pipeline set. Call set_template() first.")
 
         normalized_paths = [Path(p) for p in file_paths]
 
         if not normalized_paths:
+            logger.debug("No files to process")
             return self
+
+        logger.info(
+            "Starting batch processing",
+            n_files=len(normalized_paths),
+            parallel=parallel,
+            n_workers=n_workers if parallel else 1,
+        )
 
         if parallel:
             # Parallel processing with ThreadPoolExecutor
@@ -105,11 +122,24 @@ class BatchPipeline:
 
             def process_one(file_path):
                 try:
+                    logger.debug("Processing file", filepath=str(file_path))
                     result, metrics = self._process_file(
                         file_path, format=format, **load_kwargs
                     )
+                    logger.debug(
+                        "File processed successfully",
+                        filepath=str(file_path),
+                        n_points=len(result.x) if result else 0,
+                    )
                     return (file_path, result, metrics, None)
                 except Exception as e:
+                    logger.error(
+                        "Failed to process file",
+                        filepath=str(file_path),
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        exc_info=True,
+                    )
                     return (file_path, None, None, e)
 
             with ThreadPoolExecutor(max_workers=n_workers) as executor:
@@ -130,14 +160,32 @@ class BatchPipeline:
             # Sequential processing
             for file_path in normalized_paths:
                 try:
+                    logger.debug("Processing file", filepath=str(file_path))
                     result, metrics = self._process_file(
                         file_path, format=format, **load_kwargs
                     )
                     self.results.append((file_path, result, metrics))
+                    logger.debug(
+                        "File processed successfully",
+                        filepath=str(file_path),
+                        n_points=len(result.x) if result else 0,
+                    )
                 except Exception as e:
                     self.errors.append((file_path, e))
+                    logger.error(
+                        "Failed to process file",
+                        filepath=str(file_path),
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        exc_info=True,
+                    )
                     warnings.warn(f"Failed to process {file_path}: {e}", stacklevel=2)
 
+        logger.info(
+            "Batch processing completed",
+            n_success=len(self.results),
+            n_errors=len(self.errors),
+        )
         return self
 
     def process_directory(
@@ -162,7 +210,15 @@ class BatchPipeline:
             >>> batch.process_directory('data/', pattern='*.csv')
         """
         directory_path = Path(directory)
+        logger.debug(
+            "Scanning directory",
+            directory=str(directory_path),
+            pattern=pattern,
+            recursive=recursive,
+        )
+
         if not directory_path.exists():
+            logger.error("Directory not found", directory=str(directory))
             raise FileNotFoundError(f"Directory not found: {directory}")
 
         if recursive:
@@ -170,7 +226,18 @@ class BatchPipeline:
         else:
             file_paths = list(directory_path.glob(pattern))
 
+        logger.debug(
+            "Directory scan completed",
+            directory=str(directory_path),
+            n_files_found=len(file_paths),
+        )
+
         if not file_paths:
+            logger.warning(
+                "No files matching pattern found",
+                directory=str(directory),
+                pattern=pattern,
+            )
             warnings.warn(
                 f"No files matching '{pattern}' found in {directory}", stacklevel=2
             )
@@ -196,7 +263,8 @@ class BatchPipeline:
         path = Path(file_path)
 
         # Load data
-        pipeline.load(path, format=format, **load_kwargs)
+        with log_pipeline_stage(logger, "load", filepath=str(path)):
+            pipeline.load(path, format=format, **load_kwargs)
 
         # Execute template steps (transforms, fits, etc.)
         # The template should already have the steps configured
@@ -213,14 +281,22 @@ class BatchPipeline:
             X = np.array(result.x)
             y = np.array(result.y)
 
-            metrics["r_squared"] = model.score(X, y)
-            metrics["parameters"] = model.get_params()
-            metrics["model"] = model.__class__.__name__
+            with log_fit(
+                logger,
+                model=model.__class__.__name__,
+                data_shape=X.shape,
+            ) as ctx:
+                metrics["r_squared"] = model.score(X, y)
+                metrics["parameters"] = model.get_params()
+                metrics["model"] = model.__class__.__name__
 
-            # Calculate RMSE
-            y_pred = model.predict(X)
-            residuals = y - y_pred
-            metrics["rmse"] = float(np.sqrt(np.mean(residuals**2)))
+                # Calculate RMSE
+                y_pred = model.predict(X)
+                residuals = y - y_pred
+                metrics["rmse"] = float(np.sqrt(np.mean(residuals**2)))
+
+                ctx["r_squared"] = metrics["r_squared"]
+                ctx["rmse"] = metrics["rmse"]
 
         return result, metrics
 
@@ -307,18 +383,28 @@ class BatchPipeline:
         df = self.get_summary_dataframe()
 
         if df.empty:
+            logger.warning("No results to export")
             warnings.warn("No results to export", stacklevel=2)
             return self
 
         output_path = Path(output_path)
+
+        logger.info(
+            "Exporting batch summary",
+            output_path=str(output_path),
+            format=format,
+            n_results=len(df),
+        )
 
         if format == "excel":
             df.to_excel(output_path, index=False)
         elif format == "csv":
             df.to_csv(output_path, index=False)
         else:
+            logger.error("Unknown export format", format=format)
             raise ValueError(f"Unknown format: {format}")
 
+        logger.debug("Export completed", output_path=str(output_path))
         return self
 
     def apply_filter(
@@ -337,11 +423,18 @@ class BatchPipeline:
             >>> # Keep only results with R² > 0.9
             >>> batch.apply_filter(lambda p, d, m: m.get('r_squared', 0) > 0.9)
         """
+        original_count = len(self.results)
         self.results = [
             (path, data, metrics)
             for path, data, metrics in self.results
             if filter_fn(path, data, metrics)
         ]
+        logger.debug(
+            "Filter applied",
+            original_count=original_count,
+            filtered_count=len(self.results),
+            removed_count=original_count - len(self.results),
+        )
         return self
 
     def get_statistics(self) -> dict[str, Any]:
@@ -405,8 +498,15 @@ class BatchPipeline:
         Returns:
             self for method chaining
         """
+        n_results = len(self.results)
+        n_errors = len(self.errors)
         self.results.clear()
         self.errors.clear()
+        logger.debug(
+            "BatchPipeline cleared",
+            cleared_results=n_results,
+            cleared_errors=n_errors,
+        )
         return self
 
     def __len__(self) -> int:

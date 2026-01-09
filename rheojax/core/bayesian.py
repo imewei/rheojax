@@ -32,6 +32,9 @@ from numpyro.infer import MCMC, NUTS, init_to_uniform, init_to_value
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_bayesian
+
+logger = get_logger(__name__)
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
@@ -88,10 +91,20 @@ class BayesianResult:
 
     def __post_init__(self):
         """Validate result after initialization."""
+        logger.debug(
+            "Initializing BayesianResult",
+            num_parameters=len(self.posterior_samples),
+            num_samples=self.num_samples,
+            num_chains=self.num_chains,
+        )
         # Ensure posterior_samples are numpy arrays
         for name, samples in self.posterior_samples.items():
             if not isinstance(samples, np.ndarray):
                 self.posterior_samples[name] = np.asarray(samples, dtype=np.float64)
+        logger.debug(
+            "BayesianResult initialized",
+            parameter_names=list(self.posterior_samples.keys()),
+        )
 
     def to_inference_data(self) -> Any:
         """Convert to ArviZ InferenceData format for advanced visualization.
@@ -135,6 +148,7 @@ class BayesianResult:
             The MCMC object must be present (automatically stored by fit_bayesian).
         """
 
+        logger.debug("Converting BayesianResult to InferenceData")
         # Return cached version if available
         def _ensure_energy(idata):
             """Guarantee energy diagnostic exists for ArviZ energy plots."""
@@ -174,6 +188,7 @@ class BayesianResult:
             return idata
 
         if self._inference_data is not None:
+            logger.debug("Returning cached InferenceData")
             return _ensure_energy(self._inference_data)
 
         # Import arviz (lazy import)
@@ -181,7 +196,9 @@ class BayesianResult:
 
         try:
             az = import_arviz(required=("from_numpyro",))
+            logger.debug("ArviZ imported successfully")
         except ImportError as exc:
+            logger.error("ArviZ import failed", exc_info=True)
             raise ImportError(
                 "ArviZ is required for InferenceData conversion. "
                 "Install it with: pip install arviz"
@@ -189,6 +206,7 @@ class BayesianResult:
 
         # Ensure MCMC object is available
         if self.mcmc is None:
+            logger.error("MCMC object not available for InferenceData conversion")
             raise ValueError(
                 "MCMC object not available for conversion. "
                 "This may be a result from an older version. "
@@ -198,7 +216,13 @@ class BayesianResult:
         # Convert using ArviZ's from_numpyro utility
         # This preserves all NUTS diagnostics (energy, divergences, etc.)
         # log_likelihood=True computes pointwise log-likelihood for WAIC/LOO model comparison
+        logger.debug("Creating InferenceData from MCMC object")
         self._inference_data = az.from_numpyro(self.mcmc, log_likelihood=True)
+        logger.info(
+            "InferenceData created successfully",
+            num_chains=self.num_chains,
+            num_samples=self.num_samples,
+        )
 
         return _ensure_energy(self._inference_data)
 
@@ -249,17 +273,22 @@ class BayesianMixin:
 
     def _validate_bayesian_requirements(self) -> None:
         """Validate that required attributes exist for Bayesian inference."""
+        logger.debug("Validating Bayesian requirements")
         if not hasattr(self, "parameters"):
+            logger.error("Missing 'parameters' attribute for Bayesian inference")
             raise AttributeError(
                 "Class must have 'parameters' attribute (ParameterSet)"
             )
         if not hasattr(self, "model_function"):
+            logger.error("Missing 'model_function' method for Bayesian inference")
             raise AttributeError(
                 "Class must define 'model_function(X, params, test_mode)' method"
             )
+        logger.debug("Bayesian requirements validated successfully")
 
     def _validate_parameter_bounds(self) -> None:
         """Validate that all parameter bounds are valid (lower < upper)."""
+        logger.debug("Validating parameter bounds")
         for name in self.parameters.keys():
             param = self.parameters.get(name)
             if param is None:
@@ -271,10 +300,16 @@ class BayesianMixin:
                 and bounds[1] is not None
                 and bounds[0] >= bounds[1]
             ):
+                logger.error(
+                    "Invalid parameter bounds",
+                    parameter=name,
+                    bounds=bounds,
+                )
                 raise ValueError(
                     f"Invalid bounds for parameter '{name}': {bounds}. "
                     "Lower bound must be strictly less than upper bound."
                 )
+        logger.debug("Parameter bounds validated successfully")
 
     def _resolve_test_mode(
         self,
@@ -286,6 +321,11 @@ class BayesianMixin:
         Returns:
             Tuple of (X_array, y_array, resolved_test_mode)
         """
+        logger.debug(
+            "Resolving test mode",
+            input_type=type(X).__name__,
+            explicit_test_mode=str(test_mode) if test_mode else None,
+        )
         if isinstance(X, RheoData):
             rheo_data = X
             X_array = rheo_data.x
@@ -293,6 +333,7 @@ class BayesianMixin:
 
             if test_mode is None:
                 test_mode = detect_test_mode(rheo_data)
+                logger.debug("Test mode detected from RheoData", test_mode=str(test_mode))
         else:
             X_array = X
             y_array = None  # Will be set from y parameter
@@ -301,8 +342,10 @@ class BayesianMixin:
                 stored_mode = getattr(self, "_test_mode", None)
                 if stored_mode is not None:
                     test_mode = stored_mode
+                    logger.debug("Using stored test mode", test_mode=str(test_mode))
                 else:
                     test_mode = TestMode.RELAXATION
+                    logger.debug("Defaulting to relaxation test mode")
                     warnings.warn(
                         "test_mode not specified. Defaulting to 'relaxation'. "
                         "For correct posteriors, pass RheoData with metadata['test_mode'] "
@@ -315,6 +358,7 @@ class BayesianMixin:
         if isinstance(test_mode, str):
             test_mode = TestMode(test_mode.lower())
 
+        logger.debug("Test mode resolved", test_mode=str(test_mode))
         return X_array, y_array, test_mode
 
     def _prepare_jax_data(
@@ -325,8 +369,14 @@ class BayesianMixin:
         Returns:
             Dictionary with keys: X_jax, y_jax, is_complex, scale_info
         """
+        logger.debug(
+            "Preparing JAX data",
+            X_shape=X_array.shape if hasattr(X_array, "shape") else None,
+            y_shape=y_array.shape if hasattr(y_array, "shape") else None,
+        )
         X_jax = jnp.asarray(X_array, dtype=jnp.float64)
         is_complex = jnp.iscomplexobj(y_array)
+        logger.debug("Data is complex", is_complex=bool(is_complex))
 
         scale_info: dict[str, float | None] = {
             "data_scale": None,
@@ -497,11 +547,20 @@ class BayesianMixin:
         Args:
             seed: Random seed for reproducibility. If None, uses 0.
         """
+        logger.debug(
+            "Starting NUTS sampling",
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            seed=seed,
+        )
         user_chain_method = nuts_kwargs.pop("chain_method", None)
 
         try:
             init_strategy = init_to_value(values=warm_start_values)
+            logger.debug("Using warm-start initialization", values=warm_start_values)
         except Exception as exc:
+            logger.debug("Warm-start initialization failed", exc_info=True)
             warnings.warn(
                 "Warm-start initialization failed; falling back to uniform init. "
                 "Reason: " + str(exc),
@@ -509,6 +568,7 @@ class BayesianMixin:
                 stacklevel=3,
             )
             init_strategy = init_to_uniform()
+            logger.debug("Falling back to uniform initialization")
 
         def _select_chain_method() -> str:
             """Prefer parallel/vectorized chains when multiple chains requested.
@@ -529,9 +589,11 @@ class BayesianMixin:
             # Count accelerators only (non-CPU) for true parallel execution.
             accelerator_count = sum(1 for d in devices if d.platform != "cpu")
             if accelerator_count >= num_chains:
+                logger.debug("Using parallel chain method", accelerator_count=accelerator_count)
                 return "parallel"
             # Fall back to vectorized on single-device setups for speed over sequential.
             # Vectorized uses vmap for efficient multi-chain execution on a single device.
+            logger.debug("Using vectorized chain method")
             return "vectorized"
 
         # Use provided seed or default to 0 for reproducibility
@@ -561,20 +623,28 @@ class BayesianMixin:
             return sampler
 
         try:
-            return run_mcmc(init_strategy)
+            logger.debug("Running MCMC sampling")
+            result = run_mcmc(init_strategy)
+            logger.debug("MCMC sampling completed successfully")
+            return result
         except RuntimeError as e:
             if "Cannot find valid initial parameters" in str(e):
+                logger.debug("Warm-started NUTS initialization failed, retrying with uniform init")
                 warnings.warn(
                     "Warm-started NUTS initialization failed; retrying with uniform init.",
                     RuntimeWarning,
                     stacklevel=3,
                 )
                 try:
-                    return run_mcmc(init_to_uniform())
+                    result = run_mcmc(init_to_uniform())
+                    logger.debug("MCMC sampling completed with uniform init")
+                    return result
                 except Exception as final_exc:
+                    logger.error("NUTS sampling failed after uniform init fallback", exc_info=True)
                     raise RuntimeError(
                         f"NUTS sampling failed: {str(final_exc)}"
                     ) from final_exc
+            logger.error("NUTS sampling failed", error=str(e), exc_info=True)
             raise RuntimeError(f"NUTS sampling failed: {str(e)}") from e
 
     def _process_mcmc_results(
@@ -585,6 +655,12 @@ class BayesianMixin:
         num_chains: int,
     ) -> BayesianResult:
         """Process MCMC results into BayesianResult."""
+        logger.debug(
+            "Processing MCMC results",
+            num_params=len(param_names),
+            num_samples=num_samples,
+            num_chains=num_chains,
+        )
         samples = mcmc.get_samples()
 
         # Convert to numpy arrays (model parameters only)
@@ -646,7 +722,9 @@ class BayesianMixin:
             >>> prior_samples = model.sample_prior(num_samples=500)
             >>> print(prior_samples["a"].shape)  # (500,)
         """
+        logger.debug("Sampling prior", num_samples=num_samples)
         if not hasattr(self, "parameters"):
+            logger.error("Missing 'parameters' attribute for prior sampling")
             raise AttributeError(
                 "Class must have 'parameters' attribute (ParameterSet)"
             )
@@ -657,6 +735,7 @@ class BayesianMixin:
             param = self.parameters.get(param_name)
 
             if param.bounds is None:
+                logger.error("Parameter missing bounds for prior sampling", parameter=param_name)
                 raise ValueError(
                     f"Parameter '{param_name}' must have bounds for prior sampling"
                 )
@@ -670,6 +749,11 @@ class BayesianMixin:
 
             prior_samples[param_name] = samples
 
+        logger.debug(
+            "Prior sampling completed",
+            num_parameters=len(prior_samples),
+            parameter_names=list(prior_samples.keys()),
+        )
         return prior_samples
 
     def get_credible_intervals(
@@ -700,6 +784,11 @@ class BayesianMixin:
             ... )
             >>> print(f"95% CI for a: {intervals_95['a']}")
         """
+        logger.debug(
+            "Computing credible intervals",
+            credibility=credibility,
+            num_parameters=len(posterior_samples),
+        )
         intervals = {}
 
         for param_name, samples in posterior_samples.items():
@@ -722,6 +811,7 @@ class BayesianMixin:
                 upper = float(np.percentile(samples, upper_percentile))
                 intervals[param_name] = (lower, upper)
 
+        logger.debug("Credible intervals computed", parameter_names=list(intervals.keys()))
         return intervals
 
     def fit_bayesian(
@@ -779,67 +869,103 @@ class BayesianMixin:
             >>> # For production: use num_chains=4 (default)
             >>> result = model.fit_bayesian(X, y, num_chains=4)
         """
-        # Phase 1: Validation
-        self._validate_bayesian_requirements()
-        self._validate_parameter_bounds()
+        # Get model name for logging
+        model_name = getattr(self, "__class__", type(self)).__name__
 
-        # Phase 2: Resolve test_mode and extract data
-        X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
-        y_array = y_from_rheo if y_from_rheo is not None else y
-        self._test_mode = test_mode  # Cache for future calls
-
-        # Phase 3: Prepare JAX data
-        jax_data = self._prepare_jax_data(X_array, y_array)
-        X_jax = jax_data["X_jax"]
-        y_jax = jax_data["y_jax"]
-        is_complex_data = jax_data["is_complex"]
-        scale_info = jax_data["scale_info"]
-
-        # Phase 4: Get parameter bounds
-        param_names = list(self.parameters)
-        param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
-
-        # Phase 5: Build NumPyro model (closure captures test_mode)
-        numpyro_model = self._build_numpyro_model(
-            param_names=param_names,
-            param_bounds=param_bounds,
-            test_mode=test_mode,
-            is_complex_data=is_complex_data,
-            scale_info=scale_info,
-        )
-
-        # Phase 6: Apply NUTS kwargs overrides
-        nuts_overrides = getattr(self, "bayesian_nuts_kwargs", None)
-        if callable(nuts_overrides):
-            overrides = nuts_overrides()
-            if isinstance(overrides, dict):
-                for key, value in overrides.items():
-                    nuts_kwargs.setdefault(key, value)
-
-        # Phase 7: Build warm-start values
-        warm_start_values = self._build_warm_start_values(
-            param_names=param_names,
-            param_bounds=param_bounds,
-            initial_values=initial_values,
-            scale_info=scale_info,
-            is_complex=is_complex_data,
-        )
-
-        # Phase 8: Run NUTS sampling with multi-chain parallelization
-        mcmc = self._run_nuts_sampling(
-            numpyro_model=numpyro_model,
-            X_jax=X_jax,
-            y_jax=y_jax,
-            warm_start_values=warm_start_values,
+        with log_bayesian(
+            logger,
+            model=model_name,
             num_warmup=num_warmup,
             num_samples=num_samples,
             num_chains=num_chains,
-            nuts_kwargs=nuts_kwargs,
-            seed=seed,
-        )
+        ) as log_ctx:
+            # Phase 1: Validation
+            self._validate_bayesian_requirements()
+            self._validate_parameter_bounds()
 
-        # Phase 9: Process results
-        return self._process_mcmc_results(mcmc, param_names, num_samples, num_chains)
+            # Phase 2: Resolve test_mode and extract data
+            X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
+            y_array = y_from_rheo if y_from_rheo is not None else y
+            self._test_mode = test_mode  # Cache for future calls
+
+            logger.info(
+                "Bayesian inference started",
+                model=model_name,
+                test_mode=str(test_mode),
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                num_chains=num_chains,
+            )
+
+            # Phase 3: Prepare JAX data
+            jax_data = self._prepare_jax_data(X_array, y_array)
+            X_jax = jax_data["X_jax"]
+            y_jax = jax_data["y_jax"]
+            is_complex_data = jax_data["is_complex"]
+            scale_info = jax_data["scale_info"]
+
+            # Phase 4: Get parameter bounds
+            param_names = list(self.parameters)
+            param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
+
+            # Phase 5: Build NumPyro model (closure captures test_mode)
+            numpyro_model = self._build_numpyro_model(
+                param_names=param_names,
+                param_bounds=param_bounds,
+                test_mode=test_mode,
+                is_complex_data=is_complex_data,
+                scale_info=scale_info,
+            )
+
+            # Phase 6: Apply NUTS kwargs overrides
+            nuts_overrides = getattr(self, "bayesian_nuts_kwargs", None)
+            if callable(nuts_overrides):
+                overrides = nuts_overrides()
+                if isinstance(overrides, dict):
+                    for key, value in overrides.items():
+                        nuts_kwargs.setdefault(key, value)
+
+            # Phase 7: Build warm-start values
+            warm_start_values = self._build_warm_start_values(
+                param_names=param_names,
+                param_bounds=param_bounds,
+                initial_values=initial_values,
+                scale_info=scale_info,
+                is_complex=is_complex_data,
+            )
+
+            # Phase 8: Run NUTS sampling with multi-chain parallelization
+            mcmc = self._run_nuts_sampling(
+                numpyro_model=numpyro_model,
+                X_jax=X_jax,
+                y_jax=y_jax,
+                warm_start_values=warm_start_values,
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                num_chains=num_chains,
+                nuts_kwargs=nuts_kwargs,
+                seed=seed,
+            )
+
+            # Phase 9: Process results
+            result = self._process_mcmc_results(mcmc, param_names, num_samples, num_chains)
+
+            # Add diagnostics to log context
+            log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
+            max_r_hat = max(result.diagnostics.get("r_hat", {}).values(), default=1.0)
+            min_ess = min(result.diagnostics.get("ess", {}).values(), default=0.0)
+            log_ctx["r_hat_max"] = max_r_hat
+            log_ctx["ess_min"] = min_ess
+
+            logger.info(
+                "Bayesian inference completed",
+                model=model_name,
+                divergences=result.diagnostics.get("divergences", 0),
+                r_hat_max=max_r_hat,
+                ess_min=min_ess,
+            )
+
+            return result
 
     def _build_numpyro_model(
         self,

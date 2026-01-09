@@ -44,6 +44,7 @@ References
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger, log_fit
 from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
@@ -52,6 +53,8 @@ jax, jnp = safe_import_jax()
 from rheojax.core.base import BaseModel
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("fractional_zener_ll")
@@ -360,14 +363,22 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         For FZLL, estimates c1, c2, and tau from the data characteristics.
         """
-        import logging
-
         import numpy as np
+
+        logger.debug(
+            "Attempting relaxation parameter initialization",
+            data_size=len(X) if hasattr(X, "__len__") else "unknown",
+        )
 
         try:
             t = np.asarray(X, dtype=float).ravel()
             g = np.asarray(y, dtype=float).ravel()
             if t.shape != g.shape or t.size < 4:
+                logger.debug(
+                    "Insufficient data for relaxation initialization",
+                    t_shape=t.shape,
+                    g_shape=g.shape,
+                )
                 return False
 
             order = np.argsort(t)
@@ -405,15 +416,20 @@ class FractionalZenerLiquidLiquid(BaseModel):
             self.parameters.set_value("c2", c2_guess)
             self.parameters.set_value("tau", tau_guess)
             # Keep fractional orders at defaults (0.5)
-            logging.debug(
-                "FZLL relaxation init | c1=%.3g c2=%.3g tau=%.3g",
-                c1_guess,
-                c2_guess,
-                tau_guess,
+            logger.debug(
+                "FZLL relaxation initialization completed",
+                c1=c1_guess,
+                c2=c2_guess,
+                tau=tau_guess,
+                g_max=g_max,
             )
             return True
         except Exception as exc:
-            logging.debug(f"Relaxation initialization failed: {exc}")
+            logger.debug(
+                "Relaxation initialization failed",
+                error=str(exc),
+                exc_info=True,
+            )
             return False
 
     def _fit(
@@ -458,76 +474,128 @@ class FractionalZenerLiquidLiquid(BaseModel):
         # Store test mode for model_function
         self._test_mode = test_mode
 
-        # Data-aware initialization for relaxation mode
-        if test_mode == TestMode.RELAXATION:
-            self._initialize_relaxation_parameters(X, y)
+        logger.info(
+            "Starting FractionalZenerLiquidLiquid fit",
+            test_mode=test_mode.value if hasattr(test_mode, "value") else str(test_mode),
+            data_shape=X.shape,
+        )
 
-        # Smart initialization for oscillation mode (Issue #9)
-        if test_mode == TestMode.OSCILLATION:
-            try:
-                import numpy as np
-
-                from rheojax.utils.initialization import initialize_fractional_zener_ll
-
-                success = initialize_fractional_zener_ll(
-                    np.array(X), np.array(y), self.parameters
-                )
-                if success:
-                    import logging
-
-                    logging.debug(
-                        "Smart initialization applied from frequency-domain features"
-                    )
-            except Exception as e:
-                # Silent fallback to defaults - don't break if initialization fails
-                import logging
-
-                logging.debug(f"Smart initialization failed, using defaults: {e}")
-
-        # Create stateless model function for optimization
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            c1, c2, alpha, beta, gamma, tau = (
-                params[0],
-                params[1],
-                params[2],
-                params[3],
-                params[4],
-                params[5],
-            )
-
-            # Direct prediction based on test mode (stateless)
+        with log_fit(
+            logger, model="FractionalZenerLiquidLiquid", data_shape=X.shape
+        ) as ctx:
+            # Data-aware initialization for relaxation mode
             if test_mode == TestMode.RELAXATION:
-                return self._predict_relaxation(x, c1, c2, alpha, beta, gamma, tau)
-            elif test_mode == TestMode.CREEP:
-                return self._predict_creep(x, c1, c2, alpha, beta, gamma, tau)
-            elif test_mode == TestMode.OSCILLATION:
-                return self._predict_oscillation(x, c1, c2, alpha, beta, gamma, tau)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
+                logger.debug("Applying relaxation-mode parameter initialization")
+                self._initialize_relaxation_parameters(X, y)
 
-        # Create objective function
-        objective = create_least_squares_objective(
-            model_fn, jnp.array(X), jnp.array(y), normalize=True
-        )
+            # Smart initialization for oscillation mode (Issue #9)
+            if test_mode == TestMode.OSCILLATION:
+                try:
+                    import numpy as np
 
-        # Optimize using NLSQ TRF
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
+                    from rheojax.utils.initialization import (
+                        initialize_fractional_zener_ll,
+                    )
 
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+                    logger.debug(
+                        "Attempting smart initialization for oscillation mode",
+                        data_points=len(X),
+                    )
+                    success = initialize_fractional_zener_ll(
+                        np.array(X), np.array(y), self.parameters
+                    )
+                    if success:
+                        logger.debug(
+                            "Smart initialization applied from frequency-domain features",
+                            c1=self.parameters.get_value("c1"),
+                            c2=self.parameters.get_value("c2"),
+                            alpha=self.parameters.get_value("alpha"),
+                            beta=self.parameters.get_value("beta"),
+                            gamma=self.parameters.get_value("gamma"),
+                            tau=self.parameters.get_value("tau"),
+                        )
+                except Exception as e:
+                    # Silent fallback to defaults - don't break if initialization fails
+                    logger.debug(
+                        "Smart initialization failed, using defaults",
+                        error=str(e),
+                        exc_info=True,
+                    )
+
+            # Create stateless model function for optimization
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                c1, c2, alpha, beta, gamma, tau = (
+                    params[0],
+                    params[1],
+                    params[2],
+                    params[3],
+                    params[4],
+                    params[5],
+                )
+
+                # Direct prediction based on test mode (stateless)
+                if test_mode == TestMode.RELAXATION:
+                    return self._predict_relaxation(x, c1, c2, alpha, beta, gamma, tau)
+                elif test_mode == TestMode.CREEP:
+                    return self._predict_creep(x, c1, c2, alpha, beta, gamma, tau)
+                elif test_mode == TestMode.OSCILLATION:
+                    return self._predict_oscillation(x, c1, c2, alpha, beta, gamma, tau)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
+
+            # Create objective function
+            logger.debug("Creating least squares objective function")
+            objective = create_least_squares_objective(
+                model_fn, jnp.array(X), jnp.array(y), normalize=True
             )
 
-        self.fitted_ = True
+            # Optimize using NLSQ TRF
+            logger.debug(
+                "Starting NLSQ optimization",
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+            result = nlsq_optimize(
+                objective,
+                self.parameters,
+                use_jax=kwargs.get("use_jax", True),
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "NLSQ optimization failed",
+                    message=result.message,
+                    exc_info=True,
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+            ctx["success"] = True
+            ctx["fitted_params"] = {
+                "c1": self.parameters.get_value("c1"),
+                "c2": self.parameters.get_value("c2"),
+                "alpha": self.parameters.get_value("alpha"),
+                "beta": self.parameters.get_value("beta"),
+                "gamma": self.parameters.get_value("gamma"),
+                "tau": self.parameters.get_value("tau"),
+            }
+
+        logger.info(
+            "FractionalZenerLiquidLiquid fit completed",
+            c1=self.parameters.get_value("c1"),
+            c2=self.parameters.get_value("c2"),
+            alpha=self.parameters.get_value("alpha"),
+            beta=self.parameters.get_value("beta"),
+            gamma=self.parameters.get_value("gamma"),
+            tau=self.parameters.get_value("tau"),
+        )
         return self
 
     def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
@@ -593,12 +661,24 @@ class FractionalZenerLiquidLiquid(BaseModel):
         else:
             test_mode_str = "oscillation"
 
+        logger.debug(
+            "model_function evaluation",
+            test_mode=test_mode_str,
+            alpha=float(alpha) if hasattr(alpha, "item") else alpha,
+            beta=float(beta) if hasattr(beta, "item") else beta,
+            gamma=float(gamma) if hasattr(gamma, "item") else gamma,
+            input_shape=X.shape if hasattr(X, "shape") else len(X),
+        )
+
         # Use string comparison (JAX-safe) instead of enum comparison
         if test_mode_str == "relaxation":
+            logger.debug("Computing relaxation modulus for FZLL")
             return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
         elif test_mode_str == "creep":
+            logger.debug("Computing creep compliance for FZLL")
             return self._predict_creep(X, c1, c2, alpha, beta, gamma, tau)
         else:  # Default to oscillation
+            logger.debug("Computing complex modulus for oscillation mode")
             return self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
 
 

@@ -10,6 +10,10 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolb
 from matplotlib.figure import Figure
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class PlotCanvas(QWidget):
     """Interactive matplotlib canvas with log-scale aware zoom and tooltips.
@@ -41,6 +45,8 @@ class PlotCanvas(QWidget):
         """
         super().__init__(parent)
 
+        logger.debug("Initializing", class_name=self.__class__.__name__)
+
         # Create matplotlib figure and canvas
         self.figure = Figure(figsize=(8, 6), dpi=100)
         self.canvas = FigureCanvasQTAgg(self.figure)
@@ -71,12 +77,20 @@ class PlotCanvas(QWidget):
         # Annotation for tooltips
         self._annotation = None
 
+        logger.debug(
+            "Initialization complete",
+            class_name=self.__class__.__name__,
+            figure_size=(8, 6),
+            dpi=100,
+        )
+
     def get_axes(self):
         """Return the primary matplotlib Axes for compatibility."""
         return self.axes
 
     def refresh(self) -> None:
         """Redraw the canvas (compat helper)."""
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def plot_data(
@@ -102,6 +116,14 @@ class PlotCanvas(QWidget):
         marker : str, optional
             Marker style (default: 'o')
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="plot_data",
+            label=label,
+            data_size=len(x) if hasattr(x, "__len__") else 0,
+        )
+
         self.axes.plot(
             x,
             y,
@@ -116,6 +138,7 @@ class PlotCanvas(QWidget):
         # Store data for tooltips
         self._plot_data.append((x, y, label))
 
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def plot_fit(
@@ -141,10 +164,19 @@ class PlotCanvas(QWidget):
         linestyle : str, optional
             Line style (default: '-')
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="plot_fit",
+            label=label,
+            data_size=len(x) if hasattr(x, "__len__") else 0,
+        )
+
         self.axes.plot(
             x, y, linestyle=linestyle, label=label, color=color, linewidth=2, alpha=0.9
         )
 
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def plot_confidence_band(
@@ -170,17 +202,33 @@ class PlotCanvas(QWidget):
         alpha : float, optional
             Transparency (default: 0.3)
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="plot_confidence_band",
+            data_size=len(x) if hasattr(x, "__len__") else 0,
+        )
+
         self.axes.fill_between(
             x, y_lower, y_upper, color=color, alpha=alpha, linewidth=0
         )
 
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def clear(self) -> None:
         """Clear all plot content."""
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="clear",
+        )
+
         self.axes.clear()
         self._plot_data.clear()
         self._annotation = None
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def set_labels(self, xlabel: str = "", ylabel: str = "", title: str = "") -> None:
@@ -202,6 +250,7 @@ class PlotCanvas(QWidget):
         if title:
             self.axes.set_title(title, fontsize=12, fontweight="bold")
 
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def set_scale(self, xscale: str = "linear", yscale: str = "linear") -> None:
@@ -214,8 +263,18 @@ class PlotCanvas(QWidget):
         yscale : str, optional
             Y-axis scale ('linear' or 'log')
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="set_scale",
+            xscale=xscale,
+            yscale=yscale,
+        )
+
         self.axes.set_xscale(xscale)
         self.axes.set_yscale(yscale)
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def add_legend(self) -> None:
@@ -223,6 +282,8 @@ class PlotCanvas(QWidget):
         handles, labels = self.axes.get_legend_handles_labels()
         if handles:
             self.axes.legend(loc="best", frameon=True, framealpha=0.9, fontsize=9)
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def save_figure(self, path: str, dpi: int = 300, format: str | None = None) -> None:
@@ -237,12 +298,41 @@ class PlotCanvas(QWidget):
         format : str, optional
             File format (inferred from path if not specified)
         """
-        self.figure.savefig(path, dpi=dpi, format=format, bbox_inches="tight")
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="save_figure",
+            path=path,
+            dpi=dpi,
+        )
+
+        try:
+            self.figure.savefig(path, dpi=dpi, format=format, bbox_inches="tight")
+            logger.debug(
+                "Figure saved",
+                widget=self.__class__.__name__,
+                path=path,
+            )
+        except Exception:
+            logger.error(
+                "Failed to save figure",
+                widget=self.__class__.__name__,
+                path=path,
+                exc_info=True,
+            )
+            raise
 
     def _on_scroll(self, event) -> None:
         """Handle mouse wheel zoom (log-scale aware)."""
         if event.inaxes != self.axes:
             return
+
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="scroll_zoom",
+            direction="up" if event.button == "up" else "down",
+        )
 
         # Zoom factor
         zoom_factor = 1.2 if event.button == "up" else 1 / 1.2
@@ -288,6 +378,8 @@ class PlotCanvas(QWidget):
 
         self.axes.set_xlim(new_xlim)
         self.axes.set_ylim(new_ylim)
+
+        logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
 
     def _on_mouse_press(self, event) -> None:
@@ -296,11 +388,22 @@ class PlotCanvas(QWidget):
             return
 
         if event.button == 1:  # Left click
+            logger.debug(
+                "User interaction",
+                widget=self.__class__.__name__,
+                action="pan_start",
+            )
             self._panning = True
             self._pan_start = (event.xdata, event.ydata)
 
     def _on_mouse_release(self, event) -> None:
         """Handle mouse button release."""
+        if self._panning:
+            logger.debug(
+                "User interaction",
+                widget=self.__class__.__name__,
+                action="pan_end",
+            )
         self._panning = False
         self._pan_start = None
 

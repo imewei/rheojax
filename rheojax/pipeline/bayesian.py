@@ -25,10 +25,13 @@ from rheojax.core.arviz_utils import import_arviz
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.logging import get_logger, log_bayesian, log_fit
 from rheojax.pipeline.base import Pipeline
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
+
+logger = get_logger(__name__)
 
 
 class BayesianPipeline(Pipeline):
@@ -69,6 +72,7 @@ class BayesianPipeline(Pipeline):
         self._nlsq_result = None
         self._bayesian_result = None
         self._diagnostics = None
+        logger.debug("BayesianPipeline initialized", has_data=data is not None)
 
     def fit_nlsq(self, model: str | BaseModel, **nlsq_kwargs) -> BayesianPipeline:
         """Fit model using NLSQ optimization for point estimation.
@@ -96,6 +100,7 @@ class BayesianPipeline(Pipeline):
             >>> pipeline.fit_nlsq(Maxwell(), max_iter=1000)
         """
         if self.data is None:
+            logger.error("No data loaded for NLSQ fit")
             raise ValueError("No data loaded. Call load() first.")
 
         # Create model if string
@@ -116,15 +121,38 @@ class BayesianPipeline(Pipeline):
         if isinstance(y, jnp.ndarray):
             y = np.array(y)
 
-        model_obj.fit(X, y, method="nlsq", **nlsq_kwargs)
+        logger.debug(
+            "Starting NLSQ fit",
+            model=model_name,
+            data_shape=X.shape,
+        )
+
+        with log_fit(
+            logger,
+            model=model_name,
+            data_shape=X.shape,
+            test_mode=self.data.metadata.get("test_mode", "unknown")
+            if hasattr(self.data, "metadata") and self.data.metadata
+            else "unknown",
+        ) as ctx:
+            model_obj.fit(X, y, method="nlsq", **nlsq_kwargs)
+            r_squared = model_obj.score(X, y)
+            ctx["r_squared"] = r_squared
+            ctx["n_parameters"] = len(model_obj.parameters)
 
         # Store fitted model
         self._last_model = model_obj
         self.steps.append(("fit_nlsq", model_obj))
-        self.history.append(("fit_nlsq", model_name, model_obj.score(X, y)))
+        self.history.append(("fit_nlsq", model_name, r_squared))
 
         # Store NLSQ result from model
         self._nlsq_result = model_obj.get_nlsq_result()
+
+        logger.info(
+            "NLSQ fit completed",
+            model=model_name,
+            r_squared=r_squared,
+        )
 
         return self
 
@@ -173,12 +201,14 @@ class BayesianPipeline(Pipeline):
             ... )
         """
         if self._last_model is None:
+            logger.error("No model fitted before Bayesian inference")
             raise ValueError(
                 "No model fitted. Call fit_nlsq() first to fit a model "
                 "before running Bayesian inference."
             )
 
         if self.data is None:
+            logger.error("No data loaded for Bayesian inference")
             raise ValueError("No data loaded. Call load() first.")
 
         # Get data
@@ -198,23 +228,54 @@ class BayesianPipeline(Pipeline):
                 name: self._last_model.parameters.get_value(name)
                 for name in self._last_model.parameters
             }
+            logger.debug(
+                "Using NLSQ warm-start",
+                n_initial_values=len(initial_values),
+            )
 
         # Get test_mode from data metadata if available
         test_mode = None
         if hasattr(self.data, "metadata") and self.data.metadata is not None:
             test_mode = self.data.metadata.get("test_mode")
 
-        # Run Bayesian inference with multi-chain parallelization
-        result = self._last_model.fit_bayesian(
-            X,
-            y,
-            test_mode=test_mode,
+        model_name = self._last_model.__class__.__name__
+
+        logger.debug(
+            "Starting Bayesian inference",
+            model=model_name,
             num_warmup=num_warmup,
             num_samples=num_samples,
             num_chains=num_chains,
-            initial_values=initial_values,
-            **nuts_kwargs,
+            test_mode=test_mode,
         )
+
+        # Run Bayesian inference with multi-chain parallelization
+        with log_bayesian(
+            logger,
+            model=model_name,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+        ) as ctx:
+            result = self._last_model.fit_bayesian(
+                X,
+                y,
+                test_mode=test_mode,
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                num_chains=num_chains,
+                initial_values=initial_values,
+                **nuts_kwargs,
+            )
+
+            # Add diagnostics to context
+            ctx["divergences"] = result.diagnostics.get("divergences", 0)
+            if "r_hat" in result.diagnostics:
+                r_hat_values = list(result.diagnostics["r_hat"].values())
+                ctx["r_hat_max"] = max(r_hat_values) if r_hat_values else None
+            if "ess" in result.diagnostics:
+                ess_values = list(result.diagnostics["ess"].values())
+                ctx["ess_min"] = min(ess_values) if ess_values else None
 
         # Store results
         self._bayesian_result = result
@@ -228,6 +289,14 @@ class BayesianPipeline(Pipeline):
                 num_warmup,
                 result.diagnostics.get("divergences", 0),
             )
+        )
+
+        logger.info(
+            "Bayesian inference completed",
+            model=model_name,
+            divergences=result.diagnostics.get("divergences", 0),
+            num_samples=num_samples,
+            num_chains=num_chains,
         )
 
         return self
@@ -254,8 +323,10 @@ class BayesianPipeline(Pipeline):
             >>> print(f"Divergences: {diagnostics['divergences']}")
         """
         if self._bayesian_result is None:
+            logger.error("No Bayesian result available for diagnostics")
             raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
 
+        logger.debug("Retrieving diagnostics", n_params=len(self._diagnostics))
         return self._diagnostics
 
     def get_posterior_summary(self) -> pd.DataFrame:
@@ -279,6 +350,7 @@ class BayesianPipeline(Pipeline):
             b    0.487   0.032     0.485     0.435     0.465     0.509     0.542
         """
         if self._bayesian_result is None:
+            logger.error("No Bayesian result available for posterior summary")
             raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
 
         # Convert summary dict to DataFrame
@@ -287,6 +359,7 @@ class BayesianPipeline(Pipeline):
             summary_data[param_name] = stats
 
         df = pd.DataFrame(summary_data).T
+        logger.debug("Posterior summary retrieved", n_parameters=len(df))
         return df
 
     def plot_posterior(
@@ -320,6 +393,7 @@ class BayesianPipeline(Pipeline):
             >>> pipeline.plot_posterior(show=False).save_figure('posterior.pdf')
         """
         if self._bayesian_result is None:
+            logger.error("No Bayesian result available for posterior plot")
             raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
 
         import matplotlib.pyplot as plt
@@ -329,6 +403,11 @@ class BayesianPipeline(Pipeline):
         # Determine which parameters to plot
         if param_name is not None:
             if param_name not in posterior_samples:
+                logger.error(
+                    "Parameter not found in posterior samples",
+                    param_name=param_name,
+                    available_params=list(posterior_samples.keys()),
+                )
                 raise ValueError(
                     f"Parameter '{param_name}' not found in posterior samples. "
                     f"Available parameters: {list(posterior_samples.keys())}"
@@ -336,6 +415,8 @@ class BayesianPipeline(Pipeline):
             params_to_plot = [param_name]
         else:
             params_to_plot = list(posterior_samples.keys())
+
+        logger.debug("Plotting posterior", params=params_to_plot)
 
         # Create subplots
         n_params = len(params_to_plot)
@@ -421,6 +502,7 @@ class BayesianPipeline(Pipeline):
             >>> pipeline.plot_trace(show=False).save_figure('trace.pdf')
         """
         if self._bayesian_result is None:
+            logger.error("No Bayesian result available for trace plot")
             raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
 
         import matplotlib.pyplot as plt
@@ -430,6 +512,11 @@ class BayesianPipeline(Pipeline):
         # Determine which parameters to plot
         if param_name is not None:
             if param_name not in posterior_samples:
+                logger.error(
+                    "Parameter not found in posterior samples",
+                    param_name=param_name,
+                    available_params=list(posterior_samples.keys()),
+                )
                 raise ValueError(
                     f"Parameter '{param_name}' not found in posterior samples. "
                     f"Available parameters: {list(posterior_samples.keys())}"
@@ -437,6 +524,8 @@ class BayesianPipeline(Pipeline):
             params_to_plot = [param_name]
         else:
             params_to_plot = list(posterior_samples.keys())
+
+        logger.debug("Plotting trace", params=params_to_plot)
 
         # Create subplots
         n_params = len(params_to_plot)
@@ -494,8 +583,10 @@ class BayesianPipeline(Pipeline):
             >>> idata = pipeline._get_inference_data()
         """
         if self._bayesian_result is None:
+            logger.error("No Bayesian result available for InferenceData conversion")
             raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
 
+        logger.debug("Converting Bayesian result to InferenceData")
         return self._bayesian_result.to_inference_data()
 
     def plot_pair(
@@ -548,9 +639,17 @@ class BayesianPipeline(Pipeline):
             - Funnel geometry (divergences concentrated in specific regions)
             - Multimodal posteriors (multiple clusters)
         """
+        logger.debug(
+            "Creating pair plot",
+            var_names=var_names,
+            kind=kind,
+            divergences=divergences,
+        )
+
         try:
             az = import_arviz(required=("plot_pair",))
         except ImportError as exc:
+            logger.error("ArviZ not installed for pair plot", exc_info=True)
             raise ImportError(
                 "ArviZ is required for pair plots. Install it with: pip install arviz"
             ) from exc
@@ -634,9 +733,17 @@ class BayesianPipeline(Pipeline):
             - Assessing parameter uncertainty
             - Identifying parameters with poor estimation (wide intervals)
         """
+        logger.debug(
+            "Creating forest plot",
+            var_names=var_names,
+            combined=combined,
+            hdi_prob=hdi_prob,
+        )
+
         try:
             az = import_arviz(required=("plot_forest",))
         except ImportError as exc:
+            logger.error("ArviZ not installed for forest plot", exc_info=True)
             raise ImportError(
                 "ArviZ is required for forest plots. Install it with: pip install arviz"
             ) from exc
@@ -706,9 +813,12 @@ class BayesianPipeline(Pipeline):
             - Problematic parameterizations
             Good NUTS sampling shows similar marginal and transition energy distributions.
         """
+        logger.debug("Creating energy plot")
+
         try:
             az = import_arviz(required=("plot_energy",))
         except ImportError as exc:
+            logger.error("ArviZ not installed for energy plot", exc_info=True)
             raise ImportError(
                 "ArviZ is required for energy plots. Install it with: pip install arviz"
             ) from exc
@@ -718,6 +828,7 @@ class BayesianPipeline(Pipeline):
 
         sample_stats = getattr(idata, "sample_stats", None)
         if sample_stats is None or not hasattr(sample_stats, "energy"):
+            logger.error("Energy diagnostic missing from InferenceData")
             raise RuntimeError(
                 "Energy diagnostic is missing from InferenceData.sample_stats. "
                 "Ensure NumPyro was run with NUTS and that energy/potential_energy "
@@ -792,9 +903,16 @@ class BayesianPipeline(Pipeline):
             - Chain length adequacy
             Goal: autocorrelation drops to ~0 within a few dozen lags.
         """
+        logger.debug(
+            "Creating autocorrelation plot",
+            var_names=var_names,
+            combined=combined,
+        )
+
         try:
             az = import_arviz(required=("plot_autocorr",))
         except ImportError as exc:
+            logger.error("ArviZ not installed for autocorrelation plot", exc_info=True)
             raise ImportError(
                 "ArviZ is required for autocorrelation plots. Install it with: pip install arviz"
             ) from exc
@@ -872,9 +990,12 @@ class BayesianPipeline(Pipeline):
             - Insufficient mixing (patterns in ranks)
             Goal: uniform histogram across all bins.
         """
+        logger.debug("Creating rank plot", var_names=var_names)
+
         try:
             az = import_arviz(required=("plot_rank",))
         except ImportError as exc:
+            logger.error("ArviZ not installed for rank plot", exc_info=True)
             raise ImportError(
                 "ArviZ is required for rank plots. Install it with: pip install arviz"
             ) from exc
@@ -955,9 +1076,16 @@ class BayesianPipeline(Pipeline):
             - Overall chain quality
             Goal: ESS > 400 for bulk and tail estimates.
         """
+        logger.debug(
+            "Creating ESS plot",
+            var_names=var_names,
+            kind=kind,
+        )
+
         try:
             az = import_arviz(required=("plot_ess",))
         except ImportError as exc:
+            logger.error("ArviZ not installed for ESS plot", exc_info=True)
             raise ImportError(
                 "ArviZ is required for ESS plots. Install it with: pip install arviz"
             ) from exc
@@ -1008,6 +1136,7 @@ class BayesianPipeline(Pipeline):
         self._nlsq_result = None
         self._bayesian_result = None
         self._diagnostics = None
+        logger.debug("BayesianPipeline reset")
         return self
 
     def __repr__(self) -> str:

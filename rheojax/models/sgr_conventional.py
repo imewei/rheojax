@@ -45,7 +45,6 @@ References:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -56,6 +55,7 @@ from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
+from rheojax.logging import get_logger, log_fit
 from rheojax.utils.sgr_kernels import G0, Gp
 
 # Safe JAX import (enforces float64)
@@ -66,8 +66,8 @@ if TYPE_CHECKING:  # pragma: no cover
 else:
     jnp_typing = np
 
-# Get module logger
-logger = logging.getLogger(__name__)
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("sgr_conventional")
@@ -261,26 +261,69 @@ class SGRConventional(BaseModel):
         if test_mode is None:
             raise ValueError("test_mode must be specified for SGR fitting")
 
-        # Store test mode for mode-aware Bayesian inference
-        self._test_mode = test_mode
+        with log_fit(logger, model="SGRConventional", data_shape=X.shape) as ctx:
+            try:
+                logger.info(
+                    "Starting SGR Conventional model fit",
+                    test_mode=test_mode,
+                    n_points=len(X),
+                    dynamic_x=self.dynamic_x,
+                )
 
-        # Route to appropriate fitting method
-        if test_mode == "oscillation":
-            self._fit_oscillation_mode(X, y, **kwargs)
-        elif test_mode == "relaxation":
-            self._fit_relaxation_mode(X, y, **kwargs)
-        elif test_mode == "creep":
-            self._fit_creep_mode(X, y, **kwargs)
-        elif test_mode == "steady_shear":
-            self._fit_steady_shear_mode(X, y, **kwargs)
-        elif test_mode == "laos":
-            self._fit_laos_mode(X, y, **kwargs)
-        else:
-            raise ValueError(
-                f"Unsupported test_mode: {test_mode}. "
-                f"SGR model supports 'oscillation', 'relaxation', 'creep', "
-                f"'steady_shear', and 'laos'."
-            )
+                logger.debug(
+                    "Input data statistics",
+                    x_range=(float(np.min(X)), float(np.max(X))),
+                    y_range=(float(np.min(np.abs(y))), float(np.max(np.abs(y)))),
+                )
+
+                # Store test mode for mode-aware Bayesian inference
+                self._test_mode = test_mode
+                ctx["test_mode"] = test_mode
+
+                # Route to appropriate fitting method
+                if test_mode == "oscillation":
+                    self._fit_oscillation_mode(X, y, **kwargs)
+                elif test_mode == "relaxation":
+                    self._fit_relaxation_mode(X, y, **kwargs)
+                elif test_mode == "creep":
+                    self._fit_creep_mode(X, y, **kwargs)
+                elif test_mode == "steady_shear":
+                    self._fit_steady_shear_mode(X, y, **kwargs)
+                elif test_mode == "laos":
+                    self._fit_laos_mode(X, y, **kwargs)
+                else:
+                    raise ValueError(
+                        f"Unsupported test_mode: {test_mode}. "
+                        f"SGR model supports 'oscillation', 'relaxation', 'creep', "
+                        f"'steady_shear', and 'laos'."
+                    )
+
+                # Log final parameters
+                x_val = self.parameters.get_value("x")
+                G0_val = self.parameters.get_value("G0")
+                tau0_val = self.parameters.get_value("tau0")
+
+                ctx["x"] = x_val
+                ctx["G0"] = G0_val
+                ctx["tau0"] = tau0_val
+                ctx["phase_regime"] = self.get_phase_regime()
+
+                logger.info(
+                    "SGR Conventional model fit completed",
+                    x=x_val,
+                    G0=G0_val,
+                    tau0=tau0_val,
+                    phase_regime=self.get_phase_regime(),
+                )
+
+            except Exception as e:
+                logger.error(
+                    "SGR Conventional model fit failed",
+                    test_mode=test_mode,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
     def _fit_oscillation_mode(
         self,

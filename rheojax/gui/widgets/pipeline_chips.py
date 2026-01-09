@@ -16,6 +16,9 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.state.store import PipelineStep, StepStatus
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PipelineChips(QWidget):
@@ -51,6 +54,7 @@ class PipelineChips(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         # Main horizontal layout
         layout = QHBoxLayout(self)
@@ -88,6 +92,7 @@ class PipelineChips(QWidget):
         self._spinner_timer.timeout.connect(self._update_spinner)
         self._spinner_timer.start(500)  # Update every 500ms
         self._spinner_state = 0
+        logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def _create_chip(self, step: PipelineStep, label: str) -> QPushButton:
         """Create a chip button for a pipeline step.
@@ -111,12 +116,28 @@ class PipelineChips(QWidget):
         chip.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         # Make clickable
-        chip.clicked.connect(lambda: self.step_clicked.emit(step))
+        chip.clicked.connect(lambda: self._on_chip_clicked(step))
 
         # Set initial status (pending)
         self._apply_chip_style(chip, StepStatus.PENDING)
 
         return chip
+
+    def _on_chip_clicked(self, step: PipelineStep) -> None:
+        """Handle chip click.
+
+        Parameters
+        ----------
+        step : PipelineStep
+            Clicked pipeline step
+        """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="chip_clicked",
+            step=step.name if hasattr(step, "name") else str(step),
+        )
+        self.step_clicked.emit(step)
 
     def _create_arrow(self) -> QLabel:
         """Create an arrow connector between chips.
@@ -148,11 +169,24 @@ class PipelineChips(QWidget):
         if step not in self._chips:
             return
 
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_step_status",
+            step=step.name if hasattr(step, "name") else str(step),
+            status=status.name if hasattr(status, "name") else str(status),
+        )
+
         chip = self._chips[step]
         self._apply_chip_style(chip, status)
 
     def reset_all(self) -> None:
         """Reset all chips to pending status."""
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="reset_all",
+        )
         for chip in self._chips.values():
             self._apply_chip_style(chip, StepStatus.PENDING)
 

@@ -16,7 +16,11 @@ from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import TransformRegistry
+from rheojax.logging import get_logger, log_transform
 from rheojax.utils.optimization import create_least_squares_objective, nlsq_optimize
+
+# Module logger
+logger = get_logger(__name__)
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -218,6 +222,12 @@ class Mastercurve(BaseTransform):
         perr : ndarray
             Parameter uncertainties (standard errors)
         """
+        logger.debug(
+            "Fitting power-law model",
+            n_points=len(x),
+            x_range=(float(x.min()), float(x.max())),
+        )
+
         # Create parameter set with reasonable bounds
         params = ParameterSet()
         params.add("a", value=1.0, bounds=(1e-10, 1e10))
@@ -247,9 +257,17 @@ class Mastercurve(BaseTransform):
                 perr = np.sqrt(np.diag(cov))
             except np.linalg.LinAlgError:
                 # Singular matrix, use large uncertainties
+                logger.debug("Jacobian singular, using large uncertainties")
                 perr = np.full(3, 1e6)
         else:
             perr = np.full(3, 1e6)
+
+        logger.debug(
+            "Power-law fit completed",
+            a=float(result.x[0]),
+            b=float(result.x[1]),
+            e=float(result.x[2]),
+        )
 
         return result.x, perr
 
@@ -397,15 +415,27 @@ class Mastercurve(BaseTransform):
             Cumulative log10 shift factors for all temperatures
         """
         n_temps = len(datasets)
+        logger.debug(
+            "Computing automatic shift factors",
+            n_temperatures=n_temps,
+            ref_temp_idx=ref_temp_idx,
+        )
+
         log_aT_array = np.zeros(n_temps)
 
         # Fit power-law to each curve with outlier detection
         power_law_params = []
         curves = []
 
-        for data in datasets:
+        for i, data in enumerate(datasets):
             x = np.asarray(data.x, dtype=np.float64)
             y = np.asarray(data.y, dtype=np.float64)
+
+            logger.debug(
+                "Fitting power-law for temperature curve",
+                curve_index=i,
+                n_points=len(x),
+            )
 
             # Fit power-law
             popt, perr = self._fit_power_law(x, y)
@@ -425,6 +455,12 @@ class Mastercurve(BaseTransform):
                 curves[i + 1], curves[i], power_law_params[i + 1], power_law_params[i]
             )
             log_aT_array[i] = log_aT_array[i + 1] + log_shift
+            logger.debug(
+                "Pairwise shift computed",
+                from_idx=i + 1,
+                to_idx=i,
+                log_shift=float(log_shift),
+            )
 
         # Sequential cumulative shifting above reference temperature
         for i in range(ref_temp_idx + 1, n_temps):
@@ -433,9 +469,20 @@ class Mastercurve(BaseTransform):
                 curves[i - 1], curves[i], power_law_params[i - 1], power_law_params[i]
             )
             log_aT_array[i] = log_aT_array[i - 1] + log_shift
+            logger.debug(
+                "Pairwise shift computed",
+                from_idx=i - 1,
+                to_idx=i,
+                log_shift=float(log_shift),
+            )
 
         # Store for later retrieval
         self._auto_shift_factors = log_aT_array
+
+        logger.debug(
+            "Auto shift factors computed",
+            shift_factors=log_aT_array.tolist(),
+        )
 
         return log_aT_array
 
@@ -682,12 +729,33 @@ class Mastercurve(BaseTransform):
         ValueError
             If temperature metadata is missing
         """
-        # Handle list of datasets (create mastercurve)
+        # Determine input shape for logging
         if isinstance(data, list):
-            return self.create_mastercurve(data, return_shifts=True)  # type: ignore[return-value]
+            input_shape = (len(data),)
+        else:
+            input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
 
-        # Handle single dataset
-        return self._transform_single(data)
+        with log_transform(
+            logger,
+            "mastercurve",
+            input_shape=input_shape,
+            method=self.method,
+            reference_temp=self.T_ref,
+            auto_shift=self._auto_shift,
+        ) as ctx:
+            # Handle list of datasets (create mastercurve)
+            if isinstance(data, list):
+                result = self.create_mastercurve(data, return_shifts=True)
+                if isinstance(result, tuple):
+                    mastercurve, shift_factors = result
+                    ctx["output_shape"] = (len(mastercurve.x),)
+                    ctx["n_temperatures"] = len(shift_factors)
+                return result  # type: ignore[return-value]
+
+            # Handle single dataset
+            result = self._transform_single(data)
+            ctx["output_shape"] = (len(result.x),)
+            return result
 
     def create_mastercurve(
         self, datasets: list[RheoData], merge: bool = True, return_shifts: bool = False
@@ -719,7 +787,17 @@ class Mastercurve(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
+        logger.debug(
+            "Creating mastercurve",
+            n_datasets=len(datasets),
+            merge=merge,
+            return_shifts=return_shifts,
+        )
+
         if return_shifts and not merge:
+            logger.error(
+                "Invalid configuration: return_shifts=True requires merge=True"
+            )
             raise ValueError("return_shifts=True requires merge=True")
 
         # Extract temperatures and sort datasets

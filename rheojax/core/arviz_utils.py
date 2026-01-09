@@ -7,6 +7,10 @@ import sys
 from collections.abc import Iterable
 from types import ModuleType
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def import_arviz(*, required: Iterable[str] | None = None) -> ModuleType:
     """Return the ArviZ module or raise ImportError/RuntimeError as needed.

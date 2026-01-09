@@ -17,6 +17,9 @@ from rheojax.io.readers._utils import (
     extract_unit_from_header,
     validate_transform,
 )
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def load_excel(
@@ -106,12 +109,16 @@ def load_excel(
     try:
         import pandas as pd
     except ImportError as exc:
+        logger.error("pandas not installed for Excel reading", exc_info=True)
         raise ImportError(
             "pandas is required for Excel reading. Install with: pip install pandas openpyxl"
         ) from exc
 
     filepath = Path(filepath)
+    logger.info("Opening file", filepath=str(filepath))
+
     if not filepath.exists():
+        logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
     # Validate y_col / y_cols mutual exclusivity
@@ -156,11 +163,15 @@ def load_excel(
 
     # Read Excel file
     try:
+        logger.debug("Reading Excel file", sheet=sheet)
         df = pd.read_excel(
             filepath, sheet_name=sheet, header=header, usecols=usecols, **kwargs
         )
     except Exception as e:
+        logger.error("Failed to parse Excel file", filepath=str(filepath), exc_info=True)
         raise ValueError(f"Failed to parse Excel file: {e}") from e
+
+    logger.debug("Excel file read successfully", n_rows=len(df), n_cols=len(df.columns))
 
     # Get column headers for detection
     x_header = _get_column_header(df, x_col)
@@ -169,6 +180,7 @@ def load_excel(
     try:
         x_data = _get_column_data(df, x_col)
     except (KeyError, IndexError) as e:
+        logger.error("X column not found", x_col=x_col, exc_info=True)
         raise KeyError(f"X column not found: {e}") from e
 
     # Extract y data (single column or complex modulus)
@@ -179,17 +191,20 @@ def load_excel(
             g_prime_data = _get_column_data(df, y_cols[0])
             g_double_prime_data = _get_column_data(df, y_cols[1])
         except (KeyError, IndexError) as e:
+            logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
 
         # Convert to float arrays before constructing complex modulus
         g_prime_data = np.array(g_prime_data, dtype=float)
         g_double_prime_data = np.array(g_double_prime_data, dtype=float)
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
+        logger.debug("Constructed complex modulus from G' and G''")
     else:
         y_headers = [_get_column_header(df, y_col)]
         try:
             y_data = _get_column_data(df, y_col)
         except (KeyError, IndexError) as e:
+            logger.error("Y column not found", y_col=y_col, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
 
     # Convert to numpy arrays and handle NaN
@@ -208,7 +223,10 @@ def load_excel(
     y_data = np.take(y_data, valid_idx)
 
     if len(x_data) == 0:
+        logger.error("No valid data points after removing NaN values", filepath=str(filepath))
         raise ValueError("No valid data points after removing NaN values")
+
+    logger.debug("Data points after NaN removal", n_points=len(x_data))
 
     # Auto-extract units from headers if not provided
     if x_units is None:
@@ -220,6 +238,7 @@ def load_excel(
     # Auto-detect domain if not provided
     if domain is None:
         domain = detect_domain(x_header, x_units, y_headers)
+        logger.debug("Auto-detected domain", domain=domain)
 
     # Auto-detect test mode if not provided
     detected_test_mode = None
@@ -230,6 +249,7 @@ def load_excel(
         # If y_cols provided, default to oscillation
         if detected_test_mode is None and is_complex:
             detected_test_mode = "oscillation"
+        logger.debug("Auto-detected test mode", test_mode=detected_test_mode)
     else:
         detected_test_mode = test_mode.lower()
 
@@ -264,6 +284,14 @@ def load_excel(
         )
         for msg in warning_messages:
             warnings.warn(msg, UserWarning, stacklevel=2)
+
+    logger.info(
+        "File parsed",
+        filepath=str(filepath),
+        n_records=len(x_data),
+        test_mode=detected_test_mode,
+        domain=domain,
+    )
 
     return RheoData(
         x=x_data,

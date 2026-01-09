@@ -31,6 +31,10 @@ from rheojax.core.data import RheoData
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("springpot")
@@ -106,6 +110,8 @@ class SpringPot(BaseModel):
             nlsq_optimize,
         )
 
+        import numpy as np
+
         # Handle RheoData input
         if isinstance(X, RheoData):
             rheo_data = X
@@ -119,49 +125,114 @@ class SpringPot(BaseModel):
 
         # Validate test mode
         if test_mode == TestMode.ROTATION:
+            logger.error(
+                "Invalid test mode for SpringPot",
+                test_mode="ROTATION",
+                supported_modes=["RELAXATION", "CREEP", "OSCILLATION"],
+            )
             raise ValueError(
                 "SpringPot model does not support steady shear (rotation) test mode"
             )
 
-        # Store test mode for model_function
-        self._test_mode = test_mode
+        # Determine test_mode string for logging
+        test_mode_str = test_mode.name if hasattr(test_mode, "name") else str(test_mode)
 
-        # Create objective function with stateless predictions
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            c_alpha, alpha = params[0], params[1]
+        # Convert to numpy for shape info
+        x_np = np.asarray(x_data)
 
-            # Direct prediction based on test mode (stateless)
-            if test_mode == TestMode.RELAXATION:
-                return self._predict_relaxation(x, c_alpha, alpha)
-            elif test_mode == TestMode.CREEP:
-                return self._predict_creep(x, c_alpha, alpha)
-            elif test_mode == TestMode.OSCILLATION:
-                return self._predict_oscillation(x, c_alpha, alpha)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
-
-        objective = create_least_squares_objective(
-            model_fn, x_data, y_data, normalize=True
-        )
-
-        # Optimize
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+        with log_fit(
+            logger,
+            self.__class__.__name__,
+            data_shape=x_np.shape,
+            test_mode=test_mode_str,
+        ) as ctx:
+            logger.debug(
+                "Processing input data",
+                x_range=(float(x_np.min()), float(x_np.max())),
+                y_range=(float(np.real(np.asarray(y_data)).min()), float(np.real(np.asarray(y_data)).max())),
+                is_complex=np.iscomplexobj(y_data),
             )
 
-        self.fitted_ = True
+            # Store test mode for model_function
+            self._test_mode = test_mode
+
+            # Create objective function with stateless predictions
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                c_alpha, alpha = params[0], params[1]
+
+                # Direct prediction based on test mode (stateless)
+                if test_mode == TestMode.RELAXATION:
+                    return self._predict_relaxation(x, c_alpha, alpha)
+                elif test_mode == TestMode.CREEP:
+                    return self._predict_creep(x, c_alpha, alpha)
+                elif test_mode == TestMode.OSCILLATION:
+                    return self._predict_oscillation(x, c_alpha, alpha)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
+
+            objective = create_least_squares_objective(
+                model_fn, x_data, y_data, normalize=True
+            )
+
+            logger.debug(
+                "Starting NLSQ optimization",
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+                use_jax=kwargs.get("use_jax", True),
+                c_alpha_init=self.parameters.get_value("c_alpha"),
+                alpha_init=self.parameters.get_value("alpha"),
+            )
+
+            # Optimize
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "Optimization failed",
+                    message=result.message,
+                    iterations=getattr(result, "nit", None),
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+
+            # Log fitted parameters
+            c_alpha_fitted = self.parameters.get_value("c_alpha")
+            alpha_fitted = self.parameters.get_value("alpha")
+
+            ctx["c_alpha"] = c_alpha_fitted
+            ctx["alpha"] = alpha_fitted
+            ctx["iterations"] = getattr(result, "nit", None)
+            ctx["cost"] = getattr(result, "fun", None)
+
+            logger.debug(
+                "Optimization completed successfully",
+                c_alpha=c_alpha_fitted,
+                alpha=alpha_fitted,
+                iterations=getattr(result, "nit", None),
+                final_cost=getattr(result, "fun", None),
+            )
+
         return self
 
     def _predict(self, X):

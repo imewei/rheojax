@@ -52,6 +52,9 @@ from rheojax.gui.state.store import (
 )
 from rheojax.gui.widgets.dataset_tree import DatasetTree
 from rheojax.gui.widgets.pipeline_chips import PipelineChips
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class RheoJAXMainWindow(QMainWindow):
@@ -100,6 +103,8 @@ class RheoJAXMainWindow(QMainWindow):
         """
         super().__init__(parent)
 
+        logger.debug("Initializing", class_name=self.__class__.__name__)
+
         self._start_maximized = start_maximized
 
         # Initialize state store
@@ -113,20 +118,24 @@ class RheoJAXMainWindow(QMainWindow):
         self._current_workflow_mode: WorkflowMode = WorkflowMode.FITTING
 
         # Setup UI components
+        logger.debug("Setting up UI components")
         self.setup_ui()
         self.setup_docks()
         self.setup_tabs()
 
         # Connect signals
+        logger.debug("Connecting signals")
         self.connect_signals()
         self._connect_state_signals()
         self._init_worker_pool()
 
         # Initial status
         self.status_bar.show_message("Ready", 3000)
+        logger.info("Application initialized", window_title=self.windowTitle())
 
     def setup_ui(self) -> None:
         """Create all UI elements."""
+        logger.debug("Setting up main UI elements")
         # Window properties
         self.setWindowTitle("RheoJAX - Rheological Analysis")
         if not getattr(self, "_start_maximized", False):
@@ -161,8 +170,11 @@ class RheoJAXMainWindow(QMainWindow):
         self._update_jax_status()
         self._setup_shortcuts()
 
+        logger.debug("UI setup complete")
+
     def setup_docks(self) -> None:
         """Create dock widgets for data panel and log panel."""
+        logger.debug("Setting up dock widgets")
         # Left dock: Data panel (project tree)
         self.data_dock = QDockWidget("Data", self)
         self.data_dock.setObjectName("DataDock")
@@ -185,6 +197,7 @@ class RheoJAXMainWindow(QMainWindow):
 
     def setup_tabs(self) -> None:
         """Create tab pages for main content area."""
+        logger.debug("Setting up tab pages")
         self.tabs = QTabWidget(self)
         # Enlarge tab font for visibility
         self.tabs.setStyleSheet(
@@ -217,6 +230,8 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Set initial visibility based on default mode
         self._update_tabs_visibility(self._current_workflow_mode)
+
+        logger.debug("Tab pages setup complete", tab_count=self.tabs.count())
 
     def _update_tabs_visibility(self, mode: WorkflowMode) -> None:
         """Update tab visibility based on workflow mode.
@@ -315,10 +330,13 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _init_worker_pool(self) -> None:
         """Create and connect WorkerPool if PySide6 is available."""
+        logger.debug("Initializing worker pool")
 
         try:
             self.worker_pool = WorkerPool.instance()
+            logger.debug("Worker pool initialized successfully")
         except Exception as exc:
+            logger.error("Worker pool initialization failed", error=str(exc), exc_info=True)
             self.log(f"Worker pool unavailable: {exc}")
             return
 
@@ -549,6 +567,9 @@ class RheoJAXMainWindow(QMainWindow):
         }
 
         if page_name.lower() in page_map:
+            from_page = self.tabs.tabText(self.tabs.currentIndex())
+            to_page = page_name.capitalize()
+            logger.debug("Page navigation", from_page=from_page, to_page=to_page)
             self.tabs.setCurrentIndex(page_map[page_name.lower()])
             self.store.dispatch("SET_TAB", {"tab": page_name.lower()})
             self.log(f"Navigated to {page_name.capitalize()} page")
@@ -571,6 +592,7 @@ class RheoJAXMainWindow(QMainWindow):
         event : QCloseEvent
             Close event
         """
+        logger.debug("Application shutting down")
         # Check for unsaved changes
         if self._has_unsaved_changes:
             reply = QMessageBox.question(
@@ -589,11 +611,13 @@ class RheoJAXMainWindow(QMainWindow):
             elif reply == QMessageBox.StandardButton.Discard:
                 event.accept()
             else:
+                logger.debug("Shutdown cancelled by user")
                 event.ignore()
                 return
 
         # Cleanup
         self.log("Shutting down...")
+        logger.info("Application shutdown complete")
         event.accept()
 
     @Slot()
@@ -633,6 +657,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_new_file(self) -> None:
         """Handle new file action."""
+        logger.debug("New file action triggered")
         if self._has_unsaved_changes:
             reply = QMessageBox.question(
                 self,
@@ -649,11 +674,13 @@ class RheoJAXMainWindow(QMainWindow):
 
         self.store.dispatch("NEW_PROJECT")
         self.log("Created new project")
+        logger.info("New project created")
         self.status_bar.show_message("New project created", 3000)
 
     @Slot()
     def _on_open_file(self) -> None:
         """Handle open file action."""
+        logger.debug("Open file action triggered")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open Project",
@@ -662,19 +689,23 @@ class RheoJAXMainWindow(QMainWindow):
         )
         if file_path:
             self.log(f"Opening project: {file_path}")
+            logger.info("Opening project", file_path=file_path)
             self.store.dispatch("LOAD_PROJECT", {"file_path": file_path})
             self.status_bar.show_message(f"Opened: {file_path}", 3000)
 
     @Slot()
     def _on_save_file(self) -> None:
         """Handle save file action."""
+        logger.debug("Save file action triggered")
         self.log("Saving project...")
+        logger.info("Project saved")
         self.status_bar.show_message("Project saved", 3000)
         self._has_unsaved_changes = False
 
     @Slot()
     def _on_save_as(self) -> None:
         """Handle save as action."""
+        logger.debug("Save as action triggered")
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Project As",
@@ -683,6 +714,7 @@ class RheoJAXMainWindow(QMainWindow):
         )
         if file_path:
             self.log(f"Saving project as: {file_path}")
+            logger.info("Project saved as", file_path=file_path)
             self.store.dispatch("SAVE_PROJECT", {"file_path": file_path})
             self.status_bar.show_message(f"Saved as: {file_path}", 3000)
             self._has_unsaved_changes = False
@@ -692,6 +724,7 @@ class RheoJAXMainWindow(QMainWindow):
         """Handle opening a recent project from the home page."""
         path = Path(project_path)
         if not path.exists():
+            logger.warning("Recent project not found", path=str(path))
             QMessageBox.warning(
                 self,
                 "Project Not Found",
@@ -700,6 +733,7 @@ class RheoJAXMainWindow(QMainWindow):
             return
 
         self.log(f"Opening recent project: {path}")
+        logger.info("Opening recent project", file_path=str(path))
         self.store.dispatch("LOAD_PROJECT", {"file_path": str(path)})
         self.navigate_to("data")
         self.status_bar.show_message(f"Opened: {path.name}", 3000)
@@ -710,6 +744,7 @@ class RheoJAXMainWindow(QMainWindow):
 
         Opens the corresponding notebook in Google Colab for interactive use.
         """
+        logger.debug("Opening example", example_name=example_name)
         # Map example names to their relative paths in the repository
         example_paths = {
             "oscillation": "examples/basic/02-zener-fitting.ipynb",
@@ -739,22 +774,26 @@ class RheoJAXMainWindow(QMainWindow):
         try:
             webbrowser.open(url)
             self.log(f"Opening example: {rel_path or example_name}")
+            logger.info("Example opened", example_name=example_name, url=url)
             self.status_bar.show_message(
                 f"Opening {example_name} example in Colab...", 2000
             )
-        except Exception:
+        except Exception as exc:
+            logger.error("Failed to open example", example_name=example_name, error=str(exc), exc_info=True)
             webbrowser.open(f"{GITHUB_BASE}/examples")
             self.log("Falling back to examples repository link")
 
     @Slot()
     def _on_import(self) -> None:
         """Handle import data action."""
+        logger.debug("Import action triggered")
         wizard = ImportWizard(self)
         if wizard.exec():
             config = wizard.get_result()
             # Pre-generate dataset_id for consistent state tracking
             config["dataset_id"] = str(uuid.uuid4())
             self.log(f"Importing data from: {config['file_path']}")
+            logger.info("Importing data", file_path=config['file_path'], dataset_id=config['dataset_id'])
             self.store.dispatch("IMPORT_DATA", config)
 
             # Perform the actual load immediately (synchronous import).
@@ -789,8 +828,10 @@ class RheoJAXMainWindow(QMainWindow):
                     },
                 )
                 self.navigate_to("data")
+                logger.info("Data import successful", dataset_id=config['dataset_id'], test_mode=test_mode)
                 self.status_bar.show_message("Data imported successfully", 3000)
             except Exception as exc:
+                logger.error("Import failed", error=str(exc), exc_info=True)
                 self.log(f"Import failed: {exc}")
                 self.store.dispatch("IMPORT_DATA_FAILED", {"error": str(exc), **config})
                 self.status_bar.show_message(f"Import failed: {exc}", 5000)
@@ -798,6 +839,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_export(self) -> None:
         """Handle export action."""
+        logger.debug("Export action triggered")
         self.log("Opening export page...")
         self.navigate_to("export")
         self.status_bar.show_message("Configure export options", 2000)
@@ -815,10 +857,12 @@ class RheoJAXMainWindow(QMainWindow):
                 )
                 if path:
                     ExportService().export_parameters(fit_result, path)
+                    logger.info("Fit parameters exported", path=path)
                     self.status_bar.show_message(
                         f"Exported fit parameters to {Path(path).name}", 3000
                     )
         except Exception as exc:
+            logger.error("Export not available", error=str(exc), exc_info=True)
             self.log(f"Export not available: {exc}")
 
     # -------------------------------------------------------------------------
@@ -828,6 +872,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_undo(self) -> None:
         """Handle undo action."""
+        logger.debug("Undo action triggered")
         self.store.dispatch("UNDO")
         self.log("Undo")
         self.status_bar.show_message("Undo", 2000)
@@ -835,6 +880,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_redo(self) -> None:
         """Handle redo action."""
+        logger.debug("Redo action triggered")
         self.store.dispatch("REDO")
         self.log("Redo")
         self.status_bar.show_message("Redo", 2000)
@@ -866,11 +912,13 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_preferences(self) -> None:
         """Handle preferences action."""
+        logger.debug("Preferences action triggered")
         dialog = PreferencesDialog(parent=self)
         if dialog.exec():
             prefs = dialog.get_preferences()
             self.store.dispatch("UPDATE_PREFERENCES", prefs)
             self.log("Preferences updated")
+            logger.info("Preferences updated")
             self.status_bar.show_message("Preferences saved", 3000)
 
     # -------------------------------------------------------------------------
@@ -906,12 +954,14 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_theme_changed(self, theme: str) -> None:
         """Handle theme change."""
+        logger.debug("Theme change requested", theme=theme)
         self.menu_bar.theme_light_action.setChecked(theme == "light")
         self.menu_bar.theme_dark_action.setChecked(theme == "dark")
         self.menu_bar.theme_auto_action.setChecked(theme == "auto")
         self.store.dispatch("SET_THEME", {"theme": theme})
         self._apply_theme(theme)
         self.log(f"Theme changed to: {theme}")
+        logger.info("Theme changed", theme=theme)
         self.status_bar.show_message(f"Theme: {theme.capitalize()}", 2000)
 
     def _apply_theme(self, theme: str) -> None:
@@ -924,6 +974,7 @@ class RheoJAXMainWindow(QMainWindow):
         try:
             app.setStyleSheet(load_stylesheet(chosen))
         except Exception as exc:  # pragma: no cover - GUI runtime
+            logger.error("Failed to apply theme", theme=theme, error=str(exc), exc_info=True)
             self.log(f"Failed to apply theme {theme}: {exc}")
         else:
             # Persist theme selection into state
@@ -966,16 +1017,19 @@ class RheoJAXMainWindow(QMainWindow):
             try:
                 self.data_page.show_dataset(dataset_id)
             except Exception as exc:
+                logger.error("Could not update Data page preview", error=str(exc), exc_info=True)
                 self.log(f"Could not update Data page preview: {exc}")
 
     @Slot(str)
     def _on_dataset_selected(self, dataset_id: str) -> None:
         """Update active dataset when selected from tree."""
+        logger.debug("Dataset selected", dataset_id=dataset_id)
 
         self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})
         try:
             self.data_page.show_dataset(dataset_id)
         except Exception as exc:
+            logger.error("Could not update Data page preview", error=str(exc), exc_info=True)
             self.log(f"Could not update Data page preview: {exc}")
 
     # ------------------------------------------------------------------
@@ -983,6 +1037,7 @@ class RheoJAXMainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_job_started(self, job_id: str) -> None:
+        logger.debug("Job started", job_id=job_id)
         job_type = self._job_types.get(job_id, "")
         if job_type:
             step = "fit" if job_type == "fit" else "bayesian"
@@ -1012,6 +1067,7 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_job_completed(self, job_id: str, result: object) -> None:
         job_type = self._job_types.pop(job_id, "")
+        logger.info("Job completed", job_id=job_id, job_type=job_type)
         self.status_bar.hide_progress()
         if job_type == "fit":
             # Persist result in state and refresh UI
@@ -1054,6 +1110,7 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_job_failed(self, job_id: str, error: str) -> None:
         job_type = self._job_types.pop(job_id, "")
+        logger.error("Job failed", job_id=job_id, job_type=job_type, error=error)
         self.status_bar.hide_progress()
         if job_type:
             self.store.dispatch(
@@ -1066,6 +1123,7 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_job_cancelled(self, job_id: str) -> None:
         job_type = self._job_types.pop(job_id, "")
+        logger.info("Job cancelled", job_id=job_id, job_type=job_type)
         self.status_bar.hide_progress()
         if job_type:
             self.store.dispatch(
@@ -1115,6 +1173,7 @@ class RheoJAXMainWindow(QMainWindow):
                     ),
                 )
         except Exception as exc:
+            logger.error("Failed to update fit plot", error=str(exc), exc_info=True)
             self.log(f"Failed to update fit plot: {exc}")
 
     # -------------------------------------------------------------------------
@@ -1124,11 +1183,13 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_new_dataset(self) -> None:
         """Handle new dataset action."""
+        logger.debug("New dataset action triggered")
         self._on_import()
 
     @Slot()
     def _on_delete_dataset(self) -> None:
         """Handle delete dataset action."""
+        logger.debug("Delete dataset action triggered")
         reply = QMessageBox.question(
             self,
             "Delete Dataset",
@@ -1139,10 +1200,12 @@ class RheoJAXMainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             self.store.dispatch("DELETE_SELECTED_DATASET")
             self.log("Dataset deleted")
+            logger.info("Dataset deleted")
             self.status_bar.show_message("Dataset deleted", 3000)
 
     def _on_set_test_mode(self, mode: str) -> None:
         """Handle set test mode action."""
+        logger.debug("Test mode set", mode=mode)
         self.store.dispatch("SET_TEST_MODE", {"test_mode": mode})
         self.log(f"Test mode set to: {mode}")
         self.status_bar.show_message(f"Test mode: {mode}", 2000)
@@ -1150,6 +1213,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_auto_detect_mode(self) -> None:
         """Handle auto-detect test mode action."""
+        logger.debug("Auto-detect test mode action triggered")
         self.store.dispatch("AUTO_DETECT_TEST_MODE")
         # Refresh the Data page preview with any inferred mode
         active = self.store.get_state().active_dataset_id
@@ -1157,10 +1221,12 @@ class RheoJAXMainWindow(QMainWindow):
             try:
                 self.data_page.show_dataset(active)
                 inferred_mode = self.store.get_state().datasets.get(active).test_mode
+                logger.info("Auto-detected test mode", mode=inferred_mode)
                 self.status_bar.show_message(
                     f"Auto-detected test mode: {inferred_mode}", 2500
                 )
             except Exception as exc:
+                logger.error("Auto-detect test mode failed", error=str(exc), exc_info=True)
                 self.log(f"Auto-detect test mode failed: {exc}")
                 self.status_bar.show_message("Auto-detect test mode failed", 2500)
         else:
@@ -1172,12 +1238,14 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_select_model(self, model_id: str) -> None:
         """Handle model selection."""
+        logger.debug("Model selected", model_id=model_id)
         from rheojax.gui.services.model_service import normalize_model_name
 
         normalized = normalize_model_name(model_id)
         self.store.dispatch("SET_ACTIVE_MODEL", {"model_name": normalized})
         self.navigate_to("fit")
         self.log(f"Selected model: {normalized}")
+        logger.info("Model selection changed", model_name=normalized)
         self.status_bar.show_message(f"Model: {normalized}", 2000)
 
     @Slot(str)
@@ -1200,6 +1268,7 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _open_command_palette(self) -> None:
         """Simple command palette to trigger common actions."""
+        logger.debug("Command palette opened")
         actions: dict[str, callable] = {
             "Open Project": self._on_open_file,
             "Import Data": self._on_import,
@@ -1218,6 +1287,7 @@ class RheoJAXMainWindow(QMainWindow):
             self, "Command Palette", "Action:", labels, 0, False
         )
         if ok and selected in actions:
+            logger.debug("Command palette action selected", action=selected)
             actions[selected]()
 
     # -------------------------------------------------------------------------
@@ -1228,6 +1298,7 @@ class RheoJAXMainWindow(QMainWindow):
         self, transform_id: str, params: dict | None = None
     ) -> None:
         """Handle transform application."""
+        logger.debug("Transform requested", transform_id=transform_id)
         self.store.dispatch("APPLY_TRANSFORM", {"transform_id": transform_id})
         dataset = self.store.get_active_dataset()
         if dataset is None:
@@ -1273,10 +1344,12 @@ class RheoJAXMainWindow(QMainWindow):
                 },
             )
             self.store.dispatch("TRANSFORM_COMPLETED", {"transform_id": transform_id})
+            logger.info("Transform applied", transform_id=transform_id, new_dataset_id=new_id)
             self.status_bar.show_message(f"Transform applied: {transform_id}", 2000)
             self.log(f"Applied transform {transform_id} -> dataset {new_id}")
             self.navigate_to("transform")
         except Exception as exc:
+            logger.error("Transform failed", transform_id=transform_id, error=str(exc), exc_info=True)
             self.store.dispatch(
                 "SET_PIPELINE_STEP", {"step": "transform", "status": "ERROR"}
             )
@@ -1310,6 +1383,7 @@ class RheoJAXMainWindow(QMainWindow):
         use the centralized WorkerPool/job pipeline and always run
         `_update_fit_plot` on completion.
         """
+        logger.debug("Fit requested from page")
 
         if not isinstance(payload, dict):
             return
@@ -1346,6 +1420,7 @@ class RheoJAXMainWindow(QMainWindow):
                 validate=False,
             )
         except Exception as exc:
+            logger.error("Cannot start fit: failed to build RheoData", error=str(exc), exc_info=True)
             self.log(f"Cannot start fit: {exc}")
             self.status_bar.show_message("Unable to build dataset for fit", 4000)
             return
@@ -1413,7 +1488,9 @@ class RheoJAXMainWindow(QMainWindow):
                 worker,
                 on_job_registered=lambda jid: self._job_types.__setitem__(jid, "fit"),
             )
+            logger.info("Fit job submitted", job_id=job_id, model_name=model_name)
         except Exception as exc:
+            logger.error("Fit job submission failed", error=str(exc), exc_info=True)
             self.status_bar.hide_progress()
             self.store.dispatch("FITTING_FAILED", {"error": str(exc)})
             self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ERROR"})
@@ -1430,6 +1507,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_fit(self) -> None:
         """Handle fit action."""
+        logger.debug("Fit action triggered")
         self.log("Starting NLSQ fit...")
         self.navigate_to("fit")
         self._on_fit_requested_from_page({})
@@ -1437,6 +1515,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_bayesian(self) -> None:
         """Handle bayesian fit action."""
+        logger.debug("Bayesian action triggered")
         self.log("Starting Bayesian inference...")
         self.navigate_to("bayesian")
 
@@ -1458,6 +1537,7 @@ class RheoJAXMainWindow(QMainWindow):
                 initial_test_mode=dataset.test_mode,
             )
         except Exception as exc:
+            logger.error("Cannot start Bayesian: failed to build RheoData", error=str(exc), exc_info=True)
             self.log(f"Cannot start Bayesian: {exc}")
             self.status_bar.show_message("Unable to build dataset for Bayesian", 4000)
             return
@@ -1477,11 +1557,13 @@ class RheoJAXMainWindow(QMainWindow):
             worker,
             on_job_registered=lambda jid: self._job_types.__setitem__(jid, "bayesian"),
         )
+        logger.info("Bayesian job submitted", job_id=job_id, model_name=model_name)
         self._on_job_started(job_id)
 
     @Slot()
     def _on_show_diagnostics(self) -> None:
         """Navigate to diagnostics and refresh the current model plots."""
+        logger.debug("Show diagnostics action triggered")
         self.navigate_to("diagnostics")
         state = self.store.get_state()
         model_name = state.active_model_name
@@ -1504,6 +1586,7 @@ class RheoJAXMainWindow(QMainWindow):
         model_id : str
             Model name/ID
         """
+        logger.debug("Diagnostics plot requested", plot_type=plot_type, model_id=model_id)
         self.log(f"Diagnostics: generating {plot_type} plot for {model_id}")
         self.status_bar.show_message(f"Generating {plot_type} plot...", 2000)
 
@@ -1516,6 +1599,7 @@ class RheoJAXMainWindow(QMainWindow):
         plot_type : str
             Type of plot being exported
         """
+        logger.debug("Diagnostics export requested", plot_type=plot_type)
         self.log(f"Diagnostics: exporting {plot_type} plot")
         self.status_bar.show_message(f"Exporting {plot_type} plot...", 2000)
 
@@ -1529,6 +1613,7 @@ class RheoJAXMainWindow(QMainWindow):
             Export configuration
         """
         output_dir = config.get("output_dir", "")
+        logger.debug("Export requested", output_dir=output_dir)
         self.log(f"Export: starting export to {output_dir}")
         self.status_bar.show_message("Export in progress...", 0)
 
@@ -1541,6 +1626,7 @@ class RheoJAXMainWindow(QMainWindow):
         output_path : str
             Path where files were exported
         """
+        logger.info("Export completed", output_path=output_path)
         self.log(f"Export: completed to {output_path}")
         self.status_bar.show_message(f"Export completed: {output_path}", 5000)
 
@@ -1553,12 +1639,14 @@ class RheoJAXMainWindow(QMainWindow):
         error_msg : str
             Error message
         """
+        logger.error("Export failed", error=error_msg)
         self.log(f"Export: failed - {error_msg}")
         self.status_bar.show_message(f"Export failed: {error_msg}", 5000)
 
     @Slot()
     def _on_batch_fit(self) -> None:
         """Handle batch fit action."""
+        logger.debug("Batch fit action triggered")
         self.log("Opening batch fit dialog...")
         self.navigate_to("fit")
         self.status_bar.show_message("Batch fit: select datasets", 2000)
@@ -1566,6 +1654,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_compare_models(self) -> None:
         """Handle compare models action."""
+        logger.debug("Compare models action triggered")
         self.log("Opening model comparison...")
         self.navigate_to("diagnostics")
         self.status_bar.show_message("Model comparison", 2000)
@@ -1573,6 +1662,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_check_compatibility(self) -> None:
         """Handle compatibility check action."""
+        logger.debug("Compatibility check action triggered")
         self.store.dispatch("CHECK_COMPATIBILITY")
         self.log("Checking model-data compatibility...")
         self.status_bar.show_message("Checking compatibility...", 2000)
@@ -1580,6 +1670,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_stop(self) -> None:
         """Handle stop action."""
+        logger.debug("Stop action triggered")
         self.store.dispatch("CANCEL_JOBS")
         self.log("Stopping current operation...")
         if self.worker_pool:
@@ -1593,18 +1684,21 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_python_console(self) -> None:
         """Handle Python console action."""
+        logger.debug("Python console action triggered")
         self.log("Python console not yet implemented")
         self.status_bar.show_message("Python console (coming soon)", 3000)
 
     @Slot()
     def _on_jax_profiler(self) -> None:
         """Handle JAX profiler action."""
+        logger.debug("JAX profiler action triggered")
         self.log("JAX profiler not yet implemented")
         self.status_bar.show_message("JAX profiler (coming soon)", 3000)
 
     @Slot()
     def _on_memory_monitor(self) -> None:
         """Handle memory monitor action."""
+        logger.debug("Memory monitor action triggered")
         self.log("Memory monitor not yet implemented")
         self.status_bar.show_message("Memory monitor (coming soon)", 3000)
 
@@ -1615,6 +1709,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_open_docs(self) -> None:
         """Handle open documentation action."""
+        logger.debug("Open docs action triggered")
         webbrowser.open("https://rheojax.readthedocs.io")
         self.log("Opening documentation in browser")
         self.status_bar.show_message("Opening documentation...", 2000)
@@ -1622,6 +1717,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_open_tutorials(self) -> None:
         """Handle open tutorials action."""
+        logger.debug("Open tutorials action triggered")
         webbrowser.open("https://rheojax.readthedocs.io/en/latest/tutorials/")
         self.log("Opening tutorials in browser")
         self.status_bar.show_message("Opening tutorials...", 2000)
@@ -1629,6 +1725,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_show_shortcuts(self) -> None:
         """Handle show shortcuts action."""
+        logger.debug("Show shortcuts action triggered")
         shortcuts = """
 <h3>Keyboard Shortcuts</h3>
 <table>
@@ -1655,6 +1752,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_about(self) -> None:
         """Handle about action."""
+        logger.debug("About action triggered")
         dialog = AboutDialog(self)
         dialog.exec()
         self.log("Displayed About dialog")
@@ -1682,7 +1780,9 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.update_jax_status(
                 device_name, memory_used, memory_total, float64_enabled
             )
+            logger.debug("JAX status updated", device=device_name, float64=float64_enabled)
         except Exception as e:
+            logger.error("Failed to update JAX status", error=str(e), exc_info=True)
             self.log(f"Failed to update JAX status: {e}")
 
     def _auto_save_if_enabled(self) -> None:
@@ -1691,6 +1791,7 @@ class RheoJAXMainWindow(QMainWindow):
             state = self.store.get_state()
             if state.auto_save_enabled and state.project_path:
                 project_path = state.project_path
+                logger.debug("Auto-saving project", path=str(project_path))
                 self.store.dispatch("SAVE_PROJECT", {"file_path": str(project_path)})
 
                 # Export artifacts: parameters, plot, and Bayesian posterior if available
@@ -1710,6 +1811,7 @@ class RheoJAXMainWindow(QMainWindow):
                         try:
                             export_service.export_parameters(fit_result, params_path)
                         except Exception as exc:
+                            logger.error("Auto-export params failed", error=str(exc), exc_info=True)
                             self.log(f"Auto-export params failed: {exc}")
 
                         try:
@@ -1731,6 +1833,7 @@ class RheoJAXMainWindow(QMainWindow):
                                 )
                                 export_service.export_figure(fig, fig_path)
                         except Exception as exc:
+                            logger.error("Auto-export plot failed", error=str(exc), exc_info=True)
                             self.log(f"Auto-export plot failed: {exc}")
 
                     if bayes_result:
@@ -1741,6 +1844,7 @@ class RheoJAXMainWindow(QMainWindow):
                         try:
                             export_service.export_posterior(bayes_result, post_path)
                         except Exception as exc:
+                            logger.error("Auto-export posterior failed", error=str(exc), exc_info=True)
                             self.log(f"Auto-export posterior failed: {exc}")
                         try:
                             fig = plot_service.create_arviz_plot(
@@ -1748,6 +1852,7 @@ class RheoJAXMainWindow(QMainWindow):
                             )
                             export_service.export_figure(fig, diag_path)
                         except Exception as exc:
+                            logger.error("Auto-export diagnostics failed", error=str(exc), exc_info=True)
                             self.log(f"Auto-export diagnostics failed: {exc}")
                         try:
                             fig = plot_service.create_arviz_plot(
@@ -1755,6 +1860,7 @@ class RheoJAXMainWindow(QMainWindow):
                             )
                             export_service.export_figure(fig, forest_path)
                         except Exception as exc:
+                            logger.error("Auto-export forest failed", error=str(exc), exc_info=True)
                             self.log(f"Auto-export forest failed: {exc}")
                         try:
                             fig = plot_service.create_arviz_plot(
@@ -1762,8 +1868,11 @@ class RheoJAXMainWindow(QMainWindow):
                             )
                             export_service.export_figure(fig, energy_path)
                         except Exception as exc:
+                            logger.error("Auto-export energy failed", error=str(exc), exc_info=True)
                             self.log(f"Auto-export energy failed: {exc}")
 
+                logger.info("Auto-save completed", path=str(project_path))
                 self.status_bar.show_message(f"Auto-saved to {project_path.name}", 2000)
         except Exception as exc:
+            logger.error("Auto-save skipped", error=str(exc), exc_info=True)
             self.log(f"Auto-save skipped: {exc}")

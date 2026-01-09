@@ -42,6 +42,7 @@ References
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger, log_fit
 from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
@@ -51,6 +52,9 @@ from rheojax.core.base import BaseModel
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("fractional_kv_zener")
@@ -318,65 +322,107 @@ class FractionalKelvinVoigtZener(BaseModel):
         # Store test mode for model_function
         self._test_mode = test_mode
 
-        # Smart initialization for oscillation mode (Issue #9)
-        if test_mode == TestMode.OSCILLATION:
-            try:
-                import numpy as np
+        # Determine data shape for logging
+        data_shape = (len(X),) if hasattr(X, "__len__") else None
 
-                from rheojax.utils.initialization import initialize_fractional_kv_zener
-
-                success = initialize_fractional_kv_zener(
-                    np.array(X), np.array(y), self.parameters
-                )
-                if success:
-                    import logging
-
-                    logging.debug(
-                        "Smart initialization applied from frequency-domain features"
-                    )
-            except Exception as e:
-                # Silent fallback to defaults - don't break if initialization fails
-                import logging
-
-                logging.debug(f"Smart initialization failed, using defaults: {e}")
-
-        # Create stateless model function for optimization
-        def model_fn(x, params):
-            """Model function for optimization (stateless)."""
-            Ge, Gk, alpha, tau = params[0], params[1], params[2], params[3]
-
-            # Direct prediction based on test mode (stateless)
-            if test_mode == TestMode.RELAXATION:
-                return self._predict_relaxation(x, Ge, Gk, alpha, tau)
-            elif test_mode == TestMode.CREEP:
-                return self._predict_creep(x, Ge, Gk, alpha, tau)
-            elif test_mode == TestMode.OSCILLATION:
-                return self._predict_oscillation(x, Ge, Gk, alpha, tau)
-            else:
-                raise ValueError(f"Unsupported test mode: {test_mode}")
-
-        # Create objective function
-        objective = create_least_squares_objective(
-            model_fn, jnp.array(X), jnp.array(y), normalize=True
-        )
-
-        # Optimize using NLSQ TRF
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
-            max_iter=kwargs.get("max_iter", 1000),
-        )
-
-        # Validate optimization succeeded
-        if not result.success:
-            raise RuntimeError(
-                f"Optimization failed: {result.message}. "
-                f"Try adjusting initial values, bounds, or max_iter."
+        with log_fit(
+            logger,
+            model="FractionalKelvinVoigtZener",
+            data_shape=data_shape,
+            test_mode=test_mode_str if isinstance(test_mode_str, str) else str(test_mode),
+        ) as ctx:
+            logger.debug(
+                "Starting FKVZ fit",
+                n_points=len(X) if hasattr(X, "__len__") else 1,
+                test_mode=str(test_mode),
+                initial_params=self.parameters.to_dict(),
             )
 
-        self.fitted_ = True
+            # Smart initialization for oscillation mode (Issue #9)
+            if test_mode == TestMode.OSCILLATION:
+                try:
+                    import numpy as np
+
+                    from rheojax.utils.initialization import initialize_fractional_kv_zener
+
+                    success = initialize_fractional_kv_zener(
+                        np.array(X), np.array(y), self.parameters
+                    )
+                    if success:
+                        logger.debug(
+                            "Smart initialization applied from frequency-domain features",
+                            initialized_params=self.parameters.to_dict(),
+                        )
+                except Exception as e:
+                    logger.debug(
+                        "Smart initialization failed, using defaults",
+                        error=str(e),
+                    )
+
+            # Create stateless model function for optimization
+            def model_fn(x, params):
+                """Model function for optimization (stateless)."""
+                Ge, Gk, alpha, tau = params[0], params[1], params[2], params[3]
+
+                # Direct prediction based on test mode (stateless)
+                if test_mode == TestMode.RELAXATION:
+                    return self._predict_relaxation(x, Ge, Gk, alpha, tau)
+                elif test_mode == TestMode.CREEP:
+                    return self._predict_creep(x, Ge, Gk, alpha, tau)
+                elif test_mode == TestMode.OSCILLATION:
+                    return self._predict_oscillation(x, Ge, Gk, alpha, tau)
+                else:
+                    raise ValueError(f"Unsupported test mode: {test_mode}")
+
+            # Create objective function
+            logger.debug("Creating least squares objective", normalize=True)
+            objective = create_least_squares_objective(
+                model_fn, jnp.array(X), jnp.array(y), normalize=True
+            )
+
+            # Optimize using NLSQ TRF
+            logger.debug(
+                "Starting NLSQ optimization",
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # Validate optimization succeeded
+            if not result.success:
+                logger.error(
+                    "Optimization failed",
+                    message=result.message,
+                    final_params=self.parameters.to_dict(),
+                )
+                raise RuntimeError(
+                    f"Optimization failed: {result.message}. "
+                    f"Try adjusting initial values, bounds, or max_iter."
+                )
+
+            self.fitted_ = True
+            ctx["final_params"] = self.parameters.to_dict()
+            ctx["success"] = True
+            logger.debug(
+                "FKVZ fit completed successfully",
+                final_params=self.parameters.to_dict(),
+            )
+
         return self
 
     def _predict(self, X: jnp.ndarray) -> jnp.ndarray:

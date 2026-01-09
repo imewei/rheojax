@@ -7,6 +7,10 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.logging import get_logger, log_io
+
+logger = get_logger(__name__)
+
 
 def save_excel(
     results: dict[str, Any], filepath: str | Path, include_plots: bool = False, **kwargs
@@ -37,6 +41,12 @@ def save_excel(
     try:
         import pandas as pd
     except ImportError as exc:
+        logger.error(
+            "pandas import failed",
+            error_type="ImportError",
+            suggestion="pip install pandas openpyxl",
+            exc_info=True,
+        )
         raise ImportError(
             "pandas is required for Excel writing. Install with: pip install pandas openpyxl"
         ) from exc
@@ -44,31 +54,70 @@ def save_excel(
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create Excel writer
-    with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
-        # Write parameters sheet
-        if "parameters" in results:
-            params_df = _create_parameters_dataframe(results["parameters"])
-            params_df.to_excel(writer, sheet_name="Parameters", index=False)
+    with log_io(logger, "write", filepath=str(filepath)) as ctx:
+        sheets_written = []
 
-        # Write fit quality sheet
-        if "fit_quality" in results:
-            quality_df = _create_quality_dataframe(results["fit_quality"])
-            quality_df.to_excel(writer, sheet_name="Fit Quality", index=False)
+        # Create Excel writer
+        with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+            # Write parameters sheet
+            if "parameters" in results:
+                logger.debug(
+                    "Creating parameters dataframe",
+                    num_parameters=len(results["parameters"]),
+                )
+                params_df = _create_parameters_dataframe(results["parameters"])
+                params_df.to_excel(writer, sheet_name="Parameters", index=False)
+                sheets_written.append("Parameters")
+                logger.debug("Parameters sheet written", rows=len(params_df))
 
-        # Write predictions sheet
-        if "predictions" in results:
-            pred_df = _create_predictions_dataframe(results["predictions"])
-            pred_df.to_excel(writer, sheet_name="Predictions", index=False)
+            # Write fit quality sheet
+            if "fit_quality" in results:
+                logger.debug(
+                    "Creating fit quality dataframe",
+                    num_metrics=len(results["fit_quality"]),
+                )
+                quality_df = _create_quality_dataframe(results["fit_quality"])
+                quality_df.to_excel(writer, sheet_name="Fit Quality", index=False)
+                sheets_written.append("Fit Quality")
+                logger.debug("Fit Quality sheet written", rows=len(quality_df))
 
-        # Write residuals sheet
-        if "residuals" in results:
-            resid_df = _create_residuals_dataframe(results["residuals"])
-            resid_df.to_excel(writer, sheet_name="Residuals", index=False)
+            # Write predictions sheet
+            if "predictions" in results:
+                logger.debug(
+                    "Creating predictions dataframe",
+                    num_predictions=len(results["predictions"]),
+                )
+                pred_df = _create_predictions_dataframe(results["predictions"])
+                pred_df.to_excel(writer, sheet_name="Predictions", index=False)
+                sheets_written.append("Predictions")
+                logger.debug("Predictions sheet written", rows=len(pred_df))
 
-        # Embed plots if requested
-        if include_plots and "plots" in results:
-            _embed_plots(writer, results["plots"])
+            # Write residuals sheet
+            if "residuals" in results:
+                logger.debug(
+                    "Creating residuals dataframe",
+                    num_residuals=len(results["residuals"]),
+                )
+                resid_df = _create_residuals_dataframe(results["residuals"])
+                resid_df.to_excel(writer, sheet_name="Residuals", index=False)
+                sheets_written.append("Residuals")
+                logger.debug("Residuals sheet written", rows=len(resid_df))
+
+            # Embed plots if requested
+            if include_plots and "plots" in results:
+                logger.debug(
+                    "Embedding plots",
+                    num_plots=len(results["plots"]),
+                )
+                _embed_plots(writer, results["plots"])
+                sheets_written.extend(
+                    [f"Plot_{name[:25]}" for name in results["plots"].keys()]
+                )
+                logger.debug("Plots embedded", plot_names=list(results["plots"].keys()))
+
+        ctx["sheets_written"] = sheets_written
+        ctx["num_sheets"] = len(sheets_written)
+        ctx["include_plots"] = include_plots
 
 
 def _create_parameters_dataframe(parameters: dict[str, Any]) -> Any:
@@ -184,6 +233,10 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
     try:
         from openpyxl.drawing.image import Image as XLImage
     except ImportError:
+        logger.debug(
+            "openpyxl.drawing.image not available, skipping plot embedding",
+            reason="ImportError",
+        )
         # openpyxl not available, skip plot embedding
         return
 
@@ -192,6 +245,11 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
     for plot_name, fig in plots.items():
         # Create sheet for this plot
         sheet_name = f"Plot_{plot_name[:25]}"  # Excel sheet name limit
+        logger.debug(
+            "Embedding plot",
+            plot_name=plot_name,
+            sheet_name=sheet_name,
+        )
         if sheet_name not in workbook.sheetnames:
             workbook.create_sheet(sheet_name)
         sheet = workbook[sheet_name]
@@ -200,6 +258,11 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
         buf.seek(0)
+        logger.debug(
+            "Plot saved to buffer",
+            plot_name=plot_name,
+            buffer_size=buf.getbuffer().nbytes,
+        )
 
         # Create and add image to sheet
         img = XLImage(buf)

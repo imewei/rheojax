@@ -9,17 +9,18 @@ due to physics mismatch rather than optimization issues.
 
 from __future__ import annotations
 
-import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from scipy.stats import linregress
 
+from rheojax.logging import get_logger
+
 if TYPE_CHECKING:
     from rheojax.core.base import BaseModel
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DecayType(Enum):
@@ -62,12 +63,23 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     DecayType
         Detected decay type
     """
+    logger.debug(
+        "Detecting decay type",
+        n_points=len(t),
+        t_range=(float(t.min()), float(t.max())) if len(t) > 0 else (0, 0),
+    )
+
     if len(t) < 10 or len(G_t) < 10:
+        logger.debug("Insufficient data points for decay detection", n_points=len(t))
         return DecayType.UNKNOWN
 
     # Remove any invalid values
     valid = np.isfinite(t) & np.isfinite(G_t) & (t > 0) & (G_t > 0)
     if np.sum(valid) < 10:
+        logger.debug(
+            "Insufficient valid data points after filtering",
+            n_valid=int(np.sum(valid)),
+        )
         return DecayType.UNKNOWN
 
     t = t[valid]
@@ -79,21 +91,35 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     G_t = G_t[sort_idx]
 
     # 1. Check for exponential decay: log(G) vs t should be linear
+    slope_exp = 0.0
     try:
         log_G = np.log(G_t)
         slope_exp, intercept_exp, r_exp, _, _ = linregress(t, log_G)
         r_exp_sq = r_exp**2
-    except (ValueError, RuntimeWarning):
+        logger.debug(
+            "Exponential fit",
+            r_squared=float(r_exp_sq),
+            slope=float(slope_exp),
+        )
+    except (ValueError, RuntimeWarning) as e:
         r_exp_sq = 0.0
+        logger.debug("Exponential fit failed", error=str(e))
 
     # 2. Check for power-law decay: log(G) vs log(t) should be linear
+    slope_pow = 0.0
     try:
         log_t = np.log(t)
         log_G = np.log(G_t)
         slope_pow, intercept_pow, r_pow, _, _ = linregress(log_t, log_G)
         r_pow_sq = r_pow**2
-    except (ValueError, RuntimeWarning):
+        logger.debug(
+            "Power-law fit",
+            r_squared=float(r_pow_sq),
+            slope=float(slope_pow),
+        )
+    except (ValueError, RuntimeWarning) as e:
         r_pow_sq = 0.0
+        logger.debug("Power-law fit failed", error=str(e))
 
     # 3. Check for stretched exponential: log(-log(G/G0)) vs log(t)
     try:
@@ -110,10 +136,17 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
                 log_t[valid_stretch], log_log[valid_stretch]
             )
             r_stretch_sq = r_stretch**2
+            logger.debug(
+                "Stretched exponential fit",
+                r_squared=float(r_stretch_sq),
+                n_valid_points=int(np.sum(valid_stretch)),
+            )
         else:
             r_stretch_sq = 0.0
-    except (ValueError, RuntimeWarning):
+            logger.debug("Stretched exponential fit: insufficient valid points")
+    except (ValueError, RuntimeWarning) as e:
         r_stretch_sq = 0.0
+        logger.debug("Stretched exponential fit failed", error=str(e))
 
     # Decision logic
     threshold_high = 0.90  # High confidence
@@ -123,27 +156,51 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     if r_exp_sq > threshold_high:
         # Check if slope is negative (decay)
         if slope_exp < 0:
+            logger.info(
+                "Detected exponential decay",
+                r_squared=float(r_exp_sq),
+                slope=float(slope_exp),
+            )
             return DecayType.EXPONENTIAL
 
     # Power-law decay (gel-like)
     if r_pow_sq > threshold_high:
         # Check if slope is negative (decay)
         if slope_pow < 0:
+            logger.info(
+                "Detected power-law decay",
+                r_squared=float(r_pow_sq),
+                slope=float(slope_pow),
+            )
             return DecayType.POWER_LAW
 
     # Stretched exponential
     if r_stretch_sq > threshold_high:
+        logger.info(
+            "Detected stretched exponential decay",
+            r_squared=float(r_stretch_sq),
+        )
         return DecayType.STRETCHED
 
     # Multi-mode if nothing fits well but data shows decay
     if G_t[-1] < G_t[0] * 0.9:  # At least 10% decay
         # Check if it's a combination
         if r_exp_sq > threshold_med or r_pow_sq > threshold_med:
+            logger.info(
+                "Detected multi-mode decay",
+                r_exp_sq=float(r_exp_sq),
+                r_pow_sq=float(r_pow_sq),
+            )
             return DecayType.MULTI_MODE
         else:
             # Complex decay pattern, likely Mittag-Leffler
+            logger.info(
+                "Detected Mittag-Leffler-like decay",
+                decay_ratio=float(G_t[-1] / G_t[0]),
+            )
             return DecayType.MITTAG_LEFFLER
 
+    logger.debug("Could not determine decay type")
     return DecayType.UNKNOWN
 
 

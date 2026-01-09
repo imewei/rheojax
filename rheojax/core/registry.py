@@ -13,6 +13,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class PluginType(Enum):
     """Types of plugins that can be registered."""

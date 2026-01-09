@@ -3,7 +3,13 @@
 This module provides Qt signals for reactive UI updates on state changes.
 """
 
+from typing import Any, Callable
+
 from PySide6.QtCore import QObject, Signal
+
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class StateSignals(QObject):
@@ -102,3 +108,107 @@ class StateSignals(QObject):
     def __init__(self) -> None:
         """Initialize signal emitters."""
         super().__init__()
+
+    def emit_signal(self, signal_name: str, *args: Any) -> None:
+        """Emit a signal by name with logging.
+
+        Parameters
+        ----------
+        signal_name : str
+            Name of the signal to emit
+        *args : Any
+            Arguments to pass to the signal
+        """
+        signal = getattr(self, signal_name, None)
+        if signal is not None:
+            logger.debug("Signal emitted", signal=signal_name, args=args)
+            signal.emit(*args)
+        else:
+            logger.error(
+                "Attempted to emit unknown signal",
+                signal=signal_name,
+                exc_info=True,
+            )
+
+    def connect_signal(
+        self, signal_name: str, handler: Callable[..., Any]
+    ) -> bool:
+        """Connect a handler to a signal by name with logging.
+
+        Parameters
+        ----------
+        signal_name : str
+            Name of the signal to connect
+        handler : Callable[..., Any]
+            Handler function to connect
+
+        Returns
+        -------
+        bool
+            True if connection successful, False otherwise
+        """
+        signal = getattr(self, signal_name, None)
+        if signal is not None:
+            handler_name = getattr(handler, "__name__", repr(handler))
+            logger.debug(
+                "Signal connected", signal=signal_name, handler=handler_name
+            )
+            signal.connect(handler)
+            return True
+        else:
+            logger.error(
+                "Attempted to connect to unknown signal",
+                signal=signal_name,
+                exc_info=True,
+            )
+            return False
+
+    def disconnect_signal(
+        self, signal_name: str, handler: Callable[..., Any] | None = None
+    ) -> bool:
+        """Disconnect a handler from a signal by name with logging.
+
+        Parameters
+        ----------
+        signal_name : str
+            Name of the signal to disconnect
+        handler : Callable[..., Any] | None
+            Handler function to disconnect, or None to disconnect all
+
+        Returns
+        -------
+        bool
+            True if disconnection successful, False otherwise
+        """
+        signal = getattr(self, signal_name, None)
+        if signal is not None:
+            handler_name = (
+                getattr(handler, "__name__", repr(handler))
+                if handler
+                else "all"
+            )
+            logger.debug(
+                "Signal disconnected", signal=signal_name, handler=handler_name
+            )
+            try:
+                if handler is not None:
+                    signal.disconnect(handler)
+                else:
+                    signal.disconnect()
+                return True
+            except RuntimeError as e:
+                logger.error(
+                    "Failed to disconnect signal",
+                    signal=signal_name,
+                    handler=handler_name,
+                    error=str(e),
+                    exc_info=True,
+                )
+                return False
+        else:
+            logger.error(
+                "Attempted to disconnect from unknown signal",
+                signal=signal_name,
+                exc_info=True,
+            )
+            return False

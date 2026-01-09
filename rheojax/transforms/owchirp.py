@@ -14,12 +14,16 @@ import numpy as np
 from rheojax.core.base import BaseTransform
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
+from rheojax.logging import get_logger, log_transform
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
 # Import Array for runtime isinstance checks
 from jax import Array
+
+# Module logger
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from rheojax.core.data import RheoData
@@ -241,13 +245,32 @@ class OWChirp(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
+        logger.info(
+            "Starting OWChirp transform",
+            n_frequencies=self.n_frequencies,
+            frequency_range=self.frequency_range,
+            wavelet_width=self.wavelet_width,
+            extract_harmonics=self.extract_harmonics,
+        )
+
         # Validate domain
         if data.domain != "time":
+            logger.error(
+                "Invalid domain for OWChirp",
+                expected="time",
+                got=data.domain,
+            )
             raise ValueError("OWChirp requires time-domain data")
 
         # Get time and signal
         t = data.x
         signal = data.y
+
+        logger.debug(
+            "Input data extracted",
+            data_points=len(t),
+            domain=data.domain,
+        )
 
         # Convert to JAX arrays
         if not isinstance(t, Array):
@@ -257,9 +280,16 @@ class OWChirp(BaseTransform):
 
         # Handle complex data
         if jnp.iscomplexobj(signal):
+            logger.debug("Converting complex signal to real part")
             signal = jnp.real(signal)
 
         # Generate frequency array (log-spaced)
+        logger.debug(
+            "Generating frequency array",
+            f_min=self.frequency_range[0],
+            f_max=self.frequency_range[1],
+            n_frequencies=self.n_frequencies,
+        )
         frequencies = jnp.logspace(
             jnp.log10(self.frequency_range[0]),
             jnp.log10(self.frequency_range[1]),
@@ -267,9 +297,11 @@ class OWChirp(BaseTransform):
         )
 
         # Compute wavelet transform (use optimized FFT method)
+        logger.debug("Computing optimized wavelet transform using FFT convolution")
         coefficients = self._optimized_wavelet_transform(t, signal, frequencies)
 
         # Compute magnitude spectrum (average over time)
+        logger.debug("Computing magnitude spectrum")
         spectrum = jnp.mean(jnp.abs(coefficients), axis=1)
 
         # Create metadata
@@ -282,6 +314,12 @@ class OWChirp(BaseTransform):
                 "frequency_range": self.frequency_range,
                 "time_frequency_map": True,  # Full 2D map available
             }
+        )
+
+        logger.info(
+            "OWChirp transform completed",
+            output_frequencies=len(frequencies),
+            spectrum_shape=spectrum.shape,
         )
 
         # Return frequency-domain data (averaged)
@@ -360,6 +398,12 @@ class OWChirp(BaseTransform):
                  'fifth': (5*freq, amplitude),
                  ...}
         """
+        logger.info(
+            "Extracting harmonics",
+            fundamental_freq=fundamental_freq,
+            max_harmonic=self.max_harmonic,
+        )
+
         # Get frequency spectrum
         freq_data = self.transform(data)
         freqs = freq_data.x
@@ -373,17 +417,24 @@ class OWChirp(BaseTransform):
 
         # Find fundamental frequency if not provided
         if fundamental_freq is None:
+            logger.debug("Auto-detecting fundamental frequency from FFT peak")
             # Find peak in spectrum
             from scipy.signal import find_peaks
 
             peaks, properties = find_peaks(spectrum, prominence=0.1 * np.max(spectrum))
 
             if len(peaks) == 0:
+                logger.error("Could not detect fundamental frequency in spectrum")
                 raise ValueError("Could not detect fundamental frequency")
 
             # Fundamental is typically the strongest peak
             strongest_peak = peaks[np.argmax(spectrum[peaks])]
             fundamental_freq = freqs[strongest_peak]
+            logger.debug(
+                "Fundamental frequency detected",
+                fundamental_freq=fundamental_freq,
+                n_peaks_found=len(peaks),
+            )
 
         # Extract harmonics
         harmonics = {}
@@ -393,6 +444,10 @@ class OWChirp(BaseTransform):
         )
 
         if self.extract_harmonics:
+            logger.debug(
+                "Extracting odd harmonics",
+                max_harmonic=self.max_harmonic,
+            )
             # Extract odd harmonics up to max_harmonic
             for n in range(3, self.max_harmonic + 1, 2):
                 harmonic_freq = n * fundamental_freq
@@ -401,6 +456,12 @@ class OWChirp(BaseTransform):
                 harmonic_name = {3: "third", 5: "fifth", 7: "seventh", 9: "ninth"}
                 if n in harmonic_name:
                     harmonics[harmonic_name[n]] = (harmonic_freq, amplitude)
+
+        logger.info(
+            "Harmonic extraction completed",
+            n_harmonics=len(harmonics),
+            fundamental_freq=fundamental_freq,
+        )
 
         return harmonics
 

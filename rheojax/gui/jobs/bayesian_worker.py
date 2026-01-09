@@ -5,7 +5,6 @@ Bayesian Worker
 Background worker for Bayesian inference with NUTS sampling.
 """
 
-import logging
 import time
 import traceback
 from dataclasses import dataclass
@@ -32,11 +31,12 @@ except ImportError:
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.gui.jobs.cancellation import CancellationError, CancellationToken
+from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -202,8 +202,11 @@ class BayesianWorker(QRunnable):
         """
         try:
             logger.info(
-                f"Starting Bayesian inference for model: {self._model_name} "
-                f"({self._num_chains} chains, {self._num_samples} samples)"
+                "Bayesian worker started",
+                model=self._model_name,
+                num_samples=self._num_samples,
+                num_warmup=self._num_warmup,
+                num_chains=self._num_chains,
             )
             start_time = time.perf_counter()
 
@@ -213,28 +216,51 @@ class BayesianWorker(QRunnable):
 
             try:
                 model = ModelRegistry.create(self._model_name)
+                logger.debug(
+                    "Model created from registry",
+                    model=self._model_name,
+                )
             except KeyError:
                 raise ValueError(f"Model '{self._model_name}' not found in registry")
 
             # Apply warm start if provided
             if self._warm_start:
-                logger.info(f"Using warm-start from NLSQ: {self._warm_start}")
+                logger.info(
+                    "Using warm-start from NLSQ",
+                    parameters=list(self._warm_start.keys()),
+                )
                 for name, value in self._warm_start.items():
                     if name in model.parameters:
                         model.parameters[name].value = value
+                        logger.debug(
+                            "Applied warm-start parameter",
+                            parameter=name,
+                            value=value,
+                        )
                     else:
                         logger.warning(
-                            f"Warm-start parameter '{name}' not found in model"
+                            "Warm-start parameter not found in model",
+                            parameter=name,
                         )
 
             # Apply custom priors if provided
             if self._priors:
-                logger.info(f"Using custom priors: {list(self._priors.keys())}")
+                logger.info(
+                    "Using custom priors",
+                    parameters=list(self._priors.keys()),
+                )
                 for name, prior in self._priors.items():
                     if name in model.parameters:
                         model.parameters[name].prior = prior
+                        logger.debug(
+                            "Applied custom prior",
+                            parameter=name,
+                        )
                     else:
-                        logger.warning(f"Prior parameter '{name}' not found in model")
+                        logger.warning(
+                            "Prior parameter not found in model",
+                            parameter=name,
+                        )
 
             # Get test mode from data
             test_mode = getattr(self._data, "test_mode", None)
@@ -243,18 +269,30 @@ class BayesianWorker(QRunnable):
                     test_mode = self._data.metadata.get("test_mode", "oscillation")
                 else:
                     test_mode = "oscillation"
-                    logger.warning(f"No test_mode found, defaulting to {test_mode}")
+                    logger.warning(
+                        "No test_mode found, defaulting to oscillation",
+                        default_mode=test_mode,
+                    )
+
+            # Track sampling start time for progress logging
+            sampling_start_time = time.perf_counter()
+            last_progress_log_time = sampling_start_time
 
             # Create progress callback
             def progress_callback(stage: str, chain: int, iteration: int, total: int):
                 """Progress callback for MCMC sampling."""
+                nonlocal last_progress_log_time
                 self.cancel_token.check()
 
                 # Update stage if changed
                 if stage != self._current_stage:
                     self._current_stage = stage
                     self.signals.stage_changed.emit(stage)
-                    logger.debug(f"MCMC stage: {stage}")
+                    logger.debug(
+                        "MCMC stage changed",
+                        stage=stage,
+                        chain=chain,
+                    )
 
                 # Calculate progress percent
                 samples_per_chain = self._num_warmup + self._num_samples
@@ -264,6 +302,21 @@ class BayesianWorker(QRunnable):
                     f"{stage.capitalize()} chain {chain}: {iteration}/{total_samples}"
                 )
 
+                # Log sampling progress at DEBUG level (throttled to every 5 seconds)
+                current_time = time.perf_counter()
+                if current_time - last_progress_log_time >= 5.0:
+                    elapsed = current_time - sampling_start_time
+                    logger.debug(
+                        "Sampling progress",
+                        samples=iteration,
+                        total=total_samples,
+                        percent=percent,
+                        elapsed=f"{elapsed:.1f}s",
+                        stage=stage,
+                        chain=chain,
+                    )
+                    last_progress_log_time = current_time
+
                 # Emit progress signal normalized to percent
                 self.signals.progress.emit(percent, 100, message)
 
@@ -272,9 +325,12 @@ class BayesianWorker(QRunnable):
 
             # Execute Bayesian inference via service to honor progress/cancel
             logger.debug(
-                f"Running NUTS sampling: "
-                f"warmup={self._num_warmup}, samples={self._num_samples}, "
-                f"chains={self._num_chains}, test_mode={test_mode}"
+                "Running NUTS sampling",
+                warmup=self._num_warmup,
+                samples=self._num_samples,
+                chains=self._num_chains,
+                test_mode=test_mode,
+                seed=self._seed,
             )
 
             from rheojax.gui.services.bayesian_service import BayesianService
@@ -304,7 +360,11 @@ class BayesianWorker(QRunnable):
             num_divergences = diagnostics.get("divergences", 0)
             if num_divergences > 0:
                 self.signals.divergence_detected.emit(num_divergences)
-                logger.warning(f"Detected {num_divergences} divergent transitions")
+                logger.warning(
+                    "Detected divergent transitions",
+                    divergences=num_divergences,
+                    model=self._model_name,
+                )
 
             # Compute credible intervals (95% HDI)
             credible_intervals = {}
@@ -328,26 +388,49 @@ class BayesianWorker(QRunnable):
                 inference_data=getattr(bayesian_result, "inference_data", None),
             )
 
-            # Log diagnostics
-            logger.info(f"Bayesian inference completed in {sampling_time:.2f}s")
-            logger.info("Diagnostics:")
+            # Log convergence diagnostics at DEBUG level
             rhat_dict = diagnostics.get("r_hat") or diagnostics.get("rhat") or {}
             ess_dict = diagnostics.get("ess", {})
             for param_name in bayesian_result.posterior_samples.keys():
                 r_hat = rhat_dict.get(param_name, float("nan"))
                 ess = ess_dict.get(param_name, float("nan"))
-                logger.info(f"  {param_name}: R-hat={r_hat:.4f}, ESS={ess:.0f}")
+                logger.debug(
+                    "Parameter convergence diagnostics",
+                    parameter=param_name,
+                    r_hat=f"{r_hat:.4f}",
+                    ess=f"{ess:.0f}",
+                )
+
+            # Log completion at INFO level
+            logger.info(
+                "Bayesian worker complete",
+                model=self._model_name,
+                total_time=f"{sampling_time:.2f}s",
+                num_samples=self._num_samples,
+                num_chains=self._num_chains,
+                divergences=num_divergences,
+            )
 
             # Emit completion signal
             self.signals.completed.emit(result)
 
         except CancellationError:
-            logger.info(f"Bayesian inference for {self._model_name} cancelled")
+            elapsed = time.perf_counter() - start_time if "start_time" in locals() else 0
+            logger.info(
+                "Bayesian worker cancelled",
+                model=self._model_name,
+                elapsed=f"{elapsed:.2f}s",
+            )
             self.signals.cancelled.emit()
 
         except Exception as e:
             error_msg = f"Bayesian inference failed for {self._model_name}: {str(e)}"
-            logger.error(error_msg)
+            logger.error(
+                "Bayesian worker failed",
+                model=self._model_name,
+                error=str(e),
+                exc_info=True,
+            )
             logger.debug(traceback.format_exc())
 
             # Store error in token

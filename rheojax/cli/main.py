@@ -16,8 +16,12 @@ import argparse
 import sys
 from typing import TYPE_CHECKING
 
+from rheojax.logging import configure_logging, get_logger
+
 if TYPE_CHECKING:
     pass
+
+logger = get_logger(__name__)
 
 
 def create_main_parser() -> argparse.ArgumentParser:
@@ -67,17 +71,30 @@ For command-specific help:
 
 def show_info() -> int:
     """Display package information."""
+    logger.info("Running CLI command", command="info")
+
     import rheojax
     from rheojax.core.jax_config import safe_import_jax
 
     jax, jnp = safe_import_jax()
 
+    float64_enabled = jnp.array([1.0]).dtype == jnp.float64
+    devices = jax.devices()
+
+    logger.debug(
+        "Package configuration",
+        version=rheojax.__version__,
+        jax_version=jax.__version__,
+        float64=float64_enabled,
+        devices=str(devices),
+    )
+
     print("RheoJAX Package Information")
     print("=" * 40)
     print(f"Version:     {rheojax.__version__}")
     print(f"JAX version: {jax.__version__}")
-    print(f"Float64:     {jnp.array([1.0]).dtype == jnp.float64}")
-    print(f"Devices:     {jax.devices()}")
+    print(f"Float64:     {float64_enabled}")
+    print(f"Devices:     {devices}")
     print("=" * 40)
 
     return 0
@@ -85,11 +102,17 @@ def show_info() -> int:
 
 def main(args: list[str] | None = None) -> int:
     """Main CLI entry point."""
+    # Configure logging if not already configured
+    configure_logging()
+
     if args is None:
         args = sys.argv[1:]
 
+    logger.debug("CLI invoked", raw_args=args)
+
     # If no args, show help
     if not args:
+        logger.debug("No arguments provided, showing help")
         parser = create_main_parser()
         parser.print_help()
         return 0
@@ -98,13 +121,16 @@ def main(args: list[str] | None = None) -> int:
     if args[0] in ("--version", "-V"):
         import rheojax
 
+        logger.info("Running CLI command", command="version")
         print(f"rheojax {rheojax.__version__}")
         return 0
 
     # Dispatch to subcommand
     command = args[0]
+    logger.debug("Dispatching to subcommand", command=command, subargs=args[1:])
 
     if command == "spp":
+        logger.info("Running CLI command", command="spp")
         from rheojax.cli.spp import main as spp_main
 
         return spp_main(args[1:])
@@ -113,11 +139,13 @@ def main(args: list[str] | None = None) -> int:
         return show_info()
 
     elif command in ("--help", "-h"):
+        logger.debug("Help requested")
         parser = create_main_parser()
         parser.print_help()
         return 0
 
     else:
+        logger.error("Unknown command", command=command)
         print(f"Unknown command: {command}", file=sys.stderr)
         print("Use 'rheojax --help' for available commands", file=sys.stderr)
         return 1

@@ -12,6 +12,7 @@ Example:
 
 from __future__ import annotations
 
+import time
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -20,6 +21,7 @@ import numpy as np
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.logging import get_logger
 from rheojax.pipeline.base import Pipeline
 
 if TYPE_CHECKING:
@@ -27,6 +29,9 @@ if TYPE_CHECKING:
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+# Module-level logger
+logger = get_logger(__name__)
 
 
 class MastercurvePipeline(Pipeline):
@@ -82,12 +87,38 @@ class MastercurvePipeline(Pipeline):
                 f"number of temperatures ({len(temperatures)})"
             )
 
+        logger.info(
+            "Starting mastercurve construction",
+            n_datasets=len(file_paths),
+            reference_temp=self.reference_temp,
+        )
+        start_time = time.perf_counter()
+
         # Load all datasets
         datasets = []
-        for file_path in file_paths:
-            temp_pipeline = Pipeline()
-            temp_pipeline.load(file_path, format=format, **load_kwargs)
-            datasets.append(temp_pipeline.get_result())
+        for i, file_path in enumerate(file_paths):
+            dataset_start = time.perf_counter()
+            try:
+                temp_pipeline = Pipeline()
+                temp_pipeline.load(file_path, format=format, **load_kwargs)
+                datasets.append(temp_pipeline.get_result())
+                dataset_elapsed = time.perf_counter() - dataset_start
+                logger.debug(
+                    "Dataset loaded",
+                    dataset=i,
+                    file_path=file_path,
+                    temperature=temperatures[i],
+                    elapsed=dataset_elapsed,
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to load dataset",
+                    dataset=i,
+                    file_path=file_path,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
         # Merge datasets with temperature metadata
         merged_data = self._merge_datasets(datasets, temperatures)
@@ -99,6 +130,14 @@ class MastercurvePipeline(Pipeline):
 
         self.history.append(
             ("mastercurve", str(len(file_paths)), str(self.reference_temp))
+        )
+
+        total_time = time.perf_counter() - start_time
+        logger.info(
+            "Mastercurve construction complete",
+            n_datasets=len(file_paths),
+            n_shift_factors=len(self.shift_factors),
+            total_time=total_time,
         )
         return self
 
@@ -238,7 +277,15 @@ class ModelComparisonPipeline(Pipeline):
         X = np.array(data.x)
         y = np.array(data.y)
 
+        logger.info(
+            "Starting model comparison",
+            n_models=len(self.models),
+            data_shape=X.shape,
+        )
+        start_time = time.perf_counter()
+
         for model_name in self.models:
+            model_start = time.perf_counter()
             try:
                 # Create and fit model
                 model = ModelRegistry.create(model_name)
@@ -315,10 +362,32 @@ class ModelComparisonPipeline(Pipeline):
 
                 self.history.append(("fit_compare", model_name, str(r_squared)))
 
+                model_elapsed = time.perf_counter() - model_start
+                logger.debug(
+                    "Model fitted",
+                    model=model_name,
+                    r_squared=float(r_squared),
+                    rmse=float(rmse),
+                    elapsed=model_elapsed,
+                )
+
             except Exception as e:
+                logger.error(
+                    "Failed to fit model",
+                    model=model_name,
+                    error=str(e),
+                    exc_info=True,
+                )
                 warnings.warn(f"Failed to fit model {model_name}: {e}", stacklevel=2)
                 continue
 
+        total_time = time.perf_counter() - start_time
+        logger.info(
+            "Model comparison complete",
+            n_models=len(self.models),
+            n_successful=len(self.results),
+            total_time=total_time,
+        )
         return self
 
     def get_best_model(self, metric: str = "rmse", minimize: bool = True) -> str:
@@ -412,6 +481,13 @@ class CreepToRelaxationPipeline(Pipeline):
         """
         self.data = creep_data
 
+        logger.info(
+            "Starting creep to relaxation conversion",
+            method=method,
+            data_points=len(creep_data.x),
+        )
+        start_time = time.perf_counter()
+
         # Validate test mode
         test_mode = creep_data.metadata.get("test_mode", "").lower()
         if test_mode and test_mode != "creep":
@@ -421,14 +497,31 @@ class CreepToRelaxationPipeline(Pipeline):
                 stacklevel=2,
             )
 
-        if method == "approximate":
-            self._approximate_conversion()
-        elif method == "exact":
-            self._exact_conversion()
-        else:
-            raise ValueError(f"Unknown method: {method}")
+        try:
+            if method == "approximate":
+                self._approximate_conversion()
+            elif method == "exact":
+                self._exact_conversion()
+            else:
+                raise ValueError(f"Unknown method: {method}")
 
-        self.history.append(("creep_to_relaxation", method))
+            self.history.append(("creep_to_relaxation", method))
+
+            total_time = time.perf_counter() - start_time
+            logger.info(
+                "Creep to relaxation conversion complete",
+                method=method,
+                total_time=total_time,
+            )
+        except Exception as e:
+            logger.error(
+                "Creep to relaxation conversion failed",
+                method=method,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
         return self
 
     def _approximate_conversion(self):
@@ -509,45 +602,68 @@ class FrequencyToTimePipeline(Pipeline):
         """
         self.data = frequency_data
 
+        logger.info(
+            "Starting frequency to time conversion",
+            n_points=n_points,
+            input_points=len(frequency_data.x),
+        )
+        start_time = time.perf_counter()
+
         if frequency_data.domain != "frequency":
             warnings.warn("Input data may not be in frequency domain", stacklevel=2)
 
-        # Generate time points
-        if time_range is None:
-            # Auto-generate from frequency range
-            w_min = np.min(np.array(frequency_data.x))
-            w_max = np.max(np.array(frequency_data.x))
-            t_min = 1.0 / w_max
-            t_max = 1.0 / w_min
-        else:
-            t_min, t_max = time_range
+        try:
+            # Generate time points
+            if time_range is None:
+                # Auto-generate from frequency range
+                w_min = np.min(np.array(frequency_data.x))
+                w_max = np.max(np.array(frequency_data.x))
+                t_min = 1.0 / w_max
+                t_max = 1.0 / w_min
+            else:
+                t_min, t_max = time_range
 
-        t = np.logspace(np.log10(t_min), np.log10(t_max), n_points)
+            t = np.logspace(np.log10(t_min), np.log10(t_max), n_points)
 
-        # Simplified conversion using inverse Fourier transform approximation
-        # In practice, this would use proper numerical FFT
-        omega = np.array(frequency_data.x)
-        G_star = np.array(frequency_data.y)
+            # Simplified conversion using inverse Fourier transform approximation
+            # In practice, this would use proper numerical FFT
+            omega = np.array(frequency_data.x)
+            G_star = np.array(frequency_data.y)
 
-        # Placeholder: proper implementation would use FFT
-        # For now, use simple numerical integration
-        G_t = self._approximate_inverse_transform(t, omega, G_star)
+            # Placeholder: proper implementation would use FFT
+            # For now, use simple numerical integration
+            G_t = self._approximate_inverse_transform(t, omega, G_star)
 
-        self.data = RheoData(
-            x=t,
-            y=G_t,
-            x_units="s",
-            y_units=frequency_data.y_units,
-            domain="time",
-            metadata={
-                **frequency_data.metadata,
-                "conversion": "frequency_to_time",
-                "original_domain": "frequency",
-            },
-            validate=False,
-        )
+            self.data = RheoData(
+                x=t,
+                y=G_t,
+                x_units="s",
+                y_units=frequency_data.y_units,
+                domain="time",
+                metadata={
+                    **frequency_data.metadata,
+                    "conversion": "frequency_to_time",
+                    "original_domain": "frequency",
+                },
+                validate=False,
+            )
 
-        self.history.append(("frequency_to_time", str(n_points)))
+            self.history.append(("frequency_to_time", str(n_points)))
+
+            total_time = time.perf_counter() - start_time
+            logger.info(
+                "Frequency to time conversion complete",
+                n_points=n_points,
+                total_time=total_time,
+            )
+        except Exception as e:
+            logger.error(
+                "Frequency to time conversion failed",
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
         return self
 
     def _approximate_inverse_transform(
@@ -690,8 +806,20 @@ class SPPAmplitudeSweepPipeline(Pipeline):
                 f"number of amplitudes ({len(gamma_0_values)})"
             )
 
+        logger.info(
+            "Starting SPP amplitude sweep analysis",
+            n_datasets=len(stress_data),
+            omega=self.omega,
+        )
+        start_time = time.perf_counter()
+        n_successful = 0
+
         # Process each amplitude
-        for gamma_0, data in zip(gamma_0_values, stress_data, strict=False):
+        for i, (gamma_0, data) in enumerate(
+            zip(gamma_0_values, stress_data, strict=False)
+        ):
+            amplitude_start = time.perf_counter()
+
             # Ensure required metadata is present for downstream transforms/models
             if data.metadata is None:
                 data.metadata = {}
@@ -724,8 +852,26 @@ class SPPAmplitudeSweepPipeline(Pipeline):
                 self._sigma_dy_values.append(results["sigma_dy"])
 
                 self.history.append(("spp_analyze", str(gamma_0), "success"))
+                n_successful += 1
+
+                amplitude_elapsed = time.perf_counter() - amplitude_start
+                logger.debug(
+                    "SPP decomposition completed",
+                    dataset=i,
+                    gamma_0=gamma_0,
+                    sigma_sy=results["sigma_sy"],
+                    sigma_dy=results["sigma_dy"],
+                    elapsed=amplitude_elapsed,
+                )
 
             except Exception as e:
+                logger.error(
+                    "SPP analysis failed",
+                    dataset=i,
+                    gamma_0=gamma_0,
+                    error=str(e),
+                    exc_info=True,
+                )
                 warnings.warn(
                     f"SPP analysis failed at γ_0 = {gamma_0}: {e}", stacklevel=2
                 )
@@ -736,6 +882,14 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         self._gamma_0_values = [self._gamma_0_values[i] for i in sort_idx]
         self._sigma_sy_values = [self._sigma_sy_values[i] for i in sort_idx]
         self._sigma_dy_values = [self._sigma_dy_values[i] for i in sort_idx]
+
+        total_time = time.perf_counter() - start_time
+        logger.info(
+            "SPP amplitude sweep analysis complete",
+            n_datasets=len(stress_data),
+            n_successful=n_successful,
+            total_time=total_time,
+        )
 
         return self
 
@@ -760,6 +914,14 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         if not self._gamma_0_values:
             raise RuntimeError("No data available. Call run() first.")
 
+        logger.info(
+            "Starting SPP model fitting",
+            bayesian=bayesian,
+            yield_type=yield_type,
+            n_points=len(self._gamma_0_values),
+        )
+        start_time = time.perf_counter()
+
         gamma_0_array = np.array(self._gamma_0_values)
         if yield_type == "static":
             sigma_array = np.array(self._sigma_sy_values)
@@ -768,23 +930,41 @@ class SPPAmplitudeSweepPipeline(Pipeline):
 
         self.model = SPPYieldStress()
 
-        if bayesian:
-            self.model.fit_bayesian(
-                gamma_0_array,
-                sigma_array,
-                test_mode="oscillation",
-                **fit_kwargs,
-            )
-            self.history.append(("fit_bayesian", yield_type, "complete"))
-        else:
-            self.model.fit(
-                gamma_0_array,
-                sigma_array,
-                test_mode="oscillation",
+        try:
+            if bayesian:
+                self.model.fit_bayesian(
+                    gamma_0_array,
+                    sigma_array,
+                    test_mode="oscillation",
+                    **fit_kwargs,
+                )
+                self.history.append(("fit_bayesian", yield_type, "complete"))
+            else:
+                self.model.fit(
+                    gamma_0_array,
+                    sigma_array,
+                    test_mode="oscillation",
+                    yield_type=yield_type,
+                    **fit_kwargs,
+                )
+                self.history.append(("fit_nlsq", yield_type, "complete"))
+
+            total_time = time.perf_counter() - start_time
+            logger.info(
+                "SPP model fitting complete",
+                bayesian=bayesian,
                 yield_type=yield_type,
-                **fit_kwargs,
+                total_time=total_time,
             )
-            self.history.append(("fit_nlsq", yield_type, "complete"))
+        except Exception as e:
+            logger.error(
+                "SPP model fitting failed",
+                bayesian=bayesian,
+                yield_type=yield_type,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
 
         return self
 

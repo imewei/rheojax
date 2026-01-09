@@ -16,13 +16,14 @@ Usage:
 
 from __future__ import annotations
 
-import logging
 import re
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+from rheojax.logging import get_logger, log_io
 
 try:
     from openpyxl import load_workbook
@@ -53,7 +54,7 @@ from rheojax.io.readers.trios.common import (
     split_by_step,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # File size threshold for read-only mode (5 MB)
 LARGE_FILE_THRESHOLD_MB = 5.0
@@ -405,78 +406,143 @@ def parse_trios_excel(
     filepath = Path(filepath)
 
     if not filepath.exists():
+        logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
     _check_excel_dependencies(filepath)
 
     # Determine if we should use read-only mode
+    file_size_mb = filepath.stat().st_size / (1024 * 1024)
     if read_only is None:
-        file_size_mb = filepath.stat().st_size / (1024 * 1024)
         read_only = file_size_mb > LARGE_FILE_THRESHOLD_MB
+        if read_only:
+            logger.debug(
+                "Using read-only mode for large file",
+                filepath=str(filepath),
+                file_size_mb=round(file_size_mb, 2),
+            )
 
     # Load workbook
     suffix = filepath.suffix.lower()
+    logger.debug("Loading Excel workbook", filepath=str(filepath), format=suffix)
 
-    if suffix == ".xlsx":
-        wb = load_workbook(filepath, read_only=read_only, data_only=True)
-        sheet_names = wb.sheetnames
-    elif suffix == ".xls":
-        # xlrd handles .xls files
-        wb = xlrd.open_workbook(str(filepath))
-        sheet_names = wb.sheet_names()
-    else:
-        raise ValueError(f"Unsupported Excel format: {suffix}")
+    with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
+        io_ctx["format"] = suffix
+        io_ctx["file_size_mb"] = round(file_size_mb, 2)
 
-    # Determine which sheets to parse
-    if sheet_name == "all":
-        sheets_to_parse = list(range(len(sheet_names)))
-    elif sheet_name is None:
-        sheets_to_parse = [0]
-    elif isinstance(sheet_name, int):
-        if sheet_name < 0 or sheet_name >= len(sheet_names):
-            raise ValueError(
-                f"Sheet index {sheet_name} out of range. "
-                f"Available: 0-{len(sheet_names) - 1}"
-            )
-        sheets_to_parse = [sheet_name]
-    elif isinstance(sheet_name, str):
-        if sheet_name not in sheet_names:
-            raise ValueError(
-                f"Sheet '{sheet_name}' not found. " f"Available: {sheet_names}"
-            )
-        sheets_to_parse = [sheet_names.index(sheet_name)]
-    else:
-        raise ValueError(f"Invalid sheet_name type: {type(sheet_name)}")
-
-    # Parse sheets
-    tables: list[TRIOSTable] = []
-    global_metadata: dict[str, Any] = {}
-
-    for idx, sheet_idx in enumerate(sheets_to_parse):
         if suffix == ".xlsx":
-            sheet = wb[sheet_names[sheet_idx]]
+            wb = load_workbook(filepath, read_only=read_only, data_only=True)
+            sheet_names = wb.sheetnames
+        elif suffix == ".xls":
+            # xlrd handles .xls files
+            wb = xlrd.open_workbook(str(filepath))
+            sheet_names = wb.sheet_names()
         else:
-            sheet = _XlrdSheetWrapper(wb.sheet_by_index(sheet_idx))
+            logger.error("Unsupported Excel format", filepath=str(filepath), format=suffix)
+            raise ValueError(f"Unsupported Excel format: {suffix}")
 
-        table, sheet_metadata = parse_excel_sheet(sheet, str(filepath), idx)
+        logger.debug(
+            "Workbook loaded",
+            filepath=str(filepath),
+            sheet_count=len(sheet_names),
+            sheets=sheet_names,
+        )
 
-        # Add sheet name to table metadata
-        table.units["_sheet_name"] = sheet_names[sheet_idx]
-
-        tables.append(table)
-
-        # Merge metadata (first sheet metadata is primary)
-        if idx == 0:
-            global_metadata = sheet_metadata
+        # Determine which sheets to parse
+        if sheet_name == "all":
+            sheets_to_parse = list(range(len(sheet_names)))
+        elif sheet_name is None:
+            sheets_to_parse = [0]
+        elif isinstance(sheet_name, int):
+            if sheet_name < 0 or sheet_name >= len(sheet_names):
+                logger.error(
+                    "Sheet index out of range",
+                    filepath=str(filepath),
+                    sheet_index=sheet_name,
+                    available=f"0-{len(sheet_names) - 1}",
+                )
+                raise ValueError(
+                    f"Sheet index {sheet_name} out of range. "
+                    f"Available: 0-{len(sheet_names) - 1}"
+                )
+            sheets_to_parse = [sheet_name]
+        elif isinstance(sheet_name, str):
+            if sheet_name not in sheet_names:
+                logger.error(
+                    "Sheet not found",
+                    filepath=str(filepath),
+                    sheet_name=sheet_name,
+                    available=sheet_names,
+                )
+                raise ValueError(
+                    f"Sheet '{sheet_name}' not found. " f"Available: {sheet_names}"
+                )
+            sheets_to_parse = [sheet_names.index(sheet_name)]
         else:
-            # Store per-sheet metadata
-            global_metadata[f"sheet_{sheet_idx}_metadata"] = sheet_metadata
+            logger.error(
+                "Invalid sheet_name type",
+                filepath=str(filepath),
+                sheet_name_type=type(sheet_name).__name__,
+            )
+            raise ValueError(f"Invalid sheet_name type: {type(sheet_name)}")
 
-    if suffix == ".xlsx" and not read_only:
-        wb.close()
+        # Parse sheets
+        tables: list[TRIOSTable] = []
+        global_metadata: dict[str, Any] = {}
 
-    if not tables:
-        raise ValueError(f"No data tables found in {filepath}")
+        for idx, sheet_idx in enumerate(sheets_to_parse):
+            sheet_name_str = sheet_names[sheet_idx]
+            logger.debug(
+                "Parsing sheet",
+                filepath=str(filepath),
+                sheet_name=sheet_name_str,
+                sheet_index=sheet_idx,
+            )
+
+            if suffix == ".xlsx":
+                sheet = wb[sheet_name_str]
+            else:
+                sheet = _XlrdSheetWrapper(wb.sheet_by_index(sheet_idx))
+
+            try:
+                table, sheet_metadata = parse_excel_sheet(sheet, str(filepath), idx)
+            except Exception as e:
+                logger.error(
+                    "Failed to parse sheet",
+                    filepath=str(filepath),
+                    sheet_name=sheet_name_str,
+                    exc_info=True,
+                )
+                raise
+
+            # Add sheet name to table metadata
+            table.units["_sheet_name"] = sheet_name_str
+
+            tables.append(table)
+            logger.debug(
+                "Sheet parsed",
+                filepath=str(filepath),
+                sheet_name=sheet_name_str,
+                rows=len(table.df),
+                columns=len(table.df.columns),
+            )
+
+            # Merge metadata (first sheet metadata is primary)
+            if idx == 0:
+                global_metadata = sheet_metadata
+            else:
+                # Store per-sheet metadata
+                global_metadata[f"sheet_{sheet_idx}_metadata"] = sheet_metadata
+
+        if suffix == ".xlsx" and not read_only:
+            wb.close()
+
+        if not tables:
+            logger.error("No data tables found", filepath=str(filepath))
+            raise ValueError(f"No data tables found in {filepath}")
+
+        io_ctx["sheets_parsed"] = len(tables)
+        io_ctx["total_rows"] = sum(len(t.df) for t in tables)
 
     return TRIOSFile(
         filepath=str(filepath),

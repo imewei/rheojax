@@ -5,7 +5,6 @@ Export Page
 Result export interface with format selection and batch operations.
 """
 
-import logging
 from pathlib import Path
 from typing import Any
 
@@ -31,8 +30,9 @@ from PySide6.QtWidgets import (
 from rheojax.gui.services.export_service import ExportService
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.store import StateStore
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ExportPage(QWidget):
@@ -52,6 +52,7 @@ class ExportPage(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self._store = StateStore()
         self._export_service = ExportService()
         self._plot_service = PlotService()
@@ -145,7 +146,7 @@ class ExportPage(QWidget):
         layout.addWidget(QLabel("Data Format:", styleSheet="font-weight: bold;"))
         self._data_format_combo = QComboBox()
         self._data_format_combo.addItems(["CSV", "Excel (XLSX)", "HDF5", "JSON"])
-        self._data_format_combo.currentTextChanged.connect(self._update_preview)
+        self._data_format_combo.currentTextChanged.connect(self._on_data_format_changed)
         layout.addWidget(self._data_format_combo)
 
         # Figure format
@@ -158,7 +159,9 @@ class ExportPage(QWidget):
         eps_idx = self._figure_format_combo.findText("EPS")
         if eps_idx >= 0:
             self._figure_format_combo.model().item(eps_idx).setEnabled(False)
-        self._figure_format_combo.currentTextChanged.connect(self._update_preview)
+        self._figure_format_combo.currentTextChanged.connect(
+            self._on_figure_format_changed
+        )
         layout.addWidget(self._figure_format_combo)
 
         # Figure DPI
@@ -208,6 +211,16 @@ class ExportPage(QWidget):
         layout.addStretch()
 
         return panel
+
+    def _on_data_format_changed(self, fmt: str) -> None:
+        """Handle data format selection change."""
+        logger.debug("Format selected", format=fmt, page="ExportPage")
+        self._update_preview()
+
+    def _on_figure_format_changed(self, fmt: str) -> None:
+        """Handle figure format selection change."""
+        logger.debug("Format selected", format=fmt, page="ExportPage")
+        self._update_preview()
 
     def _create_export_panel(self) -> QWidget:
         panel = QGroupBox("Export")
@@ -396,6 +409,7 @@ class ExportPage(QWidget):
 
     def _batch_export_all_datasets(self) -> None:
         """Export all datasets in state to the selected directory (data format only)."""
+        logger.debug("Export triggered", format="batch", page="ExportPage")
         output_dir = (
             Path(self._output_dir_edit.text())
             if self._output_dir_edit.text()
@@ -413,16 +427,29 @@ class ExportPage(QWidget):
 
         output_dir.mkdir(parents=True, exist_ok=True)
         exported = []
+        total_size = 0
         for name, ds in datasets.items():
             try:
                 rheo = self._dataset_to_rheodata(ds)
                 file_path = output_dir / f"{name}.{data_ext}"
                 self._export_service.export_data(rheo, file_path, data_ext)
                 exported.append(str(file_path))
+                # Get file size if available
+                if file_path.exists():
+                    total_size += file_path.stat().st_size
             except Exception as e:
-                logger.error(f"Failed to export dataset {name}: {e}")
+                logger.error(
+                    f"Failed to export dataset {name}: {e}",
+                    exc_info=True,
+                )
 
         if exported:
+            logger.info(
+                "Batch export completed",
+                file_count=len(exported),
+                total_size_bytes=total_size,
+                output_dir=str(output_dir),
+            )
             QMessageBox.information(
                 self,
                 "Batch Export",
@@ -513,6 +540,11 @@ class ExportPage(QWidget):
             return
 
         config = self._get_export_config()
+        logger.debug(
+            "Export triggered",
+            format=config["data_format"],
+            page="ExportPage",
+        )
 
         # Emit signal for main window to handle
         self.export_requested.emit(config)
@@ -830,6 +862,13 @@ class ExportPage(QWidget):
 
             progress.close()
 
+            # Calculate total file size
+            total_size = 0
+            for file_str in exported_files:
+                file_path = Path(file_str)
+                if file_path.exists():
+                    total_size += file_path.stat().st_size
+
             # Show success message
             QMessageBox.information(
                 self,
@@ -839,7 +878,10 @@ class ExportPage(QWidget):
 
             self.export_completed.emit(str(output_dir))
             logger.info(
-                f"Export completed: {len(exported_files)} files to {output_dir}"
+                "Export completed",
+                file_count=len(exported_files),
+                total_size_bytes=total_size,
+                output_dir=str(output_dir),
             )
 
         except Exception as e:
@@ -847,7 +889,7 @@ class ExportPage(QWidget):
             error_msg = f"Export failed: {e}"
             QMessageBox.critical(self, "Export Error", error_msg)
             self.export_failed.emit(error_msg)
-            logger.error(error_msg)
+            logger.error(error_msg, exc_info=True)
 
     def export_results(
         self,
@@ -869,6 +911,7 @@ class ExportPage(QWidget):
         **kwargs
             Additional export options
         """
+        logger.debug("Export triggered", format=format or "auto", page="ExportPage")
         state = self._store.get_state()
         path = Path(file_path)
 
@@ -902,8 +945,14 @@ class ExportPage(QWidget):
         **kwargs
             Additional savefig options
         """
+        logger.debug("Export triggered", format="plot", page="ExportPage")
         # Get figure from plot service (would need integration with PlotService)
-        logger.info(f"Export plot {plot_id} to {file_path} at {dpi} DPI")
+        logger.info(
+            "Export plot completed",
+            plot_id=plot_id,
+            file_path=file_path,
+            dpi=dpi,
+        )
 
     def preview_export(self, item_ids: list[str], format: str) -> dict[str, Any]:
         """Preview export without writing files.
@@ -945,6 +994,7 @@ class ExportPage(QWidget):
         list[str]
             Paths to exported files
         """
+        logger.debug("Export triggered", format="batch", page="ExportPage")
         exported_files = []
 
         for export_config in exports:
@@ -952,6 +1002,6 @@ class ExportPage(QWidget):
                 self._perform_export(export_config)
                 exported_files.append(str(export_config.get("output_dir", "")))
             except Exception as e:
-                logger.error(f"Batch export item failed: {e}")
+                logger.error(f"Batch export item failed: {e}", exc_info=True)
 
         return exported_files

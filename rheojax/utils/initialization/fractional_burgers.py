@@ -17,7 +17,10 @@ The optimizer will refine these starting values.
 
 from __future__ import annotations
 
+from rheojax.logging import get_logger
 from rheojax.utils.initialization.base import BaseInitializer
+
+logger = get_logger(__name__)
 
 
 class FractionalBurgersInitializer(BaseInitializer):
@@ -36,28 +39,69 @@ class FractionalBurgersInitializer(BaseInitializer):
         dict
             Estimated parameters: Jg, eta1, Jk, alpha, tau_k
         """
+        logger.debug(
+            "Estimating FractionalBurgers parameters",
+            model="FractionalBurgers",
+            low_plateau=features["low_plateau"],
+            high_plateau=features["high_plateau"],
+            omega_mid=features["omega_mid"],
+            alpha_estimate=features["alpha_estimate"],
+        )
+
         epsilon = 1e-12
 
         # Jg: glassy compliance from 1/high_plateau
         Jg_init = 1.0 / max(features["high_plateau"], epsilon)
+        logger.debug(
+            "Estimated glassy compliance Jg",
+            model="FractionalBurgers",
+            Jg=Jg_init,
+        )
 
         # Jk: Kelvin compliance from compliance difference
         Jk_init = (1.0 / max(features["low_plateau"], epsilon)) - Jg_init
         Jk_init = max(Jk_init, epsilon)
+        logger.debug(
+            "Estimated Kelvin compliance Jk",
+            model="FractionalBurgers",
+            Jk=Jk_init,
+        )
 
         # eta1: viscosity from low-frequency behavior
         # Approximate omega_low as omega_mid / 10
         omega_low = features["omega_mid"] / 10.0
         eta1_init = max(features["low_plateau"] / (omega_low + epsilon), epsilon)
+        logger.debug(
+            "Estimated viscosity eta1",
+            model="FractionalBurgers",
+            eta1=eta1_init,
+            omega_low=omega_low,
+        )
 
         # tau_k: from transition frequency
         tau_k_init = 1.0 / (features["omega_mid"] + epsilon)
+        logger.debug(
+            "Estimated characteristic time tau_k",
+            model="FractionalBurgers",
+            tau_k=tau_k_init,
+        )
 
         # alpha: from slope or default to 0.5
         if 0.01 <= features["alpha_estimate"] <= 0.99:
             alpha_init = features["alpha_estimate"]
+            logger.debug(
+                "Using estimated alpha from slope",
+                model="FractionalBurgers",
+                alpha=alpha_init,
+            )
         else:
             alpha_init = 0.5
+            logger.debug(
+                "Alpha estimate out of range, using default",
+                model="FractionalBurgers",
+                alpha=alpha_init,
+                original_estimate=features["alpha_estimate"],
+            )
 
         return {
             "Jg": Jg_init,

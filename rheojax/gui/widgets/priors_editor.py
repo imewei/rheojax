@@ -29,6 +29,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 # Available prior distributions
 DISTRIBUTIONS = [
     ("normal", "Normal", ["loc", "scale"]),
@@ -88,6 +92,7 @@ class PriorsEditor(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self._parameters: list[str] = []
         self._priors: dict[str, dict[str, Any]] = {}
@@ -95,6 +100,7 @@ class PriorsEditor(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+        logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -226,6 +232,13 @@ class PriorsEditor(QWidget):
         parameters : list[str]
             List of parameter names
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_parameters",
+            parameter_count=len(parameters),
+            parameters=parameters,
+        )
         self._parameters = parameters
         self._priors = {}
 
@@ -273,6 +286,13 @@ class PriorsEditor(QWidget):
         if row < len(self._parameters):
             param = self._parameters[row]
             self._current_param = param
+            logger.debug(
+                "User interaction",
+                widget=self.__class__.__name__,
+                action="selection_changed",
+                selected_parameter=param,
+                row=row,
+            )
             self._load_prior_to_editor(param)
 
     def _load_prior_to_editor(self, param: str) -> None:
@@ -311,6 +331,13 @@ class PriorsEditor(QWidget):
             New combo box index
         """
         dist = self._dist_combo.currentData()
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="distribution_changed",
+            distribution=dist,
+            current_param=self._current_param,
+        )
         self._update_param_visibility(dist)
 
         # Load defaults for new distribution
@@ -357,6 +384,12 @@ class PriorsEditor(QWidget):
         ax = self._preview_figure.add_subplot(111)
 
         dist = self._dist_combo.currentData()
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="update_preview",
+            distribution=dist,
+        )
 
         try:
             x, pdf = self._compute_pdf(dist)
@@ -366,6 +399,13 @@ class PriorsEditor(QWidget):
             ax.set_ylabel("Density")
             ax.set_title(f"{dist.title()} Distribution")
         except Exception as e:
+            logger.error(
+                "Error computing PDF for preview",
+                widget=self.__class__.__name__,
+                distribution=dist,
+                error=str(e),
+                exc_info=True,
+            )
             ax.text(
                 0.5,
                 0.5,
@@ -435,6 +475,12 @@ class PriorsEditor(QWidget):
     def _apply_prior(self) -> None:
         """Apply current editor settings to selected parameter."""
         if self._current_param is None:
+            logger.debug(
+                "User interaction",
+                widget=self.__class__.__name__,
+                action="apply_prior_skipped",
+                reason="no_parameter_selected",
+            )
             return
 
         dist = self._dist_combo.currentData()
@@ -447,6 +493,14 @@ class PriorsEditor(QWidget):
                     params[name] = self._param_spinboxes[name].value()
                 break
 
+        logger.info(
+            "Prior applied",
+            widget=self.__class__.__name__,
+            parameter=self._current_param,
+            distribution=dist,
+            params=params,
+        )
+
         # Update prior
         self._priors[self._current_param] = {"distribution": dist, "params": params}
 
@@ -458,6 +512,12 @@ class PriorsEditor(QWidget):
 
     def _reset_priors(self) -> None:
         """Reset all priors to defaults."""
+        logger.info(
+            "Priors reset",
+            widget=self.__class__.__name__,
+            action="reset_priors",
+            parameter_count=len(self._parameters),
+        )
         for param in self._parameters:
             self._priors[param] = {
                 "distribution": "normal",
@@ -479,6 +539,14 @@ class PriorsEditor(QWidget):
         **params
             Distribution parameters
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_prior",
+            parameter=param,
+            distribution=dist,
+            params=params,
+        )
         if param not in self._parameters:
             self._parameters.append(param)
 
@@ -512,6 +580,11 @@ class PriorsEditor(QWidget):
 
     def clear(self) -> None:
         """Clear all priors."""
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="clear",
+        )
         self._parameters = []
         self._priors = {}
         self._current_param = None

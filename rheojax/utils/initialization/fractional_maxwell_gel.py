@@ -12,7 +12,10 @@ Extraction strategy:
 
 from __future__ import annotations
 
+from rheojax.logging import get_logger
 from rheojax.utils.initialization.base import BaseInitializer
+
+logger = get_logger(__name__)
 
 
 class FractionalMaxwellGelInitializer(BaseInitializer):
@@ -31,24 +34,55 @@ class FractionalMaxwellGelInitializer(BaseInitializer):
         dict
             Estimated parameters: c_alpha, alpha, eta
         """
+        logger.debug(
+            "Estimating FractionalMaxwellGel parameters",
+            model="FractionalMaxwellGel",
+            low_plateau=features["low_plateau"],
+            high_plateau=features["high_plateau"],
+            omega_mid=features["omega_mid"],
+            alpha_estimate=features["alpha_estimate"],
+        )
+
         epsilon = 1e-12
 
         # alpha: fractional order from slope or default to 0.5
         if 0.01 <= features["alpha_estimate"] <= 0.99:
             alpha_init = features["alpha_estimate"]
+            logger.debug(
+                "Using estimated alpha from slope",
+                model="FractionalMaxwellGel",
+                alpha=alpha_init,
+            )
         else:
             alpha_init = 0.5
+            logger.debug(
+                "Alpha estimate out of range, using default",
+                model="FractionalMaxwellGel",
+                alpha=alpha_init,
+                original_estimate=features["alpha_estimate"],
+            )
 
         # c_alpha: approximate from high-frequency behavior
         # At high frequency, G* ~ c_α τ^(α-1)
         # We'll use high plateau as first estimate
         c_alpha_init = max(features["high_plateau"], epsilon)
+        logger.debug(
+            "Estimated modulus coefficient c_alpha",
+            model="FractionalMaxwellGel",
+            c_alpha=c_alpha_init,
+        )
 
         # eta: estimate from transition frequency
         # tau ~ 1/omega_mid, and tau = eta / c_alpha^(1/(1-alpha))
         # So eta ~ tau * c_alpha^(1/(1-alpha))
         tau_est = 1.0 / (features["omega_mid"] + epsilon)
         eta_init = tau_est * (c_alpha_init ** (1.0 / (1.0 - alpha_init + epsilon)))
+        logger.debug(
+            "Estimated viscosity eta from transition frequency",
+            model="FractionalMaxwellGel",
+            eta=eta_init,
+            tau_estimated=tau_est,
+        )
 
         return {
             "c_alpha": c_alpha_init,

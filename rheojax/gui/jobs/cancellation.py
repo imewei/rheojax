@@ -5,7 +5,12 @@ Cancellation Token
 Thread-safe cancellation mechanism for background jobs.
 """
 
+import time
 from threading import Event
+
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class CancellationError(Exception):
@@ -33,10 +38,18 @@ class CancellationToken:
     >>> token.cancel()  # Request cancellation
     """
 
-    def __init__(self) -> None:
-        """Initialize cancellation token."""
+    def __init__(self, job_id: str | None = None) -> None:
+        """Initialize cancellation token.
+
+        Parameters
+        ----------
+        job_id : str, optional
+            Job identifier for logging purposes
+        """
         self._cancelled = Event()
         self._error: Exception | None = None
+        self._job_id = job_id
+        self._cancel_start_time: float | None = None
 
     def cancel(self) -> None:
         """Request cancellation.
@@ -44,6 +57,8 @@ class CancellationToken:
         This sets the cancellation flag. Worker threads should
         check is_cancelled() or call check() periodically.
         """
+        self._cancel_start_time = time.perf_counter()
+        logger.debug("Cancellation requested", job_id=self._job_id)
         self._cancelled.set()
 
     def is_cancelled(self) -> bool:
@@ -76,6 +91,10 @@ class CancellationToken:
         an exception that can be caught by the worker pool.
         """
         if self.is_cancelled():
+            elapsed = None
+            if self._cancel_start_time is not None:
+                elapsed = time.perf_counter() - self._cancel_start_time
+            logger.debug("Cancellation complete", job_id=self._job_id, elapsed=elapsed)
             raise CancellationError("Operation cancelled by user")
 
     def set_error(self, error: Exception) -> None:
@@ -91,6 +110,12 @@ class CancellationToken:
         This is useful for passing errors from worker threads
         back to the main thread without raising them immediately.
         """
+        logger.error(
+            "Error stored in cancellation token",
+            job_id=self._job_id,
+            error_type=type(error).__name__,
+            exc_info=True,
+        )
         self._error = error
 
     def get_error(self) -> Exception | None:
@@ -136,3 +161,4 @@ class CancellationToken:
         """
         self._cancelled.clear()
         self._error = None
+        self._cancel_start_time = None

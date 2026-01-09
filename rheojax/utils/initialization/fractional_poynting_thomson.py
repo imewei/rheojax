@@ -13,7 +13,10 @@ Extraction strategy:
 
 from __future__ import annotations
 
+from rheojax.logging import get_logger
 from rheojax.utils.initialization.base import BaseInitializer
+
+logger = get_logger(__name__)
 
 
 class FractionalPoyntingThomsonInitializer(BaseInitializer):
@@ -32,22 +35,57 @@ class FractionalPoyntingThomsonInitializer(BaseInitializer):
         dict
             Estimated parameters: Ge, Gk, alpha, tau
         """
+        logger.debug(
+            "Estimating FractionalPoyntingThomson parameters",
+            model="FractionalPoyntingThomson",
+            low_plateau=features["low_plateau"],
+            high_plateau=features["high_plateau"],
+            omega_mid=features["omega_mid"],
+            alpha_estimate=features["alpha_estimate"],
+        )
+
         epsilon = 1e-12
 
         # Ge: instantaneous modulus from high-frequency plateau
         Ge_init = max(features["high_plateau"], epsilon)
+        logger.debug(
+            "Estimated instantaneous modulus Ge",
+            model="FractionalPoyntingThomson",
+            Ge=Ge_init,
+        )
 
         # Gk: retarded modulus from difference
         Gk_init = max(features["high_plateau"] - features["low_plateau"], epsilon)
+        logger.debug(
+            "Estimated retarded modulus Gk",
+            model="FractionalPoyntingThomson",
+            Gk=Gk_init,
+        )
 
         # tau: from transition frequency
         tau_init = 1.0 / (features["omega_mid"] + epsilon)
+        logger.debug(
+            "Estimated characteristic time tau",
+            model="FractionalPoyntingThomson",
+            tau=tau_init,
+        )
 
         # alpha: from slope or default to 0.5
         if 0.01 <= features["alpha_estimate"] <= 0.99:
             alpha_init = features["alpha_estimate"]
+            logger.debug(
+                "Using estimated alpha from slope",
+                model="FractionalPoyntingThomson",
+                alpha=alpha_init,
+            )
         else:
             alpha_init = 0.5
+            logger.debug(
+                "Alpha estimate out of range, using default",
+                model="FractionalPoyntingThomson",
+                alpha=alpha_init,
+                original_estimate=features["alpha_estimate"],
+            )
 
         return {
             "Ge": Ge_init,

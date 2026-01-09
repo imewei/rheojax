@@ -16,6 +16,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class JAXStatusWidget(QWidget):
     """Compact widget for JAX runtime information and device control.
@@ -51,6 +55,7 @@ class JAXStatusWidget(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         # Main horizontal layout
         main_layout = QHBoxLayout(self)
@@ -147,6 +152,7 @@ class JAXStatusWidget(QWidget):
         self._current_device = "cpu"
         self.update_jit_cache(0)
         self.set_compiling(False)
+        logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def update_device_list(self, devices: list[str]) -> None:
         """Update the list of available devices.
@@ -156,6 +162,12 @@ class JAXStatusWidget(QWidget):
         devices : list[str]
             List of device names (e.g., ['cpu', 'cuda:0', 'cuda:1'])
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="update_device_list",
+            devices=devices,
+        )
         # Disconnect signal temporarily
         self._device_combo.currentTextChanged.disconnect(self._on_device_changed)
 
@@ -183,6 +195,12 @@ class JAXStatusWidget(QWidget):
         device : str
             Device name (e.g., 'cpu', 'cuda:0')
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_current_device",
+            device=device,
+        )
         self._current_device = device
 
         # Update combo box if device is in list
@@ -202,6 +220,13 @@ class JAXStatusWidget(QWidget):
         total : int
             Total memory in MB
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="update_memory",
+            used_mb=used,
+            total_mb=total,
+        )
         self._memory_bar.setMaximum(total)
         self._memory_bar.setValue(used)
 
@@ -257,6 +282,12 @@ class JAXStatusWidget(QWidget):
         enabled : bool
             Whether float64 is enabled
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_float64_enabled",
+            enabled=enabled,
+        )
         if enabled:
             self._float64_indicator.setText("Enabled")
             self._float64_indicator.setStyleSheet(
@@ -278,6 +309,12 @@ class JAXStatusWidget(QWidget):
         count : int
             Number of cached JIT compilations
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="update_jit_cache",
+            count=count,
+        )
         self._jit_count_label.setText(str(count))
 
         # Color based on count
@@ -294,6 +331,12 @@ class JAXStatusWidget(QWidget):
 
     def set_compiling(self, compiling: bool) -> None:
         """Show compiling indicator."""
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_compiling",
+            compiling=compiling,
+        )
         if compiling:
             self._compile_indicator.setText("Compiling...")
             self._compile_indicator.setStyleSheet(
@@ -314,4 +357,11 @@ class JAXStatusWidget(QWidget):
             Selected device name
         """
         if device and device != self._current_device:
+            logger.debug(
+                "User interaction",
+                widget=self.__class__.__name__,
+                action="device_changed",
+                old_device=self._current_device,
+                new_device=device,
+            )
             self.device_change_requested.emit(device)

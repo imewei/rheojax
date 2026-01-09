@@ -30,6 +30,10 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("herschel_bulkley")
@@ -95,39 +99,98 @@ class HerschelBulkley(BaseModel):
         Returns:
             self for method chaining
         """
-        # Sort by shear rate
-        sort_idx = np.argsort(X)
-        X_sorted = X[sort_idx]
-        y_sorted = y[sort_idx]
+        data_shape = (len(X),) if hasattr(X, "__len__") else None
 
-        # Estimate yield stress from low shear rate extrapolation
-        # σ_y ≈ stress at γ̇ → 0
-        sigma_y_est = np.min(y_sorted[: len(y_sorted) // 10 + 1])
-        if sigma_y_est < 0:
-            sigma_y_est = 0.0
+        with log_fit(logger, model="HerschelBulkley", data_shape=data_shape, test_mode="rotation") as ctx:
+            logger.debug(
+                "Starting Herschel-Bulkley model fit",
+                n_points=data_shape[0] if data_shape else None,
+                initial_sigma_y=self.parameters.get_value("sigma_y"),
+                initial_K=self.parameters.get_value("K"),
+                initial_n=self.parameters.get_value("n"),
+            )
 
-        # Subtract yield stress for power-law fitting
-        y_corrected = y_sorted - sigma_y_est
-        y_corrected = np.maximum(y_corrected, 1e-10)  # Avoid log(0)
+            try:
+                # Sort by shear rate
+                sort_idx = np.argsort(X)
+                X_sorted = X[sort_idx]
+                y_sorted = y[sort_idx]
 
-        # Fit power law to corrected data: log(σ - σ_y) = log(K) + n*log(γ̇)
-        # Use middle to high shear rate region
-        start_idx = len(X_sorted) // 4
-        log_gamma = np.log(np.abs(X_sorted[start_idx:]))
-        log_stress = np.log(y_corrected[start_idx:])
+                logger.debug("Data sorted by shear rate", n_points=len(X_sorted))
 
-        coeffs = np.polyfit(log_gamma, log_stress, 1)
-        n_est = coeffs[0]
-        K_est = np.exp(coeffs[1])
+                # Estimate yield stress from low shear rate extrapolation
+                # σ_y ≈ stress at γ̇ → 0
+                sigma_y_est = np.min(y_sorted[: len(y_sorted) // 10 + 1])
+                if sigma_y_est < 0:
+                    sigma_y_est = 0.0
 
-        # Clip to bounds
-        sigma_y_est = np.clip(sigma_y_est, 0.0, 1e6)
-        K_est = np.clip(K_est, 1e-6, 1e6)
-        n_est = np.clip(n_est, 0.01, 2.0)
+                logger.debug("Yield stress estimated from low shear rate region", sigma_y_estimate=sigma_y_est)
 
-        self.parameters.set_value("sigma_y", float(sigma_y_est))
-        self.parameters.set_value("K", float(K_est))
-        self.parameters.set_value("n", float(n_est))
+                # Subtract yield stress for power-law fitting
+                y_corrected = y_sorted - sigma_y_est
+                y_corrected = np.maximum(y_corrected, 1e-10)  # Avoid log(0)
+
+                # Fit power law to corrected data: log(σ - σ_y) = log(K) + n*log(γ̇)
+                # Use middle to high shear rate region
+                start_idx = len(X_sorted) // 4
+                log_gamma = np.log(np.abs(X_sorted[start_idx:]))
+                log_stress = np.log(y_corrected[start_idx:])
+
+                logger.debug(
+                    "Performing power-law fit on yield-corrected data",
+                    fit_region_start_idx=start_idx,
+                    n_fit_points=len(log_gamma),
+                )
+
+                coeffs = np.polyfit(log_gamma, log_stress, 1)
+                n_est = coeffs[0]
+                K_est = np.exp(coeffs[1])
+
+                logger.debug(
+                    "Power-law regression results",
+                    slope=coeffs[0],
+                    intercept=coeffs[1],
+                    n_raw=n_est,
+                    K_raw=K_est,
+                )
+
+                # Clip to bounds
+                sigma_y_est = np.clip(sigma_y_est, 0.0, 1e6)
+                K_est = np.clip(K_est, 1e-6, 1e6)
+                n_est = np.clip(n_est, 0.01, 2.0)
+
+                self.parameters.set_value("sigma_y", float(sigma_y_est))
+                self.parameters.set_value("K", float(K_est))
+                self.parameters.set_value("n", float(n_est))
+
+                # Determine material type based on parameters
+                if sigma_y_est > 0 and abs(n_est - 1.0) < 0.05:
+                    material_type = "Bingham plastic"
+                elif sigma_y_est > 0:
+                    material_type = "yield stress fluid"
+                else:
+                    material_type = "power-law fluid"
+
+                logger.debug(
+                    "Herschel-Bulkley fit completed successfully",
+                    fitted_sigma_y=float(sigma_y_est),
+                    fitted_K=float(K_est),
+                    fitted_n=float(n_est),
+                    material_type=material_type,
+                )
+
+                ctx["sigma_y"] = float(sigma_y_est)
+                ctx["K"] = float(K_est)
+                ctx["n"] = float(n_est)
+
+            except Exception as e:
+                logger.error(
+                    "Herschel-Bulkley fit failed",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
 
         return self
 

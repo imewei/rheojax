@@ -23,6 +23,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class ColumnMapperDialog(QDialog):
     """Simple dialog for column reassignment.
@@ -58,6 +62,7 @@ class ColumnMapperDialog(QDialog):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self.file_path = file_path
         self.current_mapping = current_mapping or {}
@@ -69,6 +74,13 @@ class ColumnMapperDialog(QDialog):
 
         self._setup_ui()
         self._load_data()
+
+        logger.debug(
+            "Dialog initialized",
+            dialog=self.__class__.__name__,
+            file_path=file_path,
+            has_current_mapping=bool(current_mapping),
+        )
 
     def _setup_ui(self) -> None:
         """Set up user interface."""
@@ -94,6 +106,14 @@ class ColumnMapperDialog(QDialog):
         x_label.setMinimumWidth(150)
         x_layout.addWidget(x_label)
         self.x_combo = QComboBox()
+        self.x_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="x_column",
+                value=value,
+            )
+        )
         x_layout.addWidget(self.x_combo, 1)
         mapping_layout.addLayout(x_layout)
 
@@ -103,6 +123,14 @@ class ColumnMapperDialog(QDialog):
         y_label.setMinimumWidth(150)
         y_layout.addWidget(y_label)
         self.y_combo = QComboBox()
+        self.y_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="y_column",
+                value=value,
+            )
+        )
         y_layout.addWidget(self.y_combo, 1)
         mapping_layout.addLayout(y_layout)
 
@@ -112,6 +140,14 @@ class ColumnMapperDialog(QDialog):
         y2_label.setMinimumWidth(150)
         y2_layout.addWidget(y2_label)
         self.y2_combo = QComboBox()
+        self.y2_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="y2_column",
+                value=value,
+            )
+        )
         y2_layout.addWidget(self.y2_combo, 1)
         mapping_layout.addLayout(y2_layout)
 
@@ -121,6 +157,14 @@ class ColumnMapperDialog(QDialog):
         temp_label.setMinimumWidth(150)
         temp_layout.addWidget(temp_label)
         self.temp_combo = QComboBox()
+        self.temp_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="temperature_column",
+                value=value,
+            )
+        )
         temp_layout.addWidget(self.temp_combo, 1)
         mapping_layout.addLayout(temp_layout)
 
@@ -139,11 +183,26 @@ class ColumnMapperDialog(QDialog):
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
+        button_box.accepted.connect(self._on_accept)
+        button_box.rejected.connect(self._on_reject)
         layout.addWidget(button_box)
 
         self.setLayout(layout)
+
+    def _on_accept(self) -> None:
+        """Handle dialog accept."""
+        logger.debug("Dialog closed", dialog=self.__class__.__name__, result="accepted")
+        self.accept()
+
+    def _on_reject(self) -> None:
+        """Handle dialog reject."""
+        logger.debug("Dialog closed", dialog=self.__class__.__name__, result="rejected")
+        self.reject()
+
+    def showEvent(self, event) -> None:
+        """Handle dialog show event."""
+        super().showEvent(event)
+        logger.debug("Dialog opened", dialog=self.__class__.__name__)
 
     def _load_data(self) -> None:
         """Load data from file."""
@@ -152,6 +211,12 @@ class ColumnMapperDialog(QDialog):
 
         try:
             path = Path(self.file_path)
+            logger.debug(
+                "Loading data file",
+                dialog=self.__class__.__name__,
+                file_path=str(path),
+                suffix=path.suffix,
+            )
 
             # Read file to get columns
             if path.suffix.lower() in [".csv", ".txt"]:
@@ -169,6 +234,12 @@ class ColumnMapperDialog(QDialog):
                 self.df_preview = pd.read_csv(self.file_path, sep=delimiter, nrows=5)
 
             self.columns = list(self.df_preview.columns)
+            logger.debug(
+                "Data loaded successfully",
+                dialog=self.__class__.__name__,
+                num_columns=len(self.columns),
+                columns=self.columns,
+            )
 
             # Populate combo boxes
             self._populate_combos()
@@ -184,6 +255,13 @@ class ColumnMapperDialog(QDialog):
                 self._auto_detect()
 
         except Exception as e:
+            logger.error(
+                "Failed to load file",
+                dialog=self.__class__.__name__,
+                file_path=self.file_path,
+                error=str(e),
+                exc_info=True,
+            )
             QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
 
     def _populate_combos(self) -> None:
@@ -209,6 +287,12 @@ class ColumnMapperDialog(QDialog):
         """Apply current mapping to combo boxes."""
         if not self.current_mapping:
             return
+
+        logger.debug(
+            "Applying current mapping",
+            dialog=self.__class__.__name__,
+            mapping=self.current_mapping,
+        )
 
         # Set X column
         if "x" in self.current_mapping:
@@ -236,6 +320,8 @@ class ColumnMapperDialog(QDialog):
 
     def _auto_detect(self) -> None:
         """Auto-detect column mapping based on common patterns."""
+        logger.debug("Auto-detecting columns", dialog=self.__class__.__name__)
+
         # Common column name patterns
         x_patterns = ["freq", "frequency", "omega", "time", "t", "w", "rate", "shear"]
         y_patterns = [
@@ -263,10 +349,19 @@ class ColumnMapperDialog(QDialog):
                         return True
             return False
 
-        find_match(self.x_combo, x_patterns)
-        find_match(self.y_combo, y_patterns)
-        find_match(self.y2_combo, y2_patterns)
-        find_match(self.temp_combo, temp_patterns)
+        x_found = find_match(self.x_combo, x_patterns)
+        y_found = find_match(self.y_combo, y_patterns)
+        y2_found = find_match(self.y2_combo, y2_patterns)
+        temp_found = find_match(self.temp_combo, temp_patterns)
+
+        logger.debug(
+            "Auto-detect results",
+            dialog=self.__class__.__name__,
+            x_found=x_found,
+            y_found=y_found,
+            y2_found=y2_found,
+            temp_found=temp_found,
+        )
 
     def _update_preview(self) -> None:
         """Update preview table."""
@@ -311,6 +406,12 @@ class ColumnMapperDialog(QDialog):
         temp_col = self.temp_combo.currentText()
         if temp_col and temp_col != "(None)":
             mapping["temperature"] = temp_col
+
+        logger.debug(
+            "Getting mapping",
+            dialog=self.__class__.__name__,
+            mapping=mapping,
+        )
 
         return mapping
 

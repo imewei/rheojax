@@ -13,6 +13,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

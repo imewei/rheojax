@@ -6,10 +6,11 @@ when they have GPU hardware available but are using CPU-only JAX.
 
 from __future__ import annotations
 
-import logging
 import subprocess
 
-_logger = logging.getLogger(__name__)
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def get_system_cuda_version() -> tuple[str | None, int | None]:
@@ -21,6 +22,7 @@ def get_system_cuda_version() -> tuple[str | None, int | None]:
         Tuple of (full_version, major_version) or (None, None) if not found.
         Example: ("12.6", 12) or ("13.0", 13)
     """
+    logger.debug("Detecting system CUDA version via nvcc")
     try:
         result = subprocess.run(
             ["nvcc", "--version"],
@@ -37,16 +39,19 @@ def get_system_cuda_version() -> tuple[str | None, int | None]:
                     parts = line.split("release")[-1].strip()
                     version = parts.split(",")[0].strip()
                     major = int(version.split(".")[0])
+                    logger.info(
+                        "CUDA version detected", version=version, major=major
+                    )
                     return version, major
 
     except subprocess.TimeoutExpired:
-        _logger.debug("nvcc timed out")
+        logger.debug("nvcc timed out")
     except FileNotFoundError:
-        _logger.debug("nvcc not found")
+        logger.debug("nvcc not found")
     except (ValueError, IndexError) as e:
-        _logger.debug(f"Failed to parse CUDA version: {e}")
+        logger.error("Failed to parse CUDA version", error=str(e), exc_info=True)
     except Exception as e:
-        _logger.debug(f"CUDA detection failed: {e}")
+        logger.error("CUDA detection failed", error=str(e), exc_info=True)
 
     return None, None
 
@@ -77,13 +82,13 @@ def get_gpu_info() -> tuple[str | None, float | None]:
                 return gpu_name, sm_version
 
     except subprocess.TimeoutExpired:
-        _logger.debug("nvidia-smi timed out")
+        logger.debug("nvidia-smi timed out")
     except FileNotFoundError:
-        _logger.debug("nvidia-smi not found")
+        logger.debug("nvidia-smi not found")
     except (ValueError, IndexError) as e:
-        _logger.debug(f"Failed to parse GPU info: {e}")
+        logger.debug(f"Failed to parse GPU info: {e}")
     except Exception as e:
-        _logger.debug(f"GPU detection failed: {e}")
+        logger.debug(f"GPU detection failed: {e}")
 
     return None, None
 
@@ -101,11 +106,11 @@ def get_recommended_package() -> str | None:
     gpu_name, sm_version = get_gpu_info()
 
     if cuda_major is None:
-        _logger.debug("No system CUDA detected")
+        logger.debug("No system CUDA detected")
         return None
 
     if sm_version is None:
-        _logger.debug("No GPU detected")
+        logger.debug("No GPU detected")
         return None
 
     # Check compatibility
@@ -113,16 +118,16 @@ def get_recommended_package() -> str | None:
         if sm_version >= 7.5:
             return "jax[cuda13-local]"
         else:
-            _logger.debug(f"GPU SM {sm_version} doesn't support CUDA 13")
+            logger.debug(f"GPU SM {sm_version} doesn't support CUDA 13")
             return None
     elif cuda_major == 12:
         if sm_version >= 5.2:
             return "jax[cuda12-local]"
         else:
-            _logger.debug(f"GPU SM {sm_version} too old for CUDA 12")
+            logger.debug(f"GPU SM {sm_version} too old for CUDA 12")
             return None
     else:
-        _logger.debug(f"CUDA {cuda_major} not supported")
+        logger.debug(f"CUDA {cuda_major} not supported")
         return None
 
 
@@ -155,7 +160,7 @@ def check_gpu_availability(warn: bool = True) -> bool:
         cuda_version, cuda_major = get_system_cuda_version()
 
         if gpu_name is None:
-            _logger.debug("No GPU hardware detected")
+            logger.debug("No GPU hardware detected")
             return False
 
         # Check if JAX is using GPU
@@ -165,7 +170,7 @@ def check_gpu_availability(warn: bool = True) -> bool:
         using_gpu = any("cuda" in str(d).lower() for d in devices)
 
         if using_gpu:
-            _logger.debug(f"JAX is using GPU: {devices}")
+            logger.debug(f"JAX is using GPU: {devices}")
             return True
 
         # GPU available but not being used
@@ -175,10 +180,10 @@ def check_gpu_availability(warn: bool = True) -> bool:
         return False
 
     except ImportError:
-        _logger.debug("JAX not installed")
+        logger.debug("JAX not installed")
         return False
     except Exception as e:
-        _logger.debug(f"GPU check failed: {e}")
+        logger.debug(f"GPU check failed: {e}")
         return False
 
 

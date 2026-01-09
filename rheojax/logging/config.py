@@ -29,6 +29,7 @@ class LogFormat(Enum):
 
 # Default log levels by subsystem
 DEFAULT_SUBSYSTEM_LEVELS: dict[str, str] = {
+    # Core modules
     "rheojax.models": "INFO",
     "rheojax.core": "INFO",
     "rheojax.core.bayesian": "INFO",
@@ -38,7 +39,16 @@ DEFAULT_SUBSYSTEM_LEVELS: dict[str, str] = {
     "rheojax.utils": "INFO",
     "rheojax.utils.optimization": "INFO",
     "rheojax.visualization": "WARNING",
+    # GUI modules - hierarchical for fine-grained control
     "rheojax.gui": "INFO",
+    "rheojax.gui.app": "INFO",
+    "rheojax.gui.pages": "INFO",
+    "rheojax.gui.state": "INFO",
+    "rheojax.gui.services": "INFO",
+    "rheojax.gui.jobs": "INFO",
+    "rheojax.gui.widgets": "WARNING",  # Verbose at DEBUG, quiet by default
+    "rheojax.gui.dialogs": "WARNING",  # Verbose at DEBUG, quiet by default
+    "rheojax.gui.utils": "WARNING",
 }
 
 

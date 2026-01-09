@@ -17,6 +17,9 @@ References
 """
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Safe JAX import (enforces float64)
 # Float64 precision is critical for accurate Mittag-Leffler evaluations
@@ -82,8 +85,18 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
     # Validate alpha when not traced (static values only)
     if not isinstance(alpha, jax.core.Tracer):
         if not (0 < alpha <= 2):
+            logger.error(
+                "Invalid alpha parameter for Mittag-Leffler function",
+                alpha=alpha,
+                valid_range="(0, 2]",
+            )
             raise ValueError(f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}")
 
+    logger.debug(
+        "Computing one-parameter Mittag-Leffler E_alpha(z)",
+        alpha=alpha,
+        z_shape=getattr(z, "shape", "scalar"),
+    )
     return mittag_leffler_e2(z, alpha, beta=1.0)
 
 
@@ -156,12 +169,31 @@ def mittag_leffler_e2(
     # For JAX traced values, validation is skipped to allow JIT compilation
     if not isinstance(alpha, jax.core.Tracer):
         if not (0 < alpha <= 2):
+            logger.error(
+                "Invalid alpha parameter for Mittag-Leffler function",
+                alpha=alpha,
+                beta=beta,
+                valid_range="(0, 2]",
+            )
             raise ValueError(f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}")
+
+    logger.debug(
+        "Computing two-parameter Mittag-Leffler E_{alpha,beta}(z)",
+        alpha=alpha,
+        beta=beta,
+        z_shape=getattr(z, "shape", "scalar"),
+    )
 
     # Convert input to JAX array
     z_input = jnp.asarray(z)
     is_scalar = z_input.ndim == 0
     z = jnp.atleast_1d(z_input)
+
+    logger.debug(
+        "Using Pade(6,3) approximation for Mittag-Leffler evaluation",
+        n_points=len(z),
+        is_scalar=is_scalar,
+    )
 
     # Use Pade approximation (accurate for |z| < 10)
     result = _mittag_leffler_pade(z, alpha, beta)

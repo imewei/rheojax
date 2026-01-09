@@ -14,10 +14,14 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 HAS_JAX = True
+
+# Module-level logger
+logger = get_logger(__name__)
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper only
@@ -62,8 +66,20 @@ class ParameterConstraint:
         """
         if self.type == "bounds":
             if self.min_value is not None and value < self.min_value:
+                logger.debug(
+                    "Bound check failed: value below minimum",
+                    constraint_type=self.type,
+                    value=value,
+                    min_value=self.min_value,
+                )
                 return False
             if self.max_value is not None and value > self.max_value:
+                logger.debug(
+                    "Bound check failed: value above maximum",
+                    constraint_type=self.type,
+                    value=value,
+                    max_value=self.max_value,
+                )
                 return False
             return True
 
@@ -115,6 +131,12 @@ class Parameter:
         self._value: float | None = None
         self._clamp_on_set = False
         self._was_clamped = False
+        logger.debug(
+            "Creating parameter",
+            parameter=name,
+            bounds=bounds,
+            units=units,
+        )
         self._initialize(value)
 
     def _initialize(self, value: float | None) -> None:
@@ -124,6 +146,12 @@ class Parameter:
             lower = float(lower)
             upper = float(upper)
             if lower > upper:
+                logger.error(
+                    "Invalid bounds: lower > upper",
+                    parameter=self.name,
+                    bounds=(lower, upper),
+                    exc_info=True,
+                )
                 raise ValueError(
                     f"Invalid bounds for parameter '{self.name}': {(lower, upper)}"
                 )
@@ -159,22 +187,46 @@ class Parameter:
         try:
             numeric_val = float(val)
         except (TypeError, ValueError) as exc:
+            logger.error(
+                "Failed to convert value to numeric",
+                parameter=self.name,
+                value=val,
+                exc_info=True,
+            )
             raise ValueError(
                 f"Parameter '{self.name}' requires a numeric value"
             ) from exc
 
         if not np.isfinite(numeric_val):
+            logger.error(
+                "Non-finite value received",
+                parameter=self.name,
+                value=numeric_val,
+                exc_info=True,
+            )
             raise ValueError(f"Parameter '{self.name}' received non-finite value")
 
         clamped_during_init = False
         if self.bounds:
             lower, upper = self.bounds
+            logger.debug(
+                "Bound check",
+                parameter=self.name,
+                value=numeric_val,
+                bounds=self.bounds,
+            )
             if self._clamp_on_set:
                 if numeric_val < lower:
                     warnings.warn(
                         f"Parameter '{self.name}' initialized below bounds; clamped to {lower}",
                         RuntimeWarning,
                         stacklevel=2,
+                    )
+                    logger.debug(
+                        "Value clamped to lower bound",
+                        parameter=self.name,
+                        original_value=numeric_val,
+                        clamped_value=lower,
                     )
                     numeric_val = lower
                     clamped_during_init = True
@@ -184,9 +236,22 @@ class Parameter:
                         RuntimeWarning,
                         stacklevel=2,
                     )
+                    logger.debug(
+                        "Value clamped to upper bound",
+                        parameter=self.name,
+                        original_value=numeric_val,
+                        clamped_value=upper,
+                    )
                     numeric_val = upper
                     clamped_during_init = True
             elif numeric_val < lower or numeric_val > upper:
+                logger.error(
+                    "Value out of bounds",
+                    parameter=self.name,
+                    value=numeric_val,
+                    bounds=self.bounds,
+                    exc_info=True,
+                )
                 raise ValueError(f"Value {numeric_val} out of bounds {self.bounds}")
 
         if self._clamp_on_set:
@@ -213,6 +278,12 @@ class Parameter:
         """
         for constraint in self.constraints:
             if not constraint.validate(value, context):
+                logger.debug(
+                    "Constraint validation failed",
+                    parameter=self.name,
+                    value=value,
+                    constraint_type=constraint.type,
+                )
                 return False
         return True
 
@@ -271,6 +342,7 @@ class ParameterSet:
         """Initialize empty parameter set."""
         self._parameters: dict[str, Parameter] = {}
         self._order: list[str] = []
+        logger.debug("ParameterSet created")
 
     def add(
         self,
@@ -294,6 +366,13 @@ class ParameterSet:
         Returns:
             The created Parameter object
         """
+        logger.debug(
+            "Adding parameter to set",
+            operation="add",
+            parameter=name,
+            value=value,
+            bounds=bounds,
+        )
         param = Parameter(
             name=name,
             value=value,
@@ -307,6 +386,11 @@ class ParameterSet:
         if name not in self._order:
             self._order.append(name)
 
+        logger.debug(
+            "Parameter added",
+            operation="add",
+            params=list(self._parameters.keys()),
+        )
         return param
 
     def get(self, name: str) -> Parameter | None:
@@ -318,6 +402,11 @@ class ParameterSet:
         Returns:
             Parameter object or None if not found
         """
+        logger.debug(
+            "Getting parameter",
+            operation="get",
+            parameter=name,
+        )
         return self._parameters.get(name)
 
     def set_value(self, name: str, value: float):
@@ -331,7 +420,19 @@ class ParameterSet:
             KeyError: If parameter not found
             ValueError: If value violates constraints
         """
+        logger.debug(
+            "Setting parameter value",
+            operation="set_value",
+            parameter=name,
+            value=value,
+        )
         if name not in self._parameters:
+            logger.error(
+                "Parameter not found",
+                parameter=name,
+                available_params=list(self._parameters.keys()),
+                exc_info=True,
+            )
             raise KeyError(f"Parameter '{name}' not found")
 
         param = self._parameters[name]
@@ -341,6 +442,12 @@ class ParameterSet:
             p.name: p.value for p in self._parameters.values() if p.value is not None
         }
         if not param.validate(value, context):
+            logger.error(
+                "Value violates constraints",
+                parameter=name,
+                value=value,
+                exc_info=True,
+            )
             raise ValueError(
                 f"Value {value} violates constraints for parameter '{name}'"
             )
@@ -358,11 +465,30 @@ class ParameterSet:
             KeyError: If parameter not found
             ValueError: If bounds are invalid
         """
+        logger.debug(
+            "Setting parameter bounds",
+            operation="set_bounds",
+            parameter=name,
+            bounds=bounds,
+        )
         if name not in self._parameters:
+            logger.error(
+                "Parameter not found",
+                parameter=name,
+                available_params=list(self._parameters.keys()),
+                exc_info=True,
+            )
             raise KeyError(f"Parameter '{name}' not found")
 
         min_val, max_val = bounds
         if min_val >= max_val:
+            logger.error(
+                "Invalid bounds: min >= max",
+                parameter=name,
+                min_val=min_val,
+                max_val=max_val,
+                exc_info=True,
+            )
             raise ValueError(
                 f"Invalid bounds: min ({min_val}) must be < max ({max_val})"
             )
@@ -394,6 +520,12 @@ class ParameterSet:
         for name in self._order:
             param = self._parameters[name]
             values.append(param.value if param.value is not None else 0.0)
+        logger.debug(
+            "Getting all parameter values",
+            operation="get_values",
+            params=list(self._parameters.keys()),
+            num_params=len(values),
+        )
         return np.array(values)
 
     def set_values(self, values: ArrayLike | dict[str, float]):
@@ -405,14 +537,31 @@ class ParameterSet:
         Raises:
             ValueError: If wrong number of values (array) or unknown parameter (dict)
         """
+        logger.debug(
+            "Setting multiple parameter values",
+            operation="set_values",
+            params=list(self._parameters.keys()),
+        )
         if isinstance(values, dict):
             for name, value in values.items():
                 if name not in self._parameters:
+                    logger.error(
+                        "Unknown parameter in dict",
+                        parameter=name,
+                        available_params=list(self._parameters.keys()),
+                        exc_info=True,
+                    )
                     raise ValueError(f"Unknown parameter: {name}")
                 self.set_value(name, float(value))
         else:
             values = np.atleast_1d(values)
             if len(values) != len(self._order):
+                logger.error(
+                    "Wrong number of values",
+                    expected=len(self._order),
+                    got=len(values),
+                    exc_info=True,
+                )
                 raise ValueError(
                     f"Expected {len(self._order)} values, got {len(values)}"
                 )
@@ -432,6 +581,12 @@ class ParameterSet:
                 bounds.append(param.bounds)
             else:
                 bounds.append((None, None))
+        logger.debug(
+            "Getting all parameter bounds",
+            operation="get_bounds",
+            params=list(self._parameters.keys()),
+            num_params=len(bounds),
+        )
         return bounds
 
     def get_value(self, name: str) -> float | None:
@@ -524,6 +679,12 @@ class ParameterSet:
             >>> value = params['alpha'].value  # Get value
         """
         if key not in self._parameters:
+            logger.error(
+                "Parameter not found in subscript access",
+                parameter=key,
+                available_params=list(self._parameters.keys()),
+                exc_info=True,
+            )
             raise KeyError(f"Parameter '{key}' not found in ParameterSet")
         return self._parameters[key]
 
@@ -545,6 +706,11 @@ class ParameterSet:
             >>> # Or replace entire parameter:
             >>> params['alpha'] = Parameter('alpha', value=0.8, bounds=(0, 1))
         """
+        logger.debug(
+            "Setting parameter via subscript",
+            operation="__setitem__",
+            parameter=key,
+        )
         if isinstance(value, Parameter):
             # Replace entire parameter
             self._parameters[key] = value
@@ -553,6 +719,12 @@ class ParameterSet:
         else:
             # Set value only
             if key not in self._parameters:
+                logger.error(
+                    "Parameter not found for subscript assignment",
+                    parameter=key,
+                    available_params=list(self._parameters.keys()),
+                    exc_info=True,
+                )
                 raise KeyError(
                     f"Parameter '{key}' not found. Use add() to create new parameters."
                 )
@@ -560,11 +732,21 @@ class ParameterSet:
 
     def to_dict(self) -> dict[str, dict[str, Any]]:
         """Convert to dictionary representation."""
+        logger.debug(
+            "Converting ParameterSet to dict",
+            operation="to_dict",
+            params=list(self._parameters.keys()),
+        )
         return {name: self._parameters[name].to_dict() for name in self._order}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ParameterSet:
         """Create from dictionary representation."""
+        logger.debug(
+            "Creating ParameterSet from dict",
+            operation="from_dict",
+            params=list(data.keys()),
+        )
         params = cls()
         for name, param_data in data.items():
             if isinstance(param_data, dict):
@@ -590,6 +772,7 @@ class SharedParameterSet:
         self._shared: dict[str, Parameter] = {}
         self._links: dict[str, list[Any]] = {}  # Parameter -> list of linked objects
         self._groups: dict[str, list[str]] = {}  # Group name -> parameter names
+        logger.debug("SharedParameterSet created")
 
     def add_shared(
         self,
@@ -613,6 +796,14 @@ class SharedParameterSet:
         Returns:
             The created Parameter
         """
+        logger.debug(
+            "Adding shared parameter",
+            operation="add_shared",
+            parameter=name,
+            value=value,
+            bounds=bounds,
+            group=group,
+        )
         param = Parameter(
             name=name,
             value=value,
@@ -629,6 +820,11 @@ class SharedParameterSet:
                 self._groups[group] = []
             self._groups[group].append(name)
 
+        logger.debug(
+            "Shared parameter added",
+            operation="add_shared",
+            params=list(self._shared.keys()),
+        )
         return param
 
     def link_model(self, model: Any, param_name: str):
@@ -638,7 +834,18 @@ class SharedParameterSet:
             model: Model to link
             param_name: Name of shared parameter
         """
+        logger.debug(
+            "Linking model to shared parameter",
+            operation="link_model",
+            parameter=param_name,
+        )
         if param_name not in self._shared:
+            logger.error(
+                "Shared parameter not found for linking",
+                parameter=param_name,
+                available_params=list(self._shared.keys()),
+                exc_info=True,
+            )
             raise KeyError(f"Shared parameter '{param_name}' not found")
 
         if model not in self._links[param_name]:
@@ -651,7 +858,18 @@ class SharedParameterSet:
             param_set: ParameterSet to link
             param_name: Name of shared parameter
         """
+        logger.debug(
+            "Linking ParameterSet to shared parameter",
+            operation="link_parameter_set",
+            parameter=param_name,
+        )
         if param_name not in self._shared:
+            logger.error(
+                "Shared parameter not found for linking",
+                parameter=param_name,
+                available_params=list(self._shared.keys()),
+                exc_info=True,
+            )
             raise KeyError(f"Shared parameter '{param_name}' not found")
 
         if param_set not in self._links[param_name]:
@@ -667,13 +885,31 @@ class SharedParameterSet:
         Raises:
             ValueError: If value violates constraints
         """
+        logger.debug(
+            "Setting shared parameter value",
+            operation="set_value",
+            parameter=name,
+            value=value,
+        )
         if name not in self._shared:
+            logger.error(
+                "Shared parameter not found",
+                parameter=name,
+                available_params=list(self._shared.keys()),
+                exc_info=True,
+            )
             raise KeyError(f"Shared parameter '{name}' not found")
 
         param = self._shared[name]
 
         # Validate
         if not param.validate(value):
+            logger.error(
+                "Value violates constraints for shared parameter",
+                parameter=name,
+                value=value,
+                exc_info=True,
+            )
             raise ValueError(
                 f"Value {value} violates constraints for parameter '{name}'"
             )
@@ -723,6 +959,12 @@ class SharedParameterSet:
             group_name: Name for the group
             param_names: Parameter names to include
         """
+        logger.debug(
+            "Creating parameter group",
+            operation="create_group",
+            group=group_name,
+            params=param_names,
+        )
         self._groups[group_name] = param_names
 
     def get_group(self, group_name: str) -> list[str]:
@@ -764,6 +1006,12 @@ class ParameterOptimizer:
         self.objective: Callable | None = None
         self.constraints: list[Callable] = []
         self.callback: Callable | None = None
+        logger.debug(
+            "ParameterOptimizer created",
+            num_params=len(parameters),
+            use_jax=self.use_jax,
+            track_history=track_history,
+        )
 
     @property
     def n_parameters(self) -> int:
@@ -784,6 +1032,10 @@ class ParameterOptimizer:
         Args:
             objective: Function that takes parameter values and returns scalar
         """
+        logger.debug(
+            "Setting objective function",
+            operation="set_objective",
+        )
         self.objective = objective
 
     def evaluate(self, values: ArrayLike) -> float:
@@ -796,6 +1048,10 @@ class ParameterOptimizer:
             Objective function value
         """
         if self.objective is None:
+            logger.error(
+                "No objective function set",
+                exc_info=True,
+            )
             raise ValueError("No objective function set")
 
         result = self.objective(values)
@@ -815,6 +1071,11 @@ class ParameterOptimizer:
         Returns:
             Gradient vector
         """
+        logger.debug(
+            "Computing gradient",
+            operation="compute_gradient",
+            use_jax=self.use_jax,
+        )
         if not self.use_jax or not HAS_JAX:
             # Numerical gradient
             eps = 1e-8
@@ -843,6 +1104,11 @@ class ParameterOptimizer:
         Args:
             constraint: Function that returns >= 0 for valid values
         """
+        logger.debug(
+            "Adding optimization constraint",
+            operation="add_constraint",
+            num_constraints=len(self.constraints) + 1,
+        )
         self.constraints.append(constraint)
 
     def validate_constraints(self, values: ArrayLike) -> bool:
@@ -857,6 +1123,10 @@ class ParameterOptimizer:
         values_array = _coerce_array(values)
         for constraint in self.constraints:
             if constraint(values_array) < 0:
+                logger.debug(
+                    "Constraint validation failed",
+                    operation="validate_constraints",
+                )
                 return False
         return True
 
@@ -866,6 +1136,10 @@ class ParameterOptimizer:
         Args:
             callback: Function called after each iteration
         """
+        logger.debug(
+            "Setting optimization callback",
+            operation="set_callback",
+        )
         self.callback = callback
 
     def step(self, values: ArrayLike, iteration: int | None = None):

@@ -14,7 +14,6 @@ values, "Interval and data points:" markers, and locale-aware decimal separators
 
 from __future__ import annotations
 
-import logging
 import math
 import re
 import warnings
@@ -28,8 +27,9 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.data import RheoData
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # =============================================================================
@@ -210,7 +210,7 @@ def _detect_encoding(filepath: Path) -> str:
             with open(filepath, encoding=encoding) as f:
                 # Read a sample to verify encoding works
                 f.read(4096)
-            logger.debug(f"Detected encoding: {encoding}")
+            logger.debug("Detected encoding", encoding=encoding)
             return encoding
         except (UnicodeDecodeError, UnicodeError):
             continue
@@ -398,6 +398,8 @@ def _parse_single_interval(
         int(header_match.group(2)) if header_match and header_match.group(2) else None
     )
 
+    logger.debug("Parsing interval", interval_index=interval_idx, n_points=n_points)
+
     # Find "Interval data:" line with column headers
     data_start_idx = None
     column_headers = []
@@ -483,6 +485,13 @@ def _parse_single_interval(
     # Create DataFrame
     df = pd.DataFrame(data_rows, columns=column_headers)
 
+    logger.debug(
+        "Interval parsed",
+        interval_index=interval_idx,
+        n_rows=len(df),
+        n_cols=len(df.columns),
+    )
+
     return IntervalBlock(
         interval_index=interval_idx,
         n_points=n_points,
@@ -521,7 +530,10 @@ def parse_rheocompass_intervals(
         UnicodeDecodeError: Encoding detection failed
     """
     filepath = Path(filepath)
+    logger.info("Opening file", filepath=str(filepath))
+
     if not filepath.exists():
+        logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
     # Detect encoding (using cached version for repeated file access)
@@ -536,7 +548,7 @@ def parse_rheocompass_intervals(
 
     # Detect decimal separator from content sample
     decimal_sep = _detect_decimal_separator(content[:4096])
-    logger.debug(f"Detected decimal separator: {decimal_sep}")
+    logger.debug("Detected decimal separator", decimal_sep=decimal_sep)
 
     # Extract global metadata
     global_metadata = _extract_global_metadata(lines)
@@ -544,10 +556,13 @@ def parse_rheocompass_intervals(
     # Find interval boundaries
     boundaries = _find_interval_boundaries(lines)
     if not boundaries:
+        logger.error("No interval blocks found", filepath=str(filepath))
         raise ValueError(
             f"No interval blocks found in file. "
             f"Expected '{marker}' markers in RheoCompass format."
         )
+
+    logger.debug("Found interval boundaries", n_intervals=len(boundaries))
 
     # Parse each interval
     blocks = []
@@ -557,11 +572,18 @@ def parse_rheocompass_intervals(
             block = _parse_single_interval(lines, start_idx, end_idx, decimal_sep)
             blocks.append(block)
         except ValueError as e:
-            logger.warning(f"Failed to parse interval {interval_idx}: {e}")
+            logger.warning("Failed to parse interval", interval=interval_idx, error=str(e))
             continue
 
     if not blocks:
+        logger.error("Failed to parse any interval blocks", filepath=str(filepath))
         raise ValueError("Failed to parse any interval blocks from file")
+
+    logger.info(
+        "File parsed",
+        filepath=str(filepath),
+        n_intervals=len(blocks),
+    )
 
     return global_metadata, blocks
 
@@ -1209,6 +1231,7 @@ def load_anton_paar(
         matching = [b for b in blocks if b.interval_index == interval]
         if not matching:
             valid_indices = [b.interval_index for b in blocks]
+            logger.error("Interval not found", interval=interval, valid_indices=valid_indices)
             raise ValueError(
                 f"Interval {interval} not found. Valid intervals: {valid_indices}"
             )
@@ -1234,6 +1257,7 @@ def load_anton_paar(
         detected_mode = test_mode
         if detected_mode is None:
             detected_mode = _detect_test_type(mapped_df)
+            logger.debug("Auto-detected test mode", test_mode=detected_mode, interval=block.interval_index)
 
         if detected_mode is None:
             warnings.warn(
@@ -1263,6 +1287,7 @@ def load_anton_paar(
                 block, global_meta, mapped_df, mapped_units
             )
         else:
+            logger.error("Unknown test mode", test_mode=detected_mode)
             raise ValueError(f"Unknown test mode: {detected_mode}")
 
         # Handle custom column overrides
@@ -1335,6 +1360,7 @@ def save_intervals_to_excel(
     try:
         import pandas as pd
     except ImportError as exc:
+        logger.error("pandas not installed for Excel export", exc_info=True)
         raise ImportError(
             "pandas is required for Excel export. Install with: pip install pandas openpyxl"
         ) from exc
@@ -1365,7 +1391,7 @@ def save_intervals_to_excel(
             interval_df = _create_interval_dataframe(rheo_data)
             interval_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    logger.info(f"Exported {len(rheo_data_list)} intervals to {filepath}")
+    logger.info("Exported intervals to Excel", filepath=str(filepath), n_intervals=len(rheo_data_list))
 
 
 def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:

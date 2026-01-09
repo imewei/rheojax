@@ -6,7 +6,6 @@ Bayesian inference interface with prior specification and MCMC monitoring.
 """
 
 import json
-import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -14,7 +13,9 @@ from typing import Any
 
 import numpy as np
 
-logger = logging.getLogger(__name__)
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
@@ -80,6 +81,7 @@ class BayesianPage(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self._store = StateStore()
         self._bayesian_service = BayesianService()
         self._model_service = ModelService()
@@ -358,6 +360,7 @@ class BayesianPage(QWidget):
 
     def _on_run_clicked(self) -> None:
         """Handle run button click."""
+        logger.debug("Inference triggered", page="BayesianPage")
         state = self._store.get_state()
         model_name = state.active_model_name
         dataset = self._store.get_active_dataset()
@@ -435,6 +438,18 @@ class BayesianPage(QWidget):
             warm_start_dict = self._select_warm_start_params(model_name, dataset.id)
             if warm_start_dict:
                 self._status_text.append(f"Using NLSQ warm-start: {warm_start_dict}")
+
+        # Log inference start
+        logger.info(
+            "Bayesian inference started",
+            model_name=model_name,
+            dataset_id=dataset.id,
+            num_warmup=config.get("num_warmup", 1000),
+            num_samples=config.get("num_samples", 2000),
+            num_chains=config.get("num_chains", 4),
+            warm_start=warm_start_dict is not None,
+            page="BayesianPage",
+        )
 
         # Create and run worker (only pass args BayesianWorker accepts)
         self._current_worker = BayesianWorker(
@@ -611,21 +626,40 @@ class BayesianPage(QWidget):
             # Update raw + fitted plot
             try:
                 self._update_fit_plot_from_posterior(result)
-            except Exception:
+            except Exception as e:
                 # Plotting is best-effort; keep the Bayesian results UI usable.
-                pass
+                logger.error(
+                    "Failed to update fit plot from posterior",
+                    page="BayesianPage",
+                    exc_info=True,
+                )
 
             # Update credible intervals table
             self._update_intervals_table(result)
 
+            # Log inference completion
+            sampling_time = getattr(result, "sampling_time", 0.0)
+            logger.info(
+                "Bayesian inference completed",
+                model_name=model_name,
+                dataset_id=dataset_id,
+                sampling_time=sampling_time,
+                page="BayesianPage",
+            )
+
             self._status_text.append("Bayesian inference completed successfully!")
-            self._status_text.append(f"Sampling time: {result.sampling_time:.2f}s")
+            self._status_text.append(f"Sampling time: {sampling_time:.2f}s")
             self.run_completed.emit(result)
         else:
             # Get message if available, otherwise use generic
             message = getattr(result, "message", "Inference did not converge")
             self._store.dispatch(bayesian_failed(message))
             self._status_text.append(f"Bayesian inference failed: {message}")
+            logger.error(
+                "Bayesian inference failed",
+                message=message,
+                page="BayesianPage",
+            )
             QMessageBox.warning(self, "Inference Failed", message)
 
     @Slot(str)
@@ -644,6 +678,12 @@ class BayesianPage(QWidget):
 
         self._store.dispatch(bayesian_failed(error_msg))
         self._status_text.append(f"Error: {error_msg}")
+        logger.error(
+            "Bayesian inference error",
+            error_msg=error_msg,
+            page="BayesianPage",
+            exc_info=True,
+        )
         QMessageBox.critical(self, "Inference Error", error_msg)
 
     @Slot()
@@ -1082,6 +1122,12 @@ class BayesianPage(QWidget):
 
     def _apply_preset(self, name: str) -> None:
         """Apply sampler/prior presets derived from example notebooks."""
+        logger.debug(
+            "Prior config changed",
+            parameter="preset",
+            value=name,
+            page="BayesianPage",
+        )
         self._current_preset = "custom"
         self._preset_priors = None
         self._preset_dataset_path = None
@@ -1228,6 +1274,12 @@ class BayesianPage(QWidget):
                     f"Results would be exported to: {filepath}",
                 )
         except Exception as e:
+            logger.error(
+                "Failed to export Bayesian results",
+                filepath=filepath,
+                page="BayesianPage",
+                exc_info=True,
+            )
             QMessageBox.critical(self, "Export Error", f"Failed to export results: {e}")
 
     def run_bayesian(
@@ -1276,6 +1328,12 @@ class BayesianPage(QWidget):
         prior_spec : dict
             Prior specification (e.g., {"distribution": "normal", "loc": 0, "scale": 1})
         """
+        logger.debug(
+            "Prior config changed",
+            parameter=param_name,
+            value=prior_spec,
+            page="BayesianPage",
+        )
         # Store prior specs in state using a nested dict structure
         state = self._store.get_state()
 

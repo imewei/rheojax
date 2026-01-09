@@ -28,6 +28,9 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -68,16 +71,31 @@ def validate_prony_parameters(
         >>> print(valid)
         True
     """
+    logger.debug(
+        "Validating Prony series parameters",
+        E_inf=E_inf,
+        n_modes=len(E_i) if hasattr(E_i, "__len__") else 1,
+    )
+
     # Convert to numpy arrays for consistent handling
     E_i_arr = np.asarray(E_i)
     tau_i_arr = np.asarray(tau_i)
 
     # Check E_inf non-negative
     if E_inf < 0:
+        logger.debug(
+            "Prony validation failed: negative E_inf",
+            E_inf=E_inf,
+        )
         return False, f"E_inf must be non-negative, got {E_inf}"
 
     # Check array lengths match
     if len(E_i_arr) != len(tau_i_arr):
+        logger.debug(
+            "Prony validation failed: length mismatch",
+            len_E_i=len(E_i_arr),
+            len_tau_i=len(tau_i_arr),
+        )
         return (
             False,
             f"E_i and tau_i must have same length, got {len(E_i_arr)} and {len(tau_i_arr)}",
@@ -86,6 +104,10 @@ def validate_prony_parameters(
     # Check all Eᵢ > 0
     if np.any(E_i_arr <= 0):
         neg_indices = np.where(E_i_arr <= 0)[0]
+        logger.debug(
+            "Prony validation failed: non-positive mode strengths",
+            neg_indices=neg_indices.tolist(),
+        )
         return (
             False,
             f"All E_i must be positive, found non-positive at indices {neg_indices.tolist()}",
@@ -94,11 +116,16 @@ def validate_prony_parameters(
     # Check all τᵢ > 0
     if np.any(tau_i_arr <= 0):
         neg_indices = np.where(tau_i_arr <= 0)[0]
+        logger.debug(
+            "Prony validation failed: non-positive relaxation times",
+            neg_indices=neg_indices.tolist(),
+        )
         return (
             False,
             f"All tau_i must be positive, found non-positive at indices {neg_indices.tolist()}",
         )
 
+    logger.debug("Prony parameters validation passed", n_modes=len(E_i_arr))
     return True, ""
 
 
@@ -127,10 +154,25 @@ def create_prony_parameter_set(
         >>> list(params.keys())
         ['G_inf', 'G_1', 'G_2', 'G_3', 'tau_1', 'tau_2', 'tau_3']
     """
+    logger.debug(
+        "Creating Prony ParameterSet",
+        n_modes=n_modes,
+        modulus_type=modulus_type,
+    )
+
     if n_modes < 1:
+        logger.error(
+            "Invalid n_modes for Prony ParameterSet",
+            n_modes=n_modes,
+        )
         raise ValueError(f"n_modes must be ≥ 1, got {n_modes}")
 
     if modulus_type not in ["shear", "tensile"]:
+        logger.error(
+            "Invalid modulus_type for Prony ParameterSet",
+            modulus_type=modulus_type,
+            valid_types=["shear", "tensile"],
+        )
         raise ValueError(
             f"modulus_type must be 'shear' or 'tensile', got {modulus_type}"
         )
@@ -170,6 +212,12 @@ def create_prony_parameter_set(
             description=f"Mode {i} relaxation time",
         )
 
+    logger.info(
+        "Created Prony ParameterSet",
+        n_modes=n_modes,
+        modulus_type=modulus_type,
+        n_parameters=len(param_set),
+    )
     return param_set
 
 
@@ -337,12 +385,23 @@ def select_optimal_n(
         >>> print(n_opt)
         5
     """
+    logger.debug(
+        "Selecting optimal number of modes",
+        n_candidates=len(r2_values),
+        optimization_factor=optimization_factor,
+    )
+
     if optimization_factor < 1.0:
+        logger.error(
+            "Invalid optimization_factor",
+            optimization_factor=optimization_factor,
+        )
         raise ValueError(
             f"optimization_factor must be ≥ 1.0, got {optimization_factor}"
         )
 
     if not r2_values:
+        logger.error("Empty r2_values dictionary")
         raise ValueError("r2_values cannot be empty")
 
     # Find maximum R² (best fit)
@@ -357,16 +416,36 @@ def select_optimal_n(
     # Set threshold
     r2_threshold = r2_max - allowed_degradation
 
+    logger.debug(
+        "Computed R2 threshold for mode selection",
+        r2_max=r2_max,
+        r2_threshold=r2_threshold,
+        allowed_degradation=allowed_degradation,
+    )
+
     # Find smallest N satisfying threshold
     # Sort by N (ascending) to find minimum N first
     n_sorted = sorted(r2_values.keys())
 
     for n in n_sorted:
         if r2_values[n] >= r2_threshold:
+            logger.info(
+                "Selected optimal number of modes",
+                n_opt=n,
+                r2_at_n_opt=r2_values[n],
+                r2_max=r2_max,
+                r2_threshold=r2_threshold,
+            )
             return n
 
     # If no N satisfies threshold (shouldn't happen), return smallest N
-    return min(n_sorted)
+    n_opt = min(n_sorted)
+    logger.info(
+        "Selected minimum N (no N satisfied threshold)",
+        n_opt=n_opt,
+        r2_at_n_opt=r2_values[n_opt],
+    )
+    return n_opt
 
 
 def softmax_penalty(E_i: ArrayLike, scale: float = 1.0):
@@ -457,13 +536,26 @@ def warm_start_from_n_modes(
         - Warm-start can provide 2-5x speedup in element minimization
         - Compilation reuse provides additional speedup when combined with this
     """
+    logger.debug(
+        "Extracting warm-start parameters",
+        n_target=n_target,
+        params_length=len(params_n) if hasattr(params_n, "__len__") else 1,
+        modulus_type=modulus_type,
+    )
+
     if n_target < 1:
+        logger.error("Invalid n_target for warm-start", n_target=n_target)
         raise ValueError(f"n_target must be ≥ 1, got {n_target}")
 
     params_arr = np.asarray(params_n)
 
     # Infer current N from params length: 2*N + 1
     if (len(params_arr) - 1) % 2 != 0:
+        logger.error(
+            "Invalid parameter array format",
+            params_length=len(params_arr),
+            expected_format="2*N+1",
+        )
         raise ValueError(
             f"Invalid params_n length {len(params_arr)}, expected 2*N+1 format"
         )
@@ -480,11 +572,22 @@ def warm_start_from_n_modes(
         # Truncate to first n_target modes
         E_i_target = E_i[:n_target]
         tau_i_target = tau_i[:n_target]
+        logger.debug(
+            "Warm-start: reducing modes",
+            n_current=n_current,
+            n_target=n_target,
+            operation="truncate",
+        )
 
     # Case 2: Same number of modes (no-op)
     elif n_target == n_current:
         E_i_target = E_i
         tau_i_target = tau_i
+        logger.debug(
+            "Warm-start: same number of modes",
+            n_current=n_current,
+            operation="passthrough",
+        )
 
     # Case 3: Increase modes (edge case, pad with small values)
     else:
@@ -492,8 +595,20 @@ def warm_start_from_n_modes(
         n_pad = n_target - n_current
         E_i_target = np.concatenate([E_i, np.full(n_pad, 1e3)])
         tau_i_target = np.concatenate([tau_i, np.logspace(-2, 2, n_pad)])
+        logger.debug(
+            "Warm-start: increasing modes",
+            n_current=n_current,
+            n_target=n_target,
+            n_pad=n_pad,
+            operation="pad",
+        )
 
     # Reconstruct parameter array
     params_target = np.concatenate([[E_inf], E_i_target, tau_i_target])
 
+    logger.debug(
+        "Warm-start parameters extracted",
+        output_length=len(params_target),
+        E_inf=E_inf,
+    )
     return params_target

@@ -16,9 +16,13 @@ from matplotlib.figure import Figure
 
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+# Module logger
+logger = get_logger(__name__)
 
 # Default plotting style parameters
 DEFAULT_STYLE = {
@@ -140,13 +144,35 @@ def plot_rheo_data(
         >>> data = RheoData(x=time, y=stress, domain="time")
         >>> fig, ax = plot_rheo_data(data)
     """
-    test_mode = data.metadata.get("test_mode", "")
+    logger.debug("Generating plot", plot_type="rheo_data", style=style)
 
-    # Select plot type based on domain and test mode
-    if data.domain == "frequency" or test_mode == "oscillation":
-        # Complex modulus data
-        if np.iscomplexobj(data.y):
-            return plot_frequency_domain(
+    try:
+        test_mode = data.metadata.get("test_mode", "")
+
+        # Select plot type based on domain and test mode
+        if data.domain == "frequency" or test_mode == "oscillation":
+            # Complex modulus data
+            if np.iscomplexobj(data.y):
+                result = plot_frequency_domain(
+                    _ensure_numpy(data.x),
+                    _ensure_numpy(data.y),
+                    x_units=data.x_units,
+                    y_units=data.y_units,
+                    style=style,
+                    **kwargs,
+                )
+            else:
+                result = plot_time_domain(
+                    _ensure_numpy(data.x),
+                    _ensure_numpy(data.y),
+                    x_units=data.x_units,
+                    y_units=data.y_units,
+                    style=style,
+                    **kwargs,
+                )
+        elif test_mode == "rotation" or data.x_units in ["1/s", "s^-1"]:
+            # Flow curve data
+            result = plot_flow_curve(
                 _ensure_numpy(data.x),
                 _ensure_numpy(data.y),
                 x_units=data.x_units,
@@ -155,7 +181,8 @@ def plot_rheo_data(
                 **kwargs,
             )
         else:
-            return plot_time_domain(
+            # Time-domain data (relaxation, creep, etc.)
+            result = plot_time_domain(
                 _ensure_numpy(data.x),
                 _ensure_numpy(data.y),
                 x_units=data.x_units,
@@ -163,26 +190,18 @@ def plot_rheo_data(
                 style=style,
                 **kwargs,
             )
-    elif test_mode == "rotation" or data.x_units in ["1/s", "s^-1"]:
-        # Flow curve data
-        return plot_flow_curve(
-            _ensure_numpy(data.x),
-            _ensure_numpy(data.y),
-            x_units=data.x_units,
-            y_units=data.y_units,
-            style=style,
-            **kwargs,
+
+        logger.debug("Figure created", plot_type="rheo_data")
+        return result
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate rheo_data plot",
+            plot_type="rheo_data",
+            error=str(e),
+            exc_info=True,
         )
-    else:
-        # Time-domain data (relaxation, creep, etc.)
-        return plot_time_domain(
-            _ensure_numpy(data.x),
-            _ensure_numpy(data.y),
-            x_units=data.x_units,
-            y_units=data.y_units,
-            style=style,
-            **kwargs,
-        )
+        raise
 
 
 def plot_time_domain(
@@ -210,54 +229,67 @@ def plot_time_domain(
     Returns:
         Tuple of (Figure, Axes)
     """
-    style_params = _apply_style(style)
+    logger.debug("Generating plot", plot_type="time_domain", style=style)
 
-    fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
+    try:
+        style_params = _apply_style(style)
 
-    # Set font sizes
-    plt.rcParams.update(
-        {
-            "font.size": style_params["font.size"],
-            "axes.labelsize": style_params["axes.labelsize"],
-            "xtick.labelsize": style_params["xtick.labelsize"],
-            "ytick.labelsize": style_params["ytick.labelsize"],
+        fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
+
+        # Set font sizes
+        plt.rcParams.update(
+            {
+                "font.size": style_params["font.size"],
+                "axes.labelsize": style_params["axes.labelsize"],
+                "xtick.labelsize": style_params["xtick.labelsize"],
+                "ytick.labelsize": style_params["ytick.labelsize"],
+            }
+        )
+
+        # Plot data
+        plot_kwargs = {
+            "linewidth": style_params["lines.linewidth"],
+            "marker": "o",
+            "markersize": style_params["lines.markersize"],
+            "markerfacecolor": "none",
+            "markeredgewidth": 1.0,
         }
-    )
+        plot_kwargs.update(kwargs)
 
-    # Plot data
-    plot_kwargs = {
-        "linewidth": style_params["lines.linewidth"],
-        "marker": "o",
-        "markersize": style_params["lines.markersize"],
-        "markerfacecolor": "none",
-        "markeredgewidth": 1.0,
-    }
-    plot_kwargs.update(kwargs)
+        ax.plot(x, y, **plot_kwargs)
 
-    ax.plot(x, y, **plot_kwargs)
+        # Set labels
+        x_label = f"Time ({x_units})" if x_units else "Time"
+        y_label = (
+            f"Stress ({y_units})"
+            if y_units and "Pa" in y_units
+            else f"y ({y_units})" if y_units else "y"
+        )
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
 
-    # Set labels
-    x_label = f"Time ({x_units})" if x_units else "Time"
-    y_label = (
-        f"Stress ({y_units})"
-        if y_units and "Pa" in y_units
-        else f"y ({y_units})" if y_units else "y"
-    )
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
+        # Set scales
+        if log_x:
+            ax.set_xscale("log")
+        if log_y:
+            ax.set_yscale("log")
 
-    # Set scales
-    if log_x:
-        ax.set_xscale("log")
-    if log_y:
-        ax.set_yscale("log")
+        # Grid
+        ax.grid(True, which="both", alpha=0.3, linestyle="--")
 
-    # Grid
-    ax.grid(True, which="both", alpha=0.3, linestyle="--")
+        fig.tight_layout()
 
-    fig.tight_layout()
+        logger.debug("Figure created", plot_type="time_domain")
+        return fig, ax
 
-    return fig, ax
+    except Exception as e:
+        logger.error(
+            "Failed to generate time_domain plot",
+            plot_type="time_domain",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def plot_frequency_domain(
@@ -284,77 +316,91 @@ def plot_frequency_domain(
     Returns:
         Tuple of (Figure, Axes) or (Figure, array of Axes) for complex data
     """
-    style_params = _apply_style(style)
+    logger.debug("Generating plot", plot_type="frequency_domain", style=style)
 
-    # Set font sizes
-    plt.rcParams.update(
-        {
-            "font.size": style_params["font.size"],
-            "axes.labelsize": style_params["axes.labelsize"],
-            "xtick.labelsize": style_params["xtick.labelsize"],
-            "ytick.labelsize": style_params["ytick.labelsize"],
-        }
-    )
+    try:
+        style_params = _apply_style(style)
 
-    if np.iscomplexobj(y):
-        # Complex data - plot G' and G'' on separate subplots
-        fig, axes = plt.subplots(
-            2,
-            1,
-            figsize=(
-                style_params["figure.figsize"][0],
-                style_params["figure.figsize"][1] * 1.5,
-            ),
+        # Set font sizes
+        plt.rcParams.update(
+            {
+                "font.size": style_params["font.size"],
+                "axes.labelsize": style_params["axes.labelsize"],
+                "xtick.labelsize": style_params["xtick.labelsize"],
+                "ytick.labelsize": style_params["ytick.labelsize"],
+            }
         )
 
-        # Plot kwargs
-        plot_kwargs = {
-            "linewidth": style_params["lines.linewidth"],
-            "marker": "o",
-            "markersize": style_params["lines.markersize"],
-            "markerfacecolor": "none",
-            "markeredgewidth": 1.0,
-        }
-        plot_kwargs.update(kwargs)
+        if np.iscomplexobj(y):
+            # Complex data - plot G' and G'' on separate subplots
+            fig, axes = plt.subplots(
+                2,
+                1,
+                figsize=(
+                    style_params["figure.figsize"][0],
+                    style_params["figure.figsize"][1] * 1.5,
+                ),
+            )
 
-        # G' (storage modulus)
-        x_gp, gp = _filter_positive(x, np.real(y), warn=True)
-        axes[0].loglog(x_gp, gp, **plot_kwargs, label="G'")
-        axes[0].set_ylabel(f"G' ({y_units})" if y_units else "G' (Pa)")
-        axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
-        axes[0].legend()
+            # Plot kwargs
+            plot_kwargs = {
+                "linewidth": style_params["lines.linewidth"],
+                "marker": "o",
+                "markersize": style_params["lines.markersize"],
+                "markerfacecolor": "none",
+                "markeredgewidth": 1.0,
+            }
+            plot_kwargs.update(kwargs)
 
-        # G'' (loss modulus)
-        x_gpp, gpp = _filter_positive(x, np.imag(y), warn=True)
-        axes[1].loglog(x_gpp, gpp, **plot_kwargs, label='G"', color="C1")
-        axes[1].set_xlabel(f"Frequency ({x_units})" if x_units else "Frequency (rad/s)")
-        axes[1].set_ylabel(f'G" ({y_units})' if y_units else 'G" (Pa)')
-        axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
-        axes[1].legend()
+            # G' (storage modulus)
+            x_gp, gp = _filter_positive(x, np.real(y), warn=True)
+            axes[0].loglog(x_gp, gp, **plot_kwargs, label="G'")
+            axes[0].set_ylabel(f"G' ({y_units})" if y_units else "G' (Pa)")
+            axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
+            axes[0].legend()
 
-        fig.tight_layout()
-        return fig, axes
-    else:
-        # Real data - single plot
-        fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
+            # G'' (loss modulus)
+            x_gpp, gpp = _filter_positive(x, np.imag(y), warn=True)
+            axes[1].loglog(x_gpp, gpp, **plot_kwargs, label='G"', color="C1")
+            axes[1].set_xlabel(f"Frequency ({x_units})" if x_units else "Frequency (rad/s)")
+            axes[1].set_ylabel(f'G" ({y_units})' if y_units else 'G" (Pa)')
+            axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
+            axes[1].legend()
 
-        plot_kwargs = {
-            "linewidth": style_params["lines.linewidth"],
-            "marker": "o",
-            "markersize": style_params["lines.markersize"],
-            "markerfacecolor": "none",
-            "markeredgewidth": 1.0,
-        }
-        plot_kwargs.update(kwargs)
+            fig.tight_layout()
+            logger.debug("Figure created", plot_type="frequency_domain")
+            return fig, axes
+        else:
+            # Real data - single plot
+            fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
-        x_filtered, y_filtered = _filter_positive(x, y, warn=True)
-        ax.loglog(x_filtered, y_filtered, **plot_kwargs)
-        ax.set_xlabel(f"Frequency ({x_units})" if x_units else "Frequency (rad/s)")
-        ax.set_ylabel(f"Modulus ({y_units})" if y_units else "Modulus (Pa)")
-        ax.grid(True, which="both", alpha=0.3, linestyle="--")
+            plot_kwargs = {
+                "linewidth": style_params["lines.linewidth"],
+                "marker": "o",
+                "markersize": style_params["lines.markersize"],
+                "markerfacecolor": "none",
+                "markeredgewidth": 1.0,
+            }
+            plot_kwargs.update(kwargs)
 
-        fig.tight_layout()
-        return fig, [ax]
+            x_filtered, y_filtered = _filter_positive(x, y, warn=True)
+            ax.loglog(x_filtered, y_filtered, **plot_kwargs)
+            ax.set_xlabel(f"Frequency ({x_units})" if x_units else "Frequency (rad/s)")
+            ax.set_ylabel(f"Modulus ({y_units})" if y_units else "Modulus (Pa)")
+            ax.grid(True, which="both", alpha=0.3, linestyle="--")
+
+            fig.tight_layout()
+            logger.debug("Figure created", plot_type="frequency_domain")
+            return fig, [ax]
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate frequency_domain plot",
+            plot_type="frequency_domain",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def plot_flow_curve(
@@ -382,49 +428,62 @@ def plot_flow_curve(
     Returns:
         Tuple of (Figure, Axes)
     """
-    style_params = _apply_style(style)
+    logger.debug("Generating plot", plot_type="flow_curve", style=style)
 
-    fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
+    try:
+        style_params = _apply_style(style)
 
-    # Set font sizes
-    plt.rcParams.update(
-        {
-            "font.size": style_params["font.size"],
-            "axes.labelsize": style_params["axes.labelsize"],
-            "xtick.labelsize": style_params["xtick.labelsize"],
-            "ytick.labelsize": style_params["ytick.labelsize"],
+        fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
+
+        # Set font sizes
+        plt.rcParams.update(
+            {
+                "font.size": style_params["font.size"],
+                "axes.labelsize": style_params["axes.labelsize"],
+                "xtick.labelsize": style_params["xtick.labelsize"],
+                "ytick.labelsize": style_params["ytick.labelsize"],
+            }
+        )
+
+        # Plot data on log-log scale
+        plot_kwargs = {
+            "linewidth": style_params["lines.linewidth"],
+            "marker": "o",
+            "markersize": style_params["lines.markersize"],
+            "markerfacecolor": "none",
+            "markeredgewidth": 1.0,
         }
-    )
+        plot_kwargs.update(kwargs)
 
-    # Plot data on log-log scale
-    plot_kwargs = {
-        "linewidth": style_params["lines.linewidth"],
-        "marker": "o",
-        "markersize": style_params["lines.markersize"],
-        "markerfacecolor": "none",
-        "markeredgewidth": 1.0,
-    }
-    plot_kwargs.update(kwargs)
+        # Filter positive values for log-log plot
+        x_filtered, y_filtered = _filter_positive(x, y, warn=True)
+        ax.loglog(x_filtered, y_filtered, **plot_kwargs)
 
-    # Filter positive values for log-log plot
-    x_filtered, y_filtered = _filter_positive(x, y, warn=True)
-    ax.loglog(x_filtered, y_filtered, **plot_kwargs)
+        # Set labels
+        if x_label is None:
+            x_label = f"Shear Rate ({x_units})" if x_units else "Shear Rate (1/s)"
+        if y_label is None:
+            y_label = f"Viscosity ({y_units})" if y_units else "Viscosity (Pa.s)"
 
-    # Set labels
-    if x_label is None:
-        x_label = f"Shear Rate ({x_units})" if x_units else "Shear Rate (1/s)"
-    if y_label is None:
-        y_label = f"Viscosity ({y_units})" if y_units else "Viscosity (Pa.s)"
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
 
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
+        # Grid
+        ax.grid(True, which="both", alpha=0.3, linestyle="--")
 
-    # Grid
-    ax.grid(True, which="both", alpha=0.3, linestyle="--")
+        fig.tight_layout()
 
-    fig.tight_layout()
+        logger.debug("Figure created", plot_type="flow_curve")
+        return fig, ax
 
-    return fig, ax
+    except Exception as e:
+        logger.error(
+            "Failed to generate flow_curve plot",
+            plot_type="flow_curve",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def plot_residuals(
@@ -453,82 +512,96 @@ def plot_residuals(
     Returns:
         Tuple of (Figure, Axes) or (Figure, array of Axes)
     """
-    style_params = _apply_style(style)
+    logger.debug("Generating plot", plot_type="residuals", style=style)
 
-    # Set font sizes
-    plt.rcParams.update(
-        {
-            "font.size": style_params["font.size"],
-            "axes.labelsize": style_params["axes.labelsize"],
-            "xtick.labelsize": style_params["xtick.labelsize"],
-            "ytick.labelsize": style_params["ytick.labelsize"],
-        }
-    )
+    try:
+        style_params = _apply_style(style)
 
-    if y_true is not None and y_pred is not None:
-        # Two subplots: data+predictions and residuals
-        fig, axes = plt.subplots(
-            2,
-            1,
-            figsize=(
-                style_params["figure.figsize"][0],
-                style_params["figure.figsize"][1] * 1.5,
-            ),
+        # Set font sizes
+        plt.rcParams.update(
+            {
+                "font.size": style_params["font.size"],
+                "axes.labelsize": style_params["axes.labelsize"],
+                "xtick.labelsize": style_params["xtick.labelsize"],
+                "ytick.labelsize": style_params["ytick.labelsize"],
+            }
         )
 
-        # Data and predictions
-        axes[0].plot(
-            x,
-            y_true,
-            "o",
-            label="Data",
-            markersize=style_params["lines.markersize"],
-            markerfacecolor="none",
-            markeredgewidth=1.0,
-        )
-        axes[0].plot(
-            x, y_pred, "-", label="Model", linewidth=style_params["lines.linewidth"]
-        )
-        axes[0].set_ylabel("y")
-        axes[0].legend()
-        axes[0].grid(True, alpha=0.3, linestyle="--")
+        if y_true is not None and y_pred is not None:
+            # Two subplots: data+predictions and residuals
+            fig, axes = plt.subplots(
+                2,
+                1,
+                figsize=(
+                    style_params["figure.figsize"][0],
+                    style_params["figure.figsize"][1] * 1.5,
+                ),
+            )
 
-        # Residuals
-        axes[1].plot(
-            x,
-            residuals,
-            "o",
-            markersize=style_params["lines.markersize"],
-            markerfacecolor="none",
-            markeredgewidth=1.0,
+            # Data and predictions
+            axes[0].plot(
+                x,
+                y_true,
+                "o",
+                label="Data",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+            )
+            axes[0].plot(
+                x, y_pred, "-", label="Model", linewidth=style_params["lines.linewidth"]
+            )
+            axes[0].set_ylabel("y")
+            axes[0].legend()
+            axes[0].grid(True, alpha=0.3, linestyle="--")
+
+            # Residuals
+            axes[1].plot(
+                x,
+                residuals,
+                "o",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+            )
+            axes[1].axhline(y=0, color="k", linestyle="--", linewidth=1.0)
+            axes[1].set_xlabel(f"x ({x_units})" if x_units else "x")
+            axes[1].set_ylabel("Residuals")
+            axes[1].grid(True, alpha=0.3, linestyle="--")
+
+            fig.tight_layout()
+            logger.debug("Figure created", plot_type="residuals")
+            return fig, axes
+        else:
+            # Single plot: residuals only
+            fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
+
+            ax.plot(
+                x,
+                residuals,
+                "o",
+                markersize=style_params["lines.markersize"],
+                markerfacecolor="none",
+                markeredgewidth=1.0,
+                **kwargs,
+            )
+            ax.axhline(y=0, color="k", linestyle="--", linewidth=1.0)
+            ax.set_xlabel(f"x ({x_units})" if x_units else "x")
+            ax.set_ylabel("Residuals")
+            ax.grid(True, alpha=0.3, linestyle="--")
+
+            fig.tight_layout()
+            logger.debug("Figure created", plot_type="residuals")
+            return fig, ax
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate residuals plot",
+            plot_type="residuals",
+            error=str(e),
+            exc_info=True,
         )
-        axes[1].axhline(y=0, color="k", linestyle="--", linewidth=1.0)
-        axes[1].set_xlabel(f"x ({x_units})" if x_units else "x")
-        axes[1].set_ylabel("Residuals")
-        axes[1].grid(True, alpha=0.3, linestyle="--")
-
-        fig.tight_layout()
-        return fig, axes
-    else:
-        # Single plot: residuals only
-        fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
-
-        ax.plot(
-            x,
-            residuals,
-            "o",
-            markersize=style_params["lines.markersize"],
-            markerfacecolor="none",
-            markeredgewidth=1.0,
-            **kwargs,
-        )
-        ax.axhline(y=0, color="k", linestyle="--", linewidth=1.0)
-        ax.set_xlabel(f"x ({x_units})" if x_units else "x")
-        ax.set_ylabel("Residuals")
-        ax.grid(True, alpha=0.3, linestyle="--")
-
-        fig.tight_layout()
-        return fig, ax
+        raise
 
 
 def compute_uncertainty_band(
@@ -540,10 +613,10 @@ def compute_uncertainty_band(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Compute prediction uncertainty band via error propagation.
 
-    Uses the formula: σ_y(x) = sqrt(diag(J @ pcov @ J.T))
+    Uses the formula: sigma_y(x) = sqrt(diag(J @ pcov @ J.T))
     where J is the Jacobian of the model with respect to parameters.
 
-    For 95% confidence interval, the band is ±1.96 * σ_y(x).
+    For 95% confidence interval, the band is +/-1.96 * sigma_y(x).
 
     Args:
         model_fn: Model function that takes (x, params) and returns predictions.
@@ -568,53 +641,72 @@ def compute_uncertainty_band(
         >>> pcov = np.array([[0.01, 0.0], [0.0, 0.05]])
         >>> y_fit, y_lo, y_hi = compute_uncertainty_band(model, x, popt, pcov)
     """
-    from scipy.stats import norm
+    logger.debug(
+        "Computing uncertainty band",
+        n_points=len(x_pred),
+        n_params=len(popt),
+        confidence=confidence,
+    )
 
-    x_pred = np.asarray(x_pred, dtype=np.float64)
-    popt = np.asarray(popt, dtype=np.float64)
-    pcov = np.asarray(pcov, dtype=np.float64)
-
-    # Compute y_fit
-    y_fit = np.asarray(model_fn(x_pred, popt), dtype=np.float64)
-
-    # Handle complex output (e.g., G* = G' + iG'')
-    if np.iscomplexobj(y_fit):
-        # Return None for complex - uncertainty bands are harder to interpret
-        return y_fit, None, None
-
-    # Compute Jacobian: J[i, j] = ∂y[i] / ∂param[j]
-    # Use finite differences for robustness
-    n_points = len(x_pred)
-    n_params = len(popt)
-    jac = np.zeros((n_points, n_params), dtype=np.float64)
-
-    eps = np.sqrt(np.finfo(np.float64).eps)
-    for j in range(n_params):
-        params_plus = popt.copy()
-        params_plus[j] += eps * max(abs(popt[j]), 1.0)
-        y_plus = np.asarray(model_fn(x_pred, params_plus), dtype=np.float64)
-
-        params_minus = popt.copy()
-        params_minus[j] -= eps * max(abs(popt[j]), 1.0)
-        y_minus = np.asarray(model_fn(x_pred, params_minus), dtype=np.float64)
-
-        jac[:, j] = (y_plus - y_minus) / (2 * eps * max(abs(popt[j]), 1.0))
-
-    # Compute variance: var_y = diag(J @ pcov @ J.T)
     try:
-        var_y = np.einsum("ij,jk,ik->i", jac, pcov, jac)
-        sigma_y = np.sqrt(np.maximum(var_y, 0.0))
-    except Exception:
-        # Fallback if einsum fails
-        return y_fit, None, None
+        from scipy.stats import norm
 
-    # Compute z-score for confidence interval
-    z = norm.ppf(1 - (1 - confidence) / 2)
+        x_pred = np.asarray(x_pred, dtype=np.float64)
+        popt = np.asarray(popt, dtype=np.float64)
+        pcov = np.asarray(pcov, dtype=np.float64)
 
-    y_lower = y_fit - z * sigma_y
-    y_upper = y_fit + z * sigma_y
+        # Compute y_fit
+        y_fit = np.asarray(model_fn(x_pred, popt), dtype=np.float64)
 
-    return y_fit, y_lower, y_upper
+        # Handle complex output (e.g., G* = G' + iG'')
+        if np.iscomplexobj(y_fit):
+            # Return None for complex - uncertainty bands are harder to interpret
+            logger.debug("Complex output detected, skipping uncertainty band")
+            return y_fit, None, None
+
+        # Compute Jacobian: J[i, j] = dy[i] / dparam[j]
+        # Use finite differences for robustness
+        n_points = len(x_pred)
+        n_params = len(popt)
+        jac = np.zeros((n_points, n_params), dtype=np.float64)
+
+        eps = np.sqrt(np.finfo(np.float64).eps)
+        for j in range(n_params):
+            params_plus = popt.copy()
+            params_plus[j] += eps * max(abs(popt[j]), 1.0)
+            y_plus = np.asarray(model_fn(x_pred, params_plus), dtype=np.float64)
+
+            params_minus = popt.copy()
+            params_minus[j] -= eps * max(abs(popt[j]), 1.0)
+            y_minus = np.asarray(model_fn(x_pred, params_minus), dtype=np.float64)
+
+            jac[:, j] = (y_plus - y_minus) / (2 * eps * max(abs(popt[j]), 1.0))
+
+        # Compute variance: var_y = diag(J @ pcov @ J.T)
+        try:
+            var_y = np.einsum("ij,jk,ik->i", jac, pcov, jac)
+            sigma_y = np.sqrt(np.maximum(var_y, 0.0))
+        except Exception:
+            # Fallback if einsum fails
+            logger.debug("Einsum failed for variance computation, returning None")
+            return y_fit, None, None
+
+        # Compute z-score for confidence interval
+        z = norm.ppf(1 - (1 - confidence) / 2)
+
+        y_lower = y_fit - z * sigma_y
+        y_upper = y_fit + z * sigma_y
+
+        logger.debug("Uncertainty band computed successfully")
+        return y_fit, y_lower, y_upper
+
+    except Exception as e:
+        logger.error(
+            "Failed to compute uncertainty band",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def plot_fit_with_uncertainty(
@@ -671,103 +763,116 @@ def plot_fit_with_uncertainty(
         >>> y_fit = 100 * x_fit ** -0.5
         >>> fig, ax = plot_fit_with_uncertainty(x, y, x_fit, y_fit)
     """
-    style_params = _apply_style(style)
+    logger.debug("Generating plot", plot_type="fit_with_uncertainty", style=style)
 
-    # Create figure if no axes provided
-    fig = None
-    if ax is None:
-        fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
+    try:
+        style_params = _apply_style(style)
 
-    x_data = _ensure_numpy(x_data)
-    y_data = _ensure_numpy(y_data)
-    x_fit = _ensure_numpy(x_fit)
-    y_fit = _ensure_numpy(y_fit)
+        # Create figure if no axes provided
+        fig = None
+        if ax is None:
+            fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
-    def scatter_fn(x, y, **kw):
-        return ax.scatter(x, y, **kw)
+        x_data = _ensure_numpy(x_data)
+        y_data = _ensure_numpy(y_data)
+        x_fit = _ensure_numpy(x_fit)
+        y_fit = _ensure_numpy(y_fit)
 
-    # Determine plot functions based on log scales
-    if log_x and log_y:
-        plot_fn = ax.loglog
-        # Filter positive values for log scale
-        x_data_plot, y_data_plot = _filter_positive(x_data, y_data)
-        x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
-    elif log_x:
-        plot_fn = ax.semilogx
-        x_data_plot, y_data_plot = x_data, y_data
-        x_fit_plot, y_fit_plot = x_fit, y_fit
-    elif log_y:
-        plot_fn = ax.semilogy
-        x_data_plot, y_data_plot = _filter_positive(x_data, y_data)
-        x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
-    else:
-        plot_fn = ax.plot
-        x_data_plot, y_data_plot = x_data, y_data
-        x_fit_plot, y_fit_plot = x_fit, y_fit
+        def scatter_fn(x, y, **kw):
+            return ax.scatter(x, y, **kw)
 
-    # Plot uncertainty band first (so it's behind other elements)
-    if y_lower is not None and y_upper is not None:
-        y_lower = _ensure_numpy(y_lower)
-        y_upper = _ensure_numpy(y_upper)
-        if log_y:
-            # Filter positive for log scale
-            mask = (y_lower > 0) & (y_upper > 0) & (x_fit > 0)
-            ax.fill_between(
-                x_fit[mask],
-                y_lower[mask],
-                y_upper[mask],
-                alpha=0.3,
-                color="C0",
-                label=band_label,
-                zorder=1,
-            )
+        # Determine plot functions based on log scales
+        if log_x and log_y:
+            plot_fn = ax.loglog
+            # Filter positive values for log scale
+            x_data_plot, y_data_plot = _filter_positive(x_data, y_data)
+            x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
+        elif log_x:
+            plot_fn = ax.semilogx
+            x_data_plot, y_data_plot = x_data, y_data
+            x_fit_plot, y_fit_plot = x_fit, y_fit
+        elif log_y:
+            plot_fn = ax.semilogy
+            x_data_plot, y_data_plot = _filter_positive(x_data, y_data)
+            x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
         else:
-            ax.fill_between(
-                x_fit,
-                y_lower,
-                y_upper,
-                alpha=0.3,
-                color="C0",
-                label=band_label,
-                zorder=1,
-            )
+            plot_fn = ax.plot
+            x_data_plot, y_data_plot = x_data, y_data
+            x_fit_plot, y_fit_plot = x_fit, y_fit
 
-    # Plot fitted curve
-    plot_fn(
-        x_fit_plot,
-        y_fit_plot,
-        "-",
-        linewidth=style_params["lines.linewidth"],
-        color="C0",
-        label=fit_label,
-        zorder=2,
-    )
+        # Plot uncertainty band first (so it's behind other elements)
+        if y_lower is not None and y_upper is not None:
+            y_lower = _ensure_numpy(y_lower)
+            y_upper = _ensure_numpy(y_upper)
+            if log_y:
+                # Filter positive for log scale
+                mask = (y_lower > 0) & (y_upper > 0) & (x_fit > 0)
+                ax.fill_between(
+                    x_fit[mask],
+                    y_lower[mask],
+                    y_upper[mask],
+                    alpha=0.3,
+                    color="C0",
+                    label=band_label,
+                    zorder=1,
+                )
+            else:
+                ax.fill_between(
+                    x_fit,
+                    y_lower,
+                    y_upper,
+                    alpha=0.3,
+                    color="C0",
+                    label=band_label,
+                    zorder=1,
+                )
 
-    # Plot data points
-    scatter_fn(
-        x_data_plot,
-        y_data_plot,
-        s=style_params["lines.markersize"] ** 2,
-        facecolors="none",
-        edgecolors="C1",
-        linewidths=1.5,
-        label=data_label,
-        zorder=3,
-    )
+        # Plot fitted curve
+        plot_fn(
+            x_fit_plot,
+            y_fit_plot,
+            "-",
+            linewidth=style_params["lines.linewidth"],
+            color="C0",
+            label=fit_label,
+            zorder=2,
+        )
 
-    # Labels and legend
-    if x_label:
-        ax.set_xlabel(x_label)
-    if y_label:
-        ax.set_ylabel(y_label)
+        # Plot data points
+        scatter_fn(
+            x_data_plot,
+            y_data_plot,
+            s=style_params["lines.markersize"] ** 2,
+            facecolors="none",
+            edgecolors="C1",
+            linewidths=1.5,
+            label=data_label,
+            zorder=3,
+        )
 
-    ax.legend(loc="best")
-    ax.grid(True, alpha=0.3, linestyle="--")
+        # Labels and legend
+        if x_label:
+            ax.set_xlabel(x_label)
+        if y_label:
+            ax.set_ylabel(y_label)
 
-    if fig is not None:
-        fig.tight_layout()
+        ax.legend(loc="best")
+        ax.grid(True, alpha=0.3, linestyle="--")
 
-    return fig, ax
+        if fig is not None:
+            fig.tight_layout()
+
+        logger.debug("Figure created", plot_type="fit_with_uncertainty")
+        return fig, ax
+
+    except Exception as e:
+        logger.error(
+            "Failed to generate fit_with_uncertainty plot",
+            plot_type="fit_with_uncertainty",
+            error=str(e),
+            exc_info=True,
+        )
+        raise
 
 
 def save_figure(
@@ -859,38 +964,52 @@ def save_figure(
     DPI only affects raster formats (PNG). Vector formats (PDF, SVG, EPS) are
     resolution-independent.
     """
-    filepath = Path(filepath)
+    logger.debug("Saving figure", filepath=str(filepath), format=format, dpi=dpi)
 
-    # Infer format from extension if not specified
-    if format is None:
-        if filepath.suffix:
-            format = filepath.suffix.lstrip(".")
-        else:
+    try:
+        filepath = Path(filepath)
+
+        # Infer format from extension if not specified
+        if format is None:
+            if filepath.suffix:
+                format = filepath.suffix.lstrip(".")
+            else:
+                raise ValueError(
+                    f"Cannot infer format from filepath '{filepath}' (no extension). "
+                    "Provide explicit format parameter or use file extension "
+                    "(e.g., 'output.pdf')."
+                )
+
+        # Validate format
+        supported_formats = {"pdf", "svg", "png", "eps"}
+        format_lower = format.lower()
+        if format_lower not in supported_formats:
             raise ValueError(
-                f"Cannot infer format from filepath '{filepath}' (no extension). "
-                "Provide explicit format parameter or use file extension "
-                "(e.g., 'output.pdf')."
+                f"Unsupported format '{format}'. "
+                f"Supported formats: {', '.join(sorted(supported_formats))}."
             )
 
-    # Validate format
-    supported_formats = {"pdf", "svg", "png", "eps"}
-    format_lower = format.lower()
-    if format_lower not in supported_formats:
-        raise ValueError(
-            f"Unsupported format '{format}'. "
-            f"Supported formats: {', '.join(sorted(supported_formats))}."
+        # Ensure directory exists
+        if not filepath.parent.exists():
+            raise OSError(
+                f"Directory does not exist: {filepath.parent}. "
+                "Create directory before saving."
+            )
+
+        # Save figure
+        fig.savefig(
+            filepath, format=format_lower, dpi=dpi, bbox_inches=bbox_inches, **kwargs
         )
 
-    # Ensure directory exists
-    if not filepath.parent.exists():
-        raise OSError(
-            f"Directory does not exist: {filepath.parent}. "
-            "Create directory before saving."
+        resolved_path = filepath.resolve()
+        logger.debug("Figure saved", filepath=str(resolved_path), format=format_lower)
+        return resolved_path
+
+    except Exception as e:
+        logger.error(
+            "Failed to save figure",
+            filepath=str(filepath),
+            error=str(e),
+            exc_info=True,
         )
-
-    # Save figure
-    fig.savefig(
-        filepath, format=format_lower, dpi=dpi, bbox_inches=bbox_inches, **kwargs
-    )
-
-    return filepath.resolve()
+        raise

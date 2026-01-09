@@ -7,7 +7,6 @@ Service for Bayesian inference with NumPyro and ArviZ diagnostics.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -19,8 +18,9 @@ from rheojax.core.registry import Registry
 from rheojax.gui.services.model_service import normalize_model_name
 from rheojax.gui.state.store import DatasetState
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
+from rheojax.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -70,7 +70,9 @@ class BayesianService:
 
     def __init__(self) -> None:
         """Initialize Bayesian service."""
+        logger.debug("Initializing BayesianService")
         self._registry = Registry.get_instance()
+        logger.debug("BayesianService initialized successfully")
 
     def get_default_priors(self, model_name: str) -> dict[str, dict]:
         """Get default prior distributions for model.
@@ -86,6 +88,7 @@ class BayesianService:
             Prior specifications for each parameter
             Format: {'param_name': {'dist': 'uniform', 'args': [lower, upper]}}
         """
+        logger.debug("Entering get_default_priors", model=model_name)
         try:
             model_name = normalize_model_name(model_name)
             model = self._registry.create_instance(model_name, plugin_type="model")
@@ -100,10 +103,18 @@ class BayesianService:
                     "upper": float(upper),
                 }
 
+            logger.debug(
+                "Exiting get_default_priors",
+                model=model_name,
+                num_priors=len(priors),
+            )
             return priors
 
         except Exception as e:
-            logger.error(f"Failed to get priors for {model_name}: {e}")
+            logger.error(
+                f"Failed to get priors for {model_name}: {e}",
+                exc_info=True,
+            )
             return {}
 
     def run_mcmc(
@@ -146,6 +157,15 @@ class BayesianService:
         BayesianResult
             Posterior samples and diagnostics
         """
+        logger.debug(
+            "Entering run_mcmc",
+            model=model_name,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            warm_start_provided=warm_start is not None,
+            test_mode=test_mode,
+        )
         try:
             model_name = normalize_model_name(model_name)
             # Create model instance
@@ -172,8 +192,14 @@ class BayesianService:
                 test_mode = data.metadata.get("test_mode", "oscillation")
 
             logger.info(
-                f"Running MCMC for {model_name}: "
-                f"{num_warmup} warmup + {num_samples} samples × {num_chains} chains"
+                "Starting Bayesian inference",
+                model=model_name,
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                num_chains=num_chains,
+                test_mode=test_mode,
+                data_points=len(x),
+                warm_start_used=warm_start is not None,
             )
 
             # Run Bayesian inference
@@ -230,6 +256,26 @@ class BayesianService:
                 "warm_start_used": warm_start is not None,
             }
 
+            # Extract summary diagnostics for logging
+            max_r_hat = diagnostics.get("max_rhat")
+            min_ess = diagnostics.get("min_ess")
+            divergences = diagnostics.get("divergences", 0)
+
+            logger.info(
+                "Bayesian inference complete",
+                model=model_name,
+                r_hat=max_r_hat,
+                ess=min_ess,
+                divergences=divergences,
+                num_parameters=len(posterior_samples),
+            )
+
+            logger.debug(
+                "Exiting run_mcmc",
+                model=model_name,
+                success=True,
+            )
+
             return BayesianResult(
                 model_name=model_name,
                 posterior_samples=posterior_samples,
@@ -240,7 +286,10 @@ class BayesianService:
             )
 
         except Exception as e:
-            logger.error(f"MCMC failed for {model_name}: {e}")
+            logger.error(
+                f"MCMC failed for {model_name}: {e}",
+                exc_info=True,
+            )
             raise RuntimeError(f"MCMC failed: {e}") from e
 
     def get_diagnostics(self, result: BayesianResult | Any) -> dict[str, Any]:
@@ -256,6 +305,7 @@ class BayesianService:
         dict
             Diagnostics including R-hat, ESS, divergences
         """
+        logger.debug("Entering get_diagnostics")
         try:
             import arviz as az
 
@@ -335,10 +385,18 @@ class BayesianService:
 
             diagnostics["warnings"] = warnings
 
+            logger.debug(
+                "Exiting get_diagnostics",
+                max_rhat=diagnostics["max_rhat"],
+                min_ess=diagnostics["min_ess"],
+                divergences=divergences,
+                num_warnings=len(warnings),
+            )
+
             return diagnostics
 
         except Exception as e:
-            logger.error(f"Diagnostic calculation failed: {e}")
+            logger.error(f"Diagnostic calculation failed: {e}", exc_info=True)
             return {"error": str(e)}
 
     def get_credible_intervals(
@@ -361,6 +419,11 @@ class BayesianService:
             Credible intervals for each parameter
             Format: {'param': (lower, median, upper)}
         """
+        logger.debug(
+            "Entering get_credible_intervals",
+            model=result.model_name,
+            prob=prob,
+        )
         intervals = {}
 
         alpha = 1 - prob
@@ -377,6 +440,10 @@ class BayesianService:
 
             intervals[param_name] = (lower, median, upper)
 
+        logger.debug(
+            "Exiting get_credible_intervals",
+            num_parameters=len(intervals),
+        )
         return intervals
 
     def get_posterior_means(self, result: BayesianResult) -> dict[str, float]:
@@ -392,9 +459,11 @@ class BayesianService:
         dict
             Posterior means
         """
+        logger.debug("Entering get_posterior_means", model=result.model_name)
         means = {}
         for param_name, samples in result.posterior_samples.items():
             means[param_name] = float(np.mean(samples))
+        logger.debug("Exiting get_posterior_means", num_parameters=len(means))
         return means
 
     def compare_models(
@@ -416,6 +485,11 @@ class BayesianService:
         dict
             Model comparison scores
         """
+        logger.debug(
+            "Entering compare_models",
+            num_models=len(results),
+            criterion=criterion,
+        )
         try:
             import arviz as az
 
@@ -441,10 +515,15 @@ class BayesianService:
                 else:
                     logger.warning(f"Unknown criterion: {criterion}")
 
+            logger.debug(
+                "Exiting compare_models",
+                num_models=len(comparison),
+                criterion=criterion,
+            )
             return comparison
 
         except Exception as e:
-            logger.error(f"Model comparison failed: {e}")
+            logger.error(f"Model comparison failed: {e}", exc_info=True)
             return {}
 
     def validate_priors(
@@ -466,6 +545,11 @@ class BayesianService:
         list[str]
             Validation warnings
         """
+        logger.debug(
+            "Entering validate_priors",
+            model=model_name,
+            num_priors=len(priors),
+        )
         warnings = []
 
         try:
@@ -497,6 +581,11 @@ class BayesianService:
                         )
 
         except Exception as e:
+            logger.error(f"Prior validation failed: {e}", exc_info=True)
             warnings.append(f"Prior validation failed: {e}")
 
+        logger.debug(
+            "Exiting validate_priors",
+            num_warnings=len(warnings),
+        )
         return warnings

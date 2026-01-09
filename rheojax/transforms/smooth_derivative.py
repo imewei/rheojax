@@ -15,9 +15,13 @@ from scipy.signal import savgol_filter
 from rheojax.core.base import BaseTransform
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
+from rheojax.logging import get_logger, log_transform
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
+
+# Module logger
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     import jax.numpy as jnp_typing
@@ -308,72 +312,95 @@ class SmoothDerivative(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
-        # Get data
-        x = data.x
-        y = data.y
+        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
 
-        # Convert to JAX arrays
-        if not isinstance(x, jnp.ndarray):
-            x = jnp.array(x)
-        if not isinstance(y, jnp.ndarray):
-            y = jnp.array(y)
+        with log_transform(
+            logger,
+            "smooth_derivative",
+            input_shape=input_shape,
+            method=self.method,
+            derivative_order=self.deriv,
+            window_length=self.window_length,
+        ) as ctx:
+            # Get data
+            x = data.x
+            y = data.y
 
-        # Handle complex data
-        if jnp.iscomplexobj(y):
-            y = jnp.real(y)
+            # Convert to JAX arrays
+            if not isinstance(x, jnp.ndarray):
+                x = jnp.array(x)
+            if not isinstance(y, jnp.ndarray):
+                y = jnp.array(y)
 
-        # Pre-smoothing if requested
-        if self.smooth_before:
-            y = self._smooth_data(y, self.smooth_window)
+            logger.debug(
+                "Processing derivative input",
+                n_points=len(x),
+                dtype=str(y.dtype),
+            )
 
-        # Compute derivative based on method
-        if self.method == "savgol":
-            dy_dx = self._savgol_derivative(x, y)
-        elif self.method == "finite_diff":
-            dy_dx = self._finite_diff_derivative(x, y)
-        elif self.method == "spline":
-            dy_dx = self._spline_derivative(x, y)
-        elif self.method == "total_variation":
-            dy_dx = self._total_variation_derivative(x, y)
-        else:
-            raise ValueError(f"Unknown method: {self.method}")
+            # Handle complex data
+            if jnp.iscomplexobj(y):
+                logger.debug("Taking real part of complex signal")
+                y = jnp.real(y)
 
-        # Post-smoothing if requested
-        if self.smooth_after:
-            dy_dx = self._smooth_data(dy_dx, self.smooth_window)
+            # Pre-smoothing if requested
+            if self.smooth_before:
+                logger.debug("Applying pre-smoothing", window=self.smooth_window)
+                y = self._smooth_data(y, self.smooth_window)
 
-        # Create new y_units
-        if data.y_units and data.x_units:
-            if self.deriv == 1:
-                new_y_units = f"d({data.y_units})/d({data.x_units})"
+            # Compute derivative based on method
+            logger.debug("Computing derivative", method=self.method)
+            if self.method == "savgol":
+                dy_dx = self._savgol_derivative(x, y)
+            elif self.method == "finite_diff":
+                dy_dx = self._finite_diff_derivative(x, y)
+            elif self.method == "spline":
+                dy_dx = self._spline_derivative(x, y)
+            elif self.method == "total_variation":
+                dy_dx = self._total_variation_derivative(x, y)
             else:
-                new_y_units = (
-                    f"d^{self.deriv}({data.y_units})/d({data.x_units})^{self.deriv}"
-                )
-        else:
-            new_y_units = f"derivative_order_{self.deriv}"
+                logger.error("Unknown differentiation method", method=self.method)
+                raise ValueError(f"Unknown method: {self.method}")
 
-        # Create metadata
-        new_metadata = data.metadata.copy()
-        new_metadata.update(
-            {
-                "transform": "derivative",
-                "method": self.method,
-                "derivative_order": self.deriv,
-                "window_length": self.window_length,
-                "polyorder": self.polyorder,
-            }
-        )
+            # Post-smoothing if requested
+            if self.smooth_after:
+                logger.debug("Applying post-smoothing", window=self.smooth_window)
+                dy_dx = self._smooth_data(dy_dx, self.smooth_window)
 
-        return RheoData(
-            x=x,
-            y=dy_dx,
-            x_units=data.x_units,
-            y_units=new_y_units,
-            domain=data.domain,
-            metadata=new_metadata,
-            validate=False,
-        )
+            # Create new y_units
+            if data.y_units and data.x_units:
+                if self.deriv == 1:
+                    new_y_units = f"d({data.y_units})/d({data.x_units})"
+                else:
+                    new_y_units = (
+                        f"d^{self.deriv}({data.y_units})/d({data.x_units})^{self.deriv}"
+                    )
+            else:
+                new_y_units = f"derivative_order_{self.deriv}"
+
+            # Create metadata
+            new_metadata = data.metadata.copy()
+            new_metadata.update(
+                {
+                    "transform": "derivative",
+                    "method": self.method,
+                    "derivative_order": self.deriv,
+                    "window_length": self.window_length,
+                    "polyorder": self.polyorder,
+                }
+            )
+
+            ctx["output_shape"] = (len(x),)
+
+            return RheoData(
+                x=x,
+                y=dy_dx,
+                x_units=data.x_units,
+                y_units=new_y_units,
+                domain=data.domain,
+                metadata=new_metadata,
+                validate=False,
+            )
 
     def _inverse_transform(self, data: RheoData) -> RheoData:
         """Apply numerical integration (inverse of derivative).
@@ -392,6 +419,8 @@ class SmoothDerivative(BaseTransform):
 
         from rheojax.core.data import RheoData
 
+        logger.debug("Starting numerical integration (inverse derivative)")
+
         # Get data
         x = data.x
         dy_dx = data.y
@@ -402,6 +431,11 @@ class SmoothDerivative(BaseTransform):
 
         # Numerical integration (cumulative trapezoid)
         y_integrated = scipy_cumtrapz(dy_dx_np, x_np, initial=0)
+
+        logger.debug(
+            "Integration completed",
+            n_points=len(y_integrated),
+        )
 
         # Create metadata
         new_metadata = data.metadata.copy()

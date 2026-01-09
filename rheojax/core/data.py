@@ -18,10 +18,14 @@ else:
     jnp_typing = np
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 HAS_JAX = True
+
+# Module-level logger
+logger = get_logger(__name__)
 
 
 type ArrayLike = np.ndarray | jnp_typing.ndarray | list | tuple
@@ -30,11 +34,14 @@ type ArrayLike = np.ndarray | jnp_typing.ndarray | list | tuple
 def _coerce_ndarray(data: ArrayLike | jnp_typing.ndarray | None) -> np.ndarray:
     """Convert any array-like input to a NumPy array for scalar ops."""
     if data is None:
+        logger.error("Array data is None during conversion", exc_info=True)
         raise ValueError("Array data must be initialized before conversion")
     if isinstance(data, np.ndarray):
         return data
     if HAS_JAX and isinstance(data, jnp.ndarray):
+        logger.debug("Converting JAX array to NumPy", from_type="jax.ndarray", to_type="np.ndarray")
         return np.asarray(data)
+    logger.debug("Converting array-like to NumPy", from_type=type(data).__name__, to_type="np.ndarray")
     return np.asarray(data)
 
 
@@ -70,6 +77,13 @@ class RheoData:
 
     def __post_init__(self, initial_test_mode: str | None):
         """Initialize and validate RheoData."""
+        logger.debug(
+            "Creating RheoData",
+            domain=self.domain,
+            test_mode=initial_test_mode,
+            validate=self.validate,
+        )
+
         # Normalize metadata container
         if self.metadata is None:
             self.metadata = {}
@@ -83,6 +97,7 @@ class RheoData:
             self._explicit_test_mode = self.metadata.get("test_mode")
 
         if self.x is None or self.y is None:
+            logger.error("x and y data must be provided", exc_info=True)
             raise ValueError("x and y data must be provided")
 
         # Convert to arrays
@@ -92,8 +107,23 @@ class RheoData:
         x_array = _coerce_ndarray(self.x)
         y_array = _coerce_ndarray(self.y)
 
+        # Log creation details after array conversion
+        logger.debug(
+            "RheoData arrays created",
+            x_shape=x_array.shape,
+            y_shape=y_array.shape,
+            x_dtype=str(x_array.dtype),
+            y_dtype=str(y_array.dtype),
+        )
+
         # Validate shapes
         if x_array.shape != y_array.shape:
+            logger.error(
+                "Shape mismatch between x and y data",
+                x_shape=x_array.shape,
+                y_shape=y_array.shape,
+                exc_info=True,
+            )
             raise ValueError(
                 f"x and y must have the same shape. Got x: {x_array.shape}, y: {y_array.shape}"
             )
@@ -107,33 +137,48 @@ class RheoData:
         if isinstance(data, (np.ndarray, jnp.ndarray)):
             return data
         elif isinstance(data, (list, tuple)):
+            logger.debug("Converting list/tuple to array", from_type=type(data).__name__)
             return np.array(data)
         else:
+            logger.debug("Converting to array", from_type=type(data).__name__)
             return np.array(data)
 
     def _validate_data(self):
         """Validate data for common issues."""
+        logger.debug(
+            "Validating data",
+            checks=["nan", "finite", "monotonic", "negative_frequency"],
+        )
+
         # Check for NaN values first (NaN is also non-finite)
         if isinstance(self.x, np.ndarray):
             if np.any(np.isnan(self.x)):
+                logger.error("x data contains NaN values", exc_info=True)
                 raise ValueError("x data contains NaN values")
             if not np.all(np.isfinite(self.x)):
+                logger.error("x data contains non-finite values", exc_info=True)
                 raise ValueError("x data contains non-finite values")
         elif isinstance(self.x, jnp.ndarray):
             if jnp.any(jnp.isnan(self.x)):
+                logger.error("x data contains NaN values", exc_info=True)
                 raise ValueError("x data contains NaN values")
             if not jnp.all(jnp.isfinite(self.x)):
+                logger.error("x data contains non-finite values", exc_info=True)
                 raise ValueError("x data contains non-finite values")
 
         if isinstance(self.y, np.ndarray):
             if np.any(np.isnan(self.y)):
+                logger.error("y data contains NaN values", exc_info=True)
                 raise ValueError("y data contains NaN values")
             if not np.all(np.isfinite(self.y)):
+                logger.error("y data contains non-finite values", exc_info=True)
                 raise ValueError("y data contains non-finite values")
         elif isinstance(self.y, jnp.ndarray):
             if jnp.any(jnp.isnan(self.y)):
+                logger.error("y data contains NaN values", exc_info=True)
                 raise ValueError("y data contains NaN values")
             if not jnp.all(jnp.isfinite(self.y)):
+                logger.error("y data contains non-finite values", exc_info=True)
                 raise ValueError("y data contains non-finite values")
 
         # Check for monotonic x-axis
@@ -141,16 +186,19 @@ class RheoData:
             if isinstance(self.x, np.ndarray):
                 diffs = np.diff(self.x)
                 if not (np.all(diffs > 0) or np.all(diffs < 0)):
+                    logger.debug("x-axis is not monotonic")
                     warnings.warn("x-axis is not monotonic", UserWarning, stacklevel=2)
             elif isinstance(self.x, jnp.ndarray):
                 diffs = jnp.diff(self.x)
                 if not (jnp.all(diffs > 0) or jnp.all(diffs < 0)):
+                    logger.debug("x-axis is not monotonic")
                     warnings.warn("x-axis is not monotonic", UserWarning, stacklevel=2)
 
         # Check for negative values in frequency domain
         if self.domain == "frequency":
             if isinstance(self.y, np.ndarray):
                 if np.any(np.real(self.y) < 0):
+                    logger.debug("y data contains negative values in frequency domain")
                     warnings.warn(
                         "y data contains negative values in frequency domain",
                         UserWarning,
@@ -158,11 +206,14 @@ class RheoData:
                     )
             elif isinstance(self.y, jnp.ndarray):
                 if jnp.any(jnp.real(self.y) < 0):
+                    logger.debug("y data contains negative values in frequency domain")
                     warnings.warn(
                         "y data contains negative values in frequency domain",
                         UserWarning,
                         stacklevel=2,
                     )
+
+        logger.debug("Data validation completed successfully")
 
     def to_jax(self) -> RheoData:
         """Convert arrays to JAX arrays.
@@ -170,6 +221,7 @@ class RheoData:
         Returns:
             New RheoData with JAX arrays
         """
+        logger.debug("Converting RheoData to JAX arrays", from_type="numpy", to_type="jax")
         return RheoData(
             x=jnp.array(self.x),
             y=jnp.array(self.y),
@@ -186,6 +238,7 @@ class RheoData:
         Returns:
             New RheoData with NumPy arrays
         """
+        logger.debug("Converting RheoData to NumPy arrays", from_type="jax", to_type="numpy")
         x_np = np.array(self.x) if isinstance(self.x, jnp.ndarray) else self.x
         y_np = np.array(self.y) if isinstance(self.y, jnp.ndarray) else self.y
 
@@ -205,6 +258,7 @@ class RheoData:
         Returns:
             Copy of the RheoData instance
         """
+        logger.debug("Creating copy of RheoData")
         return RheoData(
             x=self.x.copy() if hasattr(self.x, "copy") else self.x,
             y=self.y.copy() if hasattr(self.y, "copy") else self.y,
@@ -221,6 +275,7 @@ class RheoData:
         Args:
             metadata: Dictionary of metadata to add/update
         """
+        logger.debug("Updating metadata", keys=list(metadata.keys()))
         self.metadata.update(metadata)
 
     def to_dict(self) -> dict[str, Any]:
@@ -229,6 +284,7 @@ class RheoData:
         Returns:
             Dictionary with data and metadata
         """
+        logger.debug("Converting RheoData to dictionary")
         x_data = self.x.tolist() if hasattr(self.x, "tolist") else list(self.x)
         y_data = self.y.tolist() if hasattr(self.y, "tolist") else list(self.y)
 
@@ -256,6 +312,7 @@ class RheoData:
         Returns:
             RheoData instance
         """
+        logger.debug("Creating RheoData from dictionary")
         metadata = data_dict.get("metadata", {}) or {}
         test_mode = data_dict.get("test_mode")
 
@@ -439,11 +496,14 @@ class RheoData:
         from rheojax.core.test_modes import detect_test_mode
 
         # Detect test mode
+        logger.debug("Detecting test mode from data characteristics")
         mode = detect_test_mode(self)
 
         # Cache the result
         self.metadata["detected_test_mode"] = mode
         self._explicit_test_mode = mode
+
+        logger.debug("Test mode detected", test_mode=mode)
 
         return mode
 
@@ -452,6 +512,7 @@ class RheoData:
         if isinstance(idx, (int, np.integer)):
             return (self.x[idx], self.y[idx])
         else:
+            logger.debug("Slicing RheoData", index_type=type(idx).__name__)
             return RheoData(
                 x=self.x[idx],
                 y=self.y[idx],
@@ -466,6 +527,7 @@ class RheoData:
         """Add two RheoData objects or scalar."""
         if isinstance(other, RheoData):
             if not np.array_equal(self.x, other.x):
+                logger.error("x-axes must match for addition", exc_info=True)
                 raise ValueError("x-axes must match for addition")
             return RheoData(
                 x=self.x,
@@ -491,6 +553,7 @@ class RheoData:
         """Subtract two RheoData objects or scalar."""
         if isinstance(other, RheoData):
             if not np.array_equal(self.x, other.x):
+                logger.error("x-axes must match for subtraction", exc_info=True)
                 raise ValueError("x-axes must match for subtraction")
             return RheoData(
                 x=self.x,
@@ -516,6 +579,7 @@ class RheoData:
         """Multiply by scalar or another RheoData."""
         if isinstance(other, RheoData):
             if not np.array_equal(self.x, other.x):
+                logger.error("x-axes must match for multiplication", exc_info=True)
                 raise ValueError("x-axes must match for multiplication")
             y_result = self.y * other.y
         else:
@@ -541,6 +605,7 @@ class RheoData:
         Returns:
             Interpolated RheoData
         """
+        logger.debug("Interpolating data", n_new_points=len(new_x) if hasattr(new_x, "__len__") else 1)
         new_x = self._ensure_array(new_x)
 
         if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
@@ -569,6 +634,7 @@ class RheoData:
         Returns:
             Resampled RheoData
         """
+        logger.debug("Resampling data", n_points=n_points, domain=self.domain)
         x_array = _coerce_ndarray(self.x)
 
         if self.domain == "frequency":
@@ -593,6 +659,8 @@ class RheoData:
         """
         if window_size % 2 == 0:
             window_size += 1  # Make odd for symmetric window
+
+        logger.debug("Smoothing data", window_size=window_size)
 
         # Simple moving average
         kernel = np.ones(window_size) / window_size
@@ -620,6 +688,7 @@ class RheoData:
         Returns:
             RheoData with derivative values
         """
+        logger.debug("Computing numerical derivative")
         if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
             # Use JAX gradient
             dy_dx = jnp.gradient(self.y, self.x)
@@ -647,6 +716,7 @@ class RheoData:
         Returns:
             RheoData with integrated values
         """
+        logger.debug("Computing numerical integral")
         if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
             # Use JAX cumulative trapezoid
             from jax.scipy.integrate import cumulative_trapezoid
@@ -680,11 +750,13 @@ class RheoData:
             Frequency domain RheoData
         """
         if self.domain != "time":
+            logger.debug("Data is already in frequency domain")
             warnings.warn(
                 "Data is already in frequency domain", UserWarning, stacklevel=2
             )
             return self.copy()
 
+        logger.error("Frequency domain conversion not yet implemented", exc_info=True)
         # This would use FFT transform when implemented
         raise NotImplementedError(
             "Frequency domain conversion will be implemented with transforms"
@@ -697,9 +769,11 @@ class RheoData:
             Time domain RheoData
         """
         if self.domain != "frequency":
+            logger.debug("Data is already in time domain")
             warnings.warn("Data is already in time domain", UserWarning, stacklevel=2)
             return self.copy()
 
+        logger.error("Time domain conversion not yet implemented", exc_info=True)
         # This would use inverse FFT transform when implemented
         raise NotImplementedError(
             "Time domain conversion will be implemented with transforms"
@@ -716,6 +790,7 @@ class RheoData:
         Returns:
             Sliced RheoData
         """
+        logger.debug("Slicing data by x range", start=start, end=end)
         x_array = _coerce_ndarray(self.x)
         y_array = _coerce_ndarray(self.y)
 
@@ -728,6 +803,8 @@ class RheoData:
 
         sliced_x = x_array[mask]
         sliced_y = y_array[mask]
+
+        logger.debug("Sliced data", original_size=len(x_array), new_size=len(sliced_x))
 
         return RheoData(
             x=sliced_x,

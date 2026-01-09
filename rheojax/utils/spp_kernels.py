@@ -54,6 +54,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Safe JAX import (enforces float64)
 # Float64 precision is critical for accurate numerical differentiation
@@ -423,6 +426,13 @@ def harmonic_reconstruction_full(
         An_n[nn+1] = An1_n[nn+1]*cos(Delta/p*nn) - Bn1_n[nn+1]*sin(Delta/p*nn)
         Bn_n[nn+1] = Bn1_n[nn+1]*cos(Delta/p*nn) + An1_n[nn+1]*sin(Delta/p*nn)
     """
+    logger.debug(
+        "Starting harmonic reconstruction (full)",
+        omega=omega,
+        n_harmonics=n_harmonics,
+        n_cycles=n_cycles,
+    )
+
     strain_arr = jnp.atleast_1d(jnp.asarray(strain, dtype=jnp.float64))
     rate_arr = jnp.atleast_1d(jnp.asarray(strain_rate, dtype=jnp.float64))
     stress_arr = jnp.atleast_1d(jnp.asarray(stress, dtype=jnp.float64))
@@ -430,6 +440,13 @@ def harmonic_reconstruction_full(
     L = len(strain_arr)
     p = int(n_cycles)
     W = W_int if W_int is not None else int(round(L / (2 * p)))
+
+    logger.debug(
+        "Harmonic reconstruction parameters",
+        signal_length=L,
+        n_cycles_parsed=p,
+        window_size=W,
+    )
 
     # Normalize rate by omega (MATLAB convention)
     rate_normalized = rate_arr / omega
@@ -597,18 +614,35 @@ def spp_fourier_analysis(
         f''(t) = Σ [-n²ω²*An*cos(nωt) - n²ω²*Bn*sin(nωt)]
         f'''(t) = Σ [n³ω³*An*sin(nωt) - n³ω³*Bn*cos(nωt)]
     """
+    logger.info(
+        "Starting SPP Fourier analysis",
+        omega=omega,
+        dt=dt,
+        n_harmonics=n_harmonics,
+        n_cycles=n_cycles,
+    )
+
     strain_arr = jnp.atleast_1d(jnp.asarray(strain, dtype=jnp.float64))
     stress_arr = jnp.atleast_1d(jnp.asarray(stress, dtype=jnp.float64))
     L = len(strain_arr)
     p = int(n_cycles)
     W_int = int(round(L / (2 * p)))
 
+    logger.debug(
+        "SPP Fourier analysis input data",
+        signal_length=L,
+        n_cycles_parsed=p,
+        window_size=W_int,
+    )
+
     # Compute strain rate from strain (wrapped 8-point stencil)
+    logger.debug("Computing strain rate from strain (8-point stencil)")
     strain_rate = differentiate_rate_from_strain(
         strain_arr, dt, step_size=8, looped=True
     )
 
     # Get phase-aligned reconstruction with concrete W
+    logger.debug("Performing phase-aligned Fourier reconstruction")
     fourier_result = harmonic_reconstruction_full(
         strain_arr, strain_rate, stress_arr, omega, n_harmonics, p, W_int
     )
@@ -2033,6 +2067,12 @@ def build_spp_exports(
     -------
     dict with keys: spp_data_out, fsf_data_out, spp_params
     """
+    logger.debug(
+        "Building SPP export tables",
+        n_points=len(time),
+        has_fsf_data=fsf_data_out is not None,
+        n_metrics=len(metrics),
+    )
 
     spp_data_out = np.column_stack(
         [
@@ -2055,6 +2095,12 @@ def build_spp_exports(
     )
 
     fsf_out = fsf_data_out if fsf_data_out is not None else None
+
+    logger.info(
+        "SPP export tables built",
+        spp_data_shape=spp_data_out.shape,
+        has_fsf_data=fsf_out is not None,
+    )
 
     return {
         "spp_data_out": spp_data_out,
@@ -2137,6 +2183,13 @@ def convert_units(
     >>> strain_fraction = convert_units(strain_percent, 'percent', 'fraction')
     >>> stress_Pa = convert_units(stress_mPa, 'mPa', 'Pa')
     """
+    logger.debug(
+        "Converting units",
+        from_unit=from_unit,
+        to_unit=to_unit,
+        data_shape=getattr(data, "shape", "scalar"),
+    )
+
     data_arr = jnp.asarray(data, dtype=jnp.float64)
 
     # Define conversion factors (all lowercase for case-insensitive matching)
@@ -2165,9 +2218,19 @@ def convert_units(
 
     key = (from_unit.lower(), to_unit.lower())
     if key in conversions:
+        logger.debug(
+            "Unit conversion applied",
+            conversion_key=key,
+            factor=float(conversions[key]),
+        )
         return data_arr * conversions[key]
     else:
         # Return unchanged if conversion not found
+        logger.debug(
+            "No conversion found, returning unchanged data",
+            from_unit=from_unit,
+            to_unit=to_unit,
+        )
         return data_arr
 
 

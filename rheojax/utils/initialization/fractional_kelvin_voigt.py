@@ -11,7 +11,10 @@ Extraction strategy:
 
 from __future__ import annotations
 
+from rheojax.logging import get_logger
 from rheojax.utils.initialization.base import BaseInitializer
+
+logger = get_logger(__name__)
 
 
 class FractionalKelvinVoigtInitializer(BaseInitializer):
@@ -30,25 +33,65 @@ class FractionalKelvinVoigtInitializer(BaseInitializer):
         dict
             Estimated parameters: Ge, c_alpha, alpha
         """
+        logger.debug(
+            "Estimating FractionalKelvinVoigt parameters",
+            model="FractionalKelvinVoigt",
+            low_plateau=features["low_plateau"],
+            high_plateau=features["high_plateau"],
+            omega_mid=features["omega_mid"],
+            alpha_estimate=features["alpha_estimate"],
+        )
+
         epsilon = 1e-12
 
         # Ge: equilibrium modulus from low-frequency plateau
         Ge_init = max(features["low_plateau"], epsilon)
+        logger.debug(
+            "Estimated Ge from low-frequency plateau",
+            Ge=Ge_init,
+            low_plateau=features["low_plateau"],
+        )
 
         # c_alpha: from plateau difference (high - low)
         c_alpha_init = max(features["high_plateau"] - features["low_plateau"], epsilon)
+        logger.debug(
+            "Estimated c_alpha from plateau difference",
+            c_alpha=c_alpha_init,
+            difference=features["high_plateau"] - features["low_plateau"],
+        )
 
         # alpha: fractional order from slope or default to 0.5
         if 0.01 <= features["alpha_estimate"] <= 0.99:
             alpha_init = features["alpha_estimate"]
+            logger.debug(
+                "Using alpha from slope estimate",
+                alpha=alpha_init,
+                source="slope_estimate",
+            )
         else:
             alpha_init = 0.5
+            logger.debug(
+                "Using default alpha (slope estimate out of range)",
+                alpha=alpha_init,
+                alpha_estimate=features["alpha_estimate"],
+                source="default",
+            )
 
-        return {
+        estimated = {
             "Ge": Ge_init,
             "c_alpha": c_alpha_init,
             "alpha": alpha_init,
         }
+
+        logger.info(
+            "FractionalKelvinVoigt initialization complete",
+            model="FractionalKelvinVoigt",
+            Ge=Ge_init,
+            c_alpha=c_alpha_init,
+            alpha=alpha_init,
+        )
+
+        return estimated
 
     def _set_parameters(self, param_set, clipped_params: dict) -> None:
         """Set FractionalKelvinVoigt parameters in ParameterSet.
@@ -60,6 +103,13 @@ class FractionalKelvinVoigtInitializer(BaseInitializer):
         clipped_params : dict
             Clipped parameter values
         """
+        logger.debug(
+            "Setting FractionalKelvinVoigt parameters in ParameterSet",
+            Ge=clipped_params["Ge"],
+            c_alpha=clipped_params["c_alpha"],
+            alpha=clipped_params["alpha"],
+        )
+
         self._safe_set_parameter(param_set, "Ge", clipped_params["Ge"])
         self._safe_set_parameter(param_set, "c_alpha", clipped_params["c_alpha"])
         self._safe_set_parameter(param_set, "alpha", clipped_params["alpha"])

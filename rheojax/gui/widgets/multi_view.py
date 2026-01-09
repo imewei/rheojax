@@ -21,6 +21,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 # Available layout configurations
 LAYOUTS = [
     ("1x1", "Single", (1, 1)),
@@ -52,12 +56,14 @@ class PlotPanel(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__, index=index)
 
         self._index = index
         self._figure = Figure(figsize=(5, 4), dpi=100)
         self._figure.set_layout_engine("tight")
 
         self._setup_ui()
+        logger.debug("Initialization complete", class_name=self.__class__.__name__, index=index)
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -88,6 +94,13 @@ class PlotPanel(QWidget):
         title : str
             Panel title
         """
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_title",
+            index=self._index,
+            title=title,
+        )
         self._title_label.setText(title)
 
     def get_figure(self) -> Figure:
@@ -112,6 +125,12 @@ class PlotPanel(QWidget):
 
     def clear(self) -> None:
         """Clear the figure."""
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="clear",
+            index=self._index,
+        )
         self._figure.clear()
         self._canvas.draw()
 
@@ -158,6 +177,7 @@ class MultiView(QWidget):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__, layout=layout)
 
         self._current_layout = layout
         self._panels: list[PlotPanel] = []
@@ -166,6 +186,7 @@ class MultiView(QWidget):
         self._setup_ui()
         self._connect_signals()
         self._set_layout(layout)
+        logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -229,6 +250,12 @@ class MultiView(QWidget):
             New combo box index
         """
         layout_id = self._layout_combo.currentData()
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="layout_changed",
+            layout=layout_id,
+        )
         self._set_layout(layout_id)
         self.layout_changed.emit(layout_id)
 
@@ -249,6 +276,16 @@ class MultiView(QWidget):
 
         self._current_layout = layout_id
         n_panels = rows * cols
+
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="set_layout",
+            layout=layout_id,
+            rows=rows,
+            cols=cols,
+            n_panels=n_panels,
+        )
 
         # Clear existing panels
         for panel in self._panels:
@@ -272,6 +309,13 @@ class MultiView(QWidget):
             self._layout_combo.setCurrentIndex(idx)
             self._layout_combo.blockSignals(False)
 
+        logger.info(
+            "Layout changed",
+            widget=self.__class__.__name__,
+            layout=layout_id,
+            n_panels=n_panels,
+        )
+
     def _on_sync_toggled(self, checked: bool) -> None:
         """Handle sync button toggle.
 
@@ -280,7 +324,18 @@ class MultiView(QWidget):
         checked : bool
             Whether sync is enabled
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="sync_toggled",
+            enabled=checked,
+        )
         self._sync_axes = checked
+        logger.info(
+            "Axis sync state changed",
+            widget=self.__class__.__name__,
+            sync_enabled=checked,
+        )
         # Note: Full axis sync implementation would require
         # connecting xlim/ylim change callbacks across all panels
 
@@ -295,7 +350,21 @@ class MultiView(QWidget):
             Figure object or callable that draws on axes
         """
         if index < 0 or index >= len(self._panels):
+            logger.error(
+                "Panel index out of range",
+                widget=self.__class__.__name__,
+                index=index,
+                num_panels=len(self._panels),
+                exc_info=True,
+            )
             raise IndexError(f"Panel index {index} out of range")
+
+        logger.debug(
+            "State updated",
+            widget=self.__class__.__name__,
+            action="add_plot",
+            index=index,
+        )
 
         panel = self._panels[index]
         panel_fig = panel.get_figure()
@@ -306,7 +375,17 @@ class MultiView(QWidget):
         if callable(figure):
             # Call function with axes
             ax = panel_fig.add_subplot(111)
-            figure(ax)
+            try:
+                figure(ax)
+            except Exception as e:
+                logger.error(
+                    "Error calling plot function",
+                    widget=self.__class__.__name__,
+                    index=index,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
         elif hasattr(figure, "axes"):
             # Copy from another figure
             # This is a simplified approach - full copying is complex
@@ -395,10 +474,21 @@ class MultiView(QWidget):
             Panel index
         """
         if 0 <= index < len(self._panels):
+            logger.debug(
+                "User interaction",
+                widget=self.__class__.__name__,
+                action="clear_panel",
+                index=index,
+            )
             self._panels[index].clear()
 
     def clear_all(self) -> None:
         """Clear all panels."""
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="clear_all",
+        )
         for panel in self._panels:
             panel.clear()
 
@@ -421,7 +511,33 @@ class MultiView(QWidget):
         """
         panel = self.get_panel(index)
         if panel:
-            panel.get_figure().savefig(filepath, dpi=dpi, bbox_inches="tight")
+            logger.debug(
+                "User interaction",
+                widget=self.__class__.__name__,
+                action="export_panel",
+                index=index,
+                filepath=filepath,
+                dpi=dpi,
+            )
+            try:
+                panel.get_figure().savefig(filepath, dpi=dpi, bbox_inches="tight")
+                logger.info(
+                    "Panel exported",
+                    widget=self.__class__.__name__,
+                    index=index,
+                    filepath=filepath,
+                    dpi=dpi,
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to export panel",
+                    widget=self.__class__.__name__,
+                    index=index,
+                    filepath=filepath,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
     def export_all(self, base_path: str, format: str = "png", dpi: int = 150) -> None:
         """Export all panels to files.
@@ -437,11 +553,48 @@ class MultiView(QWidget):
         """
         import os
 
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="export_all",
+            base_path=base_path,
+            format=format,
+            dpi=dpi,
+            num_panels=len(self._panels),
+        )
+
         base, ext = os.path.splitext(base_path)
 
+        exported_files = []
         for i, panel in enumerate(self._panels):
             filepath = f"{base}_panel{i + 1}.{format}"
-            panel.get_figure().savefig(filepath, dpi=dpi, bbox_inches="tight")
+            try:
+                panel.get_figure().savefig(filepath, dpi=dpi, bbox_inches="tight")
+                exported_files.append(filepath)
+                logger.debug(
+                    "Panel exported",
+                    widget=self.__class__.__name__,
+                    index=i,
+                    filepath=filepath,
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to export panel",
+                    widget=self.__class__.__name__,
+                    index=i,
+                    filepath=filepath,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
+
+        logger.info(
+            "All panels exported",
+            widget=self.__class__.__name__,
+            num_panels=len(exported_files),
+            format=format,
+            dpi=dpi,
+        )
 
     def get_layout(self) -> str:
         """Get current layout.
@@ -461,6 +614,12 @@ class MultiView(QWidget):
         layout : str
             Layout identifier (e.g., "2x2")
         """
+        logger.debug(
+            "User interaction",
+            widget=self.__class__.__name__,
+            action="set_layout_preset",
+            layout=layout,
+        )
         idx = self._layout_combo.findData(layout)
         if idx >= 0:
             self._layout_combo.setCurrentIndex(idx)

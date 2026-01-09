@@ -28,6 +28,10 @@ from PySide6.QtWidgets import (
     QWizardPage,
 )
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class FileSelectionPage(QWizardPage):
     """File selection page."""
@@ -35,6 +39,7 @@ class FileSelectionPage(QWizardPage):
     def __init__(self, parent: QWizard | None = None) -> None:
         """Initialize file selection page."""
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self.setTitle("Select Data File")
         self.setSubTitle("Choose a file to import rheological data from")
 
@@ -73,6 +78,7 @@ class FileSelectionPage(QWizardPage):
 
     def _browse_file(self) -> None:
         """Open file browser dialog."""
+        logger.debug("Opening file browser", page=self.__class__.__name__)
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Data File",
@@ -81,6 +87,12 @@ class FileSelectionPage(QWizardPage):
         )
         if file_path:
             self.file_path_edit.setText(file_path)
+            logger.debug(
+                "Option changed",
+                dialog="ImportWizard",
+                option="file_path",
+                value=file_path,
+            )
 
     def _on_file_changed(self, text: str) -> None:
         """Handle file path change."""
@@ -94,6 +106,12 @@ class FileSelectionPage(QWizardPage):
                     f"<b>Type:</b> {path.suffix.upper()[1:]}"
                 )
                 self.completeChanged.emit()
+                logger.debug(
+                    "Option changed",
+                    dialog="ImportWizard",
+                    option="file_path",
+                    value=text,
+                )
             else:
                 self.info_label.setText("<font color='red'>Invalid file path</font>")
         else:
@@ -118,6 +136,12 @@ class FileSelectionPage(QWizardPage):
         if urls:
             file_path = urls[0].toLocalFile()
             self.file_path_edit.setText(file_path)
+            logger.debug(
+                "Option changed",
+                dialog="ImportWizard",
+                option="file_path",
+                value=file_path,
+            )
 
 
 class ColumnMappingPage(QWizardPage):
@@ -126,6 +150,7 @@ class ColumnMappingPage(QWizardPage):
     def __init__(self, parent: QWizard | None = None) -> None:
         """Initialize column mapping page."""
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self.setTitle("Map Columns")
         self.setSubTitle("Assign columns to rheological data types")
 
@@ -145,9 +170,7 @@ class ColumnMappingPage(QWizardPage):
         x_layout.addWidget(QLabel("X (Frequency/Time):"))
         self.x_combo = QComboBox()
         # Ignore the emitted text; we only care that completion state may have changed
-        self.x_combo.currentTextChanged.connect(
-            lambda _text: self.completeChanged.emit()
-        )
+        self.x_combo.currentTextChanged.connect(self._on_x_column_changed)
         x_layout.addWidget(self.x_combo, 1)
         mapping_layout.addLayout(x_layout)
 
@@ -155,9 +178,7 @@ class ColumnMappingPage(QWizardPage):
         y_layout = QHBoxLayout()
         y_layout.addWidget(QLabel("Y (Modulus/Viscosity):"))
         self.y_combo = QComboBox()
-        self.y_combo.currentTextChanged.connect(
-            lambda _text: self.completeChanged.emit()
-        )
+        self.y_combo.currentTextChanged.connect(self._on_y_column_changed)
         y_layout.addWidget(self.y_combo, 1)
         mapping_layout.addLayout(y_layout)
 
@@ -165,6 +186,7 @@ class ColumnMappingPage(QWizardPage):
         y2_layout = QHBoxLayout()
         y2_layout.addWidget(QLabel("Y2 (Optional, e.g., G''):"))
         self.y2_combo = QComboBox()
+        self.y2_combo.currentTextChanged.connect(self._on_y2_column_changed)
         y2_layout.addWidget(self.y2_combo, 1)
         mapping_layout.addLayout(y2_layout)
 
@@ -172,6 +194,7 @@ class ColumnMappingPage(QWizardPage):
         temp_layout = QHBoxLayout()
         temp_layout.addWidget(QLabel("Temperature (Optional):"))
         self.temp_combo = QComboBox()
+        self.temp_combo.currentTextChanged.connect(self._on_temp_column_changed)
         temp_layout.addWidget(self.temp_combo, 1)
         mapping_layout.addLayout(temp_layout)
 
@@ -194,9 +217,52 @@ class ColumnMappingPage(QWizardPage):
         self.registerField("y2_column", self.y2_combo, "currentText")
         self.registerField("temp_column", self.temp_combo, "currentText")
 
+    def _on_x_column_changed(self, text: str) -> None:
+        """Handle x column change."""
+        self.completeChanged.emit()
+        if text:
+            logger.debug(
+                "Option changed",
+                dialog="ImportWizard",
+                option="x_column",
+                value=text,
+            )
+
+    def _on_y_column_changed(self, text: str) -> None:
+        """Handle y column change."""
+        self.completeChanged.emit()
+        if text:
+            logger.debug(
+                "Option changed",
+                dialog="ImportWizard",
+                option="y_column",
+                value=text,
+            )
+
+    def _on_y2_column_changed(self, text: str) -> None:
+        """Handle y2 column change."""
+        if text:
+            logger.debug(
+                "Option changed",
+                dialog="ImportWizard",
+                option="y2_column",
+                value=text,
+            )
+
+    def _on_temp_column_changed(self, text: str) -> None:
+        """Handle temp column change."""
+        if text:
+            logger.debug(
+                "Option changed",
+                dialog="ImportWizard",
+                option="temp_column",
+                value=text,
+            )
+
     def initializePage(self) -> None:
         """Initialize page when shown."""
         file_path = self.field("file_path")
+        logger.debug("Loading columns from file", page=self.__class__.__name__, file_path=file_path)
         self._load_columns(file_path)
         self._auto_detect()
 
@@ -220,6 +286,11 @@ class ColumnMappingPage(QWizardPage):
                 df = pd.read_csv(file_path, sep=delimiter, nrows=5)
 
             columns = list(df.columns)
+            logger.debug(
+                "Columns loaded",
+                page=self.__class__.__name__,
+                num_columns=len(columns),
+            )
 
             # Populate combo boxes
             self.x_combo.clear()
@@ -240,6 +311,12 @@ class ColumnMappingPage(QWizardPage):
             self._update_preview(df)
 
         except Exception as e:
+            logger.error(
+                "Failed to load columns",
+                page=self.__class__.__name__,
+                error=str(e),
+                exc_info=True,
+            )
             QMessageBox.warning(self, "Error", f"Failed to load columns: {e}")
 
     def _update_preview(self, df: pd.DataFrame) -> None:
@@ -257,6 +334,7 @@ class ColumnMappingPage(QWizardPage):
 
     def _auto_detect(self) -> None:
         """Auto-detect column mapping."""
+        logger.debug("Auto-detecting column mapping", page=self.__class__.__name__)
         # Common column name patterns
         x_patterns = ["freq", "frequency", "omega", "time", "t", "w"]
         y_patterns = ["g'", "gp", "storage", "modulus", "eta", "viscosity", "stress"]
@@ -288,6 +366,7 @@ class TestModeSelectionPage(QWizardPage):
     def __init__(self, parent: QWizard | None = None) -> None:
         """Initialize test mode selection page."""
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self.setTitle("Select Test Mode")
         self.setSubTitle("Specify the type of rheological test")
 
@@ -313,6 +392,7 @@ class TestModeSelectionPage(QWizardPage):
             ]
         )
         self.test_mode_combo.setEnabled(False)
+        self.test_mode_combo.currentTextChanged.connect(self._on_test_mode_changed)
 
         mode_layout.addWidget(self.test_mode_combo)
 
@@ -342,7 +422,24 @@ class TestModeSelectionPage(QWizardPage):
 
     def _on_auto_detect_changed(self, state: int) -> None:
         """Handle auto-detect checkbox change."""
-        self.test_mode_combo.setEnabled(state != Qt.CheckState.Checked.value)
+        enabled = state != Qt.CheckState.Checked.value
+        self.test_mode_combo.setEnabled(enabled)
+        logger.debug(
+            "Option changed",
+            dialog="ImportWizard",
+            option="auto_detect_mode",
+            value=not enabled,
+        )
+
+    def _on_test_mode_changed(self, text: str) -> None:
+        """Handle test mode change."""
+        if text and self.test_mode_combo.isEnabled():
+            logger.debug(
+                "Option changed",
+                dialog="ImportWizard",
+                option="test_mode",
+                value=text,
+            )
 
 
 class PreviewConfirmPage(QWizardPage):
@@ -351,6 +448,7 @@ class PreviewConfirmPage(QWizardPage):
     def __init__(self, parent: QWizard | None = None) -> None:
         """Initialize preview page."""
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
         self.setTitle("Preview and Confirm")
         self.setSubTitle("Review your import settings")
 
@@ -379,6 +477,14 @@ class PreviewConfirmPage(QWizardPage):
         temp_col = self.field("temp_column")
         test_mode = self.field("test_mode")
         auto_detect = self.field("auto_detect_mode")
+
+        logger.debug(
+            "Preparing import preview",
+            page=self.__class__.__name__,
+            file_path=file_path,
+            x_col=x_col,
+            y_col=y_col,
+        )
 
         # Build summary
         summary = f"""
@@ -443,8 +549,19 @@ class PreviewConfirmPage(QWizardPage):
                     self.preview_table.setItem(i, j, QTableWidgetItem(value))
 
             self.preview_table.resizeColumnsToContents()
+            logger.debug(
+                "Preview loaded",
+                page=self.__class__.__name__,
+                num_rows=len(df_preview),
+            )
 
         except Exception as e:
+            logger.error(
+                "Failed to load preview",
+                page=self.__class__.__name__,
+                error=str(e),
+                exc_info=True,
+            )
             QMessageBox.warning(self, "Error", f"Failed to load preview: {e}")
 
 
@@ -468,6 +585,7 @@ class ImportWizard(QWizard):
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize import wizard."""
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self.setWindowTitle("Data Import Wizard")
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
@@ -486,6 +604,21 @@ class ImportWizard(QWizard):
 
         # Set minimum size
         self.setMinimumSize(700, 500)
+
+        # Connect finish/cancel signals
+        self.finished.connect(self._on_finished)
+
+    def _on_finished(self, result: int) -> None:
+        """Handle wizard finished."""
+        if result == QWizard.DialogCode.Accepted.value:
+            logger.debug("Options applied", dialog=self.__class__.__name__)
+        else:
+            logger.debug("Dialog closed", dialog=self.__class__.__name__)
+
+    def showEvent(self, event) -> None:
+        """Handle show event."""
+        super().showEvent(event)
+        logger.debug("Dialog opened", dialog=self.__class__.__name__)
 
     def get_result(self) -> dict[str, Any]:
         """Get import configuration.

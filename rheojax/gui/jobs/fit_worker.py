@@ -5,7 +5,6 @@ Fit Worker
 Background worker for NLSQ model fitting operations.
 """
 
-import logging
 import time
 import traceback
 from dataclasses import dataclass
@@ -32,11 +31,12 @@ except ImportError:
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.gui.jobs.cancellation import CancellationError, CancellationToken
+from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -173,7 +173,7 @@ class FitWorker(QRunnable):
         with the main thread.
         """
         try:
-            logger.info(f"Starting fit for model: {self._model_name}")
+            logger.info("Fit worker started", model=self._model_name)
             start_time = time.perf_counter()
 
             # Prepare fitting options
@@ -188,6 +188,17 @@ class FitWorker(QRunnable):
                 self._last_loss = loss
                 percent = min(int(iteration / max_iter * 100), 100)
                 message = f"Iteration {iteration}: loss = {loss:.6e}"
+
+                # Log iteration timing at DEBUG level
+                elapsed = time.perf_counter() - start_time
+                logger.debug(
+                    "Iteration complete",
+                    iteration=iteration,
+                    elapsed=elapsed,
+                    loss=loss,
+                    percent=percent,
+                )
+
                 self.signals.progress.emit(percent, 100, message)
 
             fit_kwargs["callback"] = progress_callback
@@ -196,7 +207,12 @@ class FitWorker(QRunnable):
             from rheojax.gui.services.model_service import ModelService
 
             service = ModelService()
-            logger.debug(f"Fitting {self._model_name} with ModelService")
+            logger.debug(
+                "Fitting with ModelService",
+                model=self._model_name,
+                initial_params=self._initial_params,
+                options=self._options,
+            )
             result = service.fit(
                 self._model_name,
                 self._data,
@@ -233,21 +249,31 @@ class FitWorker(QRunnable):
             )
 
             logger.info(
-                f"Fit completed in {fit_time:.2f}s: "
-                f"R²={r_squared:.4f}, MPE={mpe:.2f}%"
+                "Fit worker complete",
+                model=self._model_name,
+                total_time=fit_time,
+                r_squared=r_squared,
+                mpe=mpe,
+                n_iterations=n_iterations,
+                success=success,
             )
 
             # Emit completion signal
             self.signals.completed.emit(result)
 
         except CancellationError:
-            logger.info(f"Fit for {self._model_name} cancelled")
+            logger.info("Fit cancelled", model=self._model_name)
             self.signals.cancelled.emit()
 
         except Exception as e:
             error_msg = f"Fit failed for {self._model_name}: {str(e)}"
-            logger.error(error_msg)
-            logger.debug(traceback.format_exc())
+            logger.error(
+                "Fit worker failed",
+                model=self._model_name,
+                error=str(e),
+                exc_info=True,
+            )
+            logger.debug("Traceback: %s", traceback.format_exc())
 
             # Store error in token
             self.cancel_token.set_error(e)

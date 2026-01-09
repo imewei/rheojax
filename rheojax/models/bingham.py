@@ -30,6 +30,10 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.logging import get_logger, log_fit
+
+# Module logger
+logger = get_logger(__name__)
 
 
 @ModelRegistry.register("bingham")
@@ -80,42 +84,95 @@ class Bingham(BaseModel):
         """Fit Bingham parameters to data.
 
         Args:
-            X: Shear rate data (γ̇)
-            y: Stress data (σ)
+            X: Shear rate data (gamma_dot)
+            y: Stress data (sigma)
             **kwargs: Additional fitting options
 
         Returns:
             self for method chaining
         """
-        # Sort by shear rate
-        sort_idx = np.argsort(X)
-        X_sorted = X[sort_idx]
-        y_sorted = y[sort_idx]
+        with log_fit(
+            logger,
+            self.__class__.__name__,
+            data_shape=X.shape,
+            test_mode="ROTATION",
+        ) as ctx:
+            logger.debug(
+                "Processing input data",
+                gamma_dot_range=(float(X.min()), float(X.max())),
+                stress_range=(float(y.min()), float(y.max())),
+                n_points=len(X),
+            )
 
-        # For Bingham model: σ = σ_y + η_p * γ̇
-        # This is linear, so we can use linear regression
-        # However, need to account for yield stress
+            # Sort by shear rate
+            sort_idx = np.argsort(X)
+            X_sorted = X[sort_idx]
+            y_sorted = y[sort_idx]
 
-        # Estimate yield stress from intercept at γ̇ = 0
-        # Use linear fit in high shear rate region
-        mid_idx = len(X_sorted) // 2
-        coeffs = np.polyfit(X_sorted[mid_idx:], y_sorted[mid_idx:], 1)
+            # For Bingham model: sigma = sigma_y + eta_p * gamma_dot
+            # This is linear, so we can use linear regression
+            # However, need to account for yield stress
 
-        eta_p_est = coeffs[0]  # Slope = η_p
-        sigma_y_est = coeffs[1]  # Intercept = σ_y
+            # Estimate yield stress from intercept at gamma_dot = 0
+            # Use linear fit in high shear rate region
+            mid_idx = len(X_sorted) // 2
+            logger.debug(
+                "Performing linear regression",
+                mid_idx=mid_idx,
+                fit_region_start=float(X_sorted[mid_idx]),
+                fit_region_end=float(X_sorted[-1]),
+            )
 
-        # Ensure positive values
-        if sigma_y_est < 0:
-            sigma_y_est = 0.0
-        if eta_p_est < 0:
-            eta_p_est = 0.1
+            try:
+                coeffs = np.polyfit(X_sorted[mid_idx:], y_sorted[mid_idx:], 1)
+            except Exception as e:
+                logger.error(
+                    "Linear regression failed",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
 
-        # Clip to bounds
-        sigma_y_est = np.clip(sigma_y_est, 0.0, 1e6)
-        eta_p_est = np.clip(eta_p_est, 1e-6, 1e12)
+            eta_p_est = coeffs[0]  # Slope = eta_p
+            sigma_y_est = coeffs[1]  # Intercept = sigma_y
 
-        self.parameters.set_value("sigma_y", float(sigma_y_est))
-        self.parameters.set_value("eta_p", float(eta_p_est))
+            logger.debug(
+                "Initial parameter estimates from linear fit",
+                eta_p_raw=eta_p_est,
+                sigma_y_raw=sigma_y_est,
+            )
+
+            # Ensure positive values
+            if sigma_y_est < 0:
+                logger.debug(
+                    "Negative yield stress estimated, clipping to 0",
+                    sigma_y_raw=sigma_y_est,
+                )
+                sigma_y_est = 0.0
+            if eta_p_est < 0:
+                logger.debug(
+                    "Negative plastic viscosity estimated, setting to default",
+                    eta_p_raw=eta_p_est,
+                )
+                eta_p_est = 0.1
+
+            # Clip to bounds
+            sigma_y_est = np.clip(sigma_y_est, 0.0, 1e6)
+            eta_p_est = np.clip(eta_p_est, 1e-6, 1e12)
+
+            self.parameters.set_value("sigma_y", float(sigma_y_est))
+            self.parameters.set_value("eta_p", float(eta_p_est))
+
+            # Log fitted parameters
+            ctx["sigma_y"] = float(sigma_y_est)
+            ctx["eta_p"] = float(eta_p_est)
+
+            logger.debug(
+                "Fitting completed successfully",
+                sigma_y=float(sigma_y_est),
+                eta_p=float(eta_p_est),
+            )
 
         return self
 

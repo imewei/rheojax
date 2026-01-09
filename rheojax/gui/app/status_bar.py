@@ -7,6 +7,10 @@ Application status bar with progress indicators, JAX device status, and memory m
 
 from PySide6.QtWidgets import QLabel, QProgressBar, QStatusBar, QWidget
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class StatusBar(QStatusBar):
     """Application status bar with progress tracking and system indicators.
@@ -35,6 +39,7 @@ class StatusBar(QStatusBar):
             Parent widget
         """
         super().__init__(parent)
+        logger.debug("Initializing", class_name=self.__class__.__name__)
 
         # Left: Status message (permanent)
         self.message_label = QLabel("Ready")
@@ -65,6 +70,8 @@ class StatusBar(QStatusBar):
         self.float64_label.setStyleSheet("QLabel { padding: 0 10px; }")
         self.addPermanentWidget(self.float64_label)
 
+        logger.debug("Initialized", class_name=self.__class__.__name__)
+
     def show_message(self, message: str, timeout: int = 0) -> None:
         """Display temporary status message.
 
@@ -75,6 +82,7 @@ class StatusBar(QStatusBar):
         timeout : int, default=0
             Timeout in milliseconds (0 = permanent)
         """
+        logger.debug("Status updated", message=message, timeout=timeout)
         self.message_label.setText(message)
         if timeout > 0:
             # Also show in Qt status bar for timeout support
@@ -92,6 +100,7 @@ class StatusBar(QStatusBar):
         text : str, optional
             Progress text to display
         """
+        logger.debug("Progress updated", value=value, maximum=maximum, text=text)
         self.progress_bar.setMaximum(maximum)
         self.progress_bar.setValue(value)
         if text:
@@ -102,6 +111,7 @@ class StatusBar(QStatusBar):
 
     def hide_progress(self) -> None:
         """Hide progress bar."""
+        logger.debug("Progress hidden")
         self.progress_bar.setVisible(False)
         self.progress_bar.setValue(0)
 
@@ -125,6 +135,13 @@ class StatusBar(QStatusBar):
         float64_enabled : bool
             Whether float64 is enabled
         """
+        logger.debug(
+            "JAX status updated",
+            device=device,
+            memory_used=memory_used,
+            memory_total=memory_total,
+            float64_enabled=float64_enabled,
+        )
         # Update JAX device
         self.jax_label.setText(f"JAX: {device}")
 
@@ -153,6 +170,7 @@ class StatusBar(QStatusBar):
         total_mb : float
             Total available memory in megabytes
         """
+        logger.debug("Memory updated", used_mb=used_mb, total_mb=total_mb)
         self.memory_label.setText(f"Memory: {int(used_mb)}/{int(total_mb)} MB")
 
     def set_jax_device(self, device: str) -> None:
@@ -163,6 +181,7 @@ class StatusBar(QStatusBar):
         device : str
             Device name (e.g., "cpu", "cuda:0", "gpu")
         """
+        logger.debug("JAX device set", device=device)
         self.jax_label.setText(f"JAX: {device}")
 
     def set_float64_status(self, enabled: bool) -> None:
@@ -173,6 +192,7 @@ class StatusBar(QStatusBar):
         enabled : bool
             Whether float64 is enabled
         """
+        logger.debug("Float64 status set", enabled=enabled)
         # ASCII characters to avoid macOS CoreText rendering issues
         if enabled:
             self.float64_label.setText("Float64: [OK]")

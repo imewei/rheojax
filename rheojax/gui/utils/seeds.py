@@ -8,8 +8,11 @@ Random seed management for reproducibility.
 from typing import Any
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
 
 jax, jnp = safe_import_jax()
+
+logger = get_logger(__name__)
 
 
 class SeedManager:
@@ -34,6 +37,7 @@ class SeedManager:
         seed : int, optional
             Initial random seed
         """
+        logger.debug("Initializing SeedManager", seed=seed)
         ...
 
     def get_key(self) -> Any:
@@ -44,6 +48,7 @@ class SeedManager:
         PRNGKey
             JAX random key
         """
+        logger.debug("Getting current PRNG key")
         ...
 
     def split_key(self, num: int = 2) -> list[Any]:
@@ -59,6 +64,7 @@ class SeedManager:
         list[PRNGKey]
             Split keys
         """
+        logger.debug("Splitting PRNG key", num=num)
         ...
 
     def set_seed(self, seed: int) -> None:
@@ -69,6 +75,7 @@ class SeedManager:
         seed : int
             Random seed
         """
+        logger.debug("Setting new random seed", seed=seed)
         ...
 
     def get_seed(self) -> int | None:
@@ -79,4 +86,5 @@ class SeedManager:
         int | None
             Current seed
         """
+        logger.debug("Getting current seed")
         ...
