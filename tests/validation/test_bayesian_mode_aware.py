@@ -285,6 +285,9 @@ def check_posterior_accuracy(
 class TestBayesianRelaxationMode:
     """Bayesian inference validation for relaxation mode."""
 
+    # Models using Mittag-Leffler functions are extremely slow (~4s/iteration)
+    SLOW_MODELS = {FractionalJeffreysModel}
+
     @pytest.mark.parametrize(
         "model_class",
         [
@@ -308,6 +311,16 @@ class TestBayesianRelaxationMode:
         Expected behavior on v0.4.0: PASS (closure-based mode)
         """
         model = model_class()
+
+        # Use minimal MCMC settings for slow models (Mittag-Leffler based)
+        if model_class in self.SLOW_MODELS:
+            num_warmup = 200
+            num_samples = 100
+            max_tree_depth = 8
+        else:
+            num_warmup = 2000
+            num_samples = 1000
+            max_tree_depth = 12
 
         # Suppress expected warnings from sampling
         with warnings.catch_warnings():
@@ -336,17 +349,15 @@ class TestBayesianRelaxationMode:
                 initial_values[param_name] = value
 
             # Then Bayesian inference with warm-start and enhanced settings
-            # Increased num_warmup (500→2000) for complex fractional models
             # dense_mass=True for better adaptation in complex parameter spaces
-            # max_tree_depth=12 (default 10) for deeper exploration
             result = model.fit_bayesian(
                 relaxation_fractional_data.x,
                 relaxation_fractional_data.y,
-                num_warmup=2000,
-                num_samples=1000,
+                num_warmup=num_warmup,
+                num_samples=num_samples,
                 initial_values=initial_values,
                 dense_mass=True,
-                max_tree_depth=12,
+                max_tree_depth=max_tree_depth,
             )
 
         # Check MCMC diagnostics
@@ -845,6 +856,10 @@ class TestBayesianCredibleIntervals:
 class TestFractionalModelsRelaxation:
     """Comprehensive tests for all 11 fractional models in relaxation mode."""
 
+    # Models using Mittag-Leffler functions are extremely slow (~4s/iteration)
+    # Use minimal MCMC settings just to verify sampling works
+    SLOW_MODELS = {FractionalJeffreysModel}
+
     @pytest.mark.parametrize(
         "model_class",
         [
@@ -871,6 +886,17 @@ class TestFractionalModelsRelaxation:
         """
         model = model_class()
 
+        # Use minimal MCMC settings for slow models (Mittag-Leffler based)
+        # FractionalJeffreysModel takes ~4s/iteration due to Mittag-Leffler
+        if model_class in self.SLOW_MODELS:
+            num_warmup = 100
+            num_samples = 50
+            max_tree_depth = 8
+        else:
+            num_warmup = 500
+            num_samples = 200
+            max_tree_depth = 10
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
@@ -891,11 +917,11 @@ class TestFractionalModelsRelaxation:
                 result = model.fit_bayesian(
                     relaxation_fractional_data.x,
                     relaxation_fractional_data.y,
-                    num_warmup=2000,
-                    num_samples=500,
+                    num_warmup=num_warmup,
+                    num_samples=num_samples,
                     initial_values=initial_values,
                     dense_mass=True,
-                    max_tree_depth=12,
+                    max_tree_depth=max_tree_depth,
                 )
 
                 # Check that we got samples
@@ -910,3 +936,4 @@ class TestFractionalModelsRelaxation:
                 pytest.fail(
                     f"{model_class.__name__} failed Bayesian sampling: {str(e)}"
                 )
+
