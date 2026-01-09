@@ -260,17 +260,46 @@ class ModelComparisonPipeline(Pipeline):
 
                 # Calculate metrics using magnitude (real values)
                 residuals = y - y_pred_magnitude
-                rmse = np.sqrt(np.mean(residuals**2))
 
-                # Calculate R² manually (avoid calling model.score() which predicts again)
-                ss_res = np.sum(residuals**2)
-                ss_tot = np.sum((y - np.mean(y)) ** 2)
-                r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+                # Try to use NLSQ result properties (NLSQ 0.6.0 CurveFitResult compatible)
+                # Falls back to manual computation if result not available
+                nlsq_result = (
+                    model.get_nlsq_result()
+                    if hasattr(model, "get_nlsq_result")
+                    else None
+                )
+
+                if nlsq_result is not None and nlsq_result.rmse is not None:
+                    # Use NLSQ 0.6.0 CurveFitResult-compatible properties
+                    rmse = nlsq_result.rmse
+                    r_squared = nlsq_result.r_squared or 0.0
+                    aic = nlsq_result.aic
+                    bic = nlsq_result.bic
+                else:
+                    # Fallback: Calculate metrics manually
+                    rmse = np.sqrt(np.mean(residuals**2))
+
+                    # Calculate R² manually (avoid calling model.score())
+                    ss_res = np.sum(residuals**2)
+                    ss_tot = np.sum((y - np.mean(y)) ** 2)
+                    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+
+                    # Calculate AIC/BIC manually
+                    n = len(y)
+                    k = len(model.parameters) if hasattr(model, "parameters") else 0
+                    if n > 0 and rmse > 0:
+                        rss = np.sum(residuals**2)
+                        aic = 2 * k + n * np.log(rss / n)
+                        bic = k * np.log(n) + n * np.log(rss / n)
+                    else:
+                        aic = np.inf
+                        bic = np.inf
 
                 # Calculate relative RMSE
                 rel_rmse = rmse / np.mean(np.abs(y))
 
                 # Store results
+                n_params = len(model.parameters) if hasattr(model, "parameters") else 0
                 self.results[model_name] = {
                     "model": model,
                     "parameters": model.get_params(),
@@ -279,24 +308,10 @@ class ModelComparisonPipeline(Pipeline):
                     "rmse": float(rmse),
                     "rel_rmse": float(rel_rmse),
                     "r_squared": float(r_squared),
-                    "n_params": (
-                        len(model.parameters) if hasattr(model, "parameters") else 0
-                    ),
+                    "n_params": n_params,
+                    "aic": float(aic) if aic is not None else np.inf,
+                    "bic": float(bic) if bic is not None else np.inf,
                 }
-
-                # Calculate AIC (Akaike Information Criterion)
-                n = len(y)
-                k = self.results[model_name]["n_params"]
-                if n > 0 and rmse > 0:
-                    aic = n * np.log(rmse**2) + 2 * k
-                    self.results[model_name]["aic"] = float(aic)
-
-                    # Calculate BIC (Bayesian Information Criterion)
-                    bic = n * np.log(rmse**2) + k * np.log(n)
-                    self.results[model_name]["bic"] = float(bic)
-                else:
-                    self.results[model_name]["aic"] = np.inf
-                    self.results[model_name]["bic"] = np.inf
 
                 self.history.append(("fit_compare", model_name, str(r_squared)))
 

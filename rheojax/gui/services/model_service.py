@@ -525,37 +525,98 @@ class ModelService:
                 residuals = y - y_pred
                 y_real = y
 
-            # Calculate chi-squared
-            chi_squared = float(np.sum(residuals**2))
+            # Try to get metrics from OptimizationResult (NLSQ 0.6.0 compatibility)
+            nlsq_result = (
+                model.get_nlsq_result()
+                if hasattr(model, "get_nlsq_result")
+                else None
+            )
 
-            # Calculate R-squared (coefficient of determination)
-            ss_res = np.sum(residuals**2)
-            ss_tot = np.sum((y_real - np.mean(y_real)) ** 2)
-            r_squared = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+            if nlsq_result is not None and nlsq_result.r_squared is not None:
+                # Use OptimizationResult properties
+                r_squared = nlsq_result.r_squared
+                chi_squared = float(np.sum(residuals**2))
+                rmse = nlsq_result.rmse
+                mae = nlsq_result.mae
+                aic = nlsq_result.aic
+                bic = nlsq_result.bic
+                adj_r_squared = nlsq_result.adj_r_squared
 
-            # Calculate MPE (Mean Percentage Error)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                pct_errors = np.abs(residuals / y_real) * 100
-                pct_errors = pct_errors[np.isfinite(pct_errors)]
-                mpe = float(np.mean(pct_errors)) if len(pct_errors) > 0 else 0.0
+                # Calculate MPE from residuals
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    pct_errors = np.abs(residuals / y_real) * 100
+                    pct_errors = pct_errors[np.isfinite(pct_errors)]
+                    mpe = float(np.mean(pct_errors)) if len(pct_errors) > 0 else 0.0
+            else:
+                # Fallback: Calculate metrics manually
+                chi_squared = float(np.sum(residuals**2))
+
+                # Calculate R-squared (coefficient of determination)
+                ss_res = np.sum(residuals**2)
+                ss_tot = np.sum((y_real - np.mean(y_real)) ** 2)
+                r_squared = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+
+                # Calculate adjusted R-squared
+                n = len(y)
+                p = len(model.parameters)
+                if n > p + 1 and ss_tot > 0:
+                    adj_r_squared = 1.0 - ((1 - r_squared) * (n - 1) / (n - p - 1))
+                else:
+                    adj_r_squared = r_squared
+
+                # Calculate RMSE and MAE
+                rmse = float(np.sqrt(np.mean(residuals**2)))
+                mae = float(np.mean(np.abs(residuals)))
+
+                # Calculate AIC and BIC
+                if n > 0:
+                    mse = ss_res / n
+                    if mse > 0:
+                        log_likelihood = -n / 2 * (np.log(2 * np.pi * mse) + 1)
+                        aic = float(2 * p - 2 * log_likelihood)
+                        bic = float(p * np.log(n) - 2 * log_likelihood)
+                    else:
+                        aic = None
+                        bic = None
+                else:
+                    aic = None
+                    bic = None
+
+                # Calculate MPE (Mean Percentage Error)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    pct_errors = np.abs(residuals / y_real) * 100
+                    pct_errors = pct_errors[np.isfinite(pct_errors)]
+                    mpe = float(np.mean(pct_errors)) if len(pct_errors) > 0 else 0.0
 
             # Get fitted parameters
             fitted_params = {
                 name: param.value for name, param in model.parameters.items()
             }
 
-            # Get metadata with R² and MPE included
+            # Get metadata with all metrics included
             metadata = {
                 "test_mode": test_mode,
                 "n_iterations": getattr(model, "_n_iterations", None),
                 "convergence": getattr(model, "_convergence", None),
                 "r_squared": r_squared,
+                "adj_r_squared": adj_r_squared,
+                "rmse": rmse,
+                "mae": mae,
+                "aic": aic,
+                "bic": bic,
                 "mpe": mpe,
             }
 
             # Extract pcov (parameter covariance) from NLSQ result for uncertainty bands
             pcov = None
-            if hasattr(model, "_nlsq_result") and model._nlsq_result:
+            if nlsq_result is not None:
+                pcov = nlsq_result.pcov
+                metadata["nlsq_result"] = {
+                    "success": nlsq_result.success,
+                    "nfev": nlsq_result.nfev,
+                    "njev": nlsq_result.njev,
+                }
+            elif hasattr(model, "_nlsq_result") and model._nlsq_result:
                 pcov = getattr(model._nlsq_result, "pcov", None)
                 metadata["nlsq_result"] = {
                     "success": getattr(model._nlsq_result, "success", False),
