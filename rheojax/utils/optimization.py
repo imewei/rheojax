@@ -109,15 +109,15 @@ def compute_covariance_from_jacobian(
 
 @dataclass
 class OptimizationResult:
-    """Result from optimization.
+    """Result from optimization with NLSQ 0.6.0 CurveFitResult-compatible properties.
 
     This dataclass stores the results of NLSQ optimization, including optimal
     parameter values, objective function value, convergence information, and
-    NLSQ-specific diagnostic data.
+    statistical metrics compatible with NLSQ 0.6.0's CurveFitResult.
 
     Attributes:
         x: Optimal parameter values (float64 array)
-        fun: Objective function value at optimum
+        fun: Objective function value at optimum (RSS = sum of squared residuals)
         jac: Jacobian (gradient) at optimum
         pcov: Parameter covariance matrix (n_params x n_params)
         success: Whether optimization converged successfully
@@ -130,6 +130,21 @@ class OptimizationResult:
         cost: Final cost value
         grad: Final gradient
         nlsq_result: Full NLSQ result dictionary (for advanced diagnostics)
+        residuals: Residual vector (y_data - y_pred) for statistical metrics
+        y_data: Original dependent variable data (for R² computation)
+        n_data: Number of data points (for AIC/BIC computation)
+
+    Statistical Properties (NLSQ 0.6.0 CurveFitResult compatible):
+        r_squared: Coefficient of determination (R²)
+        adj_r_squared: Adjusted R² accounting for number of parameters
+        rmse: Root mean squared error
+        mae: Mean absolute error
+        aic: Akaike Information Criterion
+        bic: Bayesian Information Criterion
+
+    Methods:
+        confidence_intervals(alpha): Compute parameter confidence intervals
+        get_parameter_uncertainties(): Get standard errors from covariance diagonal
     """
 
     x: np.ndarray
@@ -146,16 +161,260 @@ class OptimizationResult:
     cost: float | None = None
     grad: np.ndarray | None = None
     nlsq_result: dict[str, Any] | None = field(default=None, repr=False)
+    # NEW: Fields for statistical metrics (NLSQ 0.6.0 compatibility)
+    residuals: np.ndarray | None = field(default=None, repr=False)
+    y_data: np.ndarray | None = field(default=None, repr=False)
+    n_data: int | None = None
+
+    # =========================================================================
+    # Statistical Properties (NLSQ 0.6.0 CurveFitResult compatible)
+    # =========================================================================
+
+    @property
+    def r_squared(self) -> float | None:
+        """Coefficient of determination (R²).
+
+        Measures goodness of fit. Range: (-∞, 1], where 1 is perfect fit.
+
+        R² = 1 - SS_res / SS_tot
+
+        where SS_res = sum((y - y_pred)²) and SS_tot = sum((y - y_mean)²)
+
+        Returns:
+            R² value, or None if residuals/y_data not available
+        """
+        if self.residuals is None or self.y_data is None:
+            return None
+
+        # Handle complex data by using magnitude
+        y_data = np.asarray(self.y_data)
+        residuals = np.asarray(self.residuals)
+
+        if np.iscomplexobj(y_data):
+            y_data = np.abs(y_data)
+        if np.iscomplexobj(residuals):
+            residuals = np.abs(residuals)
+
+        ss_res = np.sum(residuals**2)
+        ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+
+        if ss_tot == 0:
+            logger.warning("Total sum of squares is zero (constant data). R² undefined.")
+            return np.nan
+
+        return float(1 - (ss_res / ss_tot))
+
+    @property
+    def adj_r_squared(self) -> float | None:
+        """Adjusted R² accounting for number of parameters.
+
+        Adj R² = 1 - (1 - R²) * (n - 1) / (n - p - 1)
+
+        where n is number of data points and p is number of parameters.
+
+        Returns:
+            Adjusted R² value, or None if cannot be computed
+        """
+        r2 = self.r_squared
+        if r2 is None:
+            return None
+
+        n = self.n_data or (len(self.y_data) if self.y_data is not None else None)
+        if n is None:
+            return None
+
+        p = len(self.x)
+        if n - p - 1 <= 0:
+            logger.warning("Not enough degrees of freedom for adjusted R².")
+            return np.nan
+
+        return float(1 - (1 - r2) * (n - 1) / (n - p - 1))
+
+    @property
+    def rmse(self) -> float | None:
+        """Root mean squared error.
+
+        RMSE = sqrt(mean(residuals²))
+
+        Returns:
+            RMSE value, or None if residuals not available
+        """
+        if self.residuals is None:
+            return None
+
+        residuals = np.asarray(self.residuals)
+        if np.iscomplexobj(residuals):
+            residuals = np.abs(residuals)
+
+        return float(np.sqrt(np.mean(residuals**2)))
+
+    @property
+    def mae(self) -> float | None:
+        """Mean absolute error.
+
+        MAE = mean(|residuals|)
+
+        More robust to outliers than RMSE.
+
+        Returns:
+            MAE value, or None if residuals not available
+        """
+        if self.residuals is None:
+            return None
+
+        residuals = np.asarray(self.residuals)
+        return float(np.mean(np.abs(residuals)))
+
+    @property
+    def aic(self) -> float | None:
+        """Akaike Information Criterion.
+
+        AIC = 2k + n*ln(RSS/n)
+
+        where k is number of parameters, n is number of data points,
+        and RSS is residual sum of squares.
+
+        Lower is better. Used for model selection.
+
+        Returns:
+            AIC value, or None if cannot be computed
+        """
+        if self.residuals is None:
+            return None
+
+        n = self.n_data or (len(self.residuals) if self.residuals is not None else None)
+        if n is None or n == 0:
+            return None
+
+        k = len(self.x)
+        residuals = np.asarray(self.residuals)
+        if np.iscomplexobj(residuals):
+            residuals = np.abs(residuals)
+        rss = np.sum(residuals**2)
+
+        if rss <= 0:
+            logger.warning("RSS ≤ 0, AIC undefined.")
+            return np.nan
+
+        return float(2 * k + n * np.log(rss / n))
+
+    @property
+    def bic(self) -> float | None:
+        """Bayesian Information Criterion.
+
+        BIC = k*ln(n) + n*ln(RSS/n)
+
+        where k is number of parameters, n is number of data points,
+        and RSS is residual sum of squares.
+
+        Lower is better. Penalizes model complexity more than AIC.
+
+        Returns:
+            BIC value, or None if cannot be computed
+        """
+        if self.residuals is None:
+            return None
+
+        n = self.n_data or (len(self.residuals) if self.residuals is not None else None)
+        if n is None or n == 0:
+            return None
+
+        k = len(self.x)
+        residuals = np.asarray(self.residuals)
+        if np.iscomplexobj(residuals):
+            residuals = np.abs(residuals)
+        rss = np.sum(residuals**2)
+
+        if rss <= 0:
+            logger.warning("RSS ≤ 0, BIC undefined.")
+            return np.nan
+
+        return float(k * np.log(n) + n * np.log(rss / n))
+
+    # =========================================================================
+    # Statistical Methods (NLSQ 0.6.0 CurveFitResult compatible)
+    # =========================================================================
+
+    def confidence_intervals(self, alpha: float = 0.95) -> np.ndarray | None:
+        """Compute parameter confidence intervals.
+
+        Parameters
+        ----------
+        alpha : float, optional
+            Confidence level (default: 0.95 for 95% CI).
+
+        Returns
+        -------
+        intervals : ndarray or None
+            Array of shape (n_params, 2) with [lower, upper] bounds for each
+            parameter, or None if covariance not available.
+
+        Examples
+        --------
+        >>> result = nlsq_optimize(objective, params)
+        >>> ci = result.confidence_intervals(alpha=0.95)
+        >>> if ci is not None:
+        ...     for i, (lower, upper) in enumerate(ci):
+        ...         print(f"Parameter {i}: [{lower:.3f}, {upper:.3f}]")
+        """
+        if self.pcov is None:
+            return None
+
+        from scipy import stats
+
+        n = self.n_data or (len(self.residuals) if self.residuals is not None else 0)
+        p = len(self.x)
+
+        # Degrees of freedom
+        dof = max(n - p, 1)
+
+        # t-value for confidence level
+        t_val = stats.t.ppf((1 + alpha) / 2, dof)
+
+        # Standard errors from covariance diagonal
+        perr = np.sqrt(np.diag(self.pcov))
+
+        # Confidence intervals
+        intervals = np.zeros((p, 2))
+        intervals[:, 0] = self.x - t_val * perr  # Lower bound
+        intervals[:, 1] = self.x + t_val * perr  # Upper bound
+
+        return intervals
+
+    def get_parameter_uncertainties(self) -> np.ndarray | None:
+        """Get standard errors for parameters from covariance diagonal.
+
+        Returns
+        -------
+        uncertainties : ndarray or None
+            Standard errors for each parameter, or None if covariance not available.
+
+        Examples
+        --------
+        >>> result = nlsq_optimize(objective, params)
+        >>> std_errs = result.get_parameter_uncertainties()
+        >>> if std_errs is not None:
+        ...     for i, se in enumerate(std_errs):
+        ...         print(f"Parameter {i}: {result.x[i]:.4f} ± {se:.4f}")
+        """
+        if self.pcov is None:
+            return None
+
+        return np.sqrt(np.diag(self.pcov))
 
     @classmethod
     def from_nlsq(
-        cls, nlsq_result: dict[str, Any], residuals: np.ndarray | None = None
+        cls,
+        nlsq_result: dict[str, Any],
+        residuals: np.ndarray | None = None,
+        y_data: np.ndarray | None = None,
     ) -> OptimizationResult:
         """Create OptimizationResult from NLSQ result dictionary.
 
         Args:
             nlsq_result: Result dictionary from nlsq.LeastSquares.least_squares
-            residuals: Optional residual vector for covariance scaling
+            residuals: Optional residual vector for covariance scaling and metrics
+            y_data: Optional original y data for R² computation
 
         Returns:
             OptimizationResult instance with fields extracted from NLSQ result
@@ -193,6 +452,23 @@ class OptimizationResult:
         if jac is not None:
             pcov = compute_covariance_from_jacobian(jac, residuals)
 
+        # Store residuals as numpy array for statistical properties
+        residuals_np = None
+        if residuals is not None:
+            residuals_np = np.asarray(residuals, dtype=np.float64)
+            # Handle scalar residuals (0-d arrays)
+            if residuals_np.ndim == 0:
+                residuals_np = residuals_np.reshape(1)
+
+        # Store y_data for R² computation
+        y_data_np = None
+        n_data = None
+        if y_data is not None:
+            y_data_np = np.asarray(y_data)
+            n_data = len(y_data_np)
+        elif residuals_np is not None:
+            n_data = residuals_np.size
+
         return cls(
             x=x,
             fun=fun,
@@ -208,6 +484,9 @@ class OptimizationResult:
             cost=fun,  # NLSQ uses 'cost' terminology
             grad=grad,
             nlsq_result=nlsq_result,
+            residuals=residuals_np,
+            y_data=y_data_np,
+            n_data=n_data,
         )
 
 
@@ -591,6 +870,207 @@ def nlsq_multistart_optimize(
     return best_result
 
 
+def nlsq_curve_fit(
+    model_fn: Callable[[np.ndarray, np.ndarray], np.ndarray],
+    x_data: np.ndarray,
+    y_data: np.ndarray,
+    parameters: ParameterSet,
+    auto_bounds: bool = False,
+    stability: str | bool = False,
+    fallback: bool = False,
+    compute_diagnostics: bool = False,
+    multistart: bool = False,
+    n_starts: int = 10,
+    **kwargs,
+) -> OptimizationResult:
+    """Curve fitting using NLSQ 0.6.0 curve_fit() API with advanced features.
+
+    This function provides access to NLSQ 0.6.0's enhanced curve_fit() features
+    including auto-bounds, stability checks, fallback strategies, and model
+    diagnostics. It returns an OptimizationResult with CurveFitResult-compatible
+    statistical properties (r_squared, rmse, aic, bic, etc.).
+
+    Args:
+        model_fn: Model function f(x, params_array) -> y_pred.
+            Takes x_data and parameter array, returns predictions.
+        x_data: Independent variable data
+        y_data: Dependent variable data (observations)
+        parameters: ParameterSet with initial values and bounds
+        auto_bounds: Enable automatic parameter bounds inference (default: False).
+            When True, reasonable bounds are inferred based on data characteristics.
+        stability: Numerical stability checks (default: False).
+            - 'auto': Check and automatically fix stability issues
+            - 'check': Check and warn but don't fix
+            - False: Skip stability checks
+        fallback: Enable automatic fallback strategies (default: False).
+            When True, tries alternative approaches if optimization fails.
+        compute_diagnostics: Compute model health diagnostics (default: False).
+            When True, result includes identifiability analysis, gradient health, etc.
+        multistart: Enable multi-start optimization (default: False).
+            When True, explores multiple starting points to find global optimum.
+        n_starts: Number of starting points for multi-start (default: 10).
+        **kwargs: Additional arguments passed to nlsq.curve_fit()
+
+    Returns:
+        OptimizationResult with CurveFitResult-compatible statistical properties:
+        - r_squared, adj_r_squared, rmse, mae, aic, bic
+        - confidence_intervals(alpha) method
+        - get_parameter_uncertainties() method
+
+    Example:
+        >>> from rheojax.core.parameters import ParameterSet
+        >>> from rheojax.utils.optimization import nlsq_curve_fit
+        >>>
+        >>> def model(x, params):
+        ...     a, b = params
+        ...     return a * np.exp(-b * x)
+        >>>
+        >>> params = ParameterSet()
+        >>> params.add("a", value=1.0, bounds=(0, 10))
+        >>> params.add("b", value=0.5, bounds=(0, 5))
+        >>>
+        >>> result = nlsq_curve_fit(
+        ...     model, x_data, y_data, params,
+        ...     auto_bounds=True,
+        ...     stability='auto',
+        ...     fallback=True,
+        ...     compute_diagnostics=True,
+        ... )
+        >>> print(f"R² = {result.r_squared:.4f}")
+        >>> print(f"RMSE = {result.rmse:.4f}")
+        >>> ci = result.confidence_intervals(alpha=0.95)
+
+    Notes:
+        - This function uses nlsq.curve_fit() directly (not LeastSquares.least_squares())
+        - The model function signature is f(x, params_array) not f(x, *params)
+        - Results include all CurveFitResult properties for model comparison
+    """
+    import nlsq as nlsq_module
+
+    # Extract p0 and bounds from ParameterSet
+    p0 = np.asarray(parameters.get_values(), dtype=np.float64)
+    bounds_list = parameters.get_bounds()
+    lower = np.array(
+        [b[0] if b[0] is not None else -np.inf for b in bounds_list], dtype=np.float64
+    )
+    upper = np.array(
+        [b[1] if b[1] is not None else np.inf for b in bounds_list], dtype=np.float64
+    )
+
+    # Convert x_data and y_data to numpy arrays
+    x_data_np = np.asarray(x_data, dtype=np.float64)
+    y_data_np = np.asarray(y_data)  # Preserve complex type if present
+
+    # Create wrapper function f(x, *params) -> y for nlsq.curve_fit
+    # NLSQ curve_fit expects f(x, p0, p1, ...) not f(x, params_array)
+    def f_wrapper(x, *params_tuple):
+        params_array = jnp.asarray(params_tuple, dtype=jnp.float64)
+        return model_fn(x, params_array)
+
+    # Build kwargs for nlsq.curve_fit
+    curve_fit_kwargs = {
+        "p0": p0,
+        "bounds": (lower, upper),
+        "auto_bounds": auto_bounds,
+        "stability": stability,
+        "fallback": fallback,
+        "compute_diagnostics": compute_diagnostics,
+        "multistart": multistart,
+        "n_starts": n_starts,
+    }
+    curve_fit_kwargs.update(kwargs)
+
+    try:
+        # Call nlsq.curve_fit() - returns CurveFitResult (tuple unpacking compatible)
+        curve_fit_result = nlsq_module.curve_fit(
+            f_wrapper, x_data_np, y_data_np, **curve_fit_kwargs
+        )
+
+        # CurveFitResult supports both tuple unpacking and attribute access
+        # We need to check if it's a tuple (popt, pcov) or CurveFitResult object
+        if isinstance(curve_fit_result, tuple):
+            popt, pcov = curve_fit_result
+            success = True
+            message = "Optimization converged successfully"
+            nfev = 0
+            njev = 0
+            diagnostics = None
+        else:
+            # It's a CurveFitResult object
+            popt = np.asarray(curve_fit_result.popt)
+            pcov = curve_fit_result.pcov
+            success = getattr(curve_fit_result, "success", True)
+            message = getattr(curve_fit_result, "message", "Converged")
+            nfev = getattr(curve_fit_result, "nfev", 0)
+            njev = getattr(curve_fit_result, "njev", 0)
+            diagnostics = getattr(curve_fit_result, "diagnostics", None)
+
+        # Compute residuals and y_pred at optimal point
+        y_pred = model_fn(x_data_np, popt)
+        y_pred_np = np.asarray(y_pred)
+
+        # Compute residuals (handle complex data)
+        if np.iscomplexobj(y_data_np):
+            if np.iscomplexobj(y_pred_np):
+                # Both complex: residuals for real and imaginary parts
+                residuals_real = np.real(y_data_np) - np.real(y_pred_np)
+                residuals_imag = np.imag(y_data_np) - np.imag(y_pred_np)
+                residuals = np.concatenate([residuals_real, residuals_imag])
+            else:
+                # Complex data, real pred: use magnitude
+                residuals = np.abs(y_data_np) - y_pred_np
+        else:
+            if np.iscomplexobj(y_pred_np):
+                # Real data, complex pred: use magnitude of pred
+                residuals = y_data_np - np.abs(y_pred_np)
+            else:
+                # Both real
+                residuals = y_data_np - y_pred_np
+
+        # Create OptimizationResult with all metrics
+        result = OptimizationResult(
+            x=np.asarray(popt, dtype=np.float64),
+            fun=float(np.sum(residuals**2)),
+            jac=None,  # curve_fit doesn't return Jacobian directly
+            pcov=np.asarray(pcov, dtype=np.float64) if pcov is not None else None,
+            success=bool(success),
+            message=str(message),
+            nit=int(nfev),
+            nfev=int(nfev),
+            njev=int(njev),
+            optimality=None,
+            active_mask=None,
+            cost=float(np.sum(residuals**2)),
+            grad=None,
+            nlsq_result=None,
+            residuals=residuals,
+            y_data=y_data_np,
+            n_data=len(y_data_np),
+        )
+
+        # Store diagnostics if available
+        if diagnostics is not None:
+            result.nlsq_result = {"diagnostics": diagnostics}
+
+        # Update ParameterSet with optimal values
+        parameters.set_values(result.x)
+
+        return result
+
+    except Exception as e:
+        logger.warning(f"nlsq.curve_fit() failed: {e}. Falling back to nlsq_optimize.")
+
+        # Fallback to nlsq_optimize with residual-based objective
+        objective = create_least_squares_objective(model_fn, x_data_np, y_data_np)
+
+        if multistart:
+            return nlsq_multistart_optimize(
+                objective, parameters, n_starts=n_starts, **kwargs
+            )
+        else:
+            return nlsq_optimize(objective, parameters, **kwargs)
+
+
 def optimize_with_bounds(
     objective: Callable[[np.ndarray], float],
     x0: np.ndarray,
@@ -970,6 +1450,7 @@ __all__ = [
     "OptimizationResult",
     "nlsq_optimize",
     "nlsq_multistart_optimize",
+    "nlsq_curve_fit",
     "optimize_with_bounds",
     "residual_sum_of_squares",
     "create_least_squares_objective",
