@@ -1,6 +1,6 @@
 # Example Datasets
 
-This directory contains experimental datasets used in Rheo example notebooks. Synthetic datasets are generated programmatically within notebooks rather than stored as files.
+This directory contains experimental datasets used in RheoJAX example notebooks, organized by **measurement type** for intuitive access. Synthetic datasets are generated programmatically within notebooks rather than stored as files.
 
 ## Git LFS Requirement
 
@@ -25,7 +25,7 @@ sudo yum install git-lfs      # CentOS/RHEL
 git lfs install
 
 # Clone normally - LFS files download automatically
-git clone https://github.com/imewei/Rheo.git
+git clone https://github.com/imewei/rheojax.git
 ```
 
 **Verification:**
@@ -38,19 +38,56 @@ git lfs ls-files
 git lfs pull
 ```
 
-## Directory Structure
+## Directory Structure (Organized by Measurement Type)
 
 ```
 data/
-└── experimental/    # Real instrument files (TRIOS, CSV)
-    ├── cellulose_hydrogel_flow.csv
-    ├── creep_experiment.txt
-    ├── frequency_sweep_tts.txt
-    ├── multi_technique.txt
-    ├── owchirp_tcs.txt
-    ├── owchirp_tts.txt
-    ├── polypropylene_relaxation.csv
-    └── polystyrene_creep.csv
+├── oscillation/              # SAOS frequency sweeps (G', G'' vs frequency)
+│   ├── polystyrene/          # Polystyrene at various temperatures
+│   ├── polyisoprene/         # Linear polyisoprene molecular weight series
+│   ├── foods/                # Food materials (chia pudding)
+│   ├── metal_networks/       # Metal-coordinating polymer networks
+│   ├── hydrogels/            # (Empty - TTS data in temperature_sweep/)
+│   └── foams/                # (Empty - TTS data in temperature_sweep/)
+│
+├── relaxation/               # Stress relaxation G(t) vs time
+│   ├── polymers/             # PP, PS, PE, HDPE relaxation data
+│   ├── biological/           # Fish muscle
+│   ├── foams/                # Shaving foam (liquid foam)
+│   └── clays/                # Laponite at various aging times
+│
+├── creep/                    # Creep compliance J(t) vs time
+│   ├── polymers/             # Polystyrene creep data
+│   ├── biological/           # Mucus, perihepatic abscess
+│   └── creep_experiment.txt  # TRIOS creep measurement
+│
+├── flow/                     # Steady shear flow (viscosity vs shear rate)
+│   ├── hydrogels/            # CNF hydrogel flow curves
+│   ├── emulsions/            # Oil-water emulsions at various volume fractions
+│   └── solutions/            # Ethyl cellulose solutions
+│
+├── temperature_sweep/        # Multi-temperature data for TTS/mastercurves
+│   ├── polymers/             # frequency_sweep_tts.txt (150°C to -40°C)
+│   ├── hydrogels/            # Dual network hydrogel (CNF-MC-Zn)
+│   ├── foams/                # Vinyl foam DMA (-35°C to 60°C)
+│   └── time_temp_water/      # Time-temperature-water superposition data
+│
+├── laos/                     # Large Amplitude Oscillatory Shear
+│   ├── owchirp_tts.txt       # OWChirp temperature sweep (80 MB, Git LFS)
+│   ├── owchirp_tcs.txt       # OWChirp during gelation (66 MB, Git LFS)
+│   ├── raw_signal_0010.txt   # Low amplitude raw signal
+│   ├── raw_signal_0100.txt   # Medium amplitude raw signal
+│   └── raw_signal_1000.txt   # High amplitude raw signal
+│
+├── mastercurves/             # Pre-processed master curves and Prony data
+│   ├── master_curve_ps_*.csv # Polystyrene mastercurves
+│   ├── freq_master/          # Frequency-domain master curves
+│   ├── freq_raw/             # Raw frequency sweep data
+│   ├── time_master/          # Time-domain master curves + Prony series
+│   └── examples/             # Additional example datasets
+│
+└── multi_technique/          # Combined measurement files
+    └── multi_technique.txt   # Relaxation + oscillation + flow
 ```
 
 ## Privacy and Anonymization
@@ -63,145 +100,125 @@ data/
 - **Dates**: Specific dates → `MM/DD/YYYY`
 - **Sample details**: Sample names, notes → `Anonymous`
 
-The original TRIOS file structure is preserved to ensure compatibility with `rheo.io.readers.TRIOSReader` for educational and testing purposes.
+The original TRIOS file structure is preserved to ensure compatibility with `rheojax.io.readers.TRIOSReader` for educational and testing purposes.
 
-## Data Paradigms
+## Dataset Catalog by Category
 
-### Synthetic Data (Generated In-Notebook)
+### Oscillation Data
 
-**All synthetic datasets are generated programmatically within notebooks** using known parameters. This design choice provides:
+| Subfolder | Files | Material | Temperature | Use Cases |
+|-----------|-------|----------|-------------|-----------|
+| `polystyrene/` | oscillation_ps*.csv | Polystyrene | 130-190°C | SAOS model fitting |
+| `polyisoprene/` | PI_*.csv | Linear PI | -35°C | Molecular weight dependence |
+| `foods/` | oscillation_chia_data.csv | Chia pudding | Ambient | Viscoelastic food materials |
+| `metal_networks/` | epstein.csv | Metal-coordinated | Various | Supramolecular networks |
 
-- **Known ground truth** for validation (relative error < 1e-6)
-- **Reproducibility** via fixed random seed (42)
-- **Educational transparency** (students see generation code)
-- **Easy modification** for experimentation
-- **No external dependencies** (notebooks fully self-contained)
+### Relaxation Data
 
-**Example from `01-maxwell-fitting.ipynb`:**
+| Subfolder | Files | Material | Use Cases |
+|-----------|-------|----------|-----------|
+| `polymers/` | stressrelaxation_*.csv | PP, PS, PE | Maxwell, Zener, fractional models |
+| `biological/` | stressrelaxation_fishmuscle_data.csv | Fish muscle | Biological tissue mechanics |
+| `foams/` | stressrelaxation_liquidfoam_data.csv | Shaving foam | Soft matter relaxation |
+| `clays/` | rel_lapo_*.csv | Laponite | Aging, thixotropy |
+
+### Creep Data
+
+| Subfolder | Files | Material | Use Cases |
+|-----------|-------|----------|-----------|
+| `polymers/` | creep_ps*.csv | Polystyrene | Kelvin-Voigt, Burgers models |
+| `biological/` | creep_mucus_data.csv | Mucus | Biopolymer creep |
+| `biological/` | creep_perihepatic_data.csv | Tissue | Medical rheology |
+
+### Flow Data
+
+| Subfolder | Files | Material | Use Cases |
+|-----------|-------|----------|-----------|
+| `hydrogels/` | cellulose_hydrogel_flow.csv | CNF hydrogel | Power-law, Herschel-Bulkley |
+| `emulsions/` | 0.69.csv - 0.80.csv | Emulsions | Volume fraction dependence |
+| `solutions/` | ec_shear_viscosity_*.csv | EC solutions | Concentration dependence |
+
+### Temperature Sweep (TTS) Data
+
+| Subfolder | Files | Material | Temp Range | Use Cases |
+|-----------|-------|----------|------------|-----------|
+| `polymers/` | frequency_sweep_tts.txt | Polymer | 150 to -40°C | WLF, mastercurve |
+| `hydrogels/` | cnf_*.csv | Dual network | 10-80°C | Hydrogel TTS |
+| `foams/` | foam_dma_*.csv | Vinyl foam | -35 to 60°C | DMA analysis |
+| `time_temp_water/` | ttw_*.csv | Various | 20-50°C | Combined effects |
+
+### LAOS Data
+
+| File | Size | Description | Use Cases |
+|------|------|-------------|-----------|
+| owchirp_tts.txt | 80 MB | OWChirp temp sweep | Nonlinear mastercurves |
+| owchirp_tcs.txt | 66 MB | Gelation OWChirp | Mutation number, sol-gel |
+| raw_signal_*.txt | ~45 KB | Raw waveforms | SPP analysis tutorial |
+
+### Mastercurves (Pre-processed)
+
+| Subfolder | Files | Content |
+|-----------|-------|---------|
+| `freq_master/` | freq_user_master.csv | Frequency-domain mastercurve |
+| `time_master/` | time_user_master.csv | Time-domain mastercurve |
+| `time_master/` | prony_terms_*.csv | Prony series coefficients |
+
+## Loading Data Examples
+
+### Loading by Measurement Type
+
 ```python
-import numpy as np
+from pathlib import Path
+from rheojax.io import load_csv, load_trios
 
-# Generate time array (logarithmically spaced for relaxation)
-np.random.seed(42)  # Reproducibility
-t = np.logspace(-2, 2, 50)  # 0.01 to 100 seconds
+# Path to data directory
+data_dir = Path('/path/to/rheojax/examples/data')
 
-# Known parameters for validation
-G0 = 1e5  # Pa
-eta = 1e3  # Pa·s
+# Relaxation data
+polypropylene = load_csv(
+    data_dir / 'relaxation' / 'polymers' / 'polypropylene_relaxation.csv',
+    x_col='Time',
+    y_col='Relaxation Modulus'
+)
 
-# Generate relaxation data
-G_t = G0 * np.exp(-G0 * t / eta)
+# Temperature sweep for TTS
+tts_data = load_trios(data_dir / 'temperature_sweep' / 'polymers' / 'frequency_sweep_tts.txt')
 
-# Add realistic noise (1.5% relative error)
-noise = np.random.normal(0, 0.015 * G_t)
-G_t_noisy = G_t + noise
+# LAOS data
+laos_data = load_trios(data_dir / 'laos' / 'owchirp_tts.txt')
+
+# Or use Pipeline API with auto-detection
+from rheojax.pipeline import Pipeline
+pipeline = Pipeline().load(str(data_dir / 'oscillation' / 'polystyrene' / 'oscillation_ps130_data.csv'))
 ```
 
-**Parameter Values Used Across Notebooks:**
+### Finding Data by Purpose
 
-| Notebook | Model | Parameters | Time/Frequency Range | Noise Level |
-|----------|-------|------------|---------------------|-------------|
-| 01-maxwell-fitting | Maxwell | G₀=1×10⁵ Pa, η=1×10³ Pa·s | 0.01 - 100 s (50 points) | 1.5% relative |
-| 02-zener-fitting | Zener/SLS | Generated in notebook | Frequency-domain | 1-2% relative |
-| 03-springpot-fitting | SpringPot | Generated in notebook | Power-law decay | 1.5% relative |
-| 04-bingham-fitting | Bingham | Generated in notebook | Flow curve | 1.5% relative |
-| 05-power-law-fitting | Power-Law | Generated in notebook | Shear-thinning | 1.5% relative |
+```python
+# For model fitting examples:
+# - oscillation/ → SAOS models (Maxwell, Zener, fractional)
+# - relaxation/ → Stress relaxation models
+# - creep/ → Creep models (Kelvin-Voigt, Burgers)
+# - flow/ → Flow models (Power-law, Bingham, Herschel-Bulkley)
 
-**Transform Notebooks:**
-- **01-fft-analysis**: Maxwell relaxation with known analytical FFT solution
-- **02-mastercurve-tts**: Uses `frequency_sweep_tts.txt` (experimental)
-- **03-mutation-number**: Three synthetic materials (solid, viscoelastic, fluid)
-- **04-owchirp-laos-analysis**: Synthetic LAOS data with controlled nonlinearity
-- **05-smooth-derivative**: Synthetic noisy function with known analytical derivative
+# For transform examples:
+# - temperature_sweep/ → Mastercurve construction, WLF fitting
+# - laos/ → SPP decomposition, OWChirp analysis
 
-### Experimental Data (Real Instrument Files)
+# For Bayesian examples:
+# - Most use synthetic data generated in-notebook
+# - verification/ notebooks use these real datasets for validation
+```
 
-Real instrument data demonstrates authentic noise patterns, artifacts, and practical data handling. All files are located directly in `experimental/` directory.
+## Dataset Usage by Notebook Category
 
-## Experimental Dataset Catalog
-
-### Basic Model Fitting Datasets (Phase 1.1.4)
-
-Extracted from pyRheo legacy demos for educational notebooks. All files are CSV format with headers.
-
-**1. `experimental/polypropylene_relaxation.csv`**
-- **Material**: Polypropylene polymer
-- **Test Mode**: Stress Relaxation
-- **Data**: Time [s] vs Relaxation Modulus [Pa]
-- **Points**: ~600 pts, 0.001-600 s
-- **Use Cases**: Maxwell, Zener, Fractional Maxwell models
-- **Source**: pyRheo demos (Puente-Córdova)
-- **Notes**: Clean dataset, well-characterized material
-
-**2. `experimental/polystyrene_creep.csv`**
-- **Material**: Polystyrene melt (160°C)
-- **Test Mode**: Creep Compliance
-- **Data**: Time [s] vs Creep Compliance [Pa⁻¹]
-- **Points**: ~50 pts, 0.2-400 s
-- **Use Cases**: Kelvin-Voigt, Burgers, creep models
-- **Source**: pyRheo demos
-- **Notes**: High-temperature melt data
-
-**3. `experimental/cellulose_hydrogel_flow.csv`**
-- **Material**: Cellulose nanofiber (CNF) hydrogel
-- **Test Mode**: Steady Shear Flow
-- **Data**: Shear Rate [1/s] vs Viscosity [Pa·s]
-- **Points**: ~40 pts, 0.1-100 1/s
-- **Use Cases**: Power-Law, Bingham, Herschel-Bulkley models
-- **Source**: Miranda-Valdez et al. (2024) Cellulose 31:1545-1558
-- **Notes**: Shear-thinning behavior, possible yield stress
-
-### Transform Workflow Datasets (Phase 2)
-
-Extracted from hermes-rheo tutorial notebooks. All files are TRIOS instrument format (tab-delimited .txt with extensive metadata headers).
-
-**4. `experimental/frequency_sweep_tts.txt`**
-- **Format**: TA Instruments TRIOS .txt export
-- **Test**: Oscillation temperature sweep (150°C → -50°C, 10°C steps)
-- **Data**: G'(ω), G"(ω) vs frequency (0.1-20 Hz, 7 pts/decade)
-- **Points**: 20 temperature steps × 7 pts/decade
-- **Size**: 318 KB
-- **Use Cases**: Mastercurve construction, WLF shift factor calculation
-- **Source**: hermes-rheo tutorial_4
-- **Notes**: Clean frequency sweeps, ideal for TTS demonstration
-
-**5. `experimental/owchirp_tts.txt`**
-- **Format**: TA Instruments TRIOS .txt export (OWChirp protocol)
-- **Test**: Optimally Windowed Chirp temperature sweep
-- **Data**: Time-domain strain/stress → FFT → G'(ω), G"(ω) (156 frequencies)
-- **Points**: 20 temps × 156 freqs
-- **Size**: 80 MB
-- **Use Cases**: OWChirp/LAOS analysis, FFT demonstration, mastercurve with chirp data
-- **Source**: hermes-rheo tutorial_4
-- **Notes**: Includes raw time-domain waveforms + FFT results
-
-**6. `experimental/owchirp_tcs.txt`**
-- **Format**: TA Instruments TRIOS .txt export (OWChirp protocol)
-- **Test**: OWChirp during gel curing (time-evolving material)
-- **Data**: Time-series of G'(ω), G"(ω) during gelation
-- **Points**: 20 steps × 156 freqs
-- **Size**: 66 MB
-- **Use Cases**: Mutation number calculation, time-curing superposition (TCS), gel evolution
-- **Source**: hermes-rheo tutorial_5
-- **Notes**: Demonstrates viscoelastic transition from sol → gel
-
-**7. `experimental/creep_experiment.txt`**
-- **Format**: TA Instruments TRIOS .txt export
-- **Test**: Creep compliance measurement
-- **Data**: J(t) vs time under constant stress
-- **Size**: 203 KB
-- **Use Cases**: Basic I/O, creep modeling, FFT conversion to frequency domain
-- **Source**: hermes-rheo tutorial_1
-- **Notes**: Multi-step creep protocol
-
-**8. `experimental/multi_technique.txt`**
-- **Format**: TA Instruments TRIOS .txt export
-- **Test**: Multiple rheological tests on same material
-- **Data**: Relaxation + oscillation + flow on same sample
-- **Size**: 151 KB
-- **Use Cases**: Multi-technique workflows, data comparison, format handling
-- **Source**: hermes-rheo tutorial_1
-- **Notes**: Demonstrates combining multiple test modes
+| Category | Primary Data Source | Location |
+|----------|--------------------|-----------|
+| **Basic Model Fitting** | Synthetic (in-notebook) | N/A |
+| **Transform Workflows** | Temperature sweep | `temperature_sweep/` |
+| **LAOS Analysis** | OWChirp data | `laos/` |
+| **Bayesian Inference** | Synthetic (in-notebook) | N/A |
+| **Verification** | Real experimental | All categories |
 
 ## TRIOS Format Notes
 
@@ -228,139 +245,7 @@ Step 3: Data acquisition...
 <tab-delimited data columns>
 ```
 
-## Loading Data Examples
-
-### Loading Experimental Data
-
-```python
-from rheo.io.readers import read_csv, TriosReader
-from pathlib import Path
-
-# Path to data directory
-data_dir = Path('/Users/b80985/Projects/Rheo/examples/data/experimental')
-
-# CSV files (basic datasets)
-polypropylene = read_csv(
-    data_dir / 'polypropylene_relaxation.csv',
-    x_col='Time',
-    y_col='Relaxation Modulus'
-)
-
-# TRIOS files (transform datasets)
-tts_data = TriosReader().read(data_dir / 'frequency_sweep_tts.txt')
-
-# Or use Pipeline API with auto-detection
-from rheo.pipeline import Pipeline
-pipeline = Pipeline().load(str(data_dir / 'frequency_sweep_tts.txt'))
-```
-
-### Error Handling Best Practices
-
-**Always check for file existence before loading to provide helpful error messages:**
-
-```python
-from pathlib import Path
-
-data_path = Path('../data/experimental/frequency_sweep_tts.txt')
-
-if not data_path.exists():
-    print(f"❌ Data file not found: {data_path}")
-    print("\nOptions:")
-    print("  1. Check that you're running from the correct directory")
-    print("  2. Verify the relative path is correct")
-    print("  3. Download from: https://github.com/imewei/Rheo/tree/main/examples/data")
-    raise FileNotFoundError(f"Required data file missing: {data_path}")
-
-# File exists - proceed with loading
-data = read_trios(data_path)
-```
-
-**For notebooks that can fall back to synthetic data:**
-
-```python
-from pathlib import Path
-
-data_path = Path('../data/experimental/multi_technique.txt')
-
-if data_path.exists():
-    # Use real experimental data
-    print("✓ Loading experimental data")
-    data = read_trios(data_path)
-else:
-    # Generate synthetic data as fallback
-    print("⚠ Experimental data not found - using synthetic data")
-    import numpy as np
-    np.random.seed(42)
-    t = np.logspace(-2, 2, 50)
-    G_t = 1e5 * np.exp(-t / 0.01)
-    # ... generate synthetic dataset
-```
-
-### Generating Synthetic Data
-
-See individual notebooks for complete examples. Basic pattern:
-
-```python
-import numpy as np
-from rheo.models.maxwell import Maxwell
-
-# Set seed for reproducibility
-np.random.seed(42)
-
-# Create model with known parameters
-model = Maxwell()
-model.parameters.set_value('G0', 1e5)  # Pa
-model.parameters.set_value('eta', 1e3)  # Pa·s
-
-# Generate time array
-t = np.logspace(-2, 2, 50)  # 0.01 to 100 s
-
-# Generate clean data
-G_t_clean = model.predict(t)
-
-# Add realistic noise (1.5% relative error)
-noise_level = 0.015
-noise = np.random.normal(0, noise_level * G_t_clean)
-G_t_noisy = G_t_clean + noise
-```
-
-## Dataset Usage by Notebook
-
-| Notebook | Primary Dataset | Data Type | Purpose |
-|----------|-----------------|-----------|---------|
-| **Basic Model Fitting** |
-| 01-maxwell-fitting | Synthetic (generated) | In-notebook | Parameter estimation validation |
-| 02-zener-fitting | Synthetic (generated) | In-notebook | Complex modulus fitting |
-| 03-springpot-fitting | Synthetic (generated) | In-notebook | Fractional calculus models |
-| 04-bingham-fitting | Synthetic (generated) | In-notebook | Yield stress materials |
-| 05-power-law-fitting | Synthetic (generated) | In-notebook | Shear-thinning fluids |
-| **Transform Workflows** |
-| 01-fft-analysis | Synthetic (generated) | In-notebook | FFT validation with known solution |
-| 02-mastercurve-tts | frequency_sweep_tts.txt | Experimental TRIOS | TTS mastercurve, WLF fitting |
-| 03-mutation-number | Synthetic (generated) | In-notebook | Material classification (solid/VE/fluid) |
-| 04-owchirp-laos-analysis | Synthetic (generated) | In-notebook | Harmonic extraction validation |
-| 05-smooth-derivative | Synthetic (generated) | In-notebook | Derivative accuracy comparison |
-| **Bayesian Inference** |
-| 01-bayesian-basics | Synthetic (generated) | In-notebook | NLSQ → NUTS workflow demo |
-| 02-prior-selection | Synthetic (generated) | In-notebook | Prior sensitivity analysis |
-| 03-convergence-diagnostics | Synthetic (generated) | In-notebook | ArviZ diagnostic suite |
-| 04-model-comparison | Synthetic (generated) | In-notebook | Bayesian model selection (WAIC/LOO) |
-| 05-uncertainty-propagation | Synthetic (generated) | In-notebook | Credible intervals, predictions |
-| **Advanced Workflows** |
-| 01-multi-technique-fitting | Synthetic (generated) | In-notebook | Multiple test modes, same material |
-| 02-batch-processing | Synthetic (generated) | In-notebook | Multiple datasets pipeline |
-| 03-custom-models | Synthetic (generated) | In-notebook | User-defined model implementation |
-| 04-fractional-deep-dive | Synthetic (generated) | In-notebook | Fractional calculus models |
-| 05-performance-optimization | Synthetic (generated) | In-notebook | JAX/GPU acceleration benchmarks |
-
 ## Data Quality Notes
-
-### Noise Levels in Synthetic Data
-
-Standard noise levels used across notebooks:
-- **1.5%**: Typical instrument precision (most notebooks)
-- **1-2%**: Realistic experimental conditions
-- **Clean (no noise)**: Validation only (analytical comparisons)
 
 ### Experimental Data Characteristics
 
@@ -372,7 +257,7 @@ Real experimental files may have:
 
 Handle with RheoData operations:
 ```python
-from rheo.core.data import RheoData
+from rheojax.core.data import RheoData
 
 data = RheoData(x, y)
 data_clean = data.smooth(window_length=5)      # Smoothing
@@ -383,15 +268,16 @@ data_interp = data.resample(new_x=desired_x)   # Resampling
 
 To add new experimental datasets:
 
-1. **Place file in `experimental/` directory**
-2. **Add entry to this README** with:
+1. **Identify the measurement type** (oscillation, relaxation, creep, flow, etc.)
+2. **Place file in appropriate category folder**
+3. **Add entry to this README** with:
    - Material description
    - Test mode and conditions
    - Data format and column names
    - Use cases and applications
    - Source/citation
-3. **Create loading example** in relevant notebook
-4. **Update dataset usage table** above
+4. **Create loading example** in relevant notebook
+5. **Update dataset usage table** above
 
 ## Data Availability and Licensing
 
@@ -407,47 +293,8 @@ All synthetic data generation code is public domain - use freely. Generation cod
 
 All experimental datasets are used for educational purposes under academic fair use.
 
-## Troubleshooting Data Loading
-
-### FileNotFoundError
-
-**Problem:** `File not found: 'frequency_sweep_tts.txt'`
-
-**Solution:** Use absolute paths or relative to examples directory:
-```python
-from pathlib import Path
-data_dir = Path('/Users/b80985/Projects/Rheo/examples/data/experimental')
-data_file = data_dir / 'frequency_sweep_tts.txt'
-```
-
-### Unit Mismatch
-
-**Problem:** Data not scaling correctly
-
-**Solution:** Check CSV headers or TRIOS metadata:
-```python
-import pandas as pd
-df = pd.read_csv(data_file)
-print(df.columns)  # Verify column names
-```
-
-### AttributeError with RheoData
-
-**Problem:** `AttributeError: 'numpy.ndarray' has no attribute 'x_units'`
-
-**Solution:** Use RheoData wrapper:
-```python
-# Wrong:
-x, y = np.loadtxt(file, unpack=True)
-
-# Right:
-from rheo.core.data import RheoData
-data = RheoData.from_csv(file)
-print(data.x_units)
-```
-
 ---
 
-**Last Updated:** 2025-10-31
-**Total Datasets:** 8 experimental files
-**Synthetic Data:** Generated in-notebook (20 notebooks)
+**Last Updated:** 2025-01-12
+**Total Datasets:** 167 files organized by measurement type
+**Categories:** oscillation, relaxation, creep, flow, temperature_sweep, laos, mastercurves, multi_technique
