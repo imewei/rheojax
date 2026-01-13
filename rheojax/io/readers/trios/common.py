@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.data import RheoData
-from rheojax.logging import get_logger, log_io
+from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
 

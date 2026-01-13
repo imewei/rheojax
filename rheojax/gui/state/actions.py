@@ -441,7 +441,11 @@ def start_fitting(model_name: str, dataset_id: str) -> dict:
     dict
         Action dict for dispatch
     """
-    action = {"type": "START_FITTING", "model_name": model_name, "dataset_id": dataset_id}
+    action = {
+        "type": "START_FITTING",
+        "model_name": model_name,
+        "dataset_id": dataset_id,
+    }
     logger.debug(
         "Action created",
         action_type="START_FITTING",

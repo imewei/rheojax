@@ -332,7 +332,9 @@ class FractionalZenerSolidSolid(BaseModel):
             logger,
             model="FractionalZenerSolidSolid",
             data_shape=data_shape,
-            test_mode=test_mode_str if isinstance(test_mode_str, str) else str(test_mode),
+            test_mode=(
+                test_mode_str if isinstance(test_mode_str, str) else str(test_mode)
+            ),
         ) as ctx:
             logger.debug(
                 "Starting FZSS fit",

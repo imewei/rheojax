@@ -7,7 +7,6 @@ Service for generating rheological plots with matplotlib.
 
 from __future__ import annotations
 
-import logging
 import os
 import tempfile
 from typing import Any
@@ -73,7 +72,9 @@ class PlotService:
             "#ffb2f2",  # pink
             "#5ad1fa",  # cyan
         ]
-        logger.debug("PlotService initialized", available_styles=list(self._styles.keys()))
+        logger.debug(
+            "PlotService initialized", available_styles=list(self._styles.keys())
+        )
 
     def get_available_styles(self) -> list[str]:
         """Get available plot styles.
@@ -180,7 +181,7 @@ class PlotService:
             ax.yaxis.label.set_color("#e8eaed")
             ax.title.set_color("#e8eaed")
             ax.grid(True, color="#3c4043", alpha=0.6, linestyle="--", linewidth=0.8)
-            for line, color in zip(ax.get_lines(), self._dark_palette):
+            for line, color in zip(ax.get_lines(), self._dark_palette, strict=False):
                 line.set_color(color)
             for spine in ax.spines.values():
                 spine.set_color("#e8eaed")
@@ -216,7 +217,9 @@ class PlotService:
         try:
             self._apply_style_context(style)
             fig, ax = plt.subplots(figsize=(8, 6))
-            palette = self._get_palette(style) if (style or "").lower() == "dark" else None
+            palette = (
+                self._get_palette(style) if (style or "").lower() == "dark" else None
+            )
 
             x = np.asarray(data.x)
             y = np.asarray(data.y)
@@ -230,10 +233,12 @@ class PlotService:
             if test_mode is None:
                 test_mode = data.metadata.get("test_mode", "oscillation")
 
-            logger.debug("Fit plot configuration",
-                        data_shape=x.shape,
-                        has_uncertainty=has_uncertainty,
-                        resolved_test_mode=test_mode)
+            logger.debug(
+                "Fit plot configuration",
+                data_shape=x.shape,
+                has_uncertainty=has_uncertainty,
+                resolved_test_mode=test_mode,
+            )
 
             # Helper: compute uncertainty band for real-valued fits
             def _compute_band(x_vals, y_vals):
@@ -241,16 +246,14 @@ class PlotService:
                 if not has_uncertainty:
                     return None, None
                 try:
-
-                    # Get Jacobian dimensions from pcov
-                    n_params = pcov.shape[0]
                     # Use finite difference on y_fit to approximate band
                     # This is simpler than full error propagation
                     # Uncertainty ~ sqrt(diag(pcov)) projected to y space
                     param_std = np.sqrt(np.diag(pcov))
                     # Rough approximation: scale y_fit by relative param uncertainty
                     rel_uncertainty = np.mean(
-                        param_std / (np.abs(list(fit_result.parameters.values())) + 1e-10)
+                        param_std
+                        / (np.abs(list(fit_result.parameters.values())) + 1e-10)
                     )
                     sigma_y = np.abs(y_vals) * rel_uncertainty
                     z = 1.96  # 95% CI
@@ -322,7 +325,11 @@ class PlotService:
                         x, y, "o", label="Data", color=palette[0] if palette else None
                     )
                     ax.loglog(
-                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                        x,
+                        y_fit,
+                        "-",
+                        label="Fit",
+                        color=palette[1] if palette else None,
                     )
 
                     # Add uncertainty band
@@ -337,40 +344,58 @@ class PlotService:
                     ax.set_ylabel("|G*| (Pa)")
 
             elif test_mode == "relaxation":
-                ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
-                ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+                ax.loglog(
+                    x, y, "o", label="Data", color=palette[0] if palette else None
+                )
+                ax.loglog(
+                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                )
 
                 # Add uncertainty band
                 y_lo, y_hi = _compute_band(x, y_fit)
                 if y_lo is not None and y_hi is not None:
                     y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                    ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+                    ax.fill_between(
+                        x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                    )
 
                 ax.set_xlabel("Time (s)")
                 ax.set_ylabel("Relaxation Modulus G(t) (Pa)")
 
             elif test_mode == "creep":
-                ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
-                ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+                ax.loglog(
+                    x, y, "o", label="Data", color=palette[0] if palette else None
+                )
+                ax.loglog(
+                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                )
 
                 # Add uncertainty band
                 y_lo, y_hi = _compute_band(x, y_fit)
                 if y_lo is not None and y_hi is not None:
                     y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                    ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+                    ax.fill_between(
+                        x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                    )
 
                 ax.set_xlabel("Time (s)")
                 ax.set_ylabel("Creep Compliance J(t) (1/Pa)")
 
             elif test_mode == "flow":
-                ax.loglog(x, y, "o", label="Data", color=palette[0] if palette else None)
-                ax.loglog(x, y_fit, "-", label="Fit", color=palette[1] if palette else None)
+                ax.loglog(
+                    x, y, "o", label="Data", color=palette[0] if palette else None
+                )
+                ax.loglog(
+                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                )
 
                 # Add uncertainty band
                 y_lo, y_hi = _compute_band(x, y_fit)
                 if y_lo is not None and y_hi is not None:
                     y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                    ax.fill_between(x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI")
+                    ax.fill_between(
+                        x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                    )
 
                 ax.set_xlabel("Shear Rate (1/s)")
                 ax.set_ylabel("Viscosity (Pa.s)")
@@ -420,7 +445,9 @@ class PlotService:
             x = np.asarray(data.x)
             residuals = fit_result.residuals
 
-            logger.debug("Residual plot data", data_points=len(x), residual_shape=residuals.shape)
+            logger.debug(
+                "Residual plot data", data_points=len(x), residual_shape=residuals.shape
+            )
 
             # Residuals vs x
             ax1.semilogx(x, residuals, "o", color=palette[0])
@@ -482,7 +509,9 @@ class PlotService:
             }
             idata = az.from_dict(idata_dict)
 
-            logger.debug("ArviZ InferenceData created", parameters=list(posterior_samples.keys()))
+            logger.debug(
+                "ArviZ InferenceData created", parameters=list(posterior_samples.keys())
+            )
 
             # Create plot based on type
             if plot_type == "trace":
@@ -518,7 +547,9 @@ class PlotService:
                 raise ValueError(f"Unknown plot type: {plot_type}")
 
             logger.info("Plot generated", plot_type=f"arviz_{plot_type}")
-            logger.debug("create_arviz_plot completed successfully", plot_type=plot_type)
+            logger.debug(
+                "create_arviz_plot completed successfully", plot_type=plot_type
+            )
             return fig
 
         except Exception as e:
@@ -561,10 +592,12 @@ class PlotService:
             if test_mode is None:
                 test_mode = data.metadata.get("test_mode", "unknown")
 
-            logger.debug("Data plot configuration",
-                        data_shape=x.shape,
-                        is_complex=np.iscomplexobj(y),
-                        resolved_test_mode=test_mode)
+            logger.debug(
+                "Data plot configuration",
+                data_shape=x.shape,
+                is_complex=np.iscomplexobj(y),
+                resolved_test_mode=test_mode,
+            )
 
             # Plot based on type
             if np.iscomplexobj(y):
@@ -617,9 +650,7 @@ class PlotService:
                 try:
                     os.remove(tmp_path)
                 except OSError as exc:
-                    logger.debug(
-                        "Failed to remove temp style file: %s", exc
-                    )
+                    logger.debug("Failed to remove temp style file: %s", exc)
         else:
             plt.style.use("default")
             logger.debug("Using default matplotlib style")

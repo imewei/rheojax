@@ -207,7 +207,9 @@ class ResidualsPanel(QWidget):
             "State updated",
             widget=self.__class__.__name__,
             action="set_residuals",
-            residuals_shape=residuals.shape if hasattr(residuals, "shape") else len(residuals),
+            residuals_shape=(
+                residuals.shape if hasattr(residuals, "shape") else len(residuals)
+            ),
         )
         self._residuals = np.asarray(residuals).flatten()
         self._y_true = None

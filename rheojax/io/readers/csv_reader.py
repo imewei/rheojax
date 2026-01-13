@@ -254,7 +254,9 @@ def load_csv(
     y_data = np.take(y_data, valid_idx)
 
     if len(x_data) == 0:
-        logger.error("No valid data points after removing NaN values", filepath=str(filepath))
+        logger.error(
+            "No valid data points after removing NaN values", filepath=str(filepath)
+        )
         raise ValueError("No valid data points after removing NaN values")
 
     logger.debug("Data points after NaN removal", n_points=len(x_data))

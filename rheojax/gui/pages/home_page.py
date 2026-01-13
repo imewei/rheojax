@@ -193,7 +193,12 @@ class HomePage(QWidget):
 
     def _select_workflow(self, mode: str) -> None:
         """Handle workflow selection."""
-        logger.debug("Quick action triggered", action="select_workflow", page="HomePage", workflow_mode=mode)
+        logger.debug(
+            "Quick action triggered",
+            action="select_workflow",
+            page="HomePage",
+            workflow_mode=mode,
+        )
         self._store.dispatch("SET_WORKFLOW_MODE", {"mode": mode})
         self.workflow_selected.emit(mode)
         # Navigate to data tab to start work
@@ -398,7 +403,12 @@ class HomePage(QWidget):
 
         # Make clickable
         def on_project_click(event, path=project_path):
-            logger.debug("Quick action triggered", action="open_recent_project", page="HomePage", project_path=str(path))
+            logger.debug(
+                "Quick action triggered",
+                action="open_recent_project",
+                page="HomePage",
+                project_path=str(path),
+            )
             self.recent_project_opened.emit(path)
 
         widget.mousePressEvent = on_project_click
@@ -519,7 +529,12 @@ class HomePage(QWidget):
 
         # Make clickable
         def on_example_click(event, example_name=name):
-            logger.debug("Quick action triggered", action="select_example", page="HomePage", example_name=example_name)
+            logger.debug(
+                "Quick action triggered",
+                action="select_example",
+                page="HomePage",
+                example_name=example_name,
+            )
             self.example_selected.emit(example_name)
 
         card.mousePressEvent = on_example_click
@@ -679,7 +694,12 @@ class HomePage(QWidget):
         example_name : str
             Example identifier
         """
-        logger.debug("Quick action triggered", action="open_example", page="HomePage", example_name=example_name)
+        logger.debug(
+            "Quick action triggered",
+            action="open_example",
+            page="HomePage",
+            example_name=example_name,
+        )
         self.example_selected.emit(example_name)
 
     def get_example_path(self, example_name: str) -> Path | None:

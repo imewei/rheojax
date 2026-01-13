@@ -936,4 +936,3 @@ class TestFractionalModelsRelaxation:
                 pytest.fail(
                     f"{model_class.__name__} failed Bayesian sampling: {str(e)}"
                 )
-

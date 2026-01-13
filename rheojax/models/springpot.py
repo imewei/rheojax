@@ -105,12 +105,12 @@ class SpringPot(BaseModel):
         Returns:
             self for method chaining
         """
+        import numpy as np
+
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
         )
-
-        import numpy as np
 
         # Handle RheoData input
         if isinstance(X, RheoData):
@@ -149,7 +149,10 @@ class SpringPot(BaseModel):
             logger.debug(
                 "Processing input data",
                 x_range=(float(x_np.min()), float(x_np.max())),
-                y_range=(float(np.real(np.asarray(y_data)).min()), float(np.real(np.asarray(y_data)).max())),
+                y_range=(
+                    float(np.real(np.asarray(y_data)).min()),
+                    float(np.real(np.asarray(y_data)).max()),
+                ),
                 is_complex=np.iscomplexobj(y_data),
             )
 

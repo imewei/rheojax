@@ -9,9 +9,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
+from rheojax.core.data import RheoData
+from rheojax.core.registry import Registry
 from rheojax.logging import get_logger
+from rheojax.utils.compatibility import check_model_compatibility
+
+if TYPE_CHECKING:
+    from rheojax.gui.state.store import ParameterState
 
 logger = get_logger(__name__)
 
@@ -37,13 +45,6 @@ def normalize_model_name(model_name: str) -> str:
     result = alias_map.get(key.lower(), key)
     logger.debug("Model name normalized", input_name=model_name, output_name=result)
     return result
-
-
-import numpy as np
-
-from rheojax.core.data import RheoData
-from rheojax.core.registry import Registry
-from rheojax.utils.compatibility import check_model_compatibility
 
 
 def _is_placeholder_model(model_name: str | None) -> bool:
@@ -640,9 +641,7 @@ class ModelService:
 
             # Try to get metrics from OptimizationResult (NLSQ 0.6.0 compatibility)
             nlsq_result = (
-                model.get_nlsq_result()
-                if hasattr(model, "get_nlsq_result")
-                else None
+                model.get_nlsq_result() if hasattr(model, "get_nlsq_result") else None
             )
 
             if nlsq_result is not None and nlsq_result.r_squared is not None:

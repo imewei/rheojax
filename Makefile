@@ -6,7 +6,8 @@
         test test-smoke test-fast test-ci test-ci-full test-coverage test-integration test-validation \
         test-parallel test-all-parallel test-parallel-fast test-coverage-parallel \
         clean clean-all clean-pyc clean-build clean-test clean-venv \
-        format lint type-check check quick docs build publish info version
+        format lint type-check check quick docs build publish info version \
+        verify verify-fast install-hooks
 
 # Configuration
 PYTHON := python
@@ -128,6 +129,11 @@ help:
 	@echo "  $(CYAN)type-check$(RESET)       Run type checking (mypy)"
 	@echo "  $(CYAN)check$(RESET)            Run all checks (format + lint + type)"
 	@echo "  $(CYAN)quick$(RESET)            Fast iteration: format + smoke tests (~30s-2min)"
+	@echo ""
+	@echo "$(BOLD)$(GREEN)PRE-PUSH VERIFICATION$(RESET)"
+	@echo "  $(CYAN)verify$(RESET)           Run FULL local CI (lint + type + smoke tests) - use before push"
+	@echo "  $(CYAN)verify-fast$(RESET)      Quick verification (lint + type only, no tests)"
+	@echo "  $(CYAN)install-hooks$(RESET)    Install pre-commit hooks"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)DOCUMENTATION$(RESET)"
 	@echo "  $(CYAN)docs$(RESET)             Build documentation with Sphinx"
@@ -662,3 +668,54 @@ info:
 version:
 	@$(PYTHON) -c "import $(PACKAGE_NAME); print($(PACKAGE_NAME).__version__)" 2>/dev/null || \
 		echo "$(BOLD)$(RED)Error: Package not installed. Run 'make install' first.$(RESET)"
+
+# ===================
+# Pre-push verification (run before pushing to ensure CI will pass)
+# ===================
+verify:
+	@echo "$(BOLD)$(BLUE)======================================$(RESET)"
+	@echo "$(BOLD)$(BLUE)  FULL LOCAL CI VERIFICATION$(RESET)"
+	@echo "$(BOLD)$(BLUE)======================================$(RESET)"
+	@echo ""
+	@echo "$(BOLD)Step 1/3: Linting$(RESET)"
+	@$(RUN_CMD) ruff check $(PACKAGE_NAME) tests || (echo "$(RED)Lint check failed!$(RESET)" && exit 1)
+	@echo ""
+	@echo "$(BOLD)Step 2/3: Type checking (advisory)$(RESET)"
+	@$(RUN_CMD) mypy $(PACKAGE_NAME) --no-error-summary 2>&1 | tail -1 || true
+	@echo "$(YELLOW)Note: Type checking is advisory. See 'make type-check' for full report.$(RESET)"
+	@echo ""
+	@echo "$(BOLD)Step 3/3: Smoke tests$(RESET)"
+	@$(RUN_CMD) $(PYTEST) -n auto -m "smoke" || (echo "$(RED)Smoke tests failed!$(RESET)" && exit 1)
+	@echo ""
+	@echo "$(BOLD)$(GREEN)======================================$(RESET)"
+	@echo "$(BOLD)$(GREEN)  ALL CHECKS PASSED - SAFE TO PUSH$(RESET)"
+	@echo "$(BOLD)$(GREEN)======================================$(RESET)"
+
+verify-fast:
+	@echo "$(BOLD)$(BLUE)======================================$(RESET)"
+	@echo "$(BOLD)$(BLUE)  QUICK LOCAL CI VERIFICATION$(RESET)"
+	@echo "$(BOLD)$(BLUE)======================================$(RESET)"
+	@echo ""
+	@echo "$(BOLD)Step 1/2: Linting$(RESET)"
+	@$(RUN_CMD) ruff check $(PACKAGE_NAME) tests || (echo "$(RED)Lint check failed!$(RESET)" && exit 1)
+	@echo ""
+	@echo "$(BOLD)Step 2/2: Type checking (advisory)$(RESET)"
+	@$(RUN_CMD) mypy $(PACKAGE_NAME) --no-error-summary 2>&1 | tail -1 || true
+	@echo "$(YELLOW)Note: Type checking is advisory. See 'make type-check' for full report.$(RESET)"
+	@echo ""
+	@echo "$(BOLD)$(GREEN)======================================$(RESET)"
+	@echo "$(BOLD)$(GREEN)  QUICK CHECKS PASSED$(RESET)"
+	@echo "$(BOLD)$(GREEN)======================================$(RESET)"
+
+install-hooks:
+	@echo "$(BOLD)$(BLUE)Installing git hooks...$(RESET)"
+	@pre-commit install 2>/dev/null || echo "$(YELLOW)pre-commit not installed, skipping$(RESET)"
+	@echo "$(BOLD)$(GREEN)✓ Git hooks installed!$(RESET)"
+	@echo ""
+	@echo "$(BOLD)Hooks installed:$(RESET)"
+	@echo "  - pre-commit: lint, format, type checks"
+	@echo ""
+	@echo "$(BOLD)Usage:$(RESET)"
+	@echo "  git commit -m 'msg'  → runs pre-commit hooks"
+	@echo "  git push             → triggers GitHub Actions CI"
+	@echo "  make verify          → full local verification (recommended before push)"

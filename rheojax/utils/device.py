@@ -39,9 +39,7 @@ def get_system_cuda_version() -> tuple[str | None, int | None]:
                     parts = line.split("release")[-1].strip()
                     version = parts.split(",")[0].strip()
                     major = int(version.split(".")[0])
-                    logger.info(
-                        "CUDA version detected", version=version, major=major
-                    )
+                    logger.info("CUDA version detected", version=version, major=major)
                     return version, major
 
     except subprocess.TimeoutExpired:

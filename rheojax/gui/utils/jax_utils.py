@@ -78,7 +78,7 @@ class JaxUtils:
                         logger.debug("GPU memory stats unavailable: %s", exc)
 
                 devices.append(device_info)
-        except Exception as e:
+        except Exception:
             logger.error("Failed to enumerate devices", exc_info=True)
             devices.append(
                 {
@@ -116,7 +116,7 @@ class JaxUtils:
                 platform=result["platform"],
             )
             return result
-        except Exception as e:
+        except Exception:
             logger.error("Failed to get default device", exc_info=True)
             return {
                 "id": 0,
@@ -181,7 +181,7 @@ class JaxUtils:
                 except ImportError:
                     logger.debug("psutil not installed; skipping CPU memory stats")
 
-        except Exception as e:
+        except Exception:
             logger.error("Failed to get memory usage", exc_info=True)
 
         logger.debug("get_memory_usage complete", result=result)
@@ -200,9 +200,11 @@ class JaxUtils:
         try:
             x = jnp.array([1.0])
             is_float64 = x.dtype == jnp.float64
-            logger.debug("Float64 verification complete", enabled=is_float64, dtype=str(x.dtype))
+            logger.debug(
+                "Float64 verification complete", enabled=is_float64, dtype=str(x.dtype)
+            )
             return is_float64
-        except Exception as e:
+        except Exception:
             logger.error("Failed to verify float64", exc_info=True)
             return False
 
@@ -242,7 +244,7 @@ class JaxUtils:
                 platform=result["platform"],
             )
 
-        except Exception as e:
+        except Exception:
             logger.error("Failed to get backend info", exc_info=True)
             result["name"] = "JAX"
 

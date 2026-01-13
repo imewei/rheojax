@@ -101,7 +101,9 @@ def plot_lissajous(
 
         # Normalize if amplitudes provided
         strain_plot = strain / gamma_0 if gamma_0 else strain
-        rate_plot = strain_rate / (gamma_0 * omega) if (gamma_0 and omega) else strain_rate
+        rate_plot = (
+            strain_rate / (gamma_0 * omega) if (gamma_0 and omega) else strain_rate
+        )
         stress_plot = stress
 
         # Style settings
@@ -117,7 +119,9 @@ def plot_lissajous(
 
         # Plot sigma vs gamma (elastic Lissajous)
         ax1.plot(strain_plot, stress_plot, linewidth=linewidth, **kwargs)
-        ax1.set_xlabel(r"$\gamma/\gamma_0$" if gamma_0 else r"$\gamma$", fontsize=fontsize)
+        ax1.set_xlabel(
+            r"$\gamma/\gamma_0$" if gamma_0 else r"$\gamma$", fontsize=fontsize
+        )
         ax1.set_ylabel(r"$\sigma$ (Pa)", fontsize=fontsize)
         ax1.set_title("Elastic Lissajous", fontsize=fontsize + 2)
         ax1.axhline(0, color="gray", linestyle="--", linewidth=0.5)
@@ -281,7 +285,9 @@ def plot_moduli_evolution(
     try:
         plt = _ensure_matplotlib()
 
-        n_plots = 2 + (1 if delta_t is not None else 0) + (1 if G_speed is not None else 0)
+        n_plots = (
+            2 + (1 if delta_t is not None else 0) + (1 if G_speed is not None else 0)
+        )
 
         if ax is None:
             fig, axes = plt.subplots(n_plots, 1, figsize=(8, 3 * n_plots), sharex=True)
@@ -495,10 +501,20 @@ def plot_3d_trajectory(
 
         # Add start/end markers
         ax.scatter(
-            [strain[0]], [rate_normalized[0]], [stress[0]], color="g", s=100, label="Start"
+            [strain[0]],
+            [rate_normalized[0]],
+            [stress[0]],
+            color="g",
+            s=100,
+            label="Start",
         )
         ax.scatter(
-            [strain[-1]], [rate_normalized[-1]], [stress[-1]], color="r", s=100, label="End"
+            [strain[-1]],
+            [rate_normalized[-1]],
+            [stress[-1]],
+            color="r",
+            s=100,
+            label="End",
         )
 
         # Show Frenet-Serret frame at selected points
@@ -513,13 +529,17 @@ def plot_3d_trajectory(
                 scale = frame_scale * np.max(np.abs(stress))
 
                 if T_vec is not None:
-                    ax.quiver(*pos, *T_vec[i] * scale, color="red", arrow_length_ratio=0.3)
+                    ax.quiver(
+                        *pos, *T_vec[i] * scale, color="red", arrow_length_ratio=0.3
+                    )
                 if N_vec is not None:
                     ax.quiver(
                         *pos, *N_vec[i] * scale, color="green", arrow_length_ratio=0.3
                     )
                 if B_vec is not None:
-                    ax.quiver(*pos, *B_vec[i] * scale, color="blue", arrow_length_ratio=0.3)
+                    ax.quiver(
+                        *pos, *B_vec[i] * scale, color="blue", arrow_length_ratio=0.3
+                    )
 
         ax.set_xlabel(r"$\gamma$")
         ax.set_ylabel(r"$\dot{\gamma}/\omega$")
@@ -681,7 +701,9 @@ def create_spp_report(
 
         # Compute strain rate
         strain_rate = (
-            gamma_0 * omega * np.cos(omega * np.linspace(0, 2 * np.pi / omega, len(strain)))
+            gamma_0
+            * omega
+            * np.cos(omega * np.linspace(0, 2 * np.pi / omega, len(strain)))
         )
         if "strain_rate_normalized" in spp_results:
             strain_rate = np.asarray(spp_results["strain_rate_normalized"]) * omega

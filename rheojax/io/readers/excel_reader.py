@@ -168,7 +168,9 @@ def load_excel(
             filepath, sheet_name=sheet, header=header, usecols=usecols, **kwargs
         )
     except Exception as e:
-        logger.error("Failed to parse Excel file", filepath=str(filepath), exc_info=True)
+        logger.error(
+            "Failed to parse Excel file", filepath=str(filepath), exc_info=True
+        )
         raise ValueError(f"Failed to parse Excel file: {e}") from e
 
     logger.debug("Excel file read successfully", n_rows=len(df), n_cols=len(df.columns))
@@ -223,7 +225,9 @@ def load_excel(
     y_data = np.take(y_data, valid_idx)
 
     if len(x_data) == 0:
-        logger.error("No valid data points after removing NaN values", filepath=str(filepath))
+        logger.error(
+            "No valid data points after removing NaN values", filepath=str(filepath)
+        )
         raise ValueError("No valid data points after removing NaN values")
 
     logger.debug("Data points after NaN removal", n_points=len(x_data))

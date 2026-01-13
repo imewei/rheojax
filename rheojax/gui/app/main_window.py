@@ -336,7 +336,9 @@ class RheoJAXMainWindow(QMainWindow):
             self.worker_pool = WorkerPool.instance()
             logger.debug("Worker pool initialized successfully")
         except Exception as exc:
-            logger.error("Worker pool initialization failed", error=str(exc), exc_info=True)
+            logger.error(
+                "Worker pool initialization failed", error=str(exc), exc_info=True
+            )
             self.log(f"Worker pool unavailable: {exc}")
             return
 
@@ -779,7 +781,12 @@ class RheoJAXMainWindow(QMainWindow):
                 f"Opening {example_name} example in Colab...", 2000
             )
         except Exception as exc:
-            logger.error("Failed to open example", example_name=example_name, error=str(exc), exc_info=True)
+            logger.error(
+                "Failed to open example",
+                example_name=example_name,
+                error=str(exc),
+                exc_info=True,
+            )
             webbrowser.open(f"{GITHUB_BASE}/examples")
             self.log("Falling back to examples repository link")
 
@@ -793,7 +800,11 @@ class RheoJAXMainWindow(QMainWindow):
             # Pre-generate dataset_id for consistent state tracking
             config["dataset_id"] = str(uuid.uuid4())
             self.log(f"Importing data from: {config['file_path']}")
-            logger.info("Importing data", file_path=config['file_path'], dataset_id=config['dataset_id'])
+            logger.info(
+                "Importing data",
+                file_path=config["file_path"],
+                dataset_id=config["dataset_id"],
+            )
             self.store.dispatch("IMPORT_DATA", config)
 
             # Perform the actual load immediately (synchronous import).
@@ -828,7 +839,11 @@ class RheoJAXMainWindow(QMainWindow):
                     },
                 )
                 self.navigate_to("data")
-                logger.info("Data import successful", dataset_id=config['dataset_id'], test_mode=test_mode)
+                logger.info(
+                    "Data import successful",
+                    dataset_id=config["dataset_id"],
+                    test_mode=test_mode,
+                )
                 self.status_bar.show_message("Data imported successfully", 3000)
             except Exception as exc:
                 logger.error("Import failed", error=str(exc), exc_info=True)
@@ -974,7 +989,9 @@ class RheoJAXMainWindow(QMainWindow):
         try:
             app.setStyleSheet(load_stylesheet(chosen))
         except Exception as exc:  # pragma: no cover - GUI runtime
-            logger.error("Failed to apply theme", theme=theme, error=str(exc), exc_info=True)
+            logger.error(
+                "Failed to apply theme", theme=theme, error=str(exc), exc_info=True
+            )
             self.log(f"Failed to apply theme {theme}: {exc}")
         else:
             # Persist theme selection into state
@@ -1017,7 +1034,9 @@ class RheoJAXMainWindow(QMainWindow):
             try:
                 self.data_page.show_dataset(dataset_id)
             except Exception as exc:
-                logger.error("Could not update Data page preview", error=str(exc), exc_info=True)
+                logger.error(
+                    "Could not update Data page preview", error=str(exc), exc_info=True
+                )
                 self.log(f"Could not update Data page preview: {exc}")
 
     @Slot(str)
@@ -1029,7 +1048,9 @@ class RheoJAXMainWindow(QMainWindow):
         try:
             self.data_page.show_dataset(dataset_id)
         except Exception as exc:
-            logger.error("Could not update Data page preview", error=str(exc), exc_info=True)
+            logger.error(
+                "Could not update Data page preview", error=str(exc), exc_info=True
+            )
             self.log(f"Could not update Data page preview: {exc}")
 
     # ------------------------------------------------------------------
@@ -1226,7 +1247,9 @@ class RheoJAXMainWindow(QMainWindow):
                     f"Auto-detected test mode: {inferred_mode}", 2500
                 )
             except Exception as exc:
-                logger.error("Auto-detect test mode failed", error=str(exc), exc_info=True)
+                logger.error(
+                    "Auto-detect test mode failed", error=str(exc), exc_info=True
+                )
                 self.log(f"Auto-detect test mode failed: {exc}")
                 self.status_bar.show_message("Auto-detect test mode failed", 2500)
         else:
@@ -1344,12 +1367,19 @@ class RheoJAXMainWindow(QMainWindow):
                 },
             )
             self.store.dispatch("TRANSFORM_COMPLETED", {"transform_id": transform_id})
-            logger.info("Transform applied", transform_id=transform_id, new_dataset_id=new_id)
+            logger.info(
+                "Transform applied", transform_id=transform_id, new_dataset_id=new_id
+            )
             self.status_bar.show_message(f"Transform applied: {transform_id}", 2000)
             self.log(f"Applied transform {transform_id} -> dataset {new_id}")
             self.navigate_to("transform")
         except Exception as exc:
-            logger.error("Transform failed", transform_id=transform_id, error=str(exc), exc_info=True)
+            logger.error(
+                "Transform failed",
+                transform_id=transform_id,
+                error=str(exc),
+                exc_info=True,
+            )
             self.store.dispatch(
                 "SET_PIPELINE_STEP", {"step": "transform", "status": "ERROR"}
             )
@@ -1420,7 +1450,11 @@ class RheoJAXMainWindow(QMainWindow):
                 validate=False,
             )
         except Exception as exc:
-            logger.error("Cannot start fit: failed to build RheoData", error=str(exc), exc_info=True)
+            logger.error(
+                "Cannot start fit: failed to build RheoData",
+                error=str(exc),
+                exc_info=True,
+            )
             self.log(f"Cannot start fit: {exc}")
             self.status_bar.show_message("Unable to build dataset for fit", 4000)
             return
@@ -1537,7 +1571,11 @@ class RheoJAXMainWindow(QMainWindow):
                 initial_test_mode=dataset.test_mode,
             )
         except Exception as exc:
-            logger.error("Cannot start Bayesian: failed to build RheoData", error=str(exc), exc_info=True)
+            logger.error(
+                "Cannot start Bayesian: failed to build RheoData",
+                error=str(exc),
+                exc_info=True,
+            )
             self.log(f"Cannot start Bayesian: {exc}")
             self.status_bar.show_message("Unable to build dataset for Bayesian", 4000)
             return
@@ -1586,7 +1624,9 @@ class RheoJAXMainWindow(QMainWindow):
         model_id : str
             Model name/ID
         """
-        logger.debug("Diagnostics plot requested", plot_type=plot_type, model_id=model_id)
+        logger.debug(
+            "Diagnostics plot requested", plot_type=plot_type, model_id=model_id
+        )
         self.log(f"Diagnostics: generating {plot_type} plot for {model_id}")
         self.status_bar.show_message(f"Generating {plot_type} plot...", 2000)
 
@@ -1780,7 +1820,9 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.update_jax_status(
                 device_name, memory_used, memory_total, float64_enabled
             )
-            logger.debug("JAX status updated", device=device_name, float64=float64_enabled)
+            logger.debug(
+                "JAX status updated", device=device_name, float64=float64_enabled
+            )
         except Exception as e:
             logger.error("Failed to update JAX status", error=str(e), exc_info=True)
             self.log(f"Failed to update JAX status: {e}")
@@ -1811,7 +1853,11 @@ class RheoJAXMainWindow(QMainWindow):
                         try:
                             export_service.export_parameters(fit_result, params_path)
                         except Exception as exc:
-                            logger.error("Auto-export params failed", error=str(exc), exc_info=True)
+                            logger.error(
+                                "Auto-export params failed",
+                                error=str(exc),
+                                exc_info=True,
+                            )
                             self.log(f"Auto-export params failed: {exc}")
 
                         try:
@@ -1833,7 +1879,9 @@ class RheoJAXMainWindow(QMainWindow):
                                 )
                                 export_service.export_figure(fig, fig_path)
                         except Exception as exc:
-                            logger.error("Auto-export plot failed", error=str(exc), exc_info=True)
+                            logger.error(
+                                "Auto-export plot failed", error=str(exc), exc_info=True
+                            )
                             self.log(f"Auto-export plot failed: {exc}")
 
                     if bayes_result:
@@ -1844,7 +1892,11 @@ class RheoJAXMainWindow(QMainWindow):
                         try:
                             export_service.export_posterior(bayes_result, post_path)
                         except Exception as exc:
-                            logger.error("Auto-export posterior failed", error=str(exc), exc_info=True)
+                            logger.error(
+                                "Auto-export posterior failed",
+                                error=str(exc),
+                                exc_info=True,
+                            )
                             self.log(f"Auto-export posterior failed: {exc}")
                         try:
                             fig = plot_service.create_arviz_plot(
@@ -1852,7 +1904,11 @@ class RheoJAXMainWindow(QMainWindow):
                             )
                             export_service.export_figure(fig, diag_path)
                         except Exception as exc:
-                            logger.error("Auto-export diagnostics failed", error=str(exc), exc_info=True)
+                            logger.error(
+                                "Auto-export diagnostics failed",
+                                error=str(exc),
+                                exc_info=True,
+                            )
                             self.log(f"Auto-export diagnostics failed: {exc}")
                         try:
                             fig = plot_service.create_arviz_plot(
@@ -1860,7 +1916,11 @@ class RheoJAXMainWindow(QMainWindow):
                             )
                             export_service.export_figure(fig, forest_path)
                         except Exception as exc:
-                            logger.error("Auto-export forest failed", error=str(exc), exc_info=True)
+                            logger.error(
+                                "Auto-export forest failed",
+                                error=str(exc),
+                                exc_info=True,
+                            )
                             self.log(f"Auto-export forest failed: {exc}")
                         try:
                             fig = plot_service.create_arviz_plot(
@@ -1868,7 +1928,11 @@ class RheoJAXMainWindow(QMainWindow):
                             )
                             export_service.export_figure(fig, energy_path)
                         except Exception as exc:
-                            logger.error("Auto-export energy failed", error=str(exc), exc_info=True)
+                            logger.error(
+                                "Auto-export energy failed",
+                                error=str(exc),
+                                exc_info=True,
+                            )
                             self.log(f"Auto-export energy failed: {exc}")
 
                 logger.info("Auto-save completed", path=str(project_path))

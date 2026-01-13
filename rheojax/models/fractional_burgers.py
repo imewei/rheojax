@@ -357,7 +357,9 @@ class FractionalBurgersModel(BaseModel):
 
         logger.info(
             "Starting FractionalBurgersModel fit",
-            test_mode=test_mode.value if hasattr(test_mode, "value") else str(test_mode),
+            test_mode=(
+                test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+            ),
             data_shape=X.shape,
         )
 
@@ -367,7 +369,9 @@ class FractionalBurgersModel(BaseModel):
                 try:
                     import numpy as np
 
-                    from rheojax.utils.initialization import initialize_fractional_burgers
+                    from rheojax.utils.initialization import (
+                        initialize_fractional_burgers,
+                    )
 
                     logger.debug(
                         "Attempting smart initialization for oscillation mode",

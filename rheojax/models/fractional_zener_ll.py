@@ -476,7 +476,9 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         logger.info(
             "Starting FractionalZenerLiquidLiquid fit",
-            test_mode=test_mode.value if hasattr(test_mode, "value") else str(test_mode),
+            test_mode=(
+                test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+            ),
             data_shape=X.shape,
         )
 

@@ -131,9 +131,11 @@ class BayesianPipeline(Pipeline):
             logger,
             model=model_name,
             data_shape=X.shape,
-            test_mode=self.data.metadata.get("test_mode", "unknown")
-            if hasattr(self.data, "metadata") and self.data.metadata
-            else "unknown",
+            test_mode=(
+                self.data.metadata.get("test_mode", "unknown")
+                if hasattr(self.data, "metadata") and self.data.metadata
+                else "unknown"
+            ),
         ) as ctx:
             model_obj.fit(X, y, method="nlsq", **nlsq_kwargs)
             r_squared = model_obj.score(X, y)

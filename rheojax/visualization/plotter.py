@@ -362,7 +362,9 @@ def plot_frequency_domain(
             # G'' (loss modulus)
             x_gpp, gpp = _filter_positive(x, np.imag(y), warn=True)
             axes[1].loglog(x_gpp, gpp, **plot_kwargs, label='G"', color="C1")
-            axes[1].set_xlabel(f"Frequency ({x_units})" if x_units else "Frequency (rad/s)")
+            axes[1].set_xlabel(
+                f"Frequency ({x_units})" if x_units else "Frequency (rad/s)"
+            )
             axes[1].set_ylabel(f'G" ({y_units})' if y_units else 'G" (Pa)')
             axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
             axes[1].legend()

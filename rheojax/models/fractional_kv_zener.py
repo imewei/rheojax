@@ -329,7 +329,9 @@ class FractionalKelvinVoigtZener(BaseModel):
             logger,
             model="FractionalKelvinVoigtZener",
             data_shape=data_shape,
-            test_mode=test_mode_str if isinstance(test_mode_str, str) else str(test_mode),
+            test_mode=(
+                test_mode_str if isinstance(test_mode_str, str) else str(test_mode)
+            ),
         ) as ctx:
             logger.debug(
                 "Starting FKVZ fit",
@@ -343,7 +345,9 @@ class FractionalKelvinVoigtZener(BaseModel):
                 try:
                     import numpy as np
 
-                    from rheojax.utils.initialization import initialize_fractional_kv_zener
+                    from rheojax.utils.initialization import (
+                        initialize_fractional_kv_zener,
+                    )
 
                     success = initialize_fractional_kv_zener(
                         np.array(X), np.array(y), self.parameters

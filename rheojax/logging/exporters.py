@@ -152,8 +152,8 @@ class OpenTelemetryLogExporter(LogExporter):
         try:
             from opentelemetry.sdk._logs import LoggerProvider  # noqa: F401
             from opentelemetry.sdk._logs.export import (
-                BatchLogRecordProcessor,
-            )  # noqa: F401
+                BatchLogRecordProcessor,  # noqa: F401
+            )
 
             return True
         except ImportError:

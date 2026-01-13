@@ -86,7 +86,9 @@ class FitPage(QWidget):
         self._connect_signals()
         self._load_models()
         logger.debug(
-            "Initialization complete", class_name=self.__class__.__name__, page="FitPage"
+            "Initialization complete",
+            class_name=self.__class__.__name__,
+            page="FitPage",
         )
 
     def _setup_ui(self) -> None:
@@ -253,7 +255,10 @@ class FitPage(QWidget):
             return
 
         logger.debug(
-            "Model selection changed", model=model_name, page="FitPage", dispatch=dispatch
+            "Model selection changed",
+            model=model_name,
+            page="FitPage",
+            dispatch=dispatch,
         )
 
         if dispatch:

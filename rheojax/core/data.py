@@ -39,9 +39,17 @@ def _coerce_ndarray(data: ArrayLike | jnp_typing.ndarray | None) -> np.ndarray:
     if isinstance(data, np.ndarray):
         return data
     if HAS_JAX and isinstance(data, jnp.ndarray):
-        logger.debug("Converting JAX array to NumPy", from_type="jax.ndarray", to_type="np.ndarray")
+        logger.debug(
+            "Converting JAX array to NumPy",
+            from_type="jax.ndarray",
+            to_type="np.ndarray",
+        )
         return np.asarray(data)
-    logger.debug("Converting array-like to NumPy", from_type=type(data).__name__, to_type="np.ndarray")
+    logger.debug(
+        "Converting array-like to NumPy",
+        from_type=type(data).__name__,
+        to_type="np.ndarray",
+    )
     return np.asarray(data)
 
 
@@ -137,7 +145,9 @@ class RheoData:
         if isinstance(data, (np.ndarray, jnp.ndarray)):
             return data
         elif isinstance(data, (list, tuple)):
-            logger.debug("Converting list/tuple to array", from_type=type(data).__name__)
+            logger.debug(
+                "Converting list/tuple to array", from_type=type(data).__name__
+            )
             return np.array(data)
         else:
             logger.debug("Converting to array", from_type=type(data).__name__)
@@ -221,7 +231,9 @@ class RheoData:
         Returns:
             New RheoData with JAX arrays
         """
-        logger.debug("Converting RheoData to JAX arrays", from_type="numpy", to_type="jax")
+        logger.debug(
+            "Converting RheoData to JAX arrays", from_type="numpy", to_type="jax"
+        )
         return RheoData(
             x=jnp.array(self.x),
             y=jnp.array(self.y),
@@ -238,7 +250,9 @@ class RheoData:
         Returns:
             New RheoData with NumPy arrays
         """
-        logger.debug("Converting RheoData to NumPy arrays", from_type="jax", to_type="numpy")
+        logger.debug(
+            "Converting RheoData to NumPy arrays", from_type="jax", to_type="numpy"
+        )
         x_np = np.array(self.x) if isinstance(self.x, jnp.ndarray) else self.x
         y_np = np.array(self.y) if isinstance(self.y, jnp.ndarray) else self.y
 
@@ -605,7 +619,10 @@ class RheoData:
         Returns:
             Interpolated RheoData
         """
-        logger.debug("Interpolating data", n_new_points=len(new_x) if hasattr(new_x, "__len__") else 1)
+        logger.debug(
+            "Interpolating data",
+            n_new_points=len(new_x) if hasattr(new_x, "__len__") else 1,
+        )
         new_x = self._ensure_array(new_x)
 
         if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):

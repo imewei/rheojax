@@ -190,7 +190,10 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                 )
 
             logger.debug(
-                "Auto-detected columns", filepath=str(filepath), x_col=x_col, y_col=y_col
+                "Auto-detected columns",
+                filepath=str(filepath),
+                x_col=x_col,
+                y_col=y_col,
             )
             kwargs["x_col"] = x_col
             kwargs["y_col"] = y_col
@@ -222,9 +225,7 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
 
     # Check if x_col and y_col are specified
     if "x_col" not in kwargs or "y_col" not in kwargs:
-        logger.error(
-            "x_col and y_col required for Excel files", filepath=str(filepath)
-        )
+        logger.error("x_col and y_col required for Excel files", filepath=str(filepath))
         raise ValueError("For Excel files, please specify x_col and y_col parameters")
 
     return load_excel(filepath, **kwargs)

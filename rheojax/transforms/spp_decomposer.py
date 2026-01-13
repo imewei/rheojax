@@ -34,7 +34,7 @@ from jax import Array
 from rheojax.core.base import BaseTransform
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
-from rheojax.logging import get_logger, log_transform
+from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 _, jnp = safe_import_jax()

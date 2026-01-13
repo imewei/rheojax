@@ -3,7 +3,8 @@
 This module provides Qt signals for reactive UI updates on state changes.
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from PySide6.QtCore import QObject, Signal
 
@@ -130,9 +131,7 @@ class StateSignals(QObject):
                 exc_info=True,
             )
 
-    def connect_signal(
-        self, signal_name: str, handler: Callable[..., Any]
-    ) -> bool:
+    def connect_signal(self, signal_name: str, handler: Callable[..., Any]) -> bool:
         """Connect a handler to a signal by name with logging.
 
         Parameters
@@ -150,9 +149,7 @@ class StateSignals(QObject):
         signal = getattr(self, signal_name, None)
         if signal is not None:
             handler_name = getattr(handler, "__name__", repr(handler))
-            logger.debug(
-                "Signal connected", signal=signal_name, handler=handler_name
-            )
+            logger.debug("Signal connected", signal=signal_name, handler=handler_name)
             signal.connect(handler)
             return True
         else:
@@ -183,9 +180,7 @@ class StateSignals(QObject):
         signal = getattr(self, signal_name, None)
         if signal is not None:
             handler_name = (
-                getattr(handler, "__name__", repr(handler))
-                if handler
-                else "all"
+                getattr(handler, "__name__", repr(handler)) if handler else "all"
             )
             logger.debug(
                 "Signal disconnected", signal=signal_name, handler=handler_name

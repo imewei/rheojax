@@ -277,42 +277,6 @@ class SGRGeneric(BaseModel):
 
         return S
 
-    def free_energy_gradient(self, state: np.ndarray) -> np.ndarray:
-        """Compute gradient dF/dz of free energy.
-
-        The gradient components are:
-        - dF/d(sigma): Conjugate to stress (strain-like)
-        - dF/d(lambda): Conjugate to structure (chemical potential-like)
-
-        Args:
-            state: State vector [sigma, lambda]
-
-        Returns:
-            Gradient [dF/d(sigma), dF/d(lambda)]
-        """
-        sigma = state[0]
-        lam = np.clip(state[1], 0.01, 1.0 - 1e-10)
-
-        G0_val = self.parameters.get_value("G0")
-        x = self.parameters.get_value("x")
-        G0_dim = float(G0(x))
-        G_eff = G0_val * G0_dim * lam
-
-        # dU/d(sigma) = sigma / G_eff
-        dU_dsigma = sigma / (G_eff + 1e-20)
-
-        # dU/d(lambda) = -sigma^2 / (2 * G_eff^2) * G0_val * G0_dim
-        dU_dlam = -(sigma**2) / (2.0 * (G_eff + 1e-20) ** 2) * G0_val * G0_dim
-
-        # dS/d(lambda) = -ln(lambda) + ln(1-lambda) = ln((1-lambda)/lambda)
-        dS_dlam = np.log((1.0 - lam) / lam)
-
-        # dF/dz = dU/dz - T * dS/dz
-        dF_dsigma = dU_dsigma
-        dF_dlam = dU_dlam - x * dS_dlam
-
-        return np.array([dF_dsigma, dF_dlam])
-
     # =========================================================================
     # GENERIC Operators: Poisson Bracket L and Friction Matrix M
     # =========================================================================
@@ -483,38 +447,6 @@ class SGRGeneric(BaseModel):
     # Thermodynamic Consistency Checks
     # =========================================================================
 
-    def compute_entropy_production(self, state: np.ndarray) -> float:
-        """Compute entropy production rate W at given state.
-
-        The entropy production is:
-            W = (dF/dz)^T * M(z) * (dF/dz) >= 0
-
-        This must be non-negative (second law of thermodynamics).
-
-        Args:
-            state: State vector [sigma, lambda]
-
-        Returns:
-            Entropy production rate W (must be >= 0)
-
-        Raises:
-            Warning if W < 0 due to numerical errors
-        """
-        M = self.friction_matrix(state)
-        dF_dz = self.free_energy_gradient(state)
-
-        # W = dF^T M dF (quadratic form)
-        W = dF_dz @ M @ dF_dz
-
-        # Check thermodynamic consistency
-        if W < -1e-12:
-            logger.warning(
-                f"Entropy production W = {W:.6e} < 0 at state={state}. "
-                "This violates the second law and may indicate numerical issues."
-            )
-
-        return max(W, 0.0)  # Ensure non-negative for downstream use
-
     def entropy_production_rate(self, state: np.ndarray) -> float:
         """Compute entropy production rate dS/dt.
 
@@ -533,64 +465,6 @@ class SGRGeneric(BaseModel):
         W = self.compute_entropy_production(state)
 
         return W / (T + 1e-20)
-
-    def verify_thermodynamic_consistency(
-        self, state: np.ndarray, tol: float = 1e-10
-    ) -> dict:
-        """Verify all GENERIC thermodynamic consistency conditions.
-
-        Checks:
-        1. Poisson bracket antisymmetry: L = -L^T
-        2. Friction matrix symmetry: M = M^T
-        3. Friction matrix positive semi-definiteness: eigenvalues >= 0
-        4. Entropy production non-negativity: W >= 0
-        5. Degeneracy condition: L * dS/dz = 0 (for closed systems)
-
-        Args:
-            state: State vector [sigma, lambda]
-            tol: Numerical tolerance for consistency checks
-
-        Returns:
-            Dictionary with consistency check results
-        """
-        L = self.poisson_bracket(state)
-        M = self.friction_matrix(state)
-        # Note: dF_dz computed in compute_entropy_production, not needed here
-
-        results = {}
-
-        # 1. Poisson bracket antisymmetry
-        antisym_error = np.max(np.abs(L + L.T))
-        results["poisson_antisymmetric"] = antisym_error < tol
-        results["poisson_antisymmetry_error"] = antisym_error
-
-        # 2. Friction matrix symmetry
-        sym_error = np.max(np.abs(M - M.T))
-        results["friction_symmetric"] = sym_error < tol
-        results["friction_symmetry_error"] = sym_error
-
-        # 3. Friction matrix positive semi-definiteness
-        eigenvalues = np.linalg.eigvalsh(M)
-        min_eig = np.min(eigenvalues)
-        results["friction_positive_semidefinite"] = min_eig >= -tol
-        results["friction_min_eigenvalue"] = min_eig
-
-        # 4. Entropy production non-negativity
-        W = self.compute_entropy_production(state)
-        results["entropy_production_nonnegative"] = W >= -tol
-        results["entropy_production"] = W
-
-        # 5. Overall consistency
-        results["thermodynamically_consistent"] = all(
-            [
-                results["poisson_antisymmetric"],
-                results["friction_symmetric"],
-                results["friction_positive_semidefinite"],
-                results["entropy_production_nonnegative"],
-            ]
-        )
-
-        return results
 
     # =========================================================================
     # BaseModel Interface Implementation
@@ -1331,10 +1205,10 @@ class SGRGeneric(BaseModel):
 
     @staticmethod
     @jax.jit
-    def _predict_steady_shear_jit(
+    def _predict_viscosity_jit(
         gamma_dot: jnp.ndarray, x: float, G0_scale: float, tau0: float
     ) -> jnp.ndarray:
-        """JIT-compiled steady shear prediction: eta(gamma_dot).
+        """JIT-compiled viscosity prediction: eta(gamma_dot).
 
         Computes viscosity as function of shear rate:
             eta ~ gamma_dot^(x-2) for 1 < x < 2 (shear-thinning)
@@ -1450,7 +1324,7 @@ class SGRGeneric(BaseModel):
         tau0 = self.parameters.get_value("tau0")
 
         gamma_dot_jax = jnp.asarray(gamma_dot)
-        eta_jax = self._predict_steady_shear_jit(gamma_dot_jax, x, G0_scale, tau0)
+        eta_jax = self._predict_viscosity_jit(gamma_dot_jax, x, G0_scale, tau0)
 
         return np.array(eta_jax)
 
@@ -2237,11 +2111,7 @@ class SGRGeneric(BaseModel):
         L_12 = G_eff / tau0
 
         # 3x3 antisymmetric Poisson bracket (x decoupled)
-        L = np.array([
-            [0.0, L_12, 0.0],
-            [-L_12, 0.0, 0.0],
-            [0.0, 0.0, 0.0]
-        ])
+        L = np.array([[0.0, L_12, 0.0], [-L_12, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
         return L
 
@@ -2293,11 +2163,7 @@ class SGRGeneric(BaseModel):
         M_33 = alpha_aging + beta_rejuv * np.abs(gamma_dot)
 
         # Block-diagonal 3x3 friction matrix
-        M = np.array([
-            [M_11, M_12, 0.0],
-            [M_12, M_22, 0.0],
-            [0.0, 0.0, M_33]
-        ])
+        M = np.array([[M_11, M_12, 0.0], [M_12, M_22, 0.0], [0.0, 0.0, M_33]])
 
         return M
 
@@ -2364,9 +2230,8 @@ class SGRGeneric(BaseModel):
             x_ss = x_eq + x_ss_A * np.power(gamma_dot_abs + 1e-12, x_ss_n)
 
             # Evolution: aging toward x_eq at rest, rejuvenation toward x_ss under shear
-            dx_dt = (
-                alpha_aging * (x_eq - x_t[i - 1])
-                + beta_rejuv * gamma_dot_abs * (x_ss - x_t[i - 1])
+            dx_dt = alpha_aging * (x_eq - x_t[i - 1]) + beta_rejuv * gamma_dot_abs * (
+                x_ss - x_t[i - 1]
             )
             x_t[i] = x_t[i - 1] + dx_dt * dt[i]
 

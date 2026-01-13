@@ -331,7 +331,9 @@ class FractionalPoyntingThomson(BaseModel):
 
         logger.info(
             "Starting FractionalPoyntingThomson fit",
-            test_mode=test_mode.value if hasattr(test_mode, "value") else str(test_mode),
+            test_mode=(
+                test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+            ),
             data_shape=X.shape,
         )
 

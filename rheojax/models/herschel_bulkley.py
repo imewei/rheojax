@@ -101,7 +101,9 @@ class HerschelBulkley(BaseModel):
         """
         data_shape = (len(X),) if hasattr(X, "__len__") else None
 
-        with log_fit(logger, model="HerschelBulkley", data_shape=data_shape, test_mode="rotation") as ctx:
+        with log_fit(
+            logger, model="HerschelBulkley", data_shape=data_shape, test_mode="rotation"
+        ) as ctx:
             logger.debug(
                 "Starting Herschel-Bulkley model fit",
                 n_points=data_shape[0] if data_shape else None,
@@ -124,7 +126,10 @@ class HerschelBulkley(BaseModel):
                 if sigma_y_est < 0:
                     sigma_y_est = 0.0
 
-                logger.debug("Yield stress estimated from low shear rate region", sigma_y_estimate=sigma_y_est)
+                logger.debug(
+                    "Yield stress estimated from low shear rate region",
+                    sigma_y_estimate=sigma_y_est,
+                )
 
                 # Subtract yield stress for power-law fitting
                 y_corrected = y_sorted - sigma_y_est

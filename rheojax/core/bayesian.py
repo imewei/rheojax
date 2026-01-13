@@ -149,6 +149,7 @@ class BayesianResult:
         """
 
         logger.debug("Converting BayesianResult to InferenceData")
+
         # Return cached version if available
         def _ensure_energy(idata):
             """Guarantee energy diagnostic exists for ArviZ energy plots."""
@@ -333,7 +334,9 @@ class BayesianMixin:
 
             if test_mode is None:
                 test_mode = detect_test_mode(rheo_data)
-                logger.debug("Test mode detected from RheoData", test_mode=str(test_mode))
+                logger.debug(
+                    "Test mode detected from RheoData", test_mode=str(test_mode)
+                )
         else:
             X_array = X
             y_array = None  # Will be set from y parameter
@@ -589,7 +592,9 @@ class BayesianMixin:
             # Count accelerators only (non-CPU) for true parallel execution.
             accelerator_count = sum(1 for d in devices if d.platform != "cpu")
             if accelerator_count >= num_chains:
-                logger.debug("Using parallel chain method", accelerator_count=accelerator_count)
+                logger.debug(
+                    "Using parallel chain method", accelerator_count=accelerator_count
+                )
                 return "parallel"
             # Fall back to vectorized on single-device setups for speed over sequential.
             # Vectorized uses vmap for efficient multi-chain execution on a single device.
@@ -629,7 +634,9 @@ class BayesianMixin:
             return result
         except RuntimeError as e:
             if "Cannot find valid initial parameters" in str(e):
-                logger.debug("Warm-started NUTS initialization failed, retrying with uniform init")
+                logger.debug(
+                    "Warm-started NUTS initialization failed, retrying with uniform init"
+                )
                 warnings.warn(
                     "Warm-started NUTS initialization failed; retrying with uniform init.",
                     RuntimeWarning,
@@ -640,7 +647,10 @@ class BayesianMixin:
                     logger.debug("MCMC sampling completed with uniform init")
                     return result
                 except Exception as final_exc:
-                    logger.error("NUTS sampling failed after uniform init fallback", exc_info=True)
+                    logger.error(
+                        "NUTS sampling failed after uniform init fallback",
+                        exc_info=True,
+                    )
                     raise RuntimeError(
                         f"NUTS sampling failed: {str(final_exc)}"
                     ) from final_exc
@@ -735,7 +745,9 @@ class BayesianMixin:
             param = self.parameters.get(param_name)
 
             if param.bounds is None:
-                logger.error("Parameter missing bounds for prior sampling", parameter=param_name)
+                logger.error(
+                    "Parameter missing bounds for prior sampling", parameter=param_name
+                )
                 raise ValueError(
                     f"Parameter '{param_name}' must have bounds for prior sampling"
                 )
@@ -811,7 +823,9 @@ class BayesianMixin:
                 upper = float(np.percentile(samples, upper_percentile))
                 intervals[param_name] = (lower, upper)
 
-        logger.debug("Credible intervals computed", parameter_names=list(intervals.keys()))
+        logger.debug(
+            "Credible intervals computed", parameter_names=list(intervals.keys())
+        )
         return intervals
 
     def fit_bayesian(
@@ -948,7 +962,9 @@ class BayesianMixin:
             )
 
             # Phase 9: Process results
-            result = self._process_mcmc_results(mcmc, param_names, num_samples, num_chains)
+            result = self._process_mcmc_results(
+                mcmc, param_names, num_samples, num_chains
+            )
 
             # Add diagnostics to log context
             log_ctx["divergences"] = result.diagnostics.get("divergences", 0)

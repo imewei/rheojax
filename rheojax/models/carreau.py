@@ -133,8 +133,12 @@ class Carreau(BaseModel):
 
             # Estimate plateaus
             try:
-                eta0_est = np.max(y_sorted[: len(y_sorted) // 10 + 1])  # Average low shear
-                eta_inf_est = np.min(y_sorted[-len(y_sorted) // 10 :])  # Average high shear
+                eta0_est = np.max(
+                    y_sorted[: len(y_sorted) // 10 + 1]
+                )  # Average low shear
+                eta_inf_est = np.min(
+                    y_sorted[-len(y_sorted) // 10 :]
+                )  # Average high shear
 
                 logger.debug(
                     "Plateau estimates",

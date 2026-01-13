@@ -609,7 +609,9 @@ class Pipeline:
             dpi=dpi,
         ) as ctx:
             try:
-                save_figure(self._current_figure, path, format=format, dpi=dpi, **kwargs)
+                save_figure(
+                    self._current_figure, path, format=format, dpi=dpi, **kwargs
+                )
                 ctx["saved"] = True
             except Exception as e:
                 logger.error(

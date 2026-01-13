@@ -113,7 +113,7 @@ class Provenance:
                 file_path=file_path,
                 record_count=len(self._history),
             )
-        except Exception as e:
+        except Exception:
             logger.error(
                 "Failed to export provenance",
                 file_path=file_path,

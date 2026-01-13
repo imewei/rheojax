@@ -24,7 +24,9 @@ def rheodata_from_dataset_state(dataset: DatasetState) -> RheoData:
       ``y = G' + 1j*G''`` so downstream code (plotting/inference) can
       treat oscillation consistently.
     """
-    logger.debug("Entering rheodata_from_dataset_state", dataset_type=type(dataset).__name__)
+    logger.debug(
+        "Entering rheodata_from_dataset_state", dataset_type=type(dataset).__name__
+    )
     x = getattr(dataset, "x_data", None)
     y = getattr(dataset, "y_data", None)
     y2 = getattr(dataset, "y2_data", None)

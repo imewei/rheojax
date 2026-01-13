@@ -12,11 +12,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-
-from rheojax.logging import get_logger
-
-logger = get_logger(__name__)
-
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -54,6 +49,9 @@ from rheojax.gui.state.store import BayesianResult as StoredBayesianResult
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class BayesianPage(QWidget):
@@ -426,9 +424,6 @@ class BayesianPage(QWidget):
             QMessageBox.warning(self, "No Data", "Please load a dataset first.")
             return
 
-        # Get test mode from dataset
-        test_mode = dataset.metadata.get("test_mode", "oscillation")
-
         # Update state
         self._store.dispatch(start_bayesian(model_name, dataset.id))
 
@@ -626,7 +621,7 @@ class BayesianPage(QWidget):
             # Update raw + fitted plot
             try:
                 self._update_fit_plot_from_posterior(result)
-            except Exception as e:
+            except Exception:
                 # Plotting is best-effort; keep the Bayesian results UI usable.
                 logger.error(
                     "Failed to update fit plot from posterior",

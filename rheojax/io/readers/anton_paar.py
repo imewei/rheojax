@@ -572,7 +572,9 @@ def parse_rheocompass_intervals(
             block = _parse_single_interval(lines, start_idx, end_idx, decimal_sep)
             blocks.append(block)
         except ValueError as e:
-            logger.warning("Failed to parse interval", interval=interval_idx, error=str(e))
+            logger.warning(
+                "Failed to parse interval", interval=interval_idx, error=str(e)
+            )
             continue
 
     if not blocks:
@@ -1231,7 +1233,9 @@ def load_anton_paar(
         matching = [b for b in blocks if b.interval_index == interval]
         if not matching:
             valid_indices = [b.interval_index for b in blocks]
-            logger.error("Interval not found", interval=interval, valid_indices=valid_indices)
+            logger.error(
+                "Interval not found", interval=interval, valid_indices=valid_indices
+            )
             raise ValueError(
                 f"Interval {interval} not found. Valid intervals: {valid_indices}"
             )
@@ -1257,7 +1261,11 @@ def load_anton_paar(
         detected_mode = test_mode
         if detected_mode is None:
             detected_mode = _detect_test_type(mapped_df)
-            logger.debug("Auto-detected test mode", test_mode=detected_mode, interval=block.interval_index)
+            logger.debug(
+                "Auto-detected test mode",
+                test_mode=detected_mode,
+                interval=block.interval_index,
+            )
 
         if detected_mode is None:
             warnings.warn(
@@ -1391,7 +1399,11 @@ def save_intervals_to_excel(
             interval_df = _create_interval_dataframe(rheo_data)
             interval_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    logger.info("Exported intervals to Excel", filepath=str(filepath), n_intervals=len(rheo_data_list))
+    logger.info(
+        "Exported intervals to Excel",
+        filepath=str(filepath),
+        n_intervals=len(rheo_data_list),
+    )
 
 
 def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:

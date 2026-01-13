@@ -143,7 +143,9 @@ class MenuBar(QMenuBar):
         )
         file_menu.addAction(self.exit_action)
 
-        logger.debug("Menu created", menu="File", action_count=file_menu.actions().__len__())
+        logger.debug(
+            "Menu created", menu="File", action_count=file_menu.actions().__len__()
+        )
 
     def _create_edit_menu(self) -> None:
         """Create Edit menu."""
@@ -210,7 +212,9 @@ class MenuBar(QMenuBar):
         )
         edit_menu.addAction(self.preferences_action)
 
-        logger.debug("Menu created", menu="Edit", action_count=edit_menu.actions().__len__())
+        logger.debug(
+            "Menu created", menu="Edit", action_count=edit_menu.actions().__len__()
+        )
 
     def _create_view_menu(self) -> None:
         """Create View menu."""
@@ -282,9 +286,7 @@ class MenuBar(QMenuBar):
         self.theme_light_action = QAction("&Light", self)
         self.theme_light_action.setCheckable(True)
         self.theme_light_action.triggered.connect(
-            lambda: logger.debug(
-                "Action triggered", action="theme_light", menu="View"
-            )
+            lambda: logger.debug("Action triggered", action="theme_light", menu="View")
         )
         self.theme_menu.addAction(self.theme_light_action)
 
@@ -303,7 +305,9 @@ class MenuBar(QMenuBar):
         )
         self.theme_menu.addAction(self.theme_auto_action)
 
-        logger.debug("Menu created", menu="View", action_count=view_menu.actions().__len__())
+        logger.debug(
+            "Menu created", menu="View", action_count=view_menu.actions().__len__()
+        )
 
     def _create_data_menu(self) -> None:
         """Create Data menu."""
@@ -391,7 +395,9 @@ class MenuBar(QMenuBar):
         )
         data_menu.addAction(self.auto_detect_mode_action)
 
-        logger.debug("Menu created", menu="Data", action_count=data_menu.actions().__len__())
+        logger.debug(
+            "Menu created", menu="Data", action_count=data_menu.actions().__len__()
+        )
 
     def _create_models_menu(self) -> None:
         """Create Models menu with submenus."""
@@ -403,7 +409,10 @@ class MenuBar(QMenuBar):
         self.model_maxwell = QAction("Maxwell", self)
         self.model_maxwell.triggered.connect(
             lambda: logger.debug(
-                "Menu item selected", menu="Models", submenu="Classical", model="Maxwell"
+                "Menu item selected",
+                menu="Models",
+                submenu="Classical",
+                model="Maxwell",
             )
         )
         classical_menu.addAction(self.model_maxwell)
@@ -750,9 +759,7 @@ class MenuBar(QMenuBar):
         self.analysis_fit_nlsq.setShortcut(QKeySequence("Ctrl+F"))
         self.analysis_fit_nlsq.setStatusTip("Fit model using non-linear least squares")
         self.analysis_fit_nlsq.triggered.connect(
-            lambda: logger.debug(
-                "Action triggered", action="fit_nlsq", menu="Analysis"
-            )
+            lambda: logger.debug("Action triggered", action="fit_nlsq", menu="Analysis")
         )
         analysis_menu.addAction(self.analysis_fit_nlsq)
 
@@ -854,9 +861,7 @@ class MenuBar(QMenuBar):
         self.tools_preferences.setShortcut(QKeySequence.StandardKey.Preferences)
         self.tools_preferences.setStatusTip("Open preferences dialog")
         self.tools_preferences.triggered.connect(
-            lambda: logger.debug(
-                "Action triggered", action="preferences", menu="Tools"
-            )
+            lambda: logger.debug("Action triggered", action="preferences", menu="Tools")
         )
         tools_menu.addAction(self.tools_preferences)
 

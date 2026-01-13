@@ -231,9 +231,7 @@ def detect_header_row(
 
         # Check for "Number of points" - header is next
         if parts[0].strip().lower() == "number of points":
-            logger.debug(
-                "Header row detected via 'Number of points' marker", row=i + 1
-            )
+            logger.debug("Header row detected via 'Number of points' marker", row=i + 1)
             return i + 1
 
         # Check for multiple non-numeric columns (likely headers)
@@ -481,7 +479,9 @@ def parse_trios_csv(
     step_values = None
     if step_col:
         step_values = df[step_col].unique().tolist()
-        logger.debug("Step column detected", step_col=step_col, num_steps=len(step_values))
+        logger.debug(
+            "Step column detected", step_col=step_col, num_steps=len(step_values)
+        )
 
     # Create TRIOSTable
     table = TRIOSTable(

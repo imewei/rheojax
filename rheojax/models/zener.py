@@ -133,10 +133,14 @@ class Zener(BaseModel):
         self._test_mode = test_mode
 
         # Determine test mode string for logging
-        test_mode_str = test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        test_mode_str = (
+            test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        )
         data_shape = (int(x_data.shape[0]),) if hasattr(x_data, "shape") else None
 
-        with log_fit(logger, model="Zener", data_shape=data_shape, test_mode=test_mode_str) as ctx:
+        with log_fit(
+            logger, model="Zener", data_shape=data_shape, test_mode=test_mode_str
+        ) as ctx:
             logger.debug(
                 "Starting Zener model fit",
                 test_mode=test_mode_str,

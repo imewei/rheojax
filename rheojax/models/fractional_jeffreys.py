@@ -384,11 +384,18 @@ class FractionalJeffreysModel(BaseModel):
         self._test_mode = test_mode
 
         # Get test mode string for logging
-        test_mode_log = test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        test_mode_log = (
+            test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        )
         x_arr = jnp.array(X)
         data_shape = (int(x_arr.shape[0]),) if hasattr(x_arr, "shape") else None
 
-        with log_fit(logger, model="FractionalJeffreys", data_shape=data_shape, test_mode=test_mode_log) as ctx:
+        with log_fit(
+            logger,
+            model="FractionalJeffreys",
+            data_shape=data_shape,
+            test_mode=test_mode_log,
+        ) as ctx:
             logger.debug(
                 "Starting Fractional Jeffreys model fit",
                 test_mode=test_mode_log,

@@ -189,7 +189,9 @@ def step_mc(
     # Yield mask: True if particle yields
     yield_mask = r_draw > P_surv
     n_yielded = int(jnp.sum(yield_mask))
-    logger.debug("Yielding evaluated", n_yielded=n_yielded, yield_fraction=n_yielded / n)
+    logger.debug(
+        "Yielding evaluated", n_yielded=n_yielded, yield_fraction=n_yielded / n
+    )
 
     # --- 4. Update Yielded Particles ---
     # Reset strain to 0 for yielded particles

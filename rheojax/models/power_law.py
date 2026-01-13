@@ -92,7 +92,9 @@ class PowerLaw(BaseModel):
         """
         data_shape = (len(X),) if hasattr(X, "__len__") else None
 
-        with log_fit(logger, model="PowerLaw", data_shape=data_shape, test_mode="rotation") as ctx:
+        with log_fit(
+            logger, model="PowerLaw", data_shape=data_shape, test_mode="rotation"
+        ) as ctx:
             logger.debug(
                 "Starting Power Law model fit",
                 n_points=data_shape[0] if data_shape else None,
@@ -138,7 +140,11 @@ class PowerLaw(BaseModel):
                     "Power Law fit completed successfully",
                     fitted_K=float(K_fit),
                     fitted_n=float(n_fit),
-                    behavior="shear-thinning" if n_fit < 1 else ("shear-thickening" if n_fit > 1 else "Newtonian"),
+                    behavior=(
+                        "shear-thinning"
+                        if n_fit < 1
+                        else ("shear-thickening" if n_fit > 1 else "Newtonian")
+                    ),
                 )
 
                 ctx["K"] = float(K_fit)

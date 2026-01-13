@@ -234,7 +234,11 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     if auto_chunk:
         file_size_bytes = os.path.getsize(filepath)
         file_size_mb = file_size_bytes / (1024 * 1024)
-        logger.debug("File size check", file_size_mb=file_size_mb, threshold_mb=AUTO_CHUNK_THRESHOLD_MB)
+        logger.debug(
+            "File size check",
+            file_size_mb=file_size_mb,
+            threshold_mb=AUTO_CHUNK_THRESHOLD_MB,
+        )
 
         if file_size_mb > AUTO_CHUNK_THRESHOLD_MB:
             # Log auto-chunking activation
@@ -296,7 +300,9 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                 )
                 return aggregated_data
             else:
-                logger.error("No data chunks returned from auto-chunking", filepath=str(filepath))
+                logger.error(
+                    "No data chunks returned from auto-chunking", filepath=str(filepath)
+                )
                 raise ValueError("No data chunks returned from chunked reader")
 
     # Read file contents
@@ -492,7 +498,11 @@ def load_trios_chunked(
 
     for seg_idx in target_segments:
         if seg_idx >= len(segment_starts):
-            logger.warning("Segment not found", segment_index=seg_idx, total_segments=len(segment_starts))
+            logger.warning(
+                "Segment not found",
+                segment_index=seg_idx,
+                total_segments=len(segment_starts),
+            )
             warnings.warn(f"Segment {seg_idx} not found in file", stacklevel=2)
             continue
 

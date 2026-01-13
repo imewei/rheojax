@@ -351,7 +351,9 @@ class FractionalZenerSolidLiquid(BaseModel):
             logger,
             model="FractionalZenerSolidLiquid",
             data_shape=data_shape,
-            test_mode=test_mode_str if isinstance(test_mode_str, str) else str(test_mode),
+            test_mode=(
+                test_mode_str if isinstance(test_mode_str, str) else str(test_mode)
+            ),
         ) as ctx:
             logger.debug(
                 "Starting FZSL fit",
@@ -365,7 +367,9 @@ class FractionalZenerSolidLiquid(BaseModel):
                 try:
                     import numpy as np
 
-                    from rheojax.utils.initialization import initialize_fractional_zener_sl
+                    from rheojax.utils.initialization import (
+                        initialize_fractional_zener_sl,
+                    )
 
                     success = initialize_fractional_zener_sl(
                         np.array(X), np.array(y), self.parameters

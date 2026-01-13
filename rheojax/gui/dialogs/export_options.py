@@ -132,9 +132,7 @@ class ExportOptionsDialog(QDialog):
         self.dpi_spin.setValue(300)
         self.dpi_spin.setSingleStep(50)
         self.dpi_spin.setSuffix(" dpi")
-        self.dpi_spin.valueChanged.connect(
-            lambda v: self._on_option_changed("dpi", v)
-        )
+        self.dpi_spin.valueChanged.connect(lambda v: self._on_option_changed("dpi", v))
         settings_layout.addRow("Resolution (DPI):", self.dpi_spin)
 
         # Style preset

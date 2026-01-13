@@ -63,7 +63,9 @@ class PlotPanel(QWidget):
         self._figure.set_layout_engine("tight")
 
         self._setup_ui()
-        logger.debug("Initialization complete", class_name=self.__class__.__name__, index=index)
+        logger.debug(
+            "Initialization complete", class_name=self.__class__.__name__, index=index
+        )
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""

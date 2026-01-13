@@ -34,9 +34,10 @@ warnings.filterwarnings("ignore", message="Glyph.*missing from font")
 warnings.filterwarnings("ignore", message=".*layout not applied.*")
 warnings.filterwarnings("ignore", message=".*constrained_layout.*collapsed.*")
 
-from rheojax import __version__
-from rheojax.gui.utils.logging import install_gui_log_handler
-from rheojax.logging import configure_logging, get_logger, is_configured
+# Imports after warnings configuration (intentional)
+from rheojax import __version__  # noqa: E402
+from rheojax.gui.utils.logging import install_gui_log_handler  # noqa: E402
+from rheojax.logging import configure_logging, get_logger, is_configured  # noqa: E402
 
 # Module-level logger
 logger = get_logger(__name__)

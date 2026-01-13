@@ -560,9 +560,7 @@ class DiagnosticsPage(QWidget):
         model_id : str
             Model name/ID
         """
-        logger.debug(
-            "Diagnostic selected", diagnostic="trace", page="DiagnosticsPage"
-        )
+        logger.debug("Diagnostic selected", diagnostic="trace", page="DiagnosticsPage")
         self._current_model_id = model_id
         self._plot_tabs.setCurrentIndex(0)  # Trace tab
         self.show_diagnostics(model_id)
@@ -577,9 +575,7 @@ class DiagnosticsPage(QWidget):
         show_divergences : bool
             Whether to show divergences on plot
         """
-        logger.debug(
-            "Diagnostic selected", diagnostic="pair", page="DiagnosticsPage"
-        )
+        logger.debug("Diagnostic selected", diagnostic="pair", page="DiagnosticsPage")
         self._current_model_id = model_id
         self._plot_tabs.setCurrentIndex(2)  # Pair tab
         self.show_diagnostics(model_id)
@@ -594,9 +590,7 @@ class DiagnosticsPage(QWidget):
         hdi_prob : float
             HDI probability for credible intervals
         """
-        logger.debug(
-            "Diagnostic selected", diagnostic="forest", page="DiagnosticsPage"
-        )
+        logger.debug("Diagnostic selected", diagnostic="forest", page="DiagnosticsPage")
         self._current_model_id = model_id
         self._plot_tabs.setCurrentIndex(1)  # Forest tab
 

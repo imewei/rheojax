@@ -325,7 +325,8 @@ class BayesianOptionsDialog(QDialog):
 
     def _on_priors_changed(self) -> None:
         """Handle priors text change."""
-        text = self.priors_edit.toPlainText().strip()
+        # Get text to validate (value used only for logging context)
+        _ = self.priors_edit.toPlainText().strip()
         logger.debug(
             "Option changed",
             dialog=self.__class__.__name__,
@@ -405,7 +406,7 @@ class BayesianOptionsDialog(QDialog):
         if priors_text:
             try:
                 options["priors"] = json.loads(priors_text)
-            except Exception as e:
+            except Exception:
                 logger.error(
                     "Failed to parse priors JSON",
                     dialog=self.__class__.__name__,

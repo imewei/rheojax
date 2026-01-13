@@ -90,9 +90,9 @@ from rheojax.logging.metrics import (
     timed,
 )
 from rheojax.logging.templates import (
+    MSG,
     F,
     Fields,
-    MSG,
     MessageTemplates,
 )
 

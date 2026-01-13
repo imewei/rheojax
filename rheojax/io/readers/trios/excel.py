@@ -438,7 +438,9 @@ def parse_trios_excel(
             wb = xlrd.open_workbook(str(filepath))
             sheet_names = wb.sheet_names()
         else:
-            logger.error("Unsupported Excel format", filepath=str(filepath), format=suffix)
+            logger.error(
+                "Unsupported Excel format", filepath=str(filepath), format=suffix
+            )
             raise ValueError(f"Unsupported Excel format: {suffix}")
 
         logger.debug(
@@ -506,7 +508,7 @@ def parse_trios_excel(
 
             try:
                 table, sheet_metadata = parse_excel_sheet(sheet, str(filepath), idx)
-            except Exception as e:
+            except Exception:
                 logger.error(
                     "Failed to parse sheet",
                     filepath=str(filepath),

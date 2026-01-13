@@ -307,10 +307,17 @@ class FractionalKelvinVoigt(BaseModel):
             test_mode = kwargs.get("test_mode", "relaxation")
 
         # Get test mode string for logging
-        test_mode_str = test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        test_mode_str = (
+            test_mode.value if hasattr(test_mode, "value") else str(test_mode)
+        )
         data_shape = (int(x_data.shape[0]),) if hasattr(x_data, "shape") else None
 
-        with log_fit(logger, model="FractionalKelvinVoigt", data_shape=data_shape, test_mode=test_mode_str) as ctx:
+        with log_fit(
+            logger,
+            model="FractionalKelvinVoigt",
+            data_shape=data_shape,
+            test_mode=test_mode_str,
+        ) as ctx:
             logger.debug(
                 "Starting Fractional Kelvin-Voigt model fit",
                 test_mode=test_mode_str,
@@ -410,7 +417,9 @@ class FractionalKelvinVoigt(BaseModel):
             fitted_alpha = self.parameters.get_value("alpha")
 
             # Compute characteristic time
-            tau_epsilon = self._compute_tau_epsilon(fitted_Ge, fitted_c_alpha, fitted_alpha)
+            tau_epsilon = self._compute_tau_epsilon(
+                fitted_Ge, fitted_c_alpha, fitted_alpha
+            )
 
             logger.debug(
                 "Fractional Kelvin-Voigt fit completed successfully",

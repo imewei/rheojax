@@ -22,7 +22,7 @@ repos:
       - id: mixed-line-ending
       - id: name-tests-test
         args: ['--pytest-test-first']
-        exclude: ^tests/fixtures/
+        exclude: ^tests/(fixtures/|gui/visual/)
 
   - repo: https://github.com/psf/black
     rev: 25.12.0

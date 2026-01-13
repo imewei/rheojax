@@ -101,9 +101,9 @@ class TestShearBandingParity:
         )
 
         # Should agree on detection
-        assert is_banding_conv == is_banding_gen, (
-            f"Banding detection mismatch: conv={is_banding_conv}, gen={is_banding_gen}"
-        )
+        assert (
+            is_banding_conv == is_banding_gen
+        ), f"Banding detection mismatch: conv={is_banding_conv}, gen={is_banding_gen}"
 
         if is_banding_conv and is_banding_gen:
             # Check banding region agreement (5% tolerance)
@@ -235,9 +235,7 @@ class TestLAOSParity:
         strain_conv, stress_conv = sgr_conventional.simulate_laos(
             gamma_0=gamma_0, omega=omega
         )
-        strain_gen, stress_gen = sgr_generic.simulate_laos(
-            gamma_0=gamma_0, omega=omega
-        )
+        strain_gen, stress_gen = sgr_generic.simulate_laos(gamma_0=gamma_0, omega=omega)
 
         harm_conv = sgr_conventional.extract_laos_harmonics(stress_conv)
         harm_gen = sgr_generic.extract_laos_harmonics(stress_gen)
@@ -263,9 +261,7 @@ class TestLAOSParity:
         strain_conv, stress_conv = sgr_conventional.simulate_laos(
             gamma_0=gamma_0, omega=omega
         )
-        strain_gen, stress_gen = sgr_generic.simulate_laos(
-            gamma_0=gamma_0, omega=omega
-        )
+        strain_gen, stress_gen = sgr_generic.simulate_laos(gamma_0=gamma_0, omega=omega)
 
         cheb_conv = sgr_conventional.compute_chebyshev_coefficients(
             strain_conv, stress_conv, gamma_0, omega
@@ -302,7 +298,9 @@ class TestThixotropyParity:
     """Parity tests for thixotropic stress transients."""
 
     @pytest.mark.smoke
-    def test_stress_transient_parity(self, sgr_conventional, sgr_generic, shared_params):
+    def test_stress_transient_parity(
+        self, sgr_conventional, sgr_generic, shared_params
+    ):
         """Test stress transient matches within 5% tolerance."""
         # Use power-law regime for thixotropy
         params = {"x": 1.3, "G0": 1000.0, "tau0": 0.01}

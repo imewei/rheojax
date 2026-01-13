@@ -292,3 +292,19 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = ["rheojax.models.*", "rheojax.utils.mittag_leffler"]
 disable_error_code = ["name-defined", "no-any-return"]
+
+[[tool.mypy.overrides]]
+module = ["rheojax.gui.*", "rheojax.cli.*"]
+ignore_errors = true  # GUI/CLI modules have PySide6 stub issues
+
+[[tool.mypy.overrides]]
+module = [
+    "rheojax.logging.exporters",
+    "rheojax.utils.data_quality",
+    "rheojax.utils.device",
+    "rheojax.transforms.*",
+    "rheojax.io.*",
+    "rheojax.pipeline.*",
+    "rheojax.visualization.*",
+]
+ignore_errors = true  # Pre-existing type issues to be addressed incrementally

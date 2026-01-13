@@ -132,7 +132,10 @@ def compute_covariance_from_jacobian(
         logger.debug(
             "Covariance computation completed",
             pcov_shape=pcov.shape,
-            pcov_diagonal_range=(float(np.diag(pcov).min()), float(np.diag(pcov).max())),
+            pcov_diagonal_range=(
+                float(np.diag(pcov).min()),
+                float(np.diag(pcov).max()),
+            ),
         )
         return pcov
 
@@ -237,7 +240,9 @@ class OptimizationResult:
         ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
 
         if ss_tot == 0:
-            logger.warning("Total sum of squares is zero (constant data). R² undefined.")
+            logger.warning(
+                "Total sum of squares is zero (constant data). R² undefined."
+            )
             return np.nan
 
         return float(1 - (ss_res / ss_tot))
@@ -775,7 +780,9 @@ def nlsq_optimize(
     if not np.isfinite(mean_squared_error) or mean_squared_error > 1e6:
         logger.error(
             "Optimization failed: residual norm extremely large",
-            mean_squared_error=float(mean_squared_error) if np.isfinite(mean_squared_error) else "inf",
+            mean_squared_error=(
+                float(mean_squared_error) if np.isfinite(mean_squared_error) else "inf"
+            ),
             residual_count=residual_count,
             rss=float(result.fun),
         )

@@ -221,7 +221,9 @@ class BayesianWorker(QRunnable):
                     model=self._model_name,
                 )
             except KeyError:
-                raise ValueError(f"Model '{self._model_name}' not found in registry")
+                raise ValueError(
+                    f"Model '{self._model_name}' not found in registry"
+                ) from None
 
             # Apply warm start if provided
             if self._warm_start:
@@ -415,7 +417,9 @@ class BayesianWorker(QRunnable):
             self.signals.completed.emit(result)
 
         except CancellationError:
-            elapsed = time.perf_counter() - start_time if "start_time" in locals() else 0
+            elapsed = (
+                time.perf_counter() - start_time if "start_time" in locals() else 0
+            )
             logger.info(
                 "Bayesian worker cancelled",
                 model=self._model_name,

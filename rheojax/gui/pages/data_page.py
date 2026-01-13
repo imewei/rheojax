@@ -5,7 +5,6 @@ Data Page
 Data loading, visualization, and preprocessing interface.
 """
 
-import logging
 from pathlib import Path
 from typing import Any
 

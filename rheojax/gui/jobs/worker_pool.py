@@ -58,22 +58,6 @@ except ImportError:
 
         return decorator
 
-    class QThreadPool:  # type: ignore
-        pass
-
-    class QRunnable:  # type: ignore
-        pass
-
-    class Signal:  # type: ignore
-        def __init__(self, *args):
-            pass
-
-    def Slot(*args):  # type: ignore
-        def decorator(func):
-            return func
-
-        return decorator
-
     class Qt:  # type: ignore
         QueuedConnection = None
 

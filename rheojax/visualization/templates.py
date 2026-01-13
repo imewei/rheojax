@@ -186,7 +186,9 @@ def plot_modulus_frequency(
             ax.set_xlabel(
                 f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
             )
-            ax.set_ylabel(f"Modulus ({data.y_units})" if data.y_units else "Modulus (Pa)")
+            ax.set_ylabel(
+                f"Modulus ({data.y_units})" if data.y_units else "Modulus (Pa)"
+            )
             ax.set_title("Dynamic Moduli")
             ax.grid(True, which="both", alpha=0.3, linestyle="--")
 
@@ -289,7 +291,9 @@ def plot_mastercurve(
 
             # Plot (handle complex data)
             if np.iscomplexobj(y_data):
-                x_filt, y_filt = _filter_positive(x_shifted, np.real(y_data), warn=False)
+                x_filt, y_filt = _filter_positive(
+                    x_shifted, np.real(y_data), warn=False
+                )
                 ax.loglog(
                     x_filt,
                     y_filt,
@@ -414,8 +418,12 @@ def plot_model_fit(
                 )
 
                 # G' fit
-                x_gp_data, gp_data = _filter_positive(x_data, np.real(y_data), warn=True)
-                x_gp_pred, gp_pred = _filter_positive(x_data, np.real(y_pred), warn=False)
+                x_gp_data, gp_data = _filter_positive(
+                    x_data, np.real(y_data), warn=True
+                )
+                x_gp_pred, gp_pred = _filter_positive(
+                    x_data, np.real(y_pred), warn=False
+                )
                 axes[0, 0].loglog(
                     x_gp_data,
                     gp_data,
@@ -432,13 +440,19 @@ def plot_model_fit(
                     label="Model",
                     linewidth=style_params["lines.linewidth"],
                 )
-                axes[0, 0].set_ylabel(f"G' ({data.y_units})" if data.y_units else "G' (Pa)")
+                axes[0, 0].set_ylabel(
+                    f"G' ({data.y_units})" if data.y_units else "G' (Pa)"
+                )
                 axes[0, 0].legend()
                 axes[0, 0].grid(True, which="both", alpha=0.3, linestyle="--")
 
                 # G'' fit
-                x_gpp_data, gpp_data = _filter_positive(x_data, np.imag(y_data), warn=True)
-                x_gpp_pred, gpp_pred = _filter_positive(x_data, np.imag(y_pred), warn=False)
+                x_gpp_data, gpp_data = _filter_positive(
+                    x_data, np.imag(y_data), warn=True
+                )
+                x_gpp_pred, gpp_pred = _filter_positive(
+                    x_data, np.imag(y_pred), warn=False
+                )
                 axes[0, 1].loglog(
                     x_gpp_data,
                     gpp_data,
@@ -457,7 +471,9 @@ def plot_model_fit(
                     linewidth=style_params["lines.linewidth"],
                     color="C1",
                 )
-                axes[0, 1].set_ylabel(f'G" ({data.y_units})' if data.y_units else 'G" (Pa)')
+                axes[0, 1].set_ylabel(
+                    f'G" ({data.y_units})' if data.y_units else 'G" (Pa)'
+                )
                 axes[0, 1].legend()
                 axes[0, 1].grid(True, which="both", alpha=0.3, linestyle="--")
 
@@ -473,7 +489,9 @@ def plot_model_fit(
                 )
                 axes[1, 0].axhline(y=0, color="k", linestyle="--", linewidth=1.0)
                 axes[1, 0].set_xlabel(
-                    f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+                    f"Frequency ({data.x_units})"
+                    if data.x_units
+                    else "Frequency (rad/s)"
                 )
                 axes[1, 0].set_ylabel("G' Residuals (%)")
                 axes[1, 0].grid(True, alpha=0.3, linestyle="--")
@@ -491,14 +509,17 @@ def plot_model_fit(
                 )
                 axes[1, 1].axhline(y=0, color="k", linestyle="--", linewidth=1.0)
                 axes[1, 1].set_xlabel(
-                    f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+                    f"Frequency ({data.x_units})"
+                    if data.x_units
+                    else "Frequency (rad/s)"
                 )
                 axes[1, 1].set_ylabel('G" Residuals (%)')
                 axes[1, 1].grid(True, alpha=0.3, linestyle="--")
 
                 if model_name:
                     fig.suptitle(
-                        f"Model Fit: {model_name}", fontsize=style_params["axes.titlesize"]
+                        f"Model Fit: {model_name}",
+                        fontsize=style_params["axes.titlesize"],
                     )
 
                 fig.tight_layout()
@@ -535,8 +556,12 @@ def plot_model_fit(
                 )
 
                 # G' fit
-                x_gp_data, gp_data = _filter_positive(x_data, np.real(y_data), warn=True)
-                x_gp_pred, gp_pred = _filter_positive(x_data, np.real(y_pred), warn=False)
+                x_gp_data, gp_data = _filter_positive(
+                    x_data, np.real(y_data), warn=True
+                )
+                x_gp_pred, gp_pred = _filter_positive(
+                    x_data, np.real(y_pred), warn=False
+                )
                 axes[0].loglog(
                     x_gp_data,
                     gp_data,
@@ -554,15 +579,23 @@ def plot_model_fit(
                     linewidth=style_params["lines.linewidth"],
                 )
                 axes[0].set_xlabel(
-                    f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+                    f"Frequency ({data.x_units})"
+                    if data.x_units
+                    else "Frequency (rad/s)"
                 )
-                axes[0].set_ylabel(f"G' ({data.y_units})" if data.y_units else "G' (Pa)")
+                axes[0].set_ylabel(
+                    f"G' ({data.y_units})" if data.y_units else "G' (Pa)"
+                )
                 axes[0].legend()
                 axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
 
                 # G'' fit
-                x_gpp_data, gpp_data = _filter_positive(x_data, np.imag(y_data), warn=True)
-                x_gpp_pred, gpp_pred = _filter_positive(x_data, np.imag(y_pred), warn=False)
+                x_gpp_data, gpp_data = _filter_positive(
+                    x_data, np.imag(y_data), warn=True
+                )
+                x_gpp_pred, gpp_pred = _filter_positive(
+                    x_data, np.imag(y_pred), warn=False
+                )
                 axes[1].loglog(
                     x_gpp_data,
                     gpp_data,
@@ -582,15 +615,20 @@ def plot_model_fit(
                     color="C1",
                 )
                 axes[1].set_xlabel(
-                    f"Frequency ({data.x_units})" if data.x_units else "Frequency (rad/s)"
+                    f"Frequency ({data.x_units})"
+                    if data.x_units
+                    else "Frequency (rad/s)"
                 )
-                axes[1].set_ylabel(f'G" ({data.y_units})' if data.y_units else 'G" (Pa)')
+                axes[1].set_ylabel(
+                    f'G" ({data.y_units})' if data.y_units else 'G" (Pa)'
+                )
                 axes[1].legend()
                 axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
 
                 if model_name:
                     fig.suptitle(
-                        f"Model Fit: {model_name}", fontsize=style_params["axes.titlesize"]
+                        f"Model Fit: {model_name}",
+                        fontsize=style_params["axes.titlesize"],
                     )
 
                 fig.tight_layout()

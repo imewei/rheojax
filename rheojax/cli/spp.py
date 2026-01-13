@@ -18,7 +18,7 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.io import auto_load as load_data
-from rheojax.logging import configure_logging, get_logger
+from rheojax.logging import get_logger
 from rheojax.transforms.spp_decomposer import SPPDecomposer
 
 if TYPE_CHECKING:
@@ -304,11 +304,17 @@ def run_analyze(args: Namespace) -> int:
         print(f"\nSaving results to {output_path}...")
 
     try:
-        logger.debug("Saving results", output_path=str(output_path), matlab_format=args.export_matlab)
+        logger.debug(
+            "Saving results",
+            output_path=str(output_path),
+            matlab_format=args.export_matlab,
+        )
         _save_results(results, output_path, args.export_matlab, omega=args.omega)
         logger.info("Results saved successfully", output_path=str(output_path))
     except Exception as e:
-        logger.error("Failed to save results", output_path=str(output_path), exc_info=True)
+        logger.error(
+            "Failed to save results", output_path=str(output_path), exc_info=True
+        )
         print(f"Error saving results: {e}", file=sys.stderr)
         return 1
 

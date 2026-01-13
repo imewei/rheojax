@@ -262,7 +262,11 @@ class ColumnMappingPage(QWizardPage):
     def initializePage(self) -> None:
         """Initialize page when shown."""
         file_path = self.field("file_path")
-        logger.debug("Loading columns from file", page=self.__class__.__name__, file_path=file_path)
+        logger.debug(
+            "Loading columns from file",
+            page=self.__class__.__name__,
+            file_path=file_path,
+        )
         self._load_columns(file_path)
         self._auto_detect()
 

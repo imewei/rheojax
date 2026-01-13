@@ -355,9 +355,7 @@ class IconProvider:
         str
             Icon text (ASCII or emoji based on settings)
         """
-        logger.debug(
-            "Getting status icon", status=status, uses_emoji=self._allow_emoji
-        )
+        logger.debug("Getting status icon", status=status, uses_emoji=self._allow_emoji)
         if self._allow_emoji:
             icon = self.STATUS_ICONS_EMOJI.get(status, "[?]")
         else:
@@ -429,7 +427,9 @@ class IconProvider:
         elif icon_category == "file":
             icon = self.get_file_icon(icon_type)
         else:
-            logger.debug("Unknown icon category, using fallback", icon_category=icon_category)
+            logger.debug(
+                "Unknown icon category, using fallback", icon_category=icon_category
+            )
             icon = "[?]"
 
         result = f"{icon} {text}"
