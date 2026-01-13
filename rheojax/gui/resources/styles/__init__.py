@@ -1,18 +1,47 @@
 """
 RheoJAX GUI Stylesheets.
 
-Provides light and dark themes for the application.
+Provides light and dark themes for the application, along with design tokens
+for consistent programmatic styling.
 """
 
 from pathlib import Path
 
+from rheojax.gui.resources.styles.tokens import (
+    BorderRadius,
+    ColorPalette,
+    DesignTokens,
+    Shadows,
+    Spacing,
+    Typography,
+    button_style,
+    card_style,
+    empty_state_style,
+    section_header_style,
+    status_badge_style,
+)
+
 STYLES_DIR = Path(__file__).parent
 
 __all__ = [
+    # Stylesheet loaders
     "get_light_stylesheet",
     "get_dark_stylesheet",
     "get_stylesheet",
     "STYLES_DIR",
+    # Design tokens
+    "ColorPalette",
+    "Spacing",
+    "BorderRadius",
+    "Typography",
+    "Shadows",
+    "DesignTokens",
+    # Style helpers
+    "button_style",
+    "card_style",
+    "status_badge_style",
+    "section_header_style",
+    "empty_state_style",
 ]
 
 

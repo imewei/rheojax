@@ -684,9 +684,10 @@ QStatusBar QLabel {
 QGroupBox {
     background-color: #FFFFFF;
     border: 1px solid #E2E8F0;
-    border-radius: 6px;
-    margin-top: 12px;
-    padding-top: 12px;
+    border-radius: 8px;
+    margin-top: 16px;
+    padding: 16px;
+    padding-top: 24px;
     font-weight: 600;
 }
 
@@ -697,6 +698,172 @@ QGroupBox::title {
     padding: 0 8px;
     color: #1E293B;
     background-color: #FFFFFF;
+    font-size: 11pt;
+}
+
+/* ========== Card Variants ========== */
+
+/* Elevated card with subtle shadow effect */
+QFrame[frameShape="StyledPanel"][class="card"] {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+QFrame[frameShape="StyledPanel"][class="card"]:hover {
+    border-color: #CBD5E1;
+}
+
+/* Clickable card with cursor pointer */
+QFrame[frameShape="StyledPanel"][class="card-clickable"] {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+QFrame[frameShape="StyledPanel"][class="card-clickable"]:hover {
+    background-color: #F8FAFC;
+    border-color: #2563EB;
+}
+
+/* Featured/highlighted card */
+QFrame[frameShape="StyledPanel"][class="card-featured"] {
+    background-color: #FFFFFF;
+    border: 2px solid #2563EB;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+/* ========== Section Headers ========== */
+
+QLabel[class="section-header"] {
+    color: #1E293B;
+    font-size: 14pt;
+    font-weight: 600;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+QLabel[class="section-subheader"] {
+    color: #475569;
+    font-size: 12pt;
+    font-weight: 500;
+}
+
+/* ========== Empty States ========== */
+
+QLabel[class="empty-state"] {
+    color: #64748B;
+    background-color: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    border-radius: 8px;
+    padding: 24px;
+    font-size: 11pt;
+}
+
+QLabel[class="placeholder"] {
+    color: #94A3B8;
+    padding: 16px;
+    font-size: 11pt;
+}
+
+/* ========== Status Badges ========== */
+
+QLabel[class="badge-success"] {
+    background-color: #D1FAE5;
+    color: #059669;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10pt;
+    font-weight: 500;
+}
+
+QLabel[class="badge-warning"] {
+    background-color: #FEF3C7;
+    color: #D97706;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10pt;
+    font-weight: 500;
+}
+
+QLabel[class="badge-error"] {
+    background-color: #FEE2E2;
+    color: #DC2626;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10pt;
+    font-weight: 500;
+}
+
+QLabel[class="badge-info"] {
+    background-color: #DBEAFE;
+    color: #2563EB;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10pt;
+    font-weight: 500;
+}
+
+QLabel[class="badge-neutral"] {
+    background-color: #F1F5F9;
+    color: #64748B;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10pt;
+    font-weight: 500;
+}
+
+/* ========== Icon Buttons ========== */
+
+QToolButton[class="icon-button"] {
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 8px;
+    min-width: 32px;
+    min-height: 32px;
+}
+
+QToolButton[class="icon-button"]:hover {
+    background-color: #F1F5F9;
+}
+
+QToolButton[class="icon-button"]:pressed {
+    background-color: #E2E8F0;
+}
+
+QToolButton[class="icon-button-primary"] {
+    background-color: #DBEAFE;
+    border: none;
+    border-radius: 6px;
+    padding: 8px;
+    min-width: 32px;
+    min-height: 32px;
+}
+
+QToolButton[class="icon-button-primary"]:hover {
+    background-color: #BFDBFE;
+}
+
+/* ========== Page Containers ========== */
+
+QWidget[class="page-container"] {
+    background-color: #F8FAFC;
+    padding: 16px;
+}
+
+QWidget[class="panel"] {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+}
+
+QWidget[class="sidebar"] {
+    background-color: #FFFFFF;
+    border-right: 1px solid #E2E8F0;
 }
 
 /* ========== Check Box ========== */

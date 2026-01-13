@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.gui.resources.styles import ColorPalette, Spacing
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.jax_status import JAXStatusWidget
 from rheojax.logging import get_logger
@@ -127,28 +128,19 @@ class HomePage(QWidget):
     def _create_workflow_selector(self) -> QWidget:
         """Create workflow selection section."""
         group = QGroupBox("Select Workflow")
-        group.setStyleSheet(
-            """
-            QGroupBox {
-                font-size: 14pt;
-                font-weight: bold;
-                border: 2px solid #ddd;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-        """
-        )
+        # Use QSS styling from light.qss - no inline style needed
 
         layout = QHBoxLayout(group)
-        layout.setSpacing(20)
-        layout.setContentsMargins(15, 25, 15, 15)
+        layout.setSpacing(Spacing.LG)
+        layout.setContentsMargins(
+            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
+        )
 
         # Fitting Workflow Card
         fit_card = self._create_workflow_card(
             "Fitting Workflow",
             "Data -> Fit -> Bayesian -> Diagnostics -> Export",
-            "#2196F3",
+            "primary",
             "fitting",
         )
         layout.addWidget(fit_card)
@@ -157,7 +149,7 @@ class HomePage(QWidget):
         transform_card = self._create_workflow_card(
             "Transform Workflow",
             "Data -> Transforms (FFT, TTS, SPP) -> Export",
-            "#4CAF50",
+            "success",
             "transform",
         )
         layout.addWidget(transform_card)
@@ -165,25 +157,34 @@ class HomePage(QWidget):
         return group
 
     def _create_workflow_card(
-        self, title: str, description: str, color: str, mode: str
+        self, title: str, description: str, variant: str, mode: str
     ) -> QPushButton:
         """Create a workflow selection card."""
         btn = QPushButton(f"{title}\n\n{description}")
         btn.setMinimumHeight(120)
+        btn.setProperty("variant", variant)
+        # Use design tokens for consistent styling
+        if variant == "primary":
+            bg_color = ColorPalette.PRIMARY
+            bg_hover = ColorPalette.PRIMARY_HOVER
+        else:
+            bg_color = ColorPalette.SUCCESS
+            bg_hover = ColorPalette.SUCCESS_HOVER
+
         btn.setStyleSheet(
             f"""
             QPushButton {{
-                background-color: {color};
-                color: white;
+                background-color: {bg_color};
+                color: {ColorPalette.TEXT_INVERSE};
                 border: none;
                 border-radius: 8px;
                 text-align: left;
-                padding: 16px;
+                padding: {Spacing.LG}px;
                 font-size: 12pt;
-                font-weight: bold;
+                font-weight: 600;
             }}
             QPushButton:hover {{
-                background-color: {self._darken_color(color)};
+                background-color: {bg_hover};
             }}
         """
         )
@@ -209,7 +210,7 @@ class HomePage(QWidget):
         """Create header with logo and title."""
         header = QWidget()
         layout = QVBoxLayout(header)
-        layout.setSpacing(10)
+        layout.setSpacing(Spacing.SM)
 
         # Title
         title = QLabel("RheoJAX")
@@ -218,6 +219,7 @@ class HomePage(QWidget):
         title_font.setBold(True)
         title.setFont(title_font)
         title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet(f"color: {ColorPalette.TEXT_PRIMARY};")
 
         # Subtitle
         subtitle = QLabel("JAX-Accelerated Rheological Analysis")
@@ -225,7 +227,7 @@ class HomePage(QWidget):
         subtitle_font.setPointSize(14)
         subtitle.setFont(subtitle_font)
         subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setStyleSheet("color: #666;")
+        subtitle.setStyleSheet(f"color: {ColorPalette.TEXT_SECONDARY};")
 
         # Version
         try:
@@ -237,7 +239,7 @@ class HomePage(QWidget):
 
         version = QLabel(version_text)
         version.setAlignment(Qt.AlignCenter)
-        version.setStyleSheet("color: #999; font-size: 11pt;")
+        version.setStyleSheet(f"color: {ColorPalette.TEXT_MUTED}; font-size: 11pt;")
 
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -248,45 +250,31 @@ class HomePage(QWidget):
     def _create_quick_start(self) -> QWidget:
         """Create quick start section."""
         group = QGroupBox("Quick Start")
-        group.setStyleSheet(
-            """
-            QGroupBox {
-                font-size: 14pt;
-                font-weight: bold;
-                border: 2px solid #ddd;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-        """
-        )
+        # QSS styling from light.qss handles groupbox appearance
 
         layout = QHBoxLayout(group)
-        layout.setSpacing(15)
-        layout.setContentsMargins(15, 25, 15, 15)
+        layout.setSpacing(Spacing.LG)
+        layout.setContentsMargins(
+            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
+        )
 
         # Open Project button
         btn_open = self._create_action_button(
-            "Open Project", "Load an existing RheoJAX project", "#2196F3"
+            "Open Project", "Load an existing RheoJAX project", "primary"
         )
         btn_open.clicked.connect(self._on_open_project_clicked)
         layout.addWidget(btn_open)
 
         # Import Data button
         btn_import = self._create_action_button(
-            "Import Data", "Import TRIOS, Anton Paar, CSV, Excel", "#4CAF50"
+            "Import Data", "Import TRIOS, Anton Paar, CSV, Excel", "success"
         )
         btn_import.clicked.connect(self._on_import_data_clicked)
         layout.addWidget(btn_import)
 
         # New Project button
         btn_new = self._create_action_button(
-            "New Project", "Start a new analysis project", "#FF9800"
+            "New Project", "Start a new analysis project", "warning"
         )
         btn_new.clicked.connect(self._on_new_project_clicked)
         layout.addWidget(btn_new)
@@ -309,13 +297,48 @@ class HomePage(QWidget):
         self.new_project_requested.emit()
 
     def _create_action_button(
-        self, title: str, description: str, color: str
+        self, title: str, description: str, variant: str
     ) -> QPushButton:
         """Create a styled action button."""
         btn = QPushButton(f"{title}\n\n{description}")
         btn.setMinimumHeight(110)
-        btn.setProperty("variant", "primary")
-        btn.setStyleSheet("text-align: left; padding: 16px;")
+        btn.setProperty("variant", variant)
+        btn.setCursor(Qt.PointingHandCursor)
+
+        # Use design tokens for consistent styling
+        variant_colors = {
+            "primary": (ColorPalette.PRIMARY, ColorPalette.PRIMARY_HOVER),
+            "success": (ColorPalette.SUCCESS, ColorPalette.SUCCESS_HOVER),
+            "warning": (ColorPalette.WARNING, ColorPalette.WARNING_HOVER),
+            "error": (ColorPalette.ERROR, ColorPalette.ERROR_HOVER),
+            "accent": (ColorPalette.ACCENT, ColorPalette.ACCENT_HOVER),
+        }
+        bg_color, bg_hover = variant_colors.get(
+            variant, (ColorPalette.PRIMARY, ColorPalette.PRIMARY_HOVER)
+        )
+        text_color = (
+            ColorPalette.TEXT_PRIMARY
+            if variant == "warning"
+            else ColorPalette.TEXT_INVERSE
+        )
+
+        btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: {bg_color};
+                color: {text_color};
+                border: none;
+                border-radius: 8px;
+                text-align: left;
+                padding: {Spacing.LG}px;
+                font-size: 11pt;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {bg_hover};
+            }}
+        """
+        )
         return btn
 
     def _darken_color(self, hex_color: str, factor: float = 0.1) -> str:
@@ -334,31 +357,20 @@ class HomePage(QWidget):
     def _create_recent_projects(self) -> QWidget:
         """Create recent projects section."""
         group = QGroupBox("Recent Projects")
-        group.setStyleSheet(
-            """
-            QGroupBox {
-                font-size: 12pt;
-                font-weight: bold;
-                border: 2px solid #ddd;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-        """
-        )
+        # QSS styling from light.qss handles groupbox appearance
 
         layout = QVBoxLayout(group)
-        layout.setContentsMargins(15, 25, 15, 15)
-        layout.setSpacing(10)
+        layout.setContentsMargins(
+            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
+        )
+        layout.setSpacing(Spacing.SM)
 
         # Get recent projects from state
         recent_projects = self._store.get_state().recent_projects
 
         if not recent_projects:
             no_projects = QLabel("No recent projects")
-            no_projects.setStyleSheet(
-                "color: #999; font-style: italic; font-weight: normal;"
-            )
+            no_projects.setProperty("class", "placeholder")
             no_projects.setAlignment(Qt.AlignCenter)
             layout.addWidget(no_projects)
         else:
@@ -374,30 +386,35 @@ class HomePage(QWidget):
         """Create a recent project item."""
         widget = QWidget()
         widget.setStyleSheet(
-            """
-            QWidget {
-                background-color: #f5f5f5;
-                border-radius: 5px;
-                padding: 10px;
-            }
-            QWidget:hover {
-                background-color: #e8e8e8;
-            }
+            f"""
+            QWidget {{
+                background-color: {ColorPalette.BG_SURFACE};
+                border: 1px solid {ColorPalette.BORDER_DEFAULT};
+                border-radius: 6px;
+            }}
+            QWidget:hover {{
+                background-color: {ColorPalette.BG_HOVER};
+                border-color: {ColorPalette.BORDER_HOVER};
+            }}
         """
         )
 
         layout = QVBoxLayout(widget)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(5)
+        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        layout.setSpacing(Spacing.XS)
 
         # Project name
         name = QLabel(project_path.stem)
-        name.setStyleSheet("font-weight: bold; font-size: 11pt;")
+        name.setStyleSheet(
+            f"font-weight: 600; font-size: 11pt; color: {ColorPalette.TEXT_PRIMARY};"
+        )
         layout.addWidget(name)
 
         # Project path
         path_label = QLabel(str(project_path))
-        path_label.setStyleSheet("color: #666; font-size: 9pt; font-weight: normal;")
+        path_label.setStyleSheet(
+            f"color: {ColorPalette.TEXT_MUTED}; font-size: 9pt; font-weight: normal;"
+        )
         path_label.setWordWrap(True)
         layout.addWidget(path_label)
 
@@ -419,23 +436,14 @@ class HomePage(QWidget):
     def _create_examples(self) -> QWidget:
         """Create example datasets section."""
         group = QGroupBox("Example Datasets")
-        group.setStyleSheet(
-            """
-            QGroupBox {
-                font-size: 12pt;
-                font-weight: bold;
-                border: 2px solid #ddd;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-        """
-        )
+        # QSS styling from light.qss handles groupbox appearance
 
         layout = QGridLayout(group)
-        layout.setContentsMargins(15, 25, 15, 15)
-        layout.setHorizontalSpacing(12)
-        layout.setVerticalSpacing(12)
+        layout.setContentsMargins(
+            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
+        )
+        layout.setHorizontalSpacing(Spacing.MD)
+        layout.setVerticalSpacing(Spacing.MD)
         self._examples_layout = layout
         self._example_cards: list[QWidget] = []
 
@@ -451,18 +459,31 @@ class HomePage(QWidget):
             "Bayesian": "examples/data/pyRheo/fish_muscle/stressrelaxation_fishmuscle_data.csv",
         }
 
-        examples = [
-            ("Oscillation", "SAOS frequency sweep (CSV)", "#3F51B5"),
-            ("Relaxation", "Stress relaxation G(t) (CSV)", "#009688"),
-            ("Creep", "Creep compliance J(t) (CSV)", "#FF5722"),
-            ("Flow", "Steady shear flow curve (CSV)", "#E91E63"),
-            ("SGR", "Soft glassy emulsion (CSV)", "#9C27B0"),
-            ("SPP", "Multi-technique TRIOS (TXT)", "#00BCD4"),
-            ("TTS", "Time-Temperature Superposition (TXT)", "#FFC107"),
-            ("Bayesian", "Fish muscle relaxation (CSV)", "#607D8B"),
+        # Use design tokens for chart colors
+        chart_colors = [
+            ColorPalette.CHART_1,  # Blue
+            ColorPalette.CHART_3,  # Green
+            ColorPalette.CHART_5,  # Red
+            ColorPalette.CHART_6,  # Pink
+            ColorPalette.CHART_2,  # Purple
+            ColorPalette.INFO,  # Cyan-ish
+            ColorPalette.CHART_4,  # Amber
+            ColorPalette.TEXT_MUTED,  # Gray
         ]
 
-        for name, description, color in examples:
+        examples = [
+            ("Oscillation", "SAOS frequency sweep (CSV)"),
+            ("Relaxation", "Stress relaxation G(t) (CSV)"),
+            ("Creep", "Creep compliance J(t) (CSV)"),
+            ("Flow", "Steady shear flow curve (CSV)"),
+            ("SGR", "Soft glassy emulsion (CSV)"),
+            ("SPP", "Multi-technique TRIOS (TXT)"),
+            ("TTS", "Time-Temperature Superposition (TXT)"),
+            ("Bayesian", "Fish muscle relaxation (CSV)"),
+        ]
+
+        for idx, (name, description) in enumerate(examples):
+            color = chart_colors[idx % len(chart_colors)]
             card = self._create_example_card(name, description, color)
             self._example_cards.append(card)
 
@@ -504,7 +525,6 @@ class HomePage(QWidget):
             QWidget {{
                 background-color: {color};
                 border-radius: 8px;
-                padding: 15px;
             }}
             QWidget:hover {{
                 background-color: {self._darken_color(color)};
@@ -514,16 +534,21 @@ class HomePage(QWidget):
         card.setCursor(Qt.PointingHandCursor)
 
         layout = QVBoxLayout(card)
-        layout.setSpacing(5)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        layout.setSpacing(Spacing.XS)
 
         # Name
         name_label = QLabel(name)
-        name_label.setStyleSheet("color: white; font-size: 12pt; font-weight: bold;")
+        name_label.setStyleSheet(
+            f"color: {ColorPalette.TEXT_INVERSE}; font-size: 12pt; font-weight: 600;"
+        )
         layout.addWidget(name_label)
 
         # Description
         desc_label = QLabel(description)
-        desc_label.setStyleSheet("color: white; font-size: 9pt; font-weight: normal;")
+        desc_label.setStyleSheet(
+            f"color: {ColorPalette.TEXT_INVERSE}; font-size: 9pt; font-weight: normal;"
+        )
         desc_label.setWordWrap(True)
         layout.addWidget(desc_label)
 
@@ -544,21 +569,12 @@ class HomePage(QWidget):
     def _create_system_status(self) -> QWidget:
         """Create system status section."""
         group = QGroupBox("System Status")
-        group.setStyleSheet(
-            """
-            QGroupBox {
-                font-size: 12pt;
-                font-weight: bold;
-                border: 2px solid #ddd;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-        """
-        )
+        # QSS styling from light.qss handles groupbox appearance
 
         layout = QVBoxLayout(group)
-        layout.setContentsMargins(15, 25, 15, 15)
+        layout.setContentsMargins(
+            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
+        )
 
         # JAX status widget
         self._jax_status = JAXStatusWidget()
@@ -607,22 +623,13 @@ class HomePage(QWidget):
     def _create_resources(self) -> QWidget:
         """Create resources section."""
         group = QGroupBox("Resources")
-        group.setStyleSheet(
-            """
-            QGroupBox {
-                font-size: 12pt;
-                font-weight: bold;
-                border: 2px solid #ddd;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-        """
-        )
+        # QSS styling from light.qss handles groupbox appearance
 
         layout = QHBoxLayout(group)
-        layout.setContentsMargins(15, 25, 15, 15)
-        layout.setSpacing(15)
+        layout.setContentsMargins(
+            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
+        )
+        layout.setSpacing(Spacing.LG)
 
         resources = [
             ("Documentation", "https://rheojax.readthedocs.io"),
@@ -632,27 +639,27 @@ class HomePage(QWidget):
 
         for title, url in resources:
             btn = QPushButton(title)
+            btn.setProperty("variant", "secondary")
+            btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet(
-                """
-                QPushButton {
-                    background-color: #E8ECF5;
-                    color: #0F172A;
-                    border: 2px solid #CBD5E1;
+                f"""
+                QPushButton {{
+                    background-color: {ColorPalette.BG_SURFACE};
+                    color: {ColorPalette.TEXT_PRIMARY};
+                    border: 1px solid {ColorPalette.BORDER_DEFAULT};
                     border-radius: 6px;
-                    padding: 12px;
-                    font-size: 12pt;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background-color: #DBEAFE;
-                    border-color: #2563EB;
-                    color: #0B1C3A;
-                }
-                QPushButton:pressed {
-                    background-color: #C7DBFC;
-                    border-color: #1D4ED8;
-                    color: #0B1C3A;
-                }
+                    padding: {Spacing.MD}px {Spacing.LG}px;
+                    font-size: 11pt;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background-color: {ColorPalette.PRIMARY_LIGHT};
+                    border-color: {ColorPalette.PRIMARY};
+                    color: {ColorPalette.PRIMARY};
+                }}
+                QPushButton:pressed {{
+                    background-color: {ColorPalette.BG_ACTIVE};
+                }}
             """
             )
             btn.clicked.connect(lambda checked, u=url, t=title: self._open_url(u, t))

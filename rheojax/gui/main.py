@@ -55,7 +55,7 @@ def setup_logging(verbose: bool = False) -> None:
     if not is_configured():
         level = "DEBUG" if verbose else "INFO"
         configure_logging(level=level, format="standard", colorize=True)
-        logger.debug("Logging configured", level=level)
+        logger.debug("Logging configured", log_level=level)
 
 
 def check_dependencies() -> tuple[bool, list[str]]:
