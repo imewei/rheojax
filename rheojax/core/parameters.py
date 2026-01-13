@@ -601,6 +601,57 @@ class ParameterSet:
         param = self.get(name)
         return param.value if param else None
 
+    def unpack(self, *names: str) -> tuple[float | None, ...]:
+        """Extract multiple parameter values in a single call.
+
+        This method provides a concise way to extract several parameter values
+        at once, reducing boilerplate in model implementations.
+
+        Args:
+            *names: Parameter names to extract
+
+        Returns:
+            Tuple of parameter values in the same order as requested.
+            Returns None for parameters with None values.
+
+        Raises:
+            KeyError: If any parameter name is not found. The error message
+                includes the missing name and lists available parameters.
+
+        Examples:
+            Basic usage - extract multiple parameters in one line:
+
+            >>> params = ParameterSet()
+            >>> _ = params.add('x', value=1.5)
+            >>> _ = params.add('G0', value=100.0)
+            >>> _ = params.add('tau0', value=0.01)
+            >>> x, G0, tau0 = params.unpack('x', 'G0', 'tau0')
+            >>> x
+            1.5
+            >>> G0
+            100.0
+
+            Before (verbose)::
+
+                x = params.get_value('x')
+                G0 = params.get_value('G0')
+                tau0 = params.get_value('tau0')
+
+            After (concise)::
+
+                x, G0, tau0 = params.unpack('x', 'G0', 'tau0')
+        """
+        values = []
+        for name in names:
+            if name not in self._parameters:
+                available = list(self._parameters.keys())
+                raise KeyError(
+                    f"Parameter '{name}' not found. "
+                    f"Available parameters: {available}"
+                )
+            values.append(self.get_value(name))
+        return tuple(values)
+
     def __len__(self) -> int:
         """Number of parameters."""
         return len(self._parameters)
