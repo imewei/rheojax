@@ -418,4 +418,4 @@ class TestSGRGenericFitting:
             model.fit(omega, G_star)
 
         with pytest.raises(ValueError, match="Unsupported test_mode"):
-            model.fit(omega, G_star, test_mode="creep")
+            model.fit(omega, G_star, test_mode="invalid_mode")
