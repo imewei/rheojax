@@ -8,7 +8,11 @@ import csv
 import hashlib
 import io
 
-import matplotlib.pyplot as plt
+import matplotlib
+
+matplotlib.use("Agg")  # Force non-interactive backend before pyplot import
+
+import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np
 import pytest
 
@@ -16,6 +20,9 @@ pytestmark = [pytest.mark.smoke]
 
 
 def test_bayesian_ppd_plot_hash():
+    # Ensure consistent matplotlib state for reproducible rendering
+    plt.rcdefaults()
+
     rng = np.random.default_rng(0)
 
     with open("tests/fixtures/bayesian_owchirp_tts.csv", newline="") as f:

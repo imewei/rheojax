@@ -16,7 +16,7 @@ import pytest
 from rheojax.core.data import RheoData
 from rheojax.gui.services.bayesian_service import BayesianService
 
-pytestmark = [pytest.mark.smoke]
+pytestmark = [pytest.mark.slow]
 
 
 @pytest.mark.skipif(

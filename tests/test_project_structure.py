@@ -86,15 +86,12 @@ class TestProjectStructure:
         assert isinstance(jax_version, str)
         assert len(jax_version) > 0
 
-    @pytest.mark.skip(
-        reason="Development dependencies are optional - check requirements-dev.txt for full list"
-    )
     @pytest.mark.smoke
     def test_development_dependencies_installed(self):
         """Test that required development dependencies are installed.
 
-        NOTE: This test is skipped by default as these are optional development
-        dependencies. To enable this test, install with: pip install -r requirements-dev.txt
+        This test verifies dev dependencies when running in a dev environment.
+        It gracefully skips if dev dependencies are not available.
         """
         required_dev_packages = [
             "pytest",
@@ -105,11 +102,17 @@ class TestProjectStructure:
             "sphinx",
         ]
 
+        missing = []
         for package_name in required_dev_packages:
             spec = importlib.util.find_spec(package_name)
-            assert (
-                spec is not None
-            ), f"Development dependency not installed: {package_name}"
+            if spec is None:
+                missing.append(package_name)
+
+        if missing:
+            pytest.skip(
+                f"Development dependencies not installed: {missing}. "
+                "Install with: pip install -r requirements-dev.txt"
+            )
 
     def test_jax_dependency_installed(self):
         """Test that JAX is installed and accessible."""

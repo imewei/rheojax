@@ -26,8 +26,11 @@ else:
     import numpy as jnp_typing
 
 
-# Skip if pytest-benchmark not installed
-pytest.importorskip("pytest_benchmark")
+@pytest.fixture(autouse=True)
+def _require_pytest_benchmark(request):
+    """Skip benchmark tests if pytest-benchmark not installed."""
+    if "benchmark" in [m.name for m in request.node.iter_markers()]:
+        pytest.importorskip("pytest_benchmark")
 
 
 @pytest.fixture
