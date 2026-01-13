@@ -125,13 +125,18 @@ class SGRGeneric(BaseModel):
         - Reference: Fuereder & Ilg 2013 PRE 88, 042134
     """
 
-    def __init__(self):
+    def __init__(self, dynamic_x: bool = False):
         """Initialize SGR GENERIC Model.
 
         Creates ParameterSet with:
         - x (noise temperature): bounds (0.5, 3.0), default 1.5
         - G0 (modulus scale): bounds (1e-3, 1e9), default 1e3
         - tau0 (attempt time): bounds (1e-9, 1e3), default 1e-3
+
+        Args:
+            dynamic_x: If True, enable dynamic noise temperature evolution
+                with 3D state [sigma, lambda, x]. Default False for
+                backward compatibility.
         """
         super().__init__()
 
@@ -170,6 +175,21 @@ class SGRGeneric(BaseModel):
 
         # Storage for entropy production tracking
         self._cumulative_entropy_production: float = 0.0
+
+        # Internal flags for extended features
+        self._thixotropy_enabled: bool = False
+        self._dynamic_x: bool = dynamic_x
+
+        # Storage for LAOS parameters
+        self._gamma_0: float | None = None
+        self._omega_laos: float | None = None
+
+        # Storage for lambda trajectory (thixotropy)
+        self._lambda_trajectory: np.ndarray | None = None
+
+        # Initialize dynamic x parameters if enabled
+        if dynamic_x:
+            self._init_dynamic_x_parameters()
 
     # =========================================================================
     # GENERIC State Variables and Thermodynamic Functions
@@ -1309,6 +1329,51 @@ class SGRGeneric(BaseModel):
 
         return G_t
 
+    @staticmethod
+    @jax.jit
+    def _predict_steady_shear_jit(
+        gamma_dot: jnp.ndarray, x: float, G0_scale: float, tau0: float
+    ) -> jnp.ndarray:
+        """JIT-compiled steady shear prediction: eta(gamma_dot).
+
+        Computes viscosity as function of shear rate:
+            eta ~ gamma_dot^(x-2) for 1 < x < 2 (shear-thinning)
+            eta = const for x >= 2 (Newtonian)
+            sigma_y > 0 for x < 1 (yield stress, glass phase)
+
+        Args:
+            gamma_dot: Shear rate array (1/s)
+            x: Effective noise temperature (dimensionless)
+            G0_scale: Modulus scale (Pa)
+            tau0: Attempt time (s)
+
+        Returns:
+            Viscosity eta(gamma_dot) with shape (M,)
+
+        Notes:
+            - Shear-thinning exponent: x - 2
+            - Uses relationship: eta ~ G0 * tau0 * (gamma_dot * tau0)^(x-2)
+        """
+        # Dimensionless shear rate
+        gamma_dot_scaled = gamma_dot * tau0
+
+        epsilon = 1e-12
+        gamma_dot_safe = jnp.maximum(gamma_dot_scaled, epsilon)
+
+        # Compute equilibrium modulus factor
+        G0_dim = G0(x)
+
+        # Viscosity power-law exponent
+        visc_exp = x - 2.0
+
+        # Viscosity formula
+        # eta = G0_scale * tau0 * G0_dim * (gamma_dot * tau0)^(x-2)
+        # For x = 2: eta = const (Newtonian)
+        # For x < 2: eta decreases with gamma_dot (shear-thinning)
+        eta = G0_scale * tau0 * G0_dim * jnp.power(gamma_dot_safe, visc_exp)
+
+        return eta
+
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """Predict based on fitted test mode.
 
@@ -1318,7 +1383,7 @@ class SGRGeneric(BaseModel):
             X: Independent variable (frequency or time)
 
         Returns:
-            Predicted values (complex modulus or relaxation modulus)
+            Predicted values (complex modulus, relaxation modulus, or viscosity)
 
         Raises:
             ValueError: If test_mode not set (model not fitted)
@@ -1330,6 +1395,8 @@ class SGRGeneric(BaseModel):
             return self._predict_oscillation(X)
         elif self._test_mode == "relaxation":
             return self._predict_relaxation(X)
+        elif self._test_mode == "steady_shear":
+            return self._predict_steady_shear(X)
         else:
             raise ValueError(f"Unknown test_mode: {self._test_mode}")
 
@@ -1369,6 +1436,24 @@ class SGRGeneric(BaseModel):
 
         return np.array(G_t_jax)
 
+    def _predict_steady_shear(self, gamma_dot: np.ndarray) -> np.ndarray:
+        """Predict viscosity in steady shear mode.
+
+        Args:
+            gamma_dot: Shear rate array (1/s)
+
+        Returns:
+            Viscosity array (Pa.s)
+        """
+        x = self.parameters.get_value("x")
+        G0_scale = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
+
+        gamma_dot_jax = jnp.asarray(gamma_dot)
+        eta_jax = self._predict_steady_shear_jit(gamma_dot_jax, x, G0_scale, tau0)
+
+        return np.array(eta_jax)
+
     def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference with NumPyro NUTS.
 
@@ -1396,6 +1481,8 @@ class SGRGeneric(BaseModel):
             return self._predict_oscillation_jit(X_jax, x, G0_scale, tau0)
         elif mode == "relaxation":
             return self._predict_relaxation_jit(X_jax, x, G0_scale, tau0)
+        elif mode == "steady_shear":
+            return self._predict_steady_shear_jit(X_jax, x, G0_scale, tau0)
         else:
             raise ValueError(f"Unsupported test mode: {mode}")
 
@@ -1413,3 +1500,1024 @@ class SGRGeneric(BaseModel):
             return "power-law"
         else:
             return "newtonian"
+
+    # =========================================================================
+    # Dynamic x Parameter Initialization
+    # =========================================================================
+
+    def _init_dynamic_x_parameters(self) -> None:
+        """Initialize parameters for dynamic noise temperature evolution.
+
+        Adds parameters for aging/rejuvenation kinetics:
+        - x_eq: Equilibrium noise temperature at rest
+        - alpha_aging: Aging rate coefficient
+        - beta_rejuv: Rejuvenation rate coefficient
+        - x_ss_A: Steady-state amplitude
+        - x_ss_n: Steady-state power-law exponent
+        """
+        # x_eq: Equilibrium noise temperature at rest
+        if "x_eq" not in self.parameters.keys():
+            self.parameters.add(
+                name="x_eq",
+                value=1.0,
+                bounds=(0.5, 2.5),
+                units="dimensionless",
+                description="Equilibrium noise temperature at rest",
+            )
+
+        # alpha_aging: Aging rate coefficient
+        if "alpha_aging" not in self.parameters.keys():
+            self.parameters.add(
+                name="alpha_aging",
+                value=0.1,
+                bounds=(0.0, 10.0),
+                units="1/s",
+                description="Aging rate coefficient",
+            )
+
+        # beta_rejuv: Rejuvenation rate coefficient
+        if "beta_rejuv" not in self.parameters.keys():
+            self.parameters.add(
+                name="beta_rejuv",
+                value=0.5,
+                bounds=(0.0, 10.0),
+                units="s",
+                description="Rejuvenation rate coefficient",
+            )
+
+        # x_ss_A: Steady-state amplitude
+        if "x_ss_A" not in self.parameters.keys():
+            self.parameters.add(
+                name="x_ss_A",
+                value=0.5,
+                bounds=(0.0, 2.0),
+                units="dimensionless",
+                description="Steady-state amplitude factor",
+            )
+
+        # x_ss_n: Steady-state power-law exponent
+        if "x_ss_n" not in self.parameters.keys():
+            self.parameters.add(
+                name="x_ss_n",
+                value=0.3,
+                bounds=(0.0, 1.0),
+                units="dimensionless",
+                description="Steady-state power-law exponent",
+            )
+
+    # =========================================================================
+    # Thixotropy Methods (User Story 3)
+    # =========================================================================
+
+    def enable_thixotropy(
+        self,
+        k_build: float = 0.1,
+        k_break: float = 0.5,
+        n_struct: float = 2.0,
+    ) -> None:
+        """Enable thixotropy modeling with structural parameter lambda(t).
+
+        Adds thixotropy kinetics parameters to the model. The structural
+        parameter lambda represents the state of internal microstructure:
+        - lambda = 1: Fully built structure
+        - lambda = 0: Fully broken structure
+
+        Evolution equation:
+            d(lambda)/dt = k_build * (1 - lambda) - k_break * gamma_dot * lambda
+
+        The effective modulus is coupled to lambda:
+            G_eff(t) = G0 * lambda(t)^n_struct
+
+        Args:
+            k_build: Structure build-up rate (1/s), default 0.1
+            k_break: Structure breakdown rate (dimensionless), default 0.5
+            n_struct: Structural coupling exponent, default 2.0
+
+        Example:
+            >>> model = SGRGeneric()
+            >>> model.enable_thixotropy(k_build=0.1, k_break=0.5, n_struct=2.0)
+            >>> # Now model can predict stress transients with thixotropy
+        """
+        # Add thixotropy parameters if not already present
+        if "k_build" not in self.parameters.keys():
+            self.parameters.add(
+                name="k_build",
+                value=k_build,
+                bounds=(0.0, 10.0),
+                units="1/s",
+                description="Structure build-up rate (1/s)",
+            )
+        else:
+            self.parameters.set_value("k_build", k_build)
+
+        if "k_break" not in self.parameters.keys():
+            self.parameters.add(
+                name="k_break",
+                value=k_break,
+                bounds=(0.0, 10.0),
+                units="dimensionless",
+                description="Structure breakdown rate (shear-dependent)",
+            )
+        else:
+            self.parameters.set_value("k_break", k_break)
+
+        if "n_struct" not in self.parameters.keys():
+            self.parameters.add(
+                name="n_struct",
+                value=n_struct,
+                bounds=(0.1, 5.0),
+                units="dimensionless",
+                description="Structural coupling exponent",
+            )
+        else:
+            self.parameters.set_value("n_struct", n_struct)
+
+        # Flag for thixotropy mode
+        self._thixotropy_enabled = True
+
+    def evolve_lambda(
+        self,
+        t: np.ndarray,
+        gamma_dot: np.ndarray,
+        lambda_initial: float = 1.0,
+    ) -> np.ndarray:
+        """Evolve structural parameter lambda(t) for given shear history.
+
+        Integrates the thixotropy kinetics equation:
+            d(lambda)/dt = k_build * (1 - lambda) - k_break * gamma_dot * lambda
+
+        Args:
+            t: Time array (s)
+            gamma_dot: Shear rate array (1/s), same shape as t
+            lambda_initial: Initial structural parameter [0, 1], default 1.0
+
+        Returns:
+            lambda_t: Structural parameter evolution, same shape as t
+
+        Raises:
+            ValueError: If thixotropy not enabled or array shapes mismatch
+
+        Example:
+            >>> model = SGRGeneric()
+            >>> model.enable_thixotropy()
+            >>> t = np.linspace(0, 10, 100)
+            >>> gamma_dot = np.ones_like(t) * 10.0  # Constant shear
+            >>> lambda_t = model.evolve_lambda(t, gamma_dot, lambda_initial=1.0)
+        """
+        if not self._thixotropy_enabled:
+            raise ValueError("Thixotropy not enabled. Call enable_thixotropy() first.")
+
+        if t.shape != gamma_dot.shape:
+            raise ValueError(
+                f"Time and shear rate arrays must have same shape: "
+                f"t.shape={t.shape}, gamma_dot.shape={gamma_dot.shape}"
+            )
+
+        # Get thixotropy parameters
+        k_build = self.parameters.get_value("k_build")
+        k_break = self.parameters.get_value("k_break")
+
+        # Integrate using Euler method
+        dt = np.diff(t)
+        dt = np.concatenate([[0], dt])
+
+        lambda_t = np.zeros_like(t)
+        lambda_t[0] = lambda_initial
+
+        for i in range(1, len(t)):
+            dlambda_dt = (
+                k_build * (1.0 - lambda_t[i - 1])
+                - k_break * np.abs(gamma_dot[i]) * lambda_t[i - 1]
+            )
+            lambda_t[i] = lambda_t[i - 1] + dlambda_dt * dt[i]
+            # Clamp to [0, 1]
+            lambda_t[i] = np.clip(lambda_t[i], 0.0, 1.0)
+
+        # Store trajectory
+        self._lambda_trajectory = lambda_t
+
+        return lambda_t
+
+    def predict_thixotropic_stress(
+        self,
+        t: np.ndarray,
+        gamma_dot: np.ndarray,
+        lambda_t: np.ndarray | None = None,
+        lambda_initial: float = 1.0,
+    ) -> np.ndarray:
+        """Predict stress response with thixotropic modulus.
+
+        The effective modulus is coupled to the structural parameter:
+            G_eff(t) = G0 * lambda(t)^n_struct
+
+        Args:
+            t: Time array (s)
+            gamma_dot: Shear rate array (1/s)
+            lambda_t: Pre-computed lambda trajectory, or None to compute
+            lambda_initial: Initial lambda if computing [0, 1], default 1.0
+
+        Returns:
+            sigma: Stress response (Pa)
+
+        Example:
+            >>> model = SGRGeneric()
+            >>> model.enable_thixotropy()
+            >>> t = np.linspace(0, 10, 100)
+            >>> gamma_dot = np.ones_like(t) * 10.0
+            >>> sigma = model.predict_thixotropic_stress(t, gamma_dot)
+        """
+        if not self._thixotropy_enabled:
+            raise ValueError("Thixotropy not enabled. Call enable_thixotropy() first.")
+
+        # Compute lambda trajectory if not provided
+        if lambda_t is None:
+            lambda_t = self.evolve_lambda(t, gamma_dot, lambda_initial)
+
+        # Get parameters
+        G0_val = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
+        x = self.parameters.get_value("x")
+        n_struct = self.parameters.get_value("n_struct")
+
+        # Effective modulus from structure
+        G_eff = G0_val * np.power(lambda_t, n_struct)
+
+        # Viscosity from power-law (SGR-like)
+        gamma_dot_safe = np.maximum(np.abs(gamma_dot), 1e-12)
+        eta_factor = np.power(gamma_dot_safe * tau0, x - 2.0)
+
+        # Stress = G_eff * gamma_dot * tau0 * eta_factor
+        sigma = G_eff * gamma_dot * tau0 * eta_factor
+
+        return sigma
+
+    def predict_stress_transient(
+        self,
+        t: np.ndarray,
+        gamma_dot: np.ndarray,
+        lambda_initial: float = 1.0,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Predict stress transient (overshoot/undershoot) for shear step protocol.
+
+        For step-up in shear rate: Initially high stress (intact structure)
+        followed by decay as structure breaks down (overshoot).
+
+        For step-down in shear rate: Initially low stress (broken structure)
+        followed by increase as structure rebuilds (undershoot).
+
+        Args:
+            t: Time array (s)
+            gamma_dot: Shear rate array (1/s), can include steps
+            lambda_initial: Initial structural parameter [0, 1]
+
+        Returns:
+            sigma: Stress response (Pa)
+            lambda_t: Structural parameter evolution
+
+        Example:
+            >>> model = SGRGeneric()
+            >>> model.enable_thixotropy()
+            >>> t = np.linspace(0, 10, 100)
+            >>> gamma_dot = np.ones_like(t)
+            >>> gamma_dot[t >= 5] = 10.0  # Step up at t=5
+            >>> sigma, lambda_t = model.predict_stress_transient(t, gamma_dot)
+        """
+        # Evolve lambda
+        lambda_t = self.evolve_lambda(t, gamma_dot, lambda_initial)
+
+        # Compute stress
+        sigma = self.predict_thixotropic_stress(t, gamma_dot, lambda_t)
+
+        return sigma, lambda_t
+
+    # =========================================================================
+    # Shear Banding Detection Methods (User Story 1)
+    # =========================================================================
+
+    def detect_shear_banding(
+        self,
+        gamma_dot: np.ndarray | None = None,
+        sigma: np.ndarray | None = None,
+        n_points: int = 100,
+        gamma_dot_range: tuple[float, float] = (1e-2, 1e2),
+    ) -> tuple[bool, dict | None]:
+        """Detect shear banding from constitutive curve.
+
+        Computes the steady-state flow curve and checks for non-monotonicity
+        (d sigma / d gamma_dot < 0) which indicates shear banding instability.
+
+        Args:
+            gamma_dot: Shear rate array (1/s). If None, uses gamma_dot_range.
+            sigma: Stress array (Pa). If None, computes from model.
+            n_points: Number of points if computing flow curve
+            gamma_dot_range: Range for computing flow curve if gamma_dot is None
+
+        Returns:
+            is_banding: True if shear banding detected
+            banding_info: Dict with banding region info, or None
+
+        Example:
+            >>> model = SGRGeneric()
+            >>> model.parameters.set_value("x", 0.8)  # Glass regime
+            >>> is_banding, info = model.detect_shear_banding()
+        """
+        # Import detection function
+        from rheojax.transforms.srfs import detect_shear_banding as _detect_banding
+
+        # Compute flow curve if not provided
+        if gamma_dot is None:
+            gamma_dot = np.logspace(
+                np.log10(gamma_dot_range[0]),
+                np.log10(gamma_dot_range[1]),
+                n_points,
+            )
+
+        if sigma is None:
+            # Compute viscosity from model
+            self._test_mode = "steady_shear"
+            eta = self.predict(gamma_dot)
+            sigma = eta * gamma_dot
+
+        # Detect shear banding
+        is_banding, banding_info = _detect_banding(gamma_dot, sigma, warn=True)
+
+        return is_banding, banding_info
+
+    def predict_banded_flow(
+        self,
+        gamma_dot_applied: float,
+        gamma_dot: np.ndarray | None = None,
+        sigma: np.ndarray | None = None,
+        n_points: int = 100,
+    ) -> dict | None:
+        """Predict flow in shear banding regime with lever rule.
+
+        When shear banding occurs, the material splits into bands with
+        different local shear rates. This method computes the band
+        fractions and the composite stress.
+
+        Args:
+            gamma_dot_applied: Applied average shear rate (1/s)
+            gamma_dot: Shear rate array for flow curve. If None, computed.
+            sigma: Stress array for flow curve. If None, computed.
+            n_points: Number of points if computing flow curve
+
+        Returns:
+            coexistence: Dict with band coexistence info, or None
+
+        Example:
+            >>> model = SGRGeneric()
+            >>> model.parameters.set_value("x", 0.8)
+            >>> coex = model.predict_banded_flow(gamma_dot_applied=1.0)
+            >>> if coex:
+            ...     print(f"Low band: {coex['fraction_low']:.2%}")
+            ...     print(f"High band: {coex['fraction_high']:.2%}")
+        """
+        from rheojax.transforms.srfs import compute_shear_band_coexistence
+
+        # Compute flow curve if not provided
+        if gamma_dot is None:
+            gamma_dot = np.logspace(-2, 3, n_points)
+
+        if sigma is None:
+            self._test_mode = "steady_shear"
+            eta = self.predict(gamma_dot)
+            sigma = eta * gamma_dot
+
+        # Compute coexistence
+        coexistence = compute_shear_band_coexistence(
+            gamma_dot, sigma, gamma_dot_applied
+        )
+
+        return coexistence
+
+    # =========================================================================
+    # LAOS Analysis Methods (User Story 2)
+    # =========================================================================
+
+    def simulate_laos(
+        self,
+        gamma_0: float,
+        omega: float,
+        n_cycles: int = 2,
+        n_points_per_cycle: int = 256,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Simulate LAOS response for given strain amplitude and frequency.
+
+        Generates time-domain stress response to sinusoidal strain input:
+            gamma(t) = gamma_0 * sin(omega * t)
+
+        For SGR model, the stress response is computed using the complex modulus
+        in the linear viscoelastic approximation, with nonlinearity arising from
+        strain-dependent softening at large amplitudes.
+
+        Args:
+            gamma_0: Strain amplitude (dimensionless)
+            omega: Angular frequency (rad/s)
+            n_cycles: Number of oscillation cycles to simulate
+            n_points_per_cycle: Number of time points per cycle
+
+        Returns:
+            strain: Strain array gamma(t)
+            stress: Stress array sigma(t)
+
+        Example:
+            >>> model = SGRGeneric()
+            >>> model.parameters.set_value("x", 1.5)
+            >>> strain, stress = model.simulate_laos(gamma_0=0.1, omega=1.0)
+        """
+        # Store LAOS parameters
+        self._gamma_0 = gamma_0
+        self._omega_laos = omega
+
+        # Get model parameters
+        x = self.parameters.get_value("x")
+        G0_scale = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
+
+        # Time array
+        period = 2.0 * np.pi / omega
+        t_max = n_cycles * period
+        n_points = n_cycles * n_points_per_cycle
+        t = np.linspace(0, t_max, n_points, endpoint=False)
+
+        # Strain: gamma(t) = gamma_0 * sin(omega * t)
+        strain = gamma_0 * np.sin(omega * t)
+
+        # Strain rate: gamma_dot(t) = gamma_0 * omega * cos(omega * t)
+        strain_rate = gamma_0 * omega * np.cos(omega * t)
+
+        # Get complex modulus at this frequency
+        omega_arr = np.array([omega])
+        G_star = self._predict_oscillation_jit(
+            jnp.asarray(omega_arr), x, G0_scale, tau0
+        )
+        G_prime = float(G_star[0, 0])
+        G_double_prime = float(G_star[0, 1])
+
+        # In linear viscoelastic regime:
+        # sigma(t) = G' * gamma(t) + (G'' / omega) * gamma_dot(t)
+        # sigma(t) = G' * gamma_0 * sin(omega*t) + G'' * gamma_0 * cos(omega*t)
+        stress = G_prime * strain + (G_double_prime / omega) * strain_rate
+
+        # Add weak nonlinearity based on SGR physics for large amplitudes
+        # Large strains can cause local yielding events in SGR
+        # Approximate this by adding strain-softening at large |gamma|
+        if gamma_0 > 0.1:  # Only for larger amplitudes
+            # Strain-softening factor: reduces stress at high strains
+            softening = 1.0 - 0.1 * (np.abs(strain) / gamma_0) ** 2
+            stress = stress * softening
+
+        return strain, stress
+
+    def extract_laos_harmonics(
+        self,
+        stress: np.ndarray,
+        n_points_per_cycle: int = 256,
+    ) -> dict:
+        """Extract Fourier harmonics from LAOS stress response.
+
+        Performs FFT analysis to extract harmonic amplitudes and phases:
+            sigma(t) = sum_n I_n * sin(n*omega*t + phi_n)
+
+        For LAOS, odd harmonics (n = 1, 3, 5, ...) dominate due to symmetry.
+
+        Args:
+            stress: Stress time series from simulate_laos()
+            n_points_per_cycle: Points per oscillation cycle
+
+        Returns:
+            Dictionary containing:
+            - I_1, I_3, I_5, ...: Harmonic amplitudes
+            - phi_1, phi_3, phi_5, ...: Phase angles
+            - I_3_I_1, I_5_I_1, ...: Relative intensities
+
+        Example:
+            >>> strain, stress = model.simulate_laos(gamma_0=0.5, omega=1.0)
+            >>> harmonics = model.extract_laos_harmonics(stress)
+            >>> print(f"Third harmonic ratio: {harmonics['I_3_I_1']:.4f}")
+        """
+        # Use last complete cycle for steady-state analysis
+        stress_cycle = stress[-n_points_per_cycle:]
+
+        # FFT of stress signal
+        stress_fft = np.fft.fft(stress_cycle)
+        n = len(stress_cycle)
+
+        # Frequency indices for harmonics
+        # Fundamental is at index 1 (one complete cycle in the window)
+        fundamental_idx = 1
+
+        # Extract harmonic amplitudes (magnitude) and phases
+        harmonics = {}
+
+        # Fundamental (n=1)
+        I_1 = 2.0 * np.abs(stress_fft[fundamental_idx]) / n
+        phi_1 = np.angle(stress_fft[fundamental_idx])
+        harmonics["I_1"] = I_1
+        harmonics["phi_1"] = phi_1
+
+        # Third harmonic (n=3)
+        idx_3 = 3 * fundamental_idx
+        if idx_3 < n // 2:
+            I_3 = 2.0 * np.abs(stress_fft[idx_3]) / n
+            phi_3 = np.angle(stress_fft[idx_3])
+        else:
+            I_3 = 0.0
+            phi_3 = 0.0
+        harmonics["I_3"] = I_3
+        harmonics["phi_3"] = phi_3
+
+        # Fifth harmonic (n=5)
+        idx_5 = 5 * fundamental_idx
+        if idx_5 < n // 2:
+            I_5 = 2.0 * np.abs(stress_fft[idx_5]) / n
+            phi_5 = np.angle(stress_fft[idx_5])
+        else:
+            I_5 = 0.0
+            phi_5 = 0.0
+        harmonics["I_5"] = I_5
+        harmonics["phi_5"] = phi_5
+
+        # Seventh harmonic (n=7)
+        idx_7 = 7 * fundamental_idx
+        if idx_7 < n // 2:
+            I_7 = 2.0 * np.abs(stress_fft[idx_7]) / n
+            phi_7 = np.angle(stress_fft[idx_7])
+        else:
+            I_7 = 0.0
+            phi_7 = 0.0
+        harmonics["I_7"] = I_7
+        harmonics["phi_7"] = phi_7
+
+        # Relative intensities
+        if I_1 > 0:
+            harmonics["I_3_I_1"] = I_3 / I_1
+            harmonics["I_5_I_1"] = I_5 / I_1
+            harmonics["I_7_I_1"] = I_7 / I_1
+        else:
+            harmonics["I_3_I_1"] = 0.0
+            harmonics["I_5_I_1"] = 0.0
+            harmonics["I_7_I_1"] = 0.0
+
+        return harmonics
+
+    def compute_chebyshev_coefficients(
+        self,
+        strain: np.ndarray,
+        stress: np.ndarray,
+        gamma_0: float,
+        omega: float,
+        n_points_per_cycle: int = 256,
+    ) -> dict:
+        """Compute Chebyshev decomposition of LAOS response.
+
+        Decomposes stress into elastic and viscous Chebyshev contributions:
+            sigma(gamma, gamma_dot) = sum_n e_n * T_n(gamma/gamma_0)
+                                    + sum_n v_n * T_n(gamma_dot/gamma_dot_0)
+
+        where T_n are Chebyshev polynomials of the first kind.
+
+        Physical interpretation:
+        - e_n: Elastic (in-phase with strain) Chebyshev coefficients
+        - v_n: Viscous (out-of-phase with strain) Chebyshev coefficients
+        - e_3/e_1 > 0: Strain stiffening
+        - e_3/e_1 < 0: Strain softening
+        - v_3/v_1 > 0: Shear thickening
+        - v_3/v_1 < 0: Shear thinning
+
+        Args:
+            strain: Strain array from simulate_laos()
+            stress: Stress array from simulate_laos()
+            gamma_0: Strain amplitude
+            omega: Angular frequency
+            n_points_per_cycle: Points per oscillation cycle
+
+        Returns:
+            Dictionary containing:
+            - e_1, e_3, e_5: Elastic Chebyshev coefficients
+            - v_1, v_3, v_5: Viscous Chebyshev coefficients
+            - e_3_e_1, v_3_v_1: Normalized coefficients
+
+        Example:
+            >>> strain, stress = model.simulate_laos(gamma_0=0.5, omega=1.0)
+            >>> chebyshev = model.compute_chebyshev_coefficients(
+            ...     strain, stress, gamma_0=0.5, omega=1.0
+            ... )
+            >>> print(f"Strain stiffening ratio: {chebyshev['e_3_e_1']:.4f}")
+        """
+        # Use last complete cycle
+        strain_cycle = strain[-n_points_per_cycle:]
+        stress_cycle = stress[-n_points_per_cycle:]
+
+        # Normalize strain to [-1, 1] for Chebyshev basis
+        gamma_norm = strain_cycle / gamma_0
+
+        # Compute strain rate
+        dt = 2.0 * np.pi / (omega * n_points_per_cycle)
+        gamma_dot = np.gradient(strain_cycle, dt)
+        gamma_dot_0 = gamma_0 * omega
+        gamma_dot_norm = gamma_dot / gamma_dot_0
+
+        # Chebyshev polynomials T_n(x)
+        def T_1(x):
+            return x
+
+        def T_3(x):
+            return 4 * x**3 - 3 * x
+
+        def T_5(x):
+            return 16 * x**5 - 20 * x**3 + 5 * x
+
+        # Elastic coefficients (project onto strain-dependent basis)
+        e_1 = 2.0 * np.mean(stress_cycle * T_1(gamma_norm))
+        e_3 = 2.0 * np.mean(stress_cycle * T_3(gamma_norm))
+        e_5 = 2.0 * np.mean(stress_cycle * T_5(gamma_norm))
+
+        # Viscous coefficients (project onto strain-rate-dependent basis)
+        v_1 = 2.0 * np.mean(stress_cycle * T_1(gamma_dot_norm))
+        v_3 = 2.0 * np.mean(stress_cycle * T_3(gamma_dot_norm))
+        v_5 = 2.0 * np.mean(stress_cycle * T_5(gamma_dot_norm))
+
+        # Build result dictionary
+        chebyshev = {
+            "e_1": e_1,
+            "e_3": e_3,
+            "e_5": e_5,
+            "v_1": v_1,
+            "v_3": v_3,
+            "v_5": v_5,
+        }
+
+        # Normalized coefficients (standard LAOS metrics)
+        if abs(e_1) > 1e-12:
+            chebyshev["e_3_e_1"] = e_3 / e_1
+            chebyshev["e_5_e_1"] = e_5 / e_1
+        else:
+            chebyshev["e_3_e_1"] = 0.0
+            chebyshev["e_5_e_1"] = 0.0
+
+        if abs(v_1) > 1e-12:
+            chebyshev["v_3_v_1"] = v_3 / v_1
+            chebyshev["v_5_v_1"] = v_5 / v_1
+        else:
+            chebyshev["v_3_v_1"] = 0.0
+            chebyshev["v_5_v_1"] = 0.0
+
+        return chebyshev
+
+    def get_lissajous_curve(
+        self,
+        gamma_0: float,
+        omega: float,
+        n_points: int = 256,
+        normalized: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Generate Lissajous curve (stress vs strain) for LAOS.
+
+        Args:
+            gamma_0: Strain amplitude
+            omega: Angular frequency (rad/s)
+            n_points: Number of points in curve
+            normalized: If True, normalize strain and stress
+
+        Returns:
+            strain: Strain array (one period)
+            stress: Stress array (one period)
+
+        Example:
+            >>> strain, stress = model.get_lissajous_curve(gamma_0=0.1, omega=1.0)
+            >>> plt.plot(strain, stress)  # Elastic Lissajous
+        """
+        # Simulate two cycles
+        strain, stress = self.simulate_laos(
+            gamma_0, omega, n_cycles=2, n_points_per_cycle=n_points
+        )
+
+        # Use last cycle for steady-state
+        strain_cycle = strain[-n_points:]
+        stress_cycle = stress[-n_points:]
+
+        if normalized:
+            strain_cycle = strain_cycle / gamma_0
+            stress_max = np.max(np.abs(stress_cycle))
+            if stress_max > 0:
+                stress_cycle = stress_cycle / stress_max
+
+        return strain_cycle, stress_cycle
+
+    # =========================================================================
+    # Dynamic x Evolution Methods (User Story 4)
+    # =========================================================================
+
+    def _poisson_bracket_3d(self, state: np.ndarray) -> np.ndarray:
+        """Compute 3D Poisson bracket operator L(z) for dynamic x mode.
+
+        The 3x3 Poisson bracket maintains antisymmetry and decouples x
+        from reversible dynamics:
+            L = [[0, L_12, 0],
+                 [-L_12, 0, 0],
+                 [0, 0, 0]]
+
+        Args:
+            state: State vector [sigma, lambda, x]
+
+        Returns:
+            3x3 antisymmetric Poisson bracket matrix L
+        """
+        lam = np.clip(state[1], 0.01, 1.0)
+        x = state[2] if len(state) > 2 else self.parameters.get_value("x")
+
+        G0_val = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
+        G0_dim = float(G0(x))
+
+        # Coupling strength for stress-strain relationship
+        G_eff = G0_val * G0_dim * lam
+        L_12 = G_eff / tau0
+
+        # 3x3 antisymmetric Poisson bracket (x decoupled)
+        L = np.array([
+            [0.0, L_12, 0.0],
+            [-L_12, 0.0, 0.0],
+            [0.0, 0.0, 0.0]
+        ])
+
+        return L
+
+    def _friction_matrix_3d(
+        self, state: np.ndarray, gamma_dot: float = 1.0
+    ) -> np.ndarray:
+        """Compute 3D friction matrix M(z) for dynamic x mode.
+
+        Block-diagonal structure for PSD guarantee:
+            M = [[M_11, M_12, 0],
+                 [M_12, M_22, 0],
+                 [0,    0, M_33]]
+
+        Args:
+            state: State vector [sigma, lambda, x]
+            gamma_dot: Current shear rate (for M_33 calculation)
+
+        Returns:
+            3x3 symmetric positive semi-definite friction matrix M
+        """
+        lam = np.clip(state[1], 0.01, 1.0)
+        x = state[2] if len(state) > 2 else self.parameters.get_value("x")
+
+        G0_val = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
+        G0_dim = float(G0(x))
+
+        # Effective modulus and relaxation rate
+        G_eff = G0_val * G0_dim * lam
+        gamma_relax = 1.0 / tau0
+
+        # Yielding factor (Arrhenius-like)
+        yielding_factor = np.exp(-1.0 / x)
+
+        # 2x2 block components (same as 2D)
+        M_11 = yielding_factor * gamma_relax * G_eff
+        M_22 = yielding_factor * gamma_relax * lam * (1.0 - lam)
+        M_12 = 0.0  # Decoupled for simplicity
+
+        # Thixotropy modification to M_22 if enabled
+        if self._thixotropy_enabled:
+            k_build = self.parameters.get_value("k_build")
+            k_break = self.parameters.get_value("k_break")
+            M_22 = k_build * (1.0 - lam) + k_break * np.abs(gamma_dot) * lam
+
+        # M_33: x-related dissipation (aging/rejuvenation)
+        alpha_aging = self.parameters.get_value("alpha_aging")
+        beta_rejuv = self.parameters.get_value("beta_rejuv")
+        M_33 = alpha_aging + beta_rejuv * np.abs(gamma_dot)
+
+        # Block-diagonal 3x3 friction matrix
+        M = np.array([
+            [M_11, M_12, 0.0],
+            [M_12, M_22, 0.0],
+            [0.0, 0.0, M_33]
+        ])
+
+        return M
+
+    def evolve_x(
+        self,
+        t: np.ndarray,
+        gamma_dot: np.ndarray,
+        x0: float | None = None,
+    ) -> np.ndarray:
+        """Evolve noise temperature x(t) for aging/rejuvenation dynamics.
+
+        Evolution equation:
+            dx/dt = alpha_aging * (x_eq - x) + beta_rejuv * |gamma_dot| * (x_ss - x)
+
+        where x_ss = x_eq + x_ss_A * |gamma_dot|^x_ss_n is the steady-state
+        value under shear.
+
+        Args:
+            t: Time array (s)
+            gamma_dot: Shear rate array (1/s), same shape as t
+            x0: Initial noise temperature. If None, uses current x value.
+
+        Returns:
+            x_t: Noise temperature evolution, same shape as t
+
+        Example:
+            >>> model = SGRGeneric(dynamic_x=True)
+            >>> t = np.linspace(0, 100, 1000)
+            >>> gamma_dot = np.where(t < 50, 10.0, 0.0)  # Shear then rest
+            >>> x_t = model.evolve_x(t, gamma_dot, x0=1.0)
+        """
+        if not self._dynamic_x:
+            raise ValueError(
+                "Dynamic x not enabled. Create model with SGRGeneric(dynamic_x=True)."
+            )
+
+        if t.shape != gamma_dot.shape:
+            raise ValueError(
+                f"Time and shear rate arrays must have same shape: "
+                f"t.shape={t.shape}, gamma_dot.shape={gamma_dot.shape}"
+            )
+
+        # Get parameters
+        x_eq = self.parameters.get_value("x_eq")
+        alpha_aging = self.parameters.get_value("alpha_aging")
+        beta_rejuv = self.parameters.get_value("beta_rejuv")
+        x_ss_A = self.parameters.get_value("x_ss_A")
+        x_ss_n = self.parameters.get_value("x_ss_n")
+
+        if x0 is None:
+            x0 = self.parameters.get_value("x")
+
+        # Integrate using Euler method
+        dt = np.diff(t)
+        dt = np.concatenate([[0], dt])
+
+        x_t = np.zeros_like(t)
+        x_t[0] = x0
+
+        for i in range(1, len(t)):
+            gamma_dot_abs = np.abs(gamma_dot[i])
+
+            # Steady-state x under shear
+            x_ss = x_eq + x_ss_A * np.power(gamma_dot_abs + 1e-12, x_ss_n)
+
+            # Evolution: aging toward x_eq at rest, rejuvenation toward x_ss under shear
+            dx_dt = (
+                alpha_aging * (x_eq - x_t[i - 1])
+                + beta_rejuv * gamma_dot_abs * (x_ss - x_t[i - 1])
+            )
+            x_t[i] = x_t[i - 1] + dx_dt * dt[i]
+
+            # Clamp to physical range
+            x_t[i] = np.clip(x_t[i], 0.5, 3.0)
+
+        return x_t
+
+    def free_energy_gradient(self, state: np.ndarray) -> np.ndarray:
+        """Compute gradient dF/dz of free energy.
+
+        The gradient components are:
+        - dF/d(sigma): Conjugate to stress (strain-like)
+        - dF/d(lambda): Conjugate to structure (chemical potential-like)
+        - dF/d(x) = -S: Conjugate to temperature (dynamic x mode only)
+
+        Args:
+            state: State vector [sigma, lambda] or [sigma, lambda, x]
+
+        Returns:
+            Gradient [dF/d(sigma), dF/d(lambda)] or [dF/d(sigma), dF/d(lambda), dF/d(x)]
+        """
+        sigma = state[0]
+        lam = np.clip(state[1], 0.01, 1.0 - 1e-10)
+
+        # Get x from state or parameters
+        if len(state) > 2 and self._dynamic_x:
+            x = state[2]
+        else:
+            x = self.parameters.get_value("x")
+
+        G0_val = self.parameters.get_value("G0")
+        G0_dim = float(G0(x))
+        G_eff = G0_val * G0_dim * lam
+
+        # dU/d(sigma) = sigma / G_eff
+        dU_dsigma = sigma / (G_eff + 1e-20)
+
+        # dU/d(lambda) = -sigma^2 / (2 * G_eff^2) * G0_val * G0_dim
+        dU_dlam = -(sigma**2) / (2.0 * (G_eff + 1e-20) ** 2) * G0_val * G0_dim
+
+        # dS/d(lambda) = -ln(lambda) + ln(1-lambda) = ln((1-lambda)/lambda)
+        dS_dlam = np.log((1.0 - lam) / lam)
+
+        # dF/dz = dU/dz - T * dS/dz
+        dF_dsigma = dU_dsigma
+        dF_dlam = dU_dlam - x * dS_dlam
+
+        if len(state) > 2 and self._dynamic_x:
+            # dF/dx = -S for dynamic x mode
+            # S = -[lambda * ln(lambda) + (1-lambda) * ln(1-lambda)]
+            S = -(lam * np.log(lam) + (1.0 - lam) * np.log(1.0 - lam))
+            dF_dx = -S
+            return np.array([dF_dsigma, dF_dlam, dF_dx])
+        else:
+            return np.array([dF_dsigma, dF_dlam])
+
+    def compute_entropy_production(self, state: np.ndarray) -> float:
+        """Compute entropy production rate W at given state.
+
+        The entropy production is:
+            W = (dF/dz)^T * M(z) * (dF/dz) >= 0
+
+        This must be non-negative (second law of thermodynamics).
+
+        Args:
+            state: State vector [sigma, lambda] or [sigma, lambda, x]
+
+        Returns:
+            Entropy production rate W (must be >= 0)
+
+        Raises:
+            Warning if W < 0 due to numerical errors
+        """
+        # Use appropriate operators based on state dimension
+        if len(state) > 2 and self._dynamic_x:
+            M = self._friction_matrix_3d(state)
+        else:
+            M = self.friction_matrix(state)
+
+        dF_dz = self.free_energy_gradient(state)
+
+        # W = dF^T M dF (quadratic form)
+        W = dF_dz @ M @ dF_dz
+
+        # Check thermodynamic consistency
+        if W < -1e-12:
+            logger.warning(
+                f"Entropy production W = {W:.6e} < 0 at state={state}. "
+                "This violates the second law and may indicate numerical issues."
+            )
+
+        return max(W, 0.0)  # Ensure non-negative for downstream use
+
+    def verify_thermodynamic_consistency(
+        self, state: np.ndarray, tol: float = 1e-10
+    ) -> dict:
+        """Verify all GENERIC thermodynamic consistency conditions.
+
+        Checks:
+        1. Poisson bracket antisymmetry: L = -L^T
+        2. Friction matrix symmetry: M = M^T
+        3. Friction matrix positive semi-definiteness: eigenvalues >= 0
+        4. Entropy production non-negativity: W >= 0
+
+        Args:
+            state: State vector [sigma, lambda] or [sigma, lambda, x]
+            tol: Numerical tolerance for consistency checks
+
+        Returns:
+            Dictionary with consistency check results
+        """
+        # Use appropriate operators based on state dimension
+        if len(state) > 2 and self._dynamic_x:
+            L = self._poisson_bracket_3d(state)
+            M = self._friction_matrix_3d(state)
+        else:
+            L = self.poisson_bracket(state)
+            M = self.friction_matrix(state)
+
+        results = {}
+
+        # 1. Poisson bracket antisymmetry
+        antisym_error = np.max(np.abs(L + L.T))
+        results["poisson_antisymmetric"] = antisym_error < tol
+        results["poisson_antisymmetry_error"] = antisym_error
+
+        # 2. Friction matrix symmetry
+        sym_error = np.max(np.abs(M - M.T))
+        results["friction_symmetric"] = sym_error < tol
+        results["friction_symmetry_error"] = sym_error
+
+        # 3. Friction matrix positive semi-definiteness
+        eigenvalues = np.linalg.eigvalsh(M)
+        min_eig = np.min(eigenvalues)
+        results["friction_positive_semidefinite"] = min_eig >= -tol
+        results["friction_min_eigenvalue"] = min_eig
+
+        # 4. Entropy production non-negativity
+        W = self.compute_entropy_production(state)
+        results["entropy_production_nonnegative"] = W >= -tol
+        results["entropy_production"] = W
+
+        # 5. Overall consistency
+        results["thermodynamically_consistent"] = all(
+            [
+                results["poisson_antisymmetric"],
+                results["friction_symmetric"],
+                results["friction_positive_semidefinite"],
+                results["entropy_production_nonnegative"],
+            ]
+        )
+
+        return results
