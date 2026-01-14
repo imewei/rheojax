@@ -367,7 +367,7 @@ class ModelService:
             "Checking model-data compatibility",
             model=model_name,
             test_mode=test_mode,
-            n_points=len(data.x) if data.x is not None else 0,
+            n_points=len(data.x) if data is not None and data.x is not None else 0,
         )
 
         try:

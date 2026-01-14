@@ -243,7 +243,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
         if file_size_mb > AUTO_CHUNK_THRESHOLD_MB:
             # Log auto-chunking activation
             logger.info(
-                "Auto-chunking enabled",
+                f"Auto-chunking enabled for file ({file_size_mb:.1f} MB, threshold: {AUTO_CHUNK_THRESHOLD_MB} MB)",
                 filepath=str(filepath),
                 file_size_mb=round(file_size_mb, 1),
                 threshold_mb=AUTO_CHUNK_THRESHOLD_MB,

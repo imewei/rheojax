@@ -231,10 +231,12 @@ class TestAntonPaarReader:
 
         file = tmp_path / "ap_export.txt"
         file.write_text(
-            "# Anton Paar MCR export\n"
-            "Time [s];G' [kPa];G'' [kPa]\n"
-            "0.0;1.0;0.1\n"
-            "1.0;0.8;0.08\n"
+            "Project:\tTest\n"
+            "Interval and data points:\t1\t2\n"
+            "Interval data:\tTime\tG'\tG''\n"
+            "\t[s]\t[kPa]\t[kPa]\n"
+            "0.0\t1.0\t0.1\n"
+            "1.0\t0.8\t0.08\n"
         )
 
         data = load_anton_paar(file)
@@ -242,16 +244,24 @@ class TestAntonPaarReader:
         assert isinstance(data, RheoData)
         assert data.domain == "time"
         assert data.x_units == "s"
-        assert data.y_units == "pa"  # kPa normalized
-        assert "y2" in data.metadata
-        assert data.metadata["source"] == "anton_paar"
+        assert data.y_units == "Pa"  # kPa converted and normalized
+        assert data.metadata["source"] == "rheocompass"
+        assert "storage_modulus" in data.metadata["columns"]
+        assert "loss_modulus" in data.metadata["columns"]
         assert len(data.x) == 2
 
     def test_anton_paar_frequency_units(self, tmp_path):
         """Hz frequency input is normalized to rad/s."""
 
         file = tmp_path / "ap_freq.txt"
-        file.write_text("Frequency [Hz]\tG' [Pa]\tG'' [Pa]\n" "1\t10\t2\n" "2\t12\t3\n")
+        file.write_text(
+            "Project:\tTest\n"
+            "Interval and data points:\t1\t2\n"
+            "Interval data:\tFrequency\tG'\tG''\n"
+            "\t[Hz]\t[Pa]\t[Pa]\n"
+            "1\t10\t2\n"
+            "2\t12\t3\n"
+        )
 
         data = load_anton_paar(file)
 

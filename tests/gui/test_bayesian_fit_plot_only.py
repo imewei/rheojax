@@ -101,6 +101,7 @@ def test_bayesian_fit_plot_includes_credible_band(qtbot, monkeypatch) -> None:
         parameters: dict[str, float],
         x_values: np.ndarray,
         test_mode=None,
+        model_kwargs=None,
     ):
         g0 = float(parameters.get("G0", 1.0))
         tau = float(parameters.get("tau", 1.0))
@@ -163,6 +164,7 @@ def test_bayesian_oscillation_complex_includes_component_bands(
         parameters: dict[str, float],
         x_values: np.ndarray,
         test_mode=None,
+        model_kwargs=None,
     ):
         g0 = float(parameters.get("G0", 1.0))
         tau = float(parameters.get("tau", 1.0))
@@ -234,6 +236,7 @@ def test_bayesian_oscillation_y_y2_combined_plots_correctly(qtbot, monkeypatch) 
         parameters: dict[str, float],
         x_values: np.ndarray,
         test_mode=None,
+        model_kwargs=None,
     ):
         xv = np.asarray(x_values)
         # Return a complex prediction with positive components.

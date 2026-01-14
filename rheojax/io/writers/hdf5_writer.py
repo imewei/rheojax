@@ -65,7 +65,7 @@ def save_hdf5(
         logger.debug(
             "Compression settings configured",
             algorithm=compression_algorithm,
-            level=compression_opts,
+            compression_level=compression_opts,
         )
 
     with log_io(logger, "write", filepath=str(filepath)) as ctx:

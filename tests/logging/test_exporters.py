@@ -415,6 +415,8 @@ class TestExporterIntegration:
 
         root_logger = logging.getLogger("rheojax")
         root_logger.addHandler(handler)
+        original_level = root_logger.level
+        root_logger.setLevel(logging.INFO)
 
         try:
             logger = get_logger("rheojax.models.test")
@@ -424,6 +426,7 @@ class TestExporterIntegration:
             assert any("Model fitted" in e.message for e in received)
         finally:
             root_logger.removeHandler(handler)
+            root_logger.setLevel(original_level)
 
     def test_console_exporter_with_log_operation(self, capsys):
         """Test console exporter with log_operation context."""
