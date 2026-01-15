@@ -16,6 +16,11 @@ from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.pipeline_chips import PipelineChips
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.gui.widgets.priors_editor import PriorsEditor
+from rheojax.gui.widgets.pyqtgraph_canvas import (
+    PYQTGRAPH_AVAILABLE,
+    PyQtGraphCanvas,
+    is_pyqtgraph_available,
+)
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 
 __all__ = [
@@ -33,4 +38,7 @@ __all__ = [
     "PriorsEditor",
     "MultiView",
     "ResidualsPanel",
+    "PyQtGraphCanvas",
+    "is_pyqtgraph_available",
+    "PYQTGRAPH_AVAILABLE",
 ]
