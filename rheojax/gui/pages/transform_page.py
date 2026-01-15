@@ -7,8 +7,9 @@ Transform application interface (mastercurve, FFT, SRFS, etc.).
 
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
@@ -23,7 +24,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.logging import get_logger

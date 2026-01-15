@@ -5,8 +5,7 @@ Status Bar
 Application status bar with progress indicators, JAX device status, and memory monitoring.
 """
 
-from PySide6.QtWidgets import QLabel, QProgressBar, QStatusBar, QWidget
-
+from rheojax.gui.compat import QLabel, QProgressBar, QStatusBar, QWidget
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

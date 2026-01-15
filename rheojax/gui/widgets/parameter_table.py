@@ -5,16 +5,17 @@ Parameter Table Widget
 Interactive table for model parameter editing.
 """
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
+    QBrush,
+    QColor,
     QCheckBox,
     QHBoxLayout,
     QTableWidget,
     QTableWidgetItem,
     QWidget,
 )
-
 from rheojax.gui.state.store import ParameterState
 from rheojax.logging import get_logger
 

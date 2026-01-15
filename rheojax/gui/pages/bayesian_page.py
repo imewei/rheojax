@@ -12,8 +12,11 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
+    Slot,
     QCheckBox,
     QComboBox,
     QFileDialog,

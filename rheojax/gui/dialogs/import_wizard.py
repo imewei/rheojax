@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
+
+from rheojax.gui.compat import (
+    Qt,
     QCheckBox,
     QComboBox,
     QFileDialog,

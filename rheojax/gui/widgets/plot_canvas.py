@@ -8,8 +8,8 @@ Matplotlib canvas with interactive controls.
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
-from PySide6.QtWidgets import QVBoxLayout, QWidget
 
+from rheojax.gui.compat import QVBoxLayout, QWidget
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

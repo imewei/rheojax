@@ -7,7 +7,7 @@ Configure NLSQ optimization parameters.
 
 from typing import Any
 
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

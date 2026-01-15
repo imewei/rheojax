@@ -7,8 +7,7 @@ Displays summary metrics for the latest fit and Bayesian runs.
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QTextEdit, QVBoxLayout, QWidget
-
+from rheojax.gui.compat import QLabel, QTextEdit, QVBoxLayout, QWidget
 from rheojax.gui.state.store import BayesianResult, FitResult
 from rheojax.logging import get_logger
 

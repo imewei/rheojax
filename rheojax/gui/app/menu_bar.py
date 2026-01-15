@@ -5,9 +5,7 @@ Menu Bar
 Application menu bar with File, Edit, View, Data, Models, Transforms, Analysis, Tools, and Help menus.
 """
 
-from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QMenuBar, QWidget
-
+from rheojax.gui.compat import QAction, QKeySequence, QMenuBar, QWidget
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

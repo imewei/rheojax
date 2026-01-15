@@ -9,8 +9,11 @@ from typing import Any
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
-from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtWidgets import (
+
+from rheojax.gui.compat import (
+    QSize,
+    Qt,
+    Signal,
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -18,7 +21,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
 )
-
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget
 from rheojax.logging import get_logger
 

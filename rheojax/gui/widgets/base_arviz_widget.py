@@ -12,9 +12,8 @@ from typing import Any
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QWidget
 
+from rheojax.gui.compat import QTimer, QWidget
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

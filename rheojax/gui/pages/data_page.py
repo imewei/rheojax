@@ -8,9 +8,11 @@ Data loading, visualization, and preprocessing interface.
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
+    QDragEnterEvent,
+    QDropEvent,
     QComboBox,
     QFileDialog,
     QFrame,
@@ -26,7 +28,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.state.store import StateStore
 from rheojax.logging import get_logger

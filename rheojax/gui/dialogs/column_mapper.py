@@ -8,7 +8,8 @@ Simple dialog for column reassignment.
 from pathlib import Path
 
 import pandas as pd
-from PySide6.QtWidgets import (
+
+from rheojax.gui.compat import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -22,7 +23,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

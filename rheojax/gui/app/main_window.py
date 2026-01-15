@@ -9,19 +9,24 @@ import uuid
 import webbrowser
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QCloseEvent, QFont, QKeySequence, QShortcut
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
     QApplication,
+    QCloseEvent,
     QDockWidget,
     QFileDialog,
+    QFont,
     QInputDialog,
+    QKeySequence,
     QMainWindow,
     QMessageBox,
+    QShortcut,
     QTabWidget,
     QTextEdit,
     QToolBar,
+    Qt,
     QWidget,
+    Signal,
+    Slot,
 )
 
 from rheojax.gui.app.menu_bar import MenuBar

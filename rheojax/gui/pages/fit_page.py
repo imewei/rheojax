@@ -8,8 +8,11 @@ from typing import Any
 
 import numpy as np
 from matplotlib.figure import Figure
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
+    Slot,
     QAbstractItemView,
     QComboBox,
     QGroupBox,
@@ -20,7 +23,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.gui.services.model_service import ModelService, normalize_model_name
 from rheojax.gui.state.actions import (
     set_active_model,

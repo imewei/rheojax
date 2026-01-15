@@ -70,9 +70,9 @@ def check_dependencies() -> tuple[bool, list[str]]:
     missing: list[str] = []
 
     try:
-        import PySide6  # noqa: F401
+        from rheojax.gui.compat import QT_BINDING  # noqa: F401
     except ImportError:
-        missing.append("PySide6>=6.6.0")
+        missing.append("PySide6>=6.6.0 or PyQt6>=6.6.0")
 
     try:
         import matplotlib  # noqa: F401
@@ -240,12 +240,10 @@ def main(argv: list[str] | None = None) -> int:
 
     logger.debug("Initializing Qt application")
     try:
-        from PySide6.QtCore import Qt, QTimer
-        from PySide6.QtGui import QFont, QIcon
-        from PySide6.QtWidgets import QApplication
+        from rheojax.gui.compat import QApplication, QFont, QIcon, Qt, QTimer
     except ImportError as exc:
-        logger.error("Failed to import PySide6", error=str(exc), exc_info=True)
-        print(f"ERROR: Failed to import PySide6: {exc}", file=sys.stderr)
+        logger.error("Failed to import Qt bindings", error=str(exc), exc_info=True)
+        print(f"ERROR: Failed to import Qt bindings: {exc}", file=sys.stderr)
         return 1
 
     # Configure Qt application attributes before instantiation

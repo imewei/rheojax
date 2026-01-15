@@ -6,8 +6,7 @@ This module provides Qt signals for reactive UI updates on state changes.
 from collections.abc import Callable
 from typing import Any
 
-from PySide6.QtCore import QObject, Signal
-
+from rheojax.gui.compat import QObject, Signal
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

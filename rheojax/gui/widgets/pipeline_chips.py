@@ -5,16 +5,18 @@ Pipeline Chips Widget
 Visual pipeline representation with status indicators.
 """
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
+    Qt,
+    QTimer,
+    Signal,
+    QColor,
+    QFont,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QSizePolicy,
     QWidget,
 )
-
 from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.logging import get_logger
 

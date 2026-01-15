@@ -5,8 +5,9 @@ JAX Status Widget
 GPU/device status indicator with memory monitoring.
 """
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
     QComboBox,
     QFrame,
     QHBoxLayout,
@@ -15,7 +16,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

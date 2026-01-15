@@ -8,8 +8,11 @@ MCMC diagnostics and posterior analysis with ArviZ integration.
 from typing import Any
 
 import numpy as np
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
+    Slot,
     QFileDialog,
     QFrame,
     QGroupBox,
@@ -24,7 +27,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, StateStore
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas

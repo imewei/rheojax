@@ -8,8 +8,10 @@ Residual analysis visualization for model fitting diagnostics.
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
+
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -18,7 +20,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

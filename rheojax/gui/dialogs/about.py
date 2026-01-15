@@ -7,9 +7,9 @@ Application information and credits.
 
 import webbrowser
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
+    Qt,
+    QFont,
     QDialog,
     QDialogButtonBox,
     QLabel,
@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax import __version__
 from rheojax.logging import get_logger
 

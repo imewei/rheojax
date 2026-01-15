@@ -7,9 +7,10 @@ Landing page with quick start actions and recent projects.
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
+    QFont,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -20,7 +21,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.gui.resources.styles import ColorPalette, Spacing
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.jax_status import JAXStatusWidget
@@ -669,11 +669,10 @@ class HomePage(QWidget):
 
     def _open_url(self, url: str, title: str = "") -> None:
         """Open URL in default browser."""
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
+        from rheojax.gui.compat import QtCore, QtGui
 
         logger.debug("Navigation action", target=url, page="HomePage", resource=title)
-        QDesktopServices.openUrl(QUrl(url))
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def load_recent_projects(self) -> list[dict[str, str]]:
         """Load recent project list.

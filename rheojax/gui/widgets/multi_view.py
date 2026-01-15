@@ -9,8 +9,10 @@ from typing import Any
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
+
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
     QComboBox,
     QGridLayout,
     QHBoxLayout,
@@ -20,7 +22,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

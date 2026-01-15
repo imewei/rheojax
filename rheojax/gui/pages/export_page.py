@@ -8,9 +8,12 @@ Result export interface with format selection and batch operations.
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import (
+from rheojax.gui.compat import (
+    Qt,
+    Signal,
+    Slot,
+    QImage,
+    QPixmap,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -26,7 +29,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.gui.services.export_service import ExportService
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.store import StateStore
