@@ -233,7 +233,7 @@ class SmoothDerivative(BaseTransform):
         return dy_dx
 
     def _spline_derivative(self, x: JaxArray, y: JaxArray) -> JaxArray:
-        """Compute derivative using smoothing splines.
+        """Compute derivative using JIT-safe cubic splines via interpax.
 
         Parameters
         ----------
@@ -247,22 +247,29 @@ class SmoothDerivative(BaseTransform):
         jnp.ndarray
             Derivative dy/dx
         """
-        from scipy.interpolate import UnivariateSpline
+        from interpax import CubicSpline
 
-        # Convert to numpy
-        x_np = np.array(x) if isinstance(x, jnp.ndarray) else x
-        y_np = np.array(y) if isinstance(y, jnp.ndarray) else y
+        # Ensure JAX arrays
+        x_jax = jnp.asarray(x)
+        y_jax = jnp.asarray(y)
 
-        # Fit smoothing spline
-        # s parameter controls smoothing (higher = smoother)
-        s = len(x) * 0.01  # Heuristic smoothing parameter
+        # Sort data if needed (interpax requires sorted x)
+        sort_idx = jnp.argsort(x_jax)
+        x_sorted = x_jax[sort_idx]
+        y_sorted = y_jax[sort_idx]
 
-        spline = UnivariateSpline(x_np, y_np, s=s, k=min(5, self.polyorder + 1))
+        # Fit cubic spline (JIT-compatible)
+        spline = CubicSpline(x_sorted, y_sorted)
 
-        # Compute derivative
-        dy_dx = spline.derivative(n=self.deriv)(x_np)
+        # Compute derivative at original x points
+        # interpax splines have .derivative() method
+        dy_dx = spline.derivative(x_sorted, nu=self.deriv)
 
-        return jnp.array(dy_dx)
+        # Unsort if needed
+        unsort_idx = jnp.argsort(sort_idx)
+        dy_dx = dy_dx[unsort_idx]
+
+        return dy_dx
 
     def _total_variation_derivative(
         self, x: JaxArray, y: JaxArray, alpha: float = 0.1

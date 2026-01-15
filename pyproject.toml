@@ -80,6 +80,11 @@ dependencies = [
     "jax>=0.8.2",     # JAX 0.8.0+ for CUDA 12/13 support
     "jaxlib>=0.8.2",  # jaxlib 0.8.0+ - must be compatible with JAX version
 
+    # JAX-compatible scientific computing (§2 Technical Guidelines)
+    "interpax>=0.3.0",    # JIT-safe interpolation (replaces scipy.interpolate)
+    "optimistix>=0.0.9",  # Root-finding and least-squares solvers
+    "optax>=0.2.0",       # Gradient-based optimizers
+
     # Probabilistic programming
     "numpyro>=0.19.0,<1.0.0",
 
@@ -116,6 +121,8 @@ io = [
 ]
 gui = [
     "PySide6>=6.10.1",
+    "qtpy>=2.4.0",        # Qt binding abstraction (PyQt/PySide compatibility)
+    "pyqtgraph>=0.13.0",  # Interactive GPU-accelerated plotting
     "matplotlib>=3.10.8",
     "qasync>=0.28.0",
 ]
