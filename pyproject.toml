@@ -82,8 +82,6 @@ dependencies = [
 
     # JAX-compatible scientific computing (§2 Technical Guidelines)
     "interpax>=0.3.0",    # JIT-safe interpolation (replaces scipy.interpolate)
-    "optimistix>=0.0.9",  # Root-finding and least-squares solvers
-    "optax>=0.2.0",       # Gradient-based optimizers
 
     # Probabilistic programming
     "numpyro>=0.19.0,<1.0.0",

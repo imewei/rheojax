@@ -909,16 +909,14 @@ class SGRGeneric(BaseModel):
             logger.warning(
                 f"Small strain amplitude gamma_0={gamma_0}. Using SAOS approximation."
             )
-            # Extract G', G'' from stress signal via FFT
-            from scipy.fft import fft
-
-            sigma_fft = fft(sigma)
+            # Use JAX-native FFT for JAX-First compliance
+            sigma_fft = jnp.fft.fft(jnp.asarray(sigma))
             n = len(sigma)
             fundamental_idx = int(omega * (t[-1] - t[0]) / (2 * np.pi))
             fundamental_idx = max(1, min(fundamental_idx, n // 2 - 1))
 
-            G_star_amplitude = 2.0 * np.abs(sigma_fft[fundamental_idx]) / (n * gamma_0)
-            phase = np.angle(sigma_fft[fundamental_idx])
+            G_star_amplitude = 2.0 * float(jnp.abs(sigma_fft[fundamental_idx])) / (n * gamma_0)
+            phase = float(jnp.angle(sigma_fft[fundamental_idx]))
 
             G_prime = G_star_amplitude * np.cos(phase)
             G_double_prime = G_star_amplitude * np.sin(phase)
@@ -952,6 +950,12 @@ class SGRGeneric(BaseModel):
             omega: Angular frequency (rad/s)
             n_particles: Number of MC particles
             **kwargs: Optimizer arguments
+
+        Note:
+            Uses scipy.optimize.minimize (L-BFGS-B) because the objective function
+            calls Monte Carlo simulations which are stochastic and not JAX-traceable.
+            This is acceptable per Technical Guidelines as it's used only for large-
+            amplitude LAOS fitting, not the primary oscillation/relaxation modes.
         """
         from scipy.optimize import minimize
 

@@ -1011,6 +1011,13 @@ class Mastercurve(BaseTransform):
             Optimized C1 parameter
         C2_opt : float
             Optimized C2 parameter
+
+        Note
+        ----
+        Uses scipy.optimize.minimize (Nelder-Mead) because the objective function
+        compute_overlap_error() uses NumPy interpolation which is not JAX-traceable.
+        This is acceptable per Technical Guidelines as it's not in a hot path and
+        is called only once during WLF parameter fitting.
         """
         from scipy.optimize import minimize
 
@@ -1021,12 +1028,11 @@ class Mastercurve(BaseTransform):
             self.C2 = C2
             return self.compute_overlap_error(datasets)
 
-        # Optimize
+        # Optimize using Nelder-Mead (derivative-free, appropriate for non-JAX objective)
         result = minimize(
             objective,
             x0=[initial_C1, initial_C2],
             method="Nelder-Mead",
-            bounds=[(5, 50), (20, 200)],
         )
 
         C1_opt, C2_opt = result.x
