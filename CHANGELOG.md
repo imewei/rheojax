@@ -19,6 +19,41 @@ Introduced a robust inventory system that explicitly maps models to their suppor
 - **Updated** GUI `ModelService` to use dynamic categorization based on the registry
 - **Refactored** `test_modes.py` to use the registry as the single source of truth for model compatibility
 
+### Added - Shear Transformation Zone (STZ) Model
+**Plasticity and Transient Flow for Amorphous Solids**
+
+Implemented the STZ model (Langer 2008) for metallic glasses and colloidal suspensions.
+
+- **Added** `rheojax/models/stz/conventional.py`: Conventional STZ implementation
+- **Features**:
+  - Captures yield stress and stress overshoot in startup flow
+  - Internal state variables: effective temperature (χ) and STZ density (Λ)
+  - Three complexity variants: 'minimal', 'standard', 'full'
+  - Full protocol support: Flow, Creep, Relaxation, SAOS, LAOS (via ODE integration)
+- **Dependency**: Added `diffrax` for JAX-native ODE solving of transient dynamics
+
+### Added - SPP Analysis & Yield Stress Model
+**Large Amplitude Oscillatory Shear (LAOS) Characterization**
+
+- **Added** `rheojax/transforms/spp_decomposer.py`: Sequence of Physical Processes (SPP) transform
+  - Decomposes LAOS stress into elastic and viscous components cycle-by-cycle
+  - Extracts transient moduli $G'_t$ and $G''_t$
+- **Added** `rheojax/models/spp/spp_yield_stress.py`: SPP-based yield stress model
+  - Parametric model for static and dynamic yield stresses in LAOS
+- **CLI**: Added `rheojax spp` command for batch analysis of LAOS data
+
+### Added - Expanded Protocol Support
+- **SGR Model**: Added support for `STARTUP` flow (stress growth coefficient $\eta^+(t)$)
+- **Generalized Maxwell**: Added support for `FLOW_CURVE`, `STARTUP`, and `LAOS` (linear response)
+
+### Refactored
+- **Model Organization**: Moved models into subpackages by category (`classical`, `flow`, `fractional`, `sgr`, `stz`, `spp`, `multimode`)
+- **Imports**: Updated `rheojax.models` to export all models from a flat namespace for convenience
+
+### Model Count Update
+- **Updated** Total models: 23 → 25 (added STZConventional, SPPYieldStress)
+- **Updated** Total transforms: 6 → 7 (added SPPDecomposer)
+
 ### Changed - Multi-Chain Parallelization (Production Default)
 **Bayesian inference now defaults to 4 chains for production-ready diagnostics**
 
