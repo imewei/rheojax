@@ -10,7 +10,9 @@ from functools import partial
 from typing import Any, Tuple
 
 import diffrax
+import lineax
 import numpy as np
+import optimistix
 from jax import numpy as jnp
 
 from rheojax.core.jax_config import safe_import_jax
@@ -196,8 +198,12 @@ class STZConventional(STZBase):
         if not result.success:
             logger.warning(f"STZ transient fit warning: {result.message}")
 
+    @staticmethod
+    @partial(
+        jax.jit,
+        static_argnames=["mode", "gamma_dot", "sigma_applied", "sigma_0", "variant"],
+    )
     def _simulate_transient_jit(
-        self,
         t: jnp.ndarray,
         params: dict,
         mode: str,
@@ -269,8 +275,14 @@ class STZConventional(STZBase):
 
         # Set up Diffrax solver
         term = diffrax.ODETerm(lambda ti, yi, args_i: stz_ode_rhs(ti, yi, args_i))
-        solver = diffrax.Tsit5()
-        stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
+
+        # Use Kvaerno3 (L-stable, implicit) for stiff STZ dynamics
+        # Use Newton solver with QR decomposition for robustness
+        root_finder = optimistix.Newton(rtol=1e-3, atol=1e-6, linear_solver=lineax.QR())
+        solver = diffrax.Kvaerno3(root_finder=root_finder)
+
+        # PIDController for adaptive step size
+        stepsize_controller = diffrax.PIDController(rtol=1e-3, atol=1e-5)
 
         t0 = t[0]
         t1 = t[-1]
@@ -288,7 +300,7 @@ class STZConventional(STZBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=1000000,
+            max_steps=10000000,
         )
 
         # Extract stress (index 0)
@@ -460,8 +472,9 @@ class STZConventional(STZBase):
         if not result.success:
             logger.warning(f"STZ LAOS fit warning: {result.message}")
 
+    @staticmethod
+    @partial(jax.jit, static_argnames=["variant"])
     def _simulate_laos_internal(
-        self,
         t: jnp.ndarray,
         params: dict,
         gamma_0: float,
@@ -522,8 +535,12 @@ class STZConventional(STZBase):
             return stz_ode_rhs(ti, yi, args_with_rate)
 
         term = diffrax.ODETerm(laos_ode)
-        solver = diffrax.Tsit5()
-        stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
+
+        # Use Kvaerno3 (L-stable, implicit) for stiff STZ dynamics
+        root_finder = optimistix.Newton(rtol=1e-3, atol=1e-6, linear_solver=lineax.QR())
+        solver = diffrax.Kvaerno3(root_finder=root_finder)
+
+        stepsize_controller = diffrax.PIDController(rtol=1e-3, atol=1e-5)
 
         t0 = t[0]
         t1 = t[-1]
@@ -541,7 +558,7 @@ class STZConventional(STZBase):
             args=base_args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=1000000,
+            max_steps=10000000,
         )
 
         # Extract stress
