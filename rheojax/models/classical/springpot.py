@@ -28,6 +28,7 @@ from jax.scipy.special import gamma as jax_gamma
 
 from rheojax.core.base import BaseModel
 from rheojax.core.data import RheoData
+from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
@@ -37,7 +38,14 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("springpot")
+@ModelRegistry.register(
+    "springpot",
+    protocols=[
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+    ],
+)
 class SpringPot(BaseModel):
     """SpringPot fractional viscoelastic element.
 

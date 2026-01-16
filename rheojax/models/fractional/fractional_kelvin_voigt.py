@@ -38,6 +38,7 @@ from jax.scipy.special import gamma as jax_gamma
 
 from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
+from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.mittag_leffler import mittag_leffler_e
@@ -46,7 +47,14 @@ from rheojax.utils.mittag_leffler import mittag_leffler_e
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("fractional_kelvin_voigt")
+@ModelRegistry.register(
+    "fractional_kelvin_voigt",
+    protocols=[
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+    ],
+)
 class FractionalKelvinVoigt(BaseModel):
     """Fractional Kelvin-Voigt model: Spring and SpringPot in parallel.
 

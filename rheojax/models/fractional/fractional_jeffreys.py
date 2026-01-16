@@ -52,6 +52,7 @@ jax, jnp = safe_import_jax()
 from jax.scipy.special import gamma as jax_gamma
 
 from rheojax.core.base import BaseModel
+from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_fit
@@ -61,7 +62,15 @@ from rheojax.utils.mittag_leffler import mittag_leffler_e2
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("fractional_jeffreys")
+@ModelRegistry.register(
+    "fractional_jeffreys",
+    protocols=[
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+        Protocol.FLOW_CURVE,
+    ],
+)
 class FractionalJeffreysModel(BaseModel):
     """Fractional Jeffreys model.
 

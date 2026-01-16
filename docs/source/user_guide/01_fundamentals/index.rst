@@ -36,6 +36,7 @@ Section Contents
    what_is_rheology
    material_classification
    test_modes
+   model_capabilities
    parameter_interpretation
 
 Section Roadmap

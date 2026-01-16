@@ -9,10 +9,11 @@ from __future__ import annotations
 import importlib
 import inspect
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from rheojax.core.inventory import Protocol, TransformType
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -34,6 +35,8 @@ class PluginInfo:
     plugin_type: PluginType
     metadata: dict[str, Any]
     doc: str | None = None
+    protocols: list[Protocol] = field(default_factory=list)
+    transform_type: TransformType | None = None
 
     def __post_init__(self):
         """Extract documentation from plugin class."""
@@ -99,6 +102,8 @@ class Registry:
         metadata: dict[str, Any] | None = None,
         validate: bool = False,
         force: bool = False,
+        protocols: list[Protocol | str] | None = None,
+        transform_type: TransformType | str | None = None,
     ):
         """Register a plugin in the registry.
 
@@ -109,6 +114,8 @@ class Registry:
             metadata: Optional metadata dictionary
             validate: Whether to validate the plugin interface
             force: Whether to overwrite existing registration
+            protocols: List of supported protocols (for models)
+            transform_type: Type of transform (for transforms)
 
         Raises:
             ValueError: If plugin is already registered (and force=False) or invalid
@@ -125,12 +132,39 @@ class Registry:
         if validate:
             self._validate_plugin(plugin_class, plugin_enum)
 
+        # Normalize protocols
+        normalized_protocols = []
+        if protocols:
+            for p in protocols:
+                if isinstance(p, str):
+                    try:
+                        normalized_protocols.append(Protocol(p))
+                    except ValueError:
+                        logger.warning(f"Invalid protocol '{p}' for plugin '{name}'")
+                elif isinstance(p, Protocol):
+                    normalized_protocols.append(p)
+
+        # Normalize transform_type
+        normalized_transform_type = None
+        if transform_type:
+            if isinstance(transform_type, str):
+                try:
+                    normalized_transform_type = TransformType(transform_type)
+                except ValueError:
+                    logger.warning(
+                        f"Invalid transform_type '{transform_type}' for plugin '{name}'"
+                    )
+            elif isinstance(transform_type, TransformType):
+                normalized_transform_type = transform_type
+
         # Create plugin info
         info = PluginInfo(
             name=name,
             plugin_class=plugin_class,
             plugin_type=plugin_enum,
             metadata=metadata or {},
+            protocols=normalized_protocols,
+            transform_type=normalized_transform_type,
         )
 
         # Register the plugin
@@ -353,11 +387,18 @@ class Registry:
             )
         return plugin_class(*args, **kwargs)
 
-    def find_compatible(self, **criteria) -> list[str]:
+    def find_compatible(
+        self,
+        protocol: Protocol | str | None = None,
+        transform_type: TransformType | str | None = None,
+        **criteria,
+    ) -> list[str]:
         """Find plugins matching certain criteria.
 
         Args:
-            **criteria: Criteria to match against plugin metadata
+            protocol: Filter models by supported protocol
+            transform_type: Filter transforms by type
+            **criteria: Additional criteria to match against plugin metadata
 
         Returns:
             List of plugin names matching all criteria
@@ -365,14 +406,34 @@ class Registry:
         compatible = []
 
         # Check models
-        for name, info in self._models.items():
-            if self._matches_criteria(info.metadata, criteria):
-                compatible.append(name)
+        if transform_type is None:
+            for name, info in self._models.items():
+                # Protocol filtering
+                if protocol:
+                    target_proto = (
+                        Protocol(protocol) if isinstance(protocol, str) else protocol
+                    )
+                    if target_proto not in info.protocols:
+                        continue
+
+                if self._matches_criteria(info.metadata, criteria):
+                    compatible.append(name)
 
         # Check transforms
-        for name, info in self._transforms.items():
-            if self._matches_criteria(info.metadata, criteria):
-                compatible.append(name)
+        if protocol is None:
+            for name, info in self._transforms.items():
+                # Transform type filtering
+                if transform_type:
+                    target_type = (
+                        TransformType(transform_type)
+                        if isinstance(transform_type, str)
+                        else transform_type
+                    )
+                    if info.transform_type != target_type:
+                        continue
+
+                if self._matches_criteria(info.metadata, criteria):
+                    compatible.append(name)
 
         return compatible
 
@@ -405,6 +466,7 @@ class Registry:
                     "class_name": info.plugin_class.__name__,
                     "module": info.plugin_class.__module__,
                     "metadata": info.metadata,
+                    "protocols": [str(p) for p in info.protocols],
                 }
                 for name, info in self._models.items()
             },
@@ -413,6 +475,9 @@ class Registry:
                     "class_name": info.plugin_class.__name__,
                     "module": info.plugin_class.__module__,
                     "metadata": info.metadata,
+                    "transform_type": str(info.transform_type)
+                    if info.transform_type
+                    else None,
                 }
                 for name, info in self._transforms.items()
             },
@@ -429,12 +494,14 @@ class Registry:
             try:
                 module = importlib.import_module(info["module"])
                 plugin_class = getattr(module, info["class_name"])
+                protocols = info.get("protocols", [])
                 self.register(
                     name,
                     plugin_class,
                     PluginType.MODEL,
                     metadata=info.get("metadata", {}),
                     force=True,
+                    protocols=protocols,
                 )
             except (ImportError, AttributeError):
                 continue
@@ -444,22 +511,69 @@ class Registry:
             try:
                 module = importlib.import_module(info["module"])
                 plugin_class = getattr(module, info["class_name"])
+                transform_type = info.get("transform_type")
                 self.register(
                     name,
                     plugin_class,
                     PluginType.TRANSFORM,
                     metadata=info.get("metadata", {}),
                     force=True,
+                    transform_type=transform_type,
                 )
             except (ImportError, AttributeError):
                 continue
 
+    def inventory(self) -> dict[str, Any]:
+        """Get full inventory of registered plugins.
+
+        Returns:
+            Dictionary with models (by protocol) and transforms (by type)
+        """
+        inventory = {
+            "models": {p.value: [] for p in Protocol},
+            "transforms": {t.value: [] for t in TransformType},
+            "all_models": [],
+            "all_transforms": [],
+        }
+
+        # Populate models
+        for name, info in self._models.items():
+            model_entry = {
+                "name": name,
+                "class": info.plugin_class.__name__,
+                "description": info.doc.split("\n")[0] if info.doc else "",
+                "protocols": [p.value for p in info.protocols],
+            }
+            inventory["all_models"].append(model_entry)
+            for p in info.protocols:
+                inventory["models"][p.value].append(name)
+
+        # Populate transforms
+        for name, info in self._transforms.items():
+            transform_entry = {
+                "name": name,
+                "class": info.plugin_class.__name__,
+                "description": info.doc.split("\n")[0] if info.doc else "",
+                "type": info.transform_type.value if info.transform_type else None,
+            }
+            inventory["all_transforms"].append(transform_entry)
+            if info.transform_type:
+                inventory["transforms"][info.transform_type.value].append(name)
+
+        return inventory
+
     # Decorator methods for easy registration
-    def model(self, name: str | None = None, **metadata):
+    def model(
+        self,
+        name: str | None = None,
+        protocols: list[Protocol | str] | None = None,
+        **metadata,
+    ):
         """Decorator for registering a model.
 
         Args:
             name: Optional name for the model (uses class name if not provided)
+            protocols: List of supported protocols
             **metadata: Additional metadata for the model
 
         Returns:
@@ -468,16 +582,28 @@ class Registry:
 
         def decorator(cls):
             model_name = name or cls.__name__
-            self.register(model_name, cls, PluginType.MODEL, metadata=metadata)
+            self.register(
+                model_name,
+                cls,
+                PluginType.MODEL,
+                metadata=metadata,
+                protocols=protocols,
+            )
             return cls
 
         return decorator
 
-    def transform(self, name: str | None = None, **metadata):
+    def transform(
+        self,
+        name: str | None = None,
+        transform_type: TransformType | str | None = None,
+        **metadata,
+    ):
         """Decorator for registering a transform.
 
         Args:
             name: Optional name for the transform (uses class name if not provided)
+            transform_type: Type of transform
             **metadata: Additional metadata for the transform
 
         Returns:
@@ -486,7 +612,13 @@ class Registry:
 
         def decorator(cls):
             transform_name = name or cls.__name__
-            self.register(transform_name, cls, PluginType.TRANSFORM, metadata=metadata)
+            self.register(
+                transform_name,
+                cls,
+                PluginType.TRANSFORM,
+                metadata=metadata,
+                transform_type=transform_type,
+            )
             return cls
 
         return decorator
@@ -499,12 +631,12 @@ class ModelRegistry:
     delegating to the main Registry singleton.
 
     Example:
-        >>> @ModelRegistry.register('maxwell')
+        >>> @ModelRegistry.register('maxwell', protocols=['relaxation'])
         >>> class Maxwell(BaseModel):
         ...     pass
         >>>
         >>> model = ModelRegistry.create('maxwell')
-        >>> models = ModelRegistry.list_models()
+        >>> models = ModelRegistry.find(protocol='relaxation')
     """
 
     _registry = None
@@ -517,25 +649,34 @@ class ModelRegistry:
         return cls._registry
 
     @classmethod
-    def register(cls, name: str, **metadata):
+    def register(
+        cls, name: str, protocols: list[Protocol | str] | None = None, **metadata
+    ):
         """Decorator for registering a model.
 
         Args:
             name: Name for the model
+            protocols: List of supported protocols
             **metadata: Additional metadata for the model
 
         Returns:
             Decorator function
 
         Example:
-            >>> @ModelRegistry.register('maxwell')
+            >>> @ModelRegistry.register('maxwell', protocols=['relaxation', 'oscillation'])
             >>> class Maxwell(BaseModel):
             ...     pass
         """
 
         def decorator(model_class):
             registry = cls._get_registry()
-            registry.register(name, model_class, PluginType.MODEL, metadata=metadata)
+            registry.register(
+                name,
+                model_class,
+                PluginType.MODEL,
+                metadata=metadata,
+                protocols=protocols,
+            )
             return model_class
 
         return decorator
@@ -577,6 +718,20 @@ class ModelRegistry:
         return registry.get_all_models()
 
     @classmethod
+    def find(cls, protocol: Protocol | str | None = None, **criteria) -> list[str]:
+        """Find models matching criteria.
+
+        Args:
+            protocol: Filter by supported protocol
+            **criteria: Additional metadata criteria
+
+        Returns:
+            List of matching model names
+        """
+        registry = cls._get_registry()
+        return registry.find_compatible(protocol=protocol, **criteria)
+
+    @classmethod
     def get_info(cls, name: str) -> PluginInfo | None:
         """Get information about a registered model.
 
@@ -588,8 +743,8 @@ class ModelRegistry:
 
         Example:
             >>> info = ModelRegistry.get_info('maxwell')
-            >>> print(info.doc)
-            Maxwell viscoelastic model...
+            >>> print(info.protocols)
+            [<Protocol.RELAXATION: 'relaxation'>, ...]
         """
         registry = cls._get_registry()
         return registry.get_info(name, PluginType.MODEL)
@@ -612,12 +767,12 @@ class TransformRegistry:
     delegating to the main Registry singleton.
 
     Example:
-        >>> @TransformRegistry.register('fft_analysis')
+        >>> @TransformRegistry.register('fft_analysis', type='spectral')
         >>> class RheoAnalysis(BaseTransform):
         ...     pass
         >>>
         >>> transform = TransformRegistry.create('fft_analysis')
-        >>> transforms = TransformRegistry.list_transforms()
+        >>> transforms = TransformRegistry.find(type='spectral')
     """
 
     _registry = None
@@ -630,18 +785,21 @@ class TransformRegistry:
         return cls._registry
 
     @classmethod
-    def register(cls, name: str, **metadata):
+    def register(
+        cls, name: str, type: TransformType | str | None = None, **metadata
+    ):
         """Decorator for registering a transform.
 
         Args:
             name: Name for the transform
+            type: Type of transform (TransformType)
             **metadata: Additional metadata for the transform
 
         Returns:
             Decorator function
 
         Example:
-            >>> @TransformRegistry.register('fft_analysis')
+            >>> @TransformRegistry.register('fft_analysis', type='spectral')
             >>> class RheoAnalysis(BaseTransform):
             ...     pass
         """
@@ -649,7 +807,11 @@ class TransformRegistry:
         def decorator(transform_class):
             registry = cls._get_registry()
             registry.register(
-                name, transform_class, PluginType.TRANSFORM, metadata=metadata
+                name,
+                transform_class,
+                PluginType.TRANSFORM,
+                metadata=metadata,
+                transform_type=type,
             )
             return transform_class
 
@@ -692,6 +854,20 @@ class TransformRegistry:
         return registry.get_all_transforms()
 
     @classmethod
+    def find(cls, type: TransformType | str | None = None, **criteria) -> list[str]:
+        """Find transforms matching criteria.
+
+        Args:
+            type: Filter by transform type
+            **criteria: Additional metadata criteria
+
+        Returns:
+            List of matching transform names
+        """
+        registry = cls._get_registry()
+        return registry.find_compatible(transform_type=type, **criteria)
+
+    @classmethod
     def get_info(cls, name: str) -> PluginInfo | None:
         """Get information about a registered transform.
 
@@ -703,8 +879,8 @@ class TransformRegistry:
 
         Example:
             >>> info = TransformRegistry.get_info('fft_analysis')
-            >>> print(info.doc)
-            FFT-based rheological analysis...
+            >>> print(info.transform_type)
+            TransformType.SPECTRAL
         """
         registry = cls._get_registry()
         return registry.get_info(name, PluginType.TRANSFORM)
@@ -718,3 +894,4 @@ class TransformRegistry:
         """
         registry = cls._get_registry()
         registry.unregister(name, PluginType.TRANSFORM)
+

@@ -136,7 +136,9 @@ class FitPage(QWidget):
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Mode:"))
         self._mode_combo = QComboBox()
-        self._mode_combo.addItems(["oscillation", "relaxation", "creep", "rotation"])
+        self._mode_combo.addItems(
+            ["oscillation", "relaxation", "creep", "rotation", "startup", "laos"]
+        )
         self._mode_combo.currentTextChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self._mode_combo, 1)
         context_layout.addLayout(mode_row)

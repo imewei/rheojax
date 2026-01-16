@@ -21,6 +21,26 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
 
+### Model Protocol Support Matrix
+
+| Model Type | Model Name | Flow Curve (Steady Shear) | Creep | Relaxation | Start-up | SAOS (Oscillation) | LAOS (Large Amplitude) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Classical** | **Maxwell** | ✅ (Newtonian) | ✅ | ✅ | ❌ | ✅ | ❌ |
+| | **Zener** (SLS) | ✅ (Newtonian) | ✅ | ✅ | ❌ | ✅ | ❌ |
+| | **SpringPot** | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| **Flow** | **Carreau** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| | **Power Law** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| | **Herschel-Bulkley** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| | **Bingham** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| | **Cross** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Fractional** | **Fractional Maxwell** | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| | **Fractional Kelvin-Voigt**| ❌ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| **Multi-mode** | **Generalized Maxwell** | ✅ (Newtonian) | ✅ | ✅ | ✅ (Linear) | ✅ | ✅ (Linear Only) |
+| **SGR** | **SGR Conventional** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **SGR Generic** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **STZ** | **STZ Conventional** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **SPP** | **SPP Yield Stress** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ (Amp. Sweep) |
+
 ### Data & I/O
 - **Data Support**: Automatic test mode detection (relaxation, creep, oscillation, rotation)
 - **File Formats**: TRIOS, CSV, Excel, Anton Paar with format auto-detection

@@ -55,6 +55,7 @@ jax, jnp = safe_import_jax()
 from jax.scipy.special import gamma as jax_gamma
 
 from rheojax.core.base import BaseModel
+from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e
@@ -62,7 +63,14 @@ from rheojax.utils.mittag_leffler import mittag_leffler_e
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("fractional_burgers")
+@ModelRegistry.register(
+    "fractional_burgers",
+    protocols=[
+        Protocol.CREEP,
+        Protocol.RELAXATION,
+        Protocol.OSCILLATION,
+    ],
+)
 class FractionalBurgersModel(BaseModel):
     """Fractional Burgers model.
 

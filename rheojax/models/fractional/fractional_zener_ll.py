@@ -51,13 +51,21 @@ jax, jnp = safe_import_jax()
 
 
 from rheojax.core.base import BaseModel
+from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("fractional_zener_ll")
+@ModelRegistry.register(
+    "fractional_zener_ll",
+    protocols=[
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+    ],
+)
 class FractionalZenerLiquidLiquid(BaseModel):
     """Fractional Zener Liquid-Liquid model.
 

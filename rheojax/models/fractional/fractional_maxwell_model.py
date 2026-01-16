@@ -38,6 +38,7 @@ import numpy as np
 
 from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
+from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
 
@@ -45,7 +46,14 @@ from rheojax.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("fractional_maxwell_model")
+@ModelRegistry.register(
+    "fractional_maxwell_model",
+    protocols=[
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+    ],
+)
 class FractionalMaxwellModel(BaseModel):
     """Fractional Maxwell Model: Two SpringPots in series with independent orders.
 

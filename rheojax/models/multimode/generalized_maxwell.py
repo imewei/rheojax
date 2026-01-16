@@ -30,6 +30,7 @@ import numpy as np
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
 from rheojax.logging import get_logger, log_fit
@@ -59,7 +60,17 @@ else:
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("generalized_maxwell")
+@ModelRegistry.register(
+    "generalized_maxwell",
+    protocols=[
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+        Protocol.FLOW_CURVE,
+        Protocol.STARTUP,
+        Protocol.LAOS,
+    ],
+)
 class GeneralizedMaxwell(BaseModel):
     """Generalized Maxwell Model with N exponential relaxation modes.
 

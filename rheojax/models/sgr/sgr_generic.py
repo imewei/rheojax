@@ -60,6 +60,7 @@ import numpy as np
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
@@ -78,7 +79,17 @@ else:
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("sgr_generic")
+@ModelRegistry.register(
+    "sgr_generic",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.CREEP,
+        Protocol.RELAXATION,
+        Protocol.STARTUP,
+        Protocol.OSCILLATION,
+        Protocol.LAOS,
+    ],
+)
 class SGRGeneric(BaseModel):
     """Soft Glassy Rheology (SGR) GENERIC Thermodynamic Framework Model.
 

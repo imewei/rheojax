@@ -14,6 +14,7 @@ from scipy.signal import savgol_filter
 
 from rheojax.core.base import BaseTransform
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.inventory import TransformType
 from rheojax.core.registry import TransformRegistry
 from rheojax.logging import get_logger, log_transform
 
@@ -36,7 +37,7 @@ type JaxArray = jnp_typing.ndarray
 DerivativeMethod = Literal["savgol", "finite_diff", "spline", "total_variation"]
 
 
-@TransformRegistry.register("smooth_derivative")
+@TransformRegistry.register("smooth_derivative", type=TransformType.PROCESSING)
 class SmoothDerivative(BaseTransform):
     """Smooth noise-robust numerical differentiation.
 

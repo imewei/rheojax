@@ -32,6 +32,7 @@ import numpyro.distributions as dist
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
@@ -48,7 +49,13 @@ if TYPE_CHECKING:
     from rheojax.core.data import RheoData
 
 
-@ModelRegistry.register("spp_yield_stress")
+@ModelRegistry.register(
+    "spp_yield_stress",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.LAOS,
+    ],
+)
 class SPPYieldStress(BaseModel):
     """SPP-based yield stress model for LAOS analysis.
 

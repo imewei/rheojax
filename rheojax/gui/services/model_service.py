@@ -154,56 +154,32 @@ class ModelService:
             "multi_mode": [],
             "sgr": [],
             "spp_laos": [],
+            "stz": [],  # Added STZ category
             "other": [],
         }
 
-        classical = ["maxwell", "zener", "springpot"]
-        fractional_maxwell = [
-            "fractional_maxwell_gel",
-            "fractional_maxwell_liquid",
-            "fractional_maxwell_model",
-            "fractional_kelvin_voigt",
-        ]
-        fractional_zener = [
-            "fractional_zener_sl",
-            "fractional_zener_ss",
-            "fractional_zener_ll",
-            "fractional_kv_zener",
-        ]
-        fractional_advanced = [
-            "fractional_burgers",
-            "fractional_poynting_thomson",
-            "fractional_jeffreys",
-        ]
-        flow = [
-            "power_law",
-            "carreau",
-            "carreau_yasuda",
-            "cross",
-            "herschel_bulkley",
-            "bingham",
-        ]
-        multi_mode = ["generalized_maxwell"]
-        sgr = ["sgr_conventional", "sgr_generic"]
-        spp_laos = ["spp_yield_stress"]
-
+        # known prefixes or exact matches for categorization
+        # In a future update, we should add 'category' to registry metadata
         for model_name in all_models:
-            if model_name in classical:
+            name_lower = model_name.lower()
+            if name_lower in ["maxwell", "zener", "springpot"]:
                 categories["classical"].append(model_name)
-            elif model_name in fractional_maxwell:
+            elif "fractional_maxwell" in name_lower or name_lower == "fractional_kelvin_voigt":
                 categories["fractional_maxwell"].append(model_name)
-            elif model_name in fractional_zener:
+            elif "fractional_zener" in name_lower or "fractional_kv_zener" in name_lower:
                 categories["fractional_zener"].append(model_name)
-            elif model_name in fractional_advanced:
+            elif "fractional" in name_lower and ("burgers" in name_lower or "jeffreys" in name_lower or "poynting" in name_lower):
                 categories["fractional_advanced"].append(model_name)
-            elif model_name in flow:
+            elif name_lower in ["power_law", "carreau", "carreau_yasuda", "cross", "herschel_bulkley", "bingham"]:
                 categories["flow"].append(model_name)
-            elif model_name in multi_mode:
+            elif name_lower == "generalized_maxwell":
                 categories["multi_mode"].append(model_name)
-            elif model_name in sgr:
+            elif name_lower.startswith("sgr"):
                 categories["sgr"].append(model_name)
-            elif model_name in spp_laos:
+            elif name_lower.startswith("spp"):
                 categories["spp_laos"].append(model_name)
+            elif name_lower.startswith("stz"):
+                categories["stz"].append(model_name)
             else:
                 categories["other"].append(model_name)
 
@@ -282,7 +258,36 @@ class ModelService:
                 }
 
             model_name = self._normalize_model_name(model_name)
-            # Create model instance
+
+            # Get registry info for protocols
+            from rheojax.core.registry import ModelRegistry
+            from rheojax.core.test_modes import TestModeEnum
+
+            reg_info = ModelRegistry.get_info(model_name)
+            supported_modes = []
+
+            if reg_info and reg_info.protocols:
+                # Use registered protocols
+                for p in reg_info.protocols:
+                    tm = TestModeEnum.from_protocol(p)
+                    if tm != TestModeEnum.UNKNOWN:
+                        supported_modes.append(tm.value)
+                # Deduplicate
+                supported_modes = list(dict.fromkeys(supported_modes))
+            else:
+                # Fallback to heuristics (should not happen for migrated models)
+                supported_modes = ["relaxation", "creep", "oscillation"]
+                if any(
+                    flow in model_name.lower()
+                    for flow in ["power_law", "carreau", "herschel", "bingham", "cross"]
+                ):
+                    supported_modes = ["flow"]
+                elif "spp" in model_name.lower():
+                    supported_modes = ["oscillation", "rotation"]
+                elif "sgr" in model_name.lower():
+                    supported_modes = ["oscillation", "relaxation"]
+
+            # Create model instance for parameters
             model = self._registry.create_instance(model_name, plugin_type="model")
 
             # Get parameter info
@@ -297,18 +302,6 @@ class ModelService:
 
             # Get docstring
             description = model.__class__.__doc__ or "No description available"
-
-            # Determine supported test modes based on model type
-            supported_modes = ["relaxation", "creep", "oscillation"]
-            if any(
-                flow in model_name.lower()
-                for flow in ["power_law", "carreau", "herschel", "bingham", "cross"]
-            ):
-                supported_modes = ["flow"]
-            elif "spp" in model_name.lower():
-                supported_modes = ["oscillation", "rotation"]
-            elif "sgr" in model_name.lower():
-                supported_modes = ["oscillation", "relaxation"]
 
             logger.debug(
                 "Model info retrieved",

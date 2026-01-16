@@ -10,6 +10,7 @@ import diffrax
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_fit
 from rheojax.models.stz._base import STZBase
@@ -24,7 +25,17 @@ jax, jnp = safe_import_jax()
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("stz_conventional")
+@ModelRegistry.register(
+    "stz_conventional",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.CREEP,
+        Protocol.RELAXATION,
+        Protocol.STARTUP,
+        Protocol.OSCILLATION,
+        Protocol.LAOS,
+    ],
+)
 class STZConventional(STZBase):
     """Conventional Shear Transformation Zone (STZ) Model.
 

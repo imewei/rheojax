@@ -25,6 +25,7 @@ import numpy as np
 
 from rheojax.core.base import BaseModel
 from rheojax.core.data import RheoData
+from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
@@ -34,7 +35,15 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("maxwell")
+@ModelRegistry.register(
+    "maxwell",
+    protocols=[
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+        Protocol.FLOW_CURVE,
+    ],
+)
 class Maxwell(BaseModel):
     """Maxwell viscoelastic model (spring and dashpot in series).
 

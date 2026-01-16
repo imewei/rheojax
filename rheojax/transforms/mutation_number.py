@@ -13,6 +13,7 @@ import numpy as np
 from rheojax.core.base import BaseTransform
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.inventory import TransformType
 from rheojax.core.registry import TransformRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
 from rheojax.logging import get_logger
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 IntegrationMethod = Literal["trapz", "simpson", "cumulative"]
 
 
-@TransformRegistry.register("mutation_number")
+@TransformRegistry.register("mutation_number", type=TransformType.ANALYSIS)
 class MutationNumber(BaseTransform):
     """Calculate mutation number from relaxation modulus data.
 

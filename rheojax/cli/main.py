@@ -6,8 +6,9 @@ Usage:
     rheojax <command> [options]
 
 Commands:
-    spp     - SPP (Sequence of Physical Processes) analysis
-    info    - Display package information
+    spp       - SPP (Sequence of Physical Processes) analysis
+    info      - Display package information
+    inventory - List available models and transforms
 """
 
 from __future__ import annotations
@@ -34,11 +35,14 @@ def create_main_parser() -> argparse.ArgumentParser:
 Commands:
   spp       SPP (Sequence of Physical Processes) analysis for LAOS data
   info      Display package version and configuration info
+  inventory List available models and transforms with protocol support
 
 Examples:
   rheojax spp analyze data.csv --omega 1.0 --gamma-0 0.5
   rheojax spp batch data_dir/ --omega 1.0
   rheojax info
+  rheojax inventory
+  rheojax inventory --protocol laos
 
 For command-specific help:
   rheojax <command> --help
@@ -64,6 +68,23 @@ For command-specific help:
     subparsers.add_parser(
         "info",
         help="Display package information",
+    )
+
+    # Inventory subcommand
+    inventory_parser = subparsers.add_parser(
+        "inventory",
+        help="List available models and transforms",
+    )
+    inventory_parser.add_argument(
+        "--protocol",
+        type=str,
+        help="Filter models by protocol (e.g., laos, creep)",
+    )
+    inventory_parser.add_argument(
+        "--type",
+        type=str,
+        dest="transform_type",
+        help="Filter transforms by type (e.g., spectral, superposition)",
     )
 
     return parser
@@ -97,6 +118,112 @@ def show_info() -> int:
     print(f"Devices:     {devices}")
     print("=" * 40)
 
+    return 0
+
+
+def show_inventory(args: list[str] | None = None) -> int:
+    """Display model and transform inventory."""
+    logger.info("Running CLI command", command="inventory")
+
+    from rheojax.core.registry import Registry
+
+    # Parse args if passed directly (though main parser usually handles this)
+    # Here we assume args are already parsed by main parser if we had access to the namespace
+    # But since main() dispatch passes raw args list, we might need to parse again or just use Registry
+    # Actually main() dispatch structure doesn't pass parsed args, so we rely on Registry capabilities.
+    # Wait, main() passes `args[1:]` to subcommands. But `inventory` parser was defined in main parser.
+    # Let's just use the Registry directly. If filtering is needed, we'd need the parsed args.
+
+    # To keep it simple and consistent with existing `spp` pattern:
+    # We will re-parse the sub-arguments for inventory here.
+    parser = argparse.ArgumentParser(prog="rheojax inventory")
+    parser.add_argument(
+        "--protocol",
+        type=str,
+        help="Filter models by protocol",
+    )
+    parser.add_argument(
+        "--type",
+        type=str,
+        dest="transform_type",
+        help="Filter transforms by type",
+    )
+    parsed_args = parser.parse_args(args or [])
+
+    registry = Registry.get_instance()
+
+    # Force discovery of all models if not already loaded
+    # In a real package this might happen automatically via imports
+    # For now, let's assume models are imported. If not, we might need explicit discovery.
+    # We can try to import the main package to trigger registration.
+    import rheojax.models  # noqa
+    import rheojax.transforms  # noqa
+
+    inv = registry.inventory()
+
+    print("\nRheoJAX Inventory")
+    print("=================")
+
+    # Models
+    print("\nModels")
+    print("------")
+    models = inv["all_models"]
+
+    if parsed_args.protocol:
+        proto = parsed_args.protocol.lower()
+        models = [m for m in models if proto in m["protocols"]]
+        print(f"(Filtered by protocol: {proto})")
+
+    if not models:
+        print("  No models found.")
+    else:
+        # Determine column widths
+        name_width = max(len(m["name"]) for m in models) + 2
+        proto_width = 40
+
+        print(f"{'Name':<{name_width}} {'Protocols':<{proto_width}} {'Description'}")
+        print(f"{'-'*name_width} {'-'*proto_width} {'-'*30}")
+
+        for m in sorted(models, key=lambda x: x["name"]):
+            name = m["name"]
+            protos = ", ".join(m["protocols"])
+            if len(protos) > proto_width - 3:
+                protos = protos[:proto_width-3] + "..."
+            desc = m["description"] or ""
+            if len(desc) > 50:
+                desc = desc[:47] + "..."
+
+            print(f"{name:<{name_width}} {protos:<{proto_width}} {desc}")
+
+    # Transforms
+    print("\nTransforms")
+    print("----------")
+    transforms = inv["all_transforms"]
+
+    if parsed_args.transform_type:
+        ttype = parsed_args.transform_type.lower()
+        transforms = [t for t in transforms if t["type"] == ttype]
+        print(f"(Filtered by type: {ttype})")
+
+    if not transforms:
+        print("  No transforms found.")
+    else:
+        name_width = max(len(t["name"]) for t in transforms) + 2
+        type_width = 15
+
+        print(f"{'Name':<{name_width}} {'Type':<{type_width}} {'Description'}")
+        print(f"{'-'*name_width} {'-'*type_width} {'-'*30}")
+
+        for t in sorted(transforms, key=lambda x: x["name"]):
+            name = t["name"]
+            ttype = t["type"] or "N/A"
+            desc = t["description"] or ""
+            if len(desc) > 50:
+                desc = desc[:47] + "..."
+
+            print(f"{name:<{name_width}} {ttype:<{type_width}} {desc}")
+
+    print("\n")
     return 0
 
 
@@ -137,6 +264,9 @@ def main(args: list[str] | None = None) -> int:
 
     elif command == "info":
         return show_info()
+
+    elif command == "inventory":
+        return show_inventory(args[1:])
 
     elif command in ("--help", "-h"):
         logger.debug("Help requested")

@@ -12,6 +12,7 @@ import numpy as np
 
 from rheojax.core.base import BaseTransform
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.inventory import TransformType
 from rheojax.core.registry import TransformRegistry
 from rheojax.logging import get_logger, log_transform
 
@@ -34,7 +35,7 @@ type JaxArray = jnp_typing.ndarray
 WindowType = Literal["hann", "hamming", "blackman", "bartlett", "none"]
 
 
-@TransformRegistry.register("fft_analysis")
+@TransformRegistry.register("fft_analysis", type=TransformType.SPECTRAL)
 class FFTAnalysis(BaseTransform):
     """Transform time-domain rheological data to frequency domain using FFT.
 

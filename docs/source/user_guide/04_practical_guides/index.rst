@@ -35,6 +35,7 @@ Section Contents
 
    pipeline_api
    modular_api
+   model_inventory
    data_formats
    trios_format
    data_io

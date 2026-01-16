@@ -49,6 +49,7 @@ jax, jnp = safe_import_jax()
 
 
 from rheojax.core.base import BaseModel
+from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.compatibility import format_compatibility_message
@@ -58,7 +59,14 @@ from rheojax.utils.mittag_leffler import mittag_leffler_e
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("fractional_zener_ss")
+@ModelRegistry.register(
+    "fractional_zener_ss",
+    protocols=[
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+    ],
+)
 class FractionalZenerSolidSolid(BaseModel):
     """Fractional Zener Solid-Solid model.
 

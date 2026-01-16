@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
 
@@ -40,6 +41,37 @@ class TestModeEnum(str, Enum):
     def __str__(self) -> str:
         """Return string representation."""
         return self.value
+
+    @classmethod
+    def from_protocol(cls, protocol: Protocol) -> TestModeEnum:
+        """Convert inventory Protocol to TestModeEnum."""
+        if protocol == Protocol.FLOW_CURVE:
+            return cls.ROTATION
+        elif protocol == Protocol.CREEP:
+            return cls.CREEP
+        elif protocol == Protocol.RELAXATION:
+            return cls.RELAXATION
+        elif protocol == Protocol.STARTUP:
+            return cls.ROTATION  # Startup is a transient flow
+        elif protocol == Protocol.OSCILLATION:
+            return cls.OSCILLATION
+        elif protocol == Protocol.SAOS:
+            return cls.OSCILLATION
+        elif protocol == Protocol.LAOS:
+            return cls.OSCILLATION  # LAOS is a type of oscillation
+        return cls.UNKNOWN
+
+    def to_protocol(self) -> Protocol | None:
+        """Convert TestModeEnum to inventory Protocol (best effort)."""
+        if self == self.ROTATION:
+            return Protocol.FLOW_CURVE
+        elif self == self.CREEP:
+            return Protocol.CREEP
+        elif self == self.RELAXATION:
+            return Protocol.RELAXATION
+        elif self == self.OSCILLATION:
+            return Protocol.OSCILLATION
+        return None
 
 
 # Backward compatibility aliases
@@ -281,7 +313,7 @@ def get_compatible_test_modes(model_name: str) -> list[TestMode]:
     """Get compatible test modes for a given model.
 
     Queries the ModelRegistry to determine which test modes are supported
-    by the specified model.
+    by the specified model, using the Protocol-Driven Inventory System.
 
     Args:
         model_name: Name of the rheological model
@@ -291,42 +323,46 @@ def get_compatible_test_modes(model_name: str) -> list[TestMode]:
     """
     from rheojax.core.registry import ModelRegistry
 
-    # Try to get model class from registry
+    # Try to get model info from registry
+    info = ModelRegistry.get_info(model_name)
+
+    if info and info.protocols:
+        # Convert Protocols to TestModes
+        modes = []
+        for p in info.protocols:
+            tm = TestModeEnum.from_protocol(p)
+            if tm != TestModeEnum.UNKNOWN:
+                modes.append(tm)
+        # Deduplicate while preserving order
+        return list(dict.fromkeys(modes))
+
+    # Fallback to legacy detection if no protocols registered
     try:
-        info = ModelRegistry.get_info(model_name)
         if info is None:
             # Unknown model, return common modes
             return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
         model_cls = info.plugin_class
     except (KeyError, ValueError):
-        # Unknown model, return common modes
         return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
 
-    # Check for supported_test_modes attribute
+    # Check for supported_test_modes attribute (legacy)
     if hasattr(model_cls, "supported_test_modes"):
         modes = model_cls.supported_test_modes
         return [TestMode(m) if isinstance(m, str) else m for m in modes]
 
-    # Check for _fit method and infer from docstring or signature
+    # Check for _fit method and infer from docstring or signature (legacy)
     if hasattr(model_cls, "_fit"):
-        # Default modes for viscoelastic models
         modes = [TestMode.OSCILLATION, TestMode.RELAXATION]
-
-        # Check for creep support
         if hasattr(model_cls, "_fit_creep_mode") or hasattr(
             model_cls, "_predict_creep"
         ):
             modes.append(TestMode.CREEP)
-
-        # Check for rotation/steady shear support
         if hasattr(model_cls, "_fit_steady_shear_mode") or hasattr(
             model_cls, "_fit_rotation_mode"
         ):
             modes.append(TestMode.ROTATION)
-
         return modes
 
-    # Default fallback
     return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
 
 
@@ -334,7 +370,7 @@ def suggest_models_for_test_mode(test_mode: TestMode) -> list[str]:
     """Suggest appropriate models for a given test mode.
 
     Queries the ModelRegistry to find models compatible with the specified
-    test mode, prioritizing commonly used models.
+    test mode using the Protocol-Driven Inventory System.
 
     Args:
         test_mode: Detected test mode
@@ -344,23 +380,23 @@ def suggest_models_for_test_mode(test_mode: TestMode) -> list[str]:
     """
     from rheojax.core.registry import ModelRegistry
 
-    # Get all registered models
-    try:
-        all_models = ModelRegistry.list_models()
-    except Exception:
-        # Fallback to static recommendations
-        return _static_recommendations().get(test_mode, [])
-
-    compatible = []
-    for model_name in all_models:
+    # Convert TestMode to Protocol
+    if isinstance(test_mode, str):
         try:
-            modes = get_compatible_test_modes(model_name)
-            if test_mode in modes:
-                compatible.append(model_name)
-        except Exception:
-            continue
+            test_mode = TestMode(test_mode.lower())
+        except ValueError:
+            return []
 
-    # If we found compatible models, return them
+    protocol = test_mode.to_protocol()
+
+    if protocol:
+        # Use new inventory system
+        compatible = ModelRegistry.find(protocol=protocol)
+    else:
+        # Fallback for UNKNOWN or unsupported modes
+        return []
+
+    # If we found compatible models, return them sorted by priority
     if compatible:
         # Prioritize common models
         priority = [
@@ -369,6 +405,7 @@ def suggest_models_for_test_mode(test_mode: TestMode) -> list[str]:
             "sgr_conventional",
             "herschel_bulkley",
             "power_law",
+            "generalized_maxwell",
         ]
         sorted_models = sorted(
             compatible,
@@ -376,21 +413,4 @@ def suggest_models_for_test_mode(test_mode: TestMode) -> list[str]:
         )
         return sorted_models
 
-    # Fallback to static recommendations
-    return _static_recommendations().get(test_mode, [])
-
-
-def _static_recommendations() -> dict[TestMode, list[str]]:
-    """Static model recommendations as fallback."""
-    return {
-        TestMode.RELAXATION: ["maxwell", "zener", "fractional_maxwell_gel"],
-        TestMode.CREEP: ["zener", "fractional_kelvin_voigt"],
-        TestMode.OSCILLATION: [
-            "maxwell",
-            "zener",
-            "sgr_conventional",
-            "fractional_maxwell_gel",
-        ],
-        TestMode.ROTATION: ["power_law", "herschel_bulkley", "carreau", "cross"],
-        TestMode.UNKNOWN: [],
-    }
+    return []
