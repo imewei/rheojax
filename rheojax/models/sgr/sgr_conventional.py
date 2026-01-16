@@ -291,11 +291,13 @@ class SGRConventional(BaseModel):
                     self._fit_steady_shear_mode(X, y, **kwargs)
                 elif test_mode == "laos":
                     self._fit_laos_mode(X, y, **kwargs)
+                elif test_mode == "startup":
+                    self._fit_startup_mode(X, y, **kwargs)
                 else:
                     raise ValueError(
                         f"Unsupported test_mode: {test_mode}. "
                         f"SGR model supports 'oscillation', 'relaxation', 'creep', "
-                        f"'steady_shear', and 'laos'."
+                        f"'steady_shear', 'laos', and 'startup'."
                     )
 
                 # Log final parameters
@@ -837,6 +839,93 @@ class SGRConventional(BaseModel):
 
         self.fitted_ = True
 
+    def _fit_startup_mode(
+        self,
+        t: np.ndarray,
+        eta_plus: np.ndarray,
+        **kwargs,
+    ) -> None:
+        """Fit SGR to startup flow data (stress growth coefficient).
+
+        Uses NLSQ-accelerated optimization to fit SGR parameters [x, G0, tau0]
+        to stress growth coefficient η⁺(t) data from startup flow experiments.
+
+        Args:
+            t: Time array (s)
+            eta_plus: Stress growth coefficient array (Pa·s).
+                      If stress data is provided, must also pass gamma_dot in kwargs.
+            **kwargs: NLSQ optimizer arguments, plus:
+                - gamma_dot: Applied shear rate (required if y is stress, not η⁺)
+                - is_stress: If True, treat y as stress and divide by gamma_dot
+
+        Raises:
+            RuntimeError: If optimization fails to converge
+        """
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+
+        # Check if we need to convert stress to eta_plus
+        gamma_dot = kwargs.get("gamma_dot", 1.0)
+        is_stress = kwargs.get("is_stress", False)
+
+        if is_stress:
+            # Convert stress to stress growth coefficient
+            eta_plus_data = eta_plus / gamma_dot
+        else:
+            eta_plus_data = eta_plus
+
+        # Store gamma_dot for prediction
+        self._startup_gamma_dot = gamma_dot
+
+        # Convert inputs to JAX arrays
+        t_jax = jnp.asarray(t, dtype=jnp.float64)
+        eta_plus_jax = jnp.asarray(eta_plus_data, dtype=jnp.float64)
+
+        # Create model function for NLSQ
+        def model_fn(x_data: jnp.ndarray, params: jnp.ndarray) -> jnp.ndarray:
+            """Stateless model function for optimization."""
+            x_param = params[0]
+            G0_param = params[1]
+            tau0_param = params[2]
+            return self._predict_startup_jit(x_data, x_param, G0_param, tau0_param, gamma_dot)
+
+        # Create residual function (log-space for spanning decades)
+        objective = create_least_squares_objective(
+            model_fn,
+            t_jax,
+            eta_plus_jax,
+            normalize=True,
+            use_log_residuals=kwargs.get("use_log_residuals", True),
+        )
+
+        # Run NLSQ optimization
+        result = nlsq_optimize(
+            objective,
+            self.parameters,
+            use_jax=kwargs.get("use_jax", True),
+            max_iter=kwargs.get("max_iter", 1000),
+            ftol=kwargs.get("ftol", 1e-6),
+            xtol=kwargs.get("xtol", 1e-6),
+            gtol=kwargs.get("gtol", 1e-6),
+        )
+
+        if not result.success:
+            raise RuntimeError(
+                f"SGR startup fitting failed: {result.message}. "
+                "Try adjusting initial values or bounds."
+            )
+
+        logger.debug(
+            f"SGR startup fit converged: x={self.parameters.get_value('x'):.4f}, "
+            f"G0={self.parameters.get_value('G0'):.2e}, "
+            f"tau0={self.parameters.get_value('tau0'):.2e}, "
+            f"cost={result.fun:.3e}"
+        )
+
+        self.fitted_ = True
+
     @staticmethod
     @jax.jit
     def _predict_oscillation_jit(
@@ -1052,6 +1141,8 @@ class SGRConventional(BaseModel):
             return self._predict_steady_shear(X)
         elif self._test_mode == "laos":
             return self._predict_laos(X)
+        elif self._test_mode == "startup":
+            return self._predict_startup(X)
         else:
             raise ValueError(f"Unknown test_mode: {self._test_mode}")
 
@@ -1166,6 +1257,102 @@ class SGRConventional(BaseModel):
             self._gamma_0, self._omega_laos, n_cycles=1, n_points_per_cycle=len(X)
         )
         return stress
+
+    @staticmethod
+    @jax.jit
+    def _predict_startup_jit(
+        t: jnp.ndarray, x: float, G0_scale: float, tau0: float, gamma_dot: float
+    ) -> jnp.ndarray:
+        """JIT-compiled startup flow prediction: eta_plus(t).
+
+        Computes stress growth coefficient η⁺(t) = σ(t)/γ̇ = ∫₀ᵗ G(s) ds.
+
+        For SGR's power-law relaxation G(t) ~ G₀ · (1 + t/τ₀)^(x-2):
+            η⁺(t) = ∫₀ᵗ G(s) ds = G₀ · τ₀ · G₀(x) · [(1+t/τ₀)^(x-1) - 1] / (x-1)
+
+        Special case for x=1:
+            η⁺(t) = G₀ · τ₀ · G₀(x) · ln(1 + t/τ₀)
+
+        Args:
+            t: Time array (s)
+            x: Effective noise temperature (dimensionless)
+            G0_scale: Modulus scale (Pa)
+            tau0: Attempt time (s)
+            gamma_dot: Applied shear rate (1/s)
+
+        Returns:
+            Stress growth coefficient η⁺(t) with shape (M,)
+            Multiply by gamma_dot to get stress σ(t).
+
+        Notes:
+            - At short times: η⁺(t) → G₀ · t (elastic response)
+            - At long times: η⁺(t) → η₀ (zero-shear viscosity)
+            - For x < 1 (glass): η⁺ → ∞ as t → ∞ (no steady state)
+        """
+        from rheojax.utils.sgr_kernels import G0 as G0_func
+
+        # Dimensionless time
+        t_scaled = t / tau0
+
+        # Compute equilibrium modulus factor (dimensionless)
+        G0_dim = G0_func(x)
+
+        epsilon = 1e-12
+        t_safe = jnp.maximum(t_scaled, epsilon)
+
+        # Stress growth exponent: x - 1
+        exp = x - 1.0
+
+        # Integral of G(t) from 0 to t
+        # ∫ G₀·G₀(x)·(1+s/τ₀)^(x-2) ds = G₀·G₀(x)·τ₀ · [(1+t/τ₀)^(x-1) - 1]/(x-1)
+
+        # Handle special case x ≈ 1 separately
+        def x_near_one(_):
+            # ln(1 + t/tau0) for x = 1
+            return G0_scale * G0_dim * tau0 * jnp.log(1.0 + t_safe)
+
+        def x_not_one(_):
+            # [(1+t/tau0)^(x-1) - 1] / (x-1)
+            return G0_scale * G0_dim * tau0 * (
+                (jnp.power(1.0 + t_safe, exp) - 1.0) / exp
+            )
+
+        # Use lax.cond for JIT-compatible branching
+        eta_plus = jax.lax.cond(
+            jnp.abs(exp) < 1e-6,
+            x_near_one,
+            x_not_one,
+            operand=None,
+        )
+
+        return eta_plus
+
+    def _predict_startup(self, t: np.ndarray) -> np.ndarray:
+        """Predict stress growth coefficient in startup flow mode.
+
+        Args:
+            t: Time array (s)
+
+        Returns:
+            Stress growth coefficient η⁺(t) array (Pa·s)
+            To get stress: σ(t) = γ̇ · η⁺(t)
+        """
+        # Get parameters
+        x = self.parameters.get_value("x")
+        G0_scale = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
+
+        # Get stored shear rate (set during fit)
+        gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+
+        # Convert to JAX arrays
+        t_jax = jnp.asarray(t)
+
+        # Call JIT-compiled prediction
+        eta_plus_jax = self._predict_startup_jit(t_jax, x, G0_scale, tau0, gamma_dot)
+
+        # Convert back to numpy
+        return np.array(eta_plus_jax)
 
     def get_phase_regime(self) -> str:
         """Determine material phase regime from noise temperature x.
@@ -1401,6 +1588,7 @@ class SGRConventional(BaseModel):
             - For relaxation: Relaxation modulus with shape (M,)
             - For creep: Creep compliance with shape (M,)
             - For steady_shear: Viscosity with shape (M,)
+            - For startup: Stress growth coefficient with shape (M,)
 
         Note:
             Uses stored test_mode from last fit() call for mode-aware inference.
@@ -1437,6 +1625,9 @@ class SGRConventional(BaseModel):
         elif mode == "laos":
             # For LAOS Bayesian inference, use oscillation response
             return self._predict_oscillation_jit(X_jax, x, G0_scale, tau0)
+        elif mode == "startup":
+            gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+            return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
         else:
             raise ValueError(f"Unsupported test mode: {mode}")
 
