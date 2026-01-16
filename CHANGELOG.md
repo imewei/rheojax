@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - Unreleased
 
+### Added - Protocol-Driven Model Inventory System
+**Type-Safe Discovery for Models and Transforms**
+
+Introduced a robust inventory system that explicitly maps models to their supported experimental protocols and transforms to their mathematical types.
+
+- **Added** `rheojax.core.inventory`: Defines `Protocol` (FLOW_CURVE, LAOS, etc.) and `TransformType` enums
+- **Enhanced** `Registry`: Supports protocol/type metadata and query filtering (`find_compatible()`, `inventory()`)
+- **Added** CLI command `rheojax inventory`: List all models and transforms, filter by protocol/type
+- **Migrated** All 25 models and 7 transforms to declare explicit capabilities via registration decorators
+- **Updated** GUI `ModelService` to use dynamic categorization based on the registry
+- **Refactored** `test_modes.py` to use the registry as the single source of truth for model compatibility
+
 ### Changed - Multi-Chain Parallelization (Production Default)
 **Bayesian inference now defaults to 4 chains for production-ready diagnostics**
 
