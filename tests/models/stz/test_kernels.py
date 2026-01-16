@@ -4,22 +4,23 @@ Tests cover numerical stability, gradient computation, and correct physical beha
 Follows the 2-8 test rule per task group.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from rheojax.core.jax_config import safe_import_jax
 
 # Ensure float64 is enabled
 jax, jnp = safe_import_jax()
 
 from rheojax.models.stz._kernels import (
-    rate_factor_C,
-    transition_T,
-    stz_density,
-    plastic_rate,
     chi_evolution_langer2008,
     lambda_evolution,
     m_evolution,
+    plastic_rate,
+    rate_factor_C,
+    stz_density,
     stz_ode_rhs,
+    transition_T,
 )
 
 

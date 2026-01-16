@@ -6,20 +6,14 @@ supporting multiple protocols (Flow, Transient, SAOS, LAOS) via JAX and Diffrax.
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Any, Tuple
-
 import diffrax
 import numpy as np
-from jax import numpy as jnp
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_fit
 from rheojax.models.stz._base import STZBase
 from rheojax.models.stz._kernels import (
-    plastic_rate,
-    stz_density,
     stz_ode_rhs,
 )
 
@@ -106,7 +100,7 @@ class STZConventional(STZBase):
         stress_jax = jnp.asarray(stress, dtype=jnp.float64)
 
         def model_fn(x_data, params):
-            p_map = {name: val for name, val in zip(self.parameters.keys(), params)}
+            p_map = dict(zip(self.parameters.keys(), params, strict=True))
             return self._predict_steady_shear_jit(
                 x_data,
                 p_map["sigma_y"],
@@ -180,7 +174,7 @@ class STZConventional(STZBase):
 
         # Build model function that uses ODE integration
         def model_fn(x_data, params):
-            p_map = {name: val for name, val in zip(self.parameters.keys(), params)}
+            p_map = dict(zip(self.parameters.keys(), params, strict=True))
             return self._simulate_transient_jit(
                 x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0, self.variant
             )
@@ -334,10 +328,6 @@ class STZConventional(STZBase):
             y: Complex modulus [G', G''] for SAOS, or stress for LAOS
             **kwargs: Required for LAOS: gamma_0, omega
         """
-        from rheojax.utils.optimization import (
-            create_least_squares_objective,
-            nlsq_optimize,
-        )
 
         gamma_0 = kwargs.pop("gamma_0", None)
         omega = kwargs.pop("omega", None)
@@ -380,7 +370,7 @@ class STZConventional(STZBase):
         G_star_jax = jnp.asarray(G_star_2d, dtype=jnp.float64)
 
         def model_fn(x_data, params):
-            p_map = {name: val for name, val in zip(self.parameters.keys(), params)}
+            p_map = dict(zip(self.parameters.keys(), params, strict=True))
             return self._predict_saos_jit(
                 x_data,
                 p_map["G0"],
@@ -443,7 +433,7 @@ class STZConventional(STZBase):
         sigma_jax = jnp.asarray(sigma, dtype=jnp.float64)
 
         def model_fn(x_data, params):
-            p_map = {name: val for name, val in zip(self.parameters.keys(), params)}
+            p_map = dict(zip(self.parameters.keys(), params, strict=True))
             _, stress = self._simulate_laos_internal(
                 x_data, p_map, gamma_0, omega, self.variant
             )
@@ -467,7 +457,7 @@ class STZConventional(STZBase):
         gamma_0: float,
         omega: float,
         variant: str,
-    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Simulate LAOS response using Diffrax.
 
         Args:
@@ -558,7 +548,7 @@ class STZConventional(STZBase):
         omega: float,
         n_cycles: int = 2,
         n_points_per_cycle: int = 256,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Simulate LAOS response.
 
         Args:
@@ -647,7 +637,7 @@ class STZConventional(STZBase):
 
         Routes to appropriate prediction based on test_mode.
         """
-        p_values = {k: v for k, v in zip(self.parameters.keys(), params)}
+        p_values = dict(zip(self.parameters.keys(), params, strict=True))
         mode = test_mode or self._test_mode
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)

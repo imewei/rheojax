@@ -8,15 +8,15 @@ Hierarchical tree view for managing multiple datasets.
 from pathlib import Path
 
 from rheojax.gui.compat import (
-    QPoint,
-    Qt,
-    Signal,
     QBrush,
     QColor,
     QMenu,
+    QPoint,
+    Qt,
     QTreeWidget,
     QTreeWidgetItem,
     QWidget,
+    Signal,
 )
 from rheojax.gui.state.store import DatasetState
 from rheojax.logging import get_logger

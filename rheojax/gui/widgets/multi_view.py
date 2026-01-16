@@ -11,16 +11,16 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
     QComboBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QSizePolicy,
+    Qt,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 from rheojax.logging import get_logger
 

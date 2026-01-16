@@ -6,15 +6,15 @@ Interactive table for model parameter editing.
 """
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
     QBrush,
-    QColor,
     QCheckBox,
+    QColor,
     QHBoxLayout,
+    Qt,
     QTableWidget,
     QTableWidgetItem,
     QWidget,
+    Signal,
 )
 from rheojax.gui.state.store import ParameterState
 from rheojax.logging import get_logger

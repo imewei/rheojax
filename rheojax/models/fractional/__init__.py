@@ -23,7 +23,10 @@ Advanced Fractional Models (3):
 from rheojax.models.fractional.fractional_burgers import FBM, FractionalBurgersModel
 from rheojax.models.fractional.fractional_jeffreys import FJM, FractionalJeffreysModel
 from rheojax.models.fractional.fractional_kelvin_voigt import FractionalKelvinVoigt
-from rheojax.models.fractional.fractional_kv_zener import FKVZ, FractionalKelvinVoigtZener
+from rheojax.models.fractional.fractional_kv_zener import (
+    FKVZ,
+    FractionalKelvinVoigtZener,
+)
 from rheojax.models.fractional.fractional_maxwell_gel import FractionalMaxwellGel
 from rheojax.models.fractional.fractional_maxwell_liquid import FractionalMaxwellLiquid
 from rheojax.models.fractional.fractional_maxwell_model import FractionalMaxwellModel
@@ -32,9 +35,18 @@ from rheojax.models.fractional.fractional_poynting_thomson import (
     FPT,
     FractionalPoyntingThomson,
 )
-from rheojax.models.fractional.fractional_zener_ll import FZLL, FractionalZenerLiquidLiquid
-from rheojax.models.fractional.fractional_zener_sl import FZSL, FractionalZenerSolidLiquid
-from rheojax.models.fractional.fractional_zener_ss import FZSS, FractionalZenerSolidSolid
+from rheojax.models.fractional.fractional_zener_ll import (
+    FZLL,
+    FractionalZenerLiquidLiquid,
+)
+from rheojax.models.fractional.fractional_zener_sl import (
+    FZSL,
+    FractionalZenerSolidLiquid,
+)
+from rheojax.models.fractional.fractional_zener_ss import (
+    FZSS,
+    FractionalZenerSolidSolid,
+)
 
 __all__ = [
     # Mixin

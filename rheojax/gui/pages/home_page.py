@@ -8,8 +8,6 @@ Landing page with quick start actions and recent projects.
 from pathlib import Path
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
     QFont,
     QFrame,
     QGridLayout,
@@ -18,8 +16,10 @@ from rheojax.gui.compat import (
     QLabel,
     QPushButton,
     QScrollArea,
+    Qt,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 from rheojax.gui.resources.styles import ColorPalette, Spacing
 from rheojax.gui.state.store import StateStore

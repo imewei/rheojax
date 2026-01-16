@@ -8,8 +8,6 @@ Transform application interface (mastercurve, FFT, SRFS, etc.).
 from typing import Any
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
@@ -21,8 +19,10 @@ from rheojax.gui.compat import (
     QScrollArea,
     QSizePolicy,
     QSplitter,
+    Qt,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.plot_canvas import PlotCanvas

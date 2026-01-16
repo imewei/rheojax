@@ -17,8 +17,7 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models import Maxwell
-from rheojax.models import Zener
+from rheojax.models import Maxwell, Zener
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

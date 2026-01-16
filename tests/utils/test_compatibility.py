@@ -3,11 +3,13 @@
 import numpy as np
 import pytest
 
-from rheojax.models import FractionalKelvinVoigt
-from rheojax.models import FractionalMaxwellGel
-from rheojax.models import FractionalMaxwellLiquid
-from rheojax.models import FractionalZenerSolidSolid
-from rheojax.models import Maxwell
+from rheojax.models import (
+    FractionalKelvinVoigt,
+    FractionalMaxwellGel,
+    FractionalMaxwellLiquid,
+    FractionalZenerSolidSolid,
+    Maxwell,
+)
 from rheojax.utils.compatibility import (
     DecayType,
     MaterialType,

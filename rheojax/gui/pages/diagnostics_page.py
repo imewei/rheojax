@@ -10,9 +10,6 @@ from typing import Any
 import numpy as np
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
-    Slot,
     QFileDialog,
     QFrame,
     QGroupBox,
@@ -21,11 +18,14 @@ from rheojax.gui.compat import (
     QPushButton,
     QScrollArea,
     QSplitter,
+    Qt,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    Signal,
+    Slot,
 )
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, StateStore

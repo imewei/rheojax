@@ -7,17 +7,17 @@ Application information and credits.
 
 import webbrowser
 
+from rheojax import __version__
 from rheojax.gui.compat import (
-    Qt,
-    QFont,
     QDialog,
     QDialogButtonBox,
+    QFont,
     QLabel,
+    Qt,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
-from rheojax import __version__
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

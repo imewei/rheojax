@@ -12,17 +12,19 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rheojax.models import FractionalBurgersModel
-from rheojax.models import FractionalJeffreysModel
-from rheojax.models import FractionalKelvinVoigt
-from rheojax.models import FractionalKelvinVoigtZener
-from rheojax.models import FractionalMaxwellGel
-from rheojax.models import FractionalMaxwellLiquid
-from rheojax.models import FractionalMaxwellModel
-from rheojax.models import FractionalPoyntingThomson
-from rheojax.models import FractionalZenerLiquidLiquid
-from rheojax.models import FractionalZenerSolidLiquid
-from rheojax.models import FractionalZenerSolidSolid
+from rheojax.models import (
+    FractionalBurgersModel,
+    FractionalJeffreysModel,
+    FractionalKelvinVoigt,
+    FractionalKelvinVoigtZener,
+    FractionalMaxwellGel,
+    FractionalMaxwellLiquid,
+    FractionalMaxwellModel,
+    FractionalPoyntingThomson,
+    FractionalZenerLiquidLiquid,
+    FractionalZenerSolidLiquid,
+    FractionalZenerSolidSolid,
+)
 from rheojax.utils.initialization.fractional_burgers import FractionalBurgersInitializer
 from rheojax.utils.initialization.fractional_jeffreys import (
     FractionalJeffreysInitializer,

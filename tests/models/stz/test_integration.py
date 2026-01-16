@@ -6,8 +6,9 @@ Tests cover:
 - Diagnostics validation (R-hat, ESS)
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from rheojax.core.jax_config import safe_import_jax
 
 # Ensure float64 is enabled

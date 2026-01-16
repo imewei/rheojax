@@ -11,15 +11,15 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolb
 from matplotlib.figure import Figure
 
 from rheojax.gui.compat import (
-    QSize,
-    Qt,
-    Signal,
     QComboBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSize,
     QSizePolicy,
+    Qt,
     QVBoxLayout,
+    Signal,
 )
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget
 from rheojax.logging import get_logger

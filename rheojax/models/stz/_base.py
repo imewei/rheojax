@@ -8,10 +8,9 @@ Provides shared infrastructure for:
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
-from jax import numpy as jnp
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax

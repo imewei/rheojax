@@ -4,8 +4,9 @@ Tests cover steady-state flow curves and transient startup/relaxation behavior.
 Follows the 2-8 test rule per task group.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from rheojax.core.jax_config import safe_import_jax
 
 # Ensure float64 is enabled

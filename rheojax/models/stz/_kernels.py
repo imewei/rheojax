@@ -16,8 +16,6 @@ Key functions:
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe import ensures float64

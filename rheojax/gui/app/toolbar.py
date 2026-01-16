@@ -7,7 +7,7 @@ Main toolbar and related utilities.
 
 from pathlib import Path
 
-from rheojax.gui.compat import QSize, QAction, QIcon, QToolBar, QWidget
+from rheojax.gui.compat import QAction, QIcon, QSize, QToolBar, QWidget
 from rheojax.gui.resources.styles import ColorPalette, Spacing
 from rheojax.logging import get_logger
 

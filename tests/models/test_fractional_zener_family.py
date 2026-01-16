@@ -21,13 +21,22 @@ import numpy as np
 import pytest
 
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models import FBM, FractionalBurgersModel
-from rheojax.models import FJM, FractionalJeffreysModel
-from rheojax.models import FKVZ, FractionalKelvinVoigtZener
-from rheojax.models import FPT, FractionalPoyntingThomson
-from rheojax.models import FZLL, FractionalZenerLiquidLiquid
-from rheojax.models import FZSL, FractionalZenerSolidLiquid
-from rheojax.models import FZSS, FractionalZenerSolidSolid
+from rheojax.models import (
+    FBM,
+    FJM,
+    FKVZ,
+    FPT,
+    FZLL,
+    FZSL,
+    FZSS,
+    FractionalBurgersModel,
+    FractionalJeffreysModel,
+    FractionalKelvinVoigtZener,
+    FractionalPoyntingThomson,
+    FractionalZenerLiquidLiquid,
+    FractionalZenerSolidLiquid,
+    FractionalZenerSolidSolid,
+)
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

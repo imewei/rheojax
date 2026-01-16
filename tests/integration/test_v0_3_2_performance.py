@@ -20,9 +20,7 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models import FractionalZenerSolidSolid
-from rheojax.models import GeneralizedMaxwell
-from rheojax.models import Maxwell
+from rheojax.models import FractionalZenerSolidSolid, GeneralizedMaxwell, Maxwell
 from rheojax.transforms.mastercurve import Mastercurve
 
 jax, jnp = safe_import_jax()

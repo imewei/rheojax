@@ -9,11 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
+    QComboBox,
     QDragEnterEvent,
     QDropEvent,
-    QComboBox,
     QFileDialog,
     QFrame,
     QGroupBox,
@@ -22,11 +20,13 @@ from rheojax.gui.compat import (
     QMessageBox,
     QPushButton,
     QSplitter,
+    Qt,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.state.store import StateStore

@@ -14,9 +14,6 @@ from typing import Any
 import numpy as np
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
-    Slot,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -29,13 +26,15 @@ from rheojax.gui.compat import (
     QPushButton,
     QSpinBox,
     QSplitter,
+    Qt,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    Signal,
+    Slot,
 )
-
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService

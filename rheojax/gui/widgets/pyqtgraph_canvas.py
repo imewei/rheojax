@@ -17,13 +17,13 @@ import numpy as np
 
 try:
     import pyqtgraph as pg
-    from pyqtgraph import PlotWidget, mkPen, mkBrush
+    from pyqtgraph import PlotWidget, mkBrush, mkPen
 
     PYQTGRAPH_AVAILABLE = True
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
 
-from rheojax.gui.compat import QVBoxLayout, QWidget, QHBoxLayout, QPushButton, QComboBox
+from rheojax.gui.compat import QComboBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

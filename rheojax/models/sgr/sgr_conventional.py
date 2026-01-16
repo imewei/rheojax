@@ -47,8 +47,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 import diffrax
+import numpy as np
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
@@ -1532,10 +1532,10 @@ class SGRConventional(BaseModel):
         t0 = t_jax[0]
         t1 = t_jax[-1]
         dt0 = (t1 - t0) / len(t_jax) if len(t_jax) > 1 else 0.001
-        
+
         # Save solution at specified time points
         saveat = diffrax.SaveAt(ts=t_jax)
-        
+
         # Step size controller
         stepsize_controller = diffrax.PIDController(
             rtol=1.4e-8, atol=1.4e-8

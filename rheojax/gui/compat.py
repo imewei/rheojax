@@ -16,17 +16,15 @@ This allows users to choose their preferred Qt binding without code changes.
 
 from __future__ import annotations
 
-import sys
-from typing import TYPE_CHECKING
-
 # Attempt imports in priority order
 QT_BINDING: str = "none"
 QT_VERSION: str = "0.0.0"
 
 try:
     # Priority 1: qtpy abstraction layer (best compatibility)
+    from qtpy import QT_VERSION as _qt_version
     from qtpy import QtCore, QtGui, QtWidgets
-    from qtpy.QtCore import Signal, Slot, Qt, QObject, QThread, QTimer, QSize, QPoint
+    from qtpy.QtCore import QObject, QPoint, QSize, Qt, QThread, QTimer, Signal, Slot
     from qtpy.QtGui import (
         QAction,
         QBrush,
@@ -81,9 +79,9 @@ try:
         QStatusBar,
         QStyle,
         QStyleFactory,
-        QTabWidget,
         QTableWidget,
         QTableWidgetItem,
+        QTabWidget,
         QTextBrowser,
         QTextEdit,
         QToolBar,
@@ -95,7 +93,6 @@ try:
         QWizard,
         QWizardPage,
     )
-    from qtpy import QT_VERSION as _qt_version
     QT_BINDING = "qtpy"
     QT_VERSION = str(_qt_version)
 
@@ -103,7 +100,17 @@ except ImportError:
     try:
         # Priority 2: PySide6 (default for rheojax)
         from PySide6 import QtCore, QtGui, QtWidgets
-        from PySide6.QtCore import Signal, Slot, Qt, QObject, QThread, QTimer, QSize, QPoint
+        from PySide6 import __version__ as _qt_version
+        from PySide6.QtCore import (
+            QObject,
+            QPoint,
+            QSize,
+            Qt,
+            QThread,
+            QTimer,
+            Signal,
+            Slot,
+        )
         from PySide6.QtGui import (
             QAction,
             QBrush,
@@ -158,9 +165,9 @@ except ImportError:
             QStatusBar,
             QStyle,
             QStyleFactory,
-            QTabWidget,
             QTableWidget,
             QTableWidgetItem,
+            QTabWidget,
             QTextBrowser,
             QTextEdit,
             QToolBar,
@@ -172,7 +179,6 @@ except ImportError:
             QWizard,
             QWizardPage,
         )
-        from PySide6 import __version__ as _qt_version
         QT_BINDING = "PySide6"
         QT_VERSION = str(_qt_version)
 
@@ -180,8 +186,10 @@ except ImportError:
         try:
             # Priority 3: PyQt6 (fallback)
             from PyQt6 import QtCore, QtGui, QtWidgets
-            from PyQt6.QtCore import pyqtSignal as Signal, pyqtSlot as Slot
-            from PyQt6.QtCore import Qt, QObject, QThread, QTimer, QSize, QPoint
+            from PyQt6.QtCore import PYQT_VERSION_STR as _qt_version
+            from PyQt6.QtCore import QObject, QPoint, QSize, Qt, QThread, QTimer
+            from PyQt6.QtCore import pyqtSignal as Signal
+            from PyQt6.QtCore import pyqtSlot as Slot
             from PyQt6.QtGui import (
                 QAction,
                 QBrush,
@@ -236,9 +244,9 @@ except ImportError:
                 QStatusBar,
                 QStyle,
                 QStyleFactory,
-                QTabWidget,
                 QTableWidget,
                 QTableWidgetItem,
+                QTabWidget,
                 QTextBrowser,
                 QTextEdit,
                 QToolBar,
@@ -250,7 +258,6 @@ except ImportError:
                 QWizard,
                 QWizardPage,
             )
-            from PyQt6.QtCore import PYQT_VERSION_STR as _qt_version
             QT_BINDING = "PyQt6"
             QT_VERSION = str(_qt_version)
 

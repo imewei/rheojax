@@ -6,16 +6,16 @@ Visual pipeline representation with status indicators.
 """
 
 from rheojax.gui.compat import (
-    Qt,
-    QTimer,
-    Signal,
     QColor,
     QFont,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QSizePolicy,
+    Qt,
+    QTimer,
     QWidget,
+    Signal,
 )
 from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.logging import get_logger

@@ -9,6 +9,8 @@ import uuid
 import webbrowser
 from pathlib import Path
 
+from rheojax.gui.app.menu_bar import MenuBar
+from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.compat import (
     QApplication,
     QCloseEvent,
@@ -20,17 +22,14 @@ from rheojax.gui.compat import (
     QMainWindow,
     QMessageBox,
     QShortcut,
+    Qt,
     QTabWidget,
     QTextEdit,
     QToolBar,
-    Qt,
     QWidget,
     Signal,
     Slot,
 )
-
-from rheojax.gui.app.menu_bar import MenuBar
-from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.dialogs.about import AboutDialog
 from rheojax.gui.dialogs.import_wizard import ImportWizard
 from rheojax.gui.dialogs.preferences import PreferencesDialog

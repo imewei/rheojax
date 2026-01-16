@@ -8,7 +8,6 @@ Application settings and preferences.
 from typing import Any
 
 from rheojax.gui.compat import (
-    Qt,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -20,6 +19,7 @@ from rheojax.gui.compat import (
     QPushButton,
     QSlider,
     QSpinBox,
+    Qt,
     QTabWidget,
     QVBoxLayout,
     QWidget,

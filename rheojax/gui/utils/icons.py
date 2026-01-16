@@ -34,7 +34,7 @@ For Qt icons:
 import sys
 from enum import Enum, auto
 
-from rheojax.gui.compat import QIcon, QApplication, QStyle
+from rheojax.gui.compat import QApplication, QIcon, QStyle
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

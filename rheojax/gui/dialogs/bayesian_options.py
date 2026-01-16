@@ -10,7 +10,6 @@ import random
 from typing import Any
 
 from rheojax.gui.compat import (
-    Qt,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -24,10 +23,10 @@ from rheojax.gui.compat import (
     QPushButton,
     QSlider,
     QSpinBox,
+    Qt,
     QVBoxLayout,
     QWidget,
 )
-
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

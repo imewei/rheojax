@@ -9,25 +9,25 @@ from pathlib import Path
 from typing import Any
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
-    Slot,
-    QImage,
-    QPixmap,
     QCheckBox,
     QComboBox,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
+    QImage,
     QLabel,
     QLineEdit,
     QListWidget,
     QMessageBox,
+    QPixmap,
     QProgressDialog,
     QPushButton,
     QSpinBox,
+    Qt,
     QVBoxLayout,
     QWidget,
+    Signal,
+    Slot,
 )
 from rheojax.gui.services.export_service import ExportService
 from rheojax.gui.services.plot_service import PlotService

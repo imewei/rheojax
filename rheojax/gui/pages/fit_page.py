@@ -10,18 +10,18 @@ import numpy as np
 from matplotlib.figure import Figure
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
-    Slot,
     QAbstractItemView,
     QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    Qt,
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    Signal,
+    Slot,
 )
 from rheojax.gui.services.model_service import ModelService, normalize_model_name
 from rheojax.gui.state.actions import (

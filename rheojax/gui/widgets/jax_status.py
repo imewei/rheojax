@@ -6,15 +6,15 @@ GPU/device status indicator with memory monitoring.
 """
 
 from rheojax.gui.compat import (
-    Qt,
-    Signal,
     QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    Qt,
     QVBoxLayout,
     QWidget,
+    Signal,
 )
 from rheojax.logging import get_logger
 

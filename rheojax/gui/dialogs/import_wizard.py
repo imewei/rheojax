@@ -11,7 +11,6 @@ from typing import Any
 import pandas as pd
 
 from rheojax.gui.compat import (
-    Qt,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -21,6 +20,7 @@ from rheojax.gui.compat import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    Qt,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -28,7 +28,6 @@ from rheojax.gui.compat import (
     QWizard,
     QWizardPage,
 )
-
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
