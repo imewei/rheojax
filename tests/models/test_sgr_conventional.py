@@ -12,7 +12,7 @@ import pytest
 
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.models.sgr_conventional import SGRConventional
+from rheojax.models import SGRConventional
 
 
 class TestSGRConventionalStructure:

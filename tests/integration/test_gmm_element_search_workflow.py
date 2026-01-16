@@ -17,8 +17,8 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.test_modes import TestMode
-from rheojax.models.generalized_maxwell import GeneralizedMaxwell
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import GeneralizedMaxwell
+from rheojax.models import Maxwell
 
 
 @pytest.mark.integration

@@ -8,7 +8,7 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.test_modes import TestMode
-from rheojax.models.bingham import Bingham
+from rheojax.models import Bingham
 
 
 class TestBinghamBasics:

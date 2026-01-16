@@ -25,8 +25,8 @@ import pytest
 from rheojax.core.bayesian import BayesianResult
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.sgr_conventional import SGRConventional
-from rheojax.models.sgr_generic import SGRGeneric
+from rheojax.models import SGRConventional
+from rheojax.models import SGRGeneric
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

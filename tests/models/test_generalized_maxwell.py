@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+from rheojax.models import GeneralizedMaxwell
 
 # Safe JAX import
 jax, jnp = safe_import_jax()

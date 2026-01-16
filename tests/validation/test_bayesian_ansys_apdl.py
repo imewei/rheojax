@@ -28,8 +28,8 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import FractionalZenerSolidSolid
+from rheojax.models import Maxwell
 from rheojax.utils.mittag_leffler import mittag_leffler_e
 
 jax, jnp = safe_import_jax()

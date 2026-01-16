@@ -14,7 +14,7 @@ from jax import numpy as jnp
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.test_modes import TestMode
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import Maxwell
 
 jax, jnp = safe_import_jax()
 

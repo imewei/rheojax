@@ -19,10 +19,10 @@ import pytest
 from rheojax.core.bayesian import BayesianResult
 from rheojax.core.data import RheoData
 from rheojax.core.test_modes import TestMode
-from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
-from rheojax.models.fractional_zener_ll import FractionalZenerLiquidLiquid
-from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import FractionalMaxwellLiquid
+from rheojax.models import FractionalZenerLiquidLiquid
+from rheojax.models import FractionalZenerSolidSolid
+from rheojax.models import Maxwell
 
 
 @pytest.mark.slow

@@ -9,7 +9,7 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.test_modes import TestMode
-from rheojax.models.carreau import Carreau
+from rheojax.models import Carreau
 
 
 class TestCarreauBasics:

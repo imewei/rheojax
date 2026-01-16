@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from rheojax.core.test_modes import TestMode
-from rheojax.models.spp_yield_stress import SPPYieldStress
+from rheojax.models import SPPYieldStress
 
 
 def _synthetic_amplitude_sweep(scale: float = 50.0, exp: float = 0.6):

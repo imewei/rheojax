@@ -12,7 +12,7 @@ import rheojax.models  # Import to trigger all model registrations
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.models.fractional_maxwell_model import FractionalMaxwellModel
+from rheojax.models import FractionalMaxwellModel
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

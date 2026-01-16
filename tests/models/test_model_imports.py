@@ -74,7 +74,7 @@ def test_model_predictions_maintain_float64_precision():
     We test a representative classical model (Maxwell) as all models
     should behave the same due to shared safe_import_jax() mechanism.
     """
-    from rheojax.models.maxwell import Maxwell
+    from rheojax.models import Maxwell
 
     # Create test data
     t = jnp.linspace(0.01, 10.0, 50)
@@ -103,7 +103,7 @@ def test_maxwell_fit_and_predict_smoke_test():
     end-to-end with the new import mechanism. We just verify
     that fitting completes without errors and predictions are float64.
     """
-    from rheojax.models.maxwell import Maxwell
+    from rheojax.models import Maxwell
 
     # Create synthetic relaxation data
     t = np.linspace(0.1, 10.0, 50)
@@ -152,7 +152,7 @@ def test_fractional_model_float64_precision():
     Fractional models use Mittag-Leffler functions which are numerically
     sensitive. This test ensures float64 precision is maintained.
     """
-    from rheojax.models.fractional_maxwell_gel import FractionalMaxwellGel
+    from rheojax.models import FractionalMaxwellGel
 
     # Create test data
     t = jnp.linspace(0.01, 10.0, 50)
@@ -179,7 +179,7 @@ def test_flow_model_float64_precision():
     Flow models have different physics (shear-thinning) but should
     still maintain float64 precision.
     """
-    from rheojax.models.power_law import PowerLaw
+    from rheojax.models import PowerLaw
 
     # Create test data (shear rate)
     gamma_dot = jnp.logspace(-2, 2, 50)
@@ -204,7 +204,7 @@ def test_jax_operations_use_float64_in_models():
     This test creates arrays within model context to ensure
     JAX default dtype is float64.
     """
-    from rheojax.models.maxwell import Maxwell
+    from rheojax.models import Maxwell
 
     # Create model (triggers safe_import_jax in model file)
     model = Maxwell()
@@ -247,7 +247,7 @@ def test_zener_fit_and_predict_smoke_test():
     vs the 2-parameter Maxwell model. We just verify that fitting
     completes and predictions are float64.
     """
-    from rheojax.models.zener import Zener
+    from rheojax.models import Zener
 
     # Create synthetic relaxation data
     t = np.linspace(0.1, 10.0, 50)

@@ -12,7 +12,7 @@ import pytest
 from rheojax.core.bayesian import BayesianMixin, BayesianResult
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.test_modes import TestMode
-from rheojax.models.zener import Zener
+from rheojax.models import Zener
 
 
 class SimpleBayesianModel(BayesianMixin):

@@ -29,8 +29,8 @@ from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.sgr_conventional import SGRConventional
-from rheojax.models.sgr_generic import SGRGeneric
+from rheojax.models import SGRConventional
+from rheojax.models import SGRGeneric
 from rheojax.utils.sgr_kernels import G0, Gp, Z, power_law_exponent, rho_trap
 
 # Safe JAX import (enforces float64)

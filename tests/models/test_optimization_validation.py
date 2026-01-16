@@ -10,20 +10,20 @@ This test suite ensures that all fractional models:
 import numpy as np
 import pytest
 
-from rheojax.models.fractional_burgers import FractionalBurgersModel
-from rheojax.models.fractional_jeffreys import FractionalJeffreysModel
-from rheojax.models.fractional_kelvin_voigt import FractionalKelvinVoigt
-from rheojax.models.fractional_kv_zener import FractionalKelvinVoigtZener
-from rheojax.models.fractional_maxwell_gel import FractionalMaxwellGel
-from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
-from rheojax.models.fractional_maxwell_model import FractionalMaxwellModel
-from rheojax.models.fractional_poynting_thomson import FractionalPoyntingThomson
-from rheojax.models.fractional_zener_ll import FractionalZenerLiquidLiquid
-from rheojax.models.fractional_zener_sl import FractionalZenerSolidLiquid
-from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
-from rheojax.models.maxwell import Maxwell
-from rheojax.models.springpot import SpringPot
-from rheojax.models.zener import Zener
+from rheojax.models import FractionalBurgersModel
+from rheojax.models import FractionalJeffreysModel
+from rheojax.models import FractionalKelvinVoigt
+from rheojax.models import FractionalKelvinVoigtZener
+from rheojax.models import FractionalMaxwellGel
+from rheojax.models import FractionalMaxwellLiquid
+from rheojax.models import FractionalMaxwellModel
+from rheojax.models import FractionalPoyntingThomson
+from rheojax.models import FractionalZenerLiquidLiquid
+from rheojax.models import FractionalZenerSolidLiquid
+from rheojax.models import FractionalZenerSolidSolid
+from rheojax.models import Maxwell
+from rheojax.models import SpringPot
+from rheojax.models import Zener
 
 # List of all fixed models (14 total: 7 fractional + 7 additional)
 ALL_FIXED_MODELS = [

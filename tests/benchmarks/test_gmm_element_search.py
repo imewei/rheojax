@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+from rheojax.models import GeneralizedMaxwell
 
 if TYPE_CHECKING:  # pragma: no cover
     import jax.numpy as jnp_typing

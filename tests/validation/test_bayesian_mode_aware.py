@@ -36,18 +36,18 @@ from scipy import stats
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.test_modes import TestMode
-from rheojax.models.fractional_burgers import FractionalBurgersModel
-from rheojax.models.fractional_jeffreys import FractionalJeffreysModel
-from rheojax.models.fractional_kelvin_voigt import FractionalKelvinVoigt
-from rheojax.models.fractional_kv_zener import FractionalKelvinVoigtZener
-from rheojax.models.fractional_maxwell_gel import FractionalMaxwellGel
-from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
-from rheojax.models.fractional_maxwell_model import FractionalMaxwellModel
-from rheojax.models.fractional_poynting_thomson import FractionalPoyntingThomson
-from rheojax.models.fractional_zener_ll import FractionalZenerLiquidLiquid
-from rheojax.models.fractional_zener_sl import FractionalZenerSolidLiquid
-from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import FractionalBurgersModel
+from rheojax.models import FractionalJeffreysModel
+from rheojax.models import FractionalKelvinVoigt
+from rheojax.models import FractionalKelvinVoigtZener
+from rheojax.models import FractionalMaxwellGel
+from rheojax.models import FractionalMaxwellLiquid
+from rheojax.models import FractionalMaxwellModel
+from rheojax.models import FractionalPoyntingThomson
+from rheojax.models import FractionalZenerLiquidLiquid
+from rheojax.models import FractionalZenerSolidLiquid
+from rheojax.models import FractionalZenerSolidSolid
+from rheojax.models import Maxwell
 
 jax, jnp = safe_import_jax()
 

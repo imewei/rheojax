@@ -12,7 +12,7 @@ import pytest
 from rheojax.core.base import BaseModel
 from rheojax.core.bayesian import BayesianResult
 from rheojax.core.parameters import Parameter, ParameterSet
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import Maxwell
 from rheojax.utils.optimization import OptimizationResult
 
 

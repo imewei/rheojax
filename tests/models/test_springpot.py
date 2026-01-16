@@ -14,7 +14,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
-from rheojax.models.springpot import SpringPot
+from rheojax.models import SpringPot
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()

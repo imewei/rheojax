@@ -8,7 +8,7 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.test_modes import TestMode
-from rheojax.models.power_law import PowerLaw
+from rheojax.models import PowerLaw
 
 
 class TestPowerLawBasics:

@@ -9,7 +9,7 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.test_modes import TestMode
-from rheojax.models.herschel_bulkley import HerschelBulkley
+from rheojax.models import HerschelBulkley
 
 
 class TestHerschelBulkleyBasics:

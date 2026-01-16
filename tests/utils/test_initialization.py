@@ -525,7 +525,7 @@ class TestModelIntegration:
 
     def test_fzss_with_smart_initialization(self):
         """Test FractionalZenerSolidSolid with smart initialization."""
-        from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+        from rheojax.models import FractionalZenerSolidSolid
 
         # Create synthetic oscillation data
         omega = np.logspace(-2, 3, 100)
@@ -553,7 +553,7 @@ class TestModelIntegration:
 
     def test_fkv_with_smart_initialization(self):
         """Test FractionalKelvinVoigt with smart initialization."""
-        from rheojax.models.fractional_kelvin_voigt import FractionalKelvinVoigt
+        from rheojax.models import FractionalKelvinVoigt
 
         omega = np.logspace(-2, 3, 100)
 
@@ -574,7 +574,7 @@ class TestModelIntegration:
 
     def test_smart_initialization_improves_fit(self):
         """Test that smart initialization improves fit quality vs defaults."""
-        from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+        from rheojax.models import FractionalZenerSolidSolid
 
         # Create known data
         omega = np.logspace(-2, 3, 100)

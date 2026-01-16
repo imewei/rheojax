@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from rheojax.core.bayesian import BayesianResult
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import Maxwell
 
 
 @pytest.mark.smoke

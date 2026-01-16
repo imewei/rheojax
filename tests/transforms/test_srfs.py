@@ -81,7 +81,7 @@ class TestSRFSShiftFactor:
     @pytest.mark.smoke
     def test_srfs_mastercurve_collapse(self):
         """Test SRFS mastercurve collapse of flow curves."""
-        from rheojax.models.sgr_conventional import SGRConventional
+        from rheojax.models import SGRConventional
         from rheojax.transforms.srfs import SRFS
 
         # Create SGR model
@@ -139,7 +139,7 @@ class TestThixotropyKinetics:
 
     def test_structural_parameter_lambda_evolution(self):
         """Test structural parameter lambda(t) evolution kinetics."""
-        from rheojax.models.sgr_conventional import SGRConventional
+        from rheojax.models import SGRConventional
 
         # Create model with thixotropy enabled
         model = SGRConventional(dynamic_x=True)
@@ -209,7 +209,7 @@ class TestThixotropyKinetics:
 
     def test_thixotropy_step_up_stress_overshoot(self):
         """Test thixotropy step-up protocol produces stress overshoot."""
-        from rheojax.models.sgr_conventional import SGRConventional
+        from rheojax.models import SGRConventional
 
         # Create model with thixotropy
         model = SGRConventional(dynamic_x=True)
@@ -272,7 +272,7 @@ class TestThixotropyKinetics:
 
     def test_thixotropy_step_down_stress_undershoot(self):
         """Test thixotropy step-down protocol produces stress undershoot."""
-        from rheojax.models.sgr_conventional import SGRConventional
+        from rheojax.models import SGRConventional
 
         # Create model with thixotropy
         model = SGRConventional(dynamic_x=True)

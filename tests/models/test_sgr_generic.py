@@ -22,7 +22,7 @@ import pytest
 
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.models.sgr_generic import SGRGeneric
+from rheojax.models import SGRGeneric
 
 
 class TestSGRGenericThermodynamics:
@@ -192,7 +192,7 @@ class TestSGRGenericModelComparison:
 
     def test_equivalence_to_sgr_conventional_linear_regime(self):
         """Test SGRGeneric matches SGRConventional predictions in linear regime."""
-        from rheojax.models.sgr_conventional import SGRConventional
+        from rheojax.models import SGRConventional
 
         # Create both models with same parameters
         generic = SGRGeneric()

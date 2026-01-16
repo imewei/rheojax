@@ -14,7 +14,7 @@ import pytest
 
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.test_modes import TestMode
-from rheojax.models.fractional_mixin import FractionalModelMixin
+from rheojax.models.fractional import FractionalModelMixin
 
 
 class MockFractionalModel(FractionalModelMixin):
