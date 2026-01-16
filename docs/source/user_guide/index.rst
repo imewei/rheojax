@@ -8,20 +8,20 @@ Welcome to the RheoJAX User Guide, structured as a **16-week graduate course** i
 .. admonition:: How to Use This Guide
    :class: tip
 
-   This guide is organized progressively from fundamentals to advanced topics.
-   Each section includes:
+    This guide is organized progressively from fundamentals to advanced topics.
+    Each section includes:
 
-   - **Learning Objectives**: What you'll master in this section
-   - **Key Concepts**: Essential takeaways presented conceptually
-   - **Worked Examples**: Practical code demonstrations
-   - **Self-Check Questions**: Test your understanding
-   - **Further Reading**: Deep dives into mathematical details
+    - **Learning Objectives**: What you'll master in this section
+    - **Key Concepts**: Essential takeaways presented conceptually
+    - **Worked Examples**: Practical code demonstrations
+    - **Self-Check Questions**: Test your understanding
+    - **Further Reading**: Deep dives into mathematical details
 
-   **For beginners:** Start with Section 1 (Fundamentals) and progress sequentially
+    **For beginners:** Start with Section 1 (Fundamentals) and progress sequentially
 
-   **For experienced users:** Jump directly to Section 3 (Advanced Topics) or Section 4 (Practical Guides)
+    **For experienced users:** Jump directly to Section 3 (Advanced Topics) or Section 4 (Practical Guides)
 
-   **For quick reference:** Use the :doc:`/models/index` or :doc:`/api_reference`
+    **For quick reference:** Use the :doc:`/models/index` or :doc:`/api_reference`
 
 About This Guide
 ----------------
