@@ -6,17 +6,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 24 rheological models (including SGR and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 25 rheological models (including SGR, STZ, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **24 Rheological Models**: Classical (3), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Flow (6), Multi-Mode (1), SGR (2), SPP LAOS (1)
+- **25 Rheological Models**: Classical (3), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Flow (6), Multi-Mode (1), SGR (2), STZ (1), SPP LAOS (1)
 - **7 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition), SPP (Sequence of Physical Processes)
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
-- **Bayesian Inference**: All 24 models support NumPyro NUTS sampling with NLSQ warm-start
+- **Bayesian Inference**: All 25 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
@@ -384,6 +384,34 @@ from rheojax.transforms import detect_shear_banding, compute_shear_band_coexiste
 is_banding = detect_shear_banding(flow_curve)
 ```
 
+### Shear Transformation Zone (STZ) Model
+
+```python
+from rheojax.models import STZConventional
+
+# STZ model for amorphous solids: metallic glasses, colloidal suspensions
+# Based on Langer 2008 effective temperature formulation
+stz = STZConventional(variant='standard')  # 'minimal', 'standard', or 'full'
+
+# Steady-state flow curve fitting
+stz.fit(gamma_dot, stress, test_mode='rotation')
+
+# Transient startup flow (stress overshoot)
+stz.fit(time, stress, test_mode='transient', gamma_dot=1.0)
+
+# Small-amplitude oscillatory shear (SAOS)
+stz.fit(omega, G_star, test_mode='oscillation')
+
+# Large-amplitude oscillatory shear (LAOS) simulation
+result = stz.simulate_laos(gamma_0=0.1, omega=1.0, n_cycles=5)
+harmonics = stz.extract_harmonics(result)
+```
+
+**Key Features:**
+- Three variants: minimal (steady-state), standard (aging/thixotropy), full (LAOS/back-stress)
+- Captures yield stress, stress overshoot, aging, and rejuvenation
+- State variables: effective temperature (χ), STZ density (Λ), orientation (m)
+
 ### Sequence of Physical Processes (SPP) for LAOS Analysis
 
 ```python
@@ -512,6 +540,7 @@ Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 ### Model Handbooks
 
 - [SGR Models](https://rheojax.readthedocs.io/models/sgr/sgr_conventional.html) - SGR Conventional and GENERIC models
+- [STZ Models](https://rheojax.readthedocs.io/models/stz/stz_conventional.html) - Shear Transformation Zone (Langer 2008)
 - [SPP Models](https://rheojax.readthedocs.io/models/spp/spp_decomposer.html) - SPP Decomposer and Yield Stress models
 
 ## Performance

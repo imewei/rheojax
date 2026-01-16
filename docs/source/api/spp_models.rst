@@ -10,7 +10,7 @@ primary objects:
 - :class:`rheojax.transforms.spp_decomposer.SPPDecomposer` — per-cycle LAOS
   decomposition into cage modulus, static/dynamic yield stresses, power-law flow, and
   nonlinearity metrics.
-- :class:`rheojax.models.spp_yield_stress.SPPYieldStress` — a fit-ready model (NLSQ and
+- :class:`rheojax.models.spp.spp_yield_stress.SPPYieldStress` — a fit-ready model (NLSQ and
   NumPyro NUTS) that parameterizes SPP yield behavior across amplitudes or steady shear.
 - :class:`rheojax.pipeline.workflows.SPPAmplitudeSweepPipeline` — convenience pipeline
   for amplitude-sweep LAOS workflows.
@@ -34,7 +34,7 @@ SPPDecomposer
 SPPYieldStress Model
 --------------------
 
-.. autoclass:: rheojax.models.spp_yield_stress.SPPYieldStress
+.. autoclass:: rheojax.models.spp.spp_yield_stress.SPPYieldStress
    :members:
    :undoc-members:
    :show-inheritance:

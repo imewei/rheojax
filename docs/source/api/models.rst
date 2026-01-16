@@ -14,7 +14,7 @@ Classical Models
 Maxwell
 ~~~~~~~
 
-:class:`rheojax.models.maxwell.Maxwell` | Handbook: :doc:`/models/classical/maxwell`
+:class:`rheojax.models.classical.maxwell.Maxwell` | Handbook: :doc:`/models/classical/maxwell`
 Spring and dashpot in series for single-mode relaxation.
 
 .. list-table:: Parameters
@@ -34,7 +34,7 @@ Spring and dashpot in series for single-mode relaxation.
      - [1e-06, 1e+12]
      - Viscosity
 
-.. autoclass:: rheojax.models.maxwell.Maxwell
+.. autoclass:: rheojax.models.classical.maxwell.Maxwell
    :members:
    :undoc-members:
    :show-inheritance:
@@ -42,7 +42,7 @@ Spring and dashpot in series for single-mode relaxation.
 Zener (Standard Linear Solid)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.zener.Zener` | Handbook: :doc:`/models/classical/zener`
+:class:`rheojax.models.classical.zener.Zener` | Handbook: :doc:`/models/classical/zener`
 Adds an equilibrium spring to capture solid plateaus.
 
 .. list-table:: Parameters
@@ -66,7 +66,7 @@ Adds an equilibrium spring to capture solid plateaus.
      - [1e-06, 1e+12]
      - Viscosity
 
-.. autoclass:: rheojax.models.zener.Zener
+.. autoclass:: rheojax.models.classical.zener.Zener
    :members:
    :undoc-members:
    :show-inheritance:
@@ -74,7 +74,7 @@ Adds an equilibrium spring to capture solid plateaus.
 SpringPot
 ~~~~~~~~~
 
-:class:`rheojax.models.springpot.SpringPot` | Handbook: :doc:`/models/classical/springpot`
+:class:`rheojax.models.classical.springpot.SpringPot` | Handbook: :doc:`/models/classical/springpot`
 Fractional element interpolating between elastic and viscous limits.
 
 .. list-table:: Parameters
@@ -94,7 +94,7 @@ Fractional element interpolating between elastic and viscous limits.
      - [0, 1]
      - Power-law exponent (0=fluid, 1=solid)
 
-.. autoclass:: rheojax.models.springpot.SpringPot
+.. autoclass:: rheojax.models.classical.springpot.SpringPot
    :members:
    :undoc-members:
    :show-inheritance:
@@ -105,7 +105,7 @@ Multi-Mode Models
 GeneralizedMaxwell (Prony Series)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.generalized_maxwell.GeneralizedMaxwell` | Handbook: :doc:`/models/multi_mode/generalized_maxwell`
+:class:`rheojax.models.multimode.generalized_maxwell.GeneralizedMaxwell` | Handbook: :doc:`/models/multi_mode/generalized_maxwell`
 N-mode Maxwell elements in parallel for complex relaxation spectra.
 
 **v0.3.0+**: Transparent element minimization with R²-based auto-optimization
@@ -136,7 +136,7 @@ N-mode Maxwell elements in parallel for complex relaxation spectra.
 
 **Element Minimization**: Set ``optimization_factor=1.5`` (default) to auto-reduce N until R² degrades
 
-.. autoclass:: rheojax.models.generalized_maxwell.GeneralizedMaxwell
+.. autoclass:: rheojax.models.multimode.generalized_maxwell.GeneralizedMaxwell
    :members:
    :undoc-members:
    :show-inheritance:
@@ -147,7 +147,7 @@ Fractional Models
 Fractional Maxwell Gel
 ~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_maxwell_gel.FractionalMaxwellGel` | Handbook: :doc:`/models/fractional/fractional_maxwell_gel`
+:class:`rheojax.models.fractional.fractional_maxwell_gel.FractionalMaxwellGel` | Handbook: :doc:`/models/fractional/fractional_maxwell_gel`
 Spring in series with SpringPot for gel-like plateaus.
 
 .. list-table:: Parameters
@@ -171,7 +171,7 @@ Spring in series with SpringPot for gel-like plateaus.
      - [1e-06, 1e+12]
      - Dashpot viscosity
 
-.. autoclass:: rheojax.models.fractional_maxwell_gel.FractionalMaxwellGel
+.. autoclass:: rheojax.models.fractional.fractional_maxwell_gel.FractionalMaxwellGel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -179,7 +179,7 @@ Spring in series with SpringPot for gel-like plateaus.
 Fractional Maxwell Liquid
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_maxwell_liquid.FractionalMaxwellLiquid` | Handbook: :doc:`/models/fractional/fractional_maxwell_liquid`
+:class:`rheojax.models.fractional.fractional_maxwell_liquid.FractionalMaxwellLiquid` | Handbook: :doc:`/models/fractional/fractional_maxwell_liquid`
 SpringPot plus dashpot for liquid-like systems with memory.
 
 .. list-table:: Parameters
@@ -203,7 +203,7 @@ SpringPot plus dashpot for liquid-like systems with memory.
      - [1e-06, 1e+06]
      - Relaxation time
 
-.. autoclass:: rheojax.models.fractional_maxwell_liquid.FractionalMaxwellLiquid
+.. autoclass:: rheojax.models.fractional.fractional_maxwell_liquid.FractionalMaxwellLiquid
    :members:
    :undoc-members:
    :show-inheritance:
@@ -211,7 +211,7 @@ SpringPot plus dashpot for liquid-like systems with memory.
 Fractional Maxwell (General)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_maxwell_model.FractionalMaxwellModel` | Handbook: :doc:`/models/fractional/fractional_maxwell_model`
+:class:`rheojax.models.fractional.fractional_maxwell_model.FractionalMaxwellModel` | Handbook: :doc:`/models/fractional/fractional_maxwell_model`
 Two SpringPots in series for broad relaxation spectra.
 
 .. list-table:: Parameters
@@ -239,7 +239,7 @@ Two SpringPots in series for broad relaxation spectra.
      - [1e-06, 1e+06]
      - Relaxation time
 
-.. autoclass:: rheojax.models.fractional_maxwell_model.FractionalMaxwellModel
+.. autoclass:: rheojax.models.fractional.fractional_maxwell_model.FractionalMaxwellModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -247,7 +247,7 @@ Two SpringPots in series for broad relaxation spectra.
 Fractional Kelvin-Voigt
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_kelvin_voigt.FractionalKelvinVoigt` | Handbook: :doc:`/models/fractional/fractional_kelvin_voigt`
+:class:`rheojax.models.fractional.fractional_kelvin_voigt.FractionalKelvinVoigt` | Handbook: :doc:`/models/fractional/fractional_kelvin_voigt`
 Spring plus SpringPot in parallel for solid-like gels.
 
 .. list-table:: Parameters
@@ -271,7 +271,7 @@ Spring plus SpringPot in parallel for solid-like gels.
      - [0, 1]
      - Fractional order
 
-.. autoclass:: rheojax.models.fractional_kelvin_voigt.FractionalKelvinVoigt
+.. autoclass:: rheojax.models.fractional.fractional_kelvin_voigt.FractionalKelvinVoigt
    :members:
    :undoc-members:
    :show-inheritance:
@@ -279,7 +279,7 @@ Spring plus SpringPot in parallel for solid-like gels.
 Fractional Zener Solid-Liquid
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_zener_sl.FractionalZenerSolidLiquid` | Handbook: :doc:`/models/fractional/fractional_zener_sl`
+:class:`rheojax.models.fractional.fractional_zener_sl.FractionalZenerSolidLiquid` | Handbook: :doc:`/models/fractional/fractional_zener_sl`
 Equilibrium spring parallel to fractional Maxwell arm.
 
 .. list-table:: Parameters
@@ -307,7 +307,7 @@ Equilibrium spring parallel to fractional Maxwell arm.
      - [1e-06, 1e+06]
      - Relaxation time
 
-.. autoclass:: rheojax.models.fractional_zener_sl.FractionalZenerSolidLiquid
+.. autoclass:: rheojax.models.fractional.fractional_zener_sl.FractionalZenerSolidLiquid
    :members:
    :undoc-members:
    :show-inheritance:
@@ -315,7 +315,7 @@ Equilibrium spring parallel to fractional Maxwell arm.
 Fractional Zener Solid-Solid
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_zener_ss.FractionalZenerSolidSolid` | Handbook: :doc:`/models/fractional/fractional_zener_ss`
+:class:`rheojax.models.fractional.fractional_zener_ss.FractionalZenerSolidSolid` | Handbook: :doc:`/models/fractional/fractional_zener_ss`
 Two springs plus SpringPot for stiff gels and glasses.
 
 .. list-table:: Parameters
@@ -343,7 +343,7 @@ Two springs plus SpringPot for stiff gels and glasses.
      - [1e-06, 1e+06]
      - Relaxation time
 
-.. autoclass:: rheojax.models.fractional_zener_ss.FractionalZenerSolidSolid
+.. autoclass:: rheojax.models.fractional.fractional_zener_ss.FractionalZenerSolidSolid
    :members:
    :undoc-members:
    :show-inheritance:
@@ -351,7 +351,7 @@ Two springs plus SpringPot for stiff gels and glasses.
 Fractional Zener Liquid-Liquid
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_zener_ll.FractionalZenerLiquidLiquid` | Handbook: :doc:`/models/fractional/fractional_zener_ll`
+:class:`rheojax.models.fractional.fractional_zener_ll.FractionalZenerLiquidLiquid` | Handbook: :doc:`/models/fractional/fractional_zener_ll`
 Most general fractional Zener with three fractional orders.
 
 .. list-table:: Parameters
@@ -387,7 +387,7 @@ Most general fractional Zener with three fractional orders.
      - [1e-06, 1e+06]
      - Relaxation time
 
-.. autoclass:: rheojax.models.fractional_zener_ll.FractionalZenerLiquidLiquid
+.. autoclass:: rheojax.models.fractional.fractional_zener_ll.FractionalZenerLiquidLiquid
    :members:
    :undoc-members:
    :show-inheritance:
@@ -395,7 +395,7 @@ Most general fractional Zener with three fractional orders.
 Fractional Kelvin-Voigt Zener
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_kv_zener.FractionalKelvinVoigtZener` | Handbook: :doc:`/models/fractional/fractional_kv_zener`
+:class:`rheojax.models.fractional.fractional_kv_zener.FractionalKelvinVoigtZener` | Handbook: :doc:`/models/fractional/fractional_kv_zener`
 Series spring plus fractional Kelvin-Voigt block.
 
 .. list-table:: Parameters
@@ -423,7 +423,7 @@ Series spring plus fractional Kelvin-Voigt block.
      - [1e-06, 1e+06]
      - Retardation time
 
-.. autoclass:: rheojax.models.fractional_kv_zener.FractionalKelvinVoigtZener
+.. autoclass:: rheojax.models.fractional.fractional_kv_zener.FractionalKelvinVoigtZener
    :members:
    :undoc-members:
    :show-inheritance:
@@ -431,7 +431,7 @@ Series spring plus fractional Kelvin-Voigt block.
 Fractional Burgers
 ~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_burgers.FractionalBurgersModel` | Handbook: :doc:`/models/fractional/fractional_burgers`
+:class:`rheojax.models.fractional.fractional_burgers.FractionalBurgersModel` | Handbook: :doc:`/models/fractional/fractional_burgers`
 Combines Maxwell and Kelvin-Voigt elements for asphalt-like flows.
 
 .. list-table:: Parameters
@@ -463,7 +463,7 @@ Combines Maxwell and Kelvin-Voigt elements for asphalt-like flows.
      - [1e-06, 1e+06]
      - Retardation time
 
-.. autoclass:: rheojax.models.fractional_burgers.FractionalBurgersModel
+.. autoclass:: rheojax.models.fractional.fractional_burgers.FractionalBurgersModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -471,7 +471,7 @@ Combines Maxwell and Kelvin-Voigt elements for asphalt-like flows.
 Fractional Poynting-Thomson
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_poynting_thomson.FractionalPoyntingThomson` | Handbook: :doc:`/models/fractional/fractional_poynting_thomson`
+:class:`rheojax.models.fractional.fractional_poynting_thomson.FractionalPoyntingThomson` | Handbook: :doc:`/models/fractional/fractional_poynting_thomson`
 Fractional parallel branch with retardation time.
 
 .. list-table:: Parameters
@@ -499,7 +499,7 @@ Fractional parallel branch with retardation time.
      - [1e-06, 1e+06]
      - Retardation time
 
-.. autoclass:: rheojax.models.fractional_poynting_thomson.FractionalPoyntingThomson
+.. autoclass:: rheojax.models.fractional.fractional_poynting_thomson.FractionalPoyntingThomson
    :members:
    :undoc-members:
    :show-inheritance:
@@ -507,7 +507,7 @@ Fractional parallel branch with retardation time.
 Fractional Jeffreys
 ~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.fractional_jeffreys.FractionalJeffreysModel` | Handbook: :doc:`/models/fractional/fractional_jeffreys`
+:class:`rheojax.models.fractional.fractional_jeffreys.FractionalJeffreysModel` | Handbook: :doc:`/models/fractional/fractional_jeffreys`
 Two dashpots plus SpringPot for thixotropic-like liquids.
 
 .. list-table:: Parameters
@@ -535,7 +535,7 @@ Two dashpots plus SpringPot for thixotropic-like liquids.
      - [1e-06, 1e+06]
      - Relaxation time
 
-.. autoclass:: rheojax.models.fractional_jeffreys.FractionalJeffreysModel
+.. autoclass:: rheojax.models.fractional.fractional_jeffreys.FractionalJeffreysModel
    :members:
    :undoc-members:
    :show-inheritance:
@@ -546,7 +546,7 @@ Non-Newtonian Flow Models
 Power Law
 ~~~~~~~~~
 
-:class:`rheojax.models.power_law.PowerLaw` | Handbook: :doc:`/models/flow/power_law`
+:class:`rheojax.models.flow.power_law.PowerLaw` | Handbook: :doc:`/models/flow/power_law`
 Two-parameter viscosity curve tau = K*gamma^n.
 
 .. list-table:: Parameters
@@ -566,7 +566,7 @@ Two-parameter viscosity curve tau = K*gamma^n.
      - [0.01, 2]
      - Flow behavior index
 
-.. autoclass:: rheojax.models.power_law.PowerLaw
+.. autoclass:: rheojax.models.flow.power_law.PowerLaw
    :members:
    :undoc-members:
    :show-inheritance:
@@ -574,7 +574,7 @@ Two-parameter viscosity curve tau = K*gamma^n.
 Carreau
 ~~~~~~~
 
-:class:`rheojax.models.carreau.Carreau` | Handbook: :doc:`/models/flow/carreau`
+:class:`rheojax.models.flow.carreau.Carreau` | Handbook: :doc:`/models/flow/carreau`
 Smooth transition from Newtonian plateau to shear thinning.
 
 .. list-table:: Parameters
@@ -602,7 +602,7 @@ Smooth transition from Newtonian plateau to shear thinning.
      - [0.01, 1]
      - Power-law index
 
-.. autoclass:: rheojax.models.carreau.Carreau
+.. autoclass:: rheojax.models.flow.carreau.Carreau
    :members:
    :undoc-members:
    :show-inheritance:
@@ -610,7 +610,7 @@ Smooth transition from Newtonian plateau to shear thinning.
 Carreau-Yasuda
 ~~~~~~~~~~~~~~
 
-:class:`rheojax.models.carreau_yasuda.CarreauYasuda` | Handbook: :doc:`/models/flow/carreau_yasuda`
+:class:`rheojax.models.flow.carreau_yasuda.CarreauYasuda` | Handbook: :doc:`/models/flow/carreau_yasuda`
 Adds the Yasuda exponent to tune transition sharpness.
 
 .. list-table:: Parameters
@@ -642,7 +642,7 @@ Adds the Yasuda exponent to tune transition sharpness.
      - [0.1, 2]
      - Transition parameter
 
-.. autoclass:: rheojax.models.carreau_yasuda.CarreauYasuda
+.. autoclass:: rheojax.models.flow.carreau_yasuda.CarreauYasuda
    :members:
    :undoc-members:
    :show-inheritance:
@@ -650,7 +650,7 @@ Adds the Yasuda exponent to tune transition sharpness.
 Cross
 ~~~~~
 
-:class:`rheojax.models.cross.Cross` | Handbook: :doc:`/models/flow/cross`
+:class:`rheojax.models.flow.cross.Cross` | Handbook: :doc:`/models/flow/cross`
 Alternative viscosity curve with rate exponent m.
 
 .. list-table:: Parameters
@@ -678,7 +678,7 @@ Alternative viscosity curve with rate exponent m.
      - [0.1, 2]
      - Rate constant
 
-.. autoclass:: rheojax.models.cross.Cross
+.. autoclass:: rheojax.models.flow.cross.Cross
    :members:
    :undoc-members:
    :show-inheritance:
@@ -686,7 +686,7 @@ Alternative viscosity curve with rate exponent m.
 Herschel-Bulkley
 ~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.herschel_bulkley.HerschelBulkley` | Handbook: :doc:`/models/flow/herschel_bulkley`
+:class:`rheojax.models.flow.herschel_bulkley.HerschelBulkley` | Handbook: :doc:`/models/flow/herschel_bulkley`
 Yield stress plus power-law viscosity.
 
 .. list-table:: Parameters
@@ -710,7 +710,7 @@ Yield stress plus power-law viscosity.
      - [0.01, 2]
      - Flow behavior index
 
-.. autoclass:: rheojax.models.herschel_bulkley.HerschelBulkley
+.. autoclass:: rheojax.models.flow.herschel_bulkley.HerschelBulkley
    :members:
    :undoc-members:
    :show-inheritance:
@@ -718,7 +718,7 @@ Yield stress plus power-law viscosity.
 Bingham
 ~~~~~~~
 
-:class:`rheojax.models.bingham.Bingham` | Handbook: :doc:`/models/flow/bingham`
+:class:`rheojax.models.flow.bingham.Bingham` | Handbook: :doc:`/models/flow/bingham`
 Yield stress and constant plastic viscosity.
 
 .. list-table:: Parameters
@@ -738,7 +738,7 @@ Yield stress and constant plastic viscosity.
      - [1e-06, 1e+12]
      - Plastic viscosity
 
-.. autoclass:: rheojax.models.bingham.Bingham
+.. autoclass:: rheojax.models.flow.bingham.Bingham
    :members:
    :undoc-members:
    :show-inheritance:
@@ -749,7 +749,7 @@ Soft Glassy Rheology (SGR) Models
 SGR Conventional
 ~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.sgr_conventional.SGRConventional` | Handbook: :doc:`/models/sgr/sgr_conventional`
+:class:`rheojax.models.sgr.sgr_conventional.SGRConventional` | Handbook: :doc:`/models/sgr/sgr_conventional`
 Statistical mechanics model for soft glassy materials (Sollich 1998).
 
 .. list-table:: Parameters
@@ -779,7 +779,7 @@ Statistical mechanics model for soft glassy materials (Sollich 1998).
 - **1 < x < 2**: Soft Glassy Material (power-law rheology)
 - **x ≥ 2**: Newtonian liquid (no memory effects)
 
-.. autoclass:: rheojax.models.sgr_conventional.SGRConventional
+.. autoclass:: rheojax.models.sgr.sgr_conventional.SGRConventional
    :members:
    :undoc-members:
    :show-inheritance:
@@ -787,7 +787,7 @@ Statistical mechanics model for soft glassy materials (Sollich 1998).
 SGR Generic (GENERIC Framework)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.sgr_generic.SGRGeneric` | Handbook: :doc:`/models/sgr/sgr_generic`
+:class:`rheojax.models.sgr.sgr_generic.SGRGeneric` | Handbook: :doc:`/models/sgr/sgr_generic`
 Thermodynamically consistent SGR using GENERIC framework (Fuereder & Ilg 2013).
 
 .. list-table:: Parameters
@@ -817,7 +817,7 @@ Thermodynamically consistent SGR using GENERIC framework (Fuereder & Ilg 2013).
 - Enhanced numerical stability near glass transition (x → 1)
 - Consistent thermodynamic framework
 
-.. autoclass:: rheojax.models.sgr_generic.SGRGeneric
+.. autoclass:: rheojax.models.sgr.sgr_generic.SGRGeneric
    :members:
    :undoc-members:
    :show-inheritance:
@@ -879,7 +879,7 @@ SPP LAOS Models
 SPP Yield Stress
 ~~~~~~~~~~~~~~~~
 
-:class:`rheojax.models.spp_yield_stress.SPPYieldStress` | Handbook: :doc:`/models/spp/spp_yield_stress`
+:class:`rheojax.models.spp.spp_yield_stress.SPPYieldStress` | Handbook: :doc:`/models/spp/spp_yield_stress`
 Yield stress model for Sequence of Physical Processes (SPP) LAOS analysis.
 
 .. list-table:: Parameters
@@ -906,7 +906,7 @@ Yield stress model for Sequence of Physical Processes (SPP) LAOS analysis.
 **Note**: Use with :class:`rheojax.transforms.spp_decomposer.SPPDecomposer` for
 complete LAOS analysis. See :doc:`/api/spp_models` for the full SPP API reference.
 
-.. autoclass:: rheojax.models.spp_yield_stress.SPPYieldStress
+.. autoclass:: rheojax.models.spp.spp_yield_stress.SPPYieldStress
    :members:
    :undoc-members:
    :show-inheritance:

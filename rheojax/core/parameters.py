@@ -112,7 +112,26 @@ class ParameterConstraint:
 
 
 class Parameter:
-    """Single parameter with value, bounds, and metadata."""
+    """Single parameter with value, bounds, and metadata.
+
+    A Parameter represents a model parameter with support for bounds validation,
+    units tracking, and constraint enforcement. Parameters can be used in both
+    NLSQ optimization and Bayesian inference workflows.
+
+    Attributes:
+        name: Parameter identifier used for lookup and serialization.
+        value: Current parameter value (may be None if unset).
+        bounds: Lower and upper bounds as tuple (min, max).
+        units: Physical units string for display (e.g., "Pa", "s").
+        description: Human-readable description.
+        constraints: List of ParameterConstraint objects for validation.
+
+    Example:
+        >>> param = Parameter("G0", value=1e5, bounds=(1e3, 1e9), units="Pa")
+        >>> param.value = 2e5  # Validated against bounds
+        >>> param.validate()
+        True
+    """
 
     def __init__(
         self,
@@ -336,7 +355,30 @@ class Parameter:
 
 
 class ParameterSet:
-    """Collection of parameters for a model or transform."""
+    """Collection of parameters for a model or transform.
+
+    A ParameterSet manages multiple Parameter objects with dict-like access,
+    batch operations, and serialization support. It is the primary interface
+    for working with model parameters in RheoJAX.
+
+    Key Features:
+        - Dict-like access: ``params["G0"]`` or ``params.get("G0")``
+        - Batch operations: ``get_values()``, ``set_values()``, ``get_bounds()``
+        - Unpack helper: ``G0, eta = params.unpack("G0", "eta")``
+        - Serialization: ``to_dict()`` / ``from_dict()`` for JSON/HDF5
+
+    Example:
+        >>> params = ParameterSet()
+        >>> params.add("G0", value=1e5, bounds=(1e3, 1e9), units="Pa")
+        >>> params.add("eta", value=1e3, bounds=(1e-3, 1e9), units="Pa*s")
+        >>> G0, eta = params.unpack("G0", "eta")
+        >>> print(f"G0={G0:.2e}, eta={eta:.2e}")
+        G0=1.00e+05, eta=1.00e+03
+
+    See Also:
+        Parameter: Individual parameter class.
+        SharedParameterSet: For multi-model parameter sharing.
+    """
 
     def __init__(self):
         """Initialize empty parameter set."""

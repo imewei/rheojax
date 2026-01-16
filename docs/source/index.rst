@@ -150,7 +150,7 @@ Development Status
    - [done] Visualization with matplotlib
 
 **Phase 2 (Complete)**: Models and Transforms [done]
-   - [done] 24 rheological models (Classical: 3, Fractional Maxwell: 4, Fractional Zener: 4, Fractional Advanced: 3, Flow: 6, Multi-Mode: 1, SGR: 2, SPP LAOS: 1)
+   - [done] 25 rheological models (Classical: 3, Fractional Maxwell: 4, Fractional Zener: 4, Fractional Advanced: 3, Flow: 6, Multi-Mode: 1, SGR: 2, STZ: 1, SPP LAOS: 1)
    - [done] 7 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer)
    - [done] Pipeline API for fluent workflows
    - [done] 33 tutorial notebooks (basic, transforms, bayesian, advanced, SGR, SPP)
@@ -160,7 +160,7 @@ Development Status
    - [done] Uncertainty quantification via credible intervals and posterior distributions
    - [done] ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
    - [done] Model comparison (WAIC/LOO)
-   - [done] BayesianMixin: All 24 models support Bayesian inference
+   - [done] BayesianMixin: All 25 models support Bayesian inference
    - [done] BayesianPipeline with fluent API for NLSQ -> NUTS workflows
    - [done] 9 Bayesian inference tutorial notebooks (including SPP LAOS)
 
@@ -184,6 +184,14 @@ Development Status
    - [done] SPPYieldStress model with Bayesian inference support
    - [done] SPPAmplitudeSweepPipeline for amplitude sweep workflows
    - [done] Comprehensive Sphinx documentation for all SGR and SPP features
+
+**Phase 6 (Complete)**: Shear Transformation Zone (STZ) [done - v0.6.0]
+   - [done] STZConventional model (Langer 2008 effective temperature formulation)
+   - [done] Three complexity variants: minimal, standard, full
+   - [done] Multi-protocol support: steady shear, transient, SAOS, LAOS
+   - [done] State evolution: effective temperature (χ), STZ density (Λ), orientation (m)
+   - [done] ODE integration via diffrax for transient simulations
+   - [done] Comprehensive Sphinx documentation and handbook
 
 Technology Stack
 ----------------
