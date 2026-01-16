@@ -48,7 +48,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from jax.experimental.ode import odeint
+import diffrax
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
@@ -1317,10 +1317,10 @@ class SGRConventional(BaseModel):
         t_jax = jnp.asarray(t)
         gamma_dot_jax = jnp.asarray(gamma_dot)
 
-        # Define ODE function for odeint
-        # Signature: func(x, t_val, *args) -> dx/dt
-        def ode_func(x_val, t_val):
-            """ODE right-hand side: dx/dt = f(x, t)."""
+        # Define ODE vector field for diffrax
+        # Signature: vector_field(t, y, args) -> dy/dt
+        def vector_field(t_val, x_val, args):
+            """ODE vector field: dx/dt = f(t, x)."""
             # Interpolate gamma_dot at current time t_val
             # Use linear interpolation
             gamma_dot_current = jnp.interp(t_val, t_jax, gamma_dot_jax)
@@ -1332,13 +1332,47 @@ class SGRConventional(BaseModel):
             )
 
             # Compute dx/dt
+            # Ensure x_val is scalar extract if needed, though diffrax passes arrays
             return self._dx_dt_jit(
                 x_val, gamma_dot_current, x_eq, x_ss_current, alpha_aging, beta_rejuv
             )
 
-        # Integrate ODE using JAX odeint
-        # odeint signature: odeint(func, y0, t, *args, **kwargs)
-        x_trajectory_jax = odeint(ode_func, x_initial, t_jax)
+        # Solve ODE using Diffrax
+        # Use Tsit5 (Runge-Kutta 5(4)) which is generally efficient for non-stiff problems
+        # Use PIDController for adaptive step size (similar to odeint)
+        term = diffrax.ODETerm(vector_field)
+        solver = diffrax.Tsit5()
+        t0 = t_jax[0]
+        t1 = t_jax[-1]
+        dt0 = (t1 - t0) / len(t_jax) if len(t_jax) > 1 else 0.001
+        
+        # Save solution at specified time points
+        saveat = diffrax.SaveAt(ts=t_jax)
+        
+        # Step size controller
+        stepsize_controller = diffrax.PIDController(
+            rtol=1.4e-8, atol=1.4e-8
+        )  # Match standard precision
+
+        sol = diffrax.diffeqsolve(
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0=x_initial,
+            saveat=saveat,
+            stepsize_controller=stepsize_controller,
+            max_steps=100000,  # Safety limit
+        )
+
+        # Extract trajectory
+        # sol.ys has shape (num_save_points, num_states) -> (N, 1) or (N,) depending on y0
+        x_trajectory_jax = sol.ys
+
+        # Ensure correct shape (N,)
+        if x_trajectory_jax.ndim > 1:
+            x_trajectory_jax = x_trajectory_jax.squeeze()
 
         # Convert back to numpy
         x_trajectory = np.array(x_trajectory_jax)

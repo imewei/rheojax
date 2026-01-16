@@ -31,7 +31,7 @@ from numpyro.distributions import transforms as dist_transforms
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger, log_fit
-from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
+from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 

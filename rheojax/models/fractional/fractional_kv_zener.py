@@ -1,91 +1,86 @@
-"""Fractional Burgers Model (FBM).
+"""Fractional Kelvin-Voigt Zener (FKVZ) Model.
 
-This model combines Maxwell and Kelvin-Voigt elements in series with
-fractional derivatives, providing four relaxation mechanisms for
-complex viscoelastic behavior.
+This model consists of a Fractional Kelvin-Voigt element in series with a spring,
+providing retardation behavior with equilibrium compliance.
 
 Theory
 ------
-The FBM model consists of:
-- Maxwell element (spring + dashpot) in series with
-- Fractional Kelvin-Voigt element (spring + SpringPot)
+The FKVZ model consists of:
+- Spring (G_e) in series with
+- Fractional Kelvin-Voigt element (spring G_k in parallel with SpringPot)
 
 Creep compliance:
-    J(t) = J_g + (t^α)/(η_1 * Γ(1+α)) + J_k * (1 - E_α(-(t/τ_k)^α))
+    J(t) = 1/G_e + (1/G_k) * (1 - E_α(-(t/τ)^α))
 
-where:
-- J_g: Glassy compliance (instantaneous)
-- η_1: Viscosity (Maxwell arm)
-- J_k: Kelvin compliance
-- τ_k: Retardation time
+Complex compliance:
+    J*(ω) = 1/G_e + (1/G_k) / (1 + (iωτ)^α)
+
+where E_α is the one-parameter Mittag-Leffler function.
 
 Parameters
 ----------
-Jg : float
-    Glassy compliance (1/Pa), bounds [1e-9, 1e3]
-eta1 : float
-    Viscosity (Pa·s), bounds [1e-6, 1e12]
-Jk : float
-    Kelvin compliance (1/Pa), bounds [1e-9, 1e3]
+Ge : float
+    Series spring modulus (Pa), bounds [1e-3, 1e9]
+Gk : float
+    KV element modulus (Pa), bounds [1e-3, 1e9]
 alpha : float
     Fractional order, bounds [0.0, 1.0]
-tau_k : float
+tau : float
     Retardation time (s), bounds [1e-6, 1e6]
 
 Limit Cases
 -----------
-- alpha → 0: Classical Burgers model with Newtonian flow
-- alpha → 1: Burgers model with power-law flow
+- alpha → 0: Two springs in series (J = 1/G_e + 1/G_k)
+- alpha → 1: Classical Zener solid in creep formulation
 
 References
 ----------
 - Mainardi, F. (2010). Fractional Calculus and Waves in Linear Viscoelasticity
 - Bagley, R.L. & Torvik, P.J. (1986). J. Rheol. 30, 133-155
-- Schiessel, H. & Blumen, A. (1993). J. Phys. A: Math. Gen. 26, 5057
 """
 
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger, log_fit
-from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
+from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
-from jax.scipy.special import gamma as jax_gamma
 
 from rheojax.core.base import BaseModel
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e
 
+# Module logger
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("fractional_burgers")
-class FractionalBurgersModel(BaseModel):
-    """Fractional Burgers model.
+@ModelRegistry.register("fractional_kv_zener")
+class FractionalKelvinVoigtZener(BaseModel):
+    """Fractional Kelvin-Voigt Zener model.
 
-    A four-parameter fractional viscoelastic model combining
-    instantaneous compliance, viscous flow, and retardation.
+    A fractional viscoelastic model emphasizing retardation behavior
+    with finite equilibrium compliance.
 
     Test Modes
     ----------
     - Relaxation: Supported (via inversion)
     - Creep: Supported (primary mode)
     - Oscillation: Supported
-    - Rotation: Partial support (viscous flow at low frequencies)
+    - Rotation: Not supported (no steady-state flow)
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from rheojax.models import FractionalBurgersModel
+    >>> from rheojax.models import FractionalKelvinVoigtZener
     >>>
     >>> # Create model
-    >>> model = FractionalBurgersModel()
+    >>> model = FractionalKelvinVoigtZener()
     >>>
     >>> # Set parameters
-    >>> model.set_params(Jg=1e-6, eta1=1000.0, Jk=5e-6, alpha=0.5, tau_k=1.0)
+    >>> model.set_params(Ge=1000.0, Gk=500.0, alpha=0.5, tau=1.0)
     >>>
     >>> # Predict creep compliance
     >>> t = jnp.logspace(-2, 2, 50)
@@ -93,31 +88,24 @@ class FractionalBurgersModel(BaseModel):
     """
 
     def __init__(self):
-        """Initialize Fractional Burgers model."""
+        """Initialize Fractional Kelvin-Voigt Zener model."""
         super().__init__()
 
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
         self.parameters.add(
-            name="Jg",
-            value=1e-6,
-            bounds=(1e-9, 1e3),
-            units="1/Pa",
-            description="Glassy compliance",
-        )
-        self.parameters.add(
-            name="eta1",
+            name="Ge",
             value=1000.0,
-            bounds=(1e-6, 1e12),
-            units="Pa·s",
-            description="Viscosity (Maxwell arm)",
+            bounds=(1e-3, 1e9),
+            units="Pa",
+            description="Series spring modulus",
         )
         self.parameters.add(
-            name="Jk",
-            value=1e-5,
-            bounds=(1e-9, 1e3),
-            units="1/Pa",
-            description="Kelvin compliance",
+            name="Gk",
+            value=500.0,
+            bounds=(1e-3, 1e9),
+            units="Pa",
+            description="KV element modulus",
         )
         self.parameters.add(
             name="alpha",
@@ -127,7 +115,7 @@ class FractionalBurgersModel(BaseModel):
             description="Fractional order",
         )
         self.parameters.add(
-            name="tau_k",
+            name="tau",
             value=1.0,
             bounds=(1e-6, 1e6),
             units="s",
@@ -138,29 +126,26 @@ class FractionalBurgersModel(BaseModel):
     @jax.jit
     def _predict_creep(
         t: jnp.ndarray,
-        Jg: float,
-        eta1: float,
-        Jk: float,
+        Ge: float,
+        Gk: float,
         alpha: float,
-        tau_k: float,
+        tau: float,
     ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
-        J(t) = J_g + t^α/(η_1 * Γ(1+α)) + J_k * (1 - E_α(-(t/τ_k)^α))
+        J(t) = 1/G_e + (1/G_k) * (1 - E_α(-(t/τ)^α))
 
         Parameters
         ----------
         t : jnp.ndarray
             Time array (s)
-        Jg : float
-            Glassy compliance (1/Pa)
-        eta1 : float
-            Viscosity (Pa·s)
-        Jk : float
-            Kelvin compliance (1/Pa)
+        Ge : float
+            Series spring modulus (Pa)
+        Gk : float
+            KV element modulus (Pa)
         alpha : float
             Fractional order
-        tau_k : float
+        tau : float
             Retardation time (s)
 
         Returns
@@ -174,19 +159,17 @@ class FractionalBurgersModel(BaseModel):
         # Clip alpha to safe range (works with JAX tracers)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        tau_k_safe = tau_k + epsilon
-        eta1_safe = eta1 + epsilon
+        tau_safe = tau + epsilon
         # Instantaneous compliance (elastic response)
-        J_instant = Jg
-        # Fractional viscous flow term: t^α / (η_1 * Γ(1+α))
-        gamma_term = jax_gamma(1.0 + alpha_safe)
-        J_flow = jnp.power(t, alpha_safe) / (eta1_safe * gamma_term)
-        # Retardation term: J_k * (1 - E_α(-(t/τ_k)^α))
-        z = -jnp.power(t / tau_k_safe, alpha_safe)
+        J_inst = 1.0 / (Ge + epsilon)
+        # Retarded compliance amplitude
+        J_retard_amp = 1.0 / (Gk + epsilon)
+        # Compute argument: z = -(t/τ)^α
+        z = -jnp.power(t / tau_safe, alpha_safe)
+        # Mittag-Leffler function E_α(z) with concrete alpha
         ml_term = mittag_leffler_e(z, alpha=alpha_safe)
-        J_retard = Jk * (1.0 - ml_term)
-        # Total creep compliance
-        J_t = J_instant + J_flow + J_retard
+        # J(t) = 1/G_e + (1/G_k) * (1 - E_α(-(t/τ)^α))
+        J_t = J_inst + J_retard_amp * (1.0 - ml_term)
 
         return J_t
 
@@ -194,30 +177,27 @@ class FractionalBurgersModel(BaseModel):
     @jax.jit
     def _predict_relaxation(
         t: jnp.ndarray,
-        Jg: float,
-        eta1: float,
-        Jk: float,
+        Ge: float,
+        Gk: float,
         alpha: float,
-        tau_k: float,
+        tau: float,
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
         Note: Analytical relaxation modulus requires numerical inversion.
-        This provides an approximation.
+        This provides an approximation based on the creep-relaxation relationship.
 
         Parameters
         ----------
         t : jnp.ndarray
             Time array (s)
-        Jg : float
-            Glassy compliance (1/Pa)
-        eta1 : float
-            Viscosity (Pa·s)
-        Jk : float
-            Kelvin compliance (1/Pa)
+        Ge : float
+            Series spring modulus (Pa)
+        Gk : float
+            KV element modulus (Pa)
         alpha : float
             Fractional order
-        tau_k : float
+        tau : float
             Retardation time (s)
 
         Returns
@@ -231,18 +211,16 @@ class FractionalBurgersModel(BaseModel):
         # Clip alpha to safe range (works with JAX tracers)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        tau_k_safe = tau_k + epsilon
-        # Approximate using inverse relationship
-        # G(0) ≈ 1/J_g (instantaneous modulus)
-        G_inst = 1.0 / (Jg + epsilon)
-        # Long-time decay (fractional Maxwell-like)
-        # G(t) ~ t^(-α) at intermediate times
-        G_decay = G_inst * jnp.power(t / tau_k_safe, -alpha_safe)
-        # Smooth transition
-        z = -jnp.power(t / tau_k_safe, alpha_safe)
+        tau_safe = tau + epsilon
+        # Compute transition function
+        z = -jnp.power(t / tau_safe, alpha_safe)
         ml_term = mittag_leffler_e(z, alpha=alpha_safe)
-        # Combine terms
-        G_t = G_inst * ml_term + G_decay * (1.0 - ml_term)
+        # Short time modulus
+        G_short = Ge
+        # Long time modulus (series combination)
+        G_long = (Ge * Gk) / (Ge + Gk + epsilon)
+        # Interpolate using Mittag-Leffler decay
+        G_t = G_long + (G_short - G_long) * ml_term
 
         return G_t
 
@@ -250,31 +228,28 @@ class FractionalBurgersModel(BaseModel):
     @jax.jit
     def _predict_oscillation(
         omega: jnp.ndarray,
-        Jg: float,
-        eta1: float,
-        Jk: float,
+        Ge: float,
+        Gk: float,
         alpha: float,
-        tau_k: float,
+        tau: float,
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
-        Computed from complex compliance:
-        J*(ω) = J_g + (iω)^(-α)/(η_1*Γ(1-α)) + J_k/(1 + (iωτ_k)^α)
-        G*(ω) = 1/J*(ω)
+        Convert from complex compliance:
+        J*(ω) = 1/G_e + (1/G_k) / (1 + (iωτ)^α)
+        G*(ω) = 1 / J*(ω)
 
         Parameters
         ----------
         omega : jnp.ndarray
             Angular frequency array (rad/s)
-        Jg : float
-            Glassy compliance (1/Pa)
-        eta1 : float
-            Viscosity (Pa·s)
-        Jk : float
-            Kelvin compliance (1/Pa)
+        Ge : float
+            Series spring modulus (Pa)
+        Gk : float
+            KV element modulus (Pa)
         alpha : float
             Fractional order
-        tau_k : float
+        tau : float
             Retardation time (s)
 
         Returns
@@ -288,26 +263,16 @@ class FractionalBurgersModel(BaseModel):
         # Clip alpha to safe range (works with JAX tracers)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        tau_k_safe = tau_k + epsilon
-        eta1_safe = eta1 + epsilon
-        # Instantaneous compliance
-        J_inst = Jg
-        # Fractional viscous term: (iω)^(-α) / (η_1 * Γ(1-α))
-        omega_neg_alpha = jnp.power(omega, -alpha_safe)
-        phase = -jnp.pi * alpha_safe / 2.0
-        i_omega_neg_alpha = omega_neg_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
-        gamma_term = jax_gamma(1.0 - alpha_safe)
-        J_flow = i_omega_neg_alpha / (eta1_safe * gamma_term)
-        # Retardation term: J_k / (1 + (iωτ_k)^α)
-        omega_tau_alpha = jnp.power(omega * tau_k_safe, alpha_safe)
-        phase_alpha = jnp.pi * alpha_safe / 2.0
-        i_omega_tau_alpha = omega_tau_alpha * (
-            jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
-        )
-        J_retard = Jk / (1.0 + i_omega_tau_alpha)
-        # Total complex compliance
-        J_star = J_inst + J_flow + J_retard
-        # Complex modulus (inverse)
+        tau_safe = tau + epsilon
+        # Compute (iωτ)^α
+        omega_tau_alpha = jnp.power(omega * tau_safe, alpha_safe)
+        phase = jnp.pi * alpha_safe / 2.0
+        i_omega_tau_alpha = omega_tau_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
+        # Complex compliance
+        J_inst = 1.0 / (Ge + epsilon)
+        J_kv = (1.0 / (Gk + epsilon)) / (1.0 + i_omega_tau_alpha)
+        J_star = J_inst + J_kv
+        # Complex modulus (inverse of compliance)
         G_star = 1.0 / (J_star + epsilon)
         # Extract storage and loss moduli
         G_prime = jnp.real(G_star)
@@ -315,7 +280,9 @@ class FractionalBurgersModel(BaseModel):
 
         return jnp.stack([G_prime, G_double_prime], axis=-1)
 
-    def _fit(self, X: jnp.ndarray, y: jnp.ndarray, **kwargs) -> FractionalBurgersModel:
+    def _fit(
+        self, X: jnp.ndarray, y: jnp.ndarray, **kwargs
+    ) -> FractionalKelvinVoigtZener:
         """Fit model to data using NLSQ TRF optimization.
 
         Parameters
@@ -344,8 +311,8 @@ class FractionalBurgersModel(BaseModel):
         # Convert string to TestMode enum
         if isinstance(test_mode_str, str):
             test_mode_map = {
-                "creep": TestMode.CREEP,
                 "relaxation": TestMode.RELAXATION,
+                "creep": TestMode.CREEP,
                 "oscillation": TestMode.OSCILLATION,
             }
             test_mode = test_mode_map.get(test_mode_str, TestMode.CREEP)
@@ -355,71 +322,64 @@ class FractionalBurgersModel(BaseModel):
         # Store test mode for model_function
         self._test_mode = test_mode
 
-        logger.info(
-            "Starting FractionalBurgersModel fit",
-            test_mode=(
-                test_mode.value if hasattr(test_mode, "value") else str(test_mode)
-            ),
-            data_shape=X.shape,
-        )
+        # Determine data shape for logging
+        data_shape = (len(X),) if hasattr(X, "__len__") else None
 
-        with log_fit(logger, model="FractionalBurgersModel", data_shape=X.shape) as ctx:
+        with log_fit(
+            logger,
+            model="FractionalKelvinVoigtZener",
+            data_shape=data_shape,
+            test_mode=(
+                test_mode_str if isinstance(test_mode_str, str) else str(test_mode)
+            ),
+        ) as ctx:
+            logger.debug(
+                "Starting FKVZ fit",
+                n_points=len(X) if hasattr(X, "__len__") else 1,
+                test_mode=str(test_mode),
+                initial_params=self.parameters.to_dict(),
+            )
+
             # Smart initialization for oscillation mode (Issue #9)
             if test_mode == TestMode.OSCILLATION:
                 try:
                     import numpy as np
 
                     from rheojax.utils.initialization import (
-                        initialize_fractional_burgers,
+                        initialize_fractional_kv_zener,
                     )
 
-                    logger.debug(
-                        "Attempting smart initialization for oscillation mode",
-                        data_points=len(X),
-                    )
-                    success = initialize_fractional_burgers(
+                    success = initialize_fractional_kv_zener(
                         np.array(X), np.array(y), self.parameters
                     )
                     if success:
                         logger.debug(
                             "Smart initialization applied from frequency-domain features",
-                            Jg=self.parameters.get_value("Jg"),
-                            eta1=self.parameters.get_value("eta1"),
-                            Jk=self.parameters.get_value("Jk"),
-                            alpha=self.parameters.get_value("alpha"),
-                            tau_k=self.parameters.get_value("tau_k"),
+                            initialized_params=self.parameters.to_dict(),
                         )
                 except Exception as e:
-                    # Silent fallback to defaults - don't break if initialization fails
                     logger.debug(
                         "Smart initialization failed, using defaults",
                         error=str(e),
-                        exc_info=True,
                     )
 
             # Create stateless model function for optimization
             def model_fn(x, params):
                 """Model function for optimization (stateless)."""
-                Jg, eta1, Jk, alpha, tau_k = (
-                    params[0],
-                    params[1],
-                    params[2],
-                    params[3],
-                    params[4],
-                )
+                Ge, Gk, alpha, tau = params[0], params[1], params[2], params[3]
 
                 # Direct prediction based on test mode (stateless)
                 if test_mode == TestMode.RELAXATION:
-                    return self._predict_relaxation(x, Jg, eta1, Jk, alpha, tau_k)
+                    return self._predict_relaxation(x, Ge, Gk, alpha, tau)
                 elif test_mode == TestMode.CREEP:
-                    return self._predict_creep(x, Jg, eta1, Jk, alpha, tau_k)
+                    return self._predict_creep(x, Ge, Gk, alpha, tau)
                 elif test_mode == TestMode.OSCILLATION:
-                    return self._predict_oscillation(x, Jg, eta1, Jk, alpha, tau_k)
+                    return self._predict_oscillation(x, Ge, Gk, alpha, tau)
                 else:
                     raise ValueError(f"Unsupported test mode: {test_mode}")
 
             # Create objective function
-            logger.debug("Creating least squares objective function")
+            logger.debug("Creating least squares objective", normalize=True)
             objective = create_least_squares_objective(
                 model_fn, jnp.array(X), jnp.array(y), normalize=True
             )
@@ -430,20 +390,29 @@ class FractionalBurgersModel(BaseModel):
                 method=kwargs.get("method", "auto"),
                 max_iter=kwargs.get("max_iter", 1000),
             )
-            result = nlsq_optimize(
-                objective,
-                self.parameters,
-                use_jax=kwargs.get("use_jax", True),
-                method=kwargs.get("method", "auto"),
-                max_iter=kwargs.get("max_iter", 1000),
-            )
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
             # Validate optimization succeeded
             if not result.success:
                 logger.error(
-                    "NLSQ optimization failed",
+                    "Optimization failed",
                     message=result.message,
-                    exc_info=True,
+                    final_params=self.parameters.to_dict(),
                 )
                 raise RuntimeError(
                     f"Optimization failed: {result.message}. "
@@ -451,23 +420,13 @@ class FractionalBurgersModel(BaseModel):
                 )
 
             self.fitted_ = True
+            ctx["final_params"] = self.parameters.to_dict()
             ctx["success"] = True
-            ctx["fitted_params"] = {
-                "Jg": self.parameters.get_value("Jg"),
-                "eta1": self.parameters.get_value("eta1"),
-                "Jk": self.parameters.get_value("Jk"),
-                "alpha": self.parameters.get_value("alpha"),
-                "tau_k": self.parameters.get_value("tau_k"),
-            }
+            logger.debug(
+                "FKVZ fit completed successfully",
+                final_params=self.parameters.to_dict(),
+            )
 
-        logger.info(
-            "FractionalBurgersModel fit completed",
-            Jg=self.parameters.get_value("Jg"),
-            eta1=self.parameters.get_value("eta1"),
-            Jk=self.parameters.get_value("Jk"),
-            alpha=self.parameters.get_value("alpha"),
-            tau_k=self.parameters.get_value("tau_k"),
-        )
         return self
 
     def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
@@ -485,20 +444,19 @@ class FractionalBurgersModel(BaseModel):
         """
         # Get parameters
         params = self.parameters.to_dict()
-        Jg = params["Jg"]
-        eta1 = params["eta1"]
-        Jk = params["Jk"]
+        Ge = params["Ge"]
+        Gk = params["Gk"]
         alpha = params["alpha"]
-        tau_k = params["tau_k"]
+        tau = params["tau"]
 
         # Auto-detect test mode
         if jnp.all(X > 0) and len(X) > 1:
             log_range = jnp.log10(jnp.max(X)) - jnp.log10(jnp.min(X) + 1e-12)
             if log_range > 3:
-                return self._predict_oscillation(X, Jg, eta1, Jk, alpha, tau_k)
+                return self._predict_oscillation(X, Ge, Gk, alpha, tau)
 
-        # Default to creep (primary mode for Burgers)
-        return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
+        # Default to creep (primary mode for FKVZ)
+        return self._predict_creep(X, Ge, Gk, alpha, tau)
 
     def model_function(self, X, params, test_mode=None):
         """Model function for Bayesian inference.
@@ -508,7 +466,7 @@ class FractionalBurgersModel(BaseModel):
 
         Args:
             X: Independent variable (time or frequency)
-            params: Array of parameter values [Jg, eta1, Jk, alpha, tau_k]
+            params: Array of parameter values [Ge, Gk, alpha, tau]
 
         Returns:
             Model predictions as JAX array
@@ -516,11 +474,10 @@ class FractionalBurgersModel(BaseModel):
         from rheojax.core.test_modes import TestMode
 
         # Extract parameters from array (in order they were added to ParameterSet)
-        Jg = params[0]
-        eta1 = params[1]
-        Jk = params[2]
-        alpha = params[3]
-        tau_k = params[4]
+        Ge = params[0]
+        Gk = params[1]
+        alpha = params[2]
+        tau = params[3]
 
         # Use test_mode from last fit if available, otherwise default to CREEP
         # Use explicit test_mode parameter (closure-captured in fit_bayesian)
@@ -535,30 +492,19 @@ class FractionalBurgersModel(BaseModel):
         if hasattr(test_mode, "value"):
             test_mode = test_mode.value
 
-        logger.debug(
-            "model_function evaluation",
-            test_mode=str(test_mode),
-            alpha=float(alpha) if hasattr(alpha, "item") else alpha,
-            input_shape=X.shape if hasattr(X, "shape") else len(X),
-        )
-
         # Call appropriate prediction function based on test mode
         if test_mode == TestMode.RELAXATION:
-            logger.debug("Computing relaxation modulus with Mittag-Leffler evaluation")
-            return self._predict_relaxation(X, Jg, eta1, Jk, alpha, tau_k)
+            return self._predict_relaxation(X, Ge, Gk, alpha, tau)
         elif test_mode == TestMode.CREEP:
-            logger.debug("Computing creep compliance with Mittag-Leffler evaluation")
-            return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
+            return self._predict_creep(X, Ge, Gk, alpha, tau)
         elif test_mode == TestMode.OSCILLATION:
-            logger.debug("Computing complex modulus for oscillation mode")
-            return self._predict_oscillation(X, Jg, eta1, Jk, alpha, tau_k)
+            return self._predict_oscillation(X, Ge, Gk, alpha, tau)
         else:
-            # Default to creep mode for Burgers model
-            logger.debug("Default to creep mode prediction")
-            return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
+            # Default to creep mode for FKVZ model
+            return self._predict_creep(X, Ge, Gk, alpha, tau)
 
 
 # Convenience alias
-FBM = FractionalBurgersModel
+FKVZ = FractionalKelvinVoigtZener
 
-__all__ = ["FractionalBurgersModel", "FBM"]
+__all__ = ["FractionalKelvinVoigtZener", "FKVZ"]

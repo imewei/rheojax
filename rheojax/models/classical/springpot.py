@@ -19,7 +19,7 @@ References:
 from __future__ import annotations
 
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
+from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
