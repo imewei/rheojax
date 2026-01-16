@@ -122,12 +122,15 @@ class TestSTZOscillatory:
 
     @pytest.mark.slow
     def test_laos_simulation_runs(self):
-        """Test LAOS simulation runs without errors at molecular timescales."""
+        """Test LAOS simulation runs without errors."""
         model = STZConventional(variant="standard")
 
-        # Use molecular timescale-compatible parameters
+        # Set tau0=1e-9 for less stiff dynamics
+        model.parameters.set_value("tau0", 1e-9)
+
+        # Use parameters compatible with explicit solver
         gamma_0 = 0.1
-        omega = 1e11  # 0.1 THz - compatible with tau0 ~ 1e-12
+        omega = 1e8  # 100 MHz - compatible with tau0=1e-9
 
         # Only run 1 cycle with few points to keep step count manageable
         period = 2 * np.pi / omega

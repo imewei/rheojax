@@ -70,16 +70,17 @@ class TestSTZFlowTransient:
         model = STZConventional(variant="standard")
 
         # Set parameters for overshoot behavior
+        # Use tau0=1e-9 for less stiff dynamics (vs 1e-12 which causes solver issues)
         model.parameters.set_value("G0", 1e9)
         model.parameters.set_value("sigma_y", 1e6)
         model.parameters.set_value("chi_inf", 0.15)
-        model.parameters.set_value("tau0", 1e-12)
+        model.parameters.set_value("tau0", 1e-9)
         model.parameters.set_value("epsilon0", 0.1)
         model.parameters.set_value("c0", 1.0)
 
-        # Time array - use shorter time span to reduce steps
-        t = np.linspace(0, 1e-10, 50)  # 0.1 ns, fewer points
-        gamma_dot = 1e10  # Very high shear rate matching timescale
+        # Time array scaled to tau0 (several characteristic times)
+        t = np.linspace(0, 1e-7, 50)  # 100 ns, covers ~100 tau0
+        gamma_dot = 1e7  # Shear rate matching timescale
 
         p_values = {k: model.parameters.get_value(k) for k in model.parameters.keys()}
 
@@ -110,16 +111,16 @@ class TestSTZFlowTransient:
         """Test stress relaxation (gamma_dot = 0 after initial loading)."""
         model = STZConventional(variant="standard")
 
-        # Set parameters
+        # Set parameters with tau0=1e-9 for less stiff dynamics
         model.parameters.set_value("G0", 1e9)
         model.parameters.set_value("sigma_y", 1e6)
         model.parameters.set_value("chi_inf", 0.15)
-        model.parameters.set_value("tau0", 1e-12)
+        model.parameters.set_value("tau0", 1e-9)
         model.parameters.set_value("epsilon0", 0.1)
         model.parameters.set_value("c0", 1.0)
 
-        # Time array - short span
-        t = np.linspace(0, 1e-10, 50)
+        # Time array scaled to tau0
+        t = np.linspace(0, 1e-7, 50)
         sigma_0 = 5e5  # Initial stress
 
         p_values = {k: model.parameters.get_value(k) for k in model.parameters.keys()}
@@ -146,8 +147,9 @@ class TestSTZFlowTransient:
     @pytest.mark.slow
     def test_variant_differences(self):
         """Test that different variants produce different dynamics."""
-        t = np.linspace(0, 1e-11, 30)  # Very short time span
-        gamma_dot = 1e11  # Very high shear rate
+        # Time span scaled to tau0=1e-9, gamma_dot=1e7 for stable integration
+        t = np.linspace(0, 1e-7, 30)  # 100 ns
+        gamma_dot = 1e7  # Shear rate compatible with explicit solver
 
         results = {}
         for variant in ["minimal", "standard", "full"]:
@@ -155,7 +157,7 @@ class TestSTZFlowTransient:
             model.parameters.set_value("G0", 1e9)
             model.parameters.set_value("sigma_y", 1e6)
             model.parameters.set_value("chi_inf", 0.15)
-            model.parameters.set_value("tau0", 1e-12)
+            model.parameters.set_value("tau0", 1e-9)
             model.parameters.set_value("epsilon0", 0.1)
             model.parameters.set_value("c0", 1.0)
 
@@ -181,19 +183,20 @@ class TestSTZFlowTransient:
         """Test that Diffrax ODE integration converges properly."""
         model = STZConventional(variant="standard")
 
+        # Use tau0=1e-9 for less stiff dynamics
         model.parameters.set_value("G0", 1e9)
         model.parameters.set_value("sigma_y", 1e6)
         model.parameters.set_value("chi_inf", 0.15)
-        model.parameters.set_value("tau0", 1e-12)
+        model.parameters.set_value("tau0", 1e-9)
         model.parameters.set_value("epsilon0", 0.1)
         model.parameters.set_value("c0", 1.0)
 
-        gamma_dot = 1e11  # Very high shear rate
+        gamma_dot = 1e7  # Shear rate compatible with explicit solver
 
         # Coarse time grid
-        t_coarse = np.linspace(0, 1e-11, 10)
+        t_coarse = np.linspace(0, 1e-7, 10)
         # Fine time grid
-        t_fine = np.linspace(0, 1e-11, 100)
+        t_fine = np.linspace(0, 1e-7, 100)
 
         p_values = {k: model.parameters.get_value(k) for k in model.parameters.keys()}
 

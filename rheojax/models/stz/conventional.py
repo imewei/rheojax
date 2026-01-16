@@ -288,7 +288,7 @@ class STZConventional(STZBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=1000000,
+            max_steps=10_000_000,
         )
 
         # Extract stress (index 0)
@@ -541,7 +541,7 @@ class STZConventional(STZBase):
             args=base_args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=1000000,
+            max_steps=10_000_000,
         )
 
         # Extract stress
