@@ -82,6 +82,7 @@ dependencies = [
 
     # JAX-compatible scientific computing (§2 Technical Guidelines)
     "interpax>=0.3.0",    # JIT-safe interpolation (replaces scipy.interpolate)
+    "diffrax>=0.6.0",     # JAX-native ODE solver (replaces jax.experimental.ode)
 
     # Probabilistic programming
     "numpyro>=0.19.0,<1.0.0",
