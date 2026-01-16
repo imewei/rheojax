@@ -2179,10 +2179,11 @@ class SGRGeneric(BaseModel):
     ) -> np.ndarray:
         """Evolve noise temperature x(t) for aging/rejuvenation dynamics.
 
-        Evolution equation:
-            dx/dt = alpha_aging * (x_eq - x) + beta_rejuv * |gamma_dot| * (x_ss - x)
+        Evolution equation::
 
-        where x_ss = x_eq + x_ss_A * |gamma_dot|^x_ss_n is the steady-state
+            dx/dt = alpha_aging * (x_eq - x) + beta_rejuv * abs(gamma_dot) * (x_ss - x)
+
+        where ``x_ss = x_eq + x_ss_A * abs(gamma_dot)^x_ss_n`` is the steady-state
         value under shear.
 
         Args:

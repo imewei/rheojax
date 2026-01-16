@@ -295,7 +295,7 @@ class OptimizationResult:
     def mae(self) -> float | None:
         """Mean absolute error.
 
-        MAE = mean(|residuals|)
+        MAE = mean(abs(residuals))
 
         More robust to outliers than RMSE.
 
@@ -560,9 +560,11 @@ def nlsq_optimize(
             enable GPU acceleration and automatic differentiation.
         parameters: ParameterSet with initial values and bounds
         method: Optimization method. Options:
+
             - "auto": Automatically select based on bounds (default)
             - "trf": Trust Region Reflective (supports bounds)
             - "lm": Levenberg-Marquardt (no bounds)
+
             NLSQ internally selects the best algorithm regardless of this parameter.
         use_jax: Whether to use JAX for gradient computation (default: True).
             Should always be True for GPU acceleration and float64 precision.
@@ -1064,7 +1066,7 @@ def nlsq_curve_fit(
 
     Notes:
         - This function uses nlsq.curve_fit() directly (not LeastSquares.least_squares())
-        - The model function signature is f(x, params_array) not f(x, *params)
+        - The model function signature is ``f(x, params_array)`` not ``f(x, *params)``
         - Results include all CurveFitResult properties for model comparison
     """
     import nlsq as nlsq_module

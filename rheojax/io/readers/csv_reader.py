@@ -47,53 +47,51 @@ def load_csv(
     """Load data from CSV or ASCII text file into RheoData.
 
     Args:
-        filepath: Path to CSV or text file
-        x_col: Column name or index for x-axis data
+        filepath: Path to CSV or text file.
+        x_col: Column name or index for x-axis data.
         y_col: Column name or index for y-axis data (single column).
-               Mutually exclusive with y_cols.
+            Mutually exclusive with y_cols.
         y_cols: List of two column names/indices for complex modulus [G', G''].
-                First column is storage modulus (G'), second is loss modulus (G'').
-                Mutually exclusive with y_col.
-        x_units: Units for x-axis (auto-detected from header if None)
-        y_units: Units for y-axis (auto-detected from header if None)
-        domain: Data domain ('time' or 'frequency', auto-detected if None)
+            First column is storage modulus (G'), second is loss modulus (G'').
+            Mutually exclusive with y_col.
+        x_units: Units for x-axis (auto-detected from header if None).
+        y_units: Units for y-axis (auto-detected from header if None).
+        domain: Data domain ('time' or 'frequency', auto-detected if None).
         test_mode: Test mode ('relaxation', 'creep', 'oscillation', 'rotation').
-                   Auto-detected if None.
-        temperature: Temperature in Kelvin for TTS workflows
-        metadata: Additional metadata dict to merge
-        intended_transform: Transform type for metadata validation
-                           ('mastercurve', 'srfs', 'owchirp', 'spp',
-                            'fft', 'mutation', 'derivative')
-        delimiter: Column delimiter (auto-detected if None)
-        header: Row number for column headers (None if no header)
-        **kwargs: Additional arguments passed to pandas.read_csv
+            Auto-detected if None.
+        temperature: Temperature in Kelvin for TTS workflows.
+        metadata: Additional metadata dict to merge.
+        intended_transform: Transform type for metadata validation. One of
+            'mastercurve', 'srfs', 'owchirp', 'spp', 'fft', 'mutation', 'derivative'.
+        delimiter: Column delimiter (auto-detected if None).
+        header: Row number for column headers (None if no header).
+        **kwargs: Additional arguments passed to pandas.read_csv.
 
     Returns:
-        RheoData object with populated fields
+        RheoData object with populated fields.
 
     Raises:
-        FileNotFoundError: If file doesn't exist
-        KeyError: If specified columns don't exist
+        FileNotFoundError: If file doesn't exist.
+        KeyError: If specified columns don't exist.
         ValueError: If data cannot be parsed, y_cols has wrong length,
-                    or both y_col and y_cols are provided
+            or both y_col and y_cols are provided.
 
     Warnings:
-        UserWarning: If intended_transform metadata is missing
-        UserWarning: If domain incompatible with intended_transform
-        UserWarning: If test_mode conflicts with intended_transform
+        UserWarning: If intended_transform metadata is missing.
+        UserWarning: If domain incompatible with intended_transform.
+        UserWarning: If test_mode conflicts with intended_transform.
 
     Example:
-        # Simple relaxation data
-        data = load_csv("relaxation.csv", x_col="time (s)", y_col="G(t) (Pa)")
-
-        # Complex modulus oscillation data
-        data = load_csv(
-            "frequency_sweep.csv",
-            x_col="omega (rad/s)",
-            y_cols=["G' (Pa)", "G'' (Pa)"],
-            intended_transform='mastercurve',
-            temperature=298.15
-        )
+        >>> # Simple relaxation data
+        >>> data = load_csv("relaxation.csv", x_col="time (s)", y_col="G(t) (Pa)")
+        >>> # Complex modulus oscillation data
+        >>> data = load_csv(
+        ...     "frequency_sweep.csv",
+        ...     x_col="omega (rad/s)",
+        ...     y_cols=["G' (Pa)", "G'' (Pa)"],
+        ...     intended_transform='mastercurve',
+        ...     temperature=298.15,
+        ... )
     """
     filepath = Path(filepath)
 

@@ -196,6 +196,7 @@ API Reference
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autoclass:: rheojax.models.stz._base.STZBase
    :members: get_initial_state

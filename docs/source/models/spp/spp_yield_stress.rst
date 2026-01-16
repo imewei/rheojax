@@ -1,7 +1,7 @@
 SPP Yield Stress Model
 ======================
 
-.. module:: rheojax.models.spp_yield_stress
+.. module:: rheojax.models.spp.spp_yield_stress
    :synopsis: SPP-based yield stress model for LAOS amplitude sweeps
 
 Quick Reference
@@ -12,7 +12,7 @@ Quick Reference
    :stub-columns: 1
 
    * - **Model Class**
-     - :class:`~rheojax.models.spp_yield_stress.SPPYieldStress`
+     - :class:`~rheojax.models.spp.spp_yield_stress.SPPYieldStress`
    * - **Registry Name**
      - ``"spp_yield_stress"``
    * - **Test Modes**

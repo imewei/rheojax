@@ -10,6 +10,7 @@ Readers
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: TRIOSFile, TRIOSTable, IntervalBlock
 
 Auto-Detection
 ~~~~~~~~~~~~~~
@@ -33,6 +34,7 @@ TRIOS Reader
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: TRIOSFile, TRIOSTable, DataSegment, ColumnMapping, TRIOSExperiment, TRIOS_COLUMN_MAPPINGS, TRIOS_UNIT_CONVERSIONS, STEP_COLUMN_CANDIDATES, construct_complex_modulus, convert_unit, detect_step_column, detect_test_type, map_columns_to_canonical, segment_to_rheodata, select_xy_columns, split_by_step, convert_units
 
 .. autofunction:: rheojax.io.readers.trios.load_trios
    :noindex:
@@ -44,6 +46,7 @@ CSV Reader
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autofunction:: rheojax.io.readers.csv_reader.load_csv
    :noindex:
@@ -55,6 +58,7 @@ Excel Reader
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 .. autofunction:: rheojax.io.readers.excel_reader.load_excel
    :noindex:
@@ -66,6 +70,7 @@ Anton Paar Reader
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: IntervalBlock
 
 .. autofunction:: rheojax.io.readers.anton_paar.load_anton_paar
    :noindex:

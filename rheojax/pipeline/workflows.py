@@ -25,7 +25,7 @@ from rheojax.logging import get_logger
 from rheojax.pipeline.base import Pipeline
 
 if TYPE_CHECKING:
-    from rheojax.models.spp_yield_stress import SPPYieldStress
+    from rheojax.models.spp.spp_yield_stress import SPPYieldStress
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -909,7 +909,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         Returns:
             self for method chaining
         """
-        from rheojax.models.spp_yield_stress import SPPYieldStress
+        from rheojax.models.spp.spp_yield_stress import SPPYieldStress
 
         if not self._gamma_0_values:
             raise RuntimeError("No data available. Call run() first.")

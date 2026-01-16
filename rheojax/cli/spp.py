@@ -332,7 +332,7 @@ def run_analyze(args: Namespace) -> int:
         )
 
         try:
-            from rheojax.models.spp_yield_stress import SPPYieldStress
+            from rheojax.models.spp.spp_yield_stress import SPPYieldStress
 
             model = SPPYieldStress()
             gamma_0_array = np.array([args.gamma_0])
