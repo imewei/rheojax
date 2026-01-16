@@ -41,6 +41,12 @@ from rheojax.utils.prony import (
     softmax_penalty,
 )
 
+# Import diffrax for transient simulations
+try:
+    import diffrax
+except ImportError:
+    diffrax = None  # Optional dependency for LAOS/startup
+
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
@@ -185,6 +191,18 @@ class GeneralizedMaxwell(BaseModel):
                     )
                 elif test_mode == "creep":
                     self._fit_creep_mode(
+                        X, y, optimization_factor=optimization_factor, **kwargs
+                    )
+                elif test_mode == "steady_shear":
+                    self._fit_steady_shear_mode(
+                        X, y, optimization_factor=optimization_factor, **kwargs
+                    )
+                elif test_mode == "startup":
+                    self._fit_startup_mode(
+                        X, y, optimization_factor=optimization_factor, **kwargs
+                    )
+                elif test_mode == "laos":
+                    self._fit_laos_mode(
                         X, y, optimization_factor=optimization_factor, **kwargs
                     )
                 else:
@@ -505,6 +523,34 @@ class GeneralizedMaxwell(BaseModel):
                 elif self._test_mode == "creep":
                     model_n._test_mode = "creep"
                     model_n._fit_creep_mode(
+                        X,
+                        y,
+                        optimization_factor=None,
+                        initial_params=initial_params_n,
+                        **kwargs,
+                    )
+                elif self._test_mode == "startup":
+                    model_n._test_mode = "startup"
+                    model_n._fit_startup_mode(
+                        X,
+                        y,
+                        optimization_factor=None,
+                        initial_params=initial_params_n,
+                        **kwargs,
+                    )
+                elif self._test_mode == "steady_shear":
+                    model_n._test_mode = "steady_shear"
+                    model_n._fit_steady_shear_mode(
+                        X,
+                        y,
+                        optimization_factor=None,
+                        initial_params=initial_params_n,
+                        **kwargs,
+                    )
+                elif self._test_mode == "laos":
+                    # For linear model, LAOS = SAOS, use oscillation fitting
+                    model_n._test_mode = "laos"
+                    model_n._fit_laos_mode(
                         X,
                         y,
                         optimization_factor=None,
@@ -948,6 +994,12 @@ class GeneralizedMaxwell(BaseModel):
             return self._predict_oscillation(X)
         elif self._test_mode == "creep":
             return self._predict_creep(X)
+        elif self._test_mode == "steady_shear":
+            return self._predict_steady_shear(X)
+        elif self._test_mode == "startup":
+            return self._predict_startup(X)
+        elif self._test_mode == "laos":
+            return self._predict_laos(X)
         else:
             raise ValueError(f"Unknown test_mode: {self._test_mode}")
 
@@ -1463,5 +1515,408 @@ class GeneralizedMaxwell(BaseModel):
             return self._predict_creep_jit(
                 jnp.asarray(X), E_inf, E_i, tau_i, sigma_0=1.0
             )
+        elif test_mode == "steady_shear":
+            return self._predict_steady_shear_jit(E_inf, E_i, tau_i)
+        elif test_mode == "startup":
+            gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+            return self._predict_startup_jit(
+                jnp.asarray(X), E_inf, E_i, tau_i, gamma_dot
+            )
+        elif test_mode == "laos":
+            omega = getattr(self, "_laos_omega", 1.0)
+            gamma_0 = getattr(self, "_laos_gamma_0", 0.01)
+            return self._predict_laos_jit(
+                jnp.asarray(X), E_inf, E_i, tau_i, omega, gamma_0
+            )
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
+
+    # =========================================================================
+    # Steady-State Flow Protocol
+    # =========================================================================
+
+    def _fit_steady_shear_mode(
+        self,
+        gamma_dot: np.ndarray,
+        eta: np.ndarray,
+        optimization_factor: float | None = None,
+        **kwargs,
+    ) -> None:
+        """Fit GMM to steady-shear viscosity data.
+
+        For a linear viscoelastic model, steady-state viscosity is constant:
+        η₀ = Σᵢ Gᵢτᵢ (zero-shear viscosity)
+
+        Since GMM is linear, it cannot capture shear-thinning. This fit finds
+        parameters that best match the given viscosity data by using the
+        zero-shear viscosity relationship.
+
+        Args:
+            gamma_dot: Shear rate array (1/s)
+            eta: Viscosity array (Pa.s)
+            optimization_factor: Not used (no element minimization for steady-shear)
+            **kwargs: NLSQ optimizer arguments
+        """
+        # For linear viscoelastic model, η = η₀ = Σᵢ Gᵢτᵢ (constant)
+        # Fit by matching average viscosity
+        eta_avg = np.mean(eta)
+
+        symbol = "G" if self._modulus_type == "shear" else "E"
+
+        # Initialize with simple estimate: distribute η₀ across modes
+        eta_per_mode = eta_avg / self._n_modes
+        tau_i_guess = np.logspace(-2, 2, self._n_modes)
+        G_i_guess = eta_per_mode / tau_i_guess
+
+        # Set parameters
+        self.parameters.set_value(f"{symbol}_inf", 0.0)  # No equilibrium modulus for flow
+        for i in range(self._n_modes):
+            self.parameters.set_value(f"{symbol}_{i+1}", float(G_i_guess[i]))
+            self.parameters.set_value(f"tau_{i+1}", float(tau_i_guess[i]))
+
+        logger.info(
+            "GMM fitted to steady-shear mode",
+            eta_0=eta_avg,
+            note="Linear model gives constant viscosity η₀=ΣGᵢτᵢ",
+        )
+
+    @staticmethod
+    @jax.jit
+    def _predict_steady_shear_jit(
+        E_inf: float,
+        E_i: jnp_typing.ndarray,
+        tau_i: jnp_typing.ndarray,
+    ) -> jnp_typing.ndarray:
+        """JIT-compiled zero-shear viscosity calculation.
+
+        η₀ = Σᵢ Gᵢτᵢ
+        """
+        eta_0 = jnp.sum(E_i * tau_i)
+        return eta_0
+
+    def _predict_steady_shear(self, gamma_dot: np.ndarray) -> np.ndarray:
+        """Predict steady-shear viscosity (constant for linear model).
+
+        Args:
+            gamma_dot: Shear rate array (ignored for linear model)
+
+        Returns:
+            Viscosity array (constant η₀ for all shear rates)
+        """
+        symbol = "G" if self._modulus_type == "shear" else "E"
+
+        E_inf = self.parameters.get_value(f"{symbol}_inf")
+        E_i = jnp.array(
+            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+        )
+        tau_i = jnp.array(
+            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+        )
+
+        eta_0 = self._predict_steady_shear_jit(E_inf, E_i, tau_i)
+
+        # Return constant viscosity for all shear rates
+        return np.full_like(gamma_dot, float(eta_0))
+
+    # =========================================================================
+    # Startup Flow Protocol
+    # =========================================================================
+
+    def _fit_startup_mode(
+        self,
+        t: np.ndarray,
+        eta_plus: np.ndarray,
+        optimization_factor: float | None = 1.5,
+        gamma_dot: float = 1.0,
+        **kwargs,
+    ) -> None:
+        """Fit GMM to startup flow (stress growth) data.
+
+        The stress growth coefficient η⁺(t) = σ(t)/γ̇ for step shear rate.
+
+        Args:
+            t: Time array (s)
+            eta_plus: Stress growth coefficient η⁺(t) = σ(t)/γ̇ (Pa.s)
+            optimization_factor: R² threshold for element minimization
+            gamma_dot: Applied shear rate (1/s) - stored for predictions
+            **kwargs: NLSQ optimizer arguments
+        """
+        # Store gamma_dot for predictions
+        self._startup_gamma_dot = gamma_dot
+
+        # Extract kwargs
+        max_iter = kwargs.get("max_iter", 1000)
+        ftol = kwargs.get("ftol", 1e-6)
+        xtol = kwargs.get("xtol", 1e-6)
+        gtol = kwargs.get("gtol", 1e-6)
+
+        symbol = "G" if self._modulus_type == "shear" else "E"
+
+        # Define objective function
+        def objective(params):
+            """Residual for startup flow."""
+            E_inf = params[0]
+            E_i = params[1 : 1 + self._n_modes]
+            tau_i = params[1 + self._n_modes :]
+
+            eta_plus_pred = self._predict_startup_jit(
+                jnp.asarray(t), E_inf, E_i, tau_i, gamma_dot
+            )
+            return eta_plus_pred - eta_plus
+
+        # Initial guess from relaxation behavior
+        # Use initial_params if provided (for warm-start in element minimization)
+        initial_params = kwargs.get("initial_params", None)
+        if initial_params is not None and len(initial_params) == 1 + 2 * self._n_modes:
+            x0 = jnp.asarray(initial_params)
+        else:
+            eta_inf = np.max(eta_plus)  # Long-time viscosity
+            E_i_guess = jnp.full(self._n_modes, eta_inf / self._n_modes / 1.0)
+            tau_i_guess = jnp.logspace(-2, 2, self._n_modes)
+            x0 = jnp.concatenate([jnp.array([0.0]), E_i_guess, tau_i_guess])
+
+        # Bounds
+        bounds_lower = jnp.concatenate(
+            [
+                jnp.array([0.0]),
+                jnp.full(self._n_modes, 1e-12),
+                jnp.full(self._n_modes, 1e-6),
+            ]
+        )
+        bounds_upper = jnp.concatenate(
+            [
+                jnp.array([np.max(eta_plus) * 10]),
+                jnp.full(self._n_modes, np.max(eta_plus) * 10),
+                jnp.full(self._n_modes, 1e6),
+            ]
+        )
+
+        result = self._nlsq_fit(
+            objective,
+            x0,
+            bounds=(bounds_lower, bounds_upper),
+            max_nfev=max_iter,
+            ftol=ftol,
+            xtol=xtol,
+            gtol=gtol,
+        )
+
+        # Set parameters
+        params_opt = result.x
+        self.parameters.set_value(f"{symbol}_inf", float(params_opt[0]))
+        for i in range(self._n_modes):
+            self.parameters.set_value(f"{symbol}_{i+1}", float(params_opt[1 + i]))
+            self.parameters.set_value(
+                f"tau_{i+1}", float(params_opt[1 + self._n_modes + i])
+            )
+
+        self._nlsq_result = result
+
+        # Element minimization
+        if optimization_factor is not None and self._n_modes > 1:
+            self._apply_element_minimization(t, eta_plus, optimization_factor, **kwargs)
+
+    @staticmethod
+    @jax.jit
+    def _predict_startup_jit(
+        t: jnp_typing.ndarray,
+        E_inf: float,
+        E_i: jnp_typing.ndarray,
+        tau_i: jnp_typing.ndarray,
+        gamma_dot: float,
+    ) -> jnp_typing.ndarray:
+        """JIT-compiled startup flow prediction.
+
+        Stress growth coefficient: η⁺(t) = σ(t)/γ̇
+        For Maxwell element: ηᵢ⁺(t) = Gᵢτᵢ(1 - exp(-t/τᵢ))
+        Total: η⁺(t) = Σᵢ Gᵢτᵢ(1 - exp(-t/τᵢ))
+        """
+        # Each mode contribution: Gᵢτᵢ(1 - exp(-t/τᵢ))
+        eta_plus = jnp.sum(
+            E_i[:, None] * tau_i[:, None] * (1 - jnp.exp(-t[None, :] / tau_i[:, None])),
+            axis=0,
+        )
+        return eta_plus
+
+    def _predict_startup(self, t: np.ndarray) -> np.ndarray:
+        """Predict stress growth coefficient η⁺(t).
+
+        Args:
+            t: Time array (s)
+
+        Returns:
+            Stress growth coefficient η⁺(t) (Pa.s)
+        """
+        symbol = "G" if self._modulus_type == "shear" else "E"
+        gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+
+        E_inf = self.parameters.get_value(f"{symbol}_inf")
+        E_i = jnp.array(
+            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+        )
+        tau_i = jnp.array(
+            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+        )
+
+        eta_plus = self._predict_startup_jit(
+            jnp.asarray(t), E_inf, E_i, tau_i, gamma_dot
+        )
+        return np.asarray(eta_plus)
+
+    # =========================================================================
+    # LAOS Protocol
+    # =========================================================================
+
+    def _fit_laos_mode(
+        self,
+        omega: np.ndarray,
+        G_star: np.ndarray,
+        optimization_factor: float | None = 1.5,
+        gamma_0: float = 0.01,
+        **kwargs,
+    ) -> None:
+        """Fit GMM to LAOS data.
+
+        For a linear viscoelastic model, LAOS = SAOS (no nonlinear harmonics).
+        This delegates to oscillation fitting.
+
+        Args:
+            omega: Angular frequency array (rad/s)
+            G_star: Complex modulus [G', G''] - same format as oscillation
+            optimization_factor: R² threshold for element minimization
+            gamma_0: Strain amplitude (stored for predictions)
+            **kwargs: NLSQ optimizer arguments
+        """
+        # Store LAOS parameters
+        self._laos_omega = omega[0] if len(omega) > 0 else 1.0
+        self._laos_gamma_0 = gamma_0
+
+        # For linear model, LAOS = SAOS
+        logger.info(
+            "GMM LAOS mode: Linear model gives SAOS response (no nonlinear harmonics)"
+        )
+        self._fit_oscillation_mode(omega, G_star, optimization_factor, **kwargs)
+
+    @staticmethod
+    @jax.jit
+    def _predict_laos_jit(
+        t: jnp_typing.ndarray,
+        E_inf: float,
+        E_i: jnp_typing.ndarray,
+        tau_i: jnp_typing.ndarray,
+        omega: float,
+        gamma_0: float,
+    ) -> jnp_typing.ndarray:
+        """JIT-compiled LAOS stress prediction.
+
+        For linear viscoelastic model:
+        γ(t) = γ₀ sin(ωt)
+        σ(t) = G'γ₀ sin(ωt) + G''γ₀ cos(ωt)
+
+        Returns stress(t) array.
+        """
+        # Compute G' and G'' at this frequency
+        omega_tau = omega * tau_i
+        omega_tau_sq = omega_tau**2
+
+        G_prime = E_inf + jnp.sum(E_i * omega_tau_sq / (1 + omega_tau_sq))
+        G_double_prime = jnp.sum(E_i * omega_tau / (1 + omega_tau_sq))
+
+        # Linear response: σ(t) = G'γ₀ sin(ωt) + G''γ₀ cos(ωt)
+        stress = G_prime * gamma_0 * jnp.sin(omega * t) + G_double_prime * gamma_0 * jnp.cos(omega * t)
+        return stress
+
+    def _predict_laos(self, t: np.ndarray) -> np.ndarray:
+        """Predict LAOS stress response.
+
+        For linear model, returns sinusoidal stress (no higher harmonics).
+
+        Args:
+            t: Time array (s)
+
+        Returns:
+            Stress response σ(t) (Pa)
+        """
+        symbol = "G" if self._modulus_type == "shear" else "E"
+        omega = getattr(self, "_laos_omega", 1.0)
+        gamma_0 = getattr(self, "_laos_gamma_0", 0.01)
+
+        E_inf = self.parameters.get_value(f"{symbol}_inf")
+        E_i = jnp.array(
+            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+        )
+        tau_i = jnp.array(
+            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+        )
+
+        stress = self._predict_laos_jit(
+            jnp.asarray(t), E_inf, E_i, tau_i, omega, gamma_0
+        )
+        return np.asarray(stress)
+
+    def simulate_laos(
+        self,
+        omega: float,
+        gamma_0: float,
+        n_cycles: int = 5,
+        n_points_per_cycle: int = 64,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Simulate LAOS response.
+
+        Args:
+            omega: Angular frequency (rad/s)
+            gamma_0: Strain amplitude
+            n_cycles: Number of oscillation cycles
+            n_points_per_cycle: Points per cycle
+
+        Returns:
+            t: Time array
+            strain: Strain array
+            stress: Stress array
+        """
+        # Store for predictions
+        self._laos_omega = omega
+        self._laos_gamma_0 = gamma_0
+
+        # Generate time array
+        period = 2 * np.pi / omega
+        t = np.linspace(0, n_cycles * period, n_cycles * n_points_per_cycle)
+
+        # Strain
+        strain = gamma_0 * np.sin(omega * t)
+
+        # Stress (linear response)
+        stress = self._predict_laos(t)
+
+        return t, strain, stress
+
+    def extract_harmonics(
+        self, stress: np.ndarray, n_points_per_cycle: int
+    ) -> dict[str, float]:
+        """Extract Fourier harmonics from LAOS stress signal.
+
+        For linear model, only I_1 is non-zero.
+
+        Args:
+            stress: Stress signal from last cycle
+            n_points_per_cycle: Points per cycle
+
+        Returns:
+            Dictionary with I_1, I_3, I_3_I_1 (I_3/I_1 ratio)
+        """
+        # Use last cycle for analysis
+        last_cycle = stress[-n_points_per_cycle:]
+
+        # FFT
+        fft_result = jnp.fft.fft(last_cycle)
+        magnitudes = jnp.abs(fft_result) / (n_points_per_cycle / 2)
+
+        # Extract harmonics
+        I_1 = float(magnitudes[1])  # Fundamental
+        I_3 = float(magnitudes[3]) if len(magnitudes) > 3 else 0.0  # Third harmonic
+
+        return {
+            "I_1": I_1,
+            "I_3": I_3,
+            "I_3_I_1": I_3 / I_1 if I_1 > 1e-12 else 0.0,
+        }
