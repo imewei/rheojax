@@ -822,6 +822,57 @@ Thermodynamically consistent SGR using GENERIC framework (Fuereder & Ilg 2013).
    :undoc-members:
    :show-inheritance:
 
+STZ Models
+----------
+
+STZ Conventional
+~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.stz.conventional.STZConventional` | Handbook: :doc:`/models/stz/stz_conventional`
+Shear Transformation Zone model for amorphous plasticity (Langer 2008).
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``G0``
+     - Pa
+     - [1e6, 1e12]
+     - Elastic shear modulus
+   * - ``sigma_y``
+     - Pa
+     - [1e3, 1e9]
+     - Yield stress scale
+   * - ``chi_inf``
+     - -
+     - [0.01, 0.5]
+     - Steady-state effective temperature
+   * - ``tau0``
+     - s
+     - [1e-14, 1e-9]
+     - Molecular attempt time
+   * - ``epsilon0``
+     - -
+     - [0.01, 1.0]
+     - Strain increment per flip
+   * - ``c0``
+     - -
+     - [0.1, 100]
+     - Specific heat
+   * - ``ez``
+     - -
+     - [0.1, 5.0]
+     - STZ formation energy
+
+.. autoclass:: rheojax.models.stz.conventional.STZConventional
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 SPP LAOS Models
 ---------------
 
