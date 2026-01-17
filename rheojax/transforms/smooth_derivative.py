@@ -264,7 +264,8 @@ class SmoothDerivative(BaseTransform):
 
         # Compute derivative at original x points
         # interpax splines have .derivative() method
-        dy_dx = spline.derivative(x_sorted, nu=self.deriv)
+        deriv_spline = spline.derivative(nu=self.deriv)
+        dy_dx = deriv_spline(x_sorted)
 
         # Unsort if needed
         unsort_idx = jnp.argsort(sort_idx)
