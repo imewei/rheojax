@@ -588,7 +588,7 @@ class HebraudLequeux(BaseModel):
             try:
                 t_max = float(x_arr[-1])
                 return int(t_max / dt) + 1
-            except Exception:
+            except Exception as e:
                 # Fallback to stored metadata if available
                 if self._fit_data_metadata and "t_max" in self._fit_data_metadata:
                     t_max = self._fit_data_metadata["t_max"]
