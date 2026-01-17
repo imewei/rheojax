@@ -102,6 +102,9 @@ from rheojax.models.fractional import (
     FractionalZenerSolidSolid,
 )
 
+# HL models
+from rheojax.models.hl import HebraudLequeux
+
 # Multi-mode models
 from rheojax.models.multimode import GeneralizedMaxwell
 
@@ -154,6 +157,8 @@ __all__ = [
     "SGRGeneric",
     # STZ models
     "STZConventional",
+    # HL models
+    "HebraudLequeux",
     # SPP Yield Stress model
     "SPPYieldStress",
 ]
