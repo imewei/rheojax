@@ -93,7 +93,9 @@ def compute_covariance_from_jacobian(
 
         # Filter near-zero singular values
         threshold = np.finfo(np.float64).eps * max(m, n) * s[0]
-        s_inv_sq = np.where(s > threshold, 1.0 / (s**2), 0.0)
+        # Use safe division to avoid RuntimeWarning: divide by zero
+        s_safe = np.where(s > threshold, s, np.inf)
+        s_inv_sq = np.where(s > threshold, 1.0 / (s_safe**2), 0.0)
         n_filtered = np.sum(s <= threshold)
         if n_filtered > 0:
             logger.debug(
