@@ -87,7 +87,7 @@ def stz_density(chi: float) -> float:
 def plastic_rate(
     stress: float,
     Lambda: float,
-    chi: float, # Used if Lambda is not state var, but here we pass Lambda
+    chi: float,  # Used if Lambda is not state var, but here we pass Lambda
     sigma_y: float,
     tau0: float,
     epsilon0: float,
@@ -268,11 +268,11 @@ def stz_ode_rhs(
     m = 0.0
 
     # Logic based on shape/variant
-    if n_states == 2: # Minimal
+    if n_states == 2:  # Minimal
         Lambda = stz_density(chi)
-    elif n_states == 3: # Standard
+    elif n_states == 3:  # Standard
         Lambda = y[2]
-    elif n_states == 4: # Full
+    elif n_states == 4:  # Full
         Lambda = y[2]
         m = y[3]
     else:

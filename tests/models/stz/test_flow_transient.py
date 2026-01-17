@@ -162,7 +162,9 @@ class TestSTZFlowTransient:
             model.parameters.set_value("epsilon0", 0.1)
             model.parameters.set_value("c0", 1.0)
 
-            p_values = {k: model.parameters.get_value(k) for k in model.parameters.keys()}
+            p_values = {
+                k: model.parameters.get_value(k) for k in model.parameters.keys()
+            }
 
             stress = model._simulate_transient_jit(
                 jnp.asarray(t),
@@ -202,7 +204,13 @@ class TestSTZFlowTransient:
         p_values = {k: model.parameters.get_value(k) for k in model.parameters.keys()}
 
         stress_coarse = model._simulate_transient_jit(
-            jnp.asarray(t_coarse), p_values, "startup", gamma_dot, None, None, "standard"
+            jnp.asarray(t_coarse),
+            p_values,
+            "startup",
+            gamma_dot,
+            None,
+            None,
+            "standard",
         )
         stress_fine = model._simulate_transient_jit(
             jnp.asarray(t_fine), p_values, "startup", gamma_dot, None, None, "standard"

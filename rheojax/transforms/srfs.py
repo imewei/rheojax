@@ -35,8 +35,8 @@ import numpy as np
 
 from rheojax.core.base import BaseTransform
 from rheojax.core.data import RheoData
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.inventory import TransformType
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
 from rheojax.logging import get_logger
 

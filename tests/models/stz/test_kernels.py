@@ -205,5 +205,7 @@ class TestSTZKernels:
 
         # Rate should increase with Lambda (more zones -> more flow)
         Lambda_high = Lambda * 10
-        d_pl_high_lambda = plastic_rate(sigma_y, Lambda_high, chi, sigma_y, tau0, epsilon0)
+        d_pl_high_lambda = plastic_rate(
+            sigma_y, Lambda_high, chi, sigma_y, tau0, epsilon0
+        )
         assert d_pl_high_lambda > d_pl_pos

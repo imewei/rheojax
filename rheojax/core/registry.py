@@ -475,9 +475,9 @@ class Registry:
                     "class_name": info.plugin_class.__name__,
                     "module": info.plugin_class.__module__,
                     "metadata": info.metadata,
-                    "transform_type": str(info.transform_type)
-                    if info.transform_type
-                    else None,
+                    "transform_type": (
+                        str(info.transform_type) if info.transform_type else None
+                    ),
                 }
                 for name, info in self._transforms.items()
             },
@@ -785,9 +785,7 @@ class TransformRegistry:
         return cls._registry
 
     @classmethod
-    def register(
-        cls, name: str, type: TransformType | str | None = None, **metadata
-    ):
+    def register(cls, name: str, type: TransformType | str | None = None, **metadata):
         """Decorator for registering a transform.
 
         Args:
@@ -894,4 +892,3 @@ class TransformRegistry:
         """
         registry = cls._get_registry()
         registry.unregister(name, PluginType.TRANSFORM)
-

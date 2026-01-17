@@ -93,6 +93,7 @@ try:
         QWizard,
         QWizardPage,
     )
+
     QT_BINDING = "qtpy"
     QT_VERSION = str(_qt_version)
 
@@ -179,6 +180,7 @@ except ImportError:
             QWizard,
             QWizardPage,
         )
+
         QT_BINDING = "PySide6"
         QT_VERSION = str(_qt_version)
 
@@ -258,6 +260,7 @@ except ImportError:
                 QWizard,
                 QWizardPage,
             )
+
             QT_BINDING = "PyQt6"
             QT_VERSION = str(_qt_version)
 

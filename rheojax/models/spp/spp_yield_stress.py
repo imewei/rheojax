@@ -31,8 +31,8 @@ import numpy as np
 import numpyro.distributions as dist
 
 from rheojax.core.base import BaseModel
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.inventory import Protocol
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode

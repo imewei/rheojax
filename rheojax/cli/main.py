@@ -188,7 +188,7 @@ def show_inventory(args: list[str] | None = None) -> int:
             name = m["name"]
             protos = ", ".join(m["protocols"])
             if len(protos) > proto_width - 3:
-                protos = protos[:proto_width-3] + "..."
+                protos = protos[: proto_width - 3] + "..."
             desc = m["description"] or ""
             if len(desc) > 50:
                 desc = desc[:47] + "..."

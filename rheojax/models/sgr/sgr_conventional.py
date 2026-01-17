@@ -51,8 +51,8 @@ import diffrax
 import numpy as np
 
 from rheojax.core.base import BaseModel
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.inventory import Protocol
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
@@ -708,7 +708,9 @@ class SGRConventional(BaseModel):
             fundamental_idx = int(omega * (t[-1] - t[0]) / (2 * np.pi))
             fundamental_idx = max(1, min(fundamental_idx, n // 2 - 1))
 
-            G_star_amplitude = 2.0 * float(jnp.abs(sigma_fft[fundamental_idx])) / (n * gamma_0)
+            G_star_amplitude = (
+                2.0 * float(jnp.abs(sigma_fft[fundamental_idx])) / (n * gamma_0)
+            )
             phase = float(jnp.angle(sigma_fft[fundamental_idx]))
 
             G_prime = G_star_amplitude * np.cos(phase)
@@ -900,7 +902,9 @@ class SGRConventional(BaseModel):
             x_param = params[0]
             G0_param = params[1]
             tau0_param = params[2]
-            return self._predict_startup_jit(x_data, x_param, G0_param, tau0_param, gamma_dot)
+            return self._predict_startup_jit(
+                x_data, x_param, G0_param, tau0_param, gamma_dot
+            )
 
         # Create residual function (log-space for spanning decades)
         objective = create_least_squares_objective(
@@ -1324,8 +1328,8 @@ class SGRConventional(BaseModel):
 
         def x_not_one(_):
             # [(1+t/tau0)^(x-1) - 1] / (x-1)
-            return G0_scale * G0_dim * tau0 * (
-                (jnp.power(1.0 + t_safe, exp) - 1.0) / exp
+            return (
+                G0_scale * G0_dim * tau0 * ((jnp.power(1.0 + t_safe, exp) - 1.0) / exp)
             )
 
         # Use lax.cond for JIT-compatible branching

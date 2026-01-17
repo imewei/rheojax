@@ -164,13 +164,29 @@ class ModelService:
             name_lower = model_name.lower()
             if name_lower in ["maxwell", "zener", "springpot"]:
                 categories["classical"].append(model_name)
-            elif "fractional_maxwell" in name_lower or name_lower == "fractional_kelvin_voigt":
+            elif (
+                "fractional_maxwell" in name_lower
+                or name_lower == "fractional_kelvin_voigt"
+            ):
                 categories["fractional_maxwell"].append(model_name)
-            elif "fractional_zener" in name_lower or "fractional_kv_zener" in name_lower:
+            elif (
+                "fractional_zener" in name_lower or "fractional_kv_zener" in name_lower
+            ):
                 categories["fractional_zener"].append(model_name)
-            elif "fractional" in name_lower and ("burgers" in name_lower or "jeffreys" in name_lower or "poynting" in name_lower):
+            elif "fractional" in name_lower and (
+                "burgers" in name_lower
+                or "jeffreys" in name_lower
+                or "poynting" in name_lower
+            ):
                 categories["fractional_advanced"].append(model_name)
-            elif name_lower in ["power_law", "carreau", "carreau_yasuda", "cross", "herschel_bulkley", "bingham"]:
+            elif name_lower in [
+                "power_law",
+                "carreau",
+                "carreau_yasuda",
+                "cross",
+                "herschel_bulkley",
+                "bingham",
+            ]:
                 categories["flow"].append(model_name)
             elif name_lower == "generalized_maxwell":
                 categories["multi_mode"].append(model_name)

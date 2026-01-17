@@ -188,7 +188,9 @@ class STZBase(BaseModel):
         else:
             raise ValueError(f"Unknown variant: {self.variant}")
 
-    def _ode_term_strain_controlled(self, t: float, y: jnp.ndarray, args: dict) -> jnp.ndarray:
+    def _ode_term_strain_controlled(
+        self, t: float, y: jnp.ndarray, args: dict
+    ) -> jnp.ndarray:
         """ODE vector field wrapper for Diffrax.
 
         Delegates to the JAX-compiled kernel stz_ode_rhs.

@@ -70,7 +70,9 @@ class TestSTZIntegration:
         model._test_mode = "steady_shear"
 
         x = np.logspace(-2, 4, 10)
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
 
         # Should not raise for steady_shear mode
         result = model.model_function(x, params, test_mode="steady_shear")

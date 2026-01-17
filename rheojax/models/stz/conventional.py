@@ -9,8 +9,8 @@ from __future__ import annotations
 import diffrax
 import numpy as np
 
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.inventory import Protocol
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_fit
 from rheojax.models.stz._base import STZBase
@@ -148,9 +148,7 @@ class STZConventional(STZBase):
     # Transient (ODE) - Startup, Relaxation, Creep
     # =========================================================================
 
-    def _fit_transient(
-        self, t: np.ndarray, y: np.ndarray, mode: str, **kwargs
-    ) -> None:
+    def _fit_transient(self, t: np.ndarray, y: np.ndarray, mode: str, **kwargs) -> None:
         """Fit transient response (Stress Growth / Relaxation / Creep).
 
         Args:
@@ -307,9 +305,7 @@ class STZConventional(STZBase):
 
         return stress
 
-    def _predict_transient(
-        self, t: np.ndarray, mode: str | None = None
-    ) -> np.ndarray:
+    def _predict_transient(self, t: np.ndarray, mode: str | None = None) -> np.ndarray:
         """Predict transient response."""
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         p_values = {k: self.parameters.get_value(k) for k in self.parameters.keys()}
@@ -354,9 +350,7 @@ class STZConventional(STZBase):
             # SAOS mode - linear viscoelastic approximation
             self._fit_saos_mode(X, y, **kwargs)
 
-    def _fit_saos_mode(
-        self, omega: np.ndarray, G_star: np.ndarray, **kwargs
-    ) -> None:
+    def _fit_saos_mode(self, omega: np.ndarray, G_star: np.ndarray, **kwargs) -> None:
         """Fit SAOS data using linear viscoelastic approximation.
 
         In SAOS limit, STZ behaves like a Maxwell-like viscoelastic solid.

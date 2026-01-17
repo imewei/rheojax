@@ -29,8 +29,8 @@ import nlsq
 import numpy as np
 
 from rheojax.core.base import BaseModel
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.inventory import Protocol
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
 from rheojax.logging import get_logger, log_fit
@@ -1580,7 +1580,9 @@ class GeneralizedMaxwell(BaseModel):
         G_i_guess = eta_per_mode / tau_i_guess
 
         # Set parameters
-        self.parameters.set_value(f"{symbol}_inf", 0.0)  # No equilibrium modulus for flow
+        self.parameters.set_value(
+            f"{symbol}_inf", 0.0
+        )  # No equilibrium modulus for flow
         for i in range(self._n_modes):
             self.parameters.set_value(f"{symbol}_{i+1}", float(G_i_guess[i]))
             self.parameters.set_value(f"tau_{i+1}", float(tau_i_guess[i]))
@@ -1834,7 +1836,9 @@ class GeneralizedMaxwell(BaseModel):
         G_double_prime = jnp.sum(E_i * omega_tau / (1 + omega_tau_sq))
 
         # Linear response: σ(t) = G'γ₀ sin(ωt) + G''γ₀ cos(ωt)
-        stress = G_prime * gamma_0 * jnp.sin(omega * t) + G_double_prime * gamma_0 * jnp.cos(omega * t)
+        stress = G_prime * gamma_0 * jnp.sin(
+            omega * t
+        ) + G_double_prime * gamma_0 * jnp.cos(omega * t)
         return stress
 
     def _predict_laos(self, t: np.ndarray) -> np.ndarray:

@@ -59,8 +59,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from rheojax.core.base import BaseModel
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.inventory import Protocol
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
@@ -926,7 +926,9 @@ class SGRGeneric(BaseModel):
             fundamental_idx = int(omega * (t[-1] - t[0]) / (2 * np.pi))
             fundamental_idx = max(1, min(fundamental_idx, n // 2 - 1))
 
-            G_star_amplitude = 2.0 * float(jnp.abs(sigma_fft[fundamental_idx])) / (n * gamma_0)
+            G_star_amplitude = (
+                2.0 * float(jnp.abs(sigma_fft[fundamental_idx])) / (n * gamma_0)
+            )
             phase = float(jnp.angle(sigma_fft[fundamental_idx]))
 
             G_prime = G_star_amplitude * np.cos(phase)
