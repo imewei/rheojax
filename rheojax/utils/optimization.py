@@ -536,7 +536,7 @@ class OptimizationResult:
 
 
 def nlsq_optimize(
-    objective: Callable[[np.ndarray], float],
+    objective: Callable[[np.ndarray], float | np.ndarray],
     parameters: ParameterSet,
     method: str = "auto",
     use_jax: bool = True,
@@ -553,13 +553,12 @@ def nlsq_optimize(
     JIT compilation and automatic differentiation.
 
     The objective function should accept parameter values as a 1D array and
-    return a scalar value to minimize. NLSQ internally converts this to a
-    residual minimization problem.
+    return a scalar value (minimization) or vector of residuals (least squares).
 
     Args:
         objective: Objective function to minimize. Takes parameter values as
-            array and returns scalar. Should use jax.numpy for operations to
-            enable GPU acceleration and automatic differentiation.
+            array and returns scalar or residual vector. Should use jax.numpy
+            for operations to enable GPU acceleration and automatic differentiation.
         parameters: ParameterSet with initial values and bounds
         method: Optimization method. Options:
 
@@ -817,7 +816,7 @@ def nlsq_optimize(
 
 
 def nlsq_multistart_optimize(
-    objective: Callable[[np.ndarray], float],
+    objective: Callable[[np.ndarray], float | np.ndarray],
     parameters: ParameterSet,
     n_starts: int = 5,
     perturb_factor: float = 0.3,
@@ -1225,7 +1224,7 @@ def nlsq_curve_fit(
 
 
 def optimize_with_bounds(
-    objective: Callable[[np.ndarray], float],
+    objective: Callable[[np.ndarray], float | np.ndarray],
     x0: np.ndarray,
     bounds: list[tuple[float | None, float | None]],
     use_jax: bool = True,

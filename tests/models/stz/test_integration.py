@@ -149,7 +149,7 @@ class TestSTZIntegration:
         model.parameters.set_value("tau0", 1e-12)
         model.parameters.set_value("ez", 1.0)
 
-        model._test_mode = "steady_shear"
+        model._test_mode = "rotation"  # Use valid Enum value
         model.fitted_ = True
 
         # Generate synthetic stress
@@ -168,6 +168,7 @@ class TestSTZIntegration:
                 num_warmup=100,
                 num_samples=100,
                 num_chains=1,
+                test_mode="rotation",  # Explicitly match Enum
             )
 
             # Check result structure

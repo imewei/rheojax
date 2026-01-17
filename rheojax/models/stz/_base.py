@@ -170,7 +170,8 @@ class STZBase(BaseModel):
         chi_init = 0.05
 
         # Lambda_init: Equilibrium at chi_init
-        ez = self.parameters.get_value("ez")
+        ez_val = self.parameters.get_value("ez")
+        ez = ez_val if ez_val is not None else 1.0
         # Avoid div by zero if chi_init is 0 (unlikely)
         safe_chi = max(chi_init, 1e-6)
         lambda_init = jnp.exp(-ez / safe_chi)

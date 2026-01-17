@@ -317,3 +317,88 @@ def stz_ode_rhs(
         derivatives.append(d_m)
 
     return jnp.stack(derivatives)
+
+
+def stz_creep_ode_rhs(
+    t: float,
+    y: jnp.ndarray,
+    args: dict,
+) -> jnp.ndarray:
+    """ODE vector field for STZ model in creep mode.
+
+    For creep (constant stress), the state vector tracks strain instead of stress.
+    d_stress/dt = 0 implies gamma_dot_tot = gamma_dot_pl.
+
+    State vector y depends on variant:
+    - Minimal: [strain, chi]
+    - Standard: [strain, chi, Lambda]
+    - Full: [strain, chi, Lambda, m]
+
+    Args:
+        t: Time (s)
+        y: State vector
+        args: Dictionary of parameters and inputs:
+            - sigma_applied: Constant applied stress (Pa)
+            - ... (other parameters same as stz_ode_rhs)
+
+    Returns:
+        dy/dt: Time derivative of state vector
+    """
+    n_states = y.shape[0]
+
+    # Unpack state
+    # y[0] is strain
+    chi = y[1]
+
+    # Default values
+    Lambda = 0.0
+    m = 0.0
+
+    # Logic based on shape/variant
+    if n_states == 2:  # Minimal
+        Lambda = stz_density(chi)
+    elif n_states == 3:  # Standard
+        Lambda = y[2]
+    elif n_states == 4:  # Full
+        Lambda = y[2]
+        m = y[3]
+    else:
+        Lambda = stz_density(chi)
+
+    # Get parameters
+    sigma_y = args["sigma_y"]
+    tau0 = args["tau0"]
+    epsilon0 = args["epsilon0"]
+    chi_inf = args["chi_inf"]
+    c0 = args["c0"]
+
+    # Constant stress input
+    stress = args["sigma_applied"]
+
+    # Compute plastic rate
+    d_gamma_pl = plastic_rate(stress, Lambda, chi, sigma_y, tau0, epsilon0)
+
+    # 1. Strain evolution
+    # In creep, d_stress/dt = 0 => gamma_dot_tot = gamma_dot_pl
+    # So d_strain/dt = d_gamma_pl
+    d_strain = d_gamma_pl
+
+    # 2. Chi evolution
+    d_chi = chi_evolution_langer2008(chi, chi_inf, d_gamma_pl, stress, sigma_y, c0)
+
+    derivatives = [d_strain, d_chi]
+
+    # 3. Lambda evolution
+    if n_states >= 3:
+        tau_beta = args.get("tau_beta", tau0 * 100.0)
+        d_lambda = lambda_evolution(Lambda, chi, tau_beta)
+        derivatives.append(d_lambda)
+
+    # 4. m evolution
+    if n_states >= 4:
+        m_inf = args.get("m_inf", 0.1)
+        rate_m = args.get("rate_m", 1.0)
+        d_m = m_evolution(m, stress, d_gamma_pl, sigma_y, m_inf, rate_m)
+        derivatives.append(d_m)
+
+    return jnp.stack(derivatives)

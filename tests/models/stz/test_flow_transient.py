@@ -146,6 +146,50 @@ class TestSTZFlowTransient:
         assert np.isclose(stress[0], sigma_0, rtol=0.1)
 
     @pytest.mark.slow
+    def test_creep_behavior(self):
+        """Test creep response (constant stress, measure strain)."""
+        model = STZConventional(variant="standard")
+
+        # Set parameters
+        model.parameters.set_value("G0", 1e9)
+        model.parameters.set_value("sigma_y", 1e6)
+        model.parameters.set_value("chi_inf", 0.15)
+        model.parameters.set_value("tau0", 1e-9)
+        model.parameters.set_value("epsilon0", 0.1)
+        model.parameters.set_value("c0", 1.0)
+
+        # Creep parameters
+        sigma_applied = 1.2e6  # Above yield stress
+        t = np.linspace(0, 1e-7, 100)
+
+        p_values = {k: model.parameters.get_value(k) for k in model.parameters.keys()}
+
+        # Simulate creep
+        strain = model._simulate_transient_jit(
+            jnp.asarray(t),
+            p_values,
+            "creep",
+            None,
+            sigma_applied,
+            None,
+            model.variant,
+        )
+
+        strain = np.array(strain)
+
+        # Strain should be finite
+        assert np.all(np.isfinite(strain))
+
+        # Initial strain should be 0
+        assert np.isclose(strain[0], 0.0, atol=1e-10)
+
+        # Strain should be monotonically increasing (positive creep)
+        assert np.all(np.diff(strain) >= -1e-12)  # Allow tiny numerical noise
+
+        # Check that strain actually increases (not just zero)
+        assert strain[-1] > 0.0
+
+    @pytest.mark.slow
     def test_variant_differences(self):
         """Test that different variants produce different dynamics."""
         # Time span scaled to tau0=1e-9, gamma_dot=1e7 for stable integration

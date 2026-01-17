@@ -6,6 +6,8 @@ supporting multiple protocols (Flow, Transient, SAOS, LAOS) via JAX and Diffrax.
 
 from __future__ import annotations
 
+from typing import cast
+
 import diffrax
 import numpy as np
 
@@ -13,8 +15,9 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_fit
-from rheojax.models.stz._base import STZBase
+from rheojax.models.stz._base import STZBase, VariantType
 from rheojax.models.stz._kernels import (
+    stz_creep_ode_rhs,
     stz_ode_rhs,
 )
 
@@ -48,7 +51,7 @@ class STZConventional(STZBase):
     - SAOS/LAOS: Diffrax ODE integration + FFT for harmonic analysis
     """
 
-    def __init__(self, variant: str = "standard"):
+    def __init__(self, variant: VariantType = "standard"):
         """Initialize STZ Conventional Model.
 
         Args:
@@ -58,41 +61,46 @@ class STZConventional(STZBase):
         self._gamma_0: float | None = None
         self._omega_laos: float | None = None
         self._gamma_dot_applied: float | None = None
+        self._sigma_applied: float | None = None
 
     def _fit(
         self,
         X: np.ndarray,
         y: np.ndarray,
-        test_mode: str | None = None,
         **kwargs,
-    ) -> None:
+    ) -> STZConventional:
         """Fit STZ model to data.
 
         Args:
             X: Independent variable (time, frequency, or shear rate)
             y: Dependent variable (stress, modulus, viscosity)
-            test_mode: Protocol mode ('steady_shear', 'relaxation', 'creep',
-                       'startup', 'laos', 'oscillation')
-            **kwargs: Optimizer options
+            **kwargs: Optimizer options. Must include 'test_mode'.
         """
+        test_mode = kwargs.get("test_mode")
         if test_mode is None:
-            raise ValueError("test_mode must be specified for STZ fitting")
+            # Fallback for compatibility or explicit check
+            if hasattr(self, "_test_mode") and self._test_mode:
+                test_mode = self._test_mode
+            else:
+                raise ValueError("test_mode must be specified for STZ fitting")
 
         with log_fit(logger, model="STZConventional", data_shape=X.shape) as ctx:
-            self._test_mode = test_mode
+            self._test_mode = cast(str, test_mode)
             ctx["test_mode"] = test_mode
             ctx["variant"] = self.variant
 
-            if test_mode == "steady_shear":
+            if test_mode in ["steady_shear", "rotation"]:
                 self._fit_steady_shear(X, y, **kwargs)
             elif test_mode in ["relaxation", "creep", "startup"]:
-                self._fit_transient(X, y, mode=test_mode, **kwargs)
+                self._fit_transient(X, y, mode=cast(str, test_mode), **kwargs)
             elif test_mode in ["laos", "oscillation"]:
                 self._fit_oscillation(X, y, **kwargs)
             else:
                 raise ValueError(f"Unsupported test_mode: {test_mode}")
 
             self.fitted_ = True
+
+        return self
 
     # =========================================================================
     # Steady State Flow
@@ -101,7 +109,18 @@ class STZConventional(STZBase):
     def _fit_steady_shear(
         self, gamma_dot: np.ndarray, stress: np.ndarray, **kwargs
     ) -> None:
-        """Fit steady-state flow curve (stress vs shear rate)."""
+        """Fit steady-state flow curve (stress vs shear rate).
+
+        Args:
+            gamma_dot: Shear rate array (1/s).
+            stress: Shear stress array (Pa).
+            **kwargs: Optimizer options:
+                - use_log_residuals (bool): Whether to fit in log space (default: True).
+                - max_iter (int): Maximum optimization iterations.
+                - ftol (float): Function tolerance.
+                - xtol (float): Parameter tolerance.
+                - gtol (float): Gradient tolerance.
+        """
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
@@ -112,12 +131,18 @@ class STZConventional(STZBase):
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
+            # Ensure parameters are floats for JIT compilation
+            sigma_y = float(p_map["sigma_y"])
+            chi_inf = float(p_map["chi_inf"])
+            tau0 = float(p_map["tau0"])
+            ez = float(p_map["ez"])
+
             return self._predict_steady_shear_jit(
                 x_data,
-                p_map["sigma_y"],
-                p_map["chi_inf"],
-                p_map["tau0"],
-                p_map["ez"],
+                sigma_y,
+                chi_inf,
+                tau0,
+                ez,
             )
 
         objective = create_least_squares_objective(
@@ -152,13 +177,15 @@ class STZConventional(STZBase):
         """Fit transient response (Stress Growth / Relaxation / Creep).
 
         Args:
-            t: Time array (s)
-            y: Response data (stress for startup/relaxation, strain for creep)
-            mode: 'startup', 'relaxation', or 'creep'
-            **kwargs: Optimizer options including:
-                - gamma_dot: Applied shear rate for startup (required)
-                - sigma_0: Initial stress for relaxation (optional)
-                - sigma_applied: Applied stress for creep (required)
+            t: Time array (s).
+            y: Response data (stress for startup/relaxation, strain for creep).
+            mode: 'startup', 'relaxation', or 'creep'.
+            **kwargs: Protocol-specific inputs and optimizer options:
+                - gamma_dot (float): Applied shear rate for startup (required).
+                - sigma_0 (float): Initial stress for relaxation (optional).
+                - sigma_applied (float): Applied stress for creep (required).
+                - use_log_residuals (bool): Log-space fitting (default: False).
+                - max_iter (int): Maximum optimization iterations.
         """
         from rheojax.utils.optimization import (
             create_least_squares_objective,
@@ -180,12 +207,16 @@ class STZConventional(STZBase):
 
         # Store for prediction
         self._gamma_dot_applied = gamma_dot
+        self._sigma_applied = sigma_applied
 
         # Build model function that uses ODE integration
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
+            # Convert params to dict of floats/arrays
+            p_dict = p_map
+
             return self._simulate_transient_jit(
-                x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0, self.variant
+                x_data, p_dict, mode, gamma_dot, sigma_applied, sigma_0, self.variant
             )
 
         objective = create_least_squares_objective(
@@ -245,33 +276,52 @@ class STZConventional(STZBase):
         ez = params.get("ez", 1.0)
         Lambda_init = jnp.exp(-ez / chi_init)
 
-        if mode == "startup":
-            # Strain-controlled: apply constant gamma_dot, measure stress
-            args["gamma_dot"] = gamma_dot
-            sigma_init = 0.0
-        elif mode == "relaxation":
-            # Strain-controlled: gamma_dot = 0, initial stress decays
-            args["gamma_dot"] = 0.0
-            sigma_init = sigma_0 if sigma_0 is not None else params["sigma_y"]
-            chi_init = params["chi_inf"]  # Start at steady-state chi
-            Lambda_init = jnp.exp(-ez / chi_init)
-        elif mode == "creep":
-            # Stress-controlled: constant stress, measure strain
-            # This requires a modified ODE (stress is input, not state)
-            # For now, we approximate with strain-controlled approach
-            args["gamma_dot"] = sigma_applied / (params["G0"] * params["tau0"])
-            sigma_init = 0.0
+        # Define ODE function and initial state based on mode
+        if mode == "creep":
+            # Creep: Constant stress, measure strain
+            # State vector: [strain, chi, Lambda, m] (strain replaces stress)
+            ode_fn = stz_creep_ode_rhs
+            args["sigma_applied"] = sigma_applied if sigma_applied is not None else 0.0
 
-        # Build initial state based on variant
-        if variant == "minimal":
-            y0 = jnp.array([sigma_init, chi_init])
-        elif variant == "standard":
-            y0 = jnp.array([sigma_init, chi_init, Lambda_init])
-        else:  # full
-            y0 = jnp.array([sigma_init, chi_init, Lambda_init, 0.0])
+            # Strain starts at 0
+            y0_val = 0.0
+
+            # Initial state construction
+            if variant == "minimal":
+                y0 = jnp.array([y0_val, chi_init])
+            elif variant == "standard":
+                y0 = jnp.array([y0_val, chi_init, Lambda_init])
+            else:  # full
+                y0 = jnp.array([y0_val, chi_init, Lambda_init, 0.0])
+
+        else:
+            # Startup/Relaxation: Controlled rate, measure stress
+            # State vector: [stress, chi, Lambda, m]
+            ode_fn = stz_ode_rhs
+
+            if mode == "startup":
+                # Strain-controlled: apply constant gamma_dot, measure stress
+                args["gamma_dot"] = gamma_dot
+                sigma_init = 0.0
+            else:  # relaxation
+                # Strain-controlled: gamma_dot = 0, initial stress decays
+                args["gamma_dot"] = 0.0
+                sigma_init = sigma_0 if sigma_0 is not None else params["sigma_y"]
+                chi_init = params["chi_inf"]  # Start at steady-state chi
+                Lambda_init = jnp.exp(-ez / chi_init)
+
+            # Initial state construction
+            if variant == "minimal":
+                y0 = jnp.array([sigma_init, chi_init])
+            elif variant == "standard":
+                y0 = jnp.array([sigma_init, chi_init, Lambda_init])
+            else:  # full
+                y0 = jnp.array([sigma_init, chi_init, Lambda_init, 0.0])
 
         # Set up Diffrax solver
-        term = diffrax.ODETerm(lambda ti, yi, args_i: stz_ode_rhs(ti, yi, args_i))
+        term = diffrax.ODETerm(
+            lambda ti, yi, args_i: ode_fn(cast(float, ti), yi, args_i)
+        )
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
 
@@ -294,16 +344,11 @@ class STZConventional(STZBase):
             max_steps=10_000_000,
         )
 
-        # Extract stress (index 0)
-        stress = sol.ys[:, 0]
+        # Extract primary variable (index 0)
+        # For creep, this is strain. For others, this is stress.
+        result = sol.ys[:, 0]
 
-        if mode == "creep":
-            # For creep, return strain instead
-            # Strain = integral of gamma_dot * dt
-            # Approximate from plastic rate history
-            return jnp.cumsum(jnp.ones_like(stress)) * args["gamma_dot"] * dt0
-
-        return stress
+        return result
 
     def _predict_transient(self, t: np.ndarray, mode: str | None = None) -> np.ndarray:
         """Predict transient response."""
@@ -311,13 +356,15 @@ class STZConventional(STZBase):
         p_values = {k: self.parameters.get_value(k) for k in self.parameters.keys()}
 
         mode = mode or self._test_mode
+        if mode is None:
+            raise ValueError("Test mode not specified for prediction")
 
         result = self._simulate_transient_jit(
             t_jax,
             p_values,
             mode,
             self._gamma_dot_applied,
-            None,  # sigma_applied
+            self._sigma_applied,
             None,  # sigma_0
             self.variant,
         )
@@ -330,10 +377,17 @@ class STZConventional(STZBase):
     def _fit_oscillation(self, X: np.ndarray, y: np.ndarray, **kwargs) -> None:
         """Fit oscillation data (SAOS or LAOS).
 
+        Routes to specific fitting method based on strain amplitude `gamma_0`.
+        If `gamma_0 > 0.01` (1%), uses LAOS mode (full ODE). Otherwise uses SAOS
+        mode (linear approximation).
+
         Args:
-            X: Frequency array (rad/s) for SAOS, or time array for LAOS
-            y: Complex modulus [G', G''] for SAOS, or stress for LAOS
-            **kwargs: Required for LAOS: gamma_0, omega
+            X: Frequency array (rad/s) for SAOS, or time array for LAOS.
+            y: Complex modulus [G', G''] for SAOS, or stress for LAOS.
+            **kwargs: Protocol parameters:
+                - gamma_0 (float): Strain amplitude (optional, triggers LAOS if > 0.01).
+                - omega (float): Angular frequency (required if gamma_0 provided).
+                - use_log_residuals (bool): Log-space fitting (default varies).
         """
 
         gamma_0 = kwargs.pop("gamma_0", None)
@@ -355,6 +409,13 @@ class STZConventional(STZBase):
 
         In SAOS limit, STZ behaves like a Maxwell-like viscoelastic solid.
         G*(omega) approximated from steady-state chi and Lambda.
+
+        Args:
+            omega: Angular frequency array (rad/s).
+            G_star: Complex modulus data (complex array or [N, 2] array).
+            **kwargs: Optimizer options:
+                - normalize (bool): Normalize residuals (default: True).
+                - max_iter (int): Maximum optimization iterations.
         """
         from rheojax.utils.optimization import (
             create_least_squares_objective,
@@ -376,13 +437,20 @@ class STZConventional(STZBase):
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
+            # Extract parameters as floats
+            G0 = float(p_map["G0"])
+            sigma_y = float(p_map["sigma_y"])
+            chi_inf = float(p_map["chi_inf"])
+            tau0 = float(p_map["tau0"])
+            epsilon0 = float(p_map["epsilon0"])
+
             return self._predict_saos_jit(
                 x_data,
-                p_map["G0"],
-                p_map["sigma_y"],
-                p_map["chi_inf"],
-                p_map["tau0"],
-                p_map["epsilon0"],
+                G0,
+                sigma_y,
+                chi_inf,
+                tau0,
+                epsilon0,
             )
 
         objective = create_least_squares_objective(
@@ -428,7 +496,17 @@ class STZConventional(STZBase):
         omega: float,
         **kwargs,
     ) -> None:
-        """Fit LAOS data using full ODE integration + FFT."""
+        """Fit LAOS data using full ODE integration + FFT.
+
+        Args:
+            t: Time array (s).
+            sigma: Stress response array (Pa).
+            gamma_0: Strain amplitude.
+            omega: Angular frequency (rad/s).
+            **kwargs: Optimizer options:
+                - normalize (bool): Normalize residuals (default: True).
+                - max_iter (int): Maximum optimization iterations.
+        """
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
@@ -439,8 +517,11 @@ class STZConventional(STZBase):
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
+            # Convert params to dict
+            p_dict = p_map
+
             _, stress = self._simulate_laos_internal(
-                x_data, p_map, gamma_0, omega, self.variant
+                x_data, p_dict, gamma_0, omega, self.variant
             )
             return stress
 
@@ -643,11 +724,15 @@ class STZConventional(STZBase):
         Routes to appropriate prediction based on test_mode.
         """
         p_values = dict(zip(self.parameters.keys(), params, strict=True))
+        # Ensure we have a valid mode
         mode = test_mode or self._test_mode
+        if mode is None:
+            # Default fallback if not specified
+            mode = "oscillation"
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        if mode == "steady_shear":
+        if mode in ["steady_shear", "rotation"]:
             return self._predict_steady_shear_jit(
                 X_jax,
                 p_values["sigma_y"],
@@ -670,7 +755,7 @@ class STZConventional(STZBase):
                 p_values,
                 mode,
                 self._gamma_dot_applied,
-                None,
+                self._sigma_applied,
                 None,
                 self.variant,
             )
@@ -693,7 +778,7 @@ class STZConventional(STZBase):
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         p_values = {k: self.parameters.get_value(k) for k in self.parameters.keys()}
 
-        if self._test_mode == "steady_shear":
+        if self._test_mode in ["steady_shear", "rotation"]:
             result = self._predict_steady_shear_jit(
                 X_jax,
                 p_values["sigma_y"],
