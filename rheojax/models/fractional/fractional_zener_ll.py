@@ -674,9 +674,9 @@ class FractionalZenerLiquidLiquid(BaseModel):
         logger.debug(
             "model_function evaluation",
             test_mode=test_mode_str,
-            alpha=float(alpha) if hasattr(alpha, "item") else alpha,
-            beta=float(beta) if hasattr(beta, "item") else beta,
-            gamma=float(gamma) if hasattr(gamma, "item") else gamma,
+            alpha=alpha,
+            beta=beta,
+            gamma=gamma,
             input_shape=X.shape if hasattr(X, "shape") else len(X),
         )
 

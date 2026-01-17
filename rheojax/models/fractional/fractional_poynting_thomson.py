@@ -511,7 +511,7 @@ class FractionalPoyntingThomson(BaseModel):
         logger.debug(
             "model_function evaluation",
             test_mode=str(test_mode),
-            alpha=float(alpha) if hasattr(alpha, "item") else alpha,
+            alpha=alpha,  # Don't cast tracer to float
             input_shape=X.shape if hasattr(X, "shape") else len(X),
         )
 
