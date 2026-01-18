@@ -79,6 +79,12 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
 
 .. toctree::
    :maxdepth: 1
+   :caption: Elasto-Plastic Models (EPM)
+
+   epm
+
+.. toctree::
+   :maxdepth: 1
    :caption: Sequence of Physical Processes (SPP)
 
    spp/spp_decomposer
