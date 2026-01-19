@@ -275,7 +275,7 @@ class TestFractionalMaxwellLiquidJAX:
 
         vmapped = jax.vmap(predict_single)
         results = vmapped(omega)
-        assert results.shape == omega.shape
+        assert results.shape == (omega.shape[0], 2)
 
 
 class TestFractionalMaxwellLiquidNumericalStability:

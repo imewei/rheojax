@@ -131,160 +131,121 @@ class FractionalZenerSolidSolid(BaseModel):
             description="Relaxation time",
         )
 
+    @staticmethod
+    @jax.jit
+    def _predict_relaxation_jax(
+        t: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
+    ) -> jnp.ndarray:
+        """Predict relaxation modulus G(t) using JAX.
+
+        G(t) = G_e + G_m * E_α(-(t/τ_α)^α)
+        """
+        epsilon = 1e-12
+        # Clip alpha using JAX operations (tracer-safe)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        tau_alpha_safe = tau_alpha + epsilon
+
+        # Compute argument: z = -(t/τ_α)^α
+        z = -jnp.power(t / tau_alpha_safe, alpha_safe)
+
+        # Mittag-Leffler function E_α(z)
+        ml_term = mittag_leffler_e(z, alpha_safe)
+
+        # G(t) = G_e + G_m * E_α(-(t/τ_α)^α)
+        return Ge + Gm * ml_term
+
     def _predict_relaxation(
         self, t: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
-        G(t) = G_e + G_m * E_α(-(t/τ_α)^α)
+        Wrapper for JIT-compiled implementation.
+        """
+        return self._predict_relaxation_jax(t, Ge, Gm, alpha, tau_alpha)
 
-        Parameters
-        ----------
-        t : jnp.ndarray
-            Time array (s)
-        Ge : float
-            Equilibrium modulus (Pa)
-        Gm : float
-            Maxwell arm modulus (Pa)
-        alpha : float
-            Fractional order
-        tau_alpha : float
-            Relaxation time (s^α)
+    @staticmethod
+    @jax.jit
+    def _predict_creep_jax(
+        t: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
+    ) -> jnp.ndarray:
+        """Predict creep compliance J(t) using JAX.
 
-        Returns
-        -------
-        jnp.ndarray
-            Relaxation modulus G(t) (Pa)
+        For FZSS, creep compliance is:
+        J(t) = 1/(G_e + G_m) + (1/G_e - 1/(G_e + G_m)) * (1 - E_α(-(t/τ_α)^α))
         """
         epsilon = 1e-12
+        # Clip alpha using JAX operations (tracer-safe)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        tau_alpha_safe = tau_alpha + epsilon
 
-        # JIT-compiled function with JAX-compatible clipping
-        @jax.jit
-        def _compute_relaxation(t, Ge, Gm, alpha, tau_alpha):
-            # Clip alpha using JAX operations (tracer-safe)
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-            tau_alpha_safe = tau_alpha + epsilon
+        # Instantaneous and equilibrium compliances
+        G_total = Ge + Gm + epsilon
+        J_inst = 1.0 / G_total
+        J_eq = 1.0 / (Ge + epsilon)
 
-            # Compute argument: z = -(t/τ_α)^α
-            z = -jnp.power(t / tau_alpha_safe, alpha_safe)
+        # Compute argument: z = -(t/τ_α)^α
+        z = -jnp.power(t / tau_alpha_safe, alpha_safe)
 
-            # Mittag-Leffler function E_α(z)
-            ml_term = mittag_leffler_e(z, alpha_safe)
+        # Mittag-Leffler function
+        ml_term = mittag_leffler_e(z, alpha_safe)
 
-            # G(t) = G_e + G_m * E_α(-(t/τ_α)^α)
-            return Ge + Gm * ml_term
-
-        return _compute_relaxation(t, Ge, Gm, alpha, tau_alpha)
+        # J(t) = J_inst + (J_eq - J_inst) * (1 - E_α(-t^α/τ_α))
+        return J_inst + (J_eq - J_inst) * (1.0 - ml_term)
 
     def _predict_creep(
         self, t: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
     ) -> jnp.ndarray:
         """Predict creep compliance J(t).
 
-        For FZSS, creep compliance is:
-        J(t) = 1/(G_e + G_m) + (1/G_e - 1/(G_e + G_m)) * (1 - E_α(-(t/τ_α)^α))
+        Wrapper for JIT-compiled implementation.
+        """
+        return self._predict_creep_jax(t, Ge, Gm, alpha, tau_alpha)
 
-        Parameters
-        ----------
-        t : jnp.ndarray
-            Time array (s)
-        Ge : float
-            Equilibrium modulus (Pa)
-        Gm : float
-            Maxwell arm modulus (Pa)
-        alpha : float
-            Fractional order
-        tau_alpha : float
-            Relaxation time (s^α)
+    @staticmethod
+    @jax.jit
+    def _predict_oscillation_jax(
+        omega: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
+    ) -> jnp.ndarray:
+        """Predict complex modulus G*(ω) using JAX.
 
-        Returns
-        -------
-        jnp.ndarray
-            Creep compliance J(t) (1/Pa)
+        G*(ω) = G_e + G_m / (1 + (iωτ_α)^(-α))
         """
         epsilon = 1e-12
+        # Clip alpha using JAX operations (tracer-safe)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        tau_alpha_safe = tau_alpha + epsilon
 
-        # JIT-compiled function with JAX-compatible clipping
-        @jax.jit
-        def _compute_creep(t, Ge, Gm, alpha, tau_alpha):
-            # Clip alpha using JAX operations (tracer-safe)
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-            tau_alpha_safe = tau_alpha + epsilon
+        # Compute (iω)^(-α) = ω^(-α) * exp(-i*π*α/2)
+        omega_neg_alpha = jnp.power(omega, -alpha_safe)
+        phase = -jnp.pi * alpha_safe / 2.0
 
-            # Instantaneous and equilibrium compliances
-            G_total = Ge + Gm + epsilon
-            J_inst = 1.0 / G_total
-            J_eq = 1.0 / (Ge + epsilon)
+        # (iω)^(-α) in complex form
+        i_omega_neg_alpha = omega_neg_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
 
-            # Compute argument: z = -(t/τ_α)^α
-            z = -jnp.power(t / tau_alpha_safe, alpha_safe)
+        # Denominator: 1 + (iωτ_α)^(-α) = 1 + τ_α^(-α) * (iω)^(-α)
+        tau_neg_alpha = jnp.power(tau_alpha_safe, -alpha_safe)
+        denominator = 1.0 + tau_neg_alpha * i_omega_neg_alpha
 
-            # Mittag-Leffler function
-            ml_term = mittag_leffler_e(z, alpha_safe)
+        # Maxwell arm contribution: G_m / (1 + (iωτ_α)^(-α))
+        maxwell_term = Gm / denominator
 
-            # J(t) = J_inst + (J_eq - J_inst) * (1 - E_α(-t^α/τ_α))
-            return J_inst + (J_eq - J_inst) * (1.0 - ml_term)
+        # Total complex modulus
+        G_star = Ge + maxwell_term
 
-        return _compute_creep(t, Ge, Gm, alpha, tau_alpha)
+        # Extract storage and loss moduli
+        G_prime = jnp.real(G_star)
+        G_double_prime = jnp.imag(G_star)
+
+        return jnp.stack([G_prime, G_double_prime], axis=-1)
 
     def _predict_oscillation(
         self, omega: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
-        G*(ω) = G_e + G_m / (1 + (iωτ_α)^(-α))
-
-        Parameters
-        ----------
-        omega : jnp.ndarray
-            Angular frequency array (rad/s)
-        Ge : float
-            Equilibrium modulus (Pa)
-        Gm : float
-            Maxwell arm modulus (Pa)
-        alpha : float
-            Fractional order
-        tau_alpha : float
-            Relaxation time (s^α)
-
-        Returns
-        -------
-        jnp.ndarray
-            Complex modulus array with shape (..., 2) where [:, 0] is G' and [:, 1] is G''
+        Wrapper for JIT-compiled implementation.
         """
-        epsilon = 1e-12
-
-        # JIT-compiled function with JAX-compatible clipping
-        @jax.jit
-        def _compute_oscillation(omega, Ge, Gm, alpha, tau_alpha):
-            # Clip alpha using JAX operations (tracer-safe)
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-            tau_alpha_safe = tau_alpha + epsilon
-
-            # Compute (iω)^(-α) = ω^(-α) * exp(-i*π*α/2)
-            omega_neg_alpha = jnp.power(omega, -alpha_safe)
-            phase = -jnp.pi * alpha_safe / 2.0
-
-            # (iω)^(-α) in complex form
-            i_omega_neg_alpha = omega_neg_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
-
-            # Denominator: 1 + (iωτ_α)^(-α) = 1 + τ_α^(-α) * (iω)^(-α)
-            tau_neg_alpha = jnp.power(tau_alpha_safe, -alpha_safe)
-            denominator = 1.0 + tau_neg_alpha * i_omega_neg_alpha
-
-            # Maxwell arm contribution: G_m / (1 + (iωτ_α)^(-α))
-            maxwell_term = Gm / denominator
-
-            # Total complex modulus
-            G_star = Ge + maxwell_term
-
-            # Extract storage and loss moduli
-            G_prime = jnp.real(G_star)
-            G_double_prime = jnp.imag(G_star)
-
-            return jnp.stack([G_prime, G_double_prime], axis=-1)
-
-        return _compute_oscillation(omega, Ge, Gm, alpha, tau_alpha)
+        return self._predict_oscillation_jax(omega, Ge, Gm, alpha, tau_alpha)
 
     def _fit(
         self, X: jnp.ndarray, y: jnp.ndarray, **kwargs

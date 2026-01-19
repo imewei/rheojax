@@ -607,6 +607,13 @@ class BayesianMixin:
         # Encourage higher acceptance to reduce divergences in stiff fractional models.
         nuts_kwargs.setdefault("target_accept_prob", 0.99)
 
+        # Separate MCMC args from NUTS args
+        mcmc_kwargs = {}
+        if "progress_bar" in nuts_kwargs:
+            mcmc_kwargs["progress_bar"] = nuts_kwargs.pop("progress_bar")
+        if "jit_model_args" in nuts_kwargs:
+            mcmc_kwargs["jit_model_args"] = nuts_kwargs.pop("jit_model_args")
+
         def run_mcmc(strategy):
             kernel = NUTS(numpyro_model, init_strategy=strategy, **nuts_kwargs)
             chain_method = _select_chain_method()
@@ -622,6 +629,7 @@ class BayesianMixin:
                     num_samples=num_samples,
                     num_chains=num_chains,
                     chain_method=chain_method,
+                    **mcmc_kwargs,
                 )
             rng_key = jax.random.PRNGKey(rng_seed)
             sampler.run(rng_key, X_jax, y_jax)

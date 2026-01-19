@@ -124,29 +124,30 @@ class FractionalMaxwellLiquid(BaseModel):
         self, param_name: str, lower: float | None, upper: float | None
     ):
         """Provide custom priors that stay near realistic data-informed scales."""
+        return None  # Disable custom priors for stability
 
-        stats = getattr(self, "_fml_bayes_stats", {})
-        if lower is None or upper is None:
-            return None
-
-        def _log_normal(target: float, scale: float = 0.6):
-            if not np.isfinite(target) or target <= 0:
-                return None
-            low = float(max(lower, 1e-12))
-            high = float(max(upper, low * 1.01))
-            log_low = np.log(low)
-            log_high = np.log(high)
-            loc = float(np.clip(np.log(target), log_low + 1e-6, log_high - 1e-6))
-            base = dist.TruncatedNormal(
-                loc=loc, scale=scale, low=log_low, high=log_high
-            )
-            return dist.TransformedDistribution(base, dist_transforms.ExpTransform())
-
-        if param_name == "Gm" and "gm_target" in stats:
-            return _log_normal(stats["gm_target"], scale=0.7)
-        if param_name == "tau_alpha" and "tau_target" in stats:
-            return _log_normal(stats["tau_target"], scale=0.7)
-        return None
+        # stats = getattr(self, "_fml_bayes_stats", {})
+        # if lower is None or upper is None:
+        #     return None
+        #
+        # def _log_normal(target: float, scale: float = 0.6):
+        #     if not np.isfinite(target) or target <= 0:
+        #         return None
+        #     low = float(max(lower, 1e-12))
+        #     high = float(max(upper, low * 1.01))
+        #     log_low = np.log(low)
+        #     log_high = np.log(high)
+        #     loc = float(np.clip(np.log(target), log_low + 1e-6, log_high - 1e-6))
+        #     base = dist.TruncatedNormal(
+        #         loc=loc, scale=scale, low=log_low, high=log_high
+        #     )
+        #     return dist.TransformedDistribution(base, dist_transforms.ExpTransform())
+        #
+        # if param_name == "Gm" and "gm_target" in stats:
+        #     return _log_normal(stats["gm_target"], scale=0.7)
+        # if param_name == "tau_alpha" and "tau_target" in stats:
+        #     return _log_normal(stats["tau_target"], scale=0.7)
+        # return None
 
     def bayesian_parameter_bounds(
         self,
@@ -156,50 +157,53 @@ class FractionalMaxwellLiquid(BaseModel):
         test_mode,
     ) -> dict[str, tuple[float | None, float | None]]:
         """Tighten tau bounds based on data scale to avoid pathological samples."""
+        return bounds  # Disable bounds tightening for stability
 
-        stats: dict[str, float] = {}
-
-        if "tau_alpha" in bounds and X.size > 0:
-            positive_times = np.asarray(X, dtype=float)
-            positive_times = positive_times[positive_times > 0]
-            if positive_times.size:
-                t_min = float(np.min(positive_times))
-                t_max = float(np.max(positive_times))
-                lower, upper = bounds["tau_alpha"]
-                new_lower = max(lower or 0.0, t_min * 0.2, 1e-5)
-                new_upper = min(upper or np.inf, t_max * 5.0)
-                if new_upper <= new_lower:
-                    new_upper = new_lower * 10.0
-                bounds["tau_alpha"] = (new_lower, new_upper)
-
-                tau_geo = float(np.exp(0.5 * (np.log(new_lower) + np.log(new_upper))))
-                stats["tau_target"] = tau_geo
-
-        y_abs = np.asarray(y, dtype=float)
-        if y_abs.size:
-            gm_lower, gm_upper = bounds.get("Gm", (None, None))
-            gm_lower = gm_lower if gm_lower is not None else 1e-3
-            gm_upper = gm_upper if gm_upper is not None else y_abs.max() * 10.0
-            median_scale = float(np.median(np.abs(y_abs)))
-            gm_target = float(np.clip(median_scale, gm_lower * 1.1, gm_upper * 0.9))
-            stats["gm_target"] = gm_target
-
-        if stats:
-            self._fml_bayes_stats = stats
-
-        return bounds
+        # stats: dict[str, float] = {}
+        #
+        # if "tau_alpha" in bounds and X.size > 0:
+        #     positive_times = np.asarray(X, dtype=float)
+        #     positive_times = positive_times[positive_times > 0]
+        #     if positive_times.size:
+        #         t_min = float(np.min(positive_times))
+        #         t_max = float(np.max(positive_times))
+        #         lower, upper = bounds["tau_alpha"]
+        #         new_lower = max(lower or 0.0, t_min * 0.2, 1e-5)
+        #         new_upper = min(upper or np.inf, t_max * 5.0)
+        #         if new_upper <= new_lower:
+        #             new_upper = new_lower * 10.0
+        #         bounds["tau_alpha"] = (new_lower, new_upper)
+        #
+        #         tau_geo = float(np.exp(0.5 * (np.log(new_lower) + np.log(new_upper))))
+        #         stats["tau_target"] = tau_geo
+        #
+        # y_abs = np.asarray(y, dtype=float)
+        # if y_abs.size:
+        #     gm_lower, gm_upper = bounds.get("Gm", (None, None))
+        #     gm_lower = gm_lower if gm_lower is not None else 1e-3
+        #     gm_upper = gm_upper if gm_upper is not None else y_abs.max() * 10.0
+        #     median_scale = float(np.median(np.abs(y_abs)))
+        #     gm_target = float(np.clip(median_scale, gm_lower * 1.1, gm_upper * 0.9))
+        #     stats["gm_target"] = gm_target
+        #
+        # if stats:
+        #     self._fml_bayes_stats = stats
+        #
+        # return bounds
 
     def bayesian_nuts_kwargs(self) -> dict:
         """Prefer conservative NUTS settings for the stiff Mittag-Leffler kernel."""
 
-        return {"target_accept_prob": 0.95}
+        return {"target_accept_prob": 0.999, "max_tree_depth": 12}
 
+    @staticmethod
+    @jax.jit
     def _predict_relaxation_jax(
-        self, t: jnp.ndarray, Gm: float, alpha: float, tau_alpha: float
+        t: jnp.ndarray, Gm: float, alpha: float, tau_alpha: float
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t) using JAX.
 
-        G(t) = G_m t^(-α) E_{1-α,1-α}(-t^(1-α)/τ_α)
+        G(t) = G_m E_{α,1}(-(t/τ)^α)
 
         Args:
             t: Time array
@@ -214,34 +218,33 @@ class FractionalMaxwellLiquid(BaseModel):
         epsilon = 1e-12
 
         # Clip alpha but allow traced values when running inside JAX
-        alpha_clipped = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-        alpha_safe = _maybe_python_float(alpha_clipped)
-
-        # Compute Mittag-Leffler parameters
-        ml_alpha = 1.0 - alpha_safe
-        ml_beta = 1.0 - alpha_safe
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         # Compute relaxation modulus
         t_safe = jnp.maximum(t, epsilon)
         tau_alpha_safe = jnp.maximum(tau_alpha, epsilon)
 
         # Compute argument for Mittag-Leffler function
-        z = -(t_safe ** (1.0 - alpha_safe)) / tau_alpha_safe
+        # z = - (t/τ)^α
+        z = -jnp.power(t_safe / tau_alpha_safe, alpha_safe)
 
-        # Compute E_{1-α,1-α}(z) with Python float alpha/beta
-        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
+        # Compute E_{α,1}(z)
+        ml_value = mittag_leffler_e2(z, alpha=alpha_safe, beta=1.0)
 
         # Compute G(t)
-        G_t = Gm * (t_safe ** (-alpha_safe)) * ml_value
+        # G(t) = Gm * E(...)
+        G_t = Gm * ml_value
 
         return G_t
 
+    @staticmethod
+    @jax.jit
     def _predict_creep_jax(
-        self, t: jnp.ndarray, Gm: float, alpha: float, tau_alpha: float
+        t: jnp.ndarray, Gm: float, alpha: float, tau_alpha: float
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
-        J(t) = (1/G_m) + (t^α)/(G_m τ_α^α) E_{α,1+α}(-(t/τ_α)^α)
+        J(t) = (1/G_m) + (t^α)/(G_m τ^α Γ(1+α))
 
         Args:
             t: Time array
@@ -255,12 +258,7 @@ class FractionalMaxwellLiquid(BaseModel):
         # Add small epsilon
         epsilon = 1e-12
 
-        alpha_clipped = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-        alpha_safe = _maybe_python_float(alpha_clipped)
-
-        # Compute Mittag-Leffler parameters
-        ml_alpha = alpha_safe
-        ml_beta = 1.0 + alpha_safe
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         # Compute creep compliance
         t_safe = jnp.maximum(t, epsilon)
@@ -269,22 +267,19 @@ class FractionalMaxwellLiquid(BaseModel):
         # Instantaneous compliance (elastic part)
         J_instant = 1.0 / Gm
 
-        # Time-dependent part with Mittag-Leffler function
-        z = -((t_safe / tau_alpha_safe) ** alpha_safe)
+        # Viscous/Fractional part
+        # J_frac = t^α / (G_m * τ^α * Γ(1+α))
+        num = jnp.power(t_safe, alpha_safe)
+        denom = Gm * jnp.power(tau_alpha_safe, alpha_safe) * jax.scipy.special.gamma(1.0 + alpha_safe)
 
-        # Compute E_{α,1+α}(z) with Python float alpha/beta
-        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
-
-        # Creep compliance
-        J_t = (
-            J_instant
-            + (t_safe**alpha_safe) / (Gm * (tau_alpha_safe**alpha_safe)) * ml_value
-        )
+        J_t = J_instant + num / denom
 
         return J_t
 
+    @staticmethod
+    @jax.jit
     def _predict_oscillation_jax(
-        self, omega: jnp.ndarray, Gm: float, alpha: float, tau_alpha: float
+        omega: jnp.ndarray, Gm: float, alpha: float, tau_alpha: float
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω) using JAX.
 
@@ -297,13 +292,12 @@ class FractionalMaxwellLiquid(BaseModel):
             tau_alpha: Relaxation time
 
         Returns:
-            Complex modulus array
+            Complex modulus array [G', G'']
         """
         # Add small epsilon
         epsilon = 1e-12
 
-        alpha_clipped = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-        alpha_safe = _maybe_python_float(alpha_clipped)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         # Compute oscillation response
         omega_safe = jnp.maximum(omega, epsilon)
@@ -311,14 +305,19 @@ class FractionalMaxwellLiquid(BaseModel):
 
         # (iωτ_α)^α = |ωτ_α|^α * exp(i α π/2)
         omega_tau = omega_safe * tau_alpha_safe
-        i_omega_tau_alpha = (omega_tau**alpha_safe) * jnp.exp(
-            1j * alpha_safe * jnp.pi / 2.0
-        )
+        omega_tau_alpha = jnp.power(omega_tau, alpha_safe)
+        phase_alpha = jnp.pi * alpha_safe / 2.0
+
+        cos_phase = jnp.cos(phase_alpha)
+        sin_phase = jnp.sin(phase_alpha)
+
+        i_omega_tau_alpha = omega_tau_alpha * (cos_phase + 1j * sin_phase)
 
         # Complex modulus
+        # G* = Gm * X / (1 + X) where X = (iωτ)^α
         G_star = Gm * i_omega_tau_alpha / (1.0 + i_omega_tau_alpha)
 
-        return G_star
+        return jnp.stack([jnp.real(G_star), jnp.imag(G_star)], axis=-1)
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> FractionalMaxwellLiquid:
         """Fit model parameters to data.
@@ -537,7 +536,9 @@ class FractionalMaxwellLiquid(BaseModel):
         elif test_mode == "creep":
             return self._predict_creep_jax(X, **params_dict)
         elif test_mode == "oscillation":
-            return self._predict_oscillation_jax(X, **params_dict)
+            # Return complex array for oscillation mode
+            complex_result = self._predict_oscillation_jax(X, **params_dict)
+            return complex_result[..., 0] + 1j * complex_result[..., 1]
         else:
             # Default to relaxation for unknown modes
             return self._predict_relaxation_jax(X, **params_dict)
@@ -556,12 +557,8 @@ class FractionalMaxwellLiquid(BaseModel):
             RheoData with predicted y values
         """
         # Auto-detect test mode if not provided
-        if test_mode is None:
-            # Check for explicit test_mode in metadata first
-            if "test_mode" in rheo_data.metadata:
-                test_mode = rheo_data.metadata["test_mode"]
-            else:
-                test_mode = rheo_data.test_mode
+        if not isinstance(test_mode, str) or not test_mode:
+            test_mode = rheo_data.test_mode
 
         # Get parameters
         Gm = self.parameters.get_value("Gm")
@@ -577,7 +574,9 @@ class FractionalMaxwellLiquid(BaseModel):
         elif test_mode == "creep":
             y_pred = self._predict_creep_jax(x, Gm, alpha, tau_alpha)
         elif test_mode == "oscillation":
-            y_pred = self._predict_oscillation_jax(x, Gm, alpha, tau_alpha)
+            # Return complex array for RheoData [G' + iG'']
+            y_pred_stacked = self._predict_oscillation_jax(x, Gm, alpha, tau_alpha)
+            y_pred = y_pred_stacked[..., 0] + 1j * y_pred_stacked[..., 1]
         else:
             raise ValueError(
                 f"Unknown test mode: {test_mode}. "
@@ -631,10 +630,3 @@ class FractionalMaxwellLiquid(BaseModel):
                 )
             return np.array(result)
 
-
-def _maybe_python_float(value: float | jnp.ndarray) -> float | jnp.ndarray:
-    """Return a Python float when safe, otherwise leave JAX values intact."""
-
-    if isinstance(value, JAX_ARRAY_TYPES):
-        return value
-    return float(value)

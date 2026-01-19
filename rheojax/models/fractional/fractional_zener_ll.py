@@ -144,8 +144,9 @@ class FractionalZenerLiquidLiquid(BaseModel):
             description="Relaxation time",
         )
 
+    @staticmethod
+    @jax.jit
     def _predict_oscillation(
-        self,
         omega: jnp.ndarray,
         c1: float,
         c2: float,
@@ -157,82 +158,54 @@ class FractionalZenerLiquidLiquid(BaseModel):
         """Predict complex modulus G*(ω).
 
         G*(ω) = c_1 * (iω)^α / (1 + (iωτ)^β) + c_2 * (iω)^γ
-
-        Parameters
-        ----------
-        omega : jnp.ndarray
-            Angular frequency array (rad/s)
-        c1 : float
-            First SpringPot constant (Pa·s^α)
-        c2 : float
-            Second SpringPot constant (Pa·s^γ)
-        alpha : float
-            First fractional order
-        beta : float
-            Second fractional order
-        gamma : float
-            Third fractional order
-        tau : float
-            Relaxation time (s)
-
-        Returns
-        -------
-        jnp.ndarray
-            Complex modulus array with shape (..., 2) where [:, 0] is G' and [:, 1] is G''
         """
-        # Clip fractional orders BEFORE JIT to make them concrete (not traced)
-
         epsilon = 1e-12
+        # Clip fractional orders using JAX operations (tracer-safe)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
         beta_safe = jnp.clip(beta, epsilon, 1.0 - epsilon)
         gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
+        tau_safe = tau + epsilon
 
-        # JIT-compiled inner function with concrete alpha/beta/gamma
-        @jax.jit
-        def _compute_oscillation(omega, c1, c2, tau):
-            tau_safe = tau + epsilon
+        # First term: c_1 * (iω)^α / (1 + (iωτ)^β)
 
-            # First term: c_1 * (iω)^α / (1 + (iωτ)^β)
+        # Compute (iω)^α
+        omega_alpha = jnp.power(omega, alpha_safe)
+        phase_alpha = jnp.pi * alpha_safe / 2.0
+        i_omega_alpha = omega_alpha * (
+            jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
+        )
 
-            # Compute (iω)^α
-            omega_alpha = jnp.power(omega, alpha_safe)
-            phase_alpha = jnp.pi * alpha_safe / 2.0
-            i_omega_alpha = omega_alpha * (
-                jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
-            )
+        # Compute (iωτ)^β
+        omega_tau_beta = jnp.power(omega * tau_safe, beta_safe)
+        phase_beta = jnp.pi * beta_safe / 2.0
+        i_omega_tau_beta = omega_tau_beta * (
+            jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta)
+        )
 
-            # Compute (iωτ)^β
-            omega_tau_beta = jnp.power(omega * tau_safe, beta_safe)
-            phase_beta = jnp.pi * beta_safe / 2.0
-            i_omega_tau_beta = omega_tau_beta * (
-                jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta)
-            )
+        # First term
+        term1 = c1 * i_omega_alpha / (1.0 + i_omega_tau_beta)
 
-            # First term
-            term1 = c1 * i_omega_alpha / (1.0 + i_omega_tau_beta)
+        # Second term: c_2 * (iω)^γ
+        omega_gamma = jnp.power(omega, gamma_safe)
+        phase_gamma = jnp.pi * gamma_safe / 2.0
+        i_omega_gamma = omega_gamma * (
+            jnp.cos(phase_gamma) + 1j * jnp.sin(phase_gamma)
+        )
 
-            # Second term: c_2 * (iω)^γ
-            omega_gamma = jnp.power(omega, gamma_safe)
-            phase_gamma = jnp.pi * gamma_safe / 2.0
-            i_omega_gamma = omega_gamma * (
-                jnp.cos(phase_gamma) + 1j * jnp.sin(phase_gamma)
-            )
+        term2 = c2 * i_omega_gamma
 
-            term2 = c2 * i_omega_gamma
+        # Total complex modulus
+        G_star = term1 + term2
 
-            # Total complex modulus
-            G_star = term1 + term2
+        # Extract storage and loss moduli
+        G_prime = jnp.real(G_star)
+        G_double_prime = jnp.imag(G_star)
 
-            # Extract storage and loss moduli
-            G_prime = jnp.real(G_star)
-            G_double_prime = jnp.imag(G_star)
+        return jnp.stack([G_prime, G_double_prime], axis=-1)
 
-            return jnp.stack([G_prime, G_double_prime], axis=-1)
-
-        return _compute_oscillation(omega, c1, c2, tau)
-
+    @staticmethod
+    @jax.jit
     def _predict_relaxation(
-        self,
         t: jnp.ndarray,
         c1: float,
         c2: float,
@@ -243,68 +216,31 @@ class FractionalZenerLiquidLiquid(BaseModel):
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
-        Uses a combined power-law and exponential decay form:
-
         G(t) = c1 / (1 + (t/tau)^alpha) + c2 * exp(-t/tau)
-
-        This form provides liquid-like behavior (G→0 as t→∞) with two
-        distinct contributions:
-        - c1 term: fractional power-law decay controlled by alpha
-        - c2 term: exponential decay for short-time dynamics
-
-        This parameterization avoids the c1/c2 degeneracy that would occur
-        if only the sum (c1 + c2) affected predictions.
-
-        Parameters
-        ----------
-        t : jnp.ndarray
-            Time array (s)
-        c1 : float
-            First SpringPot constant (power-law term)
-        c2 : float
-            Second SpringPot constant (exponential term)
-        alpha : float
-            First fractional order (controls power-law decay)
-        beta : float
-            Second fractional order (not used in relaxation)
-        gamma : float
-            Third fractional order (not used in relaxation)
-        tau : float
-            Relaxation time (s)
-
-        Returns
-        -------
-        jnp.ndarray
-            Relaxation modulus G(t) (Pa)
         """
         epsilon = 1e-12
+        # Clip fractional orders using JAX operations (tracer-safe)
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        tau_safe = tau + epsilon
 
-        # JIT-compiled function with JAX-compatible clipping
-        @jax.jit
-        def _compute_relaxation(t, c1, c2, alpha, beta, gamma, tau):
-            # Clip fractional orders using JAX operations (tracer-safe)
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-            tau_safe = tau + epsilon
+        # Use c1 as the main modulus contribution and alpha as the decay exponent
+        # This breaks the c1/c2 degeneracy by using them differently
+        # G(t) = c1 / (1 + (t/tau)^alpha) + c2 * exp(-t/tau)
+        t_tau_ratio = t / tau_safe
 
-            # Use c1 as the main modulus contribution and alpha as the decay exponent
-            # This breaks the c1/c2 degeneracy by using them differently
-            # G(t) = c1 / (1 + (t/tau)^alpha) + c2 * exp(-t/tau)
-            t_tau_ratio = t / tau_safe
+        # Primary power-law decay term from c1
+        term1 = c1 / (1.0 + jnp.power(t_tau_ratio, alpha_safe))
 
-            # Primary power-law decay term from c1
-            term1 = c1 / (1.0 + jnp.power(t_tau_ratio, alpha_safe))
+        # Secondary exponential decay term from c2 (simpler decay)
+        term2 = c2 * jnp.exp(-t_tau_ratio)
 
-            # Secondary exponential decay term from c2 (simpler decay)
-            term2 = c2 * jnp.exp(-t_tau_ratio)
+        G_t = term1 + term2
 
-            G_t = term1 + term2
+        return G_t
 
-            return G_t
-
-        return _compute_relaxation(t, c1, c2, alpha, beta, gamma, tau)
-
+    @staticmethod
+    @jax.jit
     def _predict_creep(
-        self,
         t: jnp.ndarray,
         c1: float,
         c2: float,
@@ -317,54 +253,26 @@ class FractionalZenerLiquidLiquid(BaseModel):
 
         Note: Analytical creep compliance is complex for FZLL.
         This provides a numerical approximation.
-
-        Parameters
-        ----------
-        t : jnp.ndarray
-            Time array (s)
-        c1 : float
-            First SpringPot constant
-        c2 : float
-            Second SpringPot constant
-        alpha : float
-            First fractional order
-        beta : float
-            Second fractional order
-        gamma : float
-            Third fractional order
-        tau : float
-            Relaxation time (s)
-
-        Returns
-        -------
-        jnp.ndarray
-            Creep compliance J(t) (1/Pa)
         """
-        # Clip fractional orders BEFORE JIT to make them concrete (not traced)
-
         epsilon = 1e-12
+        # Clip fractional orders using JAX operations (tracer-safe)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
         gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
 
-        # Compute average order as concrete value
+        # Compute average order
         avg_order = (alpha_safe + gamma_safe) / 2.0
 
-        # JIT-compiled inner function with concrete alpha/gamma
-        @jax.jit
-        def _compute_creep(t, c1, c2, tau):
-            # Short time behavior
-            J_short = jnp.power(t, alpha_safe) / (c1 + epsilon)
+        # Short time behavior
+        J_short = jnp.power(t, alpha_safe) / (c1 + epsilon)
 
-            # Long time behavior (unbounded growth for liquid)
-            J_long = jnp.power(t, avg_order) / (c2 + epsilon)
+        # Long time behavior (unbounded growth for liquid)
+        J_long = jnp.power(t, avg_order) / (c2 + epsilon)
 
-            # Crossover
-            weight = jnp.tanh(t / tau)
-            J_t = J_short * (1.0 - weight) + J_long * weight
+        # Crossover
+        weight = jnp.tanh(t / (tau + epsilon))
+        J_t = J_short * (1.0 - weight) + J_long * weight
 
-            return J_t
-
-        return _compute_creep(t, c1, c2, tau)
+        return J_t
 
     def _initialize_relaxation_parameters(self, X, y) -> bool:
         """Derive heuristic starting values from relaxation data.

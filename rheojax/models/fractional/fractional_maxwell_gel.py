@@ -118,6 +118,10 @@ class FractionalMaxwellGel(BaseModel):
 
         self.fitted_ = False
 
+    def bayesian_nuts_kwargs(self) -> dict:
+        """Prefer conservative NUTS settings for the stiff Mittag-Leffler kernel."""
+        return {"target_accept_prob": 0.99}
+
     def _compute_tau(self, c_alpha: float, alpha: float) -> float:
         """Compute characteristic relaxation time.
 
@@ -126,28 +130,40 @@ class FractionalMaxwellGel(BaseModel):
             alpha: Power-law exponent
 
         Returns:
-            Characteristic time τ = η / c_α^(1/(1-α))
+            Characteristic time τ = (η / c_α)^(1/(1-α))
         """
         eta = self.parameters.get_value("eta")
         # Add small epsilon to prevent division by zero
         epsilon = 1e-12
-        return eta / (c_alpha ** (1.0 / (1.0 - alpha + epsilon)))
 
+        try:
+            # Check for alpha close to 1
+            if alpha > 1.0 - 1e-6:
+                return float('inf')
+
+            # Use algebraic simplification to avoid overflow
+            # tau^(1-alpha) = eta / c_alpha
+            # tau = (eta / c_alpha)^(1/(1-alpha))
+
+            exponent = 1.0 / (1.0 - alpha + epsilon)
+            base = eta / c_alpha
+
+            # Check for potential overflow before computing
+            if base > 1.0 and exponent > 700: # approx limit for exp(709)
+                 return float('inf')
+
+            return base ** exponent
+        except (OverflowError, ZeroDivisionError):
+            return float('inf')
+
+    @staticmethod
+    @jax.jit
     def _predict_relaxation_jax(
-        self, t: jnp.ndarray, c_alpha: float, alpha: float, eta: float
+        t: jnp.ndarray, c_alpha: float, alpha: float, eta: float
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t) using JAX.
 
         G(t) = c_α t^(-α) E_{1-α,1-α}(-t^(1-α)/τ)
-
-        Args:
-            t: Time array
-            c_alpha: SpringPot constant
-            alpha: Power-law exponent
-            eta: Viscosity
-
-        Returns:
-            Relaxation modulus array
         """
         # Add small epsilon to prevent issues at t=0 and with alpha=1
         epsilon = 1e-12
@@ -158,37 +174,31 @@ class FractionalMaxwellGel(BaseModel):
         # Compute safe values
         t_safe = jnp.maximum(t, epsilon)
 
-        # Compute characteristic time
-        tau = eta / (c_alpha ** (1.0 / (1.0 - alpha_safe)))
-
         # Compute argument for Mittag-Leffler function
-        z = -(t_safe ** (1.0 - alpha_safe)) / tau
+        # z = - (t/τ)^(1-α)
+        # Using algebraic simplification to avoid overflow in tau calculation:
+        # tau = (eta/c_alpha)^(1/(1-alpha))
+        # z = - (t * (c_alpha/eta)^(1/(1-alpha)))^(1-alpha)
+        # z = - t^(1-alpha) * (c_alpha/eta)
+        beta_safe = 1.0 - alpha_safe
+        z = -jnp.power(t_safe, beta_safe) * (c_alpha / eta)
 
-        # Compute E_{1-α,1-α}(z) (requires concrete alpha/beta)
-        ml_alpha = 1.0 - alpha_safe
-        ml_beta = 1.0 - alpha_safe
-        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
+        # Compute E_{1-α,1-α}(z)
+        ml_value = mittag_leffler_e2(z, alpha=beta_safe, beta=beta_safe)
 
-        # Compute G(t)
-        G_t = c_alpha * (t_safe ** (-alpha_safe)) * ml_value
+        # Compute G(t) = c_α * t^(-α) * E(...)
+        G_t = c_alpha * jnp.power(t_safe, -alpha_safe) * ml_value
 
         return G_t
 
+    @staticmethod
+    @jax.jit
     def _predict_creep_jax(
-        self, t: jnp.ndarray, c_alpha: float, alpha: float, eta: float
+        t: jnp.ndarray, c_alpha: float, alpha: float, eta: float
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
         J(t) = (1/c_α) t^α E_{1+α,1+α}(-(t/τ)^(1-α))
-
-        Args:
-            t: Time array
-            c_alpha: SpringPot constant
-            alpha: Power-law exponent
-            eta: Viscosity
-
-        Returns:
-            Creep compliance array
         """
         # Add small epsilon to prevent issues
         epsilon = 1e-12
@@ -199,19 +209,19 @@ class FractionalMaxwellGel(BaseModel):
         # Compute safe values
         t_safe = jnp.maximum(t, epsilon)
 
-        # Compute characteristic time
-        tau = eta / (c_alpha ** (1.0 / (1.0 - alpha_safe)))
-
         # Compute argument for Mittag-Leffler function
-        z = -((t_safe / tau) ** (1.0 - alpha_safe))
+        # z = - (t/τ)^(1-α) = - t^(1-alpha) * (c_alpha/eta)
+        beta_exp = 1.0 - alpha_safe
+        z = -jnp.power(t_safe, beta_exp) * (c_alpha / eta)
 
-        # Compute E_{1+α,1+α}(z) (requires concrete alpha/beta)
+        # Compute E_{1+α,1+α}(z)
         ml_alpha = 1.0 + alpha_safe
         ml_beta = 1.0 + alpha_safe
         ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
 
         # Compute J(t)
-        J_t = (1.0 / c_alpha) * (t_safe**alpha_safe) * ml_value
+        # J(t) = (1/c_alpha) * t^alpha * E(...)
+        J_t = (1.0 / c_alpha) * jnp.power(t_safe, alpha_safe) * ml_value
 
         # Ensure monotonicity: creep compliance must increase with time
         # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
@@ -219,23 +229,14 @@ class FractionalMaxwellGel(BaseModel):
 
         return J_t_monotonic
 
+    @staticmethod
+    @jax.jit
     def _predict_oscillation_jax(
-        self, omega: jnp.ndarray, c_alpha: float, alpha: float, eta: float
+        omega: jnp.ndarray, c_alpha: float, alpha: float, eta: float
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω) using JAX.
 
         G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
-
-        This is the correct formula for SpringPot in series with dashpot.
-
-        Args:
-            omega: Angular frequency array
-            c_alpha: SpringPot constant
-            alpha: Power-law exponent
-            eta: Viscosity
-
-        Returns:
-            Complex modulus array
         """
         # Add small epsilon
         epsilon = 1e-12
@@ -248,25 +249,35 @@ class FractionalMaxwellGel(BaseModel):
 
         # Compute safe values
         omega_safe = jnp.maximum(omega, epsilon)
-        tau_safe = jnp.maximum(
-            eta / (c_alpha ** (1.0 / (1.0 - alpha_safe + epsilon))), epsilon
-        )
 
         # (iω)^α = |ω|^α * exp(i α π/2)
-        i_omega_alpha = (omega_safe**alpha_safe) * jnp.exp(
-            1j * alpha_safe * jnp.pi / 2.0
+        omega_alpha = jnp.power(omega_safe, alpha_safe)
+        phase_alpha = jnp.pi * alpha_safe / 2.0
+        i_omega_alpha = omega_alpha * (
+            jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
         )
 
-        # (iωτ)^(1-α) = |ωτ|^(1-α) * exp(i (1-α) π/2)
-        omega_tau = omega_safe * tau_safe
-        i_omega_tau_beta = (omega_tau**beta_safe) * jnp.exp(
-            1j * beta_safe * jnp.pi / 2.0
+        # (iωτ)^(1-α) = (iω)^(1-α) * τ^(1-α)
+        # τ^(1-α) = [(eta/c_alpha)^(1/(1-alpha))]^(1-alpha) = eta/c_alpha
+        # So term is (iω)^(1-α) * (eta/c_alpha)
+        omega_beta = jnp.power(omega_safe, beta_safe)
+        phase_beta = jnp.pi * beta_safe / 2.0
+        i_omega_beta = omega_beta * (
+            jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta)
         )
+        denominator_term = i_omega_beta * (eta / c_alpha)
 
         # Complex modulus: G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
-        G_star = c_alpha * i_omega_alpha / (1.0 + i_omega_tau_beta)
+        # G* = c_alpha * i_omega_alpha / (1 + i_omega_beta * eta/c_alpha)
+        #    = i_omega_alpha / (1/c_alpha + i_omega_beta * eta/c_alpha^2) ? No.
 
-        return G_star
+        G_star = c_alpha * i_omega_alpha / (1.0 + denominator_term)
+
+        # Extract storage and loss moduli
+        G_prime = jnp.real(G_star)
+        G_double_prime = jnp.imag(G_star)
+
+        return jnp.stack([G_prime, G_double_prime], axis=-1)
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> FractionalMaxwellGel:
         """Fit model parameters to data.
@@ -504,7 +515,8 @@ class FractionalMaxwellGel(BaseModel):
         elif test_mode == "creep":
             y_pred = self._predict_creep_jax(x, c_alpha, alpha, eta)
         elif test_mode == "oscillation":
-            y_pred = self._predict_oscillation_jax(x, c_alpha, alpha, eta)
+            y_pred_stacked = self._predict_oscillation_jax(x, c_alpha, alpha, eta)
+            y_pred = y_pred_stacked[..., 0] + 1j * y_pred_stacked[..., 1]
         else:
             raise ValueError(
                 f"Unknown test mode: {test_mode}. "

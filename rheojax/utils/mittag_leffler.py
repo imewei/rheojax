@@ -2,18 +2,21 @@
 JAX-compatible Mittag-Leffler function implementations.
 
 This module provides efficient, JAX-compatible implementations of the Mittag-Leffler
-function using Pade approximations optimized for fractional rheological models.
+function using a hybrid strategy:
+1. Taylor series for small arguments (|z| < 8)
+2. Asymptotic expansions for large arguments (|z| > 8)
+   - Exponential expansion for positive z (Creep mode growth)
+   - Inverse power law expansion for negative z (Relaxation mode decay)
 
-For most rheological applications, arguments are in the range ``|z|`` < 10, where
-Pade approximations provide excellent accuracy (< 1e-6 error) with fast computation.
+This approach avoids the numerical instability of Padé approximations near alpha=beta
+and correctly models the exponential growth for positive arguments.
 
 References
 ----------
-- I. O. Sarumi, K. M. Furati and A. Q. M. Khaliq, Highly accurate global Padé
-  approximations of generalized Mittag–Leffler function and its inverse,
-  Journal of Scientific Computing, 2020, 82, 1–27
 - R. Garrappa, Numerical evaluation of two and three parameter Mittag-Leffler
   functions, SIAM Journal of Numerical Analysis, 2015, 53(3), 1350-1369
+- Haubold, H. J., Mathai, A. M., & Saxena, R. K. (2011). Mittag-Leffler functions
+  and their applications. Journal of applied mathematics, 2011.
 """
 
 from rheojax.core.jax_config import safe_import_jax
@@ -22,7 +25,6 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 # Safe JAX import (enforces float64)
-# Float64 precision is critical for accurate Mittag-Leffler evaluations
 jax, jnp = safe_import_jax()
 from jax.scipy.special import gamma as jax_gamma
 
@@ -31,59 +33,22 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
     """
     One-parameter Mittag-Leffler function E_α(z).
 
-    The Mittag-Leffler function is defined as:
-
-        E_α(``z``) = ∑_{k=0}^∞ ``z`` ^k / Γ(αk + 1)
-
-    This is a generalization of the exponential function (α=1 gives exp(``z``)).
+    E_α(z) = E_{α,1}(z)
 
     Parameters
     ----------
     z : float or jnp.ndarray
-        Argument(s) of the Mittag-Leffler function. Can be real or complex.
+        Argument(s) of the Mittag-Leffler function.
     alpha : float
         Order parameter, must be real and positive (0 < alpha <= 2).
-        Common value: alpha = 0.5 for fractional diffusion.
-        **Note:** Must be a static Python float (not a JAX traced value).
 
     Returns
     -------
     float or jnp.ndarray
-        Value(s) of E_α(``z``). Returns real values for real inputs, complex for complex inputs.
-
-    Examples
-    --------
-    >>> import jax.numpy as jnp
-    >>> from rheojax.utils.mittag_leffler import mittag_leffler_e
-    >>>
-    >>> # Single value
-    >>> mittag_leffler_e(0.5, 0.5)
-    >>>
-    >>> # Array of values
-    >>> z = jnp.linspace(0, 2, 10)
-    >>> mittag_leffler_e(z, 0.8)
-    >>>
-    >>> # JIT compilation (alpha must be concrete value)
-    >>> alpha_val = 0.5  # Concrete value, not traced
-    >>> @jax.jit
-    >>> def compute_ml(z):
-    >>>     return mittag_leffler_e(z, alpha=alpha_val)
-
-    Notes
-    -----
-    - Uses Pade(6,3) approximation for excellent accuracy in range ``|z|`` < 10
-    - Compiled with @jax.jit for performance with static alpha
-    - Validated against mpmath with < 1e-6 relative error
-    - For ``|z|`` > 10, accuracy may decrease (use with caution)
-    - Alpha must be a concrete value (not traced) for JIT compilation
-
-    Raises
-    ------
-    ValueError
-        If alpha is outside the valid range (0, 2].
+        Value(s) of E_α(z).
     """
     # Validate alpha when not traced (static values only)
-    if not isinstance(alpha, jax.core.Tracer):
+    if not isinstance(alpha, (jax.core.Tracer, jnp.ndarray)):
         if not (0 < alpha <= 2):
             logger.error(
                 "Invalid alpha parameter for Mittag-Leffler function",
@@ -92,11 +57,6 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
             )
             raise ValueError(f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}")
 
-    logger.debug(
-        "Computing one-parameter Mittag-Leffler E_alpha(z)",
-        alpha=alpha,
-        z_shape=getattr(z, "shape", "scalar"),
-    )
     return mittag_leffler_e2(z, alpha, beta=1.0)
 
 
@@ -105,69 +65,31 @@ def mittag_leffler_e2(
     z: float | jnp.ndarray, alpha: float, beta: float
 ) -> float | jnp.ndarray:
     """
-    Two-parameter Mittag-Leffler function E_{α,β}(``z``).
+    Two-parameter Mittag-Leffler function E_{α,β}(z).
 
-    The two-parameter Mittag-Leffler function is defined as:
-
-        E_{α,β}(``z``) = ∑_{k=0}^∞ ``z`` ^k / Γ(αk + β)
-
-    This generalizes the one-parameter function (β=1 reduces to E_α(``z``)).
+    Uses a hybrid evaluation strategy:
+    - |z| <= 8: Taylor Series (Kahan summation)
+    - z > 8: Positive Asymptotic Expansion (Exponential growth)
+    - z < -8: Negative Asymptotic Expansion (Algebraic decay)
+    - Smooth blending at boundaries for gradient stability.
 
     Parameters
     ----------
     z : float or jnp.ndarray
-        Argument(s) of the Mittag-Leffler function. Can be real or complex.
+        Argument(s) of the Mittag-Leffler function.
     alpha : float
-        First parameter, must be real and positive (0 < alpha <= 2).
-        **Note:** Must be a static Python float (not a JAX traced value).
+        First parameter (0 < alpha <= 2).
     beta : float
-        Second parameter, must be real. Common values: β=1, β=alpha.
-        **Note:** Must be a static Python float (not a JAX traced value).
+        Second parameter.
 
     Returns
     -------
     float or jnp.ndarray
-        Value(s) of E_{α,β}(``z``). Returns real values for real inputs, complex for complex inputs.
-
-    Examples
-    --------
-    >>> import jax.numpy as jnp
-    >>> from rheojax.utils.mittag_leffler import mittag_leffler_e2
-    >>>
-    >>> # Two-parameter evaluation
-    >>> mittag_leffler_e2(0.5, alpha=0.5, beta=1.0)
-    >>>
-    >>> # Equivalent to one-parameter when beta=1
-    >>> mittag_leffler_e2(1.0, alpha=0.8, beta=1.0)  # Same as mittag_leffler_e(1.0, 0.8)
-    >>>
-    >>> # Array evaluation
-    >>> z = jnp.array([0.1, 0.5, 1.0, 2.0])
-    >>> mittag_leffler_e2(z, alpha=0.7, beta=0.7)
-    >>>
-    >>> # JIT compilation (alpha and beta must be concrete values)
-    >>> alpha_val, beta_val = 0.5, 1.0  # Concrete values
-    >>> @jax.jit
-    >>> def compute_ml2(z):
-    >>>     return mittag_leffler_e2(z, alpha=alpha_val, beta=beta_val)
-
-    Notes
-    -----
-    - Uses Pade(6,3) approximation optimized for rheological applications
-    - Accurate to < 1e-6 for ``|z|`` < 10 (covers most rheological cases)
-    - For fractional calculus applications, common choices:
-        - Relaxation modulus: E_α(-t^α), α ∈ (0,1)
-        - Fractional derivatives: E_{α,β}(``z``) with β = 1-α
-    - JIT compilation is automatic via @jax.jit decorator
-    - Now supports traced alpha/beta values (no static_argnums required)
-
-    Raises
-    ------
-    ValueError
-        If alpha is outside the valid range (0, 2].
+        Value(s) of E_{α,β}(z).
     """
     # Validate alpha when not traced (static values only)
-    # For JAX traced values, validation is skipped to allow JIT compilation
-    if not isinstance(alpha, jax.core.Tracer):
+    # Note: We check against Tracer and Array to allow JIT-compiled calls to pass through
+    if not isinstance(alpha, (jax.core.Tracer, jnp.ndarray)):
         if not (0 < alpha <= 2):
             logger.error(
                 "Invalid alpha parameter for Mittag-Leffler function",
@@ -177,274 +99,232 @@ def mittag_leffler_e2(
             )
             raise ValueError(f"alpha must satisfy 0 < alpha <= 2, got alpha={alpha}")
 
-    logger.debug(
-        "Computing two-parameter Mittag-Leffler E_{alpha,beta}(z)",
-        alpha=alpha,
-        beta=beta,
-        z_shape=getattr(z, "shape", "scalar"),
-    )
+    # Convert scalar to array for consistency
+    z_arr = jnp.asarray(z)
+    is_scalar = z_arr.ndim == 0
+    z_arr = jnp.atleast_1d(z_arr)
 
-    # Convert input to JAX array
-    z_input = jnp.asarray(z)
-    is_scalar = z_input.ndim == 0
-    z = jnp.atleast_1d(z_input)
+    # Use float64 for precision
+    z_f64 = z_arr.astype(jnp.float64) if jnp.isrealobj(z_arr) else z_arr.astype(jnp.complex128)
 
-    logger.debug(
-        "Using Pade(6,3) approximation for Mittag-Leffler evaluation",
-        n_points=len(z),
-        is_scalar=is_scalar,
-    )
+    # Vectorized computation
+    result = _mittag_leffler_hybrid(z_f64, alpha, beta)
 
-    # Use Pade approximation (accurate for |z| < 10)
-    result = _mittag_leffler_pade(z, alpha, beta)
+    # Cast back to original dtype if needed (e.g. if input was float32)
+    if jnp.issubdtype(z_arr.dtype, jnp.floating):
+         result = result.astype(z_arr.dtype)
 
-    # Return scalar if input was scalar, otherwise return array
     if is_scalar:
         return result[0]
     return result
 
 
-def _mittag_leffler_pade(z: jnp.ndarray, alpha: float, beta: float) -> jnp.ndarray:
+def _ml_taylor(z, alpha, beta, n_iter=300):
     """
-    Pade approximation for Mittag-Leffler function (internal, JIT-compiled).
+    Taylor series expansion: E_{a,b}(z) = sum_{k=0}^N z^k / Gamma(a*k + b)
+    Using Kahan summation for reduced cancellation error.
+    """
+    def body(k, state):
+        sum_val, c_val, z_pow = state
 
-    Uses Pade(6,3) approximation R_{6,3}(z) for general |z| values.
-    Based on Sarumi et al. (2020) approximations.
+        # Calculate term
+        term = z_pow / jax_gamma(alpha * k + beta)
+
+        # Kahan summation step
+        y = term - c_val
+        t = sum_val + y
+        c_new = (t - sum_val) - y
+        sum_new = t
+
+        # Update z_power
+        z_pow_new = z_pow * z
+
+        return sum_new, c_new, z_pow_new
+
+    init_state = (jnp.zeros_like(z), jnp.zeros_like(z), jnp.ones_like(z))
+    total, _, _ = jax.lax.fori_loop(0, n_iter, body, init_state)
+    return total
+
+
+def _ml_asymptotic_pos(z, alpha, beta):
+    """
+    Asymptotic expansion for large positive z (Creep mode).
+    E_{a,b}(z) ~ (1/a) * z^((1-b)/a) * exp(z^(1/a))
+    """
+    inv_alpha = 1.0 / alpha
+    exponent = z ** inv_alpha
+    # Avoid overflow in z^((1-beta)/alpha) by checking sign
+    power_term = z ** ((1.0 - beta) * inv_alpha)
+    prefactor = inv_alpha * power_term
+    return prefactor * jnp.exp(exponent)
+
+
+def _safe_rgamma(x):
+    """
+    Computes 1/Gamma(x) safely, returning 0 at poles (negative integers) with correct gradients.
+
+    Uses reflection formula for x < 0.5:
+    1/Gamma(z) = Gamma(1-z) * sin(pi*z) / pi
+    """
+    # Reflection formula is valid everywhere but numerically better for x < 0.5
+    # and handles poles at 0, -1, -2... where sin(pi*z) = 0.
+    def _reflection(z):
+        return (jax_gamma(1.0 - z) * jnp.sin(jnp.pi * z)) / jnp.pi
+
+    def _standard(z):
+        return 1.0 / jax_gamma(z)
+
+    # Use reflection for z < 0.5 to avoid poles in standard gamma
+    return jax.lax.cond(x < 0.5, _reflection, _standard, operand=x)
+
+
+def _ml_asymptotic_neg(z, alpha, beta, n_terms=20):
+    """
+    Asymptotic expansion for large negative z (Relaxation mode).
+    E_{a,b}(z) ~ - sum_{k=1}^N z^(-k) / Gamma(beta - alpha*k)
+    """
+    inv_z = 1.0 / z
+
+    def body(k, val):
+        # k goes from 1 to n_terms
+        # Term = z^(-k) / Gamma(beta - alpha*k)
+        # Use safe reciprocal gamma to handle poles
+        rgamma_val = _safe_rgamma(beta - alpha * k)
+        term = (inv_z ** k) * rgamma_val
+        # Series is - sum(...)
+        return val - term
+
+    return jax.lax.fori_loop(1, n_terms + 1, body, jnp.zeros_like(z))
+
+
+def _sigmoid_blend(x, transition, width=1.0):
+    """Smooth sigmoid transition from 0 to 1 around transition point."""
+    return jax.nn.sigmoid((x - transition) / width)
+
+
+def _smooth_blend(val1, val2, z, threshold, width=0.5):
+    """
+    Smoothly blend between val1 (z < threshold) and val2 (z > threshold).
 
     Parameters
     ----------
-    z : jnp.ndarray
-        Input array (accurate for |z| < 10)
-    alpha : float
-        First parameter (static)
-    beta : float
-        Second parameter (static)
+    val1 : scalar
+        Value for z < threshold.
+    val2 : scalar
+        Value for z > threshold.
+    z : scalar
+        Control variable.
+    threshold : float
+        Transition point.
+    width : float
+        Width of the transition region.
 
     Returns
     -------
-    jnp.ndarray
-        Pade approximation of E_{α,β}(z)
-
-    Notes
-    -----
-    - Uses (6,3) Pade approximation for best balance of speed/accuracy
-    - Accurate to < 1e-6 for |z| < 10
-    - Fast evaluation, suitable for most rheological applications
+    scalar
+        Blended value.
     """
-    # Use float64 for critical calculations to avoid precision loss
-    z_f64 = z.astype(jnp.float64) if jnp.isrealobj(z) else z.astype(jnp.complex128)
+    weight = jax.nn.sigmoid((z - threshold) / width)
+    return (1.0 - weight) * val1 + weight * val2
 
-    # Handle special case of z ≈ 0
-    z_abs = jnp.abs(z_f64)
-    near_zero = z_abs < 1e-15
 
-    # For near-zero, return 1/Γ(β)
-    result_zero = 1.0 / jax_gamma(beta)
+def _mittag_leffler_hybrid(z, alpha, beta):
+    """Hybrid implementation using vmap + blended regions for smoothness."""
 
-    # SPECIAL CASE: alpha == beta (common in rheology!)
-    # Use improved series expansion with better convergence
-    alpha_equals_beta = jnp.abs(alpha - beta) < 1e-10
+    # Thresholds & Widths
+    # Tuned for smoothness and stability with n_iter=300 for Taylor series
+    THRESH_POS = 6.0
+    WIDTH_POS = 0.5
 
-    # Compute improved series for alpha==beta case
-    # E_{α,α}(z) = Σ_{k=0}^∞ z^k / Γ(α(k+1))
-    result_taylor = jnp.zeros_like(z_f64)
+    # Safe cutoff for positive pure branch
+    CUTOFF_POS = 10.0
 
-    # For negative z, use asymptotic approximation or clamped series
-    # Key insight: For large negative z, E_{α,α}(z) → 0 exponentially
-    z_is_negative = z_f64 < 0
-    z_magnitude = jnp.abs(z_f64)
+    # Define the scalar kernel
+    def _kernel(z_val, a_val, b_val):
+        # Dynamic Negative Threshold based on alpha
+        # For small alpha (e.g. 0.01), Taylor explodes quickly for z < -1.0.
+        # We need to switch to Asymptotic much earlier.
+        # Empirical fit:
+        # alpha=0.01 -> thresh ~ -0.97
+        # alpha=0.99 -> thresh ~ -7.93
+        thresh_neg = -0.9 - 7.1 * a_val
+        width_neg = 0.1 + 0.4 * a_val
 
-    # For negative z with moderate to large |z|, Taylor series may not converge well
-    # For small alpha (< 0.5) and |z| > 2, terms can grow before converging
-    # Use threshold based on alpha: smaller alpha needs smaller |z| threshold
-    z_threshold = jnp.maximum(2.0, 5.0 * alpha)  # Adaptive threshold
-    z_moderate_to_large = z_magnitude > z_threshold
+        # Cutoff for pure negative branch (4 sigma)
+        # safe_cutoff = thresh - 4 * width
+        cutoff_neg = thresh_neg - 4.0 * width_neg
 
-    # For very large |z| > 100, definitely use asymptotic
+        def _pure_pos(_):
+            return _ml_asymptotic_pos(z_val, a_val, b_val)
 
-    # Taylor series with Kahan summation for better numerical stability
-    # For E_{α,α}(z) = Σ_{k=0}^∞ z^k / Γ(α(k+1))
-    # Only use for |z| < threshold to ensure convergence
-    def taylor_body(k, state):
-        sum_val, compensation, z_power = state
-        gamma_val = jax_gamma(alpha * (k + 1))
-        term = z_power / gamma_val
-        y = term - compensation
-        t = sum_val + y
-        compensation = (t - sum_val) - y
-        z_power = z_power * z_f64
-        return t, compensation, z_power
+        def _pure_neg(_):
+            return _ml_asymptotic_neg(z_val, a_val, b_val)
 
-    sum_init = jnp.zeros_like(z_f64)
-    comp_init = jnp.zeros_like(z_f64)
-    power_init = jnp.ones_like(z_f64)
-    result_taylor, _, _ = jax.lax.fori_loop(
-        0, 100, taylor_body, (sum_init, comp_init, power_init)
-    )
+        def _blended_region(_):
+            # Taylor series is computed everywhere in the blended region
+            # n_iter=300 ensures accuracy up to z=10.0
+            # For negative z, the dynamic threshold ensures we don't evaluate
+            # deep in the unstable region where Taylor explodes.
+            val_taylor = _ml_taylor(z_val, a_val, b_val, n_iter=300)
 
-    # For moderate-to-large negative z, use asymptotic formula
-    # E_{α,β}(-x) ~ (1/x) * Σ Γ(k - β/α) / (Γ(1 - β/α) * (-x)^k) as x → ∞
-    # For α = β (common in rheology), this simplifies:
-    # E_{α,α}(-x) ~ C * x^(-1) for large x (power-law decay)
-    # Leading term coefficient depends on alpha
-    z_abs_safe = jnp.maximum(z_magnitude, 1e-15)
+            # Positive Asymptotic (guarded)
+            # Safety floor of 1.0 avoids domain errors
+            z_pos_safe = jnp.maximum(z_val, 1.0)
+            val_pos = _ml_asymptotic_pos(z_pos_safe, a_val, b_val)
 
-    # Asymptotic expansion (leading term):
-    # For α ≠ β: E_{α,β}(-x) ≈ (1 / (x * Γ(1 - β/α))) for large x
-    # For α = β: E_{α,α}(-x) ≈ sin(π α) / (π * x) for large x (Gorenflo et al.)
+            # Negative Asymptotic (guarded)
+            # Use dynamic threshold as ceiling to avoid evaluating asymptotic series
+            # in its divergent region (small |z|).
+            z_neg_safe = jnp.minimum(z_val, thresh_neg)
+            val_neg = _ml_asymptotic_neg(z_neg_safe, a_val, b_val)
 
-    # Case 1: alpha ≠ beta
-    # Avoid division issues when beta/alpha is near integer
-    gamma_arg = 1.0 - beta / (alpha + 1e-15)
-    gamma_term = jax_gamma(gamma_arg)
-    asymptotic_neq = 1.0 / (z_abs_safe * jnp.abs(gamma_term) + 1e-15)
+            # Blend Neg <-> Taylor (Left transition)
+            # z < thresh_neg: Neg dominates
+            # z > thresh_neg: Taylor dominates
+            res = _smooth_blend(val_neg, val_taylor, z_val, thresh_neg, width_neg)
 
-    # Case 2: alpha = beta
-    # E_{α,α}(-x) ≈ sin(π α) / (π * x)
-    asymptotic_eq = jnp.sin(jnp.pi * alpha) / (jnp.pi * z_abs_safe + 1e-15)
+            # Blend Result <-> Pos (Right transition)
+            # z < THRESH_POS: Result (Taylor/Neg) dominates
+            # z > THRESH_POS: Pos dominates
+            res = _smooth_blend(res, val_pos, z_val, THRESH_POS, WIDTH_POS)
 
-    # Select based on alpha vs beta (dynamic condition for JAX tracing)
-    alpha_equals_beta_cond = jnp.abs(alpha - beta) < 1e-10
-    asymptotic_approx = jnp.where(alpha_equals_beta_cond, asymptotic_eq, asymptotic_neq)
+            return res
 
-    # Clamp asymptotic to [0, 1] for numerical stability
-    asymptotic_approx = jnp.clip(asymptotic_approx, 0.0, 1.0)
-
-    # For negative z with moderate-to-large |z|, use asymptotic
-    # For positive z, keep Taylor (though less common in rheology)
-    result_asymptotic = jnp.where(
-        z_is_negative, asymptotic_approx, result_taylor  # Keep Taylor for positive z
-    )
-
-    # Blend Taylor and asymptotic results based on |z| threshold
-    result_taylor = jnp.where(z_moderate_to_large, result_asymptotic, result_taylor)
-
-    def _pade_eval(args):
-        z_local, alpha_local, beta_local = args
-        minus_z = -z_local
-
-        g_vals_gt = jnp.array(
-            [
-                jax_gamma(beta_local - alpha_local) / jax_gamma(beta_local),
-                jax_gamma(beta_local - alpha_local)
-                / jax_gamma(beta_local + alpha_local),
-                jax_gamma(beta_local - alpha_local)
-                / jax_gamma(beta_local + 2 * alpha_local),
-                jax_gamma(beta_local - alpha_local)
-                / jax_gamma(beta_local + 3 * alpha_local),
-                jax_gamma(beta_local - alpha_local)
-                / jax_gamma(beta_local + 4 * alpha_local),
-                jax_gamma(beta_local - alpha_local)
-                / jax_gamma(beta_local - 2 * alpha_local),
-                jax_gamma(beta_local - alpha_local)
-                / jax_gamma(beta_local - 3 * alpha_local),
-            ],
-            dtype=jnp.float64,
+        # Main branch logic with optimization for far-field
+        return jax.lax.cond(
+            z_val > CUTOFF_POS,
+            _pure_pos,
+            lambda _: jax.lax.cond(
+                z_val < cutoff_neg,
+                _pure_neg,
+                _blended_region,
+                operand=None
+            ),
+            operand=None
         )
 
-        A_gt = jnp.array(
-            [
-                [1, 0, 0, -g_vals_gt[0], 0, 0, 0],
-                [0, 1, 0, g_vals_gt[1], -g_vals_gt[0], 0, 0],
-                [0, 0, 1, -g_vals_gt[2], g_vals_gt[1], -g_vals_gt[0], 0],
-                [0, 0, 0, g_vals_gt[3], -g_vals_gt[2], g_vals_gt[1], -g_vals_gt[0]],
-                [0, 0, 0, -g_vals_gt[4], g_vals_gt[3], -g_vals_gt[2], g_vals_gt[1]],
-                [0, 1, 0, 0, 0, -1, g_vals_gt[5]],
-                [0, 0, 1, 0, 0, 0, -1],
-            ],
-            dtype=jnp.float64,
-        )
+    # Prepare for broadcasting
+    z_arr = jnp.asarray(z)
+    a_arr = jnp.asarray(alpha)
+    b_arr = jnp.asarray(beta)
 
-        b_gt = jnp.array(
-            [0, 0, 0, -1, g_vals_gt[0], g_vals_gt[6], -g_vals_gt[5]], dtype=jnp.float64
-        )
+    # Broadcast shapes to handle potentially array-valued alpha/beta (though rare)
+    # If alpha/beta are scalars, this is cheap.
+    # We want to support: z=(N,), alpha=scalar, beta=scalar
+    # Or z=(N,), alpha=(N,), beta=(N,)
+    # simple broadcasting:
+    z_b, a_b, b_b = jnp.broadcast_arrays(z_arr, a_arr, b_arr)
 
-        coeffs_gt = jnp.linalg.solve(A_gt, b_gt)
-        p_gt = coeffs_gt[:3]
-        q_gt = coeffs_gt[3:]
+    # Apply vmap over the broadcasted arrays
+    # This maps the scalar kernel over all elements
+    res = jax.vmap(_kernel)(z_b, a_b, b_b)
 
-        numerator_gt = (1 / jax_gamma(beta_local - alpha_local)) * (
-            p_gt[0] + p_gt[1] * minus_z + p_gt[2] * minus_z**2 + minus_z**3
-        )
-        denominator_gt = (
-            q_gt[0]
-            + q_gt[1] * minus_z
-            + q_gt[2] * minus_z**2
-            + q_gt[3] * minus_z**3
-            + z_local**4
-        )
-        denominator_gt_safe = jnp.where(
-            jnp.abs(denominator_gt) < 1e-15,
-            jnp.sign(denominator_gt) * 1e-15,
-            denominator_gt,
-        )
-        result_pade_gt = numerator_gt / denominator_gt_safe
+    # DEBUG: Check for NaNs
+    # Note: This will trigger synchronization, only for debugging!
+    # if jnp.any(jnp.isnan(res)):
+    #     jax.debug.print("NaN detected in ML hybrid! z={}, a={}, b={}", z_b, a_b, b_b)
 
-        g_vals_le = jnp.array(
-            [
-                jax_gamma(-alpha_local) / jax_gamma(alpha_local),
-                jax_gamma(-alpha_local) / jax_gamma(2 * alpha_local),
-                jax_gamma(-alpha_local) / jax_gamma(3 * alpha_local),
-                jax_gamma(-alpha_local) / jax_gamma(4 * alpha_local),
-                jax_gamma(-alpha_local) / jax_gamma(5 * alpha_local),
-                jax_gamma(-alpha_local) / jax_gamma(-2 * alpha_local),
-                jax_gamma(-alpha_local) / jax_gamma(-3 * alpha_local),
-            ],
-            dtype=jnp.float64,
-        )
-
-        A_le = jnp.array(
-            [
-                [1, 0, g_vals_le[0], 0, 0, 0],
-                [0, 1, -g_vals_le[1], g_vals_le[0], 0, 0],
-                [0, 0, g_vals_le[2], -g_vals_le[1], g_vals_le[0], 0],
-                [0, 0, -g_vals_le[3], g_vals_le[2], -g_vals_le[1], -g_vals_le[0]],
-                [0, 0, g_vals_le[4], -g_vals_le[3], g_vals_le[2], -g_vals_le[1]],
-                [0, 1, 0, 0, 0, -1],
-            ],
-            dtype=jnp.float64,
-        )
-
-        b_le = jnp.array([0, 0, -1, 0, g_vals_le[6], -g_vals_le[5]], dtype=jnp.float64)
-
-        coeffs_le = jnp.linalg.solve(A_le, b_le)
-        p_hat = coeffs_le[:2]
-        q_hat = coeffs_le[2:]
-
-        numerator_le = (-1 / jax_gamma(-alpha_local)) * (
-            p_hat[0] + p_hat[1] * minus_z + minus_z**2
-        )
-        denominator_le = (
-            q_hat[0]
-            + q_hat[1] * minus_z
-            + q_hat[2] * minus_z**2
-            + q_hat[3] * minus_z**3
-            + minus_z**4
-        )
-        denominator_le_safe = jnp.where(
-            jnp.abs(denominator_le) < 1e-15,
-            jnp.sign(denominator_le) * 1e-15,
-            denominator_le,
-        )
-        result_pade_le = numerator_le / denominator_le_safe
-
-        is_beta_gt_alpha = beta_local > alpha_local
-        result_pade = jnp.where(is_beta_gt_alpha, result_pade_gt, result_pade_le)
-        return jnp.maximum(result_pade, 0.0)
-
-    result_final = jax.lax.cond(
-        alpha_equals_beta,
-        lambda _: jnp.maximum(result_taylor, 0.0),
-        lambda args: _pade_eval(args),
-        operand=(z_f64, alpha, beta),
-    )
-
-    # Convert back to original precision (float32 if input was float32)
-    if jnp.isrealobj(z):
-        result_final = result_final.astype(z.dtype)
-
-    # Return zero result for near-zero z, otherwise computed result
-    return jnp.where(near_zero, result_zero, result_final)
+    return res
 
 
 # Convenience aliases

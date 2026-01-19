@@ -68,11 +68,12 @@ class BaseModel(BayesianMixin, ABC):
         pass
 
     @abstractmethod
-    def _predict(self, X: ArrayLike) -> ArrayLike:
+    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
         """Internal predict implementation to be overridden by subclasses.
 
         Args:
             X: Input features
+            **kwargs: Additional prediction options
 
         Returns:
             Predictions
@@ -497,7 +498,7 @@ class BaseModel(BayesianMixin, ABC):
             )
             raise
 
-    def predict(self, X: ArrayLike, test_mode: str | None = None) -> ArrayLike:
+    def predict(self, X: ArrayLike, test_mode: str | None = None, **kwargs) -> ArrayLike:
         """Make predictions.
 
         Args:
@@ -505,6 +506,7 @@ class BaseModel(BayesianMixin, ABC):
             test_mode: Optional test mode ('oscillation', 'relaxation', 'creep', 'flow').
                       If provided, sets model's test_mode before prediction.
                       Useful for data generation without fitting.
+            **kwargs: Additional arguments passed to the internal _predict method.
 
         Returns:
             Model predictions
@@ -515,6 +517,7 @@ class BaseModel(BayesianMixin, ABC):
             model=self.__class__.__name__,
             x_shape=x_shape,
             test_mode=test_mode,
+            kwargs=kwargs,
         )
 
         if not self.fitted_ and len(self.parameters) > 0:
@@ -524,11 +527,14 @@ class BaseModel(BayesianMixin, ABC):
                 self.fitted_ = True
 
         # Set test_mode if provided (for data generation without fitting)
-        if test_mode is not None and hasattr(self, "_test_mode"):
-            self._test_mode = test_mode
+        if test_mode is not None:
+            if hasattr(self, "_test_mode"):
+                self._test_mode = test_mode
+            # Ensure test_mode is passed to _predict
+            kwargs["test_mode"] = test_mode
 
         try:
-            result = self._predict(X)
+            result = self._predict(X, **kwargs)
             logger.debug(
                 "Predict completed",
                 model=self.__class__.__name__,

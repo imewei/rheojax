@@ -133,8 +133,10 @@ class FractionalKelvinVoigt(BaseModel):
         alpha_safe = max(alpha, epsilon)
         return (c_alpha / Ge) ** (1.0 / alpha_safe)
 
+    @staticmethod
+    @jax.jit
     def _predict_relaxation_jax(
-        self, t: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
+        t: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t) using JAX.
 
@@ -153,37 +155,26 @@ class FractionalKelvinVoigt(BaseModel):
         epsilon = 1e-12
 
         # Clip alpha to safe range
-        # For gradient computation, alpha may be a tracer - use jnp.clip
-        # For normal operation, convert to float for ML function
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        try:
-            # Try to convert to float (works for concrete values)
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-        except (TypeError, AttributeError):
-            # If alpha is a tracer (during gradient computation), use jnp.clip
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        t_safe = jnp.maximum(t, epsilon)
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_relaxation(t, Ge, c_alpha):
-            t_safe = jnp.maximum(t, epsilon)
+        # Elastic part
+        G_elastic = Ge
 
-            # Elastic part
-            G_elastic = Ge
+        # Viscous part: c_α t^(-α) / Γ(1-α)
+        gamma_term = jax_gamma(1.0 - alpha_safe)
+        G_viscous = c_alpha * (t_safe ** (-alpha_safe)) / gamma_term
 
-            # Viscous part: c_α t^(-α) / Γ(1-α)
-            gamma_term = jax_gamma(1.0 - alpha_safe)
-            G_viscous = c_alpha * (t_safe ** (-alpha_safe)) / gamma_term
+        # Total relaxation modulus
+        G_t = G_elastic + G_viscous
 
-            # Total relaxation modulus
-            G_t = G_elastic + G_viscous
+        return G_t
 
-            return G_t
-
-        return _compute_relaxation(t, Ge, c_alpha)
-
+    @staticmethod
+    @jax.jit
     def _predict_creep_jax(
-        self, t: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
+        t: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
@@ -204,39 +195,28 @@ class FractionalKelvinVoigt(BaseModel):
         epsilon = 1e-12
 
         # Clip alpha to safe range
-        # For gradient computation, alpha may be a tracer - use jnp.clip
-        # For normal operation, convert to float for ML function
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        try:
-            # Try to convert to float (works for concrete values)
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-        except (TypeError, AttributeError):
-            # If alpha is a tracer (during gradient computation), use jnp.clip
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        t_safe = jnp.maximum(t, epsilon)
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_creep(t, Ge, c_alpha):
-            t_safe = jnp.maximum(t, epsilon)
+        # Characteristic retardation time
+        tau_epsilon = (c_alpha / Ge) ** (1.0 / alpha_safe)
 
-            # Characteristic retardation time
-            tau_epsilon = (c_alpha / Ge) ** (1.0 / alpha_safe)
+        # Argument for Mittag-Leffler function
+        z = -((t_safe / tau_epsilon) ** alpha_safe)
 
-            # Argument for Mittag-Leffler function
-            z = -((t_safe / tau_epsilon) ** alpha_safe)
+        # Compute E_α(z) with concrete alpha
+        ml_value = mittag_leffler_e(z, alpha=alpha_safe)
 
-            # Compute E_α(z) with concrete alpha
-            ml_value = mittag_leffler_e(z, alpha=alpha_safe)
+        # Creep compliance
+        J_t = (1.0 / Ge) * (1.0 - ml_value)
 
-            # Creep compliance
-            J_t = (1.0 / Ge) * (1.0 - ml_value)
+        return J_t
 
-            return J_t
-
-        return _compute_creep(t, Ge, c_alpha)
-
+    @staticmethod
+    @jax.jit
     def _predict_oscillation_jax(
-        self, omega: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
+        omega: jnp.ndarray, Ge: float, c_alpha: float, alpha: float
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω) using JAX.
 
@@ -255,37 +235,28 @@ class FractionalKelvinVoigt(BaseModel):
         epsilon = 1e-12
 
         # Clip alpha to safe range
-        # For gradient computation, alpha may be a tracer - use jnp.clip
-        # For normal operation, convert to float for ML function
+        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        try:
-            # Try to convert to float (works for concrete values)
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-        except (TypeError, AttributeError):
-            # If alpha is a tracer (during gradient computation), use jnp.clip
-            alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        omega_safe = jnp.maximum(omega, epsilon)
 
-        # JIT-compiled inner function with concrete alpha
-        @jax.jit
-        def _compute_oscillation(omega, Ge, c_alpha):
-            omega_safe = jnp.maximum(omega, epsilon)
+        # Elastic part
+        G_elastic = Ge
 
-            # Elastic part
-            G_elastic = Ge
+        # SpringPot part: c_α (iω)^α = c_α |ω|^α exp(i α π/2)
+        G_springpot = (
+            c_alpha
+            * (omega_safe**alpha_safe)
+            * jnp.exp(1j * alpha_safe * jnp.pi / 2.0)
+        )
 
-            # SpringPot part: c_α (iω)^α = c_α |ω|^α exp(i α π/2)
-            G_springpot = (
-                c_alpha
-                * (omega_safe**alpha_safe)
-                * jnp.exp(1j * alpha_safe * jnp.pi / 2.0)
-            )
+        # Complex modulus
+        G_star = G_elastic + G_springpot
 
-            # Complex modulus
-            G_star = G_elastic + G_springpot
+        # Extract storage and loss moduli
+        G_prime = jnp.real(G_star)
+        G_double_prime = jnp.imag(G_star)
 
-            return G_star
-
-        return _compute_oscillation(omega, Ge, c_alpha)
+        return jnp.stack([G_prime, G_double_prime], axis=-1)
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> FractionalKelvinVoigt:
         """Fit model parameters to data.
@@ -496,7 +467,9 @@ class FractionalKelvinVoigt(BaseModel):
         elif test_mode == "creep":
             return self._predict_creep_jax(X, **params_dict)
         elif test_mode == "oscillation":
-            return self._predict_oscillation_jax(X, **params_dict)
+            # Return complex array for oscillation mode
+            complex_result = self._predict_oscillation_jax(X, **params_dict)
+            return complex_result[..., 0] + 1j * complex_result[..., 1]
         else:
             # Default to relaxation for unknown modes
             return self._predict_relaxation_jax(X, **params_dict)
@@ -536,7 +509,8 @@ class FractionalKelvinVoigt(BaseModel):
         elif test_mode == "creep":
             y_pred = self._predict_creep_jax(x, Ge, c_alpha, alpha)
         elif test_mode == "oscillation":
-            y_pred = self._predict_oscillation_jax(x, Ge, c_alpha, alpha)
+            y_pred_stacked = self._predict_oscillation_jax(x, Ge, c_alpha, alpha)
+            y_pred = y_pred_stacked[..., 0] + 1j * y_pred_stacked[..., 1]
         else:
             raise ValueError(
                 f"Unknown test mode: {test_mode}. "
