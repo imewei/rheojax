@@ -89,8 +89,7 @@ def make_grid(sigma_max: float = 5.0, n_bins: int = 501) -> HLGrid:
 # ============================================================================
 
 
-@jit
-def step_hl(
+def _physics_step(
     state: HLState,
     gdot: float,
     grid: HLGrid,
@@ -99,27 +98,7 @@ def step_hl(
     sigma_c: float,
     dt: float,
 ) -> HLState:
-    """Advance HL model by one time step.
-
-    Implements the Fokker-Planck equation with operator splitting:
-    1. Calculate Activity Gamma and Diffusion D = alpha * Gamma
-    2. Advection: -gdot * dP/dsigma (Upwind)
-    3. Diffusion: D * d2P/dsigma2 (Central)
-    4. Yielding: -(1/tau) * P for |sigma| > sigma_c
-    5. Reinjection: Add yielded mass at sigma=0
-
-    Args:
-        state: Current HLState
-        gdot: Shear rate (1/s)
-        grid: Discretization grid
-        alpha: Coupling parameter (<0.5 for glass)
-        tau: Yield timescale (s)
-        sigma_c: Yield stress threshold (Pa)
-        dt: Time step (s)
-
-    Returns:
-        Updated HLState
-    """
+    """Single explicit Euler step for HL model physics."""
     P, _, _, _, t = state
     sigma, ds, n_bins = grid
 
@@ -185,6 +164,70 @@ def step_hl(
     stress_new = jnp.sum(P_new * sigma) * ds
 
     return HLState(P_new, stress_new, Gamma, D, t + dt)
+
+
+@jit
+def step_hl(
+    state: HLState,
+    gdot: float,
+    grid: HLGrid,
+    alpha: float,
+    tau: float,
+    sigma_c: float,
+    dt: float,
+) -> HLState:
+    """Advance HL model by one time step with adaptive sub-stepping.
+
+    Implements the Fokker-Planck equation with operator splitting.
+    Automatically calculates stable sub-steps based on CFL conditions
+    for advection and diffusion.
+
+    Args:
+        state: Current HLState
+        gdot: Shear rate (1/s)
+        grid: Discretization grid
+        alpha: Coupling parameter (<0.5 for glass)
+        tau: Yield timescale (s)
+        sigma_c: Yield stress threshold (Pa)
+        dt: Time step (s)
+
+    Returns:
+        Updated HLState
+    """
+    P, _, _, _, _ = state
+    sigma, ds, _ = grid
+
+    # Calculate current parameters for CFL check
+    mask_yield = jnp.abs(sigma) > sigma_c
+    yield_pop = jnp.sum(P * mask_yield) * ds
+    Gamma = yield_pop / tau
+    D = alpha * Gamma
+
+    # CFL Stability Conditions
+    # 1. Advection: dt < dx / v
+    v_adv = jnp.abs(gdot) + 1e-12
+    dt_adv = ds / v_adv
+
+    # 2. Diffusion: dt < dx^2 / 2D
+    D_safe = D + 1e-12
+    dt_diff = (ds**2) / (2.0 * D_safe)
+
+    # Stable time step (safety factor 0.5)
+    dt_stable = 0.5 * jnp.minimum(dt_adv, dt_diff)
+
+    # Determine number of sub-steps
+    n_sub = jnp.ceil(dt / dt_stable).astype(int)
+    n_sub = jnp.maximum(n_sub, 1)
+
+    dt_sub = dt / n_sub
+
+    # Execute sub-steps
+    def body_fun(i, current_state):
+        return _physics_step(current_state, gdot, grid, alpha, tau, sigma_c, dt_sub)
+
+    final_state = lax.fori_loop(0, n_sub, body_fun, state)
+
+    return final_state
 
 
 # ============================================================================

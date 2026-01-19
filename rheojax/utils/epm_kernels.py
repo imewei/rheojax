@@ -25,13 +25,13 @@ def make_propagator_q(
     Args:
         L_x: Lattice size in x.
         L_y: Lattice size in y.
-        shear_modulus: Shear modulus $\mu$.
+        shear_modulus: Shear modulus mu.
 
     Returns:
-        2D array of the propagator in Fourier space (L_x, L_y).
+        2D array of the propagator in Fourier space (L_x, L_y // 2 + 1).
     """
     qx = jnp.fft.fftfreq(L_x) * 2 * jnp.pi
-    qy = jnp.fft.fftfreq(L_y) * 2 * jnp.pi
+    qy = jnp.fft.rfftfreq(L_y) * 2 * jnp.pi
 
     # Create meshgrid of wave vectors (indexing='ij' for matrix coords)
     QX, QY = jnp.meshgrid(qx, qy, indexing="ij")
@@ -39,12 +39,12 @@ def make_propagator_q(
 
     # Handle q=0 singularity safely
     valid_mask = Q2 > 0
+    safe_Q2 = jnp.where(valid_mask, Q2, 1.0)
 
     # Standard scalar EPM propagator (quadrupolar)
-    propagator_q = jnp.zeros_like(Q2)
     propagator_q = jnp.where(
         valid_mask,
-        -4.0 * shear_modulus * (QX**2 * QY**2) / (Q2**2),
+        -4.0 * shear_modulus * (QX**2 * QY**2) / (safe_Q2**2),
         0.0
     )
 
@@ -60,24 +60,22 @@ def solve_elastic_propagator(
 ) -> jax.Array:
     """Solve for the elastic stress redistribution rate using FFT.
 
-    Calculates $\dot{\sigma}^{el} = \mathcal{G} * \dot{\epsilon}^{pl}$.
+    Calculates sigma_dot_el = G * epsilon_dot_pl.
 
     Args:
         plastic_strain_rate: 2D array of plastic strain rate field (L, L).
-        propagator_q: Precomputed propagator in Fourier space (L, L).
+        propagator_q: Precomputed propagator in Fourier space (L, L // 2 + 1).
 
     Returns:
         2D array of elastic stress redistribution rate.
     """
-    # Perform convolution in Fourier space
-    plastic_strain_q = jnp.fft.fft2(plastic_strain_rate)
+    # Perform convolution in Fourier space using Real-FFT
+    plastic_strain_q = jnp.fft.rfft2(plastic_strain_rate)
     stress_q = propagator_q * plastic_strain_q
 
     # Transform back to real space
-    # Real input/output implies we could use rfft2, but full fft2 is standard
-    # for maintaining shape compatibility without extra logic.
-    # Taking real part handles numerical noise.
-    stress_redistribution = jnp.real(jnp.fft.ifft2(stress_q))
+    # We pass the shape `s` to ensure correct reconstruction if dimensions are odd
+    stress_redistribution = jnp.fft.irfft2(stress_q, s=plastic_strain_rate.shape)
 
     return stress_redistribution
 
@@ -93,8 +91,8 @@ def compute_plastic_strain_rate(
     """Compute the local plastic strain rate.
 
     Supports two modes:
-    1. Hard Mode: $\dot{\gamma}^p = \Gamma \sigma \Theta(|\sigma| - \sigma_c)$
-    2. Smooth Mode: $\dot{\gamma}^p = \Gamma \sigma \frac{1}{2}(1 + \tanh((|\sigma| - \sigma_c)/w))$
+    1. Hard Mode: gamma_dot_p = Gamma * sigma * Theta(|sigma| - sigma_c)
+    2. Smooth Mode: gamma_dot_p = Gamma * sigma * 0.5 * (1 + tanh((|sigma| - sigma_c)/w))
 
     Args:
         stress: Local stress field.
@@ -161,12 +159,12 @@ def epm_step(
     """Perform one full EPM time step.
 
     Dynamics:
-    $\dot{\sigma} = \mu \dot{\gamma} - \mu \dot{\gamma}^p + \mathcal{G} * \dot{\gamma}^p$
+    sigma_dot = mu * gamma_dot - mu * gamma_dot_p + G * gamma_dot_p
 
     Args:
         state: Tuple (stress, yield_thresholds, accumulated_strain, key).
         propagator_q: Precomputed propagator.
-        shear_rate: Macroscopic imposed shear rate $\dot{\gamma}$.
+        shear_rate: Macroscopic imposed shear rate gamma_dot.
         dt: Time step size.
         params: Dictionary of model parameters (mu, tau_pl, sigma_c_mean, etc.).
         smooth: Use smooth yielding (for inference) vs hard yielding (for simulation).

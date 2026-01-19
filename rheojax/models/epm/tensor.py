@@ -1,4 +1,4 @@
-"""Tensorial Elasto-Plastic Model (EPM) scaffolding.
+r"""Tensorial Elasto-Plastic Model (EPM) scaffolding.
 
 This module reserves the API space for a future implementation of a full Tensorial EPM,
 which will track the full stress tensor ($\sigma_{xx}, \sigma_{xy}, \sigma_{yy}$) and
@@ -14,11 +14,11 @@ from rheojax.core.registry import ModelRegistry
 
 @ModelRegistry.register("tensorial_epm")
 class TensorialEPM(BaseModel):
-    """3-Component Tensorial Lattice EPM (Scaffold).
+    r"""3-Component Tensorial Lattice EPM (Scaffold).
 
     Planned Features:
         - Full stress tensor state per site.
-        - Rank-4 Eshelby propagator $\mathcal{G}_{ijkl}$.
+        - Rank-4 Eshelby propagator G_ijkl.
         - Von Mises yield criterion ($\sqrt{J_2} > \sigma_c$).
         - Prediction of Normal Stress Differences ($N_1, N_2$).
     """

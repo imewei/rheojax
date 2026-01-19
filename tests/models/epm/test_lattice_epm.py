@@ -20,8 +20,8 @@ def test_lattice_epm_initialization():
     assert model.params.get_value("mu") == 1.0
     assert model.params.get_value("tau_pl") == 1.0
 
-    # Check propagator shape
-    assert model._propagator_q_norm.shape == (32, 32)
+    # Check propagator shape (Real-FFT: last dim is L//2 + 1)
+    assert model._propagator_q_norm.shape == (32, 32 // 2 + 1)
     # Check singularity
     assert model._propagator_q_norm[0, 0] == 0.0
 
@@ -104,8 +104,12 @@ def test_tensorial_epm_scaffold():
     """Test that TensorialEPM exists but raises NotImplementedError."""
     model = TensorialEPM(L=32)
 
+    # Create dummy data with a shape attribute to pass BaseModel.fit pre-checks
+    X_dummy = jnp.zeros((1,))
+    y_dummy = jnp.zeros((1,))
+
     with pytest.raises(NotImplementedError):
-        model.fit(None, None)
+        model.fit(X_dummy, y_dummy)
 
     with pytest.raises(NotImplementedError):
         model.predict(RheoData(x=jnp.array([1.]), y=jnp.array([1.])))

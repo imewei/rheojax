@@ -1576,12 +1576,28 @@ class SGRGeneric(BaseModel):
         lambda_t[0] = lambda_initial
 
         for i in range(1, len(t)):
-            dlambda_dt = (
-                k_build * (1.0 - lambda_t[i - 1])
-                - k_break * np.abs(gamma_dot[i]) * lambda_t[i - 1]
-            )
-            lambda_t[i] = lambda_t[i - 1] + dlambda_dt * dt[i]
-            # Clamp to [0, 1]
+            # Rate coefficients at current step
+            # Note: Using absolute value of gamma_dot for physical consistency
+            gamma_dot_curr = np.abs(gamma_dot[i])
+
+            # Equation: d(lambda)/dt = k_build - (k_build + k_break * gamma_dot) * lambda
+            # Form: dy/dt = A - B*y
+            A = k_build
+            B = k_build + k_break * gamma_dot_curr
+
+            # Use exponential integrator (exact solution for constant gamma_dot over dt)
+            # lambda(t+dt) = (A/B) + (lambda(t) - A/B) * exp(-B*dt)
+            # Stable for any dt
+
+            if B > 1e-12:
+                lambda_ss = A / B
+                decay = np.exp(-B * dt[i])
+                lambda_t[i] = lambda_ss + (lambda_t[i - 1] - lambda_ss) * decay
+            else:
+                # Limit B -> 0: Linear growth
+                lambda_t[i] = lambda_t[i - 1] + A * dt[i]
+
+            # Clamp to [0, 1] for numerical safety
             lambda_t[i] = np.clip(lambda_t[i], 0.0, 1.0)
 
         # Store trajectory

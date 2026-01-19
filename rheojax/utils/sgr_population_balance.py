@@ -170,7 +170,7 @@ def advection_operator(
 ) -> Array:
     """Advection step: ell -> ell + gamma_dot * dt.
 
-    Uses first-order upwind scheme for stability.
+    Uses adaptive sub-stepping to satisfy CFL condition for stability.
 
     Parameters
     ----------
@@ -188,23 +188,42 @@ def advection_operator(
     Array
         Updated P after advection
     """
-    # Courant number
-    c = gamma_dot * dt / dell
+    # Calculate Courant number for full step
+    c_total = gamma_dot * dt / dell
 
-    # Upwind scheme (handles both positive and negative gamma_dot)
-    P_new = jnp.where(
-        gamma_dot >= 0,
-        # Forward advection: P_new[j] = P[j] - c*(P[j] - P[j-1])
-        P - c * (P - jnp.roll(P, 1, axis=1)),
-        # Backward advection: P_new[j] = P[j] - c*(P[j+1] - P[j])
-        P - c * (jnp.roll(P, -1, axis=1) - P),
-    )
+    # Determine number of sub-steps needed (safety factor 0.9)
+    # n_substeps >= |c_total| / 0.9
+    n_substeps = jnp.ceil(jnp.abs(c_total) / 0.9).astype(int)
+    n_substeps = jnp.maximum(n_substeps, 1)
 
-    # Zero boundary conditions
-    P_new = P_new.at[:, 0].set(0.0)
-    P_new = P_new.at[:, -1].set(0.0)
+    # Sub-step parameters
+    # c_sub will be < 0.9 in magnitude
+    c_sub = c_total / n_substeps
 
-    return P_new
+    def body_fn(_, P_curr):
+        # Upwind scheme (handles both positive and negative gamma_dot)
+        # Using c_sub directly (signed)
+
+        # If gamma_dot > 0 (c_sub > 0): forward difference
+        # P_new[j] = P[j] - c*(P[j] - P[j-1])
+        fwd = P_curr - c_sub * (P_curr - jnp.roll(P_curr, 1, axis=1))
+
+        # If gamma_dot < 0 (c_sub < 0): backward difference
+        # P_new[j] = P[j] - c*(P[j+1] - P[j])
+        bwd = P_curr - c_sub * (jnp.roll(P_curr, -1, axis=1) - P_curr)
+
+        P_next = jnp.where(gamma_dot >= 0, fwd, bwd)
+
+        # Zero boundary conditions
+        P_next = P_next.at[:, 0].set(0.0)
+        P_next = P_next.at[:, -1].set(0.0)
+
+        return P_next
+
+    # Run sub-steps
+    P_final = jax.lax.fori_loop(0, n_substeps, body_fn, P)
+
+    return P_final
 
 
 @jax.jit

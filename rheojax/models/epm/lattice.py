@@ -68,6 +68,7 @@ class LatticeEPM(BaseModel):
         self.params.add("smoothing_width", 0.1, bounds=(0.01, 1.0))
 
         # Precompute Propagator (Cached)
+        # Using 1.0 as shear_modulus here, will scale by mu during execution
         self._propagator_q_norm = make_propagator_q(L, L, shear_modulus=1.0)
 
     def _init_state(self, key: jax.Array) -> Tuple[jax.Array, jax.Array, float, jax.Array]:
@@ -173,24 +174,42 @@ class LatticeEPM(BaseModel):
         """Start-up shear: Stress(t) at constant rate."""
         time = data.x
 
+        # Calculate dt from data if possible
+        dt = self.dt
+        if len(time) > 1:
+            dt = time[1] - time[0]
+
         # Assume constant shear rate provided in metadata
         gdot = data.metadata.get("gamma_dot", 0.1)
 
-        n_steps = len(time)
+        # Scan for N-1 steps because we know the state at t=0
+        # If time has length 1 (unlikely for startup), handle gracefully
+        n_steps = max(0, len(time) - 1)
         state = self._init_state(key)
 
         def body(carrier, _):
             curr_state = carrier
-            new_state = epm_step(curr_state, propagator_q, gdot, self.dt, params, smooth)
+            new_state = epm_step(curr_state, propagator_q, gdot, dt, params, smooth)
             return new_state, jnp.mean(new_state[0])
 
-        _, stresses = jax.lax.scan(body, state, None, length=n_steps)
+        if n_steps > 0:
+            _, stresses_scan = jax.lax.scan(body, state, None, length=n_steps)
+            # Prepend initial stress
+            initial_stress = jnp.mean(state[0])
+            stresses = jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
+        else:
+            stresses = jnp.array([jnp.mean(state[0])])
+
         return RheoData(x=time, y=stresses, initial_test_mode="startup")
 
     def _run_relaxation(self, data: RheoData, key: jax.Array, propagator_q: jax.Array, params: dict, smooth: bool):
         """Stress relaxation: G(t) after step strain."""
         time = data.x
-        n_steps = len(time)
+
+        # Calculate dt from data
+        dt = self.dt
+        if len(time) > 1:
+            dt = time[1] - time[0]
 
         # Step strain magnitude from metadata
         strain_step = data.metadata.get("gamma", 0.1)
@@ -203,20 +222,34 @@ class LatticeEPM(BaseModel):
         stress = stress + mu * strain_step
         state = (stress, thresh, strain + strain_step, k)
 
-        # Relax (gdot = 0)
+        # Initial G(0)
+        g_0 = jnp.mean(stress) / strain_step
+
+        # Relax (gdot = 0) for N-1 steps
+        n_steps = max(0, len(time) - 1)
+
         def body(carrier, _):
             curr_state = carrier
-            new_state = epm_step(curr_state, propagator_q, 0.0, self.dt, params, smooth)
+            new_state = epm_step(curr_state, propagator_q, 0.0, dt, params, smooth)
             # Return G(t) = Stress / gamma_0
             return new_state, jnp.mean(new_state[0]) / strain_step
 
-        _, moduli = jax.lax.scan(body, state, None, length=n_steps)
+        if n_steps > 0:
+            _, moduli_scan = jax.lax.scan(body, state, None, length=n_steps)
+            moduli = jnp.concatenate([jnp.array([g_0]), moduli_scan])
+        else:
+            moduli = jnp.array([g_0])
+
         return RheoData(x=time, y=moduli, initial_test_mode="relaxation")
 
     def _run_creep(self, data: RheoData, key: jax.Array, propagator_q: jax.Array, params: dict, smooth: bool):
         """Creep: Strain(t) at constant stress using Adaptive P-Controller."""
         time = data.x
-        n_steps = len(time)
+
+        # Calculate dt from data
+        dt = self.dt
+        if len(time) > 1:
+            dt = time[1] - time[0]
 
         # Target stress from metadata or mean of y (if y is stress input)
         if data.y is not None:
@@ -231,6 +264,11 @@ class LatticeEPM(BaseModel):
         state = self._init_state(key)
         # Augmented state: (EPM_State, current_gdot)
         aug_state = (state, 0.0)
+
+        # Initial strain (0.0)
+        initial_strain = state[2]
+
+        n_steps = max(0, len(time) - 1)
 
         def body(carrier, _):
             (curr_epm, gdot) = carrier
@@ -250,18 +288,27 @@ class LatticeEPM(BaseModel):
             gdot_new = jnp.maximum(gdot_new, 0.0)
 
             # Step EPM
-            new_epm = epm_step(curr_epm, propagator_q, gdot_new, self.dt, params, smooth)
+            new_epm = epm_step(curr_epm, propagator_q, gdot_new, dt, params, smooth)
 
             # Return Strain
             return (new_epm, gdot_new), new_epm[2]
 
-        _, strains = jax.lax.scan(body, aug_state, None, length=n_steps)
+        if n_steps > 0:
+            _, strains_scan = jax.lax.scan(body, aug_state, None, length=n_steps)
+            strains = jnp.concatenate([jnp.array([initial_strain]), strains_scan])
+        else:
+            strains = jnp.array([initial_strain])
+
         return RheoData(x=time, y=strains, initial_test_mode="creep")
 
     def _run_oscillation(self, data: RheoData, key: jax.Array, propagator_q: jax.Array, params: dict, smooth: bool):
         """SAOS/LAOS: Stress(t) for sinusoidal strain."""
         time = data.x
-        n_steps = len(time)
+
+        # Calculate dt from data
+        dt = self.dt
+        if len(time) > 1:
+            dt = time[1] - time[0]
 
         # Params
         gamma0 = data.metadata.get("gamma0", 1.0)
@@ -269,13 +316,32 @@ class LatticeEPM(BaseModel):
 
         state = self._init_state(key)
 
+        # Initial stress
+        initial_stress = jnp.mean(state[0])
+
+        # Run for N-1 steps
+        n_steps = max(0, len(time) - 1)
+
+        # We need time points for the scan (starting from t[0] to t[N-2] to produce t[1] to t[N-1]?)
+        # Actually, scan body(carrier, t) takes t.
+        # If we want output at t[1], we step from t[0] with gdot(t[0])?
+        # Or gdot(t[1])?
+        # Typically Euler: y_{n+1} = y_n + dt * f(y_n, t_n)
+        # So we pass t[:-1] to scan to compute updates.
+        scan_time = time[:-1] if n_steps > 0 else jnp.array([])
+
         def body(carrier, t):
             curr_state = carrier
-            # Time varying shear rate
+            # Time varying shear rate at current time t
             gdot = gamma0 * omega * jnp.cos(omega * t)
 
-            new_state = epm_step(curr_state, propagator_q, gdot, self.dt, params, smooth)
+            new_state = epm_step(curr_state, propagator_q, gdot, dt, params, smooth)
             return new_state, jnp.mean(new_state[0])
 
-        _, stresses = jax.lax.scan(body, state, time, length=n_steps)
+        if n_steps > 0:
+            _, stresses_scan = jax.lax.scan(body, state, scan_time, length=n_steps)
+            stresses = jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
+        else:
+            stresses = jnp.array([initial_stress])
+
         return RheoData(x=time, y=stresses, initial_test_mode="oscillation")
