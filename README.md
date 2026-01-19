@@ -6,14 +6,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 25 rheological models (including SGR, STZ, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 27 rheological models (including EPM, SGR, STZ, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **25 Rheological Models**: Classical (3), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Flow (6), Multi-Mode (1), SGR (2), STZ (1), SPP LAOS (1)
+- **27 Rheological Models**: Classical (3), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Flow (6), Multi-Mode (1), SGR (2), STZ (1), SPP LAOS (1), EPM (2)
 - **7 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition), SPP (Sequence of Physical Processes)
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
 - **Bayesian Inference**: All 25 models support NumPyro NUTS sampling with NLSQ warm-start
@@ -39,6 +39,7 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 | **SGR** | **SGR Conventional** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | | **SGR Generic** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **STZ** | **STZ Conventional** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **EPM** | **Lattice EPM** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | **SPP** | **SPP Yield Stress** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ (Amp. Sweep) |
 
 ### Data & I/O
@@ -387,6 +388,27 @@ sgr.fit(omega, G_star, test_mode='oscillation')
 # GENERIC framework SGR (thermodynamically consistent, Fuereder & Ilg 2013)
 sgr_gen = SGRGeneric()
 sgr_gen.fit(omega, G_star, test_mode='oscillation')
+```
+
+### Elasto-Plastic Models (EPM)
+
+```python
+from rheojax.models import LatticeEPM
+from rheojax.visualization.epm_plots import plot_lattice_fields
+
+# Lattice EPM for amorphous solids (mesoscopic simulation)
+# Spatial heterogeneity, avalanches, shear banding
+epm = LatticeEPM(L=64, yielding_mode='smooth')
+
+# Fit steady-state flow curve
+epm.fit(shear_rate, stress, test_mode='rotation')
+
+# Transient creep simulation
+epm.fit(time, strain, test_mode='creep', stress_0=1.5)
+
+# Visualize stress and threshold fields
+state = epm.get_state()
+plot_lattice_fields(state)
 ```
 
 ### Strain-Rate Frequency Superposition (SRFS)

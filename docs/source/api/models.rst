@@ -873,6 +873,60 @@ Shear Transformation Zone model for amorphous plasticity (Langer 2008).
    :undoc-members:
    :show-inheritance:
 
+Elasto-Plastic Models (EPM)
+---------------------------
+
+Lattice EPM
+~~~~~~~~~~~
+
+:class:`rheojax.models.epm.lattice.LatticeEPM` | Handbook: :doc:`/models/epm`
+Mesoscopic lattice model for amorphous solids with spatial heterogeneity and avalanches.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``mu``
+     - Pa
+     - [0.1, 100.0]
+     - Shear modulus
+   * - ``tau_pl``
+     - s
+     - [0.01, 100.0]
+     - Plastic relaxation timescale
+   * - ``sigma_c_mean``
+     - Pa
+     - [0.1, 10.0]
+     - Mean yield threshold
+   * - ``sigma_c_std``
+     - Pa
+     - [0.0, 1.0]
+     - Disorder strength (std dev of thresholds)
+   * - ``smoothing_width``
+     - Pa
+     - [0.01, 1.0]
+     - Width for smooth yielding approx (inference)
+
+.. autoclass:: rheojax.models.epm.lattice.LatticeEPM
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Tensorial EPM (Scaffold)
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.models.epm.tensor.TensorialEPM`
+Scaffolding for future full stress tensor implementation.
+
+.. autoclass:: rheojax.models.epm.tensor.TensorialEPM
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 SPP LAOS Models
 ---------------
 

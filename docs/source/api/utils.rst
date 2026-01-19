@@ -1085,3 +1085,37 @@ See Also
 - :doc:`core` - BaseModel integration with automatic strategy selection
 - :doc:`../user_guide/getting_started` - Basic fitting examples
 - :mod:`rheojax.utils.optimization` - Optimization functions using these strategies
+
+EPM Kernels
+-----------
+
+.. automodule:: rheojax.utils.epm_kernels
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The EPM kernels module provides low-level JAX functions for Elasto-Plastic Model simulations,
+including the Eshelby propagator and plastic event logic.
+
+Functions
+~~~~~~~~~
+
+.. autofunction:: rheojax.utils.epm_kernels.make_propagator_q
+   :noindex:
+
+   Creates the quadrupolar Eshelby propagator in Fourier space.
+
+.. autofunction:: rheojax.utils.epm_kernels.solve_elastic_propagator
+   :noindex:
+
+   Solves for elastic stress redistribution using FFT.
+
+.. autofunction:: rheojax.utils.epm_kernels.compute_plastic_strain_rate
+   :noindex:
+
+   Computes local plastic strain rate (supports Hard and Smooth modes).
+
+.. autofunction:: rheojax.utils.epm_kernels.epm_step
+   :noindex:
+
+   Performs one full time step of the EPM dynamics.

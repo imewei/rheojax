@@ -33,10 +33,25 @@ Quick Links
 - :doc:`api/transforms` - All 7 data transforms (FFT, mastercurve, mutation, OWChirp, smoothing, SRFS, SPP)
 - :doc:`api/pipeline` - Pipeline API for high-level workflows
 
-**Phase 3 (Bayesian Inference)**:
+**Phase 4 (Complete)**: Performance & Correctness [done - v0.3.0-v0.4.0]
 
-- :doc:`api/core` - BayesianMixin, BayesianResult (NumPyro NUTS sampling)
-- :doc:`api/pipeline` - BayesianPipeline (NLSQ -> NUTS workflow with ArviZ diagnostics)
+- :doc:`api/models` - Generalized Maxwell Model (GMM), Fractional Models
+- :doc:`api/utils` - Element minimization, warm-start optimization
+
+**Phase 5 (Complete)**: Soft Glassy Rheology & SPP [done - v0.5.0]
+
+- :doc:`api/models` - SGR Conventional, SGR Generic, SPP Yield Stress
+- :doc:`api/transforms` - SRFS (Strain-Rate Frequency Superposition), SPP Decomposer
+
+**Phase 6 (Complete)**: Shear Transformation Zone (STZ) [done - v0.6.0]
+
+- :doc:`api/models` - STZ Conventional (Langer 2008)
+
+**Phase 7 (Complete)**: Elasto-Plastic Models (EPM) [done - v0.6.0]
+
+- :doc:`api/models` - Lattice EPM (Mesoscopic, FFT-based)
+- :doc:`api/utils` - EPM Kernels (Propagator, Plasticity)
+- :doc:`api/visualization` - Lattice field plotting
 
 Overview by Category
 --------------------
@@ -66,7 +81,7 @@ Core Components
 - :class:`rheojax.core.test_modes.TestMode` - Test mode enumeration
 - :func:`rheojax.core.test_modes.detect_test_mode` - Automatic test mode detection
 
-Models (21 total)
+Models (27 total)
 ~~~~~~~~~~~~~~~~~
 
 **Classical Models (3)**:
@@ -107,6 +122,24 @@ Models (21 total)
 - :class:`rheojax.models.Cross` - Alternative to Carreau
 - :class:`rheojax.models.HerschelBulkley` - Yield stress + power-law
 - :class:`rheojax.models.Bingham` - Yield stress + Newtonian
+
+**Soft Glassy Rheology Models (2)**:
+
+- :class:`rheojax.models.SGRConventional` - Soft Glassy Rheology (Sollich 1998)
+- :class:`rheojax.models.SGRGeneric` - Thermodynamic SGR (GENERIC)
+
+**STZ Models (1)**:
+
+- :class:`rheojax.models.STZConventional` - Shear Transformation Zone (Langer 2008)
+
+**SPP LAOS Models (1)**:
+
+- :class:`rheojax.models.SPPYieldStress` - Yield stress for SPP analysis
+
+**Elasto-Plastic Models (2)**:
+
+- :class:`rheojax.models.LatticeEPM` - Mesoscopic lattice model (FFT-based)
+- :class:`rheojax.models.TensorialEPM` - Tensorial scaffolding
 
 Transforms (5 total)
 ~~~~~~~~~~~~~~~~~~~~

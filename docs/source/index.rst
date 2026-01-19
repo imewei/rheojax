@@ -193,6 +193,22 @@ Development Status
    - [done] ODE integration via diffrax for transient simulations
    - [done] Comprehensive Sphinx documentation and handbook
 
+**Phase 7 (Complete)**: Elasto-Plastic Models (EPM) [done - v0.6.0]
+   - [done] LatticeEPM: Mesoscopic lattice model with FFT-based stress redistribution
+   - [done] TensorialEPM: Scaffolding for full tensor implementation
+   - [done] EPM Kernels: JAX-accelerated Eshelby propagator and plastic event logic
+   - [done] Visualization: Lattice field plots (stress, thresholds) and evolution animations
+   - [done] Dual-mode yielding: Hard threshold (simulation) and Smooth yielding (inference)
+   - [done] Full protocol support: Flow curve, Creep (adaptive control), Oscillation, Relaxation
+
+**Phase 7 (Complete)**: Elasto-Plastic Models (EPM) [done - v0.6.0]
+   - [done] LatticeEPM: Mesoscopic lattice model with FFT-based stress redistribution
+   - [done] TensorialEPM: Scaffolding for full tensor implementation
+   - [done] EPM Kernels: JAX-accelerated Eshelby propagator and plastic event logic
+   - [done] Visualization: Lattice field plots (stress, thresholds) and evolution animations
+   - [done] Dual-mode yielding: Hard threshold (simulation) and Smooth yielding (inference)
+   - [done] Full protocol support: Flow curve, Creep (adaptive control), Oscillation, Relaxation
+
 Technology Stack
 ----------------
 

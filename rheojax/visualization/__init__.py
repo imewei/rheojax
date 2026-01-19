@@ -22,6 +22,10 @@ from rheojax.visualization.templates import (
     plot_modulus_frequency,
     plot_stress_strain,
 )
+from rheojax.visualization.epm_plots import (
+    plot_lattice_fields,
+    animate_stress_evolution,
+)
 
 __all__ = [
     # Core plotting functions
@@ -37,4 +41,7 @@ __all__ = [
     "plot_mastercurve",
     "plot_model_fit",
     "apply_template_style",
+    # EPM plots
+    "plot_lattice_fields",
+    "animate_stress_evolution",
 ]

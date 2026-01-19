@@ -117,6 +117,9 @@ from rheojax.models.spp import SPPYieldStress
 # STZ models
 from rheojax.models.stz import STZConventional
 
+# EPM models
+from rheojax.models.epm import LatticeEPM, TensorialEPM
+
 __all__ = [
     # Classical models
     "Maxwell",
@@ -161,4 +164,7 @@ __all__ = [
     "HebraudLequeux",
     # SPP Yield Stress model
     "SPPYieldStress",
+    # EPM models
+    "LatticeEPM",
+    "TensorialEPM",
 ]

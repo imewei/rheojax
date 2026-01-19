@@ -96,6 +96,29 @@ Templates
 The templates module provides reusable plot templates for common visualization tasks.
 This will be expanded in Phase 2.
 
+EPM Visualization
+-----------------
+
+.. automodule:: rheojax.visualization.epm_plots
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Tools for visualizing spatially heterogeneous fields in Lattice EPM simulations.
+
+Functions
+~~~~~~~~~
+
+.. autofunction:: rheojax.visualization.epm_plots.plot_lattice_fields
+   :noindex:
+
+   Plots stress and yield threshold fields side-by-side.
+
+.. autofunction:: rheojax.visualization.epm_plots.animate_stress_evolution
+   :noindex:
+
+   Creates an animation of the stress field evolution over time.
+
 Examples
 --------
 
