@@ -1629,7 +1629,8 @@ class GeneralizedMaxwell(BaseModel):
         eta_0 = self._predict_steady_shear_jit(E_inf, E_i, tau_i)
 
         # Return constant viscosity for all shear rates
-        return np.full_like(gamma_dot, float(eta_0))
+        # Use jnp.full_like to avoid explicit float() conversion (JIT blocker)
+        return jnp.full_like(jnp.asarray(gamma_dot), eta_0)
 
     # =========================================================================
     # Startup Flow Protocol

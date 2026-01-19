@@ -131,11 +131,11 @@ class STZConventional(STZBase):
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
-            # Ensure parameters are floats for JIT compilation
-            sigma_y = float(p_map["sigma_y"])
-            chi_inf = float(p_map["chi_inf"])
-            tau0 = float(p_map["tau0"])
-            ez = float(p_map["ez"])
+            # Use parameters directly as JAX scalars
+            sigma_y = p_map["sigma_y"]
+            chi_inf = p_map["chi_inf"]
+            tau0 = p_map["tau0"]
+            ez = p_map["ez"]
 
             return self._predict_steady_shear_jit(
                 x_data,
@@ -437,12 +437,12 @@ class STZConventional(STZBase):
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
-            # Extract parameters as floats
-            G0 = float(p_map["G0"])
-            sigma_y = float(p_map["sigma_y"])
-            chi_inf = float(p_map["chi_inf"])
-            tau0 = float(p_map["tau0"])
-            epsilon0 = float(p_map["epsilon0"])
+            # Extract parameters
+            G0 = p_map["G0"]
+            sigma_y = p_map["sigma_y"]
+            chi_inf = p_map["chi_inf"]
+            tau0 = p_map["tau0"]
+            epsilon0 = p_map["epsilon0"]
 
             return self._predict_saos_jit(
                 x_data,

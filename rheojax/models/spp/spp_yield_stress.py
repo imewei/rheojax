@@ -300,7 +300,9 @@ class SPPYieldStress(BaseModel):
 
         # Estimate cage modulus from low-amplitude linear regime
         # G_cage ≈ σ_sy / γ_0 at small γ_0
-        low_amp_mask = gamma_0_array < 0.1 * np.max(gamma_0_array)
+        low_amp_mask = (gamma_0_array < 0.1 * np.max(gamma_0_array)) & (
+            gamma_0_array > 1e-10
+        )
         if np.any(low_amp_mask):
             G_cage_est = np.mean(
                 sigma_array[low_amp_mask] / gamma_0_array[low_amp_mask]
@@ -319,6 +321,9 @@ class SPPYieldStress(BaseModel):
         sigma_array : np.ndarray
             Shear stress values
         """
+        if len(gamma_dot_array) < 2:
+            raise ValueError("Need at least 2 data points for rotation fit")
+
         # Sort by shear rate
         sort_idx = np.argsort(gamma_dot_array)
         gamma_dot_sorted = gamma_dot_array[sort_idx]

@@ -119,6 +119,8 @@ def apparent_cage_modulus(
     stress_arr = jnp.atleast_1d(jnp.asarray(stress, dtype=jnp.float64))
     strain_arr = jnp.atleast_1d(jnp.asarray(strain, dtype=jnp.float64))
     gamma_0 = jnp.float64(strain_amplitude)
+    # Avoid division by zero
+    gamma_0 = jnp.where(gamma_0 > 1e-10, gamma_0, 1e-10)
 
     # Compute sign of strain (avoid division by zero at crossings)
     strain_sign = jnp.sign(strain_arr)
@@ -373,6 +375,7 @@ def compute_phase_offset(
     return Delta
 
 
+@partial(jax.jit, static_argnums=(4, 5, 6))
 def harmonic_reconstruction_full(
     strain: "Array",
     strain_rate: "Array",
@@ -552,6 +555,7 @@ def harmonic_reconstruction_full(
     }
 
 
+@partial(jax.jit, static_argnums=(4, 5))
 def spp_fourier_analysis(
     strain: "Array",
     stress: "Array",
