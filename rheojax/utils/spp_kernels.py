@@ -1961,6 +1961,85 @@ def yield_from_displacement_stress(
     }
 
 
+# ============================================================================
+# Energy Integration (Gap 9)
+# ============================================================================
+
+
+@jax.jit
+def calculate_loop_energy(
+    stress: "Array",
+    strain: "Array",
+) -> dict:
+    """
+    Calculate energy metrics from stress-strain loops via integration.
+
+    Computes the dissipated energy (area of the hysteresis loop) and
+    elastic energy metrics, ensuring parity with MATLAB SPP analysis.
+
+    Parameters
+    ----------
+    stress : Array
+        Stress signal σ(t) (Pa)
+    strain : Array
+        Strain signal γ(t) (dimensionless)
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+        - dissipated_energy: Energy dissipated per cycle (Pa) [Loop Area]
+        - dissipated_energy_density: Dissipated energy / π (Pa)
+        - elastic_energy: Maximum stored elastic energy (Pa) [Estimated]
+
+    Notes
+    -----
+    - Dissipated Energy (E_d): Defined as the area enclosed by the Lissajous loop
+      of stress vs strain: E_d = ∮ σ dγ. This represents the viscous energy
+      loss per unit volume per cycle.
+    - Elastic Energy (E_s): Estimated as the energy stored at maximum strain,
+      approximated by 0.5 * σ(γ_max) * γ_max. This corresponds to the potential
+      energy stored in the elastic structure at peak deformation.
+    - Dissipated Energy Density: E_d / π. This is a normalized metric often
+      used to compare dissipation across different amplitudes.
+
+    The integration uses the trapezoidal rule on the time-ordered data points,
+    which correctly computes the signed area of the closed loop.
+    """
+    stress_arr = jnp.atleast_1d(jnp.asarray(stress, dtype=jnp.float64))
+    strain_arr = jnp.atleast_1d(jnp.asarray(strain, dtype=jnp.float64))
+
+    # Dissipated Energy (Loop Area)
+    # E_d = ∮ σ dγ = ∫ σ(t) * (dγ/dt) dt
+    # Use trapezoidal rule manually since jnp.trapz is deprecated/removed
+    # sum(0.5 * (y[i] + y[i+1]) * (x[i+1] - x[i]))
+    dy = strain_arr[1:] - strain_arr[:-1]
+    y_avg = 0.5 * (stress_arr[1:] + stress_arr[:-1])
+    area = jnp.sum(y_avg * dy)
+
+    # Take absolute value to ensure positive energy regardless of loop direction
+    dissipated_energy = jnp.abs(area)
+
+    # Dissipated Energy Density (Normalized by Pi)
+    dissipated_energy_density = dissipated_energy / jnp.pi
+
+    # Elastic Energy
+    # Estimated as the energy stored at maximum strain:
+    # E_s ≈ 0.5 * stress_at_max_strain * max_strain
+    # This assumes linear-like storage behavior up to the peak.
+    idx_max = jnp.argmax(jnp.abs(strain_arr))
+    stress_at_max = jnp.abs(stress_arr[idx_max])
+    strain_max = jnp.abs(strain_arr[idx_max])
+
+    elastic_energy = 0.5 * stress_at_max * strain_max
+
+    return {
+        "dissipated_energy": dissipated_energy,
+        "dissipated_energy_density": dissipated_energy_density,
+        "elastic_energy": elastic_energy,
+    }
+
+
 @jax.jit
 def frenet_serret_frame(
     rd: "Array",
@@ -2267,6 +2346,8 @@ __all__ = [
     "frenet_serret_frame",
     # Displacement-stress yield extraction (NEW - Gap 6)
     "yield_from_displacement_stress",
+    # Energy Integration (NEW - Gap 9)
+    "calculate_loop_energy",
     # Data preprocessing (NEW - Gap 7, 8)
     "differentiate_rate_from_strain",
     "convert_units",
