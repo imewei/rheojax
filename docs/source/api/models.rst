@@ -879,7 +879,7 @@ Elasto-Plastic Models (EPM)
 Lattice EPM
 ~~~~~~~~~~~
 
-:class:`rheojax.models.epm.lattice.LatticeEPM` | Handbook: :doc:`/models/epm`
+:class:`rheojax.models.epm.lattice.LatticeEPM` | Handbook: :doc:`/models/epm/lattice_epm`
 Mesoscopic lattice model for amorphous solids with spatial heterogeneity and avalanches.
 
 .. list-table:: Parameters
