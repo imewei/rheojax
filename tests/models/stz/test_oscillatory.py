@@ -33,6 +33,7 @@ class TestSTZOscillatory:
             model.parameters.get_value("chi_inf"),
             model.parameters.get_value("tau0"),
             model.parameters.get_value("epsilon0"),
+            model.parameters.get_value("ez"),
         )
 
         G_star = np.array(G_star)
@@ -60,6 +61,7 @@ class TestSTZOscillatory:
             model.parameters.get_value("chi_inf"),
             model.parameters.get_value("tau0"),
             model.parameters.get_value("epsilon0"),
+            model.parameters.get_value("ez"),
         )
 
         G_star = np.array(G_star)
@@ -88,6 +90,7 @@ class TestSTZOscillatory:
             model.parameters.get_value("chi_inf"),
             model.parameters.get_value("tau0"),
             model.parameters.get_value("epsilon0"),
+            model.parameters.get_value("ez"),
         )
 
         G_star = np.array(G_star)
@@ -111,6 +114,7 @@ class TestSTZOscillatory:
             model.parameters.get_value("chi_inf"),
             model.parameters.get_value("tau0"),
             model.parameters.get_value("epsilon0"),
+            model.parameters.get_value("ez"),
         )
 
         G_star = np.array(G_star)
@@ -187,6 +191,7 @@ class TestSTZOscillatory:
             model.parameters.get_value("chi_inf"),
             model.parameters.get_value("tau0"),
             model.parameters.get_value("epsilon0"),
+            model.parameters.get_value("ez"),
         )
 
         # High chi_inf (more liquid-like)
@@ -198,6 +203,7 @@ class TestSTZOscillatory:
             model.parameters.get_value("chi_inf"),
             model.parameters.get_value("tau0"),
             model.parameters.get_value("epsilon0"),
+            model.parameters.get_value("ez"),
         )
 
         G_star_low = np.array(G_star_low)

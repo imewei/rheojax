@@ -159,10 +159,15 @@ class STZConventional(STZBase):
     @staticmethod
     @jax.jit
     def _predict_steady_shear_jit(gamma_dot, sigma_y, chi_inf, tau0, ez):
-        """Analytical steady-state flow curve prediction."""
-        # At steady state, chi -> chi_inf
-        # Lambda -> exp(-ez / chi_inf)
-        # Solve for sigma given gamma_dot
+        """Analytical steady-state flow curve prediction.
+
+        At steady state:
+        - chi -> chi_inf
+        - Lambda = exp(-ez / chi_inf)
+        - The plastic rate prefactor includes Lambda * C where C ~ exp(-1/chi)
+        - Combined: Lambda * exp(-1/chi) = exp(-(ez + 1) / chi_inf)
+        """
+        # Combined activation factor at steady state
         term = jnp.exp(-(1.0 + ez) / chi_inf)
         arg = (gamma_dot * tau0) / (term + 1e-30)
         arg_clamped = jnp.clip(arg, -0.999999, 0.999999)
@@ -262,6 +267,7 @@ class STZConventional(STZBase):
             "epsilon0": params["epsilon0"],
             "chi_inf": params["chi_inf"],
             "c0": params["c0"],
+            "ez": params.get("ez", 1.0),
         }
 
         # Add variant-specific parameters
@@ -443,6 +449,7 @@ class STZConventional(STZBase):
             chi_inf = p_map["chi_inf"]
             tau0 = p_map["tau0"]
             epsilon0 = p_map["epsilon0"]
+            ez = p_map.get("ez", 1.0)
 
             return self._predict_saos_jit(
                 x_data,
@@ -451,6 +458,7 @@ class STZConventional(STZBase):
                 chi_inf,
                 tau0,
                 epsilon0,
+                ez,
             )
 
         objective = create_least_squares_objective(
@@ -466,14 +474,14 @@ class STZConventional(STZBase):
 
     @staticmethod
     @jax.jit
-    def _predict_saos_jit(omega, G0, sigma_y, chi_inf, tau0, epsilon0):
+    def _predict_saos_jit(omega, G0, sigma_y, chi_inf, tau0, epsilon0, ez):
         """SAOS prediction using linear viscoelastic approximation.
 
         In the linear limit (small strain), STZ behaves like a Maxwell model
         with effective relaxation time tau_eff.
         """
         # At steady state chi -> chi_inf
-        Lambda_ss = jnp.exp(-1.0 / chi_inf)
+        Lambda_ss = jnp.exp(-ez / chi_inf)
 
         # Effective Maxwell relaxation time
         # tau_eff ~ tau0 / (epsilon0 * Lambda_ss)
@@ -570,6 +578,7 @@ class STZConventional(STZBase):
             "epsilon0": params["epsilon0"],
             "chi_inf": params["chi_inf"],
             "c0": params["c0"],
+            "ez": params.get("ez", 1.0),
         }
 
         if variant in ["standard", "full"]:
@@ -748,6 +757,7 @@ class STZConventional(STZBase):
                 p_values["chi_inf"],
                 p_values["tau0"],
                 p_values["epsilon0"],
+                p_values.get("ez", 1.0),
             )
         elif mode in ["startup", "relaxation", "creep"]:
             return self._simulate_transient_jit(
@@ -796,6 +806,7 @@ class STZConventional(STZBase):
                 p_values["chi_inf"],
                 p_values["tau0"],
                 p_values["epsilon0"],
+                p_values.get("ez", 1.0),
             )
             return np.array(result)
 

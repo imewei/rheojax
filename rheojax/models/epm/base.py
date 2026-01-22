@@ -11,7 +11,6 @@ from typing import Dict, Tuple, Optional
 from rheojax.core.base import BaseModel
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.core.parameters import ParameterSet
 
 jax, jnp = safe_import_jax()
 
@@ -54,13 +53,27 @@ class EPMBase(BaseModel):
         self.L = L
         self.dt = dt
 
-        # Parameters (Optimizable)
-        self.params = ParameterSet()
-        self.params.add("mu", mu, bounds=(0.1, 100.0))
-        self.params.add("tau_pl", tau_pl, bounds=(0.01, 100.0))
-        self.params.add("sigma_c_mean", sigma_c_mean, bounds=(0.1, 10.0))
-        self.params.add("sigma_c_std", sigma_c_std, bounds=(0.0, 1.0))
-        self.params.add("smoothing_width", 0.1, bounds=(0.01, 1.0))
+        # Parameters (Optimizable) - use inherited self.parameters from BaseModel
+        self.parameters.add(
+            "mu", mu, bounds=(0.1, 100.0),
+            units="Pa", description="Shear modulus"
+        )
+        self.parameters.add(
+            "tau_pl", tau_pl, bounds=(0.01, 100.0),
+            units="s", description="Plastic relaxation timescale"
+        )
+        self.parameters.add(
+            "sigma_c_mean", sigma_c_mean, bounds=(0.1, 10.0),
+            units="Pa", description="Mean yield threshold"
+        )
+        self.parameters.add(
+            "sigma_c_std", sigma_c_std, bounds=(0.0, 1.0),
+            units="Pa", description="Yield threshold standard deviation (disorder)"
+        )
+        self.parameters.add(
+            "smoothing_width", 0.1, bounds=(0.01, 1.0),
+            units="Pa", description="Smooth yielding transition width"
+        )
 
     def _init_thresholds(self, key: jax.Array) -> jax.Array:
         """Initialize yield thresholds from Gaussian distribution.
@@ -71,8 +84,8 @@ class EPMBase(BaseModel):
         Returns:
             Array of shape (L, L) with Gaussian-distributed yield thresholds.
         """
-        mean = self.params.get_value("sigma_c_mean")
-        std = self.params.get_value("sigma_c_std")
+        mean = self.parameters.get_value("sigma_c_mean")
+        std = self.parameters.get_value("sigma_c_std")
         thresholds = mean + std * jax.random.normal(key, (self.L, self.L))
         # Ensure positive thresholds
         thresholds = jnp.maximum(thresholds, 1e-4)
@@ -85,11 +98,11 @@ class EPMBase(BaseModel):
             Dictionary with all EPM parameters (mu, tau_pl, sigma_c_mean, etc.).
         """
         return {
-            "mu": self.params.get_value("mu"),
-            "tau_pl": self.params.get_value("tau_pl"),
-            "sigma_c_mean": self.params.get_value("sigma_c_mean"),
-            "sigma_c_std": self.params.get_value("sigma_c_std"),
-            "smoothing_width": self.params.get_value("smoothing_width"),
+            "mu": self.parameters.get_value("mu"),
+            "tau_pl": self.parameters.get_value("tau_pl"),
+            "sigma_c_mean": self.parameters.get_value("sigma_c_mean"),
+            "sigma_c_std": self.parameters.get_value("sigma_c_std"),
+            "smoothing_width": self.parameters.get_value("smoothing_width"),
         }
 
     @abstractmethod

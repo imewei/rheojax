@@ -1,6 +1,6 @@
 """Rheological models package.
 
-This package contains 25 rheological models organized into 8 categories.
+This package contains 27 rheological models organized into 10 categories.
 
 Classical Models (3):
     - Maxwell: Spring and dashpot in series
@@ -42,6 +42,10 @@ Soft Glassy Rheology Models (2):
 STZ Models (1):
     - STZConventional: Shear Transformation Zone model (Langer 2008)
 
+Fluidity Models (2):
+    - FluidityLocal: Local (0D) fluidity model with aging/rejuvenation
+    - FluidityNonlocal: Non-local (1D PDE) fluidity model with shear banding
+
 SPP LAOS Models (1):
     - SPPYieldStress: Yield stress model for SPP LAOS analysis
 
@@ -51,17 +55,20 @@ Usage:
     >>> from rheojax.models import FractionalZenerSolidLiquid, FractionalBurgersModel
     >>> from rheojax.models import PowerLaw, Carreau, HerschelBulkley
     >>> from rheojax.models import SGRConventional, STZConventional
+    >>> from rheojax.models import FluidityLocal, FluidityNonlocal
     >>> from rheojax.core.registry import ModelRegistry
     >>>
     >>> # Direct instantiation
     >>> model = Maxwell()
     >>> fzsl_model = FractionalZenerSolidLiquid()
     >>> flow_model = PowerLaw()
+    >>> fluidity_model = FluidityLocal()
     >>>
     >>> # Factory pattern
     >>> model = ModelRegistry.create('maxwell')
     >>> fzsl_model = ModelRegistry.create('fractional_zener_sl')
     >>> flow_model = ModelRegistry.create('power_law')
+    >>> fluidity_model = ModelRegistry.create('fluidity_local')
     >>>
     >>> # List available models
     >>> models = ModelRegistry.list_models()
@@ -120,6 +127,9 @@ from rheojax.models.stz import STZConventional
 # EPM models
 from rheojax.models.epm import LatticeEPM, TensorialEPM
 
+# Fluidity models
+from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
+
 __all__ = [
     # Classical models
     "Maxwell",
@@ -167,4 +177,7 @@ __all__ = [
     # EPM models
     "LatticeEPM",
     "TensorialEPM",
+    # Fluidity models
+    "FluidityLocal",
+    "FluidityNonlocal",
 ]

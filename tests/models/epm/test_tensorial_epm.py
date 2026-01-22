@@ -28,20 +28,20 @@ def test_tensorial_epm_initialization():
     # Base class parameters
     assert model.L == 32
     assert model.dt == 0.01
-    assert model.params.get_value("mu") == 1.0
-    assert model.params.get_value("tau_pl") == 1.0
-    assert model.params.get_value("sigma_c_mean") == 1.0
-    assert model.params.get_value("sigma_c_std") == 0.1
+    assert model.parameters.get_value("mu") == 1.0
+    assert model.parameters.get_value("tau_pl") == 1.0
+    assert model.parameters.get_value("sigma_c_mean") == 1.0
+    assert model.parameters.get_value("sigma_c_std") == 0.1
 
     # Tensorial-specific parameters
-    assert model.params.get_value("nu") == 0.48  # Avoid 0.5 singularity
-    assert model.params.get_value("tau_pl_shear") == 1.0
-    assert model.params.get_value("tau_pl_normal") == 1.0
-    assert model.params.get_value("w_N1") == 1.0
+    assert model.parameters.get_value("nu") == 0.48  # Avoid 0.5 singularity
+    assert model.parameters.get_value("tau_pl_shear") == 1.0
+    assert model.parameters.get_value("tau_pl_normal") == 1.0
+    assert model.parameters.get_value("w_N1") == 1.0
 
     # Hill parameters
-    assert model.params.get_value("hill_H") == 0.5
-    assert model.params.get_value("hill_N") == 1.5
+    assert model.parameters.get_value("hill_H") == 0.5
+    assert model.parameters.get_value("hill_N") == 1.5
 
     # Yield criterion
     assert model.yield_criterion == "von_mises"
@@ -212,7 +212,7 @@ def test_tensorial_epm_normal_stress_extraction():
     assert jnp.allclose(sigma_xy, stress[2])
 
     # Extract normal stress differences
-    nu = model.params.get_value("nu")
+    nu = model.parameters.get_value("nu")
     N1, N2 = model.get_normal_stress_differences(stress, nu)
 
     assert N1.shape == (2, 2)
@@ -285,7 +285,7 @@ def test_tensorial_epm_startup_protocol():
 
     # Initial elastic regime: stress ~ mu * gdot * t
     t_short = time[1]
-    mu = model.params.get_value("mu")
+    mu = model.parameters.get_value("mu")
     expected_stress = mu * 0.1 * t_short
     assert jnp.isclose(result.y[1], expected_stress, rtol=0.2)
 
@@ -305,7 +305,7 @@ def test_tensorial_epm_relaxation_protocol():
 
     # G(t) should decay monotonically (or stay constant in elastic limit)
     # Initial modulus should be close to mu
-    mu = model.params.get_value("mu")
+    mu = model.parameters.get_value("mu")
     assert jnp.isclose(result.y[0], mu, rtol=0.2)
 
     # Later values should be <= initial (relaxation)
@@ -383,7 +383,7 @@ def test_tensorial_epm_parameter_bounds():
 
     # Check all parameters have bounds
     for param_name in ["mu", "nu", "tau_pl_shear", "tau_pl_normal", "sigma_c_mean", "sigma_c_std"]:
-        param = model.params.get(param_name)
+        param = model.parameters.get(param_name)
         assert param.bounds is not None, f"Parameter {param_name} missing bounds"
         lower, upper = param.bounds
         assert lower < upper, f"Invalid bounds for {param_name}"

@@ -32,7 +32,7 @@ def test_linear_response_small_strain():
 
     # Initial modulus G(0) should equal mu in elastic regime
     G_0 = result.y[0]
-    mu = model.params.get_value("mu")
+    mu = model.parameters.get_value("mu")
 
     np.testing.assert_allclose(
         G_0, mu, rtol=0.1,
@@ -65,7 +65,7 @@ def test_single_stz_eshelby_quadrupolar_decay():
     state = (stress, thresholds, strain, key)
 
     # Take one step with no external loading
-    propagator_q = model._propagator_q_norm * model.params.get_value("mu")
+    propagator_q = model._propagator_q_norm * model.parameters.get_value("mu")
     params = model._get_param_dict()
 
     new_state = model._epm_step(state, propagator_q, 0.0, 0.01, params, smooth=False)

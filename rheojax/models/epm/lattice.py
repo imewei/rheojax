@@ -4,6 +4,7 @@ from functools import partial
 from typing import Dict, Tuple, Optional, Any
 
 from rheojax.core.data import RheoData
+from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.epm.base import EPMBase
@@ -16,7 +17,16 @@ from rheojax.utils.epm_kernels import (
 jax, jnp = safe_import_jax()
 
 
-@ModelRegistry.register("lattice_epm")
+@ModelRegistry.register(
+    "lattice_epm",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.STARTUP,
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+    ],
+)
 class LatticeEPM(EPMBase):
     """2D Lattice Elasto-Plastic Model (EPM).
 
@@ -124,7 +134,7 @@ class LatticeEPM(EPMBase):
 
         # Extract Parameters
         # Scale propagator by current mu
-        mu = self.params.get_value("mu")
+        mu = self.parameters.get_value("mu")
         propagator_q = self._propagator_q_norm * mu
 
         # Use base class method for parameter extraction

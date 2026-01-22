@@ -16,6 +16,7 @@ from functools import partial
 from typing import Dict, Tuple, Optional
 
 from rheojax.core.data import RheoData
+from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.epm.base import EPMBase
@@ -27,7 +28,16 @@ from rheojax.utils.epm_kernels_tensorial import (
 jax, jnp = safe_import_jax()
 
 
-@ModelRegistry.register("tensorial_epm")
+@ModelRegistry.register(
+    "tensorial_epm",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.STARTUP,
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.OSCILLATION,
+    ],
+)
 class TensorialEPM(EPMBase):
     """3-Component Tensorial Lattice EPM.
 
@@ -98,12 +108,30 @@ class TensorialEPM(EPMBase):
         )
 
         # Add tensorial-specific parameters
-        self.params.add("nu", nu, bounds=(0.3, 0.5))
-        self.params.add("tau_pl_shear", tau_pl_shear, bounds=(0.01, 100.0))
-        self.params.add("tau_pl_normal", tau_pl_normal, bounds=(0.01, 100.0))
-        self.params.add("w_N1", 1.0, bounds=(0.1, 10.0))
-        self.params.add("hill_H", 0.5, bounds=(0.1, 5.0))
-        self.params.add("hill_N", 1.5, bounds=(0.1, 5.0))
+        self.parameters.add(
+            "nu", nu, bounds=(0.3, 0.5),
+            units="", description="Poisson's ratio for plane strain"
+        )
+        self.parameters.add(
+            "tau_pl_shear", tau_pl_shear, bounds=(0.01, 100.0),
+            units="s", description="Plastic relaxation time for shear"
+        )
+        self.parameters.add(
+            "tau_pl_normal", tau_pl_normal, bounds=(0.01, 100.0),
+            units="s", description="Plastic relaxation time for normal stresses"
+        )
+        self.parameters.add(
+            "w_N1", 1.0, bounds=(0.1, 10.0),
+            units="", description="Weight for N₁ in combined fitting loss"
+        )
+        self.parameters.add(
+            "hill_H", 0.5, bounds=(0.1, 5.0),
+            units="", description="Hill anisotropy parameter H"
+        )
+        self.parameters.add(
+            "hill_N", 1.5, bounds=(0.1, 5.0),
+            units="", description="Hill anisotropy parameter N"
+        )
 
         # Yield criterion (static configuration)
         if yield_criterion not in ["von_mises", "hill"]:
@@ -141,11 +169,11 @@ class TensorialEPM(EPMBase):
 
         # Add tensorial-specific parameters
         tensorial_params = {
-            "nu": self.params.get_value("nu"),
-            "tau_pl_shear": self.params.get_value("tau_pl_shear"),
-            "tau_pl_normal": self.params.get_value("tau_pl_normal"),
-            "hill_H": self.params.get_value("hill_H"),
-            "hill_N": self.params.get_value("hill_N"),
+            "nu": self.parameters.get_value("nu"),
+            "tau_pl_shear": self.parameters.get_value("tau_pl_shear"),
+            "tau_pl_normal": self.parameters.get_value("tau_pl_normal"),
+            "hill_H": self.parameters.get_value("hill_H"),
+            "hill_N": self.parameters.get_value("hill_N"),
         }
 
         return {**base_params, **tensorial_params}
@@ -227,7 +255,7 @@ class TensorialEPM(EPMBase):
             Tuple (N₁, N₂), each of shape (L, L).
         """
         if nu is None:
-            nu = self.params.get_value("nu")
+            nu = self.parameters.get_value("nu")
 
         sigma_xx = stress[0]
         sigma_yy = stress[1]
@@ -354,7 +382,7 @@ class TensorialEPM(EPMBase):
 
         # Extract parameters
         # Scale propagator by current mu
-        mu = self.params.get_value("mu")
+        mu = self.parameters.get_value("mu")
         propagator_q = self._propagator_q_norm * mu
 
         # Get full parameter dictionary
@@ -608,7 +636,7 @@ class TensorialEPM(EPMBase):
         elif y.ndim == 2 and y.shape[0] == 2:
             # Combined fitting [σ_xy, N₁]
             fitting_mode = "combined"
-            w_N1 = self.params.get_value("w_N1")
+            w_N1 = self.parameters.get_value("w_N1")
         elif y.ndim == 2 and y.shape[0] == 3:
             raise NotImplementedError(
                 "Full tensor fitting (3 components) not yet supported. "

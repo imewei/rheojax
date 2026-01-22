@@ -20,9 +20,9 @@ def test_epm_base_common_parameters():
     assert model.dt == 0.02
 
     # Check common parameters
-    assert model.params.get_value("mu") == 2.0
-    assert model.params.get_value("sigma_c_mean") == 0.8
-    assert model.params.get_value("sigma_c_std") == 0.2
+    assert model.parameters.get_value("mu") == 2.0
+    assert model.parameters.get_value("sigma_c_mean") == 0.8
+    assert model.parameters.get_value("sigma_c_std") == 0.2
 
 
 @pytest.mark.unit
@@ -42,8 +42,8 @@ def test_epm_base_init_thresholds_shape():
     # Should follow Gaussian distribution roughly
     mean_val = jnp.mean(thresholds)
     std_val = jnp.std(thresholds)
-    assert jnp.isclose(mean_val, model.params.get_value("sigma_c_mean"), rtol=0.2)
-    assert jnp.isclose(std_val, model.params.get_value("sigma_c_std"), rtol=0.3)
+    assert jnp.isclose(mean_val, model.parameters.get_value("sigma_c_mean"), rtol=0.2)
+    assert jnp.isclose(std_val, model.parameters.get_value("sigma_c_std"), rtol=0.3)
 
 
 @pytest.mark.unit
@@ -75,8 +75,8 @@ def test_lattice_epm_backward_compatibility_initialization():
 
     assert model.L == 32
     assert model.dt == 0.01
-    assert model.params.get_value("mu") == 1.0
-    assert model.params.get_value("tau_pl") == 1.0
+    assert model.parameters.get_value("mu") == 1.0
+    assert model.parameters.get_value("tau_pl") == 1.0
 
     # Check propagator shape (Real-FFT: last dim is L//2 + 1)
     assert model._propagator_q_norm.shape == (32, 32 // 2 + 1)

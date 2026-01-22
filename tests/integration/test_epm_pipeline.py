@@ -15,11 +15,11 @@ def test_lattice_epm_instantiation():
     """Test that LatticeEPM can be instantiated and has correct defaults."""
     model = LatticeEPM(L=32, mu=1.0)
     assert model.L == 32
-    assert model.params.get_value("mu") == 1.0
+    assert model.parameters.get_value("mu") == 1.0
 
-    # Check propagator precomputation
+    # Check propagator precomputation (Real FFT: L//2 + 1 in last dimension)
     assert hasattr(model, "_propagator_q_norm")
-    assert model._propagator_q_norm.shape == (32, 32)
+    assert model._propagator_q_norm.shape == (32, 32 // 2 + 1)
 
 
 @pytest.mark.integration

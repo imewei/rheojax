@@ -17,8 +17,8 @@ def test_lattice_epm_initialization():
 
     assert model.L == 32
     assert model.dt == 0.01
-    assert model.params.get_value("mu") == 1.0
-    assert model.params.get_value("tau_pl") == 1.0
+    assert model.parameters.get_value("mu") == 1.0
+    assert model.parameters.get_value("tau_pl") == 1.0
 
     # Check propagator shape (Real-FFT: last dim is L//2 + 1)
     assert model._propagator_q_norm.shape == (32, 32 // 2 + 1)
@@ -137,14 +137,14 @@ def test_lattice_epm_parameters_after_refactoring():
     model = LatticeEPM(L=32, dt=0.01)
 
     # Should have base EPM parameters
-    assert model.params.get_value("mu") == 1.0
-    assert model.params.get_value("tau_pl") == 1.0
-    assert model.params.get_value("sigma_c_mean") == 1.0
-    assert model.params.get_value("sigma_c_std") == 0.1
+    assert model.parameters.get_value("mu") == 1.0
+    assert model.parameters.get_value("tau_pl") == 1.0
+    assert model.parameters.get_value("sigma_c_mean") == 1.0
+    assert model.parameters.get_value("sigma_c_std") == 0.1
 
     # Should NOT have tensorial parameters (check via get method instead)
-    assert model.params.get("nu") is None
-    assert model.params.get("tau_pl_shear") is None
+    assert model.parameters.get("nu") is None
+    assert model.parameters.get("tau_pl_shear") is None
 
 
 @pytest.mark.unit

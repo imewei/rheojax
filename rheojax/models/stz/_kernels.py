@@ -67,20 +67,21 @@ def transition_T(stress: float, sigma_y: float) -> float:
 
 
 @jax.jit
-def stz_density(chi: float) -> float:
+def stz_density(chi: float, ez: float = 1.0) -> float:
     """Compute equilibrium STZ density Lambda(chi).
 
-    Lambda = exp(-1 / chi)
+    Lambda = exp(-ez / chi)
 
     Args:
-        chi: Effective temperature (dimensionless, scaled by ez/kB)
+        chi: Effective temperature (dimensionless)
+        ez: STZ formation energy (dimensionless, default 1.0)
 
     Returns:
         STZ density Lambda (dimensionless)
     """
     # Avoid division by zero
     chi_safe = jnp.maximum(chi, 1e-6)
-    return jnp.exp(-1.0 / chi_safe)
+    return jnp.exp(-ez / chi_safe)
 
 
 @jax.jit
@@ -166,23 +167,25 @@ def lambda_evolution(
     Lambda: float,
     chi: float,
     tau_relax: float,
+    ez: float = 1.0,
 ) -> float:
     """Compute STZ density evolution d(Lambda)/dt.
 
     For Standard/Full variants where Lambda is a state variable.
-    Relaxation toward equilibrium Lambda_eq(chi) = exp(-1/chi).
+    Relaxation toward equilibrium Lambda_eq(chi) = exp(-ez/chi).
 
-    d(Lambda)/dt = -(Lambda - exp(-1/chi)) / tau_relax
+    d(Lambda)/dt = -(Lambda - exp(-ez/chi)) / tau_relax
 
     Args:
         Lambda: Current STZ density
         chi: Current effective temperature
         tau_relax: Relaxation timescale (s)
+        ez: STZ formation energy (dimensionless, default 1.0)
 
     Returns:
         d(Lambda)/dt
     """
-    Lambda_eq = stz_density(chi)
+    Lambda_eq = stz_density(chi, ez)
     return -(Lambda - Lambda_eq) / tau_relax
 
 
@@ -240,7 +243,7 @@ def stz_ode_rhs(
             - epsilon0: Strain increment
             - chi_inf: Steady state chi
             - c0: Specific heat
-            - variant: 0 (Minimal), 1 (Standard), 2 (Full)
+            - ez: STZ formation energy (default 1.0)
             - tau_beta: Relaxation time for Lambda (Standard/Full)
             - m_inf: m saturation (Full)
             - rate_m: m rate (Full)
@@ -248,14 +251,6 @@ def stz_ode_rhs(
     Returns:
         dy/dt: Time derivative of state vector
     """
-    # Unpack variant - assume passed as integer
-    # We must handle JAX tracing, so variant should be static or handled carefully
-    # In diffrax, args are passed through.
-    # To support JIT, we should avoid conditional branching on non-static args if possible,
-    # or ensure variant is passed structurally.
-    # However, if 'args' is a dict, it might be treated as pytree.
-    # We'll assume variant is consistent with the y shape.
-
     # We can infer variant from y.shape
     n_states = y.shape[0]
 
@@ -267,9 +262,12 @@ def stz_ode_rhs(
     Lambda = 0.0
     m = 0.0
 
+    # Get ez from args (default 1.0 for backward compatibility)
+    ez = args.get("ez", 1.0)
+
     # Logic based on shape/variant
     if n_states == 2:  # Minimal
-        Lambda = stz_density(chi)
+        Lambda = stz_density(chi, ez)
     elif n_states == 3:  # Standard
         Lambda = y[2]
     elif n_states == 4:  # Full
@@ -277,11 +275,9 @@ def stz_ode_rhs(
         m = y[3]
     else:
         # Fallback for scalar/other shapes
-        Lambda = stz_density(chi)
+        Lambda = stz_density(chi, ez)
 
     # Get parameters from args
-    # Note: dictionary access in JIT requires args to be a registered PyTree or use loose dict
-    # Diffrax passes args as is.
     G0 = args["G0"]
     sigma_y = args["sigma_y"]
     tau0 = args["tau0"]
@@ -306,7 +302,7 @@ def stz_ode_rhs(
     # 3. Lambda evolution
     if n_states >= 3:
         tau_beta = args.get("tau_beta", tau0 * 100.0)
-        d_lambda = lambda_evolution(Lambda, chi, tau_beta)
+        d_lambda = lambda_evolution(Lambda, chi, tau_beta, ez)
         derivatives.append(d_lambda)
 
     # 4. m evolution
@@ -339,6 +335,7 @@ def stz_creep_ode_rhs(
         y: State vector
         args: Dictionary of parameters and inputs:
             - sigma_applied: Constant applied stress (Pa)
+            - ez: STZ formation energy (default 1.0)
             - ... (other parameters same as stz_ode_rhs)
 
     Returns:
@@ -354,16 +351,19 @@ def stz_creep_ode_rhs(
     Lambda = 0.0
     m = 0.0
 
+    # Get ez from args (default 1.0 for backward compatibility)
+    ez = args.get("ez", 1.0)
+
     # Logic based on shape/variant
     if n_states == 2:  # Minimal
-        Lambda = stz_density(chi)
+        Lambda = stz_density(chi, ez)
     elif n_states == 3:  # Standard
         Lambda = y[2]
     elif n_states == 4:  # Full
         Lambda = y[2]
         m = y[3]
     else:
-        Lambda = stz_density(chi)
+        Lambda = stz_density(chi, ez)
 
     # Get parameters
     sigma_y = args["sigma_y"]
@@ -391,7 +391,7 @@ def stz_creep_ode_rhs(
     # 3. Lambda evolution
     if n_states >= 3:
         tau_beta = args.get("tau_beta", tau0 * 100.0)
-        d_lambda = lambda_evolution(Lambda, chi, tau_beta)
+        d_lambda = lambda_evolution(Lambda, chi, tau_beta, ez)
         derivatives.append(d_lambda)
 
     # 4. m evolution
