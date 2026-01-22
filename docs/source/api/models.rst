@@ -916,11 +916,64 @@ Mesoscopic lattice model for amorphous solids with spatial heterogeneity and ava
    :undoc-members:
    :show-inheritance:
 
-Tensorial EPM (Scaffold)
-~~~~~~~~~~~~~~~~~~~~~~~~
+Tensorial EPM
+~~~~~~~~~~~~~
 
-:class:`rheojax.models.epm.tensor.TensorialEPM`
-Scaffolding for future full stress tensor implementation.
+:class:`rheojax.models.epm.tensor.TensorialEPM` | Handbook: :doc:`/models/epm/tensorial_epm`
+Full stress tensor implementation with normal stress difference predictions.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 14 18 50
+
+   * - Parameter
+     - Units
+     - Bounds
+     - Description
+   * - ``mu``
+     - Pa
+     - [0.1, 100.0]
+     - Shear modulus
+   * - ``nu``
+     - dimensionless
+     - [0.3, 0.5]
+     - Poisson's ratio (plane strain)
+   * - ``tau_pl_shear``
+     - s
+     - [0.01, 100.0]
+     - Plastic relaxation time for shear
+   * - ``tau_pl_normal``
+     - s
+     - [0.01, 100.0]
+     - Plastic relaxation time for normal stresses
+   * - ``sigma_c_mean``
+     - Pa
+     - [0.1, 10.0]
+     - Mean yield threshold
+   * - ``sigma_c_std``
+     - Pa
+     - [0.0, 1.0]
+     - Disorder strength (std dev)
+   * - ``w_N1``
+     - dimensionless
+     - [0.1, 10.0]
+     - Weight for N₁ in combined fitting
+   * - ``hill_H``
+     - dimensionless
+     - [0.1, 5.0]
+     - Hill anisotropy parameter H
+   * - ``hill_N``
+     - dimensionless
+     - [0.1, 5.0]
+     - Hill anisotropy parameter N
+
+**Configuration**: ``L=64`` (lattice size), ``dt=0.01`` (timestep), ``yield_criterion="von_mises"`` or ``"hill"``
+
+**Key Features**:
+- Tracks full stress tensor [σ_xx, σ_yy, σ_xy]
+- Predicts normal stress differences N₁, N₂
+- Von Mises (isotropic) or Hill (anisotropic) yield criteria
+- Flexible fitting: shear-only or combined [σ_xy, N₁]
 
 .. autoclass:: rheojax.models.epm.tensor.TensorialEPM
    :members:

@@ -6,14 +6,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 27 rheological models (including EPM, SGR, STZ, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 28 rheological models (including EPM, SGR, STZ, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **27 Rheological Models**: Classical (3), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Flow (6), Multi-Mode (1), SGR (2), STZ (1), SPP LAOS (1), EPM (2)
+- **28 Rheological Models**: Classical (3), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Flow (6), Multi-Mode (1), SGR (2), STZ (1), SPP LAOS (1), EPM (3)
 - **7 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition), SPP (Sequence of Physical Processes)
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
 - **Bayesian Inference**: All 25 models support NumPyro NUTS sampling with NLSQ warm-start
@@ -40,6 +40,7 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 | | **SGR Generic** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **STZ** | **STZ Conventional** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **EPM** | **Lattice EPM** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| | **Tensorial EPM** | ✅ (+ N₁) | ✅ | ✅ | ❌ | ✅ | ✅ |
 | **SPP** | **SPP Yield Stress** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ (Amp. Sweep) |
 
 ### Data & I/O
@@ -393,8 +394,8 @@ sgr_gen.fit(omega, G_star, test_mode='oscillation')
 ### Elasto-Plastic Models (EPM)
 
 ```python
-from rheojax.models import LatticeEPM
-from rheojax.visualization.epm_plots import plot_lattice_fields
+from rheojax.models import LatticeEPM, TensorialEPM
+from rheojax.visualization.epm_plots import plot_lattice_fields, plot_normal_stress_field
 
 # Lattice EPM for amorphous solids (mesoscopic simulation)
 # Spatial heterogeneity, avalanches, shear banding
@@ -409,6 +410,18 @@ epm.fit(time, strain, test_mode='creep', stress_0=1.5)
 # Visualize stress and threshold fields
 state = epm.get_state()
 plot_lattice_fields(state)
+
+# Tensorial EPM for normal stress predictions
+# Full stress tensor [σ_xx, σ_yy, σ_xy] with N₁, N₂ predictions
+tensorial = TensorialEPM(L=32, yield_criterion='von_mises')
+
+# Predict flow curve with normal stresses
+result = tensorial.predict(data, smooth=True)
+sigma_xy = result.y  # Shear stress
+N1 = result.metadata['N1']  # First normal stress difference
+
+# Visualize normal stress fields
+plot_normal_stress_field(stress_tensor, nu=0.48)
 ```
 
 ### Strain-Rate Frequency Superposition (SRFS)

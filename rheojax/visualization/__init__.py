@@ -25,6 +25,11 @@ from rheojax.visualization.templates import (
 from rheojax.visualization.epm_plots import (
     plot_lattice_fields,
     animate_stress_evolution,
+    plot_tensorial_fields,
+    plot_normal_stress_field,
+    plot_von_mises_field,
+    plot_normal_stress_ratio,
+    animate_tensorial_evolution,
 )
 
 __all__ = [
@@ -41,7 +46,13 @@ __all__ = [
     "plot_mastercurve",
     "plot_model_fit",
     "apply_template_style",
-    # EPM plots
+    # EPM plots - scalar
     "plot_lattice_fields",
     "animate_stress_evolution",
+    # EPM plots - tensorial
+    "plot_tensorial_fields",
+    "plot_normal_stress_field",
+    "plot_von_mises_field",
+    "plot_normal_stress_ratio",
+    "animate_tensorial_evolution",
 ]

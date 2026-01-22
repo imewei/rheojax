@@ -82,6 +82,7 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    :caption: Elasto-Plastic Models (EPM)
 
    epm/lattice_epm
+   epm/tensorial_epm
 
 .. toctree::
    :maxdepth: 1

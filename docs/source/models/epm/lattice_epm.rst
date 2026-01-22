@@ -137,3 +137,62 @@ API Reference
     :show-inheritance:
 
 .. autofunction:: rheojax.visualization.epm_plots.plot_lattice_fields
+
+Comparison: LatticeEPM vs TensorialEPM
+---------------------------------------
+
+RheoJAX provides two EPM implementations with different capabilities:
+
+.. list-table:: Feature Comparison
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - Feature
+     - LatticeEPM (Scalar)
+     - TensorialEPM
+   * - Stress Components
+     - σ_xy only
+     - [σ_xx, σ_yy, σ_xy] + σ_zz
+   * - Flow Curves
+     - ✓ Fast
+     - ✓ More accurate if N₁ ≠ 0
+   * - Normal Stress Differences
+     - ✗
+     - ✓ N₁, N₂ predictions
+   * - Yield Criteria
+     - Scalar threshold
+     - von Mises or Hill
+   * - Anisotropic Materials
+     - ✗
+     - ✓ Hill criterion
+   * - Computational Cost
+     - 1x (baseline)
+     - 3-5x slower
+   * - Memory Usage
+     - 1x
+     - 3x (tensor storage)
+   * - Fitting Speed
+     - Fast
+     - Moderate
+   * - GPU Acceleration
+     - ✓
+     - ✓
+
+**When to Use LatticeEPM**:
+- Pure shear rheology (flow curves, yield stress)
+- Fast parameter estimation
+- Exploratory analysis
+- No normal stress data available
+
+**When to Use TensorialEPM** (:doc:`tensorial_epm`):
+- Normal stress measurements available
+- Anisotropic materials (fibers, liquid crystals)
+- Flow instabilities (shear banding, edge fracture)
+- Rod climbing or die swell phenomena
+
+See Also
+--------
+
+- :doc:`tensorial_epm` — Full stress tensor implementation
+- :doc:`/user_guide/03_advanced_topics/index` — Advanced EPM workflows
+- :ref:`epm_visualization` — Visualization functions
