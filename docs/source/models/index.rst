@@ -86,6 +86,13 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
 
 .. toctree::
    :maxdepth: 1
+   :caption: Fluidity Models
+
+   fluidity/fluidity_local
+   fluidity/fluidity_nonlocal
+
+.. toctree::
+   :maxdepth: 1
    :caption: Sequence of Physical Processes (SPP)
 
    spp/spp_decomposer

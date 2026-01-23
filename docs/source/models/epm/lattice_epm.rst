@@ -128,6 +128,126 @@ Oscillation (SAOS/LAOS)
 *   **Observable**: Lissajous figures (Stress vs Strain).
 *   **Analysis**: Can capture non-linear harmonic generation and yielding transitions within a cycle.
 
+Bayesian Inference (NLSQ → NUTS)
+--------------------------------
+
+EPM models now support the full NLSQ → NUTS Bayesian inference pipeline, enabling:
+
+*   **Point estimates** via GPU-accelerated NLSQ optimization
+*   **Posterior distributions** via NumPyro's NUTS sampler
+*   **Uncertainty quantification** with credible intervals
+*   **Convergence diagnostics** (R-hat, ESS, divergences)
+
+The key requirement is the ``model_function()`` method, which provides a differentiable
+forward model for both NLSQ and NumPyro.
+
+Smooth Yielding Approximation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Bayesian inference requires gradients through the yield surface. EPM uses a smooth
+``tanh`` approximation (``smooth=True``) during fitting:
+
+.. math::
+
+    \dot{\gamma}^{pl} = \frac{\sigma}{\tau_{pl}} \frac{1}{2} \left[ 1 + \tanh\left(\frac{|\sigma| - \sigma_c}{w}\right) \right]
+
+This enables backpropagation while closely approximating the hard threshold behavior.
+
+Example: NLSQ → NUTS Pipeline
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from rheojax.models.epm import LatticeEPM
+    import numpy as np
+
+    # Create model and synthetic data
+    model = LatticeEPM(L=32, dt=0.01)
+    gamma_dot = np.logspace(-2, 1, 30)
+    stress = ...  # Your experimental data
+
+    # Step 1: NLSQ fitting (fast point estimation)
+    model.fit(gamma_dot, stress, test_mode="flow_curve", max_iter=500)
+
+    # Step 2: Bayesian inference (warm-started from NLSQ)
+    result = model.fit_bayesian(
+        gamma_dot,
+        stress,
+        test_mode="flow_curve",
+        num_warmup=500,
+        num_samples=1000,
+        num_chains=4,  # Multiple chains for R-hat diagnostics
+        seed=42,
+    )
+
+    # Step 3: Analyze posteriors
+    print(result.summary)  # Parameter means, std, credible intervals
+
+    # Convergence diagnostics
+    print(f"R-hat: {result.diagnostics['r_hat']}")
+    print(f"ESS: {result.diagnostics['ess']}")
+
+    # Credible intervals
+    intervals = model.get_credible_intervals(result.posterior_samples, credibility=0.95)
+    for name, (lower, upper) in intervals.items():
+        print(f"{name}: [{lower:.3f}, {upper:.3f}]")
+
+Fitting Parameters
+~~~~~~~~~~~~~~~~~~
+
+EPM fitting supports these keyword arguments:
+
+.. list-table:: Fitting Options
+   :header-rows: 1
+   :widths: 25 20 55
+
+   * - Parameter
+     - Default
+     - Description
+   * - ``test_mode``
+     - (required)
+     - Protocol: 'flow_curve', 'startup', 'relaxation', 'creep', 'oscillation'
+   * - ``seed``
+     - 42
+     - Random seed for reproducibility
+   * - ``gamma_dot``
+     - 0.1
+     - Shear rate for startup protocol
+   * - ``gamma``
+     - 0.1
+     - Step strain for relaxation protocol
+   * - ``stress``
+     - 1.0
+     - Target stress for creep protocol
+   * - ``gamma0``
+     - 0.01
+     - Strain amplitude for oscillation
+   * - ``omega``
+     - 1.0
+     - Angular frequency for oscillation
+   * - ``max_iter``
+     - 500
+     - Maximum NLSQ iterations
+   * - ``use_log_residuals``
+     - True
+     - Use log-space residuals (recommended)
+
+Convergence Tips
+~~~~~~~~~~~~~~~~
+
+EPM models are stochastic due to the random yield thresholds. For robust inference:
+
+1. **Use small lattices for fitting** (L=8-16): Faster and sufficient for parameter estimation
+2. **Increase warmup samples**: EPM posteriors may have multimodal structure
+3. **Check divergences**: >5% divergences suggests model-data mismatch
+4. **Run multiple chains**: Essential for R-hat diagnostics
+
+Expected diagnostics for well-converged EPM fits:
+
+*   R-hat < 1.1 for all parameters
+*   ESS > 400 per parameter
+*   Divergences < 1%
+
 API Reference
 -------------
 
