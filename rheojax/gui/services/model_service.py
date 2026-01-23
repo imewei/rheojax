@@ -36,6 +36,18 @@ def normalize_model_name(model_name: str) -> str:
     alias_map = {
         "gmm": "generalized_maxwell",
         "generalized maxwell": "generalized_maxwell",
+        # Fluidity
+        "fluidity local": "fluidity_local",
+        "fluidity nonlocal": "fluidity_nonlocal",
+        # EPM
+        "lattice epm": "lattice_epm",
+        "tensorial epm": "tensorial_epm",
+        # IKH
+        "ikh": "mikh",
+        "mlikh": "ml_ikh",
+        # HL
+        "hl": "hebraud_lequeux",
+        "hebraud lequeux": "hebraud_lequeux",
     }
 
     if key in alias_map.values():
@@ -139,6 +151,12 @@ class ModelService:
             - 'flow': PowerLaw, Carreau, HerschelBulkley, etc.
             - 'multi_mode': GeneralizedMaxwell
             - 'sgr': SGRConventional, SGRGeneric
+            - 'spp_laos': SPPYieldStress
+            - 'stz': STZConventional
+            - 'fluidity': FluidityLocal, FluidityNonlocal
+            - 'epm': LatticeEPM, TensorialEPM
+            - 'ikh': MIKH, MLIKH
+            - 'hl': HebraudLequeux
         """
         logger.debug("Getting available models from registry")
         all_models = self._registry.get_all_models()
@@ -154,7 +172,11 @@ class ModelService:
             "multi_mode": [],
             "sgr": [],
             "spp_laos": [],
-            "stz": [],  # Added STZ category
+            "stz": [],
+            "fluidity": [],
+            "epm": [],
+            "ikh": [],
+            "hl": [],
             "other": [],
         }
 
@@ -196,6 +218,14 @@ class ModelService:
                 categories["spp_laos"].append(model_name)
             elif name_lower.startswith("stz"):
                 categories["stz"].append(model_name)
+            elif name_lower.startswith("fluidity"):
+                categories["fluidity"].append(model_name)
+            elif name_lower.endswith("_epm") or name_lower.startswith("epm"):
+                categories["epm"].append(model_name)
+            elif name_lower in ["mikh", "ml_ikh"]:
+                categories["ikh"].append(model_name)
+            elif name_lower == "hebraud_lequeux":
+                categories["hl"].append(model_name)
             else:
                 categories["other"].append(model_name)
 
