@@ -1,7 +1,7 @@
 Models Summary & Selection Guide
 ==================================
 
-This page serves as a comprehensive quick-reference guide for all 23 rheological models in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
+This page serves as a comprehensive quick-reference guide for all **34+ rheological models** in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
 
 .. contents:: Page Contents
    :local:
@@ -225,12 +225,111 @@ The table below provides a comprehensive overview of all models across key chara
      - ★★★★★
      - x: 0.5-3
      - Thermodynamically consistent SGR (Fuereder & Ilg 2013)
+   * - :doc:`Fluidity Local </models/fluidity/fluidity_local>`
+     - Fluidity
+     - 2-3
+     - O, Flow
+     - Cooperative
+     - No
+     - ★★★☆☆
+     - N/A
+     - Local fluidity dynamics, simple cooperative flow
+   * - :doc:`Fluidity Nonlocal </models/fluidity/fluidity_nonlocal>`
+     - Fluidity
+     - 3-4
+     - O, Flow
+     - Cooperative
+     - No
+     - ★★★★☆
+     - N/A
+     - Nonlocal fluidity with cooperativity length
+   * - :doc:`Fluidity-Saramito Local </models/fluidity/saramito_evp>`
+     - Saramito EVP
+     - 10-12
+     - Flow, Startup, Creep, R, O, LAOS
+     - EVP Thixotropic
+     - Configurable
+     - ★★★★★
+     - N/A
+     - Tensorial EVP with fluidity coupling, N₁ predictions
+   * - :doc:`Fluidity-Saramito Nonlocal </models/fluidity/saramito_evp>`
+     - Saramito EVP
+     - 11-13
+     - Flow, Startup, Creep, R, O, LAOS
+     - EVP Thixotropic
+     - Configurable
+     - ★★★★★
+     - N/A
+     - Nonlocal EVP for shear banding, cooperativity length
+   * - :doc:`Lattice EPM </models/epm/lattice_epm>`
+     - EPM
+     - 4+
+     - R, C, Startup, Flow
+     - Elasto-plastic
+     - Configurable
+     - ★★★★★
+     - N/A
+     - Lattice elasto-plastic model, plastic rearrangements
+   * - :doc:`Tensorial EPM </models/epm/tensorial_epm>`
+     - EPM
+     - 4+
+     - R, C, Startup, Flow
+     - Elasto-plastic
+     - Configurable
+     - ★★★★★
+     - N/A
+     - Full tensorial EPM for complex loading
+   * - :doc:`MIKH </models/ikh/mikh>`
+     - IKH
+     - 4-5
+     - R, C, O
+     - Thixotropic
+     - Configurable
+     - ★★★★☆
+     - N/A
+     - Modified IKH for thixotropic materials
+   * - :doc:`MLIKH </models/ikh/ml_ikh>`
+     - IKH
+     - 4+
+     - R, C, O
+     - Thixotropic
+     - Configurable
+     - ★★★★★
+     - N/A
+     - ML-enhanced IKH with neural network augmentation
+   * - :doc:`Hébraud-Lequeux </models/hl/hebraud_lequeux>`
+     - HL
+     - 3-4
+     - R, O
+     - Soft matter
+     - No
+     - ★★★★☆
+     - N/A
+     - Mean-field model for soft glassy materials
+   * - :doc:`STZ Conventional </models/stz/stz_conventional>`
+     - STZ
+     - 4+
+     - R, O, Flow, Startup
+     - Amorphous
+     - No
+     - ★★★★★
+     - N/A
+     - Shear transformation zone model (Falk-Langer)
+   * - :doc:`SPP Yield Stress </models/spp/spp_yield_stress>`
+     - SPP
+     - 3+
+     - LAOS
+     - Yield stress
+     - Yes
+     - ★★★★☆
+     - N/A
+     - LAOS-based yield stress analysis (Rogers et al.)
 
 **Legend:**
 
-* **Test Modes:** R = Relaxation, C = Creep, O = Oscillation, Rot = Rotation (steady shear)
+* **Test Modes:** R = Relaxation, C = Creep, O = Oscillation, Rot = Rotation (steady shear), Flow = Flow curve, Startup = Startup shear, LAOS = Large-amplitude oscillatory
 * **Complexity:** ★☆☆☆☆ = Simplest, ★★★★★ = Most complex
-* **α Range:** Fractional order range for fractional models; N/A for classical/flow models
+* **α Range:** Fractional order range for fractional models; N/A for non-fractional models
 * **Equilibrium Modulus:** Whether model predicts finite G∞ at long times (solid-like)
 
 
@@ -373,6 +472,37 @@ Flow Models (6 models)
 **When to use:** Steady shear flow, viscosity vs shear rate, non-Newtonian fluids, process design.
 
 
+Fluidity-Saramito EVP Models (2 models)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**When to use:** Yield-stress fluids with combined elastic, viscous, and plastic behavior; thixotropic materials requiring
+stress overshoot prediction; systems needing normal stress difference (N₁) predictions; shear banding analysis.
+
+**Advantages:**
+
+* Full tensorial stress state: [τ_xx, τ_yy, τ_xy] for normal stress predictions
+* Von Mises yield criterion with Herschel-Bulkley plastic flow
+* Thixotropic fluidity evolution (aging + rejuvenation)
+* Predicts stress overshoot in startup shear (key thixotropic signature)
+* Supports 6 protocols: flow curve, startup, creep, relaxation, oscillation, LAOS
+* Nonlocal variant captures shear banding via cooperativity length
+
+**Model selection within Saramito family:**
+
+* **FluiditySaramitoLocal (minimal)**: Simplest, λ = 1/f only, homogeneous flow
+* **FluiditySaramitoLocal (full)**: τ_y(f) coupling, aging yield stress
+* **FluiditySaramitoNonlocal (minimal)**: Shear banding capable with D_f∇²f
+* **FluiditySaramitoNonlocal (full)**: Full thixotropic banding
+
+**Key physics:**
+
+* Upper-convected Maxwell viscoelasticity: λ(dτ/dt - L·τ - τ·L^T) + α(τ)τ = 2η_p D
+* Plasticity parameter: α = max(0, 1 - τ_y/|τ|) (Von Mises)
+* Fluidity evolution: df/dt = (f_age - f)/t_a + b|γ̇|^n(f_flow - f)
+
+**Typical applications:** Carbopol gels, cement pastes, drilling muds, mayonnaise, blood, cosmetic creams.
+
+
 Soft Glassy Rheology Models (2 models)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -507,6 +637,12 @@ By Material Type
    * - Pastes/Dense Suspensions
      - SGR GENERIC, Herschel-Bulkley
      - Near glass transition; use GENERIC for x→1
+   * - Thixotropic Yield Stress
+     - FluiditySaramitoLocal, Herschel-Bulkley
+     - Stress overshoot, aging; use Saramito for N₁
+   * - Shear Banding Materials
+     - FluiditySaramitoNonlocal, FluidityNonlocal
+     - Spatially resolved flow, cooperativity length
 
 By Application
 ~~~~~~~~~~~~~~
@@ -608,7 +744,7 @@ Parameter Count Comparison
 Bayesian Inference Support
 ---------------------------
 
-**All 23 models support complete Bayesian workflows** via NumPyro NUTS sampling:
+**All 34+ models support complete Bayesian workflows** via NumPyro NUTS sampling:
 
 * `.fit()` - Fast NLSQ point estimation
 * `.fit_bayesian()` - Full posterior sampling with MCMC

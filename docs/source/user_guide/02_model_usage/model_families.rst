@@ -21,23 +21,67 @@ Model Families Overview
    - :doc:`../01_fundamentals/test_modes` — SAOS, relaxation, creep, flow
    - :doc:`getting_started` — Basic fitting workflow
 
-The Three Model Families
--------------------------
+The Model Families
+-------------------
 
-RheoJAX provides **20 rheological models** organized into three families:
+RheoJAX provides **34+ rheological models** organized into families based on their theoretical foundations:
 
-1. **Classical Viscoelastic** (3 models) — Single or discrete relaxation times
-2. **Fractional Viscoelastic** (11 models) — Power-law relaxation, distributed timescales
-3. **Flow Models** (6 models) — Nonlinear steady shear behavior
+.. list-table:: Model Families Overview
+   :header-rows: 1
+   :widths: 20 30 50
 
-Each family targets different material types and test modes.
+   * - Category
+     - Model Family
+     - Physical Basis
+   * - ``classical``
+     - Maxwell, Zener, SpringPot
+     - Linear viscoelastic elements
+   * - ``fractional_maxwell``
+     - FractionalMaxwellGel, etc.
+     - Fractional calculus extensions (Maxwell-based)
+   * - ``fractional_zener``
+     - FractionalZenerSS, etc.
+     - Fractional calculus extensions (Zener-based)
+   * - ``fractional_advanced``
+     - Burgers, Jeffreys, Poynting-Thomson
+     - Multi-element fractional models
+   * - ``flow``
+     - PowerLaw, Carreau, Bingham, HB
+     - Viscosity vs. shear rate
+   * - ``multi_mode``
+     - GeneralizedMaxwell
+     - Discrete relaxation spectrum
+   * - ``sgr``
+     - SGRConventional, SGRGeneric
+     - Trap model for amorphous materials
+   * - ``fluidity``
+     - FluidityLocal, FluidityNonlocal
+     - Cooperative flow models
+   * - ``fluidity_saramito``
+     - FluiditySaramitoLocal, FluiditySaramitoNonlocal
+     - Tensorial EVP with thixotropic fluidity
+   * - ``epm``
+     - LatticeEPM, TensorialEPM
+     - Lattice/Tensorial elasto-plasticity
+   * - ``ikh``
+     - MIKH, MLIKH
+     - Isotropic kinematic hardening (thixotropy)
+   * - ``hl``
+     - HebraudLequeux
+     - Mean-field soft matter model
+   * - ``stz``
+     - STZConventional
+     - Shear transformation zone theory
+   * - ``spp_laos``
+     - SPPYieldStress
+     - Sequence of Physical Processes (LAOS)
 
 Quick Reference Table
 ---------------------
 
 .. list-table::
    :header-rows: 1
-   :widths: 25 20 30 25
+   :widths: 20 20 30 30
 
    * - Family
      - Test Modes
@@ -55,6 +99,34 @@ Quick Reference Table
      - Steady Shear
      - Nonlinear fluids
      - Shear thinning/thickening
+   * - SGR
+     - SAOS, Relaxation
+     - Soft glasses
+     - Noise temperature x
+   * - Fluidity
+     - SAOS, Flow
+     - Cooperative systems
+     - Spatial correlations
+   * - EPM
+     - Relaxation, Creep, Startup
+     - Elasto-plastic solids
+     - Plastic rearrangements
+   * - IKH
+     - SAOS, Relaxation, Creep
+     - Thixotropic materials
+     - Kinematic hardening
+   * - HL
+     - SAOS, Relaxation
+     - Soft matter
+     - Mean-field dynamics
+   * - STZ
+     - SAOS, Relaxation, Flow
+     - Amorphous solids
+     - Shear transformation
+   * - SPP
+     - LAOS
+     - Yield stress fluids
+     - Physical process decomposition
 
 Family 1: Classical Viscoelastic Models
 ----------------------------------------
@@ -319,6 +391,164 @@ Example: Fitting PowerLaw Model
 
 **For detailed equations**: :doc:`/models/flow/index`
 
+Family 4: Soft Glassy Rheology (SGR) Models
+--------------------------------------------
+
+**Who they're for**: Soft glassy materials (foams, emulsions, pastes, colloidal suspensions)
+
+**Test modes**: SAOS, stress relaxation
+
+**Key characteristic**: **Noise temperature** x parameterizes material state
+
+The SGR models are based on Sollich's trap model (1998), treating soft glassy materials
+as ensembles of mesoscopic elements that hop between energy traps.
+
+The 2 SGR Models
+~~~~~~~~~~~~~~~~~
+
+1. **SGR Conventional** (3 parameters: x, G₀, τ₀)
+
+   - Original Sollich formulation
+   - x < 1: Glass (aging), x > 1: Ergodic (flows)
+   - Use for: Foams, emulsions, pastes
+
+2. **SGR GENERIC** (3 parameters)
+
+   - Thermodynamically consistent (Fuereder & Ilg 2013)
+   - Better stability near x → 1
+   - Use for: Systems near glass transition
+
+**For detailed equations**: :doc:`/models/sgr/sgr_conventional`
+
+Family 5: Fluidity Models
+--------------------------
+
+**Who they're for**: Materials exhibiting cooperative flow
+
+**Test modes**: SAOS, steady shear flow
+
+**Key characteristic**: **Fluidity field** describes local flow propensity
+
+The 2 Fluidity Models
+~~~~~~~~~~~~~~~~~~~~~~
+
+1. **Fluidity Local** (2-3 parameters)
+
+   - Local fluidity dynamics
+   - Use for: Simple shear-thinning materials
+
+2. **Fluidity Nonlocal** (3-4 parameters)
+
+   - Includes spatial correlations via cooperativity length
+   - Use for: Systems with cooperative rearrangements
+
+**For detailed equations**: :doc:`/models/fluidity/fluidity_local`
+
+Family 6: Elasto-Plastic Models (EPM)
+--------------------------------------
+
+**Who they're for**: Yield stress fluids, amorphous solids, metallic glasses
+
+**Test modes**: Stress relaxation, creep, startup shear, flow curves
+
+**Key characteristic**: **Plastic rearrangements** via local yielding events
+
+The 2 EPM Models
+~~~~~~~~~~~~~~~~~
+
+1. **Lattice EPM** (multiple parameters)
+
+   - Discrete lattice of mesoscopic blocks
+   - Tracks stress redistribution after plastic events
+   - Use for: Granular materials, dense suspensions
+
+2. **Tensorial EPM** (multiple parameters)
+
+   - Full tensorial stress formulation
+   - Use for: Complex loading conditions
+
+**For detailed equations**: :doc:`/models/epm/lattice_epm`
+
+Family 7: Isotropic Kinematic Hardening (IKH)
+----------------------------------------------
+
+**Who they're for**: Thixotropic materials with structural recovery
+
+**Test modes**: SAOS, relaxation, creep
+
+**Key characteristic**: **Structure parameter** evolves with deformation
+
+The 2 IKH Models
+~~~~~~~~~~~~~~~~~
+
+1. **MIKH** (Modified IKH) — Standard thixotropic model
+
+   - Structure builds up at rest, breaks down under shear
+   - Use for: Drilling muds, waxy crude oils
+
+2. **MLIKH** (ML-enhanced IKH) — Machine learning augmented
+
+   - Neural network-enhanced constitutive relations
+   - Use for: Complex thixotropic behavior
+
+**For detailed equations**: :doc:`/models/ikh/mikh`
+
+Family 8: Hébraud-Lequeux (HL) Model
+-------------------------------------
+
+**Who they're for**: Soft glassy materials, dense suspensions
+
+**Test modes**: SAOS, relaxation
+
+**Key characteristic**: **Mean-field dynamics** for plastic flow
+
+The HL Model (3-4 parameters)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Mean-field approach to soft matter flow
+- Describes stress distribution evolution
+- Use for: Dense colloidal suspensions, soft glasses
+
+**For detailed equations**: :doc:`/models/hl/hebraud_lequeux`
+
+Family 9: Shear Transformation Zone (STZ) Models
+-------------------------------------------------
+
+**Who they're for**: Metallic glasses, amorphous solids
+
+**Test modes**: SAOS, relaxation, flow
+
+**Key characteristic**: **STZ density** evolves with deformation
+
+The STZ Model (4+ parameters)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Based on Falk-Langer STZ theory
+- Tracks shear transformation zone population
+- Use for: Metallic glasses, bulk amorphous materials
+
+**For detailed equations**: :doc:`/models/stz/stz_conventional`
+
+Family 10: SPP Models (LAOS Analysis)
+--------------------------------------
+
+**Who they're for**: Yield stress fluids characterized via LAOS
+
+**Test modes**: Large-amplitude oscillatory shear (LAOS)
+
+**Key characteristic**: **Sequence of Physical Processes** decomposition
+
+The SPP Model
+~~~~~~~~~~~~~~
+
+1. **SPP Yield Stress** — LAOS-based yield stress analysis
+
+   - Decomposes stress into elastic storage + plastic dissipation
+   - Extracts yield stress from oscillatory data
+   - Use for: Gels, pastes, structured fluids
+
+**For detailed equations**: :doc:`/models/spp/spp_yield_stress`
+
 Model Selection Flowchart
 --------------------------
 
@@ -380,9 +610,15 @@ Key Concepts
 
    3. **Flow models** (PowerLaw, Carreau, HB): Nonlinear viscosity, steady shear
 
-   4. **Start simple**: Try classical first, upgrade to fractional if needed
+   4. **Soft matter physics** (SGR, HL, Fluidity): Statistical mechanics approaches
 
-   5. **Test mode determines family**: Linear (classical/fractional) vs. nonlinear (flow)
+   5. **Elasto-plastic** (EPM, STZ, IKH): Yielding dynamics and thixotropy
+
+   6. **LAOS analysis** (SPP): Nonlinear oscillatory characterization
+
+   7. **Start simple**: Try classical first, upgrade to more complex models if needed
+
+   8. **Test mode determines family**: Linear (classical/fractional) vs. nonlinear (flow) vs. transient (startup)
 
 .. admonition:: Self-Check Questions
    :class: tip
@@ -420,15 +656,36 @@ Further Reading
 - :doc:`/models/classical/index` — 3 classical models
 - :doc:`/models/fractional/index` — 11 fractional models
 - :doc:`/models/flow/index` — 6 flow models
+- :doc:`/models/sgr/sgr_conventional` — SGR models
+- :doc:`/models/fluidity/fluidity_local` — Fluidity models
+- :doc:`/models/epm/lattice_epm` — EPM models
+- :doc:`/models/ikh/mikh` — IKH models
+- :doc:`/models/hl/hebraud_lequeux` — HL model
+- :doc:`/models/stz/stz_conventional` — STZ model
+- :doc:`/models/spp/spp_yield_stress` — SPP model
 
 **Advanced theory**:
 
 - :doc:`../03_advanced_topics/fractional_viscoelasticity_reference` — Fractional calculus
+- :doc:`../03_advanced_topics/sgr_analysis` — Soft glassy rheology
 
 Summary
 -------
 
-RheoJAX's 20 models span three families: **classical** (exponential, simple), **fractional** (power-law, complex), and **flow** (nonlinear shear). Classical models are best for simple materials with single relaxation times. Fractional models capture broad relaxation spectra in complex materials. Flow models describe shear-dependent viscosity in nonlinear regime. Always start simple and add complexity only when necessary.
+RheoJAX provides **32+ rheological models** across 10+ families:
+
+- **Classical** (Maxwell, Zener): Exponential relaxation, simple materials
+- **Fractional** (FML, FZSS, FMG): Power-law relaxation, complex materials
+- **Flow** (PowerLaw, Carreau, HB): Nonlinear viscosity, steady shear
+- **SGR** (Conventional, GENERIC): Soft glassy materials, noise temperature
+- **Fluidity** (Local, Nonlocal): Cooperative flow models
+- **EPM** (Lattice, Tensorial): Elasto-plastic yielding
+- **IKH** (MIKH, MLIKH): Thixotropic materials
+- **HL** (Hébraud-Lequeux): Mean-field soft matter
+- **STZ**: Shear transformation zones
+- **SPP**: LAOS analysis and yield stress
+
+Always start simple and add complexity only when necessary.
 
 Next Steps
 ----------

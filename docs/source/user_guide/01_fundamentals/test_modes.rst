@@ -32,8 +32,37 @@ Different experimental techniques probe different aspects of material behavior:
 
 No single test mode provides complete characterization—each reveals complementary information.
 
-The Four Major Test Modes
---------------------------
+Test Mode Summary Table
+------------------------
+
+.. list-table:: RheoJAX Test Modes Reference
+   :header-rows: 1
+   :widths: 18 22 60
+
+   * - TestModeEnum
+     - Protocol
+     - Description
+   * - ``RELAXATION``
+     - Stress relaxation G(t)
+     - Step strain, measure stress decay over time
+   * - ``CREEP``
+     - Creep compliance J(t)
+     - Step stress, measure strain growth over time
+   * - ``OSCILLATION``
+     - SAOS G*(ω)
+     - Small-amplitude oscillatory shear, complex modulus
+   * - ``FLOW_CURVE``
+     - Steady-state η(γ̇)
+     - Viscosity vs shear rate at equilibrium
+   * - ``STARTUP``
+     - Transient σ(t,γ̇)
+     - Stress overshoot/undershoot at fixed shear rate
+   * - ``ROTATION``
+     - Legacy steady shear
+     - Deprecated, use ``FLOW_CURVE`` instead
+
+The Six Test Modes
+-------------------
 
 1. Small-Amplitude Oscillatory Shear (SAOS)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -163,10 +192,10 @@ The Four Major Test Modes
 - Food products: Spreadability, flow under gravity
 - Soft tissues: Load-bearing capacity
 
-4. Steady Shear Flow
-~~~~~~~~~~~~~~~~~~~~
+4. Steady Shear Flow (Flow Curve)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**What it is**: Apply constant shear rate, measure viscosity
+**What it is**: Apply constant shear rate, measure viscosity at equilibrium
 
 **Input**: γ̇ = constant — Shear rate (s⁻¹)
 
@@ -177,6 +206,8 @@ The Four Major Test Modes
 - η(γ̇) — Viscosity as a function of shear rate
 
 **Shear rate range**: Typically 0.01 to 1000 s⁻¹
+
+**RheoJAX test mode**: ``test_mode='flow_curve'`` (or legacy ``test_mode='rotation'``)
 
 **Why it's powerful**:
 
@@ -205,6 +236,96 @@ The Four Major Test Modes
 - Food: Mouthfeel, pourability
 - Inks: Printing behavior
 - Blood: Cardiovascular fluid dynamics
+
+5. Startup Shear
+~~~~~~~~~~~~~~~~~
+
+**What it is**: Apply constant shear rate, measure transient stress evolution
+
+**Input**: γ̇ = constant (suddenly applied at t=0)
+
+**Output**: σ(t) — Stress as function of time at fixed shear rate
+
+**Measured quantity**:
+
+- σ(t, γ̇) — Transient stress response (often shows overshoot/undershoot)
+
+**Time range**: Typically 0.01 to 100 s
+
+**RheoJAX test mode**: ``test_mode='startup'``
+
+**Why it's powerful**:
+
+- Reveals thixotropic behavior (stress overshoot, undershoot)
+- Probes microstructural evolution during flow
+- Critical for understanding yielding dynamics
+- Used for elasto-plastic model validation (EPM, IKH)
+
+**Limitations**:
+
+- Transient data harder to model than steady-state
+- Requires fast instrument response
+- Sample history-dependent (must control pre-shear)
+- May require multiple shear rates for complete characterization
+
+**When to use**:
+
+- Studying thixotropy and shear rejuvenation
+- Validating constitutive models (EPM, IKH, STZ)
+- Understanding yield stress fluids and soft glasses
+- Investigating shear banding and flow instabilities
+
+**Example applications**:
+
+- Colloidal gels: Stress overshoot indicates structural breakdown
+- Emulsions: Yielding dynamics in mayonnaise, cosmetics
+- Thixotropic fluids: Drilling muds, paints
+- Soft glassy materials: Foams, pastes
+
+6. Large-Amplitude Oscillatory Shear (LAOS)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**What it is**: Apply sinusoidal strain at large amplitudes, analyze nonlinear stress response
+
+**Input**: γ(t) = γ₀ sin(ωt) with γ₀ >> linear limit
+
+**Output**: σ(t) — Non-sinusoidal stress waveform
+
+**Measured quantities**:
+
+- Higher harmonics: σ₃/σ₁, σ₅/σ₁
+- Chebyshev coefficients (e₁, e₃, v₁, v₃)
+- Lissajous-Bowditch curves (σ vs γ, σ vs γ̇)
+- SPP decomposition (sequence of physical processes)
+
+**RheoJAX test mode**: ``test_mode='oscillation'`` with SPP models
+
+**Why it's powerful**:
+
+- Probes nonlinear viscoelasticity within single test
+- Fingerprints material microstructure
+- Distinguishes between similar linear rheology materials
+- Rich information in single experiment
+
+**Limitations**:
+
+- Complex interpretation (multiple analysis frameworks)
+- Requires specialized instruments and software
+- Computationally intensive analysis
+- No universal standards for reporting
+
+**When to use**:
+
+- Distinguishing materials with similar G', G"
+- Studying yielding and flow transitions
+- Material fingerprinting and quality control
+- Research on nonlinear constitutive behavior
+
+**Example applications**:
+
+- Gels: Yield stress determination from Lissajous curves
+- Polymer melts: Strain-hardening/softening characterization
+- Complex fluids: Microstructural evolution during deformation
 
 Visual Comparison of Test Modes
 --------------------------------
@@ -377,48 +498,93 @@ Model Compatibility with Test Modes
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 15 15 15 15
+   :widths: 25 10 10 10 10 10 10
 
    * - Model Family
      - SAOS
-     - Relaxation
+     - Relax
      - Creep
      - Flow
-   * - Maxwell
+     - Startup
+     - LAOS
+   * - Classical (Maxwell, Zener)
      - ✓
      - ✓
      - ✓
      - ✗
-   * - Zener
-     - ✓
-     - ✓
-     - ✓
+     - ✗
      - ✗
    * - Fractional Models
      - ✓
      - ✓
      - ✓
      - ✗
-   * - PowerLaw
+     - ✗
+     - ✗
+   * - Flow (PowerLaw, Carreau, HB)
      - ✗
      - ✗
      - ✗
      - ✓
-   * - Carreau
      - ✗
+     - ✗
+   * - SGR (Soft Glassy Rheology)
+     - ✓
+     - ✓
+     - ✓
+     - ✗
+     - ✗
+     - ✗
+   * - Fluidity (Local, Nonlocal)
+     - ✓
      - ✗
      - ✗
      - ✓
-   * - Herschel-Bulkley
+     - ✗
+     - ✗
+   * - EPM (Lattice, Tensorial)
+     - ✗
+     - ✓
+     - ✓
+     - ✓
+     - ✓
+     - ✗
+   * - IKH (MIKH, MLIKH)
+     - ✓
+     - ✓
+     - ✓
+     - ✗
+     - ✗
+     - ✗
+   * - HL (Hébraud-Lequeux)
+     - ✓
+     - ✓
+     - ✗
+     - ✗
+     - ✗
+     - ✗
+   * - STZ (Shear Transformation)
+     - ✓
+     - ✓
+     - ✗
+     - ✓
+     - ✓
+     - ✗
+   * - SPP (LAOS Analysis)
+     - ✗
+     - ✗
      - ✗
      - ✗
      - ✗
      - ✓
 
-**Key distinction**:
+**Key distinctions**:
 
-- **Viscoelastic models** (Maxwell, Zener, fractional): Linear regime (SAOS, relaxation, creep)
-- **Flow models** (PowerLaw, Carreau, Herschel-Bulkley): Nonlinear steady shear
+- **Linear viscoelastic** (Classical, Fractional, IKH): SAOS, relaxation, creep
+- **Flow models** (PowerLaw, Carreau, HB): Nonlinear steady shear only
+- **Soft matter physics** (SGR, HL, Fluidity): Statistical mechanics approaches
+- **Elasto-plastic** (EPM, STZ): Startup transients and flow curves
+- **Nonlinear oscillatory** (SPP): LAOS analysis and yield stress
 
 Worked Example: Multi-Mode Characterization
 --------------------------------------------

@@ -93,6 +93,12 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
 
 .. toctree::
    :maxdepth: 1
+   :caption: Fluidity-Saramito EVP Models
+
+   fluidity/saramito_evp
+
+.. toctree::
+   :maxdepth: 1
    :caption: Sequence of Physical Processes (SPP)
 
    spp/spp_decomposer
