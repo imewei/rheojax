@@ -27,14 +27,12 @@ def test_lattice_epm_initialization():
 
 
 @pytest.mark.unit
-def test_lattice_epm_fit_raises():
-    """Test that _fit raises NotImplementedError (or does nothing currently)."""
-    model = LatticeEPM()
-    # Currently _fit is a pass, so it should not raise
-    try:
-        model._fit(None, None)
-    except Exception as e:
-        pytest.fail(f"_fit raised exception: {e}")
+def test_lattice_epm_fit_requires_test_mode():
+    """Test that _fit requires test_mode parameter."""
+    model = LatticeEPM(L=8, dt=0.1)
+    # _fit now works but requires test_mode
+    with pytest.raises(ValueError, match="test_mode must be specified"):
+        model._fit(jnp.array([0.1, 1.0]), jnp.array([0.5, 1.0]))
 
 
 @pytest.mark.unit

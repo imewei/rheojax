@@ -457,9 +457,337 @@ class EPMBase(BaseModel):
         return RheoData(x=time, y=stresses, initial_test_mode="oscillation")
 
     def _fit(self, X, y, **kwargs):
-        """Fit model parameters to data (NLSQ).
+        """Fit EPM parameters to data using NLSQ with smooth yielding.
 
-        EPM fitting is complex and requires smooth yielding approximation.
-        Base implementation does nothing (pass-through).
+        This method uses GPU-accelerated NLSQ optimization with smooth yielding
+        approximation to fit EPM parameters. The smooth approximation replaces
+        the hard yield threshold with a tanh transition, enabling gradient-based
+        optimization.
+
+        Args:
+            X: Input data (shear rates, time, or frequency depending on mode)
+            y: Target data (stress, modulus, or strain depending on mode)
+            **kwargs: Additional fitting options including:
+                test_mode (str): Protocol type ('flow_curve', 'startup',
+                    'relaxation', 'creep', 'oscillation'). Required.
+                seed (int): Random seed for reproducibility (default: 42)
+                gamma_dot (float): Shear rate for startup mode (default: 0.1)
+                gamma (float): Step strain for relaxation mode (default: 0.1)
+                stress (float): Target stress for creep mode (default: 1.0)
+                gamma0 (float): Strain amplitude for oscillation (default: 0.01)
+                omega (float): Angular frequency for oscillation (default: 1.0)
+                max_iter (int): Maximum NLSQ iterations (default: 500)
+                use_log_residuals (bool): Use log-space residuals (default: True)
+
+        Returns:
+            self for method chaining
         """
-        pass
+        from rheojax.logging import get_logger, log_fit
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+
+        logger = get_logger(__name__)
+
+        # Extract and cache test mode
+        test_mode = kwargs.get("test_mode")
+        if test_mode is None:
+            if hasattr(self, "_test_mode") and self._test_mode:
+                test_mode = self._test_mode
+            else:
+                raise ValueError("test_mode must be specified for EPM fitting")
+
+        # Cache metadata for model_function use
+        self._test_mode = test_mode
+        self._cached_seed = kwargs.get("seed", 42)
+        self._cached_gamma_dot = kwargs.get("gamma_dot", 0.1)
+        self._cached_gamma = kwargs.get("gamma", 0.1)
+        self._cached_stress = kwargs.get("stress", 1.0)
+        self._cached_gamma0 = kwargs.get("gamma0", 0.01)
+        self._cached_omega = kwargs.get("omega", 1.0)
+
+        data_shape = (len(X),) if hasattr(X, "__len__") else None
+
+        with log_fit(
+            logger, model=self.__class__.__name__, data_shape=data_shape,
+            test_mode=test_mode
+        ) as ctx:
+            # Convert to JAX arrays
+            X_jax = jnp.asarray(X, dtype=jnp.float64)
+            y_jax = jnp.asarray(y, dtype=jnp.float64)
+
+            # Create model function wrapper for NLSQ
+            def model_fn(x_data, params):
+                return self.model_function(x_data, params, test_mode=test_mode)
+
+            # Create least squares objective
+            objective = create_least_squares_objective(
+                model_fn,
+                X_jax,
+                y_jax,
+                use_log_residuals=kwargs.get("use_log_residuals", True),
+            )
+
+            # Run NLSQ optimization
+            result = nlsq_optimize(
+                objective,
+                self.parameters,
+                max_iter=kwargs.get("max_iter", 500),
+                ftol=kwargs.get("ftol", 1e-6),
+                xtol=kwargs.get("xtol", 1e-6),
+            )
+
+            if not result.success:
+                logger.warning(
+                    f"{self.__class__.__name__} fit warning: {result.message}"
+                )
+
+            ctx["success"] = result.success
+            ctx["cost"] = float(result.cost) if result.cost is not None else None
+            ctx["n_iter"] = result.nit
+
+            self.fitted_ = True
+
+        return self
+
+    # --- Bayesian / Model Function Interface ---
+
+    def model_function(self, X, params, test_mode=None):
+        """Compute EPM predictions for BayesianMixin integration.
+
+        This method provides a pure-function interface for Bayesian inference,
+        allowing NumPyro to sample from the parameter space. The implementation
+        is fully JAX-traceable (no numpy conversions).
+
+        Args:
+            X: Input array (shear rates, time, frequency depending on mode)
+            params: Tuple or array of parameter values in self.parameters order
+            test_mode: Protocol mode ('flow_curve', 'startup', 'relaxation',
+                      'creep', 'oscillation'). If None, uses cached test_mode.
+
+        Returns:
+            JAX array of predictions (stress, modulus, or strain depending on mode)
+        """
+        # Convert params tuple/array to dict using parameter names
+        param_names = list(self.parameters.keys())
+        p_values = dict(zip(param_names, params, strict=True))
+
+        # Resolve test mode
+        mode = test_mode or getattr(self, "_test_mode", "flow_curve")
+
+        # Ensure JAX array (no numpy conversion for traceability)
+        X_jax = jnp.asarray(X, dtype=jnp.float64)
+
+        # Get cached seed for reproducibility during MCMC sampling
+        seed = getattr(self, "_cached_seed", 42)
+        key = jax.random.PRNGKey(seed)
+
+        # Get scaled propagator (subclass must have _propagator_q_norm)
+        if not hasattr(self, "_propagator_q_norm"):
+            raise NotImplementedError(
+                "Subclass must define _propagator_q_norm. "
+                "Use LatticeEPM or TensorialEPM instead of EPMBase directly."
+            )
+        propagator_q = self._propagator_q_norm * p_values["mu"]
+
+        # Route to JAX-pure prediction functions (no RheoData wrappers)
+        if mode in ["flow_curve", "rotation", "steady_shear"]:
+            return self._model_flow_curve(X_jax, key, propagator_q, p_values)
+        elif mode == "startup":
+            gamma_dot = getattr(self, "_cached_gamma_dot", 0.1)
+            return self._model_startup(X_jax, key, propagator_q, p_values, gamma_dot)
+        elif mode == "relaxation":
+            gamma = getattr(self, "_cached_gamma", 0.1)
+            return self._model_relaxation(X_jax, key, propagator_q, p_values, gamma)
+        elif mode == "creep":
+            stress = getattr(self, "_cached_stress", 1.0)
+            return self._model_creep(X_jax, key, propagator_q, p_values, stress)
+        elif mode in ["oscillation", "saos"]:
+            gamma0 = getattr(self, "_cached_gamma0", 0.01)
+            omega = getattr(self, "_cached_omega", 1.0)
+            return self._model_oscillation(X_jax, key, propagator_q, p_values, gamma0, omega)
+        else:
+            raise ValueError(f"Unknown test mode: {mode}")
+
+    # --- JAX-Pure Model Functions for Bayesian Inference ---
+
+    def _model_flow_curve(
+        self,
+        shear_rates: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params: dict,
+    ) -> jax.Array:
+        """JAX-pure flow curve simulation (no RheoData, no numpy)."""
+        n_steps = 1000
+        dt = self.dt
+
+        def scan_fn(gdot):
+            state = self._init_state(key)
+
+            def body(carrier, _):
+                curr_state = carrier
+                new_state = self._epm_step(
+                    curr_state, propagator_q, gdot, dt, params, smooth=True
+                )
+                return new_state, jnp.mean(new_state[0])
+
+            _, history = jax.lax.scan(body, state, None, length=n_steps)
+            steady_stress = jnp.mean(history[n_steps // 2:])
+            return steady_stress
+
+        return jax.vmap(scan_fn)(shear_rates)
+
+    def _model_startup(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params: dict,
+        gamma_dot: float,
+    ) -> jax.Array:
+        """JAX-pure startup simulation."""
+        dt = self.dt
+        if len(time) > 1:
+            dt = time[1] - time[0]
+
+        n_steps = jnp.maximum(0, len(time) - 1)
+        state = self._init_state(key)
+
+        def body(carrier, _):
+            curr_state = carrier
+            new_state = self._epm_step(
+                curr_state, propagator_q, gamma_dot, dt, params, smooth=True
+            )
+            return new_state, jnp.mean(new_state[0])
+
+        initial_stress = jnp.mean(state[0])
+
+        if n_steps > 0:
+            _, stresses_scan = jax.lax.scan(body, state, None, length=n_steps)
+            stresses = jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
+        else:
+            stresses = jnp.array([initial_stress])
+
+        return stresses
+
+    def _model_relaxation(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params: dict,
+        strain_step: float,
+    ) -> jax.Array:
+        """JAX-pure relaxation simulation."""
+        dt = self.dt
+        if len(time) > 1:
+            dt = time[1] - time[0]
+
+        state = self._init_state(key)
+        stress, thresh, strain, k = state
+
+        # Apply step strain
+        mu = params["mu"]
+        stress = stress + mu * strain_step
+        state = (stress, thresh, strain + strain_step, k)
+
+        g_0 = jnp.mean(stress) / strain_step
+        n_steps = jnp.maximum(0, len(time) - 1)
+
+        def body(carrier, _):
+            curr_state = carrier
+            new_state = self._epm_step(
+                curr_state, propagator_q, 0.0, dt, params, smooth=True
+            )
+            return new_state, jnp.mean(new_state[0]) / strain_step
+
+        if n_steps > 0:
+            _, moduli_scan = jax.lax.scan(body, state, None, length=n_steps)
+            moduli = jnp.concatenate([jnp.array([g_0]), moduli_scan])
+        else:
+            moduli = jnp.array([g_0])
+
+        return moduli
+
+    def _model_creep(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params: dict,
+        target_stress: float,
+    ) -> jax.Array:
+        """JAX-pure creep simulation with P-controller."""
+        dt = self.dt
+        if len(time) > 1:
+            dt = time[1] - time[0]
+
+        Kp_base = 0.01
+        alpha = 10.0
+
+        state = self._init_state(key)
+        aug_state = (state, 0.0)
+        initial_strain = state[2]
+        n_steps = jnp.maximum(0, len(time) - 1)
+
+        def body(carrier, _):
+            (curr_epm, gdot) = carrier
+            stress_grid = curr_epm[0]
+            curr_stress = jnp.mean(stress_grid)
+
+            error = target_stress - curr_stress
+            rel_error = jnp.abs(error) / (jnp.abs(target_stress) + 1e-6)
+            Kp = Kp_base * (1.0 + alpha * rel_error)
+
+            gdot_new = gdot + Kp * error
+            gdot_new = jnp.maximum(gdot_new, 0.0)
+
+            new_epm = self._epm_step(
+                curr_epm, propagator_q, gdot_new, dt, params, smooth=True
+            )
+            return (new_epm, gdot_new), new_epm[2]
+
+        if n_steps > 0:
+            _, strains_scan = jax.lax.scan(body, aug_state, None, length=n_steps)
+            strains = jnp.concatenate([jnp.array([initial_strain]), strains_scan])
+        else:
+            strains = jnp.array([initial_strain])
+
+        return strains
+
+    def _model_oscillation(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params: dict,
+        gamma0: float,
+        omega: float,
+    ) -> jax.Array:
+        """JAX-pure oscillation simulation."""
+        dt = self.dt
+        if len(time) > 1:
+            dt = time[1] - time[0]
+
+        state = self._init_state(key)
+        initial_stress = jnp.mean(state[0])
+        n_steps = jnp.maximum(0, len(time) - 1)
+        scan_time = time[:-1] if n_steps > 0 else jnp.array([])
+
+        def body(carrier, t):
+            curr_state = carrier
+            gdot = gamma0 * omega * jnp.cos(omega * t)
+            new_state = self._epm_step(
+                curr_state, propagator_q, gdot, dt, params, smooth=True
+            )
+            return new_state, jnp.mean(new_state[0])
+
+        if n_steps > 0:
+            _, stresses_scan = jax.lax.scan(body, state, scan_time, length=n_steps)
+            stresses = jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
+        else:
+            stresses = jnp.array([initial_stress])
+
+        return stresses

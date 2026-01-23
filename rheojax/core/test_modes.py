@@ -30,12 +30,19 @@ class TestModeEnum(str, Enum):
 
     Note: Named TestModeEnum (not TestMode) to avoid pytest collection warnings.
     Pytest treats classes starting with 'Test' and ending without 'Enum' as test classes.
+
+    Note on EPM/Flow protocols:
+        - FLOW_CURVE: Steady-state stress vs shear rate (same physics as ROTATION)
+        - STARTUP: Transient stress evolution at constant shear rate
+        - ROTATION: Generic rotational/steady shear mode (legacy)
     """
 
     RELAXATION = "relaxation"
     CREEP = "creep"
     OSCILLATION = "oscillation"
     ROTATION = "rotation"
+    FLOW_CURVE = "flow_curve"  # Steady-state flow curve protocol
+    STARTUP = "startup"        # Startup shear protocol
     UNKNOWN = "unknown"
 
     def __str__(self) -> str:
@@ -46,13 +53,13 @@ class TestModeEnum(str, Enum):
     def from_protocol(cls, protocol: Protocol) -> TestModeEnum:
         """Convert inventory Protocol to TestModeEnum."""
         if protocol == Protocol.FLOW_CURVE:
-            return cls.ROTATION
+            return cls.FLOW_CURVE
         elif protocol == Protocol.CREEP:
             return cls.CREEP
         elif protocol == Protocol.RELAXATION:
             return cls.RELAXATION
         elif protocol == Protocol.STARTUP:
-            return cls.ROTATION  # Startup is a transient flow
+            return cls.STARTUP
         elif protocol == Protocol.OSCILLATION:
             return cls.OSCILLATION
         elif protocol == Protocol.SAOS:
@@ -65,6 +72,10 @@ class TestModeEnum(str, Enum):
         """Convert TestModeEnum to inventory Protocol (best effort)."""
         if self == self.ROTATION:
             return Protocol.FLOW_CURVE
+        elif self == self.FLOW_CURVE:
+            return Protocol.FLOW_CURVE
+        elif self == self.STARTUP:
+            return Protocol.STARTUP
         elif self == self.CREEP:
             return Protocol.CREEP
         elif self == self.RELAXATION:
