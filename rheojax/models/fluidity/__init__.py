@@ -36,8 +36,14 @@ References:
 
 from rheojax.models.fluidity.local import FluidityLocal
 from rheojax.models.fluidity.nonlocal_model import FluidityNonlocal
+from rheojax.models.fluidity.saramito import (
+    FluiditySaramitoLocal,
+    FluiditySaramitoNonlocal,
+)
 
 __all__ = [
     "FluidityLocal",
     "FluidityNonlocal",
+    "FluiditySaramitoLocal",
+    "FluiditySaramitoNonlocal",
 ]

@@ -46,6 +46,10 @@ Fluidity Models (2):
     - FluidityLocal: Local (0D) fluidity model with aging/rejuvenation
     - FluidityNonlocal: Non-local (1D PDE) fluidity model with shear banding
 
+Fluidity-Saramito EVP Models (2):
+    - FluiditySaramitoLocal: Local (0D) tensorial EVP with thixotropic fluidity
+    - FluiditySaramitoNonlocal: Nonlocal (1D) EVP for shear banding
+
 SPP LAOS Models (1):
     - SPPYieldStress: Yield stress model for SPP LAOS analysis
 
@@ -92,6 +96,12 @@ from rheojax.models.flow import (
 
 # Fluidity models
 from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
+
+# Fluidity-Saramito EVP models
+from rheojax.models.fluidity.saramito import (
+    FluiditySaramitoLocal,
+    FluiditySaramitoNonlocal,
+)
 
 # Fractional models
 from rheojax.models.fractional import (
@@ -183,6 +193,9 @@ __all__ = [
     # Fluidity models
     "FluidityLocal",
     "FluidityNonlocal",
+    # Fluidity-Saramito EVP models
+    "FluiditySaramitoLocal",
+    "FluiditySaramitoNonlocal",
     # IKH models
     "MIKH",
     "MLIKH",
