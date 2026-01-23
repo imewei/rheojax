@@ -103,7 +103,7 @@ def plastic_rate(
     Args:
         stress: Deviatoric stress (Pa)
         Lambda: STZ density
-        chi: Effective temperature (unused if Lambda passed directly, kept for API consistency)
+        chi: Effective temperature (unused if Lambda passed, kept for API)
         sigma_y: Yield stress scale (Pa)
         tau0: Molecular attempt time (s)
         epsilon0: Characteristic strain increment (dimensionless)

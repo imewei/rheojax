@@ -6,7 +6,7 @@ supporting multiple protocols (Flow, Transient, SAOS, LAOS) via JAX and Diffrax.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 import diffrax
 import numpy as np
@@ -783,7 +783,7 @@ class STZConventional(STZBase):
     # Prediction Interface
     # =========================================================================
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """Predict based on fitted state."""
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         p_values = {k: self.parameters.get_value(k) for k in self.parameters.keys()}
