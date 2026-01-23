@@ -360,11 +360,11 @@ class TensorialEPM(EPMBase):
             metadata=result_metadata
         )
 
-    def _predict(self, rheo_data: RheoData, **kwargs) -> RheoData:
+    def _predict(self, X, **kwargs) -> RheoData:
         """Simulate the model for the given protocol.
 
         Args:
-            rheo_data: Input data defining the protocol (t, gamma_dot, stress, etc.).
+            X: Input data - can be RheoData or numpy/JAX array.
             kwargs:
                 test_mode (str): 'flow_curve', 'startup', 'relaxation', 'creep', 'oscillation'.
                 smooth (bool): Use smooth yielding (default False for simulation, True for fitting).
@@ -375,7 +375,32 @@ class TensorialEPM(EPMBase):
             - flow_curve: y is σ_xy array, metadata['N1'] contains N₁ values
             - Other protocols: y has shape (n_points,) with σ_xy only
         """
-        test_mode = kwargs.get("test_mode", rheo_data.test_mode)
+        # Handle both RheoData and raw array input
+        if isinstance(X, RheoData):
+            rheo_data = X
+            test_mode = kwargs.get("test_mode", rheo_data.test_mode)
+        else:
+            # Raw array input - wrap in RheoData
+            test_mode = kwargs.get("test_mode")
+            if test_mode is None:
+                test_mode = getattr(self, "_test_mode", "flow_curve")
+            x_array = jnp.asarray(X, dtype=jnp.float64)
+            # Create dummy y for RheoData constructor
+            dummy_y = jnp.zeros_like(x_array)
+            metadata = {}
+            # Copy cached metadata
+            if hasattr(self, "_cached_gamma_dot"):
+                metadata["gamma_dot"] = self._cached_gamma_dot
+            if hasattr(self, "_cached_gamma"):
+                metadata["gamma"] = self._cached_gamma
+            if hasattr(self, "_cached_stress"):
+                metadata["stress"] = self._cached_stress
+            if hasattr(self, "_cached_gamma0"):
+                metadata["gamma0"] = self._cached_gamma0
+            if hasattr(self, "_cached_omega"):
+                metadata["omega"] = self._cached_omega
+            rheo_data = RheoData(x=x_array, y=dummy_y, initial_test_mode=test_mode, metadata=metadata)
+
         smooth = kwargs.get("smooth", False)
         seed = kwargs.get("seed", 0)
         key = jax.random.PRNGKey(seed)
