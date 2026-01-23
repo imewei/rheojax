@@ -139,7 +139,7 @@ class FractionalMaxwellGel(BaseModel):
         try:
             # Check for alpha close to 1
             if alpha > 1.0 - 1e-6:
-                return float('inf')
+                return float("inf")
 
             # Use algebraic simplification to avoid overflow
             # tau^(1-alpha) = eta / c_alpha
@@ -149,12 +149,12 @@ class FractionalMaxwellGel(BaseModel):
             base = eta / c_alpha
 
             # Check for potential overflow before computing
-            if base > 1.0 and exponent > 700: # approx limit for exp(709)
-                 return float('inf')
+            if base > 1.0 and exponent > 700:  # approx limit for exp(709)
+                return float("inf")
 
-            return base ** exponent
+            return base**exponent
         except (OverflowError, ZeroDivisionError):
-            return float('inf')
+            return float("inf")
 
     @staticmethod
     @jax.jit
@@ -253,18 +253,14 @@ class FractionalMaxwellGel(BaseModel):
         # (iω)^α = |ω|^α * exp(i α π/2)
         omega_alpha = jnp.power(omega_safe, alpha_safe)
         phase_alpha = jnp.pi * alpha_safe / 2.0
-        i_omega_alpha = omega_alpha * (
-            jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
-        )
+        i_omega_alpha = omega_alpha * (jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha))
 
         # (iωτ)^(1-α) = (iω)^(1-α) * τ^(1-α)
         # τ^(1-α) = [(eta/c_alpha)^(1/(1-alpha))]^(1-alpha) = eta/c_alpha
         # So term is (iω)^(1-α) * (eta/c_alpha)
         omega_beta = jnp.power(omega_safe, beta_safe)
         phase_beta = jnp.pi * beta_safe / 2.0
-        i_omega_beta = omega_beta * (
-            jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta)
-        )
+        i_omega_beta = omega_beta * (jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta))
         denominator_term = i_omega_beta * (eta / c_alpha)
 
         # Complex modulus: G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))

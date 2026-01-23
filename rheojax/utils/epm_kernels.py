@@ -6,7 +6,6 @@ for plastic events (dual-mode: hard/smooth), and the full time-stepping kernel.
 """
 
 from functools import partial
-from typing import Tuple, Union
 
 from rheojax.core.jax_config import safe_import_jax
 
@@ -14,9 +13,7 @@ jax, jnp = safe_import_jax()
 
 
 @partial(jax.jit, static_argnames=("L_x", "L_y"))
-def make_propagator_q(
-    L_x: int, L_y: int, shear_modulus: float = 1.0
-) -> jax.Array:
+def make_propagator_q(L_x: int, L_y: int, shear_modulus: float = 1.0) -> jax.Array:
     """Create the quadrupolar Eshelby propagator in Fourier space.
 
     G(q) = -4 * mu * (qx * qy)^2 / (q^2)^2 for q != 0
@@ -43,9 +40,7 @@ def make_propagator_q(
 
     # Standard scalar EPM propagator (quadrupolar)
     propagator_q = jnp.where(
-        valid_mask,
-        -4.0 * shear_modulus * (QX**2 * QY**2) / (safe_Q2**2),
-        0.0
+        valid_mask, -4.0 * shear_modulus * (QX**2 * QY**2) / (safe_Q2**2), 0.0
     )
 
     # Explicitly enforce zero mean redistribution at q=0
@@ -108,7 +103,9 @@ def compute_plastic_strain_rate(
 
     if smooth:
         # Differentiable approximation (Hyperbolic tangent)
-        activation = 0.5 * (1.0 + jnp.tanh((stress_mag - yield_thresholds) / smoothing_width))
+        activation = 0.5 * (
+            1.0 + jnp.tanh((stress_mag - yield_thresholds) / smoothing_width)
+        )
     else:
         # Hard threshold
         activation = (stress_mag > yield_thresholds).astype(stress.dtype)
@@ -149,13 +146,13 @@ def update_yield_thresholds(
 
 @partial(jax.jit, static_argnames=("smooth",))
 def epm_step(
-    state: Tuple[jax.Array, jax.Array, float, jax.Array],
+    state: tuple[jax.Array, jax.Array, float, jax.Array],
     propagator_q: jax.Array,
     shear_rate: float,
     dt: float,
     params: dict,
     smooth: bool = False,
-) -> Tuple[jax.Array, jax.Array, float, jax.Array]:
+) -> tuple[jax.Array, jax.Array, float, jax.Array]:
     """Perform one full EPM time step.
 
     Dynamics:
@@ -186,7 +183,7 @@ def epm_step(
         thresholds,
         fluidity=fluidity,
         smooth=smooth,
-        smoothing_width=params.get("smoothing_width", 0.1)
+        smoothing_width=params.get("smoothing_width", 0.1),
     )
 
     # 2. Compute Stress Rates
@@ -233,7 +230,7 @@ def epm_step(
             active_mask,
             thresholds,
             mean=params.get("sigma_c_mean", 1.0),
-            std=params.get("sigma_c_std", 0.1)
+            std=params.get("sigma_c_std", 0.1),
         )
     else:
         # In smooth mode, we typically keep the landscape fixed or evolve it continuously.

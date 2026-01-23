@@ -212,8 +212,7 @@ class BayesianPage(QWidget):
 
         # Run button
         self._btn_run = QPushButton("Run Bayesian Inference")
-        self._btn_run.setStyleSheet(
-            """
+        self._btn_run.setStyleSheet("""
             QPushButton {
                 background-color: #9C27B0;
                 color: white;
@@ -227,8 +226,7 @@ class BayesianPage(QWidget):
             QPushButton:disabled {
                 background-color: #BDBDBD;
             }
-        """
-        )
+        """)
         self._btn_run.clicked.connect(self._on_run_clicked)
         layout.addWidget(self._btn_run)
 

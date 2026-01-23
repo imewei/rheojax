@@ -26,7 +26,9 @@ def test_tensorial_propagator_shape():
 
     # Shape should be (3, 3, L, L//2+1) for rfft2 convention
     expected_shape = (3, 3, L, L // 2 + 1)
-    assert propagator.shape == expected_shape, f"Expected {expected_shape}, got {propagator.shape}"
+    assert (
+        propagator.shape == expected_shape
+    ), f"Expected {expected_shape}, got {propagator.shape}"
 
     # Check dtype is float64
     assert propagator.dtype == jnp.float64
@@ -50,7 +52,7 @@ def test_tensorial_propagator_symmetry():
                 propagator[i, j],
                 propagator[j, i],
                 rtol=1e-10,
-                err_msg=f"Propagator not symmetric at ({i}, {j})"
+                err_msg=f"Propagator not symmetric at ({i}, {j})",
             )
 
 
@@ -72,7 +74,7 @@ def test_tensorial_propagator_zero_mean():
         zero_freq_values,
         jnp.zeros((3, 3)),
         atol=1e-12,
-        err_msg="Propagator at q=0 should be zero for all components"
+        err_msg="Propagator at q=0 should be zero for all components",
     )
 
 
@@ -100,8 +102,8 @@ def test_von_mises_stress_pure_shear():
 def test_hill_criterion_reduces_to_von_mises():
     """Test that Hill criterion with H=1/3, N=1.5 reduces to von Mises."""
     from rheojax.utils.epm_kernels_tensorial import (
+        compute_hill_stress,
         compute_von_mises_stress,
-        compute_hill_stress
     )
 
     nu = 0.3
@@ -110,7 +112,7 @@ def test_hill_criterion_reduces_to_von_mises():
     stress_states = [
         jnp.array([1.0, 0.5, 0.3]),  # Mixed
         jnp.array([0.0, 0.0, 1.0]),  # Pure shear
-        jnp.array([2.0, -1.0, 0.0]), # Normal stresses only
+        jnp.array([2.0, -1.0, 0.0]),  # Normal stresses only
         jnp.array([1.5, 1.5, 0.5]),  # Equal normal stresses
     ]
 
@@ -141,11 +143,13 @@ def test_hill_criterion_reduces_to_von_mises():
         # Match: H=1/2, 2N=3 gives sqrt[sum/2 + 3σ_xy²]
         # So we need 3σ_xy² = 6σ_xy²/2 ✓ That works!
         # Therefore H=1/2, N=3/2=1.5
-        hill = compute_hill_stress(stress_tensor, hill_H=1.0/2.0, hill_N=1.5, nu=nu)
+        hill = compute_hill_stress(stress_tensor, hill_H=1.0 / 2.0, hill_N=1.5, nu=nu)
 
         np.testing.assert_allclose(
-            hill, von_mises, rtol=1e-8,
-            err_msg=f"Hill doesn't match von Mises for stress {stress_tensor}"
+            hill,
+            von_mises,
+            rtol=1e-8,
+            err_msg=f"Hill doesn't match von Mises for stress {stress_tensor}",
         )
 
 
@@ -169,7 +173,9 @@ def test_flow_rule_direction_alignment():
     assert eps_dot_p.shape == (3,), f"Expected shape (3,), got {eps_dot_p.shape}"
 
     # For yielding state, plastic strain rate should be non-zero
-    assert jnp.any(eps_dot_p != 0.0), "Plastic strain rate should be non-zero when yielding"
+    assert jnp.any(
+        eps_dot_p != 0.0
+    ), "Plastic strain rate should be non-zero when yielding"
 
     # Check that shear component direction matches stress
     # ε̇ᵖ_xy should have same sign as σ_xy
@@ -232,8 +238,8 @@ def test_yield_criterion_factory():
 def test_apply_tensorial_propagator():
     """Test that tensorial propagator application preserves zero mean."""
     from rheojax.utils.epm_kernels_tensorial import (
+        apply_tensorial_propagator,
         make_tensorial_propagator_q,
-        apply_tensorial_propagator
     )
 
     L = 32
@@ -254,7 +260,9 @@ def test_apply_tensorial_propagator():
     # Check that mean of each component is near zero (redistribution conserves)
     for i in range(3):
         mean_stress = jnp.mean(stress_dot[i])
-        assert jnp.abs(mean_stress) < 1e-6, f"Component {i} has non-zero mean: {mean_stress}"
+        assert (
+            jnp.abs(mean_stress) < 1e-6
+        ), f"Component {i} has non-zero mean: {mean_stress}"
 
 
 @pytest.mark.unit
@@ -262,7 +270,7 @@ def test_tensorial_epm_step_elastic_loading():
     """Test tensorial EPM step with pure elastic loading (no yielding)."""
     from rheojax.utils.epm_kernels_tensorial import (
         make_tensorial_propagator_q,
-        tensorial_epm_step
+        tensorial_epm_step,
     )
 
     L = 16
@@ -277,12 +285,7 @@ def test_tensorial_epm_step_elastic_loading():
 
     strain_rate = 0.1
     dt = 0.01
-    params = {
-        "mu": mu,
-        "nu": nu,
-        "tau_pl_shear": 1.0,
-        "tau_pl_normal": 1.0
-    }
+    params = {"mu": mu, "nu": nu, "tau_pl_shear": 1.0, "tau_pl_normal": 1.0}
 
     new_stress = tensorial_epm_step(
         stress, thresholds, strain_rate, dt, propagator, params, smooth=False
@@ -302,7 +305,7 @@ def test_tensorial_epm_step_with_yielding():
     """Test tensorial EPM step with active plastic sites."""
     from rheojax.utils.epm_kernels_tensorial import (
         make_tensorial_propagator_q,
-        tensorial_epm_step
+        tensorial_epm_step,
     )
 
     L = 16
@@ -311,7 +314,7 @@ def test_tensorial_epm_step_with_yielding():
 
     # Initial state: high shear stress at center that exceeds threshold
     stress = jnp.zeros((3, L, L))
-    stress = stress.at[2, L//2, L//2].set(2.0)  # σ_xy = 2.0
+    stress = stress.at[2, L // 2, L // 2].set(2.0)  # σ_xy = 2.0
 
     thresholds = jnp.ones((L, L)) * 1.0  # Will yield at center
 
@@ -319,19 +322,14 @@ def test_tensorial_epm_step_with_yielding():
 
     strain_rate = 0.0  # No external loading
     dt = 0.1
-    params = {
-        "mu": mu,
-        "nu": nu,
-        "tau_pl_shear": 1.0,
-        "tau_pl_normal": 1.0
-    }
+    params = {"mu": mu, "nu": nu, "tau_pl_shear": 1.0, "tau_pl_normal": 1.0}
 
     new_stress = tensorial_epm_step(
         stress, thresholds, strain_rate, dt, propagator, params, smooth=False
     )
 
     # Shear stress at center should decrease due to plastic relaxation
-    assert new_stress[2, L//2, L//2] < 2.0, "Stress should relax when yielding"
+    assert new_stress[2, L // 2, L // 2] < 2.0, "Stress should relax when yielding"
 
 
 @pytest.mark.unit
@@ -339,7 +337,7 @@ def test_tensorial_epm_step_smooth_vs_hard():
     """Test that smooth yielding approximates hard yielding away from threshold."""
     from rheojax.utils.epm_kernels_tensorial import (
         make_tensorial_propagator_q,
-        tensorial_epm_step
+        tensorial_epm_step,
     )
 
     L = 16
@@ -360,7 +358,7 @@ def test_tensorial_epm_step_smooth_vs_hard():
         "nu": nu,
         "tau_pl_shear": 1.0,
         "tau_pl_normal": 1.0,
-        "smoothing_width": 0.01  # Very narrow smooth transition
+        "smoothing_width": 0.01,  # Very narrow smooth transition
     }
 
     # Hard yielding
@@ -388,8 +386,8 @@ def test_propagator_conservation_law():
     When plastic strain is uniform (constant field), redistribution should sum to zero.
     """
     from rheojax.utils.epm_kernels_tensorial import (
+        apply_tensorial_propagator,
         make_tensorial_propagator_q,
-        apply_tensorial_propagator
     )
 
     L = 32
@@ -407,7 +405,9 @@ def test_propagator_conservation_law():
     # (Eshelby propagator conserves total stress)
     for i in range(3):
         total_stress = jnp.sum(stress_dot[i])
-        assert jnp.abs(total_stress) < 1e-6, f"Component {i} violates conservation: {total_stress}"
+        assert (
+            jnp.abs(total_stress) < 1e-6
+        ), f"Component {i} violates conservation: {total_stress}"
 
 
 @pytest.mark.unit
@@ -430,7 +430,9 @@ def test_plastic_strain_rate_magnitude_bounds():
     max_expected = jnp.max(jnp.abs(stress_tensor)) / min(tau_pl_shear, tau_pl_normal)
     magnitude = jnp.linalg.norm(eps_dot_p)
 
-    assert magnitude <= max_expected * 2.0, f"Plastic strain rate {magnitude} exceeds bound {max_expected}"
+    assert (
+        magnitude <= max_expected * 2.0
+    ), f"Plastic strain rate {magnitude} exceeds bound {max_expected}"
 
 
 @pytest.mark.unit
@@ -478,10 +480,14 @@ def test_hill_criterion_anisotropy_effects():
     sigma_iso = compute_hill_stress(stress_tensor, hill_H=0.5, hill_N=1.5, nu=nu)
 
     # Anisotropic parameters favoring normal stresses (larger H)
-    sigma_aniso_normal = compute_hill_stress(stress_tensor, hill_H=2.0, hill_N=1.5, nu=nu)
+    sigma_aniso_normal = compute_hill_stress(
+        stress_tensor, hill_H=2.0, hill_N=1.5, nu=nu
+    )
 
     # Anisotropic parameters favoring shear (larger N)
-    sigma_aniso_shear = compute_hill_stress(stress_tensor, hill_H=0.5, hill_N=3.0, nu=nu)
+    sigma_aniso_shear = compute_hill_stress(
+        stress_tensor, hill_H=0.5, hill_N=3.0, nu=nu
+    )
 
     # Different anisotropy should give different effective stresses
     assert not jnp.isclose(sigma_iso, sigma_aniso_normal, rtol=0.1)
@@ -503,13 +509,21 @@ def test_flow_rule_extreme_parameters():
 
     # Very fast relaxation (small tau_pl)
     eps_dot_p_fast = compute_plastic_strain_rate(
-        stress_tensor, sigma_eff, tau_pl_shear=0.001, tau_pl_normal=0.001, yield_mask=1.0
+        stress_tensor,
+        sigma_eff,
+        tau_pl_shear=0.001,
+        tau_pl_normal=0.001,
+        yield_mask=1.0,
     )
     assert jnp.all(jnp.isfinite(eps_dot_p_fast))
 
     # Very slow relaxation (large tau_pl)
     eps_dot_p_slow = compute_plastic_strain_rate(
-        stress_tensor, sigma_eff, tau_pl_shear=100.0, tau_pl_normal=100.0, yield_mask=1.0
+        stress_tensor,
+        sigma_eff,
+        tau_pl_shear=100.0,
+        tau_pl_normal=100.0,
+        yield_mask=1.0,
     )
     assert jnp.all(jnp.isfinite(eps_dot_p_slow))
 
@@ -522,7 +536,7 @@ def test_yield_criterion_exactly_at_threshold():
     """Test yielding behavior when stress exactly equals threshold (edge case)."""
     from rheojax.utils.epm_kernels_tensorial import (
         make_tensorial_propagator_q,
-        tensorial_epm_step
+        tensorial_epm_step,
     )
 
     L = 16
@@ -540,12 +554,7 @@ def test_yield_criterion_exactly_at_threshold():
 
     propagator = make_tensorial_propagator_q(L, nu, mu)
 
-    params = {
-        "mu": mu,
-        "nu": nu,
-        "tau_pl_shear": 1.0,
-        "tau_pl_normal": 1.0
-    }
+    params = {"mu": mu, "nu": nu, "tau_pl_shear": 1.0, "tau_pl_normal": 1.0}
 
     # Hard yielding: exactly at threshold may or may not yield (implementation defined)
     # Just verify it doesn't crash
@@ -604,6 +613,6 @@ def test_plastic_strain_rate_incompressibility():
     # Check incompressibility: ε̇ᵖ_xx + ε̇ᵖ_yy should be ≈ 0
     trace = eps_dot_p[0] + eps_dot_p[1]
 
-    np.testing.assert_allclose(trace, 0.0, atol=1e-10,
-                               err_msg="Plastic flow should be incompressible")
-
+    np.testing.assert_allclose(
+        trace, 0.0, atol=1e-10, err_msg="Plastic flow should be incompressible"
+    )

@@ -6,7 +6,6 @@ runner templates.
 """
 
 from abc import abstractmethod
-from typing import Dict, Tuple, Optional
 
 from rheojax.core.base import BaseModel
 from rheojax.core.data import RheoData
@@ -55,24 +54,35 @@ class EPMBase(BaseModel):
 
         # Parameters (Optimizable) - use inherited self.parameters from BaseModel
         self.parameters.add(
-            "mu", mu, bounds=(0.1, 100.0),
-            units="Pa", description="Shear modulus"
+            "mu", mu, bounds=(0.1, 100.0), units="Pa", description="Shear modulus"
         )
         self.parameters.add(
-            "tau_pl", tau_pl, bounds=(0.01, 100.0),
-            units="s", description="Plastic relaxation timescale"
+            "tau_pl",
+            tau_pl,
+            bounds=(0.01, 100.0),
+            units="s",
+            description="Plastic relaxation timescale",
         )
         self.parameters.add(
-            "sigma_c_mean", sigma_c_mean, bounds=(0.1, 10.0),
-            units="Pa", description="Mean yield threshold"
+            "sigma_c_mean",
+            sigma_c_mean,
+            bounds=(0.1, 10.0),
+            units="Pa",
+            description="Mean yield threshold",
         )
         self.parameters.add(
-            "sigma_c_std", sigma_c_std, bounds=(0.0, 1.0),
-            units="Pa", description="Yield threshold standard deviation (disorder)"
+            "sigma_c_std",
+            sigma_c_std,
+            bounds=(0.0, 1.0),
+            units="Pa",
+            description="Yield threshold standard deviation (disorder)",
         )
         self.parameters.add(
-            "smoothing_width", 0.1, bounds=(0.01, 1.0),
-            units="Pa", description="Smooth yielding transition width"
+            "smoothing_width",
+            0.1,
+            bounds=(0.01, 1.0),
+            units="Pa",
+            description="Smooth yielding transition width",
         )
 
     def _init_thresholds(self, key: jax.Array) -> jax.Array:
@@ -91,7 +101,7 @@ class EPMBase(BaseModel):
         thresholds = jnp.maximum(thresholds, 1e-4)
         return thresholds
 
-    def _get_param_dict(self) -> Dict[str, float]:
+    def _get_param_dict(self) -> dict[str, float]:
         """Extract parameters as dictionary for kernel calls.
 
         Returns:
@@ -122,13 +132,13 @@ class EPMBase(BaseModel):
     @abstractmethod
     def _epm_step(
         self,
-        state: Tuple,
+        state: tuple,
         propagator_q: jax.Array,
         shear_rate: float,
         dt: float,
         params: dict,
         smooth: bool,
-    ) -> Tuple:
+    ) -> tuple:
         """Perform one EPM time step (subclass-specific kernel).
 
         Args:
@@ -144,7 +154,9 @@ class EPMBase(BaseModel):
         """
         pass
 
-    def _init_state(self, key: jax.Array) -> Tuple[jax.Array, jax.Array, float, jax.Array]:
+    def _init_state(
+        self, key: jax.Array
+    ) -> tuple[jax.Array, jax.Array, float, jax.Array]:
         """Initialize full simulation state.
 
         Args:
@@ -210,7 +222,7 @@ class EPMBase(BaseModel):
             _, history = jax.lax.scan(body, state, None, length=n_steps)
 
             # Average last 50% for steady state
-            steady_stress = jnp.mean(history[n_steps // 2:])
+            steady_stress = jnp.mean(history[n_steps // 2 :])
             return steady_stress
 
         # Vectorize over shear rates
@@ -253,7 +265,9 @@ class EPMBase(BaseModel):
 
         def body(carrier, _):
             curr_state = carrier
-            new_state = self._epm_step(curr_state, propagator_q, gdot, dt, params, smooth)
+            new_state = self._epm_step(
+                curr_state, propagator_q, gdot, dt, params, smooth
+            )
             return new_state, jnp.mean(new_state[0])
 
         if n_steps > 0:
@@ -312,7 +326,9 @@ class EPMBase(BaseModel):
 
         def body(carrier, _):
             curr_state = carrier
-            new_state = self._epm_step(curr_state, propagator_q, 0.0, dt, params, smooth)
+            new_state = self._epm_step(
+                curr_state, propagator_q, 0.0, dt, params, smooth
+            )
             # Return G(t) = Stress / gamma_0
             return new_state, jnp.mean(new_state[0]) / strain_step
 
@@ -371,7 +387,7 @@ class EPMBase(BaseModel):
         n_steps = max(0, len(time) - 1)
 
         def body(carrier, _):
-            (curr_epm, gdot) = carrier
+            curr_epm, gdot = carrier
             stress_grid = curr_epm[0]
             curr_stress = jnp.mean(stress_grid)
 
@@ -387,7 +403,9 @@ class EPMBase(BaseModel):
             gdot_new = jnp.maximum(gdot_new, 0.0)
 
             # Step EPM
-            new_epm = self._epm_step(curr_epm, propagator_q, gdot_new, dt, params, smooth)
+            new_epm = self._epm_step(
+                curr_epm, propagator_q, gdot_new, dt, params, smooth
+            )
 
             # Return Strain
             return (new_epm, gdot_new), new_epm[2]
@@ -445,7 +463,9 @@ class EPMBase(BaseModel):
             # Time varying shear rate at current time t
             gdot = gamma0 * omega * jnp.cos(omega * t)
 
-            new_state = self._epm_step(curr_state, propagator_q, gdot, dt, params, smooth)
+            new_state = self._epm_step(
+                curr_state, propagator_q, gdot, dt, params, smooth
+            )
             return new_state, jnp.mean(new_state[0])
 
         if n_steps > 0:
@@ -510,8 +530,10 @@ class EPMBase(BaseModel):
         data_shape = (len(X),) if hasattr(X, "__len__") else None
 
         with log_fit(
-            logger, model=self.__class__.__name__, data_shape=data_shape,
-            test_mode=test_mode
+            logger,
+            model=self.__class__.__name__,
+            data_shape=data_shape,
+            test_mode=test_mode,
         ) as ctx:
             # Convert to JAX arrays
             X_jax = jnp.asarray(X, dtype=jnp.float64)
@@ -606,7 +628,9 @@ class EPMBase(BaseModel):
         elif mode in ["oscillation", "saos"]:
             gamma0 = getattr(self, "_cached_gamma0", 0.01)
             omega = getattr(self, "_cached_omega", 1.0)
-            return self._model_oscillation(X_jax, key, propagator_q, p_values, gamma0, omega)
+            return self._model_oscillation(
+                X_jax, key, propagator_q, p_values, gamma0, omega
+            )
         else:
             raise ValueError(f"Unknown test mode: {mode}")
 
@@ -634,7 +658,7 @@ class EPMBase(BaseModel):
                 return new_state, jnp.mean(new_state[0])
 
             _, history = jax.lax.scan(body, state, None, length=n_steps)
-            steady_stress = jnp.mean(history[n_steps // 2:])
+            steady_stress = jnp.mean(history[n_steps // 2 :])
             return steady_stress
 
         return jax.vmap(scan_fn)(shear_rates)
@@ -733,7 +757,7 @@ class EPMBase(BaseModel):
         n_steps = jnp.maximum(0, len(time) - 1)
 
         def body(carrier, _):
-            (curr_epm, gdot) = carrier
+            curr_epm, gdot = carrier
             stress_grid = curr_epm[0]
             curr_stress = jnp.mean(stress_grid)
 

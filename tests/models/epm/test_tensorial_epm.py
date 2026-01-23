@@ -4,11 +4,12 @@ This module tests the full tensorial (3-component) stress formulation for EPM,
 including normal stress differences (N₁, N₂) and flexible fitting.
 """
 
-import pytest
 import numpy as np
+import pytest
+
+from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.epm.tensor import TensorialEPM
-from rheojax.core.data import RheoData
 
 jax, jnp = safe_import_jax()
 
@@ -151,6 +152,7 @@ def test_tensorial_epm_smooth_mode_differentiable():
 
     Required for gradient-based optimization in fitting.
     """
+
     # Simple differentiability test
     # Create a differentiable function that runs the EPM
     def predict_shear_stress(mu_val):
@@ -159,7 +161,7 @@ def test_tensorial_epm_smooth_mode_differentiable():
         # Scale propagator by mu_val
         propagator_q = model._propagator_q_norm * mu_val
         params = model._get_param_dict()
-        params['mu'] = mu_val  # Override mu in params dict
+        params["mu"] = mu_val  # Override mu in params dict
 
         # Simple simulation
         key = jax.random.PRNGKey(42)
@@ -200,11 +202,13 @@ def test_tensorial_epm_normal_stress_extraction():
     model = TensorialEPM(L=16, dt=0.01)
 
     # Create synthetic stress tensor
-    stress = jnp.array([
-        [[1.0, 2.0], [3.0, 4.0]],  # σ_xx
-        [[0.5, 1.0], [1.5, 2.0]],  # σ_yy
-        [[0.1, 0.2], [0.3, 0.4]],  # σ_xy
-    ])
+    stress = jnp.array(
+        [
+            [[1.0, 2.0], [3.0, 4.0]],  # σ_xx
+            [[0.5, 1.0], [1.5, 2.0]],  # σ_yy
+            [[0.1, 0.2], [0.3, 0.4]],  # σ_xy
+        ]
+    )
 
     # Extract shear stress
     sigma_xy = model.get_shear_stress(stress)
@@ -246,7 +250,9 @@ def test_tensorial_epm_scalar_limit_consistency():
     seed = 42
 
     scalar_model = LatticeEPM(L=L, dt=dt, mu=1.0, tau_pl=1.0)
-    tensorial_model = TensorialEPM(L=L, dt=dt, mu=1.0, tau_pl_shear=1.0, tau_pl_normal=1.0)
+    tensorial_model = TensorialEPM(
+        L=L, dt=dt, mu=1.0, tau_pl_shear=1.0, tau_pl_normal=1.0
+    )
 
     # Simple flow curve
     shear_rates = jnp.array([0.01, 0.1])
@@ -342,9 +348,7 @@ def test_tensorial_epm_oscillation_protocol():
     # One period at omega=1
     time = jnp.linspace(0, 2 * jnp.pi, 100)
     data = RheoData(
-        x=time,
-        y=jnp.zeros_like(time),
-        metadata={"gamma0": 0.01, "omega": 1.0}
+        x=time, y=jnp.zeros_like(time), metadata={"gamma0": 0.01, "omega": 1.0}
     )
 
     result = model.predict(data, test_mode="oscillation", seed=42)
@@ -382,7 +386,14 @@ def test_tensorial_epm_parameter_bounds():
     model = TensorialEPM(L=16, dt=0.01)
 
     # Check all parameters have bounds
-    for param_name in ["mu", "nu", "tau_pl_shear", "tau_pl_normal", "sigma_c_mean", "sigma_c_std"]:
+    for param_name in [
+        "mu",
+        "nu",
+        "tau_pl_shear",
+        "tau_pl_normal",
+        "sigma_c_mean",
+        "sigma_c_std",
+    ]:
         param = model.parameters.get(param_name)
         assert param.bounds is not None, f"Parameter {param_name} missing bounds"
         lower, upper = param.bounds
@@ -390,7 +401,9 @@ def test_tensorial_epm_parameter_bounds():
 
         # Value should be within bounds
         value = param.value
-        assert lower <= value <= upper, f"Parameter {param_name} value {value} outside bounds [{lower}, {upper}]"
+        assert (
+            lower <= value <= upper
+        ), f"Parameter {param_name} value {value} outside bounds [{lower}, {upper}]"
 
 
 @pytest.mark.unit
@@ -468,7 +481,9 @@ def test_tensorial_epm_metadata_preservation():
 
     custom_metadata = {"experiment_id": "test_001", "temperature": 25.0}
     shear_rates = jnp.array([0.1, 1.0])
-    data = RheoData(x=shear_rates, y=jnp.zeros_like(shear_rates), metadata=custom_metadata)
+    data = RheoData(
+        x=shear_rates, y=jnp.zeros_like(shear_rates), metadata=custom_metadata
+    )
 
     result = model.predict(data, test_mode="flow_curve", seed=42)
 

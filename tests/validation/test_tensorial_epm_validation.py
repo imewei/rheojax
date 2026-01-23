@@ -4,12 +4,13 @@ This module validates the tensorial EPM implementation against analytical limits
 and scalar EPM predictions to ensure physical correctness.
 """
 
-import pytest
 import numpy as np
-from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.epm.tensor import TensorialEPM
-from rheojax.models.epm.lattice import LatticeEPM
+import pytest
+
 from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.models.epm.lattice import LatticeEPM
+from rheojax.models.epm.tensor import TensorialEPM
 
 jax, jnp = safe_import_jax()
 
@@ -35,8 +36,7 @@ def test_linear_response_small_strain():
     mu = model.parameters.get_value("mu")
 
     np.testing.assert_allclose(
-        G_0, mu, rtol=0.1,
-        err_msg=f"Linear response failed: G(0)={G_0} vs mu={mu}"
+        G_0, mu, rtol=0.1, err_msg=f"Linear response failed: G(0)={G_0} vs mu={mu}"
     )
 
 
@@ -153,13 +153,22 @@ def test_flow_curve_matches_scalar_epm():
     sigma_c_mean, sigma_c_std = 1.0, 0.1
 
     scalar_model = LatticeEPM(
-        L=L, dt=dt, mu=mu, tau_pl=tau_pl,
-        sigma_c_mean=sigma_c_mean, sigma_c_std=sigma_c_std
+        L=L,
+        dt=dt,
+        mu=mu,
+        tau_pl=tau_pl,
+        sigma_c_mean=sigma_c_mean,
+        sigma_c_std=sigma_c_std,
     )
 
     tensorial_model = TensorialEPM(
-        L=L, dt=dt, mu=mu, tau_pl_shear=tau_pl, tau_pl_normal=tau_pl,
-        sigma_c_mean=sigma_c_mean, sigma_c_std=sigma_c_std
+        L=L,
+        dt=dt,
+        mu=mu,
+        tau_pl_shear=tau_pl,
+        tau_pl_normal=tau_pl,
+        sigma_c_mean=sigma_c_mean,
+        sigma_c_std=sigma_c_std,
     )
 
     # Test flow curve at multiple rates
@@ -177,12 +186,14 @@ def test_flow_curve_matches_scalar_epm():
     relative_error = jnp.abs(sigma_scalar - sigma_tensorial) / (sigma_scalar + 1e-10)
 
     # At least verify same order of magnitude
-    assert jnp.all(relative_error < 0.6), \
-        f"Tensorial vs Scalar large mismatch: errors {relative_error}"
+    assert jnp.all(
+        relative_error < 0.6
+    ), f"Tensorial vs Scalar large mismatch: errors {relative_error}"
 
     # Check correlation (both should increase with rate)
-    assert jnp.corrcoef(sigma_scalar, sigma_tensorial)[0, 1] > 0.5, \
-        "Scalar and tensorial flow curves should be positively correlated"
+    assert (
+        jnp.corrcoef(sigma_scalar, sigma_tensorial)[0, 1] > 0.5
+    ), "Scalar and tensorial flow curves should be positively correlated"
 
 
 @pytest.mark.slow
@@ -198,7 +209,9 @@ def test_relaxation_decay_matches_scalar():
     gamma_0 = 0.1
 
     scalar_model = LatticeEPM(L=L, dt=dt, mu=mu, tau_pl=tau_pl)
-    tensorial_model = TensorialEPM(L=L, dt=dt, mu=mu, tau_pl_shear=tau_pl, tau_pl_normal=tau_pl)
+    tensorial_model = TensorialEPM(
+        L=L, dt=dt, mu=mu, tau_pl_shear=tau_pl, tau_pl_normal=tau_pl
+    )
 
     time = jnp.linspace(0, 5.0, 50)
     data = RheoData(x=time, y=jnp.zeros_like(time), metadata={"gamma": gamma_0})
@@ -211,8 +224,7 @@ def test_relaxation_decay_matches_scalar():
 
     # Initial moduli should match (both should be ~mu)
     np.testing.assert_allclose(
-        G_scalar[0], G_tensorial[0], rtol=0.2,
-        err_msg="Initial moduli don't match"
+        G_scalar[0], G_tensorial[0], rtol=0.2, err_msg="Initial moduli don't match"
     )
 
     # Decay rates should be similar (compare final/initial ratio)
@@ -220,6 +232,8 @@ def test_relaxation_decay_matches_scalar():
     decay_tensorial = G_tensorial[-1] / G_tensorial[0]
 
     np.testing.assert_allclose(
-        decay_scalar, decay_tensorial, rtol=0.5,
-        err_msg=f"Relaxation decay mismatch: scalar {decay_scalar} vs tensorial {decay_tensorial}"
+        decay_scalar,
+        decay_tensorial,
+        rtol=0.5,
+        err_msg=f"Relaxation decay mismatch: scalar {decay_scalar} vs tensorial {decay_tensorial}",
     )

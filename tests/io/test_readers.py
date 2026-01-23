@@ -285,16 +285,14 @@ class TestAutoDetection:
     def test_auto_detect_trios_extension(self, tmp_path):
         """Test TRIOS detection from .txt extension."""
         trios_file = tmp_path / "test.txt"
-        trios_file.write_text(
-            """Filename	test.txt
+        trios_file.write_text("""Filename	test.txt
 Instrument serial number	4010-1234
 
 [step]
 Variables	Time	Stress
 	s	Pa
 data point 1	1.0	100
-"""
-        )
+""")
 
         data = auto_load(str(trios_file))
 

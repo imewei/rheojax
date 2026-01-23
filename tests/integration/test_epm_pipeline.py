@@ -1,10 +1,11 @@
 """Integration tests for Lattice EPM pipeline."""
 
-import pytest
 import jax.numpy as jnp
+import pytest
+
+from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.epm.lattice import LatticeEPM
-from rheojax.core.data import RheoData
 from rheojax.utils.epm_kernels import epm_step
 
 jax, jnp = safe_import_jax()
@@ -30,7 +31,9 @@ def test_flow_curve_protocol():
     # Define shear rates
     gamma_dot = jnp.array([0.01, 0.1])
     # x is shear rate for flow curve
-    data = RheoData(x=gamma_dot, y=jnp.zeros_like(gamma_dot), initial_test_mode="flow_curve")
+    data = RheoData(
+        x=gamma_dot, y=jnp.zeros_like(gamma_dot), initial_test_mode="flow_curve"
+    )
 
     # Run prediction
     result = model._predict(data, seed=42)
@@ -57,9 +60,7 @@ def test_creep_protocol_adaptive():
     # Usually y holds the controlled variable (stress), result y holds response (strain).
     # If y is provided as input, it's the stress signal.
     data = RheoData(
-        x=time,
-        y=jnp.full_like(time, target_stress),
-        initial_test_mode="creep"
+        x=time, y=jnp.full_like(time, target_stress), initial_test_mode="creep"
     )
 
     # Run prediction (returns Strain)
@@ -97,7 +98,7 @@ def test_smooth_mode_differentiability():
             "tau_pl": 1.0,
             "sigma_c_mean": 1.0,
             "sigma_c_std": 0.1,
-            "smoothing_width": 0.1
+            "smoothing_width": 0.1,
         }
 
         # Run 10 steps
@@ -107,7 +108,9 @@ def test_smooth_mode_differentiability():
         def body(carrier, _):
             curr_state = carrier
             # epm_step returns (stress, thresh, strain, key)
-            new_state = epm_step(curr_state, propagator, shear_rate, 0.01, param_dict, smooth=True)
+            new_state = epm_step(
+                curr_state, propagator, shear_rate, 0.01, param_dict, smooth=True
+            )
             # Return mean stress
             return new_state, jnp.mean(new_state[0])
 

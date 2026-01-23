@@ -105,14 +105,18 @@ def mittag_leffler_e2(
     z_arr = jnp.atleast_1d(z_arr)
 
     # Use float64 for precision
-    z_f64 = z_arr.astype(jnp.float64) if jnp.isrealobj(z_arr) else z_arr.astype(jnp.complex128)
+    z_f64 = (
+        z_arr.astype(jnp.float64)
+        if jnp.isrealobj(z_arr)
+        else z_arr.astype(jnp.complex128)
+    )
 
     # Vectorized computation
     result = _mittag_leffler_hybrid(z_f64, alpha, beta)
 
     # Cast back to original dtype if needed (e.g. if input was float32)
     if jnp.issubdtype(z_arr.dtype, jnp.floating):
-         result = result.astype(z_arr.dtype)
+        result = result.astype(z_arr.dtype)
 
     if is_scalar:
         return result[0]
@@ -124,6 +128,7 @@ def _ml_taylor(z, alpha, beta, n_iter=300):
     Taylor series expansion: E_{a,b}(z) = sum_{k=0}^N z^k / Gamma(a*k + b)
     Using Kahan summation for reduced cancellation error.
     """
+
     def body(k, state):
         sum_val, c_val, z_pow = state
 
@@ -152,7 +157,7 @@ def _ml_asymptotic_pos(z, alpha, beta):
     E_{a,b}(z) ~ (1/a) * z^((1-b)/a) * exp(z^(1/a))
     """
     inv_alpha = 1.0 / alpha
-    exponent = z ** inv_alpha
+    exponent = z**inv_alpha
     # Avoid overflow in z^((1-beta)/alpha) by checking sign
     power_term = z ** ((1.0 - beta) * inv_alpha)
     prefactor = inv_alpha * power_term
@@ -166,6 +171,7 @@ def _safe_rgamma(x):
     Uses reflection formula for x < 0.5:
     1/Gamma(z) = Gamma(1-z) * sin(pi*z) / pi
     """
+
     # Reflection formula is valid everywhere but numerically better for x < 0.5
     # and handles poles at 0, -1, -2... where sin(pi*z) = 0.
     def _reflection(z):
@@ -190,7 +196,7 @@ def _ml_asymptotic_neg(z, alpha, beta, n_terms=20):
         # Term = z^(-k) / Gamma(beta - alpha*k)
         # Use safe reciprocal gamma to handle poles
         rgamma_val = _safe_rgamma(beta - alpha * k)
-        term = (inv_z ** k) * rgamma_val
+        term = (inv_z**k) * rgamma_val
         # Series is - sum(...)
         return val - term
 
@@ -295,12 +301,9 @@ def _mittag_leffler_hybrid(z, alpha, beta):
             z_val > CUTOFF_POS,
             _pure_pos,
             lambda _: jax.lax.cond(
-                z_val < cutoff_neg,
-                _pure_neg,
-                _blended_region,
-                operand=None
+                z_val < cutoff_neg, _pure_neg, _blended_region, operand=None
             ),
-            operand=None
+            operand=None,
         )
 
     # Prepare for broadcasting

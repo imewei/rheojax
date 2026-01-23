@@ -77,6 +77,9 @@ Usage:
 # Classical models
 from rheojax.models.classical import Maxwell, SpringPot, Zener
 
+# EPM models
+from rheojax.models.epm import LatticeEPM, TensorialEPM
+
 # Flow models
 from rheojax.models.flow import (
     Bingham,
@@ -86,6 +89,9 @@ from rheojax.models.flow import (
     HerschelBulkley,
     PowerLaw,
 )
+
+# Fluidity models
+from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
 
 # Fractional models
 from rheojax.models.fractional import (
@@ -112,6 +118,9 @@ from rheojax.models.fractional import (
 # HL models
 from rheojax.models.hl import HebraudLequeux
 
+# IKH models
+from rheojax.models.ikh import MIKH, MLIKH
+
 # Multi-mode models
 from rheojax.models.multimode import GeneralizedMaxwell
 
@@ -123,12 +132,6 @@ from rheojax.models.spp import SPPYieldStress
 
 # STZ models
 from rheojax.models.stz import STZConventional
-
-# EPM models
-from rheojax.models.epm import LatticeEPM, TensorialEPM
-
-# Fluidity models
-from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
 
 __all__ = [
     # Classical models
@@ -180,4 +183,7 @@ __all__ = [
     # Fluidity models
     "FluidityLocal",
     "FluidityNonlocal",
+    # IKH models
+    "MIKH",
+    "MLIKH",
 ]

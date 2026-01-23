@@ -26,9 +26,6 @@ References:
 
 from __future__ import annotations
 
-import numpyro.distributions as dist
-from numpyro.distributions import transforms as dist_transforms
-
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger, log_fit
 from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
@@ -270,7 +267,11 @@ class FractionalMaxwellLiquid(BaseModel):
         # Viscous/Fractional part
         # J_frac = t^α / (G_m * τ^α * Γ(1+α))
         num = jnp.power(t_safe, alpha_safe)
-        denom = Gm * jnp.power(tau_alpha_safe, alpha_safe) * jax.scipy.special.gamma(1.0 + alpha_safe)
+        denom = (
+            Gm
+            * jnp.power(tau_alpha_safe, alpha_safe)
+            * jax.scipy.special.gamma(1.0 + alpha_safe)
+        )
 
         J_t = J_instant + num / denom
 
@@ -629,4 +630,3 @@ class FractionalMaxwellLiquid(BaseModel):
                     f"Must be 'relaxation', 'creep', or 'oscillation'"
                 )
             return np.array(result)
-

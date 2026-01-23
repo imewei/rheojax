@@ -12,8 +12,8 @@ Key Components:
 - Full tensorial EPM time-stepping kernel
 """
 
+from collections.abc import Callable
 from functools import partial
-from typing import Callable, Dict, Tuple
 
 from rheojax.core.jax_config import safe_import_jax
 
@@ -21,9 +21,7 @@ jax, jnp = safe_import_jax()
 
 
 @partial(jax.jit, static_argnames=("L",))
-def make_tensorial_propagator_q(
-    L: int, nu: float, mu: float = 1.0
-) -> jax.Array:
+def make_tensorial_propagator_q(L: int, nu: float, mu: float = 1.0) -> jax.Array:
     """Create the tensorial Eshelby propagator in Fourier space for plane strain.
 
     The propagator G_ij(q) couples stress component i to plastic strain component j.
@@ -191,7 +189,8 @@ def compute_hill_stress(
     diff_zz_xx = sigma_zz - sigma_xx
 
     sigma_eff = jnp.sqrt(
-        hill_H * (diff_xx_yy**2 + diff_yy_zz**2 + diff_zz_xx**2) + 2 * hill_N * sigma_xy**2
+        hill_H * (diff_xx_yy**2 + diff_yy_zz**2 + diff_zz_xx**2)
+        + 2 * hill_N * sigma_xy**2
     )
 
     return sigma_eff
@@ -216,8 +215,7 @@ def get_yield_criterion(name: str) -> Callable:
 
     if name not in criteria:
         raise ValueError(
-            f"Unknown yield criterion: {name}. "
-            f"Available: {list(criteria.keys())}"
+            f"Unknown yield criterion: {name}. " f"Available: {list(criteria.keys())}"
         )
 
     return criteria[name]
@@ -318,7 +316,7 @@ def tensorial_epm_step(
     strain_rate: float,
     dt: float,
     propagator: jax.Array,
-    params: Dict[str, float],
+    params: dict[str, float],
     smooth: bool = False,
     yield_criterion: str = "von_mises",
 ) -> jax.Array:

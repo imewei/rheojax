@@ -42,33 +42,35 @@ def flow_curve_data():
 
     # Ground truth parameters (matching FluidityLocal defaults with adjustments)
     true_params = {
-        "G": 1e6,          # Default
-        "tau_y": 1e3,      # Default
-        "K": 1e3,          # Default
-        "n_flow": 0.5,     # Default
-        "f_eq": 1e-6,      # Default
-        "f_inf": 1e-3,     # Default
-        "theta": 10.0,     # Default
-        "a": 1.0,          # Default
-        "n_rejuv": 1.0,    # Default
+        "G": 1e6,  # Default
+        "tau_y": 1e3,  # Default
+        "K": 1e3,  # Default
+        "n_flow": 0.5,  # Default
+        "f_eq": 1e-6,  # Default
+        "f_inf": 1e-3,  # Default
+        "theta": 10.0,  # Default
+        "a": 1.0,  # Default
+        "n_rejuv": 1.0,  # Default
     }
 
     gamma_dot = np.logspace(-3, 2, 30)
     gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
 
     # Use actual Fluidity steady-state function
-    stress = np.array(fluidity_local_steady_state(
-        gamma_dot_jax,
-        true_params["G"],
-        true_params["tau_y"],
-        true_params["K"],
-        true_params["n_flow"],
-        true_params["f_eq"],
-        true_params["f_inf"],
-        true_params["theta"],
-        true_params["a"],
-        true_params["n_rejuv"],
-    ))
+    stress = np.array(
+        fluidity_local_steady_state(
+            gamma_dot_jax,
+            true_params["G"],
+            true_params["tau_y"],
+            true_params["K"],
+            true_params["n_flow"],
+            true_params["f_eq"],
+            true_params["f_inf"],
+            true_params["theta"],
+            true_params["a"],
+            true_params["n_rejuv"],
+        )
+    )
 
     # Add 2% noise
     noise = np.random.default_rng(42).normal(0, 0.02 * stress)
@@ -89,7 +91,9 @@ def startup_data():
     tau_relax = 1.0
 
     # Approximate startup response
-    stress = G * gamma_dot * t * np.exp(-t / tau_relax) + tau_y * (1 - np.exp(-t / tau_relax))
+    stress = G * gamma_dot * t * np.exp(-t / tau_relax) + tau_y * (
+        1 - np.exp(-t / tau_relax)
+    )
 
     # Add 3% noise
     noise = np.random.default_rng(42).normal(0, 0.03 * np.abs(stress) + 1.0)
@@ -108,9 +112,9 @@ def oscillation_data():
     tau = 1.0
 
     omega_tau = omega * tau
-    denom = 1 + omega_tau ** 2
+    denom = 1 + omega_tau**2
 
-    G_prime = G * omega_tau ** 2 / denom
+    G_prime = G * omega_tau**2 / denom
     G_double_prime = G * omega_tau / denom
 
     # Add 2% noise
@@ -272,7 +276,10 @@ class TestFluidityLocalNLSQToNUTS:
 
         # Warm start should have equal or fewer divergences
         # (Note: with small samples, both may have 0 divergences)
-        assert result_warm.diagnostics["divergences"] <= result_cold.diagnostics["divergences"] + 5
+        assert (
+            result_warm.diagnostics["divergences"]
+            <= result_cold.diagnostics["divergences"] + 5
+        )
 
     @pytest.mark.slow
     @pytest.mark.validation
@@ -314,7 +321,9 @@ class TestFluidityLocalNLSQToNUTS:
         assert result.diagnostics["divergences"] < 10, "Too many divergences"
 
         max_r_hat = max(result.diagnostics["r_hat"].values())
-        assert max_r_hat < 1.2, f"Max R-hat = {max_r_hat:.3f} indicates poor convergence"
+        assert (
+            max_r_hat < 1.2
+        ), f"Max R-hat = {max_r_hat:.3f} indicates poor convergence"
 
         min_ess = min(result.diagnostics["ess"].values())
         assert min_ess > 50, f"Min ESS = {min_ess:.1f} is too low"
@@ -326,7 +335,9 @@ class TestFluidityLocalNLSQToNUTS:
         assert "std" in result.summary["G"]
 
         # Step 5: Validate credible intervals can be computed
-        intervals = model.get_credible_intervals(result.posterior_samples, credibility=0.95)
+        intervals = model.get_credible_intervals(
+            result.posterior_samples, credibility=0.95
+        )
         assert len(intervals) >= 1
         # All intervals should be finite
         for param_name, (lower, upper) in intervals.items():
@@ -401,10 +412,13 @@ class TestProtocolCoverageMatrix:
     """Validate model_function works for all protocols."""
 
     @pytest.mark.smoke
-    @pytest.mark.parametrize("test_mode", [
-        "flow_curve",
-        "oscillation",
-    ])
+    @pytest.mark.parametrize(
+        "test_mode",
+        [
+            "flow_curve",
+            "oscillation",
+        ],
+    )
     def test_local_model_function_protocols(self, test_mode):
         """FluidityLocal model_function should work for all protocol modes."""
         model = FluidityLocal()
@@ -418,7 +432,9 @@ class TestProtocolCoverageMatrix:
             X = np.linspace(0, 10, 20)
 
         # Get parameter array
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
 
         # Call model_function
         result = model.model_function(X, params, test_mode=test_mode)
@@ -427,10 +443,13 @@ class TestProtocolCoverageMatrix:
         assert np.all(np.isfinite(result))
 
     @pytest.mark.smoke
-    @pytest.mark.parametrize("test_mode", [
-        "flow_curve",
-        "oscillation",
-    ])
+    @pytest.mark.parametrize(
+        "test_mode",
+        [
+            "flow_curve",
+            "oscillation",
+        ],
+    )
     def test_nonlocal_model_function_protocols(self, test_mode):
         """FluidityNonlocal model_function should work for all protocol modes."""
         model = FluidityNonlocal(N_y=8)
@@ -444,7 +463,9 @@ class TestProtocolCoverageMatrix:
             X = np.linspace(0, 10, 20)
 
         # Get parameter array
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
 
         # Call model_function
         result = model.model_function(X, params, test_mode=test_mode)
@@ -486,7 +507,9 @@ class TestDiagnosticsValidation:
         # All R-hat values should be positive
         for name, r_hat in result.diagnostics["r_hat"].items():
             assert r_hat > 0, f"R-hat for {name} should be positive"
-            assert r_hat < 2, f"R-hat for {name} = {r_hat:.3f} indicates severe non-convergence"
+            assert (
+                r_hat < 2
+            ), f"R-hat for {name} = {r_hat:.3f} indicates severe non-convergence"
 
     @pytest.mark.slow
     def test_ess_computation(self, flow_curve_data):
@@ -512,7 +535,9 @@ class TestDiagnosticsValidation:
         total_samples = 200 * 1
         for name, ess in result.diagnostics["ess"].items():
             assert ess > 0, f"ESS for {name} should be positive"
-            assert ess <= total_samples * 1.5, f"ESS for {name} = {ess:.1f} exceeds samples"
+            assert (
+                ess <= total_samples * 1.5
+            ), f"ESS for {name} = {ess:.1f} exceeds samples"
 
 
 # ============================================================================

@@ -12,9 +12,6 @@ Key Features:
 - Flexible fitting: shear-only or combined [σ_xy, N₁]
 """
 
-from functools import partial
-from typing import Dict, Tuple, Optional
-
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
@@ -109,28 +106,46 @@ class TensorialEPM(EPMBase):
 
         # Add tensorial-specific parameters
         self.parameters.add(
-            "nu", nu, bounds=(0.3, 0.5),
-            units="", description="Poisson's ratio for plane strain"
+            "nu",
+            nu,
+            bounds=(0.3, 0.5),
+            units="",
+            description="Poisson's ratio for plane strain",
         )
         self.parameters.add(
-            "tau_pl_shear", tau_pl_shear, bounds=(0.01, 100.0),
-            units="s", description="Plastic relaxation time for shear"
+            "tau_pl_shear",
+            tau_pl_shear,
+            bounds=(0.01, 100.0),
+            units="s",
+            description="Plastic relaxation time for shear",
         )
         self.parameters.add(
-            "tau_pl_normal", tau_pl_normal, bounds=(0.01, 100.0),
-            units="s", description="Plastic relaxation time for normal stresses"
+            "tau_pl_normal",
+            tau_pl_normal,
+            bounds=(0.01, 100.0),
+            units="s",
+            description="Plastic relaxation time for normal stresses",
         )
         self.parameters.add(
-            "w_N1", 1.0, bounds=(0.1, 10.0),
-            units="", description="Weight for N₁ in combined fitting loss"
+            "w_N1",
+            1.0,
+            bounds=(0.1, 10.0),
+            units="",
+            description="Weight for N₁ in combined fitting loss",
         )
         self.parameters.add(
-            "hill_H", 0.5, bounds=(0.1, 5.0),
-            units="", description="Hill anisotropy parameter H"
+            "hill_H",
+            0.5,
+            bounds=(0.1, 5.0),
+            units="",
+            description="Hill anisotropy parameter H",
         )
         self.parameters.add(
-            "hill_N", 1.5, bounds=(0.1, 5.0),
-            units="", description="Hill anisotropy parameter N"
+            "hill_N",
+            1.5,
+            bounds=(0.1, 5.0),
+            units="",
+            description="Hill anisotropy parameter N",
         )
 
         # Yield criterion (static configuration)
@@ -157,7 +172,7 @@ class TensorialEPM(EPMBase):
         # Start relaxed (zero stress)
         return jnp.zeros((3, self.L, self.L))
 
-    def _get_param_dict(self) -> Dict[str, float]:
+    def _get_param_dict(self) -> dict[str, float]:
         """Extract parameters as dictionary for kernel calls.
 
         Extends base class method to include tensorial parameters.
@@ -180,13 +195,13 @@ class TensorialEPM(EPMBase):
 
     def _epm_step(
         self,
-        state: Tuple[jax.Array, jax.Array, float, jax.Array],
+        state: tuple[jax.Array, jax.Array, float, jax.Array],
         propagator_q: jax.Array,
         shear_rate: float,
         dt: float,
         params: dict,
         smooth: bool,
-    ) -> Tuple[jax.Array, jax.Array, float, jax.Array]:
+    ) -> tuple[jax.Array, jax.Array, float, jax.Array]:
         """Perform one tensorial EPM time step.
 
         Delegates to tensorial_epm_step kernel from epm_kernels_tensorial module.
@@ -237,8 +252,8 @@ class TensorialEPM(EPMBase):
             return stress[..., 2, :, :]
 
     def get_normal_stress_differences(
-        self, stress: jax.Array, nu: Optional[float] = None
-    ) -> Tuple[jax.Array, jax.Array]:
+        self, stress: jax.Array, nu: float | None = None
+    ) -> tuple[jax.Array, jax.Array]:
         """Compute normal stress differences from stress tensor.
 
         For plane strain: σ_zz = ν(σ_xx + σ_yy)
@@ -270,7 +285,7 @@ class TensorialEPM(EPMBase):
 
     def predict_normal_stresses(
         self, data: RheoData, **kwargs
-    ) -> Tuple[jax.Array, jax.Array]:
+    ) -> tuple[jax.Array, jax.Array]:
         """Convenience method to predict normal stress differences.
 
         Runs the simulation and extracts N₁ and N₂ spatial averages over time.
@@ -339,7 +354,7 @@ class TensorialEPM(EPMBase):
 
             # Average last 50% for steady state
             # history has shape (n_steps, 2)
-            steady_values = jnp.mean(history[n_steps // 2:], axis=0)
+            steady_values = jnp.mean(history[n_steps // 2 :], axis=0)
             return steady_values  # [σ_xy, N₁]
 
         # Vectorize over shear rates
@@ -357,7 +372,7 @@ class TensorialEPM(EPMBase):
             x=shear_rates,
             y=sigma_xy,
             initial_test_mode="flow_curve",
-            metadata=result_metadata
+            metadata=result_metadata,
         )
 
     def _predict(self, X, **kwargs) -> RheoData:
@@ -399,7 +414,9 @@ class TensorialEPM(EPMBase):
                 metadata["gamma0"] = self._cached_gamma0
             if hasattr(self, "_cached_omega"):
                 metadata["omega"] = self._cached_omega
-            rheo_data = RheoData(x=x_array, y=dummy_y, initial_test_mode=test_mode, metadata=metadata)
+            rheo_data = RheoData(
+                x=x_array, y=dummy_y, initial_test_mode=test_mode, metadata=metadata
+            )
 
         smooth = kwargs.get("smooth", False)
         seed = kwargs.get("seed", 0)
@@ -414,15 +431,25 @@ class TensorialEPM(EPMBase):
         param_dict = self._get_param_dict()
 
         if test_mode == "flow_curve":
-            return self._run_flow_curve(rheo_data, key, propagator_q, param_dict, smooth)
+            return self._run_flow_curve(
+                rheo_data, key, propagator_q, param_dict, smooth
+            )
         elif test_mode == "startup":
-            return self._run_startup_tensorial(rheo_data, key, propagator_q, param_dict, smooth)
+            return self._run_startup_tensorial(
+                rheo_data, key, propagator_q, param_dict, smooth
+            )
         elif test_mode == "relaxation":
-            return self._run_relaxation_tensorial(rheo_data, key, propagator_q, param_dict, smooth)
+            return self._run_relaxation_tensorial(
+                rheo_data, key, propagator_q, param_dict, smooth
+            )
         elif test_mode == "creep":
-            return self._run_creep_tensorial(rheo_data, key, propagator_q, param_dict, smooth)
+            return self._run_creep_tensorial(
+                rheo_data, key, propagator_q, param_dict, smooth
+            )
         elif test_mode == "oscillation":
-            return self._run_oscillation_tensorial(rheo_data, key, propagator_q, param_dict, smooth)
+            return self._run_oscillation_tensorial(
+                rheo_data, key, propagator_q, param_dict, smooth
+            )
         else:
             raise ValueError(f"Unknown test_mode: {test_mode}")
 
@@ -454,7 +481,9 @@ class TensorialEPM(EPMBase):
 
         def body(carrier, _):
             curr_state = carrier
-            new_state = self._epm_step(curr_state, propagator_q, gdot, dt, params, smooth)
+            new_state = self._epm_step(
+                curr_state, propagator_q, gdot, dt, params, smooth
+            )
             # Extract shear stress component (index 2)
             return new_state, jnp.mean(new_state[0][2])
 
@@ -506,7 +535,9 @@ class TensorialEPM(EPMBase):
 
         def body(carrier, _):
             curr_state = carrier
-            new_state = self._epm_step(curr_state, propagator_q, 0.0, dt, params, smooth)
+            new_state = self._epm_step(
+                curr_state, propagator_q, 0.0, dt, params, smooth
+            )
             # Return G(t) = Shear Stress / gamma_0
             return new_state, jnp.mean(new_state[0][2]) / strain_step
 
@@ -557,7 +588,7 @@ class TensorialEPM(EPMBase):
         n_steps = max(0, len(time) - 1)
 
         def body(carrier, _):
-            (curr_epm, gdot) = carrier
+            curr_epm, gdot = carrier
             stress_grid = curr_epm[0]
             # Extract shear stress component
             curr_stress = jnp.mean(stress_grid[2])
@@ -574,7 +605,9 @@ class TensorialEPM(EPMBase):
             gdot_new = jnp.maximum(gdot_new, 0.0)
 
             # Step EPM
-            new_epm = self._epm_step(curr_epm, propagator_q, gdot_new, dt, params, smooth)
+            new_epm = self._epm_step(
+                curr_epm, propagator_q, gdot_new, dt, params, smooth
+            )
 
             # Return Strain
             return (new_epm, gdot_new), new_epm[2]
@@ -624,7 +657,9 @@ class TensorialEPM(EPMBase):
             # Time varying shear rate at current time t
             gdot = gamma0 * omega * jnp.cos(omega * t)
 
-            new_state = self._epm_step(curr_state, propagator_q, gdot, dt, params, smooth)
+            new_state = self._epm_step(
+                curr_state, propagator_q, gdot, dt, params, smooth
+            )
             # Extract shear stress component
             return new_state, jnp.mean(new_state[0][2])
 
@@ -661,7 +696,7 @@ class TensorialEPM(EPMBase):
         elif y.ndim == 2 and y.shape[0] == 2:
             # Combined fitting [σ_xy, N₁]
             fitting_mode = "combined"
-            w_N1 = self.parameters.get_value("w_N1")
+            # w_N1 = self.parameters.get_value("w_N1")  # TODO: Use when fitting implemented
         elif y.ndim == 2 and y.shape[0] == 3:
             raise NotImplementedError(
                 "Full tensor fitting (3 components) not yet supported. "

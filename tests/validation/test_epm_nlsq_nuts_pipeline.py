@@ -74,8 +74,10 @@ def epm_startup_data():
     overshoot_factor = 1.3
 
     # Stress rises, overshoots, then relaxes to steady state
-    stress = sigma_ss * (1 - np.exp(-t / tau_relax)) * (
-        1 + (overshoot_factor - 1) * np.exp(-t / (2 * tau_relax))
+    stress = (
+        sigma_ss
+        * (1 - np.exp(-t / tau_relax))
+        * (1 + (overshoot_factor - 1) * np.exp(-t / (2 * tau_relax)))
     )
 
     # Add 3% noise
@@ -212,7 +214,9 @@ class TestLatticeEPMModelFunction:
         X = np.logspace(-1, 1, 5)
 
         # Get parameter values as array
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
 
         result = model.model_function(X, params, test_mode="flow_curve")
 
@@ -226,7 +230,9 @@ class TestLatticeEPMModelFunction:
         model = small_lattice_epm
         X = np.logspace(-1, 1, 5)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode="flow_curve")
 
         # Stresses should be non-negative
@@ -239,7 +245,9 @@ class TestLatticeEPMModelFunction:
         model._cached_gamma_dot = 0.1  # Cache metadata
         X = np.linspace(0, 5, 10)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode="startup")
 
         assert result is not None
@@ -253,7 +261,9 @@ class TestLatticeEPMModelFunction:
         model._cached_gamma = 0.1  # Cache metadata
         X = np.linspace(0, 5, 10)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode="relaxation")
 
         assert result is not None
@@ -267,7 +277,9 @@ class TestLatticeEPMModelFunction:
         model._cached_stress = 1.0  # Cache metadata
         X = np.linspace(0, 5, 10)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode="creep")
 
         assert result is not None
@@ -282,7 +294,9 @@ class TestLatticeEPMModelFunction:
         model._cached_omega = 1.0
         X = np.linspace(0, 6.28, 20)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode="oscillation")
 
         assert result is not None
@@ -333,7 +347,8 @@ class TestLatticeEPMNLSQ:
         t, stress, gamma_dot = epm_startup_data
 
         model.fit(
-            t, stress,
+            t,
+            stress,
             test_mode="startup",
             gamma_dot=gamma_dot,
             max_iter=200,
@@ -348,7 +363,8 @@ class TestLatticeEPMNLSQ:
         t, G, gamma = epm_relaxation_data
 
         model.fit(
-            t, G,
+            t,
+            G,
             test_mode="relaxation",
             gamma=gamma,
             max_iter=200,
@@ -400,7 +416,9 @@ class TestLatticeEPMBayesian:
 
     @pytest.mark.slow
     @pytest.mark.validation
-    def test_bayesian_flow_curve_diagnostics(self, small_lattice_epm, epm_flow_curve_data):
+    def test_bayesian_flow_curve_diagnostics(
+        self, small_lattice_epm, epm_flow_curve_data
+    ):
         """Bayesian inference should have acceptable diagnostics."""
         model = small_lattice_epm
         gamma_dot, stress = epm_flow_curve_data
@@ -456,7 +474,9 @@ class TestTensorialEPMModelFunction:
         model = small_tensorial_epm
         X = np.logspace(-1, 1, 5)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode="flow_curve")
 
         assert result is not None
@@ -470,7 +490,9 @@ class TestTensorialEPMModelFunction:
         model._cached_gamma_dot = 0.1
         X = np.linspace(0, 5, 10)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode="startup")
 
         assert result is not None
@@ -487,13 +509,16 @@ class TestProtocolCoverageMatrix:
     """Validate model_function works for all protocols."""
 
     @pytest.mark.smoke
-    @pytest.mark.parametrize("test_mode", [
-        "flow_curve",
-        "startup",
-        "relaxation",
-        "creep",
-        "oscillation",
-    ])
+    @pytest.mark.parametrize(
+        "test_mode",
+        [
+            "flow_curve",
+            "startup",
+            "relaxation",
+            "creep",
+            "oscillation",
+        ],
+    )
     def test_lattice_epm_model_function_protocols(self, test_mode):
         """LatticeEPM model_function should work for all protocol modes."""
         from rheojax.models.epm import LatticeEPM
@@ -513,17 +538,22 @@ class TestProtocolCoverageMatrix:
         else:
             X = np.linspace(0, 5, 10)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode=test_mode)
 
         assert result is not None
         assert np.all(np.isfinite(result))
 
     @pytest.mark.smoke
-    @pytest.mark.parametrize("test_mode", [
-        "flow_curve",
-        "startup",
-    ])
+    @pytest.mark.parametrize(
+        "test_mode",
+        [
+            "flow_curve",
+            "startup",
+        ],
+    )
     def test_tensorial_epm_model_function_protocols(self, test_mode):
         """TensorialEPM model_function should work for protocol modes."""
         from rheojax.models.epm import TensorialEPM
@@ -542,7 +572,9 @@ class TestProtocolCoverageMatrix:
         else:
             X = np.linspace(0, 5, 10)
 
-        params = np.array([model.parameters.get_value(k) for k in model.parameters.keys()])
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
         result = model.model_function(X, params, test_mode=test_mode)
 
         assert result is not None

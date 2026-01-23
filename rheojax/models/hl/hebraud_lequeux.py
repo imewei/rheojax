@@ -116,7 +116,7 @@ class HebraudLequeux(BaseModel):
         # Internal state for protocol settings
         self._test_mode: str | None = None
         self._last_fit_kwargs: dict[str, Any] = {}
-        # We also need to store metadata about input data to reconstruct time axes in Bayesian mode
+        # Store metadata for reconstructing time axes in Bayesian mode
         self._fit_data_metadata: dict[str, Any] = {}
 
         # Grid settings (can be adjusted by user)
@@ -138,17 +138,19 @@ class HebraudLequeux(BaseModel):
         self,
         X: np.ndarray,
         y: np.ndarray,
-        test_mode: str | None = None,
-        **kwargs,
-    ) -> None:
+        **kwargs: Any,
+    ) -> "HebraudLequeux":
         """Fit HL model parameters to data.
 
         Args:
             X: Independent variable (shear rate, time, etc.)
             y: Dependent variable (stress, viscosity, compliance, etc.)
-            test_mode: Protocol mode ('steady_shear', 'creep', 'relaxation', 'startup', 'laos')
-            **kwargs: Optimizer options and protocol-specific parameters (e.g. gamma0)
+            **kwargs: Must include 'test_mode'. Options:
+                test_mode: Protocol ('steady_shear', 'creep', 'relaxation',
+                    'startup', 'laos')
+                Other optimizer/protocol-specific parameters (e.g. gamma0)
         """
+        test_mode: str | None = kwargs.pop("test_mode", None)
         if test_mode is None:
             raise ValueError("test_mode must be specified for HL fitting")
 
@@ -182,6 +184,7 @@ class HebraudLequeux(BaseModel):
                 raise ValueError(f"Unsupported test mode: {test_mode}")
 
             self.fitted_ = True
+        return self
 
     def _fit_steady_shear(self, gdot: np.ndarray, stress: np.ndarray, **kwargs):
         """Fit flow curve."""
@@ -196,14 +199,12 @@ class HebraudLequeux(BaseModel):
         # Grid sizing
         sigma_max, n_bins = self._get_grid_params()
 
-        # Calculate simulation duration for steady state
-        # We need enough strain to yield the material. Yield strain ~ sigma_c (normalized G=1).
-        # Safe margin: strain = 20 * max(1, sigma_c)
-        # Also need time >> tau.
-        # t_total = max(20*sigma_c/gdot_min, 20*tau)
+        # Calculate simulation duration for steady state.
+        # Need enough strain to yield: yield strain ~ sigma_c (G=1 normalized).
+        # Safe margin: strain = 20 * max(1, sigma_c). Also need time >> tau.
 
-        sigma_c_val = self.parameters.get_value("sigma_c")
-        tau_val = self.parameters.get_value("tau")
+        sigma_c_val = self.parameters.get_value("sigma_c") or 1.0
+        tau_val = self.parameters.get_value("tau") or 1.0
 
         # Estimate min gdot (taking non-zero min)
         gdot_abs = np.abs(gdot)
@@ -439,7 +440,7 @@ class HebraudLequeux(BaseModel):
         if not result.success:
             logger.warning(f"Optimization warning: {result.message}")
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """Predict response using fitted parameters and stored test_mode."""
         if self._test_mode is None:
             raise ValueError("Model not fitted or test_mode not set.")
@@ -460,9 +461,7 @@ class HebraudLequeux(BaseModel):
             # Replicate logic from _fit_steady_shear but for prediction
             gdot = X_jax
             gdot_abs = jnp.abs(gdot)
-            # Use a safe estimate since we are in JAX dispatch
-            # Can't use numpy conditional easily if X is traced, but predict usually takes concrete X
-            # If X is array, we can compute min
+            # Use JAX-safe estimate (predict usually takes concrete X)
             gdot_min = jnp.min(jnp.where(gdot_abs > 1e-9, gdot_abs, 1e9))
             # Fallback if all zero
             gdot_min = jnp.where(gdot_min > 1e8, 1.0, gdot_min)
@@ -569,13 +568,9 @@ class HebraudLequeux(BaseModel):
         alpha, tau, sigma_c = params
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        # Use simple fixed grid for Bayesian (since sigma_c is dynamic tracer,
-        # we can't easily resize grid in JIT).
-        # We must choose a safe large grid that covers the prior range of sigma_c.
-        # sigma_c bounds are 1e-3 to 1e6.
-        # Ideally, we should fix sigma_max to a large enough value for the problem scope.
-        # Or if params are concrete (during warmup), we could adapt? No, JIT requires static.
-        # We'll use a fixed conservative grid.
+        # Use fixed grid for Bayesian (sigma_c is dynamic tracer, can't resize
+        # in JIT). Choose a large grid covering sigma_c prior range (1e-3 to 1e6).
+        # JIT requires static shapes, so we use a fixed conservative grid.
         sigma_max = 50.0  # Conservative default for normalized data
         n_bins = 501
 
@@ -595,7 +590,7 @@ class HebraudLequeux(BaseModel):
                     return int(t_max / dt) + 1
                 else:
                     raise RuntimeError(
-                        "Cannot determine simulation steps statically for Bayesian inference."
+                        "Cannot determine n_steps for Bayesian inference."
                     ) from e
 
         # Dispatch to kernels
@@ -654,7 +649,7 @@ class HebraudLequeux(BaseModel):
 
     def get_phase_state(self) -> str:
         """Return the phase state based on alpha."""
-        alpha = self.parameters.get_value("alpha")
+        alpha = self.parameters.get_value("alpha") or 0.3
         if alpha < 0.5:
             return "glass"
         else:

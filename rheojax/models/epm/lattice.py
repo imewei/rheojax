@@ -1,17 +1,13 @@
 """Lattice-based Elasto-Plastic Model (EPM) implementation."""
 
-from functools import partial
-from typing import Dict, Tuple, Optional, Any
-
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.epm.base import EPMBase
 from rheojax.utils.epm_kernels import (
-    make_propagator_q,
     epm_step,
-    compute_plastic_strain_rate
+    make_propagator_q,
 )
 
 jax, jnp = safe_import_jax()
@@ -90,13 +86,13 @@ class LatticeEPM(EPMBase):
 
     def _epm_step(
         self,
-        state: Tuple[jax.Array, jax.Array, float, jax.Array],
+        state: tuple[jax.Array, jax.Array, float, jax.Array],
         propagator_q: jax.Array,
         shear_rate: float,
         dt: float,
         params: dict,
         smooth: bool,
-    ) -> Tuple[jax.Array, jax.Array, float, jax.Array]:
+    ) -> tuple[jax.Array, jax.Array, float, jax.Array]:
         """Perform one scalar EPM time step.
 
         Delegates to epm_step kernel from epm_kernels module.
@@ -151,7 +147,9 @@ class LatticeEPM(EPMBase):
                 metadata["gamma0"] = self._cached_gamma0
             if hasattr(self, "_cached_omega"):
                 metadata["omega"] = self._cached_omega
-            rheo_data = RheoData(x=x_array, y=dummy_y, initial_test_mode=test_mode, metadata=metadata)
+            rheo_data = RheoData(
+                x=x_array, y=dummy_y, initial_test_mode=test_mode, metadata=metadata
+            )
 
         smooth = kwargs.get("smooth", False)
         seed = kwargs.get("seed", 0)
@@ -166,15 +164,20 @@ class LatticeEPM(EPMBase):
         param_dict = self._get_param_dict()
 
         if test_mode == "flow_curve":
-            return self._run_flow_curve(rheo_data, key, propagator_q, param_dict, smooth)
+            return self._run_flow_curve(
+                rheo_data, key, propagator_q, param_dict, smooth
+            )
         elif test_mode == "startup":
             return self._run_startup(rheo_data, key, propagator_q, param_dict, smooth)
         elif test_mode == "relaxation":
-            return self._run_relaxation(rheo_data, key, propagator_q, param_dict, smooth)
+            return self._run_relaxation(
+                rheo_data, key, propagator_q, param_dict, smooth
+            )
         elif test_mode == "creep":
             return self._run_creep(rheo_data, key, propagator_q, param_dict, smooth)
         elif test_mode == "oscillation":
-            return self._run_oscillation(rheo_data, key, propagator_q, param_dict, smooth)
+            return self._run_oscillation(
+                rheo_data, key, propagator_q, param_dict, smooth
+            )
         else:
             raise ValueError(f"Unknown test_mode: {test_mode}")
-

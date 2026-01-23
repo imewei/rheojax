@@ -39,12 +39,16 @@ class TestSTZCoverage:
     def test_fit_oscillation_branching(self):
         """Test _fit_oscillation handling laos vs saos logic branches."""
         # Use mocks to check which method is called
-        with patch.object(self.model, '_fit_laos_mode') as mock_laos, \
-             patch.object(self.model, '_fit_saos_mode') as mock_saos:
+        with (
+            patch.object(self.model, "_fit_laos_mode") as mock_laos,
+            patch.object(self.model, "_fit_saos_mode") as mock_saos,
+        ):
 
             # Case 1: gamma_0 > 0.01 -> LAOS
             # We must pass omega as well for LAOS
-            self.model.fit(self.omega, self.y, test_mode="oscillation", gamma_0=0.1, omega=1.0)
+            self.model.fit(
+                self.omega, self.y, test_mode="oscillation", gamma_0=0.1, omega=1.0
+            )
             mock_laos.assert_called_once()
             mock_saos.assert_not_called()
 
@@ -53,7 +57,9 @@ class TestSTZCoverage:
             mock_saos.reset_mock()
 
             # Case 2: gamma_0 <= 0.01 -> SAOS
-            self.model.fit(self.omega, self.G_star, test_mode="oscillation", gamma_0=0.001)
+            self.model.fit(
+                self.omega, self.G_star, test_mode="oscillation", gamma_0=0.001
+            )
             mock_saos.assert_called_once()
             mock_laos.assert_not_called()
 
@@ -95,13 +101,15 @@ class TestSTZCoverage:
 
         self.model._test_mode = None
         with pytest.raises(ValueError, match="Test mode not specified"):
-             self.model._predict_transient(self.t)
+            self.model._predict_transient(self.t)
 
         # Also check the LAOS specific check in _predict
         self.model.fitted_ = True
         self.model._test_mode = "laos"
         self.model._gamma_0 = None
-        with pytest.raises(ValueError, match="LAOS prediction requires gamma_0 and omega"):
+        with pytest.raises(
+            ValueError, match="LAOS prediction requires gamma_0 and omega"
+        ):
             self.model.predict(self.t)
 
     def test_extract_harmonics_zero_fundamental(self):

@@ -1,11 +1,12 @@
 """Tests for EPMBase abstract class and LatticeEPM refactoring."""
 
-import pytest
 import numpy as np
+import pytest
+
+from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.epm.base import EPMBase
 from rheojax.models.epm.lattice import LatticeEPM
-from rheojax.core.data import RheoData
 
 jax, jnp = safe_import_jax()
 
@@ -140,7 +141,9 @@ def test_lattice_epm_backward_compatibility_oscillation():
     model = LatticeEPM(L=16, dt=0.005)
 
     time = jnp.linspace(0, 10.0, 200)
-    data = RheoData(x=time, y=jnp.zeros_like(time), metadata={"gamma0": 0.05, "omega": 2.0})
+    data = RheoData(
+        x=time, y=jnp.zeros_like(time), metadata={"gamma0": 0.05, "omega": 2.0}
+    )
 
     result = model.predict(data, test_mode="oscillation", seed=42)
 

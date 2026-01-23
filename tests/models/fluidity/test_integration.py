@@ -109,7 +109,17 @@ class TestFluidityParameterInterface:
         local = FluidityLocal()
         nonlocal_ = FluidityNonlocal()
 
-        shared_params = ["G", "tau_y", "K", "n_flow", "f_eq", "f_inf", "theta", "a", "n_rejuv"]
+        shared_params = [
+            "G",
+            "tau_y",
+            "K",
+            "n_flow",
+            "f_eq",
+            "f_inf",
+            "theta",
+            "a",
+            "n_rejuv",
+        ]
 
         for param in shared_params:
             assert param in local.parameters.keys()
@@ -302,7 +312,17 @@ class TestFluidityModelComparison:
         nonlocal_ = FluidityNonlocal()
 
         # Set same base parameters
-        for param in ["G", "tau_y", "K", "n_flow", "f_eq", "f_inf", "theta", "a", "n_rejuv"]:
+        for param in [
+            "G",
+            "tau_y",
+            "K",
+            "n_flow",
+            "f_eq",
+            "f_inf",
+            "theta",
+            "a",
+            "n_rejuv",
+        ]:
             value = local.parameters.get_value(param)
             nonlocal_.parameters.set_value(param, value)
 
@@ -329,12 +349,12 @@ class TestFluidityModelComparison:
 
         omega = np.logspace(-2, 2, 20)
 
-        G_star_local = np.array(local._predict_saos_jit(
-            jnp.asarray(omega), G, f_eq, theta
-        ))
-        G_star_nonlocal = np.array(nonlocal_._predict_saos_jit(
-            jnp.asarray(omega), G, f_eq, theta
-        ))
+        G_star_local = np.array(
+            local._predict_saos_jit(jnp.asarray(omega), G, f_eq, theta)
+        )
+        G_star_nonlocal = np.array(
+            nonlocal_._predict_saos_jit(jnp.asarray(omega), G, f_eq, theta)
+        )
 
         np.testing.assert_allclose(G_star_local, G_star_nonlocal, rtol=1e-10)
 

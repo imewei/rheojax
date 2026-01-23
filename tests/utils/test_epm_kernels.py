@@ -6,10 +6,10 @@ import pytest
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.utils.epm_kernels import (
     compute_plastic_strain_rate,
+    epm_step,
     make_propagator_q,
     solve_elastic_propagator,
-    epm_step,
-    update_yield_thresholds
+    update_yield_thresholds,
 )
 
 jax, jnp = safe_import_jax()
@@ -82,6 +82,7 @@ def test_smooth_vs_hard_yielding():
         rate_smooth[mask_far], expected_hard[mask_far], atol=1e-2
     )
 
+
 @pytest.mark.unit
 def test_epm_step_hard():
     """Test one EPM step in hard mode."""
@@ -107,6 +108,7 @@ def test_epm_step_hard():
     np.testing.assert_allclose(new_stress, expected_stress)
     assert new_strain == 0.1 * 0.01
 
+
 @pytest.mark.unit
 def test_epm_step_plastic():
     """Test EPM step with active plastic sites."""
@@ -122,7 +124,9 @@ def test_epm_step_plastic():
     propagator_q = make_propagator_q(L, L)
 
     # With gdot=0, site should relax
-    new_state = epm_step(state, propagator_q, 0.0, 0.1, {"mu": 1.0, "tau_pl": 1.0}, smooth=False)
+    new_state = epm_step(
+        state, propagator_q, 0.0, 0.1, {"mu": 1.0, "tau_pl": 1.0}, smooth=False
+    )
 
     # Site (0,0) should decrease (relax)
     assert new_state[0][0, 0] < 2.0

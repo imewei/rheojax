@@ -67,8 +67,7 @@ class MainToolBar(QToolBar):
         self.setIconSize(QSize(20, 20))
 
         # Apply consistent styling
-        self.setStyleSheet(
-            f"""
+        self.setStyleSheet(f"""
             QToolBar {{
                 background-color: {ColorPalette.BG_ELEVATED};
                 border: none;
@@ -99,8 +98,7 @@ class MainToolBar(QToolBar):
             QToolButton:disabled {{
                 color: {ColorPalette.TEXT_DISABLED};
             }}
-        """
-        )
+        """)
 
         # File operations
         self.open_action = QAction(get_icon("load"), "Open", self)

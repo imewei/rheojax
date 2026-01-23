@@ -6,17 +6,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 28 rheological models (including EPM, SGR, STZ, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 32 rheological models (including EPM, SGR, STZ, Fluidity, IKH, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **28 Rheological Models**: Classical (3), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Flow (6), Multi-Mode (1), SGR (2), STZ (1), SPP LAOS (1), EPM (3)
+- **32 Rheological Models**: Classical (3), Flow (6), Fractional Maxwell (3), Fractional Zener (3), Fractional Advanced (5), Multi-Mode (1), SGR (2), STZ (1), EPM (2), Fluidity (2), IKH (2), Hébraud-Lequeux (1), SPP LAOS (1)
 - **7 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition), SPP (Sequence of Physical Processes)
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
-- **Bayesian Inference**: All 25 models support NumPyro NUTS sampling with NLSQ warm-start
+- **Bayesian Inference**: All 32 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
@@ -41,6 +41,10 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 | **STZ** | **STZ Conventional** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **EPM** | **Lattice EPM** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | | **Tensorial EPM** | ✅ (+ N₁) | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Fluidity** | **Fluidity Local** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **Fluidity Nonlocal** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **IKH** | **MIKH** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **ML-IKH** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **SPP** | **SPP Yield Stress** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ (Amp. Sweep) |
 
 ### Data & I/O
@@ -439,6 +443,48 @@ from rheojax.transforms import detect_shear_banding, compute_shear_band_coexiste
 is_banding = detect_shear_banding(flow_curve)
 ```
 
+### Fluidity Models (Cooperative Flow)
+
+```python
+from rheojax.models import FluidityLocal, FluidityNonlocal
+
+# Local fluidity model (Picard et al. 2002)
+# For yield stress fluids with cooperative rearrangements
+fluidity = FluidityLocal()
+fluidity.fit(gamma_dot, sigma, test_mode='flow_curve')
+# Parameters: sigma_y (yield stress), f0 (microstructural relaxation rate),
+#             n (flow index), mu_inf (high-shear viscosity)
+
+# Nonlocal fluidity model with spatial correlations
+# For shear-banding and spatial heterogeneity in YSFs
+nonlocal = FluidityNonlocal(xi=0.1)  # Cooperativity length
+nonlocal.fit(gamma_dot, sigma, test_mode='flow_curve')
+
+# Predict velocity profiles (flow heterogeneity)
+velocity_profile = nonlocal.predict_velocity_profile(stress, gap_width=1e-3)
+```
+
+### Isotropic-Kinematic Hardening (IKH) Models
+
+```python
+from rheojax.models import MIKH, MLIKH
+
+# MIKH: Maxwell-Isotropic-Kinematic Hardening (Dimitriou & McKinley 2014)
+# For thixotropic elasto-viscoplastic materials: waxy crude oils, drilling fluids
+mikh = MIKH()
+mikh.fit(t, sigma, test_mode='startup', gamma_dot=1.0)
+# Parameters: G (modulus), eta (Maxwell viscosity), C (kinematic hardening),
+#             sigma_y0 (yield stress), tau_thix (thixotropic time), etc.
+
+# Predict stress overshoot in startup flow
+sigma_startup = mikh.predict_startup(t, gamma_dot=1.0)
+
+# ML-IKH: Multi-mode extension for distributed thixotropic timescales
+# Captures stretched-exponential recovery
+mlikh = MLIKH(n_modes=3, yield_mode='weighted_sum')
+mlikh.fit(t, sigma, test_mode='startup')
+```
+
 ### Shear Transformation Zone (STZ) Model
 
 ```python
@@ -596,6 +642,9 @@ Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 
 - [SGR Models](https://rheojax.readthedocs.io/models/sgr/sgr_conventional.html) - SGR Conventional and GENERIC models
 - [STZ Models](https://rheojax.readthedocs.io/models/stz/stz_conventional.html) - Shear Transformation Zone (Langer 2008)
+- [EPM Models](https://rheojax.readthedocs.io/models/epm/lattice_epm.html) - Elasto-Plastic lattice and tensorial models
+- [Fluidity Models](https://rheojax.readthedocs.io/models/fluidity/fluidity_local.html) - Local and nonlocal cooperative flow
+- [IKH Models](https://rheojax.readthedocs.io/models/ikh/index.html) - MIKH and ML-IKH for thixotropic EVP materials
 - [SPP Models](https://rheojax.readthedocs.io/models/spp/spp_decomposer.html) - SPP Decomposer and Yield Stress models
 
 ## Performance

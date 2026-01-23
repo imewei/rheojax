@@ -171,8 +171,7 @@ class HomePage(QWidget):
             bg_color = ColorPalette.SUCCESS
             bg_hover = ColorPalette.SUCCESS_HOVER
 
-        btn.setStyleSheet(
-            f"""
+        btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {bg_color};
                 color: {ColorPalette.TEXT_INVERSE};
@@ -186,8 +185,7 @@ class HomePage(QWidget):
             QPushButton:hover {{
                 background-color: {bg_hover};
             }}
-        """
-        )
+        """)
         btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(lambda: self._select_workflow(mode))
         return btn
@@ -322,8 +320,7 @@ class HomePage(QWidget):
             else ColorPalette.TEXT_INVERSE
         )
 
-        btn.setStyleSheet(
-            f"""
+        btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {bg_color};
                 color: {text_color};
@@ -337,8 +334,7 @@ class HomePage(QWidget):
             QPushButton:hover {{
                 background-color: {bg_hover};
             }}
-        """
-        )
+        """)
         return btn
 
     def _darken_color(self, hex_color: str, factor: float = 0.1) -> str:
@@ -385,8 +381,7 @@ class HomePage(QWidget):
     def _create_recent_project_item(self, project_path: Path) -> QWidget:
         """Create a recent project item."""
         widget = QWidget()
-        widget.setStyleSheet(
-            f"""
+        widget.setStyleSheet(f"""
             QWidget {{
                 background-color: {ColorPalette.BG_SURFACE};
                 border: 1px solid {ColorPalette.BORDER_DEFAULT};
@@ -396,8 +391,7 @@ class HomePage(QWidget):
                 background-color: {ColorPalette.BG_HOVER};
                 border-color: {ColorPalette.BORDER_HOVER};
             }}
-        """
-        )
+        """)
 
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
@@ -520,8 +514,7 @@ class HomePage(QWidget):
     def _create_example_card(self, name: str, description: str, color: str) -> QWidget:
         """Create an example dataset card."""
         card = QWidget()
-        card.setStyleSheet(
-            f"""
+        card.setStyleSheet(f"""
             QWidget {{
                 background-color: {color};
                 border-radius: 8px;
@@ -529,8 +522,7 @@ class HomePage(QWidget):
             QWidget:hover {{
                 background-color: {self._darken_color(color)};
             }}
-        """
-        )
+        """)
         card.setCursor(Qt.PointingHandCursor)
 
         layout = QVBoxLayout(card)
@@ -641,8 +633,7 @@ class HomePage(QWidget):
             btn = QPushButton(title)
             btn.setProperty("variant", "secondary")
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setStyleSheet(
-                f"""
+            btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {ColorPalette.BG_SURFACE};
                     color: {ColorPalette.TEXT_PRIMARY};
@@ -660,8 +651,7 @@ class HomePage(QWidget):
                 QPushButton:pressed {{
                     background-color: {ColorPalette.BG_ACTIVE};
                 }}
-            """
-            )
+            """)
             btn.clicked.connect(lambda checked, u=url, t=title: self._open_url(u, t))
             layout.addWidget(btn)
 

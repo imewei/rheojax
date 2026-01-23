@@ -43,8 +43,16 @@ class TestFluidityNonlocalSmoke:
         """Test expected parameters are present including xi."""
         model = FluidityNonlocal()
         expected_params = [
-            "G", "tau_y", "K", "n_flow", "f_eq", "f_inf",
-            "theta", "a", "n_rejuv", "xi"
+            "G",
+            "tau_y",
+            "K",
+            "n_flow",
+            "f_eq",
+            "f_inf",
+            "theta",
+            "a",
+            "n_rejuv",
+            "xi",
         ]
         for param in expected_params:
             assert param in model.parameters.keys()

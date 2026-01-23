@@ -244,9 +244,7 @@ class FractionalKelvinVoigt(BaseModel):
 
         # SpringPot part: c_α (iω)^α = c_α |ω|^α exp(i α π/2)
         G_springpot = (
-            c_alpha
-            * (omega_safe**alpha_safe)
-            * jnp.exp(1j * alpha_safe * jnp.pi / 2.0)
+            c_alpha * (omega_safe**alpha_safe) * jnp.exp(1j * alpha_safe * jnp.pi / 2.0)
         )
 
         # Complex modulus

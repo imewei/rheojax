@@ -171,9 +171,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         # Compute (iω)^α
         omega_alpha = jnp.power(omega, alpha_safe)
         phase_alpha = jnp.pi * alpha_safe / 2.0
-        i_omega_alpha = omega_alpha * (
-            jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha)
-        )
+        i_omega_alpha = omega_alpha * (jnp.cos(phase_alpha) + 1j * jnp.sin(phase_alpha))
 
         # Compute (iωτ)^β
         omega_tau_beta = jnp.power(omega * tau_safe, beta_safe)
@@ -188,9 +186,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         # Second term: c_2 * (iω)^γ
         omega_gamma = jnp.power(omega, gamma_safe)
         phase_gamma = jnp.pi * gamma_safe / 2.0
-        i_omega_gamma = omega_gamma * (
-            jnp.cos(phase_gamma) + 1j * jnp.sin(phase_gamma)
-        )
+        i_omega_gamma = omega_gamma * (jnp.cos(phase_gamma) + 1j * jnp.sin(phase_gamma))
 
         term2 = c2 * i_omega_gamma
 

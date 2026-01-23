@@ -121,8 +121,8 @@ def laplacian_1d_neumann(f: jnp.ndarray, dy: float) -> jnp.ndarray:
     # At y=0: ∂f/∂y = 0 → f[-1] = f[1] (ghost point)
     # At y=L: ∂f/∂y = 0 → f[N] = f[N-2] (ghost point)
     # Interior Laplacian formula: (f[i+1] - 2f[i] + f[i-1]) / dy²
-    # At i=0: (f[1] - 2f[0] + f[-1]) / dy² = (f[1] - 2f[0] + f[1]) / dy² = 2(f[1] - f[0]) / dy²
-    # At i=N-1: (f[N] - 2f[N-1] + f[N-2]) / dy² = (f[N-2] - 2f[N-1] + f[N-2]) / dy² = 2(f[N-2] - f[N-1]) / dy²
+    # At i=0: (f[1]-2f[0]+f[-1])/dy² = 2(f[1]-f[0])/dy² (via ghost f[-1]=f[1])
+    # At i=N-1: (f[N]-2f[N-1]+f[N-2])/dy² = 2(f[N-2]-f[N-1])/dy² (via ghost)
 
     lap_bc0 = 2.0 * (f[1] - f[0]) / (dy**2)
     lap_bcN = 2.0 * (f[-2] - f[-1]) / (dy**2)

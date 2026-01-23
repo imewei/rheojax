@@ -96,8 +96,7 @@ class TransformPage(QWidget):
         # Let height adapt to content but stay compact in the grid.
         card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         card.setMaximumHeight(200)
-        card.setStyleSheet(
-            f"""
+        card.setStyleSheet(f"""
             QFrame {{
                 background-color: {color};
                 border-radius: 8px;
@@ -106,8 +105,7 @@ class TransformPage(QWidget):
             QFrame:hover {{
                 background-color: {self._darken(color)};
             }}
-        """
-        )
+        """)
         card.setCursor(Qt.PointingHandCursor)
 
         layout = QVBoxLayout(card)

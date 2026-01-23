@@ -1,9 +1,7 @@
 """Visualization tools for Lattice Elasto-Plastic Models."""
 
-from typing import Dict, List, Optional, Tuple, Union
-
-import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.pyplot as plt
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
@@ -15,7 +13,7 @@ def _plot_scalar_lattice(
     stress: np.ndarray,
     thresholds: np.ndarray,
     title: str = "Lattice EPM State (Scalar)",
-    figsize: Tuple[int, int] = (12, 5),
+    figsize: tuple[int, int] = (12, 5),
     cmap_stress: str = "coolwarm",
     cmap_thresh: str = "viridis",
 ) -> plt.Figure:
@@ -37,7 +35,9 @@ def _plot_scalar_lattice(
 
     # Stress Plot
     max_stress = np.max(np.abs(stress))
-    im1 = ax1.imshow(stress, cmap=cmap_stress, vmin=-max_stress, vmax=max_stress, origin="lower")
+    im1 = ax1.imshow(
+        stress, cmap=cmap_stress, vmin=-max_stress, vmax=max_stress, origin="lower"
+    )
     ax1.set_title(r"Stress Field $\sigma_{ij}$")
     plt.colorbar(im1, ax=ax1)
     ax1.set_xlabel("x")
@@ -58,7 +58,7 @@ def _plot_tensorial_lattice(
     stress: np.ndarray,
     thresholds: np.ndarray,
     title: str = "Lattice EPM State (Tensorial)",
-    figsize: Tuple[int, int] = (16, 4),
+    figsize: tuple[int, int] = (16, 4),
     cmap_stress: str = "coolwarm",
     cmap_thresh: str = "viridis",
 ) -> plt.Figure:
@@ -87,7 +87,11 @@ def _plot_tensorial_lattice(
     # Plot each stress component
     for i in range(3):
         im = axes[i].imshow(
-            stress[i], cmap=cmap_stress, vmin=-max_stress, vmax=max_stress, origin="lower"
+            stress[i],
+            cmap=cmap_stress,
+            vmin=-max_stress,
+            vmax=max_stress,
+            origin="lower",
         )
         axes[i].set_title(labels[i])
         plt.colorbar(im, ax=axes[i])
@@ -106,10 +110,10 @@ def _plot_tensorial_lattice(
 
 
 def plot_lattice_fields(
-    stress: Union[np.ndarray, jax.Array],
-    thresholds: Union[np.ndarray, jax.Array],
-    title: Optional[str] = None,
-    figsize: Optional[Tuple[int, int]] = None,
+    stress: np.ndarray | jax.Array,
+    thresholds: np.ndarray | jax.Array,
+    title: str | None = None,
+    figsize: tuple[int, int] | None = None,
     cmap_stress: str = "coolwarm",
     cmap_thresh: str = "viridis",
 ) -> plt.Figure:
@@ -167,10 +171,10 @@ def plot_lattice_fields(
 
 
 def animate_stress_evolution(
-    stress_history: Union[np.ndarray, jax.Array],
+    stress_history: np.ndarray | jax.Array,
     interval: int = 50,
     cmap: str = "coolwarm",
-    save_path: Optional[str] = None,
+    save_path: str | None = None,
 ) -> animation.FuncAnimation:
     """Create an animation of the stress field evolution.
 
@@ -197,9 +201,9 @@ def animate_stress_evolution(
         vmin=-max_val,
         vmax=max_val,
         origin="lower",
-        animated=True
+        animated=True,
     )
-    ax.set_title(f"Time Step: 0")
+    ax.set_title("Time Step: 0")
     plt.colorbar(im, ax=ax, label=r"Stress $\sigma$")
 
     def update(frame):
@@ -219,12 +223,12 @@ def animate_stress_evolution(
 
 
 def plot_tensorial_fields(
-    stress: Union[np.ndarray, jax.Array],
-    figsize: Tuple[int, int] = (15, 4),
+    stress: np.ndarray | jax.Array,
+    figsize: tuple[int, int] = (15, 4),
     cmap: str = "coolwarm",
-    ax: Optional[Union[plt.Axes, List[plt.Axes]]] = None,
+    ax: plt.Axes | list[plt.Axes] | None = None,
     **kwargs,
-) -> Tuple[plt.Figure, List[plt.Axes]]:
+) -> tuple[plt.Figure, list[plt.Axes]]:
     """Plot all three stress tensor components in a 3-panel layout.
 
     Args:
@@ -277,13 +281,13 @@ def plot_tensorial_fields(
 
 
 def plot_normal_stress_field(
-    stress: Union[np.ndarray, jax.Array],
+    stress: np.ndarray | jax.Array,
     nu: float = 0.5,
-    figsize: Tuple[int, int] = (6, 5),
+    figsize: tuple[int, int] = (6, 5),
     cmap: str = "coolwarm",
-    ax: Optional[plt.Axes] = None,
+    ax: plt.Axes | None = None,
     **kwargs,
-) -> Tuple[plt.Figure, plt.Axes]:
+) -> tuple[plt.Figure, plt.Axes]:
     """Plot first normal stress difference field N₁ = σ_xx - σ_yy.
 
     Args:
@@ -324,13 +328,13 @@ def plot_normal_stress_field(
 
 
 def plot_von_mises_field(
-    stress: Union[np.ndarray, jax.Array],
-    thresholds: Union[np.ndarray, jax.Array],
+    stress: np.ndarray | jax.Array,
+    thresholds: np.ndarray | jax.Array,
     nu: float = 0.5,
-    figsize: Tuple[int, int] = (12, 5),
-    ax: Optional[Union[plt.Axes, List[plt.Axes]]] = None,
+    figsize: tuple[int, int] = (12, 5),
+    ax: plt.Axes | list[plt.Axes] | None = None,
     **kwargs,
-) -> Tuple[plt.Figure, List[plt.Axes]]:
+) -> tuple[plt.Figure, list[plt.Axes]]:
     """Plot von Mises effective stress and normalized yield map.
 
     Creates a 2-panel figure:
@@ -398,7 +402,7 @@ def plot_von_mises_field(
         **kwargs,
     )
     axes[1].set_title(r"Normalized Stress $\sigma_{\mathrm{eff}} / \sigma_c$")
-    cbar2 = plt.colorbar(im2, ax=axes[1], label=r"$\sigma_{\mathrm{eff}} / \sigma_c$")
+    plt.colorbar(im2, ax=axes[1], label=r"$\sigma_{\mathrm{eff}} / \sigma_c$")
     axes[1].set_xlabel("x")
     axes[1].set_ylabel("y")
 
@@ -407,13 +411,13 @@ def plot_von_mises_field(
 
 
 def plot_normal_stress_ratio(
-    shear_rates: Union[np.ndarray, jax.Array],
-    N1: Union[np.ndarray, jax.Array],
-    sigma_xy: Union[np.ndarray, jax.Array],
-    figsize: Tuple[int, int] = (8, 6),
-    ax: Optional[plt.Axes] = None,
+    shear_rates: np.ndarray | jax.Array,
+    N1: np.ndarray | jax.Array,
+    sigma_xy: np.ndarray | jax.Array,
+    figsize: tuple[int, int] = (8, 6),
+    ax: plt.Axes | None = None,
     **kwargs,
-) -> Tuple[plt.Figure, plt.Axes]:
+) -> tuple[plt.Figure, plt.Axes]:
     """Plot log-log of N₁/σ_xy vs shear rate.
 
     Args:
@@ -441,21 +445,21 @@ def plot_normal_stress_ratio(
         fig = ax.get_figure()
 
     # Log-log plot
-    ax.loglog(shear_rates, ratio, marker='o', **kwargs)
+    ax.loglog(shear_rates, ratio, marker="o", **kwargs)
     ax.set_xlabel(r"Shear Rate $\dot{\gamma}$ (1/s)")
     ax.set_ylabel(r"$N_1 / \sigma_{xy}$")
     ax.set_title("Normal Stress Ratio")
-    ax.grid(True, which='both', alpha=0.3)
+    ax.grid(True, which="both", alpha=0.3)
 
     plt.tight_layout()
     return fig, ax
 
 
 def animate_tensorial_evolution(
-    history: Dict[str, Union[np.ndarray, jax.Array]],
+    history: dict[str, np.ndarray | jax.Array],
     component: str = "all",
     interval: int = 50,
-    save_path: Optional[str] = None,
+    save_path: str | None = None,
     **kwargs,
 ) -> animation.FuncAnimation:
     """Create animation of tensorial stress field evolution.
@@ -476,24 +480,26 @@ def animate_tensorial_evolution(
     Returns:
         Matplotlib FuncAnimation object.
     """
-    stress_history = np.array(history['stress'])
-    time = np.array(history['time'])
+    stress_history = np.array(history["stress"])
+    time = np.array(history["time"])
 
     T, n_comp, L, _ = stress_history.shape
 
     if n_comp != 3:
-        raise ValueError(f"Expected stress shape (T, 3, L, L), got {stress_history.shape}")
+        raise ValueError(
+            f"Expected stress shape (T, 3, L, L), got {stress_history.shape}"
+        )
 
-    nu = kwargs.get('nu', 0.5)
+    nu = kwargs.get("nu", 0.5)
 
     # Determine component mapping
     component_map = {
-        'xx': 0,
-        'yy': 1,
-        'xy': 2,
+        "xx": 0,
+        "yy": 1,
+        "xy": 2,
     }
 
-    if component == 'all':
+    if component == "all":
         # 3-panel animation
         fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
@@ -506,10 +512,10 @@ def animate_tensorial_evolution(
         for i in range(3):
             im = axes[i].imshow(
                 stress_history[0, i],
-                cmap='coolwarm',
+                cmap="coolwarm",
                 vmin=-max_stress,
                 vmax=max_stress,
-                origin='lower',
+                origin="lower",
                 animated=True,
             )
             axes[i].set_title(f"{labels[i]} - t={time[0]:.3f}")
@@ -534,10 +540,10 @@ def animate_tensorial_evolution(
         max_val = np.max(np.abs(stress_history[:, idx]))
         im = ax.imshow(
             stress_history[0, idx],
-            cmap='coolwarm',
+            cmap="coolwarm",
             vmin=-max_val,
             vmax=max_val,
-            origin='lower',
+            origin="lower",
             animated=True,
         )
         ax.set_title(f"$\\sigma_{{{component}}}$ - t={time[0]:.3f}")
@@ -552,7 +558,7 @@ def animate_tensorial_evolution(
             fig, update, frames=T, interval=interval, blit=True
         )
 
-    elif component == 'N1':
+    elif component == "N1":
         # Normal stress difference animation
         fig, ax = plt.subplots(figsize=(6, 5))
 
@@ -562,10 +568,10 @@ def animate_tensorial_evolution(
 
         im = ax.imshow(
             N1_history[0],
-            cmap='coolwarm',
+            cmap="coolwarm",
             vmin=-max_N1,
             vmax=max_N1,
-            origin='lower',
+            origin="lower",
             animated=True,
         )
         ax.set_title(f"$N_1$ - t={time[0]:.3f}")
@@ -580,7 +586,7 @@ def animate_tensorial_evolution(
             fig, update, frames=T, interval=interval, blit=True
         )
 
-    elif component == 'vm':
+    elif component == "vm":
         # von Mises animation
         fig, ax = plt.subplots(figsize=(6, 5))
 
@@ -600,10 +606,10 @@ def animate_tensorial_evolution(
 
         im = ax.imshow(
             vm_history[0],
-            cmap='viridis',
+            cmap="viridis",
             vmin=0,
             vmax=max_vm,
-            origin='lower',
+            origin="lower",
             animated=True,
         )
         ax.set_title(f"$\\sigma_{{\\mathrm{{eff}}}}$ - t={time[0]:.3f}")
@@ -628,4 +634,3 @@ def animate_tensorial_evolution(
         anim.save(save_path)
 
     return anim
-

@@ -1,11 +1,12 @@
 """Tests for Lattice EPM model."""
 
-import pytest
 import numpy as np
+import pytest
+
+from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.epm.lattice import LatticeEPM
 from rheojax.models.epm.tensor import TensorialEPM
-from rheojax.core.data import RheoData
 
 jax, jnp = safe_import_jax()
 
@@ -120,7 +121,9 @@ def test_lattice_epm_oscillation_backward_compat():
     model = LatticeEPM(L=16, dt=0.01)
 
     time = jnp.linspace(0, 2 * jnp.pi, 100)
-    data = RheoData(x=time, y=jnp.zeros_like(time), metadata={"gamma0": 0.01, "omega": 1.0})
+    data = RheoData(
+        x=time, y=jnp.zeros_like(time), metadata={"gamma0": 0.01, "omega": 1.0}
+    )
 
     result = model.predict(data, test_mode="oscillation", seed=42)
 
@@ -162,6 +165,6 @@ def test_tensorial_epm_scaffold():
     result = model.predict(
         RheoData(x=jnp.array([0.1]), y=jnp.array([0.0])),
         test_mode="flow_curve",
-        seed=42
+        seed=42,
     )
     assert result.y.shape == (1,)

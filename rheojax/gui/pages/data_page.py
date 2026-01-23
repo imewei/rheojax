@@ -881,8 +881,7 @@ class DropZone(QFrame):
         logger.debug("Initializing", class_name=self.__class__.__name__)
         self.setAcceptDrops(True)
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
-        self.setStyleSheet(
-            """
+        self.setStyleSheet("""
             QFrame {
                 background-color: #f9f9f9;
                 border: 2px dashed #ccc;
@@ -892,8 +891,7 @@ class DropZone(QFrame):
                 border-color: #2196F3;
                 background-color: #f0f7ff;
             }
-        """
-        )
+        """)
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignCenter)

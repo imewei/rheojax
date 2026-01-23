@@ -33,7 +33,17 @@ class TestFluidityLocalSmoke:
     def test_parameters_exist(self):
         """Test expected parameters are present."""
         model = FluidityLocal()
-        expected_params = ["G", "tau_y", "K", "n_flow", "f_eq", "f_inf", "theta", "a", "n_rejuv"]
+        expected_params = [
+            "G",
+            "tau_y",
+            "K",
+            "n_flow",
+            "f_eq",
+            "f_inf",
+            "theta",
+            "a",
+            "n_rejuv",
+        ]
         for param in expected_params:
             assert param in model.parameters.keys()
 

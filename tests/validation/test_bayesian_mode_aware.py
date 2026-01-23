@@ -406,9 +406,7 @@ class TestBayesianRelaxationMode:
 
         assert check_divergences(
             result.diagnostics, threshold=divergence_threshold
-        ), (  # Relaxed for complex fractional models
-            f"{model_class.__name__}: Divergences > {divergence_threshold:.0%} in relaxation mode"
-        )
+        ), f"{model_class.__name__}: Divergences > {divergence_threshold:.0%} in relaxation mode"  # Relaxed for complex fractional models
 
     def test_maxwell_relaxation_posterior_accuracy(self, relaxation_maxwell_data):
         """Test Maxwell posterior accuracy in relaxation mode.

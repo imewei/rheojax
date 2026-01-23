@@ -6,7 +6,7 @@ yield-stress fluids, supporting multiple protocols via JAX and Diffrax.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 import diffrax
 import numpy as np
@@ -185,9 +185,7 @@ class FluidityLocal(FluidityBase):
     # Transient Protocols (Startup, Relaxation, Creep)
     # =========================================================================
 
-    def _fit_transient(
-        self, t: np.ndarray, y: np.ndarray, mode: str, **kwargs
-    ) -> None:
+    def _fit_transient(self, t: np.ndarray, y: np.ndarray, mode: str, **kwargs) -> None:
         """Fit transient response.
 
         Args:
@@ -671,7 +669,7 @@ class FluidityLocal(FluidityBase):
     # Prediction Interface
     # =========================================================================
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """Predict based on fitted state."""
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         p = self.get_parameter_dict()

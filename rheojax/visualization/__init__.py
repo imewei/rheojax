@@ -7,6 +7,15 @@ This module provides:
 - Export to PNG, PDF, SVG formats
 """
 
+from rheojax.visualization.epm_plots import (
+    animate_stress_evolution,
+    animate_tensorial_evolution,
+    plot_lattice_fields,
+    plot_normal_stress_field,
+    plot_normal_stress_ratio,
+    plot_tensorial_fields,
+    plot_von_mises_field,
+)
 from rheojax.visualization.plotter import (
     plot_flow_curve,
     plot_frequency_domain,
@@ -21,15 +30,6 @@ from rheojax.visualization.templates import (
     plot_model_fit,
     plot_modulus_frequency,
     plot_stress_strain,
-)
-from rheojax.visualization.epm_plots import (
-    plot_lattice_fields,
-    animate_stress_evolution,
-    plot_tensorial_fields,
-    plot_normal_stress_field,
-    plot_von_mises_field,
-    plot_normal_stress_ratio,
-    animate_tensorial_evolution,
 )
 
 __all__ = [

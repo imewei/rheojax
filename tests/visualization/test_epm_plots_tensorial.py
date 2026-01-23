@@ -11,12 +11,12 @@ import matplotlib.pyplot as plt
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.visualization.epm_plots import (
+    animate_tensorial_evolution,
     plot_lattice_fields,
     plot_normal_stress_field,
     plot_normal_stress_ratio,
     plot_tensorial_fields,
     plot_von_mises_field,
-    animate_tensorial_evolution,
 )
 
 jax, jnp = safe_import_jax()
@@ -90,9 +90,9 @@ class TestTensorialFieldPlots:
         titles = [ax.get_title() for ax in axes]
 
         # Check for LaTeX formatted component labels
-        assert any('xx' in title.lower() or 'σ' in title for title in titles)
-        assert any('yy' in title.lower() or 'σ' in title for title in titles)
-        assert any('xy' in title.lower() or 'σ' in title for title in titles)
+        assert any("xx" in title.lower() or "σ" in title for title in titles)
+        assert any("yy" in title.lower() or "σ" in title for title in titles)
+        assert any("xy" in title.lower() or "σ" in title for title in titles)
         plt.close(fig)
 
     def test_plot_tensorial_fields_colormap(self):
@@ -100,13 +100,13 @@ class TestTensorialFieldPlots:
         L = 32
         stress = np.random.randn(3, L, L)
 
-        fig, axes = plot_tensorial_fields(stress, cmap='coolwarm')
+        fig, axes = plot_tensorial_fields(stress, cmap="coolwarm")
 
         # Check that images use specified colormap
         for ax in axes:
             images = ax.get_images()
             if images:
-                assert images[0].get_cmap().name == 'coolwarm'
+                assert images[0].get_cmap().name == "coolwarm"
         plt.close(fig)
 
 
@@ -140,7 +140,7 @@ class TestNormalStressPlots:
         title = ax.get_title()
 
         # Should contain N or N1 in title
-        assert 'N' in title or '$N_1$' in title
+        assert "N" in title or "$N_1$" in title
         plt.close(fig)
 
     def test_plot_normal_stress_ratio(self):
@@ -154,8 +154,8 @@ class TestNormalStressPlots:
         assert fig is not None
         assert ax is not None
         # Should be log-log
-        assert ax.get_xscale() == 'log'
-        assert ax.get_yscale() == 'log'
+        assert ax.get_xscale() == "log"
+        assert ax.get_yscale() == "log"
         plt.close(fig)
 
 
@@ -186,12 +186,12 @@ class TestVonMisesPlots:
         # First panel: σ_eff with viridis (sequential)
         images_0 = axes[0].get_images()
         if images_0:
-            assert images_0[0].get_cmap().name == 'viridis'
+            assert images_0[0].get_cmap().name == "viridis"
 
         # Second panel: σ_eff/σ_c with RdYlGn_r (diverging centered at 1)
         images_1 = axes[1].get_images()
         if images_1:
-            assert images_1[0].get_cmap().name == 'RdYlGn_r'
+            assert images_1[0].get_cmap().name == "RdYlGn_r"
 
         plt.close(fig)
 
@@ -207,12 +207,9 @@ class TestTensorialAnimation:
         stress_history = np.random.randn(T, 3, L, L)
         time = np.linspace(0, 1, T)
 
-        history = {
-            'stress': stress_history,
-            'time': time
-        }
+        history = {"stress": stress_history, "time": time}
 
-        anim = animate_tensorial_evolution(history, component='all')
+        anim = animate_tensorial_evolution(history, component="all")
 
         assert anim is not None
         # Should have 3 plot axes + 3 colorbar axes = 6 axes for 'all' components
@@ -226,12 +223,9 @@ class TestTensorialAnimation:
         stress_history = np.random.randn(T, 3, L, L)
         time = np.linspace(0, 1, T)
 
-        history = {
-            'stress': stress_history,
-            'time': time
-        }
+        history = {"stress": stress_history, "time": time}
 
-        anim = animate_tensorial_evolution(history, component='xx')
+        anim = animate_tensorial_evolution(history, component="xx")
 
         assert anim is not None
         # Should have 1 plot axis + 1 colorbar axis = 2 axes for single component
@@ -245,12 +239,9 @@ class TestTensorialAnimation:
         stress_history = np.random.randn(T, 3, L, L)
         time = np.linspace(0, 1, T)
 
-        history = {
-            'stress': stress_history,
-            'time': time
-        }
+        history = {"stress": stress_history, "time": time}
 
-        anim = animate_tensorial_evolution(history, component='vm')
+        anim = animate_tensorial_evolution(history, component="vm")
 
         assert anim is not None
         # Should have 1 plot axis + 1 colorbar axis = 2 axes

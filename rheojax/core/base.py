@@ -498,7 +498,9 @@ class BaseModel(BayesianMixin, ABC):
             )
             raise
 
-    def predict(self, X: ArrayLike, test_mode: str | None = None, **kwargs) -> ArrayLike:
+    def predict(
+        self, X: ArrayLike, test_mode: str | None = None, **kwargs
+    ) -> ArrayLike:
         """Make predictions.
 
         Args:

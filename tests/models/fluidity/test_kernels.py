@@ -29,9 +29,7 @@ class TestFluidityKernelsSmoke:
 
     def test_f_loc_returns_scalar(self):
         """Test f_loc_herschel_bulkley returns scalar output."""
-        f_loc = f_loc_herschel_bulkley(
-            sigma=1000.0, tau_y=500.0, K=100.0, n=0.5
-        )
+        f_loc = f_loc_herschel_bulkley(sigma=1000.0, tau_y=500.0, K=100.0, n=0.5)
         assert isinstance(float(f_loc), float)
         assert np.isfinite(float(f_loc))
 
@@ -167,7 +165,7 @@ class TestFluidityKernelsODERHS:
     def test_local_ode_rhs_fluidity_relaxes_at_rest(self):
         """Test fluidity relaxes toward f_eq at rest."""
         f_init = 1e-3  # Start at high fluidity (just sheared)
-        f_eq = 1e-6    # Equilibrium is lower
+        f_eq = 1e-6  # Equilibrium is lower
 
         y = jnp.array([1000.0, f_init])
         args = {

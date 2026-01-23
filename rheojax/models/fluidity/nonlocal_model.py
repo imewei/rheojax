@@ -6,7 +6,7 @@ for yield-stress fluids with spatial diffusion, supporting shear banding analysi
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 import diffrax
 import numpy as np
@@ -116,9 +116,7 @@ class FluidityNonlocal(FluidityBase):
             if hasattr(self, "_test_mode") and self._test_mode:
                 test_mode = self._test_mode
             else:
-                raise ValueError(
-                    "test_mode must be specified for Fluidity fitting"
-                )
+                raise ValueError("test_mode must be specified for Fluidity fitting")
 
         with log_fit(logger, model="FluidityNonlocal", data_shape=X.shape) as ctx:
             self._test_mode = cast(str, test_mode)
@@ -286,9 +284,7 @@ class FluidityNonlocal(FluidityBase):
     # Transient Protocols (Startup, Relaxation, Creep)
     # =========================================================================
 
-    def _fit_transient(
-        self, t: np.ndarray, y: np.ndarray, mode: str, **kwargs
-    ) -> None:
+    def _fit_transient(self, t: np.ndarray, y: np.ndarray, mode: str, **kwargs) -> None:
         """Fit transient response using PDE solver.
 
         Args:
@@ -469,9 +465,7 @@ class FluidityNonlocal(FluidityBase):
             raise ValueError("No trajectory available. Run simulation first.")
         return self._f_field_trajectory[time_idx]
 
-    def get_shear_banding_metric(
-        self, f_field: np.ndarray | None = None
-    ) -> float:
+    def get_shear_banding_metric(self, f_field: np.ndarray | None = None) -> float:
         """Compute coefficient of variation as shear banding metric.
 
         CV = std(f) / mean(f)
@@ -777,7 +771,7 @@ class FluidityNonlocal(FluidityBase):
     # Prediction Interface
     # =========================================================================
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """Predict based on fitted state."""
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         p = self.get_parameter_dict()

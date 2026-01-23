@@ -83,7 +83,13 @@ _TEST_MODE_PATTERNS: dict[str, list[re.Pattern]] = {
     ],
     "rotation": [
         re.compile(p, re.IGNORECASE)
-        for p in [r"shear\s*[-_]?\s*rate", r"viscosity", r"eta", r"γ̇", r"gamma[-_]?dot"]
+        for p in [
+            r"shear\s*[-_]?\s*rate",
+            r"viscosity",
+            r"eta",
+            r"γ̇",
+            r"gamma[-_]?dot",
+        ]
     ],
 }
 

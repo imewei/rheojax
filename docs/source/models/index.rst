@@ -97,3 +97,9 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
 
    spp/spp_decomposer
    spp/spp_yield_stress
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Elasto-Viscoplastic (IKH) Models
+
+   ikh/index

@@ -42,7 +42,7 @@ class TestModeEnum(str, Enum):
     OSCILLATION = "oscillation"
     ROTATION = "rotation"
     FLOW_CURVE = "flow_curve"  # Steady-state flow curve protocol
-    STARTUP = "startup"        # Startup shear protocol
+    STARTUP = "startup"  # Startup shear protocol
     UNKNOWN = "unknown"
 
     def __str__(self) -> str:

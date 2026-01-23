@@ -269,8 +269,7 @@ class ExportPage(QWidget):
 
         # Export button
         self._btn_export = QPushButton("Export")
-        self._btn_export.setStyleSheet(
-            """
+        self._btn_export.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
@@ -285,8 +284,7 @@ class ExportPage(QWidget):
                 background-color: #cccccc;
                 color: #666666;
             }
-        """
-        )
+        """)
         self._btn_export.clicked.connect(self._on_export_clicked)
         layout.addWidget(self._btn_export)
 

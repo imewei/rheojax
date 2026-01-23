@@ -207,12 +207,10 @@ class TestSubprocessCrashDetection:
 
     def test_gui_launch_no_crash(self, subprocess_runner):
         """Verify GUI can be imported and initialized without crash."""
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
             import sys
             sys.exit(0)  # Quick exit after imports
-        """
-        )
+        """)
 
         result = subprocess_runner(code, timeout=5.0)
 
@@ -223,8 +221,7 @@ class TestSubprocessCrashDetection:
 
     def test_parameter_table_creation_no_crash(self, subprocess_runner):
         """Verify ParameterTable creation doesn't crash."""
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
             from PySide6.QtWidgets import QApplication
             from rheojax.gui.state.store import ParameterState
             from rheojax.gui.widgets.parameter_table import ParameterTable
@@ -244,8 +241,7 @@ class TestSubprocessCrashDetection:
             table.reset_to_defaults()
 
             print("SUCCESS")
-        """
-        )
+        """)
 
         result = subprocess_runner(code, timeout=10.0)
 
@@ -257,8 +253,7 @@ class TestSubprocessCrashDetection:
 
     def test_status_bar_update_no_crash(self, subprocess_runner):
         """Verify StatusBar updates don't crash."""
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
             from PySide6.QtWidgets import QApplication
             from rheojax.gui.app.status_bar import StatusBar
 
@@ -275,8 +270,7 @@ class TestSubprocessCrashDetection:
             status_bar.hide_progress()
 
             print("SUCCESS")
-        """
-        )
+        """)
 
         result = subprocess_runner(code, timeout=10.0)
 
@@ -288,8 +282,7 @@ class TestSubprocessCrashDetection:
 
     def test_icon_provider_all_icons_no_crash(self, subprocess_runner):
         """Verify IconProvider icon retrieval doesn't crash."""
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
             from PySide6.QtWidgets import QApplication, QLabel
             from rheojax.gui.utils.icons import IconProvider
 
@@ -311,8 +304,7 @@ class TestSubprocessCrashDetection:
                 label.show()
 
             print("SUCCESS")
-        """
-        )
+        """)
 
         result = subprocess_runner(code, timeout=10.0)
 
@@ -333,8 +325,7 @@ class TestRegressionCrashPrevention:
         Verifies that status bar uses ASCII indicators instead of
         Unicode checkmarks that could potentially cause rendering issues.
         """
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
             from PySide6.QtWidgets import QApplication
             from rheojax.gui.app.status_bar import StatusBar
 
@@ -354,8 +345,7 @@ class TestRegressionCrashPrevention:
                     raise ValueError(f"Non-ASCII in float64 label: {text}")
 
             print("SUCCESS - No Unicode checkmarks")
-        """
-        )
+        """)
 
         result = subprocess_runner(code, timeout=10.0)
 

@@ -204,14 +204,12 @@ class RheoJAXMainWindow(QMainWindow):
         logger.debug("Setting up tab pages")
         self.tabs = QTabWidget(self)
         # Enlarge tab font for visibility
-        self.tabs.setStyleSheet(
-            """
+        self.tabs.setStyleSheet("""
             QTabBar::tab {
                 font-size: 12pt;
                 padding: 8px 16px;
             }
-            """
-        )
+            """)
         self.setCentralWidget(self.tabs)
 
         # Create pages
