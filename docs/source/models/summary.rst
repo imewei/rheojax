@@ -621,6 +621,55 @@ ITT-MCT Models (2 models)
 * Both capture yielding, but ITT-MCT provides quantitative predictions from structure
 
 
+DMT Thixotropic Models (2 models)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**When to use:** Thixotropic materials with time-dependent rheology, stress overshoot in startup, delayed yielding, materials with structural buildup at rest.
+
+**Advantages:**
+
+* Scalar structure parameter λ ∈ [0, 1] tracks microstructure
+* Clear separation of buildup (aging) and breakdown (shear) kinetics
+* Two viscosity closures: exponential (smooth) or Herschel-Bulkley (yield stress)
+* Optional Maxwell backbone for stress overshoot and SAOS
+* Nonlocal variant captures shear banding via structure diffusion
+
+**Structure parameter (λ) interpretation:**
+
+.. list-table:: Structure Parameter Guide
+   :header-rows: 1
+   :widths: 15 25 60
+
+   * - λ Value
+     - Physical Meaning
+     - Material State
+   * - λ = 1
+     - Fully structured
+     - At rest (aged), maximum viscosity, colloidal network intact
+   * - 0 < λ < 1
+     - Partially broken
+     - Under shear, intermediate microstructure
+   * - λ = 0
+     - Fully broken
+     - High shear (rejuvenated), minimum viscosity, network destroyed
+
+**Model selection within DMT family:**
+
+* **DMTLocal (exponential)**: Smooth viscosity transition, no yield stress, simple
+* **DMTLocal (herschel_bulkley)**: Explicit yield stress, structure-dependent τ_y and K
+* **DMTLocal + elasticity**: Maxwell backbone for stress overshoot and SAOS
+* **DMTNonlocal**: Shear banding via structure diffusion (D_λ∇²λ)
+
+**Key physics:**
+
+* Structure kinetics: dλ/dt = (1-λ)/t_eq - aλ|γ̇|^c/t_eq
+* Equilibrium structure: λ_eq = 1/(1 + a|γ̇|^c)
+* Exponential viscosity: η(λ) = η_∞(η_0/η_∞)^λ
+* Maxwell stress: dσ/dt = Gγ̇ - σ/θ(λ)
+
+**Typical applications:** Drilling muds, waxy crude oils, cement pastes, mayonnaise, ketchup, paints, concentrated suspensions.
+
+
 **Non-Newtonian classification:**
 
 1. **Shear-thinning (pseudoplastic):** Viscosity decreases with shear rate
