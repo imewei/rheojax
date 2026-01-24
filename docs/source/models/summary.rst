@@ -1,7 +1,7 @@
 Models Summary & Selection Guide
 ==================================
 
-This page serves as a comprehensive quick-reference guide for all **34+ rheological models** in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
+This page serves as a comprehensive quick-reference guide for all **36+ rheological models** in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
 
 .. contents:: Page Contents
    :local:
@@ -315,6 +315,24 @@ The table below provides a comprehensive overview of all models across key chara
      - ★★★★★
      - N/A
      - Shear transformation zone model (Falk-Langer)
+   * - :doc:`ITT-MCT Schematic </models/itt_mct/itt_mct_schematic>`
+     - ITT-MCT
+     - 6
+     - R, C, O, Flow, Startup, LAOS
+     - Colloidal Glass
+     - Configurable
+     - ★★★★★
+     - ε: -0.5 to 0.5
+     - Dense colloidal suspensions, glass transition (F₁₂ schematic)
+   * - :doc:`ITT-MCT Isotropic </models/itt_mct/itt_mct_isotropic>`
+     - ITT-MCT
+     - 5+
+     - R, C, O, Flow, Startup, LAOS
+     - Colloidal Glass
+     - Configurable
+     - ★★★★★
+     - φ: 0.1 to 0.64
+     - Hard-sphere colloids with S(k), full MCT physics
    * - :doc:`SPP Yield Stress </models/spp/spp_yield_stress>`
      - SPP
      - 3+
@@ -329,7 +347,7 @@ The table below provides a comprehensive overview of all models across key chara
 
 * **Test Modes:** R = Relaxation, C = Creep, O = Oscillation, Rot = Rotation (steady shear), Flow = Flow curve, Startup = Startup shear, LAOS = Large-amplitude oscillatory
 * **Complexity:** ★☆☆☆☆ = Simplest, ★★★★★ = Most complex
-* **α Range:** Fractional order range for fractional models; N/A for non-fractional models
+* **α Range:** Fractional order range for fractional models; for ITT-MCT: ε = separation parameter (glass transition), φ = volume fraction; N/A for non-fractional models
 * **Equilibrium Modulus:** Whether model predicts finite G∞ at long times (solid-like)
 
 
@@ -548,6 +566,61 @@ Soft Glassy Rheology Models (2 models)
 The noise temperature x from SGR models directly relates to SRFS shift factors:
 a(γ̇) ~ (γ̇)^(2-x), enabling complementary analysis of oscillatory and flow data.
 
+
+ITT-MCT Models (2 models)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**When to use:** Dense colloidal suspensions near the glass transition, hard-sphere systems, microscopic rheological theory, yielding and flow of glassy materials.
+
+**Advantages:**
+
+* Microscopic theory based on Mode-Coupling Theory
+* Quantitative predictions for hard-sphere colloids
+* Captures glass transition physics (cage effect)
+* Full nonlinear rheology including LAOS harmonics
+* Two-time correlators for non-equilibrium response
+* Strain decorrelation naturally emerges from advection
+
+**Separation parameter (ε) interpretation:**
+
+.. list-table:: Glass Transition Parameter Guide
+   :header-rows: 1
+   :widths: 15 25 60
+
+   * - ε Value
+     - Physical Meaning
+     - Material Examples
+   * - ε < 0
+     - Glass state
+     - Dense suspensions below φ_c, kinetically arrested
+   * - ε ≈ 0
+     - Glass transition
+     - Critical point, diverging relaxation time
+   * - ε > 0
+     - Fluid state
+     - Mobile suspensions, ergodic dynamics
+
+**Model selection within ITT-MCT family:**
+
+* **ITTMCTSchematic (F₁₂)**: Simplified scalar correlator, 6 parameters, fast fitting
+* **ITTMCTIsotropic (ISM)**: Full k-resolved correlators with S(k) input, quantitative predictions
+
+**Key physics:**
+
+* Memory kernel: m(Φ) = v₁Φ + v₂Φ² (schematic) or k-integral (isotropic)
+* Glass transition criterion: v₂_c = 4 (for v₁ = 0)
+* Strain decorrelation: h(γ) = exp(-(γ/γ_c)²)
+* Integration through transients (ITT) for nonlinear flow
+
+**Typical applications:** PMMA hard-sphere colloids, silica suspensions, concentrated emulsions, microgel pastes.
+
+**Comparison with SGR:**
+
+* **SGR**: Phenomenological trap model, noise temperature x, simpler physics
+* **ITT-MCT**: Microscopic derivation, volume fraction φ, full correlator dynamics
+* Both capture yielding, but ITT-MCT provides quantitative predictions from structure
+
+
 **Non-Newtonian classification:**
 
 1. **Shear-thinning (pseudoplastic):** Viscosity decreases with shear rate
@@ -632,8 +705,11 @@ By Material Type
      - SGR Conventional, SGR GENERIC
      - Soft glassy materials; x parameter captures state
    * - Colloidal Suspensions
-     - SGR Conventional, FZSS
-     - Aging systems (x<1) or power-law fluids (1<x<2)
+     - SGR Conventional, ITTMCTSchematic, FZSS
+     - Aging systems (x<1), hard-sphere (MCT), or power-law fluids
+   * - Hard-Sphere Colloids
+     - ITTMCTSchematic, ITTMCTIsotropic
+     - Near glass transition; use ISM for quantitative S(k) predictions
    * - Pastes/Dense Suspensions
      - SGR GENERIC, Herschel-Bulkley
      - Near glass transition; use GENERIC for x→1
@@ -764,6 +840,7 @@ Next Steps
 * **Model selection workflow:** :doc:`/user_guide/model_selection`
 * **Compatibility checking:** :doc:`/user_guide/core_concepts` (automatic detection of model-data mismatches)
 * **SGR models:** :doc:`/models/sgr/sgr_conventional` and :doc:`/models/sgr/sgr_generic`
+* **ITT-MCT models:** :doc:`/models/itt_mct/itt_mct_schematic` and :doc:`/models/itt_mct/itt_mct_isotropic` for colloidal glasses
 * **SRFS transform:** :doc:`/transforms/srfs` for strain-rate frequency superposition
 * **Example notebooks:** 27 examples in ``examples/`` directory
 
