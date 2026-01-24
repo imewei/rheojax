@@ -1,6 +1,6 @@
 """Rheological models package.
 
-This package contains 27 rheological models organized into 10 categories.
+This package contains 29 rheological models organized into 11 categories.
 
 Classical Models (3):
     - Maxwell: Spring and dashpot in series
@@ -49,6 +49,10 @@ Fluidity Models (2):
 Fluidity-Saramito EVP Models (2):
     - FluiditySaramitoLocal: Local (0D) tensorial EVP with thixotropic fluidity
     - FluiditySaramitoNonlocal: Nonlocal (1D) EVP for shear banding
+
+DMT Thixotropic Models (2):
+    - DMTLocal: Local (0D) de Souza Mendes-Thompson thixotropic model
+    - DMTNonlocal: Nonlocal (1D) DMT model for shear banding
 
 SPP LAOS Models (1):
     - SPPYieldStress: Yield stress model for SPP LAOS analysis
@@ -150,6 +154,9 @@ from rheojax.models.stz import STZConventional
 # ITT-MCT models
 from rheojax.models.itt_mct import ITTMCTIsotropic, ITTMCTSchematic
 
+# DMT thixotropic models
+from rheojax.models.dmt import DMTLocal, DMTNonlocal
+
 __all__ = [
     # Classical models
     "Maxwell",
@@ -209,4 +216,7 @@ __all__ = [
     # ITT-MCT models
     "ITTMCTSchematic",
     "ITTMCTIsotropic",
+    # DMT thixotropic models
+    "DMTLocal",
+    "DMTNonlocal",
 ]
