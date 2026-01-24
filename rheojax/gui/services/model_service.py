@@ -48,6 +48,26 @@ def normalize_model_name(model_name: str) -> str:
         # HL
         "hl": "hebraud_lequeux",
         "hebraud lequeux": "hebraud_lequeux",
+        # ITT-MCT
+        "itt-mct": "itt_mct_schematic",
+        "itt mct": "itt_mct_schematic",
+        "mct": "itt_mct_schematic",
+        "itt_mct": "itt_mct_schematic",
+        "itt-mct schematic": "itt_mct_schematic",
+        "itt-mct isotropic": "itt_mct_isotropic",
+        "ism": "itt_mct_isotropic",
+        # DMT
+        "dmt": "dmt_local",
+        "dmt local": "dmt_local",
+        "dmt nonlocal": "dmt_nonlocal",
+        "de souza mendes": "dmt_local",
+        # Fluidity-Saramito
+        "saramito": "fluidity_saramito_local",
+        "fluidity saramito": "fluidity_saramito_local",
+        "fluidity-saramito": "fluidity_saramito_local",
+        "fluidity saramito local": "fluidity_saramito_local",
+        "fluidity saramito nonlocal": "fluidity_saramito_nonlocal",
+        "evp": "fluidity_saramito_local",
     }
 
     if key in alias_map.values():
@@ -154,9 +174,12 @@ class ModelService:
             - 'spp_laos': SPPYieldStress
             - 'stz': STZConventional
             - 'fluidity': FluidityLocal, FluidityNonlocal
+            - 'fluidity_saramito': FluiditySaramitoLocal, FluiditySaramitoNonlocal
             - 'epm': LatticeEPM, TensorialEPM
             - 'ikh': MIKH, MLIKH
             - 'hl': HebraudLequeux
+            - 'itt_mct': ITTMCTSchematic, ITTMCTIsotropic
+            - 'dmt': DMTLocal, DMTNonlocal
         """
         logger.debug("Getting available models from registry")
         all_models = self._registry.get_all_models()
@@ -174,9 +197,12 @@ class ModelService:
             "spp_laos": [],
             "stz": [],
             "fluidity": [],
+            "fluidity_saramito": [],
             "epm": [],
             "ikh": [],
             "hl": [],
+            "itt_mct": [],
+            "dmt": [],
             "other": [],
         }
 
@@ -218,6 +244,13 @@ class ModelService:
                 categories["spp_laos"].append(model_name)
             elif name_lower.startswith("stz"):
                 categories["stz"].append(model_name)
+            elif name_lower.startswith("itt_mct"):
+                categories["itt_mct"].append(model_name)
+            elif name_lower.startswith("dmt"):
+                categories["dmt"].append(model_name)
+            # Check fluidity_saramito before fluidity (more specific first)
+            elif name_lower.startswith("fluidity_saramito"):
+                categories["fluidity_saramito"].append(model_name)
             elif name_lower.startswith("fluidity"):
                 categories["fluidity"].append(model_name)
             elif name_lower.endswith("_epm") or name_lower.startswith("epm"):
