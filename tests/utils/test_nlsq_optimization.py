@@ -607,3 +607,386 @@ class TestNLSQPerformanceCharacteristics:
 
         # For gradient-based methods, nfev should be close to nit
         # (may vary depending on line search)
+
+
+# =============================================================================
+# NLSQ 0.6.6 Feature Tests
+# =============================================================================
+
+
+class TestNLSQ066Features:
+    """Tests for NLSQ 0.6.6 specific features."""
+
+    @pytest.mark.smoke
+    def test_workflow_auto_default(self):
+        """Test that workflow='auto' is the default and works correctly."""
+        params = ParameterSet()
+        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            return (values[0] - 5.0) ** 2
+
+        # Default workflow should be 'auto'
+        result = nlsq_optimize(objective, params)
+
+        assert result.success
+        assert abs(result.x[0] - 5.0) < 0.1
+
+    def test_workflow_parameter_accepted(self):
+        """Test that workflow parameter is accepted without error."""
+        params = ParameterSet()
+        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            return (values[0] - 5.0) ** 2
+
+        # Test with explicit workflow parameter
+        result = nlsq_optimize(objective, params, workflow="auto")
+
+        assert result.success
+        assert abs(result.x[0] - 5.0) < 0.1
+
+    def test_auto_bounds_parameter(self):
+        """Test auto_bounds parameter is accepted."""
+        params = ParameterSet()
+        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            return (values[0] - 5.0) ** 2
+
+        # auto_bounds should be accepted (may not change behavior with explicit bounds)
+        result = nlsq_optimize(objective, params, auto_bounds=True)
+
+        assert result.success
+
+    def test_stability_parameter_false(self):
+        """Test stability=False parameter is accepted."""
+        params = ParameterSet()
+        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            return (values[0] - 5.0) ** 2
+
+        result = nlsq_optimize(objective, params, stability=False)
+
+        assert result.success
+
+    def test_stability_parameter_auto(self):
+        """Test stability='auto' parameter is accepted."""
+        params = ParameterSet()
+        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            return (values[0] - 5.0) ** 2
+
+        result = nlsq_optimize(objective, params, stability="auto")
+
+        assert result.success
+
+    def test_fallback_parameter(self):
+        """Test fallback parameter is accepted."""
+        params = ParameterSet()
+        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            return (values[0] - 5.0) ** 2
+
+        result = nlsq_optimize(objective, params, fallback=True)
+
+        assert result.success
+
+    def test_compute_diagnostics_parameter(self):
+        """Test compute_diagnostics parameter is accepted."""
+        params = ParameterSet()
+        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            return (values[0] - 5.0) ** 2
+
+        result = nlsq_optimize(objective, params, compute_diagnostics=True)
+
+        assert result.success
+        # diagnostics field should exist (may be None if NLSQ doesn't populate it)
+        assert hasattr(result, "diagnostics")
+
+    def test_optimization_result_has_diagnostics_field(self):
+        """Test OptimizationResult has diagnostics field."""
+        result = OptimizationResult(
+            x=np.array([1.0]),
+            fun=0.0,
+            diagnostics={"test": "value"},
+        )
+
+        assert result.diagnostics == {"test": "value"}
+
+    def test_optimization_result_diagnostics_default_none(self):
+        """Test OptimizationResult diagnostics defaults to None."""
+        result = OptimizationResult(
+            x=np.array([1.0]),
+            fun=0.0,
+        )
+
+        assert result.diagnostics is None
+
+
+class TestNLSQ066CurveFit:
+    """Tests for NLSQ 0.6.6 curve_fit features."""
+
+    @pytest.fixture
+    def exponential_data(self):
+        """Generate exponential decay test data."""
+        np.random.seed(42)
+        x = np.linspace(0.1, 5, 50)
+        y_true = 2.0 * np.exp(-0.5 * x)
+        y_noisy = y_true + np.random.normal(0, 0.05, len(x))
+        return x, y_noisy
+
+    @pytest.mark.smoke
+    def test_curve_fit_workflow_parameter(self, exponential_data):
+        """Test nlsq_curve_fit accepts workflow parameter."""
+        from rheojax.utils.optimization import nlsq_curve_fit
+
+        x, y = exponential_data
+
+        def model(x_data, params):
+            import jax.numpy as jnp
+
+            a, b = params
+            return a * jnp.exp(-b * x_data)
+
+        params = ParameterSet()
+        params.add("a", value=1.0, bounds=(0.1, 10.0))
+        params.add("b", value=0.3, bounds=(0.01, 5.0))
+
+        result = nlsq_curve_fit(model, x, y, params, workflow="auto")
+
+        assert result.success
+        assert result.r_squared is not None
+        assert result.r_squared > 0.9
+
+    def test_curve_fit_prediction_interval(self, exponential_data):
+        """Test prediction_interval method on curve_fit result."""
+        from rheojax.utils.optimization import nlsq_curve_fit
+
+        x, y = exponential_data
+
+        def model(x_data, params):
+            import jax.numpy as jnp
+
+            a, b = params
+            return a * jnp.exp(-b * x_data)
+
+        params = ParameterSet()
+        params.add("a", value=1.0, bounds=(0.1, 10.0))
+        params.add("b", value=0.3, bounds=(0.01, 5.0))
+
+        result = nlsq_curve_fit(model, x, y, params)
+
+        # Test prediction_interval method exists and works
+        assert hasattr(result, "prediction_interval")
+
+        # Call prediction_interval
+        pi = result.prediction_interval(x[:5], alpha=0.95)
+
+        # Should return array or None
+        if pi is not None:
+            assert pi.shape == (5, 2)  # (n_points, 2) for lower/upper
+            # Lower should be less than upper
+            assert np.all(pi[:, 0] <= pi[:, 1])
+
+    def test_curve_fit_native_delegation(self, exponential_data):
+        """Test that curve_fit results can delegate to native CurveFitResult."""
+        from rheojax.utils.optimization import nlsq_curve_fit
+
+        x, y = exponential_data
+
+        def model(x_data, params):
+            import jax.numpy as jnp
+
+            a, b = params
+            return a * jnp.exp(-b * x_data)
+
+        params = ParameterSet()
+        params.add("a", value=1.0, bounds=(0.1, 10.0))
+        params.add("b", value=0.3, bounds=(0.01, 5.0))
+
+        result = nlsq_curve_fit(model, x, y, params)
+
+        # Check native delegation fields exist
+        assert hasattr(result, "_curve_fit_result")
+        assert hasattr(result, "_model_fn")
+        assert hasattr(result, "_x_data")
+
+
+class TestNLSQ066GlobalOptimization:
+    """Tests for NLSQ 0.6.6 global optimization."""
+
+    @pytest.mark.smoke
+    def test_nlsq_optimize_global_import(self):
+        """Test nlsq_optimize_global can be imported."""
+        from rheojax.utils.optimization import nlsq_optimize_global
+
+        assert callable(nlsq_optimize_global)
+
+    def test_nlsq_optimize_global_basic(self):
+        """Test nlsq_optimize_global basic functionality."""
+        from rheojax.utils.optimization import nlsq_optimize_global
+
+        params = ParameterSet()
+        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            return (values[0] - 5.0) ** 2
+
+        result = nlsq_optimize_global(objective, params)
+
+        assert result.success
+        assert abs(result.x[0] - 5.0) < 0.5
+
+
+class TestNLSQ066BackwardCompatibility:
+    """Ensure existing code works unchanged with NLSQ 0.6.6."""
+
+    @pytest.mark.smoke
+    def test_existing_model_fit_unchanged(self):
+        """Test that existing optimization calls work without modification."""
+        params = ParameterSet()
+        params.add(name="a", value=1.0, bounds=(0.0, 10.0))
+        params.add(name="b", value=1.0, bounds=(0.0, 10.0))
+
+        def objective(values):
+            a, b = values
+            return (a - 3.0) ** 2 + (b - 4.0) ** 2
+
+        # Old-style call without any new parameters
+        result = nlsq_optimize(objective, params)
+
+        assert result.success
+        assert abs(result.x[0] - 3.0) < 0.1
+        assert abs(result.x[1] - 4.0) < 0.1
+
+    @pytest.mark.smoke
+    def test_optimization_result_properties_unchanged(self):
+        """Test that existing OptimizationResult properties work correctly."""
+        params = ParameterSet()
+        params.add(name="x", value=0.0, bounds=(-10.0, 10.0))
+
+        # Create data for statistical metrics
+        x_data = np.linspace(0, 10, 50)
+        y_data = 2.0 * x_data + 1.0 + np.random.normal(0, 0.1, 50)
+
+        def objective(values):
+            slope = values[0]
+            pred = slope * x_data
+            return y_data - pred
+
+        result = nlsq_optimize(objective, params)
+
+        # All existing properties should work
+        assert result.success
+        assert result.x is not None
+        assert result.fun is not None
+        assert result.nfev >= 0
+        assert result.nit >= 0
+
+    def test_confidence_intervals_unchanged(self):
+        """Test confidence_intervals method works unchanged."""
+        # Create result with covariance
+        pcov = np.array([[0.01, 0.0], [0.0, 0.02]])
+        result = OptimizationResult(
+            x=np.array([1.0, 2.0]),
+            fun=0.1,
+            pcov=pcov,
+            residuals=np.random.normal(0, 0.1, 50),
+            n_data=50,
+        )
+
+        ci = result.confidence_intervals(alpha=0.95)
+
+        assert ci is not None
+        assert ci.shape == (2, 2)
+        # Lower bound should be less than upper bound
+        assert np.all(ci[:, 0] < ci[:, 1])
+
+    def test_statistical_properties_unchanged(self):
+        """Test r_squared, rmse, mae, aic, bic work unchanged."""
+        y_data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        residuals = np.array([0.1, -0.1, 0.05, -0.05, 0.0])
+
+        result = OptimizationResult(
+            x=np.array([1.0]),
+            fun=np.sum(residuals**2),
+            residuals=residuals,
+            y_data=y_data,
+            n_data=5,
+        )
+
+        # All statistical properties should work
+        assert result.r_squared is not None
+        assert 0.9 < result.r_squared <= 1.0
+
+        assert result.rmse is not None
+        assert result.rmse > 0
+
+        assert result.mae is not None
+        assert result.mae > 0
+
+        assert result.aic is not None
+        assert result.bic is not None
+
+
+class TestPredictionIntervalMethod:
+    """Detailed tests for the prediction_interval method."""
+
+    def test_prediction_interval_with_none_x_uses_original(self):
+        """Test prediction_interval with x=None uses original x_data."""
+        x_data = np.linspace(0, 10, 20)
+
+        def model_fn(x, params):
+            return params[0] * x
+
+        result = OptimizationResult(
+            x=np.array([2.0]),
+            fun=0.1,
+            pcov=np.array([[0.01]]),
+            residuals=np.random.normal(0, 0.1, 20),
+            n_data=20,
+            _model_fn=model_fn,
+            _x_data=x_data,
+        )
+
+        pi = result.prediction_interval(x_new=None, alpha=0.95)
+
+        if pi is not None:
+            assert pi.shape[0] == len(x_data)
+
+    def test_prediction_interval_returns_none_without_model(self):
+        """Test prediction_interval returns None when model_fn is missing."""
+        result = OptimizationResult(
+            x=np.array([1.0]),
+            fun=0.1,
+            pcov=np.array([[0.01]]),
+            # No _model_fn set
+        )
+
+        pi = result.prediction_interval(np.array([1.0, 2.0]))
+
+        assert pi is None
+
+    def test_prediction_interval_returns_none_without_pcov(self):
+        """Test prediction_interval returns None when pcov is missing."""
+
+        def model_fn(x, params):
+            return params[0] * x
+
+        result = OptimizationResult(
+            x=np.array([1.0]),
+            fun=0.1,
+            pcov=None,  # No covariance
+            _model_fn=model_fn,
+            _x_data=np.array([1.0, 2.0]),
+        )
+
+        pi = result.prediction_interval(np.array([1.0, 2.0]))
+
+        assert pi is None

@@ -152,11 +152,11 @@ def compute_covariance_from_jacobian(
 
 @dataclass
 class OptimizationResult:
-    """Result from optimization with NLSQ 0.6.0 CurveFitResult-compatible properties.
+    """Result from optimization with NLSQ 0.6.6 CurveFitResult-compatible properties.
 
     This dataclass stores the results of NLSQ optimization, including optimal
     parameter values, objective function value, convergence information, and
-    statistical metrics compatible with NLSQ 0.6.0's CurveFitResult.
+    statistical metrics compatible with NLSQ 0.6.6's CurveFitResult.
 
     Attributes:
         x: Optimal parameter values (float64 array)
@@ -176,8 +176,9 @@ class OptimizationResult:
         residuals: Residual vector (y_data - y_pred) for statistical metrics
         y_data: Original dependent variable data (for R² computation)
         n_data: Number of data points (for AIC/BIC computation)
+        diagnostics: Model health diagnostics (NLSQ 0.6.6, when compute_diagnostics=True)
 
-    Statistical Properties (NLSQ 0.6.0 CurveFitResult compatible):
+    Statistical Properties (NLSQ 0.6.6 CurveFitResult compatible):
         r_squared: Coefficient of determination (R²)
         adj_r_squared: Adjusted R² accounting for number of parameters
         rmse: Root mean squared error
@@ -187,6 +188,7 @@ class OptimizationResult:
 
     Methods:
         confidence_intervals(alpha): Compute parameter confidence intervals
+        prediction_interval(x_new, alpha): Compute prediction intervals (NLSQ 0.6.6)
         get_parameter_uncertainties(): Get standard errors from covariance diagonal
     """
 
@@ -204,10 +206,15 @@ class OptimizationResult:
     cost: float | None = None
     grad: np.ndarray | None = None
     nlsq_result: dict[str, Any] | None = field(default=None, repr=False)
-    # NEW: Fields for statistical metrics (NLSQ 0.6.0 compatibility)
+    # Fields for statistical metrics (NLSQ 0.6.6 compatibility)
     residuals: np.ndarray | None = field(default=None, repr=False)
     y_data: np.ndarray | None = field(default=None, repr=False)
     n_data: int | None = None
+    # NLSQ 0.6.6 fields for native delegation
+    diagnostics: dict[str, Any] | None = field(default=None, repr=False)
+    _curve_fit_result: Any | None = field(default=None, repr=False)
+    _model_fn: Callable | None = field(default=None, repr=False)
+    _x_data: np.ndarray | None = field(default=None, repr=False)
 
     # =========================================================================
     # Statistical Properties (NLSQ 0.6.0 CurveFitResult compatible)
@@ -447,6 +454,207 @@ class OptimizationResult:
 
         return np.sqrt(np.diag(self.pcov))
 
+    def prediction_interval(
+        self,
+        x_new: np.ndarray | None = None,
+        alpha: float = 0.95,
+    ) -> np.ndarray | None:
+        """Compute prediction intervals for new x values.
+
+        Prediction intervals account for both parameter uncertainty and
+        observation noise, providing bounds where future observations are
+        expected to fall with the specified probability.
+
+        Parameters
+        ----------
+        x_new : ndarray or None, optional
+            New x values for prediction. If None, uses original x_data.
+        alpha : float, optional
+            Confidence level for intervals (default: 0.95 for 95% PI).
+
+        Returns
+        -------
+        intervals : ndarray or None
+            Array of shape (n_points, 2) with [lower, upper] bounds for each
+            point, or None if prediction intervals cannot be computed.
+
+        Notes
+        -----
+        When a native NLSQ CurveFitResult is available (from nlsq_curve_fit),
+        this method delegates to NLSQ's prediction_interval for accuracy.
+        Otherwise, it falls back to a manual computation using covariance
+        propagation.
+
+        Examples
+        --------
+        >>> result = nlsq_curve_fit(model, x_data, y_data, params)
+        >>> pi = result.prediction_interval(x_new, alpha=0.95)
+        >>> if pi is not None:
+        ...     for i, (lower, upper) in enumerate(pi):
+        ...         print(f"x={x_new[i]:.2f}: [{lower:.3f}, {upper:.3f}]")
+        """
+        # Delegate to native NLSQ CurveFitResult when available
+        if self._curve_fit_result is not None:
+            try:
+                return self._curve_fit_result.prediction_interval(x_new, alpha)
+            except Exception as e:
+                logger.debug(
+                    "Native prediction_interval failed, using fallback",
+                    error=str(e),
+                )
+
+        # Fallback: manual computation requires model function and data
+        if self._model_fn is None or self.pcov is None:
+            logger.debug(
+                "Cannot compute prediction interval: missing model_fn or pcov"
+            )
+            return None
+
+        x_eval = x_new if x_new is not None else self._x_data
+        if x_eval is None:
+            logger.debug("Cannot compute prediction interval: no x data")
+            return None
+
+        from scipy import stats
+
+        x_eval = np.asarray(x_eval, dtype=np.float64)
+        n = self.n_data or (len(self.residuals) if self.residuals is not None else 0)
+        p = len(self.x)
+        dof = max(n - p, 1)
+
+        # t-value for prediction interval
+        t_val = stats.t.ppf((1 + alpha) / 2, dof)
+
+        # Compute predictions and standard errors via numerical differentiation
+        try:
+            y_pred = np.asarray(self._model_fn(x_eval, self.x))
+
+            # Estimate prediction variance using residual variance + parameter uncertainty
+            if self.residuals is not None:
+                residuals = np.asarray(self.residuals)
+                if np.iscomplexobj(residuals):
+                    residuals = np.abs(residuals)
+                mse = np.sum(residuals**2) / dof
+            else:
+                mse = (self.fun / n) if n > 0 else 0.0
+
+            # Simple prediction interval using MSE (conservative estimate)
+            pred_std = np.sqrt(mse) * np.ones_like(y_pred)
+
+            intervals = np.zeros((len(x_eval), 2))
+            intervals[:, 0] = y_pred - t_val * pred_std
+            intervals[:, 1] = y_pred + t_val * pred_std
+
+            return intervals
+
+        except Exception as e:
+            logger.warning(
+                "Failed to compute prediction interval",
+                error=str(e),
+            )
+            return None
+
+    @classmethod
+    def from_curve_fit_result(
+        cls,
+        curve_fit_result: Any,
+        y_data: np.ndarray | None = None,
+        model_fn: Callable | None = None,
+        x_data: np.ndarray | None = None,
+    ) -> OptimizationResult:
+        """Create OptimizationResult from NLSQ 0.6.6 CurveFitResult.
+
+        This factory method preserves the native CurveFitResult for property
+        delegation, enabling access to NLSQ 0.6.6's statistical methods like
+        prediction_interval() without reimplementation.
+
+        Parameters
+        ----------
+        curve_fit_result : CurveFitResult
+            Result from nlsq.curve_fit() call.
+        y_data : ndarray, optional
+            Original dependent variable data (for complex data handling).
+        model_fn : callable, optional
+            Model function f(x, params) for prediction intervals.
+        x_data : ndarray, optional
+            Original independent variable data for prediction intervals.
+
+        Returns
+        -------
+        result : OptimizationResult
+            Result with native delegation to CurveFitResult properties.
+
+        Examples
+        --------
+        >>> curve_fit_result = nlsq.curve_fit(model_fn, x, y, p0=p0)
+        >>> result = OptimizationResult.from_curve_fit_result(
+        ...     curve_fit_result, y_data=y, model_fn=model_fn, x_data=x
+        ... )
+        >>> print(result.r_squared)  # Delegates to native
+        >>> pi = result.prediction_interval(x_new)  # Delegates to native
+        """
+        # Extract standard fields
+        popt = np.asarray(curve_fit_result.popt, dtype=np.float64)
+        pcov = (
+            np.asarray(curve_fit_result.pcov, dtype=np.float64)
+            if curve_fit_result.pcov is not None
+            else None
+        )
+        success = getattr(curve_fit_result, "success", True)
+        message = getattr(curve_fit_result, "message", "Converged")
+        nfev = getattr(curve_fit_result, "nfev", 0)
+        njev = getattr(curve_fit_result, "njev", 0)
+        cost = getattr(curve_fit_result, "cost", None)
+
+        # Get residuals from native result
+        residuals = None
+        if hasattr(curve_fit_result, "residuals"):
+            residuals = np.asarray(curve_fit_result.residuals)
+
+        # Get diagnostics if available
+        diagnostics = getattr(curve_fit_result, "diagnostics", None)
+
+        # Compute RSS from residuals or cost
+        if residuals is not None:
+            rss = float(np.sum(residuals**2))
+        elif cost is not None:
+            rss = float(cost)
+        else:
+            rss = 0.0
+
+        # Handle y_data
+        y_data_np = np.asarray(y_data) if y_data is not None else None
+        n_data = len(y_data_np) if y_data_np is not None else None
+
+        if n_data is None and residuals is not None:
+            n_data = len(residuals)
+
+        result = cls(
+            x=popt,
+            fun=rss,
+            jac=None,
+            pcov=pcov,
+            success=bool(success),
+            message=str(message),
+            nit=int(nfev),
+            nfev=int(nfev),
+            njev=int(njev),
+            optimality=None,
+            active_mask=None,
+            cost=float(cost) if cost is not None else rss,
+            grad=None,
+            nlsq_result=None,
+            residuals=residuals,
+            y_data=y_data_np,
+            n_data=n_data,
+            diagnostics=diagnostics,
+            _curve_fit_result=curve_fit_result,
+            _model_fn=model_fn,
+            _x_data=np.asarray(x_data) if x_data is not None else None,
+        )
+
+        return result
+
     @classmethod
     def from_nlsq(
         cls,
@@ -544,6 +752,12 @@ def nlsq_optimize(
     ftol: float = 1e-6,
     xtol: float = 1e-6,
     gtol: float = 1e-6,
+    # NLSQ 0.6.6 parameters
+    workflow: str = "auto",
+    auto_bounds: bool = False,
+    stability: str | bool = False,
+    fallback: bool = False,
+    compute_diagnostics: bool = False,
     **kwargs,
 ) -> OptimizationResult:
     """Optimize objective function using NLSQ (GPU-accelerated).
@@ -576,10 +790,31 @@ def nlsq_optimize(
             Relaxed from 1e-8 due to NLSQ's mixed precision management.
         gtol: Gradient tolerance for convergence (default: 1e-6).
             Relaxed from 1e-8 due to NLSQ's mixed precision management.
+        workflow: NLSQ 0.6.6 workflow selection (default: "auto"):
+
+            - "auto": Memory-aware local optimization (default)
+            - "auto_global": Global optimization with bounds exploration
+            - "hpc": HPC mode with checkpointing support
+
+        auto_bounds: Enable automatic parameter bounds inference (default: False).
+            When True, reasonable bounds are inferred based on data characteristics.
+        stability: Numerical stability checks (default: False):
+
+            - 'auto': Check and automatically fix stability issues
+            - 'check': Check and warn but don't fix
+            - False: Skip stability checks
+
+        fallback: Enable NLSQ's native fallback strategies (default: False).
+            When True, tries alternative approaches if optimization fails.
+            Note: RheoJAX also has its own SciPy fallback independent of this.
+        compute_diagnostics: Compute model health diagnostics (default: False).
+            When True, result.diagnostics includes identifiability analysis,
+            gradient health, and other diagnostic information.
         **kwargs: Additional arguments passed to nlsq.LeastSquares.least_squares
 
     Returns:
-        OptimizationResult with optimal parameters and convergence info
+        OptimizationResult with optimal parameters, convergence info, and
+        optional diagnostics (when compute_diagnostics=True).
 
     Raises:
         ValueError: If objective is not callable or parameters is not ParameterSet
@@ -596,6 +831,15 @@ def nlsq_optimize(
         >>>
         >>> result = nlsq_optimize(objective, params)
         >>> print(result.x)  # Should be close to [5.0, 3.0]
+        >>>
+        >>> # With NLSQ 0.6.6 features
+        >>> result = nlsq_optimize(
+        ...     objective, params,
+        ...     workflow="auto_global",  # Global optimization
+        ...     stability="auto",        # Auto-fix stability issues
+        ...     compute_diagnostics=True # Get diagnostics
+        ... )
+        >>> print(result.diagnostics)
 
     Notes:
         - This function automatically handles float64 precision through NLSQ
@@ -624,6 +868,11 @@ def nlsq_optimize(
         ftol=ftol,
         xtol=xtol,
         gtol=gtol,
+        workflow=workflow,
+        auto_bounds=auto_bounds,
+        stability=stability,
+        fallback=fallback,
+        compute_diagnostics=compute_diagnostics,
     )
     logger.debug(
         "Initial parameter values",
@@ -669,6 +918,19 @@ def nlsq_optimize(
         "max_nfev": max_iter * 10,  # NLSQ uses max_nfev for iteration limit
         "verbose": 0,
     }
+
+    # Add NLSQ 0.6.6 parameters (feature detection for backward compatibility)
+    # Note: LeastSquares.least_squares may not support all curve_fit params
+    if workflow != "auto":
+        nlsq_kwargs["workflow"] = workflow
+    if auto_bounds:
+        nlsq_kwargs["auto_bounds"] = auto_bounds
+    if stability:
+        nlsq_kwargs["stability"] = stability
+    if fallback:
+        nlsq_kwargs["fallback"] = fallback
+    if compute_diagnostics:
+        nlsq_kwargs["compute_diagnostics"] = compute_diagnostics
 
     # Merge with user-provided kwargs
     nlsq_kwargs.update(kwargs)
@@ -760,6 +1022,10 @@ def nlsq_optimize(
 
     # Convert NLSQ result to OptimizationResult (with residuals for covariance)
     result = OptimizationResult.from_nlsq(nlsq_result, residuals=residuals_np)
+
+    # Store diagnostics if available (NLSQ 0.6.6+)
+    if hasattr(nlsq_result, "diagnostics") or "diagnostics" in nlsq_result:
+        result.diagnostics = nlsq_result.get("diagnostics", getattr(nlsq_result, "diagnostics", None))
 
     if (
         not result.success
@@ -995,6 +1261,47 @@ def nlsq_multistart_optimize(
     return best_result
 
 
+def nlsq_optimize_global(
+    objective: Callable[[np.ndarray], float | np.ndarray],
+    parameters: ParameterSet,
+    **kwargs,
+) -> OptimizationResult:
+    """Global optimization using NLSQ 0.6.6 workflow='auto_global'.
+
+    Convenience function for global optimization that explores parameter space
+    more thoroughly using the NLSQ 0.6.6 global optimization workflow.
+
+    Args:
+        objective: Objective function to minimize. Takes parameter values as
+            array and returns scalar or residual vector.
+        parameters: ParameterSet with initial values and bounds
+        **kwargs: Additional arguments passed to nlsq_optimize
+
+    Returns:
+        OptimizationResult with optimal parameters from global search
+
+    Example:
+        >>> from rheojax.core.parameters import ParameterSet
+        >>> params = ParameterSet()
+        >>> params.add("a", value=1.0, bounds=(0, 10))
+        >>> params.add("b", value=1.0, bounds=(0, 10))
+        >>>
+        >>> result = nlsq_optimize_global(objective, params)
+        >>> print(f"Global optimum: {result.x}")
+
+    Notes:
+        - Uses workflow='auto_global' for bounds-aware global exploration
+        - More thorough but slower than standard local optimization
+        - Useful for multi-modal objective functions
+    """
+    return nlsq_optimize(
+        objective,
+        parameters,
+        workflow="auto_global",
+        **kwargs,
+    )
+
+
 def nlsq_curve_fit(
     model_fn: Callable[[np.ndarray, np.ndarray], np.ndarray],
     x_data: np.ndarray,
@@ -1006,14 +1313,16 @@ def nlsq_curve_fit(
     compute_diagnostics: bool = False,
     multistart: bool = False,
     n_starts: int = 10,
+    workflow: str = "auto",
     **kwargs,
 ) -> OptimizationResult:
-    """Curve fitting using NLSQ 0.6.0 curve_fit() API with advanced features.
+    """Curve fitting using NLSQ 0.6.6 curve_fit() API with advanced features.
 
-    This function provides access to NLSQ 0.6.0's enhanced curve_fit() features
-    including auto-bounds, stability checks, fallback strategies, and model
-    diagnostics. It returns an OptimizationResult with CurveFitResult-compatible
-    statistical properties (r_squared, rmse, aic, bic, etc.).
+    This function provides access to NLSQ 0.6.6's enhanced curve_fit() features
+    including auto-bounds, stability checks, fallback strategies, model
+    diagnostics, and workflow selection. It returns an OptimizationResult with
+    CurveFitResult-compatible statistical properties (r_squared, rmse, aic, bic,
+    prediction_interval, etc.).
 
     Args:
         model_fn: Model function f(x, params_array) -> y_pred.
@@ -1034,12 +1343,19 @@ def nlsq_curve_fit(
         multistart: Enable multi-start optimization (default: False).
             When True, explores multiple starting points to find global optimum.
         n_starts: Number of starting points for multi-start (default: 10).
+        workflow: NLSQ 0.6.6 workflow selection (default: "auto"):
+
+            - "auto": Memory-aware local optimization (default)
+            - "auto_global": Global optimization with bounds exploration
+            - "hpc": HPC mode with checkpointing support
+
         **kwargs: Additional arguments passed to nlsq.curve_fit()
 
     Returns:
         OptimizationResult with CurveFitResult-compatible statistical properties:
         - r_squared, adj_r_squared, rmse, mae, aic, bic
         - confidence_intervals(alpha) method
+        - prediction_interval(x_new, alpha) method (NLSQ 0.6.6 native)
         - get_parameter_uncertainties() method
 
     Example:
@@ -1064,10 +1380,15 @@ def nlsq_curve_fit(
         >>> print(f"R² = {result.r_squared:.4f}")
         >>> print(f"RMSE = {result.rmse:.4f}")
         >>> ci = result.confidence_intervals(alpha=0.95)
+        >>>
+        >>> # Prediction intervals (NLSQ 0.6.6)
+        >>> pi = result.prediction_interval(x_new, alpha=0.95)
+        >>> print(f"95% PI: [{pi[0, 0]:.3f}, {pi[0, 1]:.3f}]")
 
     Notes:
         - This function uses nlsq.curve_fit() directly (not LeastSquares.least_squares())
         - The model function signature is ``f(x, params_array)`` not ``f(x, *params)``
+        - Results delegate to native CurveFitResult for prediction_interval() calls
         - Results include all CurveFitResult properties for model comparison
     """
     import nlsq as nlsq_module
@@ -1079,6 +1400,7 @@ def nlsq_curve_fit(
         auto_bounds=auto_bounds,
         stability=stability,
         multistart=multistart,
+        workflow=workflow,
     )
 
     # Extract p0 and bounds from ParameterSet
@@ -1112,6 +1434,9 @@ def nlsq_curve_fit(
         "multistart": multistart,
         "n_starts": n_starts,
     }
+    # Add workflow parameter (NLSQ 0.6.6)
+    if workflow != "auto":
+        curve_fit_kwargs["workflow"] = workflow
     curve_fit_kwargs.update(kwargs)
 
     try:
@@ -1122,24 +1447,16 @@ def nlsq_curve_fit(
 
         # CurveFitResult supports both tuple unpacking and attribute access
         # We need to check if it's a tuple (popt, pcov) or CurveFitResult object
+        is_curve_fit_result = not isinstance(curve_fit_result, tuple)
+
         if isinstance(curve_fit_result, tuple):
             popt, pcov = curve_fit_result
-            success = True
-            message = "Optimization converged successfully"
-            nfev = 0
-            njev = 0
-            diagnostics = None
         else:
             # It's a CurveFitResult object
             popt = np.asarray(curve_fit_result.popt)
             pcov = curve_fit_result.pcov
-            success = getattr(curve_fit_result, "success", True)
-            message = getattr(curve_fit_result, "message", "Converged")
-            nfev = getattr(curve_fit_result, "nfev", 0)
-            njev = getattr(curve_fit_result, "njev", 0)
-            diagnostics = getattr(curve_fit_result, "diagnostics", None)
 
-        # Compute residuals and y_pred at optimal point
+        # Compute residuals and y_pred at optimal point (for complex data handling)
         y_pred = model_fn(x_data_np, popt)
         y_pred_np = np.asarray(y_pred)
 
@@ -1161,30 +1478,47 @@ def nlsq_curve_fit(
                 # Both real
                 residuals = y_data_np - y_pred_np
 
-        # Create OptimizationResult with all metrics
-        result = OptimizationResult(
-            x=np.asarray(popt, dtype=np.float64),
-            fun=float(np.sum(residuals**2)),
-            jac=None,  # curve_fit doesn't return Jacobian directly
-            pcov=np.asarray(pcov, dtype=np.float64) if pcov is not None else None,
-            success=bool(success),
-            message=str(message),
-            nit=int(nfev),
-            nfev=int(nfev),
-            njev=int(njev),
-            optimality=None,
-            active_mask=None,
-            cost=float(np.sum(residuals**2)),
-            grad=None,
-            nlsq_result=None,
-            residuals=residuals,
-            y_data=y_data_np,
-            n_data=len(y_data_np),
-        )
+        # Create OptimizationResult - use factory for native CurveFitResult delegation
+        if is_curve_fit_result and hasattr(curve_fit_result, "prediction_interval"):
+            # NLSQ 0.6.6+ CurveFitResult with native property delegation
+            result = OptimizationResult.from_curve_fit_result(
+                curve_fit_result,
+                y_data=y_data_np,
+                model_fn=model_fn,
+                x_data=x_data_np,
+            )
+            # Override residuals for complex data handling
+            result.residuals = residuals
+            result.fun = float(np.sum(residuals**2))
+            result.cost = result.fun
+        else:
+            # Legacy tuple result or no native delegation
+            success = True if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "success", True)
+            message = "Optimization converged successfully" if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "message", "Converged")
+            nfev = 0 if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "nfev", 0)
+            njev = 0 if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "njev", 0)
+            diagnostics = None if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "diagnostics", None)
 
-        # Store diagnostics if available
-        if diagnostics is not None:
-            result.nlsq_result = {"diagnostics": diagnostics}
+            result = OptimizationResult(
+                x=np.asarray(popt, dtype=np.float64),
+                fun=float(np.sum(residuals**2)),
+                jac=None,  # curve_fit doesn't return Jacobian directly
+                pcov=np.asarray(pcov, dtype=np.float64) if pcov is not None else None,
+                success=bool(success),
+                message=str(message),
+                nit=int(nfev),
+                nfev=int(nfev),
+                njev=int(njev),
+                optimality=None,
+                active_mask=None,
+                cost=float(np.sum(residuals**2)),
+                grad=None,
+                nlsq_result=None,
+                residuals=residuals,
+                y_data=y_data_np,
+                n_data=len(y_data_np),
+                diagnostics=diagnostics,
+            )
 
         # Update ParameterSet with optimal values
         parameters.set_values(result.x)

@@ -73,7 +73,7 @@ dependencies = [
     # GPU-accelerated optimization (CRITICAL: must be imported before JAX)
     # NLSQ v0.3.0+ uses float32 by default with automatic precision fallback
     # RheoJAX explicitly enables float64 via jax.config.update("jax_enable_x64", True)
-    "nlsq>=0.6.2",
+    "nlsq>=0.6.6",
 
     # JAX ecosystem (CPU-only - works on all platforms)
     # GPU users: see installation instructions above
