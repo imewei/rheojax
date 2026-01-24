@@ -11,7 +11,10 @@ Tests verify key physical behaviors:
 import numpy as np
 import pytest
 
-from rheojax.models.fluidity.saramito import FluiditySaramitoLocal, FluiditySaramitoNonlocal
+from rheojax.models.fluidity.saramito import (
+    FluiditySaramitoLocal,
+    FluiditySaramitoNonlocal,
+)
 
 
 class TestYieldStressEmergence:
@@ -244,9 +247,12 @@ class TestNonexponentialRelaxation:
 
         # Then relaxation (by setting sigma_applied and simulating)
         # The relaxation kernel starts with elevated stress
-        from rheojax.core.jax_config import safe_import_jax
         import diffrax
-        from rheojax.models.fluidity.saramito._kernels import saramito_local_relaxation_ode_rhs
+
+        from rheojax.core.jax_config import safe_import_jax
+        from rheojax.models.fluidity.saramito._kernels import (
+            saramito_local_relaxation_ode_rhs,
+        )
 
         jax, jnp = safe_import_jax()
 
@@ -262,7 +268,13 @@ class TestNonexponentialRelaxation:
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         sol = diffrax.diffeqsolve(
-            term, solver, t[0], t[-1], 0.01, y0, args=args,
+            term,
+            solver,
+            t[0],
+            t[-1],
+            0.01,
+            y0,
+            args=args,
             saveat=diffrax.SaveAt(ts=t_jax),
             stepsize_controller=stepsize_controller,
             max_steps=1_000_000,
@@ -283,9 +295,12 @@ class TestNonexponentialRelaxation:
         # Start with stress well above yield
         sigma_0 = 500.0
 
-        from rheojax.core.jax_config import safe_import_jax
         import diffrax
-        from rheojax.models.fluidity.saramito._kernels import saramito_local_relaxation_ode_rhs
+
+        from rheojax.core.jax_config import safe_import_jax
+        from rheojax.models.fluidity.saramito._kernels import (
+            saramito_local_relaxation_ode_rhs,
+        )
 
         jax, jnp = safe_import_jax()
 
@@ -301,7 +316,13 @@ class TestNonexponentialRelaxation:
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         sol = diffrax.diffeqsolve(
-            term, solver, t[0], t[-1], 0.01, y0, args=args,
+            term,
+            solver,
+            t[0],
+            t[-1],
+            0.01,
+            y0,
+            args=args,
             saveat=diffrax.SaveAt(ts=t_jax),
             stepsize_controller=stepsize_controller,
             max_steps=1_000_000,

@@ -16,7 +16,6 @@ glass_transition_criterion
 """
 
 from functools import partial
-from typing import Tuple
 
 import numpy as np
 from scipy.optimize import least_squares
@@ -234,8 +233,8 @@ def two_time_strain_decorrelation(
         h_total = 1.0 / (1.0 + (gamma_total / gamma_c) ** 2)
         h_since_s = 1.0 / (1.0 + (gamma_since_s / gamma_c) ** 2)
     else:
-        h_total = jnp.exp(-(gamma_total / gamma_c) ** 2)
-        h_since_s = jnp.exp(-(gamma_since_s / gamma_c) ** 2)
+        h_total = jnp.exp(-((gamma_total / gamma_c) ** 2))
+        h_since_s = jnp.exp(-((gamma_since_s / gamma_c) ** 2))
 
     return h_total * h_since_s
 
@@ -251,7 +250,7 @@ def prony_decompose_memory(
     n_modes: int = 10,
     method: str = "leastsq",
     n_starts: int = 5,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Decompose memory kernel into Prony series.
 
     Fit the memory kernel m(t) to a sum of exponentials (Prony series):
@@ -332,7 +331,7 @@ def _prony_log_spacing(
     t_valid: np.ndarray,
     m_valid: np.ndarray,
     n_modes: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Simple Prony decomposition with log-spaced relaxation times.
 
     Uses fixed log-spaced τ values and linear least squares for g values.
@@ -356,7 +355,7 @@ def _prony_smart_init(
     t_valid: np.ndarray,
     m_valid: np.ndarray,
     n_modes: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Generate smart initial guess for Prony parameters.
 
     Uses log-linear interpolation of kernel decay to estimate characteristic
@@ -411,7 +410,7 @@ def _prony_leastsq_robust(
     t_valid: np.ndarray,
     m_valid: np.ndarray,
     n_modes: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Robust Prony fit using scipy.optimize.least_squares with TRF method.
 
     Uses smart initialization, log-space τ parameterization, and increased
@@ -427,14 +426,18 @@ def _prony_leastsq_robust(
     # Bounds: g >= 0, log_tau unconstrained but reasonable
     tau_min = t_valid.min() / 100
     tau_max = t_valid.max() * 100
-    lower = np.concatenate([
-        np.zeros(n_modes),
-        np.full(n_modes, np.log(tau_min)),
-    ])
-    upper = np.concatenate([
-        np.full(n_modes, np.inf),
-        np.full(n_modes, np.log(tau_max)),
-    ])
+    lower = np.concatenate(
+        [
+            np.zeros(n_modes),
+            np.full(n_modes, np.log(tau_min)),
+        ]
+    )
+    upper = np.concatenate(
+        [
+            np.full(n_modes, np.inf),
+            np.full(n_modes, np.log(tau_max)),
+        ]
+    )
 
     # Run optimization with increased limits
     result = least_squares(
@@ -467,7 +470,7 @@ def _prony_multistart(
     m_valid: np.ndarray,
     n_modes: int,
     n_starts: int = 5,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Multi-start Prony fit to escape local minima.
 
     Runs multiple optimizations with perturbed initial conditions and
@@ -477,14 +480,18 @@ def _prony_multistart(
     tau_max = t_valid.max() * 100
 
     # Bounds for optimization (log-space for τ)
-    lower = np.concatenate([
-        np.zeros(n_modes),
-        np.full(n_modes, np.log(tau_min)),
-    ])
-    upper = np.concatenate([
-        np.full(n_modes, np.inf),
-        np.full(n_modes, np.log(tau_max)),
-    ])
+    lower = np.concatenate(
+        [
+            np.zeros(n_modes),
+            np.full(n_modes, np.log(tau_min)),
+        ]
+    )
+    upper = np.concatenate(
+        [
+            np.full(n_modes, np.inf),
+            np.full(n_modes, np.log(tau_max)),
+        ]
+    )
 
     best_cost = np.inf
     best_g = None
@@ -635,7 +642,7 @@ def setup_microscopic_stress_weights(
     n_k: int = 100,
     k_BT: float = 1.0,
     sigma: float = 1.0,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Pre-compute weights for microscopic stress integration.
 
     The microscopic MCT stress formula involves a k-space integral:
@@ -845,7 +852,6 @@ def solve_equilibrium_correlator_f12(
 
         # Memory integral: ∫₀^t m(Φ(t-s)) ∂Φ/∂s ds
         # Approximate with quadrature
-        n_hist = phi_hist.shape[0]
         memory_integral = jnp.sum(m_phi * dphi_hist) * dt
 
         # MCT equation: dΦ/dt = -Γ(Φ + memory_integral)

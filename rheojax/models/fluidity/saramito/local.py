@@ -35,8 +35,8 @@ import diffrax
 import numpy as np
 
 from rheojax.core.inventory import Protocol
-from rheojax.core.registry import ModelRegistry
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import ModelRegistry
 from rheojax.logging import log_fit
 from rheojax.models.fluidity.saramito._base import FluiditySaramitoBase
 from rheojax.models.fluidity.saramito._kernels import (
@@ -44,7 +44,6 @@ from rheojax.models.fluidity.saramito._kernels import (
     saramito_local_creep_ode_rhs,
     saramito_local_ode_rhs,
     saramito_local_relaxation_ode_rhs,
-    saramito_steady_state_full,
 )
 
 # Safe import ensures float64
@@ -215,7 +214,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
 
-            tau_y_coupling = p_map.get("tau_y_coupling", 0.0) if coupling == "full" else 0.0
+            tau_y_coupling = (
+                p_map.get("tau_y_coupling", 0.0) if coupling == "full" else 0.0
+            )
             m_yield = p_map.get("m_yield", 1.0) if coupling == "full" else 1.0
 
             return saramito_flow_curve_steady(
@@ -261,7 +262,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
         p = self.get_parameter_dict()
 
-        tau_y_coupling = p.get("tau_y_coupling", 0.0) if self.coupling == "full" else 0.0
+        tau_y_coupling = (
+            p.get("tau_y_coupling", 0.0) if self.coupling == "full" else 0.0
+        )
         m_yield = p.get("m_yield", 1.0) if self.coupling == "full" else 1.0
 
         result = saramito_flow_curve_steady(

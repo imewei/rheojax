@@ -33,8 +33,8 @@ import diffrax
 import numpy as np
 
 from rheojax.core.inventory import Protocol
-from rheojax.core.registry import ModelRegistry
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import ModelRegistry
 from rheojax.logging import log_fit
 from rheojax.models.fluidity.saramito._base import FluiditySaramitoBase
 from rheojax.models.fluidity.saramito._kernels import (

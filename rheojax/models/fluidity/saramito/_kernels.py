@@ -440,7 +440,9 @@ def saramito_local_ode_rhs(
 
     # 4. Fluidity evolution
     # For rate-controlled: driving = |γ̇|
-    d_f = fluidity_evolution_saramito(f, jnp.abs(gamma_dot), f_age, f_flow, t_a, b, n_rej)
+    d_f = fluidity_evolution_saramito(
+        f, jnp.abs(gamma_dot), f_age, f_flow, t_a, b, n_rej
+    )
 
     # 5. Strain evolution
     d_gamma = gamma_dot
@@ -724,8 +726,17 @@ def saramito_flow_curve_steady(
     # Dispatch to JIT-compiled function based on coupling mode
     if coupling_mode == "full":
         return _saramito_flow_curve_steady_full(
-            gamma_dot, tau_y0, K_HB, n_HB, f_age, f_flow, t_a, b, n_rej,
-            tau_y_coupling, m_yield
+            gamma_dot,
+            tau_y0,
+            K_HB,
+            n_HB,
+            f_age,
+            f_flow,
+            t_a,
+            b,
+            n_rej,
+            tau_y_coupling,
+            m_yield,
         )
     else:
         return _saramito_flow_curve_steady_minimal(

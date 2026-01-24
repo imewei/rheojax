@@ -13,13 +13,13 @@ import numpy as np
 import pytest
 
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.ikh.mikh import MIKH
-from rheojax.models.ikh.ml_ikh import MLIKH
 from rheojax.models.ikh._kernels import (
     evolution_lambda,
     ikh_flow_curve_steady_state,
     radial_return_step_corrected,
 )
+from rheojax.models.ikh.mikh import MIKH
+from rheojax.models.ikh.ml_ikh import MLIKH
 
 jax, jnp = safe_import_jax()
 
@@ -38,8 +38,17 @@ class TestMIKH:
 
         # Check all required parameters exist
         required_params = [
-            "G", "eta", "C", "gamma_dyn", "m",
-            "sigma_y0", "delta_sigma_y", "tau_thix", "Gamma", "eta_inf", "mu_p"
+            "G",
+            "eta",
+            "C",
+            "gamma_dyn",
+            "m",
+            "sigma_y0",
+            "delta_sigma_y",
+            "tau_thix",
+            "Gamma",
+            "eta_inf",
+            "mu_p",
         ]
         for param in required_params:
             assert param in model.parameters, f"Missing parameter: {param}"
@@ -133,9 +142,7 @@ class TestMIKH:
 
         # Check plastic region (perfect plasticity)
         plastic_mask = G * gamma > sigma_y * 1.5
-        np.testing.assert_allclose(
-            stress[plastic_mask], sigma_y, rtol=0.1
-        )
+        np.testing.assert_allclose(stress[plastic_mask], sigma_y, rtol=0.1)
 
     def test_kinematic_hardening_bauschinger(self):
         """Test Bauschinger effect from kinematic hardening.
@@ -179,7 +186,9 @@ class TestMIKH:
         # and the rate of decrease shows backstress influence
         stress_during_reversal = stress[100:150]
         # Use a few steps into reversal since first point may be same
-        assert stress_during_reversal[5] < stress_at_reversal, "Stress should decrease on reversal"
+        assert (
+            stress_during_reversal[5] < stress_at_reversal
+        ), "Stress should decrease on reversal"
 
         # 3. The stress drop during unloading should be steeper than
         # without kinematic hardening (more softening effect)
@@ -202,8 +211,9 @@ class TestMIKH:
 
         # The hardening case should show different behavior
         # (not necessarily larger drop, but distinct pattern)
-        assert not np.allclose(stress[100:150], stress_no_kin[100:150], rtol=0.05), \
-            "Kinematic hardening should produce different reversal behavior"
+        assert not np.allclose(
+            stress[100:150], stress_no_kin[100:150], rtol=0.05
+        ), "Kinematic hardening should produce different reversal behavior"
 
     def test_thixotropy_buildup(self):
         """Test structural buildup at rest."""
@@ -212,7 +222,9 @@ class TestMIKH:
         model.parameters.set_value("tau_thix", 1.0)  # 1 second buildup time
         model.parameters.set_value("Gamma", 1.0)
 
-        params = dict(zip(model.parameters.keys(), model.parameters.get_values(), strict=False))
+        params = dict(
+            zip(model.parameters.keys(), model.parameters.get_values(), strict=False)
+        )
 
         # Lambda evolution at rest (gamma_dot_p = 0)
         lam_initial = 0.5
@@ -233,7 +245,9 @@ class TestMIKH:
         model.parameters.set_value("tau_thix", 10.0)  # Slow buildup
         model.parameters.set_value("Gamma", 1.0)
 
-        params = dict(zip(model.parameters.keys(), model.parameters.get_values(), strict=False))
+        params = dict(
+            zip(model.parameters.keys(), model.parameters.get_values(), strict=False)
+        )
 
         # Lambda evolution under shear
         lam_initial = 1.0
@@ -432,7 +446,6 @@ class TestMLIKH:
 
         # Should be reasonably close (within 20%)
         np.testing.assert_allclose(stress_ws, stress_mikh, rtol=0.2, atol=5.0)
-
 
 
 class TestMLIKHProtocols:
@@ -685,8 +698,8 @@ class TestIKHKernels:
         dt = 0.1
         d_gamma = 0.1  # Small strain
 
-        (sigma_new, alpha_new, lam_new), (stress_total, d_gamma_p) = radial_return_step_corrected(
-            state, (dt, d_gamma), params
+        (sigma_new, alpha_new, lam_new), (stress_total, d_gamma_p) = (
+            radial_return_step_corrected(state, (dt, d_gamma), params)
         )
 
         # Should be purely elastic
@@ -712,8 +725,8 @@ class TestIKHKernels:
         dt = 0.1
         d_gamma = 0.5  # Large strain increment
 
-        (sigma_new, alpha_new, lam_new), (stress_total, d_gamma_p) = radial_return_step_corrected(
-            state, (dt, d_gamma), params
+        (sigma_new, alpha_new, lam_new), (stress_total, d_gamma_p) = (
+            radial_return_step_corrected(state, (dt, d_gamma), params)
         )
 
         # Should have plastic flow
@@ -721,7 +734,9 @@ class TestIKHKernels:
 
         # Stress should be limited by hardening
         assert sigma_new > 50.0, "Stress should increase due to hardening"
-        assert sigma_new < 50.0 + 100.0 * 0.5, "Stress should be less than elastic prediction"
+        assert (
+            sigma_new < 50.0 + 100.0 * 0.5
+        ), "Stress should be less than elastic prediction"
 
     def test_flow_curve_steady_state_kernel(self):
         """Test steady-state flow curve kernel."""

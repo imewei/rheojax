@@ -29,8 +29,7 @@ Götze W. (2009) "Complex Dynamics of Glass-Forming Liquids", Chapter 4
 Fuchs M. & Cates M.E. (2002) Phys. Rev. Lett. 89, 248304
 """
 
-from functools import partial
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Literal
 
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -46,17 +45,13 @@ from rheojax.models.itt_mct._kernels import (
     extract_laos_harmonics,
     f12_equilibrium_correlator_rhs,
     f12_memory,
-    f12_steady_state_stress,
     f12_volterra_creep_rhs,
-    f12_volterra_flow_curve_rhs,
     f12_volterra_laos_rhs,
     f12_volterra_relaxation_rhs,
     f12_volterra_startup_rhs,
-    strain_decorrelation,
 )
 from rheojax.utils.mct_kernels import (
     glass_transition_criterion,
-    prony_decompose_memory,
 )
 
 # Try to import diffrax-based solvers for fast ODE integration
@@ -74,6 +69,7 @@ except ImportError:
     def precompile_flow_curve_solver(*args, **kwargs):
         """Stub when diffrax not available."""
         return 0.0
+
 
 jax, jnp = safe_import_jax()
 
@@ -172,14 +168,14 @@ class ITTMCTSchematic(ITTMCTBase):
 
     def __init__(
         self,
-        epsilon: Optional[float] = None,
-        v2: Optional[float] = None,
+        epsilon: float | None = None,
+        v2: float | None = None,
         integration_method: Literal["volterra", "history"] = "volterra",
         n_prony_modes: int = 10,
         decorrelation_form: Literal["gaussian", "lorentzian"] = "gaussian",
         memory_form: Literal["simplified", "full"] = "simplified",
         stress_form: Literal["schematic", "microscopic"] = "schematic",
-        phi_volume: Optional[float] = None,
+        phi_volume: float | None = None,
         k_BT: float = 1.0,
     ):
         """Initialize F₁₂ Schematic Model.
@@ -238,9 +234,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 f"stress_form must be 'schematic' or 'microscopic', got {stress_form!r}"
             )
         if stress_form == "microscopic" and phi_volume is None:
-            raise ValueError(
-                "phi_volume is required when stress_form='microscopic'"
-            )
+            raise ValueError("phi_volume is required when stress_form='microscopic'")
         self._stress_form = stress_form
         self._phi_volume = phi_volume
         self._k_BT = k_BT
@@ -249,6 +243,7 @@ class ITTMCTSchematic(ITTMCTBase):
         self._microscopic_stress_prefactor = None
         if stress_form == "microscopic":
             from rheojax.utils.mct_kernels import get_microscopic_stress_prefactor
+
             self._microscopic_stress_prefactor = get_microscopic_stress_prefactor(
                 phi_volume, k_BT=k_BT
             )
@@ -427,7 +422,7 @@ class ITTMCTSchematic(ITTMCTBase):
         v2 = self.parameters.get_value("v2")
         return f12_memory(phi, v1, v2)
 
-    def get_glass_transition_info(self) -> Dict[str, Any]:
+    def get_glass_transition_info(self) -> dict[str, Any]:
         """Get information about the glass transition state.
 
         Returns
@@ -467,7 +462,7 @@ class ITTMCTSchematic(ITTMCTBase):
     def _predict_flow_curve(
         self,
         gamma_dot: np.ndarray,
-        use_diffrax: Optional[bool] = None,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Predict steady-state flow curve σ(γ̇).
@@ -535,7 +530,10 @@ class ITTMCTSchematic(ITTMCTBase):
 
         # Use microscopic prefactor if stress_form is microscopic
         G_eff = G_inf
-        if self._stress_form == "microscopic" and self._microscopic_stress_prefactor is not None:
+        if (
+            self._stress_form == "microscopic"
+            and self._microscopic_stress_prefactor is not None
+        ):
             G_eff = self._microscopic_stress_prefactor
 
         sigma = np.zeros_like(gamma_dot)
@@ -577,7 +575,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 if self._use_lorentzian:
                     h_gamma = 1.0 / (1.0 + (gamma_eff / gamma_c) ** 2)
                 else:
-                    h_gamma = np.exp(-(gamma_eff / gamma_c) ** 2)
+                    h_gamma = np.exp(-((gamma_eff / gamma_c) ** 2))
                 sigma_y = G_eff * gamma_c * f_neq * (1 - h_gamma)
                 sigma_nonzero = np.asarray(sigma_nonzero) + sigma_y
 
@@ -602,7 +600,10 @@ class ITTMCTSchematic(ITTMCTBase):
         """
         # Use microscopic prefactor if stress_form is microscopic
         G_eff = G_inf
-        if self._stress_form == "microscopic" and self._microscopic_stress_prefactor is not None:
+        if (
+            self._stress_form == "microscopic"
+            and self._microscopic_stress_prefactor is not None
+        ):
             G_eff = self._microscopic_stress_prefactor
 
         sigma = np.zeros_like(gamma_dot)
@@ -626,7 +627,7 @@ class ITTMCTSchematic(ITTMCTBase):
     def _compute_steady_state_stress(
         self,
         gamma_dot: float,
-        t_max: Optional[float] = None,
+        t_max: float | None = None,
     ) -> float:
         """Compute steady-state stress at a single shear rate.
 
@@ -653,7 +654,10 @@ class ITTMCTSchematic(ITTMCTBase):
 
         # Use microscopic prefactor if stress_form is microscopic
         G_eff = G_inf
-        if self._stress_form == "microscopic" and self._microscopic_stress_prefactor is not None:
+        if (
+            self._stress_form == "microscopic"
+            and self._microscopic_stress_prefactor is not None
+        ):
             G_eff = self._microscopic_stress_prefactor
 
         if self._prony_amplitudes is None:
@@ -687,7 +691,7 @@ class ITTMCTSchematic(ITTMCTBase):
             if self._use_lorentzian:
                 h_gamma = 1.0 / (1.0 + (gamma_acc / gamma_c) ** 2)
             else:
-                h_gamma = np.exp(-(gamma_acc / gamma_c) ** 2)
+                h_gamma = np.exp(-((gamma_acc / gamma_c) ** 2))
             phi_advected = phi * h_gamma
 
             # Memory kernel
@@ -706,7 +710,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 if self._use_lorentzian:
                     h_mode = 1.0 / (1.0 + (gamma_mode / gamma_c) ** 2)
                 else:
-                    h_mode = np.exp(-(gamma_mode / gamma_c) ** 2)
+                    h_mode = np.exp(-((gamma_mode / gamma_c) ** 2))
                 dK_dt = -K / np.asarray(tau) + np.asarray(g) * m_phi * h_mode * dphi_dt
             else:
                 dK_dt = -K / np.asarray(tau) + np.asarray(g) * m_phi * dphi_dt
@@ -961,7 +965,7 @@ class ITTMCTSchematic(ITTMCTBase):
         if self._use_lorentzian:
             h_gamma = 1.0 / (1.0 + (gamma_pre / gamma_c) ** 2)
         else:
-            h_gamma = np.exp(-(gamma_pre / gamma_c) ** 2)
+            h_gamma = np.exp(-((gamma_pre / gamma_c) ** 2))
         state0 = np.zeros(2 + self.n_prony_modes)
         state0[0] = h_gamma  # Φ affected by pre-shear
         state0[-1] = G_inf * gamma_pre * h_gamma  # Initial stress
@@ -1089,7 +1093,7 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_0: float = 0.1,
         omega: float = 1.0,
         n_harmonics: int = 5,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Extract Fourier harmonics from LAOS response.
 
         Parameters

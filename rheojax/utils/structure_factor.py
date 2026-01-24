@@ -13,7 +13,8 @@ sk_derivatives
     Compute derivatives dS/dk needed for MCT vertex functions
 """
 
-from typing import Optional, Tuple
+from collections.abc import Callable
+from functools import partial
 
 import numpy as np
 from scipy.interpolate import CubicSpline
@@ -22,7 +23,6 @@ from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
 
 jax, jnp = safe_import_jax()
-from functools import partial
 
 logger = get_logger(__name__)
 
@@ -85,7 +85,6 @@ def percus_yevick_sk(
     eta = phi  # Often use eta = phi for PY
     eta2 = eta * eta
     eta3 = eta * eta2
-    eta4 = eta2 * eta2
 
     # Coefficients for direct correlation function c(r)
     # c(r) = -(a + b*r/σ + c*(r/σ)³) for r < σ, 0 otherwise
@@ -108,12 +107,9 @@ def percus_yevick_sk(
     # The Fourier transform involves these terms
     # From Wertheim/Hansen-McDonald derivation
     term1 = a_coeff * (sin_q - q_safe * cos_q) / q3
-    term2 = b_coeff * (
-        (2 * q_safe * sin_q + (2 - q2) * cos_q - 2) / q4
-    )
+    term2 = b_coeff * ((2 * q_safe * sin_q + (2 - q2) * cos_q - 2) / q4)
     term3 = c_coeff * (
-        (-q4 * cos_q + 4 * ((3 * q2 - 6) * cos_q + (q3 - 6 * q_safe) * sin_q + 6))
-        / q6
+        (-q4 * cos_q + 4 * ((3 * q2 - 6) * cos_q + (q3 - 6 * q_safe) * sin_q + 6)) / q6
     )
 
     # Direct correlation function in k-space
@@ -174,8 +170,7 @@ def percus_yevick_sk_jax(
     term1 = a_coeff * (sin_q - q_safe * cos_q) / q3
     term2 = b_coeff * ((2 * q_safe * sin_q + (2 - q2) * cos_q - 2) / q4)
     term3 = c_coeff * (
-        (-q4 * cos_q + 4 * ((3 * q2 - 6) * cos_q + (q3 - 6 * q_safe) * sin_q + 6))
-        / q6
+        (-q4 * cos_q + 4 * ((3 * q2 - 6) * cos_q + (q3 - 6 * q_safe) * sin_q + 6)) / q6
     )
 
     c_k = -24 * eta * (term1 + term2 + term3)
@@ -287,7 +282,7 @@ def sk_derivatives(
     k: np.ndarray,
     sk: np.ndarray,
     method: str = "finite_diff",
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Compute derivatives dS/dk and d²S/dk² for MCT vertex functions.
 
     The MCT vertex V(k,q,|k-q|) requires derivatives of S(k) for accurate
@@ -318,10 +313,7 @@ def sk_derivatives(
         dsk_dk = spline(k, nu=1)
         d2sk_dk2 = spline(k, nu=2)
     else:
-        # Central finite differences
-        dk = np.diff(k)
-        dk_avg = np.concatenate([[dk[0]], (dk[:-1] + dk[1:]) / 2, [dk[-1]]])
-
+        # Central finite differences (using np.gradient which handles spacing internally)
         # First derivative
         dsk_dk = np.gradient(sk, k)
 
@@ -340,7 +332,7 @@ def mct_vertex_isotropic(
     k: np.ndarray,
     q: np.ndarray,
     phi: float,
-    sk_func: Optional[callable] = None,
+    sk_func: Callable | None = None,
 ) -> np.ndarray:
     """Compute isotropic MCT vertex V(k,q) after angular integration.
 
@@ -370,7 +362,9 @@ def mct_vertex_isotropic(
     and the direct correlation function c(k) = 1 - 1/S(k).
     """
     if sk_func is None:
-        sk_func = lambda kk: percus_yevick_sk(kk, phi)
+
+        def sk_func(kk):
+            return percus_yevick_sk(kk, phi)
 
     n_k = len(k)
     V = np.zeros((n_k, n_k))
@@ -396,7 +390,6 @@ def mct_vertex_isotropic(
             # Approximate angular average using midpoint
             k_minus_q = (k_minus_q_min + k_minus_q_max) / 2
             s_kmq = sk_func(np.array([k_minus_q]))[0]
-            c_kmq = 1.0 - 1.0 / s_kmq
 
             # Vertex coupling (simplified Verlet-Weis form)
             coupling = ki * ck[i] + qj * cq[j]
@@ -439,8 +432,6 @@ def hard_sphere_properties(phi: float) -> dict:
     Random close packing is at φ_rcp ≈ 0.64.
     """
     eta = phi
-    eta2 = eta * eta
-    eta3 = eta * eta2
 
     # Compressibility from PY
     denom = (1 - eta) ** 4

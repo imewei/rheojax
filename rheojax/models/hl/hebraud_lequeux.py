@@ -139,7 +139,7 @@ class HebraudLequeux(BaseModel):
         X: np.ndarray,
         y: np.ndarray,
         **kwargs: Any,
-    ) -> "HebraudLequeux":
+    ) -> HebraudLequeux:
         """Fit HL model parameters to data.
 
         Args:

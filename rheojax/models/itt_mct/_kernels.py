@@ -55,7 +55,6 @@ Brader et al. 2008) and provide good qualitative predictions with ~5 parameters.
 """
 
 from functools import partial
-from typing import Tuple
 
 from rheojax.core.jax_config import safe_import_jax
 
@@ -97,7 +96,7 @@ def strain_decorrelation_gaussian(
     and computes decorrelation from the angle-averaged correlation of advected
     density modes. The Gaussian form is an empirical fit to this behavior.
     """
-    return jnp.exp(-(gamma / gamma_c) ** 2)
+    return jnp.exp(-((gamma / gamma_c) ** 2))
 
 
 @partial(jax.jit, static_argnames=())
@@ -369,7 +368,7 @@ def f12_volterra_startup_rhs(
     phi = state[0]
     K = state[1 : 1 + n_modes]
     gamma_acc = state[1 + n_modes]
-    sigma = state[2 + n_modes]
+    # state[2 + n_modes] is sigma (stress) - computed separately
 
     # Strain decorrelation
     h_gamma = strain_decorrelation(gamma_acc, gamma_c, use_lorentzian)
@@ -449,7 +448,7 @@ def compute_complex_modulus_from_correlator(
     t: jnp.ndarray,
     phi_eq: jnp.ndarray,
     G_inf: float,
-) -> Tuple[jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Compute G*(ω) from equilibrium correlator via Fourier transform.
 
     G*(ω) = iω ∫₀^∞ G(t) e^{-iωt} dt
@@ -473,7 +472,6 @@ def compute_complex_modulus_from_correlator(
     G_double_prime : jnp.ndarray
         Loss modulus G''(ω)
     """
-    dt = t[1] - t[0]  # Assume uniform spacing
 
     # Fourier transform via trapezoidal integration
     # ∫ Φ(t) e^{-iωt} dt ≈ Σ Φ(tᵢ) e^{-iωtᵢ} Δt
@@ -610,7 +608,7 @@ def f12_volterra_relaxation_rhs(
     # Unpack state
     phi = state[0]
     K = state[1 : 1 + n_modes]
-    sigma = state[1 + n_modes]
+    # state[1 + n_modes] is sigma (stress) - computed separately
 
     # For relaxation, strain is fixed at pre-shear value
     h_gamma = strain_decorrelation(gamma_pre, gamma_c, use_lorentzian)
@@ -680,10 +678,9 @@ def f12_volterra_laos_rhs(
     phi = state[0]
     K = state[1 : 1 + n_modes]
     gamma_acc = state[1 + n_modes]  # Absolute accumulated strain
-    sigma = state[2 + n_modes]
+    # state[2 + n_modes] is sigma (stress) - computed separately
 
-    # Current strain and rate
-    gamma_current = gamma_0 * jnp.sin(omega * t)
+    # Current strain rate (strain itself not needed for ODE)
     gamma_dot_current = gamma_0 * omega * jnp.cos(omega * t)
 
     # Strain decorrelation based on accumulated |γ|
@@ -730,7 +727,7 @@ def extract_laos_harmonics(
     sigma: jnp.ndarray,
     omega: float,
     n_harmonics: int = 5,
-) -> Tuple[jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Extract Fourier harmonics from LAOS stress response.
 
     σ(t) = Σₙ [σ'ₙ sin(nωt) + σ''ₙ cos(nωt)]
@@ -767,8 +764,6 @@ def extract_laos_harmonics(
         return sigma_prime, sigma_double_prime
 
     # Extract odd harmonics (1, 3, 5, ...) - even harmonics are zero for symmetric response
-    harmonic_numbers = jnp.arange(1, 2 * n_harmonics, 2)
-
     sigma_primes = []
     sigma_double_primes = []
     for n in range(1, 2 * n_harmonics, 2):

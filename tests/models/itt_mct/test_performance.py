@@ -23,7 +23,9 @@ class TestPronyDecomposition:
         # Generate synthetic memory kernel (sum of exponentials)
         t = np.logspace(-3, 2, 100)
         # True Prony series: m(t) = 0.5*exp(-t/0.1) + 0.3*exp(-t/1) + 0.2*exp(-t/10)
-        m_true = 0.5 * np.exp(-t / 0.1) + 0.3 * np.exp(-t / 1.0) + 0.2 * np.exp(-t / 10.0)
+        m_true = (
+            0.5 * np.exp(-t / 0.1) + 0.3 * np.exp(-t / 1.0) + 0.2 * np.exp(-t / 10.0)
+        )
 
         # Fit with leastsq method
         g, tau = prony_decompose_memory(t, m_true, n_modes=5, method="leastsq")
@@ -44,10 +46,14 @@ class TestPronyDecomposition:
         # Generate ill-conditioned kernel (closely spaced modes)
         t = np.logspace(-2, 3, 200)
         # Modes at τ = 0.5, 1, 2 (closely spaced in log-space)
-        m_true = 0.4 * np.exp(-t / 0.5) + 0.35 * np.exp(-t / 1.0) + 0.25 * np.exp(-t / 2.0)
+        m_true = (
+            0.4 * np.exp(-t / 0.5) + 0.35 * np.exp(-t / 1.0) + 0.25 * np.exp(-t / 2.0)
+        )
 
         # Fit with multistart method
-        g, tau = prony_decompose_memory(t, m_true, n_modes=5, method="multistart", n_starts=5)
+        g, tau = prony_decompose_memory(
+            t, m_true, n_modes=5, method="multistart", n_starts=5
+        )
 
         # Reconstruct and check fit quality
         m_fit = np.sum(g[None, :] * np.exp(-t[:, None] / tau[None, :]), axis=1)
@@ -104,7 +110,9 @@ class TestPronyDecomposition:
         m_noisy = m_clean + noise
         m_noisy = np.maximum(m_noisy, 1e-10)  # Keep positive
 
-        g, tau = prony_decompose_memory(t, m_noisy, n_modes=5, method="multistart", n_starts=3)
+        g, tau = prony_decompose_memory(
+            t, m_noisy, n_modes=5, method="multistart", n_starts=3
+        )
 
         # Reconstruct
         m_fit = np.sum(g[None, :] * np.exp(-t[:, None] / tau[None, :]), axis=1)
@@ -169,9 +177,9 @@ class TestDiffraxCompilation:
         predict_time = time.time() - start
 
         # After precompilation, prediction should be fast (< 5s for simple case)
-        assert predict_time < 10, (
-            f"After precompile(), prediction took {predict_time:.1f}s (expected <10s)"
-        )
+        assert (
+            predict_time < 10
+        ), f"After precompile(), prediction took {predict_time:.1f}s (expected <10s)"
 
     @pytest.mark.slow
     def test_precompile_reduces_first_call_time(self):
@@ -214,9 +222,7 @@ class TestPronyPerformance:
         # Generate challenging kernel (multiple time scales)
         t = np.logspace(-3, 3, 200)
         m_true = (
-            0.3 * np.exp(-t / 0.01)
-            + 0.3 * np.exp(-t / 1.0)
-            + 0.4 * np.exp(-t / 100.0)
+            0.3 * np.exp(-t / 0.01) + 0.3 * np.exp(-t / 1.0) + 0.4 * np.exp(-t / 100.0)
         )
 
         # Single-start (leastsq)
@@ -241,9 +247,9 @@ class TestPronyPerformance:
         r2_multi = 1 - ss_res_multi / ss_tot
 
         # Multi-start should be at least as good as single-start
-        assert r2_multi >= r2_single - 0.01, (
-            f"Multi-start R²={r2_multi:.4f} should be >= single-start R²={r2_single:.4f}"
-        )
+        assert (
+            r2_multi >= r2_single - 0.01
+        ), f"Multi-start R²={r2_multi:.4f} should be >= single-start R²={r2_single:.4f}"
 
         # Both should achieve reasonable fit
         assert r2_multi > 0.95, f"Multi-start R²={r2_multi:.4f}, expected > 0.95"

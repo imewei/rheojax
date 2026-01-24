@@ -46,9 +46,8 @@ Brader J.M. et al. (2008) J. Phys.: Condens. Matter 20, 494243
 """
 
 from rheojax.models.itt_mct._base import ITTMCTBase
-from rheojax.models.itt_mct.schematic import ITTMCTSchematic
-
 from rheojax.models.itt_mct.isotropic import ITTMCTIsotropic
+from rheojax.models.itt_mct.schematic import ITTMCTSchematic
 
 __all__ = [
     "ITTMCTBase",

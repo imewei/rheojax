@@ -29,11 +29,9 @@ References
 - Patrick Kidger (2021) "On Neural Differential Equations", arXiv:2202.02435
 """
 
-from functools import partial
-from typing import NamedTuple, Optional, Tuple
+from typing import NamedTuple
 
 import diffrax
-import equinox as eqx
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
@@ -105,7 +103,9 @@ def make_flow_curve_vector_field(
     state_dim = 2 + n_modes  # [Phi, K_1..K_n, gamma_accumulated]
     use_full_memory = memory_form == "full"
 
-    def vector_field(t: float, state: jnp.ndarray, args: FlowCurveParams) -> jnp.ndarray:
+    def vector_field(
+        t: float, state: jnp.ndarray, args: FlowCurveParams
+    ) -> jnp.ndarray:
         """ODE right-hand side for steady flow.
 
         State: [Phi, K_1, ..., K_n, gamma_accumulated]
@@ -155,7 +155,7 @@ def make_flow_curve_vector_field(
         # Pre-allocated output with .at[].set() for faster JIT compilation
         deriv = jnp.zeros(state_dim)
         deriv = deriv.at[0].set(dphi_dt)
-        deriv = deriv.at[1:1 + n_modes].set(dK_dt)
+        deriv = deriv.at[1 : 1 + n_modes].set(dK_dt)
         deriv = deriv.at[1 + n_modes].set(dgamma_dt)
 
         return deriv
@@ -281,7 +281,9 @@ def make_flow_curve_with_stress_vector_field(
     state_dim = 3 + n_modes  # [Phi, K_1..K_n, gamma, sigma_integral]
     use_full_memory = memory_form == "full"
 
-    def vector_field(t: float, state: jnp.ndarray, args: FlowCurveParams) -> jnp.ndarray:
+    def vector_field(
+        t: float, state: jnp.ndarray, args: FlowCurveParams
+    ) -> jnp.ndarray:
         """ODE right-hand side including stress integration."""
         # Unpack state
         phi = state[0]
@@ -331,7 +333,7 @@ def make_flow_curve_with_stress_vector_field(
         # Pre-allocated output with .at[].set() for faster JIT compilation
         deriv = jnp.zeros(state_dim)
         deriv = deriv.at[0].set(dphi_dt)
-        deriv = deriv.at[1:1 + n_modes].set(dK_dt)
+        deriv = deriv.at[1 : 1 + n_modes].set(dK_dt)
         deriv = deriv.at[1 + n_modes].set(dgamma_dt)
         deriv = deriv.at[2 + n_modes].set(dsigma_dt)
 
@@ -591,12 +593,9 @@ def solve_flow_curve_batch(
 
 def is_diffrax_available() -> bool:
     """Check if diffrax is available and working."""
-    try:
-        import diffrax
+    import importlib.util
 
-        return True
-    except ImportError:
-        return False
+    return importlib.util.find_spec("diffrax") is not None
 
 
 def clear_solver_cache():

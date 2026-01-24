@@ -36,7 +36,7 @@ def dmt_exponential():
     model = DMTLocal(closure="exponential", include_elasticity=True)
     # Set moderate viscosity contrast for predictable test behavior
     model.parameters["eta_0"].value = 1000.0  # Pa·s
-    model.parameters["eta_inf"].value = 1.0   # Pa·s
+    model.parameters["eta_inf"].value = 1.0  # Pa·s
     return model
 
 
@@ -408,7 +408,7 @@ class TestDMTLocalCreep:
         lam_init = 1.0
 
         # Expected initial elastic strain: γ_e = σ₀/G(λ=1) = σ₀/(G₀·1^m_G) = σ₀/G₀
-        expected_gamma_e = sigma_0 / (G0 * (lam_init ** m_G))
+        expected_gamma_e = sigma_0 / (G0 * (lam_init**m_G))
 
         t, gamma, gamma_dot, lam = dmt_exponential.simulate_creep(
             sigma_0=sigma_0, t_end=10.0, dt=0.01, lam_init=lam_init
@@ -441,7 +441,9 @@ class TestDMTLocalCreep:
         # Elastic strain should increase as structure decreases (G decreases)
         assert gamma_e_end > gamma_e_start
 
-    def test_creep_viscous_vs_maxwell_initial_strain(self, dmt_exponential, dmt_viscous):
+    def test_creep_viscous_vs_maxwell_initial_strain(
+        self, dmt_exponential, dmt_viscous
+    ):
         """Compare viscous and Maxwell creep initial behavior."""
         sigma_0 = 100.0
 
@@ -530,9 +532,7 @@ class TestDMTLocalLAOS:
         """Input strain should be sinusoidal."""
         gamma_0 = 0.5
         omega = 2.0
-        result = dmt_exponential.simulate_laos(
-            gamma_0=gamma_0, omega=omega, n_cycles=3
-        )
+        result = dmt_exponential.simulate_laos(gamma_0=gamma_0, omega=omega, n_cycles=3)
 
         # Check amplitude
         assert np.max(result["strain"]) == pytest.approx(gamma_0, rel=0.01)
@@ -540,9 +540,7 @@ class TestDMTLocalLAOS:
 
     def test_laos_harmonics_extraction(self, dmt_exponential):
         """Test Fourier harmonic extraction."""
-        result = dmt_exponential.simulate_laos(
-            gamma_0=0.5, omega=1.0, n_cycles=10
-        )
+        result = dmt_exponential.simulate_laos(gamma_0=0.5, omega=1.0, n_cycles=10)
 
         harmonics = dmt_exponential.extract_harmonics(result, n_harmonics=3)
 

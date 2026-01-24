@@ -22,11 +22,10 @@ import warnings
 
 import pytest
 
-from rheojax.core.inventory import Protocol
-from rheojax.core.registry import ModelRegistry
-
 # Force registration of all models
 import rheojax.models  # noqa: F401
+from rheojax.core.inventory import Protocol
+from rheojax.core.registry import ModelRegistry
 
 
 def get_predict_source(model_class: type) -> str | None:
@@ -73,7 +72,7 @@ def find_test_mode_patterns(source: str) -> set[str]:
     modes.update(re.findall(pattern_eq, source))
 
     # Pattern: test_mode in ["val1", "val2"] or test_mode in ("val1", "val2")
-    pattern_in = r'test_mode\s+in\s*[\[\(]([^\]\)]+)[\]\)]'
+    pattern_in = r"test_mode\s+in\s*[\[\(]([^\]\)]+)[\]\)]"
     for match in re.findall(pattern_in, source):
         # Extract quoted strings from the list
         modes.update(re.findall(r'["\'](\w+)["\']', match))
@@ -247,24 +246,24 @@ class TestIntrospectionHelpers:
 
     def test_find_test_mode_patterns_equality(self):
         """Test detection of == patterns."""
-        source = '''
+        source = """
         if test_mode == "relaxation":
             return self._predict_relaxation(X)
         elif test_mode == 'creep':
             return self._predict_creep(X)
-        '''
+        """
         modes = find_test_mode_patterns(source)
         assert "relaxation" in modes
         assert "creep" in modes
 
     def test_find_test_mode_patterns_in_list(self):
         """Test detection of 'in [...]' patterns."""
-        source = '''
+        source = """
         if test_mode in ["relaxation", "creep"]:
             return self._predict_transient(X)
         elif test_mode in ("oscillation", "laos"):
             return self._predict_oscillatory(X)
-        '''
+        """
         modes = find_test_mode_patterns(source)
         assert "relaxation" in modes
         assert "creep" in modes
@@ -273,11 +272,11 @@ class TestIntrospectionHelpers:
 
     def test_find_test_mode_patterns_mode_shorthand(self):
         """Test detection of 'mode ==' shorthand patterns."""
-        source = '''
+        source = """
         mode = test_mode or "relaxation"
         if mode == "flow_curve":
             return self._flow_curve(X)
-        '''
+        """
         modes = find_test_mode_patterns(source)
         assert "flow_curve" in modes
 

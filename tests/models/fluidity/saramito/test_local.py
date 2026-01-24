@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 
 from rheojax.core.inventory import Protocol
-from rheojax.core.registry import ModelRegistry
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.registry import ModelRegistry
 from rheojax.models.fluidity.saramito import FluiditySaramitoLocal
 
 jax, jnp = safe_import_jax()
@@ -260,9 +260,7 @@ class TestOscillationFitting:
         model.parameters.set_value("f_age", 1e-5)
 
         omega = np.logspace(-1, 2, 30)
-        G_star = FluiditySaramitoLocal._predict_saos_jit(
-            jnp.array(omega), 1e4, 1e-5
-        )
+        G_star = FluiditySaramitoLocal._predict_saos_jit(jnp.array(omega), 1e4, 1e-5)
 
         G_star_np = np.array(G_star)
         assert G_star_np.shape == (30, 2)
@@ -279,9 +277,7 @@ class TestOscillationFitting:
         tau_eff = 1.0 / (G * f_eq)  # Relaxation time
 
         omega = np.logspace(-3, 3, 100)
-        G_star = FluiditySaramitoLocal._predict_saos_jit(
-            jnp.array(omega), G, f_eq
-        )
+        G_star = FluiditySaramitoLocal._predict_saos_jit(jnp.array(omega), G, f_eq)
 
         G_prime = np.array(G_star[:, 0])
         G_double_prime = np.array(G_star[:, 1])

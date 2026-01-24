@@ -11,8 +11,6 @@ All functions use `safe_import_jax()` for float64 enforcement.
 
 from __future__ import annotations
 
-from functools import partial
-
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import
@@ -737,7 +735,9 @@ def invert_stress_for_gamma_dot_hb(
 
     # Fixed-point iteration
     def iterate(gamma_dot):
-        sigma_pred = tau_y + K * jnp.power(gamma_dot + 1e-12, n_flow) + eta_inf * gamma_dot
+        sigma_pred = (
+            tau_y + K * jnp.power(gamma_dot + 1e-12, n_flow) + eta_inf * gamma_dot
+        )
         # Newton-like update
         gamma_dot_new = gamma_dot * sigma_0 / jnp.maximum(sigma_pred, 1e-12)
         return jnp.clip(gamma_dot_new, 1e-12, 1e8)

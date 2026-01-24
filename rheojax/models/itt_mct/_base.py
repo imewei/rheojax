@@ -10,19 +10,16 @@ ITTMCTBase
 """
 
 from abc import abstractmethod
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Literal
 
 import numpy as np
 
 from rheojax.core.base import BaseModel
-from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.core.parameters import ParameterSet
 from rheojax.logging import get_logger
 
 jax, jnp = safe_import_jax()
-from functools import partial
 
 logger = get_logger(__name__)
 
@@ -119,14 +116,14 @@ class ITTMCTBase(BaseModel):
         self._setup_parameters()
 
         # Internal state
-        self._equilibrium_correlator: Optional[np.ndarray] = None
-        self._prony_amplitudes: Optional[np.ndarray] = None
-        self._prony_times: Optional[np.ndarray] = None
-        self._history_buffer: Optional[np.ndarray] = None
+        self._equilibrium_correlator: np.ndarray | None = None
+        self._prony_amplitudes: np.ndarray | None = None
+        self._prony_times: np.ndarray | None = None
+        self._history_buffer: np.ndarray | None = None
 
         # Protocol-specific storage
-        self._last_protocol: Optional[ProtocolType] = None
-        self._trajectory: Optional[Dict[str, np.ndarray]] = None
+        self._last_protocol: ProtocolType | None = None
+        self._trajectory: dict[str, np.ndarray] | None = None
 
     @abstractmethod
     def _setup_parameters(self) -> None:
@@ -185,7 +182,7 @@ class ITTMCTBase(BaseModel):
         self,
         X: np.ndarray,
         y: np.ndarray,
-        test_mode: Optional[str] = None,
+        test_mode: str | None = None,
         **kwargs,
     ) -> "ITTMCTBase":
         """Internal fit implementation.
@@ -242,7 +239,7 @@ class ITTMCTBase(BaseModel):
     def _predict(
         self,
         X: np.ndarray,
-        test_mode: Optional[str] = None,
+        test_mode: str | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Internal predict implementation.
@@ -372,7 +369,7 @@ class ITTMCTBase(BaseModel):
             **kwargs,
         )
 
-        self.parameters.set_values(dict(zip(param_names, result.x)))
+        self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
         self._nlsq_result = result
         return self
 
@@ -430,7 +427,7 @@ class ITTMCTBase(BaseModel):
             **kwargs,
         )
 
-        self.parameters.set_values(dict(zip(param_names, result.x)))
+        self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
         self._nlsq_result = result
         return self
 
@@ -477,7 +474,7 @@ class ITTMCTBase(BaseModel):
             **kwargs,
         )
 
-        self.parameters.set_values(dict(zip(param_names, result.x)))
+        self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
         self._nlsq_result = result
         return self
 
@@ -524,7 +521,7 @@ class ITTMCTBase(BaseModel):
             **kwargs,
         )
 
-        self.parameters.set_values(dict(zip(param_names, result.x)))
+        self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
         self._nlsq_result = result
         return self
 
@@ -571,7 +568,7 @@ class ITTMCTBase(BaseModel):
             **kwargs,
         )
 
-        self.parameters.set_values(dict(zip(param_names, result.x)))
+        self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
         self._nlsq_result = result
         return self
 
@@ -621,7 +618,7 @@ class ITTMCTBase(BaseModel):
             **kwargs,
         )
 
-        self.parameters.set_values(dict(zip(param_names, result.x)))
+        self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
         self._nlsq_result = result
         return self
 
@@ -772,7 +769,7 @@ class ITTMCTBase(BaseModel):
     # Utility Methods
     # =========================================================================
 
-    def get_glass_transition_info(self) -> Dict[str, Any]:
+    def get_glass_transition_info(self) -> dict[str, Any]:
         """Get information about the glass transition state.
 
         Returns
@@ -826,7 +823,7 @@ class ITTMCTBase(BaseModel):
             f"tau range: [{self._prony_times.min():.2e}, {self._prony_times.max():.2e}]"
         )
 
-    def get_prony_modes(self) -> Tuple[np.ndarray, np.ndarray]:
+    def get_prony_modes(self) -> tuple[np.ndarray, np.ndarray]:
         """Get Prony mode amplitudes and relaxation times.
 
         Returns

@@ -29,11 +29,9 @@ Fuchs M. & Cates M.E. (2009) J. Rheol. 53, 957
 Brader J.M. et al. (2009) Proc. Natl. Acad. Sci. 106, 15186
 """
 
-from functools import partial
-from typing import Any, Callable, Dict, Literal, Optional, Tuple
+from typing import Any, Literal
 
 import numpy as np
-from scipy.integrate import solve_ivp
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
@@ -46,7 +44,6 @@ from rheojax.utils.structure_factor import (
     interpolate_sk,
     mct_vertex_isotropic,
     percus_yevick_sk,
-    percus_yevick_sk_jax,
 )
 
 jax, jnp = safe_import_jax()
@@ -116,10 +113,10 @@ class ITTMCTIsotropic(ITTMCTBase):
 
     def __init__(
         self,
-        phi: Optional[float] = None,
+        phi: float | None = None,
         sk_source: Literal["percus_yevick", "user_provided"] = "percus_yevick",
-        k_data: Optional[np.ndarray] = None,
-        sk_data: Optional[np.ndarray] = None,
+        k_data: np.ndarray | None = None,
+        sk_data: np.ndarray | None = None,
         n_k: int = 100,
         integration_method: Literal["volterra", "history"] = "volterra",
         n_prony_modes: int = 10,
@@ -253,9 +250,9 @@ class ITTMCTIsotropic(ITTMCTBase):
 
     def update_structure_factor(
         self,
-        phi: Optional[float] = None,
-        k_data: Optional[np.ndarray] = None,
-        sk_data: Optional[np.ndarray] = None,
+        phi: float | None = None,
+        k_data: np.ndarray | None = None,
+        sk_data: np.ndarray | None = None,
     ) -> None:
         """Update structure factor (e.g., after parameter change).
 
@@ -294,10 +291,7 @@ class ITTMCTIsotropic(ITTMCTBase):
         """
         # For ISM, we solve coupled equations for each k
         # Simplified: use single-mode approximation
-
-        phi_val = self.parameters.get_value("phi")
         D0 = self.parameters.get_value("D0")
-        sigma_d = self.parameters.get_value("sigma_d")
 
         t_np = np.array(t)
         n_t = len(t_np)
@@ -374,7 +368,7 @@ class ITTMCTIsotropic(ITTMCTBase):
         m_k = jnp.dot(self.vertex, phi_k * phi_k)
         return m_k
 
-    def get_glass_transition_info(self) -> Dict[str, Any]:
+    def get_glass_transition_info(self) -> dict[str, Any]:
         """Get information about the glass transition state.
 
         Returns
@@ -397,7 +391,7 @@ class ITTMCTIsotropic(ITTMCTBase):
             "k_peak": self.k_grid[self.S_k.argmax()],
         }
 
-    def get_sk_info(self) -> Dict[str, Any]:
+    def get_sk_info(self) -> dict[str, Any]:
         """Get information about current S(k).
 
         Returns
@@ -440,7 +434,6 @@ class ITTMCTIsotropic(ITTMCTBase):
         """
         gamma_dot = np.asarray(gamma_dot)
 
-        phi = self.parameters.get_value("phi")
         sigma_d = self.parameters.get_value("sigma_d")
         D0 = self.parameters.get_value("D0")
         kBT = self.parameters.get_value("kBT")
@@ -470,7 +463,7 @@ class ITTMCTIsotropic(ITTMCTBase):
                 for j, k in enumerate(self.k_grid):
                     # Characteristic strain
                     gamma_eff = gd / Gamma_k[j]
-                    h = np.exp(-(gamma_eff / gamma_c) ** 2)
+                    h = np.exp(-((gamma_eff / gamma_c) ** 2))
 
                     # Correlator contribution
                     f_k = self._compute_nonergodicity_parameter(k)
@@ -581,7 +574,7 @@ class ITTMCTIsotropic(ITTMCTBase):
             stress_k = np.zeros(len(self.k_grid))
 
             for j, k in enumerate(self.k_grid):
-                h = np.exp(-(gamma_acc / gamma_c) ** 2)
+                h = np.exp(-((gamma_acc / gamma_c) ** 2))
                 tau_k = 1.0 / Gamma_k[j]
 
                 f_k = self._compute_nonergodicity_parameter(k)
@@ -672,7 +665,7 @@ class ITTMCTIsotropic(ITTMCTBase):
         Gamma_k = self.k_grid**2 * D0 / self.S_k
         G_scale = kBT / sigma_d**3
 
-        h_pre = np.exp(-(gamma_pre / gamma_c) ** 2)
+        h_pre = np.exp(-((gamma_pre / gamma_c) ** 2))
 
         sigma = np.zeros_like(t)
 
@@ -733,7 +726,7 @@ class ITTMCTIsotropic(ITTMCTBase):
             gamma_t = gamma_0 * np.sin(omega * t_val)
             gamma_dot_t = gamma_0 * omega * np.cos(omega * t_val)
 
-            h = np.exp(-(gamma_t / gamma_c) ** 2)
+            h = np.exp(-((gamma_t / gamma_c) ** 2))
 
             stress_k = np.zeros(len(self.k_grid))
 

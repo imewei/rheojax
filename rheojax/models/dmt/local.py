@@ -14,8 +14,7 @@ Supports all standard rheological protocols:
 
 from __future__ import annotations
 
-from functools import partial
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 
@@ -26,7 +25,6 @@ from rheojax.logging import get_logger
 from rheojax.models.dmt._base import DMTBase
 from rheojax.models.dmt._kernels import (
     elastic_modulus,
-    equilibrium_structure,
     invert_stress_for_gamma_dot_exponential,
     invert_stress_for_gamma_dot_hb,
     maxwell_stress_evolution,
@@ -121,7 +119,7 @@ class DMTLocal(DMTBase):
     # Required Abstract Methods
     # =========================================================================
 
-    def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> "DMTLocal":
+    def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> DMTLocal:
         """Fit model to data.
 
         Dispatches to protocol-specific fitting method based on test_mode.
@@ -156,9 +154,7 @@ class DMTLocal(DMTBase):
             return self._fit_creep(X, y, **kwargs)
         elif test_mode == "oscillation":
             if not self.include_elasticity:
-                raise ValueError(
-                    "SAOS requires include_elasticity=True (DMT-Maxwell)"
-                )
+                raise ValueError("SAOS requires include_elasticity=True (DMT-Maxwell)")
             return self._fit_oscillation(X, y, **kwargs)
         elif test_mode == "laos":
             return self._fit_laos(X, y, **kwargs)
@@ -203,7 +199,7 @@ class DMTLocal(DMTBase):
 
     def _fit_flow_curve(
         self, gamma_dot: np.ndarray, stress: np.ndarray, **kwargs
-    ) -> "DMTLocal":
+    ) -> DMTLocal:
         """Fit to steady-state flow curve σ(γ̇).
 
         Uses NLSQ to optimize parameters to match equilibrium stress-rate curve.
@@ -250,19 +246,19 @@ class DMTLocal(DMTBase):
         def model_fn(x, params_array):
             if self.closure == "exponential":
                 eta_0, eta_inf, a, c = params_array[:4]
-                return np.array(steady_stress_exponential(
-                    jnp.array(x), eta_0, eta_inf, a, c
-                ))
+                return np.array(
+                    steady_stress_exponential(jnp.array(x), eta_0, eta_inf, a, c)
+                )
             else:
                 tau_y0, K0, n_flow, eta_inf, a, c, m1, m2 = params_array[:8]
-                return np.array(steady_stress_herschel_bulkley(
-                    jnp.array(x), tau_y0, K0, n_flow, eta_inf, a, c, m1, m2
-                ))
+                return np.array(
+                    steady_stress_herschel_bulkley(
+                        jnp.array(x), tau_y0, K0, n_flow, eta_inf, a, c, m1, m2
+                    )
+                )
 
         # Fit using nlsq_curve_fit
-        result = nlsq_curve_fit(
-            model_fn, gamma_dot_np, stress_np, fit_params, **kwargs
-        )
+        result = nlsq_curve_fit(model_fn, gamma_dot_np, stress_np, fit_params, **kwargs)
 
         # Update main parameters with fitted values
         for name in param_names:
@@ -371,7 +367,9 @@ class DMTLocal(DMTBase):
 
         def step(lam, _):
             # Structure evolution
-            dlam = structure_evolution(lam, gamma_dot, params["t_eq"], params["a"], params["c"])
+            dlam = structure_evolution(
+                lam, gamma_dot, params["t_eq"], params["a"], params["c"]
+            )
             lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
 
             # Viscosity
@@ -379,8 +377,14 @@ class DMTLocal(DMTBase):
                 eta = viscosity_exponential(lam_new, params["eta_0"], params["eta_inf"])
             else:
                 eta = viscosity_herschel_bulkley_regularized(
-                    lam_new, gamma_dot, params["tau_y0"], params["K0"],
-                    params["n_flow"], params["eta_inf"], params["m1"], params["m2"]
+                    lam_new,
+                    gamma_dot,
+                    params["tau_y0"],
+                    params["K0"],
+                    params["n_flow"],
+                    params["eta_inf"],
+                    params["m1"],
+                    params["m2"],
                 )
 
             stress = eta * gamma_dot
@@ -404,7 +408,9 @@ class DMTLocal(DMTBase):
             sigma, lam = state
 
             # Structure evolution
-            dlam = structure_evolution(lam, gamma_dot, params["t_eq"], params["a"], params["c"])
+            dlam = structure_evolution(
+                lam, gamma_dot, params["t_eq"], params["a"], params["c"]
+            )
             lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
 
             # Elastic modulus
@@ -415,8 +421,14 @@ class DMTLocal(DMTBase):
                 eta = viscosity_exponential(lam_new, params["eta_0"], params["eta_inf"])
             else:
                 eta = viscosity_herschel_bulkley_regularized(
-                    lam_new, gamma_dot, params["tau_y0"], params["K0"],
-                    params["n_flow"], params["eta_inf"], params["m1"], params["m2"]
+                    lam_new,
+                    gamma_dot,
+                    params["tau_y0"],
+                    params["K0"],
+                    params["n_flow"],
+                    params["eta_inf"],
+                    params["m1"],
+                    params["m2"],
                 )
 
             # Relaxation time
@@ -433,9 +445,7 @@ class DMTLocal(DMTBase):
 
         return np.array(t), np.array(stress), np.array(lam)
 
-    def _fit_transient(
-        self, t: np.ndarray, stress: np.ndarray, **kwargs
-    ) -> "DMTLocal":
+    def _fit_transient(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> DMTLocal:
         """Fit to transient startup data."""
         # Extract gamma_dot from kwargs
         gamma_dot = kwargs.get("gamma_dot", 1.0)
@@ -457,9 +467,7 @@ class DMTLocal(DMTBase):
 
         params_array, bounds = self._get_params_for_optimization()
 
-        result = fit_with_nlsq(
-            residual_fn, params_array, bounds=bounds, **kwargs
-        )
+        result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **kwargs)
 
         self._set_params_from_array(result.x)
         self._fitted = True
@@ -470,7 +478,9 @@ class DMTLocal(DMTBase):
         """Predict startup stress."""
         gamma_dot = kwargs.get("gamma_dot", 1.0)
         lam_init = kwargs.get("lam_init", 1.0)
-        _, stress, _ = self.simulate_startup(gamma_dot, float(t[-1]), float(t[1] - t[0]), lam_init)
+        _, stress, _ = self.simulate_startup(
+            gamma_dot, float(t[-1]), float(t[1] - t[0]), lam_init
+        )
         return stress
 
     # =========================================================================
@@ -545,7 +555,7 @@ class DMTLocal(DMTBase):
 
         return np.array(t), np.array(stress), np.array(lam)
 
-    def _fit_relaxation(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> "DMTLocal":
+    def _fit_relaxation(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> DMTLocal:
         """Fit to relaxation data."""
         # Implementation similar to _fit_transient
         raise NotImplementedError("Relaxation fitting not yet implemented")
@@ -647,12 +657,20 @@ class DMTLocal(DMTBase):
                 )
             else:
                 gamma_dot = invert_stress_for_gamma_dot_hb(
-                    sigma_0, lam, params["tau_y0"], params["K0"],
-                    params["n_flow"], params["eta_inf"], params["m1"], params["m2"]
+                    sigma_0,
+                    lam,
+                    params["tau_y0"],
+                    params["K0"],
+                    params["n_flow"],
+                    params["eta_inf"],
+                    params["m1"],
+                    params["m2"],
                 )
 
             # Structure evolution (driven by viscous flow rate)
-            dlam = structure_evolution(lam, gamma_dot, params["t_eq"], params["a"], params["c"])
+            dlam = structure_evolution(
+                lam, gamma_dot, params["t_eq"], params["a"], params["c"]
+            )
             lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
 
             # Strain accumulation
@@ -661,7 +679,9 @@ class DMTLocal(DMTBase):
             return (lam_new, gamma_new), (gamma_new, gamma_dot, lam_new)
 
         init_state = (lam_init, 0.0)
-        _, (gamma, gamma_dot, lam) = jax.lax.scan(step, init_state, None, length=n_steps)
+        _, (gamma, gamma_dot, lam) = jax.lax.scan(
+            step, init_state, None, length=n_steps
+        )
 
         return np.array(t), np.array(gamma), np.array(gamma_dot), np.array(lam)
 
@@ -704,8 +724,14 @@ class DMTLocal(DMTBase):
                 )
             else:
                 gamma_dot_v = invert_stress_for_gamma_dot_hb(
-                    sigma_0, lam, params["tau_y0"], params["K0"],
-                    params["n_flow"], params["eta_inf"], params["m1"], params["m2"]
+                    sigma_0,
+                    lam,
+                    params["tau_y0"],
+                    params["K0"],
+                    params["n_flow"],
+                    params["eta_inf"],
+                    params["m1"],
+                    params["m2"],
                 )
 
             # Elastic strain rate (from structure change)
@@ -716,7 +742,9 @@ class DMTLocal(DMTBase):
 
             # Structure evolution (driven by viscous flow rate)
             # Use viscous rate since that represents actual material deformation
-            dlam = structure_evolution(lam, gamma_dot_v, params["t_eq"], params["a"], params["c"])
+            dlam = structure_evolution(
+                lam, gamma_dot_v, params["t_eq"], params["a"], params["c"]
+            )
             lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
 
             # Viscous strain accumulation
@@ -727,17 +755,15 @@ class DMTLocal(DMTBase):
 
             return (lam_new, gamma_v_new, lam), (gamma_total, gamma_dot_total, lam_new)
 
-        # Initial elastic strain (instantaneous response to applied stress)
-        G_init = elastic_modulus(lam_init, params["G0"], params["m_G"])
-        gamma_e_init = sigma_0 / jnp.maximum(G_init, 1e-10)
-
         # State: (λ, γ_v, λ_prev)
         init_state = (lam_init, 0.0, lam_init)
-        _, (gamma, gamma_dot, lam) = jax.lax.scan(step, init_state, None, length=n_steps)
+        _, (gamma, gamma_dot, lam) = jax.lax.scan(
+            step, init_state, None, length=n_steps
+        )
 
         return np.array(t), np.array(gamma), np.array(gamma_dot), np.array(lam)
 
-    def _fit_creep(self, t: np.ndarray, gamma: np.ndarray, **kwargs) -> "DMTLocal":
+    def _fit_creep(self, t: np.ndarray, gamma: np.ndarray, **kwargs) -> DMTLocal:
         """Fit to creep data."""
         raise NotImplementedError("Creep fitting not yet implemented")
 
@@ -790,8 +816,14 @@ class DMTLocal(DMTBase):
         else:
             # HB at low shear rate
             eta = viscosity_herschel_bulkley_regularized(
-                lam_0, 1e-6, params["tau_y0"], params["K0"],
-                params["n_flow"], params["eta_inf"], params["m1"], params["m2"]
+                lam_0,
+                1e-6,
+                params["tau_y0"],
+                params["K0"],
+                params["n_flow"],
+                params["eta_inf"],
+                params["m1"],
+                params["m2"],
             )
 
         theta_1 = eta / jnp.maximum(G, 1e-10)
@@ -802,7 +834,9 @@ class DMTLocal(DMTBase):
 
         return np.array(G_prime), np.array(G_double_prime)
 
-    def _fit_oscillation(self, omega: np.ndarray, G_star: np.ndarray, **kwargs) -> "DMTLocal":
+    def _fit_oscillation(
+        self, omega: np.ndarray, G_star: np.ndarray, **kwargs
+    ) -> DMTLocal:
         """Fit to SAOS data."""
         raise NotImplementedError("SAOS fitting not yet implemented")
 
@@ -865,7 +899,9 @@ class DMTLocal(DMTBase):
                 sigma, lam = state
 
                 # Structure evolution
-                dlam = structure_evolution(lam, sr, params["t_eq"], params["a"], params["c"])
+                dlam = structure_evolution(
+                    lam, sr, params["t_eq"], params["a"], params["c"]
+                )
                 lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
 
                 # Elastic modulus
@@ -873,11 +909,19 @@ class DMTLocal(DMTBase):
 
                 # Viscosity
                 if self.closure == "exponential":
-                    eta = viscosity_exponential(lam_new, params["eta_0"], params["eta_inf"])
+                    eta = viscosity_exponential(
+                        lam_new, params["eta_0"], params["eta_inf"]
+                    )
                 else:
                     eta = viscosity_herschel_bulkley_regularized(
-                        lam_new, sr, params["tau_y0"], params["K0"],
-                        params["n_flow"], params["eta_inf"], params["m1"], params["m2"]
+                        lam_new,
+                        sr,
+                        params["tau_y0"],
+                        params["K0"],
+                        params["n_flow"],
+                        params["eta_inf"],
+                        params["m1"],
+                        params["m2"],
                     )
 
                 # Relaxation time
@@ -894,15 +938,25 @@ class DMTLocal(DMTBase):
         else:
             # Viscous LAOS
             def step(lam, sr):
-                dlam = structure_evolution(lam, sr, params["t_eq"], params["a"], params["c"])
+                dlam = structure_evolution(
+                    lam, sr, params["t_eq"], params["a"], params["c"]
+                )
                 lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
 
                 if self.closure == "exponential":
-                    eta = viscosity_exponential(lam_new, params["eta_0"], params["eta_inf"])
+                    eta = viscosity_exponential(
+                        lam_new, params["eta_0"], params["eta_inf"]
+                    )
                 else:
                     eta = viscosity_herschel_bulkley_regularized(
-                        lam_new, sr, params["tau_y0"], params["K0"],
-                        params["n_flow"], params["eta_inf"], params["m1"], params["m2"]
+                        lam_new,
+                        sr,
+                        params["tau_y0"],
+                        params["K0"],
+                        params["n_flow"],
+                        params["eta_inf"],
+                        params["m1"],
+                        params["m2"],
                     )
 
                 stress = eta * sr
@@ -959,9 +1013,17 @@ class DMTLocal(DMTBase):
 
         for n in range(1, 2 * n_harmonics, 2):  # Odd harmonics
             # In-phase (sin)
-            sp = 2 * trapezoid(stress_cycle * np.sin(n * omega * t_cycle), t_cycle) / period
+            sp = (
+                2
+                * trapezoid(stress_cycle * np.sin(n * omega * t_cycle), t_cycle)
+                / period
+            )
             # Out-of-phase (cos)
-            spp = 2 * trapezoid(stress_cycle * np.cos(n * omega * t_cycle), t_cycle) / period
+            spp = (
+                2
+                * trapezoid(stress_cycle * np.cos(n * omega * t_cycle), t_cycle)
+                / period
+            )
 
             sigma_prime.append(sp)
             sigma_double_prime.append(spp)
@@ -970,11 +1032,13 @@ class DMTLocal(DMTBase):
         sigma_double_prime = np.array(sigma_double_prime)
 
         # Normalized intensities I_n/I_1
-        I_1 = np.sqrt(sigma_prime[0]**2 + sigma_double_prime[0]**2)
-        I_n_1 = np.array([
-            np.sqrt(sp**2 + spp**2) / I_1
-            for sp, spp in zip(sigma_prime, sigma_double_prime)
-        ])
+        I_1 = np.sqrt(sigma_prime[0] ** 2 + sigma_double_prime[0] ** 2)
+        I_n_1 = np.array(
+            [
+                np.sqrt(sp**2 + spp**2) / I_1
+                for sp, spp in zip(sigma_prime, sigma_double_prime, strict=True)
+            ]
+        )
 
         return {
             "sigma_prime": sigma_prime,
@@ -982,7 +1046,7 @@ class DMTLocal(DMTBase):
             "I_n_1": I_n_1,
         }
 
-    def _fit_laos(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> "DMTLocal":
+    def _fit_laos(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> DMTLocal:
         """Fit to LAOS data."""
         raise NotImplementedError("LAOS fitting not yet implemented")
 
@@ -1000,8 +1064,12 @@ class DMTLocal(DMTBase):
         """Get parameter array and bounds for optimization."""
         param_names = list(self.parameters.keys())
         params = jnp.array([self.parameters.get_value(n) for n in param_names])
-        bounds_lower = jnp.array([self.parameters.get_bounds(n)[0] for n in param_names])
-        bounds_upper = jnp.array([self.parameters.get_bounds(n)[1] for n in param_names])
+        bounds_lower = jnp.array(
+            [self.parameters.get_bounds(n)[0] for n in param_names]
+        )
+        bounds_upper = jnp.array(
+            [self.parameters.get_bounds(n)[1] for n in param_names]
+        )
         return params, (bounds_lower, bounds_upper)
 
     def _params_array_to_dict(self, params_array: jnp.ndarray) -> dict:

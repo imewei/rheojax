@@ -173,9 +173,7 @@ class TestFluidityEvolution:
     def test_equilibrium_at_rest(self):
         """Test df/dt = 0 at f = f_age with no flow."""
         f_age = 1e-6
-        df_dt = fluidity_evolution_saramito(
-            f_age, 0.0, f_age, 1e-2, 10.0, 1.0, 1.0
-        )
+        df_dt = fluidity_evolution_saramito(f_age, 0.0, f_age, 1e-2, 10.0, 1.0, 1.0)
 
         # Should be close to zero at equilibrium
         assert abs(df_dt) < 1e-15

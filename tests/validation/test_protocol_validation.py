@@ -22,12 +22,11 @@ from typing import Any
 import numpy as np
 import pytest
 
+# Force registration of all models by importing the models package
+import rheojax.models  # noqa: F401
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-
-# Force registration of all models by importing the models package
-import rheojax.models  # noqa: F401
 
 jax, jnp = safe_import_jax()
 
@@ -221,7 +220,9 @@ class TestProtocolValidation:
         if np.iscomplexobj(result_arr):
             actual_len = len(result_arr)
         else:
-            actual_len = result_arr.shape[-1] if result_arr.ndim > 1 else len(result_arr)
+            actual_len = (
+                result_arr.shape[-1] if result_arr.ndim > 1 else len(result_arr)
+            )
 
         assert actual_len == expected_len, (
             f"{model_name} returned wrong shape for {protocol.value}: "
@@ -237,19 +238,19 @@ class TestProtocolValidation:
             if not info or not info.protocols:
                 models_without_protocols.append(model_name)
 
-        assert not models_without_protocols, (
-            f"Models without declared protocols: {models_without_protocols}"
-        )
+        assert (
+            not models_without_protocols
+        ), f"Models without declared protocols: {models_without_protocols}"
 
     def test_protocol_pairs_not_empty(self):
         """Verify test parametrization found model/protocol pairs."""
-        assert len(_MODEL_PROTOCOL_PAIRS) > 0, (
-            "No model/protocol pairs found - check model registration"
-        )
+        assert (
+            len(_MODEL_PROTOCOL_PAIRS) > 0
+        ), "No model/protocol pairs found - check model registration"
         # Expect at least 30+ pairs given the model inventory
-        assert len(_MODEL_PROTOCOL_PAIRS) >= 30, (
-            f"Expected 30+ pairs, found {len(_MODEL_PROTOCOL_PAIRS)}"
-        )
+        assert (
+            len(_MODEL_PROTOCOL_PAIRS) >= 30
+        ), f"Expected 30+ pairs, found {len(_MODEL_PROTOCOL_PAIRS)}"
 
 
 @pytest.mark.smoke
@@ -266,9 +267,9 @@ class TestProtocolDataFactory:
 
         # kwargs should contain test_mode
         assert "test_mode" in kwargs, f"Missing test_mode for {protocol}"
-        assert kwargs["test_mode"] == protocol.value, (
-            f"test_mode mismatch: {kwargs['test_mode']} != {protocol.value}"
-        )
+        assert (
+            kwargs["test_mode"] == protocol.value
+        ), f"test_mode mismatch: {kwargs['test_mode']} != {protocol.value}"
 
     def test_factory_startup_shape(self):
         """Test STARTUP protocol generates (2, N) shaped data."""

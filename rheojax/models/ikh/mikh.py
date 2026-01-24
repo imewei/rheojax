@@ -291,7 +291,9 @@ class MIKH(IKHBase):
         if mode == "creep":
             # Creep: constant stress, track strain
             ode_fn = ikh_creep_ode_rhs
-            args["sigma_applied"] = sigma_applied if sigma_applied is not None else 100.0
+            args["sigma_applied"] = (
+                sigma_applied if sigma_applied is not None else 100.0
+            )
             # State: [strain, alpha, lambda]
             y0 = jnp.array([0.0, 0.0, lambda_init])
         elif mode == "startup":
@@ -304,7 +306,11 @@ class MIKH(IKHBase):
             # Relaxation: rate = 0, stress decays
             ode_fn = ikh_maxwell_ode_rhs
             args["gamma_dot"] = 0.0
-            sigma_init = sigma_0 if sigma_0 is not None else params.get("sigma_y0", 10.0) + params.get("delta_sigma_y", 50.0)
+            sigma_init = (
+                sigma_0
+                if sigma_0 is not None
+                else params.get("sigma_y0", 10.0) + params.get("delta_sigma_y", 50.0)
+            )
             # Start partially destructured
             lambda_init_relax = 0.5
             y0 = jnp.array([sigma_init, 0.0, lambda_init_relax])
@@ -386,9 +392,7 @@ class MIKH(IKHBase):
         """Predict steady-state flow curve."""
         return self._predict(gamma_dot, test_mode="flow_curve")
 
-    def predict_startup(
-        self, t: ArrayLike, gamma_dot: float = 1.0
-    ) -> ArrayLike:
+    def predict_startup(self, t: ArrayLike, gamma_dot: float = 1.0) -> ArrayLike:
         """Predict startup shear response.
 
         Args:
@@ -398,12 +402,14 @@ class MIKH(IKHBase):
         Returns:
             Stress vs time
         """
-        params = dict(zip(self.parameters.keys(), self.parameters.get_values(), strict=False))
-        return self._simulate_transient(jnp.asarray(t), params, "startup", gamma_dot=gamma_dot)
+        params = dict(
+            zip(self.parameters.keys(), self.parameters.get_values(), strict=False)
+        )
+        return self._simulate_transient(
+            jnp.asarray(t), params, "startup", gamma_dot=gamma_dot
+        )
 
-    def predict_relaxation(
-        self, t: ArrayLike, sigma_0: float = 100.0
-    ) -> ArrayLike:
+    def predict_relaxation(self, t: ArrayLike, sigma_0: float = 100.0) -> ArrayLike:
         """Predict stress relaxation.
 
         Args:
@@ -413,12 +419,14 @@ class MIKH(IKHBase):
         Returns:
             Stress vs time
         """
-        params = dict(zip(self.parameters.keys(), self.parameters.get_values(), strict=False))
-        return self._simulate_transient(jnp.asarray(t), params, "relaxation", sigma_0=sigma_0)
+        params = dict(
+            zip(self.parameters.keys(), self.parameters.get_values(), strict=False)
+        )
+        return self._simulate_transient(
+            jnp.asarray(t), params, "relaxation", sigma_0=sigma_0
+        )
 
-    def predict_creep(
-        self, t: ArrayLike, sigma_applied: float = 50.0
-    ) -> ArrayLike:
+    def predict_creep(self, t: ArrayLike, sigma_applied: float = 50.0) -> ArrayLike:
         """Predict creep response.
 
         Args:
@@ -428,8 +436,12 @@ class MIKH(IKHBase):
         Returns:
             Strain vs time
         """
-        params = dict(zip(self.parameters.keys(), self.parameters.get_values(), strict=False))
-        return self._simulate_transient(jnp.asarray(t), params, "creep", sigma_applied=sigma_applied)
+        params = dict(
+            zip(self.parameters.keys(), self.parameters.get_values(), strict=False)
+        )
+        return self._simulate_transient(
+            jnp.asarray(t), params, "creep", sigma_applied=sigma_applied
+        )
 
     def predict_laos(
         self, t: ArrayLike, gamma_0: float = 1.0, omega: float = 1.0
@@ -447,8 +459,11 @@ class MIKH(IKHBase):
         t_arr = jnp.asarray(t)
         strain = gamma_0 * jnp.sin(omega * t_arr)
         return self._predict_from_params(
-            t_arr, strain,
-            dict(zip(self.parameters.keys(), self.parameters.get_values(), strict=False))
+            t_arr,
+            strain,
+            dict(
+                zip(self.parameters.keys(), self.parameters.get_values(), strict=False)
+            ),
         )
 
     def model_function(self, X, params, test_mode=None):

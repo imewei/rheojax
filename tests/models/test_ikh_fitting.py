@@ -19,9 +19,9 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.models.ikh._kernels import ikh_flow_curve_steady_state
 from rheojax.models.ikh.mikh import MIKH
 from rheojax.models.ikh.ml_ikh import MLIKH
-from rheojax.models.ikh._kernels import ikh_flow_curve_steady_state
 
 jax, jnp = safe_import_jax()
 
@@ -159,7 +159,9 @@ class TestMIKHNLSQ:
 
         # Prediction should be reasonable
         stress_pred = model.predict_flow_curve(gamma_dot)
-        r2 = 1 - np.sum((stress - stress_pred) ** 2) / np.sum((stress - np.mean(stress)) ** 2)
+        r2 = 1 - np.sum((stress - stress_pred) ** 2) / np.sum(
+            (stress - np.mean(stress)) ** 2
+        )
         assert r2 > 0.9, f"R² = {r2:.3f} should be > 0.9"
 
     @pytest.mark.smoke
@@ -174,7 +176,9 @@ class TestMIKHNLSQ:
 
         # Check prediction quality (R² > 0.75 is reasonable for this complex model)
         stress_pred = model.predict(X_input, test_mode="startup")
-        r2 = 1 - np.sum((stress - stress_pred) ** 2) / np.sum((stress - np.mean(stress)) ** 2)
+        r2 = 1 - np.sum((stress - stress_pred) ** 2) / np.sum(
+            (stress - np.mean(stress)) ** 2
+        )
         assert r2 > 0.75, f"R² = {r2:.3f} should be > 0.75"
 
     @pytest.mark.smoke
@@ -189,7 +193,9 @@ class TestMIKHNLSQ:
         fitted_sigma_y0 = model.parameters.get_value("sigma_y0")
         fitted_eta_inf = model.parameters.get_value("eta_inf")
 
-        assert 10.0 < fitted_sigma_y0 < 40.0, f"sigma_y0 = {fitted_sigma_y0} out of range"
+        assert (
+            10.0 < fitted_sigma_y0 < 40.0
+        ), f"sigma_y0 = {fitted_sigma_y0} out of range"
         assert 0.01 < fitted_eta_inf < 1.0, f"eta_inf = {fitted_eta_inf} out of range"
 
 
@@ -285,8 +291,9 @@ class TestMIKHBayesian:
         posterior_G = np.mean(result.posterior_samples["G"])
 
         # Allow 50% deviation
-        assert abs(posterior_G - nlsq_G) / nlsq_G < 0.5, \
-            f"Posterior mean G={posterior_G} too far from NLSQ G={nlsq_G}"
+        assert (
+            abs(posterior_G - nlsq_G) / nlsq_G < 0.5
+        ), f"Posterior mean G={posterior_G} too far from NLSQ G={nlsq_G}"
 
 
 # =============================================================================
@@ -309,7 +316,9 @@ class TestMLIKHFitting:
 
         # Prediction should be reasonable
         stress_pred = model.predict(X_input)
-        r2 = 1 - np.sum((stress - stress_pred) ** 2) / np.sum((stress - np.mean(stress)) ** 2)
+        r2 = 1 - np.sum((stress - stress_pred) ** 2) / np.sum(
+            (stress - np.mean(stress)) ** 2
+        )
         assert r2 > 0.7, f"R² = {r2:.3f} should be > 0.7"
 
     @pytest.mark.smoke
@@ -324,7 +333,9 @@ class TestMLIKHFitting:
 
         # Prediction should be reasonable
         stress_pred = model.predict(X_input)
-        r2 = 1 - np.sum((stress - stress_pred) ** 2) / np.sum((stress - np.mean(stress)) ** 2)
+        r2 = 1 - np.sum((stress - stress_pred) ** 2) / np.sum(
+            (stress - np.mean(stress)) ** 2
+        )
         assert r2 > 0.7, f"R² = {r2:.3f} should be > 0.7"
 
     @pytest.mark.slow
@@ -347,7 +358,6 @@ class TestMLIKHFitting:
         assert result is not None
         assert "G_1" in result.posterior_samples
         assert "G_2" in result.posterior_samples
-
 
 
 class TestMLIKHProtocolFitting:

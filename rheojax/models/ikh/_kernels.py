@@ -113,7 +113,6 @@ def ikh_maxwell_ode_rhs(t, y, args):
     sigma_y0 = args["sigma_y0"]
     delta_sigma_y = args.get("delta_sigma_y", args.get("k3", 0.0))
     mu_p = args.get("mu_p", 1e-6)  # Plastic viscosity (regularization)
-    eta_inf = args.get("eta_inf", 0.0)
 
     # Applied shear rate
     gamma_dot = args.get("gamma_dot", 0.0)
@@ -144,8 +143,9 @@ def ikh_maxwell_ode_rhs(t, y, args):
     # Backstress evolution: Armstrong-Frederick
     # dα/dt = C·γ̇ᵖ - γ_dyn·|α|^(m-1)·α·|γ̇ᵖ|
     alpha_abs = jnp.abs(alpha)
-    sign_alpha = jnp.sign(alpha + 1e-20)
-    recovery_term = gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * gamma_dot_p_abs
+    recovery_term = (
+        gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * gamma_dot_p_abs
+    )
     d_alpha = C * gamma_dot_p - recovery_term
 
     # Structure evolution
@@ -182,10 +182,10 @@ def ikh_creep_ode_rhs(t, y, args):
     Returns:
         dy/dt: Time derivative of state vector
     """
-    gamma, alpha, lam = y[0], y[1], y[2]
+    # y[0] is gamma (total strain) - not needed for derivative computation
+    alpha, lam = y[1], y[2]
 
     # Extract parameters
-    G = args["G"]
     eta = args.get("eta", 1e12)
     C = args["C"]
     gamma_dyn = args.get("gamma_dyn", args.get("q", 1.0))
@@ -193,7 +193,6 @@ def ikh_creep_ode_rhs(t, y, args):
     sigma_y0 = args["sigma_y0"]
     delta_sigma_y = args.get("delta_sigma_y", args.get("k3", 0.0))
     mu_p = args.get("mu_p", 1e-6)
-    eta_inf = args.get("eta_inf", 0.0)
 
     # Applied stress (constant in creep)
     sigma_applied = args["sigma_applied"]
@@ -204,10 +203,6 @@ def ikh_creep_ode_rhs(t, y, args):
     # For creep, we need to track the elastic/plastic decomposition
     # In quasi-static: σ ≈ G·γ_e where γ = γ_e + γ_p
     # But σ is fixed, so elastic strain is: γ_e = σ/G
-    # And γ_p = γ - γ_e
-
-    gamma_e = sigma_applied / G
-    gamma_p = gamma - gamma_e
 
     # Relative stress for yield check
     xi = sigma_applied - alpha
@@ -229,7 +224,9 @@ def ikh_creep_ode_rhs(t, y, args):
 
     # Backstress evolution
     alpha_abs = jnp.abs(alpha)
-    recovery_term = gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * gamma_dot_p_abs
+    recovery_term = (
+        gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * gamma_dot_p_abs
+    )
     d_alpha = C * gamma_dot_p - recovery_term
 
     # Structure evolution
@@ -265,16 +262,15 @@ def ml_ikh_maxwell_ode_rhs_per_mode(t, y, args):
 
     # Extract state components
     sigmas = y[:n_modes]
-    alphas = y[n_modes:2*n_modes]
-    lambdas = y[2*n_modes:3*n_modes]
+    alphas = y[n_modes : 2 * n_modes]
+    lambdas = y[2 * n_modes : 3 * n_modes]
 
     # Applied shear rate
     gamma_dot = args.get("gamma_dot", 0.0)
-    eta_inf = args.get("eta_inf", 0.0)
 
     # Per-mode parameter arrays
-    G_arr = args["G"]          # Shape (n_modes,)
-    C_arr = args["C"]          # Shape (n_modes,)
+    G_arr = args["G"]  # Shape (n_modes,)
+    C_arr = args["C"]  # Shape (n_modes,)
     gamma_dyn_arr = args["gamma_dyn"]
     sigma_y0_arr = args["sigma_y0"]
     delta_sigma_y_arr = args["delta_sigma_y"]
@@ -284,9 +280,21 @@ def ml_ikh_maxwell_ode_rhs_per_mode(t, y, args):
     mu_p_arr = args.get("mu_p", jnp.full(n_modes, 1e-6))
     m_arr = args.get("m", jnp.ones(n_modes))
 
-    def mode_evolution(sigma_i, alpha_i, lam_i, G_i, C_i, gamma_dyn_i,
-                       sigma_y0_i, delta_sigma_y_i, tau_thix_i, Gamma_i,
-                       eta_i, mu_p_i, m_i):
+    def mode_evolution(
+        sigma_i,
+        alpha_i,
+        lam_i,
+        G_i,
+        C_i,
+        gamma_dyn_i,
+        sigma_y0_i,
+        delta_sigma_y_i,
+        tau_thix_i,
+        Gamma_i,
+        eta_i,
+        mu_p_i,
+        m_i,
+    ):
         """Compute derivatives for a single mode."""
         # Current yield stress for this mode
         sigma_y_i = sigma_y0_i + delta_sigma_y_i * lam_i
@@ -311,7 +319,12 @@ def ml_ikh_maxwell_ode_rhs_per_mode(t, y, args):
 
         # Backstress evolution: Armstrong-Frederick
         alpha_abs = jnp.abs(alpha_i)
-        recovery = gamma_dyn_i * jnp.power(alpha_abs + 1e-20, m_i - 1) * alpha_i * gamma_dot_p_abs
+        recovery = (
+            gamma_dyn_i
+            * jnp.power(alpha_abs + 1e-20, m_i - 1)
+            * alpha_i
+            * gamma_dot_p_abs
+        )
         d_alpha = C_i * gamma_dot_p - recovery
 
         # Structure evolution
@@ -323,10 +336,19 @@ def ml_ikh_maxwell_ode_rhs_per_mode(t, y, args):
 
     # Vectorize over modes
     d_sigmas, d_alphas, d_lambdas = jax.vmap(mode_evolution)(
-        sigmas, alphas, lambdas,
-        G_arr, C_arr, gamma_dyn_arr,
-        sigma_y0_arr, delta_sigma_y_arr, tau_thix_arr, Gamma_arr,
-        eta_arr, mu_p_arr, m_arr
+        sigmas,
+        alphas,
+        lambdas,
+        G_arr,
+        C_arr,
+        gamma_dyn_arr,
+        sigma_y0_arr,
+        delta_sigma_y_arr,
+        tau_thix_arr,
+        Gamma_arr,
+        eta_arr,
+        mu_p_arr,
+        m_arr,
     )
 
     return jnp.concatenate([d_sigmas, d_alphas, d_lambdas])
@@ -355,7 +377,7 @@ def ml_ikh_maxwell_ode_rhs_weighted_sum(t, y, args):
     # Extract state
     sigma = y[0]
     alpha = y[1]
-    lambdas = y[2:2+n_modes]
+    lambdas = y[2 : 2 + n_modes]
 
     # Global parameters
     G = args["G"]
@@ -430,9 +452,9 @@ def ml_ikh_creep_ode_rhs_per_mode(t, y, args):
     n_modes = args["n_modes"]
 
     # Extract state
-    gamma = y[0]
-    alphas = y[1:1+n_modes]
-    lambdas = y[1+n_modes:1+2*n_modes]
+    # y[0] is gamma (total strain) - not needed for derivative computation
+    alphas = y[1 : 1 + n_modes]
+    lambdas = y[1 + n_modes : 1 + 2 * n_modes]
 
     # Applied stress (constant in creep)
     sigma_applied = args["sigma_applied"]
@@ -450,9 +472,20 @@ def ml_ikh_creep_ode_rhs_per_mode(t, y, args):
     mu_p_arr = args.get("mu_p", jnp.full(n_modes, 1e-6))
     m_arr = args.get("m", jnp.ones(n_modes))
 
-    def mode_creep(alpha_i, lam_i, G_i, C_i, gamma_dyn_i,
-                   sigma_y0_i, delta_sigma_y_i, tau_thix_i, Gamma_i,
-                   eta_i, mu_p_i, m_i):
+    def mode_creep(
+        alpha_i,
+        lam_i,
+        G_i,
+        C_i,
+        gamma_dyn_i,
+        sigma_y0_i,
+        delta_sigma_y_i,
+        tau_thix_i,
+        Gamma_i,
+        eta_i,
+        mu_p_i,
+        m_i,
+    ):
         """Compute creep derivatives for a single mode."""
         # Mode yield stress
         sigma_y_i = sigma_y0_i + delta_sigma_y_i * lam_i
@@ -471,7 +504,12 @@ def ml_ikh_creep_ode_rhs_per_mode(t, y, args):
 
         # Backstress evolution
         alpha_abs = jnp.abs(alpha_i)
-        recovery = gamma_dyn_i * jnp.power(alpha_abs + 1e-20, m_i - 1) * alpha_i * gamma_dot_p_abs
+        recovery = (
+            gamma_dyn_i
+            * jnp.power(alpha_abs + 1e-20, m_i - 1)
+            * alpha_i
+            * gamma_dot_p_abs
+        )
         d_alpha = C_i * gamma_dot_p - recovery
 
         # Lambda evolution
@@ -486,10 +524,18 @@ def ml_ikh_creep_ode_rhs_per_mode(t, y, args):
 
     # Vectorize over modes
     gamma_dot_modes, d_alphas, d_lambdas = jax.vmap(mode_creep)(
-        alphas, lambdas,
-        G_arr, C_arr, gamma_dyn_arr,
-        sigma_y0_arr, delta_sigma_y_arr, tau_thix_arr, Gamma_arr,
-        eta_arr, mu_p_arr, m_arr
+        alphas,
+        lambdas,
+        G_arr,
+        C_arr,
+        gamma_dyn_arr,
+        sigma_y0_arr,
+        delta_sigma_y_arr,
+        tau_thix_arr,
+        Gamma_arr,
+        eta_arr,
+        mu_p_arr,
+        m_arr,
     )
 
     # Total strain rate (sum of mode contributions + global viscous)
@@ -521,12 +567,11 @@ def ml_ikh_creep_ode_rhs_weighted_sum(t, y, args):
     n_modes = args["n_modes"]
 
     # Extract state
-    gamma = y[0]
+    # y[0] is gamma (total strain) - not needed for derivative computation
     alpha = y[1]
-    lambdas = y[2:2+n_modes]
+    lambdas = y[2 : 2 + n_modes]
 
     # Global parameters
-    G = args["G"]
     C = args["C"]
     gamma_dyn = args.get("gamma_dyn", 1.0)
     m = args.get("m", 1.0)
@@ -613,9 +658,8 @@ def radial_return_step_corrected(state, inputs, params):
     delta_sigma_y = params.get("delta_sigma_y", params.get("k3", 0.0))
     eta_inf = params.get("eta_inf", 0.0)
 
-    # Shear rate for viscous contribution and lambda evolution
+    # Shear rate for lambda evolution
     gamma_dot = d_gamma / jnp.maximum(dt, 1e-12)
-    gamma_dot_abs = jnp.abs(gamma_dot)
 
     # Current yield stress (using lambda_n, NOT updated value)
     sigma_y_current = sigma_y0 + delta_sigma_y * lambda_n
@@ -650,7 +694,10 @@ def radial_return_step_corrected(state, inputs, params):
     sigma_next = sigma_trial - G * d_gamma_p * sign_xi
 
     # Backstress update (Armstrong-Frederick)
-    d_alpha = C * d_gamma_p * sign_xi - gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha_n * d_gamma_p
+    d_alpha = (
+        C * d_gamma_p * sign_xi
+        - gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha_n * d_gamma_p
+    )
     alpha_next = alpha_n + d_alpha
 
     # 4. Lambda update AFTER stress (timing fix)
@@ -667,7 +714,9 @@ def radial_return_step_corrected(state, inputs, params):
     # Lambda always evolves (even elastically, just with zero plastic rate in that case)
     # Actually, if elastic, plastic rate = 0, so lambda evolves only via buildup
     d_lambda_elastic = evolution_lambda(lambda_n, 0.0, params) * dt
-    lambda_final = jnp.where(is_plastic, lambda_next, jnp.clip(lambda_n + d_lambda_elastic, 0.0, 1.0))
+    lambda_final = jnp.where(
+        is_plastic, lambda_next, jnp.clip(lambda_n + d_lambda_elastic, 0.0, 1.0)
+    )
 
     # 5. Total stress (with viscous background)
     sigma_total = sigma_final + eta_inf * gamma_dot
@@ -715,7 +764,9 @@ def ikh_scan_kernel(times, strains, use_viscosity=True, **params):
 
     def scan_fn(state, inputs):
         dt, d_gamma = inputs
-        new_state, (stress, _) = radial_return_step_corrected(state, (dt, d_gamma), params_local)
+        new_state, (stress, _) = radial_return_step_corrected(
+            state, (dt, d_gamma), params_local
+        )
         return new_state, stress
 
     # Run scan
@@ -757,7 +808,7 @@ def ml_ikh_scan_kernel(
     init_state = (jnp.zeros(num_modes), jnp.zeros(num_modes), jnp.ones(num_modes))
 
     # Per-mode params (no global viscosity at mode level)
-    mode_params = {k: v for k, v in params.items()}
+    mode_params = dict(params)
     mode_params["eta_inf"] = jnp.zeros(num_modes)
 
     def vmap_return_step(states, dt_dgamma, mode_params):
@@ -765,7 +816,9 @@ def ml_ikh_scan_kernel(
         sigma_vec, alpha_vec, lambda_vec = states
         dt, d_gamma = dt_dgamma
 
-        def single_mode_step(sigma, alpha, lam, G, C, gamma_dyn, sigma_y0, delta_sigma_y, tau_thix, Gamma):
+        def single_mode_step(
+            sigma, alpha, lam, G, C, gamma_dyn, sigma_y0, delta_sigma_y, tau_thix, Gamma
+        ):
             p = {
                 "G": G,
                 "C": C,
@@ -782,10 +835,16 @@ def ml_ikh_scan_kernel(
             return new_state, stress
 
         new_states, stresses = jax.vmap(single_mode_step)(
-            sigma_vec, alpha_vec, lambda_vec,
-            mode_params["G"], mode_params["C"], mode_params["gamma_dyn"],
-            mode_params["sigma_y0"], mode_params["delta_sigma_y"],
-            mode_params["tau_thix"], mode_params["Gamma"]
+            sigma_vec,
+            alpha_vec,
+            lambda_vec,
+            mode_params["G"],
+            mode_params["C"],
+            mode_params["gamma_dyn"],
+            mode_params["sigma_y0"],
+            mode_params["delta_sigma_y"],
+            mode_params["tau_thix"],
+            mode_params["Gamma"],
         )
         return new_states, stresses
 
@@ -809,9 +868,7 @@ def ml_ikh_scan_kernel(
 
 
 @partial(jax.jit, static_argnums=(2, 3))
-def ml_ikh_weighted_sum_kernel(
-    times, strains, num_modes, use_viscosity=True, **params
-):
+def ml_ikh_weighted_sum_kernel(times, strains, num_modes, use_viscosity=True, **params):
     """ML-IKH with weighted-sum yield surface.
 
     Single global yield surface: σ_y = σ_y0 + k3·Σ(w_i·λ_i)
@@ -877,13 +934,18 @@ def ml_ikh_weighted_sum_kernel(
 
         # Plastic corrector with AF
         alpha_abs = jnp.abs(alpha_n)
-        af_correction = gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * sign_xi * alpha_n
+        af_correction = (
+            gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * sign_xi * alpha_n
+        )
         denom = jnp.maximum(G + C - af_correction, G / 10.0)
         d_gamma_p = macaulay(f_yield) / denom
 
         # Updates
         sigma_next = sigma_trial - G * d_gamma_p * sign_xi
-        d_alpha = C * d_gamma_p * sign_xi - gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha_n * d_gamma_p
+        d_alpha = (
+            C * d_gamma_p * sign_xi
+            - gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha_n * d_gamma_p
+        )
         alpha_next = alpha_n + d_alpha
 
         # Lambda evolution for each mode
@@ -899,7 +961,7 @@ def ml_ikh_weighted_sum_kernel(
 
         # Elastic path
         d_lambda_elastic = jax.vmap(
-            lambda l, tau: (1.0 / jnp.maximum(tau, 1e-12)) * (1.0 - l) * dt
+            lambda lam, tau: (1.0 / jnp.maximum(tau, 1e-12)) * (1.0 - lam) * dt
         )(lambdas_n, tau_thix_arr)
         lambdas_elastic = jnp.clip(lambdas_n + d_lambda_elastic, 0.0, 1.0)
 

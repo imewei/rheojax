@@ -283,8 +283,9 @@ class TestTwoTimeDecorrelationHelper:
     @pytest.mark.smoke
     def test_two_time_decorrelation_gaussian(self):
         """Test two-time decorrelation with Gaussian form."""
-        from rheojax.utils.mct_kernels import two_time_strain_decorrelation
         import jax.numpy as jnp
+
+        from rheojax.utils.mct_kernels import two_time_strain_decorrelation
 
         gamma_total = jnp.array([0.0, 0.1, 0.2])
         gamma_since_s = jnp.array([0.0, 0.05, 0.1])
@@ -295,16 +296,17 @@ class TestTwoTimeDecorrelationHelper:
         )
 
         # Should be product of two Gaussian decorrelations
-        h_total = jnp.exp(-(gamma_total / gamma_c) ** 2)
-        h_since_s = jnp.exp(-(gamma_since_s / gamma_c) ** 2)
+        h_total = jnp.exp(-((gamma_total / gamma_c) ** 2))
+        h_since_s = jnp.exp(-((gamma_since_s / gamma_c) ** 2))
         expected = h_total * h_since_s
 
         np.testing.assert_allclose(np.array(h_two_time), np.array(expected), rtol=1e-10)
 
     def test_two_time_decorrelation_lorentzian(self):
         """Test two-time decorrelation with Lorentzian form."""
-        from rheojax.utils.mct_kernels import two_time_strain_decorrelation
         import jax.numpy as jnp
+
+        from rheojax.utils.mct_kernels import two_time_strain_decorrelation
 
         gamma_total = jnp.array([0.0, 0.1, 0.2])
         gamma_since_s = jnp.array([0.0, 0.05, 0.1])
@@ -323,8 +325,9 @@ class TestTwoTimeDecorrelationHelper:
 
     def test_two_time_bounded(self):
         """Test that two-time decorrelation is bounded in [0, 1]."""
-        from rheojax.utils.mct_kernels import two_time_strain_decorrelation
         import jax.numpy as jnp
+
+        from rheojax.utils.mct_kernels import two_time_strain_decorrelation
 
         gamma_total = jnp.array([0.0, 0.5, 1.0, 5.0, 10.0])
         gamma_since_s = jnp.array([0.0, 0.2, 0.5, 2.0, 5.0])
@@ -348,9 +351,9 @@ class TestMicroscopicStressUtilities:
     def test_import_utilities(self):
         """Test that utility functions can be imported."""
         from rheojax.utils.mct_kernels import (
-            setup_microscopic_stress_weights,
             compute_microscopic_stress,
             get_microscopic_stress_prefactor,
+            setup_microscopic_stress_weights,
         )
 
         assert callable(setup_microscopic_stress_weights)

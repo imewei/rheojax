@@ -15,6 +15,7 @@ Supports two yield surface formulations:
 
 from typing import Literal
 
+import diffrax
 import numpy as np
 
 from rheojax.core.base import ArrayLike
@@ -23,8 +24,6 @@ from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.ikh._base import IKHBase
-import diffrax
-
 from rheojax.models.ikh._kernels import (
     ml_ikh_creep_ode_rhs_per_mode,
     ml_ikh_creep_ode_rhs_weighted_sum,
@@ -112,7 +111,9 @@ class MLIKH(IKHBase):
         if n_modes < 1:
             raise ValueError(f"n_modes must be >= 1, got {n_modes}")
         if yield_mode not in ("per_mode", "weighted_sum"):
-            raise ValueError(f"yield_mode must be 'per_mode' or 'weighted_sum', got {yield_mode}")
+            raise ValueError(
+                f"yield_mode must be 'per_mode' or 'weighted_sum', got {yield_mode}"
+            )
 
         self._n_modes = n_modes
         self._yield_mode = yield_mode
@@ -318,8 +319,12 @@ class MLIKH(IKHBase):
         }
 
         return ml_ikh_scan_kernel(
-            times, strains, num_modes=self._n_modes, use_viscosity=True,
-            eta_inf=eta_inf, **kernel_params
+            times,
+            strains,
+            num_modes=self._n_modes,
+            use_viscosity=True,
+            eta_inf=eta_inf,
+            **kernel_params,
         )
 
     def _predict_weighted_sum(self, times, strains, params):
@@ -364,8 +369,12 @@ class MLIKH(IKHBase):
 
         if self._yield_mode == "per_mode":
             # Stack per-mode parameters into arrays
-            args["G"] = jnp.stack([params[f"G_{i}"] for i in range(1, self._n_modes + 1)])
-            args["C"] = jnp.stack([params[f"C_{i}"] for i in range(1, self._n_modes + 1)])
+            args["G"] = jnp.stack(
+                [params[f"G_{i}"] for i in range(1, self._n_modes + 1)]
+            )
+            args["C"] = jnp.stack(
+                [params[f"C_{i}"] for i in range(1, self._n_modes + 1)]
+            )
             args["gamma_dyn"] = jnp.stack(
                 [params[f"gamma_dyn_{i}"] for i in range(1, self._n_modes + 1)]
             )
@@ -401,7 +410,10 @@ class MLIKH(IKHBase):
                 [params[f"Gamma_{i}"] for i in range(1, self._n_modes + 1)]
             )
             args["w"] = jnp.stack(
-                [params.get(f"w_{i}", 1.0 / self._n_modes) for i in range(1, self._n_modes + 1)]
+                [
+                    params.get(f"w_{i}", 1.0 / self._n_modes)
+                    for i in range(1, self._n_modes + 1)
+                ]
             )
             args["eta"] = 1e12
             args["mu_p"] = 1e-6
@@ -447,67 +459,83 @@ class MLIKH(IKHBase):
             if mode == "creep":
                 # State: [γ, α_1..α_N, λ_1..λ_N] (1+2N)
                 ode_fn = ml_ikh_creep_ode_rhs_per_mode
-                args["sigma_applied"] = sigma_applied if sigma_applied is not None else 100.0
-                y0 = jnp.concatenate([
-                    jnp.array([0.0]),           # gamma
-                    jnp.zeros(n),               # alphas
-                    jnp.full(n, lambda_init),   # lambdas
-                ])
+                args["sigma_applied"] = (
+                    sigma_applied if sigma_applied is not None else 100.0
+                )
+                y0 = jnp.concatenate(
+                    [
+                        jnp.array([0.0]),  # gamma
+                        jnp.zeros(n),  # alphas
+                        jnp.full(n, lambda_init),  # lambdas
+                    ]
+                )
             elif mode == "startup":
                 # State: [σ_1..σ_N, α_1..α_N, λ_1..λ_N] (3N)
                 ode_fn = ml_ikh_maxwell_ode_rhs_per_mode
                 args["gamma_dot"] = gamma_dot if gamma_dot is not None else 1.0
-                y0 = jnp.concatenate([
-                    jnp.zeros(n),               # sigmas
-                    jnp.zeros(n),               # alphas
-                    jnp.full(n, lambda_init),   # lambdas
-                ])
+                y0 = jnp.concatenate(
+                    [
+                        jnp.zeros(n),  # sigmas
+                        jnp.zeros(n),  # alphas
+                        jnp.full(n, lambda_init),  # lambdas
+                    ]
+                )
             else:  # relaxation
                 ode_fn = ml_ikh_maxwell_ode_rhs_per_mode
                 args["gamma_dot"] = 0.0
                 # Initial stress distributed across modes
-                sigma_init = sigma_0 if sigma_0 is not None else (
-                    jnp.sum(args["sigma_y0"]) + jnp.sum(args["delta_sigma_y"])
+                sigma_init = (
+                    sigma_0
+                    if sigma_0 is not None
+                    else (jnp.sum(args["sigma_y0"]) + jnp.sum(args["delta_sigma_y"]))
                 )
                 lambda_init_relax = 0.5
-                y0 = jnp.concatenate([
-                    jnp.full(n, sigma_init / n),  # sigmas (distributed)
-                    jnp.zeros(n),                  # alphas
-                    jnp.full(n, lambda_init_relax),# lambdas
-                ])
+                y0 = jnp.concatenate(
+                    [
+                        jnp.full(n, sigma_init / n),  # sigmas (distributed)
+                        jnp.zeros(n),  # alphas
+                        jnp.full(n, lambda_init_relax),  # lambdas
+                    ]
+                )
         else:  # weighted_sum
             if mode == "creep":
                 # State: [γ, α, λ_1..λ_N] (2+N)
                 ode_fn = ml_ikh_creep_ode_rhs_weighted_sum
-                args["sigma_applied"] = sigma_applied if sigma_applied is not None else 100.0
-                y0 = jnp.concatenate([
-                    jnp.array([0.0, 0.0]),      # gamma, alpha
-                    jnp.full(n, lambda_init),  # lambdas
-                ])
+                args["sigma_applied"] = (
+                    sigma_applied if sigma_applied is not None else 100.0
+                )
+                y0 = jnp.concatenate(
+                    [
+                        jnp.array([0.0, 0.0]),  # gamma, alpha
+                        jnp.full(n, lambda_init),  # lambdas
+                    ]
+                )
             elif mode == "startup":
                 # State: [σ, α, λ_1..λ_N] (2+N)
                 ode_fn = ml_ikh_maxwell_ode_rhs_weighted_sum
                 args["gamma_dot"] = gamma_dot if gamma_dot is not None else 1.0
-                y0 = jnp.concatenate([
-                    jnp.array([0.0, 0.0]),      # sigma, alpha
-                    jnp.full(n, lambda_init),  # lambdas
-                ])
+                y0 = jnp.concatenate(
+                    [
+                        jnp.array([0.0, 0.0]),  # sigma, alpha
+                        jnp.full(n, lambda_init),  # lambdas
+                    ]
+                )
             else:  # relaxation
                 ode_fn = ml_ikh_maxwell_ode_rhs_weighted_sum
                 args["gamma_dot"] = 0.0
-                sigma_init = sigma_0 if sigma_0 is not None else (
-                    args["sigma_y0"] + args["k3"]
+                sigma_init = (
+                    sigma_0 if sigma_0 is not None else (args["sigma_y0"] + args["k3"])
                 )
                 lambda_init_relax = 0.5
-                y0 = jnp.concatenate([
-                    jnp.array([sigma_init, 0.0]),
-                    jnp.full(n, lambda_init_relax),
-                ])
+                y0 = jnp.concatenate(
+                    [
+                        jnp.array([sigma_init, 0.0]),
+                        jnp.full(n, lambda_init_relax),
+                    ]
+                )
 
         # Diffrax setup
-        term = diffrax.ODETerm(
-            lambda ti, yi, args_i: ode_fn(ti, yi, args_i)
-        )
+        term = diffrax.ODETerm(lambda ti, yi, args_i: ode_fn(ti, yi, args_i))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
 
@@ -695,7 +723,9 @@ class MLIKH(IKHBase):
             sigma_applied = getattr(self, "_fit_sigma_applied", None)
             sigma_0 = getattr(self, "_fit_sigma_0", None)
             return self._simulate_transient(
-                jnp.asarray(X), param_dict, mode,
+                jnp.asarray(X),
+                param_dict,
+                mode,
                 gamma_dot=gamma_dot,
                 sigma_applied=sigma_applied,
                 sigma_0=sigma_0,
@@ -713,7 +743,6 @@ class MLIKH(IKHBase):
     def yield_mode(self) -> str:
         """Yield formulation mode ('per_mode' or 'weighted_sum')."""
         return self._yield_mode
-
 
     # -------------------------------------------------------------------------
     # Convenience Methods for Protocol-Specific Predictions
@@ -748,9 +777,7 @@ class MLIKH(IKHBase):
             strain = gamma_dot * t_arr
         return self._predict(jnp.stack([t_arr, strain]), test_mode="startup")
 
-    def predict_relaxation(
-        self, t: ArrayLike, sigma_0: float = 100.0
-    ) -> ArrayLike:
+    def predict_relaxation(self, t: ArrayLike, sigma_0: float = 100.0) -> ArrayLike:
         """Predict stress relaxation after step strain.
 
         Args:
@@ -762,9 +789,7 @@ class MLIKH(IKHBase):
         """
         return self._predict(t, test_mode="relaxation", sigma_0=sigma_0)
 
-    def predict_creep(
-        self, t: ArrayLike, sigma_applied: float = 50.0
-    ) -> ArrayLike:
+    def predict_creep(self, t: ArrayLike, sigma_applied: float = 50.0) -> ArrayLike:
         """Predict creep response under constant stress.
 
         Args:

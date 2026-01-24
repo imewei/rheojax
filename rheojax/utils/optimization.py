@@ -505,9 +505,7 @@ class OptimizationResult:
 
         # Fallback: manual computation requires model function and data
         if self._model_fn is None or self.pcov is None:
-            logger.debug(
-                "Cannot compute prediction interval: missing model_fn or pcov"
-            )
+            logger.debug("Cannot compute prediction interval: missing model_fn or pcov")
             return None
 
         x_eval = x_new if x_new is not None else self._x_data
@@ -1025,7 +1023,9 @@ def nlsq_optimize(
 
     # Store diagnostics if available (NLSQ 0.6.6+)
     if hasattr(nlsq_result, "diagnostics") or "diagnostics" in nlsq_result:
-        result.diagnostics = nlsq_result.get("diagnostics", getattr(nlsq_result, "diagnostics", None))
+        result.diagnostics = nlsq_result.get(
+            "diagnostics", getattr(nlsq_result, "diagnostics", None)
+        )
 
     if (
         not result.success
@@ -1493,11 +1493,31 @@ def nlsq_curve_fit(
             result.cost = result.fun
         else:
             # Legacy tuple result or no native delegation
-            success = True if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "success", True)
-            message = "Optimization converged successfully" if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "message", "Converged")
-            nfev = 0 if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "nfev", 0)
-            njev = 0 if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "njev", 0)
-            diagnostics = None if isinstance(curve_fit_result, tuple) else getattr(curve_fit_result, "diagnostics", None)
+            success = (
+                True
+                if isinstance(curve_fit_result, tuple)
+                else getattr(curve_fit_result, "success", True)
+            )
+            message = (
+                "Optimization converged successfully"
+                if isinstance(curve_fit_result, tuple)
+                else getattr(curve_fit_result, "message", "Converged")
+            )
+            nfev = (
+                0
+                if isinstance(curve_fit_result, tuple)
+                else getattr(curve_fit_result, "nfev", 0)
+            )
+            njev = (
+                0
+                if isinstance(curve_fit_result, tuple)
+                else getattr(curve_fit_result, "njev", 0)
+            )
+            diagnostics = (
+                None
+                if isinstance(curve_fit_result, tuple)
+                else getattr(curve_fit_result, "diagnostics", None)
+            )
 
             result = OptimizationResult(
                 x=np.asarray(popt, dtype=np.float64),

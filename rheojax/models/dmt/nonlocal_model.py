@@ -22,7 +22,6 @@ from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger
 from rheojax.models.dmt._base import DMTBase
 from rheojax.models.dmt._kernels import (
-    elastic_modulus,
     structure_evolution,
     viscosity_exponential,
     viscosity_herschel_bulkley_regularized,
@@ -168,7 +167,7 @@ class DMTNonlocal(DMTBase):
     # Required Abstract Methods
     # =========================================================================
 
-    def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> "DMTNonlocal":
+    def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> DMTNonlocal:
         """Fit model to data."""
         test_mode = kwargs.get("test_mode", "flow_curve")
 
@@ -207,13 +206,11 @@ class DMTNonlocal(DMTBase):
         array
             Laplacian ∂²field/∂y² at each point
         """
-        dy_sq = self.dy ** 2
+        dy_sq = self.dy**2
 
         # Interior points: central difference
         lap = jnp.zeros_like(field)
-        lap = lap.at[1:-1].set(
-            (field[:-2] - 2 * field[1:-1] + field[2:]) / dy_sq
-        )
+        lap = lap.at[1:-1].set((field[:-2] - 2 * field[1:-1] + field[2:]) / dy_sq)
 
         # Neumann BCs: ∂field/∂y = 0 at y=0 and y=H
         # Ghost point approach: field[-1] = field[1], field[N] = field[N-2]
@@ -222,9 +219,7 @@ class DMTNonlocal(DMTBase):
 
         return lap
 
-    def _compute_shear_rate_from_velocity(
-        self, v: jnp.ndarray
-    ) -> jnp.ndarray:
+    def _compute_shear_rate_from_velocity(self, v: jnp.ndarray) -> jnp.ndarray:
         """Compute shear rate from velocity profile.
 
         γ̇(y) = dv/dy
@@ -242,9 +237,7 @@ class DMTNonlocal(DMTBase):
         gamma_dot = jnp.zeros_like(v)
 
         # Central difference for interior
-        gamma_dot = gamma_dot.at[1:-1].set(
-            (v[2:] - v[:-2]) / (2 * self.dy)
-        )
+        gamma_dot = gamma_dot.at[1:-1].set((v[2:] - v[:-2]) / (2 * self.dy))
 
         # One-sided for boundaries
         gamma_dot = gamma_dot.at[0].set((v[1] - v[0]) / self.dy)
@@ -325,14 +318,21 @@ class DMTNonlocal(DMTBase):
             # Compute local viscosity
             if self.closure == "exponential":
                 eta = jax.vmap(
-                    lambda l, gd: viscosity_exponential(l, params["eta_0"], params["eta_inf"])
+                    lambda lam_i, gd: viscosity_exponential(
+                        lam_i, params["eta_0"], params["eta_inf"]
+                    )
                 )(lam, gamma_dot)
             else:
                 eta = jax.vmap(
-                    lambda l, gd: viscosity_herschel_bulkley_regularized(
-                        l, gd, params["tau_y0"], params["K0"],
-                        params["n_flow"], params["eta_inf"],
-                        params["m1"], params["m2"]
+                    lambda lam_i, gd: viscosity_herschel_bulkley_regularized(
+                        lam_i,
+                        gd,
+                        params["tau_y0"],
+                        params["K0"],
+                        params["n_flow"],
+                        params["eta_inf"],
+                        params["m1"],
+                        params["m2"],
                     )
                 )(lam, gamma_dot)
 
@@ -347,7 +347,9 @@ class DMTNonlocal(DMTBase):
             # Update structure: local evolution + diffusion
             # dλ/dt = (local) + D_λ ∂²λ/∂y²
             local_rate = jax.vmap(
-                lambda l, gd: structure_evolution(l, gd, params["t_eq"], params["a"], params["c"])
+                lambda lam_i, gd: structure_evolution(
+                    lam_i, gd, params["t_eq"], params["a"], params["c"]
+                )
             )(lam, gamma_dot)
 
             diffusion = params["D_lambda"] * self._laplacian(lam)
@@ -369,10 +371,9 @@ class DMTNonlocal(DMTBase):
                 gamma_dot_target = stress / jnp.maximum(eta, 1e-10)
 
             # Reconstruct velocity from shear rate
-            v_new = jnp.concatenate([
-                jnp.array([0.0]),
-                jnp.cumsum(gamma_dot_target[:-1]) * self.dy
-            ])
+            v_new = jnp.concatenate(
+                [jnp.array([0.0]), jnp.cumsum(gamma_dot_target[:-1]) * self.dy]
+            )
 
             # Rescale to match wall velocity
             v = v_new * V_wall / jnp.maximum(v_new[-1], 1e-10)
@@ -460,7 +461,7 @@ class DMTNonlocal(DMTBase):
 
     def _fit_flow_curve(
         self, gamma_dot: np.ndarray, stress: np.ndarray, **kwargs
-    ) -> "DMTNonlocal":
+    ) -> DMTNonlocal:
         """Fit to steady-state flow curve.
 
         For nonlocal model, this fits to the apparent (average) flow curve.
@@ -469,8 +470,7 @@ class DMTNonlocal(DMTBase):
         from rheojax.models.dmt.local import DMTLocal
 
         local_model = DMTLocal(
-            closure=self.closure,
-            include_elasticity=self.include_elasticity
+            closure=self.closure, include_elasticity=self.include_elasticity
         )
         local_model._fit_flow_curve(gamma_dot, stress, **kwargs)
 
@@ -496,8 +496,7 @@ class DMTNonlocal(DMTBase):
             from rheojax.models.dmt.local import DMTLocal
 
             local_model = DMTLocal(
-                closure=self.closure,
-                include_elasticity=self.include_elasticity
+                closure=self.closure, include_elasticity=self.include_elasticity
             )
             # Copy parameters
             for name in self.parameters.keys():
@@ -518,7 +517,7 @@ class DMTNonlocal(DMTBase):
                 stress.append(result["stress"][-1])
             return np.array(stress)
 
-    def _fit_startup(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> "DMTNonlocal":
+    def _fit_startup(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> DMTNonlocal:
         """Fit to startup transient."""
         raise NotImplementedError("Startup fitting for nonlocal model not implemented")
 
@@ -563,20 +562,20 @@ class DMTNonlocal(DMTBase):
 
             # Structure profile
             axes[0].plot(
-                y_mm, result["lam"][idx],
-                color=color, label=f"t = {t_val:.1f} s"
+                y_mm, result["lam"][idx], color=color, label=f"t = {t_val:.1f} s"
             )
 
             # Shear rate profile
             axes[1].plot(
-                y_mm, result["gamma_dot"][idx],
-                color=color, label=f"t = {t_val:.1f} s"
+                y_mm, result["gamma_dot"][idx], color=color, label=f"t = {t_val:.1f} s"
             )
 
             # Velocity profile
             axes[2].plot(
-                y_mm, result["velocity"][idx] * 1000,  # Convert to mm/s
-                color=color, label=f"t = {t_val:.1f} s"
+                y_mm,
+                result["velocity"][idx] * 1000,  # Convert to mm/s
+                color=color,
+                label=f"t = {t_val:.1f} s",
             )
 
         axes[0].set_xlabel("y [mm]")
