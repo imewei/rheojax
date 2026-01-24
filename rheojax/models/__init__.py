@@ -53,6 +53,10 @@ Fluidity-Saramito EVP Models (2):
 SPP LAOS Models (1):
     - SPPYieldStress: Yield stress model for SPP LAOS analysis
 
+ITT-MCT Models (2):
+    - ITTMCTSchematic: F₁₂ schematic model (scalar correlator)
+    - ITTMCTIsotropic: Isotropically sheared model with k-resolved S(k)
+
 Usage:
     >>> from rheojax.models import Maxwell, Zener, SpringPot
     >>> from rheojax.models import FractionalMaxwellGel, FractionalMaxwellLiquid
@@ -143,6 +147,9 @@ from rheojax.models.spp import SPPYieldStress
 # STZ models
 from rheojax.models.stz import STZConventional
 
+# ITT-MCT models
+from rheojax.models.itt_mct import ITTMCTIsotropic, ITTMCTSchematic
+
 __all__ = [
     # Classical models
     "Maxwell",
@@ -199,4 +206,7 @@ __all__ = [
     # IKH models
     "MIKH",
     "MLIKH",
+    # ITT-MCT models
+    "ITTMCTSchematic",
+    "ITTMCTIsotropic",
 ]
