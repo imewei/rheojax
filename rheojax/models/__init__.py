@@ -89,6 +89,9 @@ Usage:
 # Classical models
 from rheojax.models.classical import Maxwell, SpringPot, Zener
 
+# DMT thixotropic models
+from rheojax.models.dmt import DMTLocal, DMTNonlocal
+
 # EPM models
 from rheojax.models.epm import LatticeEPM, TensorialEPM
 
@@ -139,6 +142,9 @@ from rheojax.models.hl import HebraudLequeux
 # IKH models
 from rheojax.models.ikh import MIKH, MLIKH
 
+# ITT-MCT models
+from rheojax.models.itt_mct import ITTMCTIsotropic, ITTMCTSchematic
+
 # Multi-mode models
 from rheojax.models.multimode import GeneralizedMaxwell
 
@@ -150,12 +156,6 @@ from rheojax.models.spp import SPPYieldStress
 
 # STZ models
 from rheojax.models.stz import STZConventional
-
-# ITT-MCT models
-from rheojax.models.itt_mct import ITTMCTIsotropic, ITTMCTSchematic
-
-# DMT thixotropic models
-from rheojax.models.dmt import DMTLocal, DMTNonlocal
 
 __all__ = [
     # Classical models
