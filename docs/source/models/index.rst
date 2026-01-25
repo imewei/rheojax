@@ -85,6 +85,12 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
 
 .. toctree::
    :maxdepth: 2
+   :caption: Fractional IKH (FIKH) Models
+
+   fikh/index
+
+.. toctree::
+   :maxdepth: 2
    :caption: Mode-Coupling Theory (ITT-MCT)
 
    itt_mct/index
