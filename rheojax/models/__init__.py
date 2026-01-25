@@ -1,6 +1,6 @@
 """Rheological models package.
 
-This package contains 29 rheological models organized into 11 categories.
+This package contains 31 rheological models organized into 12 categories.
 
 Classical Models (3):
     - Maxwell: Spring and dashpot in series
@@ -60,6 +60,10 @@ SPP LAOS Models (1):
 ITT-MCT Models (2):
     - ITTMCTSchematic: F₁₂ schematic model (scalar correlator)
     - ITTMCTIsotropic: Isotropically sheared model with k-resolved S(k)
+
+FIKH (Fractional IKH) Models (2):
+    - FIKH: Fractional IKH with Caputo derivative and thermal coupling
+    - FMLIKH: Multi-layer variant with per-mode parameters
 
 Usage:
     >>> from rheojax.models import Maxwell, Zener, SpringPot
@@ -142,6 +146,9 @@ from rheojax.models.hl import HebraudLequeux
 # IKH models
 from rheojax.models.ikh import MIKH, MLIKH
 
+# FIKH (Fractional IKH) models
+from rheojax.models.fikh import FIKH, FMLIKH
+
 # ITT-MCT models
 from rheojax.models.itt_mct import ITTMCTIsotropic, ITTMCTSchematic
 
@@ -213,6 +220,9 @@ __all__ = [
     # IKH models
     "MIKH",
     "MLIKH",
+    # FIKH (Fractional IKH) models
+    "FIKH",
+    "FMLIKH",
     # ITT-MCT models
     "ITTMCTSchematic",
     "ITTMCTIsotropic",
