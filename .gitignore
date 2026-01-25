@@ -288,3 +288,4 @@ fix-imports/
 # User Specific / Personal
 # ----------------------------------------------------------------------------
 .serena
+examples/data/ikh/PNAS_DigitalRheometerTwin_Dataset.xlsx
