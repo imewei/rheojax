@@ -100,6 +100,84 @@ but rather as a stretched exponential (Kohlrausch-Williams-Watts form):
 where β < 1 indicates a distribution of timescales. The ML-IKH model captures this
 behavior naturally through its N structural modes.
 
+
+Stretched Exponential Decomposition (KWW)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The **Kohlrausch-Williams-Watts (KWW)** stretched exponential function:
+
+.. math::
+
+   \phi(t) = \exp\left[-(t/\tau_c)^\beta\right]
+
+where :math:`\beta \in (0, 1]` is the stretch exponent, can be mathematically
+decomposed into a sum of pure exponentials:
+
+.. math::
+
+   \exp\left[-(t/\tau_c)^\beta\right] = \int_0^\infty \rho(\tau) \, e^{-t/\tau} \, d\tau
+
+where :math:`\rho(\tau)` is the continuous relaxation time distribution.
+
+**Discrete Mode Approximation:**
+
+For practical computation, this integral is discretized:
+
+.. math::
+
+   \phi(t) \approx \sum_{r=1}^{N} w_r \exp(-t/\tau_r)
+
+The weights :math:`w_r` and timescales :math:`\tau_r` are chosen to minimize
+approximation error over the experimental time window.
+
+**Mode Selection Rule:**
+
+A fundamental result from the theory of stretched exponentials is that the
+number of modes N required for accurate representation scales as:
+
+.. math::
+
+   \boxed{N \sim \left(\frac{1}{\beta}\right)^2}
+
+This provides practical guidance for model complexity:
+
+.. list-table:: Mode Selection Based on Stretch Exponent
+   :widths: 20 20 40 20
+   :header-rows: 1
+
+   * - β
+     - Physical Behavior
+     - Interpretation
+     - N Required
+   * - 1.0
+     - Pure exponential
+     - Single timescale
+     - 1 (use MIKH)
+   * - 0.7
+     - Mild stretching
+     - Narrow distribution
+     - 2
+   * - 0.5
+     - Moderate stretching
+     - Moderate distribution
+     - 4
+   * - 0.3
+     - Strong stretching
+     - Broad distribution
+     - 9-11
+
+**Determining β from Experimental Data:**
+
+The stretch exponent β can be extracted from recovery experiments:
+
+1. Pre-shear material to destructure (λ → 0)
+2. Stop shearing and monitor yield stress recovery σ_y(t)
+3. Fit: :math:`\ln[-\ln(\Delta\sigma_y(t)/\Delta\sigma_{y,max})] = \beta \ln(t/\tau_c)`
+4. Slope gives β, intercept gives τ_c
+
+A plot of the left-hand side vs :math:`\ln(t)` should be linear for KWW behavior.
+
+
 **2. Hierarchical Microstructure:**
 
 Complex fluids often have structure at multiple length scales:
@@ -165,6 +243,46 @@ where β < 1 indicates a distribution of timescales. The ML-IKH model captures t
 .. math::
 
    \lambda(t) = \sum_{i=1}^{N} w_i \lambda_i(t)
+
+
+Timescale Distribution: Physical Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The distribution of recovery timescales in multi-mode models has concrete
+physical origins in the hierarchical nature of soft material microstructure.
+
+**Fast Modes (τ ~ 0.1–1 s):**
+
+- **Physical mechanism**: Local bond reformation, nearest-neighbor particle rearrangement
+- **Structural scale**: Individual particle contacts, primary bonds
+- **Activation energy**: Low (thermal fluctuations sufficient)
+- **Experimental signature**: Rapid initial stress recovery after flow cessation
+
+**Intermediate Modes (τ ~ 1–10 s):**
+
+- **Physical mechanism**: Cluster reorganization, aggregate restructuring
+- **Structural scale**: Multi-particle aggregates (10–100 particles)
+- **Activation energy**: Moderate (cooperative rearrangements)
+- **Experimental signature**: "Shoulder" in recovery curves, non-exponential character
+
+**Slow Modes (τ ~ 10–1000 s):**
+
+- **Physical mechanism**: Network-scale rearrangement, large-scale healing
+- **Structural scale**: Percolating network, sample-spanning structure
+- **Activation energy**: High (requires coordinated motion of many particles)
+- **Experimental signature**: Long-time logarithmic aging, incomplete recovery
+
+**Connection to Aging Dynamics:**
+
+The slowest modes often exhibit power-law rather than exponential kinetics:
+
+.. math::
+
+   \lambda_{slow}(t) \sim t^\mu \quad \text{for} \quad t \gg \tau_{max}
+
+This suggests connections to glassy dynamics and soft glassy rheology
+(see :doc:`/models/sgr/index`).
+
 
 Analogy to Prony Series
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -570,6 +688,211 @@ Use automatic determination as in Generalized Maxwell fitting:
    weights = np.ones(n_modes) / n_modes  # Equal weights as initial guess
 
 
+Industrial Applications
+-----------------------
+
+The ML-IKH model is designed for materials with **multi-timescale thixotropy**
+that single-mode models cannot capture. This section provides guidance for
+industrial materials exhibiting stretched-exponential recovery or hierarchical
+microstructure.
+
+Complex Waxy Crude Oils
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Waxy crude oils with broad wax crystal size distributions exhibit stretched-exponential
+recovery that requires multiple structural modes.
+
+**When to use ML-IKH over MIKH:**
+
+- Recovery experiments show β < 0.8 (stretched exponential fit)
+- Yield stress recovery spans >2 decades of time
+- Different temperature histories produce different recovery profiles
+
+**Mode selection for waxy crudes:**
+
+.. list-table::
+   :widths: 25 20 55
+   :header-rows: 1
+
+   * - Wax Content
+     - Recommended N
+     - Physical Interpretation
+   * - Low (<5%)
+     - 2
+     - Primary crystals + weak network
+   * - Medium (5-15%)
+     - 3
+     - Primary + secondary aggregates + network
+   * - High (>15%)
+     - 4-5
+     - Full hierarchical structure
+
+**Typical timescale distribution:**
+
+.. code-block:: python
+
+   from rheojax.models import MLIKH
+
+   # High-wax crude with hierarchical structure
+   model = MLIKH(n_modes=4, yield_mode='weighted_sum')
+
+   # Timescales spanning crystal → network scales
+   timescales = [1.0, 10.0, 100.0, 1000.0]  # seconds
+   weights = [0.15, 0.25, 0.35, 0.25]       # Network-dominated
+
+   for i, (tau, w) in enumerate(zip(timescales, weights), 1):
+       model.parameters.set_value(f"tau_thix_{i}", tau)
+       model.parameters.set_value(f"w_{i}", w)
+
+**Pipeline restart implications:**
+
+Multi-mode recovery means restart pressure depends strongly on shutdown duration:
+
+- Short shutdown (t < τ_1): Only fast modes recover, moderate restart pressure
+- Long shutdown (t > τ_N): All modes recover, maximum restart pressure
+- Intermediate: Non-linear pressure increase with rest time
+
+Bidisperse Colloidal Systems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Bidisperse (two particle size) colloidal suspensions naturally produce
+two-timescale thixotropy from different aggregation kinetics.
+
+**Per-mode formulation recommended:**
+
+Each particle population has distinct mechanical properties:
+
+.. code-block:: python
+
+   # Bidisperse colloid: small + large particles
+   model = MLIKH(n_modes=2, yield_mode='per_mode')
+
+   # Small particles: fast kinetics, lower modulus
+   model.parameters.set_value("G_1", 200.0)
+   model.parameters.set_value("tau_thix_1", 0.5)
+   model.parameters.set_value("sigma_y0_1", 5.0)
+
+   # Large particles: slow kinetics, higher modulus
+   model.parameters.set_value("G_2", 800.0)
+   model.parameters.set_value("tau_thix_2", 50.0)
+   model.parameters.set_value("sigma_y0_2", 15.0)
+
+**Identifying bidisperse behavior:**
+
+- Flow curve shows two distinct shear-thinning regimes
+- Startup stress shows double overshoot or shoulder
+- Recovery curve is clearly bi-exponential (not stretched)
+
+Drilling Fluids with Hierarchical Clay Structure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Water-based drilling fluids contain clay platelets that organize at multiple
+length scales: face-face contacts (fast), edge-face networks (slow).
+
+**Typical parameters:**
+
+.. list-table::
+   :widths: 20 25 25 30
+   :header-rows: 1
+
+   * - Mode
+     - τ_thix (s)
+     - Physical Structure
+     - Weight
+   * - Fast
+     - 0.1-1
+     - Face-face contacts
+     - 0.3-0.4
+   * - Medium
+     - 1-10
+     - Edge-face bonds
+     - 0.3-0.4
+   * - Slow
+     - 10-100
+     - House-of-cards network
+     - 0.2-0.3
+
+**API rheology connection:**
+
+The multi-mode structure explains why API rheology readings at different
+times after mixing give different values:
+
+- 10-second gel: Dominated by fast modes
+- 10-minute gel: Includes slow mode contribution
+- The ratio (10-min gel)/(10-sec gel) indicates timescale dispersion
+
+Dense Emulsions and Foams
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Concentrated emulsions exhibit multi-timescale thixotropy from droplet
+rearrangements at different length scales.
+
+**Weighted-sum formulation recommended:**
+
+Single mechanical response (droplet deformation) with distributed recovery:
+
+.. code-block:: python
+
+   # Dense emulsion (φ > 0.7)
+   model = MLIKH(n_modes=3, yield_mode='weighted_sum')
+
+   # Single mechanical modulus (droplet elasticity)
+   model.parameters.set_value("G", 500.0)
+   model.parameters.set_value("sigma_y0", 30.0)
+   model.parameters.set_value("k3", 50.0)
+
+   # Distributed recovery from droplet rearrangements
+   model.parameters.set_value("tau_thix_1", 0.1)   # Local contacts
+   model.parameters.set_value("tau_thix_2", 1.0)   # Cluster rearrangement
+   model.parameters.set_value("tau_thix_3", 10.0)  # Network healing
+
+Mode Selection for Industrial Materials
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Practical guidelines for choosing N:**
+
+1. **Start with N=2** and check if fit improves significantly with N=3
+2. **Use the β rule**: If stretched exponential fit gives β, then N ~ (1/β)²
+3. **Match experimental timescales**: Ensure τ_min < t_experiment,min and τ_max > t_experiment,max
+4. **Check for overfitting**: AIC/BIC should decrease with added modes
+
+**β (stretch exponent) → N mapping:**
+
+.. list-table::
+   :widths: 15 25 30 30
+   :header-rows: 1
+
+   * - β
+     - Behavior
+     - N Required
+     - Example Materials
+   * - 0.9-1.0
+     - Near-exponential
+     - 1 (use MIKH)
+     - Simple gels
+   * - 0.7-0.9
+     - Mild stretching
+     - 2
+     - Most drilling fluids
+   * - 0.5-0.7
+     - Moderate stretching
+     - 3-4
+     - Waxy crudes, emulsions
+   * - 0.3-0.5
+     - Strong stretching
+     - 5-9
+     - Aging glasses, cements
+
+**Data quality requirements:**
+
+Multi-mode fitting requires high-quality recovery data:
+
+- **Time range**: At least 2 decades spanning τ_min to τ_max
+- **Data density**: 10+ points per decade of time
+- **Noise level**: Signal-to-noise ratio >20 for reliable mode separation
+- **Protocol**: Pre-shear to consistent initial state before recovery
+
+
 Parameters
 ----------
 
@@ -708,6 +1031,421 @@ Fitting Protocol
 2. Fix mechanical parameters
 3. Fit kinetic parameters (τᵢ, Γᵢ, wᵢ) from recovery data
 4. Constrain Σwᵢ = 1 for physical interpretation
+
+
+Parameter Estimation Methods
+----------------------------
+
+Multi-mode models present unique parameter estimation challenges due to
+mode-mode correlations and potential overfitting. This section provides
+advanced methods for reliable ML-IKH parameter estimation.
+
+Mode Number Selection (AIC/BIC)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Selecting the optimal number of modes N requires balancing fit quality
+against model complexity.
+
+**Information Criteria:**
+
+.. math::
+
+   AIC &= 2k - 2\ln(\hat{L}) \\
+   BIC &= k\ln(n) - 2\ln(\hat{L})
+
+where k is the number of parameters, n is the number of data points,
+and L̂ is the maximum likelihood.
+
+**Practical workflow:**
+
+.. code-block:: python
+
+   import numpy as np
+   from rheojax.models import MLIKH
+
+   def compute_aic_bic(model, X, y_data):
+       """Compute AIC and BIC for fitted model."""
+       y_pred = model.predict(X)
+       n = len(y_data)
+       k = model.parameters.n_free  # Number of free parameters
+
+       # Residual sum of squares
+       rss = np.sum((y_data - y_pred)**2)
+
+       # Log-likelihood (assuming Gaussian errors)
+       sigma2 = rss / n
+       log_likelihood = -n/2 * (np.log(2*np.pi*sigma2) + 1)
+
+       aic = 2*k - 2*log_likelihood
+       bic = k*np.log(n) - 2*log_likelihood
+
+       return aic, bic
+
+   # Compare N=2, 3, 4 modes
+   results = []
+   for n_modes in [2, 3, 4]:
+       model = MLIKH(n_modes=n_modes, yield_mode='weighted_sum')
+       model.fit(X, y_data, test_mode='startup')
+       aic, bic = compute_aic_bic(model, X, y_data)
+       results.append({'n_modes': n_modes, 'AIC': aic, 'BIC': bic})
+
+   # Select model with lowest BIC (more conservative than AIC)
+   best_n = min(results, key=lambda x: x['BIC'])['n_modes']
+
+**Decision rules:**
+
+- **ΔAIC < 2**: Models essentially equivalent
+- **ΔAIC = 2-10**: Some evidence for lower-AIC model
+- **ΔAIC > 10**: Strong evidence for lower-AIC model
+- **BIC preferred** when sample size is moderate (n > 40) for parsimony
+
+Timescale Initialization from Recovery Data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Good initial timescale estimates dramatically improve convergence.
+
+**Method 1: Logarithmic derivative analysis**
+
+The logarithmic derivative of recovery data reveals characteristic timescales:
+
+.. code-block:: python
+
+   import numpy as np
+
+   def estimate_timescales_from_recovery(t, lambda_data, n_modes):
+       """Estimate timescales from recovery curve shape."""
+       # Compute logarithmic derivative
+       d_log_lambda = np.gradient(np.log(1 - lambda_data + 1e-10), np.log(t + 1e-10))
+
+       # Find peaks/shoulders in derivative (indicate timescales)
+       from scipy.signal import find_peaks
+       peaks, _ = find_peaks(-d_log_lambda, prominence=0.1)
+
+       if len(peaks) >= n_modes:
+           tau_estimates = t[peaks[:n_modes]]
+       else:
+           # Fall back to logarithmic distribution
+           tau_estimates = np.logspace(
+               np.log10(t[1]), np.log10(t[-1]), n_modes
+           )
+
+       return tau_estimates
+
+**Method 2: Stretched exponential fit**
+
+Extract β first, then distribute timescales:
+
+.. code-block:: python
+
+   from scipy.optimize import curve_fit
+
+   def stretched_exp(t, tau_c, beta):
+       return 1 - np.exp(-(t/tau_c)**beta)
+
+   # Fit stretched exponential to recovery
+   popt, _ = curve_fit(stretched_exp, t_recovery, lambda_recovery,
+                       p0=[10.0, 0.7], bounds=([0.1, 0.1], [1000, 1.0]))
+   tau_c, beta = popt
+
+   # Distribute timescales around τ_c
+   n_modes = max(2, int(np.ceil((1/beta)**2)))
+   tau_range = tau_c * 10**(2/beta)  # Span factor
+   tau_values = np.logspace(
+       np.log10(tau_c / np.sqrt(tau_range)),
+       np.log10(tau_c * np.sqrt(tau_range)),
+       n_modes
+   )
+
+Per-Mode vs Weighted-Sum Fitting Strategies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The two ML-IKH formulations require different fitting approaches.
+
+**Per-mode strategy (independent yield surfaces):**
+
+Each mode can be fit semi-independently:
+
+.. code-block:: python
+
+   from rheojax.models import MLIKH
+
+   model = MLIKH(n_modes=2, yield_mode='per_mode')
+
+   # Stage 1: Fit fast mode to short-time data
+   mask_fast = t_data < 1.0  # Short times
+   model.parameters.freeze_except(['G_1', 'tau_thix_1', 'sigma_y0_1', 'Gamma_1'])
+   model.fit(X_data[:, mask_fast], y_data[mask_fast], test_mode='startup')
+
+   # Stage 2: Fit slow mode to long-time data
+   mask_slow = t_data > 10.0  # Long times
+   model.parameters.unfreeze_all()
+   model.parameters.freeze_except(['G_2', 'tau_thix_2', 'sigma_y0_2', 'Gamma_2'])
+   model.fit(X_data[:, mask_slow], y_data[mask_slow], test_mode='startup')
+
+   # Stage 3: Global refinement with all parameters
+   model.parameters.unfreeze_all()
+   model.fit(X_data, y_data, test_mode='startup')
+
+**Weighted-sum strategy (single yield surface):**
+
+Fit mechanical parameters first, then kinetic:
+
+.. code-block:: python
+
+   model = MLIKH(n_modes=3, yield_mode='weighted_sum')
+
+   # Stage 1: Mechanical parameters from flow curve
+   model.parameters.freeze(['tau_thix_1', 'tau_thix_2', 'tau_thix_3',
+                           'Gamma_1', 'Gamma_2', 'Gamma_3',
+                           'w_1', 'w_2', 'w_3'])
+   model.fit(gamma_dot, sigma_ss, test_mode='flow_curve')
+
+   # Stage 2: Kinetic parameters from recovery
+   model.parameters.unfreeze_all()
+   model.parameters.freeze(['G', 'C', 'gamma_dyn', 'sigma_y0', 'k3'])
+   model.fit(t_recovery, lambda_recovery, test_mode='relaxation')
+
+   # Stage 3: Global refinement
+   model.parameters.unfreeze_all()
+   model.fit(X_combined, y_combined)
+
+Regularization for Correlated Mode Weights
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Mode weights wᵢ are often correlated, especially when timescales overlap.
+
+**Weight normalization constraint:**
+
+Enforce Σwᵢ = 1 during optimization:
+
+.. code-block:: python
+
+   import jax.numpy as jnp
+
+   def normalize_weights(w_raw):
+       """Softmax normalization ensures sum=1, all positive."""
+       return jnp.exp(w_raw) / jnp.sum(jnp.exp(w_raw))
+
+   # Use log-weights as free parameters
+   # w_i = softmax(log_w_i)
+
+**Timescale separation constraint:**
+
+Prevent modes from collapsing to same timescale:
+
+.. code-block:: python
+
+   def timescale_separation_penalty(tau_values, min_ratio=3.0):
+       """Penalty for timescales that are too close."""
+       tau_sorted = jnp.sort(tau_values)
+       ratios = tau_sorted[1:] / tau_sorted[:-1]
+       penalty = jnp.sum(jnp.maximum(0, min_ratio - ratios)**2)
+       return penalty
+
+**Bayesian regularization via priors:**
+
+Use informative priors to regularize mode parameters:
+
+.. code-block:: python
+
+   import numpyro
+   import numpyro.distributions as dist
+
+   def ml_ikh_bayesian_model(X, y_obs, n_modes):
+       # Log-timescales with ordering constraint
+       log_tau_base = numpyro.sample('log_tau_base', dist.Normal(1.0, 1.0))
+       log_tau_increments = numpyro.sample(
+           'log_tau_increments',
+           dist.HalfNormal(0.5).expand([n_modes - 1])
+       )
+       log_tau = jnp.cumsum(jnp.concatenate([
+           jnp.array([log_tau_base]),
+           log_tau_increments
+       ]))
+       tau_values = jnp.exp(log_tau)
+
+       # Dirichlet prior for weights (encourages diversity)
+       weights = numpyro.sample('weights',
+                                dist.Dirichlet(jnp.ones(n_modes)))
+
+       # ... rest of model
+
+This parameterization ensures τ₁ < τ₂ < ... < τₙ automatically.
+
+Bayesian Inference for Multi-Mode Models
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Bayesian inference provides uncertainty quantification for mode parameters:
+
+.. code-block:: python
+
+   from rheojax.models import MLIKH
+
+   model = MLIKH(n_modes=3, yield_mode='weighted_sum')
+
+   # Point estimate first (critical for MCMC initialization)
+   model.fit(X, y, test_mode='startup')
+
+   # Bayesian inference
+   result = model.fit_bayesian(
+       X, y,
+       num_warmup=1500,      # More warmup for multi-modal posteriors
+       num_samples=3000,     # More samples for mode weight uncertainty
+       num_chains=4,
+       seed=42
+   )
+
+   # Check mode-specific convergence
+   for i in range(1, 4):
+       print(f"Mode {i}:")
+       print(f"  τ_thix_{i}: {result.posterior_samples[f'tau_thix_{i}'].mean():.2f} "
+             f"± {result.posterior_samples[f'tau_thix_{i}'].std():.2f}")
+       print(f"  w_{i}: {result.posterior_samples[f'w_{i}'].mean():.3f} "
+             f"± {result.posterior_samples[f'w_{i}'].std():.3f}")
+
+**Diagnosing mode identifiability:**
+
+- High posterior correlation between wᵢ and wⱼ → modes may be redundant
+- Wide posterior for τᵢ → data doesn't constrain this timescale
+- Multimodal posterior → consider reducing N or using ordered parameterization
+
+
+JAX-First Numerical Implementation
+-----------------------------------
+
+The ML-IKH model uses a JAX-accelerated ODE integration strategy for all protocols.
+This section describes the internal state vector structure and numerical approach.
+
+State Vector Structure
+~~~~~~~~~~~~~~~~~~~~~~
+
+For ML-IKH with N modes, the state vector is:
+
+.. code-block:: text
+
+   y = [σ, A, λ_1, λ_2, ..., λ_N]
+
+   Dimension: 2 + N
+   ─────────────────
+   y[0] = σ       : deviatoric stress [Pa]
+   y[1] = A       : backstress internal variable (α = C·A) [-]
+   y[2:2+N] = λ_r : structure parameters for modes 1...N [-]
+
+For the **per_mode** formulation with N independent yield surfaces:
+
+.. code-block:: text
+
+   y = [σ_1, σ_2, ..., σ_N, A_1, A_2, ..., A_N, λ_1, λ_2, ..., λ_N]
+
+   Dimension: 3N
+   ─────────────────
+   y[0:N]     = σ_i : stress for each mode [Pa]
+   y[N:2N]    = A_i : backstress variable for each mode [-]
+   y[2N:3N]   = λ_i : structure parameter for each mode [-]
+
+ODE System (Rate-Controlled)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The governing equations for the weighted-sum formulation:
+
+.. code-block:: python
+
+   def rhs_mlikh(t, y, gdot, params):
+       """ML-IKH right-hand side for ODE integration.
+
+       Args:
+           t: Current time
+           y: State vector [σ, A, λ_1, ..., λ_N]
+           gdot: Applied shear rate γ̇(t)
+           params: Model parameters (G, η, C, q, m, k3, w, k1, k2)
+
+       Returns:
+           dy/dt: Time derivatives of state vector
+       """
+       sigma = y[0]
+       A = y[1]
+       lam = y[2:]  # Shape: (N,)
+
+       # Backstress and effective stress
+       sigma_back = params.C * A
+       sigma_eff = sigma - sigma_back
+
+       # Weighted yield stress from all modes
+       sigma_y = params.k3 * jnp.sum(params.w * lam)
+
+       # Plastic flow rate (Perzyna regularization)
+       overstress = jnp.maximum(jnp.abs(sigma_eff) - sigma_y, 0.0)
+       gdot_p = (overstress / params.mu_p) * jnp.sign(sigma_eff)
+
+       # Stress evolution (Maxwell element)
+       dsigma = params.G * (gdot - gdot_p) - (params.G / params.eta) * sigma
+
+       # Backstress evolution (Armstrong-Frederick)
+       fA = (params.q * jnp.abs(A))**params.m * jnp.sign(A)
+       dA = gdot_p - fA * jnp.abs(gdot_p)
+
+       # Structure evolution (each mode independent)
+       dlam = params.k1 * (1.0 - lam) - params.k2 * lam * jnp.abs(gdot_p)
+
+       return jnp.concatenate([jnp.array([dsigma, dA]), dlam])
+
+Integration Strategy
+~~~~~~~~~~~~~~~~~~~~
+
+The model uses **RK4** integration with ``jax.lax.scan`` for efficient compilation:
+
+.. code-block:: python
+
+   @jax.jit
+   def simulate_rate_control(rhs, t, u_t, y0, params):
+       """Integrate ML-IKH under rate control using scan.
+
+       Args:
+           rhs: Right-hand side function
+           t: Time array
+           u_t: Shear rate history γ̇(t)
+           y0: Initial state [σ_0, A_0, λ_1,0, ..., λ_N,0]
+           params: Model parameters
+
+       Returns:
+           y_hist: State history, shape (len(t), 2+N)
+       """
+       dt = t[1] - t[0]
+
+       def step(carry, inputs):
+           ti, ui = inputs
+           y_next = rk4_step(rhs, ti, carry, dt, ui, params)
+           return y_next, y_next
+
+       _, y_hist = jax.lax.scan(step, y0, (t, u_t))
+       return y_hist
+
+**Key advantages of JAX implementation:**
+
+1. **JIT compilation**: First call compiles, subsequent calls are fast
+2. **Automatic differentiation**: Enables gradient-based fitting and Bayesian inference
+3. **Vectorization via vmap**: Efficient batch processing over multiple shear rates
+4. **GPU acceleration**: Seamless transfer to GPU for large-scale computations
+
+Protocol-Specific Notes
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 20 80
+   :header-rows: 1
+
+   * - Protocol
+     - Implementation Notes
+   * - Flow curve
+     - For each γ̇, set ``u_t = γ̇ * ones_like(t)``, integrate to steady state
+   * - Startup
+     - Set ``u_t = γ̇_0 * ones_like(t)``, track full σ(t) for overshoot
+   * - Relaxation
+     - Initial ``σ_0 = G·γ_0`` from step strain, set ``u_t = 0``
+   * - Creep
+     - Use stress-controlled wrapper with feedback: ``γ̇_{n+1} = γ̇_n + κ(σ_0 - σ_n)``
+   * - LAOS
+     - Set ``u_t = γ_0·ω·cos(ω·t)``, extract harmonics from steady-state cycles
 
 
 Usage

@@ -18,12 +18,17 @@ that exhibit:
 
 These models are particularly well-suited for:
 
-- Waxy crude oils
-- Drilling fluids and muds
-- Greases and lubricants
-- Colloidal gels
-- Structured emulsions
-- Thixotropic cements and pastes
+- Waxy crude oils (pipeline restart, cold flow assurance)
+- Drilling fluids and muds (borehole stability, pump circulation)
+- Greases and lubricants (NLGI grades, bearing applications)
+- Colloidal gels (bidisperse systems, hierarchical structure)
+- Structured emulsions (dense emulsions, foams)
+- Thixotropic cements and pastes (self-leveling, 3D printing)
+
+Both models include comprehensive **Industrial Applications** sections with
+typical parameter ranges from field studies, and **Parameter Estimation Methods**
+covering sequential fitting, multi-start optimization, Bayesian inference,
+and regularization techniques for ill-conditioned problems
 
 
 Model Hierarchy
@@ -87,6 +92,19 @@ Key Features
 - Incorporates structural kinetics for thixotropy (Goodeve-Moore framework)
 - Maxwell viscoelasticity for liquid-like long-time behavior
 - Perzyna regularization for smooth yield transitions
+
+**Industrial Applications:**
+
+- Quantitative parameter ranges from field studies and laboratory characterization
+- Application-specific guidance for pipeline operations, drilling, lubrication
+- Mode selection rules for multi-timescale materials (β → N mapping)
+
+**Parameter Estimation:**
+
+- Sequential fitting strategies exploiting timescale separation
+- Multi-start global optimization for complex parameter landscapes
+- Bayesian inference with NLSQ warm-start and prior selection guidance
+- Regularization methods for correlated parameters
 
 **Numerical Implementation:**
 

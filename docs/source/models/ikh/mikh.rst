@@ -143,6 +143,122 @@ For other TEvp materials:
 - **Greases**: λ represents the organization of thickener fibers
 
 
+Thermokinematic Memory (FIKH Framework)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The **Fractal IKH (FIKH)** framework (Geri et al. 2017) extends the MIKH model
+to account for temperature-dependent microstructure. This is critical for
+materials like waxy crude oils where thermal history determines the precipitated
+wax content.
+
+**Effective Volume Fraction:**
+
+The wax volume fraction depends on temperature history:
+
+.. math::
+
+   \phi(T) = \phi_{\max} \cdot f(\Delta T)
+
+where :math:`\Delta T = T - T_{wax}` is the subcooling below the wax appearance
+temperature. The function :math:`f(\Delta T)` captures the precipitation kinetics.
+
+**Thermokinematic Memory:**
+
+The material "remembers" its thermal history through:
+
+1. The precipitated wax morphology (cooling rate affects crystal size/shape)
+2. The equilibrium connectivity :math:`\xi_{eq}(T)` at each temperature
+3. The effective volume fraction :math:`\phi(T)` determining available wax content
+
+This leads to a modified structure evolution equation:
+
+.. math::
+
+   \frac{d\xi}{dt} = k_1(\xi_{eq} - \xi) - k_2 \xi |\dot{\gamma}^p|
+
+where the equilibrium connectivity :math:`\xi_{eq}(T)` replaces the constant target value of 1.
+
+**Parameter Scaling with Microstructure:**
+
+In the FIKH framework, macroscopic parameters depend on both temperature (via φ)
+and structure (via ξ):
+
+.. math::
+
+   \mu_p(T, \xi) &= \mu_{p,\infty}(T) \cdot \left[1 - \frac{\xi}{\xi_c}\right]^{-[\eta]\phi} \\
+   \sigma_y(\xi) &= \sigma_{y,0} + \Delta\sigma_y \cdot \xi^n \\
+   C(\xi) &= C_0 \cdot \xi^p
+
+where :math:`\xi_c` is the critical connectivity for jamming, :math:`[\eta]` is the
+intrinsic viscosity, and :math:`n, p` are scaling exponents related to fractal dimension.
+
+
+Fractal Microstructure Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The structure parameter λ can be interpreted as the **normalized fractal connectivity**
+:math:`\xi \in [0, 1]` of the microstructural network.
+
+**Fractal Connectivity:**
+
+In a fractal network (e.g., wax crystal aggregates), the connectivity ξ represents
+the fraction of intact bonds relative to a fully percolated network:
+
+.. math::
+
+   \xi = \frac{N_{bonds}}{N_{bonds,max}}
+
+The fractal nature of colloidal aggregates leads to power-law scaling of mechanical
+properties with connectivity:
+
+- **Yield stress**: :math:`\sigma_y \propto \xi^n` with :math:`n \approx 2-3`
+- **Elastic modulus**: :math:`G \propto \xi^{d_f/(d-d_f)}` where :math:`d_f` is fractal dimension
+
+**The Avalanche Effect:**
+
+The nonlinear coupling between structure (ξ) and yield stress (σ_y) leads to
+an important dynamic phenomenon—**delayed yielding** or the "avalanche effect":
+
+1. Under stress :math:`\sigma < \sigma_y(\xi_0)`, the material creeps slowly
+2. Slow creep causes gradual structure breakdown: :math:`\xi \downarrow`
+3. As ξ decreases, :math:`\sigma_y(\xi)` drops, accelerating breakdown
+4. Eventually, catastrophic yielding occurs when :math:`\sigma > \sigma_y(\xi)`
+
+This positive feedback loop explains why thixotropic materials can appear
+solid for extended periods before suddenly flowing.
+
+**Relationship to Percolation:**
+
+Near the percolation threshold, the network connectivity follows:
+
+.. math::
+
+   \xi \propto (p - p_c)^\beta
+
+where :math:`p` is the bond occupation probability and :math:`p_c \approx 0.5` for 3D networks.
+The critical exponent β depends on network topology.
+
+
+Thermodynamic Consistency
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The MIKH model can be derived within the **Gurtin-Fried-Anand** thermomechanical
+framework, ensuring:
+
+1. **Frame invariance**: Constitutive equations are objective (independent of observer)
+2. **Second law compliance**: Dissipation inequality is satisfied
+3. **Energy balance**: Clear separation of stored (elastic) and dissipated energy
+
+The key thermodynamic quantities are:
+
+- **Free energy**: :math:`\psi(\gamma^e, \alpha, \lambda)` storing elastic energy
+- **Dissipation**: :math:`\mathcal{D} = \sigma \dot{\gamma}^p + X \dot{\alpha} + Y \dot{\lambda} \geq 0`
+
+where X and Y are thermodynamic forces conjugate to the internal variables.
+This framework guarantees that the model respects fundamental physics while
+allowing complex phenomenology.
+
+
 Physical Foundations
 --------------------
 
@@ -533,6 +649,166 @@ Relative efficiency of breakdown versus buildup. Sn ≫ 1 means structure
 breaks down efficiently under shear.
 
 
+Industrial Applications
+-----------------------
+
+The MIKH model was developed for and validated against industrial thixotropic
+materials. This section provides application-specific guidance with typical
+parameter ranges from field studies and laboratory characterization.
+
+Waxy Crude Oil Pipeline Operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The MIKH model was originally developed for waxy crude oils (Dimitriou & McKinley 2014),
+making it the reference model for pipeline flow assurance applications.
+
+**Pipeline Restart After Shutdown:**
+
+When a pipeline shuts down, wax precipitates and forms a gel network.
+Key parameter ranges from field applications:
+
+- **τ_thix = 100-10,000 s**: Long aging times for gelled pipelines
+- **σ_y,0 + Δσ_y = 50-500 Pa**: Gel strength depends on cooling rate and rest time
+- **Γ·τ_thix > 10**: Extreme shear-thinning for pipeline restart
+
+**Engineering implications:**
+
+- Restart pressure scales with σ_y(t_rest) where t_rest can span hours to days
+- Monitor thermokinematic memory (FIKH framework) for temperature-cycled systems
+- Stress overshoot during restart indicates incomplete gel breakdown
+
+**Cold Flow Assurance:**
+
+For subsea pipelines below wax appearance temperature (WAT):
+
+- Continuous low-shear flow prevents complete gelation
+- Target operating shear rate: γ̇ > 1/(Γ·τ_thix) to maintain destructured state
+- Thermal cycling protocols require FIKH framework with temperature-dependent φ
+
+Drilling Fluids and Muds
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Water-based drilling fluids exhibit pronounced IKH behavior due to clay platelet
+aggregation and polymer interactions.
+
+**Typical parameter ranges:**
+
+- **τ_thix = 1-100 s**: Faster recovery than crude oils due to smaller particles
+- **σ_y,0 = 5-15 Pa**: API barite suspension requirements for cutting transport
+- **C/γ_dyn ≈ 0.1-0.3 σ_y**: Moderate Bauschinger effect from clay orientation
+
+**Borehole Stability:**
+
+- Gel strength must exceed cutting particle buoyancy: σ_y > Δρ·g·d_particle
+- Thixotropic recovery prevents fluid loss into formation during connections
+- API 6rpm/300rpm readings map to MIKH parameters via flow curve fitting
+
+**Pump Circulation Restart:**
+
+After pipe connections or trips:
+
+- Initial startup pressure ∝ σ_y(t_connection) where t_connection ~ 30-300 s
+- Stress overshoot magnitude indicates gel breakdown efficiency
+- Design pumping rate to achieve γ̇ > 1/(Γ·τ_thix) throughout annulus
+
+Greases and Lubricants
+~~~~~~~~~~~~~~~~~~~~~~
+
+Grease consistency (NLGI grades) correlates with MIKH parameters through the
+yield stress and thixotropic timescales.
+
+**NLGI Grade Correlation:**
+
+.. list-table::
+   :widths: 15 25 30 30
+   :header-rows: 1
+
+   * - NLGI Grade
+     - Application
+     - σ_y (Pa)
+     - τ_thix (s)
+   * - 000-00
+     - Centralized systems
+     - 50-150
+     - 1-10
+   * - 0-1
+     - Enclosed gears
+     - 100-300
+     - 5-30
+   * - 2
+     - General purpose
+     - 200-500
+     - 10-100
+   * - 3-6
+     - High-consistency
+     - 400-2000
+     - 50-500
+
+**Bearing Startup Applications:**
+
+- Stress overshoot magnitude indicates grease breakdown risk under initial loading
+- Kinematic hardening (C parameter) critical for reversing loads in oscillating bearings
+- Channeling behavior: permanent structure breakdown when γ̇ peak > critical value
+
+**Kinematic Hardening in Reversing Loads:**
+
+The Bauschinger effect (controlled by C/γ_dyn ratio) is particularly important
+for greases in oscillating applications:
+
+.. code-block:: python
+
+   # Reverse flow simulation for oscillating bearing
+   model = MIKH()
+   model.parameters.set_value("C", 100.0)      # Kinematic hardening
+   model.parameters.set_value("gamma_dyn", 5.0) # Recovery rate
+   # Backstress saturation: α_max = C/γ_dyn = 20 Pa
+
+   # Simulate LAOS to observe Bauschinger effect
+   sigma_laos = model.predict_laos(t, gamma_0=0.5, omega=1.0)
+
+Thixotropic Cements and Pastes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Cementitious materials exhibit structure evolution from early hydration and
+particle flocculation.
+
+**Pumping and Placement:**
+
+- **τ_thix = 10-1000 s**: Depending on formulation and admixtures
+- Structure recovery must match placement window for self-leveling vs. vertical stability
+- High Γ values enable rapid breakdown for pumping, but may compromise build-up
+
+**Self-Leveling vs. Non-Sag Behavior:**
+
+.. list-table::
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Application
+     - Parameter Requirement
+     - Physical Interpretation
+   * - Self-leveling floors
+     - Low τ_thix, high Γ
+     - Fast breakdown, moderate recovery
+   * - Vertical surfaces
+     - High τ_thix, moderate Γ
+     - Slow breakdown, strong recovery
+   * - 3D printing
+     - Very high σ_y,0 + Δσ_y
+     - Immediate yield on deposition
+
+**Yield Stress Aging for Formwork Removal:**
+
+The time-dependent yield stress evolution determines safe formwork removal:
+
+.. math::
+
+   \sigma_y(t_{cure}) = \sigma_{y,0} + \Delta\sigma_y \cdot (1 - e^{-t_{cure}/\tau_{thix}})
+
+For critical structural applications, τ_thix must be characterized at the
+curing temperature to predict strength development.
+
+
 Parameters
 ----------
 
@@ -650,6 +926,242 @@ Troubleshooting
      - Increase C (hardening) or decrease γ_dyn (less recovery)
    * - Stress doesn't relax
      - Decrease η (Maxwell viscosity); check τ = η/G vs experiment time
+
+
+Parameter Estimation Methods
+----------------------------
+
+The MIKH model's 11 parameters span different experimental timescales and
+phenomena. Advanced estimation methods improve identifiability and uncertainty
+quantification beyond basic curve fitting.
+
+Sequential Fitting Strategy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A sequential approach exploits the separation of timescales in the MIKH model
+to improve parameter identifiability:
+
+**Stage 1: Flow Curve (Steady State)**
+
+From flow curve data σ(γ̇), fit the steady-state parameters:
+
+- σ_y,0, Δσ_y (yield stress bounds)
+- η_∞ (high-shear viscosity)
+- Γ·τ_thix product (controls shear-thinning curvature)
+
+.. code-block:: python
+
+   from rheojax.models import MIKH
+
+   model = MIKH()
+
+   # Fix elastic/hardening params, fit thixotropic
+   model.parameters.freeze(['G', 'C', 'gamma_dyn', 'eta', 'mu_p'])
+   model.fit(gamma_dot, sigma_ss, test_mode='flow_curve')
+
+   # Extract fitted values
+   sigma_y0_fit = model.parameters.get_value('sigma_y0')
+   delta_sigma_y_fit = model.parameters.get_value('delta_sigma_y')
+
+**Stage 2: Startup Transients**
+
+From startup stress overshoot σ(t; γ̇_0), fit:
+
+- G (controls initial slope and overshoot magnitude)
+- C, γ_dyn (kinematic hardening, Bauschinger effect)
+- τ_thix (recovery timescale, now separated from Γ)
+
+.. code-block:: python
+
+   # Unfreeze elastic/hardening parameters
+   model.parameters.unfreeze(['G', 'C', 'gamma_dyn'])
+
+   # Fit startup data with flow curve params fixed
+   model.fit(t_startup, sigma_startup, test_mode='startup')
+
+**Stage 3: Relaxation/Creep**
+
+From stress relaxation σ(t)|_{γ=const}, fit:
+
+- η (Maxwell viscosity, determines τ_relax = η/G)
+- μ_p (Perzyna regularization, yield transition sharpness)
+
+.. code-block:: python
+
+   model.parameters.unfreeze(['eta', 'mu_p'])
+   model.fit(t_relax, sigma_relax, test_mode='relaxation')
+
+Multi-Start Global Optimization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For datasets spanning wide parameter ranges or with multiple local minima,
+use multi-start optimization:
+
+.. code-block:: python
+
+   # Multi-start with parallel execution
+   model.fit(
+       X, y,
+       use_multi_start=True,
+       n_starts=5,           # Number of random initializations
+       parallel=True         # ThreadPoolExecutor for 3-5x speedup
+   )
+
+**When to use multi-start:**
+
+- Flow curves spanning >3 decades of shear rate
+- Combined protocol fitting (flow + startup + relaxation)
+- Initial fits show residual structure (systematic over/under-prediction)
+- Materials with unusual parameter combinations (e.g., very high τ_thix)
+
+**Global optimization for multi-modal problems:**
+
+.. code-block:: python
+
+   from rheojax.utils.optimization import nlsq_optimize_global
+
+   # Global search for challenging parameter landscapes
+   result = nlsq_optimize_global(
+       objective_fn,
+       initial_params,
+       bounds=param_bounds
+   )
+
+Bayesian Inference with MCMC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For uncertainty quantification, use NumPyro NUTS with NLSQ warm-start:
+
+.. code-block:: python
+
+   # Stage 1: Point estimate (fast, provides good initialization)
+   model.fit(X, y, test_mode='startup')
+
+   # Stage 2: Bayesian inference (4 chains for reliable R-hat)
+   result = model.fit_bayesian(
+       X, y,
+       num_warmup=1000,
+       num_samples=2000,
+       num_chains=4,         # Production: 4 chains for R-hat diagnostics
+       seed=42               # Reproducibility
+   )
+
+   # Check convergence diagnostics
+   print(f"R-hat: {result.r_hat}")   # Target: <1.01
+   print(f"ESS: {result.ess}")       # Target: >400
+
+**Prior Selection Guidance:**
+
+The choice of priors significantly affects Bayesian inference for the MIKH model:
+
+.. list-table::
+   :widths: 20 40 40
+   :header-rows: 1
+
+   * - Parameter
+     - Recommended Prior
+     - Rationale
+   * - τ_thix
+     - LogNormal(μ=log(10), σ=1)
+     - Spans 1-100 s; positive, heavy-tailed
+   * - Γ
+     - HalfNormal(σ=10)
+     - Positive breakdown coefficient
+   * - σ_y,0, Δσ_y
+     - TruncatedNormal or Uniform
+     - Material-dependent bounds
+   * - G
+     - LogNormal(μ=log(1000), σ=1)
+     - Typical modulus range for soft materials
+   * - C/γ_dyn ratio
+     - LogNormal(μ=log(10), σ=0.5)
+     - Backstress saturation constraint
+
+Regularization for Ill-Conditioned Problems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When parameters are correlated (common for G-C, τ_thix-Γ pairs), use:
+
+**1. Tikhonov Regularization:**
+
+Add penalty λ‖θ‖² to objective function to stabilize optimization:
+
+.. code-block:: python
+
+   from rheojax.utils.optimization import nlsq_curve_fit
+
+   result = nlsq_curve_fit(
+       model_fn, x, y, params,
+       regularization='tikhonov',
+       lambda_reg=1e-4  # Regularization strength
+   )
+
+**2. Bounds Tightening:**
+
+Physically constrain parameter ranges based on material knowledge:
+
+.. code-block:: python
+
+   # Constrain based on material class
+   model.parameters.set_bounds('tau_thix', (1.0, 1000.0))  # Drilling fluid
+   model.parameters.set_bounds('sigma_y0', (5.0, 50.0))   # API spec range
+
+**3. Combined Protocol Fitting:**
+
+Fitting multiple test modes simultaneously reduces parameter correlation
+by providing orthogonal constraints:
+
+.. code-block:: python
+
+   # Combined protocol fitting (pseudo-code pattern)
+   # Concatenate datasets with appropriate weighting
+   X_combined = combine_protocols(flow_data, startup_data)
+   weights = [1.0, 2.0]  # Emphasize transient data
+
+   model.fit(X_combined, y_combined, weights=weights)
+
+Sensitivity Analysis
+~~~~~~~~~~~~~~~~~~~~
+
+Identify which parameters most influence predictions to guide experimental design:
+
+**Local Sensitivity (Jacobian-based):**
+
+.. code-block:: python
+
+   import jax
+   import jax.numpy as jnp
+
+   def compute_sensitivity(model, X, param_names):
+       """Compute local parameter sensitivities."""
+
+       def prediction_fn(param_values):
+           for name, val in zip(param_names, param_values):
+               model.parameters.set_value(name, val)
+           return model.predict(X)
+
+       # Get current parameter values
+       param_values = jnp.array([
+           model.parameters.get_value(name) for name in param_names
+       ])
+
+       # Compute Jacobian: ∂σ/∂θ
+       jacobian = jax.jacobian(prediction_fn)(param_values)
+       return jacobian
+
+**Sensitivity interpretation:**
+
+- High sensitivity: Parameter strongly influences predictions (well-constrained by data)
+- Low sensitivity: Parameter weakly influences predictions (may be poorly identifiable)
+- Correlated sensitivities: Parameters are coupled (consider reparameterization)
+
+**Practical recommendations:**
+
+1. Compute sensitivities at the fitted parameter values
+2. Focus experimental design on regimes where target parameters have high sensitivity
+3. For τ_thix: use startup/recovery data at t ~ τ_thix
+4. For G: use early-time startup data (t ≪ τ_thix)
+5. For Γ: use flow curve data near γ̇ ~ 1/(Γ·τ_thix)
 
 
 Usage
