@@ -289,3 +289,4 @@ fix-imports/
 # ----------------------------------------------------------------------------
 .serena
 examples/data/ikh/PNAS_DigitalRheometerTwin_Dataset.xlsx
+docs/reference/*.pdf
