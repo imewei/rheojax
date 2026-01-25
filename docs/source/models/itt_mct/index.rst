@@ -68,6 +68,27 @@ Both models support all six standard rheological protocols:
 5. **Relaxation**: σ(t) after cessation - shows residual stress in glass
 6. **LAOS**: σ(t) for γ = γ₀sin(ωt) - shows nonlinear harmonics
 
+For detailed mathematical formulation of each protocol including governing
+equations and physical interpretation, see :doc:`itt_mct_protocols`.
+
+Theoretical Framework
+---------------------
+
+The ITT-MCT formalism consists of three key components:
+
+1. **ITT Stress Functional**: A history integral over past deformations weighted
+   by a generalized shear modulus built from transient density correlators. This
+   is the microscopic generalization of the Green-Kubo relation for driven systems.
+
+2. **MCT Correlator Dynamics**: The Zwanzig-Mori integro-differential equation
+   with a mode-coupling memory kernel. This describes how density fluctuations
+   decorrelate under the combined influence of Brownian motion and shear advection.
+
+3. **Wavevector Advection**: Flow "advects" density fluctuations, causing the
+   wavevector :math:`\mathbf{k}` to evolve as :math:`\mathbf{k}(t,t') = \mathbf{k}
+   \cdot \mathbf{E}^{-1}(t,t')` where :math:`\mathbf{E}` is the deformation gradient.
+   This advection destroys the cage structure above a critical accumulated strain.
+
 Physical Context
 ----------------
 
@@ -123,3 +144,4 @@ References
 
    itt_mct_schematic
    itt_mct_isotropic
+   itt_mct_protocols

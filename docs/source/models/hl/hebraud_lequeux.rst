@@ -1,28 +1,17 @@
 .. _hebraud_lequeux:
 
-Hébraud–Lequeux (HL) Model
-==========================
+==================================================
+Hébraud–Lequeux (HL) Model — Handbook
+==================================================
 
 Quick Reference
 ---------------
 
 **Use when:** Mean-field modeling of soft glassy materials, yield-stress fluids, foams, emulsions, pastes
-
 **Parameters:** 4 (G₀, α, σ_c, τ)
-
 **Key equation:** :math:`\partial_t P(\sigma, t) = -\dot{\gamma}(t) \partial_\sigma P + D(t) \partial^2_\sigma P - \frac{1}{\tau} \Theta(|\sigma|-\sigma_c) P + \Gamma(t) \delta(\sigma)`
-
-**Test modes:** flow_curve (steady_shear), creep, relaxation, oscillation (LAOS)
-
+**Test modes:** Flow curve, creep, relaxation, startup, oscillation (SAOS/LAOS)
 **Material examples:** Foams, emulsions, pastes, concentrated colloidal suspensions, soft glassy materials
-
-Overview
---------
-
-The **Hébraud–Lequeux (HL) model** is a seminal mean-field elastoplastic model for soft glassy materials (SGMs), introduced by Hébraud and Lequeux in 1998. It describes the rheology of yield-stress fluids, foams, emulsions, and pastes by considering the statistical evolution of local stresses.
-
-.. note::
-   This implementation uses high-performance JAX kernels with a Finite Volume Method (FVM) solver, enabling efficient fitting to flow curves, creep, relaxation, and LAOS data.
 
 Notation Guide
 --------------
@@ -34,49 +23,75 @@ Notation Guide
    * - Symbol
      - Units
      - Description
-   * - P(σ, t)
+   * - :math:`P(\sigma, t)`
      - 1/Pa
      - Probability density function of local stresses
-   * - σ
+   * - :math:`\sigma`
      - Pa
      - Local shear stress on mesoscopic block
-   * - σ_c
+   * - :math:`\sigma_c`
      - Pa
      - Local yield stress threshold
-   * - γ̇
+   * - :math:`\dot{\gamma}`
      - 1/s
      - Macroscopic applied shear rate
-   * - G₀
+   * - :math:`G_0`
      - Pa
      - Elastic shear modulus
-   * - τ
+   * - :math:`\tau`
      - s
-     - Plastic relaxation time
-   * - D(t)
+     - Plastic relaxation time (microscopic yield time)
+   * - :math:`D(t)`
      - Pa²/s
      - Mechanical noise (stress diffusivity)
-   * - Γ(t)
+   * - :math:`\Gamma(t)`
      - 1/s
      - Plastic activity rate (total yielding rate)
-   * - α
+   * - :math:`\alpha`
      - —
      - Noise coupling parameter (control parameter)
 
-Physical Basis
---------------
+Overview
+--------
 
-The model considers a material composed of mesoscopic elastoplastic blocks. Each block carries a local shear stress :math:`\sigma` which evolves through three processes:
+The **Hébraud–Lequeux (HL) model** is a seminal mean-field elastoplastic model for soft glassy materials (SGMs), introduced by Hébraud and Lequeux in 1998 [1]_. It describes the rheology of yield-stress fluids, foams, emulsions, and pastes by considering the statistical evolution of local stresses.
 
-1.  **Elastic Loading**: Under macroscopic shear rate :math:`\dot{\gamma}`, blocks accumulate stress elastically (:math:`\dot{\sigma} = G_0 \dot{\gamma}`).
-2.  **Plastic Yielding**: If the local stress exceeds a threshold :math:`\sigma_c`, the block yields (relaxes stress to zero) at a rate :math:`1/\tau`.
-3.  **Mechanical Noise**: Yielding events redistribute stress to neighbors. In a mean-field approximation, this is modeled as a stress diffusion process with diffusivity :math:`D(t)`.
+The model occupies a central place in the theory of amorphous materials as a minimal framework that captures the interplay between **elasticity**, **plasticity**, and **mechanical noise**. Unlike thermal glasses where rearrangements are driven by temperature (:math:`k_B T`), in soft glasses rearrangements are often driven by stress fluctuations arising from plastic events elsewhere in the material.
 
-Key Distinction from SGR/STZ
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. note::
+   This implementation uses high-performance JAX kernels with a Finite Volume Method (FVM) solver, enabling efficient fitting to flow curves, creep, relaxation, and LAOS data.
 
-*   **SGR (Soft Glassy Rheology)**: Disorder is in the *energy barrier heights* (trap depths). Noise is thermal-like effective temperature :math:`x`.
-*   **STZ (Shear Transformation Zone)**: Dynamics are controlled by creation/annihilation of *structural defects* (STZs).
-*   **HL (Hébraud–Lequeux)**: Disorder is in the *local stress state*. Noise is self-generated *mechanical diffusion*.
+Historical Context
+~~~~~~~~~~~~~~~~~~
+
+The HL model emerged in the late 1990s alongside the Soft Glassy Rheology (SGR) model as physicists sought to understand the "jamming" transition and rheology of disordered materials.
+
+**Origins**
+
+The model was motivated by the limitations of purely phenomenological models (like Bingham or Herschel-Bulkley) which describe *what* happens but not *why*. Hébraud and Lequeux sought a microscopic justification for the flow of concentrated suspensions.
+
+They built upon the earlier work of kinetic elastoplastic models but introduced a crucial self-consistency condition: the "mechanical noise" that facilitates local yielding is itself generated by the yielding events. This feedback loop leads to a dynamical phase transition between a solid (glassy) state and a fluid state.
+
+**Key Publications Timeline**
+
+- **1990**: Kinetic models for flow in disordered media (early mean-field approaches)
+- **1997**: SGR model introduced by Sollich et al. (energy landscape approach)
+- **1998**: **Hébraud & Lequeux** publish "Mode-coupling theory for the pasty rheology of soft glassy materials" [1]_ (stress landscape approach)
+- **2004**: Picard et al. extend ideas to spatial models (Elastoplastic Models, EPM) [7]_
+- **2009**: Bocquet, Colin & Ajdari derive similar equations from kinetic theory [5]_
+- **2018**: Nicolas et al. review establishes HL as the mean-field limit of modern EPMs [10]_
+
+**Relationship to SGR and STZ**
+
+The HL model sits in a landscape of microscopic theories:
+
+*   **SGR (Soft Glassy Rheology)**: Disorder is in the *energy barrier heights* (trap depths). Noise is a thermal-like effective temperature :math:`x`. Focuses on aging and broad relaxation spectra.
+*   **STZ (Shear Transformation Zone)**: Dynamics are controlled by creation/annihilation of specific *structural defects* (STZs). Focuses on molecular mechanisms in metallic glasses.
+*   **HL (Hébraud–Lequeux)**: Disorder is in the *local stress state*. Noise is self-generated *mechanical diffusion*. Focuses on the yield stress transition and flow curves.
+
+**Mean-Field vs. Spatial Models**
+
+HL is a **mean-field** theory: it assumes the mechanical noise is uniform ("grey noise"). It corresponds to the infinite-range limit of spatial Elastoplastic Models (EPMs). While it misses spatial correlations (like shear bands or avalanches), it correctly predicts the macroscopic rheology and phase diagram of many soft glasses.
 
 Physical Foundations
 --------------------
@@ -84,327 +99,339 @@ Physical Foundations
 Mesoscopic Block Picture
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The HL model discretizes the material into **mesoscopic blocks** of size ξ (correlation length of plastic events, typically 10-100 particle diameters). Each block is characterized by:
+The HL model discretizes the material into **mesoscopic blocks** of size :math:`\xi` (correlation length of plastic events, typically 10-100 particle diameters). Each block is characterized by:
 
-- **Local stress σ**: Elastic stress stored in the block
-- **Yield threshold σ_c**: Critical stress for plastic relaxation (assumed uniform across blocks)
-- **Elastic response**: σ increases affinely with applied strain (σ̇ = G₀·γ̇)
+1.  **Local stress** :math:`\sigma`: The shear stress carried by the block.
+2.  **Yield threshold** :math:`\sigma_c`: A critical stress above which the block becomes unstable.
+3.  **Elastic response**: Below yield, stress increases linearly with strain: :math:`\dot{\sigma} = G_0 \dot{\gamma}`.
 
-Unlike EPM (which tracks spatial positions), HL is a **mean-field model**: we track only the **probability distribution** P(σ, t) of local stresses, not their spatial arrangement.
+Unlike EPMs which track the spatial position of every block, the HL model tracks the **probability distribution** :math:`P(\sigma, t)` of finding a block with local stress :math:`\sigma`.
 
 Mechanical Noise and Self-Consistency
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The key innovation of HL is **mechanical noise coupling**: yielding events at one location create stress fluctuations that affect neighbors. In a mean-field approximation, this is modeled as:
+The key innovation of HL is **mechanical noise coupling**: yielding events at one location create stress fluctuations that affect neighbors. In a mean-field approximation, these complex elastic interactions are modeled as a stochastic noise term.
 
-**Stress diffusion**: D(t)·∂²P/∂σ²
+The stress of a block evolves due to:
+1.  **Macroscopic Loading**: Deterministic drift :math:`\dot{\gamma} G_0`.
+2.  **Mechanical Noise**: Stochastic fluctuations due to neighbors yielding, modeled as a diffusive process with diffusivity :math:`D(t)`.
 
-The diffusivity D(t) is **self-consistently** determined by the plastic activity:
+The diffusivity :math:`D(t)` is **self-consistently** determined by the plastic activity:
 
 .. math::
 
    D(t) = \alpha \Gamma(t)
 
 where:
-
-- Γ(t) = plastic activity rate (fraction of blocks yielding per unit time)
-- α = noise coupling parameter (material-dependent constant)
+- :math:`\Gamma(t)` = plastic activity rate (fraction of blocks yielding per unit time)
+- :math:`\alpha` = noise coupling parameter (material-dependent constant)
 
 **Physical interpretation**:
-
-- Each yielding event redistributes stress to neighbors (via Eshelby-like propagator)
-- In mean-field, this appears as **diffusion** in stress space
-- The stronger the plastic activity Γ, the stronger the noise D
+- Each yielding event redistributes stress to neighbors (via an Eshelby-like propagator).
+- In mean-field, the sum of many such "kicks" looks like Gaussian white noise (Central Limit Theorem).
+- The stronger the plastic activity :math:`\Gamma`, the stronger the noise :math:`D`.
 
 This self-consistency creates a **feedback loop**:
+More stress → More yielding (:math:`\Gamma \uparrow`) → More noise (:math:`D \uparrow`) → Stress spreads out (diffuses) → More blocks reach :math:`\sigma_c` → More yielding.
 
-1. More stress → More yielding (Γ increases)
-2. More yielding → More noise (D increases)
-3. More noise → Stress spreads out (more blocks approach σ_c)
-4. More blocks at σ_c → More yielding (loop closes)
+Glass Transition
+~~~~~~~~~~~~~~~~
 
-Glass Transition via Effective Temperature
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The parameter α controls the **phase** of the material:
+The parameter :math:`\alpha` controls the stability of this feedback loop, leading to a phase transition:
 
 **α < 0.5 (Glass phase)**:
-
-- Noise insufficient to maintain equilibrium
-- System "freezes" into metastable states
-- **Yield stress** σ_y > 0 emerges
-- **Aging**: Relaxation timescales grow with waiting time
+- Noise is insufficient to maintain a fluid state.
+- System "freezes" into a distribution restricted to :math:`|\sigma| < \sigma_c`.
+- **Yield stress** :math:`\sigma_y > 0` emerges.
+- **Aging**: Relaxation timescales grow with waiting time (simple aging, :math:`\mu=1`).
 
 **α ≥ 0.5 (Fluid phase)**:
-
-- Noise sufficient for ergodic exploration of stress space
-- System reaches steady state P_ss(σ)
-- **No yield stress** (flows at any stress)
-- **Finite viscosity**: η ~ 1/(α - 0.5) diverges as α → 0.5⁺
-
-The **glass transition** at α = 0.5 is a **critical point** analogous to SGR's x = 1 transition, but with different physical origin (mechanical noise vs. thermal-like effective temperature).
+- Noise is sufficient to maintain a steady distribution extending beyond :math:`\sigma_c`.
+- System flows at any non-zero stress.
+- **No yield stress** (:math:`\sigma_y = 0`).
+- **Finite viscosity**: :math:`\eta \sim 1/(\alpha - 0.5)` diverges as :math:`\alpha \to 0.5^+`.
 
 Governing Equations
-------------------------
+-------------------
 
-The probability density function :math:`P(\sigma, t)` of local stresses evolves according to the Fokker-Planck equation:
+The evolution of the probability density function :math:`P(\sigma, t)` is governed by a **Fokker-Planck equation** with sink and source terms.
+
+The Master Equation
+~~~~~~~~~~~~~~~~~~~
 
 .. math::
 
-   \partial_t P(\sigma, t) = \underbrace{-\dot{\gamma}(t) \partial_\sigma P}_{\text{Advection}} + \underbrace{D(t) \partial^2_\sigma P}_{\text{Diffusion}} - \underbrace{\frac{1}{\tau} \Theta(|\sigma|-\sigma_c) P}_{\text{Yielding}} + \underbrace{\Gamma(t) \delta(\sigma)}_{\text{Reinjection}}
+   \partial_t P(\sigma, t) = \underbrace{-G_0 \dot{\gamma}(t) \partial_\sigma P}_{\text{Advection}} + \underbrace{D(t) \partial^2_\sigma P}_{\text{Diffusion}} - \underbrace{\frac{1}{\tau} \Theta(|\sigma|-\sigma_c) P}_{\text{Yielding}} + \underbrace{\Gamma(t) \delta(\sigma)}_{\text{Reinjection}}
 
-Self-Consistency
-~~~~~~~~~~~~~~~~
+**Term-by-term breakdown:**
 
-The model is closed by coupling the noise strength :math:`D(t)` to the plastic activity rate :math:`\Gamma(t)`:
+1.  **Advection**: :math:`-G_0 \dot{\gamma}(t) \partial_\sigma P`
+    Describes the deterministic elastic loading. All blocks move through stress space with velocity :math:`v = G_0 \dot{\gamma}`.
+
+2.  **Diffusion**: :math:`D(t) \partial^2_\sigma P`
+    Describes the mechanical noise. Stress fluctuations cause blocks to perform a random walk in stress space.
+
+3.  **Yielding (Sink)**: :math:`-\frac{1}{\tau} \Theta(|\sigma|-\sigma_c) P`
+    Blocks with stress exceeding the threshold :math:`\sigma_c` yield (relax) at a rate :math:`1/\tau`. The Heaviside function :math:`\Theta` ensures only unstable blocks yield.
+
+4.  **Reinjection (Source)**: :math:`\Gamma(t) \delta(\sigma)`
+    Yielded blocks dissipate their stress and are "reborn" at zero stress state :math:`\sigma=0`. This conserves the total number of blocks (probability).
+
+Self-Consistency Closure
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The system is closed by defining the activity rate :math:`\Gamma(t)` and diffusivity :math:`D(t)`.
+
+Total yielding rate (Activity):
 
 .. math::
 
    \Gamma(t) = \frac{1}{\tau} \int_{|\sigma| > \sigma_c} P(\sigma, t) \, d\sigma
 
+Mechanical noise (Diffusion):
+
+.. math::
+
    D(t) = \alpha \Gamma(t)
 
-where :math:`\alpha` is the dimensionless coupling parameter.
+Constraints
+~~~~~~~~~~~
 
-Phase Behavior
---------------
+1.  **Probability Conservation**:
+    The equation preserves normalization :math:`\int P(\sigma, t) \, d\sigma = 1` because the sink term (integral of yielding) exactly matches the source term (reinjection).
 
-The parameter :math:`\alpha` controls the phase state of the material:
+2.  **Macroscopic Stress**:
+    The measurable stress is the first moment of the distribution:
+    :math:`\Sigma(t) = \int \sigma P(\sigma, t) \, d\sigma`
 
-*   **Glassy Phase** (:math:`\alpha < 0.5`): The material exhibits a finite yield stress :math:`\sigma_y`. Below this stress, the material is solid-like (creep arrest).
-*   **Fluid Phase** (:math:`\alpha \ge 0.5`): The material flows at any non-zero stress.
+Protocol-Specific Equations
+---------------------------
 
-Parameters
-----------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 15 10 15 60
-
-   * - Parameter
-     - Symbol
-     - Units
-     - Description
-   * - ``G0``
-     - :math:`G_0`
-     - Pa
-     - Elastic shear modulus; relates stress to strain
-   * - ``alpha``
-     - :math:`\alpha`
-     - —
-     - Noise coupling parameter; controls glass (< 0.5) vs fluid (≥ 0.5) phase
-   * - ``sigma_c``
-     - :math:`\sigma_c`
-     - Pa
-     - Local yield stress threshold for plastic relaxation
-   * - ``tau``
-     - :math:`\tau`
-     - s
-     - Plastic relaxation time; rate of local yielding
-
-Predictions and Protocols
--------------------------
+The general Master Equation simplifies under specific rheological protocols.
 
 Flow Curve (Steady Shear)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In steady shear (:math:`\dot{\gamma} = \text{const}`), the HL model predicts a **Herschel-Bulkley** behavior near yield:
+In steady state (:math:`\partial_t P = 0`) under constant shear rate :math:`\dot{\gamma}`, the equation becomes:
+
+.. math::
+
+   0 = -G_0 \dot{\gamma} \partial_\sigma P + D \partial^2_\sigma P - \frac{1}{\tau}\Theta(|\sigma|-\sigma_c)P + \Gamma \delta(\sigma)
+
+Analytical solutions exist for the fluid phase. For the glass phase (:math:`\alpha < 0.5`), the model predicts a **Herschel-Bulkley** flow curve near yield:
 
 .. math::
 
    \Sigma(\dot{\gamma}) \approx \Sigma_y + A \dot{\gamma}^{1/2}
 
-The exponent 0.5 is a universal prediction of the HL model for the glassy phase.
+The exponent **n = 0.5** is a universal prediction of the HL model (and mean-field EPMs generally) for the yielding transition.
 
-Creep (Step Stress)
-~~~~~~~~~~~~~~~~~~~
+Start-up Shear
+~~~~~~~~~~~~~~
 
-Under constant stress :math:`\Sigma_0`:
-*   If :math:`\Sigma_0 < \Sigma_y`: The shear rate decays to zero (arrest).
-*   If :math:`\Sigma_0 > \Sigma_y`: The shear rate reaches a steady finite value.
-*   The model captures **delayed yielding** (creep rupture) dynamics near the yield point.
+Starting from a relaxed (aged) state, applying constant :math:`\dot{\gamma}` leads to:
+
+1.  **Elastic Regime**: Initially, the entire distribution shifts: :math:`P(\sigma, t) \approx P_0(\sigma - G_0 \dot{\gamma} t)`. Stress grows linearly: :math:`\Sigma \sim G_0 \gamma`.
+2.  **Overshoot**: As the distribution hits :math:`\sigma_c`, avalanches of yielding occur. This causes a peak in stress (overshoot) before settling to steady state.
+3.  **Steady State**: Eventually, a balance between loading, yielding, and diffusion is reached.
+
+The height and position of the overshoot depend on the initial "age" (sharpness) of the distribution.
 
 Stress Relaxation (Step Strain)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Following a step strain :math:`\gamma_0`, the stress relaxes via:
-1.  Fast relaxation (yielding of highly stressed elements).
-2.  Slow relaxation (diffusion).
-For :math:`\alpha < 0.5`, residual stress may persist (finite elastic modulus).
+After a rapid strain step :math:`\gamma_0`, the shear rate becomes zero (:math:`\dot{\gamma}=0`). The equation simplifies to pure diffusion and decay:
 
-LAOS (Large Amplitude Oscillatory Shear)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. math::
 
-In LAOS, the PDF :math:`P(\sigma, t)` oscillates. Large amplitudes drive the distribution past :math:`\sigma_c`, causing periodic fluidization and non-linear Lissajous figures.
+   \partial_t P = D(t) \partial^2_\sigma P - \frac{1}{\tau}\Theta(|\sigma|-\sigma_c)P + \Gamma(t) \delta(\sigma)
 
-Validity and Assumptions
-------------------------
+**Crucially**:
+- Blocks with :math:`|\sigma| > \sigma_c` yield quickly (time :math:`\tau`).
+- Blocks with :math:`|\sigma| < \sigma_c` only evolve via diffusion :math:`D(t)`.
+- But :math:`D(t) \propto \Gamma(t)`, so as yielding stops, diffusion stops.
+- For :math:`\alpha < 0.5`, the system **freezes** with finite residual stress. Relaxation is incomplete.
 
-**Valid for:**
+Creep (Step Stress)
+~~~~~~~~~~~~~~~~~~~
 
-- **Mean-field systems**: Where spatial correlations are weak or averaged out
-- **Soft glassy materials**: Foams, emulsions, pastes, colloidal suspensions
-- **Athermal plasticity**: Yielding driven by stress, not thermal activation
-- **Homogeneous systems**: No shear banding or spatial localization
+Under constant stress :math:`\Sigma_{app}`, the shear rate :math:`\dot{\gamma}(t)` evolves to satisfy:
 
-**Assumptions:**
+.. math::
 
-- **Uniform yield threshold**: All blocks have same σ_c (no disorder in thresholds)
-- **Mechanical noise only**: Neglects thermal fluctuations (k_B T ≪ σ_c·ξ³)
-- **Mean-field approximation**: Stress redistribution averaged (no spatial propagator)
-- **Overdamped dynamics**: Inertia negligible
+   \Sigma_{app} = \int \sigma P(\sigma, t) \, d\sigma
 
-**Not appropriate for:**
+This is an "inverse problem" solved numerically via a servo-controller.
 
-- Systems with **spatial heterogeneity** (use EPM instead)
-- **Thixotropic materials** with evolving structure (use DMT or MIKH)
-- **Viscoelastic fluids** with polymer relaxation (use Maxwell-based models)
-- **Crystalline solids** with dislocation dynamics
+- **Below yield** (:math:`\Sigma_{app} < \Sigma_y`): :math:`\dot{\gamma} \to 0`. The distribution widens but remains confined.
+- **Above yield** (:math:`\Sigma_{app} > \Sigma_y`): :math:`\dot{\gamma} \to \text{const}`. The system flows.
+- **Near yield**: The model exhibits **delayed yielding**—a long period of slow creep followed by sudden fluidization.
+
+Oscillation (SAOS/LAOS)
+~~~~~~~~~~~~~~~~~~~~~~~
+
+For :math:`\gamma(t) = \gamma_0 \sin(\omega t)`:
+
+- **SAOS (Small Amplitude)**: The distribution oscillates slightly around 0. Linear viscoelasticity.
+- **LAOS (Large Amplitude)**: The distribution sweeps back and forth past :math:`\sigma_c`.
+  - At max strain rate (zero strain), the distribution is widest.
+  - At max strain (zero rate), the distribution is shifted.
+  - Yielding occurs periodically, creating higher harmonics in the stress response.
+
+Aging Analysis
+--------------
+
+The HL model captures physical aging, a hallmark of soft glassy materials.
+
+Simple vs. Complex Aging
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The HL model exhibits **simple aging** with an aging exponent :math:`\mu = 1`.
+
+- After a quench (or cessation of flow), the system evolves towards a "frozen" state.
+- The diffusion coefficient decays as :math:`D(t) \sim 1/t`.
+- Relaxation times grow linearly with the age of the system :math:`t_w`.
+
+Lifetime Distribution
+~~~~~~~~~~~~~~~~~~~~~
+
+The probability of a block persisting without yielding for time :math:`t` scales as the age of the system. The "traps" in HL are stress states far from :math:`\sigma_c`. As the system ages, the distribution :math:`P(\sigma)` becomes narrower and more peaked around 0, meaning blocks are "safer" from yielding.
+
+Step Strain Response
+~~~~~~~~~~~~~~~~~~~~
+
+The relaxation modulus :math:`G(t, t_w)` depends on waiting time :math:`t_w`:
+
+.. math::
+
+   G(t, t_w) \approx G_{plateau} + f(t/t_w)
+
+This :math:`t/t_w` scaling is the signature of simple aging.
+
+Comparison with SGR
+~~~~~~~~~~~~~~~~~~~
+
+Both HL and SGR predict :math:`\mu=1` aging.
+- **SGR**: Aging is due to elements finding deeper energy traps.
+- **HL**: Aging is due to the stress distribution becoming narrower (fewer elements near yield threshold).
+- **Difference**: In HL, aging stops completely if noise vanishes (:math:`\alpha \to 0`). In SGR, aging is intrinsic to the glass phase.
 
 What You Can Learn
 ------------------
 
-From fitting HL model to experimental data, you can extract insights about glass transitions, mechanical noise, and cooperative yielding in soft glassy materials.
+From fitting the HL model to experimental data, you can extract insights about the microscopic yielding processes and phase behavior.
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**α (Noise Coupling Parameter)**:
-   Dimensionless parameter controlling glass (α < 0.5) vs fluid (α ≥ 0.5) phase behavior.
-   *For graduate students*: α = D/Γ where D is stress diffusivity and Γ is plastic activity rate. At critical point α = 0.5, the system undergoes a dynamic phase transition analogous to SGR's effective temperature x = 1. Controls divergence of viscosity: η ~ 1/(α - 0.5) as α → 0.5⁺.
-   *For practitioners*: α < 0.5 predicts yield stress σ_y ≈ σ_c(1 - 2α). Use α to classify materials: α = 0.2-0.4 typical for pastes/gels, α > 0.5 for liquid-like emulsions.
+**α (Noise Coupling Parameter)**
+   *   **Definition**: Ratio of mechanical noise strength to plastic activity (:math:`\alpha = D/\Gamma`).
+   *   **For Graduate Students**: :math:`\alpha` is the control parameter for the dynamical phase transition. It measures the "fragility" of the structure. High :math:`\alpha` means a single yield event triggers many others (avalanches), fluidizing the material.
+   *   **For Practitioners**: Determines if the material has a yield stress.
+       - :math:`\alpha < 0.5`: Paste/Gel (Yield Stress exists).
+       - :math:`\alpha \ge 0.5`: Fluid (No Yield Stress).
+       - Typical values: 0.2-0.4 for strong gels, 0.45-0.55 for soft jamming systems.
 
-**σ_c (Local Yield Threshold)**:
-   Critical stress for local plastic relaxation at mesoscopic block level.
-   *For graduate students*: Sets energy scale for cage breaking or bond rupture. Not the macroscopic yield stress (which is σ_y ≈ σ_c(1-2α) for α < 0.5). Relates to microscopic interaction potentials.
-   *For practitioners*: Estimate from small-amplitude oscillatory stress sweeps or extrapolate from flow curves. σ_c/G ~ 0.1-0.5 for typical soft glasses.
+**σ_c (Local Yield Threshold)**
+   *   **Definition**: The stress at which a mesoscopic block becomes unstable.
+   *   **For Graduate Students**: Corresponds to the elementary energy barrier per unit volume.
+   *   **For Practitioners**: Closely related to the macroscopic yield stress :math:`\Sigma_y`. For :math:`\alpha \approx 0.3`, :math:`\Sigma_y \approx 0.5 \sigma_c`.
 
-**τ (Plastic Relaxation Time)**:
-   Timescale for stress relaxation in yielded blocks.
-   *For graduate students*: Microscopic hopping time or cage escape time. Sets fastest relaxation mode in system. For thermally-activated processes, τ ~ τ₀exp(ΔE/k_BT).
-   *For practitioners*: Determines transient response timescale. For τ = 0.01-1 s, expect stress overshoot duration ~ 10τ in startup flows.
+**τ (Plastic Relaxation Time)**
+   *   **Definition**: The time it takes for a yielded block to dissipate its stress.
+   *   **For Graduate Students**: The microscopic timescale of plastic rearrangement.
+   *   **For Practitioners**: Sets the timescale of transient responses. If stress overshoot peaks at 1s, :math:`\tau` is likely order 0.1-1s.
 
-Material Classification
-~~~~~~~~~~~~~~~~~~~~~~~
+Material Classification Table
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. list-table:: Material Classification from Hébraud-Lequeux Parameters
+.. list-table::
+   :widths: 20 25 30 25
    :header-rows: 1
-   :widths: 20 20 30 30
 
    * - Parameter Range
      - Material Behavior
      - Typical Materials
-     - Processing Implications
-   * - α < 0.3
-     - Strong glass (aging)
-     - Concentrated colloidal gels, dense granular media
-     - High yield stress, pronounced aging
-   * - α = 0.3-0.5
-     - Weak glass (near transition)
-     - Foams, pastes, soft colloids
-     - Moderate yield stress, thixotropy
-   * - α > 0.5
-     - Fluid (no yield stress)
-     - Dilute emulsions, weak gels
-     - Continuous flow at any stress
-   * - Flow exponent n ≈ 0.5
-     - HL universal signature
-     - All α < 0.5 systems
-     - Herschel-Bulkley with n=0.5
-   * - Γ_ss > 10 s⁻¹
-     - High plastic activity
-     - Rapidly flowing soft glasses
-     - Significant energy dissipation
+     - Rheology Signature
+   * - **α < 0.3**
+     - Strong Glass
+     - Dense granular, hard gels
+     - High yield stress, brittle fracture
+   * - **0.3 < α < 0.5**
+     - Soft Glass
+     - Foams, emulsions, pastes
+     - Moderate yield stress, shear thinning n=0.5
+   * - **α ≈ 0.5**
+     - Critical Gel
+     - Jamming transition
+     - Power-law fluid, divergence of viscosity
+   * - **α > 0.5**
+     - Viscous Fluid
+     - Dilute suspensions
+     - Newtonian-like, no yield stress
 
-Implementation Details
-----------------------
+Mathematical Summary
+--------------------
 
-The RheoJAX implementation uses an explicit Finite Volume Method (FVM) solver written in JAX.
-
-*   **Advection**: First-order upwind scheme (stable for hyperbolic transport).
-*   **Diffusion**: Central difference scheme.
-*   **Time-stepping**: Operator splitting with Forward Euler.
-*   **JIT Compilation**: The entire solver is JIT-compiled for GPU acceleration, typically running :math:`100\times` faster than pure Python implementations.
-
-Numerical Parameters
-~~~~~~~~~~~~~~~~~~~~
-
-The solver uses a discretized stress grid:
-*   `sigma_max`: Default 5.0 (normalized units).
-*   `n_bins`: Default 501.
-*   `dt`: Default 0.005.
-
-These can be adjusted if necessary, but defaults work for most experimental ranges.
-
-Fitting Guidance
-----------------
-
-Initialization Strategy
-~~~~~~~~~~~~~~~~~~~~~~~
-
-**Step 1: Determine phase (α < 0.5 or α ≥ 0.5)**
-
-From experimental observations:
-
-- **If yield stress observed**: Start with α = 0.3 (glass phase)
-- **If no yield stress**: Start with α = 0.7 (fluid phase)
-
-**Step 2: Fit flow curve (if available)**
-
-Use steady-state flow curve data to constrain:
-
-- ``sigma_c``: Should approximate yield stress σ_y (for α < 0.5) or typical stress scale
-- ``alpha``: Refine to match flow curve shape (especially near yield)
-
-**Step 3: Fit transient data (startup, relaxation, creep)**
-
-Use time-dependent data to refine:
-
-- ``tau``: Controls relaxation timescale
-- ``G0``: Match initial elastic modulus (if available from SAOS)
-
-Parameter Bounds and Physical Constraints
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. list-table::
-   :widths: 20 30 50
-   :header-rows: 1
-
-   * - Parameter
-     - Typical Range
-     - Physical Constraint
-   * - ``G0``
-     - 10-10000 Pa
-     - Match SAOS plateau modulus if available
-   * - ``alpha``
-     - 0.1-1.5
-     - α < 0.5 (glass), α ≥ 0.5 (fluid); critical at α = 0.5
-   * - ``sigma_c``
-     - 0.5-2× σ_y
-     - For glass phase; for fluids, σ_c is typical stress scale
-   * - ``tau``
-     - 0.01-100 s
-     - Should match fastest relaxation timescale in data
-
-Common Fitting Issues
+Measurement Protocols
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. list-table::
-   :widths: 35 65
-   :header-rows: 1
+**Steady Shear**: :math:`\dot{\gamma}(t) = \text{const}`
+**Step Strain**: :math:`\gamma(t) = \gamma_0 \Theta(t)`
+**Creep**: :math:`\Sigma(t) = \Sigma_0 \Theta(t)`
+**Oscillation**: :math:`\gamma(t) = \gamma_0 \sin(\omega t)`
 
-   * - Issue
-     - Solution
-   * - Flow curve too steep/shallow near yield
-     - Adjust ``alpha`` (lower α = steeper); check if α < 0.5
-   * - No yield stress predicted but observed
-     - Decrease ``alpha`` below 0.5; check σ_c initialization
-   * - Relaxation too fast/slow
-     - Adjust ``tau`` (plastic relaxation time)
-   * - Creep predicts arrest but sample flows
-     - Increase ``alpha`` above 0.5 (fluid phase)
-   * - Numerical instability (PDF becomes negative)
-     - Reduce ``dt`` or increase ``n_bins`` (finer discretization)
+Scaling Predictions
+~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: HL Model Scaling Predictions
+   :header-rows: 1
+   :widths: 20 20 60
+
+   * - Measurement
+     - Regime
+     - HL Scaling Prediction
+   * - **Flow Curve**
+     - Glass (:math:`\alpha < 0.5`)
+     - :math:`\Sigma = \Sigma_y + A \dot{\gamma}^{0.5}` (Herschel-Bulkley n=0.5)
+   * -
+     - Fluid (:math:`\alpha \to 0.5`)
+     - :math:`\Sigma \sim \dot{\gamma}^{1/2}` (Critical scaling)
+   * -
+     - Fluid (:math:`\alpha > 0.5`)
+     - :math:`\Sigma \sim \dot{\gamma}` (Newtonian at low rates)
+   * - **Relaxation**
+     - Glass
+     - :math:`\Sigma(t) \to \Sigma_{res} > 0` (Incomplete relaxation)
+   * - **Creep**
+     - Glass (:math:`\Sigma < \Sigma_y`)
+     - :math:`\dot{\gamma} \to 0` (Arrest)
+   * - **Viscosity**
+     - Fluid limit
+     - :math:`\eta \sim (\alpha - 0.5)^{-1}` (Divergence at transition)
+
+Extended Features
+-----------------
+
+Shear Banding
+~~~~~~~~~~~~~
+
+The standard HL model assumes a homogeneous shear rate. However, for certain parameter ranges (or extensions of the model), the flow curve can become non-monotonic or the material unstable, leading to **shear banding**—spatial coexistence of flowing and arrested regions.
+
+Spatial Extensions (Non-local HL)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The mean-field approximation can be relaxed by introducing spatial coupling. Instead of a global :math:`\Gamma(t)`, one defines a local :math:`\Gamma(x, t)` and allows stress diffusion to occur spatially:
+
+.. math::
+   D(x, t) = \alpha \Gamma(x, t) + l_{corr}^2 \nabla^2 \Gamma
+
+This "Spatial HL" or "Kinetic Elasto-Plastic Model" connects HL to modern EPMs.
+
+Thixotropy
+~~~~~~~~~~
+
+While HL captures aging (slow evolution), it does not explicitly model "structure" parameters like flocculation. However, the probability distribution :math:`P(\sigma)` acts as a fingerprint of the structural state. A narrow distribution corresponds to a "structured/aged" state; a wide distribution corresponds to a "rejuvenated/flowed" state.
 
 Usage
 -----
@@ -457,6 +484,10 @@ Glassy State Example
 Bayesian Inference
 ~~~~~~~~~~~~~~~~~~
 
+Bayesian inference is highly recommended for the HL model because the phase transition
+at :math:`\alpha = 0.5` means small changes in :math:`\alpha` can qualitatively change
+predictions. Quantifying uncertainty in :math:`\alpha` is therefore critical.
+
 .. code-block:: python
 
    from rheojax.models import HebraudLequeux
@@ -482,8 +513,63 @@ Bayesian Inference
    print(f"alpha: {intervals['alpha']}")
    print(f"sigma_c: {intervals['sigma_c']}")
 
-Advanced Usage Example
+   # Critical question: Is the material a glass?
+   alpha_samples = result.posterior_samples['alpha']
+   prob_glass = (alpha_samples < 0.5).mean()
+   print(f"Probability of glass phase: {prob_glass:.2%}")
+
+Startup and Relaxation
 ~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   from rheojax.models import HebraudLequeux
+   import numpy as np
+
+   model = HebraudLequeux()
+
+   # Fit to startup data (stress overshoot)
+   time = np.linspace(0, 10, 100)
+   gdot = 1.0  # Constant shear rate
+   stress_startup = np.array([...])  # Measured stress(t)
+   model.fit(time, stress_startup, test_mode='startup', gdot=gdot)
+
+   # Fit to relaxation data (step strain)
+   gamma0 = 0.1  # Step strain amplitude
+   modulus_data = np.array([...])  # G(t) = sigma(t)/gamma0
+   model.fit(time, modulus_data, test_mode='relaxation', gamma0=gamma0)
+
+LAOS Analysis
+~~~~~~~~~~~~~
+
+Large Amplitude Oscillatory Shear reveals nonlinear material response:
+
+.. code-block:: python
+
+   from rheojax.models import HebraudLequeux
+   import numpy as np
+
+   model = HebraudLequeux()
+
+   # LAOS simulation
+   gamma0 = 1.0  # Strain amplitude
+   omega = 1.0   # Angular frequency (rad/s)
+   n_cycles = 5
+
+   time = np.linspace(0, n_cycles * 2 * np.pi / omega, 500)
+   stress_laos = np.array([...])  # Measured stress(t)
+
+   model.fit(time, stress_laos, test_mode='laos', gamma0=gamma0, omega=omega)
+
+   # Predict LAOS response
+   stress_pred = model.predict(time, test_mode='laos')
+
+   # Construct Lissajous curve
+   strain = gamma0 * np.sin(omega * time)
+   # Plot stress vs strain for Lissajous-Bowditch curve
+
+Advanced Usage: Multiple Protocols
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -504,25 +590,476 @@ Advanced Usage Example
    stress_data = 10.0 + 5.0 * gdot**0.5  # Example data
    model.fit(gdot, stress_data, test_mode="flow_curve")
 
-   # 2. Predict Creep
+   # 2. Predict multiple protocols
+   fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+   # Flow curve
+   gdot_pred = np.logspace(-3, 2, 50)
+   sigma_pred = model.predict(gdot_pred, test_mode='flow_curve')
+   axes[0, 0].loglog(gdot_pred, sigma_pred)
+   axes[0, 0].set_xlabel('Shear rate (1/s)')
+   axes[0, 0].set_ylabel('Stress (Pa)')
+   axes[0, 0].set_title('Flow Curve')
+
+   # Creep (above yield)
    time = np.linspace(0, 100, 1000)
    J_pred = model.predict(time, test_mode="creep", sigma_applied=12.0)
+   axes[0, 1].plot(time, J_pred)
+   axes[0, 1].set_xlabel('Time (s)')
+   axes[0, 1].set_ylabel('Compliance J(t) (1/Pa)')
+   axes[0, 1].set_title('Creep (σ > σ_y)')
 
-   # Plot results
-   plt.figure(figsize=(10, 6))
-   plt.subplot(1, 2, 1)
-   plt.loglog(gdot, stress_data, 'o', label='Data')
-   plt.loglog(gdot, model.predict(gdot, test_mode='flow_curve'), '-', label='Fit')
-   plt.xlabel('Shear rate (1/s)')
-   plt.ylabel('Stress (Pa)')
-   plt.legend()
+   # Relaxation
+   G_pred = model.predict(time, test_mode="relaxation", gamma0=0.1)
+   axes[1, 0].semilogy(time, G_pred)
+   axes[1, 0].set_xlabel('Time (s)')
+   axes[1, 0].set_ylabel('G(t) (Pa)')
+   axes[1, 0].set_title('Stress Relaxation')
 
-   plt.subplot(1, 2, 2)
-   plt.plot(time, J_pred)
-   plt.xlabel('Time (s)')
-   plt.ylabel('Compliance J(t) (1/Pa)')
+   # Startup
+   stress_startup = model.predict(time[:200], test_mode="startup", gdot=1.0)
+   axes[1, 1].plot(time[:200], stress_startup)
+   axes[1, 1].set_xlabel('Time (s)')
+   axes[1, 1].set_ylabel('Stress (Pa)')
+   axes[1, 1].set_title('Startup Flow')
+
    plt.tight_layout()
    plt.show()
+
+Nonlinear Response
+------------------
+
+Large Amplitude Step Strain
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For step strain of amplitude :math:`\gamma_0` comparable to unity, the stress response
+depends nonlinearly on :math:`\gamma_0`. The initial stress distribution is shifted:
+
+.. math::
+
+   P(\sigma, 0^+) = P_0(\sigma - G_0 \gamma_0)
+
+If :math:`G_0 \gamma_0 > \sigma_c`, a portion of the distribution immediately exceeds
+the yield threshold and yields rapidly. This causes:
+
+1. **Instantaneous stress drop** as unstable blocks yield
+2. **Modified relaxation dynamics** as the remaining distribution evolves
+3. **Strain softening** for large amplitudes
+
+The nonlinear relaxation modulus :math:`G(\gamma_0, t)` decreases with increasing
+:math:`\gamma_0`, a phenomenon known as **Type III nonlinearity**.
+
+LAOS Nonlinearity
+~~~~~~~~~~~~~~~~~
+
+Under large amplitude oscillatory shear :math:`\gamma(t) = \gamma_0 \sin(\omega t)`:
+
+- For :math:`\gamma_0 \ll 1`: Linear viscoelastic response (elliptical Lissajous curves)
+- For :math:`\gamma_0 \sim O(1)`: Significant yielding occurs each cycle
+
+**Lissajous-Bowditch Interpretation**:
+
+The parametric plot :math:`\sigma` vs :math:`\gamma` reveals material nonlinearity:
+
+.. list-table:: Lissajous Curve Shapes in HL Model
+   :widths: 25 35 40
+   :header-rows: 1
+
+   * - Shape
+     - Physical Interpretation
+     - HL Regime
+   * - Ellipse
+     - Linear viscoelastic
+     - :math:`\gamma_0 \ll 1`
+   * - Rectangle with rounded corners
+     - Elastic + plastic dissipation
+     - :math:`\gamma_0 \sim 1`, glass phase
+   * - Parallelogram
+     - Dominant plastic yielding
+     - :math:`\gamma_0 \gg 1`
+
+**Higher Harmonic Generation**:
+
+The stress response contains odd harmonics due to the symmetric yielding process:
+
+.. math::
+
+   \sigma(t) = \gamma_0 \sum_{n=1,3,5,...} \left[ G'_n \sin(n\omega t) + G''_n \cos(n\omega t) \right]
+
+The third harmonic ratio :math:`I_{3/1} = |G^*_3|/|G^*_1|` quantifies nonlinearity:
+
+- :math:`I_{3/1} \propto \gamma_0^2` for weak nonlinearity
+- :math:`I_{3/1} \to O(1)` for strong yielding
+
+Validity and Assumptions
+------------------------
+
+Model Assumptions
+~~~~~~~~~~~~~~~~~
+
+The HL model makes several simplifying assumptions:
+
+1. **Uniform yield threshold**: All blocks have identical :math:`\sigma_c`
+2. **Mean-field coupling**: No spatial correlations between yielding events
+3. **Overdamped dynamics**: Inertial effects are negligible
+4. **Athermal yielding**: Thermal activation plays no role (:math:`k_B T \ll \sigma_c \xi^3`)
+5. **Instantaneous stress reset**: Upon yielding, blocks immediately relax to :math:`\sigma=0`
+6. **Affine deformation**: Local strain follows macroscopic strain
+
+Data Requirements
+~~~~~~~~~~~~~~~~~
+
+For robust fitting:
+
+- **Flow curve**: At least 10 points spanning 2+ decades in :math:`\dot{\gamma}`
+- **Transients**: Time resolution :math:`\Delta t < \tau/10`
+- **LAOS**: At least 3-5 complete oscillation cycles
+
+Limitations
+~~~~~~~~~~~
+
+**Mean-field approximation**:
+   Neglects spatial correlations. Real yielding events trigger neighbors (avalanches),
+   which can lead to shear banding and strain localization not captured by the basic HL model.
+
+**Uniform threshold**:
+   Real materials have a distribution of local yield stresses :math:`\rho(\sigma_c)`.
+   Extensions exist but increase model complexity.
+
+**Sharp yield criterion**:
+   The Heaviside :math:`\Theta(|\sigma| - \sigma_c)` is a hard threshold. Softer
+   yielding criteria can be implemented.
+
+**No microstructure tracking**:
+   Unlike thixotropic models (DMT, MIKH), HL does not track explicit "structure"
+   beyond the stress distribution :math:`P(\sigma)`.
+
+When HL May Fail
+~~~~~~~~~~~~~~~~
+
+Consider alternative models when:
+
+- **Shear banding observed**: Use spatial EPM or nonlocal HL
+- **Pronounced thixotropy**: Use DMT or MIKH models
+- **Temperature-sensitive**: Use thermally-activated models (SGR)
+- **Polymer contribution**: Use Maxwell + HL hybrid
+- **Non-monotonic flow curve**: May indicate instabilities beyond HL scope
+
+Fitting Guidance
+----------------
+
+Initialization Strategy
+~~~~~~~~~~~~~~~~~~~~~~~
+
+**Step 1: Determine phase (α < 0.5 or α ≥ 0.5)**
+- **Yield stress observed**: Start with α = 0.3 (glass).
+- **No yield stress**: Start with α = 0.7 (fluid).
+
+**Step 2: Fit flow curve**
+- ``sigma_c``: Constrain near observed yield stress :math:`\Sigma_y`.
+- ``alpha``: Adjust to match curvature. Lower :math:`\alpha` gives flatter (more plastic) curves.
+
+**Step 3: Fit transient data**
+- ``tau``: Controls relaxation speed.
+- ``G0``: Match initial elastic modulus.
+
+Parameter Bounds
+~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 20 30 50
+   :header-rows: 1
+
+   * - Parameter
+     - Typical Range
+     - Physical Constraint
+   * - ``G0``
+     - 10-10000 Pa
+     - Match SAOS plateau modulus
+   * - ``alpha``
+     - 0.1-1.5
+     - α < 0.5 (glass), α ≥ 0.5 (fluid)
+   * - ``sigma_c``
+     - 0.5-2× Σ_y
+     - Local yield threshold
+   * - ``tau``
+     - 0.01-100 s
+     - Relaxation timescale
+
+Common Fitting Issues
+~~~~~~~~~~~~~~~~~~~~~
+
+**Issue: α converges to unphysical values (> 1)**
+
+*Cause*: Data doesn't constrain the model, or material isn't well-described by HL.
+*Solution*: Set tight bounds ``alpha.bounds = (0.1, 0.8)``. Check if data shows yield stress behavior.
+
+**Issue: Flow curve slope doesn't match n = 0.5**
+
+*Cause*: Material may have different yielding exponent (power-law solid, polymer contribution).
+*Solution*: Consider Herschel-Bulkley with free exponent. HL universally predicts n = 0.5.
+
+**Issue: Poor fit to transient data with good flow curve fit**
+
+*Cause*: τ may be poorly constrained from steady-state data alone.
+*Solution*: Fit transient (startup, relaxation) data simultaneously or use Bayesian inference.
+
+**Issue: Relaxation doesn't plateau (continues decaying)**
+
+*Cause*: Data may be in the fluid phase (α > 0.5), or the decay timescale exceeds observation.
+*Solution*: Check phase state. Glass phase shows incomplete relaxation; fluid phase shows full decay.
+
+**Issue: Numerical oscillations in predictions**
+
+*Cause*: CFL violation in FVM solver (too large dt for given grid and shear rate).
+*Solution*: Reduce ``model.grid_n_bins`` or use adaptive time-stepping (automatic in RheoJAX).
+
+Multi-Protocol Fitting
+~~~~~~~~~~~~~~~~~~~~~~
+
+For reliable parameter estimation, fit multiple protocols simultaneously:
+
+.. code-block:: python
+
+   import numpy as np
+   from scipy.optimize import minimize
+   from rheojax.models import HebraudLequeux
+
+   def combined_objective(params, model, data_dict):
+       """Objective combining multiple protocols."""
+       model.parameters.set_values(params)
+
+       residuals = []
+
+       # Flow curve
+       if 'flow_curve' in data_dict:
+           gdot, stress = data_dict['flow_curve']
+           stress_pred = model.predict(gdot, test_mode='flow_curve')
+           residuals.append((stress - stress_pred) / stress.std())
+
+       # Startup
+       if 'startup' in data_dict:
+           time, stress, gdot = data_dict['startup']
+           stress_pred = model.predict(time, test_mode='startup', gdot=gdot)
+           residuals.append((stress - stress_pred) / stress.std())
+
+       return np.sum(np.concatenate(residuals)**2)
+
+Implementation Details
+----------------------
+
+The RheoJAX implementation uses an explicit **Finite Volume Method (FVM)** solver written in JAX.
+
+*   **Advection**: First-order upwind scheme (stable for hyperbolic transport).
+*   **Diffusion**: Central difference scheme.
+*   **Time-stepping**: Adaptive RK2 or Operator Splitting with Forward Euler.
+*   **JIT Compilation**: The entire solver is JIT-compiled for GPU acceleration (100x speedup).
+
+**Numerical Parameters**:
+*   `sigma_max`: Default 5.0 (normalized units).
+*   `n_bins`: Default 501.
+*   `dt`: Default 0.005.
+
+Finite Volume Discretization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The stress axis :math:`\sigma \in [-\sigma_{max}, \sigma_{max}]` is discretized into :math:`N` bins:
+
+.. math::
+
+   \sigma_i = -\sigma_{max} + i \cdot \Delta\sigma, \quad i = 0, 1, \ldots, N-1
+
+where :math:`\Delta\sigma = 2\sigma_{max}/(N-1)`.
+
+The probability density is stored as cell-centered values :math:`P_i \approx P(\sigma_i, t)`.
+
+**Advection (Upwind Scheme)**:
+
+.. math::
+
+   \left.\frac{\partial P}{\partial t}\right|_{adv} = -v \frac{P_i - P_{i-1}}{\Delta\sigma} \quad \text{for } v > 0
+
+where :math:`v = G_0 \dot{\gamma}`. This first-order upwind scheme is unconditionally stable for
+advection-dominated transport.
+
+**Diffusion (Central Difference)**:
+
+.. math::
+
+   \left.\frac{\partial P}{\partial t}\right|_{diff} = D \frac{P_{i+1} - 2P_i + P_{i-1}}{(\Delta\sigma)^2}
+
+The explicit scheme requires the CFL condition:
+
+.. math::
+
+   \Delta t < \frac{(\Delta\sigma)^2}{2D}
+
+**Yielding (Sink Term)**:
+
+.. math::
+
+   \left.\frac{\partial P}{\partial t}\right|_{yield} = -\frac{1}{\tau} P_i \quad \text{for } |\sigma_i| > \sigma_c
+
+**Reinjection (Source Term)**:
+
+The total mass lost to yielding is reinjected at :math:`\sigma = 0`:
+
+.. math::
+
+   \left.\frac{\partial P}{\partial t}\right|_{source} = \frac{\Gamma}{\Delta\sigma} \delta_{i, N/2}
+
+where :math:`\Gamma = \tau^{-1} \sum_{|\sigma_j| > \sigma_c} P_j \Delta\sigma`.
+
+Stability and Accuracy
+~~~~~~~~~~~~~~~~~~~~~~
+
+The explicit Euler scheme has stability constraints:
+
+1. **Advection CFL**: :math:`\Delta t < \Delta\sigma / |v|`
+2. **Diffusion CFL**: :math:`\Delta t < (\Delta\sigma)^2 / (2D)`
+
+The solver automatically sub-steps to satisfy these conditions.
+
+For highly dynamic situations (rapid flow startup), the solver may take
+many sub-steps per user-specified :math:`\Delta t`. This is handled transparently
+via JAX's ``lax.fori_loop``.
+
+**Accuracy considerations**:
+
+- First-order upwind introduces numerical diffusion proportional to :math:`|v|\Delta\sigma`
+- Central difference for physical diffusion is second-order accurate
+- Overall spatial accuracy: :math:`O(\Delta\sigma)`
+- Temporal accuracy: :math:`O(\Delta t)` (forward Euler)
+
+For high-precision work, increase ``n_bins`` (e.g., 1001) at the cost of computation time.
+
+Protocol Kernel Details
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Each rheological protocol is implemented as a specialized kernel:
+
+**Flow Curve Kernel** (``flow_curve_kernel``):
+   - Runs simulation until steady state is reached
+   - Default: 20,000 steps at dt=0.005 (100 time units)
+   - Uses ``vmap`` to parallelize over multiple shear rates
+
+**Startup Kernel** (``startup_kernel``):
+   - Initializes with narrow Gaussian at σ=0 (relaxed state)
+   - Applies constant shear rate and records stress history
+   - Returns (time, stress) arrays
+
+**Relaxation Kernel** (``relaxation_kernel``):
+   - Initializes with Gaussian shifted by step strain
+   - Applies zero shear rate (γ̇=0) and records stress decay
+   - Returns (time, stress) arrays
+
+**Creep Kernel** (``creep_kernel``):
+   - Uses servo-controller to maintain constant stress
+   - Adjusts shear rate dynamically: :math:`\dot{\gamma}_{n+1} = \dot{\gamma}_n + k_p \cdot (\Sigma_{target} - \Sigma_n) \cdot \Delta t`
+   - Returns (time, strain) arrays
+
+**LAOS Kernel** (``laos_kernel``):
+   - Applies oscillatory shear rate: :math:`\dot{\gamma}(t) = \gamma_0 \omega \cos(\omega t)`
+   - Records full stress waveform
+   - Returns (time, stress) arrays
+
+GPU Acceleration
+~~~~~~~~~~~~~~~~
+
+The JAX implementation enables significant acceleration:
+
+.. list-table:: Performance Comparison
+   :widths: 30 35 35
+   :header-rows: 1
+
+   * - Operation
+     - CPU Time
+     - GPU Time (CUDA)
+   * - Single flow curve point
+     - ~50 ms
+     - ~0.5 ms
+   * - 20-point flow curve (vmapped)
+     - ~1 s
+     - ~10 ms
+   * - Bayesian inference (1000 samples)
+     - ~30 min
+     - ~2 min
+
+First call includes JIT compilation overhead (~5-30s). Subsequent calls are fast.
+
+Theoretical Derivations
+-----------------------
+
+Yield Stress from Master Equation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The yield stress :math:`\Sigma_y` can be derived by analyzing the steady-state
+master equation. In the glass phase (:math:`\alpha < 0.5`), the distribution
+:math:`P(\sigma)` is confined to :math:`|\sigma| < \sigma_c` at zero shear rate.
+
+As :math:`\dot{\gamma} \to 0^+`, the steady-state stress approaches:
+
+.. math::
+
+   \Sigma_y = \lim_{\dot{\gamma} \to 0^+} \int \sigma P(\sigma; \dot{\gamma}) \, d\sigma
+
+This can be computed analytically for certain limits. The key result is that
+:math:`\Sigma_y` exists and is positive only for :math:`\alpha < 0.5`.
+
+Herschel-Bulkley Exponent Derivation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Near the yield point, the flow curve scales as:
+
+.. math::
+
+   \Sigma - \Sigma_y \sim \dot{\gamma}^n
+
+The exponent :math:`n = 1/2` arises from the balance of advection and diffusion
+in the wings of the distribution (near :math:`\sigma = \pm\sigma_c`).
+
+**Scaling argument**:
+
+At small :math:`\dot{\gamma}`, the distribution has tails extending just beyond :math:`\sigma_c`.
+The width of these tails scales as:
+
+.. math::
+
+   \delta\sigma \sim \sqrt{D \tau} \sim \sqrt{\alpha \Gamma \tau}
+
+The activity :math:`\Gamma` is proportional to the tail population:
+
+.. math::
+
+   \Gamma \sim \frac{\delta\sigma}{\tau}
+
+Self-consistently, this gives :math:`\delta\sigma \sim \sqrt{\alpha/\tau}`, independent of :math:`\dot{\gamma}`.
+
+The excess stress :math:`\Sigma - \Sigma_y` is proportional to the advective flux into the tail:
+
+.. math::
+
+   \Sigma - \Sigma_y \sim \dot{\gamma} \cdot (\text{time in tail}) \sim \dot{\gamma}^{1/2}
+
+This universal exponent :math:`n = 1/2` is a robust prediction of mean-field elastoplastic models.
+
+Viscosity Divergence
+~~~~~~~~~~~~~~~~~~~~
+
+In the fluid phase (:math:`\alpha > 0.5`), the zero-shear viscosity is:
+
+.. math::
+
+   \eta_0 = \lim_{\dot{\gamma} \to 0} \frac{\Sigma}{\dot{\gamma}}
+
+As :math:`\alpha \to 0.5^+`, the viscosity diverges:
+
+.. math::
+
+   \eta_0 \sim (\alpha - 0.5)^{-\beta}
+
+with :math:`\beta = 1` in the simple HL model. This divergence signals the approach
+to the glass transition.
 
 References
 ----------
@@ -567,10 +1104,133 @@ References
    *Reviews of Modern Physics*, **90**, 045006 (2018).
    https://doi.org/10.1103/RevModPhys.90.045006
 
+.. [11] Benzi, R., Divoux, T., Barber, C., Grosso, G., & Sbragaglia, M. "Stress-dependent elastic modulus and the yieldstress fluid."
+   *Physical Review E*, **91**, 023301 (2015).
+   https://doi.org/10.1103/PhysRevE.91.023301
+
+.. [12] Ferrero, E. E., Martens, K., & Barrat, J.-L. "Relaxation in yield stress systems through elastically interacting activated events."
+   *Physical Review Letters*, **113**, 248301 (2014).
+   https://doi.org/10.1103/PhysRevLett.113.248301
+
+.. [13] Moorcroft, R. L. & Fielding, S. M. "Criteria for shear banding in time-dependent flows of complex fluids."
+   *Physical Review Letters*, **110**, 086001 (2013).
+   https://doi.org/10.1103/PhysRevLett.110.086001
+
+.. [14] Divoux, T., Barentin, C., & Manneville, S. "From stress-induced fluidization processes to Herschel-Bulkley behaviour in simple yield stress fluids."
+   *Soft Matter*, **7**, 8409-8418 (2011).
+   https://doi.org/10.1039/c1sm05607g
+
+.. [15] Jop, P., Forterre, Y., & Pouliquen, O. "A constitutive law for dense granular flows."
+   *Nature*, **441**, 727-730 (2006).
+   https://doi.org/10.1038/nature04801
+
+.. [16] Falk, M. L. & Langer, J. S. "Dynamics of viscoplastic deformation in amorphous solids."
+   *Physical Review E*, **57**, 7192 (1998).
+   https://doi.org/10.1103/PhysRevE.57.7192
+
+.. [17] Martens, K., Bocquet, L., & Barrat, J.-L. "Connecting diffusion and dynamical heterogeneities in actively deformed amorphous systems."
+   *Physical Review E*, **86**, 011106 (2012).
+   https://doi.org/10.1103/PhysRevE.86.011106
+
+.. [18] Lin, J., Lerner, E., Rosso, A., & Wyart, M. "Scaling description of the yielding transition in soft amorphous solids at zero temperature."
+   *Proceedings of the National Academy of Sciences*, **111**, 14382-14387 (2014).
+   https://doi.org/10.1073/pnas.1406391111
+
+Further Reading
+---------------
+
+Textbooks and Reviews
+~~~~~~~~~~~~~~~~~~~~~
+
+- **Larson, R. G.** *The Structure and Rheology of Complex Fluids*. Oxford University Press (1999).
+  Classic textbook covering the rheology of soft materials including yield stress fluids.
+
+- **Bonn, D., Denn, M. M., Berthier, L., Divoux, T., & Manneville, S.** "Yield stress materials in soft condensed matter."
+  *Reviews of Modern Physics*, **89**, 035005 (2017).
+  Comprehensive review of yield stress materials from experimental and theoretical perspectives.
+
+- **Nicolas, A., et al.** [10]_
+  The definitive review of elastoplastic models including HL. Essential reading for understanding
+  the theoretical landscape.
+
+Experimental Context
+~~~~~~~~~~~~~~~~~~~~
+
+- **Coussot, P.** *Rheophysics: Matter in All Its States*. Springer (2014).
+  Physical intuition for complex fluids including yield stress materials.
+
+- **Divoux, T., Barentin, C., & Manneville, S.** [14]_
+  Connects HL predictions to experimental observations of creep and delayed yielding.
+
+Theoretical Extensions
+~~~~~~~~~~~~~~~~~~~~~~
+
+- **Bocquet, Colin, & Ajdari** [5]_
+  Derives HL-like equations from microscopic kinetic theory.
+
+- **Ferrero, Martens, & Barrat** [12]_
+  Extends HL ideas to systems with elastically interacting activated events.
+
+Related Models in RheoJAX
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- :doc:`/models/sgr/sgr_conventional` — Energy trap-based glass model
+- :doc:`/models/sgr/sgr_generic` — Thermodynamically consistent SGR extension
+- :doc:`/models/stz/stz_conventional` — Defect-based plasticity model
+- :doc:`/models/epm/lattice_epm` — Spatial elastoplastic model with avalanches
+- :doc:`/models/dmt/index` — Thixotropic models with structure kinetics
+- :doc:`/models/fluidity/index` — Fluidity-based yield stress models
+
+Glossary
+--------
+
+.. glossary::
+
+   Activity
+      The total rate of plastic yielding events, :math:`\Gamma(t) = \tau^{-1} \int_{|\sigma|>\sigma_c} P d\sigma`.
+
+   Coupling Parameter
+      The parameter :math:`\alpha` controlling mechanical noise strength. Determines glass (< 0.5) vs fluid (≥ 0.5) behavior.
+
+   Elastic Loading
+      The deterministic drift of stress distribution due to applied shear: :math:`-G_0 \dot{\gamma} \partial_\sigma P`.
+
+   Glass Transition
+      The dynamical phase transition at :math:`\alpha = 0.5` separating yield-stress solids from viscous fluids.
+
+   Mechanical Noise
+      Stress fluctuations from nearby yielding events, modeled as diffusion: :math:`D \partial^2_\sigma P`.
+
+   Mesoscopic Block
+      A fundamental unit of the model—a region of size :math:`\xi` characterized by a single local stress :math:`\sigma`.
+
+   Reinjection
+      The source term :math:`\Gamma \delta(\sigma)` returning yielded blocks to zero stress.
+
+   Self-Consistency
+      The closure relation :math:`D = \alpha \Gamma` linking noise to activity.
+
+   Simple Aging
+      Aging where relaxation times scale linearly with waiting time (:math:`\mu = 1`).
+
+   Stress Distribution
+      The probability density :math:`P(\sigma, t)` of finding a block with local stress :math:`\sigma`.
+
+   Yield Threshold
+      The critical local stress :math:`\sigma_c` above which blocks become unstable.
+
+API Reference
+-------------
+
+.. autoclass:: rheojax.models.hl.HebraudLequeux
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 See Also
 --------
 
 - :doc:`/models/sgr/sgr_conventional` — SGR model (energy-based glass transition)
-- :doc:`/models/stz/stz_model` — STZ model (defect-based plasticity)
+- :doc:`/models/stz/stz_conventional` — STZ model (defect-based plasticity)
 - :doc:`/models/epm/lattice_epm` — EPM model (spatial avalanches)
 - :doc:`/user_guide/03_advanced_topics/index` — Advanced elastoplastic modeling

@@ -372,6 +372,93 @@ Oscillatory Shear (SAOS and LAOS)
    - At high amplitudes: Cooperativity homogenizes flow
    - Higher harmonics in stress response
 
+Timescale Hierarchy and Regime Classification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The transient behavior of the nonlocal fluidity model is governed by the competition
+between two characteristic timescales:
+
+**Characteristic Timescales:**
+
+1. **Thixotropic time** :math:`\theta` (reorganization time):
+
+   - Timescale for local fluidity to relax toward :math:`f_{\rm loc}(\sigma)`
+   - Governs how fast the microstructure responds to stress changes
+   - Typical values: :math:`\theta \sim 0.1-100` s
+
+2. **Diffusion time** :math:`t_{\rm diff} = H^2/\xi^2`:
+
+   - Timescale for fluidity gradients to homogenize across the gap
+   - Derived from the diffusivity :math:`D_f = \xi^2/\theta` acting over distance :math:`H`
+   - Note: The intrinsic diffusion time is :math:`H^2/(D_f) = \theta \cdot (H/\xi)^2`
+
+3. **Observation timescale** :math:`t_{\rm obs}`:
+
+   - Protocol-dependent: startup time, oscillation period :math:`2\pi/\omega`, creep duration
+   - Determines which physical processes are observable
+
+**Dimensionless Control Parameter:**
+
+The ratio of diffusion to thixotropic timescales controls the spatial character:
+
+.. math::
+
+   \text{Péclet-like number:} \quad \text{Pe}_\xi = \frac{t_{\rm diff}}{t_{\rm thixo}} = \frac{H^2/\xi^2}{\theta} \cdot \theta = \left(\frac{H}{\xi}\right)^2
+
+More precisely, the relevant ratio for a given observation time is:
+
+.. math::
+
+   \alpha = \frac{\theta \cdot \xi^2}{H^2} = \frac{D_f \cdot \theta}{H^2}
+
+**Regime Classification:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 35 45
+
+   * - Regime
+     - Condition
+     - Physical Behavior
+   * - **Thixotropy-dominated**
+     - :math:`\theta \ll H^2/\xi^2`
+     - Local relaxation faster than diffusion. Fluidity responds locally;
+       spatial gradients build up and persist. Approaches local model behavior.
+   * - **Diffusion-dominated**
+     - :math:`\theta \gg H^2/\xi^2`
+     - Diffusion faster than local relaxation. Fluidity homogenizes rapidly;
+       quasi-uniform :math:`f(y) \approx \bar{f}` across gap.
+   * - **Coupled dynamics**
+     - :math:`\theta \sim H^2/\xi^2`
+     - Full PDE dynamics required. Complex spatiotemporal patterns during
+       transients. Shear bands form and evolve.
+
+**Practical Implications:**
+
+For a typical experiment with :math:`\xi = 50` μm and :math:`H = 1` mm:
+
+.. math::
+
+   \left(\frac{H}{\xi}\right)^2 = \left(\frac{1\text{ mm}}{50\text{ μm}}\right)^2 = 400
+
+- If :math:`\theta = 1` s: Diffusion time :math:`\sim 400` s → thixotropy dominates on short timescales
+- If :math:`\theta = 100` s: Diffusion time :math:`\sim 400` s → coupled regime
+- If :math:`\theta = 1000` s: Still thixotropy-dominated but approaching coupled behavior
+
+**Protocol-Specific Considerations:**
+
+- **Startup at :math:`t \ll \theta`**: Fluidity evolves locally; spatial gradients from
+  initial conditions persist. Wall nucleation of yielding visible.
+
+- **Startup at :math:`t \gg H^2/\xi^2`**: Fluidity has homogenized; flow approaches
+  local model prediction with enhanced apparent fluidity.
+
+- **Oscillatory at :math:`\omega \gg \xi^2/H^2`**: Fluidity cannot follow oscillations;
+  frozen heterogeneous profile from previous history.
+
+- **Oscillatory at :math:`\omega \ll 1/\theta`**: Fluidity tracks stress quasi-statically;
+  approaches local equilibrium each cycle.
+
 ----
 
 Numerical Implementation
@@ -528,6 +615,125 @@ Material Classification
      - Microscale cooperativity
      - Dense colloidal glasses, molecular gels
      - Weak confinement (bulk-like at macro scale)
+
+Confinement Effects and ξ Extraction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the gap width :math:`H` becomes comparable to the cooperativity length :math:`\xi`,
+strong confinement effects emerge that modify both the apparent yield stress and the
+overall flow behavior. These effects provide a direct route to measuring :math:`\xi`
+experimentally.
+
+**Confinement Scaling Laws:**
+
+The apparent yield stress depends on the confinement ratio :math:`H/\xi`:
+
+.. math::
+
+   \sigma_{y,\text{app}}(H) = \sigma_{y,\text{bulk}} \cdot g\left(\frac{H}{\xi}\right)
+
+where the scaling function :math:`g(x)` captures the crossover:
+
+- :math:`H/\xi \gg 1` (bulk limit): :math:`g \to 1`, recovers intrinsic yield stress
+- :math:`H/\xi \sim 1` (strong confinement): :math:`g < 1`, reduced apparent yield
+- :math:`H/\xi \ll 1` (fully cooperative): Flow approaches plug-like (no true yielding)
+
+A practical approximation for intermediate confinement:
+
+.. math::
+
+   \sigma_{y,\text{app}}(H) \approx \sigma_{y,\text{bulk}} \left(1 - c\frac{\xi}{H}\right)
+
+where :math:`c \approx 1-2` is a geometry-dependent constant.
+
+**Flow Curve Modification:**
+
+The full flow curve is modified in confinement. At fixed global shear rate
+:math:`\bar{\dot{\gamma}}`, the measured stress :math:`\Sigma` deviates from
+bulk predictions when :math:`H \lesssim 10\xi`:
+
+.. math::
+
+   \Sigma(H) = \frac{\bar{\dot{\gamma}}}{\bar{f}(H)}
+
+where the gap-averaged fluidity :math:`\bar{f}(H)` exceeds the local (bulk) value
+due to enhanced fluidity at walls and boundary layers of thickness :math:`\sim \xi`.
+
+**Experimental Protocol for ξ Extraction:**
+
+1. **Multi-gap measurements**: Acquire steady-state flow curves at 3-5 gap widths
+   spanning :math:`H = 0.1-10` mm (or :math:`H/\xi \approx 1-100`)
+
+2. **Extract apparent yield stress**: For each gap, fit the low-shear plateau or
+   use extrapolation (e.g., from :math:`\sigma(\dot{\gamma} \to 0)`)
+
+3. **Plot** :math:`\sigma_{y,\text{app}}` vs. :math:`1/H`:
+
+   .. code-block:: python
+
+      import numpy as np
+      from scipy.optimize import curve_fit
+
+      # Data: gap widths (m) and apparent yield stresses (Pa)
+      H_values = np.array([0.1e-3, 0.3e-3, 0.5e-3, 1e-3, 5e-3])
+      sigma_y_app = np.array([45, 52, 58, 63, 68])
+
+      # Fit: σ_y,app = σ_y,bulk * (1 - c*ξ/H)
+      def confinement_model(H, sigma_bulk, c_xi):
+          return sigma_bulk * (1 - c_xi / H)
+
+      popt, _ = curve_fit(confinement_model, H_values, sigma_y_app,
+                          p0=[70, 50e-6], bounds=([0, 0], [200, 1e-3]))
+      sigma_y_bulk, c_times_xi = popt
+      xi_estimate = c_times_xi / 1.5  # Assuming c ≈ 1.5 for Couette
+      print(f"Bulk yield stress: {sigma_y_bulk:.1f} Pa")
+      print(f"Cooperativity length: {xi_estimate*1e6:.1f} μm")
+
+4. **Validate**: Compare extracted :math:`\xi` with particle/droplet size
+   (expect :math:`\xi \approx 3-10 \times d`)
+
+**Typical ξ Values by Material:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 25 25 15
+
+   * - Material
+     - Particle/Droplet Size
+     - Expected ξ
+     - ξ/d Ratio
+   * - Concentrated emulsions
+     - 1-20 μm
+     - 5-100 μm
+     - 3-5
+   * - Colloidal glasses
+     - 0.1-1 μm
+     - 0.5-5 μm
+     - 3-10
+   * - Microgels (Carbopol)
+     - 1-10 μm
+     - 5-50 μm
+     - 3-8
+   * - Foams
+     - 50-500 μm
+     - 200-2000 μm
+     - 3-5
+
+**Geometric Considerations:**
+
+The scaling function :math:`g(H/\xi)` and constant :math:`c` depend on geometry:
+
+- **Planar channel (parallel plates)**: Stress is exactly uniform; :math:`c \approx 1-2`
+- **Cylindrical Couette**: Curvature introduces stress gradient :math:`\sigma \propto 1/r^2`.
+  For narrow gaps (:math:`(R_o - R_i)/R_i \ll 1`), planar approximation is valid.
+  For wide gaps, explicit curvature corrections are needed.
+- **Curvature threshold**: Curvature matters when :math:`(R_o - R_i)/R_i > 0.1`
+
+.. note::
+
+   When using Couette geometry with significant curvature, the stress varies across
+   the gap by :math:`\Delta\sigma/\sigma \approx 2(R_o - R_i)/R_i`. For accurate
+   :math:`\xi` extraction, either use narrow-gap approximation or full 2D modeling.
 
 ----
 

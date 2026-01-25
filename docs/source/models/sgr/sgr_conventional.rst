@@ -47,6 +47,36 @@ The SGR model was developed by Sollich and coworkers [1]_ [2]_ based on Bouchaud
 Historical Context
 ~~~~~~~~~~~~~~~~~~
 
+The Soft Glassy Rheology model emerged from the intersection of statistical physics and rheology in the late 1990s. The model represents a remarkable theoretical achievement: capturing the collective phenomenon of the glass transition within an essentially single-particle description.
+
+**Origins in Bouchaud's Trap Model**
+
+The SGR model is based upon Bouchaud's trap model of structural glasses [26]_, developed in the early 1990s to describe aging phenomena in disordered systems. Bouchaud's key insight was that the combination of:
+
+1. An exponential distribution of trap depths :math:`\rho(E) = e^{-E}`
+2. Arrhenius-activated hopping dynamics :math:`\tau(E) = \tau_0 e^{E/x}`
+
+is sufficient to produce a genuine dynamical phase transition—a glass transition—at :math:`x = x_g = 1`. The exponential form and activated hopping should be viewed *jointly* as a tactic that allows glassy dynamics to be modeled in the simplest possible way [11]_ [12]_.
+
+**Connection to Spin Glass Mean-Field Theories**
+
+The effective noise temperature :math:`x` has deep connections to theories of out-of-equilibrium systems with slow dynamics. Cugliandolo and Kurchan [26]_ showed that similar "macroscopic" effective temperatures, which remain nonzero even as :math:`k_B T \to 0`, arise naturally in mean-field spin glass models. In these systems, the effective temperature governs the fluctuation-dissipation relation for slow degrees of freedom, just as :math:`x` does in the SGR model.
+
+**Evolution of the "Noise Temperature" Concept**
+
+The parameter :math:`x` was originally introduced as an effective "noise temperature" to capture the athermal fluctuations in soft materials—energy releases from neighboring rearrangements that activate hopping even when thermal energy :math:`k_B T` is negligible compared to barrier heights :math:`E`. Whether it is fully consistent to have :math:`x \gg k_B T` was initially debated [11]_ [12]_, but subsequent thermodynamic analyses [15]_ have established that :math:`x` can be rigorously interpreted as the true nonequilibrium thermodynamic temperature of the slow configurational degrees of freedom (see :doc:`sgr_generic` for the GENERIC framework treatment).
+
+**Key Publications Timeline**
+
+- **1992**: Bouchaud introduces the trap model for aging in disordered systems [34]_
+- **1997**: Sollich, Lequeux, Hébraud & Cates propose the SGR model [1]_
+- **1998**: Sollich derives the full constitutive equations [2]_
+- **2000**: Fielding, Sollich & Cates provide comprehensive aging analysis [19]_
+- **2004**: Cates & Sollich extend to tensorial formulation [20]_
+- **2012**: Sollich & Cates establish thermodynamic interpretation [15]_
+
+**Soft Glassy Materials**
+
 Soft glassy materials (SGMs) encompass a wide class of substances with an unusual combination of material properties:
 
 - **Foams** (shaving cream, bread dough)
@@ -140,6 +170,26 @@ The distinction from simple transients:
 
 Physical Foundations
 --------------------
+
+Thermodynamic Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Recent work [15]_ has provided a rigorous thermodynamic foundation for the SGR model, interpreting the effective noise temperature :math:`x` as the true nonequilibrium thermodynamic temperature :math:`\chi` of the slow configurational degrees of freedom.
+
+The material is conceptualized as two weakly interacting subsystems:
+1. **Configurational subsystem (slow)**: Describes the arrangement of mesoscopic elements in the energy landscape. Its temperature is :math:`\chi = x`.
+2. **Kinetic-vibrational subsystem (fast)**: Describes fast motion within traps. Its temperature is the bath temperature :math:`\theta` (typically room temperature).
+
+In this framework, the SGR equation of motion ensures that the second law of thermodynamics (non-negative entropy production) is satisfied if and only if the noise temperature :math:`x` is identified with the configurational temperature :math:`\chi`.
+
+**Key Implication:**
+The evolution of :math:`x` is not arbitrary but governed by the first law of thermodynamics for the configurational subsystem:
+
+.. math::
+
+   C_V^{\text{eff}} \dot{\chi} = W + A(\theta - \chi)
+
+where :math:`W` is the rate of work done on the configurational degrees of freedom (dissipated power), and :math:`A` describes heat transfer coupling to the thermal bath. This constrains extensions of the SGR model where :math:`x` varies with time or flow rate.
 
 Mesoscopic Trap Model
 ~~~~~~~~~~~~~~~~~~~~~
@@ -308,6 +358,106 @@ The structure of the constitutive equations reveals the contributions to macrosc
 
 Probability conservation ensures the two terms sum to the total contribution from all elements.
 
+Microscopic Derivation: The Birth-Death Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The SGR constitutive equations can be derived systematically from a microscopic
+master equation describing the dynamics of individual mesoscopic elements. This
+**birth-death interpretation** provides physical insight into the model's structure
+and connects it to the underlying trap dynamics.
+
+**Master Equation for Element Dynamics**
+
+Consider the probability :math:`P(l, E, t)` that an element has local strain :math:`l`
+and trap depth :math:`E` at time :math:`t`. Under affine deformation (strain rate :math:`\dot{\gamma}`),
+elements advect with the macroscopic strain while stochastically yielding:
+
+.. math::
+
+   \frac{\partial P}{\partial t} + \dot{\gamma} \frac{\partial P}{\partial l}
+   = -\Gamma(l, E) P(l, E, t) + Y(t) \rho(E) \delta(l)
+
+where:
+
+- :math:`\Gamma(l, E) = \tau_0^{-1} \exp\left(-E/x + l^2/(2x)\right)` is the strain-enhanced escape rate
+- :math:`Y(t) = \int dE \int dl \, \Gamma(l, E) P(l, E, t)` is the total yielding rate
+- :math:`\rho(E) \delta(l)` represents elements "born" in new traps with zero local strain
+
+The first term on the right represents **deaths** (elements escaping their traps),
+while the second term represents **births** (elements falling into new traps).
+
+**Derivation of the Constitutive Form**
+
+Integrating along characteristics (following elements in strain space), the formal solution
+for elements that last yielded at time :math:`t'` is:
+
+.. math::
+
+   P(l, E, t | t') = Y(t') \rho(E) \exp\left[-\int_{t'}^{t} \Gamma(\gamma(t'') - \gamma(t'), E) \, dt''\right]
+   \delta\bigl(l - [\gamma(t) - \gamma(t')]\bigr)
+
+The probability that such an element has *not* yielded by time :math:`t` is:
+
+.. math::
+
+   G_\rho(Z(t, t')) = \int_0^\infty \rho(E) \exp\left(-\frac{Z(t, t')}{\tau(E)}\right) dE
+
+where :math:`Z(t, t') = \int_{t'}^{t} \exp\bigl([\gamma(t'') - \gamma(t')]^2/(2x)\bigr) dt''`
+is the effective (strain-accelerated) time.
+
+Summing over all "birth cohorts"—elements born at each time :math:`t'`—recovers the
+integral constitutive equation:
+
+.. math::
+
+   \sigma(t) = \gamma(t) G_0(Z(t, 0)) + \int_0^t [\gamma(t) - \gamma(t')] Y(t') G_\rho(Z(t, t')) \, dt'
+
+**Explicit Forms for Trap Survival Functions**
+
+For the standard exponential trap distribution :math:`\rho(E) = \exp(-E)` (setting :math:`x_g = 1`):
+
+.. math::
+
+   G_\rho(z) &= \int_0^\infty e^{-E} \exp(-z e^{-E/x}) \, dE
+
+            &= x \, z^{-x} \, \gamma(x, z)
+
+where :math:`\gamma(s, z) = \int_0^z t^{s-1} e^{-t} dt` is the lower incomplete gamma function.
+
+For large effective times (:math:`z \gg 1`):
+
+.. math::
+
+   G_\rho(z) \sim x \, \Gamma(x) \, z^{-x}
+
+This **power-law tail** is the essential feature responsible for aging dynamics and
+power-law rheology.
+
+**Initial Distribution Effects**
+
+The function :math:`G_0(z)` depends on the initial trap distribution :math:`P_0(E)` at sample preparation.
+Common choices include:
+
+1. **Equilibrated at high** :math:`x`: :math:`P_0(E) \propto \rho(E) e^{E/x_{\text{init}}}` truncated
+   to ensure normalizability
+
+2. **δ-function** (elements start in identical traps): :math:`P_0(E) = \delta(E - E_0)`, giving
+   :math:`G_0(z) = \exp(-z/\tau_0 e^{E_0/x})`
+
+3. **Random history** (uniform in :math:`\tau`): :math:`P_0(E) = x \rho(E)/\tau(E)`, which for
+   :math:`x > 1` gives the equilibrium distribution
+
+The choice of :math:`P_0(E)` affects early-time transients but not the long-time aging behavior,
+which is governed by :math:`G_\rho(z)`.
+
+.. note:: **Birth-Death vs. Population Balance**
+
+   The birth-death formulation is mathematically equivalent to a population balance
+   approach where one tracks :math:`n(E, t) dE` = number of elements in traps of depth
+   :math:`E` to :math:`E + dE`. The birth-death language emphasizes the renewal process
+   that is central to SGR dynamics: elements are continually recycled through the
+   trap distribution, with no memory of their previous history.
+
 Linear Response Regime
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -356,6 +506,94 @@ This is the hallmark of power-law rheology—the phase angle :math:`\delta = \pi
 - Infinite zero-shear viscosity: :math:`\eta = \lim_{\omega \to 0} G''(\omega)/\omega = \infty`
 - Flow curves are shear-thinning with :math:`\sigma/\dot{\gamma}` decreasing as :math:`\dot{\gamma}` increases
 
+Relaxation Spectrum and Integral Transforms
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The viscoelastic response of the SGR model can be connected to a **continuous relaxation
+spectrum** :math:`H(\tau)`, which provides physical insight into the distribution of
+relaxation processes.
+
+**Relaxation Spectrum Definition**
+
+The storage and loss moduli are related to the relaxation spectrum by:
+
+.. math::
+
+   G'(\omega) &= G_e + \int_0^\infty H(\tau) \frac{(\omega\tau)^2}{1 + (\omega\tau)^2} \, d\ln\tau
+
+   G''(\omega) &= \int_0^\infty H(\tau) \frac{\omega\tau}{1 + (\omega\tau)^2} \, d\ln\tau
+
+where :math:`G_e` is the equilibrium modulus (zero for fluids).
+
+**SGR Relaxation Spectrum for 1 < x < 2**
+
+For equilibrated SGR in the power-law fluid regime, the relaxation spectrum has the form:
+
+.. math::
+
+   H(\tau) = G_0 \frac{\sin(\pi(x-1))}{\pi} \left(\frac{\tau}{\tau_0}\right)^{x-2}
+
+This **power-law spectrum** with exponent :math:`x - 2` directly produces the
+power-law moduli :math:`G' \sim G'' \sim \omega^{x-1}`.
+
+**Physical Interpretation**
+
+The spectrum :math:`H(\tau) \propto \tau^{x-2}` arises from the exponential trap distribution
+:math:`\rho(E) \propto e^{-E}` and activated hopping :math:`\tau(E) = \tau_0 e^{E/x}`:
+
+.. math::
+
+   H(\tau) \, d\ln\tau \propto \rho(E(tau)) \, \frac{dE}{d\ln\tau} = x \rho(E) \propto \tau^{x-1} \cdot \tau^{-1} = \tau^{x-2}
+
+This derivation shows why the exponent in :math:`H(\tau)` differs from that in :math:`G'(\omega)` by unity.
+
+**Asymptotic Forms**
+
+.. list-table:: Frequency Asymptotes for SGR (x > 1)
+   :widths: 20 40 40
+   :header-rows: 1
+
+   * - Limit
+     - :math:`G'(\omega)`
+     - :math:`G''(\omega)`
+   * - :math:`\omega \to 0`
+     - :math:`G_0 \Gamma(1-x) \cos(\pi(x-1)/2) \, (\omega\tau_0)^{x-1}`
+     - :math:`G_0 \Gamma(1-x) \sin(\pi(x-1)/2) \, (\omega\tau_0)^{x-1}`
+   * - :math:`\omega \to \infty`
+     - :math:`G_0 \left[1 - \Gamma(1-x) \cos(\pi(x-1)/2) \, (\omega\tau_0)^{x-1}\right]`
+     - :math:`G_0 \Gamma(1-x) \sin(\pi(x-1)/2) \, (\omega\tau_0)^{x-1}`
+   * - :math:`x \to 2^-`
+     - :math:`G_0 (\omega\tau_0)^2 / [1 + (\omega\tau_0)^2]` (Maxwell)
+     - :math:`G_0 \omega\tau_0 / [1 + (\omega\tau_0)^2]`
+
+**Special Cases**
+
+For :math:`x = 2` (Newtonian limit), the relaxation spectrum degenerates to a single mode:
+
+.. math::
+
+   H(\tau) \to G_0 \, \delta(\ln\tau - \ln\tau_0)
+
+recovering the Maxwell model with relaxation time :math:`\tau_0`.
+
+For :math:`x < 1` (glass phase), the relaxation spectrum interpretation breaks down because
+there is no equilibrium state. Instead, the response must be described by the full two-time
+correlation function :math:`G(t, t_w)` including explicit aging.
+
+**Kramers-Kronig Relations**
+
+Since :math:`G^*(\omega)` is analytic in the upper half-plane, :math:`G'` and :math:`G''`
+satisfy the Kramers-Kronig relations:
+
+.. math::
+
+   G'(\omega) - G_\infty &= -\frac{2}{\pi} \mathcal{P} \int_0^\infty \frac{\omega' G''(\omega')}{\omega'^2 - \omega^2} \, d\omega'
+
+   G''(\omega) &= \frac{2\omega}{\pi} \mathcal{P} \int_0^\infty \frac{G'(\omega') - G_\infty}{\omega'^2 - \omega^2} \, d\omega'
+
+These provide a consistency check for SGR predictions and can be used to verify experimental
+data quality.
+
 ----
 
 Rheological Aging: Strain-Controlled Experiments
@@ -372,7 +610,7 @@ Following a quench (sudden reduction of :math:`x` from a large value to :math:`x
 
    P(E, t) = P_0(E) \exp[-t/\tau(E)] + \int_0^t Y(t') \rho(E) \exp[-(t - t')/\tau(E)] \, dt'
 
-with :math:`\tau(E) = \exp(E/x)`. Equivalently, the lifetime distribution :math:`P(\tau, t_w)` at waiting time :math:`t_w`:
+with :math:`\tau(E) = \exp(E/x)`. Equivalently, the lifetime distribution :math:`P(\tau, t_w)` at waiting time :math:`t_w` scales as:
 
 .. math::
 
@@ -412,6 +650,106 @@ At large :math:`t_w`, the short-time regime accounts for more of the decay, and 
 
 The major part of the decay of :math:`G` occurs on a timescale of order :math:`t_w` itself. The SGR model shows the simplest kind of aging: a single aging timescale directly proportional to :math:`t_w`.
 
+Simple vs Complex Aging
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The SGR model exhibits what is called **simple aging**: the waiting time :math:`t_w` enters
+observables only through a mapping to an effective time scale. This is distinct from
+**complex aging** where :math:`t_w` appears explicitly in the functional form of responses.
+
+**Characteristics of Simple Aging in SGR**
+
+In simple aging, the two-time response function :math:`R(t, t_w)` can be written as:
+
+.. math::
+
+   R(t, t_w) = t_w^{-a} \, \mathcal{R}\left(\frac{t - t_w}{t_w}\right)
+
+where :math:`\mathcal{R}(u)` is a universal scaling function and :math:`a` depends on the
+observable. The key features are:
+
+1. **Single timescale**: The characteristic relaxation time scales as :math:`t_w` (or :math:`t_w^\mu` more generally)
+2. **Universal scaling**: Responses at different :math:`t_w` collapse when plotted vs :math:`(t-t_w)/t_w`
+3. **Age factorization**: The :math:`t_w`-dependence factorizes out of the scaling function
+
+For the SGR step strain response with :math:`x < 1`:
+
+.. math::
+
+   G(t - t_w, t_w) = \mathcal{G}\left(\frac{t - t_w}{t_w}\right)
+
+The function :math:`\mathcal{G}(u)` is :math:`t_w`-independent, exemplifying simple aging.
+
+**The μ-Exponent**
+
+The **aging exponent** :math:`\mu` characterizes how the effective relaxation time grows with age:
+
+.. math::
+
+   \tau_{\text{eff}} \propto t_w^\mu
+
+.. list-table:: Aging Exponents in SGR
+   :widths: 20 20 60
+   :header-rows: 1
+
+   * - Regime
+     - μ value
+     - Physical meaning
+   * - :math:`x < 1` (glass)
+     - :math:`\mu = 1`
+     - Full aging; relaxation time equals sample age
+   * - :math:`x = 1` (critical)
+     - :math:`\mu = 1` (log corrections)
+     - Marginal; logarithmic corrections to scaling
+   * - :math:`1 < x < 2`
+     - :math:`\mu < 1` (transient)
+     - Sub-aging; approaches equilibrium
+
+For :math:`x < 1`, SGR gives :math:`\mu = 1` exactly—the strongest form of simple aging where
+the effective relaxation time *equals* the age.
+
+**Conditions for Complex Aging**
+
+Complex aging arises when:
+
+- Multiple coupled relaxation processes with different aging rates
+- Spatial heterogeneity introduces additional length scales
+- The trap distribution evolves non-trivially (beyond the SGR assumption)
+- External driving competes with aging on comparable timescales
+
+**Experimental Signatures**
+
+To distinguish simple from complex aging experimentally:
+
+.. list-table::
+   :widths: 40 30 30
+   :header-rows: 1
+
+   * - Test
+     - Simple aging
+     - Complex aging
+   * - :math:`G(t, t_w)` vs :math:`(t-t_w)/t_w` collapse
+     - Yes (universal curve)
+     - No (explicit :math:`t_w` dependence)
+   * - :math:`G'(\omega, t_w)` scaling with :math:`\omega t_w`
+     - Clean superposition
+     - Deviations from superposition
+   * - Two-step aging protocols
+     - Effective time additive
+     - Memory/rejuvenation effects
+
+.. note:: **Effective Time Mapping**
+
+   For simple aging, one can define an **effective time** :math:`\xi(t)` such that:
+
+   .. math::
+
+      R(t, t_w) = R_{\text{eq}}(\xi(t) - \xi(t_w))
+
+   where :math:`R_{\text{eq}}` is the equilibrium response function (if it exists for :math:`x > 1`).
+   The SGR model provides an explicit effective time through :math:`Z(t, t')`, which reduces
+   to the real time interval in linear response but accelerates under strain.
+
 Time-Dependent Oscillatory Response
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -441,32 +779,22 @@ The response is a function only of the product :math:`\omega t`. As the system a
 
    The apparent rise in :math:`G''(\omega)` at low frequencies (often interpreted as a "loss peak" at lower frequencies) may be an illusion caused by aging. No oscillatory measurement can probe frequencies far below :math:`1/t_w`, yet in aging materials, the relaxation time grows with the age. The putative loss peak can never be observed—it is a complete figment of the imagination.
 
-Startup Shear (Linear Regime)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Startup Shear
+~~~~~~~~~~~~~
 
-For steady shear at rate :math:`\dot{\gamma} \ll 1` started at time :math:`t_w`, with total strain :math:`\gamma = \dot{\gamma}(t - t_w) \ll 1`:
+For steady shear at rate :math:`\dot{\gamma} \ll 1` started at time :math:`t_w`, with total strain :math:`\gamma = \dot{\gamma}(t - t_w)`:
 
-**For** :math:`x < 1`:
+**Linear Regime**: Initially (:math:`\gamma \ll 1`), the response is elastic (:math:`\sigma \sim \gamma`) for :math:`x < 1`.
 
-.. math::
-
-   \sigma(t) \sim \dot{\gamma}(t - t_w) \quad \text{(purely elastic)}
-
-**For** :math:`1 < x < 2`:
+**Overshoot**: As strain increases, strain-induced yielding sets in. The peak stress occurs at a strain :math:`\gamma_{\text{peak}}` that increases logarithmically with age:
 
 .. math::
 
-   \sigma(t) \sim \dot{\gamma}(t - t_w)^{2-x} \quad \text{(anomalous power law)}
+   \gamma_{\text{peak}} \sim \sqrt{2x \ln(\dot{\gamma} t_w)}
 
-**For** :math:`x > 2`:
+The height of the stress overshoot also increases with age before settling into the age-independent steady state flow stress :math:`\sigma_{\text{ss}}` [12]_.
 
-.. math::
-
-   \sigma(t) \sim \dot{\gamma} \quad \text{(Newtonian)}
-
-These scalings are independent of whether :math:`t - t_w \ll t_w` or :math:`t - t_w \gg t_w`, so linear startup experiments are not a useful probe of aging dynamics.
-
-----
+**Steady State**: For :math:`t \gg 1/\dot{\gamma}`, aging is "interrupted" by flow, and the stress approaches the steady-state flow curve value (Herschel-Bulkley for :math:`x<1`).
 
 Rheological Aging: Stress-Controlled Experiments
 ------------------------------------------------
@@ -482,21 +810,19 @@ Under constant stress :math:`\sigma_0` applied at time :math:`t_w`, the strain e
 
    \gamma(t) = J(t - t_w, t_w) \sigma_0
 
-For :math:`1 < x < 2`, the creep compliance exhibits power-law behavior:
+**For** :math:`1 < x < 2` (fluid phase), the creep compliance exhibits power-law behavior:
 
 .. math::
 
-   J(t - t_w, t_w) = J_0 \left[1 + \left(\frac{t - t_w}{\tau_0}\right)^{x-1} E_{x-1,x}\left(\left(\frac{t - t_w}{\tau_0}\right)^{x-1}\right)\right]
+   J(t - t_w, t_w) \sim (t - t_w)^{x-1}
 
-where :math:`E_{\alpha,\beta}(z)` is the generalized Mittag-Leffler function.
-
-For :math:`x < 1` (glass phase), the material exhibits **power-law creep**:
+**For** :math:`x < 1` (glass phase), the material exhibits **logarithmic creep** for small stresses (:math:`\sigma_0 \ll \sigma_y`):
 
 .. math::
 
-   \gamma(t) \sim (t - t_w)^{x-1}
+   J(t - t_w, t_w) \sim \ln\left(\frac{t - t_w}{t_w}\right)
 
-with exponent :math:`0 < x - 1 < 0` (sublinear growth), but no steady-state strain rate is reached.
+This weak logarithmic aging contrasts with the strong power-law aging seen in step strain relaxation.
 
 Steady Shear Flow
 ~~~~~~~~~~~~~~~~~
@@ -516,6 +842,98 @@ This is the **Herschel-Bulkley** form with flow index :math:`n = x - 1`.
 For :math:`x > 1`, the yield stress vanishes (:math:`\sigma_y = 0`) and the material is purely shear-thinning.
 
 **Interrupted Aging by Flow**: Under steady flow, yielding of elements occurs even in the deepest traps due to strain-induced lowering of barriers. The time to yield becomes power-law rather than exponential in :math:`E`, so the aging process is "interrupted" by flow [2]_ [19]_. The flow curve remains well-defined even in the glass phase.
+
+Yield Stress Determination
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The yield stress :math:`\sigma_y` is a central quantity in soft glassy materials. The SGR model
+distinguishes between **static** and **dynamic** yield stresses, which arise from different
+experimental protocols.
+
+**Static Yield Stress (Imposed Stress)**
+
+The static yield stress :math:`\sigma_y^s` is determined from creep experiments under constant
+applied stress. For :math:`x < 1`:
+
+- If :math:`\sigma_0 < \sigma_y^s`: Bounded (logarithmic) creep—the material does not flow
+- If :math:`\sigma_0 > \sigma_y^s`: Unbounded flow after a delay time :math:`t_d(\sigma_0)`
+
+The static yield stress from the SGR model is:
+
+.. math::
+
+   \sigma_y^s = \lim_{\dot{\gamma} \to 0^+} \sigma(\dot{\gamma})
+
+For the glass phase (:math:`x < 1`), :math:`\sigma_y^s > 0` arises from the infinitely deep traps
+that can only escape through strain-induced barrier lowering.
+
+**Dynamic Yield Stress (Flow Curves)**
+
+The dynamic yield stress :math:`\sigma_y^d` is extracted from the low-shear-rate limit of
+flow curves:
+
+.. math::
+
+   \sigma_y^d = \lim_{\dot{\gamma} \to 0} \left[\sigma(\dot{\gamma}) - \eta_\infty \dot{\gamma}^{x-1}\right]
+
+In the SGR model, :math:`\sigma_y^s = \sigma_y^d` for idealized conditions. However, in practice:
+
+- **Protocol dependence**: Ramp rate, waiting time, and pre-shear affect the measured value
+- **Aging effects**: :math:`\sigma_y` may increase with sample age :math:`t_w`
+- **Thixotropy**: Structural breakdown during measurement complicates interpretation
+
+**Experimental Protocols**
+
+.. list-table:: Yield Stress Measurement Methods
+   :widths: 25 35 40
+   :header-rows: 1
+
+   * - Protocol
+     - Method
+     - SGR Prediction
+   * - Stress ramp
+     - Identify stress at which :math:`\dot{\gamma}` diverges
+     - :math:`\sigma_y(t_w) \sim` const for :math:`x < 1`
+   * - Creep test
+     - Stress below which flow is bounded
+     - Logarithmic creep for :math:`\sigma < \sigma_y`
+   * - Flow curve extrapolation
+     - Fit Herschel-Bulkley, extrapolate to :math:`\dot{\gamma} \to 0`
+     - :math:`\sigma_y + \eta_\infty \dot{\gamma}^{x-1}`
+   * - Oscillatory stress sweep
+     - Identify crossover :math:`G' = G''`
+     - Approximate; overestimates :math:`\sigma_y`
+
+**Cox-Merz Rule Violations**
+
+The Cox-Merz rule relates linear viscoelastic response to nonlinear flow:
+
+.. math::
+
+   |\eta^*(\omega)| = \eta(\dot{\gamma})\big|_{\dot{\gamma} = \omega}
+
+where :math:`\eta^* = G^*/i\omega` is the complex viscosity.
+
+**SGR predictions for Cox-Merz**:
+
+- **x > 2** (Newtonian): Cox-Merz holds approximately
+- **1 < x < 2** (power-law fluid): Cox-Merz fails due to infinite zero-shear viscosity
+- **x < 1** (glass): Strong violation—:math:`|\eta^*|` diverges as :math:`\omega \to 0`, but
+  :math:`\eta(\dot{\gamma})` remains finite due to yield stress
+
+The failure of Cox-Merz is a signature of yield stress behavior and is commonly observed
+in soft glassy materials.
+
+.. note:: **Practical Yield Stress Determination**
+
+   For SGR fitting, the yield stress is often treated as:
+
+   1. A fitting parameter in the Herschel-Bulkley form
+   2. Constrained by :math:`\sigma_y = 0` for :math:`x > 1` (no glass phase)
+   3. Related to :math:`G_0` and :math:`x` through scaling arguments for :math:`x < 1`
+
+   The relationship :math:`\sigma_y \sim G_0 \gamma_c` with :math:`\gamma_c \sim O(1)` provides
+   an order-of-magnitude estimate, where :math:`\gamma_c` is the characteristic yield strain.
 
 ----
 
@@ -566,6 +984,79 @@ The stress response is decomposed using Chebyshev polynomials:
    \sigma(\gamma, \dot{\gamma}) = \sum_{n \text{ odd}} e_n T_n(\gamma/\gamma_0) + v_n T_n(\dot{\gamma}/\dot{\gamma}_0)
 
 where :math:`e_n` quantify elastic nonlinearity and :math:`v_n` viscous nonlinearity.
+
+**Fourier Series Representation**
+
+Alternatively, the periodic stress response can be decomposed into a Fourier series:
+
+.. math::
+
+   \sigma(t) = \gamma_0 \sum_{n=1,3,5,...} \left[ G'_n(\omega, \gamma_0) \sin(n\omega t)
+   + G''_n(\omega, \gamma_0) \cos(n\omega t) \right]
+
+where:
+
+- :math:`G'_1, G''_1` are the fundamental (first harmonic) moduli
+- :math:`G'_n, G''_n` for :math:`n > 1` are higher harmonic contributions
+- Only odd harmonics appear due to the symmetry :math:`\sigma(-\gamma) = -\sigma(\gamma)`
+
+**Higher Harmonic Generation in SGR**
+
+The nonlinear yielding dynamics in SGR generate higher harmonics through:
+
+1. **Strain-induced barrier lowering**: The factor :math:`\exp(\gamma^2/(2x))` in the yielding
+   rate is inherently nonlinear
+
+2. **Population redistribution**: Large strains deplete shallow traps, altering the stress response
+
+3. **Memory effects**: The integral constitutive form couples current strain to full history
+
+The third harmonic ratio :math:`I_{3/1} = |G^*_3|/|G^*_1|` is a common measure of nonlinearity:
+
+.. math::
+
+   I_{3/1}(\gamma_0) \approx \begin{cases}
+   \propto \gamma_0^2 & \text{for } \gamma_0 \ll 1 \text{ (weak nonlinearity)} \\
+   O(1) & \text{for } \gamma_0 \sim 1 \text{ (strong nonlinearity)}
+   \end{cases}
+
+**Lissajous-Bowditch Curves**
+
+The parametric plot of :math:`\sigma(t)` vs :math:`\gamma(t)` reveals material nonlinearity:
+
+.. list-table:: Lissajous Curve Interpretation
+   :widths: 25 35 40
+   :header-rows: 1
+
+   * - Shape
+     - Interpretation
+     - SGR Regime
+   * - Ellipse
+     - Linear viscoelastic
+     - :math:`\gamma_0 \ll 1`
+   * - Rectangular (bulging)
+     - Strain stiffening + viscous dissipation
+     - :math:`\gamma_0 \sim 1`, :math:`x < 1`
+   * - S-shaped distortion
+     - Strain softening (yielding onset)
+     - :math:`\gamma_0 > 1`, transition
+   * - Parallelogram
+     - Strong plastic yielding
+     - :math:`\gamma_0 \gg 1`, fully yielded
+
+**Chebyshev vs Fourier Decomposition**
+
+The Chebyshev representation has advantages for physical interpretation:
+
+- :math:`e_1`: Linear elastic modulus (recoverable deformation)
+- :math:`e_3 > 0`: Strain stiffening (positive curvature in :math:`\sigma` vs :math:`\gamma`)
+- :math:`e_3 < 0`: Strain softening (negative curvature)
+- :math:`v_1`: Linear viscous modulus
+- :math:`v_3 > 0`: Shear thickening
+- :math:`v_3 < 0`: Shear thinning
+
+For SGR with :math:`x < 1` and moderate :math:`\gamma_0`, the dominant behavior is
+:math:`e_3 < 0` (strain softening due to yielding) and :math:`v_3 < 0` (shear thinning).
 
 Over-Aging and Rejuvenation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

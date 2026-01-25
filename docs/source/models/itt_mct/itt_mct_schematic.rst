@@ -136,6 +136,31 @@ MCT makes a specific approximation for the memory kernel:
 The vertex V encodes how density fluctuations at different length scales couple.
 This "mode-coupling" gives the theory its name.
 
+Memory Kernel Structure
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The MCT memory kernel has a **bilinear structure** arising from the mode-coupling
+approximation:
+
+.. math::
+
+   m_{\mathbf{q}}(t,s,t') = \int \frac{d^3k}{(2\pi)^3}\;
+   V_{\mathbf{q},\mathbf{k},\mathbf{p}}(t,s,t')\;
+   \Phi_{\mathbf{k}}(t,s)\,\Phi_{\mathbf{p}}(t,s)
+
+where :math:`\mathbf{p} = \mathbf{q} - \mathbf{k}`.
+
+For the schematic F₁₂ model, this complicated k-space integral is replaced by a
+polynomial approximation:
+
+.. math::
+
+   m(\Phi) = v_1 \Phi + v_2 \Phi^2
+
+The quadratic term (v₂Φ²) is essential for the glass transition—it creates the
+feedback mechanism where slow relaxation leads to stronger caging, which leads
+to even slower relaxation.
+
 The F₁₂ Schematic Model
 -----------------------
 
@@ -226,14 +251,74 @@ Integration Through Transients (ITT)
 Extending MCT to Flow
 ~~~~~~~~~~~~~~~~~~~~~
 
-Under shear, density fluctuations are "advected" by the flow. A wave vector k
-at time t' becomes k(t,t') at time t:
+Under shear, density fluctuations are "advected" by the flow.
+
+General Deformation Gradient
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For a general homogeneous flow with velocity gradient tensor
+:math:`\boldsymbol{\kappa}(t) = \nabla\mathbf{v}(t)`, the deformation gradient
+from time :math:`t'` to :math:`t` is:
+
+.. math::
+
+   \mathbf{E}(t,t') = \mathcal{T}\exp\left(\int_{t'}^{t}\boldsymbol{\kappa}(s)\,ds\right)
+
+where :math:`\mathcal{T}` denotes time ordering.
+
+Wavevectors are **back-advected** as:
+
+.. math::
+
+   \mathbf{q}(t,t') = \mathbf{q} \cdot \mathbf{E}^{-1}(t,t')
+
+For simple shear (flow in x, gradient in y):
 
 .. math::
 
    k_x(t,t') = k_x - k_y \int_{t'}^t \dot{\gamma}(s) ds = k_x - k_y \gamma(t,t')
 
 This advection destroys the cage structure, leading to flow-induced relaxation.
+
+Two-Time Correlator Definition
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The **transient density correlator** under shear is:
+
+.. math::
+
+   \Phi_{\mathbf{q}}(t,t') = \frac{\langle \rho_{\mathbf{q}(t,t')}(t)\,
+   \rho_{-\mathbf{q}}(t') \rangle}{N S(q)}
+
+This measures how density fluctuations at wavevector :math:`\mathbf{q}` decorrelate
+between times :math:`t'` and :math:`t`, accounting for the fact that the wavevector
+is advected by the flow.
+
+**Physical interpretation**: The correlator tracks the "memory" of the cage
+structure. Under shear, this memory is progressively destroyed as accumulated
+strain :math:`\gamma(t,t')` increases.
+
+Zwanzig-Mori Equation Detail
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The full ITT-MCT correlator dynamics obey the integro-differential equation:
+
+.. math::
+
+   \partial_t \Phi_{\mathbf{q}}(t,t') +
+   \Gamma_{\mathbf{q}}(t,t')\left[
+   \Phi_{\mathbf{q}}(t,t') +
+   \int_{t'}^{t} ds\; m_{\mathbf{q}}(t,s,t')\;\partial_s \Phi_{\mathbf{q}}(s,t')
+   \right] = 0
+
+with overdamped initial decay rate:
+
+.. math::
+
+   \Gamma_{\mathbf{q}}(t,t') = D_0\,\frac{q(t,t')^2}{S(q(t,t'))}
+
+where :math:`D_0` is the bare diffusion coefficient. The advected wavevector
+magnitude :math:`q(t,t')` increases with strain, accelerating the initial decay.
 
 Strain Decorrelation Function
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1079,6 +1164,146 @@ For memory-constrained systems:
    # Or process in smaller batches
    for gamma_chunk in np.array_split(gamma_dot, 10):
        sigma_chunk = model.predict(gamma_chunk, test_mode='flow_curve')
+
+JAX Implementation Patterns
+---------------------------
+
+This section provides JAX code patterns for implementing ITT-MCT calculations.
+These patterns illustrate the core algorithms used internally by RheoJAX.
+
+Memory Kernel Computation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The F₁₂ memory kernel with strain decorrelation:
+
+.. code-block:: python
+
+   import jax.numpy as jnp
+   from jax import jit
+
+   @jit
+   def memory_kernel_f12(Phi, gamma, v1, v2, gamma_c):
+       """
+       F₁₂ memory kernel: m(Φ, γ) = (v₁Φ + v₂Φ²) · h(γ)
+
+       Parameters
+       ----------
+       Phi : float
+           Correlator value
+       gamma : float
+           Accumulated strain
+       v1, v2 : float
+           MCT vertex coefficients
+       gamma_c : float
+           Critical strain for cage breaking
+       """
+       # Mode-coupling vertex
+       m_mct = v1 * Phi + v2 * Phi**2
+
+       # Shear decorrelation (Gaussian form)
+       h = jnp.exp(-(gamma / gamma_c)**2)
+
+       return m_mct * h
+
+Stress from Correlator History
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Computing stress from the correlator integral:
+
+.. code-block:: python
+
+   @jit
+   def compute_stress_from_correlator(Phi_history, dt, gamma_dot, G_inf):
+       """
+       Compute stress from correlator history
+
+       σ(t) = γ̇ ∫₀ᵗ G(τ) dτ = γ̇ G_∞ ∫₀ᵗ Φ(τ)² dτ
+
+       Parameters
+       ----------
+       Phi_history : array
+           Correlator values at each time step
+       dt : float
+           Time step
+       gamma_dot : float
+           Shear rate
+       G_inf : float
+           High-frequency modulus
+       """
+       G_history = G_inf * Phi_history**2
+       return gamma_dot * jnp.trapezoid(G_history, dx=dt)
+
+LAOS Harmonics Extraction
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Extracting Fourier harmonics from LAOS stress response:
+
+.. code-block:: python
+
+   def extract_laos_harmonics(t, stress, omega, n_harmonics=5):
+       """
+       Extract odd Fourier harmonics from LAOS stress
+
+       σ(t) = Σ [σ'_n sin(nωt) + σ''_n cos(nωt)]
+
+       Parameters
+       ----------
+       t : array
+           Time points (should cover complete cycles)
+       stress : array
+           Stress response
+       omega : float
+           Angular frequency
+       n_harmonics : int
+           Number of harmonics to extract (1, 3, 5, ...)
+
+       Returns
+       -------
+       sigma_prime : array
+           In-phase components [σ'₁, σ'₃, σ'₅, ...]
+       sigma_double_prime : array
+           Out-of-phase components [σ''₁, σ''₃, ...]
+       """
+       period = 2 * jnp.pi / omega
+
+       # Use last complete cycle
+       mask = t > (t[-1] - period)
+       t_cycle = t[mask] - (t[-1] - period)
+       stress_cycle = stress[mask]
+
+       sigma_prime = []
+       sigma_double_prime = []
+
+       for n in range(1, 2 * n_harmonics, 2):  # Odd harmonics only
+           # Fourier coefficients via projection
+           sin_component = (2 / period) * jnp.trapezoid(
+               stress_cycle * jnp.sin(n * omega * t_cycle), t_cycle
+           )
+           cos_component = (2 / period) * jnp.trapezoid(
+               stress_cycle * jnp.cos(n * omega * t_cycle), t_cycle
+           )
+
+           sigma_prime.append(sin_component)
+           sigma_double_prime.append(cos_component)
+
+       return jnp.array(sigma_prime), jnp.array(sigma_double_prime)
+
+**Usage for nonlinearity quantification:**
+
+.. code-block:: python
+
+   # Extract harmonics from LAOS simulation
+   sigma_prime, sigma_double_prime = model.get_laos_harmonics(
+       t, gamma_0=0.2, omega=1.0, n_harmonics=3
+   )
+
+   # Third harmonic ratio (intrinsic nonlinearity)
+   I_3_1 = jnp.abs(sigma_prime[1]) / jnp.abs(sigma_prime[0])
+   print(f"I₃/I₁ = {I_3_1:.4f}")
+
+   # Fifth harmonic ratio
+   I_5_1 = jnp.abs(sigma_prime[2]) / jnp.abs(sigma_prime[0])
+   print(f"I₅/I₁ = {I_5_1:.4f}")
 
 See Also
 --------

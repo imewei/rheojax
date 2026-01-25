@@ -164,6 +164,54 @@ Parameters
      - —
      - Critical strain for cage breaking
 
+Isotropic Shear Approximation (ISM)
+-----------------------------------
+
+The ISM simplifies the full anisotropic MCT equations by assuming that the
+correlator depends only on the **magnitude** of the advected wavevector.
+
+Wavevector Advection Derivation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For simple shear with rate :math:`\dot{\gamma}`, the advected wavevector is:
+
+.. math::
+
+   \mathbf{k}(t,t') = \big(k_x,\; k_y - \gamma(t,t')k_x,\; k_z\big)
+
+The advected magnitude squared is:
+
+.. math::
+
+   k(t,t')^2 = k_x^2 + (k_y - \gamma k_x)^2 + k_z^2
+   = k^2 - 2\gamma k_x k_y + \gamma^2 k_x^2
+
+**Orientational averaging**: Averaging over all initial orientations of
+:math:`\mathbf{k}` on a sphere:
+
+.. math::
+
+   \langle k_x^2 \rangle = \langle k_y^2 \rangle = \langle k_z^2 \rangle = k^2/3
+
+   \langle k_x k_y \rangle = 0
+
+This gives the **isotropically sheared** wavevector magnitude:
+
+.. math::
+
+   \boxed{
+   k(t,t') \approx k\sqrt{1 + \frac{1}{3}\gamma(t,t')^2}
+   }
+
+**Physical interpretation**:
+
+- At :math:`\gamma = 0`: :math:`k(t,t') = k` (no advection)
+- At :math:`\gamma \sim 1`: :math:`k(t,t') \approx 1.15k` (moderate stretch)
+- At :math:`\gamma \gg 1`: :math:`k(t,t') \propto k\gamma/\sqrt{3}` (strong stretch)
+
+The increased wavevector magnitude accelerates relaxation via the bare decay rate
+:math:`\Gamma(k) = k^2 D_0/S(k)`.
+
 Governing Equations
 -------------------
 
@@ -228,6 +276,68 @@ The stress tensor involves integration over all wave vectors:
 .. math::
 
    \sigma = \frac{k_B T}{6\pi^2} \int_0^\infty dk \, k^4 S(k)^2 \left[\frac{\partial \ln S}{\partial \ln k}\right]^2 \int_0^\infty d\tau \, \Phi(k,\tau)^2 h(\dot{\gamma}\tau)
+
+Microscopic Stress Formula Detail
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The full generalized Green-Kubo expression for the shear modulus is:
+
+.. math::
+
+   G(t,t') = \frac{k_B T}{60\pi^2} \int_0^{\infty} dk\; k^4
+   \left[\frac{S'(k)}{S(k)^2}\right]^2\,\Phi_k(t,t')^2
+
+**Physical interpretation of the weighting factors**:
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - Factor
+     - Physical Meaning
+   * - :math:`k^4`
+     - Short wavelengths contribute more to stress (local rearrangements)
+   * - :math:`[S'(k)]^2`
+     - Modes where S(k) varies rapidly (near the peak) dominate
+   * - :math:`[S(k)]^{-4}`
+     - Modes with strong correlations contribute less (collective, slow)
+   * - :math:`\Phi_k^2`
+     - Only correlated (unrelaxed) modes carry stress
+
+**Quantitative predictions without adjustable modulus**: Unlike the schematic
+model where :math:`G_\infty` is fitted, ISM computes the stress magnitude
+directly from :math:`k_BT`, :math:`S(k)`, and :math:`\Phi_k`. This provides a
+first-principles prediction of yield stress and flow curves.
+
+Equilibrium vs Driven Correlators
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The correlator dynamics differ between quiescent and driven states:
+
+**Quiescent MCT** (no shear, for SAOS):
+
+.. math::
+
+   \partial_t \Phi_k^{\text{eq}}(t) + \Gamma_k \left[\Phi_k^{\text{eq}}(t) +
+   \int_0^t ds\; m_k(t-s)\;\partial_s \Phi_k^{\text{eq}}(s)\right] = 0
+
+where :math:`\Gamma_k = k^2 D_0 / S(k)` is constant.
+
+**Driven ITT-MCT** (with shear):
+
+.. math::
+
+   \partial_t \Phi_k(t,t') + \Gamma_k(t,t') \left[\Phi_k(t,t') +
+   \int_{t'}^t ds\; m_k(t,s,t')\;\partial_s \Phi_k(s,t')\right] = 0
+
+where :math:`\Gamma_k(t,t') = D_0 k(t,t')^2 / S(k(t,t'))` depends on the
+advected wavevector.
+
+The key difference is that shear:
+
+1. **Accelerates initial decay** via increased :math:`\Gamma_k(t,t')`
+2. **Decorrelates the memory kernel** via :math:`h[\gamma(t,s)]`
+3. **Creates two-time dependence** in the correlator
 
 This microscopic stress formula requires:
 

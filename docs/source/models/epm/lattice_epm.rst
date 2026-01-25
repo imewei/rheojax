@@ -58,6 +58,63 @@ Notation Guide
      - —
      - Lattice size (L × L grid)
 
+Discrete State Variables
+------------------------
+
+The scalar EPM discretizes the material on a :math:`d`-dimensional periodic lattice
+(typically :math:`d=2`) with :math:`N = L_x \times L_y` sites indexed by :math:`i`.
+
+At each site :math:`i`:
+
+- **Local shear stress**: :math:`\sigma_i(t)`
+- **Local plastic strain**: :math:`\varepsilon_i^{pl}(t)`
+- **Local yield threshold**: :math:`\sigma_{y,i}` (constant or disordered)
+- **Local elastic modulus**: :math:`\mu_i` (often uniform :math:`\mu`)
+- **(Optional)** Structural variable: age :math:`x_i`, effective temperature :math:`T_i`, etc.
+
+Elastic Loading and Stress Redistribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The local stress evolves due to elastic loading from the macroscopic shear and
+redistribution from plastic events at other sites:
+
+.. math::
+
+    \boxed{
+    \sigma_i(t) = \mu \left[ \gamma(t) - \varepsilon_i^{pl}(t) \right] + \sum_j G_{ij} \, \varepsilon_j^{pl}(t)
+    }
+
+In rate form:
+
+.. math::
+
+    \boxed{
+    \dot{\sigma}_i = \mu \, \dot{\gamma}(t) - \mu \, \dot{\varepsilon}_i^{pl} + \sum_j G_{ij} \, \dot{\varepsilon}_j^{pl}
+    }
+
+where:
+
+- :math:`\mu \dot{\gamma}`: Affine elastic loading from imposed macroscopic shear
+- :math:`G_{ij}`: Eshelby propagator (elastic kernel) discretized on the lattice
+- The last two terms describe stress relaxation/redistribution from plastic strain rates
+
+Effective Kernel
+~~~~~~~~~~~~~~~~
+
+In practice, it is common to combine terms into an **effective kernel** :math:`K_{ij}`
+acting on plastic strain increments:
+
+.. math::
+
+    \boxed{
+    \dot{\sigma}_i = \mu \dot{\gamma}(t) + \sum_j K_{ij} \, \dot{\varepsilon}_j^{pl},
+    \qquad
+    K_{ij} = G_{ij} - \mu \, \delta_{ij}
+    }
+
+This form is computationally convenient since the FFT convolution directly gives the
+stress update from plastic strain rates.
+
 Physical Interpretation & Assumptions
 -------------------------------------
 
@@ -132,6 +189,30 @@ In 2D Fourier space, the propagator has characteristic **quadrupolar symmetry** 
 
     \tilde{\mathcal{G}}(\mathbf{q}) = -4 \mu \frac{q_x^2 q_y^2}{(q_x^2 + q_y^2)^2} \quad \text{for } \mathbf{q} \neq 0
 
+.. note::
+
+    For a 2D **scalar shear** model, a common alternative form is:
+
+    .. math::
+
+        \boxed{
+        \hat{G}(\mathbf{q}) \propto -\frac{(q_x^2 - q_y^2)^2}{(q_x^2 + q_y^2)^2}
+        }
+
+    with :math:`\hat{G}(\mathbf{0}) = 0`. Variants exist depending on whether you model
+    pure shear, simple shear, or include compressibility.
+
+Numerically, the **effective kernel** is defined as :math:`\hat{K}(\mathbf{q}) = \hat{G}(\mathbf{q}) - \mu`,
+and the convolution is computed via FFT:
+
+.. math::
+
+    \boxed{
+    (K \ast \dot{\varepsilon}^{pl})_i = \mathcal{F}^{-1}\left( \hat{K}(\mathbf{q}) \cdot \mathcal{F}[\dot{\varepsilon}^{pl}] \right)_i
+    }
+
+where :math:`\mathcal{F}` denotes the discrete Fourier transform.
+
 **Key properties:**
 
 - :math:`\tilde{\mathcal{G}}(0) = 0`: Plastic events conserve total stress (controlled by boundary loading)
@@ -160,6 +241,102 @@ We implement two modes of yielding:
         \dot{\gamma}^{pl} = \frac{\sigma}{\tau_{pl}} \frac{1}{2} \left[ 1 + \tanh\left(\frac{|\sigma| - \sigma_c}{w}\right) \right]
 
     A differentiable approximation that allows gradients to backpropagate through the yield surface for NLSQ/HMC fitting.
+
+Local Yield Condition
+~~~~~~~~~~~~~~~~~~~~~
+
+A site becomes unstable when the local stress exceeds its yield threshold:
+
+.. math::
+
+    \boxed{| \sigma_i | \ge \sigma_{y,i}}
+
+Once unstable, the plastic strain rate is determined by one of two dynamics:
+
+Plastic Event Dynamics
+~~~~~~~~~~~~~~~~~~~~~~
+
+**Option A: Instantaneous Flip (Quasi-Static / Event-Driven)**
+
+When unstable, site :math:`i` yields and its plastic strain jumps by a fixed increment:
+
+.. math::
+
+    \boxed{
+    \varepsilon_i^{pl} \leftarrow \varepsilon_i^{pl} + \Delta\varepsilon_0 \, \mathrm{sign}(\sigma_i)
+    }
+
+where :math:`\Delta\varepsilon_0` may be drawn from a distribution.
+Stress is then updated by redistribution to all sites:
+
+.. math::
+
+    \boxed{
+    \sigma_k \leftarrow \sigma_k + K_{ki} \, \Delta\varepsilon_0 \, \mathrm{sign}(\sigma_i) \quad \forall k
+    }
+
+After redistribution, stability is re-checked (potentially triggering avalanches).
+
+**Option B: Finite-Rate Maxwell / Viscoplastic Rule (Continuous Time Stepping)**
+
+Introduce a plastic strain rate when the yield condition is met:
+
+.. math::
+
+    \boxed{
+    \dot{\varepsilon}_i^{pl} =
+    \begin{cases}
+    0, & |\sigma_i| < \sigma_{y,i} \\[2pt]
+    \displaystyle\frac{1}{\eta}\left(\sigma_i - \sigma_{y,i} \, \mathrm{sign}(\sigma_i)\right), & |\sigma_i| \ge \sigma_{y,i}
+    \end{cases}
+    }
+
+Or a simpler **activated rule** with fixed rate:
+
+.. math::
+
+    \boxed{
+    \dot{\varepsilon}_i^{pl} = \frac{1}{\tau} \, \mathrm{sign}(\sigma_i) \, \mathbf{1}_{|\sigma_i| \ge \sigma_{y,i}}
+    }
+
+The finite-rate rule is convenient for **LAOS** and explicit time integration since it
+produces smooth time series.
+
+Macroscopic Observables
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The primary outputs from EPM simulations are spatially-averaged quantities:
+
+**Macroscopic Shear Stress:**
+
+.. math::
+
+    \boxed{
+    \Sigma(t) = \frac{1}{N} \sum_i \sigma_i(t)
+    }
+
+**Plastic Activity** (fraction of active sites or total plastic strain rate):
+
+.. math::
+
+    \Gamma(t) = \frac{1}{N} \sum_i \mathbf{1}_{|\sigma_i| \ge \sigma_{y,i}}
+    \quad \text{or} \quad
+    \Gamma(t) = \frac{1}{N} \sum_i |\dot{\varepsilon}_i^{pl}|
+
+**Energy Dissipation Rate:**
+
+.. math::
+
+    \dot{W}_{\mathrm{diss}}(t) = \frac{1}{N} \sum_i \sigma_i \, \dot{\varepsilon}_i^{pl}
+
+**Dissipated Energy Per Cycle** (for oscillatory protocols):
+
+.. math::
+
+    W_{\mathrm{diss,cycle}} = \oint \Sigma \, d\gamma
+
+This integral over a complete strain cycle gives the area enclosed by the Lissajous figure,
+representing energy lost to plastic dissipation.
 
 Numerical Implementation
 ------------------------
@@ -261,29 +438,235 @@ Material Classification
 Experimental Protocol Integration
 ---------------------------------
 
-The model supports standard rheological protocols via `_predict(test_mode=...)`.
+The model supports standard rheological protocols via ``_predict(test_mode=...)``.
+Below we provide the complete mathematical formulation for each protocol, using the
+**finite-rate** plastic flow rule (Option B) unless noted otherwise.
 
-Flow Curve
-~~~~~~~~~~
-*   **Protocol**: Constant $\dot{\gamma}$.
-*   **Observable**: Steady-state stress $\Sigma_{ss} = \langle \sigma \rangle$.
-*   **Prediction**: Herschel-Bulkley behavior $\Sigma = \Sigma_y + A \dot{\gamma}^n$.
+.. _epm-flow-curve:
 
-Creep (Stress Control)
-~~~~~~~~~~~~~~~~~~~~~~
-*   **Protocol**: Constant Stress $\Sigma_{target}$.
-*   **Implementation**: Since the EPM is strain-rate driven, we use an **Adaptive P-Controller** (PID loop) to adjust $\dot{\gamma}(t)$ dynamically:
+Flow Curve (Rotation / Steady Shear)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    .. math::
-        \dot{\gamma}_{t+1} = \dot{\gamma}_t + K_p (\Sigma_{target} - \langle \sigma \rangle_t)
+**Protocol:**
 
-*   **Observable**: Strain $\gamma(t)$ vs time.
+.. math::
 
-Oscillation (SAOS/LAOS)
-~~~~~~~~~~~~~~~~~~~~~~~
-*   **Protocol**: $\dot{\gamma}(t) = \gamma_0 \omega \cos(\omega t)$.
-*   **Observable**: Lissajous figures (Stress vs Strain).
-*   **Analysis**: Can capture non-linear harmonic generation and yielding transitions within a cycle.
+    \dot{\gamma}(t) = \dot{\gamma} = \text{const}
+
+**Governing Equations:**
+
+.. math::
+
+    \boxed{
+    \dot{\sigma} = \mu \dot{\gamma} + K \ast \dot{\varepsilon}^{pl},
+    \qquad
+    \dot{\varepsilon}^{pl} = \mathcal{R}(\sigma; \sigma_y, \eta, \tau)
+    }
+
+where :math:`\mathcal{R}` is the chosen plastic flow rule (finite-rate or activated).
+
+**Flow Curve Extraction:**
+
+Run to steady state and compute the time-averaged macroscopic stress:
+
+.. math::
+
+    \boxed{
+    \Sigma(\dot{\gamma}) = \langle \Sigma(t) \rangle_{\mathrm{steady}}
+    }
+
+**Typical Scaling:**
+
+Many EPMs produce **Herschel-Bulkley-like** flow curves:
+
+.. math::
+
+    \Sigma(\dot{\gamma}) \approx \Sigma_y + A \dot{\gamma}^n
+
+The exponent :math:`n` depends on the flow rule and noise/activation:
+
+- :math:`n \approx 0.5` near yield (diffusive scaling from avalanches)
+- :math:`n \to 1` at high rates (linear viscous regime)
+
+.. _epm-startup:
+
+Start-up of Steady Shear
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Protocol:**
+
+.. math::
+
+    \dot{\gamma}(t) =
+    \begin{cases}
+    0, & t < 0 \\
+    \dot{\gamma}_0, & t \ge 0
+    \end{cases}
+
+starting from an initial condition (often :math:`\varepsilon^{pl} = 0`, :math:`\sigma`
+drawn from a narrow distribution, or an "aged" state).
+
+**Outputs:**
+
+- Stress growth :math:`\Sigma(t)`
+- Stress overshoot :math:`\Sigma_{\max}` and peak strain :math:`\gamma_{\max}`
+- Avalanche statistics (for event-driven implementation)
+- Transient shear banding (when spatial gradient direction is retained)
+
+**Key Physics:**
+
+1. **Elastic rise**: :math:`\Sigma \propto \mu \dot{\gamma}_0 t` at early times
+2. **Overshoot**: Stress peak when first system-spanning avalanches occur
+3. **Steady state**: Relaxation to the flow curve plateau
+
+.. _epm-relaxation:
+
+Stress Relaxation (Step Strain)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Protocol (step strain):**
+
+.. math::
+
+    \gamma(t) = \gamma_0 \, H(t)
+    \quad \Rightarrow \quad
+    \dot{\gamma}(t) = \gamma_0 \, \delta(t)
+
+**Implementation:**
+
+1. Apply instantaneous affine loading at :math:`t = 0^+`:
+
+   .. math::
+
+       \sigma_i(0^+) = \sigma_i(0^-) + \mu \gamma_0
+
+2. Then evolve at :math:`\dot{\gamma}(t > 0) = 0`.
+
+**Governing Equations for** :math:`t > 0`:
+
+.. math::
+
+    \boxed{
+    \dot{\sigma} = K \ast \dot{\varepsilon}^{pl},
+    \qquad
+    \dot{\varepsilon}^{pl} = \mathcal{R}(\sigma; \sigma_y, \eta, \tau)
+    }
+
+**Relaxation Modulus:**
+
+.. math::
+
+    \boxed{
+    G(t) = \frac{\Sigma(t)}{\gamma_0}
+    }
+
+**Physics:**
+
+Stress relaxes via "cascades"—an active site yields, triggering a neighbor, keeping
+the system active long after the drive stops. This leads to slow, non-exponential
+relaxation (power-law :math:`\sim t^{-\alpha}` or logarithmic :math:`\sim \ln t`).
+
+.. _epm-creep:
+
+Creep (Step Stress)
+~~~~~~~~~~~~~~~~~~~
+
+**Protocol (step stress):**
+
+.. math::
+
+    \Sigma(t) = \Sigma_0 \, H(t)
+
+**Stress-Controlled Closure:**
+
+Since EPM is naturally strain-rate driven, we determine :math:`\dot{\gamma}(t)`
+dynamically so that:
+
+.. math::
+
+    \boxed{
+    \frac{1}{N} \sum_i \sigma_i(t) = \Sigma_0
+    }
+
+**Simple Controller:**
+
+.. math::
+
+    \boxed{
+    \dot{\gamma}_{n+1} = \dot{\gamma}_n + \lambda \left( \Sigma_0 - \Sigma_n \right)
+    }
+
+where :math:`\lambda` is the feedback gain (typically 0.1-1.0).
+
+**Creep Strain:**
+
+.. math::
+
+    \gamma(t) = \int_0^t \dot{\gamma}(s) \, ds
+
+**Behavior:**
+
+- :math:`\Sigma_0 < \Sigma_y`: Strain rate decays to zero (**arrest**)
+- :math:`\Sigma_0 > \Sigma_y`: Strain rate stabilizes to finite value (**flow**)
+- Fluidization time :math:`t_f \sim (\Sigma_y - \Sigma_0)^{-\nu}` with :math:`\nu \approx 4-6`
+
+.. _epm-oscillation:
+
+Oscillation (SAOS and LAOS)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Protocol:**
+
+.. math::
+
+    \gamma(t) = \gamma_0 \sin(\omega t),
+    \qquad
+    \dot{\gamma}(t) = \gamma_0 \omega \cos(\omega t)
+
+**Governing Equations:**
+
+.. math::
+
+    \boxed{
+    \dot{\sigma} = \mu \dot{\gamma}(t) + K \ast \dot{\varepsilon}^{pl},
+    \qquad
+    \dot{\varepsilon}^{pl} = \mathcal{R}(\sigma; \sigma_y, \eta, \tau)
+    }
+
+**SAOS Moduli** (Small Amplitude Oscillatory Shear, :math:`\gamma_0 \ll 1`):
+
+Extract first harmonic from the stress response:
+
+.. math::
+
+    \Sigma(t) \approx \Sigma'_1 \sin(\omega t) + \Sigma''_1 \cos(\omega t)
+
+Storage and loss moduli:
+
+.. math::
+
+    G' = \frac{\Sigma'_1}{\gamma_0}, \qquad G'' = \frac{\Sigma''_1}{\gamma_0}
+
+**LAOS Harmonics** (Large Amplitude Oscillatory Shear):
+
+At large :math:`\gamma_0`, the stress response contains higher harmonics:
+
+.. math::
+
+    \Sigma(t) = \sum_{n \ge 1} \left[ \Sigma'_n \sin(n\omega t) + \Sigma''_n \cos(n\omega t) \right]
+
+Higher-order moduli:
+
+.. math::
+
+    G'_n = \frac{\Sigma'_n}{\gamma_0}, \qquad G''_n = \frac{\Sigma''_n}{\gamma_0}
+
+**LAOS Physics:**
+
+- Large :math:`\gamma_0` triggers yielding cycle-by-cycle
+- The Eshelby propagator synchronizes these events
+- Complex **Lissajous figures** with shear-banding signatures
+- Intracycle yielding and strain stiffening/softening
 
 Bayesian Inference (NLSQ → NUTS)
 --------------------------------
@@ -760,6 +1143,874 @@ References
 See Also
 --------
 
+- :doc:`index` — EPM family overview and comparison
 - :doc:`tensorial_epm` — Full stress tensor implementation
-- :doc:`/user_guide/03_advanced_topics/index` — Advanced EPM workflows
+- :doc:`/models/sgr/sgr_conventional` — Mean-field SGR (complementary theory)
+- :doc:`/models/hl/hebraud_lequeux` — Mean-field HL (EPM limiting case)
+- :doc:`/models/fluidity/fluidity_local` — Fluidity approach to plasticity
 - :py:func:`rheojax.visualization.epm_plots.plot_lattice_fields` — Visualization functions for spatial fields
+
+
+JAX Implementation Utilities
+============================
+
+This section provides JAX-first implementations of the core EPM components. These
+utilities form the computational backbone of the ``LatticeEPM`` model.
+
+.. note::
+
+   For actual usage, prefer the high-level ``LatticeEPM`` class. These utilities
+   are documented for advanced users and developers.
+
+EPM Parameter Container
+-----------------------
+
+.. code-block:: python
+
+    from __future__ import annotations
+    from dataclasses import dataclass
+    import jax.numpy as jnp
+
+    Array = jnp.ndarray
+
+    @dataclass(frozen=True)
+    class EPMParams:
+        """Immutable container for EPM simulation parameters."""
+        Lx: int
+        Ly: int
+        mu: float = 1.0          # Shear modulus
+        sig_y0: float = 1.0      # Mean yield stress
+        eta: float = 1.0         # Viscoplastic viscosity
+        tau: float = 1.0         # Activated timescale
+        dt: float = 1e-3         # Time step
+        sigy_logstd: float = 0.0 # Yield stress disorder (log-normal)
+
+Fourier Grid and Eshelby Kernel
+-------------------------------
+
+.. code-block:: python
+
+    def make_qgrid(Lx: int, Ly: int):
+        """Create 2D wavevector grid for FFT operations."""
+        qx = 2 * jnp.pi * jnp.fft.fftfreq(Lx)[:, None]
+        qy = 2 * jnp.pi * jnp.fft.fftfreq(Ly)[None, :]
+        return qx, qy
+
+    def make_eshelby_kernel_hat(Lx: int, Ly: int, mu: float):
+        """Construct effective kernel K̂(q) = Ĝ(q) - μ in Fourier space.
+
+        Returns
+        -------
+        Khat : Array, shape (Lx, Ly)
+            Effective kernel for FFT convolution
+        """
+        qx, qy = make_qgrid(Lx, Ly)
+        q2 = qx * qx + qy * qy
+        q2_safe = jnp.where(q2 == 0.0, 1.0, q2)
+
+        # Quadrupolar Eshelby kernel: G(q) ∝ -(qx² - qy²)² / q⁴
+        Ghat = -((qx * qx - qy * qy) ** 2) / (q2_safe * q2_safe)
+        Ghat = jnp.where(q2 == 0.0, 0.0, Ghat)
+
+        # Effective kernel
+        Khat = Ghat - mu
+        return Khat
+
+Plastic Flow Rules
+------------------
+
+.. code-block:: python
+
+    def plastic_rate_bingham(sigma: Array, sig_y: Array, eta: float) -> Array:
+        """Bingham-like viscoplastic flow rule.
+
+        ε̇ᵖˡ = (1/η) × sign(σ) × max(|σ| - σ_y, 0)
+        """
+        sgn = jnp.sign(sigma)
+        overstress = jnp.maximum(jnp.abs(sigma) - sig_y, 0.0)
+        return (overstress / eta) * sgn
+
+Time-Stepping Kernel
+--------------------
+
+.. code-block:: python
+
+    import jax
+
+    @jax.jit
+    def epm_step(
+        sigma: Array,
+        eps_pl: Array,
+        sig_y: Array,
+        gdot: float,
+        Khat: Array,
+        p: EPMParams,
+    ) -> tuple[Array, Array]:
+        """Single EPM time step with FFT-accelerated stress redistribution.
+
+        Parameters
+        ----------
+        sigma : Array, shape (Lx, Ly)
+            Current local stress field
+        eps_pl : Array, shape (Lx, Ly)
+            Current plastic strain field
+        sig_y : Array, shape (Lx, Ly)
+            Local yield thresholds
+        gdot : float
+            Applied macroscopic shear rate
+        Khat : Array, shape (Lx, Ly)
+            Precomputed effective kernel in Fourier space
+        p : EPMParams
+            Simulation parameters
+
+        Returns
+        -------
+        sigma_new, eps_pl_new : Arrays
+            Updated stress and plastic strain fields
+        """
+        # Plastic strain rate
+        deps_pl = plastic_rate_bingham(sigma, sig_y, p.eta)
+
+        # FFT convolution for stress redistribution
+        deps_pl_hat = jnp.fft.fftn(deps_pl)
+        conv = jnp.fft.ifftn(Khat * deps_pl_hat).real
+
+        # Stress update: elastic loading + redistribution
+        dsigma = p.mu * gdot + conv
+        sigma_new = sigma + p.dt * dsigma
+        eps_pl_new = eps_pl + p.dt * deps_pl
+
+        return sigma_new, eps_pl_new
+
+Strain-Rate Controlled Simulation
+---------------------------------
+
+.. code-block:: python
+
+    @jax.jit
+    def simulate_strain_rate_control(
+        sigma0: Array,
+        eps_pl0: Array,
+        sig_y: Array,
+        gdot_t: Array,
+        Khat: Array,
+        p: EPMParams,
+    ):
+        """Run EPM simulation with prescribed strain rate history.
+
+        Uses jax.lax.scan for efficient compilation and execution.
+
+        Parameters
+        ----------
+        sigma0, eps_pl0 : Arrays
+            Initial stress and plastic strain fields
+        sig_y : Array
+            Yield threshold field
+        gdot_t : Array, shape (Nt,)
+            Strain rate at each time step
+        Khat : Array
+            Precomputed Eshelby kernel
+        p : EPMParams
+            Simulation parameters
+
+        Returns
+        -------
+        Sigma_t : Array, shape (Nt,)
+            Macroscopic stress time series
+        sigmaT, epsT : Arrays
+            Final stress and plastic strain fields
+        """
+        def body(carry, gdot):
+            sigma, eps_pl = carry
+            sigma, eps_pl = epm_step(sigma, eps_pl, sig_y, gdot, Khat, p)
+            Sigma = jnp.mean(sigma)
+            return (sigma, eps_pl), Sigma
+
+        (sigmaT, epsT), Sigma_t = jax.lax.scan(body, (sigma0, eps_pl0), gdot_t)
+        return Sigma_t, sigmaT, epsT
+
+Stress-Controlled Simulation (Creep)
+------------------------------------
+
+.. code-block:: python
+
+    @jax.jit
+    def simulate_creep_stress_control(
+        sigma0: Array,
+        eps_pl0: Array,
+        sig_y: Array,
+        Sigma_target: float,
+        Nt: int,
+        Khat: Array,
+        p: EPMParams,
+        gdot0: float = 0.0,
+        gain: float = 0.1,
+    ):
+        """Run EPM creep simulation with stress feedback control.
+
+        Parameters
+        ----------
+        Sigma_target : float
+            Target macroscopic stress
+        Nt : int
+            Number of time steps
+        gain : float
+            Feedback controller gain (λ in documentation)
+
+        Returns
+        -------
+        Sigma_t : Array
+            Macroscopic stress time series
+        gdot_t : Array
+            Strain rate time series
+        sigmaT, epsT : Arrays
+            Final fields
+        """
+        def body(carry, _):
+            sigma, eps_pl, gdot = carry
+            Sigma = jnp.mean(sigma)
+            # P-controller: adjust strain rate
+            gdot = gdot + gain * (Sigma_target - Sigma)
+            sigma, eps_pl = epm_step(sigma, eps_pl, sig_y, gdot, Khat, p)
+            return (sigma, eps_pl, gdot), (Sigma, gdot)
+
+        (sigmaT, epsT, gdotT), (Sigma_t, gdot_t) = jax.lax.scan(
+            body, (sigma0, eps_pl0, gdot0), xs=None, length=Nt
+        )
+        return Sigma_t, gdot_t, sigmaT, epsT
+
+Quasi-Static Avalanche Relaxation
+---------------------------------
+
+For event-driven (quasi-static) simulations, use iterative relaxation:
+
+.. code-block:: python
+
+    def avalanche_relax(
+        sigma: Array,
+        sig_y: Array,
+        Khat: Array,
+        Delta_eps0: float,
+        max_iters: int = 256,
+    ):
+        """Relax unstable sites via iterative yielding until stable.
+
+        All unstable sites yield simultaneously per sub-iteration (JAX-friendly).
+
+        Parameters
+        ----------
+        Delta_eps0 : float
+            Fixed plastic strain increment per yield event
+
+        Returns
+        -------
+        sigma : Array
+            Relaxed (stable) stress field
+        """
+        def one_iter(sigma, _):
+            unstable = jnp.abs(sigma) >= sig_y
+            deps = Delta_eps0 * jnp.sign(sigma) * unstable
+            deps_hat = jnp.fft.fftn(deps)
+            conv = jnp.fft.ifftn(Khat * deps_hat).real
+            sigma = sigma + conv
+            return sigma, None
+
+        sigma, _ = jax.lax.scan(one_iter, sigma, xs=jnp.arange(max_iters))
+        return sigma
+
+Field Initialization
+--------------------
+
+.. code-block:: python
+
+    import jax.random
+
+    def init_sigy(key, p: EPMParams):
+        """Initialize yield threshold field with optional log-normal disorder."""
+        if p.sigy_logstd <= 0:
+            return p.sig_y0 * jnp.ones((p.Lx, p.Ly))
+        z = jax.random.normal(key, (p.Lx, p.Ly))
+        return p.sig_y0 * jnp.exp(p.sigy_logstd * z)
+
+    def init_fields(p: EPMParams):
+        """Initialize stress and plastic strain fields to zero."""
+        sigma0 = jnp.zeros((p.Lx, p.Ly))
+        eps0 = jnp.zeros((p.Lx, p.Ly))
+        return sigma0, eps0
+
+
+Advanced Physics
+================
+
+This section covers advanced theoretical aspects of EPM plasticity, connecting
+the lattice model to broader statistical physics concepts.
+
+
+Avalanche Dynamics
+------------------
+
+One of the defining features of EPM is its ability to capture **plastic avalanches**—
+cascades of yielding events triggered by stress redistribution.
+
+Avalanche Definition
+~~~~~~~~~~~~~~~~~~~~
+
+An avalanche is a sequence of plastic events (block yieldings) triggered by a single
+driving event. The avalanche terminates when no more blocks exceed their yield thresholds.
+
+**Detection algorithm:**
+
+1. Identify primary yield event (block exceeds σ_c)
+2. Propagate stress via Eshelby (FFT convolution)
+3. Count secondary yields (blocks pushed over threshold by redistribution)
+4. Repeat until no new yields occur
+5. Total yield count = avalanche size S
+
+**Code example:**
+
+.. code-block:: python
+
+   def detect_avalanches(model, stress_time_series, sigma_c):
+       """Detect avalanches from stress time series.
+
+       Parameters
+       ----------
+       stress_time_series : ndarray, shape (T, L, L)
+           Spatiotemporal stress field
+       sigma_c : ndarray, shape (L, L)
+           Local yield thresholds
+
+       Returns
+       -------
+       avalanche_sizes : list
+           Sizes of detected avalanches
+       """
+       yielded = jnp.abs(stress_time_series) > sigma_c
+       # Count connected yield events per timestep
+       avalanche_sizes = []
+       for t in range(len(yielded) - 1):
+           new_yields = yielded[t+1] & ~yielded[t]
+           if new_yields.sum() > 0:
+               avalanche_sizes.append(int(new_yields.sum()))
+       return avalanche_sizes
+
+Avalanche Size Distribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the critical regime near yielding, avalanche sizes follow a power-law distribution:
+
+.. math::
+
+   P(S) \sim S^{-\tau} \quad \text{with cutoff } S_c \sim L^{d_f}
+
+where:
+
+- **τ ≈ 1.5-2.0**: Universal exponent (mean-field τ = 3/2, with disorder corrections)
+- **S_c**: Finite-size cutoff scaling with lattice size L
+- **d_f ≈ 2**: Fractal dimension of avalanches in 2D
+
+**Key observations:**
+
+- Well below yield (σ < σ_y): Exponentially distributed (no criticality)
+- At yield (σ ≈ σ_y): Power-law distribution (critical behavior)
+- Above yield (σ > σ_y): Flowing state, continuous plastic activity
+
+**Duration-size scaling:**
+
+Avalanche duration T scales with size S:
+
+.. math::
+
+   T(S) \sim S^{\alpha} \quad \text{with } \alpha \approx 0.5
+
+This scaling connects to the dynamical exponent z = 2 for overdamped dynamics.
+
+**References:** Lin et al. PNAS 2014 [5], Budrikis et al. Nat. Commun. 2017 [10]
+
+
+Yielding Transition Physics
+---------------------------
+
+The yielding transition in EPM exhibits **critical point behavior**, analogous to
+absorbing phase transitions in statistical physics.
+
+Critical Behavior
+~~~~~~~~~~~~~~~~~
+
+Near the macroscopic yield stress σ_y, several quantities diverge or vanish:
+
+**Correlation length:**
+
+.. math::
+
+   \xi \sim |\sigma - \sigma_y|^{-\nu}
+
+where ν is the correlation length exponent (ν ≈ 1 in mean-field).
+
+**Relaxation time:**
+
+.. math::
+
+   \tau_{relax} \sim \xi^z \sim |\sigma - \sigma_y|^{-\nu z}
+
+with dynamical exponent z ≈ 2.
+
+**Mean-field exponents:**
+
+.. list-table::
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Exponent
+     - Value
+     - Physical Meaning
+   * - τ (avalanche)
+     - 3/2
+     - Avalanche size distribution P(S) ~ S^(-τ)
+   * - ν (correlation)
+     - 1
+     - Correlation length ξ ~ (σ-σ_y)^(-ν)
+   * - β (order param)
+     - 1
+     - Plastic rate γ̇_pl ~ (σ-σ_y)^β
+   * - z (dynamical)
+     - 2
+     - Relaxation time τ ~ ξ^z
+
+**Disorder corrections:**
+
+Strong disorder (σ_c_std/σ_c_mean > 0.3) modifies these exponents:
+
+- τ increases toward 2.0 (broader avalanche distribution)
+- ν decreases (shorter correlations)
+
+Dynamical Heterogeneity
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Near yielding, the material exhibits **dynamical heterogeneity**: coexisting regions
+with different local plastic activity. This is quantified by:
+
+**Four-point correlator:**
+
+.. math::
+
+   \chi_4(t) = L^2 \left[ \langle \Delta(t)^2 \rangle - \langle \Delta(t) \rangle^2 \right]
+
+where Δ(t) is the fraction of sites that have yielded by time t.
+
+χ₄ peaks at the characteristic relaxation time, measuring the size of correlated
+rearranging regions.
+
+**Connection to absorbing phase transitions:**
+
+The yielding transition maps onto the **directed percolation universality class**
+in the athermal limit, or conserved directed percolation for stress-controlled protocols.
+
+**References:** Nicolas et al. Rev. Mod. Phys. 2018 §IV [2], Martens et al. PRL 2011 [3]
+
+
+Shear Banding Mechanisms
+------------------------
+
+EPM naturally captures **shear banding**—the localization of plastic flow into
+narrow bands separated by solid-like regions.
+
+Localization Criteria
+~~~~~~~~~~~~~~~~~~~~~
+
+Shear banding in EPM arises from two mechanisms:
+
+1. **Disorder-driven localization**: High disorder (α = σ_c_std/σ_c_mean > 0.3)
+   leads to heterogeneous yield thresholds. Regions with low σ_c yield first,
+   creating stress concentrations that nucleate bands.
+
+2. **Stress redistribution feedback**: The Eshelby propagator's quadrupolar
+   symmetry creates positive feedback—plastic events along the flow direction
+   destabilize neighboring regions.
+
+**Banding criterion:**
+
+.. math::
+
+   \frac{\sigma_{c,std}}{\sigma_{c,mean}} > 0.3 \quad \text{(disorder threshold)}
+
+**Band width:**
+
+.. math::
+
+   w_{band} \sim \xi_{corr} \sim L / \sqrt{\text{disorder}}
+
+where ξ_corr is the correlation length of plastic events.
+
+Detection Methods
+~~~~~~~~~~~~~~~~~
+
+**From velocity profile:**
+
+.. code-block:: python
+
+   def detect_shear_band(velocity_profile, y_positions, threshold=0.1):
+       """Detect shear banding from velocity profile.
+
+       Parameters
+       ----------
+       velocity_profile : ndarray
+           Velocity v_x as function of y
+       y_positions : ndarray
+           y coordinates
+       threshold : float
+           Relative gradient threshold
+
+       Returns
+       -------
+       band_width : float
+           Width of the shear band (or NaN if no banding)
+       """
+       grad_v = jnp.gradient(velocity_profile, y_positions)
+       max_grad = jnp.max(jnp.abs(grad_v))
+
+       # Banding if localized high shear region
+       high_shear = jnp.abs(grad_v) > threshold * max_grad
+       band_width = jnp.sum(high_shear) * (y_positions[1] - y_positions[0])
+       return band_width
+
+**From stress gradients:**
+
+Shear bands correlate with large spatial gradients in the stress field:
+
+.. math::
+
+   \nabla \sigma_{xy} > \sigma_{c,std} / \xi_{corr}
+
+**Transient vs steady-state banding:**
+
+- **Transient bands**: Appear during startup, may homogenize at long times
+- **Steady-state bands**: Persist indefinitely; require strong disorder or thixotropy
+
+**References:** Talamali et al. CR Mécanique 2012 [9], Nicolas et al. Soft Matter 2014 [7]
+
+
+Connections to Other Models
+---------------------------
+
+EPM connects to several other rheological frameworks, providing physical insight
+and enabling model selection.
+
+Soft Glassy Rheology (SGR)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+SGR and EPM describe similar physics from different perspectives:
+
+.. list-table::
+   :widths: 30 35 35
+   :header-rows: 1
+
+   * - Aspect
+     - SGR
+     - EPM
+   * - Approach
+     - Mean-field trap model
+     - Spatially resolved lattice
+   * - Noise temperature
+     - x (thermal + mechanical)
+     - σ_c_std (quenched disorder)
+   * - Yielding
+     - Thermally activated escape
+     - Stress-driven (athermal)
+   * - Avalanches
+     - Implicit (x < 1)
+     - Explicit cascades
+   * - Correlations
+     - None (mean-field)
+     - Quadrupolar (Eshelby)
+
+**Mapping:**
+
+The effective noise temperature x in SGR corresponds to disorder strength:
+
+.. math::
+
+   x \leftrightarrow \frac{\sigma_{c,std}}{\sigma_{c,mean}}
+
+SGR's glass transition (x = 1) maps to the EPM critical disorder threshold.
+
+Fluidity Models
+~~~~~~~~~~~~~~~
+
+Fluidity models describe plastic flow via a kinetic fluidity field φ(r, t).
+
+**Connection:**
+
+.. math::
+
+   \phi = \frac{\dot{\gamma}^{pl}}{\sigma} = \frac{1}{\eta_{pl}}
+
+The local plastic strain rate in EPM maps to fluidity:
+
+- High φ → flowing (high plastic activity)
+- Low φ → arrested (solid-like)
+
+Fluidity diffusion in nonlocal models corresponds to Eshelby stress redistribution
+in the mean-field limit.
+
+Shear Transformation Zone (STZ) Theory
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+STZ theory views plastic events as activated transitions of local structural zones.
+
+**Connection:**
+
+Each EPM lattice block represents a **mesoscopic ensemble of STZs**. The yield
+threshold σ_c corresponds to the activation barrier, and the plastic relaxation
+time τ_pl to the STZ flip rate.
+
+.. math::
+
+   \dot{\gamma}^{pl}_{EPM} \sim n_{STZ} \cdot \nu_{flip} \cdot \gamma_0
+
+where n_STZ is STZ density, ν_flip is flip rate, and γ₀ is elementary strain.
+
+Hébraud-Lequeux Mean-Field Limit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Hébraud-Lequeux (HL) model is the **mean-field limit** of EPM:
+
+- Replace Eshelby propagator with uniform redistribution
+- All sites feel average stress, not local heterogeneity
+- Exact solution possible, faster computation
+
+EPM → HL when:
+
+- L → ∞ and disorder → 0 (thermodynamic limit with weak disorder)
+- Short-range interactions dominate (screened propagator)
+
+The HL model provides analytic benchmarks for EPM predictions.
+
+Depinning Universality Class
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The yielding transition in EPM belongs to the **depinning universality class**
+(interfaces driven through random media):
+
+- **Below threshold**: Pinned (solid-like)
+- **At threshold**: Critical dynamics (avalanches)
+- **Above threshold**: Steady flow (depinned)
+
+**Shared features:**
+
+- Power-law avalanche distributions
+- Finite-size scaling: ξ ~ L at criticality
+- Hysteresis in rate-controlled protocols
+
+This connection enables use of field-theoretic methods from depinning transitions
+to understand yielding rheology.
+
+**References:** Nicolas et al. Rev. Mod. Phys. 2018 [2], Lemaitre & Caroli PRL 2009 [8]
+
+
+Model Extensions
+~~~~~~~~~~~~~~~~
+
+Several extensions to the basic EPM framework are commonly used:
+
+**1. Activated Yielding (Thermal/Athermal Noise)**
+
+   Add thermal activation to the yield criterion:
+
+   .. math::
+
+      r_i = r_0 \exp\left( -\frac{\Delta E(\sigma_i)}{k_B T} \right)
+
+   where :math:`\Delta E(\sigma_i) = E_0 (1 - |\sigma_i|/\sigma_{y,i})^p` (often :math:`p = 3/2`).
+
+   This bridges EPM toward **SGR-like dynamics** and allows modeling of creep
+   at sub-yield stresses.
+
+**2. Aging (Time-Dependent Yield Thresholds)**
+
+   Allow :math:`\sigma_{y,i}` to evolve:
+
+   .. math::
+
+      \dot{\sigma}_{y,i} = \frac{\sigma_{y,\infty} - \sigma_{y,i}}{t_{\mathrm{age}}} - \text{(rejuvenation from yielding)}
+
+   This captures physical aging in glassy materials.
+
+**3. Tensorial EPM for General Flow**
+
+   Store the full deviatoric stress tensor :math:`[\sigma_{xx}, \sigma_{yy}, \sigma_{xy}]`
+   at each site. Enables:
+
+   - Normal stress predictions (N₁, N₂)
+   - Anisotropic yield criteria (Hill, von Mises)
+   - More accurate flow instability predictions
+
+   See :doc:`tensorial_epm` for details.
+
+**4. Shear Banding / Nonlocal Models**
+
+   Retain explicit gradient direction (y-dependence in planar Couette):
+
+   - Track velocity field :math:`v_x(y, t)`
+   - Add stress diffusion :math:`D_\sigma \nabla^2 \sigma` to regularize bands
+   - Couple to fluidity field for nonlocal relaxation
+
+   Essential for predicting band width and transient banding dynamics.
+
+
+Advanced Usage: Multi-Protocol Joint Fitting
+---------------------------------------------
+
+For robust parameter estimation, fit EPM to multiple protocols simultaneously:
+
+.. code-block:: python
+
+   from rheojax.models import LatticeEPM
+   from rheojax.pipeline import Pipeline
+   import numpy as np
+
+   # Load multi-protocol data
+   flow_data = RheoData.from_csv("flow_curve.csv", test_mode="flow_curve")
+   startup_data = RheoData.from_csv("startup.csv", test_mode="startup")
+   creep_data = RheoData.from_csv("creep.csv", test_mode="creep")
+
+   # Create model with small lattice for fitting
+   model = LatticeEPM(L=12, dt=0.01)
+
+   # Joint fitting with protocol weights
+   model.fit_multi_protocol(
+       [flow_data, startup_data, creep_data],
+       weights=[1.0, 2.0, 1.0],  # Emphasize startup
+       max_iter=500
+   )
+
+   # Bayesian with multi-protocol likelihood
+   result = model.fit_bayesian_multi_protocol(
+       [flow_data, startup_data, creep_data],
+       weights=[1.0, 2.0, 1.0],
+       num_warmup=1000,
+       num_samples=2000,
+       num_chains=4,
+       seed=42
+   )
+
+   # Validate on held-out protocol (LAOS)
+   laos_data = RheoData.from_csv("laos.csv", test_mode="oscillation")
+   laos_pred = model.predict(laos_data)
+
+
+Parameter Sensitivity from Bayesian Posteriors
+----------------------------------------------
+
+Use Bayesian posteriors to understand parameter identifiability and correlations:
+
+.. code-block:: python
+
+   import arviz as az
+
+   # After fit_bayesian()
+   idata = result.to_arviz()
+
+   # Pair plot reveals correlations
+   az.plot_pair(idata, var_names=["sigma_c_mean", "sigma_c_std", "tau_pl"])
+
+   # Sensitivity: which parameters are well-constrained?
+   summary = az.summary(idata, hdi_prob=0.95)
+   for param in summary.index:
+       cv = summary.loc[param, "sd"] / summary.loc[param, "mean"]
+       print(f"{param}: CV = {cv:.2f} ({'well-constrained' if cv < 0.3 else 'uncertain'})")
+
+   # Prior-posterior comparison (diagnostic for informativeness)
+   az.plot_dist_comparison(idata, var_names=["sigma_c_mean"])
+
+
+Disorder Estimation from Stress Overshoot
+-----------------------------------------
+
+The stress overshoot in startup shear contains information about disorder strength:
+
+**Physical basis:**
+
+- Higher disorder → larger overshoot amplitude
+- Overshoot position (peak strain) → τ_pl × γ̇
+- Overshoot variability across runs → σ_c_std
+
+.. code-block:: python
+
+   def estimate_disorder_from_overshoot(gamma_dot_range, n_repeats=10):
+       """Estimate disorder from overshoot variability.
+
+       Higher variability across runs indicates stronger disorder.
+       """
+       model = LatticeEPM(L=16, dt=0.01)
+       overshoot_cv = []  # Coefficient of variation
+
+       for gamma_dot in gamma_dot_range:
+           peaks = []
+           for seed in range(n_repeats):
+               t = np.linspace(0, 50/gamma_dot, 500)
+               stress = model.predict(t, test_mode="startup",
+                                       gamma_dot=gamma_dot, seed=seed)
+               peaks.append(np.max(stress))
+
+           cv = np.std(peaks) / np.mean(peaks)
+           overshoot_cv.append(cv)
+
+       # High CV indicates strong disorder
+       return np.array(overshoot_cv)
+
+
+Full BayesianPipeline Workflow
+------------------------------
+
+Complete pipeline from data loading to uncertainty quantification:
+
+.. code-block:: python
+
+   from rheojax.pipeline.bayesian import BayesianPipeline
+   from rheojax.models import LatticeEPM
+
+   # Initialize pipeline
+   pipeline = BayesianPipeline()
+
+   # Load and fit
+   (pipeline
+       .load("experimental_data.csv",
+             x_col="gamma_dot",
+             y_col="stress",
+             test_mode="flow_curve")
+       .model(LatticeEPM, L=12, dt=0.01)  # Small lattice for fitting
+       .fit_nlsq(max_iter=500)            # Fast point estimate
+       .fit_bayesian(                     # Full Bayesian
+           num_warmup=1000,
+           num_samples=2000,
+           num_chains=4,
+           seed=42
+       )
+   )
+
+   # Diagnostics (ArviZ integration)
+   (pipeline
+       .plot_trace()                      # MCMC convergence
+       .plot_pair(divergences=True)       # Parameter correlations
+       .plot_forest(hdi_prob=0.95)        # Credible intervals
+       .plot_energy()                     # HMC diagnostics
+   )
+
+   # Check convergence
+   diagnostics = pipeline.get_diagnostics()
+   assert max(diagnostics["r_hat"].values()) < 1.05, "R-hat too high"
+   assert min(diagnostics["ess"].values()) > 400, "ESS too low"
+   assert diagnostics["divergences"] < 0.01, "Too many divergences"
+
+   # Save results
+   (pipeline
+       .save_results("epm_fit.hdf5")      # Full posteriors
+       .save_summary("epm_summary.csv")   # Parameter estimates
+   )
+
+   # Production prediction at higher resolution
+   model_prod = LatticeEPM(L=64, dt=0.01)
+   model_prod.params = pipeline.model.params.copy()
+   gamma_dot_fine = np.logspace(-2, 1, 100)
+   stress_pred = model_prod.predict(gamma_dot_fine, test_mode="flow_curve")

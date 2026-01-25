@@ -191,6 +191,62 @@ and :math:`G''_t(t)` depend only on **changes** in strain, not the total strain.
 therefore immune to the arbitrary choice of reference state that affects static schemes.
 This approach has been validated against theoretical nonlinear models [4]_.
 
+Lab Frame vs Material Frame
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A central conceptual advance in Rogers (2017) [2]_ is the distinction between the
+**lab frame strain** and the **material frame strain**. This distinction explains
+how SPP captures yielding without requiring explicit yield criteria.
+
+**Lab Frame Strain**: :math:`\gamma(t)`
+   The externally imposed deformation, measured relative to the initial configuration.
+   This is what the rheometer controls and reports.
+
+**Material Frame Strain**: :math:`\gamma(t) - \gamma_{eq}(t)`
+   The actual elastic deformation experienced by the microstructure, relative to its
+   current equilibrium position. This is the strain that produces elastic stress.
+
+**Equilibrium Strain** :math:`\gamma_{eq}(t)`:
+   The position of zero elastic extension, which can shift during deformation.
+   In linear viscoelasticity, :math:`\gamma_{eq} = 0` at all times. For yield stress
+   materials, :math:`\gamma_{eq}` shifts as cages rupture and reform.
+
+**Physical Interpretation**:
+
+Consider a material undergoing LAOS with amplitude :math:`\gamma_0`:
+
+1. **Pre-yield** (:math:`|\gamma| < \gamma_y`):
+   - :math:`\gamma_{eq} = 0` (equilibrium hasn't shifted)
+   - Material frame strain equals lab frame strain
+   - Elastic stress: :math:`\sigma_{elastic} = G'_t \cdot \gamma`
+
+2. **During yielding** (cage rupture):
+   - :math:`\gamma_{eq}` begins to shift toward :math:`\gamma`
+   - Material frame strain decreases even as lab frame strain increases
+   - This is how plastic flow reduces elastic stress
+
+3. **Post-yield** (:math:`|\gamma| > \gamma_y`):
+   - :math:`\gamma_{eq} \to \pm(\gamma_0 - \gamma_y)` for yield stress materials
+   - Material frame strain saturates near :math:`\gamma_y`
+   - Subsequent deformation is predominantly viscous
+
+**Mathematical Expression**:
+
+The complete stress decomposition becomes:
+
+.. math::
+
+   \sigma(t) = \underbrace{G'_t(t)[\gamma(t) - \gamma_{eq}(t)]}_{\text{elastic stress in material frame}}
+   + \underbrace{\frac{G''_t(t)}{\omega}\dot{\gamma}(t)}_{\text{viscous stress}}
+   + \underbrace{\sigma_y(t)}_{\text{yield contribution}}
+
+For **linear viscoelastic materials**: :math:`\gamma_{eq} = 0` and :math:`\sigma_y = 0`.
+
+For **generalized Newtonian fluids**: :math:`\gamma_{eq} = \gamma(t)` (no elastic stress).
+
+For **yield stress materials**: :math:`\gamma_{eq}` shifts during the yielding process,
+capturing the plastic strain accumulation through the displacement term.
+
 The Displacement Term
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -392,6 +448,78 @@ In the linear regime, :math:`\tau = 0` everywhere, making both derivatives zero 
 
 ----
 
+Analysis Methods
+----------------
+
+The SPP framework supports two complementary analysis approaches for computing
+instantaneous moduli from LAOS waveforms. RheoJAX implements both methods
+with Rogers-parity defaults matching the MATLAB SPPplus v2.1 implementation.
+
+Fourier Domain Filtering
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Fourier method reconstructs the stress waveform using a finite number
+of odd harmonics before computing derivatives:
+
+**Parameters:**
+
+- ``n_harmonics`` (M): Number of harmonics for reconstruction (default: 39, must be odd)
+- ``n_periods`` (p): Number of oscillation periods in the data
+
+**When to use:**
+
+- High-quality periodic data at steady alternance
+- When Fourier spectrum provides additional insight
+- For comparison with FTC (Fourier-Chebyshev) analysis
+
+**Key consideration:** M should be set based on the noise floor—higher M captures
+more nonlinear detail but may amplify noise. The default M=39 balances detail
+capture with noise rejection for typical rheometer data.
+
+Numerical Differentiation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The numerical method uses finite differences directly on the measured waveforms:
+
+**Parameters:**
+
+- ``step_size`` (k): Points for finite difference stencil (default: 8)
+- ``num_mode``: Differentiation procedure
+
+  - Mode 1: Standard (forward/backward at ends, centered elsewhere)
+  - Mode 2: Looped (assumes periodic, centered everywhere—**recommended for LAOS**)
+
+**When to use:**
+
+- Non-periodic or partial-cycle data
+- When Fourier decomposition is unnecessary
+- For real-time or streaming analysis
+
+Method Comparison
+~~~~~~~~~~~~~~~~~
+
+.. list-table:: SPP Analysis Method Comparison
+   :header-rows: 1
+   :widths: 25 35 40
+
+   * - Aspect
+     - Fourier Domain
+     - Numerical Differentiation
+   * - Data requirement
+     - Integer periods, even points/period
+     - Any sampling
+   * - Noise handling
+     - Implicit filtering via harmonic truncation
+     - Requires pre-smoothing or larger k
+   * - Computational cost
+     - FFT + filtering
+     - Direct finite differences
+   * - Best for
+     - Steady-state LAOS
+     - Transients, partial cycles
+
+----
+
 What You Can Learn
 ------------------
 
@@ -570,6 +698,73 @@ Material Characterization Capabilities
 
 Parameters
 ----------
+
+SPP Output Variables
+~~~~~~~~~~~~~~~~~~~~
+
+The SPP decomposer produces the following time-dependent quantities. These
+correspond to the output variables in the MATLAB SPPplus v2.1 implementation.
+
+.. list-table:: Standard SPP Output (always computed)
+   :header-rows: 1
+   :widths: 20 50 30
+
+   * - Variable
+     - Description
+     - Notes
+   * - :math:`G'_t(t)`
+     - Time-dependent storage modulus
+     - Instantaneous elastic response
+   * - :math:`G''_t(t)`
+     - Time-dependent loss modulus
+     - Instantaneous viscous response
+   * - :math:`|G^*_t(t)|`
+     - Magnitude of complex modulus
+     - :math:`\sqrt{G'^2_t + G''^2_t}`
+   * - :math:`\tan(\delta_t)`
+     - Time-dependent loss tangent
+     - :math:`G''_t / G'_t`
+   * - :math:`\delta_t(t)`
+     - Time-dependent phase angle
+     - Range: :math:`[-\pi/2, 3\pi/2]`
+   * - :math:`\sigma_d(t)`
+     - Displacement stress
+     - Osculating plane position
+   * - :math:`\gamma_{eq,est}(t)`
+     - Estimated equilibrium strain
+     - Valid when :math:`G'_t \gg G''_t`
+   * - :math:`\dot{G}'_t(t)`
+     - Storage modulus rate
+     - Stiffening (+) / softening (-)
+   * - :math:`\dot{G}''_t(t)`
+     - Loss modulus rate
+     - Thickening (+) / thinning (-)
+   * - :math:`|\dot{G}^*_t(t)|`
+     - Complex modulus speed
+     - Rate of modulus change
+   * - :math:`\tilde{\dot{\delta}}_t(t)`
+     - Normalized phase angle velocity
+     - Assumes sinusoidal strain
+
+.. list-table:: Extended SPP Output (TNB frame vectors)
+   :header-rows: 1
+   :widths: 20 50 30
+
+   * - Variable
+     - Description
+     - Notes
+   * - :math:`\mathbf{T}(t)`
+     - Tangent vector
+     - Direction of motion in deformation space
+   * - :math:`\mathbf{N}(t)`
+     - Normal vector
+     - Direction of curvature
+   * - :math:`\mathbf{B}(t)`
+     - Binormal vector
+     - Osculating plane orientation
+
+Extracted Physical Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The SPP decomposer extracts the following physical parameters:
 
@@ -760,8 +955,78 @@ observed in Fourier spectra are explained by the power-law flow response post-yi
 For a comprehensive review of LAOS methods including both SPP and Fourier approaches,
 see Hyun et al. (2011) [6]_.
 
+SPP vs FTC: Complementary Analysis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Recent studies (2022-2024) have demonstrated that SPP and Fourier-Transform
+coupled with Chebyshev decomposition (FTC) methods provide complementary
+insights for nonlinear rheology characterization:
+
+**SPP Advantages:**
+
+- Time-resolved instantaneous parameters at any point in the cycle
+- Direct physical interpretation (cage modulus, yield stresses)
+- No assumption about response symmetry
+- Applicable to partial cycles and transients
+- Reveals intracycle yielding sequence
+
+**FTC Advantages:**
+
+- Global measures averaged over complete cycles
+- Direct connection to Pipkin diagram coordinates
+- Established elastic/viscous Chebyshev coefficients (:math:`e_n, v_n`)
+- Broader literature base for material fingerprinting
+- Standard nonlinearity metrics (:math:`S, T, I_3/I_1`)
+
+**Recommended Workflow:**
+
+1. Apply FTC for initial nonlinearity characterization (:math:`I_3/I_1`, S, T factors)
+2. Apply SPP for intracycle process identification
+3. Combine insights: FTC defines "what" is nonlinear, SPP reveals "when" and "why"
+
+Recent comparative studies have applied both methods to food rheology (doughs, gels),
+3D printing materials, and emulsions, finding that the combined approach provides
+more complete material understanding than either method alone [11]_ [12]_.
+
 Usage
 -----
+
+Input Data Requirements
+~~~~~~~~~~~~~~~~~~~~~~~
+
+For reliable SPP analysis, input data should meet these specifications:
+
+**Data Format:**
+
+- Time series: :math:`t, \gamma(t), \dot{\gamma}(t), \sigma(t)`
+- Columns: Time [s], Strain [-], Strain Rate [1/s], Stress [Pa]
+- If strain rate unavailable, will be differentiated from strain (requires periodic data)
+
+**Sampling Requirements:**
+
+- For Fourier method: Integer number of periods with even points per period
+- For numerical method: Uniform time spacing recommended
+- Typical: 200-1000 points per period for smooth derivatives
+
+**Unit Conversions:**
+
+The decomposer accepts standard SI units. For non-SI data, apply conversion factors:
+
+.. code-block:: python
+
+   # Example: strain in % to strain units
+   data['strain'] = data['strain_percent'] / 100
+
+   # Example: stress in kPa to Pa
+   data['stress'] = data['stress_kPa'] * 1000
+
+**Data Quality Checklist:**
+
+- Remove startup transients (typically first 1-2 cycles)
+- Ensure steady alternance before analysis
+- Check for wall slip or shear banding artifacts
+- Verify data spans complete oscillation cycles
+- Confirm stress-strain Lissajous forms closed loops
 
 Basic SPP Analysis
 ~~~~~~~~~~~~~~~~~~
@@ -1011,3 +1276,11 @@ References
 .. [10] van Puyvelde, P., Velankar, S., and Mewis, J. "Rheology and morphology of
    compatibilized polymer blends." In *Polymer Blends Handbook*, Springer, 421-626 (2014).
    https://doi.org/10.1007/978-94-007-6064-6_7
+
+.. [11] Le, T. D., et al. "LAOS rheological characterization of food materials:
+   Comparison of Fourier-transform and SPP analysis methods." *Food Research
+   International* **165**, 112478 (2023). https://doi.org/10.1016/j.foodres.2023.112478
+
+.. [12] Duvarci, O. C., et al. "Comparison of LAOS analysis methods: SPP versus
+   Fourier-Chebyshev decomposition for wheat flour doughs." *Food Hydrocolloids*
+   **128**, 107570 (2022). https://doi.org/10.1016/j.foodhyd.2022.107570

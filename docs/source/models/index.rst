@@ -78,24 +78,16 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    hl/hebraud_lequeux
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Elasto-Plastic Models (EPM)
 
-   epm/lattice_epm
-   epm/tensorial_epm
+   epm/index
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Fluidity Models
 
-   fluidity/fluidity_local
-   fluidity/fluidity_nonlocal
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Fluidity-Saramito EVP Models
-
-   fluidity/saramito_evp
+   fluidity/index
 
 .. toctree::
    :maxdepth: 1

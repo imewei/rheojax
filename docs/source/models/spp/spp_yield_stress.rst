@@ -173,6 +173,174 @@ The **displacement term** :math:`\sigma_y(t) - G'_t(t)\gamma_{eq}(t)` captures:
 - This distinction between lab frame and material frame is essential for
   understanding the physical origin of the two yield stresses
 
+Connection to Steady-Shear Flow Curves
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The dynamic yield stress from SPP analysis connects directly to steady-shear
+Herschel-Bulkley fitting, enabling cross-validation between oscillatory and
+rotational measurements:
+
+**Cross-Validation Protocol:**
+
+1. Extract :math:`\sigma_{dy}` from LAOS amplitude sweep using SPP decomposition
+2. Fit steady-shear flow curve: :math:`\sigma = \sigma_y + K\dot{\gamma}^n`
+3. Compare: :math:`\sigma_{dy,\text{LAOS}}` should match :math:`\sigma_y` from steady shear
+
+**Expected Agreement:**
+
+- Good agreement indicates simple yield stress behavior (Bingham-like)
+- Discrepancy suggests thixotropy, structural evolution, or measurement artifacts
+- Large disagreement may indicate shear banding, wall slip, or elastic recoil effects
+
+**Rate-Amplitude Duality:**
+
+Rogers et al. (2011) demonstrated that yield stresses scale identically with
+strain amplitude and shear rate:
+
+.. math::
+
+   \sigma_y(\gamma_0) \propto \gamma_0^{n} \quad \text{(amplitude)}
+
+.. math::
+
+   \sigma_y(\dot{\gamma}_0) \propto \dot{\gamma}_0^{n} \quad \text{(rate)}
+
+This universal exponent (:math:`n \approx 0.2` for hard-sphere colloids) connects LAOS
+and steady-shear characterization through a single material parameter.
+
+**Practical Cross-Validation Example:**
+
+.. code-block:: python
+
+   from rheojax.models import SPPYieldStress, HerschelBulkley
+
+   # Fit LAOS amplitude sweep
+   spp_model = SPPYieldStress()
+   spp_model.fit(gamma_0, sigma_dy_laos, test_mode='oscillation', yield_type='dynamic')
+   sigma_dy_spp = spp_model.parameters.get_value('sigma_dy_scale')
+
+   # Fit steady-shear flow curve
+   hb_model = HerschelBulkley()
+   hb_model.fit(gamma_dot, sigma_steady, test_mode='rotation')
+   sigma_y_hb = hb_model.parameters.get_value('sigma_y')
+
+   # Cross-validate
+   relative_error = abs(sigma_dy_spp - sigma_y_hb) / sigma_y_hb
+   print(f"Yield stress agreement: {100 * (1 - relative_error):.1f}%")
+   # Typical agreement: >90% for simple yield stress fluids
+
+Theoretical Benchmarks (Rogers & Lettinga 2012)
+-----------------------------------------------
+
+Rogers & Lettinga (2012) [2]_ applied the SPP framework to classical nonlinear
+viscoelastic models, establishing theoretical benchmarks against which experimental
+data can be validated. These predictions serve as reference behaviors for
+interpreting yield stress material responses.
+
+Bingham Model Response
+~~~~~~~~~~~~~~~~~~~~~~
+
+The Bingham fluid :math:`\sigma = \sigma_y + \eta_p \dot{\gamma}` (for :math:`|\sigma| > \sigma_y`)
+represents the idealized yield stress fluid. Under LAOS, the SPP framework reveals
+a characteristic four-step intracycle sequence:
+
+**Step 1: Elastic Extension** (|γ| < γ_y)
+   - Stress builds linearly: :math:`\sigma = G_{cage} \cdot \gamma`
+   - :math:`G'_t \approx G_{cage}` (constant), :math:`G''_t \approx 0`
+   - Cole-Cole trajectory: remains near the :math:`G'_t` axis
+
+**Step 2: Static Yielding** (at γ = ±γ_y)
+   - Cages rupture; stress reaches :math:`\sigma_{y,static} = G_{cage} \cdot \gamma_y`
+   - Sharp transition: :math:`G'_t` drops rapidly, :math:`G''_t` increases
+   - Cole-Cole: trajectory moves from elastic toward viscous dominance
+
+**Step 3: Newtonian Flow** (|γ| > γ_y, |γ̇| large)
+   - Material flows with constant viscosity :math:`\eta_p`
+   - :math:`G'_t \approx 0`, :math:`G''_t \approx \eta_p \omega`
+   - Cole-Cole: trajectory resides near the :math:`G''_t` axis
+
+**Step 4: Cage Reformation** (as γ̇ → 0 at ±γ_max)
+   - Microstructure rapidly reforms at rate reversal
+   - :math:`G''_t \to 0`, :math:`G'_t` increases
+   - :math:`\sigma_{y,dynamic}` measured at this instant
+   - Cole-Cole: trajectory returns toward elastic dominance
+
+**Key Bingham Predictions:**
+   - The equilibrium strain :math:`\gamma_{eq}` shifts to :math:`\pm(\gamma_0 - \gamma_y)` after yielding
+   - Static yield stress :math:`\sigma_{y,static}` exceeds dynamic :math:`\sigma_{y,dynamic}` due to reformation
+   - Post-yield flow follows the steady-state Bingham flow curve exactly
+   - Higher harmonics in stress arise solely from the yield transition (not from viscosity)
+
+Giesekus Model Response
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The Giesekus model, which includes a nonlinear relaxation term with mobility
+parameter :math:`\alpha`, exhibits elastic recoil during flow reversal. Under SPP analysis:
+
+**Elastic Recoil Signatures:**
+   - Unlike ideal Bingham, :math:`G'_t` does not drop to zero during flow
+   - The material retains elastic character even post-yield due to polymer stretch
+   - Stress overshoots during startup are more pronounced than Bingham
+
+**SPP Trajectory Features:**
+   - Cole-Cole plots form loops rather than simple back-and-forth trajectories
+   - Loop area increases with Deborah number (De = λω)
+   - Trajectory directionality (clockwise vs counterclockwise) encodes stress response phase
+
+**Mobility Parameter Effects (α):**
+   - :math:`\alpha = 0` (upper-convected Maxwell): purely elastic, no shear thinning
+   - :math:`\alpha = 0.5`: intermediate behavior, moderate shear thinning
+   - :math:`\alpha \to 1`: stronger nonlinearity, more pronounced recoil features
+
+**Validation Use Cases:**
+   - If experimental data shows Giesekus-like loops but no clear yield, the material
+     may be viscoelastic rather than yield-stress
+   - Bingham-like step transitions indicate simpler yield stress behavior
+   - Hybrid behaviors suggest complex microstructure (e.g., polymer-in-suspension)
+
+Power-Law Fluid (Non-Yield)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For comparison, a purely viscous power-law fluid :math:`\sigma = K |\dot{\gamma}|^n \text{sgn}(\dot{\gamma})`
+shows characteristic SPP behavior that lacks the yield-stress sequence:
+
+**SPP Predictions:**
+   - :math:`G'_t = 0` everywhere (no elasticity)
+   - :math:`G''_t` varies with shear rate as :math:`\sim |\dot{\gamma}|^{n-1}`
+   - No cage modulus can be defined (dσ/dγ|_{σ=0} is undefined)
+   - Cole-Cole trajectory collapses to the :math:`G''_t` axis
+
+**Diagnostic Implication:**
+   If experimental SPP shows negligible :math:`G'_t` values, the material may not be
+   a yield stress fluid but rather a shear-thinning viscous material.
+
+Validating Experimental Data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use these benchmarks to assess experimental SPP results:
+
+.. list-table:: Theoretical Benchmark Comparison
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Observation
+     - Matches
+     - Physical Interpretation
+   * - Sharp 4-step transitions, :math:`G'_t \to 0` post-yield
+     - Bingham
+     - Simple yield stress fluid, brittle cages
+   * - Loops in Cole-Cole, non-zero :math:`G'_t` post-yield
+     - Giesekus-like
+     - Viscoelastic yield stress, elastic recoil
+   * - :math:`G'_t \approx 0` throughout cycle
+     - Power-law
+     - Viscous fluid, no yield stress
+   * - Partial matches
+     - Hybrid
+     - Complex microstructure; consider thixotropy or heterogeneity
+
+----
+
 Constitutive Equations
 ----------------------
 

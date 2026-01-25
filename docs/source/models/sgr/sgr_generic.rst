@@ -113,6 +113,125 @@ The two generators must satisfy **degeneracy conditions**:
 These conditions ensure thermodynamic consistency: reversible processes conserve entropy,
 while irreversible processes conserve energy.
 
+Poisson Bracket Structure
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The reversible (Hamiltonian) part of the dynamics is encoded in the **Poisson bracket**
+:math:`\{A, B\}` for any two functionals :math:`A[P]` and :math:`B[P]`:
+
+.. math::
+
+   \{A, B\} = \int dE \, dl \, P(E, l) \left[
+       \frac{\delta A}{\delta P} \mathbf{L} \frac{\delta B}{\delta P}
+   \right]
+
+For the SGR model, the Poisson bracket captures the advection of elements by
+macroscopic flow:
+
+.. math::
+
+   \{A, B\}_{\text{advection}} = \dot{\gamma} \int dE \, dl \, P \left[
+       \frac{\partial}{\partial l}\frac{\delta A}{\delta P} \cdot \frac{\delta B}{\delta \dot{\gamma}}
+       - \frac{\partial}{\partial l}\frac{\delta B}{\delta P} \cdot \frac{\delta A}{\delta \dot{\gamma}}
+   \right]
+
+**Properties of the Poisson Bracket**
+
+The Poisson bracket must satisfy:
+
+1. **Antisymmetry**: :math:`\{A, B\} = -\{B, A\}`
+
+2. **Bilinearity**: Linear in both arguments
+
+3. **Jacobi identity**: :math:`\{A, \{B, C\}\} + \{B, \{C, A\}\} + \{C, \{A, B\}\} = 0`
+
+4. **Leibniz rule**: :math:`\{AB, C\} = A\{B, C\} + B\{A, C\}`
+
+The SGR advection bracket can be verified to satisfy all these conditions.
+
+**Derivation from Continuity**
+
+The Poisson structure arises from the continuity equation for :math:`P(E, l, t)`:
+
+.. math::
+
+   \frac{\partial P}{\partial t} + \frac{\partial}{\partial l}(P \dot{l}) = \text{(yielding terms)}
+
+Under affine deformation, :math:`\dot{l} = \dot{\gamma}`, giving the advection flux.
+The reversible part corresponds to this flux without yielding, which is conservative
+(preserves :math:`\int P \, dE \, dl = 1`).
+
+Onsager-Casimir Symmetry
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The dissipative part of the dynamics, encoded in the friction matrix :math:`\mathbf{M}`,
+must satisfy **Onsager-Casimir reciprocal relations**:
+
+.. math::
+
+   M_{ij} = \epsilon_i \epsilon_j M_{ji}
+
+where :math:`\epsilon_i = \pm 1` is the time-reversal parity of variable :math:`z_i`.
+
+**Time-Reversal Parities in SGR**
+
+For the SGR distribution :math:`P(E, l, t)`:
+
+- **Trap depth** :math:`E`: Even under time reversal (:math:`\epsilon_E = +1`)
+- **Local strain** :math:`l`: Even (:math:`\epsilon_l = +1`, since :math:`l` is a displacement)
+- **Strain rate** :math:`\dot{\gamma}`: Odd (:math:`\epsilon_{\dot{\gamma}} = -1`)
+
+The yielding rate :math:`\Gamma(E, l) = \exp(-E + l^2/2)` is time-reversal symmetric
+(depends on :math:`l^2`), ensuring:
+
+.. math::
+
+   M[P](E, l; E', l') = M[P](E', l'; E, l)
+
+This **Onsager symmetry** (all parities equal) follows from the detailed balance
+structure of the yielding process with respect to :math:`\rho(E)`.
+
+**Casimir Invariants**
+
+Quantities :math:`C[P]` satisfying :math:`\{C, H\} = 0` for all Hamiltonians :math:`H`
+are Casimir invariants. For the SGR advection bracket:
+
+- Total probability :math:`\int P \, dE \, dl = 1` is a Casimir (particle number conservation)
+- The trap distribution :math:`\rho(E)` is invariant under reversible dynamics
+
+Detailed Balance and Fluctuation-Dissipation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The friction matrix :math:`\mathbf{M}` satisfies a **detailed balance** condition
+ensuring approach to equilibrium:
+
+.. math::
+
+   M[P](E, l; E', l') \, P_{\text{eq}}(E', l') = M[P](E', l'; E, l) \, P_{\text{eq}}(E, l)
+
+For the SGR yielding kernel:
+
+.. math::
+
+   M[P](E, l; E', l') = \Gamma(E, l) P(E, l) \, \rho(E') \, \delta(l')
+
+The detailed balance is satisfied because the yielding rate :math:`\Gamma(E, l)` together
+with rebirth into :math:`\rho(E)` respects the equilibrium distribution structure.
+
+**Fluctuation-Dissipation Theorem**
+
+Near equilibrium, the GENERIC structure implies a fluctuation-dissipation relation:
+
+.. math::
+
+   \langle \delta z_i(t) \delta z_j(0) \rangle_{\text{eq}} = x \, M_{ij} \, e^{-|t|/\tau_{ij}}
+
+where :math:`\delta z_i = z_i - \langle z_i \rangle_{\text{eq}}` are fluctuations and
+:math:`\tau_{ij}` is the relaxation time for the :math:`(i, j)` correlation.
+
+This connects the microscopic yielding dynamics to macroscopic response functions,
+providing a thermodynamic foundation for the noise temperature :math:`x`.
+
 State Variables for SGR
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -165,6 +284,31 @@ The nonequilibrium free energy is:
 
 This Helmholtz-like free energy uses the effective noise temperature :math:`x` instead of
 thermal temperature.
+
+Entropic Stress Contribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the GENERIC framework, configurational entropy contributes an additional stress term
+beyond the mechanical (elastic) stress. From Fuereder & Ilg (2013), the configurational
+stress arises from the entropy functional:
+
+.. math::
+
+   \sigma^{(\text{conf})} = x \frac{\partial S}{\partial \gamma}
+   = -x \int dE\,dl\, P \frac{\partial}{\partial \gamma} \ln\frac{P}{\rho}
+
+This entropic stress vanishes in equilibrium (:math:`P = P_{\text{eq}}`), but contributes
+during nonequilibrium flow when the distribution deviates from the Boltzmann form.
+
+The total stress is thus:
+
+.. math::
+
+   \sigma_{\text{total}} = \sigma^{(\text{mech})} + \sigma^{(\text{conf})}
+   = k \int dE\,dl\, l\, P(E,l) - x \int dE\,dl\, P \frac{\partial}{\partial \gamma} \ln\frac{P}{\rho}
+
+The first term is the familiar elastic stress (local strain weighted by spring constant),
+while the second represents the thermodynamic driving force from configurational disorder.
 
 Poisson Bracket (Reversible Dynamics)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -232,6 +376,215 @@ Explicitly:
    \right]
 
 At equilibrium, :math:`P = P_{\text{eq}}` and :math:`\dot{S}_{\text{prod}} = 0`.
+
+Entropy Production Decomposition
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Following Fuereder & Ilg (2013), the total entropy change can be decomposed into
+distinct physical contributions:
+
+.. math::
+
+   \dot{S}_{\text{tot}} = \dot{S}_{\text{res}} + \dot{S}_{\text{trans}} + \dot{S}_{\text{yield}}
+
+where:
+
+- :math:`\dot{S}_{\text{res}}`: Entropy change in the thermal reservoir (heat bath at temperature :math:`\theta`)
+- :math:`\dot{S}_{\text{trans}}`: Entropy transfer between the configurational subsystem (at temperature :math:`\chi = x`) and the thermal reservoir
+- :math:`\dot{S}_{\text{yield}}`: Entropy production from irreversible yielding transitions
+
+The reservoir contribution captures heat exchange:
+
+.. math::
+
+   \dot{S}_{\text{res}} = -\frac{\dot{Q}}{\theta}
+
+where :math:`\dot{Q}` is the heat flow from reservoir to configurational degrees of freedom.
+
+The transfer contribution arises from the temperature difference:
+
+.. math::
+
+   \dot{S}_{\text{trans}} = A\left(\frac{1}{\theta} - \frac{1}{\chi}\right)(\theta - \chi)
+   = \frac{A(\theta - \chi)^2}{\theta \chi} \geq 0
+
+where :math:`A` is the heat transfer coefficient. This term is always non-negative,
+representing the irreversible equilibration between thermal and configurational
+subsystems.
+
+The yielding contribution is the dominant term during flow:
+
+.. math::
+
+   \dot{S}_{\text{yield}} = \int dE\,dl\, \Gamma(E,l) P(E,l) \left[
+       \frac{E - \frac{1}{2}kl^2}{\chi} + \ln\frac{P(E,l)}{P_{\text{eq}}(E)}
+   \right] \geq 0
+
+This decomposition illuminates the thermodynamic origin of dissipation in SGR:
+yielding events release elastic strain energy, which is partially converted to
+configurational entropy and partially transferred to the thermal reservoir.
+
+Effective Temperature Dynamics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The configurational temperature :math:`\chi` (identified with the noise temperature :math:`x`)
+is not a fixed parameter but can evolve according to an energy balance. From
+Fuereder & Ilg (2013) and Sollich & Cates (2012):
+
+.. math::
+
+   C_V^{\text{eff}} \dot{\chi} = W + A(\theta - \chi)
+
+where:
+
+- :math:`C_V^{\text{eff}}`: Effective heat capacity of configurational degrees of freedom
+- :math:`W = \sigma \dot{\gamma}`: Rate of mechanical work on the configurational subsystem
+- :math:`A`: Heat transfer coefficient between configurational and thermal subsystems
+- :math:`\theta`: Thermal (bath) temperature
+
+**Physical interpretation**:
+
+1. **Mechanical injection** (:math:`W > 0`): Shear injects energy, raising :math:`\chi` ("shear rejuvenation")
+2. **Thermal relaxation** (:math:`A(\theta - \chi)`): Heat exchange drives :math:`\chi \to \theta` ("physical aging")
+
+In steady shear, :math:`\dot{\chi} = 0` implies:
+
+.. math::
+
+   \chi_{\text{ss}} = \theta + \frac{W}{A} = \theta + \frac{\sigma \dot{\gamma}}{A}
+
+Higher shear rates maintain higher effective temperatures, explaining why sheared
+glasses are "younger" (more fluid-like) than quiescent aged samples.
+
+For quiescent aging (:math:`\dot{\gamma} = 0`), the equation predicts exponential relaxation:
+
+.. math::
+
+   \chi(t) = \theta + (\chi_0 - \theta) e^{-t/\tau_{\text{age}}}
+
+where :math:`\tau_{\text{age}} = C_V^{\text{eff}}/A` is the aging timescale. This provides
+the thermodynamic foundation for the aging dynamics described in :doc:`sgr_conventional`.
+
+Thermodynamic Consistency Verification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The GENERIC framework provides built-in thermodynamic consistency, but numerical
+implementations can violate these guarantees. This section describes verification
+procedures for detecting and preventing such violations.
+
+**Numerical Verification Checklist**
+
+.. list-table:: GENERIC Consistency Checks
+   :widths: 30 40 30
+   :header-rows: 1
+
+   * - Property
+     - Test
+     - Tolerance
+   * - Antisymmetry of :math:`\mathbf{L}`
+     - :math:`\|L_{ij} + L_{ji}\| < \epsilon`
+     - :math:`\epsilon \sim 10^{-12}`
+   * - Positive semidefiniteness of :math:`\mathbf{M}`
+     - All eigenvalues :math:`\geq -\epsilon`
+     - :math:`\epsilon \sim 10^{-10}`
+   * - Energy degeneracy
+     - :math:`\|\mathbf{M} \cdot \partial E/\partial \mathbf{z}\| < \epsilon`
+     - :math:`\epsilon \sim 10^{-10}`
+   * - Entropy degeneracy
+     - :math:`\|\mathbf{L} \cdot \partial S/\partial \mathbf{z}\| < \epsilon`
+     - :math:`\epsilon \sim 10^{-10}`
+   * - Probability conservation
+     - :math:`|\int P \, dE\,dl - 1| < \epsilon`
+     - :math:`\epsilon \sim 10^{-12}`
+   * - Non-negative entropy production
+     - :math:`\dot{S}_{\text{prod}} \geq -\epsilon`
+     - :math:`\epsilon \sim 10^{-10}`
+
+**Pathological Case Detection**
+
+Certain parameter combinations or flow conditions can lead to thermodynamic
+inconsistencies even in formally correct implementations:
+
+1. **Negative effective temperature** (:math:`x < 0`):
+
+   - Physically meaningless; indicates fitting error or data issues
+   - Detection: Check :math:`x > 0` before any calculation
+   - Resolution: Constrain :math:`x \geq x_{\min} > 0` in optimization
+
+2. **Entropy decrease during equilibration**:
+
+   - Indicates numerical error in :math:`\mathbf{M}` computation
+   - Detection: Monitor :math:`\dot{S}_{\text{prod}}` sign in quiescent simulations
+   - Resolution: Reduce time step, check discretization of yielding kernel
+
+3. **Energy non-conservation in reversible limit**:
+
+   - Occurs if :math:`\mathbf{L}` is not truly antisymmetric numerically
+   - Detection: Run with :math:`\mathbf{M} = 0`, check :math:`\dot{E} = 0`
+   - Resolution: Symmetrize via :math:`L_{ij} \leftarrow (L_{ij} - L_{ji})/2`
+
+4. **Divergent stress at finite strain**:
+
+   - Can occur for :math:`x \to 0` (zero-temperature limit)
+   - Detection: Monitor stress magnitude vs strain
+   - Resolution: Regularize with :math:`x \geq x_{\text{reg}} \sim 0.01`
+
+**Parameter Bounds for Consistency**
+
+The following bounds ensure well-posed GENERIC dynamics:
+
+.. list-table:: Parameter Constraints
+   :widths: 20 30 50
+   :header-rows: 1
+
+   * - Parameter
+     - Constraint
+     - Physical Rationale
+   * - :math:`x` (noise temp)
+     - :math:`0 < x \leq 3`
+     - Positive temperature; :math:`x > 3` gives unphysical rapid relaxation
+   * - :math:`G_0` (modulus)
+     - :math:`G_0 > 0`
+     - Elastic energy must be positive
+   * - :math:`\tau_0` (attempt time)
+     - :math:`\tau_0 > 0`
+     - Microscopic timescale must be positive
+   * - :math:`k` (spring constant)
+     - :math:`k > 0`
+     - Equivalent to :math:`G_0` for normalized model
+   * - Trap distribution
+     - :math:`\int \rho(E) \, dE = 1`
+     - Proper normalization
+
+**Automated Consistency Monitoring**
+
+.. code-block:: python
+
+   from rheojax.models import SGRGeneric
+
+   model = SGRGeneric(x=1.3, G0=100.0, tau0=0.01)
+
+   # Enable consistency checks (adds ~10% overhead)
+   model.enable_thermodynamic_checks(
+       check_entropy_production=True,
+       check_probability_conservation=True,
+       check_energy_conservation=True,
+       tolerance=1e-10
+   )
+
+   # Warnings raised if violations detected during simulation
+   result = model.simulate_shear(gamma_dot=1.0, t_end=100.0)
+
+   # Explicit verification
+   consistency_report = model.verify_thermodynamic_consistency()
+   print(consistency_report)
+
+.. note:: **Numerical Precision Considerations**
+
+   The GENERIC consistency checks require double precision (:math:`\sim 10^{-15}` machine epsilon).
+   Single precision implementations will routinely fail these checks due to floating-point
+   accumulation errors. RheoJAX uses JAX's float64 mode by default, ensuring adequate
+   precision for thermodynamic verification.
 
 Governing Equations
 -------------------

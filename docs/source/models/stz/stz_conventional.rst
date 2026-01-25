@@ -57,6 +57,141 @@ Overview
 
 The Shear Transformation Zone (STZ) theory provides a physical description of plastic deformation in amorphous materials such as metallic glasses, colloidal suspensions, emulsions, and granular matter. Unlike crystalline materials where plasticity is mediated by dislocations, amorphous solids deform through localized rearrangements of particle clusters known as Shear Transformation Zones.
 
+Historical Development
+----------------------
+
+The STZ theory emerged from decades of research on plasticity in disordered materials,
+building upon foundational concepts in glass physics and amorphous plasticity.
+
+Origins and Key Contributors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Free Volume Theory (1959)**
+   Cohen and Turnbull [Cohen1959]_ proposed that molecular mobility in liquids and glasses
+   is controlled by the availability of local "free volume"—excess space beyond dense
+   packing that allows molecules to rearrange. They introduced the Boltzmann-like factor
+   :math:`\exp(-\text{const}/v_f)` for transition rates, where :math:`v_f` is the free
+   volume per particle.
+
+**Flow Defects (1977)**
+   Spaepen [7]_ identified localized "flow defects" as the carriers of plastic deformation
+   in metallic glasses. These regions of anomalous local structure could undergo shear
+   transformations under stress, producing irreversible strain.
+
+**Shear Transformation Zones (1979)**
+   Argon [6]_ introduced the term "shear transformation zones" and developed a
+   quantitative model for plastic flow in metallic glasses. He proposed that STZs are
+   small clusters (~5-10 atoms) that can flip between two stable configurations,
+   producing a local shear strain increment :math:`\varepsilon_0 \approx 0.1`.
+
+**Two-State STZ Theory (1998)**
+   Falk and Langer [2]_ formalized the STZ concept using molecular dynamics simulations
+   of a 2D Lennard-Jones glass. Their key innovations:
+
+   - **Two-state model**: STZs exist in "+" or "−" orientations, allowing directional memory
+   - **Jamming**: Once transformed, a STZ cannot transform again in the same direction
+   - **Creation/annihilation**: STZs are ephemeral, created and destroyed during plastic work
+   - **Rate factor**: Transition rates depend on the strain rate, not just temperature
+
+**Thermodynamic Constraints (2003)**
+   Langer and Pechenik [Langer2003]_ used energy balance arguments to derive the form of
+   the STZ creation/annihilation rate :math:`\Gamma`. They showed that requiring
+   non-negative dissipation (second law) uniquely determines the coupling between
+   stress and STZ dynamics.
+
+**Effective Temperature Reformulation (2008)**
+   Langer [1]_ introduced the effective temperature :math:`\chi = T_{\text{eff}}/T_Z`
+   as the fundamental state variable controlling STZ density via :math:`\Lambda = e^{-1/\chi}`.
+   This replaced earlier free-volume formulations and provided a clearer connection
+   to nonequilibrium thermodynamics.
+
+Molecular Dynamics Validation
+-----------------------------
+
+The two-state STZ model was validated by Falk and Langer [2]_ using molecular dynamics
+simulations of a model 2D glass. Their simulations provided direct evidence for localized
+plastic rearrangements and quantitative comparison with theoretical predictions.
+
+Simulation Setup
+~~~~~~~~~~~~~~~~
+
+**System composition:**
+   A 2D binary mixture of soft disks with size ratio 1:1.4, designed to suppress
+   crystallization. Systems contained 10,000 to 20,000 particles at number density
+   :math:`\rho = 0.85`.
+
+**Interaction potential:**
+   Lennard-Jones 6-12 potential with cutoff :math:`r_c = 2.5\sigma`:
+
+   .. math::
+
+      V(r) = 4\varepsilon \left[ \left(\frac{\sigma}{r}\right)^{12} - \left(\frac{\sigma}{r}\right)^{6} \right]
+
+   where :math:`\varepsilon` sets the energy scale and :math:`\sigma` the length scale.
+   All quantities are reported in reduced units (:math:`\varepsilon = \sigma = m = 1`).
+
+**Glass preparation:**
+   Samples were prepared by rapid quenching from high temperature (:math:`T = 1.0`) to
+   low temperature (:math:`T = 0.001 T_0`) at constant density. This produces a
+   disordered, kinetically arrested state.
+
+**Deformation protocol:**
+   Simple shear at constant strain rate :math:`\dot{\gamma}`, with Lees-Edwards
+   periodic boundary conditions. Strain rates ranged from :math:`10^{-4}` to
+   :math:`10^{-2}` per unit time.
+
+The D²_min Diagnostic
+~~~~~~~~~~~~~~~~~~~~~
+
+Falk and Langer introduced the :math:`D^2_{\min}` diagnostic to identify nonaffine
+deformations—particle motions that deviate from homogeneous shear. For each particle
+:math:`i`, the local affine strain tensor :math:`\mathbf{J}_i` is computed by minimizing:
+
+.. math::
+
+   D^2_i = \frac{1}{N_i} \sum_{j \in \text{neighbors}} \left| \mathbf{d}_j(t) - \mathbf{J}_i \cdot \mathbf{d}_j(0) \right|^2
+
+where :math:`\mathbf{d}_j(t)` is the displacement of neighbor :math:`j` relative to
+particle :math:`i` at time :math:`t`. High values of :math:`D^2_{\min}` identify
+particles undergoing plastic rearrangements.
+
+**Key findings from D²_min analysis:**
+
+1. **Localization**: Plastic activity is concentrated in localized regions (~5-10
+   particles), validating the STZ concept
+2. **Two-state behavior**: Regions flip between configurations, consistent with
+   the ± orientation model
+3. **Transient character**: Active zones are ephemeral, appearing and disappearing
+   during plastic flow
+
+Theory vs. MD Comparison
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The MD simulations provided quantitative validation of STZ predictions:
+
+.. list-table:: STZ Theory vs. MD Simulation
+   :widths: 30 35 35
+   :header-rows: 1
+
+   * - Observable
+     - STZ Prediction
+     - MD Result
+   * - Steady-state flow curve
+     - :math:`\sigma \sim \sigma_y + \eta(\chi_\infty) \dot{\gamma}^n`
+     - Confirmed; exponent :math:`n \approx 0.5-0.7`
+   * - Stress overshoot
+     - Present for :math:`\chi_0 < \chi_\infty`
+     - Observed; magnitude depends on quench rate
+   * - Strain at peak
+     - :math:`\gamma_{\text{peak}} \sim 0.1-0.3`
+     - Observed; :math:`\gamma_{\text{peak}} \approx 0.1`
+   * - Bauschinger effect
+     - Predicted from :math:`m` evolution
+     - Observed in cyclic loading
+   * - Jamming at low :math:`\chi`
+     - No flow for :math:`\chi < \chi_c`
+     - Confirmed; quenched systems arrested
+
 The **STZ Conventional** model (:class:`rheojax.models.stz.conventional.STZConventional`) implements the effective temperature formulation developed by Langer, Falk, and Bouchbinder (Langer 2008). It captures key nonlinear rheological phenomena including:
 
 *   **Yield Stress**: Emergence of a dynamic yield stress from structural disorder.
@@ -114,6 +249,68 @@ local structural disorder (effective temperature χ).
    → fluid-like, low yield stress
 3. **Flow-induced heating**: Plastic dissipation increases χ (rejuvenation)
 4. **Aging**: Quiescent relaxation decreases χ (annealing)
+
+Thermodynamic Constraints
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Langer and Pechenik [Langer2003]_ derived the STZ rate equations from thermodynamic
+first principles, using energy balance and the second law to constrain the form
+of the governing equations.
+
+**Energy Balance (First Law)**
+
+The total energy of the system satisfies:
+
+.. math::
+
+   \frac{dU}{dt} = \sigma \dot{\gamma} - Q_{\text{out}}
+
+where :math:`\sigma \dot{\gamma}` is the mechanical power input and :math:`Q_{\text{out}}`
+is the heat flux to the thermal bath. For the configurational subsystem (characterized
+by effective temperature :math:`\chi`), the energy balance is:
+
+.. math::
+
+   \frac{dU_C}{dt} = \Gamma - Q_C
+
+where :math:`\Gamma` is the rate at which work is converted to configurational disorder
+and :math:`Q_C` is the rate of configurational heat flow to the kinetic subsystem.
+
+**Dissipation and Second Law**
+
+The second law requires non-negative entropy production:
+
+.. math::
+
+   \dot{S}_{\text{irr}} = \frac{\sigma \dot{\gamma}}{T} - \frac{Q_C}{T} + \frac{Q_C}{T_{\text{eff}}} \geq 0
+
+This constraint, combined with energy balance, determines how plastic work is
+partitioned between:
+
+1. **Heat** (dissipated to thermal bath)
+2. **Configurational energy** (stored as structural disorder)
+
+**Dissipation Rate Formula**
+
+Langer and Pechenik showed that the plastic dissipation rate takes the form:
+
+.. math::
+
+   \dot{Q} = \varepsilon_0 \frac{\Lambda(\chi)}{\tau_0} \left[ \mathcal{C}(s) - s \mathcal{T}(s) / \sigma_y \right] \sigma_y
+
+The term :math:`\mathcal{C}(s) - s \mathcal{T}(s)/\sigma_y` ensures that dissipation is
+always positive—more energy is dissipated than stored as recoverable work. This thermodynamic
+constraint uniquely determines the coupling between stress and STZ dynamics.
+
+**Work-Heat Partition**
+
+At steady state, the mechanical work is partitioned as:
+
+- **Fraction to heat**: :math:`\approx 1 - \chi/\chi_\infty` (most work → heat at low χ)
+- **Fraction to disorder**: :math:`\approx \chi/\chi_\infty` (more stored at high χ)
+
+This explains why rejuvenation is self-limiting: as :math:`\chi \to \chi_\infty`, all
+additional work goes to heat rather than further increasing disorder.
 
 Theoretical Background
 ----------------------
@@ -174,6 +371,204 @@ State Evolution Equations
    .. math::
 
       \dot{m} = \frac{2 \mathcal{C}(s)}{\tau_0} (\mathcal{T}(s) - m) - \Gamma m
+
+Quasilinear Approximations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For many practical applications, the full nonlinear rate equations can be simplified
+using quasilinear approximations [Langer2003]_. These are valid when stress is moderate
+and the system is near steady state.
+
+**Linear Stress Function Approximation**
+
+At moderate stress (:math:`|s| \lesssim \sigma_y`), the transition bias simplifies to:
+
+.. math::
+
+   \mathcal{T}(s) = \tanh(s/\sigma_y) \approx s/\sigma_y
+
+This linearization is accurate to within 10% for :math:`|s|/\sigma_y < 0.5`.
+
+**Constant Creation Rate Approximation**
+
+Near steady state, the rate factor can be approximated:
+
+.. math::
+
+   \mathcal{C}(s) = \cosh(s/\sigma_y)^q \approx 1
+
+This holds when the stress-dependent STZ creation rate varies slowly compared to
+the relaxation dynamics.
+
+**Resulting Quasilinear Form**
+
+With both approximations, the plastic strain rate becomes:
+
+.. math::
+
+   \dot{\varepsilon}^{pl} \approx \frac{\varepsilon_0}{\tau_0 \sigma_y} \Lambda(\chi) \cdot s
+
+This is a **viscoplastic** constitutive law with stress-dependent viscosity
+:math:`\eta_{\text{eff}} = \sigma_y \tau_0 / (\varepsilon_0 \Lambda(\chi))`.
+
+**Validity Conditions**
+
+The quasilinear approximation works well when:
+
+1. :math:`|s|/\sigma_y < 0.5` (moderate stress)
+2. :math:`\chi` is approximately constant (near steady state or slow driving)
+3. The Weissenberg number :math:`\text{Wi} = \dot{\gamma} \tau_0 < 1`
+
+For transient phenomena (startup, LAOS), the full nonlinear equations should be used.
+
+Yield Stress and Dynamic Stability
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A key insight from thermodynamic analysis [Langer2003]_ is that the **yield stress
+emerges from an exchange of dynamic stability** between jammed and flowing states.
+
+**Jammed State (Low χ)**
+
+For :math:`\chi < \chi_c` (critical effective temperature), the system is dynamically
+stable in a jammed state:
+
+- STZ density :math:`\Lambda = e^{-1/\chi}` is exponentially small
+- No plastic flow occurs: :math:`\dot{\varepsilon}^{pl} \to 0`
+- Applied stress is supported elastically up to :math:`\sigma \lesssim \sigma_y`
+- The system behaves as a solid
+
+**Flowing State (High χ)**
+
+For :math:`\chi > \chi_c`, the system transitions to a flowing state:
+
+- STZ density is appreciable: :math:`\Lambda \sim O(1)`
+- Plastic strain rate balances applied strain rate
+- Stress reaches a plateau (dynamic yield stress)
+- The system behaves as a viscoplastic fluid
+
+**Critical Effective Temperature**
+
+The critical value :math:`\chi_c` can be estimated from the condition that
+the flow and aging rates balance:
+
+.. math::
+
+   \chi_c \approx \frac{1}{\ln(\tau_{\text{age}}/\tau_0)}
+
+Typical values: :math:`\chi_c \approx 0.3-0.5` for metallic glasses.
+
+**Bifurcation and Hysteresis**
+
+The transition between jammed and flowing states exhibits:
+
+- **Startup**: At fixed :math:`\dot{\gamma}`, stress overshoots then relaxes to steady state
+- **Cessation**: Upon stopping flow, :math:`\chi` decreases (aging) and system re-jams
+- **Hysteresis**: Start-up yield stress differs from cessation yield stress
+
+This bifurcation structure explains phenomena like **thixotropic yielding** and
+**viscosity bifurcation** in stress-controlled experiments.
+
+Rate Factor and Thermal Activation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The molecular rate factor :math:`\Gamma` [1]_ captures the thermally activated nature
+of STZ transitions:
+
+.. math::
+
+   \Gamma = \tau_0^{-1} \exp\left(-\frac{E_Z}{k_B T}\right)
+
+where:
+
+- :math:`\tau_0^{-1}` is the attempt frequency (molecular vibration rate)
+- :math:`E_Z` is the activation barrier for STZ rearrangement
+- :math:`T` is the thermal (bath) temperature
+
+**Separation of Timescales**
+
+Two fundamental timescales govern STZ dynamics:
+
+1. **Fast timescale** :math:`\tau_0 \sim 10^{-12}` s: molecular vibrations, elastic response
+2. **Slow timescale** :math:`\tau_R = \tau_0 e^{E_Z/k_BT}`: structural relaxation
+
+The ratio :math:`\tau_R/\tau_0` diverges at the glass transition:
+
+.. math::
+
+   \frac{\tau_R}{\tau_0} \to \infty \quad \text{as} \quad T \to T_g
+
+This separation underlies the nonequilibrium nature of glasses and the need for
+the effective temperature :math:`\chi` as an additional state variable.
+
+**Super-Arrhenius Behavior**
+
+Near the glass transition, relaxation times exhibit super-Arrhenius (Vogel-Fulcher-Tammann)
+behavior:
+
+.. math::
+
+   \tau_R = \tau_0 \exp\left(\frac{B}{T - T_0}\right)
+
+where :math:`T_0 < T_g` is the Vogel temperature. This reflects the cooperative nature
+of rearrangements as temperature decreases.
+
+**Newtonian Viscosity Limit**
+
+At low stress and strain rate, the STZ model recovers Newtonian viscosity:
+
+.. math::
+
+   \eta = G_0 \tau_R = G_0 \tau_0 \exp\left(\frac{E_Z}{k_B T}\right)
+
+The temperature dependence of viscosity is thus controlled by the STZ activation energy.
+
+Memory Effects and Bauschinger Effect
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Full variant of the STZ model includes an **orientational bias** :math:`m` that
+captures memory of the deformation history [2]_.
+
+**Orientational Bias**
+
+The variable :math:`m` represents the average orientation of STZs:
+
+- :math:`m = 0`: Random orientation (isotropic)
+- :math:`m > 0`: STZs biased in the positive shear direction
+- :math:`m < 0`: STZs biased in the negative shear direction
+
+Under steady shear, :math:`m \to m_\infty \cdot \text{sign}(\dot{\gamma})`.
+
+**Bauschinger Effect**
+
+When the shear direction is reversed:
+
+1. Initial response is softer (lower effective yield stress) because existing STZs
+   are pre-oriented to flip in the new direction
+2. The material re-hardens as :math:`m` reverses sign
+3. Asymmetric response in tension/compression cycles
+
+This is the Bauschinger effect, well-known in metallurgy and captured naturally
+by the STZ orientation variable.
+
+**Strain Recovery**
+
+After cessation of flow, partial strain recovery can occur:
+
+.. math::
+
+   \gamma_{\text{recovered}} \propto m \cdot \Lambda(\chi) \cdot \Delta t
+
+This is an **anelastic** (delayed elastic) effect arising from the relaxation of
+oriented STZ populations.
+
+**Kinematic Hardening**
+
+The back-stress :math:`\sigma_{\text{back}} = \sigma_y \cdot m` acts as a kinematic
+hardening term, shifting the center of the yield surface. This is important for:
+
+- Large amplitude oscillatory shear (LAOS)
+- Cyclic loading and fatigue
+- Start-up after flow reversal
 
 Validity and Assumptions
 ------------------------
@@ -554,6 +949,108 @@ See Also
 - **Use ITT-MCT** if: Colloidal suspensions, connection to structure factor S(k)
 - **Use Fluidity/DMT** if: Simpler thixotropic phenomenology, fewer parameters
 
+Limitations and Extensions
+--------------------------
+
+The STZ Conventional model makes several simplifying assumptions that limit its
+applicability in certain scenarios.
+
+Known Limitations
+~~~~~~~~~~~~~~~~~
+
+**Spatial Homogeneity**
+
+The model assumes homogeneous deformation. In reality, amorphous solids often
+exhibit **shear banding**—spatial localization of plastic flow into thin bands.
+Shear bands arise from the coupling between:
+
+- Flow-induced heating (χ increases)
+- Stress softening (lower viscosity at higher χ)
+- Positive feedback leading to localization
+
+*Extension*: Nonlocal STZ models add diffusion of the effective temperature
+:math:`D_\chi \nabla^2 \chi` to regularize the localization instability.
+
+**Scalar Effective Temperature**
+
+The model uses a single scalar :math:`\chi` to characterize disorder. More
+generally, structural disorder could be:
+
+- Tensorial (different disorder in different directions)
+- Multi-valued (multiple length scales of disorder)
+- Non-local (correlated over mesoscopic distances)
+
+*Extension*: Tensorial STZ models track orientation-dependent disorder.
+
+**Athermal Limit**
+
+The model assumes thermal activation over barriers. In athermal systems
+(e.g., granular matter at :math:`T = 0`), a different mechanism governs
+the STZ transition rate:
+
+.. math::
+
+   R \propto |\sigma - \sigma_y|^\beta \Theta(|\sigma| - \sigma_y)
+
+*Extension*: Rate-independent (quasi-static) STZ models for granular plasticity.
+
+**Simple Aging Kinetics**
+
+The model includes relaxation toward equilibrium via :math:`\dot{\chi} \propto
+-(\chi - \chi_{\text{eq}})`, but real aging can be:
+
+- Logarithmic in time (not exponential)
+- History-dependent (memory effects beyond :math:`m`)
+- Sensitive to stress during aging
+
+**Temperature Gradients**
+
+The model assumes isothermal conditions. Under rapid deformation, adiabatic
+heating can raise the thermal temperature, coupling :math:`T` and :math:`\chi`
+dynamics:
+
+.. math::
+
+   \rho c_p \dot{T} = \beta \sigma \dot{\gamma}^{pl}
+
+where :math:`\beta` is the Taylor-Quinney coefficient.
+
+Active Research Directions
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Shear Band Dynamics**
+
+Understanding the nucleation, propagation, and arrest of shear bands using
+spatially resolved STZ models. Key questions:
+
+- What controls shear band width?
+- How do bands interact and coalesce?
+- Can band formation be suppressed by tailoring thermal history?
+
+**Polymer Glasses**
+
+Extending STZ theory to polymer glasses, where chain connectivity introduces:
+
+- Entanglement effects at high strain
+- Reptation dynamics at long times
+- Craze formation vs shear yielding
+
+**Multi-Dimensional Stress States**
+
+Extending beyond simple shear to:
+
+- Triaxial compression (geological applications)
+- Combined shear and normal stress
+- Pressure sensitivity of yield stress
+
+**Connections to Machine Learning**
+
+Using neural networks to:
+
+- Identify STZ events in MD simulations
+- Learn effective constitutive laws from data
+- Accelerate multi-scale simulations
+
 References
 ----------
 
@@ -568,6 +1065,15 @@ References
 .. [3] Bouchbinder, E. and Langer, J. S. "Nonequilibrium thermodynamics of driven
    amorphous materials." *Physical Review E*, 80, 031131, 031132, 031133 (2009).
    https://doi.org/10.1103/PhysRevE.80.031131
+
+.. [Langer2003] Langer, J. S. and Pechenik, L. "Dynamics of shear-transformation zones
+   in amorphous plasticity: Energetic constraints in a minimal theory."
+   *Physical Review E*, 68, 061507 (2003).
+   https://doi.org/10.1103/PhysRevE.68.061507
+
+.. [Cohen1959] Cohen, M. H. and Turnbull, D. "Molecular transport in liquids and glasses."
+   *The Journal of Chemical Physics*, 31, 1164-1169 (1959).
+   https://doi.org/10.1063/1.1730566
 
 .. [4] Manning, M. L., Langer, J. S., and Carlson, J. M. "Strain localization in a shear
    transformation zone model for amorphous solids." *Physical Review E*, 76, 056106
