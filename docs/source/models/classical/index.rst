@@ -206,10 +206,10 @@ References
 ----------
 
 1. Maxwell, J.C. (1867). "On the dynamical theory of gases."
-   *Philosophical Transactions*, 157, 49-88.
+   *Philosophical Transactions*, 157, 49-88. https://www.jstor.org/stable/108968
 
 2. Zener, C.M. (1948). *Elasticity and Anelasticity of Metals*.
-   University of Chicago Press.
+   University of Chicago Press. https://doi.org/10.1002/9781118661275
 
 3. Ferry, J.D. (1980). *Viscoelastic Properties of Polymers*, 3rd ed.
    John Wiley & Sons. ISBN: 978-0471048947.
@@ -218,4 +218,4 @@ References
    Behavior*. Springer-Verlag. https://doi.org/10.1007/978-3-642-73602-5
 
 5. Koeller, R.C. (1984). "Applications of fractional calculus to the theory of
-   viscoelasticity." *J. Appl. Mech.*, 51, 299-307.
+   viscoelasticity." *J. Appl. Mech.*, 51, 299-307. https://doi.org/10.1115/1.3167616
