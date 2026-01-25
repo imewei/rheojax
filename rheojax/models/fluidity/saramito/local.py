@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
     ],
 )
 class FluiditySaramitoLocal(FluiditySaramitoBase):
-    """Local (0D) Fluidity-Saramito Model for elastoviscoplastic fluids.
+    r"""Local (0D) Fluidity-Saramito Model for elastoviscoplastic fluids.
 
     Implements a homogeneous Saramito EVP model where the material state
     is characterized by tensorial stress [τ_xx, τ_yy, τ_xy] and scalar
@@ -74,13 +74,14 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
     λ(∇̂τ) + α(τ)τ = 2η_p D
 
     where:
+
     - λ = 1/f: Fluidity-dependent relaxation time
     - ∇̂τ: Upper-convected derivative
-    - α = max(0, 1 - τ_y/|τ|): Von Mises plasticity
+    - α = max(0, 1 - τ_y/\|τ\|): Von Mises plasticity
     - η_p = G/f: Polymeric viscosity
 
     Fluidity evolves via:
-    df/dt = (f_age - f)/t_a + b|γ̇|^n(f_flow - f)
+    df/dt = (f_age - f)/t_a + b\|γ̇\|^n(f_flow - f)
 
     Parameters
     ----------

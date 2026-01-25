@@ -43,11 +43,11 @@ logger = get_logger(__name__)
     ],
 )
 class DMTNonlocal(DMTBase):
-    """Nonlocal (1D) DMT model for shear banding analysis.
+    r"""Nonlocal (1D) DMT model for shear banding analysis.
 
     Extends the local DMT model with spatial structure diffusion:
 
-    ∂λ/∂t = (1-λ)/t_eq - a·λ·|γ̇|^c/t_eq + D_λ·∂²λ/∂y²
+    ∂λ/∂t = (1-λ)/t_eq - a·λ·\|γ̇\|^c/t_eq + D_λ·∂²λ/∂y²
 
     The diffusion term introduces a cooperativity length scale:
     ξ ~ √(D_λ · t_eq)

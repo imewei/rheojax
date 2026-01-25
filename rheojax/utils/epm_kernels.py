@@ -83,11 +83,12 @@ def compute_plastic_strain_rate(
     smooth: bool = False,
     smoothing_width: float = 0.1,
 ) -> jax.Array:
-    """Compute the local plastic strain rate.
+    r"""Compute the local plastic strain rate.
 
     Supports two modes:
-    1. Hard Mode: gamma_dot_p = Gamma * sigma * Theta(|sigma| - sigma_c)
-    2. Smooth Mode: gamma_dot_p = Gamma * sigma * 0.5 * (1 + tanh((|sigma| - sigma_c)/w))
+
+    1. Hard Mode: gamma_dot_p = Gamma * sigma * Theta(\|sigma\| - sigma_c)
+    2. Smooth Mode: gamma_dot_p = Gamma * sigma * 0.5 * (1 + tanh((\|sigma\| - sigma_c)/w))
 
     Args:
         stress: Local stress field.

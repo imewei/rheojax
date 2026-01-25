@@ -338,6 +338,7 @@ def plot_von_mises_field(
     """Plot von Mises effective stress and normalized yield map.
 
     Creates a 2-panel figure:
+
     - Left: σ_eff with viridis (sequential)
     - Right: σ_eff/σ_c with RdYlGn_r centered at 1
       (Green <1: elastic, Yellow ≈1: near yield, Red >1: plastic)

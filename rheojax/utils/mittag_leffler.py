@@ -1,10 +1,12 @@
-"""
+r"""
 JAX-compatible Mittag-Leffler function implementations.
 
 This module provides efficient, JAX-compatible implementations of the Mittag-Leffler
 function using a hybrid strategy:
-1. Taylor series for small arguments (|z| < 8)
-2. Asymptotic expansions for large arguments (|z| > 8)
+
+1. Taylor series for small arguments (\|z\| < 8)
+2. Asymptotic expansions for large arguments (\|z\| > 8)
+
    - Exponential expansion for positive z (Creep mode growth)
    - Inverse power law expansion for negative z (Relaxation mode decay)
 
@@ -64,11 +66,12 @@ def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarra
 def mittag_leffler_e2(
     z: float | jnp.ndarray, alpha: float, beta: float
 ) -> float | jnp.ndarray:
-    """
+    r"""
     Two-parameter Mittag-Leffler function E_{α,β}(z).
 
     Uses a hybrid evaluation strategy:
-    - |z| <= 8: Taylor Series (Kahan summation)
+
+    - \|z\| <= 8: Taylor Series (Kahan summation)
     - z > 8: Positive Asymptotic Expansion (Exponential growth)
     - z < -8: Negative Asymptotic Expansion (Algebraic decay)
     - Smooth blending at boundaries for gradient stability.

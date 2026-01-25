@@ -47,7 +47,7 @@ jax, jnp = safe_import_jax()
     ],
 )
 class MIKH(IKHBase):
-    """Maxwell-Isotropic-Kinematic Hardening (MIKH) Model.
+    r"""Maxwell-Isotropic-Kinematic Hardening (MIKH) Model.
 
     A thixotropic elasto-viscoplastic model combining:
     1. Armstrong-Frederick kinematic hardening (backstress evolution).
@@ -65,14 +65,14 @@ class MIKH(IKHBase):
         Stress Evolution (ODE formulation):
         dσ/dt = G(γ̇ - γ̇ᵖ) - (G/η)σ
 
-        Yield Surface: |σ - α| ≤ σ_y(λ)
+        Yield Surface: \|σ - α\| ≤ σ_y(λ)
         σ_y(λ) = σ_y0 + Δσ_y * λ
 
         Structure Evolution:
-        dλ/dt = (1-λ)/τ_thix - Γ*λ*|γ̇ᵖ|
+        dλ/dt = (1-λ)/τ_thix - Γ*λ*\|γ̇ᵖ\|
 
         Backstress Evolution (Armstrong-Frederick):
-        dα = C*dγ_p - γ_dyn*|α|^(m-1)*α*|dγ_p|
+        dα = C*dγ_p - γ_dyn*\|α\|^(m-1)*α*\|dγ_p\|
 
     Parameters:
         G: Shear modulus [Pa]
