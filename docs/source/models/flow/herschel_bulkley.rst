@@ -6,11 +6,11 @@ Herschel-Bulkley Model
 Quick Reference
 ---------------
 
-**Use when:** Yield stress fluids (pastes, gels, foams), shear-thinning after yielding
-**Parameters:** 3 (:math:`\tau_y`, :math:`K`, :math:`n`)
-**Key equation:** :math:`\sigma = \sigma_y + K \dot{\gamma}^n` for :math:`\sigma > \sigma_y`
-**Test modes:** Flow curve (Steady Shear), Stress Ramp
-**Material examples:** Toothpaste, mayonnaise, drilling muds, fresh concrete, paints
+- **Use when:** Yield stress fluids (pastes, gels, foams), shear-thinning after yielding
+- **Parameters:** 3 (:math:`\tau_y`, :math:`K`, :math:`n`)
+- **Key equation:** :math:`\sigma = \sigma_y + K \dot{\gamma}^n` for :math:`\sigma > \sigma_y`
+- **Test modes:** Flow curve (Steady Shear), Stress Ramp
+- **Material examples:** Toothpaste, mayonnaise, drilling muds, fresh concrete, paints
 
 Overview
 --------

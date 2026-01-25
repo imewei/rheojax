@@ -14,11 +14,11 @@
 Quick Reference
 ---------------
 
-**Use when:** {one-line summary of when to use this model}
-**Parameters:** {N} ({list of parameter names})
-**Key equation:** :math:`{primary equation in LaTeX}`
-**Test modes:** {comma-separated list: Oscillation, relaxation, creep, steady shear, etc.}
-**Material examples:** {comma-separated list of 4-6 representative materials}
+- **Use when:** {one-line summary of when to use this model}
+- **Parameters:** {N} ({list of parameter names})
+- **Key equation:** :math:`{primary equation in LaTeX}`
+- **Test modes:** {comma-separated list: Oscillation, relaxation, creep, steady shear, etc.}
+- **Material examples:** {comma-separated list of 4-6 representative materials}
 
 Notation Guide
 --------------

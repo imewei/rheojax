@@ -6,11 +6,11 @@ SPP Decomposer (Sequence of Physical Processes)
 Quick Reference
 ---------------
 
-**Use when:** Large Amplitude Oscillatory Shear (LAOS) analysis of yield-stress fluids, colloidal glasses, soft glassy materials
-**Parameters:** Extracted quantities (G_cage, sigma_sy, sigma_dy, I3/I1, S-factor, T-factor)
-**Key equation:** :math:`\sigma(t) = G'_t(t)\gamma(t) + \frac{G''_t(t)}{\omega}\dot{\gamma}(t) + \sigma_d(t)`
-**Test modes:** LAOS (time-domain stress-strain waveforms)
-**Material examples:** Colloidal glasses, microgel pastes, concentrated emulsions, foams, polymer gels
+- **Use when:** Large Amplitude Oscillatory Shear (LAOS) analysis of yield-stress fluids, colloidal glasses, soft glassy materials
+- **Parameters:** Extracted quantities (G_cage, sigma_sy, sigma_dy, I3/I1, S-factor, T-factor)
+- **Key equation:** :math:`\sigma(t) = G'_t(t)\gamma(t) + \frac{G''_t(t)}{\omega}\dot{\gamma}(t) + \sigma_d(t)`
+- **Test modes:** LAOS (time-domain stress-strain waveforms)
+- **Material examples:** Colloidal glasses, microgel pastes, concentrated emulsions, foams, polymer gels
 
 Notation Guide
 --------------
@@ -461,7 +461,7 @@ Fourier Domain Filtering
 The Fourier method reconstructs the stress waveform using a finite number
 of odd harmonics before computing derivatives:
 
-**Parameters:**
+- **Parameters:**
 
 - ``n_harmonics`` (M): Number of harmonics for reconstruction (default: 39, must be odd)
 - ``n_periods`` (p): Number of oscillation periods in the data
@@ -481,7 +481,7 @@ Numerical Differentiation
 
 The numerical method uses finite differences directly on the measured waveforms:
 
-**Parameters:**
+- **Parameters:**
 
 - ``step_size`` (k): Points for finite difference stencil (default: 8)
 - ``num_mode``: Differentiation procedure

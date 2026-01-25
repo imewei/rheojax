@@ -4,15 +4,15 @@ Multi-Lambda Isotropic-Kinematic Hardening (ML-IKH)
 Quick Reference
 ---------------
 
-**Use when:** Multi-timescale thixotropy, stretched-exponential relaxation, distributed structure kinetics
+- **Use when:** Multi-timescale thixotropy, stretched-exponential relaxation, distributed structure kinetics
 
-**Parameters:** 7N+1 (per_mode) or 6+3N (weighted_sum)
+- **Parameters:** 7N+1 (per_mode) or 6+3N (weighted_sum)
 
-**Key equation:** :math:`\sigma_y = \sigma_{y,0} + k_3 \sum_{i=1}^{N} w_i \lambda_i` (weighted-sum) or :math:`\sigma_{total} = \sum_{i=1}^{N} \sigma_i + \eta_{\infty} \dot{\gamma}` (per-mode)
+- **Key equation:** :math:`\sigma_y = \sigma_{y,0} + k_3 \sum_{i=1}^{N} w_i \lambda_i` (weighted-sum) or :math:`\sigma_{total} = \sum_{i=1}^{N} \sigma_i + \eta_{\infty} \dot{\gamma}` (per-mode)
 
-**Test modes:** flow_curve, startup, relaxation, creep, oscillation, laos
+- **Test modes:** flow_curve, startup, relaxation, creep, oscillation, laos
 
-**Material examples:** Complex thixotropic fluids with multi-scale structural dynamics
+- **Material examples:** Complex thixotropic fluids with multi-scale structural dynamics
 
 .. currentmodule:: rheojax.models.ikh.ml_ikh
 
@@ -412,7 +412,7 @@ Per-Mode Yield (Default)
 
 Each mode has an **independent yield surface**. Total stress is the sum of mode stresses.
 
-**Use when:**
+- **Use when:**
 
 - Material has distinct yielding events at different strains
 - Different structural components have different mechanical properties
@@ -426,7 +426,7 @@ Each mode has an **independent yield surface**. Total stress is the sum of mode 
 
 Each mode follows independent MIKH equations.
 
-**Parameters:** 7 per mode + 1 global = 7N + 1 total
+- **Parameters:** 7 per mode + 1 global = 7N + 1 total
 
 Weighted-Sum Yield
 ~~~~~~~~~~~~~~~~~~
@@ -437,13 +437,13 @@ Weighted-Sum Yield
 
    \sigma_y = \sigma_{y,0} + k_3 \sum_{i=1}^{N} w_i \lambda_i
 
-**Use when:**
+- **Use when:**
 
 - Material has single mechanical response but distributed recovery kinetics
 - You want parsimonious model with fewer parameters
 - Physical intuition suggests "average" structure controls yielding
 
-**Parameters:** 6 global + 3 per mode = 6 + 3N total
+- **Parameters:** 6 global + 3 per mode = 6 + 3N total
 
 
 Mathematical Formulation

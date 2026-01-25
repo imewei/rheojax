@@ -7,11 +7,11 @@ Hébraud–Lequeux (HL) Model — Handbook
 Quick Reference
 ---------------
 
-**Use when:** Mean-field modeling of soft glassy materials, yield-stress fluids, foams, emulsions, pastes
-**Parameters:** 4 (G₀, α, σ_c, τ)
-**Key equation:** :math:`\partial_t P(\sigma, t) = -\dot{\gamma}(t) \partial_\sigma P + D(t) \partial^2_\sigma P - \frac{1}{\tau} \Theta(|\sigma|-\sigma_c) P + \Gamma(t) \delta(\sigma)`
-**Test modes:** Flow curve, creep, relaxation, startup, oscillation (SAOS/LAOS)
-**Material examples:** Foams, emulsions, pastes, concentrated colloidal suspensions, soft glassy materials
+- **Use when:** Mean-field modeling of soft glassy materials, yield-stress fluids, foams, emulsions, pastes
+- **Parameters:** 4 (G₀, α, σ_c, τ)
+- **Key equation:** :math:`\partial_t P(\sigma, t) = -\dot{\gamma}(t) \partial_\sigma P + D(t) \partial^2_\sigma P - \frac{1}{\tau} \Theta(|\sigma|-\sigma_c) P + \Gamma(t) \delta(\sigma)`
+- **Test modes:** Flow curve, creep, relaxation, startup, oscillation (SAOS/LAOS)
+- **Material examples:** Foams, emulsions, pastes, concentrated colloidal suspensions, soft glassy materials
 
 Notation Guide
 --------------

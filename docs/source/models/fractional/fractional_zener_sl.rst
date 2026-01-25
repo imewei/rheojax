@@ -6,11 +6,11 @@ Fractional Zener Solid-Liquid (Fractional)
 Quick Reference
 ---------------
 
-**Use when:** Solid-like behavior with equilibrium plateau and fractional relaxation tails
-**Parameters:** 4 (Ge, c_α, α, τ)
-**Key equation:** :math:`G(t) = G_e + c_\alpha t^{-\alpha} E_{1-\alpha,1}(-(t/\tau)^{1-\alpha})`
-**Test modes:** Oscillation, relaxation
-**Material examples:** Viscoelastic solids with finite equilibrium modulus and power-law relaxation
+- **Use when:** Solid-like behavior with equilibrium plateau and fractional relaxation tails
+- **Parameters:** 4 (Ge, c_α, α, τ)
+- **Key equation:** :math:`G(t) = G_e + c_\alpha t^{-\alpha} E_{1-\alpha,1}(-(t/\tau)^{1-\alpha})`
+- **Test modes:** Oscillation, relaxation
+- **Material examples:** Viscoelastic solids with finite equilibrium modulus and power-law relaxation
 
 .. include:: /_includes/fractional_seealso.rst
 

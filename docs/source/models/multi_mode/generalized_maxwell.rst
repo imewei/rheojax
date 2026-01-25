@@ -6,11 +6,11 @@ Generalized Maxwell Model (Multi-Mode)
 Quick Reference
 ---------------
 
-**Use when:** Broad relaxation spectra, multi-mode viscoelastic behavior, complex polymer systems
-**Parameters:** 2N+1 (E_inf, E_1...E_N, τ_1...τ_N) with transparent element minimization
-**Key equation:** :math:`E(t) = E_\infty + \sum_{i=1}^{N} E_i \exp(-t/\tau_i)` (Prony series)
-**Test modes:** Relaxation (preferred), oscillation (excellent), creep (acceptable)
-**Material examples:** Polymer melts with broad MW distributions, multi-phase composites, soft solids
+- **Use when:** Broad relaxation spectra, multi-mode viscoelastic behavior, complex polymer systems
+- **Parameters:** 2N+1 (E_inf, E_1...E_N, τ_1...τ_N) with transparent element minimization
+- **Key equation:** :math:`E(t) = E_\infty + \sum_{i=1}^{N} E_i \exp(-t/\tau_i)` (Prony series)
+- **Test modes:** Relaxation (preferred), oscillation (excellent), creep (acceptable)
+- **Material examples:** Polymer melts with broad MW distributions, multi-phase composites, soft solids
 
 Notation Guide
 --------------

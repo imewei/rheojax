@@ -6,11 +6,11 @@ SGR GENERIC (Thermodynamically Consistent)
 Quick Reference
 ---------------
 
-**Use when:** Thermodynamic consistency required, entropy production analysis, nonequilibrium thermodynamics research
-**Parameters:** 4+ (x, G0, tau0, dissipation parameters)
-**Key equation:** GENERIC framework with Poisson bracket + friction matrix
-**Test modes:** Oscillation, relaxation, nonequilibrium thermodynamics validation
-**Material examples:** Same as SGR Conventional, plus thermodynamic model validation
+- **Use when:** Thermodynamic consistency required, entropy production analysis, nonequilibrium thermodynamics research
+- **Parameters:** 4+ (x, G0, tau0, dissipation parameters)
+- **Key equation:** GENERIC framework with Poisson bracket + friction matrix
+- **Test modes:** Oscillation, relaxation, nonequilibrium thermodynamics validation
+- **Material examples:** Same as SGR Conventional, plus thermodynamic model validation
 
 Notation Guide
 --------------

@@ -6,16 +6,16 @@ ITT-MCT Isotropic (ISM)
 Quick Reference
 ---------------
 
-**Use when:** Quantitative predictions needed, S(k) available, wave-vector-dependent
+- **Use when:** Quantitative predictions needed, S(k) available, wave-vector-dependent
 dynamics important
 
-**Parameters:** 5 (φ, σ_d, D₀, k_BT, γ_c) + S(k) input
+- **Parameters:** 5 (φ, σ_d, D₀, k_BT, γ_c) + S(k) input
 
-**Key equation:** k-resolved correlator Φ(k,t) with MCT vertex from S(k)
+- **Key equation:** k-resolved correlator Φ(k,t) with MCT vertex from S(k)
 
-**Test modes:** Flow curve, oscillation, startup, creep, relaxation, LAOS
+- **Test modes:** Flow curve, oscillation, startup, creep, relaxation, LAOS
 
-**Material examples:** Dense colloidal suspensions, hard-sphere glasses, silica particles,
+- **Material examples:** Dense colloidal suspensions, hard-sphere glasses, silica particles,
 PMMA colloids, concentrated emulsions
 
 **Data required:** Structure factor S(k) from experiment or Percus-Yevick

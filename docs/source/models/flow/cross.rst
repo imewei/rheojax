@@ -7,11 +7,11 @@ Cross Model
 Quick Reference
 ---------------
 
-**Use when:** Well-characterized high-rate plateaus, tunable transition sharpness, suspensions and emulsions
-**Parameters:** 4 (eta0, eta_inf, lambda, m)
-**Key equation:** :math:`\eta = \eta_{\infty} + \frac{\eta_0 - \eta_{\infty}}{1 + (\lambda\dot{\gamma})^m}`
-**Test modes:** Flow (steady shear, rotation)
-**Material examples:** Polymer melts, colloidal suspensions, emulsions, paints, inks, lubricants
+- **Use when:** Well-characterized high-rate plateaus, tunable transition sharpness, suspensions and emulsions
+- **Parameters:** 4 (eta0, eta_inf, lambda, m)
+- **Key equation:** :math:`\eta = \eta_{\infty} + \frac{\eta_0 - \eta_{\infty}}{1 + (\lambda\dot{\gamma})^m}`
+- **Test modes:** Flow (steady shear, rotation)
+- **Material examples:** Polymer melts, colloidal suspensions, emulsions, paints, inks, lubricants
 
 Notation Guide
 --------------

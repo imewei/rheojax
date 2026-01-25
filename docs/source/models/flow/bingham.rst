@@ -6,11 +6,11 @@ Bingham Plastic
 Quick Reference
 ---------------
 
-**Use when:** Rigid below yield stress, Newtonian flow after yielding
-**Parameters:** 2 (τ_y, η_p)
-**Key equation:** :math:`\tau = \tau_y + \eta_p \dot{\gamma}` for :math:`|\tau| > \tau_y`
-**Test modes:** Flow (steady shear)
-**Material examples:** Cement pastes, drilling muds, mayonnaise, ketchup, toothpaste
+- **Use when:** Rigid below yield stress, Newtonian flow after yielding
+- **Parameters:** 2 (τ_y, η_p)
+- **Key equation:** :math:`\tau = \tau_y + \eta_p \dot{\gamma}` for :math:`|\tau| > \tau_y`
+- **Test modes:** Flow (steady shear)
+- **Material examples:** Cement pastes, drilling muds, mayonnaise, ketchup, toothpaste
 
 Overview
 --------

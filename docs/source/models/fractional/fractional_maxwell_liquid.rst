@@ -6,11 +6,11 @@ Fractional Maxwell Liquid (Fractional)
 Quick Reference
 ---------------
 
-**Use when:** Viscoelastic liquid, power-law relaxation without terminal flow plateau
-**Parameters:** 3 (Gm, α, τ_α)
-**Key equation:** :math:`G(t) = G_m t^{-\alpha} E_{1-\alpha,1-\alpha}(-t^{1-\alpha}/\tau_\alpha)`
-**Test modes:** Oscillation, relaxation
-**Material examples:** Polymer melts (linear/branched), concentrated polymer solutions, complex fluids
+- **Use when:** Viscoelastic liquid, power-law relaxation without terminal flow plateau
+- **Parameters:** 3 (Gm, α, τ_α)
+- **Key equation:** :math:`G(t) = G_m t^{-\alpha} E_{1-\alpha,1-\alpha}(-t^{1-\alpha}/\tau_\alpha)`
+- **Test modes:** Oscillation, relaxation
+- **Material examples:** Polymer melts (linear/branched), concentrated polymer solutions, complex fluids
 
 .. include:: /_includes/fractional_seealso.rst
 

@@ -6,11 +6,11 @@ Fractional Maxwell Gel (Fractional)
 Quick Reference
 ---------------
 
-**Use when:** Critical gels, power-law viscoelasticity transitioning to terminal flow
-**Parameters:** 3 (c_α, α, η)
-**Key equation:** :math:`G(t) = c_\alpha t^{-\alpha} E_{1-\alpha,1-\alpha}(-t^{1-\alpha}/\tau)` where :math:`\tau = \eta / c_\alpha^{1/(1-\alpha)}`
-**Test modes:** Oscillation, relaxation, creep
-**Material examples:** Critical gels, wormlike micelles, weak polymer networks, polymer solutions near gel point
+- **Use when:** Critical gels, power-law viscoelasticity transitioning to terminal flow
+- **Parameters:** 3 (c_α, α, η)
+- **Key equation:** :math:`G(t) = c_\alpha t^{-\alpha} E_{1-\alpha,1-\alpha}(-t^{1-\alpha}/\tau)` where :math:`\tau = \eta / c_\alpha^{1/(1-\alpha)}`
+- **Test modes:** Oscillation, relaxation, creep
+- **Material examples:** Critical gels, wormlike micelles, weak polymer networks, polymer solutions near gel point
 
 .. include:: /_includes/fractional_seealso.rst
 

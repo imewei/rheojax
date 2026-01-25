@@ -6,11 +6,11 @@ Power-Law (Ostwald–de Waele)
 Quick Reference
 ---------------
 
-**Use when:** Linear log-log flow curves, mid-range shear rates, quick characterization
-**Parameters:** 2 (:math:`K`, :math:`n`)
-**Key equation:** :math:`\sigma = K \dot{\gamma}^n`
-**Test modes:** Flow curve (Steady Shear)
-**Material examples:** Polymer melts, paints, shampoo, sauces, drilling fluids
+- **Use when:** Linear log-log flow curves, mid-range shear rates, quick characterization
+- **Parameters:** 2 (:math:`K`, :math:`n`)
+- **Key equation:** :math:`\sigma = K \dot{\gamma}^n`
+- **Test modes:** Flow curve (Steady Shear)
+- **Material examples:** Polymer melts, paints, shampoo, sauces, drilling fluids
 
 Overview
 --------

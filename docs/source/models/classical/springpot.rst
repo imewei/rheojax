@@ -6,11 +6,11 @@ SpringPot (Scott-Blair Element)
 Quick Reference
 ---------------
 
-**Use when:** Power-law behavior, broad relaxation spectra, fractional viscoelasticity
-**Parameters:** 2 (V, α)
-**Key equation:** :math:`G^*(\omega) = V (i\omega)^{\alpha}`, :math:`G'(\omega) \sim G''(\omega) \sim \omega^{\alpha}`
-**Test modes:** Oscillation, relaxation, creep
-**Material examples:** Critical gels (α=0.5), polymer melts near Tg, soft glassy materials, biological tissues
+- **Use when:** Power-law behavior, broad relaxation spectra, fractional viscoelasticity
+- **Parameters:** 2 (V, α)
+- **Key equation:** :math:`G^*(\omega) = V (i\omega)^{\alpha}`, :math:`G'(\omega) \sim G''(\omega) \sim \omega^{\alpha}`
+- **Test modes:** Oscillation, relaxation, creep
+- **Material examples:** Critical gels (α=0.5), polymer melts near Tg, soft glassy materials, biological tissues
 
 Notation Guide
 --------------

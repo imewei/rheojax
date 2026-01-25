@@ -7,11 +7,11 @@ Fluidity Nonlocal (Coussot-Ovarlez Cooperative Model) — Handbook
 Quick Reference
 ---------------
 
-**Use when:** Shear banding, wall slip, non-homogeneous flows in yield-stress fluids
-**Parameters:** 8+ (G, tau_y, eta_bg, f_eq, f_inf, theta, xi, + BCs)
-**Key equation:** :math:`\partial_t f = (f_{\rm loc}(\sigma) - f)/\theta + \xi^2 \nabla^2 f`
-**Test modes:** Rotation, start-up, creep, oscillation (with spatial profiles)
-**Material examples:** Concentrated emulsions, Carbopol gels, colloidal pastes, suspensions in microchannels
+- **Use when:** Shear banding, wall slip, non-homogeneous flows in yield-stress fluids
+- **Parameters:** 8+ (G, tau_y, eta_bg, f_eq, f_inf, theta, xi, + BCs)
+- **Key equation:** :math:`\partial_t f = (f_{\rm loc}(\sigma) - f)/\theta + \xi^2 \nabla^2 f`
+- **Test modes:** Rotation, start-up, creep, oscillation (with spatial profiles)
+- **Material examples:** Concentrated emulsions, Carbopol gels, colloidal pastes, suspensions in microchannels
 
 Notation Guide
 --------------

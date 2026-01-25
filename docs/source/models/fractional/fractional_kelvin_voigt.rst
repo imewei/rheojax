@@ -6,11 +6,11 @@ Fractional Kelvin-Voigt (Fractional)
 Quick Reference
 ---------------
 
-**Use when:** Solid with bounded creep, power-law viscoelastic damping
-**Parameters:** 2-3 (Ge, c_α, α)
-**Key equation:** :math:`G^*(\omega) = G_e + c_\alpha (i\omega)^\alpha`
-**Test modes:** Oscillation, creep, relaxation
-**Material examples:** Soft solids, filled polymers, biological tissues, materials with bounded compliance
+- **Use when:** Solid with bounded creep, power-law viscoelastic damping
+- **Parameters:** 2-3 (Ge, c_α, α)
+- **Key equation:** :math:`G^*(\omega) = G_e + c_\alpha (i\omega)^\alpha`
+- **Test modes:** Oscillation, creep, relaxation
+- **Material examples:** Soft solids, filled polymers, biological tissues, materials with bounded compliance
 
 .. include:: /_includes/fractional_seealso.rst
 

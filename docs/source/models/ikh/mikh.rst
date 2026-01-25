@@ -4,15 +4,15 @@ Maxwell-Isotropic-Kinematic Hardening (MIKH)
 Quick Reference
 ---------------
 
-**Use when:** Thixotropic elasto-viscoplastic materials with stress overshoot, Bauschinger effect, thixotropic hysteresis
+- **Use when:** Thixotropic elasto-viscoplastic materials with stress overshoot, Bauschinger effect, thixotropic hysteresis
 
-**Parameters:** 11 (G, η, C, γ_dyn, m, σ_y0, Δσ_y, τ_thix, Γ, η_inf, μ_p)
+- **Parameters:** 11 (G, η, C, γ_dyn, m, σ_y0, Δσ_y, τ_thix, Γ, η_inf, μ_p)
 
-**Key equation:** :math:`\frac{d\sigma}{dt} = G(\dot{\gamma} - \dot{\gamma}^p) - \frac{G}{\eta}\sigma` (Maxwell viscoelasticity with plasticity)
+- **Key equation:** :math:`\frac{d\sigma}{dt} = G(\dot{\gamma} - \dot{\gamma}^p) - \frac{G}{\eta}\sigma` (Maxwell viscoelasticity with plasticity)
 
-**Test modes:** flow_curve, startup, relaxation, creep, oscillation, laos
+- **Test modes:** flow_curve, startup, relaxation, creep, oscillation, laos
 
-**Material examples:** Drilling fluids, greases, waxy crude oil, thixotropic cements, structured emulsions
+- **Material examples:** Drilling fluids, greases, waxy crude oil, thixotropic cements, structured emulsions
 
 .. currentmodule:: rheojax.models.ikh.mikh
 

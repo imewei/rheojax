@@ -4,15 +4,15 @@ Shear Transformation Zone (STZ)
 Quick Reference
 ---------------
 
-**Use when:** Amorphous solids, metallic glasses, colloidal suspensions near jamming, emulsions, granular matter
+- **Use when:** Amorphous solids, metallic glasses, colloidal suspensions near jamming, emulsions, granular matter
 
-**Parameters:** 10 (G₀, σ_y, χ_∞, τ₀, ε₀, c₀, e_Z, τ_β, m_∞, Γ_m)
+- **Parameters:** 10 (G₀, σ_y, χ_∞, τ₀, ε₀, c₀, e_Z, τ_β, m_∞, Γ_m)
 
-**Key equation:** :math:`\dot{\varepsilon}^{pl} = \frac{\varepsilon_0}{\tau_0} \Lambda(\chi) \mathcal{C}(s) \mathcal{T}(s)`
+- **Key equation:** :math:`\dot{\varepsilon}^{pl} = \frac{\varepsilon_0}{\tau_0} \Lambda(\chi) \mathcal{C}(s) \mathcal{T}(s)`
 
-**Test modes:** flow_curve (steady_shear), startup, relaxation, creep, oscillation (LAOS)
+- **Test modes:** flow_curve (steady_shear), startup, relaxation, creep, oscillation (LAOS)
 
-**Material examples:** Metallic glasses, colloidal glasses, dense emulsions, granular matter
+- **Material examples:** Metallic glasses, colloidal glasses, dense emulsions, granular matter
 
 Notation Guide
 --------------

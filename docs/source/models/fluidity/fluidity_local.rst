@@ -7,11 +7,11 @@ Fluidity Local (Homogeneous Fluidity Model) — Handbook
 Quick Reference
 ---------------
 
-**Use when:** Yield-stress fluids, thixotropic materials, aging systems with homogeneous (spatially uniform) flow
-**Parameters:** 6 (G, f_eq, f_inf, tau_age, a, n)
-**Key equation:** :math:`\dot{\sigma} = G\dot{\gamma} - f(t)\sigma`
-**Test modes:** Oscillation, relaxation, creep, steady shear, start-up, LAOS
-**Material examples:** Mayonnaise, drilling muds, waxy crude oils, colloidal gels, greases, thixotropic paints
+- **Use when:** Yield-stress fluids, thixotropic materials, aging systems with homogeneous (spatially uniform) flow
+- **Parameters:** 6 (G, f_eq, f_inf, tau_age, a, n)
+- **Key equation:** :math:`\dot{\sigma} = G\dot{\gamma} - f(t)\sigma`
+- **Test modes:** Oscillation, relaxation, creep, steady shear, start-up, LAOS
+- **Material examples:** Mayonnaise, drilling muds, waxy crude oils, colloidal gels, greases, thixotropic paints
 
 Notation Guide
 --------------

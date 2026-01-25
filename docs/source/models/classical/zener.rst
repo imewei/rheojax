@@ -6,11 +6,11 @@ Zener (Standard Linear Solid)
 Quick Reference
 ---------------
 
-**Use when:** Viscoelastic solid with finite equilibrium modulus, creep-recovery tests
-**Parameters:** 3 (Gs, Gp, ηp)
-**Key equation:** :math:`G(t) = G_s + G_p \exp(-t/\tau)` where :math:`\tau = \eta_p/G_p`
-**Test modes:** Oscillation, relaxation, creep
-**Material examples:** Cross-linked PDMS, vulcanized rubber, hydrogels, biological tissues
+- **Use when:** Viscoelastic solid with finite equilibrium modulus, creep-recovery tests
+- **Parameters:** 3 (Gs, Gp, ηp)
+- **Key equation:** :math:`G(t) = G_s + G_p \exp(-t/\tau)` where :math:`\tau = \eta_p/G_p`
+- **Test modes:** Oscillation, relaxation, creep
+- **Material examples:** Cross-linked PDMS, vulcanized rubber, hydrogels, biological tissues
 
 Notation Guide
 --------------

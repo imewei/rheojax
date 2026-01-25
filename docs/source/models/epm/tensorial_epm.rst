@@ -6,15 +6,15 @@ Tensorial Elasto-Plastic Model (EPM)
 Quick Reference
 ---------------
 
-**Use when:** Full stress tensor modeling, normal stress differences (N₁, N₂), anisotropic yielding, flow instabilities
+- **Use when:** Full stress tensor modeling, normal stress differences (N₁, N₂), anisotropic yielding, flow instabilities
 
-**Parameters:** 9 (μ, ν, τ_pl_shear, τ_pl_normal, σ_c_mean, σ_c_std, w_N1, hill_H, hill_N)
+- **Parameters:** 9 (μ, ν, τ_pl_shear, τ_pl_normal, σ_c_mean, σ_c_std, w_N1, hill_H, hill_N)
 
-**Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma} \delta_{ij} - \frac{\sigma_{ij}}{\tau_{ij}^{pl}} f(\sigma_{eff}, \sigma_c) + \sum_{kl} \mathcal{G}_{ij,kl}(\mathbf{q}) \dot{\gamma}^{pl}_{kl}`
+- **Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma} \delta_{ij} - \frac{\sigma_{ij}}{\tau_{ij}^{pl}} f(\sigma_{eff}, \sigma_c) + \sum_{kl} \mathcal{G}_{ij,kl}(\mathbf{q}) \dot{\gamma}^{pl}_{kl}`
 
-**Test modes:** flow_curve, startup, relaxation, creep, oscillation
+- **Test modes:** flow_curve, startup, relaxation, creep, oscillation
 
-**Material examples:** Rod climbing polymer melts, fiber suspensions, anisotropic gels, flow-induced microstructure
+- **Material examples:** Rod climbing polymer melts, fiber suspensions, anisotropic gels, flow-induced microstructure
 
 Overview
 --------

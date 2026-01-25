@@ -6,15 +6,15 @@ Elasto-Plastic Models (EPM)
 Quick Reference
 ---------------
 
-**Use when:** Spatially-resolved modeling of amorphous solids, plastic avalanches, shear banding
+- **Use when:** Spatially-resolved modeling of amorphous solids, plastic avalanches, shear banding
 
-**Parameters:** 6 (μ, σ_c_mean, σ_c_std, τ_pl, L, dt)
+- **Parameters:** 6 (μ, σ_c_mean, σ_c_std, τ_pl, L, dt)
 
-**Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma}(t) - \mu \dot{\gamma}^{pl}_{ij} + \sum_{kl} \mathcal{G}_{ij,kl} \dot{\gamma}^{pl}_{kl}`
+- **Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma}(t) - \mu \dot{\gamma}^{pl}_{ij} + \sum_{kl} \mathcal{G}_{ij,kl} \dot{\gamma}^{pl}_{kl}`
 
-**Test modes:** flow_curve, startup, relaxation, creep, oscillation
+- **Test modes:** flow_curve, startup, relaxation, creep, oscillation
 
-**Material examples:** Metallic glasses, colloidal gels, pastes, dense granular suspensions, foams
+- **Material examples:** Metallic glasses, colloidal gels, pastes, dense granular suspensions, foams
 
 Overview
 --------

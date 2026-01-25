@@ -6,11 +6,11 @@ Fractional Zener Solid-Solid (Fractional)
 Quick Reference
 ---------------
 
-**Use when:** Solid with two elastic plateaus, power-law transition, broad relaxation spectra
-**Parameters:** 4 (Ge, Gm, α, τ_α)
-**Key equation:** :math:`G(t) = G_e + G_m E_\alpha(-(t/\tau_\alpha)^\alpha)`
-**Test modes:** Oscillation, relaxation, creep
-**Material examples:** Cross-linked networks, filled elastomers, hydrogels, biological tissues
+- **Use when:** Solid with two elastic plateaus, power-law transition, broad relaxation spectra
+- **Parameters:** 4 (Ge, Gm, α, τ_α)
+- **Key equation:** :math:`G(t) = G_e + G_m E_\alpha(-(t/\tau_\alpha)^\alpha)`
+- **Test modes:** Oscillation, relaxation, creep
+- **Material examples:** Cross-linked networks, filled elastomers, hydrogels, biological tissues
 
 .. include:: /_includes/fractional_seealso.rst
 

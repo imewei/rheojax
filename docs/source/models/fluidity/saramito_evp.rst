@@ -7,15 +7,15 @@ Fluidity-Saramito EVP Model
 Quick Reference
 ---------------
 
-**Use when:** Elastoviscoplastic materials with thixotropy
+- **Use when:** Elastoviscoplastic materials with thixotropy
 
-**Parameters:** G, τ_y, f, η_p, t_a, b
+- **Parameters:** G, τ_y, f, η_p, t_a, b
 
-**Key equation:** :math:`\boldsymbol{\tau} + \lambda \stackrel{\nabla}{\boldsymbol{\tau}} = 2\eta_p \mathbf{D}`
+- **Key equation:** :math:`\boldsymbol{\tau} + \lambda \stackrel{\nabla}{\boldsymbol{\tau}} = 2\eta_p \mathbf{D}`
 
-**Test modes:** flow_curve, startup, creep, oscillation, LAOS
+- **Test modes:** flow_curve, startup, creep, oscillation, LAOS
 
-**Material examples:** Carbopol, hair gel, mayonnaise
+- **Material examples:** Carbopol, hair gel, mayonnaise
 
 .. list-table:: Model Summary
    :widths: 30 70

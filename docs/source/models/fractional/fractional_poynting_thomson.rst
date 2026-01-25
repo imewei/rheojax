@@ -6,11 +6,11 @@ Fractional Poynting-Thomson (Fractional)
 Quick Reference
 ---------------
 
-**Use when:** Stress-relaxation with instantaneous modulus and fractional retardation
-**Parameters:** 4 (Ge, Gk, α, τ)
-**Key equation:** :math:`G(t) = G_{\mathrm{eq}} + (G_e - G_{\mathrm{eq}}) E_{\alpha}(-(t/\tau)^{\alpha})` where :math:`G_{\mathrm{eq}} = \frac{G_e G_k}{G_e + G_k}`
-**Test modes:** Relaxation, creep, oscillation
-**Material examples:** Viscoelastic solids emphasizing stress-relaxation interpretations
+- **Use when:** Stress-relaxation with instantaneous modulus and fractional retardation
+- **Parameters:** 4 (Ge, Gk, α, τ)
+- **Key equation:** :math:`G(t) = G_{\mathrm{eq}} + (G_e - G_{\mathrm{eq}}) E_{\alpha}(-(t/\tau)^{\alpha})` where :math:`G_{\mathrm{eq}} = \frac{G_e G_k}{G_e + G_k}`
+- **Test modes:** Relaxation, creep, oscillation
+- **Material examples:** Viscoelastic solids emphasizing stress-relaxation interpretations
 
 .. include:: /_includes/fractional_seealso.rst
 

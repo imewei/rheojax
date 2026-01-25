@@ -6,11 +6,11 @@ Fractional Kelvin-Voigt-Zener (Fractional)
 Quick Reference
 ---------------
 
-**Use when:** Creep/retardation analysis, solid with finite equilibrium compliance
-**Parameters:** 4 (Ge, Gk, α, τ)
-**Key equation:** :math:`J(t) = \frac{1}{G_e} + \frac{1}{G_k}[1 - E_{\alpha}(-(t/\tau)^{\alpha})]`
-**Test modes:** Creep, oscillation
-**Material examples:** Viscoelastic solids with retardation spectra, filled polymers, soft tissues
+- **Use when:** Creep/retardation analysis, solid with finite equilibrium compliance
+- **Parameters:** 4 (Ge, Gk, α, τ)
+- **Key equation:** :math:`J(t) = \frac{1}{G_e} + \frac{1}{G_k}[1 - E_{\alpha}(-(t/\tau)^{\alpha})]`
+- **Test modes:** Creep, oscillation
+- **Material examples:** Viscoelastic solids with retardation spectra, filled polymers, soft tissues
 
 .. include:: /_includes/fractional_seealso.rst
 

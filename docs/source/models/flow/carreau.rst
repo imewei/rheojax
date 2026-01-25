@@ -7,11 +7,11 @@ Carreau Model
 Quick Reference
 ---------------
 
-**Use when:** Polymer melts/solutions with smooth Newtonian-to-power-law transition, well-defined zero-shear viscosity
-**Parameters:** 4 (eta0, eta_inf, lambda, n)
-**Key equation:** :math:`\eta = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda\dot{\gamma})^2]^{(n-1)/2}`
-**Test modes:** Flow (steady shear, rotation)
-**Material examples:** Polymer melts (PE, PP, PS), polymer solutions, food gels, blood analogues, structured liquids
+- **Use when:** Polymer melts/solutions with smooth Newtonian-to-power-law transition, well-defined zero-shear viscosity
+- **Parameters:** 4 (eta0, eta_inf, lambda, n)
+- **Key equation:** :math:`\eta = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda\dot{\gamma})^2]^{(n-1)/2}`
+- **Test modes:** Flow (steady shear, rotation)
+- **Material examples:** Polymer melts (PE, PP, PS), polymer solutions, food gels, blood analogues, structured liquids
 
 Notation Guide
 --------------

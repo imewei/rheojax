@@ -6,11 +6,11 @@ Carreau–Yasuda Model
 Quick Reference
 ---------------
 
-**Use when:** Abrupt viscosity transitions, sharp changes between plateaus
-**Parameters:** 5 (η₀, η∞, λ, n, a)
-**Key equation:** :math:`\eta = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda\dot{\gamma})^{a}]^{(n-1)/a}`
-**Test modes:** Flow (steady shear)
-**Material examples:** Wormlike micelles, highly filled polymers, materials with sharp transitions
+- **Use when:** Abrupt viscosity transitions, sharp changes between plateaus
+- **Parameters:** 5 (η₀, η∞, λ, n, a)
+- **Key equation:** :math:`\eta = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda\dot{\gamma})^{a}]^{(n-1)/a}`
+- **Test modes:** Flow (steady shear)
+- **Material examples:** Wormlike micelles, highly filled polymers, materials with sharp transitions
 
 Overview
 --------

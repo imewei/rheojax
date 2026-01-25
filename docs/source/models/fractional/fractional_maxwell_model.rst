@@ -6,11 +6,11 @@ Generalized Fractional Maxwell (Two-Order)
 Quick Reference
 ---------------
 
-**Use when:** Multi-scale relaxation, hierarchical structures requiring two fractional orders
-**Parameters:** 4 (c₁, α, β, τ)
-**Key equation:** :math:`G^*(\omega) = c_1 \frac{(i\omega)^\alpha}{1 + (i\omega\tau)^\beta}`
-**Test modes:** Oscillation, relaxation
-**Material examples:** Materials with hierarchical structures, multi-scale relaxation processes
+- **Use when:** Multi-scale relaxation, hierarchical structures requiring two fractional orders
+- **Parameters:** 4 (c₁, α, β, τ)
+- **Key equation:** :math:`G^*(\omega) = c_1 \frac{(i\omega)^\alpha}{1 + (i\omega\tau)^\beta}`
+- **Test modes:** Oscillation, relaxation
+- **Material examples:** Materials with hierarchical structures, multi-scale relaxation processes
 
 .. include:: /_includes/fractional_seealso.rst
 

@@ -7,11 +7,11 @@ SGR Conventional (Soft Glassy Rheology) — Handbook
 Quick Reference
 ---------------
 
-**Use when:** Soft glassy materials (foams, emulsions, pastes, colloidal gels), yield stress fluids, aging materials
-**Parameters:** 3-4 (x, G0, tau0, optional sigma_y)
-**Key equation:** :math:`G'(\omega) \sim G''(\omega) \sim \omega^{x-1}` for :math:`1 < x < 2`
-**Test modes:** Oscillation, relaxation, creep, steady shear, LAOS
-**Material examples:** Concentrated emulsions, colloidal suspensions, foams, pastes, mayonnaise, hair gel
+- **Use when:** Soft glassy materials (foams, emulsions, pastes, colloidal gels), yield stress fluids, aging materials
+- **Parameters:** 3-4 (x, G0, tau0, optional sigma_y)
+- **Key equation:** :math:`G'(\omega) \sim G''(\omega) \sim \omega^{x-1}` for :math:`1 < x < 2`
+- **Test modes:** Oscillation, relaxation, creep, steady shear, LAOS
+- **Material examples:** Concentrated emulsions, colloidal suspensions, foams, pastes, mayonnaise, hair gel
 
 Notation Guide
 --------------

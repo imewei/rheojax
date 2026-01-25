@@ -6,16 +6,16 @@ ITT-MCT Schematic (F₁₂)
 Quick Reference
 ---------------
 
-**Use when:** Dense colloidal suspensions, glassy materials, yield-stress fluids,
+- **Use when:** Dense colloidal suspensions, glassy materials, yield-stress fluids,
 materials showing glass transition behavior
 
-**Parameters:** 5 (v₁, v₂, Γ, γ_c, G_∞) or equivalently (ε, v₁, Γ, γ_c, G_∞)
+- **Parameters:** 5 (v₁, v₂, Γ, γ_c, G_∞) or equivalently (ε, v₁, Γ, γ_c, G_∞)
 
-**Key equation:** Memory kernel m(Φ) = v₁Φ + v₂Φ² with glass transition at v₂ = 4
+- **Key equation:** Memory kernel m(Φ) = v₁Φ + v₂Φ² with glass transition at v₂ = 4
 
-**Test modes:** Flow curve, oscillation, startup, creep, relaxation, LAOS
+- **Test modes:** Flow curve, oscillation, startup, creep, relaxation, LAOS
 
-**Material examples:** PMMA colloids, emulsions, carbopol gels, concentrated polymer solutions
+- **Material examples:** PMMA colloids, emulsions, carbopol gels, concentrated polymer solutions
 
 Notation Guide
 --------------

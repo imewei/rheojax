@@ -7,16 +7,16 @@ SPP Yield Stress Model
 Quick Reference
 ---------------
 
-**Use when:** Extracting yield stress from LAOS amplitude sweeps, characterizing
+- **Use when:** Extracting yield stress from LAOS amplitude sweeps, characterizing
 cage-based yield stress fluids, connecting oscillatory to steady-shear behavior
 
-**Parameters:** 8 (G_cage, sigma_sy_scale, sigma_sy_exp, sigma_dy_scale, sigma_dy_exp, eta_inf, n_power_law, noise)
+- **Parameters:** 8 (G_cage, sigma_sy_scale, sigma_sy_exp, sigma_dy_scale, sigma_dy_exp, eta_inf, n_power_law, noise)
 
-**Key equation:** :math:`\sigma_{sy}(\gamma_0) = \sigma_{sy,0} \cdot |\gamma_0|^{n_{sy}}` and :math:`\sigma_{dy}(\gamma_0) = \sigma_{dy,0} \cdot |\gamma_0|^{n_{dy}}`
+- **Key equation:** :math:`\sigma_{sy}(\gamma_0) = \sigma_{sy,0} \cdot |\gamma_0|^{n_{sy}}` and :math:`\sigma_{dy}(\gamma_0) = \sigma_{dy,0} \cdot |\gamma_0|^{n_{dy}}`
 
-**Test modes:** oscillation (LAOS amplitude sweep), rotation (flow curve)
+- **Test modes:** oscillation (LAOS amplitude sweep), rotation (flow curve)
 
-**Material examples:** Yield stress fluids, colloidal gels, concentrated emulsions, foams, soft glasses, carbopol microgels, mayonnaise
+- **Material examples:** Yield stress fluids, colloidal gels, concentrated emulsions, foams, soft glasses, carbopol microgels, mayonnaise
 
 Notation Guide
 --------------

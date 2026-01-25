@@ -6,11 +6,11 @@ Fractional Zener Liquid-Liquid (Fractional)
 Quick Reference
 ---------------
 
-**Use when:** Liquid with broad multi-order fractional dispersions, complex viscoelastic behavior
-**Parameters:** 6 (c₁, c₂, α, β, γ, τ)
-**Key equation:** :math:`G^*(\omega) = \frac{c_1(i\omega)^{\alpha}}{1 + (i\omega\tau)^{\beta}} + c_2(i\omega)^{\gamma}`
-**Test modes:** Oscillation, relaxation
-**Material examples:** Complex fluids with multiple fractional relaxation mechanisms
+- **Use when:** Liquid with broad multi-order fractional dispersions, complex viscoelastic behavior
+- **Parameters:** 6 (c₁, c₂, α, β, γ, τ)
+- **Key equation:** :math:`G^*(\omega) = \frac{c_1(i\omega)^{\alpha}}{1 + (i\omega\tau)^{\beta}} + c_2(i\omega)^{\gamma}`
+- **Test modes:** Oscillation, relaxation
+- **Material examples:** Complex fluids with multiple fractional relaxation mechanisms
 
 .. include:: /_includes/fractional_seealso.rst
 

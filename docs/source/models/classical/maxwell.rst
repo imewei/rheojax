@@ -6,11 +6,11 @@ Maxwell (Classical)
 Quick Reference
 ---------------
 
-**Use when:** Single relaxation time, exponential stress decay, viscoelastic liquids
-**Parameters:** 2 (G, η)
-**Key equation:** :math:`G(t) = G \exp(-t/\tau)` where :math:`\tau = \eta/G`
-**Test modes:** Oscillation, relaxation
-**Material examples:** Polymer melts (PS, PDMS), viscoelastic liquids, dilute solutions
+- **Use when:** Single relaxation time, exponential stress decay, viscoelastic liquids
+- **Parameters:** 2 (G, η)
+- **Key equation:** :math:`G(t) = G \exp(-t/\tau)` where :math:`\tau = \eta/G`
+- **Test modes:** Oscillation, relaxation
+- **Material examples:** Polymer melts (PS, PDMS), viscoelastic liquids, dilute solutions
 
 Notation Guide
 --------------
