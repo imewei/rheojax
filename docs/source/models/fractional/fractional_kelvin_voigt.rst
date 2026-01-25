@@ -15,12 +15,173 @@ Quick Reference
 .. seealso::
    :doc:`/user_guide/fractional_viscoelasticity_reference` — Mathematical foundations of fractional calculus, SpringPot element, Mittag-Leffler functions, and physical meaning of fractional order α.
 
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 15 70
+   :header-rows: 1
+
+   * - Symbol
+     - Units
+     - Description
+   * - :math:`G_e`
+     - Pa
+     - Equilibrium modulus (spring stiffness)
+   * - :math:`c_\alpha`
+     - Pa·s\ :sup:`α`
+     - SpringPot quasi-property (damping coefficient)
+   * - :math:`\alpha`
+     - dimensionless
+     - Fractional order (0 < α < 1, controls damping character)
+   * - :math:`\tau_\varepsilon`
+     - s
+     - Characteristic retardation time, :math:`\tau_\varepsilon = (c_\alpha/G_e)^{1/\alpha}`
+   * - :math:`E_\alpha(z)`
+     - dimensionless
+     - One-parameter Mittag-Leffler function
+   * - :math:`\Gamma(z)`
+     - dimensionless
+     - Gamma function
+
 Overview
 --------
 
 The Fractional Kelvin-Voigt (FKV) model consists of a Hookean spring and a SpringPot element connected in parallel. This configuration describes materials that exhibit solid-like behavior with power-law creep and viscoelastic damping. Unlike the classical Kelvin-Voigt model which combines a spring and dashpot in parallel, the FKV model replaces the dashpot with a SpringPot, introducing fractional-order power-law damping instead of purely viscous dissipation.
 
 The FKV model is particularly effective for characterizing soft solids, filled polymers, biological tissues, and materials that exhibit bounded creep compliance-materials that deform under constant stress but reach an equilibrium strain rather than flowing indefinitely. The fractional order alpha controls the rate and character of this creep process.
+
+Physical Foundations
+--------------------
+
+The FKV model represents the simplest fractional viscoelastic solid, consisting of:
+
+**Mechanical Configuration:**
+
+.. code-block:: text
+
+   [Spring Ge] ---- parallel ---- [SpringPot (c_α, α)]
+
+**Microstructural Interpretation:**
+
+- **Spring (Ge)**: Permanent network structure (crosslinks, crystalline domains)
+  providing equilibrium elasticity
+- **SpringPot (c_α, α)**: Distributed viscoelastic damping from hierarchical
+  relaxation processes (chain rearrangements, bond breaking/reformation)
+- **Solid behavior**: Bounded creep to equilibrium compliance J∞ = 1/Ge
+
+The parallel configuration ensures that stress is shared between elastic and
+viscoelastic components, with the spring providing long-term load-bearing capacity.
+
+What You Can Learn
+------------------
+
+This section explains how to extract material insights from fitted FKV parameters.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Equilibrium Modulus (Ge)**:
+   The long-time elastic plateau representing permanent network structure.
+
+   - **For graduate students**: Ge relates to crosslink density via rubber
+     elasticity theory: Ge ≈ νkBT where ν is network strand density
+   - **For practitioners**: Higher Ge means stiffer material; compare to
+     design requirements
+
+**SpringPot Constant (c_α)**:
+   Controls the magnitude of viscoelastic damping.
+
+   - High c_α/Ge ratio: Strong damping, slow approach to equilibrium
+   - Low c_α/Ge ratio: Weak damping, rapid approach to equilibrium
+   - Units: Pa·s^α (unusual due to fractional calculus)
+
+**Fractional Order (α)**:
+   Governs the character of power-law damping and spectrum breadth.
+
+   - **α → 0**: Purely elastic (spring-like), minimal damping
+   - **α → 0.3-0.5**: Typical for soft solids, broad relaxation spectrum
+   - **α → 0.7-0.9**: Approaching classical Kelvin-Voigt (viscous damping)
+   - **α → 1**: Classical Kelvin-Voigt with Newtonian dashpot
+
+   *Physical meaning*: Lower α indicates broader distribution of relaxation
+   times arising from structural heterogeneity (polydispersity, filler
+   distribution, network inhomogeneity).
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: FKV Behavior Classification
+   :header-rows: 1
+   :widths: 20 25 25 30
+
+   * - Parameter Pattern
+     - Material Type
+     - Examples
+     - Key Characteristics
+   * - High Ge (> 10⁵ Pa), low α
+     - Stiff crosslinked solid
+     - Thermosets, vulcanized rubber
+     - Minimal creep, strong damping
+   * - Moderate Ge (10³-10⁵ Pa), α ~ 0.4
+     - Soft viscoelastic solid
+     - Hydrogels, elastomers
+     - Balanced elasticity/damping
+   * - Low Ge (< 10³ Pa), high α
+     - Very soft gel
+     - Weak physical gels
+     - Significant creep, slow recovery
+
+Diagnostic Indicators
+~~~~~~~~~~~~~~~~~~~~~
+
+- **Ge near lower bound**: Material may be liquid-like; consider fractional
+  Maxwell gel instead
+- **α near 1**: Data supports classical Kelvin-Voigt; use simpler model
+- **Poor fit at long time**: Equilibrium not reached; extend measurement time
+- **c_α and α strongly correlated**: Need broader frequency/time coverage
+
+Fitting Guidance
+----------------
+
+**Recommended Data Collection:**
+
+1. **Creep test**: 3-4 decades in time, verify plateau at long times
+2. **Frequency sweep**: 3-4 decades, strain within LVR (< 5%)
+3. **Temperature control**: ±0.1°C for soft materials
+
+**Initialization Strategy:**
+
+.. code-block:: text
+
+   # From creep compliance J(t)
+   Ge_init = 1 / J(t → ∞)  # Equilibrium compliance
+   c_alpha_init = Ge_init / (characteristic_time**alpha_init)
+   alpha_init = 0.5  # Default for soft solids
+
+   # From frequency sweep G'(ω), G"(ω)
+   Ge_init = G'(ω → 0)  # Low-frequency plateau
+   alpha_init = slope of log(G") vs log(ω) in power-law regime
+
+**Optimization Tips:**
+
+- Fit in compliance space for creep data (more natural)
+- Use frequency-domain fitting for SAOS data
+- Constrain 0.05 < α < 0.95 to avoid numerical issues
+- Verify residuals show no systematic trends
+
+See Also
+--------
+
+- :doc:`fractional_maxwell_gel` — provides the series counterpart used for gel-like
+  liquids
+- :doc:`fractional_kv_zener` — Kelvin-Voigt element combined with an extra spring for
+  plateau control
+- :doc:`../flow/bingham` — combine bounded creep solids with yield-stress flow models
+- :doc:`../../transforms/mutation_number` — monitor whether the quasi-solid assumption
+  holds during gelation
+- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
+  Kelvin-Voigt, Maxwell, and Zener fractional families
 
 Governing Equations
 -------------------
@@ -225,9 +386,41 @@ See also
 References
 ----------
 
-- R.L. Bagley and P.J. Torvik, "A theoretical basis for the application of fractional
-  calculus to viscoelasticity," *J. Rheol.* 27, 201–210 (1983).
-- N. Makris and M.C. Constantinou, "Fractional-derivative Maxwell model for viscous
-  dampers," *J. Struct. Eng.* 117, 2708–2724 (1991).
-- H. Schiessel, R. Metzler, A. Blumen, and T.F. Nonnenmacher, "Generalized viscoelastic
-  models: their fractional equations with solutions," *J. Phys. A* 28, 6567–6584 (1995).
+.. [1] Bagley, R. L., and Torvik, P. J. "A theoretical basis for the application of
+   fractional calculus to viscoelasticity." *Journal of Rheology*, 27, 201–210 (1983).
+   https://doi.org/10.1122/1.549724
+
+.. [2] Makris, N., and Constantinou, M. C. "Fractional-derivative Maxwell model for
+   viscous dampers." *Journal of Structural Engineering*, 117, 2708–2724 (1991).
+   https://doi.org/10.1061/%28ASCE%290733-9445%281991%29117:9%282708%29
+
+.. [3] Schiessel, H., Metzler, R., Blumen, A., and Nonnenmacher, T. F. "Generalized
+   viscoelastic models: their fractional equations with solutions."
+   *Journal of Physics A*, 28, 6567–6584 (1995).
+   https://doi.org/10.1088/0305-4470/28/23/012
+
+.. [4] Mainardi, F. *Fractional Calculus and Waves in Linear Viscoelasticity*.
+   Imperial College Press (2010). https://doi.org/10.1142/p614
+
+.. [5] Friedrich, C. "Relaxation and retardation functions of the Maxwell model
+   with fractional derivatives." *Rheologica Acta*, 30, 151–158 (1991).
+   https://doi.org/10.1007/BF01134604
+.. [6] Metzler, R., Schick, W., Kilian, H.-G., & Nonnenmacher, T. F. "Relaxation in filled polymers: A fractional calculus approach."
+   *Journal of Chemical Physics*, **103**, 7180-7186 (1995).
+   https://doi.org/10.1063/1.470346
+
+.. [7] Friedrich, C. "Relaxation and retardation functions of the Maxwell model with fractional derivatives."
+   *Rheologica Acta*, **30**, 151-158 (1991).
+   https://doi.org/10.1007/BF01134604
+
+.. [8] Heymans, N. & Bauwens, J. C. "Fractal rheological models and fractional differential equations for viscoelastic behavior."
+   *Rheologica Acta*, **33**, 210-219 (1994).
+   https://doi.org/10.1007/BF00437306
+
+.. [9] Nonnenmacher, T. F. & Glöckle, W. G. "A fractional model for mechanical stress relaxation."
+   *Philosophical Magazine Letters*, **64**, 89-93 (1991).
+   https://doi.org/10.1080/09500839108214672
+
+.. [10] Podlubny, I. *Fractional Differential Equations*.
+   Academic Press (1999). ISBN: 978-0125588409
+

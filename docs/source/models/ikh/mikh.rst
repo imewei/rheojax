@@ -1,18 +1,18 @@
 Maxwell-Isotropic-Kinematic Hardening (MIKH)
 ============================================
 
-.. admonition:: Quick Reference
-   :class: hint
+Quick Reference
+---------------
 
-   **Use when:** Thixotropic elasto-viscoplastic materials with stress overshoot, Bauschinger effect, thixotropic hysteresis
+**Use when:** Thixotropic elasto-viscoplastic materials with stress overshoot, Bauschinger effect, thixotropic hysteresis
 
-   **Parameters:** 11 (G, η, C, γ_dyn, m, σ_y0, Δσ_y, τ_thix, Γ, η_inf, μ_p)
+**Parameters:** 11 (G, η, C, γ_dyn, m, σ_y0, Δσ_y, τ_thix, Γ, η_inf, μ_p)
 
-   **Key equations:** dσ/dt = G(γ̇ - γ̇ᵖ) - (G/η)σ, dα = C·dγ_p - γ_dyn·α·|dγ_p|
+**Key equation:** :math:`\frac{d\sigma}{dt} = G(\dot{\gamma} - \dot{\gamma}^p) - \frac{G}{\eta}\sigma` (Maxwell viscoelasticity with plasticity)
 
-   **Test modes:** flow_curve, startup, relaxation, creep, oscillation, laos
+**Test modes:** flow_curve, startup, relaxation, creep, oscillation, laos
 
-   **Materials:** Drilling fluids, greases, waxy crude oil, thixotropic cements, structured emulsions
+**Material examples:** Drilling fluids, greases, waxy crude oil, thixotropic cements, structured emulsions
 
 .. currentmodule:: rheojax.models.ikh.mikh
 
@@ -187,12 +187,12 @@ As plastic deformation accumulates, α evolves according to the Armstrong-Freder
 - C is the kinematic hardening modulus [Pa]
 - This creates a "memory" of the plastic deformation direction
 
-**Term 2 (Dynamic Recovery):** -γ_dyn·|α|^(m-1)·α·|dγ_p|
+**Term 2 (Dynamic Recovery):** -γ_dyn·\|α\|^(m-1)·α·\|dγ_p\|
 
 - Limits backstress saturation (prevents unbounded growth)
 - γ_dyn controls recovery rate
 - m controls nonlinearity (m = 1 is linear, m > 1 accelerates recovery at high α)
-- Recovery is proportional to |dγ_p|, so it only occurs during plastic flow
+- Recovery is proportional to \|dγ_p\|, so it only occurs during plastic flow
 
 **Steady-state backstress:** At steady plastic flow:
 
@@ -227,7 +227,7 @@ The structure evolves according to a first-order kinetic equation:
 - At rest (γ̇ᵖ = 0): λ(t) = 1 - (1 - λ_0)·exp(-t/τ_thix)
 - Physical origin: Brownian motion, thermal fluctuations allow bond reformation
 
-**Term 2 (Breakdown):** Γ·λ·|γ̇ᵖ|
+**Term 2 (Breakdown):** Γ·λ·\|γ̇ᵖ\|
 
 - Structure breaks down proportionally to plastic strain rate
 - Γ is the breakdown efficiency coefficient
@@ -261,7 +261,7 @@ viscous background η_∞·γ̇. The latter represents the suspending fluid's vi
 
    f = |\xi| - \sigma_y(\lambda) \leq 0 \quad \text{where} \quad \xi = \sigma - \alpha
 
-The material yields when the relative stress |ξ| = |σ - α| exceeds the current
+The material yields when the relative stress \|ξ\| = \|σ - α\| exceeds the current
 yield stress σ_y(λ). The backstress α shifts the yield surface in stress space.
 
 **Plastic flow rule (Perzyna regularization):**
@@ -307,7 +307,7 @@ The MIKH model uses two numerical formulations depending on the experimental pro
 Suitable for stress-controlled or strain-relaxation experiments where the
 full viscoelastic response is needed:
 
-.. code-block:: python
+.. code-block:: text
 
    # State: [σ, α, λ]
    dσ/dt = G(γ̇ - γ̇ᵖ) - (G/η)σ
@@ -370,6 +370,126 @@ This produces the characteristic shear-thinning flow curve:
 - **Low shear rate (γ̇ → 0):** σ → σ_y,0 + Δσ_y (structured yield stress)
 - **High shear rate (γ̇ → ∞):** σ → σ_y,0 + η_∞·γ̇ (linear viscous)
 
+Governing Equations
+-------------------
+
+The complete MIKH system comprises three coupled ODEs (see Mathematical Formulation for details):
+
+.. math::
+
+   \frac{d\sigma}{dt} &= G(\dot{\gamma} - \dot{\gamma}^p) - \frac{G}{\eta}\sigma \\
+   \frac{d\alpha}{dt} &= C\dot{\gamma}^p - \gamma_{dyn}|\alpha|^{m-1}\alpha|\dot{\gamma}^p| \\
+   \frac{d\lambda}{dt} &= \frac{1-\lambda}{\tau_{thix}} - \Gamma\lambda|\dot{\gamma}^p|
+
+With plastic flow rate:
+
+.. math::
+
+   \dot{\gamma}^p = \frac{\langle |\sigma - \alpha| - \sigma_y(\lambda) \rangle}{\mu_p} \cdot \text{sign}(\sigma - \alpha)
+
+Validity and Assumptions
+------------------------
+
+**Valid for:**
+
+- **Thixotropic elasto-viscoplastic fluids**: Waxy crude oils, drilling muds, greases, structured emulsions
+- **Materials with Bauschinger effect**: Easier reverse flow after forward loading
+- **Yield stress evolution**: Rest-time dependent yield stress
+- **Moderate shear rates**: Below onset of turbulence or flow instabilities
+
+**Assumptions:**
+
+- **Single structural parameter λ**: One-dimensional structure kinetics (no multi-scale structure)
+- **Isotropic yielding**: von Mises-like yield criterion (no anisotropy)
+- **Affine deformation**: No spatial gradients (homogeneous flow)
+- **Incompressible**: No density changes
+- **Isothermal**: No temperature effects
+
+**Not appropriate for:**
+
+- **Multi-timescale thixotropy**: Use :doc:`ml_ikh` instead
+- **Shear banding**: Requires spatial extension (1D or 2D)
+- **Viscoelastic effects** dominating over plasticity: Use Maxwell or Oldroyd-B models
+- **High-frequency oscillations**: Limited by quasi-static assumption
+
+What You Can Learn
+------------------
+
+From fitting Modified IKH to experimental data, you can extract insights about thixotropy, kinematic hardening (Bauschinger effect), and structural evolution in elasto-viscoplastic materials.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**λ (Structure Parameter)**:
+   Dimensionless internal variable (0 ≤ λ ≤ 1) quantifying microstructural integrity.
+   *For graduate students*: λ represents fraction of intact bonds/aggregates. Evolution: dλ/dt = (1-λ)/τ_thix - Γλ|γ̇^p|. At steady state: λ_ss = 1/(1 + Γτ_thix|γ̇|). Couples to yield stress via σ_y(λ) = σ_y,0 + Δσ_y·λ, capturing aging-induced hardening.
+   *For practitioners*: λ = 1 (fully aged, maximum strength) vs λ = 0 (fully broken down, minimum strength). Measure indirectly via yield stress recovery tests. Materials with long τ_thix retain flow history.
+
+**α (Kinematic Backstress)**:
+   Internal stress representing directional anisotropy from flow-induced microstructure.
+   *For graduate students*: Armstrong-Frederick kinematic hardening: dα/dt = C·γ̇^p - γ_dyn|α|^(m-1)α|γ̇^p|. Produces Bauschinger effect (easier reverse yielding). At steady state: α_ss = C/γ_dyn. Ratio (σ_y - 2α_ss)/σ_y quantifies asymmetry.
+   *For practitioners*: Measure via reverse flow tests. High C → strong directional memory, pronounced Bauschinger effect. Typical for waxy crude oils, fiber suspensions.
+
+**τ_thix (Thixotropic Rebuilding Time)**:
+   Timescale for structural recovery at rest.
+   *For graduate students*: First-order kinetics for aging: λ → 1 with time constant τ_thix. Sets width of hysteresis loops in up-down flow ramps. For thermally-activated processes, τ_thix ~ τ₀exp(ΔE_build/k_BT).
+   *For practitioners*: Extract from rest-time dependent startup tests or step-strain recovery. Fast aging (τ_thix < 10 s) vs slow aging (τ_thix > 100 s). Critical for pumping restart protocols.
+
+**Γ (Breakdown Coefficient)**:
+   Efficiency of shear-induced destructuring (units: inverse shear rate).
+   *For graduate students*: Controls shear-thinning: λ_ss = 1/(1 + Γτ_thix|γ̇|). High Γ → rapid breakdown, low Γ → persistent structure. Connects to flow curve via σ_ss(γ̇) = σ_y,0 + Δσ_y/(1 + Γτ_thix|γ̇|) + η_∞|γ̇|.
+   *For practitioners*: Fit from flow curve curvature. Γτ_thix ~ 1 at characteristic shear rate where structure is half-broken.
+
+**C, γ_dyn, m (Kinematic Hardening Parameters)**:
+   Control backstress evolution and Bauschinger effect magnitude.
+   *For graduate students*: C is hardening modulus, γ_dyn is dynamic recovery rate, m is recovery exponent (m=1 linear, m>1 nonlinear). Armstrong-Frederick model with m=1 widely used. Steady α_ss = C/γ_dyn independent of m.
+   *For practitioners*: Identify from cyclic loading or reverse flow tests. C/γ_dyn sets saturation backstress (typ. 10-50% of σ_y).
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Modified IKH Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - τ_thix < 10 s, Γτ_thix < 1
+     - Fast aging, weak shear-thinning
+     - Soft gels, cosmetics, paints
+     - Rapid recovery, moderate thixotropy
+   * - τ_thix = 10-100 s, Γτ_thix = 1-10
+     - Moderate aging, strong shear-thinning
+     - Drilling muds, greases, emulsions
+     - Pronounced thixotropy, history-dependent
+   * - τ_thix > 100 s, Γτ_thix > 10
+     - Slow aging, extreme shear-thinning
+     - Waxy crude oils, cement pastes
+     - Long memory, pumping challenges
+   * - C/γ_dyn < 0.1σ_y
+     - Weak Bauschinger effect
+     - Isotropic gels, simple colloids
+     - Symmetric yielding
+   * - C/γ_dyn > 0.3σ_y
+     - Strong Bauschinger effect
+     - Waxy crude oils, fiber suspensions
+     - Directional flow history, asymmetric yielding
+
+- **Connection to SAOS**: G ≈ G' (storage modulus) at high frequency
+
+**5. Stress Overshoot Magnitude**
+
+- **Overshoot ratio**: (σ_max - σ_ss) / σ_ss
+- Controlled by interplay of G, C, and λ₀ (initial structure)
+- **Physical signature**: Thixotropic materials show overshoot; purely viscoplastic do not
+
+**6. Yield Stress Aging**
+
+- **Time dependence**: σ_y(t_rest) = σ_y,0 + Δσ_y·(1 - exp(-t_rest/τ_thix))
+- **Aging rate**: 1/τ_thix
+- **Maximum recoverable yield stress**: σ_y,0 + Δσ_y
 
 Dimensionless Groups
 --------------------
@@ -532,6 +652,36 @@ Troubleshooting
      - Decrease η (Maxwell viscosity); check τ = η/G vs experiment time
 
 
+Usage
+-----
+
+The MIKH model is available via:
+
+.. code-block:: python
+
+   from rheojax.models import MIKH
+
+**Common workflows**:
+
+1. **Flow curve fitting**: Determine σ_y0, Δσ_y, η_inf from steady-state data
+2. **Startup fitting**: Extract G, C, γ_dyn from transient stress overshoot
+3. **Creep/relaxation**: Constrain η (Maxwell viscosity) and μ_p (plastic viscosity)
+4. **Bayesian inference**: Quantify uncertainty in thixotropic timescales
+
+**Integration with Pipeline**:
+
+.. code-block:: python
+
+   from rheojax.pipeline import Pipeline
+
+   # Fluent API for complete workflow
+   (Pipeline()
+    .load('startup_data.csv', x_col='time', y_col='stress')
+    .fit_nlsq('mikh', test_mode='startup')
+    .fit_bayesian(num_samples=2000)
+    .plot_trace()
+    .save('mikh_results.hdf5'))
+
 Usage Examples
 --------------
 
@@ -637,22 +787,47 @@ Relation to Other Models
 References
 ----------
 
-1. Dimitriou, C.J. & McKinley, G.H. (2014). "A comprehensive constitutive law for
-   waxy crude oil: a thixotropic yield stress fluid." *Soft Matter*, 10(35), 6619-6644.
-   DOI: 10.1039/c4sm00578c
+.. [1] Dimitriou, C. J. and McKinley, G. H. "A comprehensive constitutive law for
+   waxy crude oil: a thixotropic yield stress fluid." *Soft Matter*, 10(35),
+   6619-6644 (2014). https://doi.org/10.1039/c4sm00578c
 
-2. Geri, M., Venkatesan, R., Sambath, K., & McKinley, G.H. (2017). "Thermokinematic
-   memory and the thixotropic elasto‐viscoplasticity of waxy crude oils."
-   *J. Rheol.*, 61(3), 427-454. DOI: 10.1122/1.4978259
+.. [2] Geri, M., Venkatesan, R., Sambath, K., and McKinley, G. H. "Thermokinematic
+   memory and the thixotropic elasto-viscoplasticity of waxy crude oils."
+   *Journal of Rheology*, 61(3), 427-454 (2017). https://doi.org/10.1122/1.4978259
 
-3. Saramito, P. (2009). "A new elastoviscoplastic model based on the Herschel–Bulkley
-   viscoplastic model." *J. Non-Newtonian Fluid Mech.*, 158, 154-161.
+.. [3] Saramito, P. "A new elastoviscoplastic model based on the Herschel-Bulkley
+   viscoplastic model." *Journal of Non-Newtonian Fluid Mechanics*, 158, 154-161
+   (2009). https://doi.org/10.1016/j.jnnfm.2008.08.001
 
-4. de Souza Mendes, P.R. & Thompson, R.L. (2019). "Time-dependent yield stress
-   materials." *Annu. Rev. Fluid Mech.*, 51, 421-449.
+.. [4] de Souza Mendes, P. R. and Thompson, R. L. "Time-dependent yield stress
+   materials." *Annual Review of Fluid Mechanics*, 51, 421-449 (2019).
+   https://doi.org/10.1146/annurev-fluid-010518-040305
 
-5. Armstrong, P.J. & Frederick, C.O. (1966). "A mathematical representation of the
-   multiaxial Bauschinger effect." *CEGB Report RD/B/N731*.
+.. [5] Armstrong, P. J. and Frederick, C. O. "A mathematical representation of the
+   multiaxial Bauschinger effect." *CEGB Report RD/B/N731* (1966).
 
-6. Mewis, J. & Wagner, N.J. (2009). "Thixotropy."
-   *Adv. Colloid Interface Sci.*, 147-148, 214-227.
+.. [6] Mewis, J. and Wagner, N. J. "Thixotropy." *Advances in Colloid and Interface
+   Science*, 147-148, 214-227 (2009). https://doi.org/10.1016/j.cis.2008.09.005
+
+.. [7] Chaboche, J. L. "Constitutive equations for cyclic plasticity and cyclic
+   viscoplasticity." *International Journal of Plasticity*, 5(3), 247-302 (1989).
+   https://doi.org/10.1016/0749-6419(89)90015-6
+
+.. [8] Larson, R. G. and Wei, Y. "A review of thixotropy and its rheological modeling."
+   *Journal of Rheology*, 63(3), 477-501 (2019). https://doi.org/10.1122/1.5055031
+
+.. [9] Dullaert, K. and Mewis, J. "A structural kinetics model for thixotropy."
+   *Journal of Non-Newtonian Fluid Mechanics*, 139(1-2), 21-30 (2006).
+   https://doi.org/10.1016/j.jnnfm.2006.06.002
+
+.. [10] Prager, W. "A new method of analyzing stresses and strains in work-hardening
+   plastic solids." *Journal of Applied Mechanics*, 23, 493-496 (1956).
+   https://doi.org/10.1115/1.4011389
+
+See Also
+--------
+
+- :doc:`ml_ikh` — Multi-mode extension for distributed thixotropic timescales
+- :doc:`/models/dmt/dmt_local` — Alternative thixotropic formulation (de Souza Mendes-Thompson)
+- :doc:`/models/fluidity/saramito` — Fluidity-Saramito EVP models with thixotropy
+- :doc:`/user_guide/03_advanced_topics/index` — Advanced thixotropic modeling workflows

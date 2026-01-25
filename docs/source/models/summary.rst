@@ -3,10 +3,6 @@ Models Summary & Selection Guide
 
 This page serves as a comprehensive quick-reference guide for all **36+ rheological models** in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
 
-.. contents:: Page Contents
-   :local:
-   :depth: 2
-
 
 Complete Model Comparison Matrix
 ---------------------------------
@@ -515,8 +511,8 @@ stress overshoot prediction; systems needing normal stress difference (N₁) pre
 **Key physics:**
 
 * Upper-convected Maxwell viscoelasticity: λ(dτ/dt - L·τ - τ·L^T) + α(τ)τ = 2η_p D
-* Plasticity parameter: α = max(0, 1 - τ_y/|τ|) (Von Mises)
-* Fluidity evolution: df/dt = (f_age - f)/t_a + b|γ̇|^n(f_flow - f)
+* Plasticity parameter: α = max(0, 1 - τ_y/\|τ\|) (Von Mises)
+* Fluidity evolution: df/dt = (f_age - f)/t_a + b\|γ̇\|^n(f_flow - f)
 
 **Typical applications:** Carbopol gels, cement pastes, drilling muds, mayonnaise, blood, cosmetic creams.
 

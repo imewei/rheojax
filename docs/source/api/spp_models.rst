@@ -17,10 +17,6 @@ primary objects:
 
 For conceptual background see :doc:`/user_guide/03_advanced_topics/spp_analysis`.
 
-.. contents:: Page Contents
-   :local:
-   :depth: 2
-
 
 SPPDecomposer
 -------------

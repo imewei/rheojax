@@ -22,8 +22,67 @@ The Fractional Zener Solid-Solid (FZSS) model is a generalization of the classic
 
 The FZSS model is particularly effective for characterizing cross-linked polymer networks, filled elastomers, and biological tissues that exhibit solid-like behavior with broad relaxation spectra arising from microstructural heterogeneity.
 
-Physical Interpretation
------------------------
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 40 20
+   :header-rows: 1
+
+   * - Symbol
+     - Description
+     - Units
+   * - :math:`G_e`
+     - Equilibrium modulus (permanent network structure)
+     - Pa
+   * - :math:`G_m`
+     - Maxwell arm modulus (relaxing contribution)
+     - Pa
+   * - :math:`\alpha`
+     - Fractional order (0 < α < 1, controls relaxation spectrum breadth)
+     - —
+   * - :math:`\tau_\alpha`
+     - Characteristic relaxation time
+     - s\ :sup:`α`
+   * - :math:`E_\alpha(z)`
+     - One-parameter Mittag-Leffler function
+     - —
+   * - :math:`G^*(ω)`
+     - Complex modulus
+     - Pa
+   * - :math:`G'(ω)`
+     - Storage modulus
+     - Pa
+   * - :math:`G''(ω)`
+     - Loss modulus
+     - Pa
+   * - :math:`J(t)`
+     - Creep compliance
+     - Pa\ :sup:`-1`
+   * - :math:`\omega`
+     - Angular frequency
+     - rad/s
+   * - :math:`t`
+     - Time
+     - s
+   * - :math:`\tan\delta`
+     - Loss tangent (G''/G')
+     - —
+
+Physical Foundations
+--------------------
+
+The Fractional Zener Solid-Solid model generalizes the classical Zener (Standard Linear Solid) model by replacing the dashpot in the Maxwell arm with a SpringPot element. This substitution enables the model to capture materials with broad relaxation spectra arising from structural heterogeneity.
+
+**Mechanical Analogue:**
+
+.. code-block:: text
+
+   [Spring (Ge)] ---- parallel ---- [Spring (Gm) ---- series ---- SpringPot (α)]
+
+The parallel spring provides permanent elasticity, while the Maxwell arm (spring + SpringPot) contributes transient viscoelastic response.
+
+**Microstructural Interpretation:**
 
 The FZSS model captures materials that behave as **viscoelastic solids** with two distinct elastic moduli:
 
@@ -32,6 +91,135 @@ The FZSS model captures materials that behave as **viscoelastic solids** with tw
 2. **Maxwell arm modulus (Gm)**: Represents additional stiffness from temporary network interactions that relax over time through power-law dynamics governed by the SpringPot element.
 
 3. **SpringPot element**: Provides fractional-order viscoelastic damping, generalizing the classical dashpot. The fractional order α quantifies the breadth of the relaxation spectrum.
+
+**Connection to Molecular Weight Distribution:**
+
+For cross-linked polymer networks, the dual-plateau structure reflects:
+
+- **Ge**: Crosslink density via rubber elasticity theory (Ge ≈ νkBT, where ν is network strand density)
+- **Gm**: Transient entanglements or temporary junctions that relax on timescale τ_α
+- **α**: Polydispersity in chain length between crosslinks or heterogeneity in crosslink density
+
+Lower α values indicate broader distributions of local network properties (crosslink spacing, chain stiffness, filler dispersion).
+
+**Hierarchical Structure:**
+
+The power-law transition between plateaus arises naturally from hierarchical relaxation processes:
+
+- Small-scale: Local chain rearrangements, side-chain motion
+- Intermediate-scale: Cooperative motion of network strands
+- Large-scale: Global network reorganization
+
+This multi-scale relaxation is captured by a single parameter (α) rather than requiring multiple discrete relaxation times.
+
+What You Can Learn
+------------------
+
+This section explains how to extract material insights from fitted FZSS parameters,
+emphasizing the dual plateau structure and power-law transition.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Equilibrium Modulus (Ge)**:
+   The long-time elastic plateau from permanent network structure.
+
+   - **For graduate students**: Ge relates to crosslink density via rubber
+     elasticity: Ge ≈ νkBT where ν is network strand density
+   - **For practitioners**: Higher Ge means stiffer equilibrium behavior
+
+**Maxwell Arm Modulus (Gm)**:
+   Additional stiffness that relaxes over time.
+
+   - **Gm/Ge ratio** indicates relative importance of transient vs permanent elasticity
+   - High Gm/Ge (> 5): Strong transient response (impact loading important)
+   - Low Gm/Ge (< 1): Dominated by equilibrium structure
+
+**Fractional Order (α)**:
+   Controls the breadth of relaxation spectrum and power-law transition character.
+
+   - **α → 0.2-0.3**: Very broad spectrum, highly heterogeneous networks
+   - **α → 0.4-0.5**: Typical for filled elastomers, moderate polydispersity
+   - **α → 0.6-0.7**: Narrower spectrum, more uniform structure
+   - **α → 1**: Exponential relaxation (classical Zener)
+
+   *Physical interpretation*: Lower α indicates greater structural heterogeneity
+   (filler dispersion, crosslink density distribution, molecular weight distribution).
+
+**Characteristic Time (τ_α)**:
+   Timescale for transition between plateaus.
+
+   - Marks crossover from high modulus (Ge + Gm) to equilibrium (Ge)
+   - Temperature-dependent: follows WLF or Arrhenius
+   - Application: compare τ_α to service timescales
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: FZSS Behavior Classification
+   :header-rows: 1
+   :widths: 20 25 25 30
+
+   * - Parameter Pattern
+     - Material Type
+     - Examples
+     - Key Characteristics
+   * - High Ge, high Gm, low α
+     - Stiff filled elastomer
+     - Carbon black rubber, nanocomposites
+     - Strong damping, broad spectrum
+   * - Moderate Ge, Gm ~ Ge, α ~ 0.4
+     - Crosslinked network
+     - Hydrogels, thermosets
+     - Balanced transient/equilibrium
+   * - Low Ge, high Gm/Ge, high α
+     - Soft elastic solid
+     - Biological tissues, weak gels
+     - Large relaxation, narrow spectrum
+
+Diagnostic Indicators
+~~~~~~~~~~~~~~~~~~~~~
+
+- **Gm/Ge > 100**: Transient response dominates; verify measurements at short times
+- **α near bounds (0.05 or 0.95)**: Data may not support fractional behavior
+- **Poor fit in transition region**: Need better coverage around ω ~ 1/τ_α
+- **Ge poorly constrained**: Low-frequency data insufficient; extend range
+
+Fitting Guidance
+----------------
+
+**Recommended Data Collection:**
+
+1. **Frequency sweep** (SAOS): 4-5 decades to capture both plateaus
+2. **Coverage**: Ensure both low-ω (Ge) and high-ω (Ge + Gm) plateaus visible
+3. **Test amplitude**: Within LVR (< 5% strain)
+4. **Temperature**: Constant ±0.1°C
+
+**Initialization Strategy (Automatic in RheoJAX v0.2.0+):**
+
+.. code-block:: python
+
+   # Smart initialization applied automatically when test_mode='oscillation'
+   # From frequency sweep |G*|(ω):
+   Ge_init = low_freq_plateau  # G'(ω → 0)
+   Gm_init = high_freq_plateau - Ge_init  # ΔG between plateaus
+   tau_alpha_init = 1 / (frequency at steepest slope)
+   alpha_init = slope in transition region
+
+**Optimization Tips:**
+
+- Use smart initialization (automatic for oscillation mode)
+- Verify both plateaus are captured in data
+- Fit simultaneously to G' and G" with equal weighting
+- Use log-weighted least squares for better conditioning
+- Check residuals for systematic deviations
+
+**Common Pitfalls:**
+
+- **Insufficient frequency range**: Cannot determine both plateaus accurately
+- **Missing transition region**: α poorly constrained
+- **α near 1**: Use classical Zener for simpler interpretation
+- **Ge near zero**: Material may be liquid-like; use FMG or FML instead
 
 **For FZSS specifically**, the fractional order α quantifies how the material transitions between the two elastic plateaus (Ge and Ge + Gm). Smaller α values indicate a more gradual, power-law transition over many decades of time/frequency. Typical α ranges for FZSS applications:
 
@@ -376,28 +564,45 @@ See Also
 References
 ----------
 
-**Foundational Works:**
+.. [1] Mainardi, F. *Fractional Calculus and Waves in Linear Viscoelasticity*.
+   Imperial College Press (2010). https://doi.org/10.1142/p614
 
-- F. Mainardi, *Fractional Calculus and Waves in Linear Viscoelasticity*, Imperial College
-  Press (2010).
-- R.C. Koeller, "Applications of fractional calculus to the theory of viscoelasticity,"
-  *J. Appl. Mech.* 51, 299–307 (1984).
-- H. Schiessel, R. Metzler, A. Blumen, and T.F. Nonnenmacher, "Generalized viscoelastic
-  models: their fractional equations with solutions," *J. Phys. A* 28, 6567–6584 (1995).
+.. [2] Koeller, R. C. "Applications of fractional calculus to the theory of
+   viscoelasticity." *Journal of Applied Mechanics*, 51, 299–307 (1984).
+   https://doi.org/10.1115/1.3167616
 
-**Mittag-Leffler Functions:**
+.. [3] Schiessel, H., Metzler, R., Blumen, A., and Nonnenmacher, T. F. "Generalized
+   viscoelastic models: their fractional equations with solutions."
+   *Journal of Physics A*, 28, 6567–6584 (1995).
+   https://doi.org/10.1088/0305-4470/28/23/012
 
-- Gorenflo, R., Kilbas, A.A., Mainardi, F., Rogosin, S.V. (2014). *Mittag-Leffler Functions,
-  Related Topics and Applications*. Springer.
+.. [4] Gorenflo, R., Kilbas, A. A., Mainardi, F., and Rogosin, S. V.
+   *Mittag-Leffler Functions, Related Topics and Applications*. Springer (2014).
+   https://doi.org/10.1007/978-3-662-43930-2
 
-**Physical Interpretation of Fractional Order:**
+.. [5] Mainardi, F., and Spada, G. "Creep, relaxation and viscosity properties
+   for basic fractional models in rheology."
+   *European Physical Journal Special Topics*, 193, 133–160 (2011).
+   https://doi.org/10.1140/epjst/e2011-01387-1
 
-- Mainardi, F., Spada, G. (2011). "Creep, Relaxation and Viscosity Properties for Basic
-  Fractional Models in Rheology." *European Physical Journal Special Topics*, 193, 133-160.
-- Friedrich, C., Braun, H. (1992). "Generalized Cole-Cole Behavior and its Rheological
-  Relevance." *Rheologica Acta*, 31, 309-322.
+.. [6] Friedrich, C., and Braun, H. "Generalized Cole-Cole behavior and its
+   rheological relevance." *Rheologica Acta*, 31, 309–322 (1992).
+   https://doi.org/10.1007/BF00418328
 
-**Applications to Biological Materials:**
+.. [7] Metzler, R., and Nonnenmacher, T. F. "Fractional relaxation processes and
+   fractional rheological models for the description of a class of viscoelastic
+   materials." *International Journal of Plasticity*, 19, 941–959 (2003).
+   https://doi.org/10.1016/S0749-6419(02)00087-6
 
-- Schiessel, H., Metzler, R., Blumen, A., Nonnenmacher, T.F. (1995). "Generalized viscoelastic
-  models: their fractional equations with solutions." *J. Phys. A* 28, 6567–6584.
+.. [8] Schiessel, H., and Blumen, A. "Hierarchical analogues to fractional
+   relaxation equations." *Journal of Physics A*, 26, 5057–5069 (1993).
+   https://doi.org/10.1088/0305-4470/26/19/034
+
+.. [9] Bagley, R. L., and Torvik, P. J. "A theoretical basis for the application
+   of fractional calculus to viscoelasticity." *Journal of Rheology*, 27, 201–210 (1983).
+   https://doi.org/10.1122/1.549724
+
+.. [10] Heymans, N., and Bauwens, J. C. "Fractal rheological models and fractional
+    differential equations for viscoelastic behavior."
+    *Rheologica Acta*, 33, 210–219 (1994).
+    https://doi.org/10.1007/BF00437306

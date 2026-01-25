@@ -10,10 +10,6 @@ Data Format Reference
    fitting analyses and transforms. Use this as a technical specification when
    preparing data for analysis.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
 Core Data Container: RheoData
 -----------------------------
 

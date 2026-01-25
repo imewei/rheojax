@@ -12,6 +12,50 @@ Quick Reference
 **Test modes:** Relaxation (preferred), oscillation (excellent), creep (acceptable)
 **Material examples:** Polymer melts with broad MW distributions, multi-phase composites, soft solids
 
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 40 20
+   :header-rows: 1
+
+   * - Symbol
+     - Description
+     - Units
+   * - :math:`E_\infty` / :math:`G_\infty`
+     - Equilibrium modulus (0 for liquids)
+     - Pa
+   * - :math:`E_i` / :math:`G_i`
+     - Mode i strength
+     - Pa
+   * - :math:`\tau_i`
+     - Mode i relaxation time
+     - s
+   * - :math:`N`
+     - Number of modes
+     - —
+   * - :math:`N_{\text{opt}}`
+     - Optimized number of modes
+     - —
+   * - :math:`H(\tau)`
+     - Continuous relaxation spectrum
+     - Pa
+   * - :math:`\gamma(t)`
+     - Strain
+     - —
+   * - :math:`\sigma(t)`
+     - Stress
+     - Pa
+   * - :math:`\omega`
+     - Angular frequency
+     - rad/s
+   * - :math:`G'(\omega)`
+     - Storage modulus
+     - Pa
+   * - :math:`G''(\omega)`
+     - Loss modulus
+     - Pa
+
 Overview
 --------
 
@@ -251,8 +295,338 @@ For creep simulation, the GMM ODEs are solved using unconditionally stable backw
 
 **Stability**: :math:`\alpha_i \in [0,1]` ensures unconditional stability (no CFL restriction). JAX's `jax.lax.scan` enables GPU-accelerated time-stepping.
 
+----
+
 Parameters
 ----------
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 18 15 12 15 40
+
+   * - Name
+     - Symbol
+     - Units
+     - Bounds
+     - Notes
+   * - ``E_inf``
+     - :math:`E_\infty`
+     - Pa
+     - :math:`E_\infty \geq 0`
+     - Equilibrium modulus (0 for liquids)
+   * - ``E_i``
+     - :math:`E_i`
+     - Pa
+     - :math:`E_i > 0`
+     - Mode i strength (i = 1...N)
+   * - ``tau_i``
+     - :math:`\tau_i`
+     - s
+     - :math:`\tau_i > 0`
+     - Mode i relaxation time (i = 1...N)
+   * - ``n_modes``
+     - :math:`N`
+     - —
+     - :math:`N \geq 1`
+     - Number of modes (user input)
+   * - ``n_modes_opt``
+     - :math:`N_{\text{opt}}`
+     - —
+     - :math:`N_{\text{opt}} \leq N`
+     - Optimized modes (auto-reduced)
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**E_inf (Equilibrium Modulus)**:
+   - **Physical meaning**: Long-time plateau modulus representing permanent network structure
+   - **Molecular origin**: Chemical crosslinks, physical entanglements that don't relax
+   - **Typical values**:
+      - Viscoelastic liquids: :math:`E_\infty = 0` (flows at long times)
+      - Crosslinked elastomers: :math:`10^4 - 10^6` Pa
+      - Lightly crosslinked gels: :math:`10^1 - 10^4` Pa
+   - **Significance**: :math:`E_\infty > 0` indicates solid-like equilibrium behavior
+
+**E_i (Mode Strengths)**:
+   - **Physical meaning**: Contribution of the i-th relaxation mechanism to total modulus
+   - **Molecular origin**: Weight fraction of chains with relaxation time :math:`\tau_i`
+   - **Distribution shape**: Reflects molecular weight distribution (MWD)
+   - **Sum rule**: :math:`\sum_{i=1}^N E_i` = total relaxed modulus (liquid-like contribution)
+
+**tau_i (Relaxation Times)**:
+   - **Physical meaning**: Characteristic timescale for the i-th relaxation process
+   - **Molecular origin**: Chain length via :math:`\tau_i \sim M_i^{3.4}` (reptation scaling)
+   - **Logarithmic spacing**: Typically spans 4-8 decades for broad MWD polymers
+   - **Distribution**: Ordered :math:`\tau_1 < \tau_2 < ... < \tau_N` during fitting
+
+**N (Number of Modes)**:
+   - **Physical meaning**: Resolution of discrete spectrum approximation
+   - **Selection guidelines**:
+      - N=1-3: Single relaxation process (narrow MWD)
+      - N=5-10: Typical polymer melt (broad MWD)
+      - N=10-20: High-resolution spectrum reconstruction
+   - **Parsimony**: Automatic reduction to N_opt balances fit quality with overfitting risk
+
+----
+
+Validity and Assumptions
+-------------------------
+
+Model Assumptions
+~~~~~~~~~~~~~~~~~
+
+1. **Linear viscoelasticity**: The GMM assumes linear superposition of strain and stress (Boltzmann superposition principle)
+2. **Isothermal**: Temperature effects require time-temperature superposition (TTS) via mastercurve construction
+3. **Homogeneous deformation**: No spatial gradients or wall slip
+4. **Discrete spectrum approximation**: Continuous spectrum :math:`H(\tau)` is approximated by N discrete modes
+5. **Exponential basis**: Relaxation processes are represented as exponential decays
+
+Data Requirements
+~~~~~~~~~~~~~~~~~
+
+**Minimum requirements**:
+   - Data points :math:`M \geq 3N` (avoid overfitting)
+   - Time/frequency span :math:`\geq 3` decades (capture relaxation range)
+   - Linear viscoelastic regime (strain < 1-5% for most polymers)
+
+**Optimal requirements**:
+   - Data points :math:`M \geq 5N` (good conditioning)
+   - Time/frequency span :math:`\geq 5` decades (broad spectrum)
+   - Multiple test modes (relaxation + oscillation for validation)
+   - Temperature series (for TTS mastercurve)
+
+Limitations
+~~~~~~~~~~~
+
+**Narrow relaxation spectra**:
+   For materials with < 2 decades of relaxation, GMM is overparameterized. Use single Maxwell or Zener models instead.
+
+**Power-law regions**:
+   Discrete modes poorly approximate continuous power-law spectra. Consider fractional models (FML, FZSS) for smoother representation.
+
+**Nonlinear behavior**:
+   GMM is strictly linear. For large-amplitude deformation, use nonlinear models (Saramito, DMT, Fluidity).
+
+**Extrapolation**:
+   GMM predictions outside the fitted time/frequency range are unreliable. Fractional models extrapolate better due to power-law forms.
+
+**Element minimization artifacts**:
+   Automatic reduction from N to N_opt may miss subtle features if optimization_factor is too aggressive (> 2.0).
+
+----
+
+What You Can Learn
+------------------
+
+This section explains how to interpret fitted Generalized Maxwell Model parameters
+to extract insights about material structure, molecular properties, and processing behavior.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**G_i (Mode Strengths)**:
+   Contribution of i-th relaxation process to total modulus, related to density of
+   chains/modes with characteristic time τ_i.
+
+   *For graduate students*: G_i approximates the continuous spectrum: G_i ≈ H(τ_i)Δ(log τ_i).
+   For entangled polymers: G_i ∝ w(M_i) where w is the molecular weight distribution.
+   Sum rule: Σ G_i = total relaxed modulus. Plateau modulus G_N^0 ≈ E_∞ for crosslinked
+   systems relates to entanglement density via G_N^0 = ρRT/M_e.
+
+   *For practitioners*: Extract from dynamic moduli fitting. Typical: narrow MWD (1-2
+   dominant modes), broad MWD (5-15 modes spanning decades). Monitor G_i changes for
+   degradation (decrease) or crosslinking (increase in G_∞).
+
+**τ_i (Relaxation Times)**:
+   Characteristic timescales for each relaxation mode, typically logarithmically spaced.
+
+   *For graduate students*: For polymers: τ_i ~ M_i^3.4 (reptation) or M_i^2 (Rouse).
+   Logarithmic spacing: τ_i = τ_min·(τ_max/τ_min)^((i-1)/(N-1)). Zero-shear viscosity:
+   η_0 = Σ G_i·τ_i. Temperature dependence via WLF or Arrhenius shift factors.
+
+   *For practitioners*: Typical spans: 4-8 decades (10^-3 to 10^5 s) for polymer melts.
+   Fast modes (τ < 1 s) = local dynamics, slow modes (τ > 100 s) = terminal relaxation.
+   Extract via TTS if narrow experimental time window.
+
+**E_∞ (Equilibrium Modulus)**:
+   Permanent network modulus, zero for viscoelastic liquids, nonzero for soft solids.
+
+   *For graduate students*: E_∞ = 0 (terminal flow, η_0 finite). E_∞ > 0 (permanent
+   crosslinks, infinite η). For rubber elasticity: G_∞ = νkT where ν is crosslink density.
+   Relates to gel point: E_∞ appears at percolation threshold.
+
+   *For practitioners*: Measure from G' low-frequency plateau. Uncrosslinked melts:
+   E_∞ = 0. Elastomers/gels: E_∞ = 10^3-10^6 Pa. Monitor E_∞ during curing to track gelation.
+
+**N (Number of Modes)**:
+   Discrete approximation order for continuous relaxation spectrum.
+
+   *For graduate students*: N-mode Prony series approximates continuous H(τ). Optimal N
+   balances fit quality vs parsimony. Information criteria (AIC, BIC) or element
+   minimization (N_opt from degradation tolerance) guide selection.
+
+   *For practitioners*: Start with N = 5-10 for polymers. RheoJAX auto-optimizes to
+   N_opt (e.g., request N = 10, get N_opt = 3 if sufficient). Monodisperse: N = 1-3,
+   broad MWD: N = 10-20.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Generalized Maxwell Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - N = 1, E_∞ = 0
+     - Single-mode viscoelastic liquid
+     - Monodisperse polymer solutions
+     - Simple Maxwell behavior, exponential relaxation
+   * - N = 2-5, E_∞ = 0
+     - Narrow MWD polymer melt
+     - Polyethylene, polypropylene (narrow)
+     - Few relaxation timescales, predictable flow
+   * - N = 5-15, E_∞ = 0
+     - Broad MWD polymer melt
+     - Polydisperse polyethylene, polystyrene
+     - Complex relaxation, wide processing window
+   * - N = 10-20, E_∞ = 0
+     - Very broad MWD or multi-phase
+     - Polymer blends, branched polymers
+     - Extreme timescale dispersion, TTS needed
+   * - E_∞ > 0, N = 3-10
+     - Soft solid (gel, elastomer)
+     - Rubber, hydrogels, crosslinked polymers
+     - Permanent network, shape memory
+   * - τ_max/τ_min < 10²
+     - Narrow spectrum
+     - Monodisperse, single mechanism
+     - Simple relaxation, single timescale dominates
+   * - τ_max/τ_min > 10⁴
+     - Broad spectrum
+     - Polydisperse, complex systems
+     - Wide processing window, TTS essential
+
+Physical Insights from Prony Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Mode Spectrum Interpretation:**
+
+The discrete relaxation spectrum {τ_i, E_i} provides a fingerprint of the material's relaxation processes:
+
+**Mode strength E_i**:
+   - **Physical meaning**: Contribution of the i-th relaxation mechanism to total modulus
+   - **Distribution shape**: Reflects molecular weight distribution (MWD) or phase heterogeneity
+   - **Sum rule**: :math:`\sum_{i=1}^N E_i` = total relaxed modulus (liquid-like component)
+
+**Relaxation time τ_i**:
+   - **Physical meaning**: Characteristic timescale for the i-th relaxation process
+   - **Polymer interpretation**: Related to molecular weight via :math:`\tau_i \sim M_i^{3.4}` (Rouse/reptation)
+   - **Logarithmic spacing**: Typically spans 4-8 decades for broad MWD polymers
+
+**Connection to Molecular Weight Distribution:**
+
+For entangled polymers, the Prony spectrum approximately maps to the MWD via:
+
+.. math::
+
+   E_i \propto w(M_i) \quad \text{(weight fraction at molecular weight } M_i\text{)}
+
+This enables rheological characterization of MWD without gel permeation chromatography (GPC), particularly useful for:
+   - Polymerization monitoring (batch-to-batch consistency)
+   - Degradation studies (tracking MW changes over time)
+   - Blend characterization (resolving individual components)
+
+**Prony Series Decomposition Insights:**
+
+The GMM decomposes complex viscoelastic behavior into interpretable components:
+
+**Short-time modes** (:math:`\tau_i < 1` s):
+   - Fast Rouse modes (local chain motion)
+   - β-relaxation processes (segmental dynamics)
+   - Typical for glassy dynamics near T_g
+
+**Intermediate-time modes** (:math:`1 < \tau_i < 100` s):
+   - Reptation modes (chain diffusion)
+   - Constraint release mechanisms
+   - Typical for polymer melts at processing temperatures
+
+**Long-time modes** (:math:`\tau_i > 100` s):
+   - Terminal relaxation (flow onset)
+   - Entanglement network relaxation
+   - Accessible via TTS mastercurves
+
+**Equilibrium modulus E_∞:**
+
+For **liquids** (:math:`E_\infty = 0`):
+   - Material eventually flows (polymer melts, solutions)
+   - Terminal relaxation completes
+   - Viscosity :math:`\eta_0 = \sum_i E_i \tau_i` (zero-shear viscosity)
+
+For **solids** (:math:`E_\infty > 0`):
+   - Permanent network (crosslinks, entanglements)
+   - Plateau modulus :math:`G_N^0 \approx E_\infty`
+   - Rubber elasticity (vulcanized rubbers, gels)
+
+**Spectral Width and Material Complexity:**
+
+The width of the relaxation spectrum reveals material complexity:
+
+**Narrow spectrum** (< 2 decades):
+   - Monodisperse polymers
+   - Single relaxation mechanism
+   - Well-defined characteristic timescale
+
+**Broad spectrum** (> 4 decades):
+   - Polydisperse polymers (broad MWD)
+   - Multi-phase materials (composites, blends)
+   - Multiple relaxation mechanisms
+
+**Spectral shape interpretation**:
+   - **Monotonic decrease** (E_i decreases with τ_i): Typical for polymers
+   - **Bimodal peaks**: Blends or multi-phase materials
+   - **Flat plateau**: Continuous power-law relaxation (consider fractional models)
+
+Material Characterization Capabilities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**From Relaxation Tests:**
+   - Discrete relaxation spectrum {τ_i, E_i}
+   - Total relaxed modulus :math:`\sum_i E_i`
+   - Equilibrium modulus :math:`E_\infty`
+   - Relaxation breadth (decades spanned by τ_i)
+
+**From Oscillation Tests:**
+   - Storage modulus :math:`G'(\omega)` across frequency range
+   - Loss modulus :math:`G''(\omega)` (dissipation)
+   - Loss tangent :math:`\tan \delta = G''/G'` (viscoelastic character)
+   - Plateau modulus :math:`G_N^0` (from :math:`G'` plateau)
+
+**From Creep Tests:**
+   - Creep compliance :math:`J(t)`
+   - Retardation spectrum (inverse problem)
+   - Recovery behavior (viscoelastic vs viscoplastic)
+
+**From Time-Temperature Superposition:**
+   - Shift factors :math:`a_T` (WLF or Arrhenius)
+   - Temperature-independent spectrum (at reference T)
+   - Activation energy (from :math:`a_T` vs T)
+   - Glass transition temperature T_g (from :math:`\tan \delta` peak)
+
+**Cross-Validation Capabilities:**
+   - Tri-mode equality: Fit in relaxation, predict in oscillation/creep
+   - Cox-Merz rule: Compare :math:`|\eta^*(\omega)|` to :math:`\eta(\dot{\gamma})`
+   - Kramers-Kronig relations: Check thermodynamic consistency
+
+**Quality Control Applications:**
+   - Batch-to-batch consistency (compare {τ_i, E_i})
+   - Aging/degradation tracking (monitor spectrum evolution)
+   - Blend composition verification (detect individual components)
+   - Cure monitoring (track crosslink density via :math:`E_\infty`)
+
+----
 
 .. list-table:: Generalized Maxwell Model Parameters
    :header-rows: 1
@@ -728,6 +1102,15 @@ Diagnostics Extraction
    }
    result = gmm.fit_bayesian(t, G_data, priors=custom_priors)
 
+----
+
+Usage
+-----
+
+(Usage examples already present in the file)
+
+----
+
 Experimental Design
 -------------------
 
@@ -919,7 +1302,9 @@ Sample Applications: Rheometer (Fluid Dynamics)
       eta_star = np.sqrt(G_prime**2 + G_double_prime**2) / omega
 
       # Steady shear viscosity (experimental)
-      eta_shear = ...  # From flow curve
+      # Example: eta_shear = load_flow_curve_data()
+      shear_rate = np.logspace(-2, 2, 30)
+      eta_shear = 1e3 * shear_rate**(-0.5)  # Example: shear-thinning
 
       # Check Cox-Merz: η(γ̇) ≈ |η*(ω)| at ω = γ̇
       import matplotlib.pyplot as plt
@@ -1270,8 +1655,10 @@ Oscillation Mode with Time-Temperature Superposition
 
    for T in temps:
        omega = np.logspace(-2, 2, 50)
-       G_prime = ...  # Experimental G' at temperature T
-       G_double_prime = ...  # Experimental G" at temperature T
+       # Load experimental data at temperature T
+       # Example: G_prime, G_double_prime = load_dma_data(T)
+       G_prime = 1e5 * (omega / 1.0)**0.2  # Example: weak power-law
+       G_double_prime = 1e4 * omega  # Example: linear at low frequency
 
        data = RheoData(
            x=omega,
@@ -1312,6 +1699,12 @@ Creep Mode Prediction
 
    import numpy as np
    from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+
+   # Generate synthetic oscillation data
+   omega = np.logspace(-2, 2, 50)
+   G_prime = 1e5 * (omega / 1.0)**0.3
+   G_double_prime = 3e4 * omega**0.5
+   G_star = np.column_stack([G_prime, G_double_prime])
 
    # First fit to relaxation or oscillation data
    gmm = GeneralizedMaxwell(n_modes=5, modulus_type='shear')
@@ -1412,9 +1805,10 @@ DMA Workflow (Solid Mechanics)
 
    for T in temps:
        # Example: load from file
-       omega = ...  # rad/s
-       E_prime = ...  # Pa
-       E_double_prime = ...  # Pa
+       # omega, E_prime, E_double_prime = load_dma_data(T)
+       omega = np.logspace(-2, 2, 50)  # rad/s
+       E_prime = 1e6 * (omega / 1.0)**0.15  # Pa (example: weak frequency dependence)
+       E_double_prime = 1e5 * omega**0.3  # Pa (example: loss modulus)
 
        data = RheoData(
            x=omega,
@@ -1474,11 +1868,26 @@ Rheometer Workflow (Fluid Dynamics)
 
    from rheojax.models.generalized_maxwell import GeneralizedMaxwell
    from rheojax.transforms.mastercurve import Mastercurve
+   from rheojax.core.data import RheoData
    import numpy as np
    import matplotlib.pyplot as plt
 
-   # 1. SAOS frequency sweep at multiple temperatures
-   # (Similar to DMA example, but for polymer melts)
+   # 1. SAOS frequency sweep at multiple temperatures (example for polymer melts)
+   temps = [140, 160, 180, 200, 220]  # °C
+   datasets = []
+
+   for T in temps:
+       omega = np.logspace(-2, 2, 50)
+       G_prime = 1e5 * (omega / 1.0)**0.25 * np.exp((180 - T) / 20)
+       G_double_prime = 3e4 * omega**0.6 * np.exp((180 - T) / 25)
+
+       data = RheoData(
+           x=omega,
+           y=np.column_stack([G_prime, G_double_prime]),
+           domain='frequency',
+           metadata={'temperature': T + 273.15}
+       )
+       datasets.append(data)
 
    # 2. Mastercurve with auto shift
    mc = Mastercurve(reference_temp=180+273.15, auto_shift=True)
@@ -1498,8 +1907,8 @@ Rheometer Workflow (Fluid Dynamics)
    eta_star = np.sqrt(G_prime**2 + G_double_prime**2) / omega
 
    # Compare with steady shear (experimental)
-   shear_rate_exp = ...  # 1/s
-   viscosity_exp = ...   # Pa·s
+   shear_rate_exp = np.logspace(-2, 2, 40)  # 1/s
+   viscosity_exp = 1e3 * shear_rate_exp**(-0.4)  # Pa·s (example: shear-thinning)
 
    plt.figure(figsize=(8, 6))
    plt.loglog(omega, eta_star, '-', label='|η*| (GMM, SAOS)')
@@ -1527,58 +1936,51 @@ See Also
 References
 ----------
 
-**Foundational: Prony Series and Spectrum Reconstruction**
+.. [1] Park, S. W. and Schapery, R. A. "Methods of interconversion between linear
+   viscoelastic material functions. Part I—A numerical method based on Prony series."
+   *International Journal of Solids and Structures*, 36(11), 1653-1675 (1999).
+   https://doi.org/10.1016/S0020-7683(98)00055-9
 
-1. Park, S. W., & Schapery, R. A. (1999). "Methods of interconversion between linear viscoelastic material functions. Part I—A numerical method based on Prony series." *International Journal of Solids and Structures*, 36(11), 1653-1675.
-   DOI: 10.1016/S0020-7683(98)00055-9
-   Classic reference for Prony series parameter identification and interconversion algorithms.
+.. [2] Baumgaertel, M. and Winter, H. H. "Determination of discrete relaxation and
+   retardation time spectra from dynamic mechanical data." *Rheologica Acta*, 28(6),
+   511-519 (1989). https://doi.org/10.1007/BF01332922
 
-2. Baumgaertel, M., & Winter, H. H. (1989). "Determination of discrete relaxation and retardation time spectra from dynamic mechanical data." *Rheologica Acta*, 28(6), 511-519.
-   DOI: 10.1007/BF01332922
-   NLREG algorithm for spectrum extraction with regularization.
+.. [3] Malkin, A. Y. and Isayev, A. I. *Rheology: Concepts, Methods, and Applications*,
+   3rd Edition. ChemTec Publishing (2017). ISBN: 978-1927885215
 
-3. Malkin, A. Y., & Isayev, A. I. (2017). *Rheology: Concepts, Methods, and Applications*, 3rd Edition. ChemTec Publishing.
-   Chapter 4: Linear viscoelasticity and continuous relaxation spectra.
+.. [4] Ferry, J. D. *Viscoelastic Properties of Polymers*, 3rd Edition. Wiley (1980).
+   ISBN: 978-0471048947
 
-**Software Implementation**
+.. [5] Williams, M. L., Landel, R. F., and Ferry, J. D. "The Temperature Dependence of
+   Relaxation Mechanisms in Amorphous Polymers and Other Glass-forming Liquids."
+   *Journal of the American Chemical Society*, 77(14), 3701-3707 (1955).
+   https://doi.org/10.1021/ja01619a008
 
-4. PyVisco (2020-2024). Python package for viscoelastic model fitting.
-   Source for automatic shift factor algorithm (power-law intersection).
+.. [6] Tassieri, M. "Linear viscoelasticity in the frequency domain." In *Microrheology
+   with Optical Tweezers*. Pan Stanford Publishing, pp. 31-58 (2018).
+   https://doi.org/10.1201/9781315364872
 
-5. RheoJAX (2024). JAX-accelerated rheological analysis with NLSQ optimization.
-   DOI: (pending publication)
-   5-270× speedup over scipy-based implementations.
+.. [7] Hoffman, M. D. and Gelman, A. "The No-U-Turn Sampler: Adaptively Setting Path
+   Lengths in Hamiltonian Monte Carlo." *Journal of Machine Learning Research*,
+   15(1), 1593-1623 (2014). https://jmlr.org/papers/v15/hoffman14a.html
 
-**Time-Temperature Superposition**
+.. [8] Doi, M. and Edwards, S. F. *The Theory of Polymer Dynamics*. Oxford University
+   Press (1986). ISBN: 978-0198520009
 
-6. Ferry, J. D. (1980). *Viscoelastic Properties of Polymers*, 3rd Edition. Wiley.
-   Chapter 11: Time-temperature superposition principle and WLF equation.
+.. [9] Rubinstein, M. and Colby, R. H. *Polymer Physics*. Oxford University Press (2003).
+   ISBN: 978-0198520597
 
-7. Williams, M. L., Landel, R. F., & Ferry, J. D. (1955). "The Temperature Dependence of Relaxation Mechanisms in Amorphous Polymers and Other Glass-forming Liquids." *Journal of the American Chemical Society*, 77(14), 3701-3707.
-   DOI: 10.1021/ja01619a008
-   Original WLF equation derivation.
+.. [10] Dealy, J. M. and Larson, R. G. *Structure and Rheology of Molten Polymers*.
+   Hanser Publishers (2006). https://doi.org/10.3139/9783446412811
 
-**Bayesian Inference for Rheology**
+.. [11] Stadler, F. J. and Bailly, C. "A new method for the calculation of continuous
+   relaxation spectra from dynamic-mechanical data." *Rheologica Acta*, 48(1),
+   33-49 (2009). https://doi.org/10.1007/s00397-008-0303-2
 
-8. Tassieri, M. (2018). "Linear viscoelasticity in the frequency domain." In *Microrheology with Optical Tweezers*. Pan Stanford Publishing, pp. 31-58.
-   Bayesian approaches to rheological parameter estimation.
+.. [12] Honerkamp, J. and Weese, J. "A nonlinear regularization method for the calculation
+   of relaxation spectra." *Rheologica Acta*, 32(1), 65-73 (1993).
+   https://doi.org/10.1007/BF00396678
 
-9. Hoffman, M. D., & Gelman, A. (2014). "The No-U-Turn Sampler: Adaptively Setting Path Lengths in Hamiltonian Monte Carlo." *Journal of Machine Learning Research*, 15(1), 1593-1623.
-   NUTS algorithm used in NumPyro for Bayesian inference.
-
-**Polymer Physics (Molecular Interpretation)**
-
-10. Doi, M., & Edwards, S. F. (1986). *The Theory of Polymer Dynamics*. Oxford University Press.
-    Chapter 5: Reptation theory and molecular relaxation mechanisms.
-
-11. Rubinstein, M., & Colby, R. H. (2003). *Polymer Physics*. Oxford University Press.
-    Chapter 9: Linear viscoelasticity and relaxation time distributions.
-
-**Multi-Mode Applications**
-
-12. Dealy, J. M., & Larson, R. G. (2006). *Structure and Rheology of Molten Polymers*. Hanser Publishers.
-    Chapter 3: Multi-mode Maxwell models for polymer melts.
-
-13. Stadler, F. J., & Bailly, C. (2009). "A new method for the calculation of continuous relaxation spectra from dynamic-mechanical data." *Rheologica Acta*, 48(1), 33-49.
-    DOI: 10.1007/s00397-008-0303-2
-    Advanced spectrum extraction with edge preservation.
+.. [13] Anderssen, R. S. and Davies, A. R. "Simple moving-average formulae for the direct
+   recovery of the relaxation spectrum." *Journal of Rheology*, 45(1), 1-27 (2001).
+   https://doi.org/10.1122/1.1332787

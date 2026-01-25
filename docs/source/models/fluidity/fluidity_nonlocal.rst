@@ -13,10 +13,6 @@ Quick Reference
 **Test modes:** Rotation, start-up, creep, oscillation (with spatial profiles)
 **Material examples:** Concentrated emulsions, Carbopol gels, colloidal pastes, suspensions in microchannels
 
-.. contents:: Table of Contents
-   :depth: 3
-   :local:
-
 Notation Guide
 --------------
 
@@ -431,6 +427,110 @@ For rate-controlled protocols, :math:`\Sigma(t)` must be updated at each step:
 
 ----
 
+Governing Equations
+-------------------
+
+Core PDE System
+~~~~~~~~~~~~~~~
+
+The Nonlocal Fluidity Model is governed by a reaction-diffusion partial differential equation coupled to the momentum balance:
+
+**Fluidity Evolution PDE:**
+
+.. math::
+
+   \frac{\partial f(y, t)}{\partial t} = \frac{f_{\rm loc}(\Sigma(t)) - f(y, t)}{\theta} + \xi^2 \frac{\partial^2 f(y, t)}{\partial y^2}
+
+**Momentum Balance (Stress Uniformity):**
+
+.. math::
+
+   \frac{\partial \sigma}{\partial y} = 0 \quad \Rightarrow \quad \sigma(y, t) = \Sigma(t) \quad \text{(uniform)}
+
+**Constitutive Relation:**
+
+.. math::
+
+   \dot{\gamma}(y, t) = f(y, t) \cdot \Sigma(t)
+
+**Boundary Conditions** (Neumann no-flux):
+
+.. math::
+
+   \left.\frac{\partial f}{\partial y}\right|_{y=0, H} = 0
+
+**Global Constraint** (rate-controlled):
+
+.. math::
+
+   \bar{\dot{\gamma}}(t) = \frac{1}{H} \int_0^H \dot{\gamma}(y, t) \, dy = \Sigma(t) \bar{f}(t) \quad \Rightarrow \quad \Sigma(t) = \frac{\bar{\dot{\gamma}}(t)}{\bar{f}(t)}
+
+These equations couple spatial diffusion (:math:`\xi^2 \nabla^2 f`) with local relaxation dynamics, producing spatial heterogeneity in flow even under uniform stress.
+
+----
+
+What You Can Learn
+------------------
+
+From fitting Nonlocal Fluidity to experimental data, you can extract insights about cooperativity, confinement effects, shear banding, and spatial heterogeneity in yield-stress fluids.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**ξ (Cooperativity Length)**:
+   Characteristic length scale over which plastic rearrangements induce cooperative flow in neighboring regions.
+   *For graduate students*: ξ ~ 3-10×d_particle (colloidal cage size, droplet diameter). Governs fluidity diffusion via ∂f/∂t = ... + ξ²∇²f. Dimensionless confinement ratio H/ξ controls bulk (H/ξ >> 10) vs nonlocal (H/ξ ~ 1-10) regimes. Shear band interface width ~ ξ. Relates to correlation length of yielding events.
+   *For practitioners*: Measure from gap-dependent flow curves: σ_y,app(H) = σ_y,bulk·[1 - c(ξ/H)]. Typical values: emulsions (10 μm droplets) ξ ~ 30-50 μm, colloidal glasses ξ ~ 1-10 μm. Critical for microfluidic design (H < 10ξ shows strong confinement).
+
+**θ (Reorganization Time)**:
+   Timescale for local structural equilibration, analogous to τ_age in local model.
+   *For graduate students*: Competes with diffusive timescale t_diff ~ H²/ξ². Ratio θ/t_diff determines if spatial gradients persist (θ >> t_diff) or homogenize (θ << t_diff) during transients. Fluidity diffusivity D_f = ξ²/θ.
+   *For practitioners*: Extract from startup dynamics. Typical: θ = 0.1-100 s. Fast relaxation (θ < 1 s) = rapidly homogenizing flows, slow relaxation (θ > 10 s) = persistent heterogeneity.
+
+**H (Gap Width)**:
+   Geometric parameter controlling confinement effects via dimensionless ratio H/ξ.
+   *For graduate students*: Key control parameter. H/ξ >> 10 recovers bulk/local behavior. H/ξ ~ 1-10 exhibits enhanced apparent fluidity, reduced yield stress. H/ξ < 1 = fully cooperative homogenized flow. Universal confinement scaling: σ_y,app/σ_y,bulk ~ f(H/ξ).
+   *For practitioners*: Perform gap-dependent measurements to extract ξ. For processing, H > 10ξ ensures bulk-like behavior. Narrower gaps (microfluidics, thin films) require nonlocal modeling.
+
+**f_w (Wall Fluidity, Dirichlet BC)**:
+   Enhanced fluidity at walls due to boundary slip or roughness effects.
+   *For graduate students*: Boundary condition: f(y=0,H) = f_w. Physical origin: wall-particle interactions, reduced coordination at boundaries. Creates fluidity boundary layers with thickness ~ ξ. Controls apparent slip velocity v_slip ~ ξ·f_w·σ.
+   *For practitioners*: Fit from velocity profiles or apparent slip measurements. f_w = 0 (no-flux Neumann BC) vs f_w > 0 (slip). Roughness or surfactants modify f_w.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Nonlocal Fluidity Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - H/ξ > 10
+     - Bulk regime (local model sufficient)
+     - Concentrated emulsions in wide gaps
+     - Standard rheometry applicable
+   * - H/ξ = 1-10
+     - Nonlocal regime (strong confinement)
+     - Colloidal pastes in microchannels, thin films
+     - Gap-dependent yield stress, apparent slip
+   * - H/ξ < 1
+     - Fully cooperative (homogenized)
+     - Nanofluidics, ultra-thin coatings
+     - No true yielding, enhanced flow
+   * - ξ = 10-100 μm
+     - Mesoscale cooperativity
+     - Emulsions, foams, microgels
+     - Moderate confinement sensitivity
+   * - ξ < 1 μm
+     - Microscale cooperativity
+     - Dense colloidal glasses, molecular gels
+     - Weak confinement (bulk-like at macro scale)
+
+----
+
 Parameters
 ----------
 
@@ -680,6 +780,7 @@ Transient Start-Up with Profiles
 
    from rheojax.models import FluidityNonlocal
    import numpy as np
+   import matplotlib.pyplot as plt
 
    model = FluidityNonlocal(xi=50e-6, theta=10.0, tau_y=50.0, eta_bg=10.0, H=1e-3)
 
@@ -687,19 +788,27 @@ Transient Start-Up with Profiles
    t = np.linspace(0, 100, 1000)
    gamma_dot_0 = 1.0
 
-   result = model.predict_startup(t, gamma_dot_0, return_profiles=True)
+   # Simulate startup shear
+   gamma, sigma, fluidity = model.simulate_startup(t, gamma_dot_0)
 
-   sigma_t = result['stress']
-   f_profiles = result['fluidity_profiles']  # shape (n_t, n_y)
-   y_grid = result['y_grid']
+   # Plot stress evolution
+   plt.figure(figsize=(10, 6))
+   plt.subplot(2, 1, 1)
+   plt.plot(t, sigma)
+   plt.xlabel('Time (s)')
+   plt.ylabel('Stress (Pa)')
+   plt.title('Startup Stress')
 
-   # Plot fluidity evolution across gap
-   import matplotlib.pyplot as plt
-   for i in [0, 100, 500, -1]:
-       plt.plot(y_grid * 1e3, f_profiles[i], label=f't = {t[i]:.1f} s')
-   plt.xlabel('Position (mm)')
+   # Plot fluidity evolution at different positions
+   plt.subplot(2, 1, 2)
+   y_indices = [0, 25, 50, 75, 99]  # 5 positions across gap
+   for idx in y_indices:
+       y_mm = idx * gap_width / 99 * 1e3  # Convert to mm
+       plt.plot(t, fluidity[:, idx], label=f'y = {y_mm:.2f} mm')
+   plt.xlabel('Time (s)')
    plt.ylabel('Fluidity (1/s)')
    plt.legend()
+   plt.tight_layout()
 
 Shear Banding Analysis
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -760,6 +869,26 @@ References
 .. [5] Kamani, K., Donley, G. J., & Rogers, S. A. "Unification of the rheological physics of yield stress fluids."
    *Physical Review Letters*, **126**, 218002 (2021).
    https://doi.org/10.1103/PhysRevLett.126.218002
+.. [6] Picard, G., Ajdari, A., Lequeux, F., & Bocquet, L. "Slow flows of yield stress fluids: Complex spatiotemporal behavior within a simple elastoplastic model."
+   *Physical Review E*, **71**, 010501(R) (2005).
+   https://doi.org/10.1103/PhysRevE.71.010501
+
+.. [7] Kamrin, K. & Koval, G. "Nonlocal constitutive relation for steady granular flow."
+   *Physical Review Letters*, **108**, 178301 (2012).
+   https://doi.org/10.1103/PhysRevLett.108.178301
+
+.. [8] Henann, D. L. & Kamrin, K. "A predictive, size-dependent continuum model for dense granular flows."
+   *Proceedings of the National Academy of Sciences*, **110**, 6730-6735 (2013).
+   https://doi.org/10.1073/pnas.1219153110
+
+.. [9] Balmforth, N. J., Frigaard, I. A., & Ovarlez, G. "Yielding to stress: Recent developments in viscoplastic fluid mechanics."
+   *Annual Review of Fluid Mechanics*, **46**, 121-146 (2014).
+   https://doi.org/10.1146/annurev-fluid-010313-141424
+
+.. [10] Nicolas, A., Ferrero, E. E., Martens, K., & Barrat, J.-L. "Deformation and flow of amorphous solids: Insights from elastoplastic models."
+   *Reviews of Modern Physics*, **90**, 045006 (2018).
+   https://doi.org/10.1103/RevModPhys.90.045006
+
 
 Further Reading
 ~~~~~~~~~~~~~~~

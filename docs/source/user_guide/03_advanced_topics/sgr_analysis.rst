@@ -6,10 +6,6 @@ Soft Glassy Rheology (SGR) Analysis
 
 **Statistical Mechanics Framework for Complex Soft Materials**
 
-.. contents:: Table of Contents
-   :local:
-   :depth: 3
-
 Overview
 ========
 

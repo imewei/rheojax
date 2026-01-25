@@ -8,10 +8,6 @@ RheoJAX includes 33 comprehensive tutorial notebooks organized into five learnin
 All notebooks are located in the ``examples/`` directory and demonstrate best practices with
 real-world datasets and synthetic data generation patterns.
 
-.. contents:: Table of Contents
-   :local:
-   :depth: 2
-
 Quick Navigation
 ================
 

@@ -3,11 +3,61 @@
 Tensorial Elasto-Plastic Model (EPM)
 =====================================
 
+Quick Reference
+---------------
+
+**Use when:** Full stress tensor modeling, normal stress differences (N₁, N₂), anisotropic yielding, flow instabilities
+
+**Parameters:** 9 (μ, ν, τ_pl_shear, τ_pl_normal, σ_c_mean, σ_c_std, w_N1, hill_H, hill_N)
+
+**Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma} \delta_{ij} - \frac{\sigma_{ij}}{\tau_{ij}^{pl}} f(\sigma_{eff}, \sigma_c) + \sum_{kl} \mathcal{G}_{ij,kl}(\mathbf{q}) \dot{\gamma}^{pl}_{kl}`
+
+**Test modes:** flow_curve, startup, relaxation, creep, oscillation
+
+**Material examples:** Rod climbing polymer melts, fiber suspensions, anisotropic gels, flow-induced microstructure
+
+Overview
+--------
+
 The Tensorial EPM extends the scalar :doc:`lattice_epm` to track the **full stress tensor**, enabling predictions of **normal stress differences** (N₁, N₂), anisotropic yielding, and flow-induced microstructure. This is critical for capturing non-Newtonian behaviors like rod climbing (Weissenberg effect), die swell, and flow instabilities.
 
-.. contents:: Table of Contents
-    :local:
-    :depth: 2
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 15 70
+   :header-rows: 1
+
+   * - Symbol
+     - Units
+     - Description
+   * - σ_ij
+     - Pa
+     - Stress tensor components [σ_xx, σ_yy, σ_xy]
+   * - σ_zz
+     - Pa
+     - Out-of-plane stress (from plane strain constraint)
+   * - N₁
+     - Pa
+     - First normal stress difference (σ_xx - σ_yy)
+   * - N₂
+     - Pa
+     - Second normal stress difference (σ_yy - σ_zz)
+   * - σ_eff
+     - Pa
+     - Effective stress (von Mises or Hill criterion)
+   * - γ̇ᵖ_ij
+     - 1/s
+     - Plastic strain rate tensor (deviatoric)
+   * - :math:`\mathcal{G}_{ij,kl}`
+     - —
+     - Tensorial Eshelby propagator (4th-order)
+   * - ν
+     - —
+     - Poisson's ratio (plane strain constraint)
+   * - H, N
+     - —
+     - Hill anisotropy parameters
 
 Physical Interpretation
 -----------------------
@@ -70,7 +120,65 @@ Plastic flow is component-wise with independent timescales:
 
 where :math:`\sigma'_{ij}` is the deviatoric stress. Separate τ_pl_shear and τ_pl_normal allow modeling materials with different relaxation times for shear and dilation.
 
-Mathematical Formulation
+Physical Foundations
+--------------------
+
+Why Track the Full Stress Tensor?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Many complex fluids exhibit **normal stress differences** during shear flow:
+
+- **Polymer melts**: Rod climbing (Weissenberg effect), die swell, extrudate swell
+- **Fiber suspensions**: Normal stresses from fiber orientation and rotation
+- **Anisotropic gels**: Directional microstructure leads to non-isotropic yielding
+
+The scalar EPM (σ_xy only) misses these phenomena because:
+
+1. Normal components σ_xx, σ_yy evolve independently under shear
+2. Yielding in one direction affects stress redistribution in all directions
+3. Anisotropic yield criteria (Hill) require full tensor
+
+Tensorial Eshelby Solution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When a site yields plastically with strain rate :math:`\dot{\gamma}^{pl}_{kl}`, the stress redistribution to site :math:`\mathbf{r}` is given by the 4th-order Eshelby tensor:
+
+.. math::
+
+    \Delta \sigma_{ij}(\mathbf{r}) = \mathcal{G}_{ij,kl}(\mathbf{r}) \dot{\gamma}^{pl}_{kl}
+
+In Fourier space (plane strain, 2D):
+
+.. math::
+
+    \tilde{\mathcal{G}}_{ij,kl}(\mathbf{q}) = C_{ijmn} \frac{q_m q_n}{|\mathbf{q}|^2}
+
+where C is the elastic stiffness tensor. For isotropic elasticity with shear modulus μ and Poisson ratio ν:
+
+.. math::
+
+    C_{ijkl} = \mu \left[ \delta_{ik}\delta_{jl} + \delta_{il}\delta_{jk} + \frac{2\nu}{1-2\nu} \delta_{ij}\delta_{kl} \right]
+
+**Key property**: The propagator couples all stress components, so a plastic event in σ_xy affects σ_xx and σ_yy, and vice versa.
+
+Plane Strain and Normal Stress Generation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In 2D flow with out-of-plane confinement (e.g., narrow gap rheometry), the strain ε_zz = 0 but stress σ_zz ≠ 0. The constraint is:
+
+.. math::
+
+    \sigma_{zz} = \nu (\sigma_{xx} + \sigma_{yy})
+
+This coupling generates **non-zero N₂**:
+
+.. math::
+
+    N_2 = \sigma_{yy} - \sigma_{zz} = (1 - \nu) \sigma_{yy} - \nu \sigma_{xx}
+
+even when N₁ = σ_xx - σ_yy might be small. This is a purely geometric effect of confinement.
+
+Governing Equations
 ------------------------
 
 Plane Strain Constraint
@@ -93,7 +201,7 @@ Normal Stress Differences
     N_2 &= \sigma_{yy} - \sigma_{zz} = (1 - \nu) \sigma_{yy} - \nu \sigma_{xx}
 
 Typical experimental observations:
-- Polymer melts: N₁ > 0 (rod climbing), |N₂| ≪ N₁
+- Polymer melts: N₁ > 0 (rod climbing), \|N₂\| ≪ N₁
 - Shear banding: Large gradients in N₁ correlate with band boundaries
 
 Fitting to Normal Stress Data
@@ -107,6 +215,161 @@ The loss function for combined fitting is:
 
 Set ``w_N1 > 1`` to prioritize normal stress accuracy.
 
+Validity and Assumptions
+------------------------
+
+**Valid for:**
+
+- Materials where **normal stresses are measurable** and significant (N₁/σ_xy > 0.1)
+- **Anisotropic materials** with directional microstructure (fibers, liquid crystals)
+- **Flow instabilities** driven by normal stress gradients (shear banding, edge fracture)
+- **Confined geometries** where plane strain applies (narrow gap, slit flow)
+
+**Assumptions:**
+
+- **Plane strain constraint**: ε_zz = 0 (appropriate for 2D confined flow)
+- **Isotropic elasticity** (unless Hill criterion used for anisotropy)
+- **Quenched disorder** in yield thresholds (same as scalar EPM)
+- **No inertia** (overdamped dynamics)
+
+**Not appropriate for:**
+
+- Pure shear measurements where N₁ is not measured (use LatticeEPM instead)
+- 3D bulk flows without confinement (requires full 3D tensor implementation)
+- Very compressible materials (model assumes ν ≈ 0.4-0.5)
+
+What You Can Learn
+------------------
+
+From fitting TensorialEPM to experimental data, you can extract insights about normal stress generation, anisotropic yielding, and flow instabilities in soft matter.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**σ_c (Yield Stress Threshold)**:
+   Local critical stress for plastic yielding in von Mises or Hill criterion.
+   *For graduate students*: For von Mises, σ_eff = √(½τ:τ) must exceed σ_c for plastic flow. Connects to microscopic cage breaking or bond rupture energetics.
+   *For practitioners*: Design parameter for processing stresses. σ_c sets minimum stress for continuous flow.
+
+**N₁, N₂ (Normal Stress Differences)**:
+   First (N₁ = σ_xx - σ_yy) and second (N₂ = σ_yy - σ_zz) normal stress differences from tensorial stress state.
+   *For graduate students*: N₁ arises from upper-convected Maxwell backbone (chain stretching, particle alignment). N₂ from plane strain constraint: N₂ = (1-ν)σ_yy - νσ_xx. Ratio N₁/σ_xy ~ Wi (Weissenberg number) quantifies elasticity.
+   *For practitioners*: Measure N₁ to predict rod climbing (Weissenberg effect), die swell, and edge fracture. N₁/σ_xy > 0.5 indicates strong elastic effects.
+
+**Hill H, N (Anisotropy Parameters)**:
+   Hill criterion parameters quantifying directional yield resistance (H for normal, N for shear).
+   *For graduate students*: Effective stress: σ_eff,Hill = √[H(σ_xx-σ_yy)² + 2Nσ_xy²]. H=1, N=3 recovers von Mises. Microstructurally, H and N relate to fiber orientation tensor or crystallographic texture.
+   *For practitioners*: Fit H and N from biaxial or combined loading tests. Use to predict forming limits and failure modes in anisotropic materials.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from TensorialEPM Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - N₁/σ_xy < 0.1
+     - Weakly elastic
+     - Pastes, concentrated suspensions
+     - Minimal normal stress effects
+   * - N₁/σ_xy = 0.1-1
+     - Moderate elasticity
+     - Emulsions, soft colloids
+     - Rod climbing, moderate die swell
+   * - N₁/σ_xy > 1
+     - Strongly elastic
+     - Polymer melts, fiber suspensions
+     - Strong Weissenberg effect, edge fracture
+   * - H=1, N=3 (isotropic)
+     - von Mises yielding
+     - Isotropic gels, foams
+     - Symmetric flow patterns
+   * - H≠1 or N≠3 (anisotropic)
+     - Directional yielding
+     - Fiber composites, liquid crystals
+     - Asymmetric instabilities, orientation-dependent strength
+
+Fitting Guidance
+----------------
+
+Initialization Strategy
+~~~~~~~~~~~~~~~~~~~~~~~
+
+**Step 1: Fit shear stress only (w_N1 = 0)**
+
+Start with shear stress data to get baseline parameters:
+
+- ``mu``, ``sigma_c_mean``, ``tau_pl_shear``
+
+This is equivalent to scalar EPM fitting.
+
+**Step 2: Add normal stress constraint (w_N1 = 1)**
+
+Refine parameters to match both σ_xy and N₁:
+
+- Adjust ``nu`` (Poisson ratio) to control N₁ magnitude
+- Adjust ``tau_pl_normal`` if N₁ relaxation differs from shear
+
+**Step 3: Test anisotropy (Hill criterion)**
+
+If isotropic fit fails (R² < 0.9 for N₁):
+
+- Switch to ``yield_criterion='hill'``
+- Fit ``hill_H`` and ``hill_N`` while holding other parameters fixed
+
+Parameter Bounds and Physical Constraints
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 20 30 50
+   :header-rows: 1
+
+   * - Parameter
+     - Typical Range
+     - Physical Constraint
+   * - ``nu``
+     - 0.40-0.49
+     - Avoid 0.5 (incompressible singularity); N₁ sensitive to ν
+   * - ``tau_pl_shear``
+     - 0.01-10 s
+     - Match shear stress relaxation timescale
+   * - ``tau_pl_normal``
+     - 0.1-10× tau_pl_shear
+     - Often similar, but can differ for anisotropic materials
+   * - ``w_N1``
+     - 0.1-10
+     - Higher weight = prioritize N₁ fit over σ_xy
+   * - ``hill_H``
+     - 0.5-2.0
+     - H = 1, N = 3 recovers von Mises (isotropic)
+   * - ``hill_N``
+     - 1.5-5.0
+     - N controls shear-normal coupling
+
+Common Fitting Issues
+~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 35 65
+   :header-rows: 1
+
+   * - Issue
+     - Solution
+   * - N₁ predictions too small
+     - Increase ``sigma_c_std`` (disorder) or reduce ``nu`` to 0.42-0.45
+   * - N₁ predictions too large
+     - Increase ``nu`` toward 0.48 or reduce disorder
+   * - Shear fit good, N₁ fit poor
+     - Increase ``w_N1`` to 2-5; consider anisotropy (Hill)
+   * - Convergence fails with w_N1 > 0
+     - Fit shear first (w_N1=0), then refine with w_N1=1
+   * - GPU memory overflow
+     - Reduce ``L`` to 32 or 48; batch process long time series
+
 API Reference
 -------------
 
@@ -114,6 +377,7 @@ API Reference
     :members:
     :undoc-members:
     :show-inheritance:
+    :no-index:
 
 Parameters
 ----------
@@ -185,8 +449,32 @@ Parameters
      - 0
      - Random seed for threshold initialization (reproducibility)
 
-Usage Examples
---------------
+Usage
+-----
+
+Basic Usage
+~~~~~~~~~~~
+
+.. code-block:: python
+
+    from rheojax.models.epm import TensorialEPM
+    import numpy as np
+
+    # Create model instance
+    model = TensorialEPM(L=32, dt=0.01)
+
+    # Fit to flow curve data
+    gamma_dot = np.logspace(-2, 1, 10)
+    stress_exp = np.array([0.5, 1.2, 2.8, 5.1, 8.7, 13.5, 19.8, 27.3, 36.2, 46.5])
+
+    model.fit(gamma_dot, stress_exp, test_mode='flow_curve')
+
+    # Predict stress (including normal stress differences)
+    gamma_dot_new = np.logspace(-2, 1, 30)
+    sigma_pred = model.predict(gamma_dot_new, test_mode='flow_curve')
+
+Advanced Usage Examples
+------------------------
 
 Basic Flow Curve with N₁ Prediction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -365,8 +653,48 @@ GPU Memory Overflow
 References
 ----------
 
-1. **Hébraud-Lequeux Theory**: Hébraud, P., & Lequeux, F. (1998). *Phys. Rev. Lett.*, 81, 2934.
-2. **EPM Framework**: Bocquet, L., Colin, A., & Ajdari, A. (2009). *Phys. Rev. Lett.*, 103, 036001.
-3. **Eshelby Tensor**: Eshelby, J. D. (1957). *Proc. R. Soc. Lond. A*, 241, 376.
-4. **Hill Anisotropy**: Hill, R. (1948). *Proc. R. Soc. Lond. A*, 193, 281.
-5. **Normal Stress Differences**: Bird, R. B., Armstrong, R. C., & Hassager, O. (1987). *Dynamics of Polymeric Liquids*, Vol. 1.
+.. [1] Hébraud, P. and Lequeux, F. "Mode-coupling theory for the pasty rheology of soft
+   glassy materials." *Physical Review Letters*, 81, 2934 (1998).
+   https://doi.org/10.1103/PhysRevLett.81.2934
+
+.. [2] Bocquet, L., Colin, A., and Ajdari, A. "Kinetic theory of plastic flow in soft
+   glassy materials." *Physical Review Letters*, 103, 036001 (2009).
+   https://doi.org/10.1103/PhysRevLett.103.036001
+
+.. [3] Eshelby, J. D. "The determination of the elastic field of an ellipsoidal inclusion,
+   and related problems." *Proceedings of the Royal Society A*, 241, 376-396 (1957).
+   https://doi.org/10.1098/rspa.1957.0133
+
+.. [4] Hill, R. "A theory of the yielding and plastic flow of anisotropic metals."
+   *Proceedings of the Royal Society A*, 193, 281-297 (1948).
+   https://doi.org/10.1098/rspa.1948.0045
+
+.. [5] Bird, R. B., Armstrong, R. C., and Hassager, O. *Dynamics of Polymeric Liquids*,
+   Vol. 1: Fluid Mechanics, 2nd Edition. Wiley (1987). ISBN: 978-0471802457
+
+.. [6] Picard, G., Ajdari, A., Lequeux, F., and Bocquet, L. "Elastic consequences of a
+   single plastic event: A step towards the microscopic modeling of the flow of yield
+   stress fluids." *European Physical Journal E*, 15, 371-381 (2004).
+   https://doi.org/10.1140/epje/i2004-10054-8
+
+.. [7] Nicolas, A., Ferrero, E. E., Martens, K., and Barrat, J.-L. "Deformation and flow
+   of amorphous solids: Insights from elastoplastic models." *Reviews of Modern Physics*,
+   90, 045006 (2018). https://doi.org/10.1103/RevModPhys.90.045006
+
+.. [8] Larson, R. G. "Constitutive equations for polymer melts and solutions."
+   *Butterworths Series in Chemical Engineering*, Boston (1988). ISBN: 978-0409901191
+
+.. [9] Coussot, P. "Yield stress fluid flows: A review of experimental data."
+   *Journal of Non-Newtonian Fluid Mechanics*, 211, 31-49 (2014).
+   https://doi.org/10.1016/j.jnnfm.2014.05.006
+
+.. [10] Saramito, P. "A new elastoviscoplastic model based on the Herschel-Bulkley
+    viscoplastic model." *Journal of Non-Newtonian Fluid Mechanics*, 158, 154-161 (2009).
+    https://doi.org/10.1016/j.jnnfm.2008.12.001
+
+See Also
+--------
+
+- :doc:`lattice_epm` — Scalar EPM for faster fitting when N₁ data unavailable
+- :doc:`/user_guide/03_advanced_topics/index` — Advanced EPM workflows
+- :py:func:`rheojax.visualization.epm_plots.plot_tensorial_fields` — Visualization functions for tensor fields

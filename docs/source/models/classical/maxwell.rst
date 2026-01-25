@@ -400,6 +400,138 @@ Diagnostic Signatures
 - **Slope of log** :math:`G'` **vs log** :math:`\omega` **= 2 at low** :math:`\omega`: Terminal behavior of viscoelastic liquids
 - **Loss tangent**: :math:`\tan\delta = 1/(\omega\tau)` is **monotonically decreasing** (unlike Zener model with minimum)
 
+----
+
+What You Can Learn
+------------------
+
+This section explains how to translate fitted Maxwell parameters into material
+insights and actionable knowledge for both research and industrial applications.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**G (Spring Modulus)**:
+   Fitted :math:`G` reveals the instantaneous elastic response:
+
+   - **Low values (<10⁴ Pa)**: Dilute solution, low entanglement density, or near-terminal regime
+   - **Moderate values (10⁴-10⁶ Pa)**: Typical processing-grade polymer melts, well-entangled
+   - **High values (>10⁶ Pa)**: Very high MW, high entanglement density, or glassy contribution
+
+   *For graduate students*: Compare with plateau modulus :math:`G_N^0` from Generalized Maxwell
+   or from :math:`G_N^0 = \rho RT / M_e` to estimate entanglement MW. The single Maxwell :math:`G`
+   underestimates :math:`G_N^0` when multiple modes contribute.
+
+   *For practitioners*: :math:`G` indicates die swell magnitude and elastic recoil strength.
+   Higher :math:`G` means more pronounced elastic effects in processing.
+
+**eta (Dashpot Viscosity)**:
+   Fitted :math:`\eta` reveals the flow resistance:
+
+   - **Low values (<10³ Pa·s)**: Low MW, high temperature, or weak entanglement
+   - **Moderate values (10³-10⁶ Pa·s)**: Typical polymer melt processing range
+   - **High values (>10⁶ Pa·s)**: Very high MW, low temperature, or near :math:`T_g`
+
+   *For graduate students*: Use :math:`\eta \sim M^{3.4}` scaling (for :math:`M > 2M_c`) to estimate
+   molecular weight. Compare with capillary viscometry or GPC data.
+
+   *For practitioners*: :math:`\eta` controls pumping power requirements and flow rates
+   in processing. Higher :math:`\eta` means slower filling, higher pressures needed.
+
+**tau (Relaxation Time)**:
+   The derived parameter :math:`\tau = \eta/G` is the most important for processing:
+
+   - **Short** :math:`\tau` **(<0.1 s)**: Fast relaxation, minimal melt memory, easy processing
+   - **Moderate** :math:`\tau` **(0.1-10 s)**: Typical processing regime, some elastic effects
+   - **Long** :math:`\tau` **(>10 s)**: Strong melt memory, stress relaxation issues, orientation effects
+
+   *For graduate students*: Compare :math:`\tau` with reptation time :math:`\tau_d` from
+   tube model. For monodisperse melts, single Maxwell :math:`\tau \approx \tau_d`.
+
+   *For practitioners*: Processing Deborah number :math:`De = \tau \cdot \dot{\gamma}_{process}`
+   determines whether elastic (:math:`De > 1`) or viscous (:math:`De < 1`) effects dominate.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Maxwell Parameters
+   :header-rows: 1
+   :widths: 22 22 28 28
+
+   * - Parameter Pattern
+     - Material Type
+     - Examples
+     - Processing Notes
+   * - High :math:`G`, high :math:`\eta`
+     - High-MW entangled melt
+     - UHMWPE, high-MW PS
+     - Strong elastic effects, die swell
+   * - Low :math:`G`, low :math:`\eta`
+     - Low-MW oligomer/liquid
+     - Wax, low-MW PDMS
+     - Near-Newtonian, easy processing
+   * - High :math:`G`, low :math:`\eta` (short :math:`\tau`)
+     - Concentrated, fast-relaxing
+     - Branched polymers at high T
+     - Good processability
+   * - Low :math:`G`, high :math:`\eta` (long :math:`\tau`)
+     - Dilute but entangled
+     - Dilute polymer solution
+     - Slow dynamics, low elasticity
+
+Molecular Weight Estimation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From fitted :math:`\eta` using the empirical scaling relation:
+
+.. math::
+
+   M_w \approx \left( \frac{\eta}{K_\eta} \right)^{1/3.4}
+
+where :math:`K_\eta` is polymer- and temperature-specific:
+   - Polyethylene (190°C): :math:`K_\eta \approx 3.4 \times 10^{-14}` (Pa·s)/(g/mol)^3.4
+   - Polystyrene (170°C): :math:`K_\eta \approx 1.1 \times 10^{-14}` (Pa·s)/(g/mol)^3.4
+
+Process Window Estimation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From :math:`\tau`, estimate the shear rate range for different flow behaviors:
+
+- **Newtonian regime** (De < 0.1): :math:`\dot{\gamma} < 0.1/\tau`
+- **Transition regime** (0.1 < De < 10): :math:`0.1/\tau < \dot{\gamma} < 10/\tau`
+- **Elastic-dominated** (De > 10): :math:`\dot{\gamma} > 10/\tau`
+
+For typical processing rates (:math:`\dot{\gamma} \approx 10^2 - 10^4` s⁻¹), target
+:math:`\tau < 0.01` s for minimal elastic effects.
+
+Diagnostic Indicators
+~~~~~~~~~~~~~~~~~~~~~
+
+**Warning signs in fitted parameters**:
+
+- **If** :math:`\tau` **outside data frequency range**: :math:`G''` peak not captured; extend frequency sweep
+- **If R² < 0.95**: Multiple relaxation times present; use Generalized Maxwell
+- **If fit residuals show curvature**: Single exponential inadequate; try fractional models
+- **If** :math:`G` **hits bounds**: Data may be in terminal regime only; verify :math:`G' \sim \omega^2` slope
+
+Application Examples
+~~~~~~~~~~~~~~~~~~~~
+
+**Quality Control**:
+   - Track :math:`\tau` across batches to monitor MW consistency
+   - Verify :math:`G` within specification for grade identification
+   - Use :math:`\eta` to detect contamination or degradation
+
+**Process Troubleshooting**:
+   - High die swell → :math:`G` or :math:`\tau` too high → increase temperature or reduce MW
+   - Shark skin melt fracture → :math:`\tau` too long → blend with lower-MW grade
+   - Poor weld line strength → :math:`\tau` too short → increase MW or reduce temperature
+
+**Material Development**:
+   - Target :math:`\tau \approx 0.1-1` s for balanced processability
+   - Increase :math:`G` by increasing MW or crosslink density
+   - Reduce :math:`\tau` via chain branching or blending
+
 Experimental Design
 -------------------
 
@@ -808,55 +940,69 @@ Time-Temperature Superposition
    model = Maxwell()
    model.fit(master_data.omega, master_data.G_star)
 
-See also
+See Also
 --------
 
-- :doc:`zener` — adds a parallel spring for finite creep recovery.
-- :doc:`springpot` — fractional generalization providing power-law slopes.
-- :doc:`../fractional/fractional_maxwell_gel` — series dashpot + springpot capturing gel
-  behavior.
+**Classical Models:**
+
+- :doc:`zener` — adds a parallel spring for finite creep recovery
+- :doc:`springpot` — fractional generalization providing power-law slopes
+
+**Fractional Models:**
+
+- :doc:`../fractional/fractional_maxwell_gel` — series dashpot + springpot capturing gel behavior
 - :doc:`../fractional/fractional_maxwell_liquid` — fractional dashpot for broad relaxation spectra
-- :doc:`../../transforms/fft` — convert time-domain data to :math:`G'(\omega)` and
-  :math:`G''(\omega)` prior to fitting.
+
+**Transforms:**
+
+- :doc:`../../transforms/fft` — convert time-domain data to :math:`G'(\omega)` and :math:`G''(\omega)` prior to fitting
 - :doc:`../../transforms/mastercurve` — time-temperature superposition for extending frequency range
-- :doc:`../../examples/basic/01-maxwell-fitting` — notebook demonstrating parameter
-  estimation and validation.
+
+**Examples:**
+
+- :doc:`../../examples/basic/01-maxwell-fitting` — notebook demonstrating parameter estimation and validation
+
+**User Guides:**
+
 - :doc:`../../user_guide/model_selection` — decision flowcharts for choosing rheological models
 
 References
 ----------
 
-**Foundational Textbooks**
+.. [1] Ferry, J. D. *Viscoelastic Properties of Polymers*, 3rd Edition. Wiley (1980).
+   ISBN: 978-0471048947. Classic reference for linear viscoelasticity, WLF equation,
+   and molecular theories.
 
-1. Ferry, J. D. *Viscoelastic Properties of Polymers*, 3rd Edition. Wiley, 1980.
-   Classic reference for linear viscoelasticity, WLF equation, and molecular theories.
+.. [2] Tschoegl, N. W. *The Phenomenological Theory of Linear Viscoelastic Behavior*.
+   Springer, Berlin (1989). https://doi.org/10.1007/978-3-642-73602-5. Rigorous
+   mathematical treatment of constitutive equations and interconversion relations.
 
-2. Tschoegl, N. W. *The Phenomenological Theory of Linear Viscoelastic Behavior*. Springer, 1989.
-   Rigorous mathematical treatment of constitutive equations and interconversion relations.
+.. [3] Macosko, C. W. *Rheology: Principles, Measurements, and Applications*.
+   Wiley-VCH, New York (1994). ISBN: 978-0471185758. Excellent balance of theory,
+   experimental techniques, and practical applications.
 
-3. Macosko, C. W. *Rheology: Principles, Measurements, and Applications*. Wiley-VCH, 1994.
-   Excellent balance of theory, experimental techniques, and practical applications.
+.. [4] Barnes, H. A., Hutton, J. F., and Walters, K. *An Introduction to Rheology*.
+   Elsevier, Amsterdam (1989). ISBN: 978-0444871404. Accessible introduction
+   covering viscosity, viscoelasticity, and normal stresses.
 
-4. Barnes, H. A., Hutton, J. F., Walters, K. *An Introduction to Rheology*. Elsevier, 1989.
-   Accessible introduction covering viscosity, viscoelasticity, and normal stresses.
+.. [5] Doi, M., and Edwards, S. F. *The Theory of Polymer Dynamics*. Oxford
+   University Press (1986). ISBN: 978-0198520337. Foundation for reptation theory
+   connecting Maxwell model to molecular dynamics.
 
-**Molecular Theory**
+.. [6] McLeish, T. C. B. "Tube Theory of Entangled Polymer Dynamics."
+   *Advances in Physics*, 51(6), 1379–1527 (2002).
+   https://doi.org/10.1080/00018730210153216
 
-5. Doi, M., Edwards, S. F. *The Theory of Polymer Dynamics*. Oxford University Press, 1986.
-   Foundation for reptation theory connecting Maxwell model to molecular dynamics.
+.. [7] Maxwell, J. C. "On the Dynamical Theory of Gases."
+   *Philosophical Transactions of the Royal Society of London*, 157, 49–88 (1867).
+   https://doi.org/10.1098/rstl.1867.0004. Original paper introducing the model.
 
-6. McLeish, T. C. B. "Tube Theory of Entangled Polymer Dynamics." *Advances in Physics*, 51(6), 1379-1527 (2002).
-   Modern perspective on reptation with extensions (constraint release, contour length fluctuations).
+.. [8] Bird, R. B., Armstrong, R. C., and Hassager, O. *Dynamics of Polymeric
+   Liquids, Volume 1: Fluid Mechanics*. 2nd ed., Wiley, New York (1987).
+   ISBN: 978-0471802457
 
-**Historical**
+.. [9] Larson, R. G. *The Structure and Rheology of Complex Fluids*.
+   Oxford University Press, New York (1999). ISBN: 978-0195121971
 
-7. Maxwell, J. C. "On the Dynamical Theory of Gases." *Philosophical Transactions of the Royal Society of London*, 157, 49-88 (1867).
-   Original paper introducing the model (in context of gas viscosity, later applied to viscoelasticity).
-
-**Recent Reviews (2020-2024)**
-
-8. Tutorial review of linear rheology for polymer chemists: basics and best practices for covalent adaptable networks. *Polymer Chemistry*, Royal Society of Chemistry (2024).
-   Modern practical guide with fitting protocols and common pitfalls.
-
-9. Non-Maxwellian viscoelastic stress relaxations in soft matter. *Soft Matter*, Royal Society of Chemistry (2023).
-   Discusses when Maxwell model fails and fractional alternatives.
+.. [10] Rubinstein, M., and Colby, R. H. *Polymer Physics*.
+   Oxford University Press (2003). ISBN: 978-0198520597

@@ -4,10 +4,6 @@ Logging (rheojax.logging)
 Comprehensive logging system for monitoring and debugging RheoJAX operations.
 Provides structured logging, JAX-safe utilities, and performance metrics.
 
-.. contents::
-   :local:
-   :depth: 2
-
 Configuration
 -------------
 

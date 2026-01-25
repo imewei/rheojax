@@ -4,10 +4,6 @@ Models API
 Concise parameter reference for every rheological model. For derivations, limits,
 and usage recipes see the :doc:`/models/index` handbook.
 
-.. contents::
-   :local:
-   :depth: 2
-
 Classical Models
 ----------------
 

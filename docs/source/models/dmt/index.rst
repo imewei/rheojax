@@ -4,10 +4,6 @@
 DMT Thixotropic Models
 ======================================
 
-.. contents:: Table of Contents
-   :local:
-   :depth: 3
-
 Quick Reference
 ===============
 
@@ -384,6 +380,7 @@ DMTLocal
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 DMTNonlocal
 -----------
@@ -392,6 +389,7 @@ DMTNonlocal
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Usage Examples
 ==============

@@ -89,25 +89,12 @@ Contents
    :caption: User Guide
 
    user_guide/index
-   user_guide/01_fundamentals/index
-   user_guide/02_model_usage/index
-   user_guide/03_advanced_topics/index
-   user_guide/04_practical_guides/index
-   user_guide/05_appendices/index
 
 .. toctree::
    :maxdepth: 2
    :caption: API Reference
 
    api_reference
-   api/core
-   api/models
-   api/transforms
-   api/spp_models
-   api/pipeline
-   api/utils
-   api/io
-   api/visualization
 
 .. toctree::
    :maxdepth: 2

@@ -31,6 +31,81 @@ The generalized model represents the most expressive formulation of the family. 
 useful for materials exhibiting multi-scale relaxation processes or hierarchical
 structures where different fractional orders govern distinct time/frequency bands.
 
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 40 20
+   :header-rows: 1
+
+   * - Symbol
+     - Description
+     - Units
+   * - :math:`c_1`
+     - Material constant (sets modulus scale)
+     - Pa·s\ :sup:`α`
+   * - :math:`\alpha`
+     - First fractional order (high-frequency power-law slope)
+     - —
+   * - :math:`\beta`
+     - Second fractional order (transition behavior)
+     - —
+   * - :math:`\tau`
+     - Characteristic relaxation time (crossover frequency)
+     - s
+   * - :math:`E_\alpha(z)`
+     - One-parameter Mittag-Leffler function
+     - —
+   * - :math:`G^*(ω)`
+     - Complex modulus
+     - Pa
+   * - :math:`G'(ω)`
+     - Storage modulus
+     - Pa
+   * - :math:`G''(ω)`
+     - Loss modulus
+     - Pa
+   * - :math:`\omega`
+     - Angular frequency
+     - rad/s
+   * - :math:`t`
+     - Time
+     - s
+
+Physical Foundations
+--------------------
+
+The generalized Fractional Maxwell Model extends the canonical single-order formulation by incorporating two independent SpringPot elements in series, each characterized by its own fractional order. This enables the model to capture complex hierarchical relaxation processes that cannot be described by a single power-law exponent.
+
+**Mechanical Analogue:**
+
+.. code-block:: text
+
+   [SpringPot (α)] ---- series ---- [SpringPot (β)]
+
+The first SpringPot (α) dominates at high frequencies, while the second (β) controls the transition to low-frequency behavior. The combined effect produces a low-frequency slope of (α+β).
+
+**Microstructural Interpretation:**
+
+- **First SpringPot (α)**: Fast relaxation modes from local chain dynamics, segmental motion, or small-scale network rearrangements
+- **Second SpringPot (β)**: Slow relaxation modes from large-scale structural relaxation, cooperative motion, or hierarchical network dynamics
+- **Combined behavior**: Multi-scale relaxation spectrum with two distinct power-law regimes separated by characteristic time τ
+
+**Connection to Molecular Weight Distribution:**
+
+For polymer melts and solutions, the two fractional orders can capture:
+
+1. **α**: Reflects the breadth of high-frequency modes (entanglement dynamics, chain stretching)
+2. **β**: Captures low-frequency modes (reptation, constraint release, branching relaxation)
+3. **Dual power-law**: Arises naturally from bimodal or hierarchical molecular weight distributions
+
+This model is particularly suited for:
+
+- Polymer blends with distinct component relaxation times
+- Branched polymers with arm retraction and backbone relaxation
+- Filled systems with matrix and filler-interface contributions
+- Associative polymers with multiple bonding timescales
+
 Governing Equations
 -------------------
 
@@ -162,6 +237,158 @@ The two-order form encompasses several simpler models as limiting cases:
 - **tau -> 0**: Pure SpringPot with exponent alpha
 - **tau -> inf**: Pure SpringPot with exponent (alpha+beta) at low frequencies
 
+What You Can Learn
+------------------
+
+This section explains what insights you can extract from fitting the Generalized Fractional Maxwell Model to your experimental data, emphasizing the multi-scale relaxation processes enabled by two independent fractional orders.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Material Constant (c₁)**:
+   Sets the overall magnitude of the viscoelastic response. Higher c₁ indicates stiffer material behavior.
+
+   *For graduate students*: c₁ has unusual units (Pa·s^α) due to the fractional calculus framework. It relates to the spectral strength at the highest frequencies measured.
+   *For practitioners*: c₁ scales the entire modulus curve vertically; compare to target stiffness specifications.
+
+**First Fractional Order (α)**:
+   Controls the high-frequency power-law slope. Values closer to 0 indicate more solid-like response at short times, while values closer to 1 indicate more liquid-like (viscous) behavior.
+
+   - **α → 0**: Nearly elastic at short times, very broad relaxation spectrum
+   - **α → 0.5**: Balanced solid-liquid character, critical gel behavior
+   - **α → 1**: Viscous-like, narrower spectrum
+
+   *For graduate students*: α quantifies the polydispersity of the fast relaxation modes in the material's microstructure.
+   *For practitioners*: Lower α means more complex short-time behavior (important for impact loading).
+
+**Second Fractional Order (β)**:
+   Governs the transition behavior and low-frequency power-law slope. Together with α, determines the total low-frequency slope (α+β).
+
+   - **β → 0**: Sharp transition, elastic-like at long times
+   - **β → 0.5**: Gradual transition
+   - **β → 1**: Viscous-like at long times
+
+   *For graduate students*: β captures slow relaxation mechanisms (network rearrangements, large-scale structural relaxation).
+   *For practitioners*: Higher β indicates more liquid-like long-time response.
+
+**Relaxation Time (τ)**:
+   Characteristic timescale separating the two power-law regimes. Marks the crossover frequency ω ≈ 1/τ.
+
+   *For graduate students*: τ is temperature-dependent via WLF or Arrhenius, enabling time-temperature superposition.
+   *For practitioners*: Compare τ to service timescales to predict whether material will exhibit regime 1 (α-dominated) or regime 2 (α+β-dominated) behavior.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Two-Order Fractional Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - α ≈ β ≈ 0.5
+     - Single-scale fractional
+     - Use simpler FMG/FML
+     - Unnecessary complexity
+   * - α < 0.3, β > 0.6
+     - Hierarchical relaxation
+     - Polymer blends, composites
+     - Multi-timescale processing needed
+   * - α > 0.7, β < 0.3
+     - Viscous with elastic memory
+     - Solutions with entanglements
+     - Flow-dominated but elastic recoil
+   * - \|α - β\| > 0.4
+     - Two-scale structure
+     - Filled polymers, micellar
+     - Distinct fast/slow mechanisms
+
+Fitting Guidance
+----------------
+
+**Recommended Data Collection:**
+
+1. **Frequency sweep** (SAOS): 4-5 decades minimum to capture dual power-law regimes
+2. **Test amplitude**: Within LVR (< 5% strain typically)
+3. **Coverage**: Ensure both high and low frequency power-law regions visible
+4. **Temperature**: Constant ±0.1°C
+
+**Initialization Strategy:**
+
+.. code-block:: python
+
+   # From frequency sweep showing two power-law regimes
+   alpha_init = slope at high frequencies
+   beta_init = (slope at low frequencies) - alpha_init
+   c1_init = magnitude in high-frequency region
+   tau_init = 1 / (crossover frequency between regimes)
+
+**Optimization Tips:**
+
+- This is a complex 4-parameter model; ensure data quality is high
+- Fit simultaneously to G' and G" with equal weighting
+- Use log-weighted least squares for better conditioning
+- Verify that both power-law regimes are clearly visible in data
+- Compare to simpler models (FMG, FML) using AIC/BIC criteria
+
+**When to Use:**
+
+- Only when simpler fractional models (FMG, FML, FZSS) show systematic deviations
+- When log-log plots clearly show two distinct power-law slopes
+- For materials with hierarchical structures or multi-scale relaxation
+
+**Common Pitfalls:**
+
+- **Overfitting**: Too many parameters for limited data; verify with cross-validation
+- **Parameter correlation**: α and β may be poorly constrained; report confidence intervals
+- **Insufficient data range**: Need 4+ decades to resolve both power-law regimes
+
+Usage
+-----
+
+.. code-block:: python
+
+   from rheojax.models import FractionalMaxwellModel
+   from rheojax.core.data import RheoData
+   import numpy as np
+
+   # Create model instance
+   model = FractionalMaxwellModel()
+
+   # Set parameters for a multi-scale viscoelastic material
+   model.parameters.set_value('c1', 1e5)      # Pa*s^alpha
+   model.parameters.set_value('alpha', 0.5)   # dimensionless
+   model.parameters.set_value('beta', 0.7)    # dimensionless
+   model.parameters.set_value('tau', 1.0)     # s
+
+   # Predict complex modulus showing dual power-law regimes
+   omega = np.logspace(-2, 3, 100)
+   data_freq = RheoData(x=omega, y=np.zeros_like(omega), domain='frequency')
+   data_freq.metadata['test_mode'] = 'oscillation'
+   G_star = model.predict(data_freq)
+
+   # Analyze regime transitions
+   Gp = G_star.y.real
+   Gpp = G_star.y.imag
+   # At omega << 1/tau: slope approx (alpha+beta)
+   # At omega >> 1/tau: slope approx alpha
+
+   # Fit to experimental data with two power-law regimes
+   omega_exp = np.logspace(-2, 3, 100)
+   G_star_exp = load_experimental_data()
+   model.fit(omega_exp, G_star_exp, test_mode='oscillation')
+
+   # Compare to simpler models
+   from rheojax.models import FractionalMaxwellGel
+   fmg = FractionalMaxwellGel()
+   fmg.fit(omega_exp, G_star_exp, test_mode='oscillation')
+   # Use AIC to compare: lower is better
+
+For more details on the :class:`rheojax.models.FractionalMaxwellModel` class, see the
+:doc:`API reference </api/models>`.
+
 API References
 --------------
 
@@ -210,26 +437,72 @@ Usage
 
 For more details on the :class:`rheojax.models.FractionalMaxwellModel` class, see the :doc:`API reference </api/models>`.
 
-See also
+See Also
 --------
 
-- :doc:`fractional_maxwell_gel` and :doc:`fractional_maxwell_liquid` — canonical
-  single-order forms used throughout the literature.
-- :doc:`fractional_burgers` — adds a Kelvin element to capture additional retardation.
-- :doc:`../flow/carreau` — complementary shear-thinning law for steady-flow data.
-- :doc:`../../transforms/mastercurve` — merge multi-temperature spectra before fitting.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing all
-  fractional families on synthetic and experimental data.
+Related Models
+~~~~~~~~~~~~~~
+
+- :doc:`fractional_maxwell_gel` — canonical single-order form (SpringPot + dashpot) for gels with terminal flow
+- :doc:`fractional_maxwell_liquid` — canonical single-order form (spring + SpringPot) for viscoelastic liquids
+- :doc:`fractional_burgers` — adds a Kelvin element to capture additional retardation and creep compliance
+- :doc:`../classical/maxwell` — classical limit (α = β = 1, exponential relaxation)
+- :doc:`../classical/springpot` — fundamental SpringPot element theory
+
+Related Concepts
+~~~~~~~~~~~~~~~~
+
+- :doc:`../flow/carreau` — complementary shear-thinning law for steady-flow data
+- :doc:`../../transforms/mastercurve` — merge multi-temperature spectra before fitting to extract time-temperature behavior
+
+Examples and Guides
+~~~~~~~~~~~~~~~~~~~
+
+- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing all fractional families on synthetic and experimental data
+- :doc:`../../examples/model-comparison/01-fractional-family` — systematic comparison using AIC/BIC criteria
+- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing between single-order and two-order models
 
 References
 ----------
 
-- H. Schiessel and A. Blumen, "Hierarchical analogues to fractional relaxation
-  equations," *J. Phys. A* 26, 5057–5069 (1993).
-- N. Heymans and J.C. Bauwens, "Fractal rheological models and fractional differential
-  equations for viscoelastic behavior," *Rheol. Acta* 33, 210–219 (1994).
-- H. Schiessel, R. Metzler, A. Blumen, and T.F. Nonnenmacher, "Generalized viscoelastic
-  models: their fractional equations with solutions," *J. Phys. A* 28, 6567–6584 (1995).
-- F. Mainardi, *Fractional Calculus and Waves in Linear Viscoelasticity*, Imperial College
-  Press (2010).
-- R.L. Magin, *Fractional Calculus in Bioengineering*, Begell House (2006).
+.. [1] Schiessel, H., and Blumen, A. "Hierarchical analogues to fractional relaxation
+   equations." *Journal of Physics A*, 26, 5057–5069 (1993).
+   https://doi.org/10.1088/0305-4470/26/19/034
+
+.. [2] Heymans, N., and Bauwens, J. C. "Fractal rheological models and fractional
+   differential equations for viscoelastic behavior."
+   *Rheologica Acta*, 33, 210–219 (1994).
+   https://doi.org/10.1007/BF00437306
+
+.. [3] Schiessel, H., Metzler, R., Blumen, A., and Nonnenmacher, T. F. "Generalized
+   viscoelastic models: their fractional equations with solutions."
+   *Journal of Physics A*, 28, 6567–6584 (1995).
+   https://doi.org/10.1088/0305-4470/28/23/012
+
+.. [4] Mainardi, F. *Fractional Calculus and Waves in Linear Viscoelasticity*.
+   Imperial College Press (2010). https://doi.org/10.1142/p614
+
+.. [5] Magin, R. L. *Fractional Calculus in Bioengineering*. Begell House (2006).
+   ISBN: 978-1567002157
+
+.. [6] Metzler, R., and Nonnenmacher, T. F. "Fractional relaxation processes and
+   fractional rheological models for the description of a class of viscoelastic
+   materials." *International Journal of Plasticity*, 19, 941–959 (2003).
+   https://doi.org/10.1016/S0749-6419(02)00087-6
+
+.. [7] Friedrich, C. "Relaxation and retardation functions of the Maxwell model
+   with fractional derivatives." *Rheologica Acta*, 30, 151–158 (1991).
+   https://doi.org/10.1007/BF01134604
+
+.. [8] Bagley, R. L., and Torvik, P. J. "A theoretical basis for the application
+   of fractional calculus to viscoelasticity." *Journal of Rheology*, 27, 201–210 (1983).
+   https://doi.org/10.1122/1.549724
+
+.. [9] Gorenflo, R., Kilbas, A. A., Mainardi, F., and Rogosin, S. V.
+   *Mittag-Leffler Functions, Related Topics and Applications*. Springer (2014).
+   https://doi.org/10.1007/978-3-662-43930-2
+
+.. [10] Jaishankar, A., and McKinley, G. H. "A fractional K-BKZ constitutive formulation
+    for describing the nonlinear rheology of multiscale complex fluids."
+    *Journal of Rheology*, 58, 1751–1788 (2014).
+    https://doi.org/10.1122/1.4892114

@@ -540,6 +540,148 @@ Diagnostic Signatures
 
    Fraction recovered = :math:`G_p / (G_s + G_p)`
 
+What You Can Learn
+------------------
+
+This section explains how to extract material insights and process guidance from fitted Zener parameters.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Gs (Equilibrium Modulus)**:
+   Fitted :math:`G_s` reveals the permanent network structure:
+
+   - **Low values (<10³ Pa)**: Weak hydrogels, low cross-link density, soft tissues
+   - **Moderate values (10⁴-10⁶ Pa)**: Elastomers, biological tissues, filled rubbers
+   - **High values (>10⁷ Pa)**: Thermosets, highly crosslinked networks, rigid materials
+
+   *For researchers*: Calculate cross-link density from :math:`G_s`:
+
+   .. math::
+
+      \nu_c = \frac{G_s}{RT} \quad (\text{mol/m}^3), \qquad M_c = \frac{\rho RT}{2G_s} \quad (\text{g/mol})
+
+   *For practitioners*: :math:`G_s` indicates dimensional stability under sustained load. Higher :math:`G_s` means less creep deformation.
+
+**Gp (Maxwell Arm Modulus)**:
+   Fitted :math:`G_p` quantifies transient network contribution:
+
+   - **Low** :math:`G_p/G_s` **ratio (<0.5)**: Strongly crosslinked, minimal relaxation
+   - **Moderate** :math:`G_p/G_s` **(0.5-2)**: Balanced network (permanent + transient)
+   - **High** :math:`G_p/G_s` **(>2)**: Weak permanent structure, strong transient bonds
+
+   *For researchers*: :math:`G_p/(G_s + G_p)` = fraction of strain recovered in creep-recovery test
+
+   *For practitioners*: High :math:`G_p` means strong viscous dissipation (damping), useful for vibration isolation
+
+**ηp (Maxwell Dashpot Viscosity)**:
+   Fitted :math:`\eta_p` controls stress relaxation timescale:
+
+   - **Short** :math:`\tau_\epsilon = \eta_p/G_p` **(<0.1 s)**: Fast relaxation, minimal processing history
+   - **Moderate** :math:`\tau_\epsilon` **(0.1-100 s)**: Typical elastomers, biological timescales
+   - **Long** :math:`\tau_\epsilon` **(>100 s)**: Slow relaxation, shape memory effects
+
+   *For researchers*: :math:`\eta_p` relates to chain friction and entanglement dynamics
+
+   *For practitioners*: Processing Deborah number :math:`De = \tau_\epsilon \cdot \dot{\gamma}_{process}` determines if elastic effects are significant
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Zener Parameters
+   :header-rows: 1
+   :widths: 22 22 28 28
+
+   * - Parameter Pattern
+     - Material Type
+     - Examples
+     - Key Property
+   * - High :math:`G_s`, low :math:`G_p`
+     - Strongly crosslinked
+     - Thermosets, vulcanized rubber
+     - Minimal creep, high recovery
+   * - Moderate :math:`G_s`, high :math:`G_p`
+     - Physical gels, tissues
+     - Gelatin, collagen, skin
+     - Significant relaxation
+   * - Low :math:`G_s`, high :math:`G_p`
+     - Weak gels
+     - Alginate, low cross-link
+     - Poor dimensional stability
+   * - :math:`G_s \approx G_p`
+     - Balanced viscoelastic
+     - Filled elastomers
+     - Equal elastic/viscous contribution
+
+Network Structure Estimation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Cross-link density from** :math:`G_s`:
+
+For elastomers at temperature :math:`T`:
+
+.. math::
+
+   M_c = \frac{\rho RT}{2 G_s}
+
+Example: PDMS with :math:`G_s = 5 \times 10^4` Pa at 298 K, :math:`\rho = 965` kg/m³:
+
+.. math::
+
+   M_c = \frac{965 \times 8.314 \times 298}{2 \times 5 \times 10^4} \approx 24000 \text{ g/mol}
+
+**Creep recovery fraction:**
+
+.. math::
+
+   \text{Recovery} = \frac{G_p}{G_s + G_p}
+
+Example: :math:`G_s = 5 \times 10^4` Pa, :math:`G_p = 2 \times 10^5` Pa:
+
+.. math::
+
+   \text{Recovery} = \frac{2 \times 10^5}{5 \times 10^4 + 2 \times 10^5} = 0.80 = 80\%
+
+Diagnostic Indicators
+~~~~~~~~~~~~~~~~~~~~~
+
+**Warning signs in fitted parameters:**
+
+- **If** :math:`G_s \to 0`: Material is liquid, not solid → use Maxwell or Burgers model
+- **If** :math:`G_p \gg G_s` **(>10×)**: Weak network, consider fractional models (FZSS)
+- **If** :math:`\tau_\epsilon` **outside data range**: Expand frequency sweep or use time-temperature superposition
+- **If** :math:`R^2 < 0.95`: Single relaxation time inadequate → use Generalized Maxwell or fractional models
+- **If** :math:`\eta_p > 10^{12}` **Pa·s**: Unrealistic viscosity, check bounds and initialization
+
+**Material quality checks:**
+
+- **Cross-link uniformity**: Low :math:`G_p/G_s` ratio indicates uniform crosslinking
+- **Cure completion**: :math:`G_s` should not change with waiting time if fully cured
+- **Filler dispersion**: High :math:`G_s` and :math:`G_p` indicate good filler-polymer interaction
+
+Application Examples
+~~~~~~~~~~~~~~~~~~~~
+
+**Quality Control (Elastomers):**
+   - Track :math:`G_s` batch-to-batch to verify crosslink density consistency
+   - Monitor :math:`\tau_\epsilon` for cure optimization (shorter → faster production)
+   - Use :math:`G_p/(G_s + G_p)` to classify grades (soft/medium/hard)
+
+**Material Design (Hydrogels):**
+   - Target :math:`G_s = 10^3-10^4` Pa for soft tissue mimics
+   - Adjust crosslinker ratio to achieve desired :math:`M_c`
+   - Use :math:`\tau_\epsilon` to match physiological timescales (0.1-10 s)
+
+**Process Optimization:**
+   - Calculate :math:`De = \tau_\epsilon \cdot \dot{\gamma}` for molding/extrusion
+   - If :math:`De > 1`: Reduce processing rate or increase temperature
+   - If :math:`De < 0.1`: Can increase throughput without elastic defects
+
+**Failure Prediction:**
+   - Low :math:`G_s` indicates weak network → creep failure risk
+   - High :math:`\tau_\epsilon` indicates stress accumulation → relaxation cracking risk
+   - Recovery fraction < 50% suggests permanent deformation under load
+
 Experimental Design
 -------------------
 
@@ -945,7 +1087,8 @@ Basic Fitting Example
 
 .. code-block:: python
 
-   import jax.numpy as jnp
+   from rheojax.core.jax_config import safe_import_jax
+   jax, jnp = safe_import_jax()
    from rheojax.models import Zener
 
    omega = jnp.logspace(-1, 3, 160)
@@ -1028,66 +1171,61 @@ Tips & Pitfalls
 - For filled polymers or composites, consider fractional models (FZSS) if Zener fit is poor.
 - Check creep recovery: If no recovery observed, material is liquid → use Maxwell/Burgers instead.
 
-See also
+See Also
 --------
 
-- :doc:`maxwell` — series spring-dashpot limit for purely viscous relaxation.
-- :doc:`springpot` — replaces the dashpot with a fractional element for power-law decay.
-- :doc:`../fractional/fractional_zener_sl` — fractional generalization with SpringPot
-  behavior plus an equilibrium branch.
+**Classical Models:**
+
+- :doc:`maxwell` — series spring-dashpot limit for purely viscous relaxation
+- :doc:`springpot` — replaces the dashpot with a fractional element for power-law decay
+
+**Fractional Models:**
+
+- :doc:`../fractional/fractional_zener_sl` — fractional generalization with SpringPot behavior plus an equilibrium branch
 - :doc:`../fractional/fractional_zener_ss` — both springs replaced with SpringPots (power-law relaxation)
-- :doc:`../../transforms/fft` — convert relaxation data to :math:`G^*(\omega)` before
-  fitting.
+
+**Transforms:**
+
+- :doc:`../../transforms/fft` — convert relaxation data to :math:`G^*(\omega)` before fitting
 - :doc:`../../transforms/mastercurve` — time-temperature superposition to extend frequency range
-- :doc:`../../examples/basic/02-zener-creep` — notebook that estimates :math:`G_s`,
-  :math:`G_p`, and :math:`\eta_p` from creep-recovery experiments.
+
+**Examples:**
+
+- :doc:`../../examples/basic/02-zener-creep` — notebook that estimates :math:`G_s`, :math:`G_p`, and :math:`\eta_p` from creep-recovery experiments
+
+**User Guides:**
+
 - :doc:`../../user_guide/model_selection` — decision flowcharts for model selection
 
 References
 ----------
 
-**Foundational Textbooks**
+.. [1] Ferry, J. D. *Viscoelastic Properties of Polymers*, 3rd Edition. Wiley (1980).
+   ISBN: 978-0471048947. Comprehensive treatment of linear viscoelasticity.
 
-1. Ferry, J. D. *Viscoelastic Properties of Polymers*, 3rd Edition. Wiley, 1980.
-   Comprehensive treatment of linear viscoelasticity, relaxation spectra, and molecular theories.
+.. [2] Tschoegl, N. W. *The Phenomenological Theory of Linear Viscoelastic Behavior*.
+   Springer, Berlin (1989). https://doi.org/10.1007/978-3-642-73602-5
 
-2. Tschoegl, N. W. *The Phenomenological Theory of Linear Viscoelastic Behavior*. Springer, 1989.
-   Rigorous mathematical treatment of constitutive equations and interconversion relations.
+.. [3] Macosko, C. W. *Rheology: Principles, Measurements, and Applications*.
+   Wiley-VCH, New York (1994). ISBN: 978-0471185758
 
-3. Macosko, C. W. *Rheology: Principles, Measurements, and Applications*. Wiley-VCH, 1994.
-   Excellent practical guide with experimental protocols and data analysis.
+.. [4] Lakes, R. S. *Viscoelastic Solids*. CRC Press (1999).
+   ISBN: 978-0849396588. Focused on solid viscoelasticity with engineering applications.
 
-4. Lakes, R. S. *Viscoelastic Solids*. CRC Press, 1999.
-   Focused on solid viscoelasticity with applications to engineering materials.
+.. [5] Christensen, R. M. *Theory of Viscoelasticity*, 2nd Edition. Dover (1982).
+   ISBN: 978-0486428802. Mathematical foundations with composite materials applications.
 
-5. Christensen, R. M. *Theory of Viscoelasticity*, 2nd Edition. Dover, 1982.
-   Mathematical foundations with applications to composite materials.
+.. [6] Zener, C. *Elasticity and Anelasticity of Metals*. University of Chicago
+   Press (1948). Original work on anelastic relaxation in metals.
 
-**Historical**
+.. [7] Flory, P. J. *Principles of Polymer Chemistry*. Cornell University Press (1953).
+   ISBN: 978-0801401343. Affine network theory and equilibrium modulus derivations.
 
-6. Zener, C. *Elasticity and Anelasticity of Metals*. University of Chicago Press, 1948.
-   Original work on anelastic relaxation in metals (foundation for Zener model).
+.. [8] Rubinstein, M., and Colby, R. H. *Polymer Physics*. Oxford University Press (2003).
+   ISBN: 978-0198520597. Modern treatment of polymer network elasticity and dynamics.
 
-**Network Theory**
+.. [9] Findley, W. N., Lai, J. S., and Onaran, K. *Creep and Relaxation of Nonlinear
+   Viscoelastic Materials*. Dover (1989). ISBN: 978-0486660165
 
-7. Flory, P. J. *Principles of Polymer Chemistry*. Cornell University Press, 1953.
-   Affine network theory and equilibrium modulus derivations.
-
-8. Rubinstein, M., Colby, R. H. *Polymer Physics*. Oxford University Press, 2003.
-   Modern treatment of polymer network elasticity and dynamics.
-
-**Experimental Methods**
-
-9. Findley, W. N., Lai, J. S., Onaran, K. *Creep and Relaxation of Nonlinear Viscoelastic Materials*. Dover, 1989.
-   Classic reference for creep-recovery testing and data interpretation.
-
-10. Menard, K. P. *Dynamic Mechanical Analysis: A Practical Introduction*, 2nd Edition. CRC Press, 2008.
-    Practical guide to DMA testing including amplitude sweeps and frequency sweeps.
-
-**Recent Reviews (2020-2024)**
-
-11. Tutorial review of linear rheology for polymer chemists: basics and best practices. *Polymer Chemistry*, Royal Society of Chemistry (2024).
-    Modern experimental protocols with emphasis on parameter identifiability.
-
-12. Viscoelasticity of hydrogels and soft biological tissues. *Soft Matter* (2023).
-    Applications of Zener model to soft matter with fractional extensions.
+.. [10] Menard, K. P. *Dynamic Mechanical Analysis: A Practical Introduction*,
+   2nd Edition. CRC Press (2008). https://doi.org/10.1201/9781420053135

@@ -3,10 +3,6 @@ Transforms Summary & Workflow Guide
 
 This page provides a comprehensive quick-reference guide for all 5 data transforms in RheoJAX. Use the comparison matrices and workflow examples below to select and chain transforms for your rheological analysis pipelines.
 
-.. contents:: Page Contents
-   :local:
-   :depth: 2
-
 
 Complete Transforms Comparison Matrix
 --------------------------------------

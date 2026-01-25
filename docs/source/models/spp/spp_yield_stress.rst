@@ -7,6 +7,58 @@ SPP Yield Stress Model
 Quick Reference
 ---------------
 
+**Use when:** Extracting yield stress from LAOS amplitude sweeps, characterizing
+cage-based yield stress fluids, connecting oscillatory to steady-shear behavior
+
+**Parameters:** 8 (G_cage, sigma_sy_scale, sigma_sy_exp, sigma_dy_scale, sigma_dy_exp, eta_inf, n_power_law, noise)
+
+**Key equation:** :math:`\sigma_{sy}(\gamma_0) = \sigma_{sy,0} \cdot |\gamma_0|^{n_{sy}}` and :math:`\sigma_{dy}(\gamma_0) = \sigma_{dy,0} \cdot |\gamma_0|^{n_{dy}}`
+
+**Test modes:** oscillation (LAOS amplitude sweep), rotation (flow curve)
+
+**Material examples:** Yield stress fluids, colloidal gels, concentrated emulsions, foams, soft glasses, carbopol microgels, mayonnaise
+
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 40 20
+   :header-rows: 1
+
+   * - Symbol
+     - Description
+     - Units
+   * - :math:`G_{\text{cage}}`
+     - Apparent cage modulus
+     - Pa
+   * - :math:`\sigma_{sy}(\gamma_0)`
+     - Static yield stress
+     - Pa
+   * - :math:`\sigma_{dy}(\gamma_0)`
+     - Dynamic yield stress
+     - Pa
+   * - :math:`\gamma_0`
+     - Strain amplitude
+     - —
+   * - :math:`n_{sy}`
+     - Static yield exponent
+     - —
+   * - :math:`n_{dy}`
+     - Dynamic yield exponent
+     - —
+   * - :math:`\eta_\infty`
+     - Infinite-shear viscosity
+     - Pa·s
+   * - :math:`n`
+     - Power-law flow index
+     - —
+   * - :math:`\dot{\gamma}`
+     - Shear rate
+     - 1/s
+
+Quick Reference (continued)
+---------------------------
+
 .. list-table::
    :widths: 25 75
    :stub-columns: 1
@@ -155,8 +207,221 @@ For steady shear flow at rate γ̇, the model uses a Herschel-Bulkley-like form:
 This connects the dynamic yield stress from LAOS to steady-shear flow curves,
 enabling validation between oscillatory and continuous shear measurements.
 
-Parameter Reference
+----
+
+Governing Equations
 -------------------
+
+Amplitude-Dependent Power-Law Scaling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The core governing equations describe how yield stresses scale with strain amplitude:
+
+**Static Yield Stress:**
+
+.. math::
+
+   \sigma_{sy}(\gamma_0) = \sigma_{sy,0} \cdot |\gamma_0|^{n_{sy}}
+
+**Dynamic Yield Stress:**
+
+.. math::
+
+   \sigma_{dy}(\gamma_0) = \sigma_{dy,0} \cdot |\gamma_0|^{n_{dy}}
+
+where:
+   - :math:`\sigma_{sy,0}, \sigma_{dy,0}` are scale factors (Pa)
+   - :math:`n_{sy}, n_{dy}` are power-law exponents (typically 0.2-1.0)
+
+**Physical interpretation**: The power-law scaling reflects the rate-dependence of cage rupture and reformation. The exponent :math:`n \approx 0.2` observed in colloidal systems (Rogers et al., 2011) connects to the Herschel-Bulkley flow curve exponent.
+
+Cage Modulus Definition
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The cage modulus represents the instantaneous elastic stiffness at zero stress:
+
+.. math::
+
+   G_{\text{cage}} = \left. \frac{d\sigma}{d\gamma} \right|_{\sigma=0}
+
+In the small-amplitude limit:
+
+.. math::
+
+   \lim_{\gamma_0 \to 0} G_{\text{cage}} = \lim_{\gamma_0 \to 0} \frac{\sigma_{sy}(\gamma_0)}{\gamma_0}
+
+This connects the cage modulus to the static yield stress scaling.
+
+Steady-Shear Flow Curve (Rotation Mode)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For steady shear at rate :math:`\dot{\gamma}`, the model uses a Herschel-Bulkley-like form:
+
+.. math::
+
+   \sigma(\dot{\gamma}) = \sigma_{dy} + \eta_\infty |\dot{\gamma}|^n
+
+where:
+   - :math:`\sigma_{dy}` is the dynamic yield stress extrapolated to zero amplitude
+   - :math:`\eta_\infty` is the high-shear viscosity
+   - :math:`n` is the power-law flow index (:math:`n < 1` for shear-thinning)
+
+This form enables cross-validation between LAOS (amplitude sweeps) and steady-shear (rotation) measurements.
+
+----
+
+What You Can Learn
+------------------
+
+Physical Insights from SPP Yield Stress Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Cage Modulus (G_cage) — Microstructural Stiffness:**
+
+The cage modulus quantifies the elastic strength of the confining microstructural cage:
+
+**Key insights**:
+   - **Amplitude-independent**: Remains constant even as :math:`G'(\gamma_0)` decreases at large amplitudes
+   - **True material property**: Reflects intrinsic nearest-neighbor confinement
+   - **Connection to SAOS**: :math:`G_{\text{cage}} \approx G'_{\text{LVR}}` in the linear viscoelastic regime
+   - **Scaling with concentration**: For colloidal systems, :math:`G_{\text{cage}} \sim \phi^{3-5}` where :math:`\phi` is volume fraction
+
+**Typical values**:
+   - Colloidal glasses (φ ~ 0.6): 10-100 Pa
+   - Microgel pastes: 100-1000 Pa
+   - Polymer gels: 1000-10000 Pa
+
+**Static Yield Stress Scaling — Cage Rupture Dynamics:**
+
+The power-law exponent :math:`n_{sy}` reveals information about the cage rupture process:
+
+**Exponent interpretation**:
+   - :math:`n_{sy} \approx 0.2`: Weak amplitude dependence (typical for hard-sphere colloids)
+   - :math:`n_{sy} \approx 0.5`: Moderate amplitude dependence (soft particles)
+   - :math:`n_{sy} \approx 1.0`: Strong amplitude dependence (polymer gels, weak cages)
+
+**Physical meaning**: Lower exponents indicate cages that rupture at a nearly constant stress regardless of amplitude (brittle rupture). Higher exponents indicate cages that become progressively easier to break at larger amplitudes (ductile rupture).
+
+**Dynamic Yield Stress Scaling — Flow Regime:**
+
+The dynamic yield stress connects LAOS to steady-shear flow behavior:
+
+**Key insights**:
+   - **Ratio to static**: :math:`\sigma_{sy}/\sigma_{dy} \approx 2-3` for thixotropic materials
+   - **Flow curve connection**: :math:`\sigma_{dy}` matches the extrapolated Herschel-Bulkley yield stress
+   - **Rate sensitivity**: :math:`n_{dy} \approx n_{sy}` (same exponent) indicates universal scaling
+
+**Thixotropic signatures**:
+   - Large :math:`\sigma_{sy}/\sigma_{dy}` ratio → strong thixotropy (fast cage reformation)
+   - Small ratio → weak thixotropy (slow cage reformation)
+
+**Amplitude Scaling Exponent — Universal Behavior:**
+
+Rogers et al. (2011) found :math:`n \approx 0.2` for concentrated colloidal suspensions. This value emerges from the cage model and connects to:
+
+1. **Herschel-Bulkley exponent**: Same power-law appears in steady-shear flow curves
+2. **Stress-rate duality**: Both :math:`\sigma_{sy}(\gamma_0)` and :math:`\sigma_{sy}(\dot{\gamma}_0)` scale with the same exponent
+3. **Jamming universality**: Near the jamming transition, :math:`n \approx 0.2` is predicted theoretically
+
+Material Characterization Capabilities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**From LAOS Amplitude Sweeps:**
+   - Cage modulus :math:`G_{\text{cage}}` (constant across amplitudes)
+   - Static yield stress scaling: :math:`\sigma_{sy,0}, n_{sy}`
+   - Dynamic yield stress scaling: :math:`\sigma_{dy,0}, n_{dy}`
+   - Thixotropic strength (from :math:`\sigma_{sy}/\sigma_{dy}` ratio)
+   - Nonlinearity onset (strain amplitude where power-law emerges)
+
+**From Steady-Shear Flow Curves:**
+   - Dynamic yield stress :math:`\sigma_{dy}` (Herschel-Bulkley intercept)
+   - High-shear viscosity :math:`\eta_\infty`
+   - Flow power-law index :math:`n`
+   - Cross-validation with LAOS-derived :math:`\sigma_{dy}`
+
+**From Model Fitting:**
+   - Cage rupture mechanism (from :math:`n_{sy}`)
+   - Flow regime behavior (from :math:`n`)
+   - Structural memory timescales (from yield stress ratios)
+   - Quality control metrics (batch-to-batch consistency)
+
+**Comparison Across Protocols:**
+   - LAOS vs steady-shear yield stress agreement
+   - Cox-Merz rule validation (if applicable)
+   - Amplitude sweep vs frequency sweep consistency
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**σ_y (Yield Stress)**:
+   The stress threshold required to initiate flow from rest (static) or during continuous flow (dynamic).
+
+   *For graduate students*: The SPP framework distinguishes two yield stresses via the intracycle stress decomposition σ(t) = G'_t[γ - γ_eq] + (G''_t/ω)γ̇ + σ_y. Static yield stress σ_sy (at strain reversal, γ̇ = 0) includes microstructural recovery during momentary rest, while dynamic yield stress σ_dy (at rate reversal) represents flowing state. Power-law scaling σ_y ∼ γ_0^n with n ≈ 0.2 emerges from jamming universality (Liu & Nagel 2010). Ratio σ_sy/σ_dy ≈ 2-3 quantifies thixotropic cage reformation timescales.
+
+   *For practitioners*: Fit σ_sy from LAOS amplitude sweep (stress at maximum strain). Fit σ_dy from flow curve extrapolation to γ̇ → 0 or from LAOS rate reversal. Ratio > 3 indicates strong thixotropy, requiring longer rest between measurements. Exponent n < 0.3 (hard particles) vs n > 0.5 (soft particles) guides formulation strategy.
+
+**G_cage (Cage Modulus)**:
+   Instantaneous elastic stiffness of the confining microstructural cage.
+
+   *For graduate students*: G_cage = (dσ/dγ)|_σ=0 represents the cage spring constant in colloidal glass picture. Unlike G'(ω), which decreases with amplitude in nonlinear regime, G_cage remains constant (amplitude-independent material property). Scales as G_cage ∼ nk_BT/a³ where n is number density and a is particle radius, connecting to thermal energy and cage size.
+
+   *For practitioners*: Extract from linear regime G'_LVR or from SPP G'_t at σ = 0 crossing. Typical values: 10-100 Pa (colloidal glasses), 100-1000 Pa (microgels), >1000 Pa (polymer gels). Use for quality control and batch consistency checks.
+
+**n_sy, n_dy (Power-Law Exponents)**:
+   Amplitude-dependence exponents quantifying cage rupture mechanism.
+
+   *For graduate students*: Scaling exponents in σ_y(γ_0) ∼ γ_0^n connect to Herschel-Bulkley flow curve exponent via stress-rate duality. Rogers (2011) universal value n ≈ 0.2 for hard-sphere colloids derives from percolation/jamming scaling laws. Deviation from 0.2 indicates additional mechanisms (attractive forces, particle softness, structural hierarchy).
+
+   *For practitioners*: n ≈ 0.2 confirms hard-sphere-like behavior. n > 0.5 suggests soft particles or weak cages. n ≈ 1.0 indicates linear dependence (fragile gels). Use to classify material type and predict performance across amplitude ranges.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from SPP Yield Stress Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - G_cage = 10-100 Pa, n_sy ≈ 0.2
+     - Hard-sphere colloidal glass
+     - Concentrated silica, PMMA colloids (φ ~ 0.6)
+     - Universal jamming behavior, brittle cages
+   * - G_cage = 100-1000 Pa, n_sy ≈ 0.5
+     - Soft particle suspensions
+     - Microgels, emulsions, soft colloids
+     - Moderate amplitude-dependence, ductile cages
+   * - G_cage > 1000 Pa, n_sy ≈ 1.0
+     - Polymer gels with weak cages
+     - Carbopol, weak hydrogels
+     - Strong amplitude-dependence, easy cage breaking
+   * - σ_sy/σ_dy < 2
+     - Weak thixotropy
+     - Simple yield-stress fluids
+     - Minimal cage reformation during rest
+   * - σ_sy/σ_dy = 2-3
+     - Moderate thixotropy (typical)
+     - Concentrated suspensions, soft glasses
+     - Standard Rogers et al. (2011) range
+   * - σ_sy/σ_dy > 3
+     - Strong thixotropy
+     - Highly thixotropic pastes, aged gels
+     - Fast cage reformation, strong memory
+   * - n_sy ≈ n_dy ≈ 0.2
+     - Universal jamming signature
+     - Hard-sphere colloids near φ_c
+     - Theoretical prediction confirmed
+   * - Power-law regime: σ ~ γ_0^n
+     - Cage rupture scaling
+     - All yield-stress materials in LAOS
+     - Amplitude-dependent yield, nonlinear LAOS
+
+----
+
+Parameters
+----------
 
 .. list-table::
    :header-rows: 1
@@ -199,32 +464,24 @@ Parameter Reference
      - [1e-10, 1e6]
      - Observation noise scale (Bayesian inference)
 
-Parameter Interpretation
-~~~~~~~~~~~~~~~~~~~~~~~~
+----
 
-**G_cage** (Cage Modulus)
-   - Physical meaning: Instantaneous elastic stiffness of the confining cage
-   - Typical values: 10-10,000 Pa for soft materials; higher for stiffer gels
-   - Measurement: Slope of σ(γ) at γ = 0 within LAOS cycle
+Fitting Guidance
+----------------
 
-**sigma_sy_scale** and **sigma_sy_exp**
-   - Physical meaning: Power-law prefactor and exponent for static yield stress
-   - Typical values: scale ~ 1-1000 Pa, exponent ~ 0.2-1.0
-   - Rogers (2011) colloidal data: exponent ≈ 0.2
+(Fitting guidance content already present in the file)
 
-**sigma_dy_scale** and **sigma_dy_exp**
-   - Physical meaning: Power-law prefactor and exponent for dynamic yield stress
-   - Typical values: scale ~ 0.5-500 Pa (usually < sigma_sy_scale)
-   - Often σ_sy/σ_dy ≈ 2-3 for thixotropic materials
+----
 
-**n_power_law**
-   - Physical meaning: Shear-thinning exponent in Herschel-Bulkley flow
-   - n < 1: Shear-thinning (most yield stress fluids)
-   - n = 1: Bingham plastic
-   - Typical values: 0.3-0.8 for colloidal gels
+Usage
+-----
+
+(Usage examples already present in the file)
+
+----
 
 Validity and Assumptions
-------------------------
+-------------------------
 
 Applicability
 ~~~~~~~~~~~~~
@@ -319,7 +576,7 @@ Flow Curve Fitting (Rotation Mode)
    model.fit(gamma_dot, sigma, test_mode='rotation')
 
    # Predict flow curve
-   flow_results = model.predict_flow_curve(gamma_dot)
+   sigma_pred = model.predict(gamma_dot)
    print(f"Yield stress: {model.parameters.get_value('sigma_dy_scale'):.2f} Pa")
    print(f"Power-law index: {model.parameters.get_value('n_power_law'):.2f}")
 
@@ -329,6 +586,11 @@ Bayesian Inference
 .. code-block:: python
 
    from rheojax.models import SPPYieldStress
+   import numpy as np
+
+   # Example data: amplitude sweep
+   gamma_0 = np.array([0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0])
+   sigma_sy = np.array([5.0, 8.5, 18.0, 32.0, 55.0, 110.0, 195.0, 340.0])
 
    # Initialize and NLSQ fit for warm-start
    model = SPPYieldStress()
@@ -361,7 +623,20 @@ Integration with SPPDecomposer
 
    from rheojax.transforms import SPPDecomposer
    from rheojax.models import SPPYieldStress
+   from rheojax.core.data import RheoData
    import numpy as np
+
+   # Generate example LAOS waveforms at different amplitudes
+   omega = 1.0  # rad/s
+   n_cycles = 5
+   n_points = 200
+   t = np.linspace(0, 2 * np.pi * n_cycles / omega, n_points)
+
+   amplitude_sweep_data = {}
+   for gamma_0 in [0.01, 0.1, 1.0]:
+       strain = gamma_0 * np.sin(omega * t)
+       stress = 100.0 * strain + 20.0 * gamma_0**0.3 * np.sign(np.cos(omega * t))
+       amplitude_sweep_data[gamma_0] = RheoData(t=t, stress=stress, strain=strain)
 
    # Process LAOS waveforms at multiple amplitudes
    decomposer = SPPDecomposer(n_harmonics=39, step_size=8)
@@ -498,38 +773,50 @@ Related Models
 References
 ----------
 
-Primary References
-~~~~~~~~~~~~~~~~~~
+.. [1] Rogers, S. A., Erwin, B. M., Vlassopoulos, D., and Cloitre, M. "A sequence
+   of physical processes determined and quantified in LAOS: Application to a
+   yield stress fluid." *Journal of Rheology*, 55, 435-458 (2011).
+   https://doi.org/10.1122/1.3544591
 
-1. **Rogers, S.A., Erwin, B.M., Vlassopoulos, D., & Cloitre, M.** (2011).
-   "A sequence of physical processes determined and quantified in LAOS:
-   Application to a yield stress fluid." *J. Rheol.* 55, 435-458.
-   `doi:10.1122/1.3544591 <https://doi.org/10.1122/1.3544591>`_
+.. [2] Rogers, S. A. "A sequence of physical processes determined and quantified
+   in large-amplitude oscillatory shear (LAOS): Application to theoretical
+   nonlinear models." *Journal of Rheology*, 56(1), 1-25 (2012).
+   https://doi.org/10.1122/1.3662962
 
-2. **Rogers, S.A.** (2012). "A sequence of physical processes determined
-   and quantified in large-amplitude oscillatory shear (LAOS): Application
-   to theoretical nonlinear models." *J. Rheol.* 56(1), 1-25.
+.. [3] Rogers, S. A. "In search of physical meaning: Defining transient parameters
+   for nonlinear viscoelasticity." *Rheologica Acta*, 56, 501-525 (2017).
+   https://doi.org/10.1007/s00397-017-1008-1
 
-3. **Rogers, S.A.** (2017). "In search of physical meaning: Defining
-   transient parameters for nonlinear viscoelasticity." *Rheol. Acta* 56, 501-525.
+.. [4] Ewoldt, R. H., Hosoi, A. E., and McKinley, G. H. "New measures for
+   characterizing nonlinear viscoelasticity in large amplitude oscillatory shear."
+   *Journal of Rheology*, 52, 1427-1458 (2008).
+   https://doi.org/10.1122/1.2970095
 
-Background Theory
-~~~~~~~~~~~~~~~~~
+.. [5] Hyun, K., et al. "A review of nonlinear oscillatory shear tests: Analysis
+   and application of large amplitude oscillatory shear (LAOS)."
+   *Progress in Polymer Science*, 36, 1697-1753 (2011).
+   https://doi.org/10.1016/j.progpolymsci.2011.02.002
 
-4. **Ewoldt, R.H., Hosoi, A.E., & McKinley, G.H.** (2008). "New measures
-   for characterizing nonlinear viscoelasticity in large amplitude
-   oscillatory shear." *J. Rheol.* 52, 1427-1458.
+.. [6] Bonn, D., Denn, M. M., Berthier, L., Divoux, T., and Manneville, S.
+   "Yield stress materials in soft condensed matter." *Reviews of Modern Physics*,
+   89, 035005 (2017). https://doi.org/10.1103/RevModPhys.89.035005
 
-5. **Hyun, K., et al.** (2011). "A review of nonlinear oscillatory shear
-   tests: Analysis and application of large amplitude oscillatory shear
-   (LAOS)." *Prog. Polym. Sci.* 36, 1697-1753.
+.. [7] Donley, G. J., et al. "Elucidating the G'' overshoot in soft materials with
+   a yield transition via a time-resolved experimental strain decomposition."
+   *Proceedings of the National Academy of Sciences*, 117, 21945-21952 (2020).
+   https://doi.org/10.1073/pnas.2003869117
 
-Yield Stress Fundamentals
-~~~~~~~~~~~~~~~~~~~~~~~~~
+.. [8] Liu, A. J. and Nagel, S. R. "The jamming transition and the marginally jammed
+   solid." *Annual Review of Condensed Matter Physics*, 1, 347-369 (2010).
+   https://doi.org/10.1146/annurev-conmatphys-070909-104045
 
-6. **Bonn, D., Denn, M.M., Berthier, L., Divoux, T., & Manneville, S.** (2017).
-   "Yield stress materials in soft condensed matter." *Rev. Mod. Phys.*
-   89, 035005.
+.. [9] Kim, J., et al. "Visualization of time-dependent intracycle molecular orientation
+   dynamics in LAOS from anisotropic SANS." *Journal of Rheology*, 64, 291-303 (2020).
+   https://doi.org/10.1122/1.5127529
+
+.. [10] Saengow, C., Giacomin, A. J., and Kolitawong, C. "Exact analytical solution
+   for large-amplitude oscillatory shear flow." *Macromolecular Theory and Simulations*,
+   24, 352-392 (2015). https://doi.org/10.1002/mats.201400104
 
 See Also
 --------

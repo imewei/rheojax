@@ -12,6 +12,38 @@ Quick Reference
 **Test modes:** Oscillation, relaxation, nonequilibrium thermodynamics validation
 **Material examples:** Same as SGR Conventional, plus thermodynamic model validation
 
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 85
+   :header-rows: 1
+
+   * - Symbol
+     - Meaning
+   * - :math:`\mathbf{z}`
+     - State variables (probability distribution :math:`P(E, l, t)`)
+   * - :math:`E(\mathbf{z})`
+     - Total energy functional (Hamiltonian)
+   * - :math:`S(\mathbf{z})`
+     - Entropy functional (Boltzmann form)
+   * - :math:`F(\mathbf{z})`
+     - Free energy :math:`F = E - xS`
+   * - :math:`\mathbf{L}`
+     - Poisson bracket matrix (antisymmetric, reversible dynamics)
+   * - :math:`\mathbf{M}`
+     - Friction matrix (symmetric positive semidefinite, dissipative dynamics)
+   * - :math:`\dot{S}_{\text{prod}}`
+     - Entropy production rate (non-negative by construction)
+   * - :math:`P(E, l, t)`
+     - Distribution of trap depth :math:`E` and local strain :math:`l`
+   * - :math:`\rho(E)`
+     - Trap density of states :math:`e^{-E}`
+   * - :math:`x`
+     - Effective noise temperature (control parameter)
+   * - :math:`Z`
+     - Partition function
+
 Overview
 --------
 
@@ -28,6 +60,28 @@ The GENERIC formulation, developed by Grmela and Öttinger [2]_, guarantees:
 
 This implementation follows Fuereder and Ilg's thermodynamically consistent reformulation
 of the SGR model [1]_, enabling entropy production calculations and thermodynamic validation.
+
+Physical Foundations
+--------------------
+
+The GENERIC framework extends the SGR mesoscopic trap model with rigorous
+nonequilibrium thermodynamic structure. All physical foundations from the
+conventional SGR model apply (see :doc:`sgr_conventional`), with the addition
+of thermodynamically consistent separation of reversible and irreversible
+dynamics.
+
+**Key additions beyond conventional SGR:**
+
+1. **Energy-Entropy Split**: Dynamics are decomposed into Hamiltonian (energy-conserving)
+   and dissipative (entropy-producing) contributions
+2. **Degeneracy Conditions**: Mathematical constraints that enforce the first and
+   second laws of thermodynamics
+3. **Fluctuation-Dissipation**: Automatic consistency with equilibrium statistical
+   mechanics when :math:`x = k_B T`
+
+The physical interpretation of traps, yielding, and effective temperature remains
+identical to conventional SGR. The GENERIC formulation adds mathematical rigor
+and enables calculation of thermodynamic quantities (entropy production, free energy).
 
 Theoretical Foundation
 ----------------------
@@ -178,6 +232,27 @@ Explicitly:
    \right]
 
 At equilibrium, :math:`P = P_{\text{eq}}` and :math:`\dot{S}_{\text{prod}} = 0`.
+
+Governing Equations
+-------------------
+
+The GENERIC time evolution equation for the state variable :math:`\mathbf{z}` is:
+
+.. math::
+
+   \frac{d\mathbf{z}}{dt} = \mathbf{L}(\mathbf{z}) \cdot \frac{\partial E}{\partial \mathbf{z}}
+                         + \mathbf{M}(\mathbf{z}) \cdot \frac{\partial S}{\partial \mathbf{z}}
+
+This structure guarantees:
+
+- **First law**: :math:`\dot{E} = \mathbf{L} \cdot \partial E/\partial \mathbf{z} \cdot \partial E/\partial \mathbf{z} + \mathbf{M} \cdot \partial E/\partial \mathbf{z} \cdot \partial S/\partial \mathbf{z} = 0`
+  (by degeneracy condition :math:`\mathbf{M} \cdot \partial E/\partial \mathbf{z} = 0`)
+
+- **Second law**: :math:`\dot{S} = \mathbf{M} \cdot \partial S/\partial \mathbf{z} \cdot \partial S/\partial \mathbf{z} \geq 0`
+  (by positive semidefiniteness of :math:`\mathbf{M}`)
+
+For the SGR system, :math:`\mathbf{z} = P(E, l, t)` is the distribution function, and the
+energy and entropy functionals are given in the theoretical foundation section.
 
 Constitutive Equations
 ----------------------
@@ -447,6 +522,121 @@ Parameters
      - :math:`k > 0`
      - Local elastic constant (often set equal to :math:`G_0`)
 
+What You Can Learn
+------------------
+
+The GENERIC formulation of SGR extends all insights from the conventional model with rigorous thermodynamic validation capabilities. The same parameters (x, G₀, τ₀) appear, but with additional thermodynamic interpretation.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**x (Effective Noise Temperature)**:
+   In the GENERIC framework, x is the configurational temperature that couples energy and entropy evolution.
+
+   *For graduate students*: x appears in the free energy F = E - xS as the Lagrange multiplier enforcing the constraint that reversible dynamics (Poisson bracket) conserve entropy while irreversible dynamics (friction matrix) conserve energy. The degeneracy conditions L·∂S/∂z = 0 and M·∂E/∂z = 0 ensure thermodynamic consistency. The glass transition at x = 1 is where the entropy functional S[P] becomes unbounded, making equilibrium impossible.
+
+   *For practitioners*: Same interpretation as conventional SGR (x < 1 is glass, 1 < x < 2 is power-law fluid, x ≥ 2 is Newtonian), but GENERIC provides additional validation: you can check that entropy production Ṡ_prod ≥ 0 for all deformation histories. If this fails, your fitted parameters are thermodynamically inconsistent.
+
+**G₀ (Plateau Modulus)**:
+   The elastic modulus scale, appearing in the energy functional E[P].
+
+   *For graduate students*: G₀ sets the elastic strain energy contribution ½k∫l²P(E,l)dEdl to the total energy. In GENERIC, the Poisson bracket generates affine deformation (∂_t l = γ̇), which is purely reversible (energy-conserving). The friction matrix generates yielding (l → 0), which is dissipative (entropy-producing).
+
+   *For practitioners*: Same as conventional SGR. GENERIC adds the guarantee that the predicted G₀ is consistent with thermodynamic stability (positive definite friction matrix M ≥ 0).
+
+**τ₀ (Attempt Time)**:
+   The microscopic timescale for dissipative transitions.
+
+   *For graduate students*: In GENERIC, 1/τ₀ = Γ₀ appears in the friction matrix M as the rate coefficient for yield transitions. The detailed balance condition ensures that M satisfies Onsager reciprocity, connecting forward and reverse transition rates via the equilibrium distribution ρ(E).
+
+   *For practitioners*: Same as conventional SGR. GENERIC provides validation that τ₀ is consistent with equilibrium fluctuation-dissipation (FDT) relations if x equals thermal temperature.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from SGR GENERIC Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - x Range
+     - Thermodynamic State
+     - Typical Materials
+     - GENERIC Diagnostics
+   * - **x < 0.5**
+     - Deep non-equilibrium glass
+     - Highly aged colloidal gels, arrested emulsions, structural glasses
+     - Large Ṡ_prod during flow, multiple F[P] minima, no normalizable P_eq(E)
+   * - **0.5 < x < 1**
+     - Marginal non-equilibrium glass
+     - Fresh colloidal suspensions, carbopol gels, foams
+     - Moderate Ṡ_prod, metastable F[P], equilibrium exists but unreachable
+   * - **1 < x < 1.5**
+     - Near-equilibrium fluid
+     - Dilute emulsions, soft foams, near-critical suspensions
+     - Low Ṡ_prod, single F[P] minimum, FDT approximately satisfied
+   * - **1.5 < x < 2**
+     - Equilibrium fluid
+     - Surfactant solutions, polymer-colloid mixtures
+     - Ṡ_prod → 0 as γ̇ → 0, FDT satisfied, unique equilibrium state
+   * - **x ≥ 2**
+     - Thermalized fluid
+     - Dilute suspensions, simple liquids
+     - Exponential relaxation to equilibrium, full FDT, thermal noise dominates
+
+Thermodynamic Validation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Entropy Production Rate**: Quantifies irreversibility during flow
+
+.. math::
+
+   \dot{S}_{\text{prod}} = \frac{\sigma \dot{\gamma}}{x} \geq 0
+
+- **Zero for quiescent aging**: :math:`\dot{S}_{\text{prod}} = 0` when :math:`\dot{\gamma} = 0`
+- **Positive during flow**: Mechanical dissipation drives entropy production
+- **Connection to Rayleighian**: :math:`\dot{S}_{\text{prod}}` can be derived from a variational principle
+
+**Free Energy Landscape**: Compute the nonequilibrium free energy :math:`F = E - xS`:
+
+- **Glass phase (x < 1)**: Multiple metastable minima (aging attracts system to deeper states)
+- **Fluid phase (x > 1)**: Single global minimum (equilibrium state)
+- **Barrier heights**: Quantify activation energies for structural rearrangements
+
+**Fluctuation-Dissipation Verification**: Check consistency between:
+
+- Storage modulus :math:`G'(\omega)` (energy storage)
+- Loss modulus :math:`G''(\omega)` (dissipation)
+- Thermal fluctuation spectrum (from :math:`S`)
+
+Nonequilibrium Steady States (NESS)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Under constant shear rate, the system reaches a NESS with:
+
+.. math::
+
+   \dot{S}_{\text{prod}}^{\text{NESS}} = \frac{\sigma_{ss} \dot{\gamma}}{x}
+
+This connects the mechanical stress to the rate of configurational entropy production.
+
+**Interpretation**: The effective temperature :math:`x` acts as a "configurational
+temperature" that converts mechanical dissipation into entropy. Higher :math:`x`
+means the system is more disordered, so the same dissipation produces less entropy.
+
+Model Validation Beyond Rheology
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The GENERIC formulation allows validation against:
+
+1. **Calorimetry**: Specific heat related to :math:`c_0` parameter
+2. **Structural probes**: Trap distribution :math:`\rho(E)` vs X-ray PDF analysis
+3. **Thermodynamic inequalities**: Clausius-Duhem inequality satisfaction
+4. **Onsager reciprocity**: Symmetry of dissipative couplings
+
+**When to use GENERIC**: If you need to verify that your constitutive model
+satisfies fundamental thermodynamic laws, or if you want to compute entropy
+production and free energy evolution during complex deformation histories.
+
 Validity and Assumptions
 ------------------------
 
@@ -514,6 +704,20 @@ Fluctuation-Dissipation Verification
    fdt_ratio = model.verify_fluctuation_dissipation(omega)
 
    print(f"FDT ratio (should be ~1): {fdt_ratio:.3f}")
+
+Fitting Guidance
+----------------
+
+Same strategy as conventional SGR (see :doc:`sgr_conventional`), with additional
+thermodynamic validation steps:
+
+1. **Initial fit**: Use NLSQ with oscillatory or flow curve data to estimate :math:`x, G_0, \tau_0`
+2. **Verify GENERIC structure**: Call ``validate_generic_structure()`` to check all degeneracy conditions
+3. **Check entropy production**: Ensure :math:`\dot{S}_{\text{prod}} \geq 0` for all flow rates
+4. **Bayesian with thermodynamic priors**: Use informative priors based on calorimetric data if available
+
+**Troubleshooting**: If GENERIC validation fails, the parameter values may be
+unphysical (e.g., negative :math:`\tau_0` or :math:`G_0`). Re-fit with tighter bounds.
 
 Usage
 -----
@@ -585,12 +789,18 @@ Comparison with Conventional SGR
    S_prod = generic.entropy_production(gamma_dot=1.0)
    print(f"Entropy production: {S_prod:.4f}")
 
-See also
+See Also
 --------
 
-- :doc:`sgr_conventional` — Standard SGR model (simpler, same rheological predictions)
+- :doc:`sgr_conventional` — Standard SGR model (simpler, same rheological predictions; start here)
 - :doc:`../../transforms/srfs` — Strain-Rate Frequency Superposition transform
-- :doc:`../multi_mode/generalized_maxwell` — Alternative multi-mode approach
+- :doc:`../multi_mode/generalized_maxwell` — Alternative multi-mode approach for viscoelastic spectra
+- :doc:`../fractional/fractional_maxwell_gel` — Fractional models for power-law gels (alternative to SGR for x ~ 1.5)
+
+**Related advanced models:**
+
+- :doc:`../stz/stz_conventional` — STZ theory (effective temperature formulation, similar aging physics)
+- :doc:`../fluidity/fluidity_saramito_local` — Fluidity models (phenomenological thixotropy)
 
 API References
 --------------
@@ -609,12 +819,32 @@ References
    Development of a general formalism." *Physical Review E*, **56**, 6620 (1997).
    https://doi.org/10.1103/PhysRevE.56.6620
 
-Further Reading
-~~~~~~~~~~~~~~~
+.. [3] Öttinger, H. C. *Beyond Equilibrium Thermodynamics*. Wiley (2005).
+   ISBN: 978-0471666585
 
-- Öttinger, H. C. *Beyond Equilibrium Thermodynamics*. Wiley, 2005.
-  Comprehensive treatment of GENERIC and nonequilibrium thermodynamics.
+.. [4] Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
+   *Physical Review E*, **85**, 031127 (2012).
+   https://doi.org/10.1103/PhysRevE.85.031127
 
-- Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
-  *Physical Review E*, **85**, 031127 (2012).
-  https://doi.org/10.1103/PhysRevE.85.031127
+.. [5] Sollich, P. "Rheological constitutive equation for a model of soft glassy materials."
+   *Physical Review E*, **58**, 738 (1998).
+   https://doi.org/10.1103/PhysRevE.58.738
+.. [6] Grmela, M. "Bracket formulation of dissipative fluid mechanics equations."
+   *Physics Letters A*, **102**, 355-358 (1984).
+   https://doi.org/10.1016/0375-9601(84)90297-4
+
+.. [7] Morrison, P. J. "Bracket formulation for irreversible classical fields."
+   *Physics Letters A*, **100**, 423-427 (1984).
+   https://doi.org/10.1016/0375-9601(84)90635-2
+
+.. [8] Beris, A. N. & Edwards, B. J. *Thermodynamics of Flowing Systems with Internal Microstructure*.
+   Oxford University Press (1994). ISBN: 978-0195076943
+
+.. [9] Fielding, S. M., Sollich, P., & Cates, M. E. "Aging and rheology in soft materials."
+   *Journal of Rheology*, **44**, 323-369 (2000).
+   https://doi.org/10.1122/1.551088
+
+.. [10] Nicolas, A., Ferrero, E. E., Martens, K., & Barrat, J.-L. "Deformation and flow of amorphous solids: Insights from elastoplastic models."
+   *Reviews of Modern Physics*, **90**, 045006 (2018).
+   https://doi.org/10.1103/RevModPhys.90.045006
+

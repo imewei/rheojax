@@ -22,8 +22,49 @@ The Fractional Maxwell Liquid (FML) model consists of a Hookean spring in series
 
 Unlike the Fractional Maxwell Gel which includes a dashpot for terminal flow, the FML model maintains power-law behavior across all time scales, making it ideal for materials that show persistent viscoelastic behavior without approaching pure viscous flow.
 
-Physical Interpretation
------------------------
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 40 20
+   :header-rows: 1
+
+   * - Symbol
+     - Description
+     - Units
+   * - :math:`G_m`
+     - Maxwell modulus (short-time elastic stiffness)
+     - Pa
+   * - :math:`\alpha`
+     - Fractional order (0 < α < 1, controls relaxation spectrum breadth)
+     - —
+   * - :math:`\tau_\alpha`
+     - Characteristic relaxation time
+     - s\ :sup:`α`
+   * - :math:`E_{\alpha,\beta}(z)`
+     - Two-parameter Mittag-Leffler function
+     - —
+   * - :math:`G^*(ω)`
+     - Complex modulus
+     - Pa
+   * - :math:`G'(ω)`
+     - Storage modulus (elastic component)
+     - Pa
+   * - :math:`G''(ω)`
+     - Loss modulus (viscous component)
+     - Pa
+   * - :math:`J(t)`
+     - Creep compliance
+     - Pa\ :sup:`-1`
+   * - :math:`\omega`
+     - Angular frequency
+     - rad/s
+   * - :math:`t`
+     - Time
+     - s
+
+Physical Foundations
+--------------------
 
 The FML model represents **viscoelastic liquids** with zero equilibrium modulus (Ge = 0), meaning the material flows under sustained stress. The physical structure consists of:
 
@@ -174,6 +215,195 @@ Validity and Assumptions
 - Supported RheoJAX test modes: relaxation, creep, oscillation.
 - Fractional orders stay within (0, 1) to keep kernels causal and bounded.
 - Assumes liquid-like behavior: zero equilibrium modulus (Ge = 0), material flows under stress.
+
+What You Can Learn
+------------------
+
+This section explains how to translate fitted FML parameters into material
+insights and actionable knowledge.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Fractional Order (α)**:
+   The fractional order reveals molecular architecture and relaxation dynamics:
+
+   - **0.7 < α < 0.9**: Narrow relaxation spectrum. Typical for linear,
+     monodisperse polymer melts with well-defined entanglement dynamics.
+
+   - **0.5 < α < 0.7**: Moderate spectrum breadth. Common in branched polymers,
+     polydisperse melts, or concentrated solutions where multiple relaxation
+     mechanisms coexist.
+
+   - **α < 0.5**: Very broad spectrum. Indicates complex hierarchical relaxation
+     (star polymers, H-polymers) or strong polydispersity.
+
+   *For graduate students*: The fractional order connects to molecular weight
+   distribution. For polymers, α ≈ 1/(1 + PDI/3) approximately, where PDI is
+   the polydispersity index. Branching lowers α due to arm retraction and
+   branch point hopping mechanisms.
+
+   *For practitioners*: Use α to assess batch-to-batch consistency. A sudden
+   drop in α suggests contamination with branched species or broadening of MWD.
+
+**Maxwell Modulus (Gm)**:
+   The modulus reveals network/entanglement density:
+
+   - **Gm ≈ GN⁰ (plateau modulus)**: For entangled polymer melts, Gm should
+     match the rubbery plateau from literature. Significant deviation suggests
+     incomplete entanglement or dilution.
+
+   - **Relationship to Me**: :math:`G_m = \rho R T / M_e` where Me is
+     entanglement molecular weight.
+
+   *For practitioners*: Track Gm as a QC metric. For polymer melts, Gm should
+   be stable (±10%) across batches of the same grade.
+
+**Relaxation Time (τ_α)**:
+   The characteristic time connects to molecular weight:
+
+   - **Scaling**: For linear polymers, :math:`\tau_\alpha \propto M_w^{3.4}`
+     (reptation theory).
+
+   - **Temperature dependence**: Follows WLF or Arrhenius behavior.
+
+   *For practitioners*: Compare τ_α to process timescales. For extrusion,
+   ensure :math:`\tau_\alpha < 1/\dot{\gamma}_{process}` for complete relaxation.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: FML Material Classification
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - α Range
+     - Spectrum Type
+     - Typical Materials
+     - Implications
+   * - 0.8 < α < 1.0
+     - Very narrow
+     - Monodisperse linear polymers
+     - Near-Maxwellian, consider classical model
+   * - 0.6 < α < 0.8
+     - Narrow-moderate
+     - Commercial polymer melts
+     - Standard processing behavior
+   * - 0.4 < α < 0.6
+     - Broad
+     - Branched polymers, blends
+     - Complex flow behavior, longer relaxation
+   * - α < 0.4
+     - Very broad
+     - Highly branched, filled systems
+     - Multiple mechanisms, difficult to process
+
+Diagnostic Indicators
+~~~~~~~~~~~~~~~~~~~~~
+
+Warning signs in fitted parameters:
+
+- **α → 1**: Material is nearly Maxwellian. Consider using classical Maxwell
+  for simpler interpretation and faster computation.
+
+- **Gm ≠ GN⁰**: If Gm differs significantly from tabulated plateau modulus,
+  check for dilution, incomplete entanglement, or fitting errors.
+
+- **τ_α inconsistent with Mw**: Compare to literature correlations. Large
+  deviations suggest degradation or contamination.
+
+- **Poor fit at low frequencies**: Terminal behavior may not match FML
+  predictions. Consider FMG (with dashpot) for materials showing true
+  terminal flow.
+
+Application Examples
+~~~~~~~~~~~~~~~~~~~~
+
+**Polymer Grade Verification**:
+   Fit FML to frequency sweep, compare α and τ_α to specifications. A batch
+   with lower α likely has broader MWD or unexpected branching.
+
+**Processing Optimization**:
+   Use τ_α to set residence times. For complete stress relaxation, ensure
+   process time > 5τ_α.
+
+**Blend Analysis**:
+   Lower α in blends indicates poor miscibility (separate relaxation modes)
+   or broad combined MWD.
+
+Fitting Guidance
+----------------
+
+**Recommended Data Collection:**
+
+1. **Frequency sweep** (SAOS): 3-5 decades (e.g., 0.01-100 rad/s)
+2. **Test amplitude**: Within LVR (typically 0.5-5% strain)
+3. **Coverage**: Ensure both elastic plateau and power-law regimes captured
+4. **Temperature control**: ±0.1°C for polymer melts
+
+**Initialization Strategy:**
+
+.. code-block:: python
+
+   # From frequency sweep |G*|(ω)
+   Gm_init = high_freq_plateau  # Elastic plateau
+   tau_alpha_init = 1 / (frequency at steepest slope)
+   alpha_init = slope in power-law region
+
+   # Smart initialization (automatic in RheoJAX v0.2.0+)
+   # Applied automatically when test_mode='oscillation'
+
+**Optimization Tips:**
+
+- Fit simultaneously to G' and G" for better constraint
+- Use log-weighted least squares
+- Verify power-law region (parallel G', G" slopes)
+- Check residuals for systematic deviations
+
+**Common Pitfalls:**
+
+- **Insufficient high-frequency data**: Cannot determine Gm accurately
+- **Missing power-law regime**: Need broader frequency coverage
+- **α near 1**: Use classical Maxwell for simpler interpretation
+
+Usage
+-----
+
+.. code-block:: python
+
+   from rheojax.models import FractionalMaxwellLiquid
+   from rheojax.core.data import RheoData
+   import numpy as np
+
+   # Create model instance
+   model = FractionalMaxwellLiquid()
+
+   # Fit to experimental data (smart initialization automatic)
+   omega_exp = np.logspace(-2, 2, 50)
+   G_star_exp = load_experimental_data()  # Complex modulus
+   model.fit(omega_exp, G_star_exp, test_mode='oscillation')
+
+   # Inspect fitted parameters
+   print(f"Gm = {model.parameters.get_value('Gm'):.2e} Pa")
+   print(f"α = {model.parameters.get_value('alpha'):.4f}")
+   print(f"τ_α = {model.parameters.get_value('tau_alpha'):.2e} s^α")
+
+   # Predict relaxation modulus
+   t = np.logspace(-3, 3, 100)
+   data = RheoData(x=t, y=np.zeros_like(t), domain='time')
+   data.metadata['test_mode'] = 'relaxation'
+   G_t = model.predict(data)
+
+   # Bayesian uncertainty quantification
+   result = model.fit_bayesian(
+       omega_exp, G_star_exp,
+       num_warmup=1000,
+       num_samples=2000,
+       test_mode='oscillation'
+   )
+   intervals = model.get_credible_intervals(result.posterior_samples, credibility=0.95)
+
+For more details, see :doc:`API reference </api/models>`.
 
 Regimes and Behavior
 --------------------
@@ -365,43 +595,72 @@ Usage
 
 For more details on the :class:`rheojax.models.FractionalMaxwellLiquid` class, see the :doc:`API reference </api/models>`.
 
-See also
+See Also
 --------
 
-- :doc:`fractional_maxwell_gel` — uses a dashpot instead of a spring for gel-like systems.
-- :doc:`fractional_maxwell_model` — generalized two-order series analogue.
-- :doc:`fractional_jeffreys` — adds a parallel dashpot for finite zero-shear viscosity.
-- :doc:`../../transforms/fft` — convert relaxation data to :math:`G^*(\omega)` before
-  fitting.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook covering the
-  complete Fractional Maxwell family.
-- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing models.
+Related Models
+~~~~~~~~~~~~~~
+
+- :doc:`fractional_maxwell_gel` — uses a dashpot instead of a spring for gel-like systems with terminal flow
+- :doc:`fractional_maxwell_model` — generalized two-order series analogue with independent α and β
+- :doc:`fractional_jeffreys` — adds a parallel dashpot for finite zero-shear viscosity
+- :doc:`../classical/maxwell` — classical limit (α → 1, exponential relaxation)
+- :doc:`../classical/springpot` — fundamental SpringPot element theory
+
+Transforms
+~~~~~~~~~~
+
+- :doc:`../../transforms/fft` — convert relaxation data to :math:`G^*(\omega)` before fitting
+- :doc:`../../transforms/mastercurve` — time-temperature superposition for polymer melts
+- :doc:`../../transforms/derivatives` — compute loss tangent tan δ from G' and G"
+
+Examples
+~~~~~~~~
+
+- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook covering the complete Fractional Maxwell family
+- :doc:`../../examples/fitting/01-smart-initialization` — demonstration of automatic initialization (v0.2.0)
+- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing models
 
 References
 ----------
 
-**Foundational Works:**
+.. [1] Friedrich, C. "Relaxation and retardation functions of the Maxwell model
+   with fractional derivatives." *Rheologica Acta*, 30, 151–158 (1991).
+   https://doi.org/10.1007/BF01134604
 
-- C. Friedrich, "Relaxation and retardation functions of the Maxwell model with fractional
-  derivatives," *Rheol. Acta* 30, 151–158 (1991).
-- H. Schiessel, R. Metzler, A. Blumen, and T.F. Nonnenmacher, "Generalized viscoelastic
-  models: their fractional equations with solutions," *J. Phys. A* 28, 6567–6584 (1995).
-- R. Metzler, W. Schick, H.-G. Kilian, and T.F. Nonnenmacher, "Relaxation in filled
-  polymers: A fractional calculus approach," *J. Chem. Phys.* 103, 7180–7186 (1995).
+.. [2] Schiessel, H., Metzler, R., Blumen, A., and Nonnenmacher, T. F.
+   "Generalized viscoelastic models: their fractional equations with solutions."
+   *Journal of Physics A*, 28, 6567–6584 (1995).
+   https://doi.org/10.1088/0305-4470/28/23/012
 
-**Mittag-Leffler Functions:**
+.. [3] Metzler, R., Schick, W., Kilian, H.-G., and Nonnenmacher, T. F.
+   "Relaxation in filled polymers: A fractional calculus approach."
+   *Journal of Chemical Physics*, 103, 7180–7186 (1995).
+   https://doi.org/10.1063/1.470346
 
-- Gorenflo, R., Kilbas, A.A., Mainardi, F., Rogosin, S.V. (2014). *Mittag-Leffler Functions,
-  Related Topics and Applications*. Springer.
+.. [4] Gorenflo, R., Kilbas, A. A., Mainardi, F., and Rogosin, S. V.
+   *Mittag-Leffler Functions, Related Topics and Applications*. Springer (2014).
+   https://doi.org/10.1007/978-3-662-43930-2
 
-**Physical Interpretation:**
+.. [5] Mainardi, F., and Spada, G. "Creep, relaxation and viscosity properties
+   for basic fractional models in rheology."
+   *European Physical Journal Special Topics*, 193, 133–160 (2011).
+   https://doi.org/10.1140/epjst/e2011-01387-1
 
-- Mainardi, F., Spada, G. (2011). "Creep, Relaxation and Viscosity Properties for Basic
-  Fractional Models in Rheology." *European Physical Journal Special Topics*, 193, 133-160.
-- Friedrich, C., Braun, H. (1992). "Generalized Cole-Cole Behavior and its Rheological
-  Relevance." *Rheologica Acta*, 31, 309-322.
+.. [6] Friedrich, C., and Braun, H. "Generalized Cole-Cole behavior and its
+   rheological relevance." *Rheologica Acta*, 31, 309–322 (1992).
+   https://doi.org/10.1007/BF00418328
 
-**Polymer Applications:**
+.. [7] Metzler, R., and Klafter, J. "The random walk's guide to anomalous
+   diffusion: A fractional dynamics approach."
+   *Physics Reports*, 339, 1–77 (2000).
+   https://doi.org/10.1016/S0370-1573(00)00070-3
 
-- Metzler, R., Klafter, J. (2000). "The Random Walk's Guide to Anomalous Diffusion: A
-  Fractional Dynamics Approach." *Physics Reports*, 339(1), 1-77.
+.. [8] Mainardi, F. *Fractional Calculus and Waves in Linear Viscoelasticity*.
+   Imperial College Press (2010). https://doi.org/10.1142/p614
+
+.. [9] Ferry, J. D. *Viscoelastic Properties of Polymers*, 3rd Edition.
+   Wiley (1980). ISBN: 978-0471048947
+
+.. [10] Doi, M., and Edwards, S. F. *The Theory of Polymer Dynamics*.
+   Oxford University Press (1986). ISBN: 978-0198520337

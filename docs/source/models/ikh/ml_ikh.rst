@@ -1,18 +1,18 @@
 Multi-Lambda Isotropic-Kinematic Hardening (ML-IKH)
 =====================================================
 
-.. admonition:: Quick Reference
-   :class: hint
+Quick Reference
+---------------
 
-   **Use when:** Multi-timescale thixotropy, stretched-exponential relaxation, distributed structure kinetics
+**Use when:** Multi-timescale thixotropy, stretched-exponential relaxation, distributed structure kinetics
 
-   **Parameters:** 7N+1 (per_mode) or 6+3N (weighted_sum)
+**Parameters:** 7N+1 (per_mode) or 6+3N (weighted_sum)
 
-   **Key feature:** Distributed thixotropic timescales for complex recovery
+**Key equation:** :math:`\sigma_y = \sigma_{y,0} + k_3 \sum_{i=1}^{N} w_i \lambda_i` (weighted-sum) or :math:`\sigma_{total} = \sum_{i=1}^{N} \sigma_i + \eta_{\infty} \dot{\gamma}` (per-mode)
 
-   **yield_mode:** ``'per_mode'`` (default) or ``'weighted_sum'``
+**Test modes:** flow_curve, startup, relaxation, creep, oscillation, laos
 
-   **Materials:** Complex thixotropic fluids with multi-scale structural dynamics
+**Material examples:** Complex thixotropic fluids with multi-scale structural dynamics
 
 .. currentmodule:: rheojax.models.ikh.ml_ikh
 
@@ -36,6 +36,41 @@ Physical motivation:
   organization** with different restructuring rates
 - Multi-mode models provide better fit with fewer total parameters than increasing
   complexity of single-mode equations
+
+Notation Guide
+--------------
+
+.. list-table::
+   :widths: 15 15 70
+   :header-rows: 1
+
+   * - Symbol
+     - Units
+     - Description
+   * - N
+     - —
+     - Number of structural modes
+   * - λᵢ
+     - —
+     - Structural parameter for mode i (0 = destructured, 1 = structured)
+   * - τ_thix,i
+     - s
+     - Rebuilding timescale for mode i
+   * - Γᵢ
+     - —
+     - Breakdown coefficient for mode i
+   * - wᵢ
+     - —
+     - Weight of mode i (weighted_sum formulation only)
+   * - σᵢ
+     - Pa
+     - Stress contribution from mode i (per_mode formulation only)
+   * - αᵢ
+     - Pa
+     - Backstress for mode i (per_mode formulation only)
+   * - γ̇ᵖᵢ
+     - 1/s
+     - Plastic strain rate for mode i (per_mode formulation only)
 
 
 Theoretical Background
@@ -106,6 +141,57 @@ For practical computation, this integral is discretized into N modes:
    \lambda(t) \approx \sum_{i=1}^{N} w_i \lambda_i(t)
 
 with weights wᵢ and timescales τᵢ chosen to span the relevant range.
+
+Physical Foundations
+--------------------
+
+Distributed Structure Kinetics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Real thixotropic materials often have **multiple structural populations** with different kinetic timescales:
+
+- **Waxy crude oils**: Primary wax crystals (fast), crystal clusters (medium), space-spanning networks (slow)
+- **Colloidal gels**: Primary bonds (fast), aggregates (medium), network structure (slow)
+- **Emulsions**: Droplet-droplet contacts (fast), floc formation (medium), phase separation (slow)
+
+Each population may build up and break down at different rates, leading to **stretched-exponential recovery**:
+
+.. math::
+
+   \lambda(t) \approx 1 - (1 - \lambda_0) \exp\left[-(t/\tau)^\beta\right]
+
+where β < 1 indicates a distribution of timescales. The ML-IKH model captures this by superposing N exponential modes:
+
+.. math::
+
+   \lambda(t) = \sum_{i=1}^{N} w_i \lambda_i(t)
+
+Analogy to Prony Series
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The multi-mode structure is directly analogous to **Prony series** for viscoelasticity:
+
+- **Viscoelasticity**: G(t) = Σ Gᵢ·exp(-t/τᵢ) (Generalized Maxwell)
+- **Thixotropy**: λ(t) = Σ wᵢ·λᵢ(t) where λᵢ evolves with τ_thix,i (ML-IKH)
+
+Both use **discrete mode approximations** to represent continuous relaxation spectra.
+
+Governing Equations
+-------------------
+
+The ML-IKH model has two formulations (see Mathematical Formulation for complete equations):
+
+**Per-Mode Formulation** (N independent yield surfaces):
+
+- Each mode i has state (σᵢ, αᵢ, λᵢ)
+- Total stress: σ_total = Σ σᵢ + η_∞·γ̇
+- Use when: Distinct mechanical populations (e.g., bimodal particle size)
+
+**Weighted-Sum Formulation** (single yield surface):
+
+- Single state (σ, α) with N structure parameters λᵢ
+- Yield stress: σ_y = σ_y,0 + k₃·Σ wᵢλᵢ
+- Use when: Single mechanical response with distributed recovery kinetics
 
 Connection to Generalized Maxwell Model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -354,6 +440,88 @@ The yield stress becomes:
    \sigma_{y,ss} = \sigma_{y,0} + k_3 \sum_{i=1}^{N} w_i \lambda_{ss,i}
 
 
+Validity and Assumptions
+------------------------
+
+**Valid for:**
+
+- **Multi-timescale thixotropy**: Materials with stretched-exponential or multi-exponential recovery
+- **Hierarchical microstructure**: Multiple structural length/time scales
+- **Complex thixotropic loops**: History-dependent behavior not captured by single-mode models
+
+**Assumptions:**
+
+- **Discrete mode approximation**: Continuous relaxation spectrum approximated by N modes
+- **Independent mode kinetics**: No coupling between structural populations (each λᵢ evolves independently)
+- **Affine deformation**: Homogeneous flow (no spatial gradients)
+- **Isothermal**: No temperature dependence
+
+**Not appropriate for:**
+
+- **Simple thixotropy**: Use :doc:`mikh` instead (simpler, fewer parameters)
+- **Shear banding**: Requires spatial extension
+- **Temperature-dependent kinetics**: Would require additional modes or temperature-dependent parameters
+
+What You Can Learn
+------------------
+
+From fitting Multi-Lambda IKH to experimental data, you can extract insights about timescale distributions, structural mode coupling, and complex thixotropic behavior.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**λ_i (Multiple Structure Parameters)**:
+   Set of N dimensionless internal variables (0 ≤ λ_i ≤ 1) tracking distinct structural populations or timescales.
+   *For graduate students*: Each λ_i evolves independently: dλ_i/dt = (1-λ_i)/τ_thix,i - Γ_i·λ_i|γ̇^p|. In weighted_sum mode, σ_y = σ_y,0 + k_3·Σw_i·λ_i represents distributed kinetics affecting single yield mechanism. In per_mode, each λ_i has independent yield surface. Recovers stretched-exponential via superposition: λ(t) ≈ Σw_i·exp(-t/τ_i) ~ exp[-(t/τ_c)^β].
+   *For practitioners*: Fast mode (τ_1 ~ 0.1-1 s) = local bond reformation. Slow mode (τ_N ~ 100-1000 s) = network reorganization. Measure via multi-step recovery tests at different rest times.
+
+**τ_thix,i (Recovery Timescale Spectrum)**:
+   Set of N characteristic rebuilding times spanning 2-4 decades.
+   *For graduate students*: Logarithmic spacing: τ_i = τ_min·(τ_max/τ_min)^((i-1)/(N-1)). Span τ_max/τ_min quantifies timescale dispersion. Broader span (>100) requires more modes (N ≥ 3-5). Connects to Kohlrausch-Williams-Watts stretch exponent β via N ~ (1/β)².
+   *For practitioners*: Extract from recovery data fitting. If single-mode MIKH R² improvement > 10% with ML-IKH, complex thixotropy confirmed. Typical: N=2-3 sufficient for most soft materials.
+
+**w_i (Mode Weights, weighted_sum only)**:
+   Normalized weights (Σw_i = 1) quantifying relative importance of each structural timescale.
+   *For graduate students*: In weighted_sum: σ_y = σ_y,0 + k_3·Σw_i·λ_i. Dominant mode: argmax(w_i·k_3). Weights relate to distribution of structural elements (e.g., particle size distribution in bimodal colloids).
+   *For practitioners*: w_1 = 0.6, w_2 = 0.3, w_3 = 0.1 means fast mode dominates yield stress evolution. Adjust weights if recovery curves show multi-exponential character.
+
+**Γ_i (Mode-Specific Breakdown Coefficients)**:
+   Efficiency of shear-induced destructuring for each structural population.
+   *For graduate students*: Controls mode-specific shear-thinning: λ_ss,i = 1/(1 + Γ_i·τ_thix,i|γ̇|). Different Γ_i values enable modeling materials where some structure (weak bonds) breaks easily while other structure (strong crosslinks) persists.
+   *For practitioners*: Fit from flow curve multi-regime behavior. Example: Γ_1 >> Γ_2 means fast mode breaks down at low shear, slow mode only at high shear.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Multi-Lambda IKH Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - N = 2, τ_max/τ_min < 10
+     - Simple bimodal thixotropy
+     - Bidisperse colloids, two-network gels
+     - Moderate complexity, 2-exponential recovery
+   * - N = 3-5, τ_max/τ_min = 10-100
+     - Complex thixotropy
+     - Waxy crude oils, cement pastes, dense emulsions
+     - Stretched-exponential recovery, history-dependent
+   * - N > 5, τ_max/τ_min > 100
+     - Extreme timescale dispersion
+     - Aging soft glasses, hierarchical gels
+     - Requires long-time measurements, non-Fickian
+   * - Per-mode: G_1 << G_2
+     - Bimodal elasticity
+     - Filled polymers, composite gels
+     - Distinct mechanical populations
+   * - Weighted-sum: w_fast > 0.7
+     - Fast-mode dominated
+     - Quickly recovering suspensions
+     - Rapid restructuring after flow
+
 Timescale Distribution Strategies
 ---------------------------------
 
@@ -388,12 +556,18 @@ Use automatic determination as in Generalized Maxwell fitting:
 
 .. code-block:: python
 
-   from rheojax.utils.prony import fit_prony_series
+   import numpy as np
 
-   # Fit N modes to recovery data
-   tau_values, weights = fit_prony_series(
-       t_recovery, lambda_recovery, n_modes=3
-   )
+   # Example: fit N modes to recovery data
+   # Generate synthetic recovery data
+   t_recovery = np.linspace(0, 100, 200)
+   lambda_recovery = 1.0 - 0.8 * np.exp(-t_recovery / 10.0) - 0.2 * np.exp(-t_recovery / 50.0)
+
+   # For automatic mode selection, use logarithmic distribution
+   n_modes = 3
+   tau_min, tau_max = 1.0, 100.0
+   tau_values = np.logspace(np.log10(tau_min), np.log10(tau_max), n_modes)
+   weights = np.ones(n_modes) / n_modes  # Equal weights as initial guess
 
 
 Parameters
@@ -456,8 +630,8 @@ Weighted-Sum Parameters (yield_mode='weighted_sum')
      - Global high-shear viscosity [Pa·s]
 
 
-Fitting Strategies
-------------------
+Fitting Guidance
+----------------
 
 Choosing Number of Modes
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -536,6 +710,36 @@ Fitting Protocol
 4. Constrain Σwᵢ = 1 for physical interpretation
 
 
+Usage
+-----
+
+The ML-IKH model is available via:
+
+.. code-block:: python
+
+   from rheojax.models import MLIKH
+
+**Common workflows**:
+
+1. **Recovery data fitting**: Determine N modes and timescales from rest-time recovery
+2. **Flow curve + startup**: Fit mechanical and kinetic parameters jointly
+3. **Model selection**: Compare N=2 vs N=3 via AIC/BIC
+4. **Bayesian inference**: Quantify uncertainty in mode weights and timescales
+
+**Integration with Pipeline**:
+
+.. code-block:: python
+
+   from rheojax.pipeline import BayesianPipeline
+
+   # Multi-mode thixotropic analysis
+   (BayesianPipeline()
+    .load('recovery_data.csv', x_col='time', y_col='yield_stress')
+    .fit_nlsq('ml_ikh', n_modes=3, yield_mode='weighted_sum')
+    .fit_bayesian(num_samples=2000)
+    .plot_pair()  # Check mode correlations
+    .save('ml_ikh_3mode_results.hdf5'))
+
 Usage Examples
 --------------
 
@@ -592,6 +796,14 @@ Fitting
 ~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
+
+   # Generate synthetic startup data
+   t_data = np.linspace(0, 20, 100)
+   gamma_data = 1.0 * t_data  # Constant shear rate
+   X_data = np.stack([t_data, gamma_data])
+   stress_data = 50.0 * (1.0 - np.exp(-t_data / 5.0)) + 10.0 * t_data
 
    # Fit to data
    model.fit(X_data, stress_data, max_iter=500)
@@ -669,19 +881,47 @@ physical structures.
 References
 ----------
 
-1. Wei, Y., Solomon, M.J., & Larson, R.G. (2018). "A multimode structural kinetics
-   constitutive equation for the transient rheology of thixotropic elasto‐viscoplastic
-   fluids." *J. Rheol.*, 62(1), 321-342. DOI: 10.1122/1.4996752
+.. [1] Wei, Y., Solomon, M. J., and Larson, R. G. "A multimode structural kinetics
+   constitutive equation for the transient rheology of thixotropic elasto-viscoplastic
+   fluids." *Journal of Rheology*, 62(1), 321-342 (2018).
+   https://doi.org/10.1122/1.4996752
 
-2. Dimitriou, C.J. & McKinley, G.H. (2014). "A comprehensive constitutive law for
-   waxy crude oil." *Soft Matter*, 10(35), 6619-6644.
+.. [2] Dimitriou, C. J. and McKinley, G. H. "A comprehensive constitutive law for
+   waxy crude oil: a thixotropic yield stress fluid." *Soft Matter*, 10(35),
+   6619-6644 (2014). https://doi.org/10.1039/c4sm00578c
 
-3. Geri, M., Venkatesan, R., Sambath, K., & McKinley, G.H. (2017). "Thermokinematic
-   memory and the thixotropic elasto‐viscoplasticity of waxy crude oils."
-   *J. Rheol.*, 61(3), 427-454. DOI: 10.1122/1.4978259
+.. [3] Geri, M., Venkatesan, R., Sambath, K., and McKinley, G. H. "Thermokinematic
+   memory and the thixotropic elasto-viscoplasticity of waxy crude oils."
+   *Journal of Rheology*, 61(3), 427-454 (2017). https://doi.org/10.1122/1.4978259
 
-4. Fielding, S.M. et al. (2009). "Aging and rheology in soft materials."
-   *J. Rheol.*, 53(1), 39-64.
+.. [4] Fielding, S. M., et al. "Aging and rheology in soft materials."
+   *Journal of Rheology*, 53(1), 39-64 (2009). https://doi.org/10.1122/1.3018902
 
-5. Mewis, J. & Wagner, N.J. (2009). "Thixotropy."
-   *Adv. Colloid Interface Sci.*, 147-148, 214-227.
+.. [5] Mewis, J. and Wagner, N. J. "Thixotropy." *Advances in Colloid and Interface
+   Science*, 147-148, 214-227 (2009). https://doi.org/10.1016/j.cis.2008.09.005
+
+.. [6] Kohlrausch, R. "Theorie des elektrischen Rückstandes in der Leidener Flasche."
+   *Annalen der Physik*, 167(2), 179-214 (1854). https://doi.org/10.1002/andp.18541670203
+
+.. [7] Williams, G. and Watts, D. C. "Non-symmetrical dielectric relaxation behaviour
+   arising from a simple empirical decay function." *Transactions of the Faraday Society*,
+   66, 80-85 (1970). https://doi.org/10.1039/tf9706600080
+
+.. [8] de Souza Mendes, P. R. and Thompson, R. L. "A critical overview of elasto-viscoplastic
+   thixotropic modeling." *Journal of Non-Newtonian Fluid Mechanics*, 187-188, 8-15 (2012).
+   https://doi.org/10.1016/j.jnnfm.2012.08.006
+
+.. [9] Dullaert, K. and Mewis, J. "A structural kinetics model for thixotropy."
+   *Journal of Non-Newtonian Fluid Mechanics*, 139(1-2), 21-30 (2006).
+   https://doi.org/10.1016/j.jnnfm.2006.06.002
+
+.. [10] Larson, R. G. and Wei, Y. "A review of thixotropy and its rheological modeling."
+   *Journal of Rheology*, 63(3), 477-501 (2019). https://doi.org/10.1122/1.5055031
+
+See Also
+--------
+
+- :doc:`mikh` — Single-mode thixotropic IKH model (simpler baseline)
+- :doc:`/models/dmt/dmt_local` — Alternative multi-timescale thixotropy approach
+- :doc:`/models/generalized_maxwell` — Multi-mode viscoelasticity (Prony series)
+- :doc:`/user_guide/03_advanced_topics/index` — Advanced multi-mode fitting strategies

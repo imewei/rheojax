@@ -4,10 +4,6 @@ Isotropic-Kinematic Hardening (IKH) Models
 This section documents the Isotropic-Kinematic Hardening (IKH) family of models
 for thixotropic elasto-viscoplastic (TEvp) materials.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
 
 Overview
 --------

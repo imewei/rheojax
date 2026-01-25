@@ -9,10 +9,6 @@ TA Instruments TRIOS Format
    This reference documents the TRIOS file format from TA Instruments rheometers
    and how RheoJAX reads and processes these files.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
 Overview
 --------
 

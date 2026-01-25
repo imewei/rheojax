@@ -4,10 +4,6 @@ Transforms API
 Concise reference for all built-in transforms. For workflows, diagrams, and tuning guidance
 see the :doc:`/transforms/index` handbook and :doc:`/user_guide/transforms`.
 
-.. contents::
-   :local:
-   :depth: 1
-
 FFTAnalysis
 ~~~~~~~~~~~
 

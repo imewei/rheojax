@@ -9,6 +9,7 @@ This page contains the complete API reference for all public modules, classes, a
 
    api/core
    api/models
+   api/spp_models
    api/transforms
    api/pipeline
    api/io

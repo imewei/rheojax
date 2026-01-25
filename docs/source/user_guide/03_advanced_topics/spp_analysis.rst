@@ -6,10 +6,6 @@ Sequence of Physical Processes (SPP)
 
 **Time-Domain LAOS Analysis Without Fourier Transform Limitations**
 
-.. contents:: Table of Contents
-   :local:
-   :depth: 3
-
 Overview
 ========
 

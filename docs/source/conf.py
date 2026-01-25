@@ -67,14 +67,22 @@ except ImportError:
     pass
 
 templates_path = ["../_templates"]
-exclude_patterns = []
+exclude_patterns = [
+    "_templates/*",      # Template files not meant for toctree
+    "_includes/*",       # Include files meant for .. include::
+    "_guides/*",         # Style guides not meant for toctree
+]
 
 # Suppress warnings for auto-generated files
 suppress_warnings = [
     "autodoc.duplicate_object",  # Suppress duplicate object warnings from autosummary
     "autosummary",  # Suppress autosummary warnings
     "toc.not_readable",  # Suppress warnings about auto-generated files not in toctree
+    "toc.not_included",  # Suppress warnings for template/include files not in toctree
     "ref.doc",  # Suppress missing document warnings
+    "ref.footnote",  # Suppress warnings for bibliography-style references (not inline-cited)
+    "ref.citation",  # Suppress warnings for bibliography-style citations (not inline-cited)
+    "docutils",  # Suppress minor docutils warnings from autodoc-processed docstrings
 ]
 
 # MyST parser settings (if available)

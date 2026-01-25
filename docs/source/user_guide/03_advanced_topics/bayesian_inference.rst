@@ -5,10 +5,6 @@ Bayesian Inference
 This guide covers RheoJAX's comprehensive Bayesian inference capabilities, including NLSQ -> NUTS workflow,
 ArviZ diagnostic visualization, and best practices for MCMC analysis.
 
-.. contents:: Table of Contents
-   :local:
-   :depth: 2
-
 Overview
 ========
 

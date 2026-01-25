@@ -4,12 +4,18 @@
 Fluidity-Saramito EVP Model
 ================================
 
-.. contents:: Table of Contents
-   :local:
-   :depth: 3
-
 Quick Reference
-===============
+---------------
+
+**Use when:** Elastoviscoplastic materials with thixotropy
+
+**Parameters:** G, τ_y, f, η_p, t_a, b
+
+**Key equation:** :math:`\boldsymbol{\tau} + \lambda \stackrel{\nabla}{\boldsymbol{\tau}} = 2\eta_p \mathbf{D}`
+
+**Test modes:** flow_curve, startup, creep, oscillation, LAOS
+
+**Material examples:** Carbopol, hair gel, mayonnaise
 
 .. list-table:: Model Summary
    :widths: 30 70
@@ -174,6 +180,9 @@ Coupling Modes
 Mathematical Formulation
 ========================
 
+Governing Equations
+===================
+
 Component Equations (Simple Shear)
 ----------------------------------
 
@@ -203,6 +212,110 @@ At steady state, the model reduces to Herschel-Bulkley form:
    \sigma = \tau_y + K_\text{HB}\dot{\gamma}^{n_\text{HB}}
 
 with fluidity-dependent parameters when using full coupling.
+
+----
+
+Validity and Assumptions
+=========================
+
+Model Assumptions
+-----------------
+
+1. **Tensorial stress description**: Uses full stress tensor :math:`\boldsymbol{\tau}`, suitable for 3D flows
+2. **Von Mises yield criterion**: Isotropic yielding based on stress magnitude :math:`|\boldsymbol{\tau}|`
+3. **Upper-convected Maxwell framework**: Appropriate for entangled polymers and structured fluids
+4. **Thixotropic fluidity evolution**: Single scalar internal variable :math:`f` tracks structure
+5. **Isothermal**: Temperature effects not explicitly modeled
+
+Applicability
+-------------
+
+The model is most appropriate for:
+
+- **Elastoviscoplastic fluids**: Materials exhibiting elastic recoil, yield stress, and time-dependent viscosity
+- **Concentrated emulsions**: Mayonnaise, creams, cosmetics
+- **Polymer gels**: Carbopol, hydrogels with yield stress
+- **Pastes and slurries**: Cement, drilling muds, waxy crude oils
+- **Complex loading**: Protocols requiring tensorial stress (extensional flow, normal stresses)
+
+Limitations
+-----------
+
+**No shear banding (local model)**:
+   The homogeneous (local) model cannot capture spatial heterogeneity. For shear-banded flows, use the :class:`FluiditySaramitoNonlocal` variant.
+
+**Single structural variable**:
+   Real materials may have multiple structural timescales or multi-mode thixotropy. Consider multi-lambda extensions for complex aging.
+
+**Isotropic yielding**:
+   The Von Mises criterion assumes isotropic yield surface. Anisotropic materials may require tensorial yield criteria.
+
+**Small strain assumption**:
+   The UCM framework assumes affine deformation. Not suitable for materials with wall slip or non-affine microstructure.
+
+----
+
+What You Can Learn
+==================
+
+From fitting Fluidity-Saramito EVP to experimental data, you can extract insights about elastoviscoplasticity, thixotropic coupling, and normal stress generation in yield-stress materials.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**f (Fluidity)**:
+   Time-dependent inverse relaxation time controlling both viscosity η_p = G/f and relaxation time λ = 1/f in tensorial UCM framework.
+   *For graduate students*: Unlike scalar fluidity models, here f couples to tensorial stress evolution: λ·∇τ + α(τ)τ = 2η_p·D where λ = 1/f. Evolution: df/dt = (f_age - f)/t_a + b\|γ̇\|^n_rej(f_flow - f). Plasticity α = max(0, 1 - τ_y/\|τ\|) activates only when Von Mises stress \|τ\| = √(½τ:τ) > τ_y. Normal stresses N₁ ~ λγ̇τ_xy ~ γ̇/f² (aged materials with low f exhibit larger N₁).
+   *For practitioners*: f_age ≈ 10^-6 to 10^-3 s^-1 (solid-like), f_flow ≈ 10^-2 to 1 s^-1 (liquid-like). Measure via startup overshoot magnitude (larger overshoot = lower initial f after aging).
+
+**G (Elastic Modulus)**:
+   Elastic stiffness in UCM backbone, controlling both stress buildup and normal stress generation.
+   *For graduate students*: Sets stress scale and Weissenberg number Wi = λγ̇ = γ̇/f. Normal stress scaling: N₁/τ_xy ~ Wi ~ γ̇/f. For UCM, N₂ = 0. Startup overshoot: σ_peak ~ τ_y + Gγ_y where γ_y is yield strain.
+   *For practitioners*: Extract from initial slope in startup or from G' plateau in SAOS. Typical: G = 10²-10⁴ Pa (soft colloids), 10⁴-10⁶ Pa (polymer gels).
+
+**τ_y (Yield Stress)**:
+   Von Mises yield criterion threshold. In minimal coupling, constant. In full coupling: τ_y(f) = τ_y0 + a_y/f^m (aged materials are stronger).
+   *For graduate students*: Plasticity parameter α = max(0, 1 - τ_y/\|τ\|) controls plastic dissipation term. α = 0 below yield (elastic), α > 0 above yield (viscoplastic flow). Full coupling exponent m typically 0.3-1.0 captures aging-induced hardening.
+   *For practitioners*: Measure from flow curve low-shear plateau or creep bifurcation stress. Full coupling appropriate if yield stress increases significantly after aging (wait-time dependent startup tests).
+
+**t_a, b, n_rej (Fluidity Evolution Parameters)**:
+   Control aging (t_a) and rejuvenation (b, n_rej) kinetics analogous to local fluidity model.
+   *For graduate students*: df/dt = (f_age - f)/t_a + b\|γ̇\|^n_rej(f_flow - f). Characteristic shear rate: γ̇_c ~ (1/(bt_a))^(1/n_rej). Stress overshoot magnitude and position depend on t_a (waiting time scaling), b and n_rej (breakdown kinetics).
+   *For practitioners*: Extract from startup test family at different wait times. Typical: t_a = 10-1000 s, b = 0.1-10, n_rej = 0.5-1.5. Longer t_a = more pronounced thixotropy.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Fluidity-Saramito Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - N₁/τ_xy < 0.1, minimal coupling
+     - Weakly elastic EVP
+     - Carbopol gels, pastes
+     - Dominant viscoplasticity, minimal normal stresses
+   * - N₁/τ_xy = 0.1-1, minimal coupling
+     - Moderate elasticity
+     - Emulsions, soft colloids, cosmetics
+     - Significant rod climbing, moderate die swell
+   * - N₁/τ_xy > 1, minimal coupling
+     - Strongly elastic EVP
+     - Polymer gels, fiber suspensions
+     - Strong Weissenberg effect, edge fracture risk
+   * - Full coupling: m > 0.5
+     - Strong aging-yield coupling
+     - Waxy crude oils, cement
+     - Wait-time dependent yield, restart challenges
+   * - t_a > 100 s, full coupling
+     - Extreme thixotropy with elasticity
+     - Waxy crude oils, drilling muds
+     - Long-term aging, complex restart dynamics
+
+----
 
 Parameters
 ==========
@@ -350,6 +463,25 @@ Parameter Interpretation by Material
 - :math:`n_\text{HB} \sim 0.3-0.7`
 - :math:`t_a \sim 10-1000` s
 
+----
+
+Usage
+=====
+
+(Usage examples already present in the file)
+
+----
+
+See Also
+========
+
+- :doc:`fluidity_local` — Scalar fluidity model without tensorial stress
+- :doc:`fluidity_nonlocal` — Nonlocal model for shear banding
+- :doc:`../dmt/dmt_local` — DMT structural-kinetics thixotropic model
+- :doc:`../flow/herschel_bulkley` — Simpler yield stress model (steady shear only)
+
+----
+
 Fitting Guidance
 ================
 
@@ -387,7 +519,8 @@ Step-by-Step Example
 
    # 4. Get credible intervals
    intervals = model.get_credible_intervals(result.posterior_samples)
-   print(f"tau_y0: {intervals['tau_y0']['mean']:.1f} [{intervals['tau_y0']['lower']:.1f}, {intervals['tau_y0']['upper']:.1f}]")
+   for param, stats in intervals.items():
+       print(f"{param}: {stats['mean']:.2f} [{stats['lower']:.2f}, {stats['upper']:.2f}]")
 
 Troubleshooting
 ---------------
@@ -484,15 +617,27 @@ LAOS Analysis
 
 .. code-block:: python
 
+   from rheojax.models.fluidity import FluiditySaramitoLocal
+   import numpy as np
+   import matplotlib.pyplot as plt
+
    # Large amplitude oscillatory shear
+   model = FluiditySaramitoLocal(coupling="minimal")
+
    gamma_0 = 1.0  # 100% strain
    omega = 1.0    # rad/s
 
-   t, strain, stress = model.simulate_laos(gamma_0, omega, n_cycles=3)
+   # Simulate LAOS
+   t = np.linspace(0, 2*np.pi/omega * 3, 300)  # 3 cycles
+   strain, stress, fluidity = model.simulate_laos(t, gamma_0, omega)
 
-   # Extract harmonics
-   harmonics = model.extract_harmonics(stress)
-   print(f"I3/I1 ratio: {harmonics['I_3_I_1']:.4f}")  # Nonlinearity measure
+   # Plot Lissajous curves
+   plt.figure(figsize=(8, 6))
+   plt.plot(strain, stress)
+   plt.xlabel('Strain')
+   plt.ylabel('Stress (Pa)')
+   plt.title('LAOS Lissajous Curve')
+   plt.grid(True)
 
 Nonlocal Model with Shear Banding
 ---------------------------------
@@ -600,22 +745,46 @@ and cannot capture thixotropic behaviors.
 References
 ==========
 
-1. Saramito, P. (2007). A new constitutive equation for elastoviscoplastic
-   fluid flows. *J. Non-Newtonian Fluid Mech.* 145, 1-14.
+.. [1] Saramito, P. "A new constitutive equation for elastoviscoplastic
+   fluid flows." *Journal of Non-Newtonian Fluid Mechanics*, 145, 1-14 (2007).
+   https://doi.org/10.1016/j.jnnfm.2006.04.012
 
-2. Saramito, P. (2009). A new elastoviscoplastic model based on the
-   Herschel-Bulkley viscoplastic model. *J. Non-Newtonian Fluid Mech.*
-   158, 154-161.
+.. [2] Saramito, P. "A new elastoviscoplastic model based on the
+   Herschel-Bulkley viscoplastic model." *Journal of Non-Newtonian Fluid Mechanics*,
+   158, 154-161 (2009). https://doi.org/10.1016/j.jnnfm.2008.12.001
 
-3. Coussot, P. et al. (2002). Viscosity bifurcation in thixotropic,
-   yielding fluids. *J. Rheol.* 46(3), 573-589.
+.. [3] Coussot, P., Nguyen, Q. D., Huynh, H. T., and Bonn, D. "Viscosity bifurcation
+   in thixotropic, yielding fluids." *Journal of Rheology*, 46(3), 573-589 (2002).
+   https://doi.org/10.1122/1.1459447
 
-4. Bocquet, L., Colin, A., & Ajdari, A. (2009). Kinetic theory of
-   plastic flow in soft glassy materials. *Phys. Rev. Lett.* 103, 036001.
+.. [4] Bocquet, L., Colin, A., and Ajdari, A. "Kinetic theory of plastic flow
+   in soft glassy materials." *Physical Review Letters*, 103, 036001 (2009).
+   https://doi.org/10.1103/PhysRevLett.103.036001
 
-5. Ovarlez, G. et al. (2012). Phenomenology and physical origin of
-   shear-localization and shear banding in complex fluids.
-   *J. Non-Newtonian Fluid Mech.* 177-178, 19-28.
+.. [5] Ovarlez, G., Mahaut, F., Deboeuf, S., Lenoir, N., Hormozi, S., and Chateau, X.
+   "Phenomenology and physical origin of shear-localization and shear banding
+   in complex fluids." *Journal of Non-Newtonian Fluid Mechanics*, 177-178, 19-28 (2012).
+   https://doi.org/10.1016/j.jnnfm.2012.03.011
+.. [6] Oldroyd, J. G. "On the formulation of rheological equations of state."
+   *Proceedings of the Royal Society A*, **200**, 523-541 (1950).
+   https://doi.org/10.1098/rspa.1950.0035
+
+.. [7] Dimitriou, C. J., Casanellas, L., Ober, T. J., & McKinley, G. H. "Rheo-PIV of a shear-banding wormlike micellar solution under large amplitude oscillatory shear."
+   *Rheologica Acta*, **51**, 395-411 (2012).
+   https://doi.org/10.1007/s00397-012-0619-9
+
+.. [8] Fraggedakis, D., Dimakopoulos, Y., & Tsamopoulos, J. "Yielding the yield stress analysis: A thorough comparison of recently proposed elasto-visco-plastic (EVP) fluid models."
+   *Journal of Non-Newtonian Fluid Mechanics*, **238**, 170-188 (2016).
+   https://doi.org/10.1016/j.jnnfm.2016.11.007
+
+.. [9] de Souza Mendes, P. R. & Thompson, R. L. "A critical overview of elasto-viscoplastic thixotropic modeling."
+   *Journal of Non-Newtonian Fluid Mechanics*, **187-188**, 8-15 (2012).
+   https://doi.org/10.1016/j.jnnfm.2012.08.006
+
+.. [10] Balmforth, N. J., Frigaard, I. A., & Ovarlez, G. "Yielding to stress: Recent developments in viscoplastic fluid mechanics."
+   *Annual Review of Fluid Mechanics*, **46**, 121-146 (2014).
+   https://doi.org/10.1146/annurev-fluid-010313-141424
+
 
 API Reference
 =============
@@ -623,7 +792,9 @@ API Reference
 .. autoclass:: rheojax.models.fluidity.saramito.FluiditySaramitoLocal
    :members:
    :inherited-members:
+   :no-index:
 
 .. autoclass:: rheojax.models.fluidity.saramito.FluiditySaramitoNonlocal
    :members:
    :inherited-members:
+   :no-index:

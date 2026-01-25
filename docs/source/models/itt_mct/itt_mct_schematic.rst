@@ -603,7 +603,7 @@ Validity and Assumptions
 **When the model works well:**
 
 - Dense suspensions (φ > 0.4 for hard spheres)
-- Near the glass transition (|ε| < 0.3)
+- Near the glass transition (\|ε\| < 0.3)
 - Monodisperse or narrow size distribution
 - No attractive interactions (hard-sphere-like)
 - Brownian timescales (colloidal, not granular)
@@ -614,6 +614,157 @@ Validity and Assumptions
 - Underestimates relaxation times in deeply supercooled regime
 - No hopping/activated processes (important at low T or high ε)
 - Assumes isotropic structure (no shear-induced ordering)
+
+What You Can Learn
+------------------
+
+The ITT-MCT model provides quantitative predictions of glass transition behavior through the lens of density correlators and cage dynamics. The separation parameter ε and critical strain γ_c are the key diagnostics.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**ε (Separation Parameter)**:
+   The distance from the glass transition, defined as ε = (v₂ - v₂,c)/v₂,c where v₂,c = 4 for the F₁₂ model.
+
+   *For graduate students*: ε is the control parameter in the MCT bifurcation analysis. At ε = 0, the self-consistent equation f = v₁f + v₂f² undergoes a fold bifurcation, creating a non-zero long-time limit f > 0 for ε > 0. The α-relaxation time diverges as τ_α ∼ \|ε\|^(-γ) with γ ≈ 2.5 (MCT universal exponent). The power-law exponents a and b for β-relaxation and α-relaxation are determined by the exponent parameter λ = Γ(1-a)²/Γ(1-2a).
+
+   *For practitioners*: ε < 0 means fluid (full relaxation), ε > 0 means glass (permanent caging). Fitting ε from oscillatory or flow curve data immediately tells you if the material has a yield stress. ε ≈ 0.1 is a typical moderately strong glass, ε ≈ 0.5 is a very strong glass. Near ε = 0, expect extreme slowing down and sensitivity to temperature or concentration.
+
+**γ_c (Critical Strain)**:
+   The strain scale at which the cage structure is destroyed by shear.
+
+   *For graduate students*: γ_c appears in the strain decorrelation function h(γ) = exp[-(γ/γ_c)²], which describes how accumulated strain breaks down density correlations. Physically, γ_c is related to the Lindemann criterion: when a particle is displaced by ~γ_c times the cage size (≈ particle diameter), the cage loses memory of its initial configuration. For hard spheres, γ_c ≈ 0.05-0.1 corresponds to the amplitude of thermal vibrations in the cage.
+
+   *For practitioners*: γ_c controls the onset of shear thinning in flow curves. Smaller γ_c means the material yields more easily under strain. Fitting γ_c from the crossover shear rate γ̇* (where viscosity drops) via γ̇* ≈ 1/(τ_α γ_c) reveals the cage stiffness.
+
+**v₁, v₂ (Vertex Coefficients)**:
+   The mode-coupling constants determining the memory kernel m(Φ) = v₁Φ + v₂Φ².
+
+   *For graduate students*: v₁ and v₂ arise from the k-space convolution integral in the full MCT vertex V(k,q,\|k-q\|) ∝ S(k)S(q)S(\|k-q\|)[k·q c(q)/k² + k·p c(p)/k²]². The F₁₂ schematic replaces this with a polynomial approximation. For pure F₁₂, v₁ = 0 and v₂ controls the distance from the glass transition. Higher v₂ means stronger coupling → stronger caging → higher glass transition.
+
+   *For practitioners*: Usually keep v₁ = 0 (default) and fit only v₂ or equivalently ε. If v₁ ≠ 0, the critical point shifts: v₂,c = 4/(1-v₁)². Only adjust v₁ if the model fails with v₁ = 0.
+
+**Γ (Bare Relaxation Rate)**:
+   The inverse microscopic timescale, Γ = 1/τ₀.
+
+   *For graduate students*: In MCT, Γ(k) = k²D₀/S(k) is the bare (non-interacting) relaxation rate for mode k. For the schematic model, Γ is the average rate controlling the short-time β-relaxation. It sets the absolute timescale: all relaxation times scale as Γ⁻¹.
+
+   *For practitioners*: Γ determines the high-frequency behavior in oscillatory tests. From the crossover frequency ω* in G'(ω), estimate Γ ≈ ω*. Typical values: 10³-10⁶ s⁻¹ for colloids (diffusion-limited), 10⁻²-10² s⁻¹ for pastes.
+
+**G_∞ (High-Frequency Modulus)**:
+   The elastic modulus at frequencies above all relaxation processes.
+
+   *For graduate students*: G_∞ is the plateau modulus in the schematic stress formula σ = G_∞ ∫Φ²h(γ)dt'. It corresponds to the k-space integral G_∞ = (k_BT/60π²)∫dk k⁴[S'(k)/S(k)²]² in the full MCT. For hard spheres, G_∞ ≈ nk_BT where n is number density.
+
+   *For practitioners*: G_∞ is fitted from the high-frequency plateau in G'(ω) or from the yield stress magnitude. Unlike phenomenological models, G_∞ has a microscopic interpretation tied to particle stiffness and number density.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from ITT-MCT Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - ε Range
+     - Glass State
+     - Typical Materials
+     - Flow Characteristics
+   * - **ε < -0.2**
+     - Deep fluid
+     - Dilute colloids (φ < 0.4), weak suspensions
+     - No yield stress, Newtonian or weakly shear-thinning, G'' > G' at all ω
+   * - **-0.2 < ε < 0**
+     - Near-critical fluid
+     - Moderate colloids (0.4 < φ < 0.516), pre-jammed emulsions
+     - Zero yield stress but very slow relaxation (τ_α → ∞), G' ≈ G'' at low ω, extreme shear thinning
+   * - **0 < ε < 0.1**
+     - Marginal glass
+     - Dense colloids (φ ≈ 0.52-0.55), soft microgel pastes
+     - Small yield stress (10-100 Pa), fragile caging, strong overshoot in startup, G' > G'' with small plateau
+   * - **0.1 < ε < 0.3**
+     - Moderate glass
+     - Hard-sphere colloids (φ ≈ 0.55-0.58), carbopol gels
+     - Clear yield stress (100-1000 Pa), robust caging, pronounced plateau in G'(ω)
+   * - **ε > 0.3**
+     - Deep glass
+     - Jammed colloids (φ > 0.58), concentrated emulsions
+     - Large yield stress (>1000 Pa), rigid caging, nearly frequency-independent G'
+
+Connection to Cage Breaking
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Critical Strain (γ_c)**: Quantifies cage strength
+
+- **γ_c ~ 0.05**: Very rigid cages (hard-sphere-like, strong glass)
+- **γ_c ~ 0.15**: Soft cages (deformable particles, weak glass)
+- **γ_c ~ 0.3**: Fragile cages (near-critical or polymer-like)
+
+The strain decorrelation function :math:`h(\gamma) = \exp[-(\gamma/\gamma_c)^2]`
+describes how accumulated strain destroys the structural correlation:
+
+- At :math:`\gamma < \gamma_c`: Cage is intact, correlations persist
+- At :math:`\gamma \sim \gamma_c`: Cage begins to break, correlations decay rapidly
+- At :math:`\gamma \gg \gamma_c`: Cage is destroyed, system is fully fluidized
+
+**Physical Interpretation**: :math:`\gamma_c` represents the typical strain needed
+to displace a particle by one particle diameter and escape the cage. It is related
+to the Lindemann criterion for melting.
+
+Yield Stress Emergence
+~~~~~~~~~~~~~~~~~~~~~~~
+
+In the glass state (:math:`\varepsilon > 0`), the model predicts a dynamic yield stress:
+
+.. math::
+
+   \sigma_y = G_\infty \gamma_c f
+
+where :math:`f` is the non-ergodicity parameter (glass plateau height). This
+connects the yield stress to three microscopic quantities:
+
+1. **G_∞**: High-frequency modulus (single-particle stiffness)
+2. **γ_c**: Cage escape strain (local rearrangement threshold)
+3. **f**: Degree of caging (structural arrest parameter)
+
+**Diagnostic use**: If fitted :math:`\sigma_y` is much larger than expected from
+:math:`G_\infty \gamma_c f`, additional yield mechanisms (e.g., attractive forces,
+structural bonds) may be present beyond MCT caging.
+
+Relaxation Timescale Hierarchy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The model distinguishes multiple timescales:
+
+1. **Microscopic time**: :math:`\tau_0 = 1/\Gamma` (Brownian diffusion timescale)
+2. **β-relaxation**: Short-time rattling in cage, :math:`\tau_\beta \sim \tau_0`
+3. **α-relaxation**: Cage escape time, :math:`\tau_\alpha \sim \tau_0 |\varepsilon|^{-\gamma}` (diverges as :math:`\varepsilon \to 0`)
+
+Near the glass transition, :math:`\tau_\alpha` can be 10⁶-10¹⁰ times larger than
+:math:`\tau_0`, explaining why materials appear "glassy" on experimental timescales
+yet are technically ergodic.
+
+**From fitting**: The crossover frequency in :math:`G'(\omega), G''(\omega)` gives
+:math:`\omega_\alpha \sim 1/\tau_\alpha`, revealing the structural relaxation timescale.
+
+Shear-Induced Fluidization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ITT-MCT model shows how shear melts the glass through strain accumulation:
+
+- **Low shear rates** (:math:`\dot{\gamma} \tau_\alpha \ll 1`): Cage has time to reform,
+  system behaves as solid with yield stress
+- **High shear rates** (:math:`\dot{\gamma} \tau_\alpha \gg 1`): Cage is continuously
+  broken by flow, effective viscosity decreases (shear thinning)
+
+The **Weissenberg number** :math:`Wi = \dot{\gamma} \tau_\alpha` controls the
+flow-microstructure coupling:
+
+- :math:`Wi \ll 1`: Quasistatic flow, microstructure equilibrates
+- :math:`Wi \sim 1`: Transient regime, stress overshoot occurs
+- :math:`Wi \gg 1`: Driven flow, microstructure is fully perturbed
+
+**Practical insight**: If startup experiments show stress overshoot at shear rate
+:math:`\dot{\gamma}_{\text{peak}}`, estimate :math:`\tau_\alpha \sim 1/\dot{\gamma}_{\text{peak}}`.
 
 Regimes and Behavior
 --------------------
@@ -737,8 +888,8 @@ ITT-MCT vs Fluidity Models
      - Not in schematic
      - In nonlocal version
 
-Usage Examples
---------------
+Usage
+-----
 
 Basic Flow Curve
 ~~~~~~~~~~~~~~~~
@@ -929,6 +1080,21 @@ For memory-constrained systems:
    for gamma_chunk in np.array_split(gamma_dot, 10):
        sigma_chunk = model.predict(gamma_chunk, test_mode='flow_curve')
 
+See Also
+--------
+
+- :doc:`itt_mct_isotropic` — Full k-resolved MCT for quantitative predictions with S(k) input
+- :doc:`../sgr/sgr_conventional` — Alternative glass transition model (trap-based, no S(k) required)
+- :doc:`../fluidity/fluidity_saramito_local` — Simpler thixotropic yield stress model
+- :doc:`../stz/stz_conventional` — Shear transformation zone theory (effective temperature approach)
+
+**Choosing between ITT-MCT and SGR:**
+
+- **Use ITT-MCT** if: You have colloidal systems, know the volume fraction, want
+  to connect to microscopic structure factor S(k)
+- **Use SGR** if: You have generic soft glasses (foams, emulsions, pastes), want
+  simpler parameterization, focus on aging/rejuvenation dynamics
+
 API Reference
 -------------
 
@@ -936,43 +1102,46 @@ API Reference
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 References
 ----------
 
-**Foundational MCT:**
+.. [1] Götze, W. *Complex Dynamics of Glass-Forming Liquids: A Mode-Coupling Theory*.
+   Oxford University Press (2009). https://doi.org/10.1093/acprof:oso/9780199235346.001.0001
 
-.. [Gotze2009] Götze W. (2009) "Complex Dynamics of Glass-Forming Liquids: A
-   Mode-Coupling Theory", Oxford University Press. *The definitive MCT reference.*
+.. [2] Götze, W. and Sjögren, L. "Scaling properties in the β-relaxation regime
+   of the glass transition." *Journal of Physics C*, 17, 5759 (1984).
+   https://doi.org/10.1088/0022-3719/17/32/016
 
-.. [Gotze1984] Götze W. & Sjögren L. (1984) "Scaling properties in the β-relaxation
-   regime of the glass transition", J. Phys. C 17, 5759. *Two-step relaxation.*
+.. [3] Fuchs, M. and Cates, M. E. "Theory of Nonlinear Rheology and Yielding of
+   Dense Colloidal Suspensions." *Physical Review Letters*, 89, 248304 (2002).
+   https://doi.org/10.1103/PhysRevLett.89.248304
 
-**ITT-MCT Development:**
+.. [4] Fuchs, M. and Cates, M. E. "A mode coupling theory for Brownian particles
+   in homogeneous steady shear flow." *Journal of Rheology*, 53, 957 (2009).
+   https://doi.org/10.1122/1.3119084
 
-.. [Fuchs2002] Fuchs M. & Cates M.E. (2002) "Theory of Nonlinear Rheology and
-   Yielding of Dense Colloidal Suspensions", Phys. Rev. Lett. 89, 248304.
-   *Original ITT-MCT formulation.*
+.. [5] Brader, J. M., Voigtmann, T., Fuchs, M., Larson, R. G., and Cates, M. E.
+   "Glass rheology: From mode-coupling theory to a dynamical yield criterion."
+   *Journal of Physics: Condensed Matter*, 20, 494243 (2008).
+   https://doi.org/10.1088/0953-8984/20/49/494243
 
-.. [Fuchs2009] Fuchs M. & Cates M.E. (2009) "A mode coupling theory for Brownian
-   particles in homogeneous steady shear flow", J. Rheol. 53, 957.
-   *Detailed derivations.*
+.. [6] Siebenbürger, M., Ballauff, M., and Voigtmann, T. "Creep in colloidal glasses."
+   *Journal of Rheology*, 53, 707 (2009). https://doi.org/10.1122/1.3093067
 
-**Applications and Validation:**
+.. [7] Brader, J. M., Cates, M. E., and Fuchs, M. "First-principles constitutive
+   equation for suspension rheology." *Proceedings of the National Academy of
+   Sciences*, 106, 15186 (2009). https://doi.org/10.1073/pnas.0905330106
 
-.. [Brader2008] Brader J.M. et al. (2008) "Glass rheology: From mode-coupling theory
-   to a dynamical yield criterion", J. Phys.: Condens. Matter 20, 494243.
+.. [8] Henrich, O., Varnik, F., and Fuchs, M. "Extended mode-coupling theory for
+   dense colloidal suspensions under shear." *Physical Review E*, 76, 031404 (2007).
+   https://doi.org/10.1103/PhysRevE.76.031404
 
-.. [Siebenbuerger2009] Siebenbürger M. et al. (2009) "Creep in colloidal glasses",
-   J. Rheol. 53, 707. *Experimental validation.*
+.. [9] Amann, C. P., Siebenbürger, M., Ballauff, M., and Fuchs, M. "Nonlinear
+   rheology of glass-forming colloidal dispersions: Transient stress-strain
+   relations from anisotropic mode coupling theory." *Journal of Physics:
+   Condensed Matter*, 27, 194121 (2015). https://doi.org/10.1088/0953-8984/27/19/194121
 
-.. [Brader2009] Brader J.M. et al. (2009) "First-principles constitutive equation
-   for suspension rheology", Proc. Natl. Acad. Sci. 106, 15186. *ISM development.*
-
-**Experimental Techniques:**
-
-.. [Pham2008] Pham K.N. et al. (2008) "Yielding of colloidal glasses", Europhys.
-   Lett. 75, 624. *Hard-sphere rheology.*
-
-.. [Petekidis2002] Petekidis G. et al. (2002) "Rearrangements in hard-sphere glasses
-   under oscillatory shear strain", Phys. Rev. E 66, 051402. *LAOS experiments.*
+.. [10] Mewis, J. and Wagner, N. J. "Colloidal Suspension Rheology." Cambridge
+   University Press (2012). ISBN: 978-0521515368

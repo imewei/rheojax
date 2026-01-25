@@ -1,8 +1,8 @@
 .. _model-fluidity-local:
 
-=====================================================
+==========================================================
 Fluidity Local (Homogeneous Fluidity Model) — Handbook
-=====================================================
+==========================================================
 
 Quick Reference
 ---------------
@@ -12,10 +12,6 @@ Quick Reference
 **Key equation:** :math:`\dot{\sigma} = G\dot{\gamma} - f(t)\sigma`
 **Test modes:** Oscillation, relaxation, creep, steady shear, start-up, LAOS
 **Material examples:** Mayonnaise, drilling muds, waxy crude oils, colloidal gels, greases, thixotropic paints
-
-.. contents:: Table of Contents
-   :depth: 3
-   :local:
 
 Notation Guide
 --------------
@@ -329,6 +325,107 @@ Oscillatory Shear (SAOS and LAOS)
    - Higher harmonics in stress response
    - Intracycle softening and stiffening
    - Lissajous-Bowditch curves show nonlinear features
+
+----
+
+Governing Equations
+-------------------
+
+Core Coupled ODEs
+~~~~~~~~~~~~~~~~~
+
+The Local Fluidity Model is governed by two coupled ordinary differential equations that describe the evolution of stress and fluidity under applied deformation:
+
+**Stress Evolution:**
+
+.. math::
+
+   \frac{d\sigma}{dt} = G \frac{d\gamma}{dt} - f(t) \sigma(t)
+
+**Fluidity Evolution:**
+
+.. math::
+
+   \frac{df}{dt} = \frac{f_{\rm eq} - f}{\tau_{\rm age}} + a \left|\frac{d\gamma}{dt}\right|^n (f_\infty - f)
+
+**Initial Conditions:**
+
+.. math::
+
+   \sigma(0) = \sigma_0, \quad f(0) = f_0 \quad \text{(typically } f_0 = f_{\rm eq} \text{ for aged samples)}
+
+These equations capture the key physics:
+   - **Elastic loading** via :math:`G\dot{\gamma}` (strain rate drives stress buildup)
+   - **Viscous relaxation** via :math:`-f\sigma` (fluidity controls stress dissipation)
+   - **Structural aging** via :math:`(f_{\rm eq} - f)/\tau_{\rm age}` (rebuilding at rest)
+   - **Shear rejuvenation** via :math:`a|\dot{\gamma}|^n(f_\infty - f)` (breakdown under flow)
+
+----
+
+What You Can Learn
+------------------
+
+From fitting Local Fluidity to experimental data, you can extract insights about yield stress emergence, thixotropic kinetics, and microstructural evolution in homogeneous flows.
+
+Parameter Interpretation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**f (Fluidity)**:
+   Time-dependent inverse relaxation time f = 1/τ, providing direct interpretation of effective viscosity η_eff(t) = G/f(t).
+   *For graduate students*: f tracks microstructural state: low f (f → f_eq) = highly structured solid-like, high f (f → f_∞) = broken-down liquid-like. Evolution: df/dt = (f_eq - f)/τ_age + a|γ̇|^n(f_∞ - f). At steady state: f_ss = [f_eq/τ_age + a|γ̇|^n·f_∞]/[1/τ_age + a|γ̇|^n]. Connects to SGR effective temperature x via f ~ x.
+   *For practitioners*: Measure indirectly via η(t) = G/f(t) in startup tests. For yield-stress fluids, f_eq ≈ 0 (solid at rest), f_∞ = G/η_∞ (liquid at high shear).
+
+**f_eq (Equilibrium Fluidity)**:
+   Fluidity at complete rest, controlling yield stress behavior.
+   *For graduate students*: For true yield-stress fluids, f_eq → 0, giving σ_y = G·lim(γ̇/f_ss) as γ̇ → 0. Nonzero f_eq produces viscoelastic liquid (no yield stress). Sets solid-like viscosity η_rest = G/f_eq.
+   *For practitioners*: f_eq ≈ 10^-6 to 10^-3 s^-1 for yield-stress fluids (mayonnaise, drilling muds). f_eq > 10^-2 s^-1 indicates viscoelastic liquid without true yield stress.
+
+**f_∞ (Infinite-Shear Fluidity)**:
+   Fluidity limit at very high shear rates (fully broken-down structure).
+   *For graduate students*: Sets minimum viscosity η_∞ = G/f_∞ at high shear. Difference f_∞ - f_eq quantifies maximum structural change. Shear-thinning ratio η_rest/η_∞ = f_∞/f_eq (typically 10^3-10^6 for strong thixotropic materials).
+   *For practitioners*: Extract from high-shear plateau in flow curves. Typical: f_∞ = 10^-1 to 10^2 s^-1. Higher f_∞ = lower high-shear viscosity.
+
+**τ_age (Aging Timescale)**:
+   Characteristic time for structure rebuilding at rest.
+   *For graduate students*: First-order aging kinetics: f → f_eq with time constant τ_age. Sets width of thixotropic hysteresis loops and stress overshoot position in startup. Competes with rejuvenation time τ_rej ~ 1/(a|γ̇|^n). For thermally-activated processes, τ_age ~ τ₀exp(ΔE_build/k_BT).
+   *For practitioners*: Measure via rest-time dependent startup tests or creep recovery. Fast aging (τ_age = 1-10 s) vs slow aging (τ_age = 10^2-10^4 s). Critical for pumping restart protocols.
+
+**a, n (Rejuvenation Parameters)**:
+   Control shear-induced breakdown: df/dt|_rej = a|γ̇|^n(f_∞ - f).
+   *For graduate students*: a is breakdown amplitude, n is rate sensitivity (n = 1 linear, n > 1 superlinear). Characteristic shear rate: γ̇_c ~ (1/(aτ_age))^(1/n) where structure is half-broken. Connects to Herschel-Bulkley exponent via steady-state analysis.
+   *For practitioners*: Extract from flow curve curvature. Typical: a ~ 0.1-10, n ~ 0.5-1.5. Higher a or n = more rapid breakdown under flow.
+
+Material Classification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Material Classification from Local Fluidity Parameters
+   :header-rows: 1
+   :widths: 20 20 30 30
+
+   * - Parameter Range
+     - Material Behavior
+     - Typical Materials
+     - Processing Implications
+   * - f_eq < 10^-4 s^-1, τ_age > 100 s
+     - Strong yield stress, slow aging
+     - Waxy crude oils, cement pastes
+     - High yield stress, long memory, pumping challenges
+   * - f_eq = 10^-4 to 10^-2 s^-1, τ_age = 10-100 s
+     - Moderate yield stress, intermediate aging
+     - Mayonnaise, drilling muds, paints
+     - Pronounced thixotropy, restart protocols needed
+   * - f_eq > 10^-2 s^-1, τ_age < 10 s
+     - Weak/no yield stress, fast recovery
+     - Soft gels, cosmetics, dilute emulsions
+     - Minimal thixotropy, easy flow
+   * - n ≈ 1
+     - Linear breakdown
+     - Simple thixotropic fluids
+     - Predictable shear-thinning
+   * - n > 1.5
+     - Superlinear breakdown
+     - Complex soft solids with abrupt yielding
+     - Strong rate-dependence, flow instabilities
 
 ----
 
@@ -650,6 +747,26 @@ References
 .. [5] Bocquet, L., Colin, A., & Ajdari, A. "Kinetic theory of plastic flow in soft glassy materials."
    *Physical Review Letters*, **103**, 036001 (2009).
    https://doi.org/10.1103/PhysRevLett.103.036001
+
+.. [6] Picard, G., Ajdari, A., Lequeux, F., & Bocquet, L. "Slow flows of yield stress fluids: Complex spatiotemporal behavior within a simple elastoplastic model."
+   *Physical Review E*, **71**, 010501(R) (2005).
+   https://doi.org/10.1103/PhysRevE.71.010501
+
+.. [7] Mansard, V., Colin, A., Chauduri, P., & Bocquet, L. "A molecular dynamics study of non-local effects in the flow of soft jammed particles."
+   *Soft Matter*, **9**, 7489-7500 (2013).
+   https://doi.org/10.1039/c3sm50847a
+
+.. [8] Shaukat, A., Sharma, A., & Joshi, Y. M. "Squeeze flow behavior of (soft glassy) thixotropic material."
+   *Journal of Non-Newtonian Fluid Mechanics*, **167-168**, 9-17 (2012).
+   https://doi.org/10.1016/j.jnnfm.2011.09.006
+
+.. [9] Blackwell, B. C. & Ewoldt, R. H. "A simple thixotropic-viscoelastic constitutive model produces unique signatures in large-amplitude oscillatory shear (LAOS)."
+   *Journal of Non-Newtonian Fluid Mechanics*, **208-209**, 27-41 (2014).
+   https://doi.org/10.1016/j.jnnfm.2014.03.006
+
+.. [10] Divoux, T., Barentin, C., & Manneville, S. "Stress overshoot in a simple yield stress fluid: An extensive study combining rheology and velocimetry."
+   *Soft Matter*, **7**, 9335-9349 (2011).
+   https://doi.org/10.1039/c1sm05740e
 
 Further Reading
 ~~~~~~~~~~~~~~~
