@@ -12,8 +12,7 @@ Quick Reference
 **Test modes:** Oscillation, relaxation, rotation (steady shear)
 **Material examples:** Polymer solutions with broad relaxation spectra, complex fluids with viscous flow
 
-.. seealso::
-   :doc:`/user_guide/fractional_viscoelasticity_reference` — Mathematical foundations of fractional calculus, SpringPot element, Mittag-Leffler functions, and physical meaning of fractional order α.
+.. include:: /_includes/fractional_seealso.rst
 
 Notation Guide
 --------------

@@ -13,6 +13,7 @@ to quickly compare available transforms and jump to details.
    mutation_number
    owchirp
    smooth_derivative
+   spp
    srfs
 
 See also

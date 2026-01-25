@@ -1,6 +1,6 @@
 # RheoJAX Documentation Structure
 
-**Last Updated:** November 14, 2025
+**Last Updated:** January 25, 2026
 
 ## Production Documentation
 
@@ -10,6 +10,8 @@ docs/
 ├── Makefile                       # Sphinx build commands
 ├── requirements-docs.txt          # Documentation dependencies
 ├── .gitignore                     # Excluded files/folders
+├── model-test-mode-compatibility.md  # Model-test mode matrix
+├── STRUCTURE.md                   # This file
 │
 ├── source/                        # Sphinx source files
 │   ├── conf.py                    # Sphinx configuration
@@ -25,14 +27,24 @@ docs/
 │   │
 │   ├── models/                    # Model Handbook (technical reference)
 │   │   ├── index.rst              # Models overview
-│   │   ├── summary.rst            # Comparison matrix (2,569 words)
+│   │   ├── summary.rst            # Comparison matrix
 │   │   ├── classical/             # 3 models (Maxwell, Zener, SpringPot)
+│   │   ├── flow/                  # 6 flow models (PowerLaw, Bingham, HerschelBulkley, Carreau, Cross, CarreauYasuda)
 │   │   ├── fractional/            # 11 fractional models
-│   │   └── flow/                  # 6 flow models
+│   │   ├── multi_mode/            # 1 model (GeneralizedMaxwell)
+│   │   ├── sgr/                   # 2 models (SGRConventional, SGRGeneric)
+│   │   ├── spp/                   # 2 docs (SPPDecomposer, SPPYieldStress) — LAOS analysis
+│   │   ├── stz/                   # 1 model (STZConventional)
+│   │   ├── itt_mct/               # 2 models + protocols (ITTMCTSchematic, ITTMCTIsotropic)
+│   │   ├── dmt/                   # 2 models (DMTLocal, DMTNonlocal)
+│   │   ├── fluidity/              # 2 models (FluiditySaramitoLocal, FluiditySaramitoNonlocal)
+│   │   ├── epm/                   # 2 models (LatticeEPM, TensorialEPM)
+│   │   ├── hl/                    # 1 model (HebraudLequeux)
+│   │   └── ikh/                   # 2 models (MIKH, MLIKH)
 │   │
 │   ├── transforms/                # Transform Reference
 │   │   ├── index.rst
-│   │   ├── summary.rst            # Application guide (3,854 words)
+│   │   ├── summary.rst            # Application guide
 │   │   ├── fft.rst                # FFT analysis
 │   │   ├── mastercurve.rst        # Time-temperature superposition
 │   │   ├── mutation_number.rst    # Material classification
@@ -74,7 +86,7 @@ docs/
 - **Purpose:** Mathematical "what" and "how"
 - **Audience:** Researchers, practitioners
 - **Content:** Full equations, Quick Reference summaries
-- **Size:** 17,350 words, 22 files
+- **Size:** ~40,000+ words, 38 models across 14 categories
 
 ### Tier 3: Transform Reference (Preprocessing Math)
 - **Purpose:** Data preprocessing theory
@@ -105,12 +117,13 @@ Working files, reports, and analysis documents are preserved in `.archive/` but 
 
 ✅ **Zero duplication** (down from 40%)
 ✅ **70 learning objectives** across User Guide
-✅ **Quick Reference** on all 20 models
+✅ **Quick Reference** on all 38 models
 ✅ **4 learning pathways** (1-16 weeks)
 ✅ **100+ material database**
 ✅ **Graduate student ready**
+✅ **14 model categories** (Classical, Flow, Fractional, Multi-Mode, SGR, SPP, STZ, ITT-MCT, DMT, Fluidity, EPM, HL, IKH)
 
 ---
 
-**Documentation Version:** 0.2.0
-**Build Status:** ✅ Clean (0 errors, 3 warnings)
+**Documentation Version:** 0.6.0
+**Build Status:** ✅ Clean (0 errors, 0 warnings)

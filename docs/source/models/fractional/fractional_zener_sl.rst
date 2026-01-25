@@ -12,8 +12,7 @@ Quick Reference
 **Test modes:** Oscillation, relaxation
 **Material examples:** Viscoelastic solids with finite equilibrium modulus and power-law relaxation
 
-.. seealso::
-   :doc:`/user_guide/fractional_viscoelasticity_reference` — Mathematical foundations of fractional calculus, SpringPot element, Mittag-Leffler functions, and physical meaning of fractional order α.
+.. include:: /_includes/fractional_seealso.rst
 
 Notation Guide
 --------------

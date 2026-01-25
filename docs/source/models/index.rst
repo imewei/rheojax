@@ -18,39 +18,22 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    summary
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Classical Models
 
-   classical/maxwell
-   classical/zener
-   classical/springpot
+   classical/index
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Fractional Models
 
-   fractional/fractional_maxwell_gel
-   fractional/fractional_maxwell_liquid
-   fractional/fractional_maxwell_model
-   fractional/fractional_kelvin_voigt
-   fractional/fractional_zener_sl
-   fractional/fractional_zener_ss
-   fractional/fractional_zener_ll
-   fractional/fractional_kv_zener
-   fractional/fractional_burgers
-   fractional/fractional_poynting_thomson
-   fractional/fractional_jeffreys
+   fractional/index
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Flow & Viscoplastic Models
 
-   flow/power_law
-   flow/carreau
-   flow/carreau_yasuda
-   flow/cross
-   flow/herschel_bulkley
-   flow/bingham
+   flow/index
 
 .. toctree::
    :maxdepth: 1
@@ -59,23 +42,22 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    multi_mode/generalized_maxwell
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Soft Glassy Rheology (SGR)
 
-   sgr/sgr_conventional
-   sgr/sgr_generic
+   sgr/index
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Shear Transformation Zone (STZ)
 
-   stz/stz_conventional
+   stz/index
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Hébraud–Lequeux (HL)
 
-   hl/hebraud_lequeux
+   hl/index
 
 .. toctree::
    :maxdepth: 2
@@ -90,11 +72,10 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    fluidity/index
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Sequence of Physical Processes (SPP)
 
-   spp/spp_decomposer
-   spp/spp_yield_stress
+   spp/index
 
 .. toctree::
    :maxdepth: 2

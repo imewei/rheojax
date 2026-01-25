@@ -12,8 +12,7 @@ Quick Reference
 **Test modes:** Oscillation, relaxation, creep
 **Material examples:** Cross-linked networks, filled elastomers, hydrogels, biological tissues
 
-.. seealso::
-   :doc:`/user_guide/fractional_viscoelasticity_reference` — Mathematical foundations of fractional calculus, SpringPot element, Mittag-Leffler functions, and physical meaning of fractional order α.
+.. include:: /_includes/fractional_seealso.rst
 
 Overview
 --------

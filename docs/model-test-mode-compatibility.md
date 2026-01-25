@@ -2,6 +2,8 @@
 
 This document provides a comprehensive overview of which rheological models support each test mode in RheoJAX.
 
+**Last Updated:** January 25, 2026
+
 ## Test Modes Overview
 
 | Test Mode | Domain | Description |
@@ -10,6 +12,9 @@ This document provides a comprehensive overview of which rheological models supp
 | **creep** | Time | Strain development under constant stress (increasing response) |
 | **oscillation** | Frequency | Small amplitude oscillatory shear (SAOS) |
 | **rotation** | Steady | Steady shear flow |
+| **flow_curve** | Steady | Steady-state flow curve (stress vs shear rate) |
+| **startup** | Transient | Stress overshoot during startup of steady shear |
+| **laos** | Nonlinear | Large amplitude oscillatory shear (waveform analysis) |
 
 ---
 
@@ -65,34 +70,49 @@ This document provides a comprehensive overview of which rheological models supp
 
 ## Quick Reference Matrix
 
-| Model | Relaxation | Creep | Oscillation | Rotation |
-|-------|:----------:|:-----:|:-----------:|:--------:|
-| Maxwell | ✓ | ✓ | ✓ | ✓ |
-| Zener | ✓ | ✓ | ✓ | ✓ |
-| SpringPot | ✓ | ✓ | ✓ | ✗ |
-| PowerLaw | ✗ | ✗ | ✗ | ✓ |
-| Bingham | ✗ | ✗ | ✗ | ✓ |
-| HerschelBulkley | ✗ | ✗ | ✗ | ✓ |
-| Carreau | ✗ | ✗ | ✗ | ✓ |
-| Cross | ✗ | ✗ | ✗ | ✓ |
-| CarreauYasuda | ✗ | ✗ | ✗ | ✓ |
-| GeneralizedMaxwell | ✓ | ✓ | ✓ | ✗ |
-| FractionalMaxwellModel | ✓ | ✓ | ✓ | ✗ |
-| FractionalMaxwellLiquid | ✓ | ✓ | ✓ | ✗ |
-| FractionalMaxwellGel | ✓ | ✓ | ✓ | ✗ |
-| FractionalKelvinVoigt | ✓ | ✓ | ✓ | ✗ |
-| FractionalZenerSolidSolid | ✓ | ✓ | ✓ | ✗ |
-| FractionalZenerSolidLiquid | ✓ | ✓ | ✓ | ✗ |
-| FractionalZenerLiquidLiquid | ✓ | ✓ | ✓ | ~ |
-| FractionalKelvinVoigtZener | ✓ | ✓ | ✓ | ✗ |
-| FractionalPoyntingThomson | ✓ | ✓ | ✓ | ✗ |
-| FractionalBurgersModel | ✓ | ✓ | ✓ | ~ |
-| FractionalJeffreysModel | ✓ | ✓ | ✓ | ✓ |
-| SGRConventional | ✗ | ✗ | ✓ | ✗ |
-| SGRGeneric | ✗ | ✗ | ✓ | ✗ |
-| SPPYieldStress | ✗ | ✗ | ✓ | ✓ |
+| Model | Relaxation | Creep | Oscillation | Rotation | Flow Curve | Startup | LAOS |
+|-------|:----------:|:-----:|:-----------:|:--------:|:----------:|:-------:|:----:|
+| Maxwell | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Zener | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| SpringPot | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| PowerLaw | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ |
+| Bingham | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ |
+| HerschelBulkley | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ |
+| Carreau | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ |
+| Cross | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ |
+| CarreauYasuda | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ |
+| GeneralizedMaxwell | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalMaxwellModel | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalMaxwellLiquid | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalMaxwellGel | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalKelvinVoigt | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalZenerSolidSolid | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalZenerSolidLiquid | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalZenerLiquidLiquid | ✓ | ✓ | ✓ | ~ | ✗ | ✗ | ✗ |
+| FractionalKelvinVoigtZener | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalPoyntingThomson | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| FractionalBurgersModel | ✓ | ✓ | ✓ | ~ | ✗ | ✗ | ✗ |
+| FractionalJeffreysModel | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| SGRConventional | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ |
+| SGRGeneric | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ |
+| SPPYieldStress | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| SPPDecomposer | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| ITTMCTSchematic | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
+| ITTMCTIsotropic | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
+| DMTLocal | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
+| DMTNonlocal | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ |
+| FluiditySaramitoLocal | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
+| FluiditySaramitoNonlocal | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ |
+| STZConventional | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ |
+| HebraudLequeux | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
+| MIKH | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ |
+| MLIKH | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ |
+| LatticeEPM | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ |
+| TensorialEPM | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ |
 
 **Legend:** ✓ = Full support | ~ = Partial support | ✗ = Not supported
+
+**Total Models:** 38 (up from 24 in v0.5.0)
 
 ---
 
@@ -136,8 +156,38 @@ All rotation-only models for steady shear characterization:
 - **SGRConventional**: Sollich 1998 statistical mechanics (foams, emulsions, pastes)
 - **SGRGeneric**: GENERIC thermodynamic framework (Fuereder & Ilg 2013)
 
-### SPP Yield Stress (1 model)
-- **SPPYieldStress**: Sequence of Physical Processes for LAOS amplitude sweeps
+### SPP LAOS Analysis (2 components)
+- **SPPDecomposer**: Sequence of Physical Processes transform for LAOS waveform decomposition
+  - Supports Fourier domain filtering (n_harmonics=39 default) and numerical differentiation methods
+  - Extracts instantaneous moduli G'_t(t), G''_t(t), TNB frame vectors
+  - Computes cage modulus, static/dynamic yield stresses
+- **SPPYieldStress**: Power-law model for SPP-extracted yield stresses from amplitude sweeps
+
+### Shear Transformation Zone (1 model)
+- **STZConventional**: Amorphous solid plasticity (Falk & Langer)
+
+### ITT-MCT Models (2 models)
+- **ITTMCTSchematic**: F₁₂ schematic mode-coupling (glass transition, memory kernel)
+- **ITTMCTIsotropic**: Isotropic MCT with structure factor input
+
+### DMT Thixotropic (2 models)
+- **DMTLocal**: de Souza Mendes-Thompson structural kinetics (0D)
+- **DMTNonlocal**: Nonlocal variant with spatial diffusion (shear banding)
+
+### Fluidity-Saramito EVP (2 models)
+- **FluiditySaramitoLocal**: Tensorial EVP with fluidity evolution (0D)
+- **FluiditySaramitoNonlocal**: Nonlocal variant for shear banding
+
+### EPM Models (2 models)
+- **LatticeEPM**: Lattice-based elastoplastic model
+- **TensorialEPM**: Tensorial elastoplastic model
+
+### Hébraud-Lequeux (1 model)
+- **HebraudLequeux**: Mean-field model for soft glassy materials
+
+### IKH Kinematic Hardening (2 models)
+- **MIKH**: Modified IKH with aging/rejuvenation
+- **MLIKH**: Machine-learning enhanced IKH
 
 ---
 
