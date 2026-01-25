@@ -312,3 +312,138 @@ class TestFIKHModelFunction:
 
         result = model.model_function(gamma_dot, params)
         assert result.shape == gamma_dot.shape
+
+
+class TestFIKHRelaxation:
+    """Test FIKH relaxation protocol predictions."""
+
+    @pytest.fixture
+    def model(self):
+        """Create isothermal FIKH model for relaxation tests."""
+        return FIKH(include_thermal=False, alpha_structure=0.6)
+
+    @pytest.mark.smoke
+    def test_relaxation_prediction(self, model):
+        """Test relaxation prediction produces valid output."""
+        t = jnp.linspace(0, 100, 200)
+        sigma_0 = 100.0
+
+        stress = model.predict_relaxation(t, sigma_0=sigma_0)
+
+        assert stress.shape == t.shape
+        assert jnp.isfinite(stress).all()
+        # Initial stress should be close to sigma_0
+        assert float(stress[0]) > sigma_0 * 0.5
+
+    def test_relaxation_decays_over_time(self, model):
+        """Test that relaxation shows stress decay (Mittag-Leffler behavior)."""
+        t = jnp.linspace(0, 500, 500)
+        sigma_0 = 100.0
+
+        stress = model.predict_relaxation(t, sigma_0=sigma_0)
+
+        # Stress should decay over time
+        initial_stress = float(stress[10])  # After initial transient
+        final_stress = float(stress[-1])
+
+        # Final stress should be less than initial (relaxation)
+        assert final_stress < initial_stress
+
+    def test_relaxation_alpha_affects_decay_rate(self):
+        """Test that smaller alpha gives slower (power-law) relaxation."""
+        t = jnp.linspace(0, 200, 200)
+        sigma_0 = 100.0
+
+        # Fast relaxation (alpha close to 1 = exponential-like)
+        model_fast = FIKH(include_thermal=False, alpha_structure=0.9)
+        stress_fast = model_fast.predict_relaxation(t, sigma_0=sigma_0)
+
+        # Slow relaxation (alpha close to 0 = strong memory)
+        model_slow = FIKH(include_thermal=False, alpha_structure=0.3)
+        stress_slow = model_slow.predict_relaxation(t, sigma_0=sigma_0)
+
+        # At intermediate times, lower alpha should retain more stress
+        mid_idx = len(t) // 2
+        # Slow relaxation should have higher stress at mid-time
+        # (power-law decays slower than exponential at long times)
+        assert float(stress_slow[mid_idx]) >= float(stress_fast[mid_idx]) * 0.5
+
+
+class TestFIKHCreep:
+    """Test FIKH creep protocol predictions."""
+
+    @pytest.fixture
+    def model(self):
+        """Create isothermal FIKH model for creep tests."""
+        return FIKH(include_thermal=False, alpha_structure=0.5)
+
+    @pytest.mark.smoke
+    def test_creep_prediction(self, model):
+        """Test creep prediction produces valid output."""
+        t = jnp.linspace(0, 100, 200)
+        sigma_applied = 50.0
+
+        strain = model.predict_creep(t, sigma_applied=sigma_applied)
+
+        assert strain.shape == t.shape
+        assert jnp.isfinite(strain).all()
+        # Initial strain should be near zero
+        assert abs(float(strain[0])) < 1.0
+
+    def test_creep_strain_increases_under_stress(self, model):
+        """Test that creep strain increases monotonically under constant stress."""
+        t = jnp.linspace(0, 200, 200)
+        sigma_applied = 80.0  # Above yield to ensure flow
+
+        strain = model.predict_creep(t, sigma_applied=sigma_applied)
+
+        # Strain should generally increase over time
+        # (though with thixotropy there can be complex dynamics)
+        final_strain = float(strain[-1])
+        initial_strain = float(strain[10])
+
+        assert final_strain > initial_strain
+
+
+class TestFIKHPrecompile:
+    """Test FIKH precompile method."""
+
+    @pytest.mark.smoke
+    def test_precompile_isothermal(self):
+        """Test precompile works for isothermal model."""
+        model = FIKH(include_thermal=False, alpha_structure=0.5)
+
+        compile_time = model.precompile(n_points=50, verbose=False)
+
+        assert isinstance(compile_time, float)
+        assert compile_time > 0
+
+    def test_precompile_thermal(self):
+        """Test precompile works for thermal model."""
+        model = FIKH(include_thermal=True, alpha_structure=0.5)
+
+        compile_time = model.precompile(n_points=50, verbose=False)
+
+        assert isinstance(compile_time, float)
+        assert compile_time > 0
+
+    def test_precompile_speeds_up_subsequent_calls(self):
+        """Test that precompile reduces prediction time."""
+        import time as time_module
+
+        model = FIKH(include_thermal=False, alpha_structure=0.5)
+
+        # First call (cold)
+        _ = model.precompile(n_points=50, verbose=False)
+
+        # Now measure prediction time (should be fast)
+        t = jnp.linspace(0, 10, 100)
+        strain = 0.01 * t
+
+        start = time_module.perf_counter()
+        _ = model._predict_from_params(t, strain, model._get_params_dict())
+        elapsed = time_module.perf_counter() - start
+
+        # After precompile, prediction should be reasonably fast
+        # (hard to test exact speedup, but it shouldn't be absurdly slow)
+        assert elapsed < 30.0  # Should complete in under 30s

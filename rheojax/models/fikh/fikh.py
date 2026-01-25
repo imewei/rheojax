@@ -612,6 +612,79 @@ class FIKH(FIKHBase):
             "limiting_case_E_a_0": "Isothermal FIKH behavior",
         }
 
+
+    def precompile(self, n_points: int = 100, verbose: bool = True) -> float:
+        """Precompile JIT kernels for faster subsequent predictions.
+
+        Triggers JAX JIT compilation of the core FIKH kernels by running
+        a small dummy prediction. This is useful when you want to avoid
+        the compilation overhead on first real prediction.
+
+        Args:
+            n_points: Number of time points for dummy data.
+            verbose: Print compilation time if True.
+
+        Returns:
+            Compilation time in seconds.
+
+        Example:
+            >>> model = FIKH(include_thermal=True)
+            >>> compile_time = model.precompile()  # Triggers JIT
+            >>> # Now predictions will be fast
+            >>> sigma = model.predict_startup(t_real, gamma_dot=1.0)
+        """
+        import time as time_module
+
+        # Create dummy data
+        t_dummy = jnp.linspace(0, 10, n_points)
+        strain_dummy = 0.1 * t_dummy  # Linear ramp
+
+        params = self._get_params_dict()
+
+        start = time_module.perf_counter()
+
+        # Trigger isothermal kernel compilation
+        from rheojax.models.fikh._kernels import (
+            fikh_scan_kernel_isothermal,
+            fikh_scan_kernel_thermal,
+        )
+
+        alpha = params.get("alpha_structure", self.alpha_structure)
+
+        # Always compile isothermal kernel
+        _ = fikh_scan_kernel_isothermal(
+            t_dummy,
+            strain_dummy,
+            n_history=self.n_history,
+            alpha=alpha,
+            use_viscosity=True,
+            **params,
+        )
+
+        # Compile thermal kernel if enabled
+        if self.include_thermal:
+            T_init = params.get("T_env", params.get("T_ref", 298.15))
+            _ = fikh_scan_kernel_thermal(
+                t_dummy,
+                strain_dummy,
+                n_history=self.n_history,
+                alpha=alpha,
+                use_viscosity=True,
+                T_init=T_init,
+                **params,
+            )
+
+        elapsed = time_module.perf_counter() - start
+
+        if verbose:
+            logger.info(
+                "FIKH kernels precompiled",
+                compile_time_s=f"{elapsed:.2f}",
+                include_thermal=self.include_thermal,
+            )
+
+        return elapsed
+
     def __repr__(self) -> str:
         """String representation."""
         alpha = self.parameters.get_value("alpha_structure")

@@ -546,7 +546,6 @@ def fikh_return_step_thermal(
 # =============================================================================
 
 
-@jax.jit
 def fikh_maxwell_ode_rhs(
     t: float,
     y: jnp.ndarray,
@@ -648,7 +647,6 @@ def fikh_maxwell_ode_rhs(
         return jnp.array([d_sigma, d_alpha, d_gamma_p, d_lam])
 
 
-@jax.jit
 def fikh_creep_ode_rhs(
     t: float,
     y: jnp.ndarray,
