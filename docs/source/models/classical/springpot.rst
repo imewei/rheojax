@@ -68,18 +68,52 @@ The SpringPot describes materials with **hierarchical or fractal structure** whe
 Connection to Fractional Calculus
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Caputo fractional derivative generalizes integer-order derivatives:
+The Caputo fractional derivative generalizes integer-order derivatives. For
+:math:`n-1 < \alpha < n` (where :math:`n = \lceil\alpha\rceil`):
 
 .. math::
 
-   {}^{C}D_t^{\alpha} f(t) = \frac{1}{\Gamma(1-\alpha)} \int_0^t \frac{f'(s)}{(t-s)^{\alpha}} ds
+   {}^{C}D_t^{\alpha} f(t) = \frac{1}{\Gamma(n-\alpha)} \int_0^t (t-s)^{n-\alpha-1} f^{(n)}(s) \, ds
 
-For viscoelasticity, this represents **memory** of past deformations weighted by a power-law kernel :math:`(t-s)^{-\alpha}`. Unlike exponential memory (Maxwell), power-law memory captures **long-range temporal correlations**.
+**For viscoelastic SpringPot** (:math:`0 < \alpha < 1`, so :math:`n=1`):
+
+.. math::
+
+   {}^{C}D_t^{\alpha} f(t) = \frac{1}{\Gamma(1-\alpha)} \int_0^t \frac{f'(s)}{(t-s)^{\alpha}} \, ds, \quad 0 < \alpha < 1
+
+.. list-table:: Key cases for Caputo derivative order
+   :header-rows: 1
+   :widths: 20 10 70
+
+   * - Order α
+     - n
+     - Formula
+   * - :math:`0 < \alpha < 1`
+     - 1
+     - :math:`\frac{1}{\Gamma(1-\alpha)} \int_0^t (t-s)^{-\alpha} f'(s) \, ds`
+   * - :math:`1 < \alpha < 2`
+     - 2
+     - :math:`\frac{1}{\Gamma(2-\alpha)} \int_0^t (t-s)^{1-\alpha} f''(s) \, ds`
+   * - :math:`2 < \alpha < 3`
+     - 3
+     - :math:`\frac{1}{\Gamma(3-\alpha)} \int_0^t (t-s)^{2-\alpha} f'''(s) \, ds`
+
+**Limiting behavior** (recovers integer derivatives):
+
+- As :math:`\alpha \to 1^-`: :math:`{}^{C}D_t^{\alpha} f(t) \to f'(t)`
+- As :math:`\alpha \to 2^-`: :math:`{}^{C}D_t^{\alpha} f(t) \to f''(t)`
+
+**Memory effect:** The integral form means the fractional derivative depends on
+the *entire history* of :math:`f` from 0 to :math:`t`, not just local behavior.
+This power-law kernel :math:`(t-s)^{-\alpha}` captures **fading memory**—why
+fractional calculus models viscoelastic materials with long-range temporal
+correlations (unlike exponential memory in Maxwell models).
 
 **Physical interpretation of α:**
-   - α → 0: Short-range memory (elastic, spring-like)
-   - α = 0.5: Self-similar memory (critical gel)
-   - α → 1: Long-range memory (viscous, dashpot-like)
+
+- α → 0: Short-range memory (elastic, spring-like)
+- α = 0.5: Self-similar memory (critical gel)
+- α → 1: Long-range memory (viscous, dashpot-like)
 
 Physical Foundation
 -------------------
