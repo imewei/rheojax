@@ -1,6 +1,6 @@
 """Rheological models package.
 
-This package contains 31 rheological models organized into 12 categories.
+This package contains 33 rheological models organized into 13 categories.
 
 Classical Models (3):
     - Maxwell: Spring and dashpot in series
@@ -65,6 +65,10 @@ FIKH (Fractional IKH) Models (2):
     - FIKH: Fractional IKH with Caputo derivative and thermal coupling
     - FMLIKH: Multi-layer variant with per-mode parameters
 
+Giesekus Nonlinear Viscoelastic Models (2):
+    - GiesekusSingleMode: Single-mode Giesekus with shear-thinning and normal stresses
+    - GiesekusMultiMode: Multi-mode extension with N relaxation times
+
 Usage:
     >>> from rheojax.models import Maxwell, Zener, SpringPot
     >>> from rheojax.models import FractionalMaxwellGel, FractionalMaxwellLiquid
@@ -98,6 +102,9 @@ from rheojax.models.dmt import DMTLocal, DMTNonlocal
 
 # EPM models
 from rheojax.models.epm import LatticeEPM, TensorialEPM
+
+# FIKH (Fractional IKH) models
+from rheojax.models.fikh import FIKH, FMLIKH
 
 # Flow models
 from rheojax.models.flow import (
@@ -140,14 +147,14 @@ from rheojax.models.fractional import (
     FractionalZenerSolidSolid,
 )
 
+# Giesekus nonlinear viscoelastic models
+from rheojax.models.giesekus import GiesekusMultiMode, GiesekusSingleMode
+
 # HL models
 from rheojax.models.hl import HebraudLequeux
 
 # IKH models
 from rheojax.models.ikh import MIKH, MLIKH
-
-# FIKH (Fractional IKH) models
-from rheojax.models.fikh import FIKH, FMLIKH
 
 # ITT-MCT models
 from rheojax.models.itt_mct import ITTMCTIsotropic, ITTMCTSchematic
@@ -229,4 +236,7 @@ __all__ = [
     # DMT thixotropic models
     "DMTLocal",
     "DMTNonlocal",
+    # Giesekus nonlinear viscoelastic models
+    "GiesekusSingleMode",
+    "GiesekusMultiMode",
 ]

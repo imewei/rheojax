@@ -25,6 +25,12 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
 
 .. toctree::
    :maxdepth: 2
+   :caption: Nonlinear Viscoelastic (Giesekus)
+
+   giesekus/index
+
+.. toctree::
+   :maxdepth: 2
    :caption: Fractional Models
 
    fractional/index
