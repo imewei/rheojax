@@ -85,8 +85,6 @@ class GiesekusMultiMode(BaseModel):
 
     Attributes
     ----------
-    n_modes : int
-        Number of modes
     parameters : ParameterSet
         Model parameters including per-mode values
     fitted_ : bool
