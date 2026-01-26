@@ -40,7 +40,10 @@ docs/
 │   │   ├── fluidity/              # 2 models (FluiditySaramitoLocal, FluiditySaramitoNonlocal)
 │   │   ├── epm/                   # 2 models (LatticeEPM, TensorialEPM)
 │   │   ├── hl/                    # 1 model (HebraudLequeux)
-│   │   └── ikh/                   # 2 models (MIKH, MLIKH)
+│   │   ├── ikh/                   # 2 models (MIKH, MLIKH)
+│   │   ├── giesekus/              # 2 models (GiesekusSingleMode, GiesekusMultiMode)
+│   │   ├── fikh/                  # 2 models (FIKH, FMLIKH)
+│   │   └── fluidity/              # 2 "pure" fluidity models (distinct from EVP saramito)
 │   │
 │   ├── transforms/                # Transform Reference
 │   │   ├── index.rst
@@ -86,7 +89,7 @@ docs/
 - **Purpose:** Mathematical "what" and "how"
 - **Audience:** Researchers, practitioners
 - **Content:** Full equations, Quick Reference summaries
-- **Size:** ~40,000+ words, 38 models across 14 categories
+- **Size:** ~40,000+ words, 44 models across 17 categories
 
 ### Tier 3: Transform Reference (Preprocessing Math)
 - **Purpose:** Data preprocessing theory
@@ -117,11 +120,11 @@ Working files, reports, and analysis documents are preserved in `.archive/` but 
 
 ✅ **Zero duplication** (down from 40%)
 ✅ **70 learning objectives** across User Guide
-✅ **Quick Reference** on all 38 models
+✅ **Quick Reference** on all 44 models
 ✅ **4 learning pathways** (1-16 weeks)
 ✅ **100+ material database**
 ✅ **Graduate student ready**
-✅ **14 model categories** (Classical, Flow, Fractional, Multi-Mode, SGR, SPP, STZ, ITT-MCT, DMT, Fluidity, EPM, HL, IKH)
+✅ **17 model categories** (Classical, Flow, Fractional, Multi-Mode, SGR, SPP, STZ, ITT-MCT, DMT, Fluidity-EVP, EPM, HL, IKH, Giesekus, FIKH, Pure Fluidity)
 
 ---
 
