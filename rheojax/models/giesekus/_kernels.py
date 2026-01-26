@@ -151,14 +151,22 @@ def _solve_giesekus_f_quartic(
     wi: float,
     alpha: float,
 ) -> float:
-    """Solve the quartic equation for auxiliary function f(Wi).
+    """Solve for the viscosity reduction factor f(Wi, α).
 
-    The steady-state viscosity is η = η_s + η_p·f where f satisfies::
+    The steady-state polymer viscosity is η_p(γ̇) = η_p·f where f ∈ (0, 1]
+    satisfies the Giesekus steady-state momentum balance.
 
-        (1 - f)·(1 - 2α) + Wi²·f²·[(1-f)·α·(2-f) + f·(1-2α)] = 0
+    Uses Newton iteration on the reduced shear stress balance with
+    τ_xx and τ_yy eliminated analytically from the normal stress balances.
+    At steady state in simple shear, the dimensionless component equations
+    (s_ij = τ_ij·λ/η_p, Wi = λγ̇) are::
 
-    This simplifies to a cubic in f for the general case.
-    We use Newton iteration starting from the low-Wi limit f ≈ 1.
+        (1) s_xx - 2Wi·s_xy + α(s_xx² + s_xy²) = 0
+        (2) s_yy + α(s_xy² + s_yy²) = 0
+        (3) s_xy - Wi·s_yy + α·s_xy·(s_xx + s_yy) = Wi
+
+    With s_xy = Wi·f, equations (1)-(2) give s_xx(f) and s_yy(f) in
+    closed form via quadratic formula. The residual is (3) / Wi.
 
     Parameters
     ----------
@@ -170,67 +178,86 @@ def _solve_giesekus_f_quartic(
     Returns
     -------
     float
-        Auxiliary function f (dimensionless, 0 < f ≤ 1)
+        Viscosity reduction factor f (dimensionless, 0 < f ≤ 1)
     """
-    # Handle limiting cases
-    wi2 = wi * wi
+    # Limiting cases where f = 1 exactly
+    is_trivial = (alpha < 1e-12) | (wi < 1e-12)
 
-    # Low Wi limit: f → 1
-    # High Wi limit: f → 0 (for α > 0)
+    wi2 = wi * wi
+    # Guard against division by zero in the α > 0 branch
+    alpha_safe = jnp.maximum(alpha, 1e-30)
+
+    # Physical upper bound: disc_yy ≥ 0 requires |2α·Wi·f| ≤ 1
+    f_max = jnp.minimum(
+        0.999 / (2.0 * alpha_safe * jnp.maximum(wi, 1e-10)),
+        1.0 - 1e-10,
+    )
 
     def residual(f_val):
-        # Residual of the implicit equation for f
-        # From Bird et al. (1987) Eq. 4.4-12:
-        # (1-f)(1 + αWi²f²) = Wi²f²(1-2α)(1-f) + Wi²αf²(2-f)(1-f)
-        # Simplified form using f² directly:
-        f2 = f_val * f_val
-        wi2f2 = wi2 * f2
+        s_xy = wi * f_val
+        s_xy2 = s_xy * s_xy
 
-        # Numerator and denominator approach
-        # f satisfies: (1-f²)(1 + α·Wi²·f²) = f[1 + (1-2α)·Wi²·f²]
-        lhs = (1.0 - f2) * (1.0 + alpha * wi2f2)
-        rhs = f_val * (1.0 + (1.0 - 2.0 * alpha) * wi2f2)
-        return lhs - rhs
+        # s_yy from Eq(2): quadratic α·s_yy² + s_yy + α·s_xy² = 0
+        disc_yy = jnp.maximum(1.0 - 4.0 * alpha_safe * alpha_safe * s_xy2, 0.0)
+        s_yy = (-1.0 + jnp.sqrt(disc_yy + 1e-30)) / (2.0 * alpha_safe)
+
+        # s_xx from Eq(1): quadratic α·s_xx² + s_xx - (2Wi·s_xy - α·s_xy²) = 0
+        q_xx = 2.0 * wi * s_xy - alpha_safe * s_xy2
+        disc_xx = jnp.maximum(1.0 + 4.0 * alpha_safe * q_xx, 0.0)
+        s_xx = (-1.0 + jnp.sqrt(disc_xx + 1e-30)) / (2.0 * alpha_safe)
+
+        # Residual from Eq(3) divided by Wi
+        return f_val - s_yy + alpha_safe * f_val * (s_xx + s_yy) - 1.0
 
     def d_residual(f_val):
-        # Derivative of residual w.r.t. f
-        f2 = f_val * f_val
-        wi2f2 = wi2 * f2
+        s_xy = wi * f_val
+        s_xy2 = s_xy * s_xy
 
-        # d/df[(1-f²)(1 + α·Wi²·f²)]
-        # = -2f(1 + α·Wi²·f²) + (1-f²)·2α·Wi²·f
-        d_lhs = (
-            -2.0 * f_val * (1.0 + alpha * wi2f2)
-            + (1.0 - f2) * 2.0 * alpha * wi2 * f_val
+        disc_yy = jnp.maximum(1.0 - 4.0 * alpha_safe * alpha_safe * s_xy2, 0.0)
+        sqrt_disc_yy = jnp.sqrt(disc_yy + 1e-30)
+        s_yy = (-1.0 + sqrt_disc_yy) / (2.0 * alpha_safe)
+
+        q_xx = 2.0 * wi * s_xy - alpha_safe * s_xy2
+        disc_xx = jnp.maximum(1.0 + 4.0 * alpha_safe * q_xx, 0.0)
+        sqrt_disc_xx = jnp.sqrt(disc_xx + 1e-30)
+        s_xx = (-1.0 + sqrt_disc_xx) / (2.0 * alpha_safe)
+
+        # ds_yy/df: chain rule through s_xy = wi·f
+        # ds_yy/ds_xy = -4α²·s_xy / (2α·√disc_yy) = -2α·s_xy / √disc_yy
+        ds_yy_df = -2.0 * alpha_safe * s_xy * wi / (sqrt_disc_yy + 1e-30)
+
+        # ds_xx/df: d(disc_xx)/ds_xy = 4α(2Wi - 2α·s_xy)
+        # ds_xx/ds_xy = 4α(2Wi - 2α·s_xy) / (4α·√disc_xx) = (2Wi - 2α·s_xy)/√disc_xx
+        ds_xx_df = (
+            2.0 * (wi - alpha_safe * s_xy) * wi / (sqrt_disc_xx + 1e-30)
         )
 
-        # d/df[f(1 + (1-2α)·Wi²·f²)]
-        # = (1 + (1-2α)·Wi²·f²) + f·2(1-2α)·Wi²·f
-        d_rhs = (1.0 + (1.0 - 2.0 * alpha) * wi2f2) + 2.0 * f_val * (
-            1.0 - 2.0 * alpha
-        ) * wi2 * f_val
+        # dR/df = 1 - ds_yy/df + α(s_xx+s_yy) + α·f·(ds_xx/df + ds_yy/df)
+        return (
+            1.0
+            - ds_yy_df
+            + alpha_safe * (s_xx + s_yy)
+            + alpha_safe * f_val * (ds_xx_df + ds_yy_df)
+        )
 
-        return d_lhs - d_rhs
+    # Initial guess interpolating between asymptotic limits
+    # Low Wi: f ≈ 1 - α·Wi² (first-order perturbation)
+    f_low = jnp.maximum(1.0 - alpha_safe * wi2, 0.3)
+    # High Wi: f approaches f_max = 1/(2α·Wi) from below
+    f_high = 0.9 * f_max
+    f_init = jnp.where(wi < 1.0, jnp.minimum(f_low, f_max), f_high)
 
-    # Initial guess: interpolate between limits
-    # Low Wi: f ≈ 1 - α·Wi² (perturbation)
-    # High Wi: f ≈ 1/(α·Wi) for α > 0
-    f_low = jnp.maximum(1.0 - alpha * wi2, 0.1)
-    f_high = jnp.where(alpha > 1e-10, 1.0 / (1.0 + alpha * wi), 0.99)
-    f_init = jnp.where(wi < 1.0, f_low, f_high)
-
-    # Newton iteration (4-6 iterations typically sufficient)
+    # Newton iteration with damping
     def newton_step(f_val, _):
         res = residual(f_val)
         dres = d_residual(f_val)
-        # Damped Newton with bounds
         delta = res / jnp.where(jnp.abs(dres) > 1e-20, dres, 1e-20)
-        f_new = f_val - 0.8 * delta  # Damping for stability
-        return jnp.clip(f_new, 1e-10, 1.0 - 1e-10), None
+        f_new = f_val - 0.7 * delta
+        return jnp.clip(f_new, 1e-10, f_max), None
 
-    f_final, _ = jax.lax.scan(newton_step, f_init, None, length=10)
+    f_final, _ = jax.lax.scan(newton_step, f_init, None, length=20)
 
-    return f_final
+    return jnp.where(is_trivial, 1.0, f_final)
 
 
 @jax.jit
@@ -812,7 +839,6 @@ def giesekus_multimode_ode_rhs(
     eta_p_modes: jnp.ndarray,
     lambda_modes: jnp.ndarray,
     alpha_modes: jnp.ndarray,
-    n_modes: int,
 ) -> jnp.ndarray:
     """ODE right-hand side for multi-mode Giesekus dynamics.
 
@@ -835,15 +861,14 @@ def giesekus_multimode_ode_rhs(
         Relaxation times for each mode (s), shape (N,)
     alpha_modes : jnp.ndarray
         Mobility factors for each mode, shape (N,)
-    n_modes : int
-        Number of modes N
 
     Returns
     -------
     jnp.ndarray
         Time derivatives, shape (4*N,)
     """
-    # Reshape state: (N, 4)
+    # Reshape state: (N, 4) — n_modes derived from array shape (static at trace time)
+    n_modes = eta_p_modes.shape[0]
     state_reshaped = state.reshape((n_modes, 4))
 
     def single_mode_rhs(mode_state, mode_params):

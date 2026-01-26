@@ -989,9 +989,9 @@ class GiesekusSingleMode(GiesekusBase):
 
             # Numerical integration (trapezoidal)
             dt = t[1] - t[0]
-            sigma_n_prime = 2 * np.trapz(stress * sin_basis, dx=dt) / (t[-1] - t[0])
+            sigma_n_prime = 2 * np.trapezoid(stress * sin_basis, dx=dt) / (t[-1] - t[0])
             sigma_n_double_prime = (
-                2 * np.trapz(stress * cos_basis, dx=dt) / (t[-1] - t[0])
+                2 * np.trapezoid(stress * cos_basis, dx=dt) / (t[-1] - t[0])
             )
 
             sigma_prime.append(sigma_n_prime)

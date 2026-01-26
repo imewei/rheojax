@@ -568,7 +568,6 @@ class GiesekusMultiMode(BaseModel):
                 args["eta_p"],
                 args["lambda"],
                 args["alpha"],
-                args["n_modes"],
             )
 
         args = {
@@ -576,7 +575,6 @@ class GiesekusMultiMode(BaseModel):
             "eta_p": eta_p_modes,
             "lambda": lambda_modes,
             "alpha": alpha_modes,
-            "n_modes": self._n_modes,
         }
 
         term = diffrax.ODETerm(ode_fn)
@@ -648,7 +646,6 @@ class GiesekusMultiMode(BaseModel):
                 args["eta_p"],
                 args["lambda"],
                 args["alpha"],
-                args["n_modes"],
             )
 
         args = {
@@ -656,7 +653,6 @@ class GiesekusMultiMode(BaseModel):
             "eta_p": eta_p_modes,
             "lambda": lambda_modes,
             "alpha": alpha_modes,
-            "n_modes": self._n_modes,
         }
 
         term = diffrax.ODETerm(ode_fn)

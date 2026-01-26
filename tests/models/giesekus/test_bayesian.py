@@ -192,9 +192,8 @@ class TestCredibleIntervals:
         )
 
         assert "eta_p" in intervals
-        assert "lower" in intervals["eta_p"]
-        assert "upper" in intervals["eta_p"]
-        assert intervals["eta_p"]["lower"] < intervals["eta_p"]["upper"]
+        lower, upper = intervals["eta_p"]
+        assert lower < upper
 
     @pytest.mark.slow
     def test_credible_intervals_contain_true(self):
@@ -229,8 +228,7 @@ class TestCredibleIntervals:
         )
 
         # True value should be within CI (with high probability)
-        eta_p_lower = intervals["eta_p"]["lower"]
-        eta_p_upper = intervals["eta_p"]["upper"]
+        eta_p_lower, eta_p_upper = intervals["eta_p"]
 
         # Allow some tolerance for statistical variation
         assert eta_p_lower < true_eta_p * 1.3
