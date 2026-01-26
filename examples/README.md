@@ -14,12 +14,14 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - Advanced transforms for experimental data analysis (including SRFS)
 - **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**35 Tutorial Notebooks** (all complete ✅) organized into 5 learning paths:
+**47 Tutorial Notebooks** (all complete ✅) organized into 7 learning paths:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
 - **Transform Workflows** (7 notebooks ✅) - Data analysis techniques (+ SRFS)
 - **Bayesian Inference** (7 notebooks ✅) - Uncertainty quantification
 - **Advanced Workflows** (9 notebooks ✅) - Production patterns (+ SGR)
 - **DMT Thixotropic Models** (6 notebooks ✅) - Structural-kinetics thixotropy across all 6 protocols
+- **EPM Mesoscopic Models** (6 notebooks ✅) - Elasto-Plastic Model for amorphous solids across 5 protocols + visualization
+- **SGR Soft Glassy Models** (6 notebooks ✅) - Soft Glassy Rheology across all 6 protocols
 
 ## Prerequisites
 
@@ -250,6 +252,66 @@ Comprehensive tutorials for the de Souza Mendes-Thompson (DMT) structural-kineti
 - Real: emulsion flow curve, laponite clay relaxation (5 aging times), mucus creep compliance
 - Synthetic: startup, SAOS, and LAOS from parameters calibrated to the real emulsion data (3% noise)
 
+### Phase 6: EPM Mesoscopic Models
+
+Comprehensive tutorials for the Elasto-Plastic Model (EPM) — a mesoscopic approach for amorphous solids (glasses, gels, dense emulsions) with lattice-based plastic avalanche dynamics.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-epm-flow-curve.ipynb](epm/01_epm_flow_curve.ipynb)** | Flow curve | Real emulsion φ=0.80 | NLSQ→NUTS, Eshelby propagator, disorder distribution, TensorialEPM N₁ |
+| **[02-epm-saos.ipynb](epm/02_epm_saos.ipynb)** | SAOS | Real polystyrene | G'/G'' from disorder, Cole-Cole, crossover frequency ω_c |
+| **[03-epm-startup.ipynb](epm/03_epm_startup.ipynb)** | Startup shear | Synthetic (calibrated) | Stress overshoot, avalanche onset, N₁(t) evolution, parameter recovery |
+| **[04-epm-creep.ipynb](epm/04_epm_creep.ipynb)** | Creep | Real mucus | Bounded vs unbounded creep, yield stress estimation |
+| **[05-epm-relaxation.ipynb](epm/05_epm_relaxation.ipynb)** | Relaxation | Real polystyrene | Disorder-induced multi-relaxation, relaxation spectrum, SAOS comparison |
+| **[06-epm-visualization.ipynb](epm/06_epm_visualization.ipynb)** | All | Synthetic | Visualization gallery, tensorial fields, von Mises, animations |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — establishes EPM physics and calibrates parameters for Notebook 03
+2. **02-saos**, **04-creep**, and **05-relaxation** use independent real data (any order)
+3. Complete with **06-visualization** for lattice stress field analysis
+
+**Models:**
+- **LatticeEPM**: Scalar stress field, full NLSQ + Bayesian fitting
+- **TensorialEPM**: 3-component stress tensor [σ_xx, σ_yy, σ_xy], forward predictions only (N₁)
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data sources:**
+- Real: emulsion flow curve, polystyrene SAOS, mucus creep, polystyrene relaxation
+- Synthetic: startup from parameters calibrated to the real emulsion data (3% noise)
+
+### Phase 7: SGR Soft Glassy Rheology
+
+Comprehensive tutorials for the Soft Glassy Rheology (SGR) model — a statistical mechanics framework for soft glassy materials (foams, emulsions, pastes, colloidal suspensions) controlled by noise temperature x.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-sgr-flow-curve.ipynb](sgr/01_sgr_flow_curve.ipynb)** | Flow curve | Real emulsions (6 φ) | Volume fraction sweep x(φ), phase regime, shear banding, SGRGeneric |
+| **[02-sgr-stress-relaxation.ipynb](sgr/02_sgr_stress_relaxation.ipynb)** | Relaxation | Real laponite clay (5 aging times) | Power-law G(t)~t^(x-2), aging sweep x(t_wait), thermodynamic consistency |
+| **[03-sgr-saos.ipynb](sgr/03_sgr_saos.ipynb)** | SAOS | Real chia seed gel | Phase regime exploration, power-law scaling, Cole-Cole, SGRGeneric |
+| **[04-sgr-creep.ipynb](sgr/04_sgr_creep.ipynb)** | Creep | Real mucus | Power-law J(t)~t^(2-x), limited-data Bayesian inference |
+| **[05-sgr-startup.ipynb](sgr/05_sgr_startup.ipynb)** | Startup | Synthetic (calibrated) | Stress growth η⁺(t), dynamic_x thixotropy, evolve_x() |
+| **[06-sgr-laos.ipynb](sgr/06_sgr_laos.ipynb)** | LAOS | Synthetic (calibrated) | Lissajous curves, Fourier harmonics, Chebyshev decomposition |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — calibrates parameters for Notebooks 05 and 06
+2. **02-relaxation**, **03-saos**, and **04-creep** use independent real data (any order)
+3. Complete with **05-startup** and **06-laos** for nonlinear protocols
+
+**Models:**
+- **SGRConventional** (Sollich 1998): Primary model in all 6 notebooks, all protocols
+- **SGRGeneric** (Fuereder & Ilg 2013): Thermodynamic GENERIC framework, compared in NB 01-03
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data sources:**
+- Real: emulsion flow curves (6 volume fractions), laponite clay relaxation (5 aging times), chia seed gel SAOS, mucus creep
+- Synthetic: startup and LAOS from parameters calibrated to real emulsion data (3% noise)
+
 ## Quick Reference
 
 ### By Topic
@@ -290,6 +352,18 @@ Comprehensive tutorials for the de Souza Mendes-Thompson (DMT) structural-kineti
 | DMT Creep | [dmt/04-dmt-creep](dmt/04_dmt_creep.ipynb) | DMT | ✅ Complete |
 | DMT SAOS | [dmt/05-dmt-saos](dmt/05_dmt_saos.ipynb) | DMT | ✅ Complete |
 | DMT LAOS | [dmt/06-dmt-laos](dmt/06_dmt_laos.ipynb) | DMT | ✅ Complete |
+| EPM Flow Curve | [epm/01-epm-flow-curve](epm/01_epm_flow_curve.ipynb) | EPM | ✅ Complete |
+| EPM SAOS | [epm/02-epm-saos](epm/02_epm_saos.ipynb) | EPM | ✅ Complete |
+| EPM Startup | [epm/03-epm-startup](epm/03_epm_startup.ipynb) | EPM | ✅ Complete |
+| EPM Creep | [epm/04-epm-creep](epm/04_epm_creep.ipynb) | EPM | ✅ Complete |
+| EPM Relaxation | [epm/05-epm-relaxation](epm/05_epm_relaxation.ipynb) | EPM | ✅ Complete |
+| EPM Visualization | [epm/06-epm-visualization](epm/06_epm_visualization.ipynb) | EPM | ✅ Complete |
+| SGR Flow Curve | [sgr/01-sgr-flow-curve](sgr/01_sgr_flow_curve.ipynb) | SGR | ✅ Complete |
+| SGR Stress Relaxation | [sgr/02-sgr-stress-relaxation](sgr/02_sgr_stress_relaxation.ipynb) | SGR | ✅ Complete |
+| SGR SAOS | [sgr/03-sgr-saos](sgr/03_sgr_saos.ipynb) | SGR | ✅ Complete |
+| SGR Creep | [sgr/04-sgr-creep](sgr/04_sgr_creep.ipynb) | SGR | ✅ Complete |
+| SGR Startup | [sgr/05-sgr-startup](sgr/05_sgr_startup.ipynb) | SGR | ✅ Complete |
+| SGR LAOS | [sgr/06-sgr-laos](sgr/06_sgr_laos.ipynb) | SGR | ✅ Complete |
 
 ### By API Level
 
