@@ -14,7 +14,7 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - Advanced transforms for experimental data analysis (including SRFS)
 - **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**47 Tutorial Notebooks** (all complete ✅) organized into 7 learning paths:
+**59 Tutorial Notebooks** (all complete ✅) organized into 9 learning paths:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
 - **Transform Workflows** (7 notebooks ✅) - Data analysis techniques (+ SRFS)
 - **Bayesian Inference** (7 notebooks ✅) - Uncertainty quantification
@@ -22,6 +22,8 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - **DMT Thixotropic Models** (6 notebooks ✅) - Structural-kinetics thixotropy across all 6 protocols
 - **EPM Mesoscopic Models** (6 notebooks ✅) - Elasto-Plastic Model for amorphous solids across 5 protocols + visualization
 - **SGR Soft Glassy Models** (6 notebooks ✅) - Soft Glassy Rheology across all 6 protocols
+- **STZ Amorphous Solid Models** (6 notebooks ✅) - Shear Transformation Zones across all 6 protocols
+- **HL Hébraud-Lequeux Models** (6 notebooks ✅) - Mean-field elastoplastic model across all 6 protocols
 
 ## Prerequisites
 
@@ -312,6 +314,66 @@ Comprehensive tutorials for the Soft Glassy Rheology (SGR) model — a statistic
 - Real: emulsion flow curves (6 volume fractions), laponite clay relaxation (5 aging times), chia seed gel SAOS, mucus creep
 - Synthetic: startup and LAOS from parameters calibrated to real emulsion data (3% noise)
 
+### Phase 8: STZ Shear Transformation Zone Models
+
+Comprehensive tutorials for the Shear Transformation Zone (STZ) model — a microscopic theory for plastic flow in amorphous solids (metallic glasses, colloidal glasses, dense emulsions) based on effective temperature dynamics.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-stz-flow-curve.ipynb](stz/01_stz_flow_curve.ipynb)** | Flow curve | Synthetic (arctanh) | Arctanh formula, C/T kernels, chi_inf activation, 4-parameter steady state |
+| **[02-stz-startup-shear.ipynb](stz/02_stz_startup_shear.ipynb)** | Startup shear | Synthetic (calibrated) | Stress overshoot, chi evolution, Lambda dynamics, variant comparison |
+| **[03-stz-stress-relaxation.ipynb](stz/03_stz_stress_relaxation.ipynb)** | Relaxation | Real laponite clay (5 ages) | Physical aging, chi_inf(t_wait), STZ vs SGR comparison |
+| **[04-stz-creep.ipynb](stz/04_stz_creep.ipynb)** | Creep | Real mucus | Yield bifurcation, sub-yield vs super-yield, chi trajectory |
+| **[05-stz-saos.ipynb](stz/05_stz_saos.ipynb)** | SAOS | Real polystyrene (ps145) | Maxwell approximation, tau_eff, crossover, Cole-Cole |
+| **[06-stz-laos.ipynb](stz/06_stz_laos.ipynb)** | LAOS | Synthetic (calibrated) | Lissajous curves, Fourier harmonics I3/I1, variant comparison |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — calibrates parameters for Notebooks 02 and 06
+2. **03-relaxation**, **04-creep**, and **05-saos** use independent real data (any order)
+3. Complete with **06-laos** for nonlinear oscillatory analysis
+
+**Models:**
+- **STZConventional**: 3 variants (minimal/standard/full) controlling state variable complexity
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data sources:**
+- Synthetic: flow curve (NB01, arctanh formula with known params), startup (NB02) and LAOS (NB06) from NB01 params (3% noise)
+- Real: laponite clay relaxation (5 aging times), mucus creep, polystyrene SAOS
+
+### Phase 9: HL Hébraud-Lequeux Models
+
+Comprehensive tutorials for the Hébraud-Lequeux (HL) mean-field elastoplastic model — a mesoscopic approach for yield-stress fluids (emulsions, foams, pastes, colloidal glasses) based on stress block dynamics with stochastic yielding.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-hl-flow-curve.ipynb](hl/01_hl_flow_curve.ipynb)** | Flow curve | Real emulsion (6 φ) | Yield stress extraction, volume fraction sweep α(φ), P(glass) |
+| **[02-hl-relaxation.ipynb](hl/02_hl_relaxation.ipynb)** | Relaxation | Real laponite clay (5 t_w) | Incomplete relaxation, aging sweep α(t_w), glass signature |
+| **[03-hl-creep.ipynb](hl/03_hl_creep.ipynb)** | Creep | Real polystyrene (5 T) | Delayed yielding, temperature sweep α(T), identifiability |
+| **[04-hl-saos.ipynb](hl/04_hl_saos.ipynb)** | SAOS | Synthetic (calibrated) | G'/G'' analysis, glass vs fluid, Cole-Cole plots |
+| **[05-hl-startup.ipynb](hl/05_hl_startup.ipynb)** | Startup | Synthetic (calibrated) | Stress overshoot, τ from transients, shear rate effects |
+| **[06-hl-laos.ipynb](hl/06_hl_laos.ipynb)** | LAOS | Synthetic (calibrated) | Lissajous curves, Fourier harmonics I₃/I₁, nonlinearity |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — calibrates parameters for Notebooks 04-06
+2. **02-relaxation** and **03-creep** use independent real data (any order)
+3. Complete with **04-saos**, **05-startup**, and **06-laos** for oscillatory/transient analysis
+
+**Key Physics:**
+- **Coupling parameter α**: Controls glass (α < 0.5) vs fluid (α ≥ 0.5) behavior
+- **P(glass) = P(α < 0.5)**: Bayesian phase classification from posteriors
+- **Incomplete relaxation**: Glass phase signature (G(t→∞) > 0)
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data sources:**
+- Real: emulsion flow curves (6 volume fractions), laponite clay relaxation (5 aging times), polystyrene creep (5 temperatures)
+- Synthetic: SAOS, startup, and LAOS from parameters calibrated to real emulsion data (3% noise)
+
 ## Quick Reference
 
 ### By Topic
@@ -364,6 +426,18 @@ Comprehensive tutorials for the Soft Glassy Rheology (SGR) model — a statistic
 | SGR Creep | [sgr/04-sgr-creep](sgr/04_sgr_creep.ipynb) | SGR | ✅ Complete |
 | SGR Startup | [sgr/05-sgr-startup](sgr/05_sgr_startup.ipynb) | SGR | ✅ Complete |
 | SGR LAOS | [sgr/06-sgr-laos](sgr/06_sgr_laos.ipynb) | SGR | ✅ Complete |
+| STZ Flow Curve | [stz/01-stz-flow-curve](stz/01_stz_flow_curve.ipynb) | STZ | ✅ Complete |
+| STZ Startup Shear | [stz/02-stz-startup-shear](stz/02_stz_startup_shear.ipynb) | STZ | ✅ Complete |
+| STZ Stress Relaxation | [stz/03-stz-stress-relaxation](stz/03_stz_stress_relaxation.ipynb) | STZ | ✅ Complete |
+| STZ Creep | [stz/04-stz-creep](stz/04_stz_creep.ipynb) | STZ | ✅ Complete |
+| STZ SAOS | [stz/05-stz-saos](stz/05_stz_saos.ipynb) | STZ | ✅ Complete |
+| STZ LAOS | [stz/06-stz-laos](stz/06_stz_laos.ipynb) | STZ | ✅ Complete |
+| HL Flow Curve | [hl/01-hl-flow-curve](hl/01_hl_flow_curve.ipynb) | HL | ✅ Complete |
+| HL Relaxation | [hl/02-hl-relaxation](hl/02_hl_relaxation.ipynb) | HL | ✅ Complete |
+| HL Creep | [hl/03-hl-creep](hl/03_hl_creep.ipynb) | HL | ✅ Complete |
+| HL SAOS | [hl/04-hl-saos](hl/04_hl_saos.ipynb) | HL | ✅ Complete |
+| HL Startup | [hl/05-hl-startup](hl/05_hl_startup.ipynb) | HL | ✅ Complete |
+| HL LAOS | [hl/06-hl-laos](hl/06_hl_laos.ipynb) | HL | ✅ Complete |
 
 ### By API Level
 
