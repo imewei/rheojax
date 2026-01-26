@@ -1,7 +1,8 @@
 .. _model-giesekus:
 
-Giesekus Model
-==============
+===========================
+Giesekus Model — Handbook
+===========================
 
 Quick Reference
 ---------------
@@ -12,6 +13,8 @@ Quick Reference
 - **Diagnostic:** :math:`N_2/N_1 = -\alpha/2` (direct experimental route to :math:`\alpha`)
 - **Test modes:** Flow curve, oscillation, startup, relaxation, creep, LAOS
 - **Material examples:** Polymer melts, concentrated solutions, wormlike micelles
+
+----
 
 Notation Guide
 --------------
@@ -38,12 +41,26 @@ Notation Guide
      - Elastic modulus, :math:`G = \eta_p / \lambda`
    * - :math:`\text{Wi}`
      - Weissenberg number, :math:`\text{Wi} = \lambda \dot{\gamma}`
+   * - :math:`\text{De}`
+     - Deborah number, :math:`\text{De} = \lambda / t_{\text{obs}}`
    * - :math:`N_1`
      - First normal stress difference, :math:`N_1 = \tau_{xx} - \tau_{yy}`
    * - :math:`N_2`
      - Second normal stress difference, :math:`N_2 = \tau_{yy} - \tau_{zz}`
+   * - :math:`\Psi_1`
+     - First normal stress coefficient, :math:`\Psi_1 = N_1 / \dot{\gamma}^2`
+   * - :math:`\Psi_2`
+     - Second normal stress coefficient, :math:`\Psi_2 = N_2 / \dot{\gamma}^2`
+   * - :math:`\eta^*`
+     - Complex viscosity, :math:`\eta^* = \eta' - i\eta''`
+   * - :math:`J(t)`
+     - Creep compliance, :math:`J(t) = \gamma(t) / \sigma_0`
    * - :math:`\overset{\nabla}{\boldsymbol{\tau}}`
      - Upper-convected derivative (frame-invariant time derivative)
+   * - :math:`\mathbf{c}`
+     - Conformation tensor (average molecular conformation)
+
+----
 
 Overview
 --------
@@ -65,10 +82,10 @@ a direct experimental route to determine the mobility parameter :math:`\alpha`.
 Historical Context
 ~~~~~~~~~~~~~~~~~~
 
-Hanswalter Giesekus introduced this model in 1982 as a "simple constitutive equation
-based on the concept of deformation-dependent tensorial mobility." The key insight
-was that molecular mobility in polymer melts is not isotropic—molecules aligned by
-flow experience different friction in different directions.
+Hanswalter Giesekus introduced this model in 1982 [1]_ as a "simple constitutive
+equation based on the concept of deformation-dependent tensorial mobility." The key
+insight was that molecular mobility in polymer melts is not isotropic—molecules
+aligned by flow experience different friction in different directions.
 
 The model became widely adopted because:
 
@@ -77,11 +94,13 @@ The model became widely adopted because:
 - The parameter :math:`\alpha` has clear physical interpretation
 - Predictions agree well with experimental data for many polymeric systems
 
+----
+
 Physical Foundations
 --------------------
 
 Molecular Picture: Anisotropic Drag
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Giesekus model arises from considering how polymer chains experience drag
 in a flowing medium. When chains are stretched and aligned by flow:
@@ -98,7 +117,7 @@ The mobility parameter :math:`\alpha` quantifies this anisotropy:
 
 - :math:`\alpha = 0`: Isotropic drag → recovers UCM model
 - :math:`\alpha = 0.5`: Maximum anisotropy → strongest thinning
-- Typical values: 0.1-0.4 for most polymer melts and solutions
+- Typical values: 0.1–0.4 for most polymer melts and solutions
 
 Network Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -113,132 +132,769 @@ where:
 The quadratic :math:`\boldsymbol{\tau} \cdot \boldsymbol{\tau}` term represents the
 stress-induced acceleration of network relaxation.
 
-Derivation from Configuration Tensor
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Stress Decomposition
+~~~~~~~~~~~~~~~~~~~~
 
-The most rigorous derivation uses a configuration tensor :math:`\mathbf{c}` representing
-the average molecular conformation:
+The total Cauchy stress for an incompressible Giesekus fluid is split into solvent
+and polymeric contributions:
 
 .. math::
 
-   \mathbf{c} + \lambda \overset{\nabla}{\mathbf{c}} + \frac{\alpha}{\eta_p}(\mathbf{c} \cdot \boldsymbol{\tau}) = \mathbf{I}
+   \boldsymbol{\sigma} = -p\mathbf{I} + \boldsymbol{\sigma}_s + \boldsymbol{\tau}
 
-Combined with the stress-configuration relation :math:`\boldsymbol{\tau} = G(\mathbf{c} - \mathbf{I})`,
-this yields the Giesekus equation. The anisotropic term :math:`\mathbf{c} \cdot \boldsymbol{\tau}`
-couples stress relaxation to molecular orientation.
+where:
+
+- :math:`\boldsymbol{\sigma}_s = 2\eta_s \mathbf{D}` is the Newtonian solvent stress
+- :math:`\boldsymbol{\tau}` is the polymer extra stress evolving via the Giesekus law
+- :math:`p` is the isotropic pressure
+
+Some texts use :math:`\boldsymbol{\sigma}_p` in place of :math:`\boldsymbol{\tau}` for
+the polymeric stress. Throughout this handbook we use :math:`\boldsymbol{\tau}` to denote
+the polymer contribution, consistent with the rest of RheoJAX documentation.
+
+Conformation Tensor Form
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An alternative and often numerically preferred formulation uses the conformation
+tensor :math:`\mathbf{c}` representing the average molecular conformation. The
+stress–configuration relation is:
+
+.. math::
+
+   \boldsymbol{\tau} = \frac{\eta_p}{\lambda}(\mathbf{c} - \mathbf{I})
+
+The evolution of :math:`\mathbf{c}` follows:
+
+.. math::
+
+   \lambda \overset{\nabla}{\mathbf{c}} + (\mathbf{c} - \mathbf{I}) + \alpha (\mathbf{c} - \mathbf{I})^2 = 0
+
+This form is preferred in CFD applications because it guarantees positive-definiteness
+of :math:`\mathbf{c}` when combined with appropriate numerical methods [14]_.
+
+Material Functions
+~~~~~~~~~~~~~~~~~~
+
+The Giesekus model defines the following material functions, which are measurable
+experimentally:
+
+**Shear viscosity** (from steady shear):
+
+.. math::
+
+   \eta(\dot{\gamma}) = \frac{\sigma_{xy}}{\dot{\gamma}} = \frac{\tau_{xy}}{\dot{\gamma}} + \eta_s
+
+**Complex viscosity** (from oscillatory shear):
+
+.. math::
+
+   \eta^*(\omega) = \eta'(\omega) - i\eta''(\omega)
+
+**Normal stress coefficients** (from steady shear):
+
+.. math::
+
+   \Psi_1(\dot{\gamma}) = \frac{N_1}{\dot{\gamma}^2} = \frac{\tau_{xx} - \tau_{yy}}{\dot{\gamma}^2}
+
+   \Psi_2(\dot{\gamma}) = \frac{N_2}{\dot{\gamma}^2} = \frac{\tau_{yy} - \tau_{zz}}{\dot{\gamma}^2}
+
+**Crossover frequency** (from SAOS):
+
+.. math::
+
+   \omega_c = \frac{1}{\lambda} \quad \text{where } G'(\omega_c) = G''(\omega_c) - \eta_s \omega_c
+
+----
 
 Governing Equations
 -------------------
 
-Constitutive Equation
-~~~~~~~~~~~~~~~~~~~~~
+Kinematics and Notation
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-The complete stress for the Giesekus model is:
+The velocity field :math:`\mathbf{v}(\mathbf{x}, t)` defines the velocity gradient
+tensor :math:`\nabla\mathbf{v}` and the rate-of-deformation tensor:
 
 .. math::
 
-   \boldsymbol{\sigma} = -p\mathbf{I} + 2\eta_s \mathbf{D} + \boldsymbol{\tau}
+   \mathbf{D} = \frac{1}{2}\bigl(\nabla\mathbf{v} + (\nabla\mathbf{v})^T\bigr)
 
-where :math:`\boldsymbol{\tau}` satisfies the Giesekus constitutive equation:
+The **upper-convected derivative** of a tensor :math:`\mathbf{A}` is the
+frame-invariant time derivative:
+
+.. math::
+
+   \overset{\nabla}{\mathbf{A}} = \frac{D\mathbf{A}}{Dt} - (\nabla\mathbf{v})^T \cdot \mathbf{A} - \mathbf{A} \cdot (\nabla\mathbf{v})
+
+where :math:`D/Dt = \partial_t + \mathbf{v} \cdot \nabla` is the material derivative.
+For homogeneous flows (spatially uniform stress), the convective term
+:math:`\mathbf{v} \cdot \nabla\boldsymbol{\tau}` vanishes and the material derivative
+reduces to the ordinary time derivative.
+
+**Simple shear geometry:**
+
+The velocity field :math:`\mathbf{v} = (\dot{\gamma} y, 0, 0)` defines:
+
+.. math::
+
+   \nabla\mathbf{v} = \begin{pmatrix} 0 & \dot{\gamma} & 0 \\ 0 & 0 & 0 \\ 0 & 0 & 0 \end{pmatrix}, \qquad
+   \mathbf{D} = \frac{1}{2}\begin{pmatrix} 0 & \dot{\gamma} & 0 \\ \dot{\gamma} & 0 & 0 \\ 0 & 0 & 0 \end{pmatrix}
+
+The polymer stress tensor in simple shear has the structure:
+
+.. math::
+
+   \boldsymbol{\tau} = \begin{pmatrix} \tau_{xx} & \tau_{xy} & 0 \\ \tau_{xy} & \tau_{yy} & 0 \\ 0 & 0 & \tau_{zz} \end{pmatrix}
+
+Constitutive Equation
+~~~~~~~~~~~~~~~~~~~~~
+
+The polymer stress :math:`\boldsymbol{\tau}` satisfies the Giesekus constitutive
+equation [1]_:
 
 .. math::
 
    \boldsymbol{\tau} + \lambda \overset{\nabla}{\boldsymbol{\tau}} + \frac{\alpha \lambda}{\eta_p} \boldsymbol{\tau} \cdot \boldsymbol{\tau} = 2 \eta_p \mathbf{D}
 
-The upper-convected derivative is:
+The measurable total shear stress is:
 
 .. math::
 
-   \overset{\nabla}{\boldsymbol{\tau}} = \frac{\partial \boldsymbol{\tau}}{\partial t} + \mathbf{v} \cdot \nabla \boldsymbol{\tau} - (\nabla \mathbf{v})^T \cdot \boldsymbol{\tau} - \boldsymbol{\tau} \cdot (\nabla \mathbf{v})
+   \sigma_{xy} = \eta_s \dot{\gamma} + \tau_{xy}
 
-Simple Shear Flow
-~~~~~~~~~~~~~~~~~
-
-For steady simple shear with velocity :math:`v_x = \dot{\gamma} y`, the stress
-components satisfy:
+The normal stress differences are:
 
 .. math::
 
-   \tau_{xx} + \frac{\alpha \lambda}{\eta_p}(\tau_{xx}^2 + \tau_{xy}^2) &= 2\lambda \dot{\gamma} \tau_{xy}
+   N_1 = \tau_{xx} - \tau_{yy}, \qquad N_2 = \tau_{yy} - \tau_{zz}
 
-   \tau_{yy} + \frac{\alpha \lambda}{\eta_p}(\tau_{xy}^2 + \tau_{yy}^2) &= 0
-
-   \tau_{xy} + \frac{\alpha \lambda}{\eta_p}\tau_{xy}(\tau_{xx} + \tau_{yy}) &= \eta_p \dot{\gamma}
-
-These coupled nonlinear equations admit analytical solutions in terms of an
-auxiliary function :math:`f(\text{Wi})`.
-
-Steady-State Viscosity
-~~~~~~~~~~~~~~~~~~~~~~
-
-The steady shear viscosity is:
-
-.. math::
-
-   \eta(\dot{\gamma}) = \eta_s + \eta_p \cdot f(\text{Wi})
-
-where :math:`f(\text{Wi})` is the polymeric viscosity reduction factor satisfying
-an implicit quartic equation. Key limits:
-
-- **Low Wi** (:math:`\text{Wi} \ll 1`): :math:`f \to 1`, so :math:`\eta \to \eta_0 = \eta_p + \eta_s`
-- **High Wi** (:math:`\text{Wi} \gg 1`): :math:`f \sim \text{Wi}^{-1}` for :math:`\alpha > 0`
-
-Normal Stress Differences
+Component-wise ODE System
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Giesekus model predicts:
+In simple shear, the constitutive equation reduces to four coupled ODEs for
+the stress components [3]_:
 
 .. math::
 
-   N_1 = \tau_{xx} - \tau_{yy} > 0 \quad \text{(rod climbing, die swell)}
-
-   N_2 = \tau_{yy} - \tau_{zz} < 0 \quad \text{(secondary flows)}
-
-With the fundamental diagnostic ratio:
+   \frac{d\tau_{xx}}{dt} = -\frac{\tau_{xx}}{\lambda} + 2\dot{\gamma}\,\tau_{xy} - \frac{\alpha}{\eta_p}(\tau_{xx}^2 + \tau_{xy}^2)
 
 .. math::
 
-   \frac{N_2}{N_1} = -\frac{\alpha}{2}
-
-This ratio is **independent of shear rate**, making it an excellent experimental
-route to determine :math:`\alpha`.
-
-SAOS Response
-~~~~~~~~~~~~~
-
-Small-amplitude oscillatory shear (SAOS) is independent of :math:`\alpha` and matches the
-Maxwell model:
+   \frac{d\tau_{yy}}{dt} = -\frac{\tau_{yy}}{\lambda} - \frac{\alpha}{\eta_p}(\tau_{xy}^2 + \tau_{yy}^2)
 
 .. math::
 
-   G'(\omega) = G \frac{(\omega\lambda)^2}{1 + (\omega\lambda)^2}
+   \frac{d\tau_{xy}}{dt} = -\frac{\tau_{xy}}{\lambda} + \dot{\gamma}\,\tau_{yy} - \frac{\alpha}{\eta_p}\tau_{xy}(\tau_{xx} + \tau_{yy}) + \frac{\eta_p}{\lambda}\dot{\gamma}
 
-   G''(\omega) = G \frac{\omega\lambda}{1 + (\omega\lambda)^2} + \eta_s \omega
+.. math::
 
-where :math:`G = \eta_p/\lambda` is the elastic modulus.
+   \frac{d\tau_{zz}}{dt} = -\frac{\tau_{zz}}{\lambda} - \frac{\alpha}{\eta_p}\tau_{zz}^2
 
-Transient Flows
-~~~~~~~~~~~~~~~
+Each equation has three contributions:
 
-**Startup flow** (constant :math:`\dot{\gamma}` from rest):
+1. **Linear relaxation**: :math:`-\tau_{ij}/\lambda` (exponential decay toward equilibrium)
+2. **Convective coupling**: terms involving :math:`\dot{\gamma}\tau_{ij}` (flow-induced stress transfer)
+3. **Quadratic nonlinearity**: terms involving :math:`\alpha \tau^2/\eta_p` (anisotropic drag)
 
-The Giesekus model predicts stress overshoot—a peak stress higher than
-the steady-state value. The overshoot:
+The :math:`\tau_{zz}` component decouples from the other three and relaxes to zero
+from any initial condition.
 
-- Occurs at strain :math:`\gamma \sim O(1)`
-- Increases with Weissenberg number
-- Is more pronounced for larger :math:`\alpha`
+Dimensionless Formulation
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Stress relaxation** (cessation of flow):
+Define dimensionless variables:
 
-Stress decays faster than pure exponential due to the quadratic term:
+- **Weissenberg number**: :math:`\text{Wi} = \lambda \dot{\gamma}`
+- **Dimensionless stress**: :math:`\tau_{ij}^* = \tau_{ij} \lambda / \eta_p`
+- **Dimensionless time**: :math:`t^* = t / \lambda`
+
+The ODEs become:
+
+.. math::
+
+   \frac{d\tau_{xx}^*}{dt^*} = -\tau_{xx}^* + 2\,\text{Wi}\;\tau_{xy}^* - \alpha(\tau_{xx}^{*2} + \tau_{xy}^{*2})
+
+.. math::
+
+   \frac{d\tau_{yy}^*}{dt^*} = -\tau_{yy}^* - \alpha(\tau_{xy}^{*2} + \tau_{yy}^{*2})
+
+.. math::
+
+   \frac{d\tau_{xy}^*}{dt^*} = -\tau_{xy}^* + \text{Wi}\;\tau_{yy}^* - \alpha\,\tau_{xy}^*(\tau_{xx}^* + \tau_{yy}^*) + \text{Wi}
+
+This formulation is useful because:
+
+- All behavior is parameterized by just **two numbers**: :math:`\text{Wi}` and :math:`\alpha`
+- Universal behavior curves collapse data at different rates and relaxation times
+- Improved numerical conditioning when :math:`\eta_p/\lambda` spans many orders of magnitude
+
+Analytical Steady-State Solutions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+At steady state (:math:`d/dt = 0`), the ODE system reduces to a nonlinear algebraic
+system that admits closed-form solutions [1]_ [7]_.
+
+Define the auxiliary discriminant:
+
+.. math::
+
+   \Lambda = \sqrt{1 + 16\,\alpha(1-\alpha)\,\text{Wi}^2}
+
+and the auxiliary function:
+
+.. math::
+
+   f(\text{Wi}) = \frac{1 - \Lambda}{8\,\alpha(1-\alpha)\,\text{Wi}^2}\Bigl[1 + \Lambda + 2(1-2\alpha)\,\text{Wi}^2\Bigr]
+
+The steady-state polymer stress components are:
+
+.. math::
+
+   \tau_{xy,\text{ss}} = \frac{\eta_p}{\lambda} \cdot \frac{(1 - f)\,\text{Wi}}{1 + (1-2\alpha)\,f}
+
+.. math::
+
+   \tau_{xx,\text{ss}} = \frac{\eta_p}{\lambda} \cdot \frac{2\,(1-f)^2\,\text{Wi}^2}{[1 + (1-2\alpha)\,f]\,[1 - \alpha\,f]}
+
+.. math::
+
+   \tau_{yy,\text{ss}} = \frac{\eta_p}{\lambda} \cdot \frac{-2\,\alpha\,f\,(1-f)\,\text{Wi}^2}{[1 + (1-2\alpha)\,f]\,[1 - \alpha\,f]}
+
+.. math::
+
+   \tau_{zz,\text{ss}} = 0
+
+The **steady-state shear viscosity** is:
+
+.. math::
+
+   \eta(\dot{\gamma}) = \eta_s + \eta_p \cdot \frac{1 - f}{1 + (1 - 2\alpha)\,f}
+
+where the term :math:`(1-f)/[1 + (1-2\alpha)\,f]` is the polymeric viscosity reduction
+factor.
+
+**Normal stress coefficients** at steady state:
+
+.. math::
+
+   \Psi_1(\dot{\gamma}) = \frac{\tau_{xx,\text{ss}} - \tau_{yy,\text{ss}}}{\dot{\gamma}^2}, \qquad
+   \Psi_2(\dot{\gamma}) = \frac{\tau_{yy,\text{ss}}}{\dot{\gamma}^2}
+
+Limiting Behaviors
+^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 20 30 30 20
+   :header-rows: 1
+
+   * - Quantity
+     - Low Wi (:math:`\text{Wi} \ll 1`)
+     - High Wi (:math:`\text{Wi} \gg 1`)
+     - Notes
+   * - :math:`\eta`
+     - :math:`\eta_0 = \eta_p + \eta_s`
+     - :math:`\sim \text{Wi}^{-1}`
+     - Shear-thinning
+   * - :math:`\Psi_1`
+     - :math:`\Psi_{1,0} = 2\eta_p\lambda`
+     - :math:`\sim \text{Wi}^{-2}`
+     - Decreases
+   * - :math:`\Psi_2`
+     - :math:`\Psi_{2,0} = -\alpha\,\eta_p\lambda`
+     - :math:`\sim \text{Wi}^{-2}`
+     - Negative
+   * - :math:`N_2/N_1`
+     - :math:`-\alpha`
+     - :math:`-\alpha/2`
+     - Rate-independent at high Wi
+
+----
+
+Protocol-Specific Equations
+----------------------------
+
+This section presents the complete equations for each experimental protocol
+supported by the Giesekus model. Each protocol specifies the imposed
+kinematic or stress condition, the resulting ODE system (or algebraic system),
+initial conditions, and characteristic output observables.
+
+Steady Shear (Flow Curve)
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Protocol:** Constant shear rate :math:`\dot{\gamma} = \text{const}`, solve at
+steady state (:math:`\partial_t \boldsymbol{\tau} = 0`).
+
+**Governing system:** Setting all time derivatives to zero in the component
+ODEs yields the nonlinear algebraic system:
+
+.. math::
+
+   \frac{\tau_{xx}}{\lambda} - 2\dot{\gamma}\,\tau_{xy} + \frac{\alpha}{\eta_p}(\tau_{xx}^2 + \tau_{xy}^2) = 0
+
+.. math::
+
+   \frac{\tau_{yy}}{\lambda} + \frac{\alpha}{\eta_p}(\tau_{xy}^2 + \tau_{yy}^2) = 0
+
+.. math::
+
+   \frac{\tau_{xy}}{\lambda} - \dot{\gamma}\,\tau_{yy} + \frac{\alpha}{\eta_p}\tau_{xy}(\tau_{xx} + \tau_{yy}) = \frac{\eta_p}{\lambda}\dot{\gamma}
+
+.. math::
+
+   \frac{\tau_{zz}}{\lambda} + \frac{\alpha}{\eta_p}\tau_{zz}^2 = 0 \quad \Rightarrow \quad \tau_{zz} = 0
+
+**Solution method:** Use the analytical formulas from the previous section or
+Newton–Raphson iteration.
+
+**Output observables:**
+
+- **Flow curve**: :math:`\sigma_{xy}(\dot{\gamma}) = \eta_s \dot{\gamma} + \tau_{xy,\text{ss}}(\dot{\gamma})`
+- **Viscosity**: :math:`\eta(\dot{\gamma}) = \sigma_{xy}/\dot{\gamma}`
+- **Normal stresses**: :math:`N_1 = \tau_{xx} - \tau_{yy} > 0`, :math:`N_2 = \tau_{yy} < 0`
+
+**Shear-thinning behavior:**
+
+.. list-table::
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Wi range
+     - :math:`\eta` behavior
+     - Physics
+   * - :math:`\text{Wi} \ll 1`
+     - :math:`\eta \approx \eta_0`
+     - Newtonian plateau
+   * - :math:`\text{Wi} \sim 1`
+     - Onset of thinning
+     - Nonlinear drag effects begin
+   * - :math:`\text{Wi} \gg 1`
+     - :math:`\eta \sim \text{Wi}^{-1}`
+     - Power-law region
+
+**Normal stress ratio:**
+
+.. math::
+
+   \frac{N_2}{N_1} \approx -\frac{\alpha}{2} \quad (\text{at high Wi})
+
+This ratio is approximately independent of shear rate, making it the primary
+experimental route to determine :math:`\alpha` [10]_ [11]_.
+
+Startup of Steady Shear
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Protocol:** Apply constant shear rate from rest: :math:`\dot{\gamma}(t) = \dot{\gamma}_0\,H(t)`,
+where :math:`H(t)` is the Heaviside step function.
+
+**Initial conditions:** :math:`\tau_{xx}(0) = \tau_{yy}(0) = \tau_{xy}(0) = \tau_{zz}(0) = 0`
+
+**ODE system:**
+
+.. math::
+
+   \frac{d\tau_{xx}}{dt} = -\frac{\tau_{xx}}{\lambda} + 2\dot{\gamma}_0\,\tau_{xy} - \frac{\alpha}{\eta_p}(\tau_{xx}^2 + \tau_{xy}^2)
+
+.. math::
+
+   \frac{d\tau_{yy}}{dt} = -\frac{\tau_{yy}}{\lambda} - \frac{\alpha}{\eta_p}(\tau_{xy}^2 + \tau_{yy}^2)
+
+.. math::
+
+   \frac{d\tau_{xy}}{dt} = -\frac{\tau_{xy}}{\lambda} + \dot{\gamma}_0\,\tau_{yy} - \frac{\alpha}{\eta_p}\tau_{xy}(\tau_{xx} + \tau_{yy}) + \frac{\eta_p}{\lambda}\dot{\gamma}_0
+
+**Output:** :math:`\sigma_{xy}(t) = \eta_s \dot{\gamma}_0 + \tau_{xy}(t)` and
+:math:`N_1(t) = \tau_{xx}(t) - \tau_{yy}(t)`.
+
+**Characteristic features:**
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Time/strain regime
+     - Behavior
+   * - :math:`t \ll \lambda` (linear elastic)
+     - :math:`\tau_{xy} \approx G\,\dot{\gamma}_0\,t` (affine, slope = :math:`G`)
+   * - :math:`\gamma \sim O(1)` (overshoot)
+     - Stress peaks above steady state, :math:`N_1` also overshoots
+   * - :math:`t \gg \lambda` (steady state)
+     - Stress relaxes to :math:`\tau_{xy,\text{ss}}`
+
+**Overshoot characteristics:**
+
+- **Peak strain**: :math:`\gamma_{\text{peak}} \sim 2\text{–}3` strain units (depends on Wi and :math:`\alpha`)
+- **Overshoot ratio**: :math:`\sigma_{\text{peak}}/\sigma_{\text{ss}}` increases with Wi
+- Higher :math:`\alpha` → smaller overshoot (stronger nonlinear damping)
+- **High-Wi scaling**: :math:`\gamma_{\text{peak}} \sim \text{const}` (2–3), :math:`\sigma_{\text{peak}}/\sigma_{\text{ss}} \sim \text{Wi}^{1/2}`
+
+Stress Relaxation
+~~~~~~~~~~~~~~~~~
+
+**Protocol:** Apply instantaneous step strain :math:`\gamma_0` at :math:`t = 0`, then
+:math:`\dot{\gamma}(t > 0) = 0`.
+
+**Initial conditions** (from instantaneous elastic response):
+
+.. math::
+
+   \tau_{xy}(0^+) = G\,\gamma_0 = \frac{\eta_p}{\lambda}\,\gamma_0
+
+.. math::
+
+   \tau_{xx}(0^+) = 2\,G\,\gamma_0^2
+
+.. math::
+
+   \tau_{yy}(0^+) = 0, \qquad \tau_{zz}(0^+) = 0
+
+**Relaxation ODEs** (with :math:`\dot{\gamma} = 0`):
+
+.. math::
+
+   \frac{d\tau_{xx}}{dt} = -\frac{\tau_{xx}}{\lambda} - \frac{\alpha}{\eta_p}(\tau_{xx}^2 + \tau_{xy}^2)
+
+.. math::
+
+   \frac{d\tau_{yy}}{dt} = -\frac{\tau_{yy}}{\lambda} - \frac{\alpha}{\eta_p}(\tau_{xy}^2 + \tau_{yy}^2)
+
+.. math::
+
+   \frac{d\tau_{xy}}{dt} = -\frac{\tau_{xy}}{\lambda} - \frac{\alpha}{\eta_p}\tau_{xy}(\tau_{xx} + \tau_{yy})
+
+**Linear regime** (small :math:`\gamma_0`, quadratic terms negligible):
+
+.. math::
+
+   G(t) = \frac{\tau_{xy}(t)}{\gamma_0} = G\,e^{-t/\lambda}
+
+**Nonlinear regime** (finite :math:`\gamma_0`):
+
+The quadratic :math:`\alpha`-terms accelerate relaxation when stress is high,
+giving **faster-than-exponential** initial decay:
 
 .. math::
 
    \sigma(t) < \sigma_0 \exp(-t/\lambda)
 
-The quadratic :math:`\boldsymbol{\tau} \cdot \boldsymbol{\tau}` term accelerates
-relaxation when stress is high.
+**Damping function** (quantifies strain-dependent relaxation):
+
+.. math::
+
+   h(\gamma_0) = \frac{G(t, \gamma_0)}{G(t)} \quad \text{at early times}
+
+For the Giesekus model, the instantaneous response obeys the Lodge–Meissner
+rule (:math:`h(\gamma) = 1` at :math:`t = 0^+`), but nonlinear effects emerge
+during the relaxation process.
+
+**Time-strain separability** (approximate):
+
+.. math::
+
+   G(t, \gamma_0) \approx G(t) \cdot h(\gamma_0)
+
+where :math:`G(t) = G\,e^{-t/\lambda}` and :math:`h(\gamma_0)` is the damping function.
+
+Creep (Step Stress)
+~~~~~~~~~~~~~~~~~~~
+
+**Protocol:** Apply constant total shear stress :math:`\sigma_{xy}(t) = \sigma_0\,H(t)`.
+
+**Stress-control closure:** The applied stress constraint gives:
+
+.. math::
+
+   \dot{\gamma}(t) = \frac{\sigma_0 - \tau_{xy}(t)}{\eta_s}
+
+This makes the shear rate a dependent variable computed from the evolving polymer
+stress.
+
+**Coupled ODE system** (5 equations: 4 stress + strain):
+
+.. math::
+
+   \frac{d\tau_{xx}}{dt} = -\frac{\tau_{xx}}{\lambda} + 2\dot{\gamma}\,\tau_{xy} - \frac{\alpha}{\eta_p}(\tau_{xx}^2 + \tau_{xy}^2)
+
+.. math::
+
+   \frac{d\tau_{yy}}{dt} = -\frac{\tau_{yy}}{\lambda} - \frac{\alpha}{\eta_p}(\tau_{xy}^2 + \tau_{yy}^2)
+
+.. math::
+
+   \frac{d\tau_{xy}}{dt} = -\frac{\tau_{xy}}{\lambda} + \dot{\gamma}\,\tau_{yy} - \frac{\alpha}{\eta_p}\tau_{xy}(\tau_{xx} + \tau_{yy}) + \frac{\eta_p}{\lambda}\dot{\gamma}
+
+.. math::
+
+   \frac{d\gamma}{dt} = \dot{\gamma}(t) = \frac{\sigma_0 - \tau_{xy}(t)}{\eta_s}
+
+where :math:`\dot{\gamma}` in the stress equations is evaluated from the closure at
+each time step.
+
+**Initial conditions:** :math:`\tau_{xx} = \tau_{yy} = \tau_{xy} = \tau_{zz} = \gamma = 0`
+
+**Creep compliance:**
+
+.. math::
+
+   J(t) = \frac{\gamma(t)}{\sigma_0}
+
+**Limiting behaviors:**
+
+.. list-table::
+   :widths: 25 35 40
+   :header-rows: 1
+
+   * - Time
+     - :math:`J(t)`
+     - Physics
+   * - :math:`t \to 0^+`
+     - :math:`J_0 = 1/G = \lambda/\eta_p`
+     - Instantaneous elastic compliance
+   * - :math:`t \to \infty`
+     - :math:`J(t) \sim t/\eta_0`
+     - Steady-state viscous flow
+
+**Recovery after unloading** (stress removed at :math:`t = t_1`):
+
+- Elastic strain recovered: :math:`\Delta\gamma_{\text{rec}} \approx \sigma_0/G`
+- Permanent (viscous) strain: :math:`\gamma_{\text{perm}} = \gamma(t_1) - \Delta\gamma_{\text{rec}}`
+
+.. note::
+
+   When :math:`\eta_s = 0` (no solvent), the stress-control closure becomes
+   singular. This case requires a DAE (differential-algebraic equation) solver
+   or reformulation.
+
+Small-Amplitude Oscillatory Shear (SAOS)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Protocol:** :math:`\gamma(t) = \gamma_0 \sin(\omega t)` with :math:`\gamma_0 \ll 1`.
+
+In the linear limit, the quadratic :math:`\alpha`-term is negligible and the Giesekus
+model reduces to the Oldroyd-B/Maxwell response. The SAOS moduli are therefore
+**independent of** :math:`\alpha`:
+
+**Storage modulus:**
+
+.. math::
+
+   G'(\omega) = G \frac{(\omega\lambda)^2}{1 + (\omega\lambda)^2} = \frac{\eta_p \omega^2 \lambda}{1 + (\omega\lambda)^2}
+
+**Loss modulus:**
+
+.. math::
+
+   G''(\omega) = G \frac{\omega\lambda}{1 + (\omega\lambda)^2} + \eta_s \omega = \frac{\eta_p \omega}{1 + (\omega\lambda)^2} + \eta_s \omega
+
+where :math:`G = \eta_p/\lambda` is the elastic modulus.
+
+**Complex viscosity:**
+
+.. math::
+
+   \eta'(\omega) = \frac{\eta_p}{1 + (\omega\lambda)^2} + \eta_s
+
+.. math::
+
+   \eta''(\omega) = \frac{\eta_p \omega\lambda}{1 + (\omega\lambda)^2}
+
+**Limiting behaviors:**
+
+.. list-table::
+   :widths: 25 35 40
+   :header-rows: 1
+
+   * - Frequency
+     - :math:`G'`
+     - :math:`G''`
+   * - :math:`\omega \to 0`
+     - :math:`G' \sim \omega^2`
+     - :math:`G'' \sim \omega`
+   * - :math:`\omega \to \infty`
+     - :math:`G' \to G = \eta_p/\lambda`
+     - :math:`G'' \sim \eta_s \omega` (solvent)
+
+**Crossover frequency:**
+
+.. math::
+
+   \omega_c = 1/\lambda \quad \text{where } G'(\omega_c) = G''(\omega_c) - \eta_s\omega_c
+
+Large-Amplitude Oscillatory Shear (LAOS)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Protocol:** :math:`\gamma(t) = \gamma_0 \sin(\omega t)` with :math:`\gamma_0` finite.
+
+The shear rate is :math:`\dot{\gamma}(t) = \gamma_0 \omega \cos(\omega t)`.
+
+**Full ODE system:** The component equations are the same as the general simple
+shear system with the time-dependent :math:`\dot{\gamma}(t)` inserted:
+
+.. math::
+
+   \frac{d\tau_{xx}}{dt} = -\frac{\tau_{xx}}{\lambda} + 2\dot{\gamma}(t)\,\tau_{xy} - \frac{\alpha}{\eta_p}(\tau_{xx}^2 + \tau_{xy}^2)
+
+.. math::
+
+   \frac{d\tau_{yy}}{dt} = -\frac{\tau_{yy}}{\lambda} - \frac{\alpha}{\eta_p}(\tau_{xy}^2 + \tau_{yy}^2)
+
+.. math::
+
+   \frac{d\tau_{xy}}{dt} = -\frac{\tau_{xy}}{\lambda} + \dot{\gamma}(t)\,\tau_{yy} - \frac{\alpha}{\eta_p}\tau_{xy}(\tau_{xx} + \tau_{yy}) + \frac{\eta_p}{\lambda}\dot{\gamma}(t)
+
+The total shear stress is :math:`\sigma(t) = \tau_{xy}(t) + \eta_s \dot{\gamma}(t)`.
+
+**Fourier decomposition** of the periodic stress response [16]_:
+
+.. math::
+
+   \sigma(t) = \sum_{n=1,3,5,\ldots} \bigl[\sigma_n' \sin(n\omega t) + \sigma_n'' \cos(n\omega t)\bigr]
+
+Only odd harmonics appear due to the symmetry of shear flow.
+
+**First harmonic moduli** (strain-amplitude dependent):
+
+.. math::
+
+   G_1'(\omega, \gamma_0) = \frac{\sigma_1'}{\gamma_0}, \qquad G_1''(\omega, \gamma_0) = \frac{\sigma_1''}{\gamma_0}
+
+**Third harmonic ratio** (primary nonlinearity measure):
+
+.. math::
+
+   I_{3/1} = \frac{\sqrt{\sigma_3'^2 + \sigma_3''^2}}{\sqrt{\sigma_1'^2 + \sigma_1''^2}}
+
+**MAOS scaling** (medium-amplitude regime):
+
+.. math::
+
+   I_{3/1} \sim \gamma_0^2 \quad \text{as } \gamma_0 \to 0
+
+**Chebyshev decomposition:**
+
+.. math::
+
+   \sigma(\gamma, \dot{\gamma}) = \gamma_0 \sum_{n \text{ odd}} \bigl[e_n\,T_n(x) + v_n\,T_n(y)\bigr]
+
+where :math:`x = \gamma/\gamma_0`, :math:`y = \dot{\gamma}/(\gamma_0\omega)`, and
+:math:`T_n` are Chebyshev polynomials.
+
+**Pipkin diagram regimes:**
+
+.. list-table::
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - :math:`\text{De} = \omega\lambda`
+     - :math:`\text{Wi} = \gamma_0 \omega \lambda`
+     - Regime
+   * - Any
+     - :math:`\ll 1`
+     - Linear viscoelastic (SAOS)
+   * - :math:`\ll 1`
+     - Any
+     - Quasi-steady nonlinear
+   * - :math:`\gg 1`
+     - :math:`\gg 1`
+     - Highly nonlinear viscoelastic
+
+**Giesekus LAOS signatures:**
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Feature
+     - Giesekus behavior
+   * - Strain softening
+     - :math:`G_1'` decreases with :math:`\gamma_0` (from :math:`\alpha > 0`)
+   * - Higher harmonics
+     - Present due to quadratic stress term
+   * - Lissajous shape
+     - Ellipse → tilted/distorted at high :math:`\gamma_0`
+   * - :math:`I_{3/1}` scaling
+     - :math:`I_{3/1} \sim \gamma_0^2` in MAOS regime
+
+----
+
+Multi-Mode Giesekus
+--------------------
+
+Motivation
+~~~~~~~~~~
+
+Real polymer systems have a broad spectrum of relaxation times arising from
+polydispersity and the range of molecular conformations. A single-mode Giesekus
+model cannot capture the broad frequency dependence typically observed in
+:math:`G'(\omega)` and :math:`G''(\omega)` data. The multi-mode extension
+addresses this by superposing :math:`N` independent Giesekus modes.
+
+Constitutive Equation
+~~~~~~~~~~~~~~~~~~~~~
+
+The total stress is:
+
+.. math::
+
+   \boldsymbol{\sigma} = -p\mathbf{I} + 2\eta_s\mathbf{D} + \sum_{k=1}^{N} \boldsymbol{\tau}_k
+
+where each mode :math:`k` evolves independently:
+
+.. math::
+
+   \boldsymbol{\tau}_k + \lambda_k \overset{\nabla}{\boldsymbol{\tau}_k} + \frac{\alpha_k \lambda_k}{\eta_{p,k}} \boldsymbol{\tau}_k \cdot \boldsymbol{\tau}_k = 2\eta_{p,k}\,\mathbf{D}
+
+Each mode has its own relaxation time :math:`\lambda_k`, polymer viscosity
+:math:`\eta_{p,k}`, and mobility factor :math:`\alpha_k`.
+
+Linear Viscoelastic Spectra (SAOS)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For multi-mode SAOS, the moduli superpose linearly:
+
+.. math::
+
+   G'(\omega) = \sum_{k=1}^{N} \frac{\eta_{p,k}\,\omega^2\,\lambda_k}{1 + (\omega\lambda_k)^2}
+
+.. math::
+
+   G''(\omega) = \sum_{k=1}^{N} \frac{\eta_{p,k}\,\omega}{1 + (\omega\lambda_k)^2} + \eta_s\,\omega
+
+Zero-Shear Properties
+~~~~~~~~~~~~~~~~~~~~~
+
+.. math::
+
+   \eta_0 = \sum_{k=1}^{N} \eta_{p,k} + \eta_s
+
+.. math::
+
+   \Psi_{1,0} = 2 \sum_{k=1}^{N} \eta_{p,k}\,\lambda_k
+
+.. math::
+
+   \Psi_{2,0} = -\sum_{k=1}^{N} \alpha_k\,\eta_{p,k}\,\lambda_k
+
+Multi-Mode ODE State Vector
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For transient simulations, the state vector has :math:`4N` components (4 stress
+components per mode). Each mode evolves independently with its own parameters
+but shares the same velocity field :math:`\dot{\gamma}(t)`:
+
+.. math::
+
+   \mathbf{y} = [\tau_{xx}^{(1)}, \tau_{yy}^{(1)}, \tau_{xy}^{(1)}, \tau_{zz}^{(1)}, \ldots, \tau_{xx}^{(N)}, \tau_{yy}^{(N)}, \tau_{xy}^{(N)}, \tau_{zz}^{(N)}]
+
+Fitting Strategy
+~~~~~~~~~~~~~~~~
+
+1. **Discrete spectrum from SAOS**: Fit :math:`G_k = \eta_{p,k}/\lambda_k` and :math:`\lambda_k` to SAOS data
+2. **Logarithmic spacing**: Place :math:`\lambda_k` at logarithmically spaced points across the frequency window
+3. **Regularization**: Use non-negative least squares (NNLS) or Tikhonov regularization to avoid overfitting
+4. **Typical mode count**: 5–10 modes cover 4–6 decades in frequency
+5. **Fix** :math:`\alpha_k` **from nonlinear data**: The linear spectrum determines :math:`\eta_{p,k}` and :math:`\lambda_k`; fit :math:`\alpha_k` to flow curve or normal stress data
+
+----
 
 Parameters
 ----------
@@ -300,6 +956,41 @@ Parameter Interpretation
    - Important for dilute/semi-dilute solutions
    - Often negligible for melts (:math:`\eta_s \ll \eta_p`)
 
+Physical Constraints
+~~~~~~~~~~~~~~~~~~~~
+
+- :math:`0 \leq \alpha \leq 0.5` for most physical systems
+- :math:`\alpha > 0.5` can produce unphysical behavior at high Wi (non-monotonic flow curves)
+- :math:`\eta_s \geq 0`, :math:`\lambda > 0`, :math:`\eta_p > 0`
+
+Typical Parameter Ranges by Material
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 25 20 20 15 20
+   :header-rows: 1
+
+   * - Material
+     - :math:`\eta_p` (Pa·s)
+     - :math:`\lambda` (s)
+     - :math:`\alpha`
+     - :math:`\eta_s` (Pa·s)
+   * - Polymer solutions
+     - 0.1–1000
+     - 0.001–10
+     - 0.1–0.5
+     - 0.001–1
+   * - Polymer melts
+     - 100–10\ :sup:`6`
+     - 0.1–1000
+     - 0.1–0.5
+     - ~0
+   * - Wormlike micelles
+     - 1–100
+     - 0.1–10
+     - 0.3–0.5
+     - 0.001–0.1
+
 Derived Quantities
 ~~~~~~~~~~~~~~~~~~
 
@@ -307,6 +998,8 @@ Derived Quantities
 - **Elastic modulus**: :math:`G = \eta_p/\lambda`
 - **Weissenberg number**: :math:`\text{Wi} = \lambda \dot{\gamma}`
 - **Deborah number**: :math:`\text{De} = \lambda/t_{\text{obs}}`
+
+----
 
 Validity and Assumptions
 ------------------------
@@ -359,6 +1052,8 @@ When NOT to Use
 - **Thixotropic materials**: Use fluidity models
 - **Yield stress fluids**: Use EVP models (Saramito)
 
+----
+
 Regimes and Behavior
 --------------------
 
@@ -387,7 +1082,7 @@ Weissenberg Number Regimes
      - Strong shear-thinning
 
 Effect of :math:`\alpha` on Behavior
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :widths: 15 25 30 30
@@ -414,66 +1109,185 @@ Effect of :math:`\alpha` on Behavior
      - −0.25
      - Wormlike micelles
 
+----
+
 What You Can Learn
 ------------------
 
-From Flow Curve Fitting
-~~~~~~~~~~~~~~~~~~~~~~~
+From SAOS Data
+~~~~~~~~~~~~~~
 
-**Primary outputs:**
+**Extractable parameters:** :math:`\eta_p`, :math:`\lambda`, :math:`\eta_s`, :math:`G`
 
-- :math:`\eta_0 = \eta_p + \eta_s`: Zero-shear viscosity (plateau value)
-- :math:`\lambda` **from onset**: Shear rate where thinning begins ≈ :math:`1/\lambda`
-- **Power-law index**: High-Wi slope gives effective n
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
 
-**What this reveals:**
-
-- Molecular weight (via :math:`\eta_0 and \lambda` scaling)
-- Entanglement density
-- Solution concentration effects
-
-From SAOS Fitting
-~~~~~~~~~~~~~~~~~
-
-**Primary outputs:**
-
-- **G =** :math:`\eta_p/\lambda`: From high-frequency G' plateau
-- :math:`\lambda` **from crossover**: Where G' = G''
-- :math:`\eta_s` **from G''**: High-frequency slope
+   * - Observable
+     - Extracted quantity
+   * - :math:`G''/\omega` as :math:`\omega \to 0`
+     - :math:`\eta_0 = \eta_p + \eta_s`
+   * - :math:`G''/\omega` as :math:`\omega \to \infty`
+     - :math:`\eta_s` (high-frequency limit)
+   * - Crossover :math:`G' = G'' - \eta_s\omega`
+     - :math:`\lambda = 1/\omega_c`
+   * - :math:`G'` plateau (:math:`\omega \to \infty`)
+     - :math:`G = \eta_p/\lambda`
 
 **What this reveals:**
 
-- Elastic modulus (network strength)
-- Relaxation spectrum width (single mode = narrow peak)
-- Solvent contribution
+- **Elastic modulus** :math:`G`: Network strength / entanglement density
+- **Relaxation time** :math:`\lambda`: Molecular weight, longest relaxation mode
+- **Relaxation spectrum width**: Single-mode fit quality indicates how narrow/broad the spectrum is
+
+.. note::
+
+   The mobility parameter :math:`\alpha` is **not** determinable from SAOS data because
+   SAOS is :math:`\alpha`-independent (linear regime).
+
+From Steady Shear (Flow Curve)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Extractable parameters:** :math:`\eta_0`, :math:`\lambda` (onset), :math:`\alpha` (shape)
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Observable
+     - Extracted quantity
+   * - Low-rate plateau :math:`\eta(\dot{\gamma} \to 0)`
+     - :math:`\eta_0 = \eta_p + \eta_s`
+   * - Onset shear rate for thinning
+     - :math:`\lambda \approx 1/\dot{\gamma}_{\text{onset}}`
+   * - Shape of thinning curve
+     - :math:`\alpha` (controls power-law slope)
+
+**What this reveals:**
+
+- **Molecular weight** (via :math:`\eta_0` and :math:`\lambda` scaling laws)
+- **Entanglement density**: :math:`\eta_0 \sim c^{3.4}` for entangled systems
+- **Cross-validation**: Compare :math:`\eta_0` and :math:`\lambda` from SAOS
 
 From Normal Stress Measurements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Primary output:**
+**Primary output:** Direct :math:`\alpha` determination.
 
-- :math:`\alpha = -2N_2/N_1`: Direct measurement of mobility factor
+.. math::
+
+   \alpha = -\frac{2\,N_2}{N_1}
 
 **What this reveals:**
 
-- Degree of molecular anisotropy
-- Network structure
-- Material classification (polymer vs. micelle)
+- **Degree of molecular anisotropy**: Higher :math:`\alpha` → more anisotropic drag
+- **Material classification**: Polymer melts (:math:`\alpha \sim 0.1\text{–}0.3`), wormlike micelles (:math:`\alpha \sim 0.3\text{–}0.5`)
+- **Experimental techniques**: Cone-and-plate (for :math:`N_1`), parallel-plate edge measurements or cone-partitioned plate (for :math:`N_2`)
 
 From Startup Flow
 ~~~~~~~~~~~~~~~~~
 
 **Primary outputs:**
 
-- **Overshoot ratio** :math:`\sigma_{\text{max}}/\sigma_{ss}`: Increases with Wi
-- **Strain at peak**: :math:`\gamma_{\text{peak}}` ~ 1-3 for Giesekus
-- **Transient timescale**: Approach to steady state
+- **Overshoot ratio** :math:`\sigma_{\text{max}}/\sigma_{\text{ss}}`: Increases with Wi, quantifies nonlinear viscoelastic character
+- **Strain at peak**: :math:`\gamma_{\text{peak}} \sim 2\text{–}3` — network deformation scale
+- **Time to steady state**: :math:`\sim 3\text{–}5\lambda` — validates relaxation time
+- **Initial slope**: :math:`d\sigma/d\gamma|_{t \to 0} = G` — instantaneous elastic modulus
 
-**What this reveals:**
+From Stress Relaxation
+~~~~~~~~~~~~~~~~~~~~~~
 
-- Nonlinear viscoelastic character
-- Network reformation dynamics
-- Stress relaxation mechanisms
+**Primary outputs:**
+
+- **Exponential vs. faster-than-exponential decay**: Faster initial decay confirms :math:`\alpha > 0`
+- **Relaxation modulus**: :math:`G(t) = \tau_{xy}(t)/\gamma_0` — full time-dependent response
+- **Damping function** :math:`h(\gamma_0)`: Quantifies nonlinear strain effects (strain thinning)
+- **Time-strain separability**: Whether :math:`G(t, \gamma_0) \approx G(t) \cdot h(\gamma_0)` holds
+
+From Creep
+~~~~~~~~~~
+
+**Primary outputs:**
+
+- **Instantaneous compliance**: :math:`J_0 = 1/G = \lambda/\eta_p`
+- **Steady-state viscosity**: Long-time slope :math:`dJ/dt \to 1/\eta_0`
+- **Elastic recovery** (after unloading): Recoverable strain :math:`\approx \sigma_0/G`
+- **Retardation spectrum**: Transition from elastic to viscous response
+
+From LAOS
+~~~~~~~~~
+
+**Primary outputs** [16]_:
+
+- **Strain softening onset**: Critical :math:`\gamma_0` where :math:`G_1'` begins decreasing — identifies linear-to-nonlinear transition
+- **Third harmonic ratio** :math:`I_{3/1}`: Quantifies strength of nonlinearity
+- **MAOS scaling** :math:`I_{3/1} \sim \gamma_0^2`: Material time exponent from intrinsic nonlinearity
+- **Lissajous shapes**: Visual nonlinear fingerprint — ellipse distortion at high amplitude
+- **Chebyshev coefficients** :math:`e_n, v_n`: Decompose intracycle elastic and viscous nonlinearity
+
+Combined Multi-Protocol Analysis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Recommended fitting sequence:**
+
+1. **SAOS** → :math:`\eta_p, \lambda, \eta_s` (linear parameters, :math:`\alpha`-independent)
+2. **Flow curve** → refine :math:`\eta_p, \lambda`; determine :math:`\alpha` from thinning shape
+3. **Normal stresses** → fix :math:`\alpha = -2N_2/N_1` (most direct route)
+4. **Startup** → validate overshoot predictions, refine :math:`\alpha`
+5. **Relaxation/Creep** → confirm time constants, validate nonlinear response
+
+**Parameter-to-data mapping:**
+
+.. list-table::
+   :widths: 20 15 15 15 15 20
+   :header-rows: 1
+
+   * - Data type
+     - :math:`\eta_p`
+     - :math:`\lambda`
+     - :math:`\alpha`
+     - :math:`\eta_s`
+     - Strength
+   * - SAOS
+     - ✓
+     - ✓
+     - —
+     - ✓
+     - Best for linear params
+   * - Flow curve
+     - ✓
+     - ✓
+     - ✓
+     - ✓
+     - Thinning shape → :math:`\alpha`
+   * - :math:`N_1, N_2`
+     - —
+     - —
+     - ✓✓
+     - —
+     - Most direct :math:`\alpha`
+   * - Startup
+     - ✓
+     - ✓
+     - ✓
+     - —
+     - Overshoot validates model
+   * - Relaxation
+     - ✓
+     - ✓
+     - (✓)
+     - —
+     - Decay rate confirms :math:`\lambda`
+   * - Creep
+     - ✓
+     - ✓
+     - (✓)
+     - ✓
+     - Compliance confirms :math:`G`
+
+(✓✓ = primary route; ✓ = determinable; (✓) = weakly sensitive; — = not accessible)
+
+----
 
 Experimental Design
 -------------------
@@ -538,6 +1352,8 @@ Material-Specific Recommendations
      - 2–3
      - SAOS + low-Wi flow curve
 
+----
+
 Computational Implementation
 ----------------------------
 
@@ -571,7 +1387,7 @@ Numerical Considerations
 **Steady-state solver:**
 
 - Newton iteration for auxiliary function f(Wi)
-- Converges in 5-10 iterations typically
+- Converges in 5–10 iterations typically
 - May need damping at very high Wi
 
 **ODE integration:**
@@ -585,6 +1401,8 @@ Numerical Considerations
 - High Wi (>100) may require reduced tolerances
 - Very small :math:`\alpha` (<0.01) approaches UCM singularities
 - Use log-residuals for fitting flow curves
+
+----
 
 Fitting Guidance
 ----------------
@@ -622,6 +1440,49 @@ Initial Parameter Estimates
    # High-Wi slope of η vs γ̇ in log-log ≈ (n-1)
    # For Giesekus: n ≈ 0.5 at alpha = 0.5
 
+**From transient data:**
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Observable
+     - Estimated parameter
+   * - Time to steady state
+     - :math:`\lambda \approx t_{\text{ss}} / (3\text{–}5)`
+   * - Overshoot magnitude
+     - Higher :math:`\alpha` → smaller overshoot
+   * - Initial slope in startup
+     - :math:`G = \eta_p/\lambda` from :math:`d\sigma/d\gamma|_0`
+
+Parameter Estimation Summary
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 15 25 25 35
+   :header-rows: 1
+
+   * - Parameter
+     - From SAOS
+     - From steady shear
+     - From transient
+   * - :math:`\eta_p`
+     - :math:`\eta_0 - \eta_s`
+     - Low-rate plateau − :math:`\eta_s`
+     - Initial slope / :math:`\lambda`
+   * - :math:`\lambda`
+     - :math:`1/\omega_c`
+     - :math:`1/\dot{\gamma}_{\text{onset}}`
+     - :math:`t_{\text{ss}}/(3\text{–}5)`
+   * - :math:`\alpha`
+     - — (not accessible)
+     - Thinning shape; :math:`-2N_2/N_1`
+     - Overshoot ratio
+   * - :math:`\eta_s`
+     - High-:math:`\omega` :math:`G''/\omega`
+     - High-rate plateau
+     - —
+
 Fitting Strategy
 ~~~~~~~~~~~~~~~~
 
@@ -629,6 +1490,15 @@ Fitting Strategy
 2. **Fit SAOS first** for :math:`\eta_p`, :math:`\lambda` (:math:`\alpha`-independent)
 3. **Fit flow curve** to refine and get :math:`\alpha`
 4. **Validate with startup** for dynamic behavior
+
+Multi-Mode Fitting
+~~~~~~~~~~~~~~~~~~
+
+1. **Discrete spectrum from SAOS**: Fit :math:`G_k, \lambda_k` pairs to :math:`G'(\omega), G''(\omega)` using logarithmically spaced relaxation times
+2. **Non-negative least squares (NNLS)**: Ensures :math:`\eta_{p,k} \geq 0`
+3. **Tikhonov regularization**: Prevents overfitting when the number of modes exceeds data quality
+4. **Fix** :math:`\alpha_k` **after linear fit**: Determine mobility factors from nonlinear data (flow curve, normal stresses)
+5. **Typical**: 5–10 modes for 4–6 decades in frequency
 
 Troubleshooting
 ~~~~~~~~~~~~~~~
@@ -655,6 +1525,8 @@ Troubleshooting
    * - SAOS mismatch
      - Single mode inadequate
      - Use multi-mode Giesekus
+
+----
 
 Usage Examples
 --------------
@@ -767,6 +1639,8 @@ Bayesian Fitting
    # Get credible intervals
    intervals = model.get_credible_intervals(result.posterior_samples)
 
+----
+
 Model Comparison
 ----------------
 
@@ -856,6 +1730,8 @@ When to Choose Each Model
 - **FENE-P**: Extension-dominated, fiber spinning
 - **Oldroyd-B/UCM**: Simple validation, teaching
 
+----
+
 See Also
 --------
 
@@ -875,89 +1751,94 @@ Related Topics
 - :ref:`protocol-startup` — Startup flow experiments
 - Bayesian inference — Parameter uncertainty quantification
 
+----
+
 References
 ----------
 
-Primary Sources
-~~~~~~~~~~~~~~~
-
-1. Giesekus, H. (1982). "A simple constitutive equation for polymer fluids
+.. [1] Giesekus, H. (1982). "A simple constitutive equation for polymer fluids
    based on the concept of deformation-dependent tensorial mobility."
-   *J. Non-Newtonian Fluid Mech.*, 11, 69-109.
+   *J. Non-Newtonian Fluid Mech.*, **11**, 69-109.
    https://doi.org/10.1016/0377-0257(82)85016-7
 
-2. Giesekus, H. (1983). "Stressing behaviour in simple shear flow as
+.. [2] Giesekus, H. (1983). "Stressing behaviour in simple shear flow as
    predicted by a new constitutive model for polymer fluids."
-   *J. Non-Newtonian Fluid Mech.*, 12, 367-374.
+   *J. Non-Newtonian Fluid Mech.*, **12**, 367-374.
 
-Textbooks
-~~~~~~~~~
-
-3. Bird, R.B., Armstrong, R.C., & Hassager, O. (1987).
+.. [3] Bird, R.B., Armstrong, R.C., & Hassager, O. (1987).
    *Dynamics of Polymeric Liquids, Vol. 1: Fluid Mechanics.* 2nd ed.
    Wiley-Interscience. Chapter 4.
 
-4. Larson, R.G. (1988). *Constitutive Equations for Polymer Melts and Solutions.*
+.. [4] Larson, R.G. (1988). *Constitutive Equations for Polymer Melts and Solutions.*
    Butterworths. Chapter 4.
 
-5. Morrison, F.A. (2001). *Understanding Rheology.*
+.. [5] Morrison, F.A. (2001). *Understanding Rheology.*
    Oxford University Press. Chapter 9.
 
-6. Macosko, C.W. (1994). *Rheology: Principles, Measurements, and Applications.*
+.. [6] Macosko, C.W. (1994). *Rheology: Principles, Measurements, and Applications.*
    Wiley-VCH. Chapter 3.
 
-Applications
-~~~~~~~~~~~~
+.. [7] Yoo, J.Y., & Choi, H.C. (1989). "On the steady simple shear flows of the
+   one-mode Giesekus fluid." *Rheol. Acta*, **28**, 13-24.
 
-7. Yoo, J.Y., & Choi, H.C. (1989). "On the steady simple shear flows of the
-   one-mode Giesekus fluid." *Rheol. Acta*, 28, 13-24.
+.. [8] Schleiniger, G., & Weinacht, R.J. (1991). "Steady Poiseuille flows for a
+   Giesekus fluid." *J. Non-Newtonian Fluid Mech.*, **40**, 79-102.
 
-8. Schleiniger, G., & Weinacht, R.J. (1991). "Steady Poiseuille flows for a
-   Giesekus fluid." *J. Non-Newtonian Fluid Mech.*, 40, 79-102.
-
-9. Quinzani, L.M., Armstrong, R.C., & Brown, R.A. (1994). "Birefringence and
+.. [9] Quinzani, L.M., Armstrong, R.C., & Brown, R.A. (1994). "Birefringence and
    laser-Doppler velocimetry (LDV) studies of viscoelastic flow through a
-   planar contraction." *J. Non-Newtonian Fluid Mech.*, 52, 1-36.
+   planar contraction." *J. Non-Newtonian Fluid Mech.*, **52**, 1-36.
 
-Normal Stress Measurements
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. [10] Magda, J.J., & Baek, S.G. (1994). "Concentrated entangled and semidilute
+   entangled polystyrene solutions and the second normal stress difference."
+   *Polymer*, **35**, 1187-1194.
 
-10. Magda, J.J., & Baek, S.G. (1994). "Concentrated entangled and semidilute
-    entangled polystyrene solutions and the second normal stress difference."
-    *Polymer*, 35, 1187-1194.
+.. [11] Lee, C.S., Tripp, B.C., & Magda, J.J. (1992). "Does :math:`N_2` depend on
+   the shear rate in polymer melts?" *Rheol. Acta*, **31**, 306-314.
 
-11. Lee, C.S., Tripp, B.C., & Magda, J.J. (1992). "Does :math:`N_2` depend on the shear
-    rate in polymer melts?" *Rheol. Acta*, 31, 306-314.
+.. [12] Quinzani, L.M., McKinley, G.H., Brown, R.A., & Armstrong, R.C. (1990).
+   "Modeling the rheology of polyisobutylene solutions."
+   *J. Rheol.*, **34**, 705-748.
 
-Multi-Mode Extensions
-~~~~~~~~~~~~~~~~~~~~~
+.. [13] Debbaut, B., & Crochet, M.J. (1988). "Extensional effects in complex flows."
+   *J. Non-Newtonian Fluid Mech.*, **30**, 169-184.
 
-12. Quinzani, L.M., McKinley, G.H., Brown, R.A., & Armstrong, R.C. (1990).
-    "Modeling the rheology of polyisobutylene solutions."
-    *J. Rheol.*, 34, 705-748.
+.. [14] Hulsen, M.A., Fattal, R., & Kupferman, R. (2005). "Flow of viscoelastic
+   fluids past a cylinder at high Weissenberg number: Stabilized simulations
+   using matrix logarithms." *J. Non-Newtonian Fluid Mech.*, **127**, 27-39.
 
-13. Debbaut, B., & Crochet, M.J. (1988). "Extensional effects in complex flows."
-    *J. Non-Newtonian Fluid Mech.*, 30, 169-184.
+.. [15] Guénette, R., & Fortin, M. (1995). "A new mixed finite element method for
+   computing viscoelastic flows." *J. Non-Newtonian Fluid Mech.*, **60**, 27-52.
 
-Numerical Methods
-~~~~~~~~~~~~~~~~~
+.. [16] Hyun, K., Wilhelm, M., Klein, C.O., Cho, K.S., Nam, J.G., Ahn, K.H.,
+   Lee, S.J., Ewoldt, R.H., & McKinley, G.H. (2011). "A review of nonlinear
+   oscillatory shear tests: Analysis and application of large amplitude
+   oscillatory shear (LAOS)." *Prog. Polym. Sci.*, **36**, 1697-1753.
 
-14. Hulsen, M.A., Fattal, R., & Kupferman, R. (2005). "Flow of viscoelastic
-    fluids past a cylinder at high Weissenberg number: Stabilized simulations
-    using matrix logarithms." *J. Non-Newtonian Fluid Mech.*, 127, 27-39.
+.. [17] Dealy, J.M., & Wissbrun, K.F. (1990). *Melt Rheology and its Role in
+   Plastics Processing.* Van Nostrand Reinhold.
 
-15. Guénette, R., & Fortin, M. (1995). "A new mixed finite element method for
-    computing viscoelastic flows." *J. Non-Newtonian Fluid Mech.*, 60, 27-52.
+Further Reading
+~~~~~~~~~~~~~~~
 
-API Reference
--------------
+- Giesekus, H. (1985). "Constitutive equations for polymer fluids based on the
+  concept of configuration-dependent molecular mobility: a generalized
+  mean-configuration model." *J. Non-Newtonian Fluid Mech.*, **17**, 349-372.
 
-.. autoclass:: rheojax.models.giesekus.GiesekusSingleMode
-   :members:
-   :undoc-members:
-   :show-inheritance:
+- Bird, R.B., & Wiest, J.M. (1995). "Constitutive equations for polymeric liquids."
+  *Annual Review of Fluid Mechanics*, **27**, 169-193.
 
-.. autoclass:: rheojax.models.giesekus.GiesekusMultiMode
-   :members:
-   :undoc-members:
-   :show-inheritance:
+- Owens, R.G., & Phillips, T.N. (2002). *Computational Rheology.*
+  Imperial College Press. Chapter 3.
+
+- Ewoldt, R.H., & McKinley, G.H. (2010). "On secondary loops in LAOS via
+  self-intersection of Lissajous-Bowditch curves."
+  *Rheol. Acta*, **49**, 213-219.
+
+----
+
+API References
+--------------
+
+- Module: :mod:`rheojax.models.giesekus`
+- Class: :class:`rheojax.models.giesekus.GiesekusSingleMode`
+- Class: :class:`rheojax.models.giesekus.GiesekusMultiMode`

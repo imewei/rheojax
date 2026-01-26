@@ -73,6 +73,19 @@ where f(Wi) decreases with Weissenberg number Wi = :math:`\lambda\dot{\gamma}`.
 
 This provides a direct experimental route to determine :math:`\alpha`.
 
+**Multi-Mode Superposition:**
+
+For polydisperse systems with broad relaxation spectra, the multi-mode Giesekus
+model sums N independent mode contributions:
+
+.. math::
+
+   G'(\omega) = \sum_{k=1}^{N} \frac{\eta_{p,k} \lambda_k \omega^2}{1 + (\lambda_k \omega)^2}, \qquad
+   G''(\omega) = \eta_s \omega + \sum_{k=1}^{N} \frac{\eta_{p,k} \omega}{1 + (\lambda_k \omega)^2}
+
+See the :doc:`Handbook <giesekus>` for multi-mode fitting strategies and
+protocol-specific equations.
+
 
 Supported Protocols
 -------------------
@@ -148,6 +161,13 @@ Quick Start
 
    # Predict SAOS
    G_prime, G_double_prime = model.predict_saos(omega)
+
+
+.. note::
+
+   For comprehensive theory including analytical steady-state solutions,
+   dimensionless formulations, protocol-specific ODE systems, LAOS analysis,
+   and multi-mode fitting strategies, see the :doc:`Giesekus Handbook <giesekus>`.
 
 
 When to Use Giesekus
