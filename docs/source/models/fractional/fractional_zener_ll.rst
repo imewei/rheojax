@@ -469,13 +469,13 @@ Given fitted parameters :math:`c_1` = 500 Pa·s\ :math:`^{\alpha, c_2}` = 100 Pa
        model_fzll = FractionalZenerLiquidLiquid()
 
        # Initialize from FMG results
-       c1_init = model_fmg.parameters.get_value('c')
+       c1_init = model_fmg.parameters.get_value('c_alpha')
        alpha_init = model_fmg.parameters.get_value('alpha')
-       tau_init = model_fmg.parameters.get_value('tau')
+       eta_init = model_fmg.parameters.get_value('eta')
 
        model_fzll.parameters.set_value('c1', c1_init)
        model_fzll.parameters.set_value('alpha', alpha_init)
-       model_fzll.parameters.set_value('tau', tau_init)
+       model_fzll.parameters.set_value('eta', eta_init)
 
        result_fzll = model_fzll.fit(data)
        R2_fzll = result_fzll.r_squared
@@ -541,10 +541,10 @@ Basic Fitting (Advanced Users Only)
    model_simple.fit(data)
 
    # Use simple model results as initial guess
-   model.parameters.set_value('c1', model_simple.parameters.get_value('c'))
+   model.parameters.set_value('c1', model_simple.parameters.get_value('c_alpha'))
    model.parameters.set_value('alpha', model_simple.parameters.get_value('alpha'))
-   model.parameters.set_value('tau', model_simple.parameters.get_value('tau'))
-   model.parameters.set_value('c2', model_simple.parameters.get_value('c') * 0.2)
+   model.parameters.set_value('eta', model_simple.parameters.get_value('eta'))
+   model.parameters.set_value('c2', model_simple.parameters.get_value('c_alpha') * 0.2)
    model.parameters.set_value('beta', 0.5)
    model.parameters.set_value('gamma', 0.7)
 

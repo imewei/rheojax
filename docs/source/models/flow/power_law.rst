@@ -498,7 +498,7 @@ Temperature Dependence
    for T, data in zip(temperatures, datasets):
        model = PowerLaw()
        model.fit(data)
-       K_values.append(model.get_parameter('K'))
+       K_values.append(model.parameters.get_value('K'))
 
    # Arrhenius analysis: ln(K) vs 1/T
    T_kelvin = np.array(temperatures) + 273.15

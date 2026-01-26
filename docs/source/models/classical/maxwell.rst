@@ -881,9 +881,9 @@ Basic Fitting Example
    maxwell = Maxwell()
    maxwell.fit(omega, data)  # replace ``data`` with target complex modulus
 
-   G = maxwell.parameters.get_value('G')
+   G0 = maxwell.parameters.get_value('G0')
    eta = maxwell.parameters.get_value('eta')
-   tau = eta / G
+   tau = eta / G0
 
    Gstar = maxwell.predict(omega)
 

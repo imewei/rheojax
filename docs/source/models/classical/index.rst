@@ -154,7 +154,7 @@ Quick Start
    model.fit(t, G_t, test_mode='relaxation')
 
    # Get fitted relaxation time
-   tau = model.parameters.get_value('eta') / model.parameters.get_value('G')
+   tau = model.parameters.get_value('eta') / model.parameters.get_value('G0')
 
 **Zener model:**
 

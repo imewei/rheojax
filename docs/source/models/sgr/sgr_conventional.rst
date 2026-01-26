@@ -962,20 +962,17 @@ The SGR model extends naturally to nonlinear oscillatory rheology. For :math:`\g
 
    from rheojax.models import SGRConventional
 
-   model = SGRConventional(x=1.3, G0=100.0, tau0=0.01)
+   model = SGRConventional()
+   model.parameters.set_value('x', 1.3)
+   model.parameters.set_value('G0', 100.0)
+   model.parameters.set_value('tau0', 0.01)
 
    # Simulate LAOS response
-   laos_result = model.predict_laos(
+   strain, stress = model.simulate_laos(
+       gamma_0=1.0,         # Strain amplitude
        omega=1.0,           # Angular frequency (rad/s)
-       gamma0=1.0,          # Strain amplitude
        n_cycles=5           # Number of oscillation cycles
    )
-
-   # Access Lissajous-Bowditch curves
-   stress, strain = laos_result['stress'], laos_result['strain']
-
-   # Chebyshev decomposition for nonlinear coefficients
-   en, vn = laos_result['e_n'], laos_result['v_n']
 
 The stress response is decomposed using Chebyshev polynomials:
 

@@ -486,11 +486,11 @@ Two-stage fitting often works best:
 
    # Stage 1: Carreau fit (fixed a=2)
    model.parameters.set_value('a', 2.0)
-   model.parameters.get_parameter('a').vary = False
+   model.parameters.get('a').vary = False
    model.fit(gamma_dot, eta, test_mode='flow_curve')
 
    # Stage 2: Release a and refine
-   model.parameters.get_parameter('a').vary = True
+   model.parameters.get('a').vary = True
    model.fit(gamma_dot, eta, test_mode='flow_curve')
 
 Troubleshooting
@@ -542,11 +542,11 @@ Basic Fitting
    model.fit(gamma_dot, eta, test_mode='flow_curve')
 
    # Extract parameters
-   print(f"eta_0 = {model.get_parameter('eta_0'):.1f} Pa·s")
-   print(f"eta_inf = {model.get_parameter('eta_inf'):.3f} Pa·s")
-   print(f"lambda = {model.get_parameter('lambda_'):.4f} s")
-   print(f"n = {model.get_parameter('n'):.3f}")
-   print(f"a = {model.get_parameter('a'):.2f}")
+   print(f"eta_0 = {model.parameters.get_value('eta_0'):.1f} Pa·s")
+   print(f"eta_inf = {model.parameters.get_value('eta_inf'):.3f} Pa·s")
+   print(f"lambda = {model.parameters.get_value('lambda_'):.4f} s")
+   print(f"n = {model.parameters.get_value('n'):.3f}")
+   print(f"a = {model.parameters.get_value('a'):.2f}")
 
 Two-Stage Fitting
 ~~~~~~~~~~~~~~~~~
@@ -558,8 +558,8 @@ Two-Stage Fitting
    model = CarreauYasuda()
 
    # Stage 1: Carreau fit (fix a=2)
-   model.params.set_value('a', 2.0)
-   model.params.get_parameter('a').vary = False
+   model.parameters.set_value('a', 2.0)
+   model.parameters.get('a').vary = False
    model.fit(gamma_dot, eta, test_mode='flow_curve')
 
    # Check if Carreau is sufficient
@@ -567,7 +567,7 @@ Two-Stage Fitting
    print(f"Carreau R² = {r2_carreau:.5f}")
 
    # Stage 2: Full Carreau-Yasuda (release a)
-   model.params.get_parameter('a').vary = True
+   model.parameters.get('a').vary = True
    model.fit(gamma_dot, eta, test_mode='flow_curve')
    r2_cy = model.r_squared
 

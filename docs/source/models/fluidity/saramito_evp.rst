@@ -1050,13 +1050,14 @@ Creep Bifurcation
 Normal Stress Predictions
 -------------------------
 
-.. code-block:: python
-
-   gamma_dot = np.array([0.1, 1.0, 10.0])
-   N1, N2 = model.predict_normal_stresses(gamma_dot)
-
-   print(f"N1 at γ̇=1: {N1[1]:.1f} Pa")
-   # N2 = 0 for UCM
+The Fluidity-Saramito model tracks tensorial stress components
+(:math:`\tau_{xx}`, :math:`\tau_{yy}`, :math:`\tau_{xy}`) internally via
+the upper-convected Maxwell constitutive equation, enabling first normal
+stress difference :math:`N_1 = \tau_{xx} - \tau_{yy}` to emerge naturally
+during transient simulations (startup, LAOS). No public
+``predict_normal_stresses()`` method is currently exposed; instead, access
+normal stress data through the tensorial stress output of
+``simulate_startup()`` or ``simulate_laos()``.
 
 LAOS Analysis
 -------------
@@ -1140,9 +1141,7 @@ Fourier decomposition of the stress waveform provides quantitative nonlinearity 
    omega = 1.0    # rad/s
 
    # Simulate LAOS with sufficient cycles for steady state
-   n_cycles = 10
-   t = np.linspace(0, 2*np.pi/omega * n_cycles, n_cycles * 100)
-   strain, stress, fluidity = model.simulate_laos(t, gamma_0, omega)
+   t, strain, stress = model.simulate_laos(gamma_0, omega, n_cycles=10, n_points_per_cycle=100)
 
    # Extract harmonics from last cycle (steady state)
    last_cycle_idx = -100  # Last 100 points = 1 cycle
@@ -1177,8 +1176,7 @@ Fourier decomposition of the stress waveform provides quantitative nonlinearity 
    omega = 1.0    # rad/s
 
    # Simulate LAOS
-   t = np.linspace(0, 2*np.pi/omega * 3, 300)  # 3 cycles
-   strain, stress, fluidity = model.simulate_laos(t, gamma_0, omega)
+   t, strain, stress = model.simulate_laos(gamma_0, omega, n_cycles=3)
 
    # Plot Lissajous curves
    fig, axes = plt.subplots(1, 2, figsize=(12, 5))

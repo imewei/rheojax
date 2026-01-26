@@ -492,12 +492,12 @@ With Custom Initialization
 
    # Initialize with estimates from data inspection
    model = HerschelBulkley()
-   model.set_parameter('tau_y', 50.0)  # From low-rate plateau
-   model.set_parameter('K', 10.0)
-   model.set_parameter('n', 0.4)
+   model.parameters.set_value('tau_y', 50.0)  # From low-rate plateau
+   model.parameters.set_value('K', 10.0)
+   model.parameters.set_value('n', 0.4)
 
    # Constrain n for shear-thinning only
-   model.set_parameter_bounds('n', lower=0.1, upper=1.0)
+   model.parameters.set_bounds('n', lower=0.1, upper=1.0)
 
    model.fit(gamma_dot, sigma, test_mode='flow_curve')
 
@@ -542,10 +542,10 @@ Comparing with Bingham
    # Compare fit quality
    print(f"HB R² = {hb.r_squared:.5f}")
    print(f"Bingham R² = {bingham.r_squared:.5f}")
-   print(f"HB n = {hb.get_parameter('n'):.3f}")
+   print(f"HB n = {hb.parameters.get_value('n'):.3f}")
 
    # If n ≈ 1 and R² similar, use Bingham for parsimony
-   if abs(hb.get_parameter('n') - 1.0) < 0.1:
+   if abs(hb.parameters.get_value('n') - 1.0) < 0.1:
        print("Consider using simpler Bingham model")
 
 Pipeline Workflow

@@ -202,8 +202,8 @@ Quick Start
    model = FluiditySaramitoLocal(coupling="minimal")
    model.fit(gamma_dot, sigma, test_mode="flow_curve")
 
-   # Get normal stress predictions
-   N1, N2 = model.predict_normal_stresses(gamma_dot)
+   # Note: tensorial stress (τ_xx, τ_yy, τ_xy) is tracked internally;
+   # access N1 via transient simulations (simulate_startup, simulate_laos)
 
 
 Protocol-Specific Recommendations
