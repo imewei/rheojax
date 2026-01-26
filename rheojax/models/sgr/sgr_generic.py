@@ -533,11 +533,13 @@ class SGRGeneric(BaseModel):
                     self._fit_steady_shear_mode(X, y, **kwargs)
                 elif test_mode == "laos":
                     self._fit_laos_mode(X, y, **kwargs)
+                elif test_mode == "startup":
+                    self._fit_startup_mode(X, y, **kwargs)
                 else:
                     raise ValueError(
                         f"Unsupported test_mode: {test_mode}. "
                         f"SGR GENERIC model supports 'oscillation', 'relaxation', "
-                        f"'creep', 'steady_shear', 'laos'."
+                        f"'creep', 'steady_shear', 'laos', 'startup'."
                     )
 
                 # Log final parameters
@@ -870,6 +872,70 @@ class SGRGeneric(BaseModel):
 
         self.fitted_ = True
 
+    def _fit_startup_mode(
+        self,
+        t: np.ndarray,
+        eta_plus: np.ndarray,
+        **kwargs,
+    ) -> None:
+        """Fit SGR GENERIC to startup flow data (stress growth coefficient).
+
+        Uses NLSQ-accelerated optimization to fit SGR parameters [x, G0, tau0]
+        to stress growth coefficient η⁺(t) data.
+
+        Args:
+            t: Time array (s)
+            eta_plus: Stress growth coefficient array (Pa·s)
+            **kwargs: NLSQ optimizer arguments, plus:
+                - gamma_dot: Applied shear rate (required if y is stress)
+                - is_stress: If True, treat y as stress
+        """
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+
+        gamma_dot = kwargs.get("gamma_dot", 1.0)
+        is_stress = kwargs.get("is_stress", False)
+
+        if is_stress:
+            eta_plus_data = eta_plus / gamma_dot
+        else:
+            eta_plus_data = eta_plus
+
+        t_jax = jnp.asarray(t, dtype=jnp.float64)
+        eta_plus_jax = jnp.asarray(eta_plus_data, dtype=jnp.float64)
+
+        def model_fn(x_data: jnp.ndarray, params: jnp.ndarray) -> jnp.ndarray:
+            x_param = params[0]
+            G0_param = params[1]
+            tau0_param = params[2]
+            return self._predict_startup_jit(
+                x_data, x_param, G0_param, tau0_param, gamma_dot
+            )
+
+        objective = create_least_squares_objective(
+            model_fn,
+            t_jax,
+            eta_plus_jax,
+            normalize=True,
+            use_log_residuals=kwargs.get("use_log_residuals", True),
+        )
+
+        result = nlsq_optimize(objective, self.parameters, **kwargs)
+
+        if not result.success:
+            raise RuntimeError(f"SGR GENERIC startup fitting failed: {result.message}")
+
+        logger.debug(
+            f"SGR GENERIC startup fit converged: x={self.parameters.get_value('x'):.4f}, "
+            f"G0={self.parameters.get_value('G0'):.2e}, "
+            f"tau0={self.parameters.get_value('tau0'):.2e}, "
+            f"cost={result.fun:.3e}"
+        )
+
+        self.fitted_ = True
+
     def _fit_laos_mode(
         self,
         t: np.ndarray,
@@ -1153,6 +1219,45 @@ class SGRGeneric(BaseModel):
         sigma = G0_scale * G0_dim * jnp.power(gamma_dot_scaled, x - 1.0)
 
         return sigma
+
+    @staticmethod
+    @jax.jit
+    def _predict_startup_jit(
+        t: jnp.ndarray, x: float, G0_scale: float, tau0: float, gamma_dot: float
+    ) -> jnp.ndarray:
+        """JIT-compiled startup flow prediction: eta_plus(t).
+
+        Computes stress growth coefficient η⁺(t) = σ(t)/γ̇ = ∫₀ᵗ G(s) ds.
+        Same analytical form as SGRConventional for linear viscoelastic envelope.
+        """
+        from rheojax.utils.sgr_kernels import G0 as G0_func
+
+        # Dimensionless time
+        t_scaled = t / tau0
+
+        # Compute equilibrium modulus factor
+        G0_dim = G0_func(x)
+
+        epsilon = 1e-12
+        t_safe = jnp.maximum(t_scaled, epsilon)
+        exp = x - 1.0
+
+        def x_near_one(_):
+            return G0_scale * G0_dim * tau0 * jnp.log(1.0 + t_safe)
+
+        def x_not_one(_):
+            return (
+                G0_scale * G0_dim * tau0 * ((jnp.power(1.0 + t_safe, exp) - 1.0) / exp)
+            )
+
+        eta_plus = jax.lax.cond(
+            jnp.abs(exp) < 1e-6,
+            x_near_one,
+            x_not_one,
+            operand=None,
+        )
+
+        return eta_plus
 
     @staticmethod
     @jax.jit
