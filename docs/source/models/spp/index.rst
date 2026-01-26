@@ -133,7 +133,7 @@ shows a characteristic feature:
 
 **Intercycle vs Intracycle:**
 
-- **Intercycle**: Comparison across different strain amplitudes γ₀
+- **Intercycle**: Comparison across different strain amplitudes :math:`\gamma_0`
 - **Intracycle**: Evolution within a single oscillation period
 
 

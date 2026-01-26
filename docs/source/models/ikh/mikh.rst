@@ -31,27 +31,27 @@ Notation Guide
    * - Symbol
      - Units
      - Description
-   * - σ
+   * - :math:`\sigma`
      - Pa
      - Deviatoric stress (elasto-plastic component)
-   * - α
+   * - :math:`\alpha`
      - Pa
      - Backstress (kinematic hardening variable)
-   * - λ
+   * - :math:`\lambda`
      - –
      - Structural parameter (0 = destructured, 1 = structured)
-   * - γ̇
+   * - :math:`\dot{\gamma}`
      - 1/s
      - Total shear rate
-   * - γ̇ᵖ
+   * - :math:`\dot{\gamma}^p`
      - 1/s
      - Plastic shear rate
-   * - σ_y
+   * - :math:`\sigma_y`
      - Pa
-     - Current yield stress (depends on λ)
-   * - ξ
+     - Current yield stress (depends on :math:`\lambda`)
+   * - :math:`\xi`
      - Pa
-     - Relative stress (ξ = σ - α)
+     - Relative stress (:math:`\xi = \sigma - \alpha`)
 
 
 Overview

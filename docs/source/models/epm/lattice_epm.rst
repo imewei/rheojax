@@ -33,30 +33,30 @@ Notation Guide
    * - Symbol
      - Units
      - Description
-   * - σ
+   * - :math:`\sigma`
      - Pa
      - Local shear stress at lattice site
-   * - γ̇
+   * - :math:`\dot{\gamma}`
      - 1/s
      - Macroscopic applied shear rate
-   * - γ̇ᵖ
+   * - :math:`\dot{\gamma}^p`
      - 1/s
      - Local plastic strain rate at yielded sites
-   * - σ_c
+   * - :math:`\sigma_c`
      - Pa
      - Local yield stress threshold (varies spatially)
-   * - μ
+   * - :math:`\mu`
      - Pa
      - Shear modulus of elastic matrix
-   * - τ_pl
+   * - :math:`\tau_{pl}`
      - s
      - Plastic relaxation time for yielded blocks
    * - :math:`\mathcal{G}(\mathbf{r})`
      - —
      - Eshelby propagator (stress redistribution kernel)
-   * - L
+   * - :math:`L`
      - —
-     - Lattice size (L × L grid)
+     - Lattice size (:math:`L \times L` grid)
 
 Discrete State Variables
 ------------------------

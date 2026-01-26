@@ -47,28 +47,28 @@ Notation Guide
    * - Symbol
      - Units
      - Description
-   * - N
+   * - :math:`N`
      - —
      - Number of structural modes
-   * - λᵢ
+   * - :math:`\lambda_i`
      - —
      - Structural parameter for mode i (0 = destructured, 1 = structured)
-   * - τ_thix,i
+   * - :math:`\tau_{thix,i}`
      - s
      - Rebuilding timescale for mode i
-   * - Γᵢ
+   * - :math:`\Gamma_i`
      - —
      - Breakdown coefficient for mode i
-   * - wᵢ
+   * - :math:`w_i`
      - —
      - Weight of mode i (weighted_sum formulation only)
-   * - σᵢ
+   * - :math:`\sigma_i`
      - Pa
      - Stress contribution from mode i (per_mode formulation only)
-   * - αᵢ
+   * - :math:`\alpha_i`
      - Pa
      - Backstress for mode i (per_mode formulation only)
-   * - γ̇ᵖᵢ
+   * - :math:`\dot{\gamma}^p_i`
      - 1/s
      - Plastic strain rate for mode i (per_mode formulation only)
 

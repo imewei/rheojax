@@ -31,31 +31,31 @@ Notation Guide
    * - Symbol
      - Units
      - Description
-   * - σ_ij
+   * - :math:`\sigma_{ij}`
      - Pa
-     - Stress tensor components [σ_xx, σ_yy, σ_xy]
-   * - σ_zz
+     - Stress tensor components [:math:`\sigma_{xx}`, :math:`\sigma_{yy}`, :math:`\sigma_{xy}`]
+   * - :math:`\sigma_{zz}`
      - Pa
      - Out-of-plane stress (from plane strain constraint)
-   * - N₁
+   * - :math:`N_1`
      - Pa
-     - First normal stress difference (σ_xx - σ_yy)
-   * - N₂
+     - First normal stress difference (:math:`\sigma_{xx} - \sigma_{yy}`)
+   * - :math:`N_2`
      - Pa
-     - Second normal stress difference (σ_yy - σ_zz)
-   * - σ_eff
+     - Second normal stress difference (:math:`\sigma_{yy} - \sigma_{zz}`)
+   * - :math:`\sigma_{eff}`
      - Pa
      - Effective stress (von Mises or Hill criterion)
-   * - γ̇ᵖ_ij
+   * - :math:`\dot{\gamma}^p_{ij}`
      - 1/s
      - Plastic strain rate tensor (deviatoric)
    * - :math:`\mathcal{G}_{ij,kl}`
      - —
      - Tensorial Eshelby propagator (4th-order)
-   * - ν
+   * - :math:`\nu`
      - —
      - Poisson's ratio (plane strain constraint)
-   * - H, N
+   * - :math:`H, N`
      - —
      - Hill anisotropy parameters
 

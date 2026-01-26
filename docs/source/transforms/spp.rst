@@ -29,20 +29,20 @@ Theory
 Instantaneous Moduli
 ~~~~~~~~~~~~~~~~~~~~
 
-For sinusoidal strain :math:`\\gamma(t) = \\gamma_0 \\sin(\\omega t)` with measured stress
-:math:`\\sigma(t)`, SPP defines instantaneous moduli:
+For sinusoidal strain :math:`\gamma(t) = \gamma_0 \sin(\omega t)` with measured stress
+:math:`\sigma(t)`, SPP defines instantaneous moduli:
 
 **Storage modulus (elastic contribution):**
 
 .. math::
 
-   G'_t = \\frac{d\\sigma}{d\\gamma}\\bigg|_t = \\frac{d\\sigma/dt}{d\\gamma/dt} = \\frac{\\dot{\\sigma}}{\\dot{\\gamma}}
+   G'_t = \frac{d\sigma}{d\gamma}\bigg|_t = \frac{d\sigma/dt}{d\gamma/dt} = \frac{\dot{\sigma}}{\dot{\gamma}}
 
 **Loss modulus (viscous contribution):**
 
 .. math::
 
-   G''_t = \\frac{1}{\\omega}\\frac{d\\sigma}{d\\gamma}\\bigg|_{\\dot{\\gamma}=\\text{const}}
+   G''_t = \frac{1}{\omega}\frac{d\sigma}{d\gamma}\bigg|_{\dot{\gamma}=\text{const}}
 
 These instantaneous values reduce to the standard linear viscoelastic moduli in the
 small-strain limit but reveal rich nonlinear behavior at large amplitudes.
