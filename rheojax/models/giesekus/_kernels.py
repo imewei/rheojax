@@ -1,0 +1,858 @@
+"""JAX-accelerated physics kernels for the Giesekus model.
+
+This module provides JIT-compiled functions for:
+1. Stress tensor operations (quadratic term τ·τ)
+2. Upper-convected derivative in simple shear
+3. Analytical solutions for steady and oscillatory shear
+4. ODE right-hand sides for transient protocols
+
+All functions are designed for float64 precision and JAX compatibility.
+
+Key Equation
+------------
+The Giesekus constitutive equation is::
+
+    τ + λ∇̂τ + (αλ/η_p)τ·τ = 2η_p D
+
+where:
+- τ is the polymer extra stress tensor
+- λ is the relaxation time
+- α is the mobility factor (0 ≤ α ≤ 0.5)
+- η_p is the polymer viscosity
+- D is the rate-of-deformation tensor
+- ∇̂ denotes the upper-convected derivative
+
+State Vector Convention
+-----------------------
+For 3D incompressible flow, we use a 4-component state::
+
+    state = [τ_xx, τ_yy, τ_xy, τ_zz]
+
+where τ_zz is needed for the trace in tr(τ·τ) calculations.
+For simple shear: τ_zz = 0 at steady state.
+"""
+
+from __future__ import annotations
+
+from rheojax.core.jax_config import safe_import_jax
+
+jax, jnp = safe_import_jax()
+
+
+# =============================================================================
+# Tensor Operations
+# =============================================================================
+
+
+@jax.jit
+def stress_tensor_product_2d(
+    tau_xx: float,
+    tau_yy: float,
+    tau_xy: float,
+    tau_zz: float,
+) -> tuple[float, float, float, float]:
+    """Compute τ·τ components for the Giesekus quadratic term.
+
+    For a symmetric stress tensor in simple shear::
+
+        τ = [[τ_xx, τ_xy, 0   ],
+             [τ_xy, τ_yy, 0   ],
+             [0,    0,    τ_zz]]
+
+    The product τ·τ gives::
+
+        (τ·τ)_xx = τ_xx² + τ_xy²
+        (τ·τ)_yy = τ_xy² + τ_yy²
+        (τ·τ)_xy = τ_xy(τ_xx + τ_yy)
+        (τ·τ)_zz = τ_zz²
+
+    Parameters
+    ----------
+    tau_xx : float
+        Normal stress component τ_xx (Pa)
+    tau_yy : float
+        Normal stress component τ_yy (Pa)
+    tau_xy : float
+        Shear stress component τ_xy (Pa)
+    tau_zz : float
+        Normal stress component τ_zz (Pa)
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        Components (τ·τ)_xx, (τ·τ)_yy, (τ·τ)_xy, (τ·τ)_zz
+    """
+    tt_xx = tau_xx * tau_xx + tau_xy * tau_xy
+    tt_yy = tau_xy * tau_xy + tau_yy * tau_yy
+    tt_xy = tau_xy * (tau_xx + tau_yy)
+    tt_zz = tau_zz * tau_zz
+
+    return tt_xx, tt_yy, tt_xy, tt_zz
+
+
+@jax.jit
+def upper_convected_derivative_2d(
+    tau_xx: float,
+    tau_yy: float,
+    tau_xy: float,
+    gamma_dot: float,
+) -> tuple[float, float, float]:
+    """Compute upper-convected derivative terms in simple shear.
+
+    For simple shear flow with velocity gradient::
+
+        L = [[0, γ̇, 0],
+             [0, 0, 0],
+             [0, 0, 0]]
+
+    The upper-convected derivative is::
+
+        ∇̂τ = dτ/dt - L·τ - τ·L^T
+
+    The convective terms (L·τ + τ·L^T) are::
+
+        (L·τ + τ·L^T)_xx = 2γ̇τ_xy
+        (L·τ + τ·L^T)_yy = 0
+        (L·τ + τ·L^T)_xy = γ̇τ_yy
+
+    Note: τ_zz has no convective contribution in simple shear.
+
+    Parameters
+    ----------
+    tau_xx : float
+        Normal stress component τ_xx (Pa)
+    tau_yy : float
+        Normal stress component τ_yy (Pa)
+    tau_xy : float
+        Shear stress component τ_xy (Pa)
+    gamma_dot : float
+        Shear rate (1/s)
+
+    Returns
+    -------
+    tuple[float, float, float]
+        Convective terms: (conv_xx, conv_yy, conv_xy)
+        These are subtracted from dτ/dt to get ∇̂τ components.
+    """
+    conv_xx = 2.0 * gamma_dot * tau_xy
+    conv_yy = 0.0
+    conv_xy = gamma_dot * tau_yy
+
+    return conv_xx, conv_yy, conv_xy
+
+
+# =============================================================================
+# Steady-State Analytical Solutions
+# =============================================================================
+
+
+@jax.jit
+def _solve_giesekus_f_quartic(
+    wi: float,
+    alpha: float,
+) -> float:
+    """Solve the quartic equation for auxiliary function f(Wi).
+
+    The steady-state viscosity is η = η_s + η_p·f where f satisfies::
+
+        (1 - f)·(1 - 2α) + Wi²·f²·[(1-f)·α·(2-f) + f·(1-2α)] = 0
+
+    This simplifies to a cubic in f for the general case.
+    We use Newton iteration starting from the low-Wi limit f ≈ 1.
+
+    Parameters
+    ----------
+    wi : float
+        Weissenberg number Wi = λγ̇
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+
+    Returns
+    -------
+    float
+        Auxiliary function f (dimensionless, 0 < f ≤ 1)
+    """
+    # Handle limiting cases
+    wi2 = wi * wi
+
+    # Low Wi limit: f → 1
+    # High Wi limit: f → 0 (for α > 0)
+
+    def residual(f_val):
+        # Residual of the implicit equation for f
+        # From Bird et al. (1987) Eq. 4.4-12:
+        # (1-f)(1 + αWi²f²) = Wi²f²(1-2α)(1-f) + Wi²αf²(2-f)(1-f)
+        # Simplified form using f² directly:
+        f2 = f_val * f_val
+        wi2f2 = wi2 * f2
+
+        # Numerator and denominator approach
+        # f satisfies: (1-f²)(1 + α·Wi²·f²) = f[1 + (1-2α)·Wi²·f²]
+        lhs = (1.0 - f2) * (1.0 + alpha * wi2f2)
+        rhs = f_val * (1.0 + (1.0 - 2.0 * alpha) * wi2f2)
+        return lhs - rhs
+
+    def d_residual(f_val):
+        # Derivative of residual w.r.t. f
+        f2 = f_val * f_val
+        wi2f2 = wi2 * f2
+
+        # d/df[(1-f²)(1 + α·Wi²·f²)]
+        # = -2f(1 + α·Wi²·f²) + (1-f²)·2α·Wi²·f
+        d_lhs = (
+            -2.0 * f_val * (1.0 + alpha * wi2f2)
+            + (1.0 - f2) * 2.0 * alpha * wi2 * f_val
+        )
+
+        # d/df[f(1 + (1-2α)·Wi²·f²)]
+        # = (1 + (1-2α)·Wi²·f²) + f·2(1-2α)·Wi²·f
+        d_rhs = (1.0 + (1.0 - 2.0 * alpha) * wi2f2) + 2.0 * f_val * (
+            1.0 - 2.0 * alpha
+        ) * wi2 * f_val
+
+        return d_lhs - d_rhs
+
+    # Initial guess: interpolate between limits
+    # Low Wi: f ≈ 1 - α·Wi² (perturbation)
+    # High Wi: f ≈ 1/(α·Wi) for α > 0
+    f_low = jnp.maximum(1.0 - alpha * wi2, 0.1)
+    f_high = jnp.where(alpha > 1e-10, 1.0 / (1.0 + alpha * wi), 0.99)
+    f_init = jnp.where(wi < 1.0, f_low, f_high)
+
+    # Newton iteration (4-6 iterations typically sufficient)
+    def newton_step(f_val, _):
+        res = residual(f_val)
+        dres = d_residual(f_val)
+        # Damped Newton with bounds
+        delta = res / jnp.where(jnp.abs(dres) > 1e-20, dres, 1e-20)
+        f_new = f_val - 0.8 * delta  # Damping for stability
+        return jnp.clip(f_new, 1e-10, 1.0 - 1e-10), None
+
+    f_final, _ = jax.lax.scan(newton_step, f_init, None, length=10)
+
+    return f_final
+
+
+@jax.jit
+def giesekus_steady_shear_viscosity(
+    gamma_dot: float,
+    eta_p: float,
+    lambda_1: float,
+    alpha: float,
+    eta_s: float,
+) -> float:
+    """Compute steady shear viscosity η(γ̇) for Giesekus model.
+
+    The viscosity is::
+
+        η(γ̇) = η_s + η_p·f(Wi)
+
+    where f is the auxiliary function solving the Giesekus implicit equation.
+
+    Parameters
+    ----------
+    gamma_dot : float
+        Shear rate (1/s)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+    eta_s : float
+        Solvent viscosity (Pa·s)
+
+    Returns
+    -------
+    float
+        Steady shear viscosity η (Pa·s)
+    """
+    wi = lambda_1 * jnp.abs(gamma_dot)
+    f = _solve_giesekus_f_quartic(wi, alpha)
+    return eta_s + eta_p * f
+
+
+@jax.jit
+def giesekus_steady_shear_stress(
+    gamma_dot: float,
+    eta_p: float,
+    lambda_1: float,
+    alpha: float,
+    eta_s: float,
+) -> float:
+    """Compute steady shear stress σ(γ̇) for Giesekus model.
+
+    Parameters
+    ----------
+    gamma_dot : float
+        Shear rate (1/s)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+    eta_s : float
+        Solvent viscosity (Pa·s)
+
+    Returns
+    -------
+    float
+        Steady shear stress σ = η·γ̇ (Pa)
+    """
+    eta = giesekus_steady_shear_viscosity(gamma_dot, eta_p, lambda_1, alpha, eta_s)
+    return eta * gamma_dot
+
+
+# Vectorized version for arrays
+giesekus_steady_shear_stress_vec = jax.jit(
+    jax.vmap(
+        giesekus_steady_shear_stress,
+        in_axes=(0, None, None, None, None),
+    )
+)
+
+
+@jax.jit
+def giesekus_steady_normal_stresses(
+    gamma_dot: float,
+    eta_p: float,
+    lambda_1: float,
+    alpha: float,
+) -> tuple[float, float]:
+    """Compute first and second normal stress differences.
+
+    For the Giesekus model::
+
+        N₁ = τ_xx - τ_yy = Ψ₁·γ̇²
+        N₂ = τ_yy - τ_zz = Ψ₂·γ̇² = -(α/2)·N₁
+
+    The first normal stress coefficient is::
+
+        Ψ₁ = 2η_p·λ·f² / [1 + (1-2α)·Wi²·f²]
+
+    Parameters
+    ----------
+    gamma_dot : float
+        Shear rate (1/s)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+
+    Returns
+    -------
+    tuple[float, float]
+        (N₁, N₂) in Pa
+    """
+    wi = lambda_1 * jnp.abs(gamma_dot)
+    f = _solve_giesekus_f_quartic(wi, alpha)
+
+    # First normal stress coefficient
+    f2 = f * f
+    wi2f2 = wi * wi * f2
+    psi1 = 2.0 * eta_p * lambda_1 * f2 / (1.0 + (1.0 - 2.0 * alpha) * wi2f2)
+
+    # Normal stress differences
+    gd2 = gamma_dot * gamma_dot
+    N1 = psi1 * gd2
+    N2 = -alpha * N1 / 2.0  # Giesekus prediction: N2/N1 = -α/2
+
+    return N1, N2
+
+
+# Vectorized version
+giesekus_steady_normal_stresses_vec = jax.jit(
+    jax.vmap(
+        giesekus_steady_normal_stresses,
+        in_axes=(0, None, None, None),
+    )
+)
+
+
+@jax.jit
+def giesekus_steady_stress_components(
+    gamma_dot: float,
+    eta_p: float,
+    lambda_1: float,
+    alpha: float,
+    eta_s: float,
+) -> tuple[float, float, float, float]:
+    """Compute all steady-state stress tensor components.
+
+    Returns the full stress state [τ_xx, τ_yy, τ_xy, τ_zz] at steady state.
+
+    Parameters
+    ----------
+    gamma_dot : float
+        Shear rate (1/s)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+    eta_s : float
+        Solvent viscosity (Pa·s)
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        (τ_xx, τ_yy, τ_xy, τ_zz) in Pa
+    """
+    # Get shear stress
+    tau_xy = giesekus_steady_shear_stress(gamma_dot, eta_p, lambda_1, alpha, eta_s)
+
+    # Get normal stresses (polymer contribution only)
+    N1, N2 = giesekus_steady_normal_stresses(gamma_dot, eta_p, lambda_1, alpha)
+
+    # From definitions: N1 = τ_xx - τ_yy, N2 = τ_yy - τ_zz
+    # At steady state in simple shear, τ_zz = 0 (no flow in z)
+    tau_zz = 0.0
+    tau_yy = N2 + tau_zz  # τ_yy = N2 (since τ_zz = 0)
+    tau_xx = N1 + tau_yy  # τ_xx = N1 + τ_yy
+
+    return tau_xx, tau_yy, tau_xy, tau_zz
+
+
+# Vectorized version
+giesekus_steady_stress_components_vec = jax.jit(
+    jax.vmap(
+        giesekus_steady_stress_components,
+        in_axes=(0, None, None, None, None),
+    )
+)
+
+
+# =============================================================================
+# SAOS (Small-Amplitude Oscillatory Shear) - Linear Regime
+# =============================================================================
+
+
+@jax.jit
+def giesekus_saos_moduli(
+    omega: float,
+    eta_p: float,
+    lambda_1: float,
+    eta_s: float,
+) -> tuple[float, float]:
+    """Compute storage and loss moduli G'(ω) and G''(ω).
+
+    In the linear viscoelastic regime (small strain amplitude), the Giesekus
+    model reduces to Maxwell behavior (α-independent)::
+
+        G'(ω) = G·(ωλ)² / (1 + (ωλ)²)
+        G''(ω) = G·(ωλ) / (1 + (ωλ)²) + η_s·ω
+
+    where G = η_p/λ is the elastic modulus.
+
+    Note: α does not appear because the quadratic τ·τ term is O(γ₀²)
+    and vanishes in the linear limit.
+
+    Parameters
+    ----------
+    omega : float
+        Angular frequency (rad/s)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    eta_s : float
+        Solvent viscosity (Pa·s)
+
+    Returns
+    -------
+    tuple[float, float]
+        (G', G'') in Pa
+    """
+    G = eta_p / lambda_1  # Elastic modulus
+    omega_lambda = omega * lambda_1
+    omega_lambda_sq = omega_lambda * omega_lambda
+    denom = 1.0 + omega_lambda_sq
+
+    G_prime = G * omega_lambda_sq / denom
+    G_double_prime = G * omega_lambda / denom + eta_s * omega
+
+    return G_prime, G_double_prime
+
+
+# Vectorized version for frequency sweep
+giesekus_saos_moduli_vec = jax.jit(
+    jax.vmap(
+        giesekus_saos_moduli,
+        in_axes=(0, None, None, None),
+    )
+)
+
+
+@jax.jit
+def giesekus_complex_viscosity(
+    omega: float,
+    eta_p: float,
+    lambda_1: float,
+    eta_s: float,
+) -> tuple[float, float]:
+    """Compute complex viscosity magnitude and phase.
+
+    The complex viscosity is::
+
+        η*(ω) = η' - iη'' = (G'' - iG')/ω
+
+    Parameters
+    ----------
+    omega : float
+        Angular frequency (rad/s)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    eta_s : float
+        Solvent viscosity (Pa·s)
+
+    Returns
+    -------
+    tuple[float, float]
+        (|η*|, δ) where δ is the phase angle in radians
+    """
+    G_prime, G_double_prime = giesekus_saos_moduli(omega, eta_p, lambda_1, eta_s)
+
+    # |η*| = |G*|/ω = sqrt(G'² + G''²)/ω
+    G_star_mag = jnp.sqrt(G_prime * G_prime + G_double_prime * G_double_prime)
+    eta_star_mag = G_star_mag / omega
+
+    # Phase angle: tan(δ) = G''/G'
+    delta = jnp.arctan2(G_double_prime, G_prime)
+
+    return eta_star_mag, delta
+
+
+# =============================================================================
+# ODE Right-Hand Sides for Transient Protocols
+# =============================================================================
+
+
+@jax.jit
+def giesekus_ode_rhs(
+    t: float,
+    state: jnp.ndarray,
+    gamma_dot: float,
+    eta_p: float,
+    lambda_1: float,
+    alpha: float,
+) -> jnp.ndarray:
+    """ODE right-hand side for rate-controlled Giesekus dynamics.
+
+    State vector: [τ_xx, τ_yy, τ_xy, τ_zz]
+
+    The evolution equations come from rearranging::
+
+        τ + λ∇̂τ + (αλ/η_p)τ·τ = 2η_p D
+
+    to::
+
+        dτ/dt = (2η_p D - τ - (αλ/η_p)τ·τ)/λ + (L·τ + τ·L^T)
+
+    For simple shear with D_xy = γ̇/2, the rate-of-deformation tensor gives
+    a source term only in the xy component.
+
+    Parameters
+    ----------
+    t : float
+        Time (s), unused but required by ODE solvers
+    state : jnp.ndarray
+        State vector [τ_xx, τ_yy, τ_xy, τ_zz] (Pa)
+    gamma_dot : float
+        Applied shear rate (1/s)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivatives [dτ_xx/dt, dτ_yy/dt, dτ_xy/dt, dτ_zz/dt]
+    """
+    tau_xx, tau_yy, tau_xy, tau_zz = state
+
+    # Upper-convected derivative terms (L·τ + τ·L^T)
+    conv_xx, conv_yy, conv_xy = upper_convected_derivative_2d(
+        tau_xx, tau_yy, tau_xy, gamma_dot
+    )
+
+    # Quadratic stress term τ·τ
+    tt_xx, tt_yy, tt_xy, tt_zz = stress_tensor_product_2d(
+        tau_xx, tau_yy, tau_xy, tau_zz
+    )
+
+    # Nonlinear coefficient
+    alpha_lambda_over_eta = alpha * lambda_1 / eta_p
+
+    # Rate of deformation contribution (only xy component for simple shear)
+    # D_xy = γ̇/2, so 2η_p·D_xy = η_p·γ̇
+    source_xy = eta_p * gamma_dot
+
+    # Time derivatives: dτ/dt = (source - τ - α_coeff·τ·τ)/λ + convective
+    inv_lambda = 1.0 / lambda_1
+
+    d_tau_xx = (-tau_xx - alpha_lambda_over_eta * tt_xx) * inv_lambda + conv_xx
+    d_tau_yy = (-tau_yy - alpha_lambda_over_eta * tt_yy) * inv_lambda + conv_yy
+    d_tau_xy = (
+        source_xy - tau_xy - alpha_lambda_over_eta * tt_xy
+    ) * inv_lambda + conv_xy
+    d_tau_zz = (
+        -tau_zz - alpha_lambda_over_eta * tt_zz
+    ) * inv_lambda  # No convective term
+
+    return jnp.array([d_tau_xx, d_tau_yy, d_tau_xy, d_tau_zz])
+
+
+@jax.jit
+def giesekus_ode_rhs_laos(
+    t: float,
+    state: jnp.ndarray,
+    gamma_0: float,
+    omega: float,
+    eta_p: float,
+    lambda_1: float,
+    alpha: float,
+) -> jnp.ndarray:
+    """ODE right-hand side for LAOS (Large-Amplitude Oscillatory Shear).
+
+    The applied strain is γ(t) = γ₀·sin(ωt), so::
+
+        γ̇(t) = γ₀·ω·cos(ωt)
+
+    Parameters
+    ----------
+    t : float
+        Time (s)
+    state : jnp.ndarray
+        State vector [τ_xx, τ_yy, τ_xy, τ_zz] (Pa)
+    gamma_0 : float
+        Strain amplitude (dimensionless)
+    omega : float
+        Angular frequency (rad/s)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivatives [dτ_xx/dt, dτ_yy/dt, dτ_xy/dt, dτ_zz/dt]
+    """
+    gamma_dot = gamma_0 * omega * jnp.cos(omega * t)
+    return giesekus_ode_rhs(t, state, gamma_dot, eta_p, lambda_1, alpha)
+
+
+@jax.jit
+def giesekus_creep_ode_rhs(
+    t: float,
+    state: jnp.ndarray,
+    sigma_applied: float,
+    eta_p: float,
+    lambda_1: float,
+    alpha: float,
+    eta_s: float,
+) -> jnp.ndarray:
+    """ODE right-hand side for stress-controlled (creep) deformation.
+
+    State vector: [τ_xx, τ_yy, τ_xy, τ_zz, γ]
+    where γ is the accumulated strain.
+
+    In creep, the total stress σ = τ_xy + η_s·γ̇ is held constant,
+    so γ̇ must be computed implicitly::
+
+        γ̇ = (σ - τ_xy) / η_s
+
+    For η_s = 0, creep is not well-defined (instantaneous jump to
+    steady state), so a small regularization is applied.
+
+    Parameters
+    ----------
+    t : float
+        Time (s)
+    state : jnp.ndarray
+        State vector [τ_xx, τ_yy, τ_xy, τ_zz, γ] (Pa, Pa, Pa, Pa, -)
+    sigma_applied : float
+        Applied constant stress (Pa)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+    eta_s : float
+        Solvent viscosity (Pa·s)
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivatives [dτ_xx/dt, dτ_yy/dt, dτ_xy/dt, dτ_zz/dt, dγ/dt]
+    """
+    tau_xx, tau_yy, tau_xy, tau_zz, gamma = state
+
+    # Compute shear rate from stress constraint
+    # σ = τ_xy + η_s·γ̇  =>  γ̇ = (σ - τ_xy) / η_s
+    # Regularize for small η_s
+    eta_s_reg = jnp.maximum(eta_s, 1e-10 * eta_p)
+    gamma_dot = (sigma_applied - tau_xy) / eta_s_reg
+
+    # Stress evolution (same as rate-controlled)
+    stress_state = jnp.array([tau_xx, tau_yy, tau_xy, tau_zz])
+    d_stress = giesekus_ode_rhs(t, stress_state, gamma_dot, eta_p, lambda_1, alpha)
+
+    # Strain evolution
+    d_gamma = gamma_dot
+
+    return jnp.concatenate([d_stress, jnp.array([d_gamma])])
+
+
+@jax.jit
+def giesekus_relaxation_ode_rhs(
+    t: float,
+    state: jnp.ndarray,
+    eta_p: float,
+    lambda_1: float,
+    alpha: float,
+) -> jnp.ndarray:
+    """ODE right-hand side for stress relaxation (γ̇ = 0).
+
+    After cessation of flow, the stress relaxes with γ̇ = 0.
+    The Giesekus model predicts faster-than-exponential decay
+    due to the quadratic τ·τ term.
+
+    Parameters
+    ----------
+    t : float
+        Time (s)
+    state : jnp.ndarray
+        State vector [τ_xx, τ_yy, τ_xy, τ_zz] (Pa)
+    eta_p : float
+        Polymer viscosity (Pa·s)
+    lambda_1 : float
+        Relaxation time (s)
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivatives [dτ_xx/dt, dτ_yy/dt, dτ_xy/dt, dτ_zz/dt]
+    """
+    return giesekus_ode_rhs(t, state, 0.0, eta_p, lambda_1, alpha)
+
+
+# =============================================================================
+# Multi-Mode Extensions
+# =============================================================================
+
+
+@jax.jit
+def giesekus_multimode_saos_moduli(
+    omega: float,
+    eta_p_modes: jnp.ndarray,
+    lambda_modes: jnp.ndarray,
+    eta_s: float,
+) -> tuple[float, float]:
+    """Compute multi-mode SAOS moduli by superposition.
+
+    For N modes with individual (η_p,i, λ_i)::
+
+        G'(ω) = Σ G_i·(ωλ_i)² / (1 + (ωλ_i)²)
+        G''(ω) = Σ G_i·(ωλ_i) / (1 + (ωλ_i)²) + η_s·ω
+
+    where G_i = η_p,i / λ_i.
+
+    Parameters
+    ----------
+    omega : float
+        Angular frequency (rad/s)
+    eta_p_modes : jnp.ndarray
+        Polymer viscosities for each mode (Pa·s), shape (N,)
+    lambda_modes : jnp.ndarray
+        Relaxation times for each mode (s), shape (N,)
+    eta_s : float
+        Solvent viscosity (Pa·s)
+
+    Returns
+    -------
+    tuple[float, float]
+        (G', G'') in Pa
+    """
+    # Compute per-mode contributions
+    G_modes = eta_p_modes / lambda_modes
+    omega_lambda = omega * lambda_modes
+    omega_lambda_sq = omega_lambda * omega_lambda
+    denom = 1.0 + omega_lambda_sq
+
+    G_prime_contributions = G_modes * omega_lambda_sq / denom
+    G_double_prime_contributions = G_modes * omega_lambda / denom
+
+    # Sum over modes
+    G_prime = jnp.sum(G_prime_contributions)
+    G_double_prime = jnp.sum(G_double_prime_contributions) + eta_s * omega
+
+    return G_prime, G_double_prime
+
+
+@jax.jit
+def giesekus_multimode_ode_rhs(
+    t: float,
+    state: jnp.ndarray,
+    gamma_dot: float,
+    eta_p_modes: jnp.ndarray,
+    lambda_modes: jnp.ndarray,
+    alpha_modes: jnp.ndarray,
+    n_modes: int,
+) -> jnp.ndarray:
+    """ODE right-hand side for multi-mode Giesekus dynamics.
+
+    State vector: [τ_xx^1, τ_yy^1, τ_xy^1, τ_zz^1, ..., τ_xx^N, ..., τ_zz^N]
+    Total length: 4*N
+
+    Each mode evolves independently with its own (η_p, λ, α).
+
+    Parameters
+    ----------
+    t : float
+        Time (s)
+    state : jnp.ndarray
+        Concatenated state vector, shape (4*N,)
+    gamma_dot : float
+        Applied shear rate (1/s)
+    eta_p_modes : jnp.ndarray
+        Polymer viscosities for each mode (Pa·s), shape (N,)
+    lambda_modes : jnp.ndarray
+        Relaxation times for each mode (s), shape (N,)
+    alpha_modes : jnp.ndarray
+        Mobility factors for each mode, shape (N,)
+    n_modes : int
+        Number of modes N
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivatives, shape (4*N,)
+    """
+    # Reshape state: (N, 4)
+    state_reshaped = state.reshape((n_modes, 4))
+
+    def single_mode_rhs(mode_state, mode_params):
+        eta_p, lambda_1, alpha = mode_params
+        return giesekus_ode_rhs(t, mode_state, gamma_dot, eta_p, lambda_1, alpha)
+
+    mode_params = jnp.stack([eta_p_modes, lambda_modes, alpha_modes], axis=1)
+
+    # vmap over modes
+    d_states = jax.vmap(single_mode_rhs)(state_reshaped, mode_params)
+
+    return d_states.flatten()
