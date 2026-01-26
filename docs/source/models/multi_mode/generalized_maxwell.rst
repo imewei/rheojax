@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Broad relaxation spectra, multi-mode viscoelastic behavior, complex polymer systems
-- **Parameters:** 2N+1 (E_inf, E_1...E_N, τ_1...τ_N) with transparent element minimization
+- **Parameters:** 2N+1 (:math:`E_\infty, E_1, \ldots, E_N, \tau_1, \ldots, \tau_N`) with transparent element minimization
 - **Key equation:** :math:`E(t) = E_\infty + \sum_{i=1}^{N} E_i \exp(-t/\tau_i)` (Prony series)
 - **Test modes:** Relaxation (preferred), oscillation (excellent), creep (acceptable)
 - **Material examples:** Polymer melts with broad MW distributions, multi-phase composites, soft solids
@@ -22,10 +22,10 @@ Notation Guide
    * - Symbol
      - Description
      - Units
-   * - :math:`E_\infty` / :math:`G_\infty`
+   * - :math:`E_\infty/G_\infty`
      - Equilibrium modulus (0 for liquids)
      - Pa
-   * - :math:`E_i` / :math:`G_i`
+   * - :math:`E_i/G_i`
      - Mode i strength
      - Pa
    * - :math:`\tau_i`
@@ -63,7 +63,7 @@ The Generalized Maxwell Model (GMM) extends the single Maxwell element to **N pa
 
 **Key innovation: Tri-mode equality** – The same Prony parameters describe relaxation, oscillation, and creep without FFT transforms. Fit in one test mode, predict in all modes with 5-270× NLSQ speedup over scipy-based implementations.
 
-**Transparent element minimization** – Users request N=10 modes, the system automatically optimizes to N_opt (e.g., 3) based on R² degradation tolerance, balancing parsimony with fit quality.
+**Transparent element minimization** – Users request N=10 modes, the system automatically optimizes to N_opt (e.g., 3) based on :math:`R^2` degradation tolerance, balancing parsimony with fit quality.
 
 Physical Foundations
 --------------------
@@ -82,8 +82,8 @@ The GMM consists of **N Maxwell elements in parallel**, each contributing a dist
             ↓
    Plus equilibrium spring E_∞ (optional, can be zero for liquids)
 
-   Total stress: σ = E_∞ ε + Σᵢ σᵢ
-   Each mode: σᵢ + τᵢ dσᵢ/dt = Eᵢ dε/dt
+| Total stress: :math:`\sigma = E_\infty \varepsilon + \sum_i \sigma_i`
+| Each mode: :math:`\sigma_i + \tau_i d\sigma_i/dt = E_i d\varepsilon/dt`
 
 The parallel configuration means:
 
@@ -100,14 +100,14 @@ The GMM represents materials with **multiple relaxation mechanisms** operating s
    - Long-range entanglements that don't relax experimentally
    - Zero for viscoelastic liquids (polymer melts)
 
-**Mode strengths Eᵢ**:
+**Mode strengths** :math:`E_i`:
    - Contribution of i-th relaxation process to total modulus
-   - Related to density of chains with relaxation time τᵢ
+   - Related to density of chains with relaxation time :math:`\tau_i`
    - Approximates continuous spectrum: :math:`E_i \approx H(\tau_i) \Delta(\log \tau_i)`
 
-**Relaxation times τᵢ**:
+**Relaxation times** :math:`\tau_i`:
    - Distributed timescales from Rouse modes (fast) to reptation (slow)
-   - Typically span 4-8 decades (e.g., 10⁻³ to 10⁵ s for polymer melts)
+   - Typically span 4-8 decades (e.g., 10\ :math:`^{-3 to 10^5}` s for polymer melts)
    - Logarithmic spacing: :math:`\tau_i = \tau_{\min} \cdot 10^{i \Delta \log \tau}`
 
 **Physical meaning of N modes**:
@@ -138,32 +138,32 @@ Material Examples with Typical N
    * - Material
      - N modes
      - E_inf (Pa)
-     - τ range (s)
+     - :math:`\tau` range (s)
      - Ref
    * - Polystyrene melt (broad MW)
      - 8-15
      - 0
-     - 10⁻² - 10⁴
+     - 10\ :math:`^{-2 - 10^4}`
      - [1]
    * - PMMA at T_g + 50°C
      - 10-20
      - 0
-     - 10⁻⁴ - 10²
+     - 10\ :math:`^{-4 - 10^2}`
      - [2]
    * - SBR rubber (unfilled)
      - 5-10
-     - 5×10⁵
-     - 10⁻⁶ - 10¹
+     - :math:`5 \times 10^5`
+     - 10\ :math:`^{-6 - 10^1}`
      - [3]
    * - Bitumen (asphalt)
      - 12-18
-     - 1×10⁵
-     - 10⁻³ - 10⁶
+     - :math:`1 \times 10^5`
+     - 10\ :math:`^{-3 - 10^6}`
      - [4]
    * - Hydrogel (multi-network)
      - 3-5
-     - 1×10⁴
-     - 10⁻¹ - 10³
+     - :math:`1 \times 10^4`
+     - 10\ :math:`^{-1 - 10^3}`
      - [5]
 
 Governing Equations
@@ -199,7 +199,7 @@ Prony Series Mathematical Formulation
 Tri-Mode Equality Proof
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Theorem**: The same Prony parameters {E_∞, E_i, τ_i} satisfy all three test modes.
+**Theorem**: The same Prony parameters {E_∞, E_i, :math:`\tau_i`} satisfy all three test modes.
 
 **Proof sketch**:
 
@@ -424,35 +424,35 @@ to extract insights about material structure, molecular properties, and processi
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**G_i (Mode Strengths)**:
+:math:`G_i` **(Mode Strengths)**:
    Contribution of i-th relaxation process to total modulus, related to density of
-   chains/modes with characteristic time τ_i.
+   chains/modes with characteristic time :math:`\tau_i`.
 
-   *For graduate students*: G_i approximates the continuous spectrum: G_i ≈ H(τ_i)Δ(log τ_i).
+   *For graduate students*: G_i approximates the continuous spectrum: :math:`G_i \approx H(\tau_i) \Delta(\log \tau_i)`.
    For entangled polymers: G_i ∝ w(M_i) where w is the molecular weight distribution.
-   Sum rule: Σ G_i = total relaxed modulus. Plateau modulus G_N^0 ≈ E_∞ for crosslinked
-   systems relates to entanglement density via G_N^0 = ρRT/M_e.
+   Sum rule: :math:`\Sigma` G_i = total relaxed modulus. Plateau modulus G_N^0 ≈ E_∞ for crosslinked
+   systems relates to entanglement density via G_N^0 = :math:`\rhoRT/M_e`.
 
    *For practitioners*: Extract from dynamic moduli fitting. Typical: narrow MWD (1-2
    dominant modes), broad MWD (5-15 modes spanning decades). Monitor G_i changes for
    degradation (decrease) or crosslinking (increase in G_∞).
 
-**τ_i (Relaxation Times)**:
+:math:`\tau_i` **(Relaxation Times)**:
    Characteristic timescales for each relaxation mode, typically logarithmically spaced.
 
-   *For graduate students*: For polymers: τ_i ~ M_i^3.4 (reptation) or M_i^2 (Rouse).
-   Logarithmic spacing: τ_i = τ_min·(τ_max/τ_min)^((i-1)/(N-1)). Zero-shear viscosity:
-   η_0 = Σ G_i·τ_i. Temperature dependence via WLF or Arrhenius shift factors.
+   *For graduate students*: For polymers: :math:`\tau_i` ~ M_i^3.4 (reptation) or M_i^2 (Rouse).
+   Logarithmic spacing: :math:`\tau_i = \tau_min \cdot (\tau_max/\tau_min)^((i-1)/(N-1))`. Zero-shear viscosity:
+   :math:`\eta_0 = \Sigma G_i \cdot \tau_i`. Temperature dependence via WLF or Arrhenius shift factors.
 
    *For practitioners*: Typical spans: 4-8 decades (10^-3 to 10^5 s) for polymer melts.
-   Fast modes (τ < 1 s) = local dynamics, slow modes (τ > 100 s) = terminal relaxation.
+   Fast modes (:math:`\tau` < 1 s) = local dynamics, slow modes (:math:`\tau` > 100 s) = terminal relaxation.
    Extract via TTS if narrow experimental time window.
 
-**E_∞ (Equilibrium Modulus)**:
+:math:`E_\infty` **(Equilibrium Modulus)**:
    Permanent network modulus, zero for viscoelastic liquids, nonzero for soft solids.
 
-   *For graduate students*: E_∞ = 0 (terminal flow, η_0 finite). E_∞ > 0 (permanent
-   crosslinks, infinite η). For rubber elasticity: G_∞ = νkT where ν is crosslink density.
+   *For graduate students*: E_∞ = 0 (terminal flow, :math:`\eta_0` finite). E_∞ > 0 (permanent
+   crosslinks, infinite :math:`\eta`). For rubber elasticity: :math:`G_{\infty} = \nu k T` where :math:`\nu` is crosslink density.
    Relates to gel point: E_∞ appears at percolation threshold.
 
    *For practitioners*: Measure from G' low-frequency plateau. Uncrosslinked melts:
@@ -461,7 +461,7 @@ Parameter Interpretation
 **N (Number of Modes)**:
    Discrete approximation order for continuous relaxation spectrum.
 
-   *For graduate students*: N-mode Prony series approximates continuous H(τ). Optimal N
+   *For graduate students*: N-mode Prony series approximates continuous H(:math:`\tau`). Optimal N
    balances fit quality vs parsimony. Information criteria (AIC, BIC) or element
    minimization (N_opt from degradation tolerance) guide selection.
 
@@ -500,11 +500,11 @@ Material Classification
      - Soft solid (gel, elastomer)
      - Rubber, hydrogels, crosslinked polymers
      - Permanent network, shape memory
-   * - τ_max/τ_min < 10²
+   * - :math:`\tau_max/\tau_min < 10^2`
      - Narrow spectrum
      - Monodisperse, single mechanism
      - Simple relaxation, single timescale dominates
-   * - τ_max/τ_min > 10⁴
+   * - :math:`\tau_max/\tau_min > 10^4`
      - Broad spectrum
      - Polydisperse, complex systems
      - Wide processing window, TTS essential
@@ -514,14 +514,14 @@ Physical Insights from Prony Parameters
 
 **Mode Spectrum Interpretation:**
 
-The discrete relaxation spectrum {τ_i, E_i} provides a fingerprint of the material's relaxation processes:
+The discrete relaxation spectrum {:math:`\tau_i`, E_i} provides a fingerprint of the material's relaxation processes:
 
 **Mode strength E_i**:
    - **Physical meaning**: Contribution of the i-th relaxation mechanism to total modulus
    - **Distribution shape**: Reflects molecular weight distribution (MWD) or phase heterogeneity
    - **Sum rule**: :math:`\sum_{i=1}^N E_i` = total relaxed modulus (liquid-like component)
 
-**Relaxation time τ_i**:
+**Relaxation time** :math:`\tau_i` **:**
    - **Physical meaning**: Characteristic timescale for the i-th relaxation process
    - **Polymer interpretation**: Related to molecular weight via :math:`\tau_i \sim M_i^{3.4}` (Rouse/reptation)
    - **Logarithmic spacing**: Typically spans 4-8 decades for broad MWD polymers
@@ -545,7 +545,7 @@ The GMM decomposes complex viscoelastic behavior into interpretable components:
 
 **Short-time modes** (:math:`\tau_i < 1` s):
    - Fast Rouse modes (local chain motion)
-   - β-relaxation processes (segmental dynamics)
+   - :math:`\beta-relaxation` processes (segmental dynamics)
    - Typical for glassy dynamics near T_g
 
 **Intermediate-time modes** (:math:`1 < \tau_i < 100` s):
@@ -585,7 +585,7 @@ The width of the relaxation spectrum reveals material complexity:
    - Multiple relaxation mechanisms
 
 **Spectral shape interpretation**:
-   - **Monotonic decrease** (E_i decreases with τ_i): Typical for polymers
+   - **Monotonic decrease** (E_i decreases with :math:`\tau_i`): Typical for polymers
    - **Bimodal peaks**: Blends or multi-phase materials
    - **Flat plateau**: Continuous power-law relaxation (consider fractional models)
 
@@ -593,10 +593,10 @@ Material Characterization Capabilities
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **From Relaxation Tests:**
-   - Discrete relaxation spectrum {τ_i, E_i}
+   - Discrete relaxation spectrum {:math:`\tau_i`, E_i}
    - Total relaxed modulus :math:`\sum_i E_i`
    - Equilibrium modulus :math:`E_\infty`
-   - Relaxation breadth (decades spanned by τ_i)
+   - Relaxation breadth (decades spanned by :math:`\tau_i`)
 
 **From Oscillation Tests:**
    - Storage modulus :math:`G'(\omega)` across frequency range
@@ -621,7 +621,7 @@ Material Characterization Capabilities
    - Kramers-Kronig relations: Check thermodynamic consistency
 
 **Quality Control Applications:**
-   - Batch-to-batch consistency (compare {τ_i, E_i})
+   - Batch-to-batch consistency (compare {:math:`\tau_i`, E_i})
    - Aging/degradation tracking (monitor spectrum evolution)
    - Blend composition verification (detect individual components)
    - Cure monitoring (track crosslink density via :math:`E_\infty`)
@@ -702,7 +702,7 @@ Parameter Interpretation
       - Soft gels: :math:`10^3 - 10^5` Pa
       - Rubbers: :math:`10^5 - 10^7` Pa
 
-**Eᵢ / Gᵢ (Mode Strengths)**:
+:math:`E_i / G_i` **(Mode Strengths)**:
    - **Physical meaning**: Contribution of i-th mode to total modulus
    - **Distribution**: Reflects relaxation spectrum :math:`H(\tau_i)`
    - **Magnitude ordering**:
@@ -711,7 +711,7 @@ Parameter Interpretation
    - **Sum interpretation**: :math:`\sum E_i` = total relaxed modulus
    - **Typical ranges**: :math:`10^3 - 10^7` Pa (material-dependent)
 
-**τᵢ (Relaxation Times)**:
+:math:`\tau_i` **(Relaxation Times)**:
    - **Physical meaning**: Timescale for i-th relaxation process
    - **Logarithmic spacing**: Usually :math:`\tau_i = 10^{a + i \cdot \Delta}`
    - **Coverage**: Should span experimental time/frequency window
@@ -736,18 +736,18 @@ Algorithm Overview
 
 **Problem**: How many modes N are truly needed to fit the data well?
 
-**Solution**: Iterative N reduction with R² degradation criterion.
+**Solution**: Iterative N reduction with :math:`R^2` degradation criterion.
 
 **User workflow**:
    1. User requests ``n_modes=10`` (generous upper bound)
    2. System fits N=10, then N=9, N=8, ..., N=1
-   3. Computes R² for each N
+   3. Computes :math:`R^2` for each N
    4. Selects smallest N where :math:`R^2_N \geq \text{threshold}`
    5. Returns optimized model with N_opt modes transparently
 
 **Transparency**: User receives optimal model without manual intervention. Diagnostics available via ``get_element_minimization_diagnostics()``.
 
-R² Threshold Criterion
+:math:`R^2` Threshold Criterion
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 **Threshold definition**:
@@ -760,7 +760,7 @@ R² Threshold Criterion
 
 **Interpretation**:
 
-- :math:`R^2_{\max}` = best R² across all N (typically N=10)
+- :math:`R^2_{\max}` = best :math:`R^2` across all N (typically N=10)
 - :math:`1 - R^2_{\max}` = degradation "room" from perfect fit
 - ``optimization_factor`` controls how much degradation is tolerable
 
@@ -789,7 +789,7 @@ optimization_factor Interpretation
      - Meaning
      - Use case
    * - 1.0
-     - Strict: require R² = R²_max
+     - Strict: require :math:`R^2 = R^2_max`
      - Research (spectrum reconstruction)
    * - 1.5 (default)
      - Balanced: allow 50% degradation
@@ -808,7 +808,7 @@ Example: N=10 → N_opt=3
 
 **Scenario**: Fit PS melt relaxation data with ``n_modes=10``.
 
-**R² progression**:
+:math:`R^2` **progression**:
 
 .. code-block:: text
 
@@ -853,9 +853,9 @@ Two-Step NLSQ Fitting
 Motivation: Physical Constraints
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Problem**: Prony series requires **all Eᵢ > 0** (physical moduli cannot be negative).
+**Problem**: Prony series requires **all** :math:`E_i` **> 0** (physical moduli cannot be negative).
 
-**Challenge**: Unconstrained optimization can produce negative Eᵢ during intermediate iterations, leading to:
+**Challenge**: Unconstrained optimization can produce negative :math:`E_i` during intermediate iterations, leading to:
    - Non-physical predictions
    - Numerical instabilities (negative moduli → complex logarithms)
    - Poor convergence
@@ -880,7 +880,7 @@ where the **softmax penalty** is:
 **Properties**:
    - **Differentiable** (JAX-compatible gradients)
    - **Smooth**: No discontinuities (NLSQ handles well)
-   - **Encourages positive Eᵢ**: Penalty ≈ 0 when Eᵢ ≫ 0, increases for Eᵢ < 0
+   - **Encourages positive** :math:`E_i`: Penalty ≈ 0 when :math:`E_i` ≫ 0, increases for :math:`E_i` < 0
    - **Scale parameter**: Default ``scale=1e-3`` balances enforcement strength
 
 **Behavior**:
@@ -895,12 +895,12 @@ where the **softmax penalty** is:
    penalty = softmax_penalty(E_i, scale=1e3)
    # → penalty ≈ 0.3 (small penalty for finite positive values)
 
-**Outcome**: Optimization is **gently steered** toward positive Eᵢ, but not strictly enforced (allows exploration).
+**Outcome**: Optimization is **gently steered** toward positive :math:`E_i`, but not strictly enforced (allows exploration).
 
 Step 2: Hard Bounds Re-Fit (If Needed)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Trigger**: If Step 1 converges with **any Eᵢ < 0**, re-fit with hard bounds.
+**Trigger**: If Step 1 converges with **any** :math:`E_i` **< 0**, re-fit with hard bounds.
 
 **Hard bounds**: :math:`E_i \in [10^{-12}, 10^{10}]` (strictly enforced by NLSQ).
 
@@ -910,7 +910,7 @@ Step 2: Hard Bounds Re-Fit (If Needed)
    - Two-step approach combines smooth optimization (Step 1) with guaranteed feasibility (Step 2)
 
 **Practical outcome**:
-   - ~80% of fits succeed in Step 1 without negative Eᵢ → fast convergence
+   - ~80% of fits succeed in Step 1 without negative :math:`E_i` → fast convergence
    - ~20% trigger Step 2 → slightly slower but guaranteed physical parameters
 
 Performance: 5-270× Speedup
@@ -1158,7 +1158,7 @@ Test Mode Recommendations
 **Protocol**:
    - Step strain :math:`\gamma_0` within LVR (1-5%)
    - Logarithmic time sampling: 10 pts/decade
-   - Duration: 5-8 decades in time (e.g., 10⁻² to 10⁶ s via TTS)
+   - Duration: 5-8 decades in time (e.g., 10\ :math:`^{-2 to 10^6}` s via TTS)
    - Temperature control: ±0.1°C
 
 **Example**: DMA isothermal relaxation test at T = T_g + 30°C.
@@ -1172,7 +1172,7 @@ Test Mode Recommendations
 
 **Protocol**:
    - Amplitude sweep to find LVR (typically :math:`\gamma_0 = 0.5-5\%`)
-   - Frequency range: 5-8 decades (e.g., 10⁻² to 10⁵ rad/s via TTS)
+   - Frequency range: 5-8 decades (e.g., 10\ :math:`^{-2 to 10^5}` rad/s via TTS)
    - Temperature sweep for mastercurve: 5-10 temperatures
    - Use automatic shift factors: ``Mastercurve(auto_shift=True)``
 
@@ -1203,17 +1203,17 @@ Sample Applications: DMA (Solid Mechanics)
 
 **Typical workflow**:
 
-1. **Temperature sweep** (fixed ω):
+1. **Temperature sweep** (fixed :math:`\omega`):
       - T = T_g - 50°C to T_g + 100°C (e.g., -50°C to 150°C for PMMA)
-      - ω = 1 rad/s (common standard)
+      - :math:`\omega` = 1 rad/s (common standard)
       - Measure :math:`E'(T)`, :math:`E''(T)`, :math:`\tan \delta(T)`
       - Identify glass transition (peak in :math:`\tan \delta`)
 
 2. **Frequency sweep** (multiple T):
       - 5-10 isothermal temperatures
-      - ω = 10⁻² to 10² rad/s per temperature
+      - :math:`\omega` = 10\ :math:`^{-2 to 10^2}` rad/s per temperature
       - Construct mastercurve via TTS: ``Mastercurve(auto_shift=True)``
-      - Extended range: ω_reduced = 10⁻⁶ to 10⁶ rad/s
+      - Extended range: :math:`\omega_reduced = 10`\ :math:`^{-6 to 10^6}` rad/s
 
 3. **Fit GMM to mastercurve**:
 
@@ -1259,8 +1259,8 @@ Sample Applications: Rheometer (Fluid Dynamics)
 **Typical workflow**:
 
 1. **SAOS frequency sweep** (linear regime):
-      - ω = 10⁻² to 10² rad/s
-      - γ₀ = 1% (within LVR, verified by amplitude sweep)
+      - :math:`\omega` = 10\ :math:`^{-2 to 10^2}` rad/s
+      - :math:`\gamma_0` = 1% (within LVR, verified by amplitude sweep)
       - Measure :math:`G'(\omega)`, :math:`G''(\omega)`
       - Identify terminal region (:math:`G' \sim \omega^2`, :math:`G'' \sim \omega`)
 
@@ -1367,7 +1367,7 @@ Element Minimization Best Practices
    plt.legend()
    plt.show()
 
-**Expected**: R² decreases slowly as N reduces, then drops sharply below N_opt.
+**Expected**: :math:`R^2` decreases slowly as N reduces, then drops sharply below N_opt.
 
 **4. Disable minimization for manual control**:
 
@@ -1379,7 +1379,7 @@ Element Minimization Best Practices
 optimization_factor Selection Guide
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Default 1.5 rationale**: Balances parsimony (fewer modes) with fit quality (R² degradation).
+**Default 1.5 rationale**: Balances parsimony (fewer modes) with fit quality (:math:`R^2` degradation).
 
 **When to adjust**:
 
@@ -1414,11 +1414,11 @@ Troubleshooting Convergence Issues
    * - NLSQ fails (max_iter reached)
      - ``nlsq_result.success = False``
      - Increase ``max_iter=5000``, check data quality
-   * - Negative Eᵢ after Step 2
-     - Warning: "Negative Eᵢ detected"
+   * - Negative :math:`E_i` after Step 2
+     - Warning: "Negative :math:`E_i` detected"
      - Reduce N, check for data artifacts (noise, outliers)
-   * - R² poor for all N
-     - R² < 0.90 even for N=20
+   * - :math:`R^2` poor for all N
+     - :math:`R^2` < 0.90 even for N=20
      - GMM inappropriate (try fractional models)
    * - Element minimization unstable
      - N_opt = 1 or N_opt = N_max
@@ -1436,10 +1436,10 @@ Troubleshooting Convergence Issues
            ftol=1e-8,      # Tighter tolerance
            xtol=1e-8)
 
-Validation with R² and Residual Analysis
+Validation with :math:`R^2` and Residual Analysis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**1. Goodness-of-fit (R²)**:
+**1. Goodness-of-fit (** :math:`R^2` **)**:
 
 .. code-block:: python
 
@@ -1456,9 +1456,9 @@ Validation with R² and Residual Analysis
    print(f"R² = {r2:.4f}")  # Should be > 0.95
 
 **Interpretation**:
-   - R² > 0.98: Excellent fit
-   - R² ∈ [0.95, 0.98]: Good fit
-   - R² < 0.95: Poor fit (increase N or try different model)
+   - :math:`R^2` > 0.98: Excellent fit
+   - :math:`R^2` ∈ [0.95, 0.98]: Good fit
+   - :math:`R^2` < 0.95: Poor fit (increase N or try different model)
 
 **2. Residual plots**:
 
@@ -1506,19 +1506,19 @@ Single Maxwell vs GMM
      - Monodisperse, homogeneous
      - Polydisperse, multi-phase
    * - Number of parameters
-     - 2 (G, η)
+     - 2 (G, :math:`\eta`)
      - 2N+1 (auto-reduced)
    * - Fitting time
      - 0.1 s
      - 0.5-5 s (depends on N)
    * - Interpretation
-     - Simple (one τ)
-     - Complex (spectrum H(τ))
+     - Simple (one :math:`\tau`)
+     - Complex (spectrum H(:math:`\tau`))
    * - Use case
      - Quick screening
      - Detailed characterization
 
-**Decision rule**: If single Maxwell gives R² < 0.95, try GMM.
+**Decision rule**: If single Maxwell gives :math:`R^2` < 0.95, try GMM.
 
 GMM vs Fractional Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1540,10 +1540,10 @@ GMM vs Fractional Models
      - Excellent (high N)
      - Good (fewer params)
    * - Physical interpretation
-     - Mode strengths Eᵢ
-     - Fractional order α
+     - Mode strengths :math:`E_i`
+     - Fractional order :math:`\alpha`
    * - Extrapolation
-     - Poor (outside τ range)
+     - Poor (outside :math:`\tau` range)
      - Better (power-law)
    * - Computational cost
      - O(N) per evaluation
@@ -1575,7 +1575,7 @@ Computational Cost vs Accuracy
    * - N modes
      - Iterations
      - Time (s)
-     - R²
+     - :math:`R^2`
      - N_opt
    * - 3
      - 150

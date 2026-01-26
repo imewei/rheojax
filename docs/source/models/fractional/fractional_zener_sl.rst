@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Solid-like behavior with equilibrium plateau and fractional relaxation tails
-- **Parameters:** 4 (Ge, c_α, α, τ)
+- **Parameters:** 4 (Ge, :math:`c_{\alpha, \alpha, \tau}`)
 - **Key equation:** :math:`G(t) = G_e + c_\alpha t^{-\alpha} E_{1-\alpha,1}(-(t/\tau)^{1-\alpha})`
 - **Test modes:** Oscillation, relaxation
 - **Material examples:** Viscoelastic solids with finite equilibrium modulus and power-law relaxation
@@ -28,11 +28,11 @@ Notation Guide
      - Pa
      - Equilibrium modulus (parallel spring, long-time plateau)
    * - :math:`c_\alpha`
-     - Pa·s\ :sup:`α`
+     - Pa·s\ :math:`^{\alpha}`
      - SpringPot constant (relaxation magnitude)
    * - :math:`\alpha`
      - dimensionless
-     - Fractional order (0 < α < 1, power-law character)
+     - Fractional order (0 < :math:`\alpha` < 1, power-law character)
    * - :math:`\tau`
      - s
      - Relaxation time (characteristic timescale)
@@ -143,7 +143,7 @@ Limiting Behavior
 What You Can Learn
 ------------------
 
-This section explains what insights you can extract from fitting the Fractional Zener Solid-Liquid model to your experimental data, emphasizing the dual-modulus solid structure with one solid springpot (α) and one liquid springpot (1-α).
+This section explains what insights you can extract from fitting the Fractional Zener Solid-Liquid model to your experimental data, emphasizing the dual-modulus solid structure with one solid springpot (:math:`\alpha`) and one liquid springpot (1-:math:`\alpha`).
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -151,34 +151,34 @@ Parameter Interpretation
 **Equilibrium Modulus (Ge)**:
    The low-frequency plateau modulus, indicating the material's long-term stiffness under sustained load. This arises from the parallel spring providing permanent network structure.
 
-   *For graduate students*: Ge relates to crosslink density via rubber elasticity theory: Ge ≈ ν·kB·T where ν is network strand density. For chemically crosslinked networks, Ge is temperature-independent; for physical networks (entanglements), Ge scales with T.
+   *For graduate students*: Ge relates to crosslink density via rubber elasticity theory: Ge ≈ :math:`\nu \cdot kB \cdot T where \nu` is network strand density. For chemically crosslinked networks, Ge is temperature-independent; for physical networks (entanglements), Ge scales with T.
    *For practitioners*: Higher Ge means stiffer equilibrium behavior. Compare to target specifications for structural applications. If Ge → 0, material flows—consider FMG instead.
 
-**Fractional Order (α)**:
-   Controls the breadth of relaxation spectrum and power-law decay character. This model uses a "solid" springpot (α) paired with a "liquid" springpot (1-α) in series.
+**Fractional Order (** :math:`\alpha` **)**:
+   Controls the breadth of relaxation spectrum and power-law decay character. This model uses a "solid" springpot (:math:`\alpha`) paired with a "liquid" springpot (1-:math:`\alpha`) in series.
 
-   - **α → 0**: Very broad spectrum, solid-like response dominates, nearly elastic at short times
-   - **α → 0.5**: Critical gel behavior, balanced solid-liquid character, maximum spectrum breadth
-   - **α → 1**: Narrow spectrum, approaches classical Zener with exponential relaxation
+   - :math:`\alpha` **→ 0**: Very broad spectrum, solid-like response dominates, nearly elastic at short times
+   - :math:`\alpha` **→ 0.5**: Critical gel behavior, balanced solid-liquid character, maximum spectrum breadth
+   - :math:`\alpha` **→ 1**: Narrow spectrum, approaches classical Zener with exponential relaxation
 
-   *For graduate students*: α quantifies polydispersity in the relaxation time distribution. Lower α indicates greater microstructural heterogeneity (filler dispersion, crosslink density variation, molecular weight distribution).
-   *For practitioners*: Lower α means relaxation spreads over more time decades. Critical for predicting long-term creep and stress relaxation.
+   *For graduate students*: :math:`\alpha` quantifies polydispersity in the relaxation time distribution. Lower :math:`\alpha` indicates greater microstructural heterogeneity (filler dispersion, crosslink density variation, molecular weight distribution).
+   *For practitioners*: Lower :math:`\alpha` means relaxation spreads over more time decades. Critical for predicting long-term creep and stress relaxation.
 
-**SpringPot Constant (c_α)**:
-   Sets the magnitude of the fractional dissipation contribution from the Maxwell arm. Units are Pa·s^α.
+**SpringPot Constant (** :math:`c_{\alpha}` **)**:
+   Sets the magnitude of the fractional dissipation contribution from the Maxwell arm. Units are Pa·s\ :math:`^{\alpha}`.
 
-   - **High c_α/Ge ratio (> 5)**: Strong viscoelastic dissipation, large relaxation from high-frequency to Ge
-   - **Moderate c_α/Ge ratio (1-5)**: Balanced elastic-dissipative response
-   - **Low c_α/Ge ratio (< 1)**: Predominantly elastic response, small relaxation
+   - **High** :math:`c_{\alpha/Ge}` **ratio (> 5)**: Strong viscoelastic dissipation, large relaxation from high-frequency to Ge
+   - **Moderate** :math:`c_{\alpha/Ge}` **ratio (1-5)**: Balanced elastic-dissipative response
+   - **Low** :math:`c_{\alpha/Ge}` **ratio (< 1)**: Predominantly elastic response, small relaxation
 
-   *For graduate students*: c_α represents the spectral strength of the relaxing modes. Higher c_α indicates more energy stored in temporary (relaxing) structures.
-   *For practitioners*: High c_α/Ge means large difference between short-time and long-time stiffness—critical for impact vs. sustained loading.
+   *For graduate students*: :math:`c_{\alpha}` represents the spectral strength of the relaxing modes. Higher :math:`c_{\alpha}` indicates more energy stored in temporary (relaxing) structures.
+   *For practitioners*: High :math:`c_{\alpha/Ge}` means large difference between short-time and long-time stiffness—critical for impact vs. sustained loading.
 
-**Relaxation Time (τ)**:
+**Relaxation Time (** :math:`\tau` **)**:
    Characteristic timescale for the transition from high modulus (Ge + high-frequency contribution) to equilibrium modulus Ge.
 
-   *For graduate students*: τ is temperature-dependent (WLF/Arrhenius), enabling time-temperature superposition. Unusual units (s^α) arise from fractional calculus.
-   *For practitioners*: Compare τ to service timescales. If tservice << τ, use high-frequency modulus; if tservice >> τ, use Ge.
+   *For graduate students*: :math:`\tau` is temperature-dependent (WLF/Arrhenius), enabling time-temperature superposition. Unusual units (s\ :math:`^{\alpha}`) arise from fractional calculus.
+   *For practitioners*: Compare :math:`\tau` to service timescales. If tservice << :math:`\tau`, use high-frequency modulus; if tservice >> :math:`\tau`, use Ge.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -191,15 +191,15 @@ Material Classification
      - Material Type
      - Typical Materials
      - Processing Implications
-   * - Ge > 10⁵ Pa, α < 0.3
+   * - Ge > :math:`10^5 Pa, \alpha` < 0.3
      - Stiff crosslinked solid
      - Vulcanized rubber, thermosets
      - Load-bearing, minimal creep
-   * - Ge ~ 10³-10⁴ Pa, α ~ 0.4-0.6
+   * - Ge ~ :math:`10^3-10^4 Pa, \alpha` ~ 0.4-0.6
      - Soft viscoelastic solid
      - Gels, soft tissues, elastomers
      - Damping, vibration isolation
-   * - Ge < 10³ Pa, α > 0.7
+   * - Ge < :math:`10^3 Pa, \alpha` > 0.7
      - Weakly crosslinked network
      - Hydrogels, biopolymers
      - Requires careful handling, creep-prone
@@ -208,7 +208,7 @@ Material Classification
    :header-rows: 1
    :widths: 20 30 30 20
 
-   * - α Range
+   * - :math:`\alpha` Range
      - Spectrum Breadth
      - Typical Materials
      - Decades Needed
@@ -229,8 +229,8 @@ Diagnostic Indicators
 ~~~~~~~~~~~~~~~~~~~~~
 
 - **Ge fits near lower bound**: Material may be liquid-like (Ge → 0); consider Fractional Maxwell Gel (FMG) instead
-- **α hits bounds (0.05 or 0.95)**: Data may not support fractional behavior; try classical Zener for simpler interpretation
-- **c_α/Ge > 100**: Extreme relaxation; verify data quality at short times and check for nonlinear effects
+- :math:`\alpha` **hits bounds (0.05 or 0.95)**: Data may not support fractional behavior; try classical Zener for simpler interpretation
+- :math:`c_{\alpha/Ge}` **> 100**: Extreme relaxation; verify data quality at short times and check for nonlinear effects
 - **Poor fit at low frequencies**: Equilibrium plateau Ge not reached; extend frequency range or measurement time
 - **Systematic residual trends**: Check for thermorheological complexity (frequency-dependent shift factors) or nonlinear viscoelasticity
 
@@ -240,7 +240,7 @@ Fitting Guidance
 **Recommended Data Collection:**
 
 1. **Frequency sweep** (SAOS) or **Stress relaxation**: 4-5 decades
-2. **Coverage**: Ensure equilibrium plateau Ge is clearly visible at low ω
+2. **Coverage**: Ensure equilibrium plateau Ge is clearly visible at low :math:`\omega`
 3. **Test amplitude**: Within LVR (< 5% strain or stress)
 4. **Temperature**: Constant ±0.1°C
 
@@ -261,16 +261,16 @@ Fitting Guidance
 
 **Optimization Tips:**
 
-- Verify equilibrium plateau Ge is reached (G' → Ge at low ω)
+- Verify equilibrium plateau Ge is reached (G' → Ge at low :math:`\omega`)
 - Use log-weighted least squares
 - Constrain Ge > 0 (solid-like behavior required)
-- Check that α is well-constrained (not at bounds)
+- Check that :math:`\alpha` is well-constrained (not at bounds)
 
 **Common Pitfalls:**
 
 - **Ge near zero**: Material may be liquid-like; use FMG instead
 - **Poor low-frequency fit**: Equilibrium not reached; extend frequency range
-- **α near 1**: Consider classical Zener for simpler interpretation
+- :math:`\alpha` **near 1**: Consider classical Zener for simpler interpretation
 
 **Troubleshooting Table:**
 
@@ -284,16 +284,16 @@ Fitting Guidance
    * - Ge converges to lower bound
      - Liquid-like behavior
      - Switch to FMG or FML model
-   * - α hits upper bound (0.95+)
+   * - :math:`\alpha` hits upper bound (0.95+)
      - Nearly exponential relaxation
      - Use classical Zener for clarity
-   * - c_α/Ge > 100
+   * - :math:`c_{\alpha/Ge}` > 100
      - Extreme relaxation or data quality
      - Check short-time data, verify LVR
-   * - Poor fit at ω → 0
+   * - Poor fit at :math:`\omega` → 0
      - Equilibrium not reached
      - Extend frequency range or measurement time
-   * - High correlation Ge-c_α
+   * - High correlation Ge-:math:`c_{\alpha}`
      - Insufficient frequency coverage
      - Need broader data spanning 4+ decades
    * - Non-monotonic residuals
@@ -308,19 +308,19 @@ Practical Applications
 
 **Quality Control:**
 
-The fractional order α and relaxation time τ provide sensitive quality metrics for batch consistency. Monitor these parameters over production runs:
+The fractional order :math:`\alpha` and relaxation time :math:`\tau` provide sensitive quality metrics for batch consistency. Monitor these parameters over production runs:
 
-- **Decreased α**: Indicates increased polydispersity from contamination, degradation, or processing variations
-- **Increased τ**: May signal molecular weight increase from post-cure or aggregation
+- **Decreased** :math:`\alpha`: Indicates increased polydispersity from contamination, degradation, or processing variations
+- **Increased** :math:`\tau`: May signal molecular weight increase from post-cure or aggregation
 - **Decreased Ge**: Loss of crosslink density from aging or incomplete cure
 
 **Material Development:**
 
 Use FZSL fitting to guide formulation:
 
-1. **Filler optimization**: Lower α with increasing filler loading indicates filler-matrix interphase effects. Target α > 0.6 for good dispersion.
+1. **Filler optimization**: Lower :math:`\alpha` with increasing filler loading indicates filler-matrix interphase effects. Target :math:`\alpha` > 0.6 for good dispersion.
 2. **Crosslink density**: Ge scales with crosslink density. Track Ge vs. cure time or temperature to optimize curing protocols.
-3. **Polymer blending**: Broad α (< 0.4) suggests incompatibility or phase separation. Target α > 0.5 for miscible blends.
+3. **Polymer blending**: Broad :math:`\alpha` (< 0.4) suggests incompatibility or phase separation. Target :math:`\alpha` > 0.5 for miscible blends.
 
 **Failure Prediction:**
 
@@ -334,16 +334,16 @@ The FZSL model enables long-term performance prediction:
 
 For structural applications:
 
-- **Short-term loading** (t << τ): Use instantaneous modulus G(0) = Ge + c_α τ^(-α)
-- **Long-term loading** (t >> τ): Use equilibrium modulus Ge
-- **Cyclic loading** (ω ≈ 1/τ): Maximum energy dissipation, critical for damping applications
+- **Short-term loading** (t << :math:`\tau`): Use instantaneous modulus G(0) = Ge + :math:`c_{\alpha \tau^(-\alpha)}`
+- **Long-term loading** (t >> :math:`\tau`): Use equilibrium modulus Ge
+- **Cyclic loading** (:math:`\omega \approx 1/\tau`): Maximum energy dissipation, critical for damping applications
 
 Example Calculations
 --------------------
 
 **Relaxation Modulus Prediction:**
 
-Given fitted parameters Ge = 1.0 MPa, c_α = 0.5 MPa·s^0.5, α = 0.5, τ = 10 s:
+Given fitted parameters Ge = 1.0 MPa, :math:`c_{\alpha}` = 0.5 MPa·s^0.5, :math:`\alpha = 0.5, \tau` = 10 s:
 
 .. code-block:: python
 

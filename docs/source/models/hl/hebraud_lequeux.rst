@@ -8,7 +8,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Mean-field modeling of soft glassy materials, yield-stress fluids, foams, emulsions, pastes
-- **Parameters:** 4 (G₀, α, σ_c, τ)
+- **Parameters:** 4 (G_0, :math:`\alpha`, :math:`\sigma_c`, :math:`\tau`)
 - **Key equation:** :math:`\partial_t P(\sigma, t) = -\dot{\gamma}(t) \partial_\sigma P + D(t) \partial^2_\sigma P - \frac{1}{\tau} \Theta(|\sigma|-\sigma_c) P + \Gamma(t) \delta(\sigma)`
 - **Test modes:** Flow curve, creep, relaxation, startup, oscillation (SAOS/LAOS)
 - **Material examples:** Foams, emulsions, pastes, concentrated colloidal suspensions, soft glassy materials
@@ -42,7 +42,7 @@ Notation Guide
      - s
      - Plastic relaxation time (microscopic yield time)
    * - :math:`D(t)`
-     - Pa²/s
+     - Pa^2/s
      - Mechanical noise (stress diffusivity)
    * - :math:`\Gamma(t)`
      - 1/s
@@ -139,13 +139,13 @@ Glass Transition
 
 The parameter :math:`\alpha` controls the stability of this feedback loop, leading to a phase transition:
 
-**α < 0.5 (Glass phase)**:
+:math:`\alpha` **< 0.5 (Glass phase)**:
 - Noise is insufficient to maintain a fluid state.
 - System "freezes" into a distribution restricted to :math:`|\sigma| < \sigma_c`.
 - **Yield stress** :math:`\sigma_y > 0` emerges.
 - **Aging**: Relaxation timescales grow with waiting time (simple aging, :math:`\mu=1`).
 
-**α ≥ 0.5 (Fluid phase)**:
+:math:`\alpha` **≥ 0.5 (Fluid phase)**:
 - Noise is sufficient to maintain a steady distribution extending beyond :math:`\sigma_c`.
 - System flows at any non-zero stress.
 - **No yield stress** (:math:`\sigma_y = 0`).
@@ -324,7 +324,7 @@ From fitting the HL model to experimental data, you can extract insights about t
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**α (Noise Coupling Parameter)**
+:math:`\alpha` **(Noise Coupling Parameter)**
    *   **Definition**: Ratio of mechanical noise strength to plastic activity (:math:`\alpha = D/\Gamma`).
    *   **For Graduate Students**: :math:`\alpha` is the control parameter for the dynamical phase transition. It measures the "fragility" of the structure. High :math:`\alpha` means a single yield event triggers many others (avalanches), fluidizing the material.
    *   **For Practitioners**: Determines if the material has a yield stress.
@@ -332,12 +332,12 @@ Parameter Interpretation
        - :math:`\alpha \ge 0.5`: Fluid (No Yield Stress).
        - Typical values: 0.2-0.4 for strong gels, 0.45-0.55 for soft jamming systems.
 
-**σ_c (Local Yield Threshold)**
+:math:`\sigma_c` **(Local Yield Threshold)**
    *   **Definition**: The stress at which a mesoscopic block becomes unstable.
    *   **For Graduate Students**: Corresponds to the elementary energy barrier per unit volume.
    *   **For Practitioners**: Closely related to the macroscopic yield stress :math:`\Sigma_y`. For :math:`\alpha \approx 0.3`, :math:`\Sigma_y \approx 0.5 \sigma_c`.
 
-**τ (Plastic Relaxation Time)**
+:math:`\tau` **(Plastic Relaxation Time)**
    *   **Definition**: The time it takes for a yielded block to dissipate its stress.
    *   **For Graduate Students**: The microscopic timescale of plastic rearrangement.
    *   **For Practitioners**: Sets the timescale of transient responses. If stress overshoot peaks at 1s, :math:`\tau` is likely order 0.1-1s.
@@ -353,19 +353,19 @@ Material Classification Table
      - Material Behavior
      - Typical Materials
      - Rheology Signature
-   * - **α < 0.3**
+   * - :math:`\alpha` **< 0.3**
      - Strong Glass
      - Dense granular, hard gels
      - High yield stress, brittle fracture
-   * - **0.3 < α < 0.5**
+   * - **0.3 <** :math:`\alpha` **< 0.5**
      - Soft Glass
      - Foams, emulsions, pastes
      - Moderate yield stress, shear thinning n=0.5
-   * - **α ≈ 0.5**
+   * - :math:`\alpha` **≈ 0.5**
      - Critical Gel
      - Jamming transition
      - Power-law fluid, divergence of viscosity
-   * - **α > 0.5**
+   * - :math:`\alpha` **> 0.5**
      - Viscous Fluid
      - Dilute suspensions
      - Newtonian-like, no yield stress
@@ -751,9 +751,9 @@ Fitting Guidance
 Initialization Strategy
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-**Step 1: Determine phase (α < 0.5 or α ≥ 0.5)**
-- **Yield stress observed**: Start with α = 0.3 (glass).
-- **No yield stress**: Start with α = 0.7 (fluid).
+**Step 1: Determine phase (** :math:`\alpha` **< 0.5 or** :math:`\alpha` **≥ 0.5)**
+- **Yield stress observed**: Start with :math:`\alpha` = 0.3 (glass).
+- **No yield stress**: Start with :math:`\alpha` = 0.7 (fluid).
 
 **Step 2: Fit flow curve**
 - ``sigma_c``: Constrain near observed yield stress :math:`\Sigma_y`.
@@ -778,9 +778,9 @@ Parameter Bounds
      - Match SAOS plateau modulus
    * - ``alpha``
      - 0.1-1.5
-     - α < 0.5 (glass), α ≥ 0.5 (fluid)
+     - :math:`\alpha` < 0.5 (glass), :math:`\alpha` ≥ 0.5 (fluid)
    * - ``sigma_c``
-     - 0.5-2× Σ_y
+     - 0.5-2× :math:`\Sigma_y`
      - Local yield threshold
    * - ``tau``
      - 0.01-100 s
@@ -789,7 +789,7 @@ Parameter Bounds
 Common Fitting Issues
 ~~~~~~~~~~~~~~~~~~~~~
 
-**Issue: α converges to unphysical values (> 1)**
+**Issue:** :math:`\alpha` **converges to unphysical values (> 1)**
 
 *Cause*: Data doesn't constrain the model, or material isn't well-described by HL.
 *Solution*: Set tight bounds ``alpha.bounds = (0.1, 0.8)``. Check if data shows yield stress behavior.
@@ -801,12 +801,12 @@ Common Fitting Issues
 
 **Issue: Poor fit to transient data with good flow curve fit**
 
-*Cause*: τ may be poorly constrained from steady-state data alone.
+*Cause*: :math:`\tau` may be poorly constrained from steady-state data alone.
 *Solution*: Fit transient (startup, relaxation) data simultaneously or use Bayesian inference.
 
 **Issue: Relaxation doesn't plateau (continues decaying)**
 
-*Cause*: Data may be in the fluid phase (α > 0.5), or the decay timescale exceeds observation.
+*Cause*: Data may be in the fluid phase (:math:`\alpha` > 0.5), or the decay timescale exceeds observation.
 *Solution*: Check phase state. Glass phase shows incomplete relaxation; fluid phase shows full decay.
 
 **Issue: Numerical oscillations in predictions**
@@ -944,13 +944,13 @@ Each rheological protocol is implemented as a specialized kernel:
    - Uses ``vmap`` to parallelize over multiple shear rates
 
 **Startup Kernel** (``startup_kernel``):
-   - Initializes with narrow Gaussian at σ=0 (relaxed state)
+   - Initializes with narrow Gaussian at :math:`\sigma = 0` (relaxed state)
    - Applies constant shear rate and records stress history
    - Returns (time, stress) arrays
 
 **Relaxation Kernel** (``relaxation_kernel``):
    - Initializes with Gaussian shifted by step strain
-   - Applies zero shear rate (γ̇=0) and records stress decay
+   - Applies zero shear rate (:math:`\dot{\gamma} = 0`) and records stress decay
    - Returns (time, stress) arrays
 
 **Creep Kernel** (``creep_kernel``):

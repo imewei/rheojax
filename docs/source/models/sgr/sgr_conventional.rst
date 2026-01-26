@@ -240,7 +240,7 @@ The parameter :math:`x` is the dimensionless **effective noise temperature**. Un
 - **Slow structural relaxations** (aging)
 - **Nonlinear couplings** to other elements
 
-Because energy barriers in soft materials are large compared to :math:`k_B T` (by factors of :math:`10^3`–:math:`10^6`), the effective noise :math:`x` is of order the mean barrier height :math:`\langle E \rangle`, not :math:`k_B T`. This "macroscopic" effective temperature remains nonzero even as :math:`k_B T \to 0`, consistent with theories of out-of-equilibrium systems with slow dynamics [26]_ [27]_.
+Because energy barriers in soft materials are large compared to :math:`k_B T` (by factors of :math:`10^3`– :math:`10^6`), the effective noise :math:`x` is of order the mean barrier height :math:`\langle E \rangle`, not :math:`k_B T`. This "macroscopic" effective temperature remains nonzero even as :math:`k_B T \to 0`, consistent with theories of out-of-equilibrium systems with slow dynamics [26]_ [27]_.
 
 The glass transition occurs at :math:`x_g = 1`:
 
@@ -441,7 +441,7 @@ Common choices include:
 1. **Equilibrated at high** :math:`x`: :math:`P_0(E) \propto \rho(E) e^{E/x_{\text{init}}}` truncated
    to ensure normalizability
 
-2. **δ-function** (elements start in identical traps): :math:`P_0(E) = \delta(E - E_0)`, giving
+2. :math:`\delta` **-function** (elements start in identical traps): :math:`P_0(E) = \delta(E - E_0)`, giving
    :math:`G_0(z) = \exp(-z/\tau_0 e^{E_0/x})`
 
 3. **Random history** (uniform in :math:`\tau`): :math:`P_0(E) = x \rho(E)/\tau(E)`, which for
@@ -680,7 +680,7 @@ For the SGR step strain response with :math:`x < 1`:
 
 The function :math:`\mathcal{G}(u)` is :math:`t_w`-independent, exemplifying simple aging.
 
-**The μ-Exponent**
+**The** :math:`\mu` **-Exponent**
 
 The **aging exponent** :math:`\mu` characterizes how the effective relaxation time grows with age:
 
@@ -693,7 +693,7 @@ The **aging exponent** :math:`\mu` characterizes how the effective relaxation ti
    :header-rows: 1
 
    * - Regime
-     - μ value
+     - :math:`\mu` value
      - Physical meaning
    * - :math:`x < 1` (glass)
      - :math:`\mu = 1`
@@ -918,7 +918,7 @@ where :math:`\eta^* = G^*/i\omega` is the complex viscosity.
 
 - **x > 2** (Newtonian): Cox-Merz holds approximately
 - **1 < x < 2** (power-law fluid): Cox-Merz fails due to infinite zero-shear viscosity
-- **x < 1** (glass): Strong violation—:math:`|\eta^*|` diverges as :math:`\omega \to 0`, but
+- **x < 1** (glass): Strong violation— :math:`|\eta^*|` diverges as :math:`\omega \to 0`, but
   :math:`\eta(\dot{\gamma})` remains finite due to yield stress
 
 The failure of Cox-Merz is a signature of yield stress behavior and is commonly observed
@@ -1230,30 +1230,30 @@ Parameter Interpretation
 **x (Effective Noise Temperature)**:
    The ratio of thermal-like noise energy to the mean trap depth, controlling the fundamental phase behavior of the material.
 
-   *For graduate students*: x represents the dimensionless "configurational temperature" that governs the statistical mechanics of mesoscopic elements in an energy landscape. When x < x_g = 1, the equilibrium Boltzmann distribution P_eq(E) ∝ ρ(E)exp(E/x) is non-normalizable, meaning no steady state exists and the system must age. The glass transition at x = 1 is a genuine dynamical phase transition where the relaxation time diverges.
+   *For graduate students*: x represents the dimensionless "configurational temperature" that governs the statistical mechanics of mesoscopic elements in an energy landscape. When x < x_g = 1, the equilibrium Boltzmann distribution P_eq(E) ∝ :math:`\rho(E)exp(E/x)` is non-normalizable, meaning no steady state exists and the system must age. The glass transition at x = 1 is a genuine dynamical phase transition where the relaxation time diverges.
 
-   *For practitioners*: x < 1 means your material behaves as a solid (yield stress, aging, thixotropic recovery). 1 < x < 2 means it flows but with infinite zero-shear viscosity and power-law rheology. x ≥ 2 means conventional Newtonian behavior. Fitting x from the slope of log(G') vs log(ω) immediately classifies your material's phase.
+   *For practitioners*: x < 1 means your material behaves as a solid (yield stress, aging, thixotropic recovery). 1 < x < 2 means it flows but with infinite zero-shear viscosity and power-law rheology. x ≥ 2 means conventional Newtonian behavior. Fitting x from the slope of log(G') vs log(:math:`\omega`) immediately classifies your material's phase.
 
-**G₀ (Plateau Modulus)**:
+**G_0 (Plateau Modulus)**:
    The characteristic elastic stress scale arising from local element deformation.
 
-   *For graduate students*: G₀ sets the energy scale of elastic strain energy (½kl²). In the trap model, it corresponds to the spring constant k of mesoscopic elements. For foams and emulsions, G₀ ≈ γ/R where γ is interfacial tension and R is bubble/droplet radius. For colloidal glasses, G₀ ≈ n k_B T where n is number density.
+   *For graduate students*: G_0 sets the energy scale of elastic strain energy (½kl^2). In the trap model, it corresponds to the spring constant k of mesoscopic elements. For foams and emulsions, G_0 ≈ :math:`\gamma`/R where :math:`\gamma` is interfacial tension and R is bubble/droplet radius. For colloidal glasses, G_0 ≈ n k_B T where n is number density.
 
-   *For practitioners*: G₀ is the high-frequency plateau in oscillatory tests (when accessible) or can be extracted from the low-rate flow stress. Typical values: 10-1000 Pa for foams, 100-10000 Pa for pastes, 1-100 Pa for colloidal glasses.
+   *For practitioners*: G_0 is the high-frequency plateau in oscillatory tests (when accessible) or can be extracted from the low-rate flow stress. Typical values: 10-1000 Pa for foams, 100-10000 Pa for pastes, 1-100 Pa for colloidal glasses.
 
-**τ₀ (Attempt Time)**:
+:math:`\tau_0` **(Attempt Time)**:
    The microscopic timescale for rearrangement attempts (yield events).
 
-   *For graduate students*: τ₀ is the inverse of the bare hopping rate Γ₀ = 1/τ₀. For Brownian systems, τ₀ ≈ η_s a³/(k_B T) where η_s is solvent viscosity and a is the element size. For non-Brownian systems, τ₀ may reflect vibration or diffusion timescales.
+   *For graduate students*: :math:`\tau_0` is the inverse of the bare hopping rate :math:`\Gamma_0` = 1/:math:`\tau_0`. For Brownian systems, :math:`\tau_0` ≈ :math:`\eta_s` a^3/(k_B T) where :math:`\eta_s` is solvent viscosity and a is the element size. For non-Brownian systems, :math:`\tau_0` may reflect vibration or diffusion timescales.
 
-   *For practitioners*: τ₀ determines the absolute frequency scale of rheology. Fitting both τ₀ and x allows prediction of G'(ω), G''(ω) across decades in frequency. Typical values: 10⁻⁶-10⁻² s for colloids, 10⁻⁴-10⁻¹ s for emulsions, 10⁻³-1 s for pastes.
+   *For practitioners*: :math:`\tau_0` determines the absolute frequency scale of rheology. Fitting both :math:`\tau_0` and x allows prediction of G'(:math:`\omega`), G''(:math:`\omega`) across decades in frequency. Typical values: 10⁻^6-10⁻^2 s for colloids, 10⁻^4-10⁻^1 s for emulsions, 10⁻^3-1 s for pastes.
 
-**σ_y (Yield Stress, x < 1 only)**:
+:math:`\sigma_y` **(Yield Stress, x < 1 only)**:
    The dynamic yield stress emerging from non-ergodicity.
 
-   *For graduate students*: Unlike phenomenological Bingham models, σ_y in SGR arises from the divergence of the relaxation time as x → 1. The true yield stress is σ_y = lim_{γ̇→0} σ(γ̇) > 0 when x < 1, reflecting the inability of the system to equilibrate on experimental timescales. The "yieldedness" is a consequence of broken ergodicity, not a material constant.
+   *For graduate students*: Unlike phenomenological Bingham models, :math:`\sigma_y` in SGR arises from the divergence of the relaxation time as :math:`x \to 1`. The true yield stress is :math:`\sigma_y = \lim_{\dot{\gamma} \to 0} \sigma(\dot{\gamma}) > 0` when :math:`x < 1`, reflecting the inability of the system to equilibrate on experimental timescales. The "yieldedness" is a consequence of broken ergodicity, not a material constant.
 
-   *For practitioners*: If x < 1 from your fit, expect a measurable yield stress. If experimental σ_y is much larger than model predictions, additional physics (attractive forces, network structure) may be present beyond SGR caging.
+   *For practitioners*: If x < 1 from your fit, expect a measurable yield stress. If experimental :math:`\sigma_y` is much larger than model predictions, additional physics (attractive forces, network structure) may be present beyond SGR caging.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1269,7 +1269,7 @@ Material Classification
    * - **x < 0.5**
      - Deep glass
      - Highly concentrated pastes, aged colloidal gels, arrested emulsions
-     - Large yield stress (>100 Pa), strong aging (hours-days), brittle yielding, no flow below σ_y
+     - Large yield stress (>100 Pa), strong aging (hours-days), brittle yielding, no flow below :math:`\sigma_y`
    * - **0.5 < x < 1**
      - Marginal glass
      - Fresh colloidal suspensions, carbopol gels, moderately concentrated foams
@@ -1277,15 +1277,15 @@ Material Classification
    * - **1 < x < 1.5**
      - Weak power-law fluid
      - Dilute emulsions, soft foams, near-critical suspensions
-     - No true yield stress, G' ≈ G'' ≈ ω^(x-1) with weak frequency dependence, tan(δ) ≈ 0.5-1.0 (constant)
+     - No true yield stress, G' ≈ G'' ≈ :math:`\omega^{(x-1)}`  with weak frequency dependence, tan(:math:`\delta`) ≈ 0.5-1.0 (constant)
    * - **1.5 < x < 2**
      - Strong power-law fluid
      - Low-concentration surfactant solutions, polymer-colloid mixtures
-     - Fluid-like (G'' > G' at low ω), stronger frequency dependence, tan(δ) > 1 (constant), infinite viscosity but fast equilibration
+     - Fluid-like (G'' > G' at low :math:`\omega`), stronger frequency dependence, tan(:math:`\delta`) > 1 (constant), infinite viscosity but fast equilibration
    * - **x ≥ 2**
      - Newtonian/Maxwell liquid
      - Dilute suspensions, simple liquids, polymer solutions below overlap
-     - Exponential relaxation, finite viscosity, G'' ∼ ω at low frequencies, single Maxwell time
+     - Exponential relaxation, finite viscosity, G'' ∼ :math:`\omega` at low frequencies, single Maxwell time
 
 Connection to Aging and Rejuvenation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1329,7 +1329,7 @@ on the balance of shallow vs deep trap dynamics).
 Predictive Power
 ~~~~~~~~~~~~~~~~
 
-From a single parameter (x) and two scales (G₀, τ₀), the SGR model predicts:
+From a single parameter (x) and two scales (G_0, :math:`\tau_0`), the SGR model predicts:
 
 1. **Frequency-dependent moduli** with correct power-law exponents
 2. **Flow curve shape** (yield stress + power-law or shear thinning)
@@ -1338,7 +1338,7 @@ From a single parameter (x) and two scales (G₀, τ₀), the SGR model predicts
 5. **LAOS nonlinearity** through Chebyshev coefficients
 
 **Fitting Strategy**: Start with oscillatory data to extract x from the slope
-of log(G') vs log(ω). Then verify consistency with flow curve and transient
+of log(G') vs log(:math:`\omega`). Then verify consistency with flow curve and transient
 experiments. Discrepancies indicate additional physics (e.g., thixotropy,
 shear banding) requiring extended models.
 

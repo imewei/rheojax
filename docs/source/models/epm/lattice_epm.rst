@@ -8,7 +8,7 @@ Quick Reference
 
 - **Use when:** Spatially-resolved modeling of amorphous solids, plastic avalanches, shear banding
 
-- **Parameters:** 6 (μ, σ_c_mean, σ_c_std, τ_pl, L, dt)
+- **Parameters:** 6 (:math:`\mu, \sigma_c_mean, \sigma_c_std, \tau_pl`, L, dt)
 
 - **Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma}(t) - \mu \dot{\gamma}^{pl}_{ij} + \sum_{kl} \mathcal{G}_{ij,kl} \dot{\gamma}^{pl}_{kl}`
 
@@ -163,7 +163,7 @@ Physical Foundations
 Mesoscopic Coarse-Graining
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The EPM operates at a length scale ξ (correlation length of plastic events, typically 10-100 particle diameters in colloidal systems). At this scale:
+The EPM operates at a length scale :math:`\xi` (correlation length of plastic events, typically 10-100 particle diameters in colloidal systems). At this scale:
 
 - The material is **homogeneous enough** for continuum elasticity to apply
 - Plastic yielding is **localized** to discrete regions (blocks)
@@ -177,7 +177,7 @@ This mesoscopic view differs from:
 Stress Redistribution via Eshelby Propagator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When a block yields plastically, it releases local stress. However, **mechanical equilibrium** (∇·σ = 0) requires this stress to be redistributed to neighboring blocks. The Eshelby propagator describes this redistribution:
+When a block yields plastically, it releases local stress. However, **mechanical equilibrium** (∇·:math:`\sigma` = 0) requires this stress to be redistributed to neighboring blocks. The Eshelby propagator describes this redistribution:
 
 .. math::
 
@@ -365,13 +365,13 @@ Validity and Assumptions
 
 - **Athermal plasticity**: Yielding driven by stress, not thermal activation (T ≈ 0)
 - **Overdamped dynamics**: Inertia negligible (quasi-static or low Stokes number)
-- **2D simple shear**: Single shear component σ_xy (for scalar EPM)
+- **2D simple shear**: Single shear component :math:`\sigma_xy` (for scalar EPM)
 - **Periodic systems**: Infinite lattice (no boundary effects)
 
 **Assumptions:**
 
-- **Quenched disorder**: Yield thresholds σ_c,i drawn from Gaussian, renewed upon yielding
-- **Elastic homogeneity**: Uniform shear modulus μ throughout
+- **Quenched disorder**: Yield thresholds :math:`\sigma_c,i` drawn from Gaussian, renewed upon yielding
+- **Elastic homogeneity**: Uniform shear modulus :math:`\mu` throughout
 - **Mean-field-like yield**: Local yield criterion (no cooperative yielding beyond Eshelby coupling)
 
 **Not appropriate for:**
@@ -388,20 +388,20 @@ From fitting EPM to experimental data, you can extract insights about mesoscopic
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**σ_c (Yield Stress Threshold)**:
+:math:`\sigma_c` **(Yield Stress Threshold)**:
    The local stress at which mesoscopic blocks yield plastically. Typically lower than macroscopic yield stress due to spatial averaging.
-   *For graduate students*: σ_c represents the energy barrier for local plastic rearrangements in the free energy landscape. For colloidal gels, σ_c ~ bond strength; for glasses, σ_c ~ activation barrier height.
-   *For practitioners*: Use σ_c to predict onset of yielding in processing. Lower σ_c = easier to flow but potentially less stable structures.
+   *For graduate students*: :math:`\sigma_c` represents the energy barrier for local plastic rearrangements in the free energy landscape. For colloidal gels, :math:`\sigma_c` ~ bond strength; for glasses, :math:`\sigma_c` ~ activation barrier height.
+   *For practitioners*: Use :math:`\sigma_c` to predict onset of yielding in processing. Lower :math:`\sigma_c` = easier to flow but potentially less stable structures.
 
-**σ_c_std (Disorder Strength)**:
+:math:`\sigma_c_std` **(Disorder Strength)**:
    Standard deviation of local yield thresholds across the material, quantifying microstructural heterogeneity.
-   *For graduate students*: Disorder drives avalanche criticality. Larger σ_c_std → broader avalanche size distributions, power-law exponents closer to τ ≈ 2.0 (with disorder) vs. 1.5 (mean-field). Controls correlation length ξ_corr of yielding events.
-   *For practitioners*: High disorder correlates with pronounced shear banding. Monitor σ_c_std/σ_c ratio to predict flow instabilities.
+   *For graduate students*: Disorder drives avalanche criticality. Larger :math:`\sigma_c_std` → broader avalanche size distributions, power-law exponents closer to :math:`\tau` ≈ 2.0 (with disorder) vs. 1.5 (mean-field). Controls correlation length :math:`\xi_corr` of yielding events.
+   *For practitioners*: High disorder correlates with pronounced shear banding. Monitor :math:`\sigma_c_std/\sigma_c` ratio to predict flow instabilities.
 
-**α (Disorder Parameter)**:
-   Related parameter quantifying yield threshold variability, α = σ_c_std/σ_c.
-   *For graduate students*: Critical parameter in mean-field elastoplastic theory. α → 0 recovers deterministic plasticity; α >> 1 leads to extreme heterogeneity and arrested dynamics.
-   *For practitioners*: α > 0.3 indicates strong spatial heterogeneity requiring spatially-resolved models.
+:math:`\alpha` **(Disorder Parameter)**:
+   Related parameter quantifying yield threshold variability, :math:`\alpha = \sigma_c_std/\sigma_c`.
+   *For graduate students*: Critical parameter in mean-field elastoplastic theory. :math:`\alpha` → 0 recovers deterministic plasticity; :math:`\alpha` >> 1 leads to extreme heterogeneity and arrested dynamics.
+   *For practitioners*: :math:`\alpha` > 0.3 indicates strong spatial heterogeneity requiring spatially-resolved models.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -414,23 +414,23 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - σ_c = 10-100 Pa, α < 0.2
+   * - :math:`\sigma_c` = 10-100 Pa, :math:`\alpha` < 0.2
      - Homogeneous yielding
      - Monodisperse colloids, simple gels
      - Uniform flow, minimal banding
-   * - σ_c = 50-500 Pa, α = 0.2-0.5
+   * - :math:`\sigma_c` = 50-500 Pa, :math:`\alpha` = 0.2-0.5
      - Moderate heterogeneity
      - Emulsions, pastes, polydisperse suspensions
      - Possible shear banding, flow instabilities
-   * - σ_c = 100-1000 Pa, α > 0.5
+   * - :math:`\sigma_c` = 100-1000 Pa, :math:`\alpha` > 0.5
      - Strong heterogeneity, avalanches
      - Metallic glasses, dense granular media
      - Shear localization, stick-slip
-   * - τ_pl < 0.1 s
+   * - :math:`\tau_pl` < 0.1 s
      - Fast plastic relaxation
      - Soft colloids, concentrated emulsions
      - Rapid stress relaxation, smooth flow
-   * - τ_pl > 1 s
+   * - :math:`\tau_pl` > 1 s
      - Slow plastic relaxation
      - Glassy polymers, hard colloids
      - Stress overshoots, memory effects
@@ -809,8 +809,8 @@ Parameter Bounds and Physical Constraints
      - 10-10000 Pa
      - Match SAOS elastic modulus G' if available
    * - ``sigma_c_mean``
-     - 0.5-2× macroscopic σ_y
-     - Lower bound: σ_y/2; upper bound: 2σ_y
+     - 0.5-2× macroscopic :math:`\sigma_y`
+     - Lower bound: :math:`\sigma_y/2`; upper bound: :math:`2\sigma_y`
    * - ``sigma_c_std``
      - 0.1-0.5× sigma_c_mean
      - Larger disorder = stronger shear banding
@@ -822,7 +822,7 @@ Parameter Bounds and Physical Constraints
      - Fitting: 8-16; Production: 32-128
    * - ``dt``
      - 0.001-0.05
-     - Must resolve τ_pl (dt < τ_pl/10)
+     - Must resolve :math:`\tau_pl (dt < \tau_pl/10)`
 
 Common Fitting Issues
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1057,14 +1057,14 @@ RheoJAX provides two EPM implementations with different capabilities:
      - LatticeEPM (Scalar)
      - TensorialEPM
    * - Stress Components
-     - σ_xy only
-     - [σ_xx, σ_yy, σ_xy] + σ_zz
+     - :math:`\sigma_xy` only
+     - [:math:`\sigma_xx, \sigma_yy, \sigma_xy`] + :math:`\sigma_zz`
    * - Flow Curves
      - ✓ Fast
-     - ✓ More accurate if N₁ ≠ 0
+     - ✓ More accurate if :math:`N_1` ≠ 0
    * - Normal Stress Differences
      - ✗
-     - ✓ N₁, N₂ predictions
+     - ✓ :math:`N_1, N_2` predictions
    * - Yield Criteria
      - Scalar threshold
      - von Mises or Hill
@@ -1460,7 +1460,7 @@ driving event. The avalanche terminates when no more blocks exceed their yield t
 
 **Detection algorithm:**
 
-1. Identify primary yield event (block exceeds σ_c)
+1. Identify primary yield event (block exceeds :math:`\sigma_c`)
 2. Propagate stress via Eshelby (FFT convolution)
 3. Count secondary yields (blocks pushed over threshold by redistribution)
 4. Repeat until no new yields occur
@@ -1505,15 +1505,15 @@ In the critical regime near yielding, avalanche sizes follow a power-law distrib
 
 where:
 
-- **τ ≈ 1.5-2.0**: Universal exponent (mean-field τ = 3/2, with disorder corrections)
+- :math:`\tau` **≈ 1.5-2.0**: Universal exponent (mean-field :math:`\tau` = 3/2, with disorder corrections)
 - **S_c**: Finite-size cutoff scaling with lattice size L
 - **d_f ≈ 2**: Fractal dimension of avalanches in 2D
 
 **Key observations:**
 
-- Well below yield (σ < σ_y): Exponentially distributed (no criticality)
-- At yield (σ ≈ σ_y): Power-law distribution (critical behavior)
-- Above yield (σ > σ_y): Flowing state, continuous plastic activity
+- Well below yield (:math:`\sigma < \sigma_y`): Exponentially distributed (no criticality)
+- At yield (:math:`\sigma \approx \sigma_y`): Power-law distribution (critical behavior)
+- Above yield (:math:`\sigma > \sigma_y`): Flowing state, continuous plastic activity
 
 **Duration-size scaling:**
 
@@ -1537,7 +1537,7 @@ absorbing phase transitions in statistical physics.
 Critical Behavior
 ~~~~~~~~~~~~~~~~~
 
-Near the macroscopic yield stress σ_y, several quantities diverge or vanish:
+Near the macroscopic yield stress :math:`\sigma_y`, several quantities diverge or vanish:
 
 **Correlation length:**
 
@@ -1545,7 +1545,7 @@ Near the macroscopic yield stress σ_y, several quantities diverge or vanish:
 
    \xi \sim |\sigma - \sigma_y|^{-\nu}
 
-where ν is the correlation length exponent (ν ≈ 1 in mean-field).
+where :math:`\nu` is the correlation length exponent (:math:`\nu` ≈ 1 in mean-field).
 
 **Relaxation time:**
 
@@ -1564,25 +1564,25 @@ with dynamical exponent z ≈ 2.
    * - Exponent
      - Value
      - Physical Meaning
-   * - τ (avalanche)
+   * - :math:`\tau` (avalanche)
      - 3/2
-     - Avalanche size distribution P(S) ~ S^(-τ)
-   * - ν (correlation)
+     - Avalanche size distribution P(S) ~ S^(-:math:`\tau`)
+   * - :math:`\nu` (correlation)
      - 1
-     - Correlation length ξ ~ (σ-σ_y)^(-ν)
-   * - β (order param)
+     - Correlation length :math:`\xi` ~ (:math:`\sigma-\sigma_y`)^(-:math:`\nu`)
+   * - :math:`\beta` (order param)
      - 1
-     - Plastic rate γ̇_pl ~ (σ-σ_y)^β
+     - Plastic rate :math:`\dot{\gamma}_pl` ~ (:math:`\sigma-\sigma_y`)\ :math:`^{\beta}`
    * - z (dynamical)
      - 2
-     - Relaxation time τ ~ ξ^z
+     - Relaxation time :math:`\tau` ~ :math:`\xi^z`
 
 **Disorder corrections:**
 
-Strong disorder (σ_c_std/σ_c_mean > 0.3) modifies these exponents:
+Strong disorder (:math:`\sigma_c_std/\sigma_c_mean` > 0.3) modifies these exponents:
 
-- τ increases toward 2.0 (broader avalanche distribution)
-- ν decreases (shorter correlations)
+- :math:`\tau` increases toward 2.0 (broader avalanche distribution)
+- :math:`\nu` decreases (shorter correlations)
 
 Dynamical Heterogeneity
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1596,9 +1596,9 @@ with different local plastic activity. This is quantified by:
 
    \chi_4(t) = L^2 \left[ \langle \Delta(t)^2 \rangle - \langle \Delta(t) \rangle^2 \right]
 
-where Δ(t) is the fraction of sites that have yielded by time t.
+where :math:`\Delta(t)` is the fraction of sites that have yielded by time t.
 
-χ₄ peaks at the characteristic relaxation time, measuring the size of correlated
+:math:`\chi_4` peaks at the characteristic relaxation time, measuring the size of correlated
 rearranging regions.
 
 **Connection to absorbing phase transitions:**
@@ -1620,8 +1620,8 @@ Localization Criteria
 
 Shear banding in EPM arises from two mechanisms:
 
-1. **Disorder-driven localization**: High disorder (α = σ_c_std/σ_c_mean > 0.3)
-   leads to heterogeneous yield thresholds. Regions with low σ_c yield first,
+1. **Disorder-driven localization**: High disorder (:math:`\alpha = \sigma_c_std/\sigma_c_mean` > 0.3)
+   leads to heterogeneous yield thresholds. Regions with low :math:`\sigma_c` yield first,
    creating stress concentrations that nucleate bands.
 
 2. **Stress redistribution feedback**: The Eshelby propagator's quadrupolar
@@ -1640,7 +1640,7 @@ Shear banding in EPM arises from two mechanisms:
 
    w_{band} \sim \xi_{corr} \sim L / \sqrt{\text{disorder}}
 
-where ξ_corr is the correlation length of plastic events.
+where :math:`\xi_corr` is the correlation length of plastic events.
 
 Detection Methods
 ~~~~~~~~~~~~~~~~~
@@ -1713,7 +1713,7 @@ SGR and EPM describe similar physics from different perspectives:
      - Spatially resolved lattice
    * - Noise temperature
      - x (thermal + mechanical)
-     - σ_c_std (quenched disorder)
+     - :math:`\sigma_c_std` (quenched disorder)
    * - Yielding
      - Thermally activated escape
      - Stress-driven (athermal)
@@ -1737,7 +1737,7 @@ SGR's glass transition (x = 1) maps to the EPM critical disorder threshold.
 Fluidity Models
 ~~~~~~~~~~~~~~~
 
-Fluidity models describe plastic flow via a kinetic fluidity field φ(r, t).
+Fluidity models describe plastic flow via a kinetic fluidity field :math:`\phi(r`, t).
 
 **Connection:**
 
@@ -1747,8 +1747,8 @@ Fluidity models describe plastic flow via a kinetic fluidity field φ(r, t).
 
 The local plastic strain rate in EPM maps to fluidity:
 
-- High φ → flowing (high plastic activity)
-- Low φ → arrested (solid-like)
+- High :math:`\phi` → flowing (high plastic activity)
+- Low :math:`\phi` → arrested (solid-like)
 
 Fluidity diffusion in nonlocal models corresponds to Eshelby stress redistribution
 in the mean-field limit.
@@ -1761,14 +1761,14 @@ STZ theory views plastic events as activated transitions of local structural zon
 **Connection:**
 
 Each EPM lattice block represents a **mesoscopic ensemble of STZs**. The yield
-threshold σ_c corresponds to the activation barrier, and the plastic relaxation
-time τ_pl to the STZ flip rate.
+threshold :math:`\sigma_c` corresponds to the activation barrier, and the plastic relaxation
+time :math:`\tau_pl` to the STZ flip rate.
 
 .. math::
 
    \dot{\gamma}^{pl}_{EPM} \sim n_{STZ} \cdot \nu_{flip} \cdot \gamma_0
 
-where n_STZ is STZ density, ν_flip is flip rate, and γ₀ is elementary strain.
+where n_STZ is STZ density, :math:`\nu_flip` is flip rate, and :math:`\gamma_0` is elementary strain.
 
 Hébraud-Lequeux Mean-Field Limit
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1799,7 +1799,7 @@ The yielding transition in EPM belongs to the **depinning universality class**
 **Shared features:**
 
 - Power-law avalanche distributions
-- Finite-size scaling: ξ ~ L at criticality
+- Finite-size scaling: :math:`\xi` ~ L at criticality
 - Hysteresis in rate-controlled protocols
 
 This connection enables use of field-theoretic methods from depinning transitions
@@ -1841,7 +1841,7 @@ Several extensions to the basic EPM framework are commonly used:
    Store the full deviatoric stress tensor :math:`[\sigma_{xx}, \sigma_{yy}, \sigma_{xy}]`
    at each site. Enables:
 
-   - Normal stress predictions (N₁, N₂)
+   - Normal stress predictions (:math:`N_1, N_2`)
    - Anisotropic yield criteria (Hill, von Mises)
    - More accurate flow instability predictions
 
@@ -1932,8 +1932,8 @@ The stress overshoot in startup shear contains information about disorder streng
 **Physical basis:**
 
 - Higher disorder → larger overshoot amplitude
-- Overshoot position (peak strain) → τ_pl × γ̇
-- Overshoot variability across runs → σ_c_std
+- Overshoot position (peak strain) → :math:`\tau_pl` × :math:`\dot{\gamma}`
+- Overshoot variability across runs → :math:`\sigma_c_std`
 
 .. code-block:: python
 

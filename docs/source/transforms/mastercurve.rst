@@ -151,7 +151,7 @@ Usage
 Troubleshooting
 ---------------
 
-- **Non-monotonic :math:`a_T`** - supply tighter bounds or reorder temperature data to
+- **Non-monotonic** :math:`a_T` - supply tighter bounds or reorder temperature data to
   increase overlap; penalize with ``enforce_monotonic=True``.
 - **Poor overlap** - use ``smooth_overlap=True`` or restrict the fitting frequency range to
   regions with sufficient data density.

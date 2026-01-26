@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Viscoelastic liquid, power-law relaxation without terminal flow plateau
-- **Parameters:** 3 (Gm, α, τ_α)
+- **Parameters:** 3 (Gm, :math:`\alpha, \tau_\alpha`)
 - **Key equation:** :math:`G(t) = G_m t^{-\alpha} E_{1-\alpha,1-\alpha}(-t^{1-\alpha}/\tau_\alpha)`
 - **Test modes:** Oscillation, relaxation
 - **Material examples:** Polymer melts (linear/branched), concentrated polymer solutions, complex fluids
@@ -35,11 +35,11 @@ Notation Guide
      - Maxwell modulus (short-time elastic stiffness)
      - Pa
    * - :math:`\alpha`
-     - Fractional order (0 < α < 1, controls relaxation spectrum breadth)
+     - Fractional order (0 < :math:`\alpha` < 1, controls relaxation spectrum breadth)
      - —
    * - :math:`\tau_\alpha`
      - Characteristic relaxation time
-     - s\ :sup:`α`
+     - s\ :math:`^{\alpha}`
    * - :math:`E_{\alpha,\beta}(z)`
      - Two-parameter Mittag-Leffler function
      - —
@@ -69,16 +69,16 @@ The FML model represents **viscoelastic liquids** with zero equilibrium modulus 
 
 1. **Hookean spring (Gm)**: Provides instantaneous elastic response at short times. Represents chain/network stretching before relaxation mechanisms activate.
 
-2. **SpringPot element**: Governs the relaxation dynamics through power-law viscoelasticity. The fractional order α controls the breadth of the relaxation spectrum.
+2. **SpringPot element**: Governs the relaxation dynamics through power-law viscoelasticity. The fractional order :math:`\alpha` controls the breadth of the relaxation spectrum.
 
 The series configuration ensures that sustained stress eventually leads to unbounded strain growth (flow), distinguishing this from solid-like models.
 
-**For FML specifically**, the fractional order α directly controls the slope in log-log plots of G'(ω) and G"(ω), with both moduli scaling as ω\ :sup:`α` in the power-law region. Typical α ranges for FML applications:
+**For FML specifically**, the fractional order :math:`\alpha` directly controls the slope in log-log plots of G'(:math:`\omega`) and G"(:math:`\omega`), with both moduli scaling as :math:`\omega`\ :math:`^{\alpha}` in the power-law region. Typical :math:`\alpha` ranges for FML applications:
 
-- Polymer melts (linear homopolymers): α ≈ 0.7-0.9
-- Polymer melts (branched): α ≈ 0.5-0.7
-- Concentrated polymer solutions: α ≈ 0.5-0.8
-- Complex fluids (colloidal dispersions): α ≈ 0.4-0.7
+- Polymer melts (linear homopolymers): :math:`\alpha` ≈ 0.7-0.9
+- Polymer melts (branched): :math:`\alpha` ≈ 0.5-0.7
+- Concentrated polymer solutions: :math:`\alpha` ≈ 0.5-0.8
+- Complex fluids (colloidal dispersions): :math:`\alpha` ≈ 0.4-0.7
 
 Mathematical Foundations
 ------------------------
@@ -92,11 +92,11 @@ The FML model relies on the **two-parameter Mittag-Leffler function**:
 
    E_{\alpha,\beta}(z) = \sum_{k=0}^{\infty} \frac{z^k}{\Gamma(\alpha k + \beta)}
 
-where Γ is the gamma function. This generalization of the exponential function is essential for fractional viscoelasticity.
+where :math:`\Gamma` is the gamma function. This generalization of the exponential function is essential for fractional viscoelasticity.
 
 **Key Properties:**
-   - E₁,₁(z) = exp(z) (recovers classical exponential)
-   - E_α,α(-t^α) provides the characteristic power-law relaxation
+   - :math:`E_1,_1(z)` = exp(z) (recovers classical exponential)
+   - :math:`E_{\alpha,\alpha(-t^\alpha)}` provides the characteristic power-law relaxation
    - Smoothly interpolates between short-time power-law and long-time stretched exponential
 
 Power-Law Relaxation Derivation
@@ -123,8 +123,8 @@ Governing Equations
 where :math:`G_m` is the Maxwell modulus, :math:`E_{\alpha,\beta}(z)` is the two-parameter Mittag-Leffler function, and :math:`\tau_\alpha` is the characteristic relaxation time with units of s\ :sup:`alpha`.
 
 **Physical interpretation:**
-   - Short times (t << τ_α): G(t) ≈ Gm (elastic plateau)
-   - Intermediate times: G(t) ~ t^(-α) (power-law relaxation)
+   - Short times (t << :math:`\tau_\alpha`): G(t) ≈ Gm (elastic plateau)
+   - Intermediate times: G(t) ~ t^(-:math:`\alpha`) (power-law relaxation)
    - Long times: Stretched exponential decay toward zero
 
 **Complex Modulus**:
@@ -145,9 +145,9 @@ Decomposing into storage and loss moduli:
    G''(\omega) = G_m \frac{(\omega\tau_\alpha)^\alpha \sin(\alpha\pi/2)}{1 + 2(\omega\tau_\alpha)^\alpha \cos(\alpha\pi/2) + (\omega\tau_\alpha)^{2\alpha}}
 
 **Frequency-Domain Behavior:**
-   - High ω (ω >> 1/τ_α): G' → Gm, G" → 0 (elastic plateau)
-   - Intermediate ω (ω ~ 1/τ_α): G', G" ~ ω^α (power-law scaling, parallel slopes)
-   - Low ω (ω << 1/τ_α): G' ~ ω^(2α), G" ~ ω^α (liquid-like terminal regime)
+   - High :math:`\omega (\omega >> 1/\tau_\alpha)`: G' → Gm, G" → 0 (elastic plateau)
+   - Intermediate :math:`\omega (\omega` ~ 1/:math:`\tau_\alpha`): G', G" ~ :math:`\omega^\alpha` (power-law scaling, parallel slopes)
+   - Low :math:`\omega (\omega << 1/\tau_\alpha)`: G' ~ :math:`\omega^(2\alpha), G`" ~ :math:`\omega^\alpha` (liquid-like terminal regime)
 
 **Creep Compliance**:
 
@@ -199,16 +199,16 @@ The Fractional Maxwell Liquid model has three parameters:
 
 **Parameter Interpretation:**
 
-- **Gm**: Instantaneous modulus reflecting chain/network stiffness. For polymer melts, relates to entanglement density via Gm ≈ GN⁰ (plateau modulus). Typical values: 10³-10⁶ Pa for polymer melts.
+- **Gm**: Instantaneous modulus reflecting chain/network stiffness. For polymer melts, relates to entanglement density via Gm ≈ :math:`G_N^0` (plateau modulus). Typical values: :math:`10^3-10^6` Pa for polymer melts.
 
-- **alpha**: Quantifies relaxation spectrum breadth. Lower α → broader spectra from molecular weight polydispersity, branching, or complex intermolecular interactions. For linear polymers, α ≈ 0.7-0.9; for branched polymers, α ≈ 0.5-0.7.
+- **alpha**: Quantifies relaxation spectrum breadth. Lower :math:`\alpha` → broader spectra from molecular weight polydispersity, branching, or complex intermolecular interactions. For linear polymers, :math:`\alpha` ≈ 0.7-0.9; for branched polymers, :math:`\alpha` ≈ 0.5-0.7.
 
-- **tau_alpha**: Average relaxation time scale. Has unusual units (s^α) due to fractional calculus. For polymer melts, relates to molecular weight via τ_α ~ Mw^(3.4). Typical values: 10⁻³-10³ s depending on molecular weight and temperature.
+- **tau_alpha**: Average relaxation time scale. Has unusual units (s\ :math:`^{\alpha}`) due to fractional calculus. For polymer melts, relates to molecular weight via :math:`\tau_\alpha` ~ Mw^(3.4). Typical values: :math:`10 \times 10^{-3-10^3}` s depending on molecular weight and temperature.
 
 Validity and Assumptions
 ------------------------
 
-- Linear viscoelastic assumption: strain amplitudes remain small (γ₀ < 5-10% typically).
+- Linear viscoelastic assumption: strain amplitudes remain small (:math:`\gamma_0` < 5-10% typically).
 - Isothermal conditions: constant temperature throughout experiment.
 - Time-invariant material parameters: no aging, polymerization, or degradation.
 - Supported RheoJAX test modes: relaxation, creep, oscillation.
@@ -224,31 +224,31 @@ insights and actionable knowledge.
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Fractional Order (α)**:
+**Fractional Order (** :math:`\alpha` **)**:
    The fractional order reveals molecular architecture and relaxation dynamics:
 
-   - **0.7 < α < 0.9**: Narrow relaxation spectrum. Typical for linear,
+   - **0.7 <** :math:`\alpha` **< 0.9**: Narrow relaxation spectrum. Typical for linear,
      monodisperse polymer melts with well-defined entanglement dynamics.
 
-   - **0.5 < α < 0.7**: Moderate spectrum breadth. Common in branched polymers,
+   - **0.5 <** :math:`\alpha` **< 0.7**: Moderate spectrum breadth. Common in branched polymers,
      polydisperse melts, or concentrated solutions where multiple relaxation
      mechanisms coexist.
 
-   - **α < 0.5**: Very broad spectrum. Indicates complex hierarchical relaxation
+   - :math:`\alpha` **< 0.5**: Very broad spectrum. Indicates complex hierarchical relaxation
      (star polymers, H-polymers) or strong polydispersity.
 
    *For graduate students*: The fractional order connects to molecular weight
-   distribution. For polymers, α ≈ 1/(1 + PDI/3) approximately, where PDI is
-   the polydispersity index. Branching lowers α due to arm retraction and
+   distribution. For polymers, :math:`\alpha` ≈ 1/(1 + PDI/3) approximately, where PDI is
+   the polydispersity index. Branching lowers :math:`\alpha` due to arm retraction and
    branch point hopping mechanisms.
 
-   *For practitioners*: Use α to assess batch-to-batch consistency. A sudden
-   drop in α suggests contamination with branched species or broadening of MWD.
+   *For practitioners*: Use :math:`\alpha` to assess batch-to-batch consistency. A sudden
+   drop in :math:`\alpha` suggests contamination with branched species or broadening of MWD.
 
 **Maxwell Modulus (Gm)**:
    The modulus reveals network/entanglement density:
 
-   - **Gm ≈ GN⁰ (plateau modulus)**: For entangled polymer melts, Gm should
+   - **Gm ≈** :math:`G_N^0` **(plateau modulus)**: For entangled polymer melts, Gm should
      match the rubbery plateau from literature. Significant deviation suggests
      incomplete entanglement or dilution.
 
@@ -258,7 +258,7 @@ Parameter Interpretation
    *For practitioners*: Track Gm as a QC metric. For polymer melts, Gm should
    be stable (±10%) across batches of the same grade.
 
-**Relaxation Time (τ_α)**:
+**Relaxation Time (** :math:`\tau_\alpha` **)**:
    The characteristic time connects to molecular weight:
 
    - **Scaling**: For linear polymers, :math:`\tau_\alpha \propto M_w^{3.4}`
@@ -266,7 +266,7 @@ Parameter Interpretation
 
    - **Temperature dependence**: Follows WLF or Arrhenius behavior.
 
-   *For practitioners*: Compare τ_α to process timescales. For extrusion,
+   *For practitioners*: Compare :math:`\tau_\alpha` to process timescales. For extrusion,
    ensure :math:`\tau_\alpha < 1/\dot{\gamma}_{process}` for complete relaxation.
 
 Material Classification
@@ -276,23 +276,23 @@ Material Classification
    :header-rows: 1
    :widths: 20 20 30 30
 
-   * - α Range
+   * - :math:`\alpha` Range
      - Spectrum Type
      - Typical Materials
      - Implications
-   * - 0.8 < α < 1.0
+   * - 0.8 < :math:`\alpha` < 1.0
      - Very narrow
      - Monodisperse linear polymers
      - Near-Maxwellian, consider classical model
-   * - 0.6 < α < 0.8
+   * - 0.6 < :math:`\alpha` < 0.8
      - Narrow-moderate
      - Commercial polymer melts
      - Standard processing behavior
-   * - 0.4 < α < 0.6
+   * - 0.4 < :math:`\alpha` < 0.6
      - Broad
      - Branched polymers, blends
      - Complex flow behavior, longer relaxation
-   * - α < 0.4
+   * - :math:`\alpha` < 0.4
      - Very broad
      - Highly branched, filled systems
      - Multiple mechanisms, difficult to process
@@ -302,13 +302,13 @@ Diagnostic Indicators
 
 Warning signs in fitted parameters:
 
-- **α → 1**: Material is nearly Maxwellian. Consider using classical Maxwell
+- :math:`\alpha` **→ 1**: Material is nearly Maxwellian. Consider using classical Maxwell
   for simpler interpretation and faster computation.
 
-- **Gm ≠ GN⁰**: If Gm differs significantly from tabulated plateau modulus,
+- **Gm ≠** :math:`G_N^0`: If Gm differs significantly from tabulated plateau modulus,
   check for dilution, incomplete entanglement, or fitting errors.
 
-- **τ_α inconsistent with Mw**: Compare to literature correlations. Large
+- :math:`\tau_\alpha` **inconsistent with Mw**: Compare to literature correlations. Large
   deviations suggest degradation or contamination.
 
 - **Poor fit at low frequencies**: Terminal behavior may not match FML
@@ -319,15 +319,15 @@ Application Examples
 ~~~~~~~~~~~~~~~~~~~~
 
 **Polymer Grade Verification**:
-   Fit FML to frequency sweep, compare α and τ_α to specifications. A batch
-   with lower α likely has broader MWD or unexpected branching.
+   Fit FML to frequency sweep, compare :math:`\alpha and \tau_\alpha` to specifications. A batch
+   with lower :math:`\alpha` likely has broader MWD or unexpected branching.
 
 **Processing Optimization**:
-   Use τ_α to set residence times. For complete stress relaxation, ensure
-   process time > 5τ_α.
+   Use :math:`\tau_\alpha` to set residence times. For complete stress relaxation, ensure
+   process time > :math:`5\tau_\alpha`.
 
 **Blend Analysis**:
-   Lower α in blends indicates poor miscibility (separate relaxation modes)
+   Lower :math:`\alpha` in blends indicates poor miscibility (separate relaxation modes)
    or broad combined MWD.
 
 Fitting Guidance
@@ -363,7 +363,7 @@ Fitting Guidance
 
 - **Insufficient high-frequency data**: Cannot determine Gm accurately
 - **Missing power-law regime**: Need broader frequency coverage
-- **α near 1**: Use classical Maxwell for simpler interpretation
+- :math:`\alpha` **near 1**: Use classical Maxwell for simpler interpretation
 
 Usage
 -----
@@ -445,17 +445,17 @@ The Fractional Maxwell Liquid exhibits characteristic behavior across different 
 Comparison with Classical Maxwell
 ----------------------------------
 
-**Classical Maxwell (α = 1):**
-   - Single relaxation time τ
-   - Exponential relaxation: G(t) = Gm exp(-t/τ)
+**Classical Maxwell (** :math:`\alpha` **= 1):**
+   - Single relaxation time :math:`\tau`
+   - Exponential relaxation: G(t) = Gm exp(-t/:math:`\tau`)
    - Narrow relaxation spectrum (Lorentzian)
-   - Low-frequency behavior: G' ~ ω², G" ~ ω (classical liquid)
+   - Low-frequency behavior: G' ~ :math:`\omega^2, G`" ~ :math:`\omega` (classical liquid)
 
-**Fractional Maxwell Liquid (0 < α < 1):**
+**Fractional Maxwell Liquid (0 <** :math:`\alpha` **< 1):**
    - Continuous distribution of relaxation times
-   - Power-law relaxation: G(t) ~ t^(-α)
+   - Power-law relaxation: G(t) ~ t^(-:math:`\alpha`)
    - Broad relaxation spectrum
-   - Low-frequency behavior: G' ~ ω^(2α), G" ~ ω^α (generalized liquid)
+   - Low-frequency behavior: G' ~ :math:`\omega^(2\alpha), G`" ~ :math:`\omega^\alpha` (generalized liquid)
 
 **When to Use Fractional:**
    - Power-law relaxation observed in stress relaxation experiments
@@ -484,27 +484,27 @@ Material Examples
 -----------------
 
 **Polymer Melts (Linear):**
-   - Polyethylene, polypropylene, polystyrene (α ≈ 0.7-0.9)
-   - Gm ≈ GN⁰ (plateau modulus from entanglements)
-   - Relatively narrow spectra (high α) for monodisperse polymers
+   - Polyethylene, polypropylene, polystyrene (:math:`\alpha` ≈ 0.7-0.9)
+   - Gm ≈ :math:`G_N^0` (plateau modulus from entanglements)
+   - Relatively narrow spectra (high :math:`\alpha`) for monodisperse polymers
 
 **Polymer Melts (Branched):**
-   - Long-chain branched polyethylene, star polymers (α ≈ 0.5-0.7)
-   - Broader spectra (lower α) from hierarchical relaxation processes
+   - Long-chain branched polyethylene, star polymers (:math:`\alpha` ≈ 0.5-0.7)
+   - Broader spectra (lower :math:`\alpha`) from hierarchical relaxation processes
    - Arm retraction, branch point hopping add complexity
 
 **Concentrated Polymer Solutions:**
-   - Solutions above overlap concentration c* (α ≈ 0.5-0.8)
-   - Lower α than melts due to solvent-polymer interactions
+   - Solutions above overlap concentration c* (:math:`\alpha` ≈ 0.5-0.8)
+   - Lower :math:`\alpha` than melts due to solvent-polymer interactions
    - Spectrum breadth depends on concentration and molecular weight distribution
 
 **Micellar Solutions:**
-   - Wormlike micelles, surfactant solutions (α ≈ 0.4-0.7)
+   - Wormlike micelles, surfactant solutions (:math:`\alpha` ≈ 0.4-0.7)
    - Broad spectra from micelle size distribution and reptation
-   - Can exhibit gel-like behavior (α ≈ 0.5) near critical concentration
+   - Can exhibit gel-like behavior (:math:`\alpha` ≈ 0.5) near critical concentration
 
 **Colloidal Dispersions:**
-   - Dense colloidal suspensions (α ≈ 0.4-0.6)
+   - Dense colloidal suspensions (:math:`\alpha` ≈ 0.4-0.6)
    - Particle size polydispersity creates broad relaxation spectra
    - Hydrodynamic interactions contribute to spectrum breadth
 
@@ -520,15 +520,15 @@ When ``test_mode='oscillation'``, the initialization system:
 
 1. **Extracts frequency features** from :math:`|G^*|(\omega)` data:
    - High-frequency plateau → estimates Gm
-   - Transition frequency ω_mid (maximum slope of :math:`|G^*|`) → estimates τ_α = 1/ω_mid
-   - Slope in power-law region → estimates fractional order α
+   - Transition frequency :math:`\omega_mid` (maximum slope of :math:`|G^*|`) → estimates :math:`\tau_\alpha = 1/\omega_mid`
+   - Slope in power-law region → estimates fractional order :math:`\alpha`
 
 2. **Estimates fractional order** from parallel slopes:
-   - Identifies region where G'(ω) and G"(ω) have parallel slopes
+   - Identifies region where G'(:math:`\omega`) and G"(:math:`\omega`) have parallel slopes
    - Extracts slope via linear regression in log-log space
-   - Maps slope directly to α (slope ≈ α in power-law region)
+   - Maps slope directly to :math:`\alpha (slope \approx \alpha` in power-law region)
 
-3. **Clips to parameter bounds** to ensure Gm > 0, 0 < α < 1, τ_α > 0
+3. **Clips to parameter bounds** to ensure Gm > 0, 0 < :math:`\alpha < 1, \tau_\alpha` > 0
 
 Benefits
 ~~~~~~~~
@@ -601,9 +601,9 @@ Related Models
 ~~~~~~~~~~~~~~
 
 - :doc:`fractional_maxwell_gel` — uses a dashpot instead of a spring for gel-like systems with terminal flow
-- :doc:`fractional_maxwell_model` — generalized two-order series analogue with independent α and β
+- :doc:`fractional_maxwell_model` — generalized two-order series analogue with independent :math:`\alpha and \beta`
 - :doc:`fractional_jeffreys` — adds a parallel dashpot for finite zero-shear viscosity
-- :doc:`../classical/maxwell` — classical limit (α → 1, exponential relaxation)
+- :doc:`../classical/maxwell` — classical limit (:math:`\alpha` → 1, exponential relaxation)
 - :doc:`../classical/springpot` — fundamental SpringPot element theory
 
 Transforms
@@ -611,7 +611,7 @@ Transforms
 
 - :doc:`../../transforms/fft` — convert relaxation data to :math:`G^*(\omega)` before fitting
 - :doc:`../../transforms/mastercurve` — time-temperature superposition for polymer melts
-- :doc:`../../transforms/derivatives` — compute loss tangent tan δ from G' and G"
+- :doc:`../../transforms/derivatives` — compute loss tangent tan :math:`\delta` from G' and G"
 
 Examples
 ~~~~~~~~

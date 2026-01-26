@@ -97,7 +97,7 @@ Key Features
 
 - Quantitative parameter ranges from field studies and laboratory characterization
 - Application-specific guidance for pipeline operations, drilling, lubrication
-- Mode selection rules for multi-timescale materials (β → N mapping)
+- Mode selection rules for multi-timescale materials (:math:`\beta` → N mapping)
 
 **Parameter Estimation:**
 

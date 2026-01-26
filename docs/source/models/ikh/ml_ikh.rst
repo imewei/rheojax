@@ -97,7 +97,7 @@ but rather as a stretched exponential (Kohlrausch-Williams-Watts form):
 
    \sigma_y(t) = \sigma_{y,\infty} - (\sigma_{y,\infty} - \sigma_{y,0}) e^{-(t/\tau)^\beta}
 
-where β < 1 indicates a distribution of timescales. The ML-IKH model captures this
+where :math:`\beta` < 1 indicates a distribution of timescales. The ML-IKH model captures this
 behavior naturally through its N structural modes.
 
 
@@ -145,7 +145,7 @@ This provides practical guidance for model complexity:
    :widths: 20 20 40 20
    :header-rows: 1
 
-   * - β
+   * - :math:`\beta`
      - Physical Behavior
      - Interpretation
      - N Required
@@ -166,14 +166,14 @@ This provides practical guidance for model complexity:
      - Broad distribution
      - 9-11
 
-**Determining β from Experimental Data:**
+**Determining** :math:`\beta` **from Experimental Data:**
 
-The stretch exponent β can be extracted from recovery experiments:
+The stretch exponent :math:`\beta` can be extracted from recovery experiments:
 
-1. Pre-shear material to destructure (λ → 0)
-2. Stop shearing and monitor yield stress recovery σ_y(t)
+1. Pre-shear material to destructure (:math:`\lambda` → 0)
+2. Stop shearing and monitor yield stress recovery :math:`\sigma_y(t)`
 3. Fit: :math:`\ln[-\ln(\Delta\sigma_y(t)/\Delta\sigma_{y,max})] = \beta \ln(t/\tau_c)`
-4. Slope gives β, intercept gives τ_c
+4. Slope gives :math:`\beta`, intercept gives :math:`\tau_c`
 
 A plot of the left-hand side vs :math:`\ln(t)` should be linear for KWW behavior.
 
@@ -204,13 +204,13 @@ Mathematical Justification
 
 The multi-mode formulation is mathematically justified by viewing the structural
 parameter as arising from a distribution of relaxation times. If structure recovery
-is governed by a spectrum of timescales P(τ), then:
+is governed by a spectrum of timescales P(:math:`\tau`), then:
 
 .. math::
 
    \lambda(t) = \int_0^\infty P(\tau) \lambda_\tau(t) \, d\tau
 
-where λ_τ(t) is the contribution from structures with timescale τ.
+where :math:`\lambda_\tau(t)` is the contribution from structures with timescale :math:`\tau`.
 
 For practical computation, this integral is discretized into N modes:
 
@@ -218,7 +218,7 @@ For practical computation, this integral is discretized into N modes:
 
    \lambda(t) \approx \sum_{i=1}^{N} w_i \lambda_i(t)
 
-with weights wᵢ and timescales τᵢ chosen to span the relevant range.
+with weights :math:`w_i` and timescales :math:`\tau_i` chosen to span the relevant range.
 
 Physical Foundations
 --------------------
@@ -238,7 +238,7 @@ Each population may build up and break down at different rates, leading to **str
 
    \lambda(t) \approx 1 - (1 - \lambda_0) \exp\left[-(t/\tau)^\beta\right]
 
-where β < 1 indicates a distribution of timescales. The ML-IKH model captures this by superposing N exponential modes:
+where :math:`\beta` < 1 indicates a distribution of timescales. The ML-IKH model captures this by superposing N exponential modes:
 
 .. math::
 
@@ -251,21 +251,21 @@ Timescale Distribution: Physical Interpretation
 The distribution of recovery timescales in multi-mode models has concrete
 physical origins in the hierarchical nature of soft material microstructure.
 
-**Fast Modes (τ ~ 0.1–1 s):**
+**Fast Modes (** :math:`\tau` **~ 0.1–1 s):**
 
 - **Physical mechanism**: Local bond reformation, nearest-neighbor particle rearrangement
 - **Structural scale**: Individual particle contacts, primary bonds
 - **Activation energy**: Low (thermal fluctuations sufficient)
 - **Experimental signature**: Rapid initial stress recovery after flow cessation
 
-**Intermediate Modes (τ ~ 1–10 s):**
+**Intermediate Modes (** :math:`\tau` **~ 1–10 s):**
 
 - **Physical mechanism**: Cluster reorganization, aggregate restructuring
 - **Structural scale**: Multi-particle aggregates (10–100 particles)
 - **Activation energy**: Moderate (cooperative rearrangements)
 - **Experimental signature**: "Shoulder" in recovery curves, non-exponential character
 
-**Slow Modes (τ ~ 10–1000 s):**
+**Slow Modes (** :math:`\tau` **~ 10–1000 s):**
 
 - **Physical mechanism**: Network-scale rearrangement, large-scale healing
 - **Structural scale**: Percolating network, sample-spanning structure
@@ -289,8 +289,8 @@ Analogy to Prony Series
 
 The multi-mode structure is directly analogous to **Prony series** for viscoelasticity:
 
-- **Viscoelasticity**: G(t) = Σ Gᵢ·exp(-t/τᵢ) (Generalized Maxwell)
-- **Thixotropy**: λ(t) = Σ wᵢ·λᵢ(t) where λᵢ evolves with τ_thix,i (ML-IKH)
+- **Viscoelasticity**: G(t) = :math:`\Sigma G_i \cdot exp(-t/\tau_i)` (Generalized Maxwell)
+- **Thixotropy**: :math:`\lambda(t) = \Sigma w_i \cdot \lambda_i(t) where \lambda_i` evolves with :math:`\tau_thix,i` (ML-IKH)
 
 Both use **discrete mode approximations** to represent continuous relaxation spectra.
 
@@ -301,14 +301,14 @@ The ML-IKH model has two formulations (see Mathematical Formulation for complete
 
 **Per-Mode Formulation** (N independent yield surfaces):
 
-- Each mode i has state (σᵢ, αᵢ, λᵢ)
-- Total stress: σ_total = Σ σᵢ + η_∞·γ̇
+- Each mode i has state (:math:`\sigma_i, \alpha_i, \lambda_i`)
+- Total stress: :math:`\sigma_{total} = \Sigma \sigma_i + \eta_{\infty} \dot{\gamma}`
 - Use when: Distinct mechanical populations (e.g., bimodal particle size)
 
 **Weighted-Sum Formulation** (single yield surface):
 
-- Single state (σ, α) with N structure parameters λᵢ
-- Yield stress: σ_y = σ_y,0 + k₃·Σ wᵢλᵢ
+- Single state (:math:`\sigma, \alpha`) with N structure parameters :math:`\lambda_i`
+- Yield stress: :math:`\sigma_y = \sigma_y,0 + k_3 \cdot \Sigma w_i\lambda_i`
 - Use when: Single mechanical response with distributed recovery kinetics
 
 Connection to Generalized Maxwell Model
@@ -328,8 +328,8 @@ The ML-IKH model relates to the MIKH model exactly as the Generalized Maxwell Mo
      - Maxwell element
      - Generalized Maxwell (Prony series)
    * - Thixotropy
-     - MIKH (single λ)
-     - ML-IKH (N λᵢ)
+     - MIKH (single :math:`\lambda`)
+     - ML-IKH (N :math:`\lambda_i`)
    * - Recovery
      - Exponential
      - Stretched exponential / multi-exponential
@@ -356,8 +356,8 @@ Generalized Maxwell Model:
 
 ::
 
-   Mode 1: [Spring G₁] ─ [Dashpot] ─ [Yield σ_y,1(λ₁)] ─ [Hardening α₁]
-   Mode 2: [Spring G₂] ─ [Dashpot] ─ [Yield σ_y,2(λ₂)] ─ [Hardening α₂]
+   Mode 1: [Spring G_1] ─ [Dashpot] ─ [Yield σ_y,1(λ_1)] ─ [Hardening α_1]
+   Mode 2: [Spring G_2] ─ [Dashpot] ─ [Yield σ_y,2(λ_2)] ─ [Hardening α_2]
    ...
    Mode N: [Spring Gₙ] ─ [Dashpot] ─ [Yield σ_y,N(λₙ)] ─ [Hardening αₙ]
    ─────────────────────────────────────────────────────────────────────
@@ -385,12 +385,12 @@ This represents **distributed kinetics** affecting a single yield mechanism:
 
 ::
 
-   Single mechanical element: [Spring G] ─ [Dashpot] ─ [Yield σ_y(λ₁...λₙ)] ─ [Hardening α]
+   Single mechanical element: [Spring G] ─ [Dashpot] ─ [Yield σ_y(λ_1...λₙ)] ─ [Hardening α]
 
    With structure from multiple populations:
-   λ₁ (fast): τ₁ ~ 0.1 s     ─┐
-   λ₂ (medium): τ₂ ~ 1 s     ─┼─> weighted sum → σ_y(t)
-   λ₃ (slow): τ₃ ~ 10 s      ─┘
+   λ_1 (fast): τ_1 ~ 0.1 s     ─┐
+   λ_2 (medium): τ_2 ~ 1 s     ─┼─> weighted sum → σ_y(t)
+   λ_3 (slow): τ_3 ~ 10 s      ─┘
 
 **Physical scenarios for weighted_sum:**
 
@@ -452,7 +452,7 @@ Mathematical Formulation
 Per-Mode Formulation
 ~~~~~~~~~~~~~~~~~~~~
 
-State for each mode i: (σᵢ, αᵢ, λᵢ)
+State for each mode i: (:math:`\sigma_i, \alpha_i, \lambda_i`)
 
 **Yield condition per mode:**
 
@@ -484,14 +484,14 @@ State for each mode i: (σᵢ, αᵢ, λᵢ)
 
    \sigma_{total} = \sum_{i=1}^{N} \sigma_i + \eta_{\infty} \dot{\gamma}
 
-Note that each mode has its own plastic strain rate γ̇ᵖᵢ determined by its own
-yield condition. The total strain rate γ̇ is the same for all modes (parallel
+Note that each mode has its own plastic strain rate :math:`\dot{\gamma}^p_i` determined by its own
+yield condition. The total strain rate :math:`\dot{\gamma}` is the same for all modes (parallel
 connection assumption).
 
 Weighted-Sum Formulation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Single state: (σ, α) with multiple λᵢ
+Single state: (:math:`\sigma, \alpha`) with multiple :math:`\lambda_i`
 
 **Single yield condition:**
 
@@ -511,8 +511,8 @@ Single state: (σ, α) with multiple λᵢ
 
    \dot{\lambda}_i = \frac{1-\lambda_i}{\tau_{thix,i}} - \Gamma_i \lambda_i |\dot{\gamma}^p|
 
-Each λᵢ evolves independently with its own (τᵢ, Γᵢ), but all share the same
-plastic strain rate γ̇ᵖ.
+Each :math:`\lambda_i` evolves independently with its own (:math:`\tau_i, \Gamma_i`), but all share the same
+plastic strain rate :math:`\dot{\gamma}^p`.
 
 **Backstress evolution:**
 
@@ -545,7 +545,7 @@ The total stress is:
 
 **Weighted-sum steady state:**
 
-All λᵢ reach steady state with the global plastic strain rate:
+All :math:`\lambda_i` reach steady state with the global plastic strain rate:
 
 .. math::
 
@@ -570,7 +570,7 @@ Validity and Assumptions
 **Assumptions:**
 
 - **Discrete mode approximation**: Continuous relaxation spectrum approximated by N modes
-- **Independent mode kinetics**: No coupling between structural populations (each λᵢ evolves independently)
+- **Independent mode kinetics**: No coupling between structural populations (each :math:`\lambda_i` evolves independently)
 - **Affine deformation**: Homogeneous flow (no spatial gradients)
 - **Isothermal**: No temperature dependence
 
@@ -588,25 +588,25 @@ From fitting Multi-Lambda IKH to experimental data, you can extract insights abo
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**λ_i (Multiple Structure Parameters)**:
-   Set of N dimensionless internal variables (0 ≤ λ_i ≤ 1) tracking distinct structural populations or timescales.
-   *For graduate students*: Each λ_i evolves independently: dλ_i/dt = (1-λ_i)/τ_thix,i - Γ_i·λ_i|γ̇^p|. In weighted_sum mode, σ_y = σ_y,0 + k_3·Σw_i·λ_i represents distributed kinetics affecting single yield mechanism. In per_mode, each λ_i has independent yield surface. Recovers stretched-exponential via superposition: λ(t) ≈ Σw_i·exp(-t/τ_i) ~ exp[-(t/τ_c)^β].
-   *For practitioners*: Fast mode (τ_1 ~ 0.1-1 s) = local bond reformation. Slow mode (τ_N ~ 100-1000 s) = network reorganization. Measure via multi-step recovery tests at different rest times.
+:math:`\lambda_i` **(Multiple Structure Parameters)**:
+   Set of N dimensionless internal variables (0 ≤ :math:`\lambda_i` ≤ 1) tracking distinct structural populations or timescales.
+   *For graduate students*: Each :math:`\lambda_i` evolves independently: :math:`d\lambda_i/dt = (1-\lambda_i)/\tau_thix,i - \Gamma_i \cdot \lambda_i|\dot{\gamma}^p|`. In weighted_sum mode, :math:`\sigma_y = \sigma_y,0 + k_3 \cdot \Sigmaw_i \cdot \lambda_i` represents distributed kinetics affecting single yield mechanism. In per_mode, each :math:`\lambda_i` has independent yield surface. Recovers stretched-exponential via superposition: :math:`\lambda(t) \approx \Sigmaw_i \cdot exp(-t/\tau_i)` ~ exp[-(t/:math:`\tau_c`)\ :math:`^{\beta}`].
+   *For practitioners*: Fast mode (:math:`\tau_1` ~ 0.1-1 s) = local bond reformation. Slow mode (:math:`\tau_N` ~ 100-1000 s) = network reorganization. Measure via multi-step recovery tests at different rest times.
 
-**τ_thix,i (Recovery Timescale Spectrum)**:
+:math:`\tau_thix,i` **(Recovery Timescale Spectrum)**:
    Set of N characteristic rebuilding times spanning 2-4 decades.
-   *For graduate students*: Logarithmic spacing: τ_i = τ_min·(τ_max/τ_min)^((i-1)/(N-1)). Span τ_max/τ_min quantifies timescale dispersion. Broader span (>100) requires more modes (N ≥ 3-5). Connects to Kohlrausch-Williams-Watts stretch exponent β via N ~ (1/β)².
-   *For practitioners*: Extract from recovery data fitting. If single-mode MIKH R² improvement > 10% with ML-IKH, complex thixotropy confirmed. Typical: N=2-3 sufficient for most soft materials.
+   *For graduate students*: Logarithmic spacing: :math:`\tau_i = \tau_min \cdot (\tau_max/\tau_min)^((i-1)/(N-1)). Span \tau_max/\tau_min` quantifies timescale dispersion. Broader span (>100) requires more modes (N ≥ 3-5). Connects to Kohlrausch-Williams-Watts stretch exponent :math:`\beta` via N ~ (1/:math:`\beta`)\ :math:`^2`.
+   *For practitioners*: Extract from recovery data fitting. If single-mode MIKH :math:`R^2` improvement > 10% with ML-IKH, complex thixotropy confirmed. Typical: N=2-3 sufficient for most soft materials.
 
 **w_i (Mode Weights, weighted_sum only)**:
-   Normalized weights (Σw_i = 1) quantifying relative importance of each structural timescale.
-   *For graduate students*: In weighted_sum: σ_y = σ_y,0 + k_3·Σw_i·λ_i. Dominant mode: argmax(w_i·k_3). Weights relate to distribution of structural elements (e.g., particle size distribution in bimodal colloids).
+   Normalized weights (:math:`\Sigmaw_i` = 1) quantifying relative importance of each structural timescale.
+   *For graduate students*: In weighted_sum: :math:`\sigma_y = \sigma_y,0 + k_3 \cdot \Sigmaw_i \cdot \lambda_i`. Dominant mode: argmax(w_i·k_3). Weights relate to distribution of structural elements (e.g., particle size distribution in bimodal colloids).
    *For practitioners*: w_1 = 0.6, w_2 = 0.3, w_3 = 0.1 means fast mode dominates yield stress evolution. Adjust weights if recovery curves show multi-exponential character.
 
-**Γ_i (Mode-Specific Breakdown Coefficients)**:
+:math:`\Gamma_i` **(Mode-Specific Breakdown Coefficients)**:
    Efficiency of shear-induced destructuring for each structural population.
-   *For graduate students*: Controls mode-specific shear-thinning: λ_ss,i = 1/(1 + Γ_i·τ_thix,i|γ̇|). Different Γ_i values enable modeling materials where some structure (weak bonds) breaks easily while other structure (strong crosslinks) persists.
-   *For practitioners*: Fit from flow curve multi-regime behavior. Example: Γ_1 >> Γ_2 means fast mode breaks down at low shear, slow mode only at high shear.
+   *For graduate students*: Controls mode-specific shear-thinning: :math:`\lambda_ss,i = 1/(1 + \Gamma_i \cdot \tau_thix,i|\dot{\gamma}|)`. Different :math:`\Gamma_i` values enable modeling materials where some structure (weak bonds) breaks easily while other structure (strong crosslinks) persists.
+   *For practitioners*: Fit from flow curve multi-regime behavior. Example: :math:`\Gamma_1 >> \Gamma_2` means fast mode breaks down at low shear, slow mode only at high shear.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -619,15 +619,15 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - N = 2, τ_max/τ_min < 10
+   * - N = 2, :math:`\tau_max/\tau_min` < 10
      - Simple bimodal thixotropy
      - Bidisperse colloids, two-network gels
      - Moderate complexity, 2-exponential recovery
-   * - N = 3-5, τ_max/τ_min = 10-100
+   * - N = 3-5, :math:`\tau_max/\tau_min` = 10-100
      - Complex thixotropy
      - Waxy crude oils, cement pastes, dense emulsions
      - Stretched-exponential recovery, history-dependent
-   * - N > 5, τ_max/τ_min > 100
+   * - N > 5, :math:`\tau_max/\tau_min` > 100
      - Extreme timescale dispersion
      - Aging soft glasses, hierarchical gels
      - Requires long-time measurements, non-Fickian
@@ -652,11 +652,11 @@ For general-purpose fitting, distribute timescales logarithmically:
 
    \tau_i = \tau_{min} \cdot \left( \frac{\tau_{max}}{\tau_{min}} \right)^{(i-1)/(N-1)}
 
-For N = 3 with τ_min = 0.1 s and τ_max = 100 s:
+For N = 3 with :math:`\tau_min` = 0.1 s and :math:`\tau_max` = 100 s:
 
-- τ₁ = 0.1 s (fast mode)
-- τ₂ = 3.16 s (intermediate mode)
-- τ₃ = 100 s (slow mode)
+- :math:`\tau_1` = 0.1 s (fast mode)
+- :math:`\tau_2` = 3.16 s (intermediate mode)
+- :math:`\tau_3` = 100 s (slow mode)
 
 Experimentally-Motivated Distribution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -664,8 +664,8 @@ Experimentally-Motivated Distribution
 Choose timescales based on observed relaxation data:
 
 1. Fit stretched exponential to recovery data
-2. Extract characteristic time τ_c and stretch exponent β
-3. Use N modes spanning τ_c · 10^(±2/β) approximately
+2. Extract characteristic time :math:`\tau_c` and stretch exponent :math:`\beta`
+3. Use N modes spanning :math:`\tau_c \cdot 10^{\pm 2/\beta}` approximately
 
 Prony-Series Approach
 ~~~~~~~~~~~~~~~~~~~~~
@@ -704,7 +704,7 @@ recovery that requires multiple structural modes.
 
 **When to use ML-IKH over MIKH:**
 
-- Recovery experiments show β < 0.8 (stretched exponential fit)
+- Recovery experiments show :math:`\beta` < 0.8 (stretched exponential fit)
 - Yield stress recovery spans >2 decades of time
 - Different temperature histories produce different recovery profiles
 
@@ -748,8 +748,8 @@ recovery that requires multiple structural modes.
 
 Multi-mode recovery means restart pressure depends strongly on shutdown duration:
 
-- Short shutdown (t < τ_1): Only fast modes recover, moderate restart pressure
-- Long shutdown (t > τ_N): All modes recover, maximum restart pressure
+- Short shutdown (t < :math:`\tau_1`): Only fast modes recover, moderate restart pressure
+- Long shutdown (t > :math:`\tau_N`): All modes recover, maximum restart pressure
 - Intermediate: Non-linear pressure increase with rest time
 
 Bidisperse Colloidal Systems
@@ -796,7 +796,7 @@ length scales: face-face contacts (fast), edge-face networks (slow).
    :header-rows: 1
 
    * - Mode
-     - τ_thix (s)
+     - :math:`\tau_thix` (s)
      - Physical Structure
      - Weight
    * - Fast
@@ -852,17 +852,17 @@ Mode Selection for Industrial Materials
 **Practical guidelines for choosing N:**
 
 1. **Start with N=2** and check if fit improves significantly with N=3
-2. **Use the β rule**: If stretched exponential fit gives β, then N ~ (1/β)²
-3. **Match experimental timescales**: Ensure τ_min < t_experiment,min and τ_max > t_experiment,max
+2. **Use the** :math:`\beta` **rule**: If stretched exponential fit gives :math:`\beta`, then N ~ (1/:math:`\beta`)\ :math:`^2`
+3. **Match experimental timescales**: Ensure :math:`\tau_min` < t_experiment,min and :math:`\tau_max` > t_experiment,max
 4. **Check for overfitting**: AIC/BIC should decrease with added modes
 
-**β (stretch exponent) → N mapping:**
+:math:`\beta` **(stretch exponent) → N mapping:**
 
 .. list-table::
    :widths: 15 25 30 30
    :header-rows: 1
 
-   * - β
+   * - :math:`\beta`
      - Behavior
      - N Required
      - Example Materials
@@ -887,7 +887,7 @@ Mode Selection for Industrial Materials
 
 Multi-mode fitting requires high-quality recovery data:
 
-- **Time range**: At least 2 decades spanning τ_min to τ_max
+- **Time range**: At least 2 decades spanning :math:`\tau_min to \tau_max`
 - **Data density**: 10+ points per decade of time
 - **Noise level**: Signal-to-noise ratio >20 for reliable mode separation
 - **Protocol**: Pre-shear to consistent initial state before recovery
@@ -978,7 +978,7 @@ more than 5-10%.
 Initializing Timescales
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Distribute τᵢ logarithmically across expected range:
+Distribute :math:`\tau_i` logarithmically across expected range:
 
 .. code-block:: python
 
@@ -1021,16 +1021,16 @@ Fitting Protocol
 **For per_mode:**
 
 1. Fit each mode's parameters separately to data at different timescales
-2. Use long-time recovery data for slow modes (large τᵢ)
-3. Use fast startup data for fast modes (small τᵢ)
+2. Use long-time recovery data for slow modes (large :math:`\tau_i`)
+3. Use fast startup data for fast modes (small :math:`\tau_i`)
 4. Global optimization to fine-tune
 
 **For weighted_sum:**
 
-1. Fit global parameters (G, C, σ_y0) from startup/flow curve
+1. Fit global parameters (G, C, :math:`\sigma_y0`) from startup/flow curve
 2. Fix mechanical parameters
-3. Fit kinetic parameters (τᵢ, Γᵢ, wᵢ) from recovery data
-4. Constrain Σwᵢ = 1 for physical interpretation
+3. Fit kinetic parameters (:math:`\tau_i, \Gamma_i, w_i`) from recovery data
+4. Constrain :math:`\Sigmaw_i` = 1 for physical interpretation
 
 
 Parameter Estimation Methods
@@ -1094,9 +1094,9 @@ and L̂ is the maximum likelihood.
 
 **Decision rules:**
 
-- **ΔAIC < 2**: Models essentially equivalent
-- **ΔAIC = 2-10**: Some evidence for lower-AIC model
-- **ΔAIC > 10**: Strong evidence for lower-AIC model
+- :math:`\DeltaAIC` **< 2**: Models essentially equivalent
+- :math:`\DeltaAIC` **= 2-10**: Some evidence for lower-AIC model
+- :math:`\DeltaAIC` **> 10**: Strong evidence for lower-AIC model
 - **BIC preferred** when sample size is moderate (n > 40) for parsimony
 
 Timescale Initialization from Recovery Data
@@ -1133,7 +1133,7 @@ The logarithmic derivative of recovery data reveals characteristic timescales:
 
 **Method 2: Stretched exponential fit**
 
-Extract β first, then distribute timescales:
+Extract :math:`\beta` first, then distribute timescales:
 
 .. code-block:: python
 
@@ -1212,11 +1212,11 @@ Fit mechanical parameters first, then kinetic:
 Regularization for Correlated Mode Weights
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Mode weights wᵢ are often correlated, especially when timescales overlap.
+Mode weights :math:`w_i` are often correlated, especially when timescales overlap.
 
 **Weight normalization constraint:**
 
-Enforce Σwᵢ = 1 during optimization:
+Enforce :math:`\Sigmaw_i` = 1 during optimization:
 
 .. code-block:: python
 
@@ -1270,7 +1270,7 @@ Use informative priors to regularize mode parameters:
 
        # ... rest of model
 
-This parameterization ensures τ₁ < τ₂ < ... < τₙ automatically.
+This parameterization ensures :math:`\tau_1 < \tau_2 < \cdots < \tau_n` automatically.
 
 Bayesian Inference for Multi-Mode Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1305,8 +1305,8 @@ Bayesian inference provides uncertainty quantification for mode parameters:
 
 **Diagnosing mode identifiability:**
 
-- High posterior correlation between wᵢ and wⱼ → modes may be redundant
-- Wide posterior for τᵢ → data doesn't constrain this timescale
+- High posterior correlation between :math:`w_i` and wⱼ → modes may be redundant
+- Wide posterior for :math:`\tau_i` → data doesn't constrain this timescale
 - Multimodal posterior → consider reducing N or using ordered parameterization
 
 
@@ -1437,15 +1437,15 @@ Protocol-Specific Notes
    * - Protocol
      - Implementation Notes
    * - Flow curve
-     - For each γ̇, set ``u_t = γ̇ * ones_like(t)``, integrate to steady state
+     - For each :math:`\dot{\gamma}`, set ``u_t = gamma_dot * ones_like(t)``, integrate to steady state
    * - Startup
-     - Set ``u_t = γ̇_0 * ones_like(t)``, track full σ(t) for overshoot
+     - Set ``u_t = gamma_dot_0 * ones_like(t)``, track full :math:`\sigma(t)` for overshoot
    * - Relaxation
-     - Initial ``σ_0 = G·γ_0`` from step strain, set ``u_t = 0``
+     - Initial ``sigma_0 = G * gamma_0`` from step strain, set ``u_t = 0``
    * - Creep
-     - Use stress-controlled wrapper with feedback: ``γ̇_{n+1} = γ̇_n + κ(σ_0 - σ_n)``
+     - Use stress-controlled wrapper with feedback: :math:`\dot{\gamma}_{n+1} = \dot{\gamma}_n + \kappa(\sigma_0 - \sigma_n)`
    * - LAOS
-     - Set ``u_t = γ_0·ω·cos(ω·t)``, extract harmonics from steady-state cycles
+     - Set ``u_t = gamma_0 * omega * cos(omega * t)``, extract harmonics from steady-state cycles
 
 
 Usage
@@ -1585,7 +1585,7 @@ This produces bi-exponential recovery, which can approximate stretched exponenti
 **N modes:**
 
 The sum of N exponentials can approximate stretched exponential recovery for
-0.5 ≤ β ≤ 1 with good accuracy using N = 3-5 modes.
+0.5 ≤ :math:`\beta` ≤ 1 with good accuracy using N = 3-5 modes.
 
 
 Relation to MIKH
@@ -1603,7 +1603,7 @@ Limitations and Considerations
 ------------------------------
 
 **Computational cost:** ML-IKH with N modes requires tracking 3N state variables
-(σᵢ, αᵢ, λᵢ for per_mode) versus 3 for MIKH. Computational cost scales roughly
+(:math:`\sigma_i, \alpha_i, \lambda_i` for per_mode) versus 3 for MIKH. Computational cost scales roughly
 linearly with N due to JAX vmap optimization.
 
 **Parameter identifiability:** With many modes, parameters may become poorly

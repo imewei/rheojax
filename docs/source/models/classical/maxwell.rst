@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Single relaxation time, exponential stress decay, viscoelastic liquids
-- **Parameters:** 2 (G, η)
+- **Parameters:** 2 (G, :math:`\eta`)
 - **Key equation:** :math:`G(t) = G \exp(-t/\tau)` where :math:`\tau = \eta/G`
 - **Test modes:** Oscillation, relaxation
 - **Material examples:** Polymer melts (PS, PDMS), viscoelastic liquids, dilute solutions
@@ -86,32 +86,32 @@ Material Examples with Typical Parameters
 
    * - Material
      - G (Pa)
-     - η (Pa·s)
-     - τ (s)
+     - :math:`\eta` (Pa·s)
+     - :math:`\tau` (s)
      - Ref
    * - Polystyrene melt (170°C)
-     - 1×10⁵
-     - 1×10⁶
+     - :math:`1 \times 10^5`
+     - :math:`1 \times 10^6`
      - 10
      - [1]
    * - Polyethylene melt (190°C)
-     - 3×10⁴
-     - 3×10⁵
+     - :math:`3 \times 10^4`
+     - :math:`3 \times 10^5`
      - 10
      - [1]
    * - Bitumen (25°C)
-     - 1×10⁶
-     - 1×10⁸
+     - :math:`1 \times 10^6`
+     - :math:`1 \times 10^8`
      - 100
      - [2]
    * - Dilute polymer solution
-     - 1×10²
-     - 1×10¹
+     - :math:`1 \times 10^2`
+     - :math:`1 \times 10^1`
      - 0.1
      - [3]
    * - PDMS (crosslinked)
-     - 5×10⁵
-     - 5×10⁴
+     - :math:`5 \times 10^5`
+     - :math:`5 \times 10^4`
      - 0.1
      - [4]
 
@@ -271,7 +271,7 @@ Parameter Interpretation
       - Gels: :math:`10^2 - 10^5` Pa
    - **Scaling**: :math:`G \sim \rho RT / M` (low MW), :math:`G \sim \rho RT / M_e` (entangled)
 
-**η (Dashpot Viscosity)**:
+:math:`\eta` **(Dashpot Viscosity)**:
    - **Physical meaning**: Resistance to flow, energy dissipation rate
    - **Molecular origin**: Chain friction during reptation or Rouse relaxation
    - **Typical ranges**:
@@ -280,7 +280,7 @@ Parameter Interpretation
       - Dilute solutions: :math:`10^{-2} - 10^2` Pa·s
    - **Scaling**: :math:`\eta \sim M^{3.4}` (entangled polymers), :math:`\eta \sim M` (Rouse)
 
-**τ (Relaxation Time)**:
+:math:`\tau` **(Relaxation Time)**:
    - **Physical meaning**: Timescale separating elastic (solid-like) from viscous (liquid-like) behavior
    - **Diagnostic**: :math:`\tau^{-1}` corresponds to frequency where :math:`G''(\omega)` peaks
    - **Material design**: Long :math:`\tau` → more elastic character; short :math:`\tau` → more viscous
@@ -341,7 +341,7 @@ Regimes and Behavior
 Limiting Cases
 ~~~~~~~~~~~~~~
 
-**Low frequency (ω → 0, terminal region)**:
+**Low frequency (** :math:`\omega` **→ 0, terminal region)**:
 
 .. math::
 
@@ -351,7 +351,7 @@ Limiting Cases
 
 **Interpretation**: Viscous liquid-like behavior dominates. Energy dissipation (:math:`G''`) exceeds storage (:math:`G'`).
 
-**High frequency (ω → ∞, glassy region)**:
+**High frequency (** :math:`\omega` **→ ∞, glassy region)**:
 
 .. math::
 
@@ -383,7 +383,7 @@ Asymptotic Behavior Summary
    * - Low :math:`\omega \ll 1/\tau`
      - :math:`\sim \omega^2`
      - :math:`\sim \omega`
-     - Viscous liquid (tan δ ≫ 1)
+     - Viscous liquid (tan :math:`\delta` ≫ 1)
    * - :math:`\omega \approx 1/\tau`
      - :math:`\approx G/2`
      - :math:`\approx G/2`
@@ -391,7 +391,7 @@ Asymptotic Behavior Summary
    * - High :math:`\omega \gg 1/\tau`
      - :math:`\to G`
      - :math:`\to 0`
-     - Elastic solid (tan δ → 0)
+     - Elastic solid (tan :math:`\delta` → 0)
 
 Diagnostic Signatures
 ~~~~~~~~~~~~~~~~~~~~~
@@ -414,9 +414,9 @@ Parameter Interpretation
 **G (Spring Modulus)**:
    Fitted :math:`G` reveals the instantaneous elastic response:
 
-   - **Low values (<10⁴ Pa)**: Dilute solution, low entanglement density, or near-terminal regime
-   - **Moderate values (10⁴-10⁶ Pa)**: Typical processing-grade polymer melts, well-entangled
-   - **High values (>10⁶ Pa)**: Very high MW, high entanglement density, or glassy contribution
+   - **Low values (<** :math:`10^4` **Pa)**: Dilute solution, low entanglement density, or near-terminal regime
+   - **Moderate values (** :math:`10^4-10^6` **Pa)**: Typical processing-grade polymer melts, well-entangled
+   - **High values (>** :math:`10^6` **Pa)**: Very high MW, high entanglement density, or glassy contribution
 
    *For graduate students*: Compare with plateau modulus :math:`G_N^0` from Generalized Maxwell
    or from :math:`G_N^0 = \rho RT / M_e` to estimate entanglement MW. The single Maxwell :math:`G`
@@ -428,9 +428,9 @@ Parameter Interpretation
 **eta (Dashpot Viscosity)**:
    Fitted :math:`\eta` reveals the flow resistance:
 
-   - **Low values (<10³ Pa·s)**: Low MW, high temperature, or weak entanglement
-   - **Moderate values (10³-10⁶ Pa·s)**: Typical polymer melt processing range
-   - **High values (>10⁶ Pa·s)**: Very high MW, low temperature, or near :math:`T_g`
+   - **Low values (<** :math:`10^3` **Pa·s)**: Low MW, high temperature, or weak entanglement
+   - **Moderate values (** :math:`10^3-10^6` **Pa·s)**: Typical polymer melt processing range
+   - **High values (>** :math:`10^6` **Pa·s)**: Very high MW, low temperature, or near :math:`T_g`
 
    *For graduate students*: Use :math:`\eta \sim M^{3.4}` scaling (for :math:`M > 2M_c`) to estimate
    molecular weight. Compare with capillary viscometry or GPC data.
@@ -501,7 +501,7 @@ From :math:`\tau`, estimate the shear rate range for different flow behaviors:
 - **Transition regime** (0.1 < De < 10): :math:`0.1/\tau < \dot{\gamma} < 10/\tau`
 - **Elastic-dominated** (De > 10): :math:`\dot{\gamma} > 10/\tau`
 
-For typical processing rates (:math:`\dot{\gamma} \approx 10^2 - 10^4` s⁻¹), target
+For typical processing rates (:math:`\dot{\gamma} \approx 10^2 - 10^4` s\ :math:`^{-1}`), target
 :math:`\tau < 0.01` s for minimal elastic effects.
 
 Diagnostic Indicators
@@ -510,7 +510,7 @@ Diagnostic Indicators
 **Warning signs in fitted parameters**:
 
 - **If** :math:`\tau` **outside data frequency range**: :math:`G''` peak not captured; extend frequency sweep
-- **If R² < 0.95**: Multiple relaxation times present; use Generalized Maxwell
+- **If** :math:`R^2` **< 0.95**: Multiple relaxation times present; use Generalized Maxwell
 - **If fit residuals show curvature**: Single exponential inadequate; try fractional models
 - **If** :math:`G` **hits bounds**: Data may be in terminal regime only; verify :math:`G' \sim \omega^2` slope
 
@@ -563,7 +563,7 @@ Recommended Test Modes
 
 **Protocol**:
    - Apply step strain :math:`\gamma_0` within LVR (1-5%)
-   - Rise time < 0.1:math:`\tau` (instrument limitation)
+   - Rise time < :math:`0.1\tau` (instrument limitation)
    - Measurement duration: :math:`5-10\tau` to capture full decay
    - Log-time sampling: More points at early times
 
@@ -587,7 +587,7 @@ Sample Preparation Considerations
 
 **Polymer solutions**:
    - Dissolve at :math:`T > T_g` with gentle stirring (avoid degradation)
-   - Filter through 0.45 μm PTFE filter to remove aggregates
+   - Filter through 0.45 :math:`\mum` PTFE filter to remove aggregates
    - Equilibrate at test temperature for 30 min
    - Use solvent trap to prevent evaporation
 
@@ -837,10 +837,10 @@ Diagnostic Tests to Discriminate Models
    - **Partial recovery** → Zener, Burgers (viscoelastic solid)
    - **Power-law creep** → Fractional models
 
-**Test 4: Tan δ behavior**
+**Test 4: Tan** :math:`\delta` **behavior**
    - **Monotonic decrease** with :math:`\omega` → Maxwell
-   - **Minimum** in tan δ → Zener
-   - **Constant** tan δ → Critical gel (FMG with :math:`\alpha \approx 0.5`)
+   - **Minimum** in tan :math:`\delta` → Zener
+   - **Constant** tan :math:`\delta` → Critical gel (FMG with :math:`\alpha \approx 0.5`)
 
 Connection to Advanced Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -858,7 +858,7 @@ Connection to Advanced Models
    Maxwell model: :math:`|\eta^*| = \eta / \sqrt{1 + (\omega\tau)^2}`
 
 **Winter-Chambon criterion**:
-   Maxwell model does **not** satisfy gel point criterion (tan δ ≠ constant). Use FMG for critical gels.
+   Maxwell model does **not** satisfy gel point criterion (tan :math:`\delta` ≠ constant). Use FMG for critical gels.
 
 API References
 --------------

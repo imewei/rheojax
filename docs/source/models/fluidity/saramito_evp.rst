@@ -9,7 +9,7 @@ Quick Reference
 
 - **Use when:** Elastoviscoplastic materials with thixotropy
 
-- **Parameters:** G, τ_y, f, η_p, t_a, b
+- **Parameters:** G, :math:`\tau_y`, f, :math:`\eta_p`, t_a, b
 
 - **Key equation:** :math:`\boldsymbol{\tau} + \lambda \stackrel{\nabla}{\boldsymbol{\tau}} = 2\eta_p \mathbf{D}`
 
@@ -94,7 +94,7 @@ Overview
 The Fluidity-Saramito Elastoviscoplastic (EVP) model combines three key physical mechanisms:
 
 1. **Viscoelasticity**: Upper-convected Maxwell framework with elastic recoil,
-   storage modulus G', and first normal stress difference N₁.
+   storage modulus G', and first normal stress difference N_1.
 
 2. **Viscoplasticity**: True Von Mises yield surface with Herschel-Bulkley
    plastic flow above yield.
@@ -232,11 +232,11 @@ When selecting coupling options, consider these "knobs" in order of priority:
      - Parameter
      - Effect
      - Recommendation
-   * - **1. λ(f)**
+   * - **1.** :math:`\lambda(f)`
      - :math:`\lambda = 1/f`
      - Thixotropic viscosity, stress relaxation rate
      - **Always recommended** — core physics
-   * - **2. τ_y(f)**
+   * - **2.** :math:`\tau_y(f)`
      - Aging yield coupling
      - Wait-time dependent yield stress
      - Use if yield stress varies with rest time
@@ -554,23 +554,23 @@ Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 **f (Fluidity)**:
-   Time-dependent inverse relaxation time controlling both viscosity η_p = G/f and relaxation time λ = 1/f in tensorial UCM framework.
-   *For graduate students*: Unlike scalar fluidity models, here f couples to tensorial stress evolution: λ·∇τ + α(τ)τ = 2η_p·D where λ = 1/f. Evolution: df/dt = (f_age - f)/t_a + b\|γ̇\|^n_rej(f_flow - f). Plasticity α = max(0, 1 - τ_y/\|τ\|) activates only when Von Mises stress \|τ\| = √(½τ:τ) > τ_y. Normal stresses N₁ ~ λγ̇τ_xy ~ γ̇/f² (aged materials with low f exhibit larger N₁).
+   Time-dependent inverse relaxation time controlling both viscosity :math:`\eta_p` = G/f and relaxation time :math:`\lambda` = 1/f in tensorial UCM framework.
+   *For graduate students*: Unlike scalar fluidity models, here f couples to tensorial stress evolution: :math:`\lambda \cdot \overset{\nabla}{\boldsymbol{\tau}} + \alpha(\boldsymbol{\tau}) \boldsymbol{\tau} = 2\eta_p \mathbf{D}` where :math:`\lambda = 1/f`. Evolution: :math:`df/dt = (f_{\text{age}} - f)/t_a + b|\dot{\gamma}|^{n_{\text{rej}}}(f_{\text{flow}} - f)`. Plasticity :math:`\alpha = \max(0, 1 - \tau_y/|\boldsymbol{\tau}|)` activates only when Von Mises stress :math:`|\boldsymbol{\tau}| = \sqrt{\frac{1}{2}\boldsymbol{\tau}:\boldsymbol{\tau}} > \tau_y`. Normal stresses :math:`N_1 \sim \lambda \dot{\gamma} \tau_{xy} \sim \dot{\gamma}/f^2` (aged materials with low f exhibit larger :math:`N_1`).
    *For practitioners*: f_age ≈ 10^-6 to 10^-3 s^-1 (solid-like), f_flow ≈ 10^-2 to 1 s^-1 (liquid-like). Measure via startup overshoot magnitude (larger overshoot = lower initial f after aging).
 
 **G (Elastic Modulus)**:
    Elastic stiffness in UCM backbone, controlling both stress buildup and normal stress generation.
-   *For graduate students*: Sets stress scale and Weissenberg number Wi = λγ̇ = γ̇/f. Normal stress scaling: N₁/τ_xy ~ Wi ~ γ̇/f. For UCM, N₂ = 0. Startup overshoot: σ_peak ~ τ_y + Gγ_y where γ_y is yield strain.
-   *For practitioners*: Extract from initial slope in startup or from G' plateau in SAOS. Typical: G = 10²-10⁴ Pa (soft colloids), 10⁴-10⁶ Pa (polymer gels).
+   *For graduate students*: Sets stress scale and Weissenberg number Wi = :math:`\lambda \dot{\gamma}` = :math:`\dot{\gamma}`/f. Normal stress scaling: N_1/:math:`\tau_{xy}` ~ Wi ~ :math:`\dot{\gamma}`/f. For UCM, N_2 = 0. Startup overshoot: :math:`\sigma_{peak}` ~ :math:`\tau_y` + :math:`G\gamma_y` where :math:`\gamma_y` is yield strain.
+   *For practitioners*: Extract from initial slope in startup or from G' plateau in SAOS. Typical: G = 10^2-10^4 Pa (soft colloids), 10^4-10^6 Pa (polymer gels).
 
-**τ_y (Yield Stress)**:
-   Von Mises yield criterion threshold. In minimal coupling, constant. In full coupling: τ_y(f) = τ_y0 + a_y/f^m (aged materials are stronger).
-   *For graduate students*: Plasticity parameter α = max(0, 1 - τ_y/\|τ\|) controls plastic dissipation term. α = 0 below yield (elastic), α > 0 above yield (viscoplastic flow). Full coupling exponent m typically 0.3-1.0 captures aging-induced hardening.
+:math:`\tau_y` **(Yield Stress)**:
+   Von Mises yield criterion threshold. In minimal coupling, constant. In full coupling: :math:`\tau_y(f)` = :math:`\tau_{y0}` + a_y/f^m (aged materials are stronger).
+   *For graduate students*: Plasticity parameter :math:`\alpha` = max(0, 1 - :math:`\tau_y`/:math:`|\tau|`) controls plastic dissipation term. :math:`\alpha` = 0 below yield (elastic), :math:`\alpha` > 0 above yield (viscoplastic flow). Full coupling exponent m typically 0.3-1.0 captures aging-induced hardening.
    *For practitioners*: Measure from flow curve low-shear plateau or creep bifurcation stress. Full coupling appropriate if yield stress increases significantly after aging (wait-time dependent startup tests).
 
 **t_a, b, n_rej (Fluidity Evolution Parameters)**:
    Control aging (t_a) and rejuvenation (b, n_rej) kinetics analogous to local fluidity model.
-   *For graduate students*: df/dt = (f_age - f)/t_a + b\|γ̇\|^n_rej(f_flow - f). Characteristic shear rate: γ̇_c ~ (1/(bt_a))^(1/n_rej). Stress overshoot magnitude and position depend on t_a (waiting time scaling), b and n_rej (breakdown kinetics).
+   *For graduate students*: :math:`df/dt = (f_{age} - f)/t_a + b|\dot{\gamma}|^{n_{rej}}(f_{flow} - f)`. Characteristic shear rate: :math:`\dot{\gamma}_c \sim (1/(bt_a))^{1/n_{rej}}`. Stress overshoot magnitude and position depend on t_a (waiting time scaling), b and n_rej (breakdown kinetics).
    *For practitioners*: Extract from startup test family at different wait times. Typical: t_a = 10-1000 s, b = 0.1-10, n_rej = 0.5-1.5. Longer t_a = more pronounced thixotropy.
 
 Material Classification
@@ -584,15 +584,15 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - N₁/τ_xy < 0.1, minimal coupling
+   * - N_1/:math:`\tau_{xy}` < 0.1, minimal coupling
      - Weakly elastic EVP
      - Carbopol gels, pastes
      - Dominant viscoplasticity, minimal normal stresses
-   * - N₁/τ_xy = 0.1-1, minimal coupling
+   * - N_1/:math:`\tau_{xy}` = 0.1-1, minimal coupling
      - Moderate elasticity
      - Emulsions, soft colloids, cosmetics
      - Significant rod climbing, moderate die swell
-   * - N₁/τ_xy > 1, minimal coupling
+   * - N_1/:math:`\tau_{xy}` > 1, minimal coupling
      - Strongly elastic EVP
      - Polymer gels, fiber suspensions
      - Strong Weissenberg effect, edge fracture risk
@@ -778,9 +778,9 @@ Fitting Guidance
 Recommended Workflow
 --------------------
 
-1. **Start with flow curve** to get τ_y, K_HB, n_HB
+1. **Start with flow curve** to get :math:`\tau_y`, K_HB, n_HB
 2. **Add startup** to get G and fluidity dynamics (t_a, b, n_rej)
-3. **Use creep** to validate τ_y (bifurcation point)
+3. **Use creep** to validate :math:`\tau_y` (bifurcation point)
 4. **Optionally use LAOS** for nonlinear validation
 
 Step-by-Step Example
@@ -862,9 +862,9 @@ enabling progressive refinement.
      - :math:`t_a` (from peak timing), :math:`b`, :math:`n_{\rm rej}` (from peak magnitude)
      - Use waiting time series. Overshoot position → kinetics
    * - 4
-     - Creep tests (σ near τ_y)
+     - Creep tests (:math:`\sigma` near :math:`\tau_y`)
      - Validate :math:`\tau_{y0}` from bifurcation point
-     - σ < τ_y: bounded; σ > τ_y: unbounded. Confirms yield
+     - :math:`\sigma` < :math:`\tau_y`: bounded; :math:`\sigma` > :math:`\tau_y`: unbounded. Confirms yield
 
 **Step 1: SAOS Analysis**
 
@@ -944,7 +944,7 @@ Extract kinetic parameters from stress overshoot:
      - Well-identified from SAOS or early startup
    * - :math:`\tau_{y0}`
      - Flow curve low-shear limit; creep bifurcation
-     - Requires low :math:`\dot{\gamma}` data (< 0.01 s⁻¹)
+     - Requires low :math:`\dot{\gamma}` data (< 0.01 s⁻^1)
    * - :math:`K_{\rm HB}`, :math:`n_{\rm HB}`
      - Flow curve shape
      - Often correlated; fix one if uncertain
@@ -968,7 +968,7 @@ For the nonlocal model, velocity profiles provide direct access to :math:`\xi`:
 1. **Velocity profile measurement**: Ultrasound velocimetry (USV), MRI, or PIV
 2. **Shear rate extraction**: :math:`\dot{\gamma}(y) = dv/dy`
 3. **Fluidity profile**: :math:`f(y) = \dot{\gamma}(y)/\sigma` (uniform stress)
-4. **ξ extraction**: Fit boundary layer decay of :math:`f(y)` from walls
+4. :math:`\xi` **extraction**: Fit boundary layer decay of :math:`f(y)` from walls
 
 .. code-block:: python
 
@@ -1076,29 +1076,29 @@ the interplay between elasticity, plasticity, and thixotropy:
    * - Projection
      - Shape Feature
      - Physical Interpretation
-   * - **Elastic** (σ vs γ)
+   * - **Elastic** (:math:`\sigma` vs :math:`\gamma`)
      - Parallelogram deviation
-     - Yielding, plastic flow above τ_y
-   * - **Elastic** (σ vs γ)
+     - Yielding, plastic flow above :math:`\tau_y`
+   * - **Elastic** (:math:`\sigma` vs :math:`\gamma`)
      - Enclosed area
      - Energy dissipation per cycle
-   * - **Viscous** (σ vs γ̇)
+   * - **Viscous** (:math:`\sigma` vs :math:`\dot{\gamma}`)
      - Bow-tie/self-intersection
      - Thixotropy, structure kinetics
-   * - **Viscous** (σ vs γ̇)
+   * - **Viscous** (:math:`\sigma` vs :math:`\dot{\gamma}`)
      - Asymmetric loops
      - Non-equilibrium fluidity dynamics
 
-**Elastic Projection (σ vs γ):**
+**Elastic Projection (** :math:`\sigma` **vs** :math:`\gamma` **):**
 
 - **Linear viscoelastic**: Ellipse with slope G' and area ∝ G''
-- **With yielding**: Parallelogram-like corners where |τ| crosses τ_y
+- **With yielding**: Parallelogram-like corners where :math:`|\tau|` crosses :math:`\tau_y`
 - **With thixotropy**: Cycle-to-cycle evolution as fluidity equilibrates
 - **Strain softening**: Counterclockwise deviation (intracycle) indicates structure breakdown
 
-**Viscous Projection (σ vs γ̇):**
+**Viscous Projection (** :math:`\sigma` **vs** :math:`\dot{\gamma}` **):**
 
-- **Linear viscoelastic**: Ellipse with slope η' and area ∝ η''
+- **Linear viscoelastic**: Ellipse with slope :math:`\eta`' and area ∝ :math:`\eta`''
 - **With thixotropy**: Self-intersecting "bow-tie" or "figure-8" patterns
 - **Interpretation**: Self-intersection occurs when fluidity lags the deformation,
   causing stress to increase/decrease non-monotonically during each quarter cycle
@@ -1114,8 +1114,8 @@ the interplay between elasticity, plasticity, and thixotropy:
      - Cause
      - Parameter Sensitivity
    * - Self-intersecting viscous loops
-     - f lags γ̇ by π/2
-     - τ_age vs 1/ω ratio
+     - f lags :math:`\dot{\gamma}` by :math:`\pi/2`
+     - :math:`\tau_{age}` vs 1/:math:`\omega` ratio
    * - Cycle evolution (softening)
      - f not at steady state
      - Number of pre-cycles needed
@@ -1124,7 +1124,7 @@ the interplay between elasticity, plasticity, and thixotropy:
      - n_rej ≠ 1
    * - Harmonic distortion
      - Nonlinear plasticity
-     - γ_0/γ_y ratio
+     - :math:`\gamma_0/\gamma_y` ratio
 
 **Harmonic Extraction:**
 
@@ -1270,11 +1270,11 @@ vs FluidityLocal
      - FluidityLocal
      - FluiditySaramitoLocal
    * - Stress tensor
-     - Scalar σ
-     - Tensorial [τ_xx, τ_yy, τ_xy]
+     - Scalar :math:`\sigma`
+     - Tensorial [:math:`\tau_{xx}`, :math:`\tau_{yy}`, :math:`\tau_{xy}`]
    * - Normal stresses
      - No
-     - Yes (N₁ from UCM)
+     - Yes (N_1 from UCM)
    * - Yield criterion
      - None (implicit)
      - Von Mises (explicit)
@@ -1287,7 +1287,7 @@ vs FluidityLocal
 
 The Saramito model is preferred when:
 
-- Normal stresses (N₁) are important
+- Normal stresses (N_1) are important
 - Tensorial stress state is needed
 - True yield criterion is required
 

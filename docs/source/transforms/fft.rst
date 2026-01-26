@@ -751,7 +751,7 @@ Troubleshooting
 - **Aliasing** -- verify the sampling rate satisfies Nyquist (``fs >= 2 * f_max``) or resample.
 - **Phase jumps between stress/strain** -- enable cross-correlation alignment or median
   detrending to remove offsets before FFT.
-- **Noisy :math:`G'` at low frequency** -- widen ``n_fft`` (heavier padding) and average
+- **Noisy** :math:`G'` **at low frequency** -- widen ``n_fft`` (heavier padding) and average
   multiple acquisitions via ``stack_mode="average"``.
 - **Kramers-Kronig violations** -- check for instrument artifacts (inertia, compliance, slip).
 - **Spurious peaks** -- verify window function applied correctly, check for electrical noise.

@@ -76,7 +76,7 @@ Key Features
 
 **Physical Foundation:**
 
-- Structure parameter λ ∈ [0, 1] tracks microstructural organization
+- Structure parameter :math:`\lambda` ∈ [0, 1] tracks microstructural organization
 - Competing buildup (aging) and breakdown (shear-induced) kinetics
 - Multiple viscosity closures: exponential or Herschel-Bulkley
 - Optional Maxwell backbone for viscoelastic effects
@@ -87,7 +87,7 @@ Key Features
 - **Fluidity-Maxwell formulation**: Jeffreys/Oldroyd-B backbone with structure-dependent
   relaxation and retardation times for true stress relaxation and SAOS moduli
 - **Nonlocal fluidity**: Spatial diffusion for shear band regularization with
-  cooperativity length ξ ~ √(D_λ · t_eq)
+  cooperativity length :math:`\xi` ~ √(:math:`D_{\lambda}` · t_eq)
 - **Complete protocol equations**: Full mathematical derivations for all rheological
   tests with closed-form solutions where available
 

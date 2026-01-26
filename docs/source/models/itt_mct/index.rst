@@ -13,8 +13,8 @@ Overview
 Mode-Coupling Theory (MCT) provides a first-principles approach to understanding
 the dynamics of dense particulate systems. The theory predicts:
 
-- **Glass transition** at a critical volume fraction (φ ≈ 0.516 for hard spheres)
-- **Two-step relaxation** with β (in-cage) and α (cage-breaking) processes
+- **Glass transition** at a critical volume fraction (:math:`\phi` ≈ 0.516 for hard spheres)
+- **Two-step relaxation** with :math:`\beta` (in-cage) and :math:`\alpha` (cage-breaking) processes
 - **Yield stress** in the glass state from arrested structure
 - **Shear thinning** from flow-induced cage breaking
 
@@ -31,11 +31,11 @@ Available Models
    * - Model
      - Description
    * - :ref:`ITTMCTSchematic <model-itt-mct-schematic>`
-     - F₁₂ schematic model with scalar correlator. Fast computation, captures
+     - F_1_2 schematic model with scalar correlator. Fast computation, captures
        essential physics with ~6 parameters. Best for qualitative understanding
        and fitting experimental data.
    * - :ref:`ITTMCTIsotropic <model-itt-mct-isotropic>`
-     - Full isotropically sheared model with k-resolved correlators Φ(k,t).
+     - Full isotropically sheared model with k-resolved correlators :math:`\Phi(k,t)`.
        Uses structure factor S(k) input. More quantitative but computationally
        expensive.
 
@@ -61,12 +61,12 @@ Supported Protocols
 
 Both models support all six standard rheological protocols:
 
-1. **Flow curve** (steady shear): σ(γ̇) - shows yield stress and shear thinning
-2. **SAOS** (oscillation): G'(ω), G''(ω) - shows glass plateau and loss peak
-3. **Startup**: σ(t) at constant γ̇ - shows stress overshoot
-4. **Creep**: J(t) at constant σ - shows viscosity bifurcation
-5. **Relaxation**: σ(t) after cessation - shows residual stress in glass
-6. **LAOS**: σ(t) for γ = γ₀sin(ωt) - shows nonlinear harmonics
+1. **Flow curve** (steady shear): :math:`\sigma(\dot{\gamma})` - shows yield stress and shear thinning
+2. **SAOS** (oscillation): :math:`G'(\omega)`, :math:`G''(\omega)` - shows glass plateau and loss peak
+3. **Startup**: :math:`\sigma(t)` at constant :math:`\dot{\gamma}` - shows stress overshoot
+4. **Creep**: :math:`J(t)` at constant :math:`\sigma` - shows viscosity bifurcation
+5. **Relaxation**: :math:`\sigma(t)` after cessation - shows residual stress in glass
+6. **LAOS**: :math:`\sigma(t)` for :math:`\gamma = \gamma_0 \sin(\omega t)` - shows nonlinear harmonics
 
 For detailed mathematical formulation of each protocol including governing
 equations and physical interpretation, see :doc:`itt_mct_protocols`.
@@ -105,23 +105,23 @@ from the cage effect, independent of specific interparticle interactions.
 Key Parameters
 --------------
 
-**F₁₂ Schematic Model:**
+**F_1_2 Schematic Model:**
 
-- **ε (epsilon)**: Separation parameter controlling distance from glass transition
+- :math:`\varepsilon` **(epsilon)**: Separation parameter controlling distance from glass transition
   
-  - ε < 0: Ergodic fluid
-  - ε = 0: Critical point
-  - ε > 0: Glass state
+  - :math:`\varepsilon` < 0: Ergodic fluid
+  - :math:`\varepsilon` = 0: Critical point
+  - :math:`\varepsilon` > 0: Glass state
 
-- **γ_c**: Critical strain for cage breaking (~0.05-0.2)
-- **Γ**: Bare relaxation rate (microscopic timescale)
+- :math:`\gamma_c`: Critical strain for cage breaking (~0.05-0.2)
+- :math:`\Gamma`: Bare relaxation rate (microscopic timescale)
 - **G_∞**: High-frequency modulus
 
 **ISM Model:**
 
-- **φ (phi)**: Volume fraction (glass at φ ≈ 0.516)
+- :math:`\phi` **(phi)**: Volume fraction (glass at :math:`\phi` ≈ 0.516)
 - **S(k)**: Structure factor (from Percus-Yevick or experiment)
-- **D₀**: Bare diffusion coefficient
+- **D_0**: Bare diffusion coefficient
 
 References
 ----------

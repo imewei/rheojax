@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Viscoelastic solid with finite equilibrium modulus, creep-recovery tests
-- **Parameters:** 3 (Gs, Gp, ηp)
+- **Parameters:** 3 (Gs, Gp, :math:`\etap`)
 - **Key equation:** :math:`G(t) = G_s + G_p \exp(-t/\tau)` where :math:`\tau = \eta_p/G_p`
 - **Test modes:** Oscillation, relaxation, creep
 - **Material examples:** Cross-linked PDMS, vulcanized rubber, hydrogels, biological tissues
@@ -107,39 +107,39 @@ Material Examples with Typical Parameters
      - :math:`\tau` (s)
      - Ref
    * - Crosslinked PDMS
-     - 5×10⁴
-     - 2×10⁵
-     - 2×10⁴
+     - :math:`5 \times 10^4`
+     - :math:`2 \times 10^5`
+     - :math:`2 \times 10^4`
      - 0.1
      - [1]
    * - Vulcanized rubber (NR)
-     - 1×10⁶
-     - 3×10⁶
-     - 3×10⁷
+     - :math:`1 \times 10^6`
+     - :math:`3 \times 10^6`
+     - :math:`3 \times 10^7`
      - 10
      - [2]
    * - PVA hydrogel (5 wt%)
-     - 2×10³
-     - 5×10³
-     - 5×10²
+     - :math:`2 \times 10^3`
+     - :math:`5 \times 10^3`
+     - :math:`5 \times 10^2`
      - 0.1
      - [3]
    * - Biological tissue (skin)
-     - 1×10⁴
-     - 5×10⁴
-     - 1×10⁴
+     - :math:`1 \times 10^4`
+     - :math:`5 \times 10^4`
+     - :math:`1 \times 10^4`
      - 0.2
      - [4]
    * - Filled elastomer (CB 40 phr)
-     - 3×10⁵
-     - 7×10⁵
-     - 7×10⁶
+     - :math:`3 \times 10^5`
+     - :math:`7 \times 10^5`
+     - :math:`7 \times 10^6`
      - 10
      - [2]
    * - Epoxy (cured)
-     - 2×10⁹
-     - 5×10⁸
-     - 5×10¹⁰
+     - :math:`2 \times 10^9`
+     - :math:`5 \times 10^8`
+     - :math:`5 \times 10^1^0`
      - 100
      - [5]
 
@@ -155,7 +155,7 @@ For **chemically crosslinked elastomers**, the equilibrium modulus follows **aff
    G_s = G_e = \nu k_B T
 
 where:
-   - :math:`\nu` = number density of elastically effective network strands (mol/m³)
+   - :math:`\nu` = number density of elastically effective network strands (mol/:math:`m^3`)
    - :math:`k_B` = Boltzmann constant
    - :math:`T` = absolute temperature
    - Equivalent: :math:`G_e = \rho RT / M_c` where :math:`M_c` = molecular weight between cross-links
@@ -293,17 +293,17 @@ Mathematical Significance
 
 **Rational function form**: The complex modulus is a **first-order rational function** (ratio of polynomials), characteristic of single-relaxation-time models.
 
-**Loss tangent minimum**: Unlike Maxwell model (monotonic tan δ), Zener exhibits a **minimum** in loss tangent:
+**Loss tangent minimum**: Unlike Maxwell model (monotonic tan :math:`\delta`), Zener exhibits a **minimum** in loss tangent:
 
 .. math::
 
    \tan\delta(\omega) = \frac{G''}{G'} = \frac{G_p \omega \tau_\epsilon}{G_s (1 + (\omega\tau_\epsilon)^2) + G_p (\omega\tau_\epsilon)^2}
 
-At low :math:`\omega`: :math:`\tan\delta \sim \omega` (solid-like, tan δ → 0)
+At low :math:`\omega`: :math:`\tan\delta \sim \omega` (solid-like, tan :math:`\delta` → 0)
 
-At high :math:`\omega`: :math:`\tan\delta \sim 1/\omega` (glassy, tan δ → 0)
+At high :math:`\omega`: :math:`\tan\delta \sim 1/\omega` (glassy, tan :math:`\delta` → 0)
 
-At intermediate :math:`\omega`: **maximum dissipation** (tan δ peaks near :math:`\omega \approx 1/\tau_\epsilon`)
+At intermediate :math:`\omega`: **maximum dissipation** (tan :math:`\delta` peaks near :math:`\omega \approx 1/\tau_\epsilon`)
 
 **Creep compliance**: Unlike Maxwell, Zener predicts **bounded creep**:
 
@@ -353,7 +353,7 @@ Parameter Interpretation
    - **Relation to initial modulus**: :math:`G_0 = G_s + G_p`
    - **Diagnostic**: :math:`G_p = G(0) - G(\infty)` from relaxation data
 
-**ηp (Maxwell Dashpot Viscosity)**:
+:math:`\etap` **(Maxwell Dashpot Viscosity)**:
    - **Physical meaning**: Controls timescale of stress relaxation
    - **Molecular origin**: Chain friction, reptation, or bond breakage/reformation
    - **Typical ranges**: :math:`10^2 - 10^{10}` Pa·s (highly material-dependent)
@@ -448,7 +448,7 @@ Regimes and Behavior
 Limiting Cases
 ~~~~~~~~~~~~~~
 
-**Low frequency (ω → 0, terminal region)**:
+**Low frequency (** :math:`\omega` **→ 0, terminal region)**:
 
 .. math::
 
@@ -458,7 +458,7 @@ Limiting Cases
 
 **Interpretation**: Elastic solid-like (G' > G''), but with residual dissipation from Maxwell arm.
 
-**High frequency (ω → ∞, glassy region)**:
+**High frequency (** :math:`\omega` **→ ∞, glassy region)**:
 
 .. math::
 
@@ -525,7 +525,7 @@ Diagnostic Signatures
 ~~~~~~~~~~~~~~~~~~~~~
 
 **1. Loss tangent minimum**:
-   Unlike Maxwell (monotonic decrease), Zener exhibits tan δ **peak** then **decrease** at high ω.
+   Unlike Maxwell (monotonic decrease), Zener exhibits tan :math:`\delta` **peak** then **decrease** at high :math:`\omega`.
 
 **2. Two plateaus in** :math:`G'(\omega)`:
    - Low-frequency: :math:`G' \approx G_s`
@@ -551,9 +551,9 @@ Parameter Interpretation
 **Gs (Equilibrium Modulus)**:
    Fitted :math:`G_s` reveals the permanent network structure:
 
-   - **Low values (<10³ Pa)**: Weak hydrogels, low cross-link density, soft tissues
-   - **Moderate values (10⁴-10⁶ Pa)**: Elastomers, biological tissues, filled rubbers
-   - **High values (>10⁷ Pa)**: Thermosets, highly crosslinked networks, rigid materials
+   - **Low values (<** :math:`10^3` **Pa)**: Weak hydrogels, low cross-link density, soft tissues
+   - **Moderate values (** :math:`10^4-10^6` **Pa)**: Elastomers, biological tissues, filled rubbers
+   - **High values (>** :math:`10^7` **Pa)**: Thermosets, highly crosslinked networks, rigid materials
 
    *For researchers*: Calculate cross-link density from :math:`G_s`:
 
@@ -574,7 +574,7 @@ Parameter Interpretation
 
    *For practitioners*: High :math:`G_p` means strong viscous dissipation (damping), useful for vibration isolation
 
-**ηp (Maxwell Dashpot Viscosity)**:
+:math:`\etap` **(Maxwell Dashpot Viscosity)**:
    Fitted :math:`\eta_p` controls stress relaxation timescale:
 
    - **Short** :math:`\tau_\epsilon = \eta_p/G_p` **(<0.1 s)**: Fast relaxation, minimal processing history
@@ -624,7 +624,7 @@ For elastomers at temperature :math:`T`:
 
    M_c = \frac{\rho RT}{2 G_s}
 
-Example: PDMS with :math:`G_s = 5 \times 10^4` Pa at 298 K, :math:`\rho = 965` kg/m³:
+Example: PDMS with :math:`G_s = 5 \times 10^4` Pa at 298 K, :math:`\rho = 965` kg/:math:`m^3`:
 
 .. math::
 
@@ -705,7 +705,7 @@ Recommended Test Modes
 **Expected features**:
    - :math:`G'` levels off at low :math:`\omega` (plateau = :math:`G_s`)
    - :math:`G''` shows **clear peak** at :math:`\omega \approx 1/\tau_\epsilon`
-   - :math:`G' > G''` across all frequencies (solid-like, tan δ < 1)
+   - :math:`G' > G''` across all frequencies (solid-like, tan :math:`\delta` < 1)
 
 **2. Stress Relaxation Test**
 
@@ -716,7 +716,7 @@ Recommended Test Modes
 
 **Protocol**:
    - Step strain: :math:`\gamma_0 = 1-5\%` (within LVR)
-   - Rise time: < 0.05:math:`\tau_\epsilon` (instrument limitation)
+   - Rise time: < :math:`0.05\tau_\epsilon` (instrument limitation)
    - Duration: :math:`5-10\tau_\epsilon` to observe plateau
    - **Critical**: Measure long enough to reach :math:`G(\infty) = G_s` (many users stop too early!)
 
@@ -960,7 +960,7 @@ Worked Example with Numbers
    - :math:`G''` peak at :math:`\omega = 10` rad/s, :math:`G''_{\max} \approx 1.0 \times 10^5` Pa
 
 **Initialization**:
-   - :math:`G_s = 5.0 \times 10^4` Pa (low-ω plateau)
+   - :math:`G_s = 5.0 \times 10^4` Pa (low-:math:`\omega` plateau)
    - :math:`G_s + G_p = 2.5 \times 10^5` Pa → :math:`G_p = 2.0 \times 10^5` Pa
    - :math:`\tau_\epsilon = 1 / 10 = 0.1` s
    - :math:`\eta_p = G_p \tau_\epsilon = 2.0 \times 10^5 \times 0.1 = 2.0 \times 10^4` Pa·s
@@ -971,7 +971,7 @@ Worked Example with Numbers
    - Validation: :math:`\tau_\epsilon = 2.05 \times 10^4 / 2.1 \times 10^5 = 0.098` s ≈ 0.1 s ✓
 
 **Physical interpretation**:
-   - Cross-link density: :math:`\nu_c = G_s / RT = 4.8 \times 10^4 / (8.314 \times 298) = 19.4` mol/m³
+   - Cross-link density: :math:`\nu_c = G_s / RT = 4.8 \times 10^4 / (8.314 \times 298) = 19.4` mol/:math:`m^3`
    - Molecular weight between cross-links: :math:`M_c = \rho / (2\nu_c) \approx 25000` g/mol (typical for PDMS)
    - Relaxation time: 0.1 s suggests moderate chain dynamics
 

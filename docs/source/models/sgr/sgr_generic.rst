@@ -878,7 +878,7 @@ Parameters
 What You Can Learn
 ------------------
 
-The GENERIC formulation of SGR extends all insights from the conventional model with rigorous thermodynamic validation capabilities. The same parameters (x, G₀, τ₀) appear, but with additional thermodynamic interpretation.
+The GENERIC formulation of SGR extends all insights from the conventional model with rigorous thermodynamic validation capabilities. The same parameters (x, G_0, :math:`\tau_0`) appear, but with additional thermodynamic interpretation.
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -890,19 +890,19 @@ Parameter Interpretation
 
    *For practitioners*: Same interpretation as conventional SGR (x < 1 is glass, 1 < x < 2 is power-law fluid, x ≥ 2 is Newtonian), but GENERIC provides additional validation: you can check that entropy production Ṡ_prod ≥ 0 for all deformation histories. If this fails, your fitted parameters are thermodynamically inconsistent.
 
-**G₀ (Plateau Modulus)**:
+**G_0 (Plateau Modulus)**:
    The elastic modulus scale, appearing in the energy functional E[P].
 
-   *For graduate students*: G₀ sets the elastic strain energy contribution ½k∫l²P(E,l)dEdl to the total energy. In GENERIC, the Poisson bracket generates affine deformation (∂_t l = γ̇), which is purely reversible (energy-conserving). The friction matrix generates yielding (l → 0), which is dissipative (entropy-producing).
+   *For graduate students*: G_0 sets the elastic strain energy contribution ½k∫l^2P(E,l)dEdl to the total energy. In GENERIC, the Poisson bracket generates affine deformation (∂_t l = :math:`\dot{\gamma}`), which is purely reversible (energy-conserving). The friction matrix generates yielding (l → 0), which is dissipative (entropy-producing).
 
-   *For practitioners*: Same as conventional SGR. GENERIC adds the guarantee that the predicted G₀ is consistent with thermodynamic stability (positive definite friction matrix M ≥ 0).
+   *For practitioners*: Same as conventional SGR. GENERIC adds the guarantee that the predicted G_0 is consistent with thermodynamic stability (positive definite friction matrix M ≥ 0).
 
-**τ₀ (Attempt Time)**:
+:math:`\tau_0` **(Attempt Time)**:
    The microscopic timescale for dissipative transitions.
 
-   *For graduate students*: In GENERIC, 1/τ₀ = Γ₀ appears in the friction matrix M as the rate coefficient for yield transitions. The detailed balance condition ensures that M satisfies Onsager reciprocity, connecting forward and reverse transition rates via the equilibrium distribution ρ(E).
+   *For graduate students*: In GENERIC, 1/:math:`\tau_0` = :math:`\Gamma_0` appears in the friction matrix M as the rate coefficient for yield transitions. The detailed balance condition ensures that M satisfies Onsager reciprocity, connecting forward and reverse transition rates via the equilibrium distribution :math:`\rho(E)`.
 
-   *For practitioners*: Same as conventional SGR. GENERIC provides validation that τ₀ is consistent with equilibrium fluctuation-dissipation (FDT) relations if x equals thermal temperature.
+   *For practitioners*: Same as conventional SGR. GENERIC provides validation that :math:`\tau_0` is consistent with equilibrium fluctuation-dissipation (FDT) relations if x equals thermal temperature.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -930,7 +930,7 @@ Material Classification
    * - **1.5 < x < 2**
      - Equilibrium fluid
      - Surfactant solutions, polymer-colloid mixtures
-     - Ṡ_prod → 0 as γ̇ → 0, FDT satisfied, unique equilibrium state
+     - Ṡ_prod → 0 as :math:`\dot{\gamma}` → 0, FDT satisfied, unique equilibrium state
    * - **x ≥ 2**
      - Thermalized fluid
      - Dilute suspensions, simple liquids

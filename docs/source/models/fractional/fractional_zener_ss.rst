@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Solid with two elastic plateaus, power-law transition, broad relaxation spectra
-- **Parameters:** 4 (Ge, Gm, α, τ_α)
+- **Parameters:** 4 (Ge, Gm, :math:`\alpha, \tau_\alpha`)
 - **Key equation:** :math:`G(t) = G_e + G_m E_\alpha(-(t/\tau_\alpha)^\alpha)`
 - **Test modes:** Oscillation, relaxation, creep
 - **Material examples:** Cross-linked networks, filled elastomers, hydrogels, biological tissues
@@ -38,11 +38,11 @@ Notation Guide
      - Maxwell arm modulus (relaxing contribution)
      - Pa
    * - :math:`\alpha`
-     - Fractional order (0 < α < 1, controls relaxation spectrum breadth)
+     - Fractional order (0 < :math:`\alpha` < 1, controls relaxation spectrum breadth)
      - —
    * - :math:`\tau_\alpha`
      - Characteristic relaxation time
-     - s\ :sup:`α`
+     - s\ :math:`^{\alpha}`
    * - :math:`E_\alpha(z)`
      - One-parameter Mittag-Leffler function
      - —
@@ -89,17 +89,17 @@ The FZSS model captures materials that behave as **viscoelastic solids** with tw
 
 2. **Maxwell arm modulus (Gm)**: Represents additional stiffness from temporary network interactions that relax over time through power-law dynamics governed by the SpringPot element.
 
-3. **SpringPot element**: Provides fractional-order viscoelastic damping, generalizing the classical dashpot. The fractional order α quantifies the breadth of the relaxation spectrum.
+3. **SpringPot element**: Provides fractional-order viscoelastic damping, generalizing the classical dashpot. The fractional order :math:`\alpha` quantifies the breadth of the relaxation spectrum.
 
 **Connection to Molecular Weight Distribution:**
 
 For cross-linked polymer networks, the dual-plateau structure reflects:
 
-- **Ge**: Crosslink density via rubber elasticity theory (Ge ≈ νkBT, where ν is network strand density)
-- **Gm**: Transient entanglements or temporary junctions that relax on timescale τ_α
-- **α**: Polydispersity in chain length between crosslinks or heterogeneity in crosslink density
+- **Ge**: Crosslink density via rubber elasticity theory (:math:`G_e \approx \nu k_B T`, where :math:`\nu` is network strand density)
+- **Gm**: Transient entanglements or temporary junctions that relax on timescale :math:`\tau_\alpha`
+- :math:`\alpha`: Polydispersity in chain length between crosslinks or heterogeneity in crosslink density
 
-Lower α values indicate broader distributions of local network properties (crosslink spacing, chain stiffness, filler dispersion).
+Lower :math:`\alpha` values indicate broader distributions of local network properties (crosslink spacing, chain stiffness, filler dispersion).
 
 **Hierarchical Structure:**
 
@@ -109,7 +109,7 @@ The power-law transition between plateaus arises naturally from hierarchical rel
 - Intermediate-scale: Cooperative motion of network strands
 - Large-scale: Global network reorganization
 
-This multi-scale relaxation is captured by a single parameter (α) rather than requiring multiple discrete relaxation times.
+This multi-scale relaxation is captured by a single parameter (:math:`\alpha`) rather than requiring multiple discrete relaxation times.
 
 What You Can Learn
 ------------------
@@ -124,7 +124,7 @@ Parameter Interpretation
    The long-time elastic plateau from permanent network structure.
 
    - **For graduate students**: Ge relates to crosslink density via rubber
-     elasticity: Ge ≈ νkBT where ν is network strand density
+     elasticity: :math:`G_e \approx \nu k_B T` where :math:`\nu` is network strand density
    - **For practitioners**: Higher Ge means stiffer equilibrium behavior
 
 **Maxwell Arm Modulus (Gm)**:
@@ -134,23 +134,23 @@ Parameter Interpretation
    - High Gm/Ge (> 5): Strong transient response (impact loading important)
    - Low Gm/Ge (< 1): Dominated by equilibrium structure
 
-**Fractional Order (α)**:
+**Fractional Order (** :math:`\alpha` **)**:
    Controls the breadth of relaxation spectrum and power-law transition character.
 
-   - **α → 0.2-0.3**: Very broad spectrum, highly heterogeneous networks
-   - **α → 0.4-0.5**: Typical for filled elastomers, moderate polydispersity
-   - **α → 0.6-0.7**: Narrower spectrum, more uniform structure
-   - **α → 1**: Exponential relaxation (classical Zener)
+   - :math:`\alpha` **→ 0.2-0.3**: Very broad spectrum, highly heterogeneous networks
+   - :math:`\alpha` **→ 0.4-0.5**: Typical for filled elastomers, moderate polydispersity
+   - :math:`\alpha` **→ 0.6-0.7**: Narrower spectrum, more uniform structure
+   - :math:`\alpha` **→ 1**: Exponential relaxation (classical Zener)
 
-   *Physical interpretation*: Lower α indicates greater structural heterogeneity
+   *Physical interpretation*: Lower :math:`\alpha` indicates greater structural heterogeneity
    (filler dispersion, crosslink density distribution, molecular weight distribution).
 
-**Characteristic Time (τ_α)**:
+**Characteristic Time (** :math:`\tau_\alpha` **)**:
    Timescale for transition between plateaus.
 
    - Marks crossover from high modulus (Ge + Gm) to equilibrium (Ge)
    - Temperature-dependent: follows WLF or Arrhenius
-   - Application: compare τ_α to service timescales
+   - Application: compare :math:`\tau_\alpha` to service timescales
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -163,15 +163,15 @@ Material Classification
      - Material Type
      - Examples
      - Key Characteristics
-   * - High Ge, high Gm, low α
+   * - High Ge, high Gm, low :math:`\alpha`
      - Stiff filled elastomer
      - Carbon black rubber, nanocomposites
      - Strong damping, broad spectrum
-   * - Moderate Ge, Gm ~ Ge, α ~ 0.4
+   * - Moderate Ge, Gm ~ Ge, :math:`\alpha` ~ 0.4
      - Crosslinked network
      - Hydrogels, thermosets
      - Balanced transient/equilibrium
-   * - Low Ge, high Gm/Ge, high α
+   * - Low Ge, high Gm/Ge, high :math:`\alpha`
      - Soft elastic solid
      - Biological tissues, weak gels
      - Large relaxation, narrow spectrum
@@ -180,8 +180,8 @@ Diagnostic Indicators
 ~~~~~~~~~~~~~~~~~~~~~
 
 - **Gm/Ge > 100**: Transient response dominates; verify measurements at short times
-- **α near bounds (0.05 or 0.95)**: Data may not support fractional behavior
-- **Poor fit in transition region**: Need better coverage around ω ~ 1/τ_α
+- :math:`\alpha` **near bounds (0.05 or 0.95)**: Data may not support fractional behavior
+- **Poor fit in transition region**: Need better coverage around :math:`\omega` ~ 1/:math:`\tau_\alpha`
 - **Ge poorly constrained**: Low-frequency data insufficient; extend range
 
 Fitting Guidance
@@ -190,7 +190,7 @@ Fitting Guidance
 **Recommended Data Collection:**
 
 1. **Frequency sweep** (SAOS): 4-5 decades to capture both plateaus
-2. **Coverage**: Ensure both low-ω (Ge) and high-ω (Ge + Gm) plateaus visible
+2. **Coverage**: Ensure both low-:math:`\omega` (Ge) and high-:math:`\omega` (Ge + Gm) plateaus visible
 3. **Test amplitude**: Within LVR (< 5% strain)
 4. **Temperature**: Constant ±0.1°C
 
@@ -216,16 +216,16 @@ Fitting Guidance
 **Common Pitfalls:**
 
 - **Insufficient frequency range**: Cannot determine both plateaus accurately
-- **Missing transition region**: α poorly constrained
-- **α near 1**: Use classical Zener for simpler interpretation
+- **Missing transition region**: :math:`\alpha` poorly constrained
+- :math:`\alpha` **near 1**: Use classical Zener for simpler interpretation
 - **Ge near zero**: Material may be liquid-like; use FMG or FML instead
 
-**For FZSS specifically**, the fractional order α quantifies how the material transitions between the two elastic plateaus (Ge and Ge + Gm). Smaller α values indicate a more gradual, power-law transition over many decades of time/frequency. Typical α ranges for FZSS applications:
+**For FZSS specifically**, the fractional order :math:`\alpha` quantifies how the material transitions between the two elastic plateaus (Ge and Ge + Gm). Smaller :math:`\alpha` values indicate a more gradual, power-law transition over many decades of time/frequency. Typical :math:`\alpha` ranges for FZSS applications:
 
-- Cross-linked polymer networks: α ≈ 0.3-0.6
-- Filled elastomers: α ≈ 0.2-0.5
-- Biological tissues (soft): α ≈ 0.1-0.4
-- Hydrogels: α ≈ 0.4-0.7
+- Cross-linked polymer networks: :math:`\alpha` ≈ 0.3-0.6
+- Filled elastomers: :math:`\alpha` ≈ 0.2-0.5
+- Biological tissues (soft): :math:`\alpha` ≈ 0.1-0.4
+- Hydrogels: :math:`\alpha` ≈ 0.4-0.7
 
 Governing Equations
 -------------------
@@ -241,12 +241,12 @@ The FZSS model is built on the **Mittag-Leffler function**, which plays the same
 
    E_\alpha(z) = \sum_{k=0}^{\infty} \frac{z^k}{\Gamma(\alpha k + 1)}
 
-where Γ is the gamma function. This function provides a smooth interpolation between exponential decay (α = 1) and power-law relaxation (0 < α < 1).
+where :math:`\Gamma` is the gamma function. This function provides a smooth interpolation between exponential decay (:math:`\alpha` = 1) and power-law relaxation (0 < :math:`\alpha` < 1).
 
 **Key Properties:**
-   - E₁(z) = exp(z) (recovers classical exponential)
-   - E_α(0) = 1 for all α
-   - E_α(-t^α) exhibits initial power-law decay t^(-α) followed by stretched exponential for large t
+   - :math:`E_1(z)` = exp(z) (recovers classical exponential)
+   - :math:`E_{\alpha(0)}` = 1 for all :math:`\alpha`
+   - :math:`E_{\alpha(-t^\alpha)}` exhibits initial power-law decay t^(-:math:`\alpha`) followed by stretched exponential for large t
    - Captures broad relaxation spectra with a single parameter
 
 Time Domain
@@ -264,7 +264,7 @@ Time Domain
 **Physical interpretation:**
    - At t = 0: G(0) = Ge + Gm (instantaneous modulus, glassy response)
    - At t → ∞: G(∞) = Ge (equilibrium modulus, permanent network)
-   - Intermediate times: Power-law relaxation G(t) - Ge ~ t^(-α)
+   - Intermediate times: Power-law relaxation G(t) - Ge ~ t^(-:math:`\alpha`)
 
 **Creep compliance:**
 
@@ -305,10 +305,10 @@ Decomposing into storage and loss moduli reveals:
    G''(\omega) = G_m \frac{(\omega\tau_\alpha)^\alpha \sin(\alpha\pi/2)}{1 + 2(\omega\tau_\alpha)^\alpha \cos(\alpha\pi/2) + (\omega\tau_\alpha)^{2\alpha}}
 
 **Frequency-domain behavior:**
-   - Low ω: G' → Ge (elastic plateau), G" → 0
-   - Transition region (ω ~ 1/τ_α): Power-law scaling G', G" ~ ω^α with slope α in log-log plot
-   - High ω: G' → Ge + Gm (second plateau), G" decreases as ω^(-α)
-   - Loss tangent tan δ = G"/G' exhibits a maximum at the transition frequency
+   - Low :math:`\omega`: G' → Ge (elastic plateau), G" → 0
+   - Transition region (:math:`\omega` ~ 1/:math:`\tau_\alpha`): Power-law scaling G', G" ~ :math:`\omega^\alpha` with slope :math:`\alpha` in log-log plot
+   - High :math:`\omega`: G' → Ge + Gm (second plateau), G" decreases as :math:`\omega^(-\alpha)`
+   - Loss tangent tan :math:`\delta` = G"/G' exhibits a maximum at the transition frequency
 
 Parameters
 ----------
@@ -349,14 +349,14 @@ Parameters
 
 - **Gm**: Represents additional stiffness from temporary network structures that relax over time. The ratio Gm/Ge indicates the relative importance of transient vs permanent elasticity.
 
-- **alpha**: Controls the relaxation dynamics. Lower α indicates broader relaxation spectra from microstructural heterogeneity. For cross-linked networks, α ≈ 0.3-0.6.
+- **alpha**: Controls the relaxation dynamics. Lower :math:`\alpha` indicates broader relaxation spectra from microstructural heterogeneity. For cross-linked networks, :math:`\alpha` ≈ 0.3-0.6.
 
-- **tau_alpha**: Characteristic time scale for relaxation. Has unusual units (s^α) due to fractional calculus. Related to average relaxation time but incorporates spectrum breadth.
+- **tau_alpha**: Characteristic time scale for relaxation. Has unusual units (s\ :math:`^{\alpha}`) due to fractional calculus. Related to average relaxation time but incorporates spectrum breadth.
 
 Validity and Assumptions
 ------------------------
 
-- Linear viscoelastic assumption: strain amplitudes remain small (typically γ₀ < 1-10%).
+- Linear viscoelastic assumption: strain amplitudes remain small (typically :math:`\gamma_0` < 1-10%).
 - Isothermal conditions: temperature constant throughout the experiment.
 - Time-invariant material parameters: no aging, degradation, or structural evolution.
 - Supported RheoJAX test modes: relaxation, creep, oscillation.
@@ -366,21 +366,21 @@ Validity and Assumptions
 Regimes and Behavior
 --------------------
 
-**Short-Time / High-Frequency Regime** (t << τ_α or ω >> 1/τ_α):
+**Short-Time / High-Frequency Regime** (t << :math:`\tau_\alpha or \omega >> 1/\tau_\alpha`):
    - Both springs contribute: G(t) → Ge + Gm
-   - Elastic plateau: G'(ω) → Ge + Gm
+   - Elastic plateau: G'(:math:`\omega`) → Ge + Gm
    - Material behaves as stiff solid with modulus Ge + Gm
    - Minimal energy dissipation: G" → 0
 
-**Intermediate Regime** (t ~ τ_α or ω ~ 1/τ_α):
-   - Power-law relaxation: G(t) - Ge ~ (t/τ_α)^(-α)
-   - Frequency-domain: G'(ω), G"(ω) ~ ω^α (parallel slopes in log-log plot)
-   - Loss tangent maximum: tan δ peaks at transition frequency
+**Intermediate Regime** (t ~ :math:`\tau_\alpha or \omega` ~ 1/:math:`\tau_\alpha`):
+   - Power-law relaxation: G(t) - Ge ~ (t/:math:`\tau_\alpha`)^(-:math:`\alpha`)
+   - Frequency-domain: G'(:math:`\omega`), G"(:math:`\omega`) ~ :math:`\omega^\alpha` (parallel slopes in log-log plot)
+   - Loss tangent maximum: tan :math:`\delta` peaks at transition frequency
    - This is the **fingerprint** of fractional viscoelasticity
 
-**Long-Time / Low-Frequency Regime** (t >> τ_α or ω << 1/τ_α):
+**Long-Time / Low-Frequency Regime** (t >> :math:`\tau_\alpha or \omega << 1/\tau_\alpha`):
    - Equilibrium plateau: G(t) → Ge
-   - Elastic plateau: G'(ω) → Ge
+   - Elastic plateau: G'(:math:`\omega`) → Ge
    - Permanent network structure dominates
    - Solid-like behavior: G' > G", material does not flow
 
@@ -389,15 +389,15 @@ Comparison with Classical Zener Model
 
 The FZSS model offers significant advantages over the classical Zener model:
 
-**Classical Zener (α = 1):**
-   - Single relaxation time τ
-   - Exponential relaxation: G(t) = Ge + Gm exp(-t/τ)
+**Classical Zener (** :math:`\alpha` **= 1):**
+   - Single relaxation time :math:`\tau`
+   - Exponential relaxation: G(t) = Ge + Gm exp(-t/:math:`\tau`)
    - Narrow relaxation spectrum (Lorentzian)
    - Often insufficient for real materials with heterogeneous microstructures
 
-**Fractional Zener (0 < α < 1):**
+**Fractional Zener (0 <** :math:`\alpha` **< 1):**
    - Continuous distribution of relaxation times
-   - Power-law relaxation: G(t) - Ge ~ t^(-α)
+   - Power-law relaxation: G(t) - Ge ~ t^(-:math:`\alpha`)
    - Broad relaxation spectrum (power-law or log-normal distribution)
    - Captures material heterogeneity with fewer parameters
 
@@ -417,8 +417,8 @@ Limiting Behavior
 
 The FZSS model recovers simpler models in specific limits:
 
-- **α → 1**: Classical Zener model with exponential decay: G(t) = Ge + Gm exp(-t/τ_α)
-- **α → 0**: Ge dominates, Gm contribution becomes frequency-independent elastic addition
+- :math:`\alpha` **→ 1**: Classical Zener model with exponential decay: G(t) = Ge + Gm exp(-t/:math:`\tau_\alpha`)
+- :math:`\alpha` **→ 0**: Ge dominates, Gm contribution becomes frequency-independent elastic addition
 - **Gm → 0**: Purely elastic solid with modulus Ge (no relaxation)
 - **Ge → 0**: Fractional Maxwell Liquid (FML) — material flows under stress
 - **tau_alpha → 0**: Two springs in parallel, G(t) = Ge + Gm (no time dependence)
@@ -428,27 +428,27 @@ Material Examples
 -----------------
 
 **Cross-Linked Polymer Networks:**
-   - Natural rubber, synthetic elastomers (α ≈ 0.4-0.6)
+   - Natural rubber, synthetic elastomers (:math:`\alpha` ≈ 0.4-0.6)
    - Ge from vulcanization cross-links, Gm from chain dynamics
    - Broad relaxation spectra from cross-link density heterogeneity
 
 **Filled Elastomers:**
-   - Carbon black or silica-filled rubber (α ≈ 0.2-0.5)
-   - Lower α due to filler-polymer interactions creating hierarchical structure
+   - Carbon black or silica-filled rubber (:math:`\alpha` ≈ 0.2-0.5)
+   - Lower :math:`\alpha` due to filler-polymer interactions creating hierarchical structure
    - Ge from cross-links, Gm from glassy polymer layers near filler
 
 **Hydrogels:**
-   - Chemically cross-linked PVA, alginate (α ≈ 0.4-0.7)
+   - Chemically cross-linked PVA, alginate (:math:`\alpha` ≈ 0.4-0.7)
    - Ge from covalent or ionic cross-links
    - Gm from polymer-water interactions and entanglements
 
 **Biological Tissues:**
-   - Skin, tendons, cartilage (α ≈ 0.1-0.4)
-   - Very broad spectra (low α) from hierarchical collagen/elastin networks
+   - Skin, tendons, cartilage (:math:`\alpha` ≈ 0.1-0.4)
+   - Very broad spectra (low :math:`\alpha`) from hierarchical collagen/elastin networks
    - Ge from collagen cross-links, Gm from proteoglycan matrix
 
 **Semi-Crystalline Polymers:**
-   - Polyethylene, polypropylene (α ≈ 0.3-0.5)
+   - Polyethylene, polypropylene (:math:`\alpha` ≈ 0.3-0.5)
    - Ge from crystalline regions, Gm from amorphous phase relaxation
 
 Smart Initialization (NEW in v0.2.0)
@@ -464,12 +464,12 @@ When ``test_mode='oscillation'``, the initialization system:
 1. **Extracts frequency features** from :math:`|G^*|(\omega)` data:
    - Low-frequency plateau → estimates Ge
    - High-frequency plateau → estimates Ge + Gm (thus Gm = high_plateau - low_plateau)
-   - Transition frequency ω_mid (steepest slope) → estimates τ_α = 1/ω_mid
-   - Slope in transition region → estimates fractional order α
+   - Transition frequency :math:`\omega_mid` (steepest slope) → estimates :math:`\tau_\alpha = 1/\omega_mid`
+   - Slope in transition region → estimates fractional order :math:`\alpha`
 
 2. **Estimates fractional order** from loss tangent slope:
-   - Analyzes slope of tan δ = G"/G' in intermediate frequency range
-   - Maps slope to α using power-law scaling theory
+   - Analyzes slope of tan :math:`\delta` = G"/G' in intermediate frequency range
+   - Maps slope to :math:`\alpha` using power-law scaling theory
 
 3. **Clips to parameter bounds** to ensure physical validity
 
@@ -490,7 +490,7 @@ The initialization uses the **Template Method design pattern** with a 5-step alg
 
 1. Extract frequency features (common across all fractional models)
 2. Validate data quality (frequency range, plateau ratio)
-3. Estimate model-specific parameters (FZSS: Ge, Gm, τ_α, α)
+3. Estimate model-specific parameters (FZSS: Ge, Gm, :math:`\tau_\alpha, \alpha`)
 4. Clip to ParameterSet bounds
 5. Set parameters safely
 

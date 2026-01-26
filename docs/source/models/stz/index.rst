@@ -19,7 +19,7 @@ Quick Reference
      - Parameters
      - Use Case
    * - :doc:`stz_conventional`
-     - 5-7 (G, σ_y, χ, τ₀, ε₀, ...)
+     - 5-7 (G, :math:`\sigma_y`, :math:`\chi`, :math:`\tau_0`, :math:`\varepsilon_0`, ...)
      - Amorphous solids, metallic glasses, granular materials
 
 
@@ -36,9 +36,9 @@ Zones—that rearrange cooperatively under stress.
 
 - **Localized rearrangements**: Plasticity occurs in discrete STZ regions (~10-100 atoms)
 - **Two-state model**: STZs exist in (+) and (-) orientations relative to shear
-- **Effective temperature**: Configurational disorder tracked by χ (chi)
+- **Effective temperature**: Configurational disorder tracked by :math:`\chi` (chi)
 - **Rate-dependent**: Thermal activation + mechanical driving
-- **Disorder dynamics**: χ evolves with plastic strain and aging
+- **Disorder dynamics**: :math:`\chi` evolves with plastic strain and aging
 
 **Materials described by STZ:**
 
@@ -71,17 +71,17 @@ The net plastic strain rate depends on the population imbalance:
 
    \dot{\gamma}^{pl} = \varepsilon_0 \Gamma(\sigma, \chi) (n_+ - n_-)
 
-where Γ is the transition rate and ε₀ is strain per STZ flip.
+where :math:`\Gamma` is the transition rate and :math:`\varepsilon_0` is strain per STZ flip.
 
-**Effective Temperature χ:**
+**Effective Temperature** :math:`\chi` **:**
 
-The configurational disorder is characterized by an effective temperature χ that:
+The configurational disorder is characterized by an effective temperature :math:`\chi` that:
 
 - **Increases** under plastic deformation (disorder created by rearrangements)
 - **Decreases** during aging (structural relaxation toward equilibrium)
-- **Governs STZ density**: More STZs at higher χ (more disordered states)
+- **Governs STZ density**: More STZs at higher :math:`\chi` (more disordered states)
 
-The evolution of χ is governed by:
+The evolution of :math:`\chi` is governed by:
 
 .. math::
 
@@ -91,7 +91,7 @@ The evolution of χ is governed by:
 
 At steady state, the STZ model predicts:
 
-- **Yield stress**: σ_y emerges from the competition between creation and
+- **Yield stress**: :math:`\sigma_y` emerges from the competition between creation and
   annihilation of STZs
 - **Rate dependence**: Logarithmic or power-law depending on regime
 - **Temperature sensitivity**: Arrhenius activation for thermal STZ flips
@@ -113,27 +113,27 @@ Key Parameters
      - Pa
      - Elastic stiffness
    * - Yield stress
-     - σ_y
+     - :math:`\sigma_y`
      - Pa
      - Threshold for plastic flow
    * - Effective temp.
-     - χ
+     - :math:`\chi`
      - —
      - Configurational disorder (0 = ordered)
    * - Attempt time
-     - τ₀
+     - :math:`\tau_0`
      - s
      - Microscopic attempt frequency
    * - STZ strain
-     - ε₀
+     - :math:`\varepsilon_0`
      - —
      - Strain per STZ flip (~0.1-1)
    * - Activation volume
      - V*
-     - nm³
-     - Volume of STZ (~1 nm³)
-   * - Steady-state χ
-     - χ_ss
+     - :math:`\text{n}m^3`
+     - Volume of STZ (~1 :math:`\text{n}m^3`)
+   * - Steady-state :math:`\chi`
+     - :math:`\chi_ss`
      - —
      - Disorder level under flow
 
@@ -145,13 +145,13 @@ Model Predictions
 
 The STZ model predicts rate-dependent yield stress behavior:
 
-- **Low rates**: Yield stress σ_y (athermal limit)
-- **Intermediate rates**: Logarithmic strengthening σ ~ σ_y + A·ln(γ̇)
+- **Low rates**: Yield stress :math:`\sigma_y` (athermal limit)
+- **Intermediate rates**: Logarithmic strengthening :math:`\sigma \sim \sigma_y + A \cdot \ln(\dot{\gamma})`
 - **High rates**: Power-law or saturation
 
 **Transient Response:**
 
-- **Stress overshoot**: Peak stress during startup (χ evolution)
+- **Stress overshoot**: Peak stress during startup (:math:`\chi` evolution)
 - **Strain softening**: Post-yield stress reduction as disorder increases
 - **Strain hardening**: At very high strains, disorder saturates
 
@@ -159,7 +159,7 @@ The STZ model predicts rate-dependent yield stress behavior:
 
 The STZ model naturally predicts shear band formation when:
 
-- Strain softening is strong (large χ increase per strain)
+- Strain softening is strong (large :math:`\chi` increase per strain)
 - Thermal diffusion is weak compared to mechanical driving
 - Material has positive feedback between disorder and flow rate
 

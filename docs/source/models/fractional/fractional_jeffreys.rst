@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Viscoelastic liquid with fractional relaxation, terminal viscous flow
-- **Parameters:** 4 (η₁, η₂, α, τ₁)
+- **Parameters:** 4 (:math:`\eta_1`, :math:`\eta_2`, :math:`\alpha`, :math:`\tau_1`)
 - **Key equation:** :math:`G^*(\omega) = \eta_1(i\omega) \frac{1 + (i\omega\tau_2)^{\alpha}}{1 + (i\omega\tau_1)^{\alpha}}`
 - **Test modes:** Oscillation, relaxation, rotation (steady shear)
 - **Material examples:** Polymer solutions with broad relaxation spectra, complex fluids with viscous flow
@@ -32,7 +32,7 @@ Notation Guide
      - Second viscosity (series branch)
    * - :math:`\alpha`
      - dimensionless
-     - Fractional order (0 < α < 1, controls spectrum breadth)
+     - Fractional order (0 < :math:`\alpha` < 1, controls spectrum breadth)
    * - :math:`\tau_1`
      - s
      - Relaxation time (characteristic timescale)
@@ -63,11 +63,11 @@ consists of:
 
 **Microstructural Interpretation:**
 
-- **Parallel dashpot (η₁)**: Provides zero-shear viscosity from long-range
+- **Parallel dashpot** (:math:`\eta_1`): Provides zero-shear viscosity from long-range
   molecular motion (chain reptation, solvent flow)
 - **Series branch**: SpringPot + dashpot combination creates fractional
-  relaxation with characteristic time τ₁
-- **Liquid behavior**: Both branches dissipate energy → zero equilibrium modulus
+  relaxation with characteristic time :math:`\tau_1`
+- **Liquid behavior**: Both branches dissipate energy :math:`\to` zero equilibrium modulus
 
 This configuration is particularly suited for polymer solutions where the parallel
 dashpot represents the solvent contribution and the series branch captures polymer
@@ -163,50 +163,50 @@ relaxation characteristics.
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Primary Viscosity (η₁)**:
+**Primary Viscosity (** :math:`\eta_1` **)**:
    The dominant viscosity controlling zero-shear behavior and terminal flow.
 
    - **For graduate students**: In polymer solutions, :math:`\eta_1 \propto M_w^{3.4}`
      for entangled systems (reptation scaling). For solutions, :math:`\eta_1` combines
-     solvent viscosity with polymer contribution, separable via η₁ = η_solvent + η_polymer.
+     solvent viscosity with polymer contribution, separable via :math:`\eta_1 = \eta_solvent + \eta_polymer`.
    - **For practitioners**: :math:`\eta_1` determines processing viscosity and flow rates.
      Directly measurable as :math:`\lim_{\omega \to 0} G''/\omega`. Critical for pump sizing,
      mixing times, and coating applications.
 
-**Secondary Viscosity (η₂)**:
+**Secondary Viscosity (** :math:`\eta_2` **)**:
    Controls the high-frequency elastic-like response and relaxation strength.
 
    - **Viscosity ratio**: :math:`\eta_2/\eta_1` indicates the relative strength of the two branches.
      Large ratio (>0.5): Significant elastic contribution at high frequencies. Small ratio (<0.1):
      Weakly viscoelastic, nearly Newtonian.
    - **Derived time**: :math:`\tau_2 = (\eta_2/\eta_1)\tau_1` sets the high-frequency transition.
-   - **For practitioners**: Higher η₂ means stronger elastic recoil (die swell in extrusion) and
+   - **For practitioners**: Higher :math:`\eta_2` means stronger elastic recoil (die swell in extrusion) and
      slower stress relaxation.
 
-**Fractional Order (α)**:
+**Fractional Order (** :math:`\alpha` **)**:
    Governs the breadth of the relaxation spectrum and power-law character.
 
-   - **α → 0.2-0.4**: Very broad spectrum, highly polydisperse or complex microstructure
+   - :math:`\alpha` **→ 0.2-0.4**: Very broad spectrum, highly polydisperse or complex microstructure
      (wormlike micelles with broad contour length distribution, blended polymer solutions)
-   - **α → 0.5-0.7**: Moderate breadth, typical for commercial polymer solutions with
+   - :math:`\alpha` **→ 0.5-0.7**: Moderate breadth, typical for commercial polymer solutions with
      moderate polydispersity (PDI = 2-4)
-   - **α → 0.8-0.95**: Narrow spectrum, nearly monodisperse systems (fractionated polymers)
-   - **α → 1**: Classical Jeffreys (single exponential), use simpler model
+   - :math:`\alpha` **→ 0.8-0.95**: Narrow spectrum, nearly monodisperse systems (fractionated polymers)
+   - :math:`\alpha` **→ 1**: Classical Jeffreys (single exponential), use simpler model
 
-   *Physical interpretation*: Lower α indicates greater polydispersity in relaxation times
+   *Physical interpretation*: Lower :math:`\alpha` indicates greater polydispersity in relaxation times
    arising from molecular weight distribution, chain architecture (branching), or structural
-   heterogeneity. For polymers, α ≈ 1/(1 + PDI/4) approximately.
+   heterogeneity. For polymers, :math:`\alpha` ≈ 1/(1 + PDI/4) approximately.
 
-   *For practitioners*: Use α as a QC metric for batch consistency. A sudden drop in α suggests
+   *For practitioners*: Use :math:`\alpha` as a QC metric for batch consistency. A sudden drop in :math:`\alpha` suggests
    contamination, degradation (chain scission), or aggregation.
 
-**Relaxation Time (τ₁)**:
+**Relaxation Time (** :math:`\tau_1` **)**:
    Characteristic timescale for the fractional relaxation process.
 
    - **Temperature dependence**: Follows WLF equation for polymers above Tg, Arrhenius below Tg.
    - **Molecular weight scaling**: For polymer solutions, :math:`\tau_1 \propto M_w^{3.4}` in
      entangled regime, :math:`\tau_1 \propto M_w` for unentangled chains.
-   - **For practitioners**: Compare τ₁ to process timescales. Ensure process time > 5τ₁ for
+   - **For practitioners**: Compare :math:`\tau_1` to process timescales. Ensure process time > :math:`5\tau_1` for
      complete stress relaxation in molding or coating operations.
 
 Material Classification
@@ -220,19 +220,19 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - High η₁ (>10³ Pa·s), low α (<0.5)
+   * - High :math:`\eta_1 (>10^3` Pa·s), low :math:`\alpha` (<0.5)
      - Highly entangled viscoelastic
      - Concentrated polymer solutions, melts
      - High die swell, elastic instabilities
-   * - Moderate η₁/η₂ (0.2-0.8), α ≈ 0.5
+   * - Moderate :math:`\eta_1/\eta_2` (0.2-0.8), :math:`\alpha` ≈ 0.5
      - Balanced viscoelastic liquid
      - Wormlike micelles, associative polymers
      - Moderate shear thinning, extensional thickening
-   * - Low η₁ (<100 Pa·s), α > 0.7
+   * - Low :math:`\eta_1` (<100 Pa·s), :math:`\alpha` > 0.7
      - Weakly viscoelastic
      - Dilute polymer solutions, oligomers
      - Easy flow, minimal elastic effects
-   * - α ≈ 1 (any η₁)
+   * - :math:`\alpha \approx 1 (any \eta_1)`
      - Near-Maxwellian
      - Monodisperse linear polymers
      - Use classical Jeffreys for simplicity
@@ -241,7 +241,7 @@ Material Classification
    :header-rows: 1
    :widths: 20 20 30 30
 
-   * - η₂/η₁ Ratio
+   * - :math:`\eta_2/\eta_1` Ratio
      - Physical Interpretation
      - Typical Materials
      - Key Applications
@@ -265,14 +265,14 @@ Material Classification
 Diagnostic Indicators
 ~~~~~~~~~~~~~~~~~~~~~
 
-- **η₁ much larger than expected**: Check for yield stress (use Bingham or Herschel-Bulkley instead)
+- :math:`\eta_1` **much larger than expected**: Check for yield stress (use Bingham or Herschel-Bulkley instead)
   or incorrect temperature control.
 - **Poor low-frequency fit**: Terminal region not reached; extend frequency range below 0.01 rad/s
   or use longer stress relaxation tests.
-- **α near 1**: Data may be described by simpler classical Jeffreys; fractional model overfitting.
-- **Strong η₁-τ₁ correlation**: Well-constrained zero-shear viscosity but individual parameters
-  ambiguous. Report η₀ = η₁ instead.
-- **η₂ > η₁**: Non-physical unless fitting error; check data quality and bounds.
+- :math:`\alpha` **near 1**: Data may be described by simpler classical Jeffreys; fractional model overfitting.
+- **Strong** :math:`\eta_1-\tau_1` **correlation**: Well-constrained zero-shear viscosity but individual parameters
+  ambiguous. Report :math:`\eta_0 = \eta_1` instead.
+- :math:`\eta_2 > \eta_1`: Non-physical unless fitting error; check data quality and bounds.
 
 Fitting Guidance
 ----------------
@@ -298,14 +298,14 @@ Fitting Guidance
 
 - Fit simultaneously to G' and G" for better constraint
 - Use log-weighted least squares
-- Verify terminal flow region (G" ~ ω, G' ~ ω²) at low frequencies
+- Verify terminal flow region (G" ~ :math:`\omega`, G' ~ :math:`\omega^2`) at low frequencies
 - Check residuals for systematic deviations
 
 **Common Pitfalls:**
 
-- **Insufficient low-frequency data**: Cannot determine η₁ accurately
-- **High-frequency artifacts**: Instrument inertia effects can bias α
-- **Wrong model choice**: If G' plateaus at low ω, use solid model instead
+- **Insufficient low-frequency data**: Cannot determine :math:`\eta_1` accurately
+- **High-frequency artifacts**: Instrument inertia effects can bias :math:`\alpha`
+- **Wrong model choice**: If G' plateaus at low :math:`\omega`, use solid model instead
 
 **Troubleshooting Table:**
 
@@ -316,22 +316,22 @@ Fitting Guidance
    * - Issue
      - Likely Cause
      - Solution
-   * - G' plateaus at low ω
+   * - G' plateaus at low :math:`\omega`
      - Solid-like behavior
      - Use FZSL or FMG instead
-   * - η₁ hits upper bound
+   * - :math:`\eta_1` hits upper bound
      - Yield stress present
      - Use Bingham/Herschel-Bulkley
-   * - Poor terminal fit (G" ~ ω)
+   * - Poor terminal fit (G" ~ :math:`\omega`)
      - Terminal region not reached
-     - Extend to ω < 0.01 rad/s
-   * - α near 1.0
+     - Extend to :math:`\omega` < 0.01 rad/s
+   * - :math:`\alpha` near 1.0
      - Narrow spectrum
      - Use classical Jeffreys
-   * - Strong η₁-τ₁ correlation
-     - Well-constrained η₀ only
-     - Report η₀ = η₁, accept ambiguity
-   * - η₂ > η₁ (non-physical)
+   * - Strong :math:`\eta_1-\tau_1` correlation
+     - Well-constrained :math:`\eta_0` only
+     - Report :math:`\eta_0 = \eta_1`, accept ambiguity
+   * - :math:`\eta_2 > \eta_1` (non-physical)
      - Fitting error
      - Check bounds, data quality
    * - Oscillating residuals
@@ -339,14 +339,14 @@ Fitting Guidance
      - Consider GMM for multi-mode
    * - High-frequency upturn
      - Inertia artifacts
-     - Exclude data above critical ω
+     - Exclude data above critical :math:`\omega`
 
 Practical Applications
 ----------------------
 
 **Flow Rate Prediction:**
 
-The zero-shear viscosity η₁ determines flow behavior in processing:
+The zero-shear viscosity :math:`\eta_1` determines flow behavior in processing:
 
 .. code-block:: python
 
@@ -372,7 +372,7 @@ The zero-shear viscosity η₁ determines flow behavior in processing:
 
 **Die Swell Prediction:**
 
-The viscosity ratio η₂/η₁ and relaxation time τ₁ control elastic effects:
+The viscosity ratio :math:`\eta_2/\eta_1` and relaxation time :math:`\tau_1` control elastic effects:
 
 .. code-block:: python
 
@@ -412,7 +412,7 @@ Example Calculations
 
 **Complex Modulus Prediction:**
 
-Given fitted parameters η₁ = 1000 Pa·s, η₂ = 500 Pa·s, α = 0.5, τ₁ = 10 s:
+Given fitted parameters :math:`\eta_1` = 1000 Pa·s, :math:`\eta_2` = 500 Pa·s, :math:`\alpha = 0.5, \tau_1` = 10 s:
 
 .. code-block:: python
 
@@ -482,7 +482,7 @@ See Also
 - :doc:`fractional_kelvin_voigt` — parallel SpringPot + spring element providing the other
   branch
 - :doc:`fractional_burgers` — combines Maxwell and fractional Kelvin-Voigt in series
-- :doc:`../../transforms/fft` — obtain :math:`G'`/ :math:`G''` prior to fitting Jeffreys
+- :doc:`../../transforms/fft` — obtain :math:`G'/G''` prior to fitting Jeffreys
   spectra
 - :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
   Jeffreys, Burgers, and Maxwell families
@@ -695,7 +695,7 @@ See also
 - :doc:`fractional_kelvin_voigt` — parallel SpringPot + spring element providing the other
   branch.
 - :doc:`fractional_burgers` — combines Maxwell and fractional Kelvin-Voigt in series.
-- :doc:`../../transforms/fft` — obtain :math:`G'`/ :math:`G''` prior to fitting Jeffreys
+- :doc:`../../transforms/fft` — obtain :math:`G'/G''` prior to fitting Jeffreys
   spectra.
 - :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
   Jeffreys, Burgers, and Maxwell families.

@@ -9,9 +9,9 @@ Quick Reference
 - **Use when:** Quantitative predictions needed, S(k) available, wave-vector-dependent
 dynamics important
 
-- **Parameters:** 5 (φ, σ_d, D₀, k_BT, γ_c) + S(k) input
+- **Parameters:** 5 (:math:`\phi`, :math:`\sigma_d`, D_0, k_BT, :math:`\gamma_c`) + S(k) input
 
-- **Key equation:** k-resolved correlator Φ(k,t) with MCT vertex from S(k)
+- **Key equation:** k-resolved correlator :math:`\Phi(k,t)` with MCT vertex from S(k)
 
 - **Test modes:** Flow curve, oscillation, startup, creep, relaxation, LAOS
 
@@ -44,7 +44,7 @@ Notation Guide
    * - :math:`\sigma_d`
      - Particle diameter (m)
    * - :math:`D_0`
-     - Bare short-time diffusion coefficient (m²/s)
+     - Bare short-time diffusion coefficient (m^2/s)
    * - :math:`k_B T`
      - Thermal energy (J)
    * - :math:`\Gamma(k)`
@@ -52,18 +52,18 @@ Notation Guide
    * - :math:`\gamma_c`
      - Critical strain for cage breaking (dimensionless)
    * - :math:`n`
-     - Number density (particles/m³)
+     - Number density (particles/m^3)
 
 Overview
 --------
 
 The Isotropically Sheared Model (ISM) is the full k-resolved MCT for nonlinear
-rheology. Unlike the F₁₂ schematic model, ISM tracks correlators at each wave
+rheology. Unlike the F_1_2 schematic model, ISM tracks correlators at each wave
 vector k, using the static structure factor S(k) to compute the memory kernel.
 
-**Key differences from F₁₂:**
+**Key differences from F_1_2:**
 
-- k-resolved correlators Φ(k,t)
+- k-resolved correlators :math:`\Phi(k,t)`
 - Memory kernel from S(k) via MCT vertex V(k,q,|k-q|)
 - Quantitative predictions without empirical parameters
 - Higher computational cost
@@ -73,14 +73,14 @@ vector k, using the static structure factor S(k) to compute the memory kernel.
 - S(k) is known (from scattering experiments or simulation)
 - Wave-vector-dependent relaxation is important
 - Quantitative comparison with microscopic measurements
-- Systems where F₁₂ simplifications are too severe
+- Systems where F_1_2 simplifications are too severe
 
 Physical Foundations
 --------------------
 
-The ISM model extends the schematic F₁₂ theory (see :doc:`itt_mct_schematic`) to
+The ISM model extends the schematic F_1_2 theory (see :doc:`itt_mct_schematic`) to
 include full k-dependence. All physical concepts from the schematic model apply:
-cage effect, β-relaxation, α-relaxation, glass transition. The key addition is
+cage effect, :math:`\beta`-relaxation, :math:`\alpha`-relaxation, glass transition. The key addition is
 **wave-vector resolution** of the dynamics.
 
 **Why k-dependence matters:**
@@ -93,7 +93,7 @@ cage effect, β-relaxation, α-relaxation, glass transition. The key addition is
    gives absolute stress values without empirical modulus
 
 The ISM model is the most faithful representation of MCT for colloidal glasses,
-but requires S(k) as input and is computationally more expensive than F₁₂.
+but requires S(k) as input and is computationally more expensive than F_1_2.
 
 Structure Factor Input
 ----------------------
@@ -107,7 +107,7 @@ For hard spheres, the analytic Percus-Yevick solution provides S(k):
 
    model = ITTMCTIsotropic(phi=0.55)  # Uses Percus-Yevick automatically
 
-The glass transition occurs at φ_MCT ≈ 0.516 for hard spheres.
+The glass transition occurs at :math:`\phi_{MCT}` ≈ 0.516 for hard spheres.
 
 User-Provided S(k)
 ~~~~~~~~~~~~~~~~~~
@@ -138,27 +138,27 @@ Parameters
      - Bounds
      - Units
      - Physical Meaning
-   * - φ
+   * - :math:`\phi`
      - 0.55
      - (0.1, 0.64)
      - —
-     - Volume fraction (glass at φ ≈ 0.516)
-   * - σ_d
-     - 10⁻⁶
-     - (10⁻⁹, 10⁻³)
+     - Volume fraction (glass at :math:`\phi` ≈ 0.516)
+   * - :math:`\sigma_d`
+     - 10⁻^6
+     - (10⁻^9, 10⁻^3)
      - m
      - Particle diameter
-   * - D₀
-     - 10⁻¹²
-     - (10⁻¹⁸, 10⁻⁶)
-     - m²/s
+   * - D_0
+     - 10⁻^1^2
+     - (10⁻^1^8, 10⁻^6)
+     - m^2/s
      - Bare short-time diffusion coefficient
    * - k_BT
-     - 4.1×10⁻²¹
-     - (10⁻²⁴, 10⁻¹⁸)
+     - 4.1×10⁻^2^1
+     - (10⁻^2^4, 10⁻^1^8)
      - J
      - Thermal energy
-   * - γ_c
+   * - :math:`\gamma_c`
      - 0.1
      - (0.01, 0.5)
      - —
@@ -356,7 +356,7 @@ Validity and Assumptions
 
 **When ISM works well:**
 
-- Dense colloidal suspensions (φ > 0.4 for hard spheres)
+- Dense colloidal suspensions (:math:`\phi` > 0.4 for hard spheres)
 - Monodisperse or narrow size distribution
 - No attractive interactions (or weak compared to entropic caging)
 - Brownian dynamics (not granular or inertial)
@@ -364,60 +364,60 @@ Validity and Assumptions
 
 **Limitations:**
 
-- Computationally expensive (O(n_k² × N) vs O(N) for F₁₂)
+- Computationally expensive (O(n_k^2 × N) vs O(N) for F_1_2)
 - Requires accurate S(k) input
 - Assumes isotropic structure under shear (no shear-induced ordering)
 - No hopping or activated processes (important deep in glass)
 - Underestimates relaxation times far from transition
 
-**When to simplify to F₁₂:**
+**When to simplify to F_1_2:**
 
 If you don't have S(k) data or if qualitative trends are sufficient, use the
-F₁₂ schematic model instead. ISM is for quantitative comparison with experiments
+F_1_2 schematic model instead. ISM is for quantitative comparison with experiments
 where S(k) is measured via light scattering, X-rays, or neutron scattering.
 
 What You Can Learn
 ------------------
 
-The ISM model extends the F₁₂ schematic with full k-resolution and quantitative predictions from the structure factor S(k). All parameters now have microscopic interpretation tied to colloidal physics.
+The ISM model extends the F_1_2 schematic with full k-resolution and quantitative predictions from the structure factor S(k). All parameters now have microscopic interpretation tied to colloidal physics.
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**φ (Volume Fraction)**:
+:math:`\phi` **(Volume Fraction)**:
    The packing fraction of particles, controlling the glass transition.
 
-   *For graduate students*: φ is the order parameter for the jamming/glass transition in hard spheres. The MCT glass transition occurs at φ_MCT ≈ 0.516, slightly below the random close packing φ_RCP ≈ 0.64. The Percus-Yevick structure factor S(k;φ) becomes singular at φ_MCT, where the self-consistent MCT equation develops a non-zero long-time limit f(k) > 0. The separation from the transition scales as ε ∼ (φ - φ_g)/φ_g.
+   *For graduate students*: :math:`\phi` is the order parameter for the jamming/glass transition in hard spheres. The MCT glass transition occurs at :math:`\phi_{MCT}` ≈ 0.516, slightly below the random close packing :math:`\phi_{RCP}` ≈ 0.64. The Percus-Yevick structure factor S(k; :math:`\phi`) becomes singular at :math:`\phi_{MCT}`, where the self-consistent MCT equation develops a non-zero long-time limit f(k) > 0. The separation from the transition scales as :math:`\varepsilon` ∼ (:math:`\phi` - :math:`\phi_g`)/:math:`\phi_g`.
 
-   *For practitioners*: φ < 0.4 is dilute (fluid), 0.4 < φ < 0.516 is dense fluid (slow but ergodic), φ > 0.516 is glass (yield stress). Fitting φ from rheology requires knowing the particle size σ_d to convert number density to volume fraction. Typical calibration: measure φ gravimetrically or via osmotic pressure.
+   *For practitioners*: :math:`\phi` < 0.4 is dilute (fluid), 0.4 < :math:`\phi` < 0.516 is dense fluid (slow but ergodic), :math:`\phi` > 0.516 is glass (yield stress). Fitting :math:`\phi` from rheology requires knowing the particle size :math:`\sigma_d` to convert number density to volume fraction. Typical calibration: measure :math:`\phi` gravimetrically or via osmotic pressure.
 
-**σ_d (Particle Diameter)**:
+:math:`\sigma_d` **(Particle Diameter)**:
    The hard-sphere diameter used to compute S(k) and set the k-grid resolution.
 
-   *For graduate students*: σ_d sets the characteristic length scale for structural correlations. The S(k) peak occurs at k* ≈ 2π/σ_d (nearest-neighbor spacing). In the microscopic stress formula, σ_d appears implicitly through the k-grid: stress is dominated by modes near k* where S(k) is maximal and S'(k) is large.
+   *For graduate students*: :math:`\sigma_d` sets the characteristic length scale for structural correlations. The S(k) peak occurs at k* ≈ :math:`2\pi/ \sigma_d` (nearest-neighbor spacing). In the microscopic stress formula, :math:`\sigma_d` appears implicitly through the k-grid: stress is dominated by modes near k* where S(k) is maximal and S'(k) is large.
 
-   *For practitioners*: Use σ_d from microscopy (e.g., dynamic light scattering radius), not the hydrodynamic radius. For polydisperse systems, use the number-average diameter. Typical values: 10 nm - 10 μm for colloids.
+   *For practitioners*: Use :math:`\sigma_d` from microscopy (e.g., dynamic light scattering radius), not the hydrodynamic radius. For polydisperse systems, use the number-average diameter. Typical values: 10 nm - 10 :math:`\mu\text{m}` for colloids.
 
-**D₀ (Bare Diffusion Coefficient)**:
-   The short-time (non-interacting) diffusion coefficient, D₀ = k_BT/(6πη_s a) for Stokes-Einstein.
+**D_0 (Bare Diffusion Coefficient)**:
+   The short-time (non-interacting) diffusion coefficient, D_0 = k_BT/(:math:`6\pi \eta_s` a) for Stokes-Einstein.
 
-   *For graduate students*: D₀ sets the bare relaxation rate Γ(k) = k²D₀/S(k). At high k (short wavelengths), S(k) → 1 and Γ(k) ≈ k²D₀ (free diffusion). At the S(k) peak, Γ(k) is strongly suppressed by the large S(k), leading to slow collective relaxation. The long-time diffusion coefficient D_L = D₀/S(0) accounts for thermodynamic slowing.
+   *For graduate students*: D_0 sets the bare relaxation rate :math:`\Gamma(k)` = k^2D_0/S(k). At high k (short wavelengths), S(k) → 1 and :math:`\Gamma(k)` ≈ k^2D_0 (free diffusion). At the S(k) peak, :math:`\Gamma(k)` is strongly suppressed by the large S(k), leading to slow collective relaxation. The long-time diffusion coefficient D_L = D_0/S(0) accounts for thermodynamic slowing.
 
-   *For practitioners*: Measure D₀ from dilute suspension DLS (φ → 0 limit) or calculate from Stokes-Einstein using solvent viscosity η_s. Typical values: 10⁻¹²-10⁻⁹ m²/s for colloids in water.
+   *For practitioners*: Measure D_0 from dilute suspension DLS (:math:`\phi` → 0 limit) or calculate from Stokes-Einstein using solvent viscosity :math:`\eta_s`. Typical values: 10⁻^1^2-10⁻^9 m^2/s for colloids in water.
 
 **k_BT (Thermal Energy)**:
    The thermal energy scale, k_B × temperature in Kelvin.
 
-   *For graduate students*: k_BT sets the absolute stress scale in the microscopic formula σ ∼ (k_BT/60π²)∫dk k⁴[S'(k)]²Φ². For hard spheres, the stress is purely entropic (no potential energy), so k_BT is the only energy scale. At room temperature, k_BT ≈ 4.11 × 10⁻²¹ J.
+   *For graduate students*: k_BT sets the absolute stress scale in the microscopic formula :math:`\sigma` ∼ (k_BT/:math:`60\pi^2`)∫dk k^4[S'(k)]\ :math:`^{2\Phi^2}`. For hard spheres, the stress is purely entropic (no potential energy), so k_BT is the only energy scale. At room temperature, k_BT ≈ 4.11 × 10⁻^2^1 J.
 
-   *For practitioners*: Use k_BT = 4.11×10⁻²¹ J at 25°C. For temperature-dependent studies, scale k_BT linearly with T. If fitted stress is off by a factor of 2, check if the effective temperature differs from solvent temperature (non-equilibrium heating).
+   *For practitioners*: Use k_BT = 4.11×10⁻^2^1 J at 25°C. For temperature-dependent studies, scale k_BT linearly with T. If fitted stress is off by a factor of 2, check if the effective temperature differs from solvent temperature (non-equilibrium heating).
 
-**γ_c (Critical Strain)**:
-   The cage-breaking strain scale (same as F₁₂ schematic).
+:math:`\gamma_c` **(Critical Strain)**:
+   The cage-breaking strain scale (same as F_1_2 schematic).
 
-   *For graduate students*: γ_c appears in the strain decorrelation h(γ) = exp[-(γ/γ_c)²]. For hard spheres, γ_c ≈ 0.05-0.1 corresponds to the Lindemann parameter: the ratio of thermal vibration amplitude to particle spacing. Unlike the schematic model, γ_c in ISM is the only remaining fit parameter—all other quantities are determined by φ, σ_d, D₀, k_BT, and S(k).
+   *For graduate students*: :math:`\gamma_c` appears in the strain decorrelation h(:math:`\gamma`) = exp[-(:math:`\gamma/\gamma_c`)^2]. For hard spheres, :math:`\gamma_c` ≈ 0.05-0.1 corresponds to the Lindemann parameter: the ratio of thermal vibration amplitude to particle spacing. Unlike the schematic model, :math:`\gamma_c` in ISM is the only remaining fit parameter—all other quantities are determined by :math:`\phi`, :math:`\sigma_d`, D_0, k_BT, and S(k).
 
-   *For practitioners*: Fit γ_c from the shear-thinning onset in flow curves. Smaller γ_c means easier cage breaking. Typical values: 0.05 (rigid hard spheres), 0.15 (soft microgels), 0.3 (polymeric cages).
+   *For practitioners*: Fit :math:`\gamma_c` from the shear-thinning onset in flow curves. Smaller :math:`\gamma_c` means easier cage breaking. Typical values: 0.05 (rigid hard spheres), 0.15 (soft microgels), 0.3 (polymeric cages).
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -426,27 +426,27 @@ Material Classification
    :header-rows: 1
    :widths: 20 20 30 30
 
-   * - φ Range
+   * - :math:`\phi` Range
      - Glass State
      - Typical Materials
      - S(k) Characteristics
-   * - **φ < 0.45**
+   * - :math:`\phi` **< 0.45**
      - Dilute fluid
      - Low-concentration PMMA colloids, silica sols
      - S(k) peak < 2, weak correlations, fast relaxation at all k
-   * - **0.45 < φ < 0.516**
+   * - **0.45 <** :math:`\phi` **< 0.516**
      - Dense fluid
      - Pre-jammed colloids, moderate emulsions
-     - S(k) peak = 2-3, strong correlations, slow but ergodic, critical slowing as φ → φ_g
-   * - **0.516 < φ < 0.55**
+     - S(k) peak = 2-3, strong correlations, slow but ergodic, critical slowing as :math:`\phi` → :math:`\phi_g`
+   * - **0.516 <** :math:`\phi` **< 0.55**
      - Marginal glass
      - Weakly jammed colloids, soft microgel pastes
-     - S(k) peak > 3, non-ergodic Φ(k,t→∞) > 0, small yield stress
-   * - **0.55 < φ < 0.58**
+     - S(k) peak > 3, non-ergodic :math:`\Phi(k,t→∞)` > 0, small yield stress
+   * - **0.55 <** :math:`\phi` **< 0.58**
      - Moderate glass
      - Hard-sphere colloids, carbopol microgels
      - S(k) peak > 4, large f(k), clear yield stress, pronounced plateau
-   * - **φ > 0.58**
+   * - :math:`\phi` **> 0.58**
      - Deep glass/jammed
      - Highly concentrated colloids, dense emulsions
      - S(k) peak > 5, near-complete arrest, large yield stress, approaching RCP
@@ -469,15 +469,15 @@ at multiple k, fit the ISM model to all k simultaneously to validate MCT predict
 Quantitative Stress Predictions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unlike F₁₂ (which has a fitted modulus :math:`G_\infty`), ISM predicts stress
+Unlike F_1_2 (which has a fitted modulus :math:`G_\infty`), ISM predicts stress
 from first principles given:
 
-- Volume fraction φ
-- Particle size σ_d
+- Volume fraction :math:`\phi`
+- Particle size :math:`\sigma_d`
 - Thermal energy k_BT
 - S(k) (from Percus-Yevick or experiment)
 
-**No adjustable stress scale**: The only rheological fit parameter is γ_c
+**No adjustable stress scale**: The only rheological fit parameter is :math:`\gamma_c`
 (critical strain). The absolute stress magnitude is predicted from S(k).
 
 **Validation test**: Compare ISM predictions to experimental flow curves. If
@@ -497,7 +497,7 @@ reveals:
 - **S(k) peak height**: Strength of structural correlations (higher = stronger caging)
 - **S(0)**: Compressibility (diverges at jamming in hard spheres)
 
-**Connection to φ_g**: The glass transition volume fraction φ_g ≈ 0.516 is where
+**Connection to** :math:`\phi_g`: The glass transition volume fraction :math:`\phi_g` ≈ 0.516 is where
 S(k) becomes so large that :math:`\Phi(k, t \to \infty) > 0` for some k.
 
 Fitting Guidance
@@ -523,8 +523,8 @@ If you have a well-characterized colloidal suspension:
 
 **Method 2: Fit to rheological data**
 
-If material properties are unknown, fit φ and γ_c to flow curve data, keeping
-σ_d, D₀, k_BT as physically reasonable estimates.
+If material properties are unknown, fit :math:`\phi` and :math:`\gamma_c` to flow curve data, keeping
+:math:`\sigma_d`, D_0, k_BT as physically reasonable estimates.
 
 Troubleshooting
 ~~~~~~~~~~~~~~~
@@ -537,11 +537,11 @@ Troubleshooting
 **Problem: Predicted stress too high/low**
 
 - Solution: Adjust k_BT (effective thermal energy may differ from room temperature
-  in driven systems) or check if D₀ is correct (hydrodynamic interactions).
+  in driven systems) or check if D_0 is correct (hydrodynamic interactions).
 
 **Problem: Slow computation**
 
-- Solution: Reduce k-grid resolution (``n_k_points`` parameter) or use F₁₂ schematic
+- Solution: Reduce k-grid resolution (``n_k_points`` parameter) or use F_1_2 schematic
   for initial exploration.
 
 Usage
@@ -596,7 +596,7 @@ Update Parameters
 Model Comparison
 ----------------
 
-ISM vs F₁₂
+ISM vs F_1_2
 ~~~~~~~~~~
 
 .. list-table::
@@ -604,23 +604,23 @@ ISM vs F₁₂
    :header-rows: 1
 
    * - Aspect
-     - F₁₂ Schematic
+     - F_1_2 Schematic
      - ISM
    * - Correlators
-     - Single scalar Φ(t)
-     - Array Φ(k,t), n_k points
+     - Single scalar :math:`\Phi(t)`
+     - Array :math:`\Phi(k,t)`, n_k points
    * - S(k) input
      - Not needed
      - Required
    * - Parameters
-     - ε, Γ, γ_c, G_∞
-     - φ, D₀, σ_d, k_BT, γ_c
+     - :math:`\varepsilon`, :math:`\Gamma`, :math:`\gamma_c`, G_∞
+     - :math:`\phi`, D_0, :math:`\sigma_d`, k_BT, :math:`\gamma_c`
    * - Glass transition
-     - At v₂ = 4
-     - At φ ≈ 0.516
+     - At v_2 = 4
+     - At :math:`\phi` ≈ 0.516
    * - Computation
      - O(N) per step
-     - O(n_k² × N)
+     - O(n_k^2 × N)
    * - Best for
      - Fitting, exploration
      - Quantitative predictions
@@ -628,14 +628,14 @@ ISM vs F₁₂
 See Also
 --------
 
-- :doc:`itt_mct_schematic` — Simplified F₁₂ schematic model (faster, no S(k) required)
+- :doc:`itt_mct_schematic` — Simplified F_1_2 schematic model (faster, no S(k) required)
 - :doc:`../sgr/sgr_conventional` — Alternative glass transition framework (trap model)
 - :doc:`../stz/stz_conventional` — Shear transformation zone theory (effective temperature)
 
-**When to use ISM vs F₁₂:**
+**When to use ISM vs F_1_2:**
 
 - **Use ISM** if: S(k) is known, quantitative predictions needed, validating MCT theory
-- **Use F₁₂** if: Fitting rheological data, qualitative trends, faster computation
+- **Use F_1_2** if: Fitting rheological data, qualitative trends, faster computation
 
 API Reference
 -------------

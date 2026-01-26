@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Multi-scale relaxation, hierarchical structures requiring two fractional orders
-- **Parameters:** 4 (c₁, α, β, τ)
+- **Parameters:** 4 (:math:`c_1, \alpha, \beta, \tau`)
 - **Key equation:** :math:`G^*(\omega) = c_1 \frac{(i\omega)^\alpha}{1 + (i\omega\tau)^\beta}`
 - **Test modes:** Oscillation, relaxation
 - **Material examples:** Materials with hierarchical structures, multi-scale relaxation processes
@@ -42,7 +42,7 @@ Notation Guide
      - Units
    * - :math:`c_1`
      - Material constant (sets modulus scale)
-     - Pa·s\ :sup:`α`
+     - Pa·s\ :math:`^{\alpha}`
    * - :math:`\alpha`
      - First fractional order (high-frequency power-law slope)
      - —
@@ -82,20 +82,20 @@ The generalized Fractional Maxwell Model extends the canonical single-order form
 
    [SpringPot (α)] ---- series ---- [SpringPot (β)]
 
-The first SpringPot (α) dominates at high frequencies, while the second (β) controls the transition to low-frequency behavior. The combined effect produces a low-frequency slope of (α+β).
+The first SpringPot (:math:`\alpha`) dominates at high frequencies, while the second (:math:`\beta`) controls the transition to low-frequency behavior. The combined effect produces a low-frequency slope of (:math:`\alpha+\beta`).
 
 **Microstructural Interpretation:**
 
-- **First SpringPot (α)**: Fast relaxation modes from local chain dynamics, segmental motion, or small-scale network rearrangements
-- **Second SpringPot (β)**: Slow relaxation modes from large-scale structural relaxation, cooperative motion, or hierarchical network dynamics
-- **Combined behavior**: Multi-scale relaxation spectrum with two distinct power-law regimes separated by characteristic time τ
+- **First SpringPot (** :math:`\alpha` **)**: Fast relaxation modes from local chain dynamics, segmental motion, or small-scale network rearrangements
+- **Second SpringPot (** :math:`\beta` **)**: Slow relaxation modes from large-scale structural relaxation, cooperative motion, or hierarchical network dynamics
+- **Combined behavior**: Multi-scale relaxation spectrum with two distinct power-law regimes separated by characteristic time :math:`\tau`
 
 **Connection to Molecular Weight Distribution:**
 
 For polymer melts and solutions, the two fractional orders can capture:
 
-1. **α**: Reflects the breadth of high-frequency modes (entanglement dynamics, chain stretching)
-2. **β**: Captures low-frequency modes (reptation, constraint release, branching relaxation)
+1. :math:`\alpha`: Reflects the breadth of high-frequency modes (entanglement dynamics, chain stretching)
+2. :math:`\beta`: Captures low-frequency modes (reptation, constraint release, branching relaxation)
 3. **Dual power-law**: Arises naturally from bimodal or hierarchical molecular weight distributions
 
 This model is particularly suited for:
@@ -244,37 +244,37 @@ This section explains what insights you can extract from fitting the Generalized
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Material Constant (c₁)**:
-   Sets the overall magnitude of the viscoelastic response. Higher c₁ indicates stiffer material behavior.
+**Material Constant (** :math:`c_1` **)**:
+   Sets the overall magnitude of the viscoelastic response. Higher :math:`c_1` indicates stiffer material behavior.
 
-   *For graduate students*: c₁ has unusual units (Pa·s^α) due to the fractional calculus framework. It relates to the spectral strength at the highest frequencies measured.
-   *For practitioners*: c₁ scales the entire modulus curve vertically; compare to target stiffness specifications.
+   *For graduate students*: :math:`c_1` has unusual units (Pa·s\ :math:`^{\alpha}`) due to the fractional calculus framework. It relates to the spectral strength at the highest frequencies measured.
+   *For practitioners*: :math:`c_1` scales the entire modulus curve vertically; compare to target stiffness specifications.
 
-**First Fractional Order (α)**:
+**First Fractional Order (** :math:`\alpha` **)**:
    Controls the high-frequency power-law slope. Values closer to 0 indicate more solid-like response at short times, while values closer to 1 indicate more liquid-like (viscous) behavior.
 
-   - **α → 0**: Nearly elastic at short times, very broad relaxation spectrum
-   - **α → 0.5**: Balanced solid-liquid character, critical gel behavior
-   - **α → 1**: Viscous-like, narrower spectrum
+   - :math:`\alpha` **→ 0**: Nearly elastic at short times, very broad relaxation spectrum
+   - :math:`\alpha` **→ 0.5**: Balanced solid-liquid character, critical gel behavior
+   - :math:`\alpha` **→ 1**: Viscous-like, narrower spectrum
 
-   *For graduate students*: α quantifies the polydispersity of the fast relaxation modes in the material's microstructure.
-   *For practitioners*: Lower α means more complex short-time behavior (important for impact loading).
+   *For graduate students*: :math:`\alpha` quantifies the polydispersity of the fast relaxation modes in the material's microstructure.
+   *For practitioners*: Lower :math:`\alpha` means more complex short-time behavior (important for impact loading).
 
-**Second Fractional Order (β)**:
-   Governs the transition behavior and low-frequency power-law slope. Together with α, determines the total low-frequency slope (α+β).
+**Second Fractional Order (** :math:`\beta` **)**:
+   Governs the transition behavior and low-frequency power-law slope. Together with :math:`\alpha`, determines the total low-frequency slope (:math:`\alpha+\beta`).
 
-   - **β → 0**: Sharp transition, elastic-like at long times
-   - **β → 0.5**: Gradual transition
-   - **β → 1**: Viscous-like at long times
+   - :math:`\beta` **→ 0**: Sharp transition, elastic-like at long times
+   - :math:`\beta` **→ 0.5**: Gradual transition
+   - :math:`\beta` **→ 1**: Viscous-like at long times
 
-   *For graduate students*: β captures slow relaxation mechanisms (network rearrangements, large-scale structural relaxation).
-   *For practitioners*: Higher β indicates more liquid-like long-time response.
+   *For graduate students*: :math:`\beta` captures slow relaxation mechanisms (network rearrangements, large-scale structural relaxation).
+   *For practitioners*: Higher :math:`\beta` indicates more liquid-like long-time response.
 
-**Relaxation Time (τ)**:
-   Characteristic timescale separating the two power-law regimes. Marks the crossover frequency ω ≈ 1/τ.
+**Relaxation Time (** :math:`\tau` **)**:
+   Characteristic timescale separating the two power-law regimes. Marks the crossover frequency :math:`\omega \approx 1/\tau`.
 
-   *For graduate students*: τ is temperature-dependent via WLF or Arrhenius, enabling time-temperature superposition.
-   *For practitioners*: Compare τ to service timescales to predict whether material will exhibit regime 1 (α-dominated) or regime 2 (α+β-dominated) behavior.
+   *For graduate students*: :math:`\tau` is temperature-dependent via WLF or Arrhenius, enabling time-temperature superposition.
+   *For practitioners*: Compare :math:`\tau` to service timescales to predict whether material will exhibit regime 1 (:math:`\alpha-dominated`) or regime 2 (:math:`\alpha+\beta-dominated`) behavior.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -287,19 +287,19 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - α ≈ β ≈ 0.5
+   * - :math:`\alpha \approx \beta` ≈ 0.5
      - Single-scale fractional
      - Use simpler FMG/FML
      - Unnecessary complexity
-   * - α < 0.3, β > 0.6
+   * - :math:`\alpha < 0.3, \beta` > 0.6
      - Hierarchical relaxation
      - Polymer blends, composites
      - Multi-timescale processing needed
-   * - α > 0.7, β < 0.3
+   * - :math:`\alpha > 0.7, \beta` < 0.3
      - Viscous with elastic memory
      - Solutions with entanglements
      - Flow-dominated but elastic recoil
-   * - \|α - β\| > 0.4
+   * - :math:`|\alpha - \beta|` > 0.4
      - Two-scale structure
      - Filled polymers, micellar
      - Distinct fast/slow mechanisms
@@ -341,7 +341,7 @@ Fitting Guidance
 **Common Pitfalls:**
 
 - **Overfitting**: Too many parameters for limited data; verify with cross-validation
-- **Parameter correlation**: α and β may be poorly constrained; report confidence intervals
+- **Parameter correlation**: :math:`\alpha and \beta` may be poorly constrained; report confidence intervals
 - **Insufficient data range**: Need 4+ decades to resolve both power-law regimes
 
 Usage
@@ -445,7 +445,7 @@ Related Models
 - :doc:`fractional_maxwell_gel` — canonical single-order form (SpringPot + dashpot) for gels with terminal flow
 - :doc:`fractional_maxwell_liquid` — canonical single-order form (spring + SpringPot) for viscoelastic liquids
 - :doc:`fractional_burgers` — adds a Kelvin element to capture additional retardation and creep compliance
-- :doc:`../classical/maxwell` — classical limit (α = β = 1, exponential relaxation)
+- :doc:`../classical/maxwell` — classical limit (:math:`\alpha = \beta` = 1, exponential relaxation)
 - :doc:`../classical/springpot` — fundamental SpringPot element theory
 
 Related Concepts

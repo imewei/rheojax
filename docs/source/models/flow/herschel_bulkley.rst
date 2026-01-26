@@ -123,7 +123,7 @@ Material Behavior Guide
    :header-rows: 1
 
    * - Material Class
-     - σ_y (Pa)
+     - :math:`\sigma_y` (Pa)
      - K (Pa·s\ :sup:`n`)
      - n
      - Notes
@@ -146,7 +146,7 @@ Material Behavior Guide
      - 10–200
      - 50–500
      - 0.2–0.5
-     - Self-compacting has lower σ_y
+     - Self-compacting has lower :math:`\sigma_y`
    * - **Ketchup**
      - 10–50
      - 5–20
@@ -205,7 +205,7 @@ When to Use Alternatives
    * - Fitted n ≈ 1 (within ±0.1)
      - Newtonian post-yield
      - :doc:`bingham` (simpler)
-   * - Fitted σ_y ≈ 0
+   * - Fitted :math:`\sigma_y` ≈ 0
      - No yield stress
      - :doc:`power_law` or :doc:`carreau`
    * - Thixotropic hysteresis
@@ -224,16 +224,16 @@ material insights and actionable knowledge.
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Yield Stress (σ_y)**:
+**Yield Stress (** :math:`\sigma_y` **)**:
    The yield stress reveals the strength of the material's microstructural network:
 
-   - **σ_y < 10 Pa**: Weak network. Material will flow under its own weight or
+   - :math:`\sigma_y` **< 10 Pa**: Weak network. Material will flow under its own weight or
      light handling. Common in dilute suspensions and thin gels.
 
-   - **10 < σ_y < 100 Pa**: Moderate network. Material holds shape against gravity
+   - **10 <** :math:`\sigma_y` **< 100 Pa**: Moderate network. Material holds shape against gravity
      but yields to reasonable forces. Typical for most commercial pastes.
 
-   - **σ_y > 100 Pa**: Strong network. Requires significant force to initiate
+   - :math:`\sigma_y` **> 100 Pa**: Strong network. Requires significant force to initiate
      flow. Common in stiff pastes like toothpaste and cement.
 
    *For graduate students*: The yield stress scales with microstructural
@@ -307,19 +307,19 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Process Implications
-   * - High σ_y, low n
+   * - High :math:`\sigma_y`, low n
      - Stiff, thinning paste
      - Toothpaste, grease
      - Extrusion-based processing
-   * - Moderate σ_y, n ≈ 0.5
+   * - Moderate :math:`\sigma_y`, n ≈ 0.5
      - Standard paste
      - Mayo, lotions
      - Conventional pumping/mixing
-   * - Low σ_y, n close to 1
+   * - Low :math:`\sigma_y`, n close to 1
      - Near-Bingham
      - Thin suspensions
      - Consider Bingham model
-   * - High σ_y, n close to 1
+   * - High :math:`\sigma_y`, n close to 1
      - Stiff plastic
      - Cement, clay
      - High-pressure extrusion
@@ -345,16 +345,16 @@ Diagnostic Indicators
 
 Warning signs in fitted parameters:
 
-- **σ_y → 0 or negative**: Data may not have a true yield stress. Consider
+- :math:`\sigma_y` **→ 0 or negative**: Data may not have a true yield stress. Consider
   Power-Law or Carreau model. Check that low-rate data is reliable.
 
 - **n > 1**: Shear-thickening post-yield is rare. Check for inertial artifacts,
   Taylor vortices, or slip at high rates.
 
-- **K very small with high σ_y**: Unusual combination. Check units and data
+- **K very small with high** :math:`\sigma_y`: Unusual combination. Check units and data
   scaling.
 
-- **Strong parameter correlations**: Especially σ_y–K correlation. Extend
+- **Strong parameter correlations**: Especially :math:`\sigma_y`– :math:`K` correlation. Extend
   measurement range; ensure data spans transition region well.
 
 - **Systematic residuals at low rates**: May indicate wall slip or viscoelastic
@@ -600,7 +600,7 @@ Related Flow Models
 ~~~~~~~~~~~~~~~~~~~
 
 - :doc:`bingham` — Special case with n = 1 (linear post-yield)
-- :doc:`power_law` — Special case with σ_y = 0 (no yield stress)
+- :doc:`power_law` — Special case with :math:`\sigma_y = 0` (no yield stress)
 - :doc:`carreau` — For materials without yield stress
 - :doc:`cross` — Alternative generalized Newtonian model
 

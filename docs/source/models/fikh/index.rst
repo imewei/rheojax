@@ -12,11 +12,11 @@ The FIKH family extends the classical :doc:`../ikh/index` framework by replacing
 structure kinetics with a **Caputo fractional derivative**. This captures the
 **power-law memory** observed in many complex fluids:
 
-- **Standard IKH (α = 1)**: Exponential recovery :math:`\lambda \sim \exp(-t/\tau)`
-- **Fractional FIKH (α < 1)**: Power-law recovery :math:`\lambda \sim t^{\alpha-1}` at long times
+- **Standard IKH (** :math:`\alpha` **= 1)**: Exponential recovery :math:`\lambda \sim \exp(-t/\tau)`
+- **Fractional FIKH (** :math:`\alpha` **< 1)**: Power-law recovery :math:`\lambda \sim t^{\alpha-1}` at long times
 
 Fractional derivatives introduce a fading memory where recent deformation history
-affects the current structure more than distant past. This single parameter α captures
+affects the current structure more than distant past. This single parameter :math:`\alpha` captures
 a broad distribution of restructuring timescales without requiring multiple modes.
 
 **Thermokinematic coupling** adds:
@@ -60,7 +60,7 @@ Experimental Signatures
 
 **Use FIKH when you observe**:
 
-1. **Power-law stress relaxation** at long times: G(t) ~ t^(-α), not exp(-t/τ)
+1. **Power-law stress relaxation** at long times: G(t) ~ t^(-:math:`\alpha`), not exp(-t/:math:`\tau`)
 2. **Stretched exponential recovery** after shear cessation
 3. **Broad relaxation spectrum** in frequency sweep (Cole-Cole depression)
 4. **Delayed yielding** in creep tests below apparent yield stress
@@ -106,7 +106,7 @@ Model Comparison
    * - Hierarchical structure
      - Limited
      - ✓ Use this
-   * - When α → 1 (exponential)
+   * - When :math:`\alpha` → 1 (exponential)
      - Consider MIKH
      - Consider ML-IKH
 
@@ -120,7 +120,7 @@ Material-Specific Recommendations
 
    * - Material
      - Recommended Model
-     - Typical α
+     - Typical :math:`\alpha`
      - Key Protocol
    * - Waxy crude oils
      - FIKH (thermal)
@@ -154,7 +154,7 @@ Key Features
 **Fractional Structure Evolution:**
 
 - Caputo derivative captures power-law fading memory
-- Single α parameter spans exponential (α=1) to strong memory (α→0)
+- Single :math:`\alpha` parameter spans exponential (:math:`\alpha=1`) to strong memory (:math:`\alpha \to 0`)
 - Mittag-Leffler relaxation generalizes the exponential
 
 **Armstrong-Frederick Kinematic Hardening:**

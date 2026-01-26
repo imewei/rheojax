@@ -22,7 +22,7 @@
 
    .. math::
 
-      \\frac{d\\lambda}{dt} = \\underbrace{\\frac{1-\\lambda}{t_{eq}}}_{\\text{aging}} - \\underbrace{a\\lambda|\\dot{\\gamma}|^c/t_{eq}}_{\\text{rejuvenation}}
+      \frac{d\lambda}{dt} = \underbrace{\frac{1-\lambda}{t_{eq}}}_{\text{aging}} - \underbrace{a\lambda|\dot{\gamma}|^c/t_{eq}}_{\text{rejuvenation}}
 
    where :math:`t_{eq}` is equilibration time, :math:`a` is breakdown rate, and :math:`c` is
    shear-rate exponent.

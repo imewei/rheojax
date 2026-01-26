@@ -20,15 +20,15 @@ Where:
 
 - :math:`\boldsymbol{\tau}` is the polymer extra stress tensor
 - :math:`\lambda` is the relaxation time
-- :math:`\alpha` is the mobility factor (0 ≤ α ≤ 0.5)
+- :math:`\alpha` is the mobility factor (0 ≤ :math:`\alpha` ≤ 0.5)
 - :math:`\eta_p` is the polymer viscosity
 - :math:`\overset{\nabla}{\boldsymbol{\tau}}` is the upper-convected derivative
 - :math:`\mathbf{D}` is the rate-of-deformation tensor
 
-The mobility factor α controls shear-thinning:
+The mobility factor :math:`\alpha` controls shear-thinning:
 
-- **α = 0**: Recovers UCM (no shear-thinning)
-- **α = 0.5**: Maximum anisotropy/shear-thinning
+- :math:`\alpha` **= 0**: Recovers UCM (no shear-thinning)
+- :math:`\alpha` **= 0.5**: Maximum anisotropy/shear-thinning
 
 
 Model Variants
@@ -55,7 +55,7 @@ Key Features
 
    \eta(\dot{\gamma}) = \eta_s + \eta_p \cdot f(\text{Wi})
 
-where f(Wi) decreases with Weissenberg number Wi = λγ̇.
+where f(Wi) decreases with Weissenberg number Wi = :math:`\lambda\dot{\gamma}`.
 
 **Normal Stress Differences:**
 
@@ -71,7 +71,7 @@ where f(Wi) decreases with Weissenberg number Wi = λγ̇.
 
    \frac{N_2}{N_1} = -\frac{\alpha}{2}
 
-This provides a direct experimental route to determine α.
+This provides a direct experimental route to determine :math:`\alpha`.
 
 
 Supported Protocols
@@ -86,10 +86,10 @@ Supported Protocols
      - Notes
    * - FLOW_CURVE
      - Analytical
-     - Steady shear σ(γ̇), η(γ̇)
+     - Steady shear :math:`\sigma(\dot{\gamma})`, :math:`\eta(\dot{\gamma})`
    * - OSCILLATION
      - Analytical
-     - SAOS G'(ω), G''(ω) (α-independent)
+     - SAOS G'(:math:`\omega`), G''(:math:`\omega`) (:math:`\alpha`-independent)
    * - STARTUP
      - ODE (diffrax)
      - Stress overshoot at constant rate
@@ -101,7 +101,7 @@ Supported Protocols
      - Strain evolution under constant stress
    * - LAOS
      - ODE + FFT
-     - Nonlinear harmonics I₃, I₅, ...
+     - Nonlinear harmonics :math:`I_3`, :math:`I_5`, ...
 
 
 Quick Start
@@ -164,8 +164,8 @@ When to Use Giesekus
 
 ::
 
-   Is N₂ measurable (negative)?
-   ├── YES → Giesekus captures N₂/N₁ = -α/2
+   Is N_2 measurable (negative)?
+   ├── YES → Giesekus captures N_2/N_1 = -α/2
    │
    └── NO → Is only shear-thinning needed?
        ├── YES → Consider simpler Carreau/Cross
@@ -178,7 +178,7 @@ When to Use Giesekus
    :header-rows: 1
 
    * - Material
-     - Typical α
+     - Typical :math:`\alpha`
      - n_modes
      - Key Protocol
    * - Polymer melts

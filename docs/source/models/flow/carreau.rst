@@ -67,7 +67,7 @@ Molecular Interpretation
 
 The Carreau model captures the macroscopic consequences of molecular-scale phenomena in polymer systems:
 
-**Low shear rates (Newtonian plateau :math:`\eta_0`)**:
+**Low shear rates (Newtonian plateau** :math:`\eta_0` **)**:
    At rest or very low shear, polymer chains are in their equilibrium conformations. Chain entanglements form a temporary network. The viscosity is determined by the friction of chains moving past each other:
 
    - Entangled chains must reptate (snake) through the entanglement tube
@@ -82,7 +82,7 @@ The Carreau model captures the macroscopic consequences of molecular-scale pheno
    - Chain-chain friction decreases
    - Viscosity drops following power law: :math:`\eta \sim \dot{\gamma}^{n-1}`
 
-**High shear rates (Second Newtonian plateau :math:`\eta_{\infty}`)**:
+**High shear rates (Second Newtonian plateau** :math:`\eta_{\infty}` **)**:
    At very high shear:
 
    - Chains are fully oriented in flow direction
@@ -367,7 +367,7 @@ Data Requirements
 - **Required**: Flow curve :math:`\eta(\dot{\gamma})` or :math:`\sigma(\dot{\gamma})` from steady shear
 - **Shear rate range**: At least 3 decades, ideally 4-5 decades
 - **Coverage**: Should span both plateaus and power-law region
-- **Recommended**: :math:`\dot{\gamma} = 10^{-2}` to :math:`10^{4}` s⁻¹ for polymers
+- **Recommended**: :math:`\dot{\gamma} = 10^{-2}` to :math:`10^{4}` s\ :math:`^{-1}` for polymers
 
 Limitations
 ~~~~~~~~~~~
@@ -537,7 +537,7 @@ Recommended Test Protocol
    - Verify temperature uniformity (< 0.5°C variation)
 
 **Step 3: Flow curve measurement**
-   - Sweep shear rate: :math:`10^{-2}` to :math:`10^{3}` s⁻¹ (or instrument limit)
+   - Sweep shear rate: :math:`10^{-2}` to :math:`10^{3}` s\ :math:`^{-1}` (or instrument limit)
    - Log spacing: 5-10 points per decade
    - Measurement time: Auto (until stress steady) or 30 s minimum
    - Direction: Ascending preferred (avoid thixotropic artifacts)

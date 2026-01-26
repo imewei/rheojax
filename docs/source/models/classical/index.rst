@@ -16,13 +16,13 @@ Quick Reference
      - Parameters
      - Use Case
    * - :doc:`maxwell`
-     - 2 (G, η)
+     - 2 (G, :math:`\eta`)
      - Stress relaxation, simple viscoelastic liquids
    * - :doc:`zener`
-     - 3 (G₁, G₂, η)
+     - 3 (:math:`G_1, G_2, \eta`)
      - Solids with single relaxation time, standard linear solid
    * - :doc:`springpot`
-     - 2 (c_α, α)
+     - 2 (:math:`c_{\alpha, \alpha}`)
      - Power-law behavior, fractional element, broad spectra
 
 
@@ -123,19 +123,19 @@ Key Parameters
      - Pa
      - Elastic stiffness (energy storage)
    * - Viscosity
-     - η
+     - :math:`\eta`
      - Pa·s
      - Resistance to flow (energy dissipation)
    * - Relaxation time
-     - τ
+     - :math:`\tau`
      - s
-     - τ = η/G, characteristic timescale
+     - :math:`\tau = \eta/G`, characteristic timescale
    * - SpringPot constant
-     - c_α
-     - Pa·s^α
+     - :math:`c_{\alpha}`
+     - Pa·s\ :math:`^{\alpha}`
      - Quasi-property (fractional element)
    * - Fractional order
-     - α
+     - :math:`\alpha`
      - —
      - 0 = elastic, 1 = viscous, 0.5 = critical gel
 

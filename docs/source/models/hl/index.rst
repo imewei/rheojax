@@ -18,7 +18,7 @@ Quick Reference
      - Parameters
      - Use Case
    * - :doc:`hebraud_lequeux`
-     - 4-5 (G, σ_c, τ, α, D)
+     - 4-5 (G, :math:`\sigma_c`, :math:`\tau`, :math:`\alpha`, D)
      - Mean-field plasticity, noise-activated flow, soft glasses
 
 
@@ -35,7 +35,7 @@ framework for yield stress fluids.
 
 - **Mean-field approach**: Material represented as ensemble of mesoscopic elements
 - **Elastic loading**: Elements store stress until yield threshold
-- **Plastic yielding**: Stress released when local stress exceeds σ_c
+- **Plastic yielding**: Stress released when local stress exceeds :math:`\sigma_c`
 - **Noise activation**: Plastic events occur with rate proportional to noise amplitude
 - **Mechanical noise**: Yielding events generate noise that activates neighbors
 
@@ -56,15 +56,15 @@ Physical Framework
 **Mesoscopic Elements:**
 
 The material is coarse-grained into identical mesoscopic elements, each
-characterized by local stress σ_el. Elements:
+characterized by local stress :math:`\sigma_{el}`. Elements:
 
-1. **Load elastically**: dσ_el/dt = G·γ̇ under macroscopic shear
-2. **Yield plastically**: Reset to σ_el = 0 when |σ_el| > σ_c
+1. **Load elastically**: :math:`d\sigma_{el}`/dt = G\ :math:`\cdot \dot{\gamma}` under macroscopic shear
+2. **Yield plastically**: Reset to :math:`\sigma_{el}` = 0 when :math:`|\sigma_{el}|` > :math:`\sigma_c`
 3. **Relax via noise**: Activated hopping with rate ~ exp(-U/D) where D is noise
 
 **Stress Distribution:**
 
-The probability distribution P(σ_el, t) of local stresses evolves according to a
+The probability distribution P(:math:`\sigma_{el}`, t) of local stresses evolves according to a
 Fokker-Planck equation with:
 
 - Convective flux from elastic loading
@@ -94,19 +94,19 @@ Key Parameters
      - Pa
      - Stiffness of mesoscopic elements
    * - Yield threshold
-     - σ_c
+     - :math:`\sigma_c`
      - Pa
      - Local stress for plastic yielding
    * - Noise amplitude
      - D
-     - Pa²
+     - Pa^2
      - Strength of mechanical noise
    * - Relaxation time
-     - τ
+     - :math:`\tau`
      - s
      - Microscopic relaxation timescale
    * - Noise coupling
-     - α
+     - :math:`\alpha`
      - —
      - Rate of plastic events generating noise
 
@@ -122,7 +122,7 @@ The HL model predicts a yield stress with continuous transition:
 
    \sigma(\dot{\gamma}) = \sigma_y + \eta_{eff}\dot{\gamma}^n
 
-where σ_y depends on G, σ_c, and D.
+where :math:`\sigma_y` depends on G, :math:`\sigma_c`, and D.
 
 **Oscillatory Response:**
 

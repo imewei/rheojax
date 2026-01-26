@@ -213,7 +213,7 @@ Step-by-Step Procedure
 
 **Output:** Mutation number :math:`\delta(t)`, flags for quasi-steady validation.
 
-1. **Smooth :math:`\phi(t)`** with :class:`SmoothDerivative` configured for the noise spectrum:
+1. **Smooth** :math:`\phi(t)` with :class:`SmoothDerivative` configured for the noise spectrum:
 
    .. code-block:: python
 

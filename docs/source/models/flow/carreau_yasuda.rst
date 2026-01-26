@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Abrupt viscosity transitions, sharp changes between plateaus
-- **Parameters:** 5 (η₀, η∞, λ, n, a)
+- **Parameters:** 5 (:math:`\eta_0`, :math:`\eta_\infty`, :math:`\lambda`, n, a)
 - **Key equation:** :math:`\eta = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda\dot{\gamma})^{a}]^{(n-1)/a}`
 - **Test modes:** Flow (steady shear)
 - **Material examples:** Wormlike micelles, highly filled polymers, materials with sharp transitions
@@ -206,8 +206,8 @@ Material Behavior Guide
    :header-rows: 1
 
    * - Material Class
-     - η₀ (Pa·s)
-     - η∞ (Pa·s)
+     - :math:`\eta_0` (Pa·s)
+     - :math:`\eta_\infty` (Pa·s)
      - n
      - a
      - Notes
@@ -282,7 +282,7 @@ When to Use Alternatives
      - Carreau-Yasuda overparameterized
      - :doc:`carreau` (4 parameters)
    * - No visible zero-shear plateau
-     - η₀ unconstrained
+     - :math:`\eta_0` unconstrained
      - :doc:`power_law` or :doc:`cross`
    * - Stress intercept at zero rate
      - Material has yield stress
@@ -317,7 +317,7 @@ Parameter Interpretation
      Common in branched polymers and materials with multiple structural components.
 
    *For graduate students*: The Yasuda exponent connects to the Cole-Davidson
-   parameter in dielectric relaxation and the stretched exponential β in KWW
+   parameter in dielectric relaxation and the stretched exponential :math:`\beta` in KWW
    relaxation. Lower :math:`a` corresponds to more exponential (single-mode)
    relaxation; higher :math:`a` corresponds to stretched relaxation.
 
@@ -325,7 +325,7 @@ Parameter Interpretation
    instabilities. If :math:`a < 1.5`, consider whether sudden viscosity drops
    might cause flow instabilities or poor coating uniformity.
 
-**Relaxation Time (λ)**:
+**Relaxation Time (** :math:`\lambda` **)**:
    The relaxation time identifies the critical shear rate for structural response:
 
    - **Critical shear rate**: :math:`\dot{\gamma}_c = 1/\lambda` marks where
@@ -339,10 +339,10 @@ Parameter Interpretation
    :math:`\tau_d \propto M_w^{3.4}/c^{1.5}` (reptation theory).
 
    *For practitioners*: Compare :math:`\lambda` to process timescales. Coating
-   at 100 s⁻¹ with :math:`\lambda = 0.1` s gives :math:`Wi = 10`—firmly in the
+   at 100 s\ :math:`^{-1}` with :math:`\lambda = 0.1` s gives :math:`Wi = 10`—firmly in the
    power-law regime with good leveling.
 
-**Viscosity Ratio (η₀/η∞)**:
+**Viscosity Ratio (** :math:`\eta_0/\eta_\infty` **)**:
    The ratio of plateau viscosities quantifies total thinning capacity:
 
    - **Small ratio (< 10)**: Mild thinning; limited shear-rate sensitivity
@@ -359,7 +359,7 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - Low a, high η₀/η∞
+   * - Low a, high :math:`\eta_0/\eta_\infty`
      - Sharp transition, breakable network
      - Wormlike micelles, associative gels
      - Shear-banding risk, flow instabilities
@@ -367,7 +367,7 @@ Material Classification
      - Standard polymer behavior
      - Linear polymer solutions, melts
      - Predictable processing, stable flow
-   * - High a, high η₀
+   * - High a, high :math:`\eta_0`
      - Broad relaxation spectrum
      - Branched polymers, blends
      - Wide processing window, forgiving
@@ -398,13 +398,13 @@ Warning signs in fitted parameters:
 - **a approaching bounds**: If :math:`a < 0.5` or :math:`a > 4`, the model may
   be compensating for other issues (yield stress, data artifacts).
 
-- **λ at measurement bounds**: If :math:`\lambda` equals 1/(max shear rate) or
+- :math:`\lambda` **at measurement bounds**: If :math:`\lambda` equals 1/(max shear rate) or
   1/(min shear rate), the transition is outside your measurement window.
 
-- **Strong a-λ correlation**: These parameters are inherently correlated. Consider
+- **Strong a-** :math:`\lambda` **correlation**: These parameters are inherently correlated. Consider
   fixing one based on literature or prior measurements.
 
-- **η∞ > η₀**: Physically impossible. Check data for slip or inertia at high rates.
+- :math:`\eta_\infty > \eta_0`: Physically impossible. Check data for slip or inertia at high rates.
 
 Experimental Design
 -------------------
@@ -412,7 +412,7 @@ Experimental Design
 Recommended Protocol
 ~~~~~~~~~~~~~~~~~~~~
 
-1. **Wide shear rate range**: Span at least 4 decades, ideally 6 (0.01–10,000 s⁻¹).
+1. **Wide shear rate range**: Span at least 4 decades, ideally 6 (0.01–10,000 s\ :math:`^{-1}`).
 
 2. **Logarithmic spacing**: Use 10 points per decade for good resolution.
 
@@ -434,13 +434,13 @@ Geometry Selection
    * - Shear Rate Range
      - Geometry
      - Notes
-   * - 0.001–100 s⁻¹
+   * - 0.001–100 s\ :math:`^{-1}`
      - Cone-plate (1–2°)
      - Uniform shear rate; best for low rates
-   * - 0.1–1000 s⁻¹
+   * - 0.1–1000 s\ :math:`^{-1}`
      - Parallel plate
      - Adjustable gap; good for moderate rates
-   * - 10–10,000 s⁻¹
+   * - 10–10,000 s\ :math:`^{-1}`
      - Capillary
      - Best for high rates; requires Rabinowitsch correction
    * - Full range
@@ -509,13 +509,13 @@ Troubleshooting
    * - a → upper bound
      - Effectively Newtonian
      - Use Carreau or simpler model
-   * - λ poorly constrained
+   * - :math:`\lambda` poorly constrained
      - Transition outside data range
      - Extend shear rate range
-   * - η∞ negative
+   * - :math:`\eta_\infty` negative
      - Optimization artifact
-     - Constrain η∞ ≥ 0; check high-rate data
-   * - Strong a-λ correlation
+     - Constrain :math:`\eta_{\infty}` ≥ 0; check high-rate data
+   * - Strong a-:math:`\lambda` correlation
      - Insufficient transition data
      - Fix a = 2 or increase mid-range points
 

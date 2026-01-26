@@ -6,7 +6,7 @@ Quick Reference
 
 - **Use when:** Amorphous solids, metallic glasses, colloidal suspensions near jamming, emulsions, granular matter
 
-- **Parameters:** 10 (G₀, σ_y, χ_∞, τ₀, ε₀, c₀, e_Z, τ_β, m_∞, Γ_m)
+- **Parameters:** 10 (:math:`G_0, \sigma_y, \chi_{\infty}, \tau_0, \varepsilon_0, c_0, e_Z, \tau_\beta, m_{\infty}, \Gamma_m`)
 
 - **Key equation:** :math:`\dot{\varepsilon}^{pl} = \frac{\varepsilon_0}{\tau_0} \Lambda(\chi) \mathcal{C}(s) \mathcal{T}(s)`
 
@@ -140,7 +140,7 @@ Simulation Setup
    periodic boundary conditions. Strain rates ranged from :math:`10^{-4}` to
    :math:`10^{-2}` per unit time.
 
-The D²_min Diagnostic
+The :math:`D^2_min` Diagnostic
 ~~~~~~~~~~~~~~~~~~~~~
 
 Falk and Langer introduced the :math:`D^2_{\min}` diagnostic to identify nonaffine
@@ -155,7 +155,7 @@ where :math:`\mathbf{d}_j(t)` is the displacement of neighbor :math:`j` relative
 particle :math:`i` at time :math:`t`. High values of :math:`D^2_{\min}` identify
 particles undergoing plastic rearrangements.
 
-**Key findings from D²_min analysis:**
+**Key findings from** :math:`D^2_min` **analysis:**
 
 1. **Localization**: Plastic activity is concentrated in localized regions (~5-10
    particles), validating the STZ concept
@@ -239,16 +239,16 @@ of small groups of particles.
 The STZ concept identifies these rearrangements with mesoscopic regions (5-10
 particles) that can flip between two stable configurations under stress. The
 flipping is an activated process, with the activation barrier depending on the
-local structural disorder (effective temperature χ).
+local structural disorder (effective temperature :math:`\chi`).
 
 **Key physical picture:**
 
-1. **Low χ (annealed glass)**: Deep potential energy minima, high barriers, rare
+1. **Low** :math:`\chi` **(annealed glass)**: Deep potential energy minima, high barriers, rare
    STZ flips → solid-like, high yield stress
-2. **High χ (rejuvenated glass)**: Shallow potential, low barriers, frequent flips
+2. **High** :math:`\chi` **(rejuvenated glass)**: Shallow potential, low barriers, frequent flips
    → fluid-like, low yield stress
-3. **Flow-induced heating**: Plastic dissipation increases χ (rejuvenation)
-4. **Aging**: Quiescent relaxation decreases χ (annealing)
+3. **Flow-induced heating**: Plastic dissipation increases :math:`\chi` (rejuvenation)
+4. **Aging**: Quiescent relaxation decreases :math:`\chi` (annealing)
 
 Thermodynamic Constraints
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -306,8 +306,8 @@ constraint uniquely determines the coupling between stress and STZ dynamics.
 
 At steady state, the mechanical work is partitioned as:
 
-- **Fraction to heat**: :math:`\approx 1 - \chi/\chi_\infty` (most work → heat at low χ)
-- **Fraction to disorder**: :math:`\approx \chi/\chi_\infty` (more stored at high χ)
+- **Fraction to heat**: :math:`\approx 1 - \chi/\chi_\infty` (most work → heat at low :math:`\chi`)
+- **Fraction to disorder**: :math:`\approx \chi/\chi_\infty` (more stored at high :math:`\chi`)
 
 This explains why rejuvenation is self-limiting: as :math:`\chi \to \chi_\infty`, all
 additional work goes to heat rather than further increasing disorder.
@@ -427,7 +427,7 @@ Yield Stress and Dynamic Stability
 A key insight from thermodynamic analysis [Langer2003]_ is that the **yield stress
 emerges from an exchange of dynamic stability** between jammed and flowing states.
 
-**Jammed State (Low χ)**
+**Jammed State (Low** :math:`\chi` **)**
 
 For :math:`\chi < \chi_c` (critical effective temperature), the system is dynamically
 stable in a jammed state:
@@ -437,7 +437,7 @@ stable in a jammed state:
 - Applied stress is supported elastically up to :math:`\sigma \lesssim \sigma_y`
 - The system behaves as a solid
 
-**Flowing State (High χ)**
+**Flowing State (High** :math:`\chi` **)**
 
 For :math:`\chi > \chi_c`, the system transitions to a flowing state:
 
@@ -580,12 +580,12 @@ Validity and Assumptions
    scalar :math:`\chi`
 3. **Two-state STZ**: Each zone can flip between "+" and "-" orientations
 4. **Local stress bias**: Applied stress biases transitions via :math:`\tanh(s/\sigma_y)`
-5. **Separation of timescales**: Fast elastic response (τ₀) vs slow χ evolution
+5. **Separation of timescales**: Fast elastic response (:math:`\tau_0`) vs slow :math:`\chi` evolution
 
 **When the model works well:**
 
 - Amorphous solids below glass transition (T < T_g)
-- Dense colloidal suspensions (φ > 0.55)
+- Dense colloidal suspensions (:math:`\phi` > 0.55)
 - Metallic glasses under deformation
 - Systems where plastic flow is localized (not cooperative)
 
@@ -593,62 +593,62 @@ Validity and Assumptions
 
 - No spatial coupling (homogeneous model; use nonlocal variants for shear banding)
 - Assumes scalar effective temperature (no tensorial disorder)
-- No explicit aging kinetics beyond χ relaxation
+- No explicit aging kinetics beyond :math:`\chi` relaxation
 - Steady-state plasticity may differ from real activated hopping
 
 **Data Requirements:**
 
 - Flow curves (steady shear) for basic fitting
-- Startup flow for transient dynamics and χ evolution
+- Startup flow for transient dynamics and :math:`\chi` evolution
 - LAOS for nonlinear rheology and back-stress effects (Full variant)
 
 What You Can Learn
 ------------------
 
-STZ theory provides a microscopic framework for understanding plasticity in amorphous materials through the effective temperature χ and the density of active shear transformation zones Λ(χ).
+STZ theory provides a microscopic framework for understanding plasticity in amorphous materials through the effective temperature :math:`\chi` and the density of active shear transformation zones :math:`\Lambda(\chi)`.
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**χ (Effective Temperature)**:
+:math:`\chi` **(Effective Temperature)**:
    The configurational disorder parameter, normalized by the glass transition temperature.
 
-   *For graduate students*: χ = T_eff/T_g is the ratio of the effective configurational temperature to the glass transition temperature T_g. Unlike thermal temperature T, χ quantifies the disorder in the inherent structure (energy landscape minima). In equilibrium, χ → k_BT/T_g. Under flow, plastic dissipation drives χ above its equilibrium value (rejuvenation). The STZ density Λ = exp(-e_Z/χ) ≈ exp(-1/χ) controls the rate of plastic events. At χ = 1, the system is at the glass transition; χ < 1 is glassy (arrested), χ > 1 is liquid-like.
+   *For graduate students*: :math:`\chi` = T_eff/T_g is the ratio of the effective configurational temperature to the glass transition temperature T_g. Unlike thermal temperature T, :math:`\chi` quantifies the disorder in the inherent structure (energy landscape minima). In equilibrium, :math:`\chi` → k_BT/T_g. Under flow, plastic dissipation drives :math:`\chi` above its equilibrium value (rejuvenation). The STZ density :math:`\Lambda` = exp(-e_Z/:math:`\chi`) ≈ exp(-1/:math:`\chi`) controls the rate of plastic events. At :math:`\chi` = 1, the system is at the glass transition; :math:`\chi` < 1 is glassy (arrested), :math:`\chi` > 1 is liquid-like.
 
-   *For practitioners*: χ < 0.5 means deeply annealed glass (high yield stress, brittle), 0.5 < χ < 1.0 means moderately annealed (moderate yield stress, ductile), χ > 1.0 means rejuvenated or liquid-like (low or no yield stress). Fitting χ₀ from startup overshoot magnitude and χ_∞ from steady-state shear thinning reveals the material's structural evolution under flow.
+   *For practitioners*: :math:`\chi` < 0.5 means deeply annealed glass (high yield stress, brittle), 0.5 < :math:`\chi` < 1.0 means moderately annealed (moderate yield stress, ductile), :math:`\chi` > 1.0 means rejuvenated or liquid-like (low or no yield stress). Fitting :math:`\chi_0` from startup overshoot magnitude and :math:`\chi_{\infty}` from steady-state shear thinning reveals the material's structural evolution under flow.
 
-**σ_y (Yield Stress Scale)**:
+:math:`\sigma_y` **(Yield Stress Scale)**:
    The stress scale for STZ activation, not the macroscopic yield stress.
 
-   *For graduate students*: σ_y appears in the activation factors C(s) = cosh(s/σ_y)^q and T(s) = tanh(s/σ_y). It sets the stress scale at which STZs flip from one orientation to the other. The macroscopic yield stress σ_y^eff ∼ σ_y√Λ(χ) depends on the STZ density. Near the glass transition, σ_y is related to the shear modulus times the STZ size: σ_y ≈ G₀ε₀.
+   *For graduate students*: :math:`\sigma_y` appears in the activation factors C(s) = cosh(s/:math:`\sigma_y`)^q and T(s) = tanh(s/:math:`\sigma_y`). It sets the stress scale at which STZs flip from one orientation to the other. The macroscopic yield stress :math:`\sigma_y^eff \sim \sigma_y` :math:`\sqrt{\Lambda(\chi)}` depends on the STZ density. Near the glass transition, :math:`\sigma_y` is related to the shear modulus times the STZ size: :math:`\sigma_y \approx G_0\varepsilon_0`.
 
-   *For practitioners*: σ_y controls the curvature of the flow curve. Larger σ_y means the material transitions more gradually from solid-like to fluid-like behavior. Fit σ_y from the stress scale where the flow curve bends (not the low-rate plateau, which depends on χ).
+   *For practitioners*: :math:`\sigma_y` controls the curvature of the flow curve. Larger :math:`\sigma_y` means the material transitions more gradually from solid-like to fluid-like behavior. Fit :math:`\sigma_y` from the stress scale where the flow curve bends (not the low-rate plateau, which depends on :math:`\chi`).
 
-**ε₀ (STZ Strain)**:
+:math:`\varepsilon_0` **(STZ Strain)**:
    The local strain released when a single STZ flips orientation.
 
-   *For graduate students*: ε₀ is the typical strain increment per STZ rearrangement event. It represents the local shear transformation of a cluster of ~5-10 particles. The plastic strain rate is ε̇^pl = ε₀Λ(χ)R where R is the STZ flip rate. Typical values ε₀ ≈ 0.1-0.3 correspond to a displacement of ~10-30% of the particle diameter.
+   *For graduate students*: :math:`\varepsilon_0` is the typical strain increment per STZ rearrangement event. It represents the local shear transformation of a cluster of ~5-10 particles. The plastic strain rate is :math:`\dot{\varepsilon}^pl = \varepsilon_0\Lambda(\chi)R` where R is the STZ flip rate. Typical values :math:`\varepsilon_0` ≈ 0.1-0.3 correspond to a displacement of ~10-30% of the particle diameter.
 
-   *For practitioners*: ε₀ is usually fixed (not fitted) at 0.1 or 0.2 based on literature values for similar materials. It controls the absolute magnitude of the plastic strain rate.
+   *For practitioners*: :math:`\varepsilon_0` is usually fixed (not fitted) at 0.1 or 0.2 based on literature values for similar materials. It controls the absolute magnitude of the plastic strain rate.
 
-**c₀ (Effective Specific Heat)**:
-   The configurational heat capacity controlling the rate of χ evolution.
+:math:`c_0` **(Effective Specific Heat)**:
+   The configurational heat capacity controlling the rate of :math:`\chi` evolution.
 
-   *For graduate students*: c₀ appears in dχ/dt = (sε̇^pl/c₀σ_y)(χ_∞ - χ). It represents the density of configurational states per unit energy. Physically, c₀ ∼ (k_B/T_g)(∂S_conf/∂E)_V where S_conf is the configurational entropy. Lower c₀ means the system heats (increases χ) more rapidly under plastic dissipation.
+   *For graduate students*: :math:`c_0` appears in :math:`d\chi/dt = (s\dot{\varepsilon}^{pl}/c_0\sigma_y)(\chi_{\infty} - \chi)`. It represents the density of configurational states per unit energy. Physically, :math:`c_0` ~ :math:`(k_B/T_g)(\partial S_{conf}/\partial E)_V` where :math:`S_{conf}` is the configurational entropy. Lower :math:`c_0` means the system heats (increases :math:`\chi`) more rapidly under plastic dissipation.
 
-   *For practitioners*: c₀ controls the width of the stress overshoot in startup. Smaller c₀ → sharper overshoot. Fit c₀ from the time to reach peak stress at a given shear rate. Typical values: 0.1-1.0.
+   *For practitioners*: :math:`c_0` controls the width of the stress overshoot in startup. Smaller :math:`c_0` → sharper overshoot. Fit :math:`c_0` from the time to reach peak stress at a given shear rate. Typical values: 0.1-1.0.
 
-**τ₀ (Attempt Time)**:
+:math:`\tau_0` **(Attempt Time)**:
    The microscopic timescale for STZ flip attempts.
 
-   *For graduate students*: τ₀ is the inverse attempt frequency, related to phonon vibrations (metallic glasses) or Brownian diffusion (colloids). The plastic strain rate scales as ε̇^pl ∼ ε₀/τ₀. For metallic glasses, τ₀ ≈ 10⁻¹²-10⁻⁹ s (atomic vibrations). For colloids, τ₀ ≈ η_s a³/k_BT (Brownian time).
+   *For graduate students*: :math:`\tau_0` is the inverse attempt frequency, related to phonon vibrations (metallic glasses) or Brownian diffusion (colloids). The plastic strain rate scales as :math:`\dot{\varepsilon}^pl \sim \varepsilon_0/\tau_0`. For metallic glasses, :math:`\tau_0 \approx 10`\ :math:`^{-1^2-10}`\ :math:`^{-9}` s (atomic vibrations). For colloids, :math:`\tau_0 \approx \eta_s a^3/k_BT` (Brownian time).
 
-   *For practitioners*: τ₀ sets the absolute timescale of flow. Fit τ₀ from the shear rate scale where the flow curve transitions from yield-dominated to rate-dependent. Typical values: 10⁻⁹-10⁻⁶ s for glasses, 10⁻⁴-10⁻¹ s for pastes.
+   *For practitioners*: :math:`\tau_0` sets the absolute timescale of flow. Fit :math:`\tau_0` from the shear rate scale where the flow curve transitions from yield-dominated to rate-dependent. Typical values: :math:`10 \times 10^{-9-10}`\ :math:`^{-6}` s for glasses, :math:`10 \times 10^{-4-10}`\ :math:`^{-1}` s for pastes.
 
 **e_Z (STZ Formation Energy)**:
    The energy barrier for creating a new STZ, normalized by k_BT_g.
 
-   *For graduate students*: e_Z appears in the equilibrium STZ density Λ_eq = exp(-e_Z/χ). It represents the free energy cost of introducing a local rearrangeable region. In the Standard/Full variants, dΛ/dt = -(Λ - exp(-e_Z/χ))/τ_β describes the relaxation toward equilibrium. Typical values e_Z ≈ 0.5-2.
+   *For graduate students*: e_Z appears in the equilibrium STZ density :math:`\Lambda_eq` = exp(-e_Z/:math:`\chi`). It represents the free energy cost of introducing a local rearrangeable region. In the Standard/Full variants, :math:`d\Lambda/dt = -(\Lambda` - exp(-e_Z/:math:`\chi`))/:math:`\tau_\beta` describes the relaxation toward equilibrium. Typical values e_Z ≈ 0.5-2.
 
    *For practitioners*: e_Z controls the equilibrium STZ density and thus the long-time aging behavior. Higher e_Z → fewer equilibrium STZs → slower aging. Usually fitted from aging experiments (stress growth at rest).
 
@@ -659,27 +659,27 @@ Material Classification
    :header-rows: 1
    :widths: 20 20 30 30
 
-   * - χ Range
+   * - :math:`\chi` Range
      - Structural State
      - Typical Materials
      - Flow Behavior
-   * - **χ < 0.4**
+   * - :math:`\chi` **< 0.4**
      - Deeply annealed glass
      - Aged metallic glasses, ultra-strong colloids
      - Very high yield stress (>10 GPa for metals, >1 kPa for colloids), brittle, catastrophic failure, minimal ductility
-   * - **0.4 < χ < 0.7**
+   * - **0.4 <** :math:`\chi` **< 0.7**
      - Moderately annealed glass
      - As-quenched metallic glasses, carbopol gels, aged emulsions
      - High yield stress (1-10 GPa for metals, 100-1000 Pa for colloids), ductile with large overshoot, significant aging
-   * - **0.7 < χ < 1.0**
+   * - **0.7 <** :math:`\chi` **< 1.0**
      - Weakly annealed glass
      - Rejuvenated metallic glasses, fresh colloidal suspensions
      - Moderate yield stress (0.1-1 GPa for metals, 10-100 Pa for colloids), small overshoot, weak aging
-   * - **1.0 < χ < 1.5**
+   * - **1.0 <** :math:`\chi` **< 1.5**
      - Near-transition
      - Glasses near T_g, very soft colloids
      - Low or no clear yield stress, strong shear thinning, no aging
-   * - **χ > 1.5**
+   * - :math:`\chi` **> 1.5**
      - Supercooled liquid
      - Above T_g, dilute suspensions
      - Newtonian or weakly shear-thinning, no solid-like behavior
@@ -687,17 +687,17 @@ Material Classification
 Connection to Aging and Rejuvenation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Aging (Quiescent Evolution)**: In the absence of flow, χ decreases via:
+**Aging (Quiescent Evolution)**: In the absence of flow, :math:`\chi` decreases via:
 
 .. math::
 
    \dot{\chi}_{\text{aging}} = -\frac{\chi - \chi_{\text{eq}}}{\tau_{\text{age}}}
 
-- Aging timescale :math:`\tau_{\text{age}}` can be 10³-10⁶ seconds (hours to days)
-- Decrease in χ → increase in yield stress over time (thixotropic hardening)
+- Aging timescale :math:`\tau_{\text{age}}` can be :math:`10^3-10^6` seconds (hours to days)
+- Decrease in :math:`\chi` → increase in yield stress over time (thixotropic hardening)
 - Measurable via time-dependent stress growth in startup experiments
 
-**Rejuvenation (Flow-Induced Heating)**: During flow, plastic dissipation increases χ:
+**Rejuvenation (Flow-Induced Heating)**: During flow, plastic dissipation increases :math:`\chi`:
 
 .. math::
 
@@ -725,14 +725,14 @@ the yield stress to microscopic parameters:
 
 **Physical interpretation:**
 
-- **Low χ**: Few STZs available (:math:`\Lambda \to 0`), very high activation barrier
-- **High χ**: Many STZs (:math:`\Lambda \to 1`), easy plastic flow
+- **Low** :math:`\chi`: Few STZs available (:math:`\Lambda \to 0`), very high activation barrier
+- **High** :math:`\chi`: Many STZs (:math:`\Lambda \to 1`), easy plastic flow
 
 This explains why:
 
-1. **Aging increases yield stress**: χ decreases → Λ decreases → fewer active STZs
-2. **Rejuvenation decreases yield stress**: χ increases → Λ increases → more active STZs
-3. **Temperature dependence**: Near T_g, χ is very sensitive to temperature
+1. **Aging increases yield stress**: :math:`\chi` decreases → :math:`\Lambda` decreases → fewer active STZs
+2. **Rejuvenation decreases yield stress**: :math:`\chi` increases → :math:`\Lambda` increases → more active STZs
+3. **Temperature dependence**: Near T_g, :math:`\chi` is very sensitive to temperature
 
 Transient Stress Overshoot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -743,26 +743,26 @@ The stress overshoot in startup flow arises from competition between:
 2. **Structural evolution**: :math:`\chi` increases due to plastic dissipation
 3. **Accelerating plasticity**: Higher :math:`\chi` → higher :math:`\Lambda` → faster :math:`\dot{\varepsilon}^{pl}`
 
-**Peak stress location**: Occurs when :math:`d\sigma/dt = 0`, typically at strain γ ~ 0.1-0.3
+**Peak stress location**: Occurs when :math:`d\sigma/dt = 0`, typically at strain :math:`\gamma` ~ 0.1-0.3
 
 **Overshoot magnitude**: :math:`\sigma_{\text{peak}} / \sigma_{ss}` increases with:
 
-- Lower initial χ (more annealed)
+- Lower initial :math:`\chi` (more annealed)
 - Higher shear rate (Wi > 1)
-- Lower c₀ (slower χ evolution)
+- Lower :math:`c_0 (slower \chi` evolution)
 
 Fitting Strategy
 ~~~~~~~~~~~~~~~~
 
 From steady-state flow curves, extract:
 
-1. **σ_y**: Plateau stress at low :math:`\dot{\gamma}`
-2. **Shear thinning slope**: Related to χ_∞ and c₀
+1. :math:`\sigma_y`: Plateau stress at low :math:`\dot{\gamma}`
+2. **Shear thinning slope**: Related to :math:`\chi_{\infty}` and :math:`c_0`
 
 From startup transients, extract:
 
-3. **χ₀ (initial state)**: Controls overshoot magnitude
-4. **τ_β or c₀**: Controls overshoot timing
+3. :math:`\chi_0` **(initial state)**: Controls overshoot magnitude
+4. :math:`\tau_\beta or c_0`: Controls overshoot timing
 
 From aging experiments, extract:
 
@@ -842,21 +842,21 @@ Parameter Initialization
 
 Fit :math:`\sigma(\dot{\gamma})` to extract:
 
-- **σ_y**: Extrapolate to :math:`\dot{\gamma} \to 0`
-- **χ_∞**: From shear thinning slope (higher slope → higher χ_∞)
+- :math:`\sigma_y`: Extrapolate to :math:`\dot{\gamma} \to 0`
+- :math:`\chi_{\infty}`: From shear thinning slope (higher slope → higher :math:`\chi_{\infty}`)
 
 **Step 2: From startup overshoot**
 
 Fit :math:`\sigma(t)` at constant :math:`\dot{\gamma}` to extract:
 
-- **χ₀ (initial χ)**: Controls overshoot height
-- **c₀ or τ_β**: Controls overshoot width
+- :math:`\chi_0 (initial \chi)`: Controls overshoot height
+- :math:`c_0 or \tau_\beta`: Controls overshoot width
 
 **Step 3: From LAOS (optional, Full variant)**
 
 Fit Lissajous curves to extract:
 
-- **m_∞, Γ_m**: Back-stress and kinematic hardening parameters
+- **m_∞,** :math:`\Gamma_m`: Back-stress and kinematic hardening parameters
 
 Typical Parameter Ranges
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -868,41 +868,41 @@ Typical Parameter Ranges
    * - Parameter
      - Typical Range
      - Notes
-   * - χ₀
+   * - :math:`\chi_0`
      - 0.3-1.0
      - Initial effective temperature (lower = more annealed)
-   * - χ_∞
+   * - :math:`\chi_{\infty}`
      - 0.5-2.0
      - Steady-state at high drive (higher = more rejuvenated)
-   * - σ_y
-     - 10²-10⁶ Pa
+   * - :math:`\sigma_y`
+     - :math:`10^2-10^6` Pa
      - Material-dependent yield stress scale
-   * - τ₀
-     - 10⁻⁹-10⁻⁶ s
+   * - :math:`\tau_0`
+     - :math:`10 \times 10^{-9-10}`\ :math:`^{-6}` s
      - Molecular vibration time (faster for colloids than polymers)
-   * - ε₀
+   * - :math:`\varepsilon_0`
      - 0.1-0.3
      - Strain per STZ flip (dimensionless)
-   * - c₀
+   * - :math:`c_0`
      - 0.1-1.0
-     - Specific heat (higher = slower χ evolution)
+     - Specific heat (higher = slower :math:`\chi` evolution)
 
 Troubleshooting
 ~~~~~~~~~~~~~~~
 
 **Problem: No stress overshoot in startup**
 
-- **Solution**: Increase initial χ contrast (lower χ₀ or higher χ_∞)
+- **Solution**: Increase initial :math:`\chi` contrast (lower :math:`\chi_0` or higher :math:`\chi_{\infty}`)
 - Or increase shear rate (need Wi = :math:`\dot{\gamma} \tau_\alpha > 1`)
 
 **Problem: Overshoot too sharp/broad**
 
-- **Solution**: Adjust c₀ (lower c₀ → sharper overshoot)
-- Or adjust τ_β (Standard/Full variant)
+- **Solution**: Adjust :math:`c_0 (lower c_0` → sharper overshoot)
+- Or adjust :math:`\tau_\beta` (Standard/Full variant)
 
 **Problem: Wrong steady-state stress**
 
-- **Solution**: Adjust σ_y and χ_∞ simultaneously
+- **Solution**: Adjust :math:`\sigma_y` and :math:`\chi_{\infty}` simultaneously
 - Check if variant is appropriate (Minimal vs Standard vs Full)
 
 Usage
@@ -964,8 +964,8 @@ The model assumes homogeneous deformation. In reality, amorphous solids often
 exhibit **shear banding**—spatial localization of plastic flow into thin bands.
 Shear bands arise from the coupling between:
 
-- Flow-induced heating (χ increases)
-- Stress softening (lower viscosity at higher χ)
+- Flow-induced heating (:math:`\chi` increases)
+- Stress softening (lower viscosity at higher :math:`\chi`)
 - Positive feedback leading to localization
 
 *Extension*: Nonlocal STZ models add diffusion of the effective temperature

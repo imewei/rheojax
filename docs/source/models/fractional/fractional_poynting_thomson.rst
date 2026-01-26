@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Stress-relaxation with instantaneous modulus and fractional retardation
-- **Parameters:** 4 (Ge, Gk, α, τ)
+- **Parameters:** 4 (Ge, Gk, :math:`\alpha, \tau`)
 - **Key equation:** :math:`G(t) = G_{\mathrm{eq}} + (G_e - G_{\mathrm{eq}}) E_{\alpha}(-(t/\tau)^{\alpha})` where :math:`G_{\mathrm{eq}} = \frac{G_e G_k}{G_e + G_k}`
 - **Test modes:** Relaxation, creep, oscillation
 - **Material examples:** Viscoelastic solids emphasizing stress-relaxation interpretations
@@ -32,7 +32,7 @@ Notation Guide
      - Retarded modulus (Kelvin element spring)
    * - :math:`\alpha`
      - dimensionless
-     - Fractional order (0 < α < 1, power-law character)
+     - Fractional order (0 < :math:`\alpha` < 1, power-law character)
    * - :math:`\tau`
      - s
      - Retardation time (characteristic timescale)
@@ -178,23 +178,23 @@ Parameter Interpretation
    Controls the amount of stress relaxation from Ge to Geq. The equilibrium modulus is given by Geq = Ge·Gk/(Ge + Gk).
 
    *For graduate students*: Gk represents the spring stiffness in the Kelvin element. The harmonic mean relationship for Geq arises from the series-parallel spring configuration.
-   *For practitioners*: Relaxation magnitude ΔG = Ge - Geq is directly determined by the Ge/Gk ratio. Higher Gk → less relaxation.
+   *For practitioners*: Relaxation magnitude :math:`\DeltaG` = Ge - Geq is directly determined by the Ge/Gk ratio. Higher Gk → less relaxation.
 
-**Fractional Order (α)**:
+**Fractional Order (** :math:`\alpha` **)**:
    Governs the power-law character of stress relaxation between instantaneous and equilibrium values. Values closer to 0 indicate more solid-like continuous relaxation, while values closer to 1 indicate more liquid-like narrow relaxation.
 
-   - **α → 0**: Very slow, broad-spectrum relaxation approaching plateau behavior
-   - **α → 0.5**: Typical fractional solid, balanced spectrum breadth
-   - **α → 1**: Exponential relaxation (classical Poynting-Thomson/Zener)
+   - :math:`\alpha` **→ 0**: Very slow, broad-spectrum relaxation approaching plateau behavior
+   - :math:`\alpha` **→ 0.5**: Typical fractional solid, balanced spectrum breadth
+   - :math:`\alpha` **→ 1**: Exponential relaxation (classical Poynting-Thomson/Zener)
 
-   *For graduate students*: α quantifies polydispersity in the retardation time spectrum. Lower α indicates greater microstructural heterogeneity.
-   *For practitioners*: Lower α means relaxation spreads over more time decades—important for long-term load-bearing applications.
+   *For graduate students*: :math:`\alpha` quantifies polydispersity in the retardation time spectrum. Lower :math:`\alpha` indicates greater microstructural heterogeneity.
+   *For practitioners*: Lower :math:`\alpha` means relaxation spreads over more time decades—important for long-term load-bearing applications.
 
-**Retardation Time (τ)**:
+**Retardation Time (** :math:`\tau` **)**:
    Characteristic timescale for the transition from Ge to Geq.
 
-   *For graduate students*: τ is temperature-dependent (WLF/Arrhenius), enabling time-temperature superposition for master curve construction.
-   *For practitioners*: Compare τ to service timescales. If service time << τ, use Ge; if >> τ, use Geq.
+   *For graduate students*: :math:`\tau` is temperature-dependent (WLF/Arrhenius), enabling time-temperature superposition for master curve construction.
+   *For practitioners*: Compare :math:`\tau` to service timescales. If service time << :math:`\tau`, use Ge; if >> :math:`\tau`, use Geq.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -224,7 +224,7 @@ Material Classification
    :header-rows: 1
    :widths: 25 25 25 25
 
-   * - α Range
+   * - :math:`\alpha` Range
      - Spectrum Character
      - Typical Materials
      - Fitting Considerations
@@ -246,7 +246,7 @@ Diagnostic Indicators
 
 - **G(t) continues decreasing at longest time**: Equilibrium not reached; extend measurement time or consider liquid model (FMG/FML)
 - **Ge/Gk near 1**: Minimal relaxation; simpler elastic model may suffice
-- **α hits bounds (0.05 or 0.95)**: Data may not support fractional behavior; try classical Zener
+- :math:`\alpha` **hits bounds (0.05 or 0.95)**: Data may not support fractional behavior; try classical Zener
 - **Non-monotonic residuals**: Check for multiple relaxation mechanisms or nonlinear effects
 
 Fitting Guidance
@@ -299,7 +299,7 @@ Fitting Guidance
    * - Ge/Gk ≈ 1
      - Minimal relaxation
      - Consider simple elastic model
-   * - α near upper bound (0.95+)
+   * - :math:`\alpha` near upper bound (0.95+)
      - Nearly exponential
      - Use classical Poynting-Thomson
    * - Non-monotonic residuals
@@ -350,33 +350,33 @@ Compare candidates by relaxation characteristics:
    * - Material
      - Ge (MPa)
      - Geq (MPa)
-     - τ (s)
-     - α
+     - :math:`\tau` (s)
+     - :math:`\alpha`
      - Relaxation
    * - PTFE
      - 500
      - 400
      - 1000
      - 0.65
-     - 20% at 10⁴ s
+     - 20% at :math:`10^4` s
    * - Fiber composite
      - 2000
      - 1800
      - 5000
      - 0.55
-     - 10% at 10⁴ s
+     - 10% at :math:`10^4` s
    * - Metal gasket
      - 100000
      - 98000
      - 100
      - 0.85
-     - 2% at 10⁴ s
+     - 2% at :math:`10^4` s
    * - Rubber O-ring
      - 10
      - 5
      - 100
      - 0.45
-     - 50% at 10⁴ s
+     - 50% at :math:`10^4` s
 
 **Quality Control Applications:**
 
@@ -385,7 +385,7 @@ Monitor relaxation parameters for product consistency:
 1. **Instantaneous modulus (Ge)**: Sensitive to cure state and crosslink density
 2. **Equilibrium modulus (Geq)**: Tracks permanent network structure
 3. **Relaxation magnitude (Ge - Geq)**: Indicates temporary vs. permanent structure balance
-4. **Fractional order (α)**: QC metric for microstructural uniformity
+4. **Fractional order (** :math:`\alpha` **)**: QC metric for microstructural uniformity
 
 **Design Guidelines:**
 
@@ -393,7 +393,7 @@ For applications requiring sustained stress:
 
 - **Critical applications** (pressure vessels, structural): Target Ge/Geq < 1.5 for minimal relaxation
 - **Sealing applications**: Ge/Geq = 2-5 acceptable if recompression possible
-- **Damping applications**: Maximize tan(δ) at operating frequency (ω ≈ 1/τ)
+- **Damping applications**: Maximize tan(:math:`\delta`) at operating frequency (:math:`\omega \approx 1/\tau`)
 - **Service life**: Ensure measurement time > 10× service time for reliable extrapolation
 
 Example Calculations
@@ -401,7 +401,7 @@ Example Calculations
 
 **Stress Relaxation Prediction:**
 
-Given fitted parameters Ge = 2.0 MPa, Gk = 5.0 MPa, α = 0.55, τ = 500 s:
+Given fitted parameters Ge = 2.0 MPa, Gk = 5.0 MPa, :math:`\alpha = 0.55, \tau` = 500 s:
 
 .. code-block:: python
 

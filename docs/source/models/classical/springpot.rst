@@ -7,10 +7,10 @@ Quick Reference
 ---------------
 
 - **Use when:** Power-law behavior, broad relaxation spectra, fractional viscoelasticity
-- **Parameters:** 2 (V, α)
+- **Parameters:** 2 (V, :math:`\alpha`)
 - **Key equation:** :math:`G^*(\omega) = V (i\omega)^{\alpha}`, :math:`G'(\omega) \sim G''(\omega) \sim \omega^{\alpha}`
 - **Test modes:** Oscillation, relaxation, creep
-- **Material examples:** Critical gels (α=0.5), polymer melts near Tg, soft glassy materials, biological tissues
+- **Material examples:** Critical gels (:math:`\alpha=0.5`), polymer melts near Tg, soft glassy materials, biological tissues
 
 Notation Guide
 --------------
@@ -22,9 +22,9 @@ Notation Guide
    * - Symbol
      - Meaning
    * - :math:`V`
-     - Fractional stiffness (Pa·s\ :sup:`α`). Sets absolute magnitude of modulus.
+     - Fractional stiffness (Pa·s\ :math:`^{\alpha}`). Sets absolute magnitude of modulus.
    * - :math:`\alpha`
-     - Fractional order (0 < α < 1). Controls power-law slope and spectrum breadth.
+     - Fractional order (0 < :math:`\alpha` < 1). Controls power-law slope and spectrum breadth.
    * - :math:`{}^{C}D_t^{\alpha}`
      - Caputo fractional derivative operator.
    * - :math:`\tan\delta`
@@ -55,7 +55,7 @@ The SpringPot describes materials with **hierarchical or fractal structure** whe
    - Power-law rheology from structural disorder
    - Examples: Colloidal glasses, dense emulsions, concentrated suspensions
 
-**Critical Gels (α = 0.5):**
+**Critical Gels (** :math:`\alpha` **= 0.5):**
    - Materials at the gel point (percolation threshold)
    - Self-similar network structure
    - Winter-Chambon criterion: :math:`G' = G'' \propto \omega^{0.5}`
@@ -85,7 +85,7 @@ The Caputo fractional derivative generalizes integer-order derivatives. For
    :header-rows: 1
    :widths: 20 10 70
 
-   * - Order α
+   * - Order :math:`\alpha`
      - n
      - Formula
    * - :math:`0 < \alpha < 1`
@@ -109,11 +109,11 @@ This power-law kernel :math:`(t-s)^{-\alpha}` captures **fading memory**—why
 fractional calculus models viscoelastic materials with long-range temporal
 correlations (unlike exponential memory in Maxwell models).
 
-**Physical interpretation of α:**
+**Physical interpretation of** :math:`\alpha` **:**
 
-- α → 0: Short-range memory (elastic, spring-like)
-- α = 0.5: Self-similar memory (critical gel)
-- α → 1: Long-range memory (viscous, dashpot-like)
+- :math:`\alpha` → 0: Short-range memory (elastic, spring-like)
+- :math:`\alpha` = 0.5: Self-similar memory (critical gel)
+- :math:`\alpha` → 1: Long-range memory (viscous, dashpot-like)
 
 Physical Foundation
 -------------------
@@ -225,10 +225,10 @@ Limitations
    Real materials exhibit power-law behavior only over limited frequency/time windows. SpringPot should be restricted to the range where :math:`\log(G')` vs :math:`\log(\omega)` is linear.
 
 **Singular limits:**
-   α → 0 or α → 1 are numerically unstable. Use bounds [0.05, 0.95] in fitting. For α < 0.1, use spring model; for α > 0.9, use dashpot model.
+   :math:`\alpha \to 0 or \alpha` → 1 are numerically unstable. Use bounds [0.05, 0.95] in fitting. For :math:`\alpha` < 0.1, use spring model; for :math:`\alpha` > 0.9, use dashpot model.
 
 **Temperature dependence:**
-   Both V and α may depend on temperature. For time-temperature superposition, use composite models where α can remain constant while timescales shift.
+   Both V and :math:`\alpha` may depend on temperature. For time-temperature superposition, use composite models where :math:`\alpha` can remain constant while timescales shift.
 
 What You Can Learn
 ------------------
@@ -241,9 +241,9 @@ Parameter Interpretation
 **V (Fractional Stiffness)**:
    Fitted :math:`V` reveals the absolute magnitude of the material response:
 
-   - **Low values (<10² Pa·s\ :sup:`α`)**: Soft materials (weak gels, dilute solutions)
-   - **Moderate values (10²-10⁴ Pa·s\ :sup:`α`)**: Biological tissues, polymer gels
-   - **High values (>10⁴ Pa·s\ :sup:`α`)**: Dense colloidal suspensions, concentrated emulsions
+   - **Low values (<** :math:`10^2` **Pa·s\ :sup:`** :math:`\alpha` **`)**: Soft materials (weak gels, dilute solutions)
+   - **Moderate values (** :math:`10^2-10^4` **Pa·s\ :sup:`** :math:`\alpha` **`)**: Biological tissues, polymer gels
+   - **High values (>** :math:`10^4` **Pa·s\ :sup:`** :math:`\alpha` **`)**: Dense colloidal suspensions, concentrated emulsions
 
    *For practitioners*: :math:`V` at reference frequency :math:`\omega_{\text{ref}}` gives characteristic modulus via :math:`|G^*(\omega_{\text{ref}})| = V \omega_{\text{ref}}^{\alpha}`.
 
@@ -252,16 +252,16 @@ Parameter Interpretation
 **alpha (Fractional Order)**:
    Fitted :math:`\alpha` quantifies spectrum breadth and material state:
 
-   - **Low α (<0.2)**: Narrow spectrum, nearly elastic solid
-   - **α ≈ 0.5**: Critical gel (Winter-Chambon criterion), self-similar structure
-   - **High α (>0.8)**: Broad spectrum, nearly viscous liquid
+   - **Low** :math:`\alpha` **(<0.2)**: Narrow spectrum, nearly elastic solid
+   - :math:`\alpha` **≈ 0.5**: Critical gel (Winter-Chambon criterion), self-similar structure
+   - **High** :math:`\alpha` **(>0.8)**: Broad spectrum, nearly viscous liquid
 
    *For researchers*: :math:`\alpha` relates to structural complexity:
-      - Monodisperse systems: α → 0 or 1 (single timescale)
-      - Polydisperse/hierarchical systems: 0.2 < α < 0.8 (broad spectrum)
-      - At gel point: α = 0.5 exactly (percolation threshold)
+      - Monodisperse systems: :math:`\alpha` → 0 or 1 (single timescale)
+      - Polydisperse/hierarchical systems: 0.2 < :math:`\alpha` < 0.8 (broad spectrum)
+      - At gel point: :math:`\alpha` = 0.5 exactly (percolation threshold)
 
-   *For quality control*: Track α to monitor gelation progress or structural degradation.
+   *For quality control*: Track :math:`\alpha` to monitor gelation progress or structural degradation.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -270,7 +270,7 @@ Material Classification
    :header-rows: 1
    :widths: 18 28 28 26
 
-   * - α Range
+   * - :math:`\alpha` Range
      - Material Type
      - Physical State
      - Examples
@@ -288,11 +288,11 @@ Material Classification
      - Polymer melts near T\ :sub:`g`
 
 **Winter-Chambon Gel Point Criterion:**
-   At gelation, α = 0.5 exactly and :math:`\tan\delta = 1` (G' = G'').
+   At gelation, :math:`\alpha` = 0.5 exactly and :math:`\tan\delta = 1` (G' = G'').
 
    To verify gel point:
       1. Fit SpringPot to frequency sweep
-      2. Check α ≈ 0.5 (within ±0.05)
+      2. Check :math:`\alpha` ≈ 0.5 (within ±0.05)
       3. Verify :math:`\tan\delta` is frequency-independent
       4. Confirm :math:`G' \approx G''` across decades
 
@@ -301,35 +301,35 @@ Diagnostic Indicators
 
 **Warning signs in fitted parameters:**
 
-- **If α < 0.1 or α > 0.9**: Power-law regime too narrow; SpringPot not appropriate. Use Maxwell (α → 1) or spring (α → 0) instead.
-- **If fit quality poor (R² < 0.95)**: Material exhibits plateaus or terminal flow. Use Fractional Maxwell or Fractional Zener models.
-- **If α varies with temperature**: Material is thermorheologically complex. Cannot use simple time-temperature superposition.
-- **If tan δ not constant**: Pure SpringPot inadequate; mixture of relaxation processes. Use composite models.
+- **If** :math:`\alpha < 0.1 or \alpha` **> 0.9**: Power-law regime too narrow; SpringPot not appropriate. Use Maxwell (:math:`\alpha` → 1) or spring (:math:`\alpha` → 0) instead.
+- **If fit quality poor (** :math:`R^2` **< 0.95)**: Material exhibits plateaus or terminal flow. Use Fractional Maxwell or Fractional Zener models.
+- **If** :math:`\alpha` **varies with temperature**: Material is thermorheologically complex. Cannot use simple time-temperature superposition.
+- **If tan** :math:`\delta` **not constant**: Pure SpringPot inadequate; mixture of relaxation processes. Use composite models.
 
 **Verification strategies:**
 
-1. **Log-log linearity**: Plot :math:`\log(G')` vs :math:`\log(\omega)` → slope should equal α across entire range
+1. **Log-log linearity**: Plot :math:`\log(G')` vs :math:`\log(\omega)` → slope should equal :math:`\alpha` across entire range
 2. **Loss tangent constancy**: :math:`\tan\delta = \tan(\pi\alpha/2)` should be frequency-independent
 3. **G'/G'' ratio**: Should satisfy :math:`G'/G'' = \cot(\pi\alpha/2)` at all frequencies
-4. **Relaxation modulus**: :math:`\log(G(t))` vs :math:`\log(t)` → slope = -α
+4. **Relaxation modulus**: :math:`\log(G(t))` vs :math:`\log(t)` → slope = -:math:`\alpha`
 
 Application Examples
 ~~~~~~~~~~~~~~~~~~~~
 
 **Gel Point Determination:**
-   - Track α during crosslinking/gelation
-   - Gel point occurs when α = 0.5 (±0.05)
+   - Track :math:`\alpha` during crosslinking/gelation
+   - Gel point occurs when :math:`\alpha` = 0.5 (±0.05)
    - Confirms percolation transition
 
 **Material Development:**
-   - Tune crosslink density to achieve target α
-   - α = 0.3-0.4 for soft tissue mimics
-   - α = 0.5 for self-healing gels at rest state
+   - Tune crosslink density to achieve target :math:`\alpha`
+   - :math:`\alpha` = 0.3-0.4 for soft tissue mimics
+   - :math:`\alpha` = 0.5 for self-healing gels at rest state
 
 **Quality Control:**
-   - Monitor α batch-to-batch for consistency
-   - Degradation typically increases α (network breakdown)
-   - Aging typically decreases α (network strengthening)
+   - Monitor :math:`\alpha` batch-to-batch for consistency
+   - Degradation typically increases :math:`\alpha` (network breakdown)
+   - Aging typically decreases :math:`\alpha` (network strengthening)
 
 Material Examples
 -----------------
@@ -378,7 +378,7 @@ Experimental Design
 **Creep Test:**
 
 1. **Constant stress**: Within LVR (verify with amplitude sweep)
-2. **Time span**: Long enough to observe power-law regime (> 10³ s for gels)
+2. **Time span**: Long enough to observe power-law regime (> :math:`10^3` s for gels)
 3. **Sampling**: Log-spaced to avoid early-time bias
 4. **Analysis**: :math:`\log(J(t))` vs :math:`\log(t)` → slope = :math:`\alpha`
 
@@ -432,7 +432,7 @@ Optimization Algorithm Selection
    - 5-270× faster than scipy.optimize
 
 **Bounds:**
-   - :math:`V`: [1e-2, 1e8] Pa·s\ :sup:`α` (adjust based on material)
+   - :math:`V`: [1e-2, 1e8] Pa·s\ :math:`^{\alpha}` (adjust based on material)
    - :math:`\alpha`: [0.05, 0.95] (avoid singularities at 0 and 1)
 
 **Fitting strategy:**
@@ -450,21 +450,21 @@ Troubleshooting Common Fitting Problems
    * - Problem
      - Diagnostic
      - Solution
-   * - α converges to bounds (0.05 or 0.95)
+   * - :math:`\alpha` converges to bounds (0.05 or 0.95)
      - Power-law regime too narrow
-     - Use Maxwell (α → 1) or spring (α → 0) model instead
+     - Use Maxwell (:math:`\alpha` → 1) or spring (:math:`\alpha` → 0) model instead
    * - Poor fit despite linear log-log plot
      - Transition regions at data edges
      - Restrict fitting to middle decade where slope is constant
-   * - Noisy α estimate
+   * - Noisy :math:`\alpha` estimate
      - Insufficient frequency/time span
      - Extend measurement to cover 3+ decades
    * - Oscillatory residuals
      - Multiple relaxation modes present
      - Use Fractional Zener or Generalized Maxwell
    * - V unrealistic (negative or extreme)
-     - Poor α initialization
-     - Reinitialize α from slope analysis before fitting V
+     - Poor :math:`\alpha` initialization
+     - Reinitialize :math:`\alpha` from slope analysis before fitting V
 
 Validation Strategies
 ~~~~~~~~~~~~~~~~~~~~~

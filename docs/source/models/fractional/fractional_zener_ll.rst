@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Liquid with broad multi-order fractional dispersions, complex viscoelastic behavior
-- **Parameters:** 6 (c₁, c₂, α, β, γ, τ)
+- **Parameters:** 6 (:math:`c_1, c_2, \alpha, \beta, \gamma, \tau`)
 - **Key equation:** :math:`G^*(\omega) = \frac{c_1(i\omega)^{\alpha}}{1 + (i\omega\tau)^{\beta}} + c_2(i\omega)^{\gamma}`
 - **Test modes:** Oscillation, relaxation
 - **Material examples:** Complex fluids with multiple fractional relaxation mechanisms
@@ -25,10 +25,10 @@ Notation Guide
      - Units
      - Description
    * - :math:`c_1`
-     - Pa·s\ :sup:`α`
+     - Pa·s\ :math:`^{\alpha}`
      - First SpringPot constant (high-frequency behavior)
    * - :math:`c_2`
-     - Pa·s\ :sup:`γ`
+     - Pa·s\ :math:`^{\gamma}`
      - Second SpringPot constant (low-frequency behavior)
    * - :math:`\alpha`
      - dimensionless
@@ -65,11 +65,11 @@ viscoelastic model with three independent fractional orders:
 
 **Microstructural Interpretation:**
 
-- **Primary branch (c₁, α, β)**: Captures main relaxation mechanism with
-  characteristic time τ. The two orders α and β control high-frequency and
+- **Primary branch (** :math:`c_1, \alpha, \beta` **)**: Captures main relaxation mechanism with
+  characteristic time :math:`\tau`. The two orders :math:`\alpha and \beta` control high-frequency and
   crossover behavior, respectively.
-- **Secondary branch (c₂, γ)**: Provides additional relaxation mode at different
-  timescale. Order γ controls low-frequency terminal behavior.
+- **Secondary branch (** :math:`c_2, \gamma` **)**: Provides additional relaxation mode at different
+  timescale. Order :math:`\gamma` controls low-frequency terminal behavior.
 - **Liquid-like**: No equilibrium modulus, material flows under stress
 - **Multi-scale relaxation**: Three orders allow hierarchical relaxation processes
 
@@ -175,31 +175,31 @@ This section explains what insights you can extract from fitting the most genera
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Three Fractional Orders (α, β, γ)**:
+**Three Fractional Orders (** :math:`\alpha, \beta, \gamma` **)**:
    Each order controls a different frequency/time regime, enabling characterization of hierarchical relaxation. All three are bounded between 0 (solid-like) and 1 (liquid-like).
 
-   - **α**: High-frequency power-law slope. Controls short-time/fast relaxation behavior.
-   - **β**: Crossover behavior near τ. Governs the transition between primary and secondary relaxation mechanisms.
-   - **γ**: Low-frequency/long-time terminal behavior. Determines terminal flow characteristics.
+   - :math:`\alpha`: High-frequency power-law slope. Controls short-time/fast relaxation behavior.
+   - :math:`\beta`: Crossover behavior near :math:`\tau`. Governs the transition between primary and secondary relaxation mechanisms.
+   - :math:`\gamma`: Low-frequency/long-time terminal behavior. Determines terminal flow characteristics.
 
-   *For graduate students*: The presence of three independent orders suggests hierarchical microstructural relaxation mechanisms operating at different scales—e.g., segmental motion (α), chain relaxation (β), and network rearrangement (γ).
-   *For practitioners*: Each order corresponds to a distinct timescale in material response. Map α, β, γ to processing conditions (mixing, extrusion, curing) to optimize manufacturing.
+   *For graduate students*: The presence of three independent orders suggests hierarchical microstructural relaxation mechanisms operating at different scales—e.g., segmental motion (:math:`\alpha`), chain relaxation (:math:`\beta`), and network rearrangement (:math:`\gamma`).
+   *For practitioners*: Each order corresponds to a distinct timescale in material response. Map :math:`\alpha, \beta, \gamma` to processing conditions (mixing, extrusion, curing) to optimize manufacturing.
 
-**SpringPot Constants (c₁, c₂)**:
+**SpringPot Constants (** :math:`c_1, c_2` **)**:
    Determine the relative strength of the two parallel relaxation branches.
 
-   - **c₁/c₂ > 10**: Primary branch (α, β) dominates; secondary (γ) is a correction
-   - **c₁/c₂ ≈ 1**: Both mechanisms contribute equally; true two-mode behavior
-   - **c₁/c₂ < 0.1**: Secondary branch (γ) dominates; consider simpler model
+   - :math:`c_1/c_2` **> 10**: Primary branch (:math:`\alpha, \beta`) dominates; secondary (:math:`\gamma`) is a correction
+   - :math:`c_1/c_2` **≈ 1**: Both mechanisms contribute equally; true two-mode behavior
+   - :math:`c_1/c_2` **< 0.1**: Secondary branch (:math:`\gamma`) dominates; consider simpler model
 
-   *For graduate students*: The ratio c₁/c₂ relates to the partition of energy dissipation between fast (primary) and slow (secondary) mechanisms.
-   *For practitioners*: High c₁/c₂ means short-time response is critical; low c₁/c₂ emphasizes long-time flow.
+   *For graduate students*: The ratio :math:`c_1/c_2` relates to the partition of energy dissipation between fast (primary) and slow (secondary) mechanisms.
+   *For practitioners*: High :math:`c_1/c_2` means short-time response is critical; low :math:`c_1/c_2` emphasizes long-time flow.
 
-**Relaxation Time (τ)**:
+**Relaxation Time (** :math:`\tau` **)**:
    Characteristic timescale separating primary and secondary relaxation regimes.
 
-   *For graduate students*: τ marks the crossover frequency ω ≈ 1/τ where the dominant relaxation mechanism shifts.
-   *For practitioners*: Compare τ to process timescales to determine which regime governs product performance.
+   *For graduate students*: :math:`\tau` marks the crossover frequency :math:`\omega \approx 1/\tau` where the dominant relaxation mechanism shifts.
+   *For practitioners*: Compare :math:`\tau` to process timescales to determine which regime governs product performance.
 
 When to Use This Model
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -207,11 +207,11 @@ When to Use This Model
 This 6-parameter model is the most flexible fractional Zener variant. Use only when:
 
 1. **Simpler models fail**: If 3-4 parameter fractional models (FMG, FML, FZSS) show systematic deviations
-2. **Multiple distinct power-law regimes**: Data shows different slopes α, β, γ in separate frequency decades
+2. **Multiple distinct power-law regimes**: Data shows different slopes :math:`\alpha, \beta, \gamma` in separate frequency decades
 3. **Complex fluids**: Polymer blends, filled systems, colloidal suspensions, or hierarchical structures
 4. **High-quality data**: At least 5 decades in frequency with >100 points
 
-**Critical Warning**: With 6 parameters, overfitting is highly probable. Always compare to simpler models using information criteria (AIC, BIC). Prefer simpler models unless FZLL provides statistically significant improvement (ΔAIC > 10).
+**Critical Warning**: With 6 parameters, overfitting is highly probable. Always compare to simpler models using information criteria (AIC, BIC). Prefer simpler models unless FZLL provides statistically significant improvement (:math:`\DeltaAIC` > 10).
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -223,16 +223,16 @@ Material Classification
    * - Order Pattern
      - Physical Interpretation
      - Material Examples
-   * - α ≈ β ≈ γ
+   * - :math:`\alpha \approx \beta \approx \gamma`
      - Single relaxation mechanism
      - Use simpler FMG/FML instead
-   * - α < β < γ (ascending)
+   * - :math:`\alpha < \beta < \gamma` (ascending)
      - Hierarchical fast-to-slow relaxation
      - Polymer solutions, micellar systems
-   * - α > γ, β intermediate
+   * - :math:`\alpha > \gamma, \beta` intermediate
      - Two-scale relaxation
      - Filled polymers, composites
-   * - \|α - γ\| > 0.5, any β
+   * - :math:`|\alpha - \gamma|` > 0.5, any :math:`\beta`
      - Extreme spectrum breadth
      - Complex biomaterials, blends
 
@@ -244,15 +244,15 @@ Material Classification
      - → 0 Limit
      - → 1 Limit
      - Typical Range
-   * - α
+   * - :math:`\alpha`
      - Solid-like (fast)
      - Viscous (fast)
      - 0.3-0.7
-   * - β
+   * - :math:`\beta`
      - Elastic crossover
      - Viscous crossover
      - 0.2-0.8
-   * - γ
+   * - :math:`\gamma`
      - Solid-like (slow)
      - Newtonian terminal
      - 0.5-0.95 (liquid)
@@ -308,10 +308,10 @@ Fitting Guidance
    * - Poor AIC vs simpler models
      - Overfitting
      - Prefer 3-4 parameter models
-   * - α ≈ β ≈ γ
+   * - :math:`\alpha \approx \beta \approx \gamma`
      - Single relaxation mode
      - Use FMG or FML instead
-   * - c₂/c₁ < 0.01 or > 100
+   * - :math:`c_2/c_1` < 0.01 or > 100
      - One branch dominates
      - Simplify to single-branch model
    * - Fit diverges
@@ -332,9 +332,9 @@ Model Selection Guidelines
 Use FZLL only if ALL of the following are true:
 
 1. **Data quality**: 5+ decades in frequency, >100 points, SNR > 20 dB
-2. **Simpler models fail**: FMG/FML show systematic deviations (R² < 0.95)
-3. **Multiple power-law regimes**: Clearly distinct slopes α, β, γ in log-log plot
-4. **Statistical justification**: ΔAIC > 10 compared to best 4-parameter model
+2. **Simpler models fail**: FMG/FML show systematic deviations (:math:`R^2` < 0.95)
+3. **Multiple power-law regimes**: Clearly distinct slopes :math:`\alpha, \beta, \gamma` in log-log plot
+4. **Statistical justification**: :math:`\DeltaAIC` > 10 compared to best 4-parameter model
 5. **Physical interpretation**: Can explain three orders from microstructure
 
 **Comparison Workflow:**
@@ -378,9 +378,9 @@ Practical Applications
 FZLL is useful for characterizing extremely complex materials where hierarchical relaxation mechanisms operate:
 
 1. **Polymer blends**: Three orders represent each component plus interfacial dynamics
-2. **Filled systems**: Matrix (α), filler-matrix interphase (β), filler network (γ)
+2. **Filled systems**: Matrix (:math:`\alpha`), filler-matrix interphase (:math:`\beta`), filler network (:math:`\gamma`)
 3. **Biological materials**: Molecular (fast), cellular (medium), tissue (slow) scales
-4. **Colloidal suspensions**: Brownian (α), hydrodynamic (β), structural (γ) relaxation
+4. **Colloidal suspensions**: Brownian (:math:`\alpha`), hydrodynamic (:math:`\beta`), structural (:math:`\gamma`) relaxation
 
 **Quality Control Warning:**
 
@@ -404,7 +404,7 @@ Example Calculations
 
 **Multi-Order Spectrum Analysis:**
 
-Given fitted parameters c₁ = 500 Pa·s^α, c₂ = 100 Pa·s^γ, α = 0.4, β = 0.6, γ = 0.8, τ = 10 s:
+Given fitted parameters :math:`c_1` = 500 Pa·s\ :math:`^{\alpha, c_2}` = 100 Pa·s\ :math:`^{\gamma, \alpha = 0.4, \beta = 0.6, \gamma = 0.8, \tau}` = 10 s:
 
 .. code-block:: python
 

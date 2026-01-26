@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Rigid below yield stress, Newtonian flow after yielding
-- **Parameters:** 2 (τ_y, η_p)
+- **Parameters:** 2 (:math:`\tau_y`, :math:`\eta_p`)
 - **Key equation:** :math:`\tau = \tau_y + \eta_p \dot{\gamma}` for :math:`|\tau| > \tau_y`
 - **Test modes:** Flow (steady shear)
 - **Material examples:** Cement pastes, drilling muds, mayonnaise, ketchup, toothpaste
@@ -229,7 +229,7 @@ When to Use Alternatives
    * - Post-yield shear-thinning/thickening
      - Non-linear flow beyond yield
      - :doc:`herschel_bulkley` (:math:`n \neq 1`)
-   * - Fitted :math:`\tau_y \approx 0`
+   * - Fitted :math:`\tau_y` ≈ 0
      - No yield stress
      - :doc:`power_law` or :doc:`carreau`
    * - Thixotropic hysteresis
@@ -350,7 +350,7 @@ insights and actionable knowledge for both research and industrial applications.
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Yield Stress (τ_y)**:
+**Yield Stress (** :math:`\tau_y` **)**:
    The yield stress reveals the strength of the material's internal network:
 
    - **Low yield stress (< 10 Pa)**: Weak structure. Material flows easily under
@@ -373,16 +373,16 @@ Parameter Interpretation
    needs :math:`\tau_y > 50` Pa to prevent oil separation; a paint needs
    :math:`\tau_y > 5` Pa to avoid sagging on vertical surfaces.
 
-**Plastic Viscosity (η_p)**:
+**Plastic Viscosity (** :math:`\eta_p` **)**:
    The plastic viscosity governs post-yield energy dissipation:
 
-   - **Low η_p (< 0.1 Pa·s)**: Thin flow once yielded. Good for easy pumping
+   - **Low** :math:`\eta_p` **(< 0.1 Pa·s)**: Thin flow once yielded. Good for easy pumping
      but may cause splashing or poor coating uniformity.
 
-   - **Moderate η_p (0.1–5 Pa·s)**: Balanced flow. Typical for most applications
+   - **Moderate** :math:`\eta_p` **(0.1–5 Pa·s)**: Balanced flow. Typical for most applications
      requiring controlled spreading or mixing.
 
-   - **High η_p (> 5 Pa·s)**: Viscous flow requiring sustained energy input.
+   - **High** :math:`\eta_p` **(> 5 Pa·s)**: Viscous flow requiring sustained energy input.
      Common in heavy pastes and slurries.
 
    *For graduate students*: The plastic viscosity includes contributions from
@@ -402,19 +402,19 @@ Material Classification
    :header-rows: 1
    :widths: 20 20 30 30
 
-   * - τ_y / η_p Ratio
+   * - :math:`\tau_y / \eta_p` Ratio
      - Behavior
      - Typical Materials
      - Process Implications
-   * - Low ratio (< 10 s⁻¹)
+   * - Low ratio (< 10 s\ :math:`^{-1}`)
      - "Thick and easy"
      - Light sauces, thin lotions
      - Easy pumping, gravity flow possible
-   * - Moderate (10–100 s⁻¹)
+   * - Moderate (10–100 s\ :math:`^{-1}`)
      - Balanced plasticity
      - Mayonnaise, drilling mud
      - Standard processing equipment
-   * - High ratio (> 100 s⁻¹)
+   * - High ratio (> 100 s\ :math:`^{-1}`)
      - "Stiff paste"
      - Toothpaste, cement
      - High pressure extrusion needed
@@ -454,15 +454,15 @@ Diagnostic Indicators
 
 Warning signs in fitted parameters:
 
-- **τ_y → 0**: Material is Newtonian or nearly so. Check if yield stress model
+- :math:`\tau_y` **→ 0**: Material is Newtonian or nearly so. Check if yield stress model
   is appropriate; consider using :doc:`carreau` instead.
 
-- **τ_y negative**: Fitting artifact from noisy low-rate data. Constrain to
+- :math:`\tau_y` **negative**: Fitting artifact from noisy low-rate data. Constrain to
   :math:`\tau_y \geq 0` or use robust fitting.
 
-- **η_p unexpectedly low**: Check for wall slip or instrument calibration issues.
+- :math:`\eta_p` **unexpectedly low**: Check for wall slip or instrument calibration issues.
 
-- **Strong correlation between τ_y and η_p**: Insufficient data range. Extend
+- **Strong correlation between** :math:`\tau_y` **and** :math:`\eta_p`: Insufficient data range. Extend
   measurements to higher shear rates for better separation.
 
 - **Systematic residuals**: If residuals curve, the material shows shear-thinning
@@ -476,7 +476,7 @@ Application Examples
    indicates batch problems (wrong emulsifier ratio, insufficient homogenization).
 
 **Drilling Mud Formulation**:
-   Target :math:`\tau_y = 5-15` Pa for cuttings suspension with :math:`\eta_p < 0.1`
+   Target :math:`\tau_y = 5-15` Pa for cuttings suspension with :math:`\eta_p` < 0.1
    Pa·s for easy circulation. The API recommends reporting both 6 rpm and 300 rpm
    readings for Bingham analysis.
 

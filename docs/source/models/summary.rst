@@ -21,7 +21,7 @@ The table below provides a comprehensive overview of all models across key chara
      - Material Type
      - Equilibrium Modulus
      - Complexity
-     - α Range
+     - :math:`\alpha` Range
      - Best For
    * - :doc:`Maxwell </models/classical/maxwell>`
      - Classical
@@ -247,7 +247,7 @@ The table below provides a comprehensive overview of all models across key chara
      - Configurable
      - ★★★★★
      - N/A
-     - Tensorial EVP with fluidity coupling, N₁ predictions
+     - Tensorial EVP with fluidity coupling, :math:`N_1` predictions
    * - :doc:`Fluidity-Saramito Nonlocal </models/fluidity/saramito_evp>`
      - Saramito EVP
      - 11-13
@@ -318,8 +318,8 @@ The table below provides a comprehensive overview of all models across key chara
      - Colloidal Glass
      - Configurable
      - ★★★★★
-     - ε: -0.5 to 0.5
-     - Dense colloidal suspensions, glass transition (F₁₂ schematic)
+     - :math:`\varepsilon`: -0.5 to 0.5
+     - Dense colloidal suspensions, glass transition (:math:`F_1_2` schematic)
    * - :doc:`ITT-MCT Isotropic </models/itt_mct/itt_mct_isotropic>`
      - ITT-MCT
      - 5+
@@ -327,7 +327,7 @@ The table below provides a comprehensive overview of all models across key chara
      - Colloidal Glass
      - Configurable
      - ★★★★★
-     - φ: 0.1 to 0.64
+     - :math:`\phi`: 0.1 to 0.64
      - Hard-sphere colloids with S(k), full MCT physics
    * - :doc:`SPP Yield Stress </models/spp/spp_yield_stress>`
      - SPP
@@ -343,7 +343,7 @@ The table below provides a comprehensive overview of all models across key chara
 
 * **Test Modes:** R = Relaxation, C = Creep, O = Oscillation, Rot = Rotation (steady shear), Flow = Flow curve, Startup = Startup shear, LAOS = Large-amplitude oscillatory
 * **Complexity:** ★☆☆☆☆ = Simplest, ★★★★★ = Most complex
-* **α Range:** Fractional order range for fractional models; for ITT-MCT: ε = separation parameter (glass transition), φ = volume fraction; N/A for non-fractional models
+* :math:`\alpha` **Range:** Fractional order range for fractional models; for ITT-MCT: :math:`\varepsilon` = separation parameter (glass transition), :math:`\phi` = volume fraction; N/A for non-fractional models
 * **Equilibrium Modulus:** Whether model predicts finite G∞ at long times (solid-like)
 
 
@@ -366,7 +366,7 @@ For a comprehensive decision flowchart based on your experimental data, see:
      - Two plateaus visible
      - FZSS ★★★★☆ (most common)
    * -
-     - One plateau (low-ω)
+     - One plateau (low-:math:`\omega`)
      - FML ★★★☆☆
    * -
      - Power-law (no plateaus)
@@ -386,7 +386,7 @@ For a comprehensive decision flowchart based on your experimental data, see:
    * -
      - Unbounded compliance
      - Maxwell ★☆☆☆☆, FML ★★★☆☆
-   * - **Flow (η vs γ̇)**
+   * - **Flow (** :math:`\eta vs \dot{\gamma}` **)**
      - Yield stress + linear
      - Bingham ★★☆☆☆
    * -
@@ -439,37 +439,37 @@ Fractional Models (11 models)
 
 * Capture power-law dynamics naturally
 * Fewer parameters than multi-mode Maxwell
-* Physical interpretation via fractional order α
+* Physical interpretation via fractional order :math:`\alpha`
 * Excellent for polymers, gels, biological materials
 
-**Fractional order (α) interpretation:**
+**Fractional order (** :math:`\alpha` **) interpretation:**
 
 .. list-table:: Fractional Order Interpretation Guide
    :header-rows: 1
    :widths: 15 25 60
 
-   * - α Value
+   * - :math:`\alpha` Value
      - Physical Meaning
      - Material Examples
-   * - α → 0
+   * - :math:`\alpha` → 0
      - Elastic-dominated
      - Stiff gels, crosslinked elastomers (spring-like)
-   * - α ≈ 0.3-0.5
+   * - :math:`\alpha` ≈ 0.3-0.5
      - Balanced viscoelasticity
      - Soft gels, entangled polymers, biological tissues
-   * - α ≈ 0.5
+   * - :math:`\alpha` ≈ 0.5
      - Critical gel
      - Gel point, sol-gel transition
-   * - α → 1
+   * - :math:`\alpha` → 1
      - Viscous-dominated
      - Polymer melts, concentrated solutions (dashpot-like)
 
-**Typical α ranges by material:**
+**Typical** :math:`\alpha` **ranges by material:**
 
-* **Soft gels:** α = 0.2 - 0.4
-* **Polymer melts:** α = 0.6 - 0.9
-* **Biological tissues:** α = 0.3 - 0.5
-* **Emulsions:** α = 0.4 - 0.7
+* **Soft gels:** :math:`\alpha` = 0.2 - 0.4
+* **Polymer melts:** :math:`\alpha` = 0.6 - 0.9
+* **Biological tissues:** :math:`\alpha` = 0.3 - 0.5
+* **Emulsions:** :math:`\alpha` = 0.4 - 0.7
 
 **Model selection within fractional family:**
 
@@ -490,11 +490,11 @@ Fluidity-Saramito EVP Models (2 models)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **When to use:** Yield-stress fluids with combined elastic, viscous, and plastic behavior; thixotropic materials requiring
-stress overshoot prediction; systems needing normal stress difference (N₁) predictions; shear banding analysis.
+stress overshoot prediction; systems needing normal stress difference (:math:`N_1`) predictions; shear banding analysis.
 
 **Advantages:**
 
-* Full tensorial stress state: [τ_xx, τ_yy, τ_xy] for normal stress predictions
+* Full tensorial stress state: [:math:`\tau_xx, \tau_yy, \tau_xy`] for normal stress predictions
 * Von Mises yield criterion with Herschel-Bulkley plastic flow
 * Thixotropic fluidity evolution (aging + rejuvenation)
 * Predicts stress overshoot in startup shear (key thixotropic signature)
@@ -503,16 +503,16 @@ stress overshoot prediction; systems needing normal stress difference (N₁) pre
 
 **Model selection within Saramito family:**
 
-* **FluiditySaramitoLocal (minimal)**: Simplest, λ = 1/f only, homogeneous flow
-* **FluiditySaramitoLocal (full)**: τ_y(f) coupling, aging yield stress
-* **FluiditySaramitoNonlocal (minimal)**: Shear banding capable with D_f∇²f
+* **FluiditySaramitoLocal (minimal)**: Simplest, :math:`\lambda` = 1/f only, homogeneous flow
+* **FluiditySaramitoLocal (full)**: :math:`\tau_y(f)` coupling, aging yield stress
+* **FluiditySaramitoNonlocal (minimal)**: Shear banding capable with :math:`D_f \nabla^2 f`
 * **FluiditySaramitoNonlocal (full)**: Full thixotropic banding
 
 **Key physics:**
 
-* Upper-convected Maxwell viscoelasticity: λ(dτ/dt - L·τ - τ·L^T) + α(τ)τ = 2η_p D
-* Plasticity parameter: α = max(0, 1 - τ_y/\|τ\|) (Von Mises)
-* Fluidity evolution: df/dt = (f_age - f)/t_a + b\|γ̇\|^n(f_flow - f)
+* Upper-convected Maxwell viscoelasticity: :math:`\lambda(d\tau/dt - L \cdot \tau - \tau \cdot L^T) + \alpha(\tau)\tau = 2\eta_p` D
+* Plasticity parameter: :math:`\alpha` = max(0, 1 - :math:`\tau_y/` :math:`|\tau|`) (Von Mises)
+* Fluidity evolution: :math:`df/dt = (f_{age} - f)/t_a + b|\dot{\gamma}|^n(f_{flow} - f)`
 
 **Typical applications:** Carbopol gels, cement pastes, drilling muds, mayonnaise, blood, cosmetic creams.
 
@@ -530,7 +530,7 @@ Soft Glassy Rheology Models (2 models)
 * Power-law rheology emerges from microscopic physics
 * Bayesian inference support for uncertainty quantification
 
-**Noise temperature (x) interpretation:**
+**Noise temperature (** :math:`x` **) interpretation:**
 
 .. list-table:: Noise Temperature Interpretation Guide
    :header-rows: 1
@@ -560,7 +560,7 @@ Soft Glassy Rheology Models (2 models)
 **Connection to SRFS Transform:**
 
 The noise temperature x from SGR models directly relates to SRFS shift factors:
-a(γ̇) ~ (γ̇)^(2-x), enabling complementary analysis of oscillatory and flow data.
+a(:math:`\dot{\gamma}`) ~ (:math:`\dot{\gamma}`)^(2-x), enabling complementary analysis of oscillatory and flow data.
 
 
 ITT-MCT Models (2 models)
@@ -577,35 +577,35 @@ ITT-MCT Models (2 models)
 * Two-time correlators for non-equilibrium response
 * Strain decorrelation naturally emerges from advection
 
-**Separation parameter (ε) interpretation:**
+**Separation parameter (** :math:`\varepsilon` **) interpretation:**
 
 .. list-table:: Glass Transition Parameter Guide
    :header-rows: 1
    :widths: 15 25 60
 
-   * - ε Value
+   * - :math:`\varepsilon` Value
      - Physical Meaning
      - Material Examples
-   * - ε < 0
+   * - :math:`\varepsilon` < 0
      - Glass state
-     - Dense suspensions below φ_c, kinetically arrested
-   * - ε ≈ 0
+     - Dense suspensions below :math:`\phi_c`, kinetically arrested
+   * - :math:`\varepsilon` ≈ 0
      - Glass transition
      - Critical point, diverging relaxation time
-   * - ε > 0
+   * - :math:`\varepsilon` > 0
      - Fluid state
      - Mobile suspensions, ergodic dynamics
 
 **Model selection within ITT-MCT family:**
 
-* **ITTMCTSchematic (F₁₂)**: Simplified scalar correlator, 6 parameters, fast fitting
+* **ITTMCTSchematic (** :math:`F_1_2` **)**: Simplified scalar correlator, 6 parameters, fast fitting
 * **ITTMCTIsotropic (ISM)**: Full k-resolved correlators with S(k) input, quantitative predictions
 
 **Key physics:**
 
-* Memory kernel: m(Φ) = v₁Φ + v₂Φ² (schematic) or k-integral (isotropic)
-* Glass transition criterion: v₂_c = 4 (for v₁ = 0)
-* Strain decorrelation: h(γ) = exp(-(γ/γ_c)²)
+* Memory kernel: m(:math:`\Phi`) = :math:`v_1\Phi + v_2\Phi^2` (schematic) or k-integral (isotropic)
+* Glass transition criterion: :math:`v_2_c` = 4 (for :math:`v_1` = 0)
+* Strain decorrelation: h(:math:`\gamma`) = exp(-(:math:`\gamma/\gamma_c`)\ :math:`^2`)
 * Integration through transients (ITT) for nonlinear flow
 
 **Typical applications:** PMMA hard-sphere colloids, silica suspensions, concentrated emulsions, microgel pastes.
@@ -613,7 +613,7 @@ ITT-MCT Models (2 models)
 **Comparison with SGR:**
 
 * **SGR**: Phenomenological trap model, noise temperature x, simpler physics
-* **ITT-MCT**: Microscopic derivation, volume fraction φ, full correlator dynamics
+* **ITT-MCT**: Microscopic derivation, volume fraction :math:`\phi`, full correlator dynamics
 * Both capture yielding, but ITT-MCT provides quantitative predictions from structure
 
 
@@ -624,44 +624,44 @@ DMT Thixotropic Models (2 models)
 
 **Advantages:**
 
-* Scalar structure parameter λ ∈ [0, 1] tracks microstructure
+* Scalar structure parameter :math:`\lambda` ∈ [0, 1] tracks microstructure
 * Clear separation of buildup (aging) and breakdown (shear) kinetics
 * Two viscosity closures: exponential (smooth) or Herschel-Bulkley (yield stress)
 * Optional Maxwell backbone for stress overshoot and SAOS
 * Nonlocal variant captures shear banding via structure diffusion
 
-**Structure parameter (λ) interpretation:**
+**Structure parameter (** :math:`\lambda` **) interpretation:**
 
 .. list-table:: Structure Parameter Guide
    :header-rows: 1
    :widths: 15 25 60
 
-   * - λ Value
+   * - :math:`\lambda` Value
      - Physical Meaning
      - Material State
-   * - λ = 1
+   * - :math:`\lambda` = 1
      - Fully structured
      - At rest (aged), maximum viscosity, colloidal network intact
-   * - 0 < λ < 1
+   * - 0 < :math:`\lambda` < 1
      - Partially broken
      - Under shear, intermediate microstructure
-   * - λ = 0
+   * - :math:`\lambda` = 0
      - Fully broken
      - High shear (rejuvenated), minimum viscosity, network destroyed
 
 **Model selection within DMT family:**
 
 * **DMTLocal (exponential)**: Smooth viscosity transition, no yield stress, simple
-* **DMTLocal (herschel_bulkley)**: Explicit yield stress, structure-dependent τ_y and K
+* **DMTLocal (herschel_bulkley)**: Explicit yield stress, structure-dependent :math:`\tau_y` and K
 * **DMTLocal + elasticity**: Maxwell backbone for stress overshoot and SAOS
-* **DMTNonlocal**: Shear banding via structure diffusion (D_λ∇²λ)
+* **DMTNonlocal**: Shear banding via structure diffusion (:math:`D_{\lambda}` :math:`\nabla ^2\lambda`)
 
 **Key physics:**
 
-* Structure kinetics: dλ/dt = (1-λ)/t_eq - aλ|γ̇|^c/t_eq
-* Equilibrium structure: λ_eq = 1/(1 + a|γ̇|^c)
-* Exponential viscosity: η(λ) = η_∞(η_0/η_∞)^λ
-* Maxwell stress: dσ/dt = Gγ̇ - σ/θ(λ)
+* Structure kinetics: :math:`d\lambda/dt = (1-\lambda)/t_eq - a\lambda|\dot{\gamma}|^c/t_eq`
+* Equilibrium structure: :math:`\lambda_{eq} = 1/(1 + a|\dot{\gamma}|^c)`
+* Exponential viscosity: :math:`\eta(\lambda) = \eta_{\infty}(\eta_0/\eta_{\infty})^{\lambda}`
+* Maxwell stress: :math:`d\sigma/dt = G\dot{\gamma} - \sigma/\theta(\lambda)`
 
 **Typical applications:** Drilling muds, waxy crude oils, cement pastes, mayonnaise, ketchup, paints, concentrated suspensions.
 
@@ -724,22 +724,22 @@ By Material Type
      - Notes
    * - Polymer Melts
      - FML, FZSS, Carreau (flow)
-     - α typically 0.6-0.9; use flow models for processing
+     - :math:`\alpha` typically 0.6-0.9; use flow models for processing
    * - Soft Gels
      - FZSS, FMG, SpringPot
-     - α typically 0.2-0.4; check for yield stress
+     - :math:`\alpha` typically 0.2-0.4; check for yield stress
    * - Elastomers
      - FZSS, Zener
      - Two plateaus common; classical may suffice
    * - Biological Tissues
      - FZSS, FML, Fractional Burgers
-     - α typically 0.3-0.5; complex behavior common
+     - :math:`\alpha` typically 0.3-0.5; complex behavior common
    * - Emulsions/Suspensions
      - FZSS (oscillation), Herschel-Bulkley (flow)
      - Check for yield stress in flow
    * - Critical Gels
      - SpringPot, FMG
-     - α ≈ 0.5; power-law across all frequencies
+     - :math:`\alpha` ≈ 0.5; power-law across all frequencies
    * - Polymer Solutions
      - Carreau, Cross (flow); FML (oscillation)
      - Shear-thinning dominant
@@ -760,7 +760,7 @@ By Material Type
      - Near glass transition; use GENERIC for x→1
    * - Thixotropic Yield Stress
      - FluiditySaramitoLocal, Herschel-Bulkley
-     - Stress overshoot, aging; use Saramito for N₁
+     - Stress overshoot, aging; use Saramito for :math:`N_1`
    * - Shear Banding Materials
      - FluiditySaramitoNonlocal, FluidityNonlocal
      - Spatially resolved flow, cooperativity length
@@ -832,34 +832,34 @@ Parameter Count Comparison
 
 **2-Parameter Models (Simplest):**
 
-* **Maxwell**: G₀, η - Liquid with single relaxation
+* **Maxwell**: :math:`G_0, \eta` - Liquid with single relaxation
 * **PowerLaw**: K, n - Shear-thinning/thickening
-* **Bingham**: τ₀, ηpl - Linear viscoplastic
-* **SpringPot**: V, α - Pure power-law element
+* **Bingham**: :math:`\tau_0, \etapl` - Linear viscoplastic
+* **SpringPot**: V, :math:`\alpha` - Pure power-law element
 
 **3-Parameter Models:**
 
-* **Zener**: Gs, Gp, ηp - Classical solid with plateau
-* **FML**: V, α, η - Fractional liquid
-* **FMG**: Gs, V, α - Fractional gel
-* **Herschel-Bulkley**: τ₀, K, n - Yield + power-law
+* **Zener**: Gs, Gp, :math:`\etap` - Classical solid with plateau
+* **FML**: V, :math:`\alpha, \eta` - Fractional liquid
+* **FMG**: Gs, V, :math:`\alpha` - Fractional gel
+* **Herschel-Bulkley**: :math:`\tau_0`, K, n - Yield + power-law
 
 **4-Parameter Models:**
 
-* **FZSS**: Ge, Gm, α, τα - Most common fractional solid
-* **FZSL**: Gs, ηs, V, α - Fractional solid-liquid Zener
-* **FZLL**: ηs, ηp, V, α - Fractional liquid-liquid Zener
-* **FKV**: Gp, V, α, (ηp optional) - Fractional Kelvin-Voigt
-* **Carreau**: η₀, η∞, λ, n - Flow with plateaus
-* **Cross**: K, m, η₀, η∞ - Alternative flow interpolation
-* **Fractional Maxwell Model**: V₁, V₂, α₁, α₂ - Dual springpots
+* **FZSS**: Ge, Gm, :math:`\alpha, \tau\alpha` - Most common fractional solid
+* **FZSL**: Gs, :math:`\etas, V, \alpha` - Fractional solid-liquid Zener
+* **FZLL**: :math:`\etas, \etap, V, \alpha` - Fractional liquid-liquid Zener
+* **FKV**: Gp, V, :math:`\alpha, (\etap` optional) - Fractional Kelvin-Voigt
+* **Carreau**: :math:`\eta_0, \eta_{\infty}, \lambda`, n - Flow with plateaus
+* **Cross**: K, m, :math:`\eta_0, \eta_{\infty}` - Alternative flow interpolation
+* **Fractional Maxwell Model**: :math:`V_1, V_2, \alpha_1, \alpha_2` - Dual springpots
 * **Fractional Jeffreys**: Two dashpots + springpot parameters
 
 **5-Parameter Models (Most Complex):**
 
 * **Fractional Burgers**: Maxwell + FKV (5 params) - Creep + relaxation
 * **Fractional Poynting-Thomson**: Multi-plateau solid (5 params)
-* **Carreau-Yasuda**: η₀, η∞, λ, n, a - Adjustable transition
+* **Carreau-Yasuda**: :math:`\eta_0, \eta_{\infty}, \lambda`, n, a - Adjustable transition
 
 
 Bayesian Inference Support

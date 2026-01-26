@@ -88,8 +88,8 @@ intracycle sequence of physical processes during nonlinear deformation.
 The model parameterizes the nonlinear response in terms of:
 
 - **G_cage**: Apparent cage modulus (elastic stiffness of the microstructural cage)
-- **Static yield stress** (σ_sy): Stress at strain reversal (maximum strain amplitude)
-- **Dynamic yield stress** (σ_dy): Stress at rate reversal (zero strain rate)
+- **Static yield stress** (:math:`\sigma_{sy}`): Stress at strain reversal (maximum strain amplitude)
+- **Dynamic yield stress** (:math:`\sigma_{dy}`): Stress at rate reversal (zero strain rate)
 - **Power-law scaling**: Amplitude dependence of yield stresses with exponent
 
 This approach connects LAOS analysis to steady-shear flow behavior, enabling
@@ -104,12 +104,12 @@ Cage Model for Yield Stress Fluids
 The SPP yield stress model is grounded in the colloidal cage picture, where
 particles are confined by nearest-neighbor "cages":
 
-1. **Linear Regime** (small γ_0): The cage deforms elastically with stiffness G_cage
-2. **Yielding** (γ_0 → γ_yield): Cage constraints are overcome at the yield point
-3. **Flow Regime** (large γ_0): Particles escape cages and flow viscously
+1. **Linear Regime** (small :math:`\gamma_0`): The cage deforms elastically with stiffness G_cage
+2. **Yielding** (:math:`\gamma_0` → :math:`\gamma_{yield}`): Cage constraints are overcome at the yield point
+3. **Flow Regime** (large :math:`\gamma_0`): Particles escape cages and flow viscously
 
 The cage modulus G_cage represents the instantaneous elastic stiffness measured
-at the point where stress passes through zero (σ = 0). This corresponds to the
+at the point where stress passes through zero (:math:`\sigma` = 0). This corresponds to the
 slope of the stress-strain Lissajous curve at the origin.
 
 Static vs. Dynamic Yield Stress
@@ -117,17 +117,17 @@ Static vs. Dynamic Yield Stress
 
 The SPP framework distinguishes two physically distinct yield stresses:
 
-**Static Yield Stress (σ_sy)**
-   - Measured at strain reversal (γ = ±γ_0, γ̇ = 0)
+**Static Yield Stress (** :math:`\sigma_{sy}` **)**
+   - Measured at strain reversal (:math:`\gamma` = ±\ :math:`\gamma_0`, :math:`\dot{\gamma}` = 0)
    - Represents the stress required to initiate flow from rest
    - Larger than dynamic yield due to microstructural recovery during strain reversal
 
-**Dynamic Yield Stress (σ_dy)**
-   - Measured at rate reversal (γ̇ = 0, γ ≠ 0)
+**Dynamic Yield Stress (** :math:`\sigma_{dy}` **)**
+   - Measured at rate reversal (:math:`\dot{\gamma}` = 0, :math:`\gamma` ≠ 0)
    - Represents the stress during continuous flow
    - Connects to steady-shear yield stress extrapolation
 
-The ratio σ_sy/σ_dy is typically around 2-3 for colloidal systems and reveals
+The ratio :math:`\sigma_{sy}/\sigma_{dy}` is typically around 2-3 for colloidal systems and reveals
 information about cage reformation kinetics and thixotropy.
 
 Power-Law Amplitude Scaling
@@ -244,22 +244,22 @@ The Bingham fluid :math:`\sigma = \sigma_y + \eta_p \dot{\gamma}` (for :math:`|\
 represents the idealized yield stress fluid. Under LAOS, the SPP framework reveals
 a characteristic four-step intracycle sequence:
 
-**Step 1: Elastic Extension** (|γ| < γ_y)
+**Step 1: Elastic Extension** (:math:`|\gamma|` < :math:`\gamma_y`)
    - Stress builds linearly: :math:`\sigma = G_{cage} \cdot \gamma`
    - :math:`G'_t \approx G_{cage}` (constant), :math:`G''_t \approx 0`
    - Cole-Cole trajectory: remains near the :math:`G'_t` axis
 
-**Step 2: Static Yielding** (at γ = ±γ_y)
+**Step 2: Static Yielding** (at :math:`\gamma` = ±\ :math:`\gamma_y`)
    - Cages rupture; stress reaches :math:`\sigma_{y,static} = G_{cage} \cdot \gamma_y`
    - Sharp transition: :math:`G'_t` drops rapidly, :math:`G''_t` increases
    - Cole-Cole: trajectory moves from elastic toward viscous dominance
 
-**Step 3: Newtonian Flow** (|γ| > γ_y, |γ̇| large)
+**Step 3: Newtonian Flow** (:math:`|\gamma|` > :math:`\gamma_y`, :math:`|\dot{\gamma}|` large)
    - Material flows with constant viscosity :math:`\eta_p`
    - :math:`G'_t \approx 0`, :math:`G''_t \approx \eta_p \omega`
    - Cole-Cole: trajectory resides near the :math:`G''_t` axis
 
-**Step 4: Cage Reformation** (as γ̇ → 0 at ±γ_max)
+**Step 4: Cage Reformation** (as :math:`\dot{\gamma}` → 0 at ±\ :math:`\gamma_{max}`)
    - Microstructure rapidly reforms at rate reversal
    - :math:`G''_t \to 0`, :math:`G'_t` increases
    - :math:`\sigma_{y,dynamic}` measured at this instant
@@ -284,10 +284,10 @@ parameter :math:`\alpha`, exhibits elastic recoil during flow reversal. Under SP
 
 **SPP Trajectory Features:**
    - Cole-Cole plots form loops rather than simple back-and-forth trajectories
-   - Loop area increases with Deborah number (De = λω)
+   - Loop area increases with Deborah number (De = :math:`\lambda \omega`)
    - Trajectory directionality (clockwise vs counterclockwise) encodes stress response phase
 
-**Mobility Parameter Effects (α):**
+**Mobility Parameter Effects (** :math:`\alpha` **):**
    - :math:`\alpha = 0` (upper-convected Maxwell): purely elastic, no shear thinning
    - :math:`\alpha = 0.5`: intermediate behavior, moderate shear thinning
    - :math:`\alpha \to 1`: stronger nonlinearity, more pronounced recoil features
@@ -307,7 +307,7 @@ shows characteristic SPP behavior that lacks the yield-stress sequence:
 **SPP Predictions:**
    - :math:`G'_t = 0` everywhere (no elasticity)
    - :math:`G''_t` varies with shear rate as :math:`\sim |\dot{\gamma}|^{n-1}`
-   - No cage modulus can be defined (dσ/dγ|_{σ=0} is undefined)
+   - No cage modulus can be defined (:math:`d\sigma/d\gamma|_{\sigma=0}` is undefined)
    - Cole-Cole trajectory collapses to the :math:`G''_t` axis
 
 **Diagnostic Implication:**
@@ -347,7 +347,7 @@ Constitutive Equations
 Oscillation Mode (LAOS Amplitude Sweep)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For amplitude sweep analysis with strain amplitude γ_0:
+For amplitude sweep analysis with strain amplitude :math:`\gamma_0`:
 
 .. math::
 
@@ -366,7 +366,7 @@ The cage modulus at small amplitude approximates:
 Rotation Mode (Steady Shear)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For steady shear flow at rate γ̇, the model uses a Herschel-Bulkley-like form:
+For steady shear flow at rate :math:`\dot{\gamma}`, the model uses a Herschel-Bulkley-like form:
 
 .. math::
 
@@ -455,7 +455,7 @@ The cage modulus quantifies the elastic strength of the confining microstructura
    - **Scaling with concentration**: For colloidal systems, :math:`G_{\text{cage}} \sim \phi^{3-5}` where :math:`\phi` is volume fraction
 
 **Typical values**:
-   - Colloidal glasses (φ ~ 0.6): 10-100 Pa
+   - Colloidal glasses (:math:`\phi` ~ 0.6): 10-100 Pa
    - Microgel pastes: 100-1000 Pa
    - Polymer gels: 1000-10000 Pa
 
@@ -521,24 +521,24 @@ Material Characterization Capabilities
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**σ_y (Yield Stress)**:
+:math:`\sigma_y` **(Yield Stress)**:
    The stress threshold required to initiate flow from rest (static) or during continuous flow (dynamic).
 
-   *For graduate students*: The SPP framework distinguishes two yield stresses via the intracycle stress decomposition σ(t) = G'_t[γ - γ_eq] + (G''_t/ω)γ̇ + σ_y. Static yield stress σ_sy (at strain reversal, γ̇ = 0) includes microstructural recovery during momentary rest, while dynamic yield stress σ_dy (at rate reversal) represents flowing state. Power-law scaling σ_y ∼ γ_0^n with n ≈ 0.2 emerges from jamming universality (Liu & Nagel 2010). Ratio σ_sy/σ_dy ≈ 2-3 quantifies thixotropic cage reformation timescales.
+   *For graduate students*: The SPP framework distinguishes two yield stresses via the intracycle stress decomposition :math:`\sigma(t)` = G'_t[:math:`\gamma` - :math:`\gamma_{eq}`] + (G''_t/:math:`\omega`)\ :math:`\dot{\gamma}` + :math:`\sigma_y`. Static yield stress :math:`\sigma_{sy}` (at strain reversal, :math:`\dot{\gamma}` = 0) includes microstructural recovery during momentary rest, while dynamic yield stress :math:`\sigma_{dy}` (at rate reversal) represents flowing state. Power-law scaling :math:`\sigma_y` ∼ :math:`\gamma_0^n` with n ≈ 0.2 emerges from jamming universality (Liu & Nagel 2010). Ratio :math:`\sigma_{sy}/\sigma_{dy}` ≈ 2-3 quantifies thixotropic cage reformation timescales.
 
-   *For practitioners*: Fit σ_sy from LAOS amplitude sweep (stress at maximum strain). Fit σ_dy from flow curve extrapolation to γ̇ → 0 or from LAOS rate reversal. Ratio > 3 indicates strong thixotropy, requiring longer rest between measurements. Exponent n < 0.3 (hard particles) vs n > 0.5 (soft particles) guides formulation strategy.
+   *For practitioners*: Fit :math:`\sigma_{sy}` from LAOS amplitude sweep (stress at maximum strain). Fit :math:`\sigma_{dy}` from flow curve extrapolation to :math:`\dot{\gamma}` → 0 or from LAOS rate reversal. Ratio > 3 indicates strong thixotropy, requiring longer rest between measurements. Exponent n < 0.3 (hard particles) vs n > 0.5 (soft particles) guides formulation strategy.
 
 **G_cage (Cage Modulus)**:
    Instantaneous elastic stiffness of the confining microstructural cage.
 
-   *For graduate students*: G_cage = (dσ/dγ)|_σ=0 represents the cage spring constant in colloidal glass picture. Unlike G'(ω), which decreases with amplitude in nonlinear regime, G_cage remains constant (amplitude-independent material property). Scales as G_cage ∼ nk_BT/a³ where n is number density and a is particle radius, connecting to thermal energy and cage size.
+   *For graduate students*: :math:`G_{\text{cage}} = (d\sigma/d\gamma)|_{\sigma=0}` represents the cage spring constant in colloidal glass picture. Unlike :math:`G'(\omega)`, which decreases with amplitude in nonlinear regime, :math:`G_{\text{cage}}` remains constant (amplitude-independent material property). Scales as :math:`G_{\text{cage}} \sim nk_BT/a^3` where n is number density and a is particle radius, connecting to thermal energy and cage size.
 
-   *For practitioners*: Extract from linear regime G'_LVR or from SPP G'_t at σ = 0 crossing. Typical values: 10-100 Pa (colloidal glasses), 100-1000 Pa (microgels), >1000 Pa (polymer gels). Use for quality control and batch consistency checks.
+   *For practitioners*: Extract from linear regime G'_LVR or from SPP G'_t at :math:`\sigma` = 0 crossing. Typical values: 10-100 Pa (colloidal glasses), 100-1000 Pa (microgels), >1000 Pa (polymer gels). Use for quality control and batch consistency checks.
 
 **n_sy, n_dy (Power-Law Exponents)**:
    Amplitude-dependence exponents quantifying cage rupture mechanism.
 
-   *For graduate students*: Scaling exponents in σ_y(γ_0) ∼ γ_0^n connect to Herschel-Bulkley flow curve exponent via stress-rate duality. Rogers (2011) universal value n ≈ 0.2 for hard-sphere colloids derives from percolation/jamming scaling laws. Deviation from 0.2 indicates additional mechanisms (attractive forces, particle softness, structural hierarchy).
+   *For graduate students*: Scaling exponents in :math:`\sigma_y(\gamma_0) \sim \gamma_0^n` connect to Herschel-Bulkley flow curve exponent via stress-rate duality. Rogers (2011) universal value n ≈ 0.2 for hard-sphere colloids derives from percolation/jamming scaling laws. Deviation from 0.2 indicates additional mechanisms (attractive forces, particle softness, structural hierarchy).
 
    *For practitioners*: n ≈ 0.2 confirms hard-sphere-like behavior. n > 0.5 suggests soft particles or weak cages. n ≈ 1.0 indicates linear dependence (fragile gels). Use to classify material type and predict performance across amplitude ranges.
 
@@ -555,7 +555,7 @@ Material Classification
      - Processing Implications
    * - G_cage = 10-100 Pa, n_sy ≈ 0.2
      - Hard-sphere colloidal glass
-     - Concentrated silica, PMMA colloids (φ ~ 0.6)
+     - Concentrated silica, PMMA colloids (:math:`\phi` ~ 0.6)
      - Universal jamming behavior, brittle cages
    * - G_cage = 100-1000 Pa, n_sy ≈ 0.5
      - Soft particle suspensions
@@ -565,23 +565,23 @@ Material Classification
      - Polymer gels with weak cages
      - Carbopol, weak hydrogels
      - Strong amplitude-dependence, easy cage breaking
-   * - σ_sy/σ_dy < 2
+   * - :math:`\sigma_{sy}/\sigma_{dy}` < 2
      - Weak thixotropy
      - Simple yield-stress fluids
      - Minimal cage reformation during rest
-   * - σ_sy/σ_dy = 2-3
+   * - :math:`\sigma_{sy}/\sigma_{dy}` = 2-3
      - Moderate thixotropy (typical)
      - Concentrated suspensions, soft glasses
      - Standard Rogers et al. (2011) range
-   * - σ_sy/σ_dy > 3
+   * - :math:`\sigma_{sy}/\sigma_{dy}` > 3
      - Strong thixotropy
      - Highly thixotropic pastes, aged gels
      - Fast cage reformation, strong memory
    * - n_sy ≈ n_dy ≈ 0.2
      - Universal jamming signature
-     - Hard-sphere colloids near φ_c
+     - Hard-sphere colloids near :math:`\phi_c`
      - Theoretical prediction confirmed
-   * - Power-law regime: σ ~ γ_0^n
+   * - Power-law regime: :math:`\sigma` ~ :math:`\gamma_0^n`
      - Cage rupture scaling
      - All yield-stress materials in LAOS
      - Amplitude-dependent yield, nonlinear LAOS
@@ -602,7 +602,7 @@ Parameters
    * - ``G_cage``
      - Pa
      - [1e-3, 1e9]
-     - Apparent cage modulus; elastic stiffness at σ = 0
+     - Apparent cage modulus; elastic stiffness at :math:`\sigma` = 0
    * - ``sigma_sy_scale``
      - Pa
      - [1e-6, 1e9]
@@ -681,9 +681,9 @@ Limitations
 
 - **Simple materials**: Newtonian fluids show no amplitude dependence
 - **Polymer solutions**: May require different physical interpretation
-- **Extreme amplitude**: Very large γ_0 may show non-power-law behavior
+- **Extreme amplitude**: Very large :math:`\gamma_0` may show non-power-law behavior
 - **Transient effects**: Not suitable for strongly time-dependent (aging) materials
-- **Low frequency**: β-relaxation must be slow compared to measurement
+- **Low frequency**: :math:`\beta`-relaxation must be slow compared to measurement
 
 Usage Examples
 --------------
@@ -871,7 +871,7 @@ Cage Modulus Issues
 
 **Solutions**:
 
-1. Ensure adequate data in linear regime (γ_0 < 0.1)
+1. Ensure adequate data in linear regime (:math:`\gamma_0` < 0.1)
 2. Verify linear viscoelastic moduli are consistent
 3. Consider if cage model is appropriate for the material
 

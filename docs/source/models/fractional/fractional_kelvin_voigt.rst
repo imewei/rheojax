@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Solid with bounded creep, power-law viscoelastic damping
-- **Parameters:** 2-3 (Ge, c_α, α)
+- **Parameters:** 2-3 (Ge, :math:`c_{\alpha, \alpha}`)
 - **Key equation:** :math:`G^*(\omega) = G_e + c_\alpha (i\omega)^\alpha`
 - **Test modes:** Oscillation, creep, relaxation
 - **Material examples:** Soft solids, filled polymers, biological tissues, materials with bounded compliance
@@ -28,11 +28,11 @@ Notation Guide
      - Pa
      - Equilibrium modulus (spring stiffness)
    * - :math:`c_\alpha`
-     - Pa·s\ :sup:`α`
+     - Pa·s\ :math:`^{\alpha}`
      - SpringPot quasi-property (damping coefficient)
    * - :math:`\alpha`
      - dimensionless
-     - Fractional order (0 < α < 1, controls damping character)
+     - Fractional order (0 < :math:`\alpha` < 1, controls damping character)
    * - :math:`\tau_\varepsilon`
      - s
      - Characteristic retardation time, :math:`\tau_\varepsilon = (c_\alpha/G_e)^{1/\alpha}`
@@ -65,7 +65,7 @@ The FKV model represents the simplest fractional viscoelastic solid, consisting 
 
 - **Spring (Ge)**: Permanent network structure (crosslinks, crystalline domains)
   providing equilibrium elasticity
-- **SpringPot (c_α, α)**: Distributed viscoelastic damping from hierarchical
+- **SpringPot (** :math:`c_{\alpha, \alpha}` **)**: Distributed viscoelastic damping from hierarchical
   relaxation processes (chain rearrangements, bond breaking/reformation)
 - **Solid behavior**: Bounded creep to equilibrium compliance J∞ = 1/Ge
 
@@ -84,26 +84,26 @@ Parameter Interpretation
    The long-time elastic plateau representing permanent network structure.
 
    - **For graduate students**: Ge relates to crosslink density via rubber
-     elasticity theory: Ge ≈ νkBT where ν is network strand density
+     elasticity theory: :math:`G_e \approx \nu k_B T` where :math:`\nu` is network strand density
    - **For practitioners**: Higher Ge means stiffer material; compare to
      design requirements
 
-**SpringPot Constant (c_α)**:
+**SpringPot Constant (** :math:`c_{\alpha}` **)**:
    Controls the magnitude of viscoelastic damping.
 
-   - High c_α/Ge ratio: Strong damping, slow approach to equilibrium
-   - Low c_α/Ge ratio: Weak damping, rapid approach to equilibrium
-   - Units: Pa·s^α (unusual due to fractional calculus)
+   - High :math:`c_{\alpha/Ge}` ratio: Strong damping, slow approach to equilibrium
+   - Low :math:`c_{\alpha/Ge}` ratio: Weak damping, rapid approach to equilibrium
+   - Units: Pa·s\ :math:`^{\alpha}` (unusual due to fractional calculus)
 
-**Fractional Order (α)**:
+**Fractional Order (** :math:`\alpha` **)**:
    Governs the character of power-law damping and spectrum breadth.
 
-   - **α → 0**: Purely elastic (spring-like), minimal damping
-   - **α → 0.3-0.5**: Typical for soft solids, broad relaxation spectrum
-   - **α → 0.7-0.9**: Approaching classical Kelvin-Voigt (viscous damping)
-   - **α → 1**: Classical Kelvin-Voigt with Newtonian dashpot
+   - :math:`\alpha` **→ 0**: Purely elastic (spring-like), minimal damping
+   - :math:`\alpha` **→ 0.3-0.5**: Typical for soft solids, broad relaxation spectrum
+   - :math:`\alpha` **→ 0.7-0.9**: Approaching classical Kelvin-Voigt (viscous damping)
+   - :math:`\alpha` **→ 1**: Classical Kelvin-Voigt with Newtonian dashpot
 
-   *Physical meaning*: Lower α indicates broader distribution of relaxation
+   *Physical meaning*: Lower :math:`\alpha` indicates broader distribution of relaxation
    times arising from structural heterogeneity (polydispersity, filler
    distribution, network inhomogeneity).
 
@@ -118,15 +118,15 @@ Material Classification
      - Material Type
      - Examples
      - Key Characteristics
-   * - High Ge (> 10⁵ Pa), low α
+   * - High Ge (> :math:`10^5 Pa`), low :math:`\alpha`
      - Stiff crosslinked solid
      - Thermosets, vulcanized rubber
      - Minimal creep, strong damping
-   * - Moderate Ge (10³-10⁵ Pa), α ~ 0.4
+   * - Moderate Ge (:math:`10^3-10^5 Pa`), :math:`\alpha` ~ 0.4
      - Soft viscoelastic solid
      - Hydrogels, elastomers
      - Balanced elasticity/damping
-   * - Low Ge (< 10³ Pa), high α
+   * - Low Ge (< :math:`10^3` Pa), high :math:`\alpha`
      - Very soft gel
      - Weak physical gels
      - Significant creep, slow recovery
@@ -136,9 +136,9 @@ Diagnostic Indicators
 
 - **Ge near lower bound**: Material may be liquid-like; consider fractional
   Maxwell gel instead
-- **α near 1**: Data supports classical Kelvin-Voigt; use simpler model
+- :math:`\alpha` **near 1**: Data supports classical Kelvin-Voigt; use simpler model
 - **Poor fit at long time**: Equilibrium not reached; extend measurement time
-- **c_α and α strongly correlated**: Need broader frequency/time coverage
+- :math:`c_{\alpha and \alpha}` **strongly correlated**: Need broader frequency/time coverage
 
 Fitting Guidance
 ----------------
@@ -166,7 +166,7 @@ Fitting Guidance
 
 - Fit in compliance space for creep data (more natural)
 - Use frequency-domain fitting for SAOS data
-- Constrain 0.05 < α < 0.95 to avoid numerical issues
+- Constrain 0.05 < :math:`\alpha` < 0.95 to avoid numerical issues
 - Verify residuals show no systematic trends
 
 See Also

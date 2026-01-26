@@ -622,7 +622,7 @@ Nonlocal Parameters (``DMTNonlocal`` only)
      - Bounds
    * - ``D_lambda``
      - Structure diffusion coefficient
-     - m²/s
+     - m^2/s
      - 1e-9
      - [1e-12, 1e-6]
 
@@ -1526,9 +1526,9 @@ The structure diffusion introduces a characteristic length scale:
 
 This **cooperativity length** sets the minimum shear band width. Typical values:
 
-- :math:`D_\lambda \sim 10^{-9}` to :math:`10^{-12}` m²/s
+- :math:`D_\lambda \sim 10^{-9}` to :math:`10^{-12}` m^2/s
 - :math:`t_{eq} \sim 1` to :math:`1000` s
-- :math:`\xi \sim 1` μm to :math:`1` mm
+- :math:`\xi \sim 1~\mu\text{m}` to :math:`1` mm
 
 **Physical interpretation**: Structure rearrangements are not purely local but involve
 cooperative motion of neighboring material elements over distance :math:`\xi`.

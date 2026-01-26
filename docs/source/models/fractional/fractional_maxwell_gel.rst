@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Critical gels, power-law viscoelasticity transitioning to terminal flow
-- **Parameters:** 3 (c_α, α, η)
+- **Parameters:** 3 (:math:`c_\alpha`, :math:`\alpha`, :math:`\eta`)
 - **Key equation:** :math:`G(t) = c_\alpha t^{-\alpha} E_{1-\alpha,1-\alpha}(-t^{1-\alpha}/\tau)` where :math:`\tau = \eta / c_\alpha^{1/(1-\alpha)}`
 - **Test modes:** Oscillation, relaxation, creep
 - **Material examples:** Critical gels, wormlike micelles, weak polymer networks, polymer solutions near gel point
@@ -158,9 +158,9 @@ Physical Meaning of :math:`\alpha`
 
 The fractional order :math:`\alpha` characterizes the **viscoelastic character**:
 
-- **:math:`\alpha < 0.5`**: Solid-like (:math:`G' > G''` at intermediate frequencies)
-- **:math:`\alpha = 0.5`**: Critical gel signature (:math:`G' \sim G'' \propto \omega^{0.5}`)
-- **:math:`\alpha > 0.5`**: Liquid-like (:math:`G'' > G'` at low frequencies)
+- :math:`\alpha < 0.5`: Solid-like (:math:`G' > G''` at intermediate frequencies)
+- :math:`\alpha = 0.5`: Critical gel signature (:math:`G' \sim G'' \propto \omega^{0.5}`)
+- :math:`\alpha > 0.5`: Liquid-like (:math:`G'' > G'` at low frequencies)
 
 **Material Ranges:**
 
@@ -203,7 +203,7 @@ Validity and Assumptions
 - **Isothermal conditions**: Temperature constant throughout measurement
 - **Time-invariant material**: No aging, gelation, or structural evolution
 - **Supported test modes**: Oscillation, relaxation, creep
-- **Fractional order bounds**: 0.05 < α < 0.95 for numerical stability
+- **Fractional order bounds**: 0.05 < :math:`\alpha` < 0.95 for numerical stability
 - **Liquid-like behavior**: Zero equilibrium modulus (material flows under stress)
 - **Terminal flow**: Dashpot ensures G(t → ∞) → 0 and unbounded creep
 
@@ -247,14 +247,14 @@ Experimental Design
 **Stress Relaxation:**
 
 1. **Step strain**: :math:`\gamma_0 = 1-5\%` within LVR
-2. **Time span**: Cover 4-5 decades (e.g., 0.01-10³ s)
+2. **Time span**: Cover 4-5 decades (e.g., 0.01-:math:`10^3` s)
 3. **Sampling**: Log-spaced to capture both regimes
 4. **Analysis**: Early-time power-law → late-time viscous decay
 
 **Creep Test:**
 
 1. **Constant stress**: Within LVR
-2. **Time span**: Long enough to observe viscous flow (> 10³ s)
+2. **Time span**: Long enough to observe viscous flow (> :math:`10^3` s)
 3. **Expected**: Bounded creep → unbounded flow
 
 Fitting Strategies
@@ -311,11 +311,11 @@ Model Comparison
 Limiting Behavior
 -----------------
 
-- **:math:`\alpha \to 1`**: Approaches classical Maxwell (:math:`G^*(\omega) \sim i\omega\eta`)
-- **:math:`\alpha \to 0`**: Approaches elastic spring in series with dashpot
-- **:math:`\eta \to \infty`**: Reduces to pure SpringPot (:math:`G^*(\omega) = c_\alpha (i\omega)^\alpha`)
-- **:math:`\eta \to 0`**: Non-physical (no dissipation mechanism)
-- **:math:`c_\alpha \to 0`**: Pure dashpot (:math:`G^*(\omega) = i\omega\eta`)
+- :math:`\alpha \to 1`: Approaches classical Maxwell (:math:`G^*(\omega) \sim i\omega\eta`)
+- :math:`\alpha \to 0`: Approaches elastic spring in series with dashpot
+- :math:`\eta \to \infty`: Reduces to pure SpringPot (:math:`G^*(\omega) = c_\alpha (i\omega)^\alpha`)
+- :math:`\eta \to 0`: Non-physical (no dissipation mechanism)
+- :math:`c_\alpha \to 0`: Pure dashpot (:math:`G^*(\omega) = i\omega\eta`)
 
 What You Can Learn
 ------------------
@@ -326,23 +326,23 @@ insights and actionable knowledge.
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Fractional Order (α)**:
+**Fractional Order (** :math:`\alpha` **)**:
    The fractional order reveals the breadth of the relaxation spectrum and
    proximity to the gel point:
 
-   - **α < 0.3**: Very broad spectrum, highly heterogeneous network. Common in
+   - :math:`\alpha` **< 0.3**: Very broad spectrum, highly heterogeneous network. Common in
      dense colloidal gels or materials with strong polydispersity.
 
-   - **0.3 < α < 0.5**: Intermediate behavior. Typical for physical gels with
+   - **0.3 <** :math:`\alpha` **< 0.5**: Intermediate behavior. Typical for physical gels with
      moderate cross-link density or entangled polymer solutions.
 
-   - **α ≈ 0.5**: Critical gel signature (Winter-Chambon criterion). Material
+   - :math:`\alpha` **≈ 0.5**: Critical gel signature (Winter-Chambon criterion). Material
      is at or near the gel point with :math:`G' \approx G'' \propto \omega^{0.5}`.
 
-   - **0.5 < α < 0.7**: Liquid-dominant behavior. Typical for wormlike micelles
+   - **0.5 <** :math:`\alpha` **< 0.7**: Liquid-dominant behavior. Typical for wormlike micelles
      and weakly associated polymers where flow dominates.
 
-   - **α > 0.7**: Nearly Maxwellian. Consider using classical Maxwell model
+   - :math:`\alpha` **> 0.7**: Nearly Maxwellian. Consider using classical Maxwell model
      for simpler interpretation.
 
    *For graduate students*: The fractional order relates to the fractal
@@ -354,12 +354,12 @@ Parameter Interpretation
    textures. Values approaching 0.5 indicate proximity to sol-gel transition—
    small formulation changes can dramatically shift behavior.
 
-**SpringPot Quasi-Property (c_α)**:
+**SpringPot Quasi-Property (** :math:`c_{\alpha}` **)**:
    The quasi-property sets the modulus scale:
 
-   - **Low c_α (< 100 Pa·s^α)**: Weak network. Soft, easily deformable gel.
-   - **Moderate c_α (100-10⁴ Pa·s^α)**: Typical gel strength for most applications.
-   - **High c_α (> 10⁴ Pa·s^α)**: Stiff network. Strong gel with high elastic
+   - **Low** :math:`c_{\alpha}` **(< 100 Pa·s^** :math:`\alpha` **)**: Weak network. Soft, easily deformable gel.
+   - **Moderate** :math:`c_\alpha` **(100–10⁴ Pa·s^** :math:`\alpha` **)**: Typical gel strength for most applications.
+   - **High** :math:`c_\alpha` **(> 10⁴ Pa·s^** :math:`\alpha` **)**: Stiff network. Strong gel with high elastic
      character.
 
    *For graduate students*: The quasi-property relates to network density and
@@ -369,16 +369,16 @@ Parameter Interpretation
    *For practitioners*: Use :math:`c_\alpha` as a QC metric for gel strength.
    A 50% drop indicates network degradation or incomplete gelation.
 
-**Terminal Viscosity (η)**:
+**Terminal Viscosity (** :math:`\eta` **)**:
    The dashpot viscosity controls long-time flow:
 
-   - **High η (> 10³ Pa·s)**: Slow flow at long times. Material maintains shape
+   - **High** :math:`\eta (> 10^3` **Pa·s)**: Slow flow at long times. Material maintains shape
      for extended periods but will eventually sag or level.
 
-   - **Moderate η (10-10³ Pa·s)**: Balanced behavior. Typical for controlled-
+   - **Moderate** :math:`\eta (10-10^3` **Pa·s)**: Balanced behavior. Typical for controlled-
      release applications.
 
-   - **Low η (< 10 Pa·s)**: Rapid terminal flow. Material levels quickly once
+   - **Low** :math:`\eta` **(< 10 Pa·s)**: Rapid terminal flow. Material levels quickly once
      network relaxes.
 
    *For practitioners*: The ratio :math:`\tau = \eta/c_\alpha^{1/(1-\alpha)}`
@@ -392,23 +392,23 @@ Material Classification
    :header-rows: 1
    :widths: 20 20 30 30
 
-   * - α Range
+   * - :math:`\alpha` Range
      - Material State
      - Typical Materials
      - Process Implications
-   * - α < 0.4
+   * - :math:`\alpha` < 0.4
      - Strong gel
      - Dense colloidal gels, stiff hydrogels
      - Good shape retention, difficult to pump
-   * - 0.4 < α < 0.55
+   * - 0.4 < :math:`\alpha` < 0.55
      - Critical gel
      - Polymer gels near gel point, weak networks
      - Sensitive to conditions, handle carefully
-   * - 0.55 < α < 0.7
+   * - 0.55 < :math:`\alpha` < 0.7
      - Weak gel / sol
      - Wormlike micelles, associative polymers
      - Easy flow, may not hold shape
-   * - α > 0.7
+   * - :math:`\alpha` > 0.7
      - Near-Maxwellian
      - Dilute polymer solutions
      - Use classical Maxwell model
@@ -418,33 +418,33 @@ Diagnostic Indicators
 
 Warning signs in fitted parameters:
 
-- **α → 0 or → 1**: Model may be inappropriate. Check if SpringPot-only or
+- :math:`\alpha` **→ 0 or → 1**: Model may be inappropriate. Check if SpringPot-only or
   classical Maxwell fits better.
 
-- **Large uncertainty in α**: Data don't span sufficient frequency range.
+- **Large uncertainty in** :math:`\alpha`: Data don't span sufficient frequency range.
   Extend measurements to capture both regimes.
 
-- **η poorly constrained**: Low-frequency data insufficient. Extend to lower
+- :math:`\eta` **poorly constrained**: Low-frequency data insufficient. Extend to lower
   frequencies or use creep tests to capture terminal flow.
 
-- **c_α and η strongly correlated**: The characteristic time τ is well-
-  determined but individual parameters are not. Report τ instead.
+- :math:`c_{\alpha and \eta}` **strongly correlated**: The characteristic time :math:`\tau` is well-
+  determined but individual parameters are not. Report :math:`\tau` instead.
 
 Application Examples
 ~~~~~~~~~~~~~~~~~~~~
 
 **Gel Formulation Development**:
-   Track α as crosslinker is added. Approach to α ≈ 0.5 indicates proximity to
-   gel point. For stable gels, target α < 0.45 with sufficient margin from
+   Track :math:`\alpha` as crosslinker is added. Approach to :math:`\alpha` ≈ 0.5 indicates proximity to
+   gel point. For stable gels, target :math:`\alpha` < 0.45 with sufficient margin from
    the transition.
 
 **Quality Control**:
-   Monitor c_α batch-to-batch. A ±20% specification catches network degradation
+   Monitor :math:`c_{\alpha}` batch-to-batch. A ±20% specification catches network degradation
    while allowing normal variation.
 
 **Process Design**:
-   Calculate τ to determine when material transitions from gel-like to flowable.
-   For coating applications, ensure τ exceeds leveling time to prevent sagging.
+   Calculate :math:`\tau` to determine when material transitions from gel-like to flowable.
+   For coating applications, ensure :math:`\tau` exceeds leveling time to prevent sagging.
 
 Fitting Guidance
 ----------------
@@ -471,15 +471,15 @@ Fitting Guidance
 
 - Use smart initialization (automatic for oscillation mode)
 - Fit in log-space for better conditioning
-- Constrain α bounds to [0.1, 0.9] to avoid singularities
+- Constrain :math:`\alpha` bounds to [0.1, 0.9] to avoid singularities
 - Use NLSQ optimizer (5-270x faster than scipy)
 - Verify residuals show no systematic trends
 
 **Common Pitfalls:**
 
-- **Insufficient low-frequency data**: Cannot determine η accurately
+- **Insufficient low-frequency data**: Cannot determine :math:`\eta` accurately
 - **Missing power-law regime**: Need broader frequency coverage
-- **α near 1**: Use classical Maxwell for simpler interpretation
+- :math:`\alpha` **near 1**: Use classical Maxwell for simpler interpretation
 
 Usage
 -----
@@ -537,10 +537,10 @@ Troubleshooting
    * - **Poor fit in terminal regime**
      - Insufficient low-frequency data
      - Extend frequency sweep to lower :math:`\omega` or use longer relaxation test.
-   * - **:math:`\alpha` closes to 1**
+   * - :math:`\alpha` **closes to 1**
      - Material is nearly Maxwellian
      - Use classical **Maxwell** model instead (narrow spectrum).
-   * - **Oscillatory residuals at high :math:`\omega`**
+   * - **Oscillatory residuals at high** :math:`\omega`
      - Multiple relaxation modes
      - Use **Fractional Maxwell Model (FMM)** which has two fractional orders.
    * - **Non-convergence**
@@ -606,9 +606,9 @@ Related Models
 ~~~~~~~~~~~~~~
 
 - :doc:`fractional_maxwell_liquid` — complementary model with spring instead of dashpot (solid-like equilibrium)
-- :doc:`fractional_maxwell_model` — generalized two-order formulation with independent α and β
+- :doc:`fractional_maxwell_model` — generalized two-order formulation with independent :math:`\alpha and \beta`
 - :doc:`fractional_burgers` — adds Kelvin branch for delayed elasticity and creep
-- :doc:`../classical/maxwell` — classical limit (α → 1, exponential relaxation)
+- :doc:`../classical/maxwell` — classical limit (:math:`\alpha` → 1, exponential relaxation)
 - :doc:`../classical/springpot` — fundamental SpringPot element theory
 
 Transforms
@@ -617,7 +617,7 @@ Transforms
 - :doc:`../../transforms/owchirp` — broadband LAOS sweeps to estimate fractional slopes
 - :doc:`../../transforms/fft` — convert relaxation data to frequency domain for fitting
 - :doc:`../../transforms/mutation_number` — monitor gel-to-sol transitions in curing/aging systems
-- :doc:`../../transforms/mastercurve` — time-temperature superposition for temperature-dependent τ
+- :doc:`../../transforms/mastercurve` — time-temperature superposition for temperature-dependent :math:`\tau`
 
 Examples
 ~~~~~~~~

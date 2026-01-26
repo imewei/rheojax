@@ -26,7 +26,7 @@ Quick Reference
      - Two-order generalized, hierarchical relaxation
    * - :doc:`fractional_kelvin_voigt`
      - 3
-     - Solids with bounded creep, spring ∥ SpringPot
+     - Solids with bounded creep, spring :math:`\parallel` SpringPot
    * - :doc:`fractional_zener_ss`
      - 4
      - Solid-Solid Zener, low-frequency plateau
@@ -58,10 +58,10 @@ constitutive equations with fractional-order derivatives, enabling:
 
 - **Power-law relaxation**: :math:`G(t) \sim t^{-\alpha}` for broad spectra
 - **Parsimonious fitting**: Fewer parameters than multi-mode models
-- **Physical insight**: Fractional order α relates to structural heterogeneity
+- **Physical insight**: Fractional order :math:`\alpha` relates to structural heterogeneity
 
 The **SpringPot** element is the fundamental building block, interpolating
-between ideal spring (α = 0) and dashpot (α = 1) behavior.
+between ideal spring (:math:`\alpha` = 0) and dashpot (:math:`\alpha` = 1) behavior.
 
 .. include:: /_includes/fractional_seealso.rst
 
@@ -88,24 +88,24 @@ Model Hierarchy
    │
    ├── Kelvin-Voigt Family (Parallel)
    │   ├── FractionalKelvinVoigt
-   │   │   └── Spring ∥ SpringPot
+   │   │   └── Spring \parallel SpringPot
    │   │   └── Solid with bounded creep
    │   │
    │   └── FractionalKVZener
-   │       └── Spring ── [Spring ∥ SpringPot]
+   │       └── Spring ── [Spring \parallel SpringPot]
    │       └── Complex retardation
    │
    ├── Zener Family (Combined)
    │   ├── FractionalZenerSS
-   │   │   └── Spring ── [SpringPot ∥ Spring]
+   │   │   └── Spring ── [SpringPot \parallel Spring]
    │   │   └── Solid-Solid, plateau at both limits
    │   │
    │   ├── FractionalZenerSL
-   │   │   └── Spring ── [SpringPot ∥ Dashpot]
+   │   │   └── Spring ── [SpringPot \parallel Dashpot]
    │   │   └── Solid-Liquid, terminal flow
    │   │
    │   └── FractionalZenerLL
-   │       └── Dashpot ── [SpringPot ∥ Dashpot]
+   │       └── Dashpot ── [SpringPot \parallel Dashpot]
    │       └── Liquid-Liquid, double flow
    │
    └── Extended Models
@@ -133,7 +133,7 @@ When to Use Which Model
    * - Gel (terminal flow)
      - FMG
      - FZSL
-     - G'' > G' at low ω
+     - G'' > G' at low :math:`\omega`
    * - Polymer melt
      - FML
      - FMG, FZSL
@@ -152,22 +152,22 @@ When to Use Which Model
      - Two power-law slopes
    * - Critical gel (gel point)
      - SpringPot
-     - FMG (α ≈ 0.5)
-     - tan δ ≈ const
+     - FMG (:math:`\alpha` ≈ 0.5)
+     - tan :math:`\delta` ≈ const
 
 **Decision Flowchart:**
 
-1. Does material flow at long times (G'' > G' as ω → 0)?
-   - **Yes** → Maxwell family (FMG, FML, FZSL, FZLL)
-   - **No** → Kelvin-Voigt family or FZSS
+1. Does material flow at long times (G'' > G' as :math:`\omega \to 0`)?
+   - **Yes** :math:`\to` Maxwell family (FMG, FML, FZSL, FZLL)
+   - **No** :math:`\to` Kelvin-Voigt family or FZSS
 
 2. Is there a high-frequency plateau in G'?
-   - **Yes** → Models with spring in series (FML, FZSS, FZSL)
-   - **No** → Models starting with SpringPot (FMG, FKV)
+   - **Yes** :math:`\to` Models with spring in series (FML, FZSS, FZSL)
+   - **No** :math:`\to` Models starting with SpringPot (FMG, FKV)
 
 3. Are two power-law regimes visible?
-   - **Yes** → Two-Order FM or FBurgers
-   - **No** → Single-order models
+   - **Yes** :math:`\to` Two-Order FM or FBurgers
+   - **No** :math:`\to` Single-order models
 
 
 Key Parameters
@@ -182,33 +182,33 @@ Key Parameters
      - Units
      - Physical Meaning
    * - Fractional order
-     - α
+     - :math:`\alpha`
      - —
      - 0 = solid, 1 = liquid, 0.5 = critical gel
    * - SpringPot constant
-     - c_α
-     - Pa·s^α
+     - :math:`c_\alpha`
+     - Pa·s\ :math:`^{\alpha}`
      - Sets magnitude (unusual units)
    * - Shear modulus
      - G
      - Pa
      - Elastic plateau stiffness
    * - Viscosity
-     - η
+     - :math:`\eta`
      - Pa·s
      - Terminal viscosity (when present)
    * - Relaxation time
-     - τ
+     - :math:`\tau`
      - s
-     - Crossover frequency ω ≈ 1/τ
+     - Crossover frequency :math:`\omega \approx 1/\tau`
 
-**Physical interpretation of α:**
+**Physical interpretation of** :math:`\alpha`:
 
-- **α → 0**: Nearly elastic, broad relaxation spectrum
-- **α → 0.3–0.5**: Typical for soft solids, gels
-- **α → 0.5**: Critical gel, self-similar structure
-- **α → 0.7–0.9**: Approaching Newtonian behavior
-- **α → 1**: Classical dashpot (Newtonian)
+- :math:`\alpha \to 0`: Nearly elastic, broad relaxation spectrum
+- :math:`\alpha \to 0.3` **–0.5**: Typical for soft solids, gels
+- :math:`\alpha \to 0.5`: Critical gel, self-similar structure
+- :math:`\alpha \to 0.7` **–0.9**: Approaching Newtonian behavior
+- :math:`\alpha \to 1`: Classical dashpot (Newtonian)
 
 
 Quick Start
@@ -260,7 +260,7 @@ Quick Start
 
    # Credible intervals for fractional order
    intervals = model.get_credible_intervals(result.posterior_samples)
-   print(f"α: [{intervals['alpha'][0]:.2f}, {intervals['alpha'][1]:.2f}]")
+   print(f"alpha: [{intervals['alpha'][0]:.2f}, {intervals['alpha'][1]:.2f}]")
 
 
 Model Documentation

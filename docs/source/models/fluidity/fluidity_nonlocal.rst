@@ -84,8 +84,8 @@ The cooperativity length :math:`\xi` characterizes this coupling:
    \xi \sim 3-10 \times (\text{particle size})
 
 For example:
-   - Emulsions with 10 μm droplets: :math:`\xi \sim 30-100` μm
-   - Colloidal glasses with 1 μm particles: :math:`\xi \sim 3-10` μm
+   - Emulsions with 10 :math:`\mu\text{m}` droplets: :math:`\xi \sim 30\text{--}100~\mu\text{m}`
+   - Colloidal glasses with 1 :math:`\mu\text{m}` particles: :math:`\xi \sim 3\text{--}10~\mu\text{m}`
 
 When the flow geometry (gap :math:`H`) is comparable to :math:`\xi`, strong confinement effects emerge.
 
@@ -435,7 +435,7 @@ More precisely, the relevant ratio for a given observation time is:
 
 **Practical Implications:**
 
-For a typical experiment with :math:`\xi = 50` μm and :math:`H = 1` mm:
+For a typical experiment with :math:`\xi = 50~\mu\text{m}` and :math:`H = 1` mm:
 
 .. math::
 
@@ -447,16 +447,16 @@ For a typical experiment with :math:`\xi = 50` μm and :math:`H = 1` mm:
 
 **Protocol-Specific Considerations:**
 
-- **Startup at :math:`t \ll \theta`**: Fluidity evolves locally; spatial gradients from
+- **Startup at** :math:`t \ll \theta`: Fluidity evolves locally; spatial gradients from
   initial conditions persist. Wall nucleation of yielding visible.
 
-- **Startup at :math:`t \gg H^2/\xi^2`**: Fluidity has homogenized; flow approaches
+- **Startup at** :math:`t \gg H^2/\xi^2`: Fluidity has homogenized; flow approaches
   local model prediction with enhanced apparent fluidity.
 
-- **Oscillatory at :math:`\omega \gg \xi^2/H^2`**: Fluidity cannot follow oscillations;
+- **Oscillatory at** :math:`\omega \gg \xi^2/H^2`: Fluidity cannot follow oscillations;
   frozen heterogeneous profile from previous history.
 
-- **Oscillatory at :math:`\omega \ll 1/\theta`**: Fluidity tracks stress quasi-statically;
+- **Oscillatory at** :math:`\omega \ll 1/\theta`: Fluidity tracks stress quasi-statically;
   approaches local equilibrium each cycle.
 
 ----
@@ -564,24 +564,24 @@ From fitting Nonlocal Fluidity to experimental data, you can extract insights ab
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**ξ (Cooperativity Length)**:
+:math:`\xi` **(Cooperativity Length)**:
    Characteristic length scale over which plastic rearrangements induce cooperative flow in neighboring regions.
-   *For graduate students*: ξ ~ 3-10×d_particle (colloidal cage size, droplet diameter). Governs fluidity diffusion via ∂f/∂t = ... + ξ²∇²f. Dimensionless confinement ratio H/ξ controls bulk (H/ξ >> 10) vs nonlocal (H/ξ ~ 1-10) regimes. Shear band interface width ~ ξ. Relates to correlation length of yielding events.
-   *For practitioners*: Measure from gap-dependent flow curves: σ_y,app(H) = σ_y,bulk·[1 - c(ξ/H)]. Typical values: emulsions (10 μm droplets) ξ ~ 30-50 μm, colloidal glasses ξ ~ 1-10 μm. Critical for microfluidic design (H < 10ξ shows strong confinement).
+   *For graduate students*: :math:`\xi \sim 3`-10 × d_particle (colloidal cage size, droplet diameter). Governs fluidity diffusion via :math:`\partial f/\partial t = \ldots + \xi^2 \nabla^2 f`. Dimensionless confinement ratio :math:`H/\xi` controls bulk (:math:`H/\xi \gg 10`) vs nonlocal (:math:`H/\xi \sim 1`-10) regimes. Shear band interface width :math:`\sim \xi`. Relates to correlation length of yielding events.
+   *For practitioners*: Measure from gap-dependent flow curves: :math:`\sigma_{y,app}(H) = \sigma_{y,bulk} \cdot [1 - c(\xi/H)]`. Typical values: emulsions (10 :math:`\mu\text{m}` droplets) :math:`\xi` ~ 30-50 :math:`\mu\text{m}`, colloidal glasses :math:`\xi` ~ 1-10 :math:`\mu\text{m}`. Critical for microfluidic design (H < :math:`10\xi` shows strong confinement).
 
-**θ (Reorganization Time)**:
-   Timescale for local structural equilibration, analogous to τ_age in local model.
-   *For graduate students*: Competes with diffusive timescale t_diff ~ H²/ξ². Ratio θ/t_diff determines if spatial gradients persist (θ >> t_diff) or homogenize (θ << t_diff) during transients. Fluidity diffusivity D_f = ξ²/θ.
-   *For practitioners*: Extract from startup dynamics. Typical: θ = 0.1-100 s. Fast relaxation (θ < 1 s) = rapidly homogenizing flows, slow relaxation (θ > 10 s) = persistent heterogeneity.
+:math:`\theta` **(Reorganization Time)**:
+   Timescale for local structural equilibration, analogous to :math:`\tau_{age}` in local model.
+   *For graduate students*: Competes with diffusive timescale t_diff ~ H^2/:math:`\xi^2`. Ratio :math:`\theta/t_diff` determines if spatial gradients persist (:math:`\theta` >> t_diff) or homogenize (:math:`\theta` << t_diff) during transients. Fluidity diffusivity D_f = :math:`\xi^2/\theta`.
+   *For practitioners*: Extract from startup dynamics. Typical: :math:`\theta` = 0.1-100 s. Fast relaxation (:math:`\theta` < 1 s) = rapidly homogenizing flows, slow relaxation (:math:`\theta` > 10 s) = persistent heterogeneity.
 
 **H (Gap Width)**:
-   Geometric parameter controlling confinement effects via dimensionless ratio H/ξ.
-   *For graduate students*: Key control parameter. H/ξ >> 10 recovers bulk/local behavior. H/ξ ~ 1-10 exhibits enhanced apparent fluidity, reduced yield stress. H/ξ < 1 = fully cooperative homogenized flow. Universal confinement scaling: σ_y,app/σ_y,bulk ~ f(H/ξ).
-   *For practitioners*: Perform gap-dependent measurements to extract ξ. For processing, H > 10ξ ensures bulk-like behavior. Narrower gaps (microfluidics, thin films) require nonlocal modeling.
+   Geometric parameter controlling confinement effects via dimensionless ratio H/:math:`\xi`.
+   *For graduate students*: Key control parameter. H/:math:`\xi` >> 10 recovers bulk/local behavior. H/:math:`\xi` ~ 1-10 exhibits enhanced apparent fluidity, reduced yield stress. H/:math:`\xi` < 1 = fully cooperative homogenized flow. Universal confinement scaling: :math:`\sigma_{y,app}/\sigma_{y,bulk}` ~ f(H/:math:`\xi`).
+   *For practitioners*: Perform gap-dependent measurements to extract :math:`\xi`. For processing, H > :math:`10\xi` ensures bulk-like behavior. Narrower gaps (microfluidics, thin films) require nonlocal modeling.
 
 **f_w (Wall Fluidity, Dirichlet BC)**:
    Enhanced fluidity at walls due to boundary slip or roughness effects.
-   *For graduate students*: Boundary condition: f(y=0,H) = f_w. Physical origin: wall-particle interactions, reduced coordination at boundaries. Creates fluidity boundary layers with thickness ~ ξ. Controls apparent slip velocity v_slip ~ ξ·f_w·σ.
+   *For graduate students*: Boundary condition: f(y=0,H) = f_w. Physical origin: wall-particle interactions, reduced coordination at boundaries. Creates fluidity boundary layers with thickness ~ :math:`\xi`. Controls apparent slip velocity v_slip ~ :math:`\xi`·f_w\ :math:`\cdot \sigma`.
    *For practitioners*: Fit from velocity profiles or apparent slip measurements. f_w = 0 (no-flux Neumann BC) vs f_w > 0 (slip). Roughness or surfactants modify f_w.
 
 Material Classification
@@ -595,28 +595,28 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - H/ξ > 10
+   * - H/:math:`\xi` > 10
      - Bulk regime (local model sufficient)
      - Concentrated emulsions in wide gaps
      - Standard rheometry applicable
-   * - H/ξ = 1-10
+   * - H/:math:`\xi` = 1-10
      - Nonlocal regime (strong confinement)
      - Colloidal pastes in microchannels, thin films
      - Gap-dependent yield stress, apparent slip
-   * - H/ξ < 1
+   * - H/:math:`\xi` < 1
      - Fully cooperative (homogenized)
      - Nanofluidics, ultra-thin coatings
      - No true yielding, enhanced flow
-   * - ξ = 10-100 μm
+   * - :math:`\xi` = 10-100 :math:`\mu\text{m}`
      - Mesoscale cooperativity
      - Emulsions, foams, microgels
      - Moderate confinement sensitivity
-   * - ξ < 1 μm
+   * - :math:`\xi` < 1 :math:`\mu\text{m}`
      - Microscale cooperativity
      - Dense colloidal glasses, molecular gels
      - Weak confinement (bulk-like at macro scale)
 
-Confinement Effects and ξ Extraction
+Confinement Effects and :math:`\xi` Extraction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When the gap width :math:`H` becomes comparable to the cooperativity length :math:`\xi`,
@@ -659,7 +659,7 @@ bulk predictions when :math:`H \lesssim 10\xi`:
 where the gap-averaged fluidity :math:`\bar{f}(H)` exceeds the local (bulk) value
 due to enhanced fluidity at walls and boundary layers of thickness :math:`\sim \xi`.
 
-**Experimental Protocol for ξ Extraction:**
+**Experimental Protocol for** :math:`\xi` **Extraction:**
 
 1. **Multi-gap measurements**: Acquire steady-state flow curves at 3-5 gap widths
    spanning :math:`H = 0.1-10` mm (or :math:`H/\xi \approx 1-100`)
@@ -692,7 +692,7 @@ due to enhanced fluidity at walls and boundary layers of thickness :math:`\sim \
 4. **Validate**: Compare extracted :math:`\xi` with particle/droplet size
    (expect :math:`\xi \approx 3-10 \times d`)
 
-**Typical ξ Values by Material:**
+**Typical** :math:`\xi` **Values by Material:**
 
 .. list-table::
    :header-rows: 1
@@ -700,23 +700,23 @@ due to enhanced fluidity at walls and boundary layers of thickness :math:`\sim \
 
    * - Material
      - Particle/Droplet Size
-     - Expected ξ
-     - ξ/d Ratio
+     - Expected :math:`\xi`
+     - :math:`\xi`/d Ratio
    * - Concentrated emulsions
-     - 1-20 μm
-     - 5-100 μm
+     - 1-20 :math:`\mu\text{m}`
+     - 5-100 :math:`\mu\text{m}`
      - 3-5
    * - Colloidal glasses
-     - 0.1-1 μm
-     - 0.5-5 μm
+     - 0.1-1 :math:`\mu\text{m}`
+     - 0.5-5 :math:`\mu\text{m}`
      - 3-10
    * - Microgels (Carbopol)
-     - 1-10 μm
-     - 5-50 μm
+     - 1-10 :math:`\mu\text{m}`
+     - 5-50 :math:`\mu\text{m}`
      - 3-8
    * - Foams
-     - 50-500 μm
-     - 200-2000 μm
+     - 50-500 :math:`\mu\text{m}`
+     - 200-2000 :math:`\mu\text{m}`
      - 3-5
 
 **Geometric Considerations:**
@@ -802,8 +802,8 @@ Parameter Interpretation
    - **Physical meaning**: Range of cooperative rearrangements
    - **Estimation**: :math:`\xi \approx 3-5d` where :math:`d` is particle/droplet diameter
    - **Typical values**:
-      - Emulsions (10 μm droplets): :math:`\xi \sim 30-50` μm
-      - Colloidal glasses: :math:`\xi \sim 1-10` μm
+      - Emulsions (10 :math:`\mu\text{m}` droplets): :math:`\xi \sim 30\text{--}50~\mu\text{m}`
+      - Colloidal glasses: :math:`\xi \sim 1\text{--}10~\mu\text{m}`
    - **Measurement**: From confinement experiments (flow curve vs. gap width)
 
 **theta (Reorganization Time):**
@@ -841,7 +841,7 @@ Data Requirements
 Limitations
 ~~~~~~~~~~~
 
-**Constant ξ assumption:**
+**Constant** :math:`\xi` **assumption:**
    In reality, :math:`\xi` may be stress-dependent [5]_:
    :math:`\xi(\sigma) \sim (|\sigma| - \tau_y)^{-\nu}`
    near the yield point.

@@ -410,9 +410,9 @@ MCT Predictions
    :header-rows: 1
 
    * - State
-     - G*(ω) Behavior
+     - G*(:math:`\omega`) Behavior
    * - **Fluid** (:math:`\varepsilon < 0`)
-     - :math:`G' \sim \omega^2` at low ω, crossover to plateau at high ω
+     - :math:`G' \sim \omega^2` at low :math:`\omega`, crossover to plateau at high :math:`\omega`
    * - **Glass** (:math:`\varepsilon > 0`)
      - :math:`G'(\omega \to 0) \to G_\infty f` (non-zero plateau)
    * - **Critical** (:math:`\varepsilon = 0`)

@@ -6,7 +6,7 @@ Quick Reference
 
 - **Use when:** Thixotropic elasto-viscoplastic materials with stress overshoot, Bauschinger effect, thixotropic hysteresis
 
-- **Parameters:** 11 (G, η, C, γ_dyn, m, σ_y0, Δσ_y, τ_thix, Γ, η_inf, μ_p)
+- **Parameters:** 11 (G, :math:`\eta, C, \gamma_dyn, m, \sigma_y0, \Delta\sigma_y, \tau_thix, \Gamma, \eta_inf, \mu_p`)
 
 - **Key equation:** :math:`\frac{d\sigma}{dt} = G(\dot{\gamma} - \dot{\gamma}^p) - \frac{G}{\eta}\sigma` (Maxwell viscoelasticity with plasticity)
 
@@ -61,10 +61,10 @@ The **MIKH** (Maxwell-Isotropic-Kinematic Hardening) model is a comprehensive
 thixotropic elasto-viscoplastic constitutive equation developed by Dimitriou & McKinley (2014)
 for complex fluids like waxy crude oil. It combines:
 
-1. **Maxwell viscoelasticity**: Stress relaxation via η (Maxwell viscosity)
+1. **Maxwell viscoelasticity**: Stress relaxation via :math:`\eta` (Maxwell viscosity)
 2. **Kinematic hardening**: Backstress evolution (Armstrong-Frederick type)
-3. **Isotropic hardening**: Yield stress evolution via structural parameter λ
-4. **Viscous background**: High-shear Newtonian contribution (η_inf)
+3. **Isotropic hardening**: Yield stress evolution via structural parameter :math:`\lambda`
+4. **Viscous background**: High-shear Newtonian contribution (:math:`\eta_inf`)
 
 The model captures:
 
@@ -103,22 +103,22 @@ Material Class: Thixotropic Elasto-Viscoplastic Fluids (TEvp)
 
 TEvp materials exhibit several characteristic behaviors:
 
-**1. Yield Stress:** Below a critical stress σ_y, the material responds elastically
-(reversibly). Above σ_y, plastic flow occurs irreversibly.
+**1. Yield Stress:** Below a critical stress :math:`\sigma_y`, the material responds elastically
+(reversibly). Above :math:`\sigma_y`, plastic flow occurs irreversibly.
 
 **2. Thixotropy:** The material's structure—and hence its properties—depend on
 mechanical history. Under shear, microstructure breaks down (destructuring);
-at rest, it recovers (restructuring). The structural parameter λ ∈ [0, 1] tracks
+at rest, it recovers (restructuring). The structural parameter :math:`\lambda` ∈ [0, 1] tracks
 this state:
 
-- λ = 1: Fully structured (maximum yield stress, maximum elasticity)
-- λ = 0: Fully destructured (minimum yield stress)
+- :math:`\lambda` = 1: Fully structured (maximum yield stress, maximum elasticity)
+- :math:`\lambda` = 0: Fully destructured (minimum yield stress)
 
 **3. Viscoelasticity:** Even in the elastic regime, the material exhibits stress
 relaxation over time due to microstructural rearrangements.
 
 **4. Kinematic Hardening:** Under cyclic loading, the material exhibits directional
-memory—the Bauschinger effect. This is captured through the backstress α, which
+memory—the Bauschinger effect. This is captured through the backstress :math:`\alpha`, which
 shifts the yield surface in stress space.
 
 Physical Interpretation of the Microstructure
@@ -131,16 +131,16 @@ In waxy crude oils, the microstructure consists of:
   provide mechanical integrity
 - **Continuous oil phase** that acts as the suspending medium
 
-The structural parameter λ represents the **fraction of intact inter-crystalline bonds**.
+The structural parameter :math:`\lambda` represents the **fraction of intact inter-crystalline bonds**.
 When sheared, bonds break (destructuring); at rest, thermal fluctuations allow
 bonds to reform (restructuring). This microscopic picture motivates the kinetic
-equations for λ evolution.
+equations for :math:`\lambda` evolution.
 
 For other TEvp materials:
 
-- **Drilling fluids**: λ represents the organization of clay platelets and polymer chains
-- **Colloidal gels**: λ represents the fraction of intact colloidal bonds
-- **Greases**: λ represents the organization of thickener fibers
+- **Drilling fluids**: :math:`\lambda` represents the organization of clay platelets and polymer chains
+- **Colloidal gels**: :math:`\lambda` represents the fraction of intact colloidal bonds
+- **Greases**: :math:`\lambda` represents the organization of thickener fibers
 
 
 Thermokinematic Memory (FIKH Framework)
@@ -180,8 +180,8 @@ where the equilibrium connectivity :math:`\xi_{eq}(T)` replaces the constant tar
 
 **Parameter Scaling with Microstructure:**
 
-In the FIKH framework, macroscopic parameters depend on both temperature (via φ)
-and structure (via ξ):
+In the FIKH framework, macroscopic parameters depend on both temperature (via :math:`\phi`)
+and structure (via :math:`\xi`):
 
 .. math::
 
@@ -196,12 +196,12 @@ intrinsic viscosity, and :math:`n, p` are scaling exponents related to fractal d
 Fractal Microstructure Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The structure parameter λ can be interpreted as the **normalized fractal connectivity**
+The structure parameter :math:`\lambda` can be interpreted as the **normalized fractal connectivity**
 :math:`\xi \in [0, 1]` of the microstructural network.
 
 **Fractal Connectivity:**
 
-In a fractal network (e.g., wax crystal aggregates), the connectivity ξ represents
+In a fractal network (e.g., wax crystal aggregates), the connectivity :math:`\xi` represents
 the fraction of intact bonds relative to a fully percolated network:
 
 .. math::
@@ -216,12 +216,12 @@ properties with connectivity:
 
 **The Avalanche Effect:**
 
-The nonlinear coupling between structure (ξ) and yield stress (σ_y) leads to
+The nonlinear coupling between structure (:math:`\xi`) and yield stress (:math:`\sigma_y`) leads to
 an important dynamic phenomenon—**delayed yielding** or the "avalanche effect":
 
 1. Under stress :math:`\sigma < \sigma_y(\xi_0)`, the material creeps slowly
 2. Slow creep causes gradual structure breakdown: :math:`\xi \downarrow`
-3. As ξ decreases, :math:`\sigma_y(\xi)` drops, accelerating breakdown
+3. As :math:`\xi` decreases, :math:`\sigma_y(\xi)` drops, accelerating breakdown
 4. Eventually, catastrophic yielding occurs when :math:`\sigma > \sigma_y(\xi)`
 
 This positive feedback loop explains why thixotropic materials can appear
@@ -236,7 +236,7 @@ Near the percolation threshold, the network connectivity follows:
    \xi \propto (p - p_c)^\beta
 
 where :math:`p` is the bond occupation probability and :math:`p_c \approx 0.5` for 3D networks.
-The critical exponent β depends on network topology.
+The critical exponent :math:`\beta` depends on network topology.
 
 
 Thermodynamic Consistency
@@ -267,19 +267,19 @@ Maxwell-Like Framework
 
 The MIKH model uses a Maxwell-like viscoelastic element as its foundation.
 The Maxwell element consists of a spring (modulus G) in series with a dashpot
-(viscosity η), giving a relaxation time τ = η/G:
+(viscosity :math:`\eta`), giving a relaxation time :math:`\tau = \eta/G`:
 
 .. math::
 
    \frac{d\sigma}{dt} = G(\dot{\gamma} - \dot{\gamma}^p) - \frac{G}{\eta}\sigma
 
 The first term represents elastic loading minus plastic flow. The second term
-represents viscoelastic relaxation with characteristic time τ = η/G.
+represents viscoelastic relaxation with characteristic time :math:`\tau = \eta/G`.
 
 **Physical interpretation:**
 
-- At short times (t ≪ τ): Elastic response dominates, σ ≈ G·γ
-- At long times (t ≫ τ): Viscous flow, σ → 0 under constant strain
+- At short times (t ≪ :math:`\tau`): Elastic response dominates, :math:`\sigma \approx G \cdot \gamma`
+- At long times (t ≫ :math:`\tau`): Viscous flow, :math:`\sigma` → 0 under constant strain
 - The Maxwell element captures the liquid-like long-time behavior of structured fluids
 
 Kinematic Hardening (Armstrong-Frederick)
@@ -289,26 +289,26 @@ Kinematic hardening is a plasticity concept that accounts for the Bauschinger ef
 when a material is deformed plastically in one direction, subsequent yield in the
 opposite direction occurs at a lower stress than the initial yield stress.
 
-The backstress α represents the "center" of the yield surface in stress space.
-As plastic deformation accumulates, α evolves according to the Armstrong-Frederick
+The backstress :math:`\alpha` represents the "center" of the yield surface in stress space.
+As plastic deformation accumulates, :math:`\alpha` evolves according to the Armstrong-Frederick
 (AF) law:
 
 .. math::
 
    d\alpha = C \cdot d\gamma^p - \gamma_{dyn} |\alpha|^{m-1} \alpha |d\gamma^p|
 
-**Term 1 (Hardening):** C·dγ_p
+**Term 1 (Hardening):** C\ :math:`\cdot d\gamma_p`
 
 - The backstress increases proportionally to plastic strain increment
 - C is the kinematic hardening modulus [Pa]
 - This creates a "memory" of the plastic deformation direction
 
-**Term 2 (Dynamic Recovery):** -γ_dyn·\|α\|^(m-1)·α·\|dγ_p\|
+**Term 2 (Dynamic Recovery):** :math:`-\gamma_{\text{dyn}} \cdot |\alpha|^{m-1} \cdot \alpha \cdot |d\gamma_p|`
 
 - Limits backstress saturation (prevents unbounded growth)
-- γ_dyn controls recovery rate
-- m controls nonlinearity (m = 1 is linear, m > 1 accelerates recovery at high α)
-- Recovery is proportional to \|dγ_p\|, so it only occurs during plastic flow
+- :math:`\gamma_dyn` controls recovery rate
+- m controls nonlinearity (m = 1 is linear, m > 1 accelerates recovery at high :math:`\alpha`)
+- Recovery is proportional to :math:`|d\gamma_p|`, so it only occurs during plastic flow
 
 **Steady-state backstress:** At steady plastic flow:
 
@@ -316,20 +316,20 @@ As plastic deformation accumulates, α evolves according to the Armstrong-Freder
 
    \alpha_{ss} = \frac{C}{\gamma_{dyn}} \cdot \text{sign}(\dot{\gamma}^p)
 
-The ratio C/γ_dyn determines the maximum backstress magnitude.
+The ratio C/:math:`\gamma_dyn` determines the maximum backstress magnitude.
 
 Isotropic Hardening (Thixotropy)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The yield stress evolves with a structural parameter λ ∈ [0, 1]:
+The yield stress evolves with a structural parameter :math:`\lambda` ∈ [0, 1]:
 
 .. math::
 
    \sigma_y(\lambda) = \sigma_{y,0} + \Delta\sigma_y \cdot \lambda
 
-- σ_y,0: Minimal yield stress when fully destructured (λ = 0)
-- Δσ_y: Additional yield stress from structure
-- σ_y,max = σ_y,0 + Δσ_y: Maximum yield stress when fully structured (λ = 1)
+- :math:`\sigma_y,0`: Minimal yield stress when fully destructured (:math:`\lambda` = 0)
+- :math:`\Delta\sigma_y`: Additional yield stress from structure
+- :math:`\sigma_y,max = \sigma_y,0 + \Delta\sigma_y`: Maximum yield stress when fully structured (:math:`\lambda` = 1)
 
 The structure evolves according to a first-order kinetic equation:
 
@@ -337,16 +337,16 @@ The structure evolves according to a first-order kinetic equation:
 
    \frac{d\lambda}{dt} = \frac{1-\lambda}{\tau_{thix}} - \Gamma \lambda |\dot{\gamma}^p|
 
-**Term 1 (Buildup):** (1-λ)/τ_thix
+**Term 1 (Buildup):** (1-:math:`\lambda`)/:math:`\tau_thix`
 
-- Structure recovers toward λ = 1 with characteristic time τ_thix
-- At rest (γ̇ᵖ = 0): λ(t) = 1 - (1 - λ_0)·exp(-t/τ_thix)
+- Structure recovers toward :math:`\lambda` = 1 with characteristic time :math:`\tau_thix`
+- At rest (:math:`\dot{\gamma}^p = 0`): :math:`\lambda(t)` = 1 - (1 - :math:`\lambda_0`)·exp(-t/:math:`\tau_thix`)
 - Physical origin: Brownian motion, thermal fluctuations allow bond reformation
 
-**Term 2 (Breakdown):** Γ·λ·\|γ̇ᵖ\|
+**Term 2 (Breakdown):** :math:`\Gamma \cdot \lambda \cdot` :math:`|\dot{\gamma}^p|`
 
 - Structure breaks down proportionally to plastic strain rate
-- Γ is the breakdown efficiency coefficient
+- :math:`\Gamma` is the breakdown efficiency coefficient
 - Physical origin: Mechanical work breaks inter-particle bonds
 
 **Steady-state structure:** At constant shear rate:
@@ -368,8 +368,8 @@ Core Equations
 
    \sigma_{total} = \sigma + \eta_{\infty} \dot{\gamma}
 
-The total stress consists of the elasto-plastic contribution σ and a purely
-viscous background η_∞·γ̇. The latter represents the suspending fluid's viscosity.
+The total stress consists of the elasto-plastic contribution :math:`\sigma` and a purely
+viscous background :math:`\eta_{\infty} \dot{\gamma}`. The latter represents the suspending fluid's viscosity.
 
 **Yield condition:**
 
@@ -377,8 +377,8 @@ viscous background η_∞·γ̇. The latter represents the suspending fluid's vi
 
    f = |\xi| - \sigma_y(\lambda) \leq 0 \quad \text{where} \quad \xi = \sigma - \alpha
 
-The material yields when the relative stress \|ξ\| = \|σ - α\| exceeds the current
-yield stress σ_y(λ). The backstress α shifts the yield surface in stress space.
+The material yields when the relative stress :math:`|\xi|` = :math:`|\sigma - \alpha|` exceeds the current
+yield stress :math:`\sigma_y(\lambda)`. The backstress :math:`\alpha` shifts the yield surface in stress space.
 
 **Plastic flow rule (Perzyna regularization):**
 
@@ -392,9 +392,9 @@ where ⟨·⟩ denotes Macaulay brackets (positive part function):
 
    \langle f \rangle = \max(f, 0) = \begin{cases} f & \text{if } f > 0 \\ 0 & \text{if } f \leq 0 \end{cases}
 
-The Perzyna regularization parameter μ_p [Pa·s] controls how sharply the material
-transitions from elastic to plastic behavior. Small μ_p gives rate-independent
-plasticity; larger μ_p smooths the transition.
+The Perzyna regularization parameter :math:`\mu_p` [Pa·s] controls how sharply the material
+transitions from elastic to plastic behavior. Small :math:`\mu_p` gives rate-independent
+plasticity; larger :math:`\mu_p` smooths the transition.
 
 Complete System of ODEs
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -451,7 +451,7 @@ The return mapping algorithm provides:
 - Implicit treatment of the plastic corrector
 - Efficient JAX scan implementation for long time series
 
-**Critical timing fix:** The structure parameter λ is updated AFTER the stress
+**Critical timing fix:** The structure parameter :math:`\lambda` is updated AFTER the stress
 calculation, using the plastic strain rate from the current step. This ensures
 consistency with the physical picture where structure responds to the applied
 deformation.
@@ -467,7 +467,7 @@ At steady state (d/dt = 0), the flow curve follows from the equilibrium conditio
 
    \lambda_{ss} = \frac{k_1}{k_1 + k_2|\dot{\gamma}|}
 
-where k₁ = 1/τ_thix and k₂ = Γ.
+where :math:`k_1 = 1/\tau_thix and k_2 = \Gamma`.
 
 **Steady-state stress:**
 
@@ -483,8 +483,8 @@ Substituting the structure balance:
 
 This produces the characteristic shear-thinning flow curve:
 
-- **Low shear rate (γ̇ → 0):** σ → σ_y,0 + Δσ_y (structured yield stress)
-- **High shear rate (γ̇ → ∞):** σ → σ_y,0 + η_∞·γ̇ (linear viscous)
+- **Low shear rate (** :math:`\dot{\gamma} \to 0` **):** :math:`\sigma \to \sigma_y,0 + \Delta\sigma_y` (structured yield stress)
+- **High shear rate (** :math:`\dot{\gamma} \to \infty` **):** :math:`\sigma \to \sigma_{y,0} + \eta_{\infty} \dot{\gamma}` (linear viscous)
 
 Governing Equations
 -------------------
@@ -515,7 +515,7 @@ Validity and Assumptions
 
 **Assumptions:**
 
-- **Single structural parameter λ**: One-dimensional structure kinetics (no multi-scale structure)
+- **Single structural parameter** :math:`\lambda`: One-dimensional structure kinetics (no multi-scale structure)
 - **Isotropic yielding**: von Mises-like yield criterion (no anisotropy)
 - **Affine deformation**: No spatial gradients (homogeneous flow)
 - **Incompressible**: No density changes
@@ -536,30 +536,30 @@ From fitting Modified IKH to experimental data, you can extract insights about t
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**λ (Structure Parameter)**:
-   Dimensionless internal variable (0 ≤ λ ≤ 1) quantifying microstructural integrity.
-   *For graduate students*: λ represents fraction of intact bonds/aggregates. Evolution: dλ/dt = (1-λ)/τ_thix - Γλ|γ̇^p|. At steady state: λ_ss = 1/(1 + Γτ_thix|γ̇|). Couples to yield stress via σ_y(λ) = σ_y,0 + Δσ_y·λ, capturing aging-induced hardening.
-   *For practitioners*: λ = 1 (fully aged, maximum strength) vs λ = 0 (fully broken down, minimum strength). Measure indirectly via yield stress recovery tests. Materials with long τ_thix retain flow history.
+:math:`\lambda` **(Structure Parameter)**:
+   Dimensionless internal variable (0 ≤ :math:`\lambda` ≤ 1) quantifying microstructural integrity.
+   *For graduate students*: :math:`\lambda` represents fraction of intact bonds/aggregates. Evolution: :math:`d\lambda/dt = (1-\lambda)/\tau_thix - \Gamma\lambda|\dot{\gamma}^p|`. At steady state: :math:`\lambda_ss = 1/(1 + \Gamma\tau_thix|\dot{\gamma}|)`. Couples to yield stress via :math:`\sigma_y(\lambda) = \sigma_y,0 + \Delta\sigma_y \cdot \lambda`, capturing aging-induced hardening.
+   *For practitioners*: :math:`\lambda` = 1 (fully aged, maximum strength) vs :math:`\lambda` = 0 (fully broken down, minimum strength). Measure indirectly via yield stress recovery tests. Materials with long :math:`\tau_thix` retain flow history.
 
-**α (Kinematic Backstress)**:
+:math:`\alpha` **(Kinematic Backstress)**:
    Internal stress representing directional anisotropy from flow-induced microstructure.
-   *For graduate students*: Armstrong-Frederick kinematic hardening: dα/dt = C·γ̇^p - γ_dyn|α|^(m-1)α|γ̇^p|. Produces Bauschinger effect (easier reverse yielding). At steady state: α_ss = C/γ_dyn. Ratio (σ_y - 2α_ss)/σ_y quantifies asymmetry.
+   *For graduate students*: Armstrong-Frederick kinematic hardening: :math:`d\alpha/dt = C \cdot \dot{\gamma}^p - \gamma_dyn|\alpha|^(m-1)\alpha|\dot{\gamma}^p|`. Produces Bauschinger effect (easier reverse yielding). At steady state: :math:`\alpha_ss = C/\gamma_dyn. Ratio (\sigma_y - 2\alpha_ss)/\sigma_y` quantifies asymmetry.
    *For practitioners*: Measure via reverse flow tests. High C → strong directional memory, pronounced Bauschinger effect. Typical for waxy crude oils, fiber suspensions.
 
-**τ_thix (Thixotropic Rebuilding Time)**:
+:math:`\tau_thix` **(Thixotropic Rebuilding Time)**:
    Timescale for structural recovery at rest.
-   *For graduate students*: First-order kinetics for aging: λ → 1 with time constant τ_thix. Sets width of hysteresis loops in up-down flow ramps. For thermally-activated processes, τ_thix ~ τ₀exp(ΔE_build/k_BT).
-   *For practitioners*: Extract from rest-time dependent startup tests or step-strain recovery. Fast aging (τ_thix < 10 s) vs slow aging (τ_thix > 100 s). Critical for pumping restart protocols.
+   *For graduate students*: First-order kinetics for aging: :math:`\lambda` → 1 with time constant :math:`\tau_thix`. Sets width of hysteresis loops in up-down flow ramps. For thermally-activated processes, :math:`\tau_thix` ~ :math:`\tau_0exp(\DeltaE_build/k_BT)`.
+   *For practitioners*: Extract from rest-time dependent startup tests or step-strain recovery. Fast aging (:math:`\tau_thix` < 10 s) vs slow aging (:math:`\tau_thix` > 100 s). Critical for pumping restart protocols.
 
-**Γ (Breakdown Coefficient)**:
+:math:`\Gamma` **(Breakdown Coefficient)**:
    Efficiency of shear-induced destructuring (units: inverse shear rate).
-   *For graduate students*: Controls shear-thinning: λ_ss = 1/(1 + Γτ_thix|γ̇|). High Γ → rapid breakdown, low Γ → persistent structure. Connects to flow curve via σ_ss(γ̇) = σ_y,0 + Δσ_y/(1 + Γτ_thix|γ̇|) + η_∞|γ̇|.
-   *For practitioners*: Fit from flow curve curvature. Γτ_thix ~ 1 at characteristic shear rate where structure is half-broken.
+   *For graduate students*: Controls shear-thinning: :math:`\lambda_{ss} = 1/(1 + \Gamma\tau_{thix}|\dot{\gamma}|)`. High :math:`\Gamma` → rapid breakdown, low :math:`\Gamma` → persistent structure. Connects to flow curve via :math:`\sigma_{ss}(\dot{\gamma}) = \sigma_{y,0} + \Delta\sigma_y/(1 + \Gamma\tau_{thix}|\dot{\gamma}|) + \eta_{\infty} |\dot{\gamma}|`.
+   *For practitioners*: Fit from flow curve curvature. :math:`\Gamma\tau_thix` ~ 1 at characteristic shear rate where structure is half-broken.
 
-**C, γ_dyn, m (Kinematic Hardening Parameters)**:
+**C,** :math:`\gamma_dyn` **, m (Kinematic Hardening Parameters)**:
    Control backstress evolution and Bauschinger effect magnitude.
-   *For graduate students*: C is hardening modulus, γ_dyn is dynamic recovery rate, m is recovery exponent (m=1 linear, m>1 nonlinear). Armstrong-Frederick model with m=1 widely used. Steady α_ss = C/γ_dyn independent of m.
-   *For practitioners*: Identify from cyclic loading or reverse flow tests. C/γ_dyn sets saturation backstress (typ. 10-50% of σ_y).
+   *For graduate students*: C is hardening modulus, :math:`\gamma_dyn` is dynamic recovery rate, m is recovery exponent (m=1 linear, m>1 nonlinear). Armstrong-Frederick model with m=1 widely used. Steady :math:`\alpha_ss = C/\gamma_dyn` independent of m.
+   *For practitioners*: Identify from cyclic loading or reverse flow tests. C/:math:`\gamma_dyn` sets saturation backstress (typ. 10-50% of :math:`\sigma_y`).
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -572,23 +572,23 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - τ_thix < 10 s, Γτ_thix < 1
+   * - :math:`\tau_thix < 10 s, \Gamma\tau_thix` < 1
      - Fast aging, weak shear-thinning
      - Soft gels, cosmetics, paints
      - Rapid recovery, moderate thixotropy
-   * - τ_thix = 10-100 s, Γτ_thix = 1-10
+   * - :math:`\tau_thix` = 10-100 s, :math:`\Gamma\tau_thix` = 1-10
      - Moderate aging, strong shear-thinning
      - Drilling muds, greases, emulsions
      - Pronounced thixotropy, history-dependent
-   * - τ_thix > 100 s, Γτ_thix > 10
+   * - :math:`\tau_thix > 100 s, \Gamma\tau_thix` > 10
      - Slow aging, extreme shear-thinning
      - Waxy crude oils, cement pastes
      - Long memory, pumping challenges
-   * - C/γ_dyn < 0.1σ_y
+   * - C/:math:`\gamma_dyn < 0.1\sigma_y`
      - Weak Bauschinger effect
      - Isotropic gels, simple colloids
      - Symmetric yielding
-   * - C/γ_dyn > 0.3σ_y
+   * - C/:math:`\gamma_dyn > 0.3\sigma_y`
      - Strong Bauschinger effect
      - Waxy crude oils, fiber suspensions
      - Directional flow history, asymmetric yielding
@@ -597,15 +597,15 @@ Material Classification
 
 **5. Stress Overshoot Magnitude**
 
-- **Overshoot ratio**: (σ_max - σ_ss) / σ_ss
-- Controlled by interplay of G, C, and λ₀ (initial structure)
+- **Overshoot ratio**: (:math:`\sigma_max - \sigma_ss`) / :math:`\sigma_ss`
+- Controlled by interplay of G, C, and :math:`\lambda_0` (initial structure)
 - **Physical signature**: Thixotropic materials show overshoot; purely viscoplastic do not
 
 **6. Yield Stress Aging**
 
-- **Time dependence**: σ_y(t_rest) = σ_y,0 + Δσ_y·(1 - exp(-t_rest/τ_thix))
-- **Aging rate**: 1/τ_thix
-- **Maximum recoverable yield stress**: σ_y,0 + Δσ_y
+- **Time dependence**: :math:`\sigma_y(t_rest) = \sigma_y,0 + \Delta\sigma_y \cdot (1` - exp(-t_rest/:math:`\tau_thix`))
+- **Aging rate**: 1/:math:`\tau_thix`
+- **Maximum recoverable yield stress**: :math:`\sigma_y,0 + \Delta\sigma_y`
 
 Dimensionless Groups
 --------------------
@@ -667,13 +667,13 @@ making it the reference model for pipeline flow assurance applications.
 When a pipeline shuts down, wax precipitates and forms a gel network.
 Key parameter ranges from field applications:
 
-- **τ_thix = 100-10,000 s**: Long aging times for gelled pipelines
-- **σ_y,0 + Δσ_y = 50-500 Pa**: Gel strength depends on cooling rate and rest time
-- **Γ·τ_thix > 10**: Extreme shear-thinning for pipeline restart
+- :math:`\tau_thix` **= 100-10,000 s**: Long aging times for gelled pipelines
+- :math:`\sigma_y,0 + \Delta\sigma_y` **= 50-500 Pa**: Gel strength depends on cooling rate and rest time
+- :math:`\Gamma \cdot \tau_thix` **> 10**: Extreme shear-thinning for pipeline restart
 
 **Engineering implications:**
 
-- Restart pressure scales with σ_y(t_rest) where t_rest can span hours to days
+- Restart pressure scales with :math:`\sigma_y(t_rest)` where t_rest can span hours to days
 - Monitor thermokinematic memory (FIKH framework) for temperature-cycled systems
 - Stress overshoot during restart indicates incomplete gel breakdown
 
@@ -682,8 +682,8 @@ Key parameter ranges from field applications:
 For subsea pipelines below wax appearance temperature (WAT):
 
 - Continuous low-shear flow prevents complete gelation
-- Target operating shear rate: γ̇ > 1/(Γ·τ_thix) to maintain destructured state
-- Thermal cycling protocols require FIKH framework with temperature-dependent φ
+- Target operating shear rate: :math:`\dot{\gamma} > 1/(\Gamma \cdot \tau_thix)` to maintain destructured state
+- Thermal cycling protocols require FIKH framework with temperature-dependent :math:`\phi`
 
 Drilling Fluids and Muds
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -693,13 +693,13 @@ aggregation and polymer interactions.
 
 **Typical parameter ranges:**
 
-- **τ_thix = 1-100 s**: Faster recovery than crude oils due to smaller particles
-- **σ_y,0 = 5-15 Pa**: API barite suspension requirements for cutting transport
-- **C/γ_dyn ≈ 0.1-0.3 σ_y**: Moderate Bauschinger effect from clay orientation
+- :math:`\tau_thix` **= 1-100 s**: Faster recovery than crude oils due to smaller particles
+- :math:`\sigma_y,0` **= 5-15 Pa**: API barite suspension requirements for cutting transport
+- **C/** :math:`\gamma_{\text{dyn}}` **≈ 0.1–0.3** :math:`\sigma_y`: Moderate Bauschinger effect from clay orientation
 
 **Borehole Stability:**
 
-- Gel strength must exceed cutting particle buoyancy: σ_y > Δρ·g·d_particle
+- Gel strength must exceed cutting particle buoyancy: :math:`\sigma_y > \Delta\rho \cdot g \cdot d_particle`
 - Thixotropic recovery prevents fluid loss into formation during connections
 - API 6rpm/300rpm readings map to MIKH parameters via flow curve fitting
 
@@ -707,9 +707,9 @@ aggregation and polymer interactions.
 
 After pipe connections or trips:
 
-- Initial startup pressure ∝ σ_y(t_connection) where t_connection ~ 30-300 s
+- Initial startup pressure ∝ :math:`\sigma_y(t_connection)` where t_connection ~ 30-300 s
 - Stress overshoot magnitude indicates gel breakdown efficiency
-- Design pumping rate to achieve γ̇ > 1/(Γ·τ_thix) throughout annulus
+- Design pumping rate to achieve :math:`\dot{\gamma} > 1/(\Gamma \cdot \tau_thix)` throughout annulus
 
 Greases and Lubricants
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -725,8 +725,8 @@ yield stress and thixotropic timescales.
 
    * - NLGI Grade
      - Application
-     - σ_y (Pa)
-     - τ_thix (s)
+     - :math:`\sigma_y` (Pa)
+     - :math:`\tau_thix` (s)
    * - 000-00
      - Centralized systems
      - 50-150
@@ -748,11 +748,11 @@ yield stress and thixotropic timescales.
 
 - Stress overshoot magnitude indicates grease breakdown risk under initial loading
 - Kinematic hardening (C parameter) critical for reversing loads in oscillating bearings
-- Channeling behavior: permanent structure breakdown when γ̇ peak > critical value
+- Channeling behavior: permanent structure breakdown when :math:`\dot{\gamma}` peak > critical value
 
 **Kinematic Hardening in Reversing Loads:**
 
-The Bauschinger effect (controlled by C/γ_dyn ratio) is particularly important
+The Bauschinger effect (controlled by C/:math:`\gamma_dyn` ratio) is particularly important
 for greases in oscillating applications:
 
 .. code-block:: python
@@ -774,9 +774,9 @@ particle flocculation.
 
 **Pumping and Placement:**
 
-- **τ_thix = 10-1000 s**: Depending on formulation and admixtures
+- :math:`\tau_thix` **= 10-1000 s**: Depending on formulation and admixtures
 - Structure recovery must match placement window for self-leveling vs. vertical stability
-- High Γ values enable rapid breakdown for pumping, but may compromise build-up
+- High :math:`\Gamma` values enable rapid breakdown for pumping, but may compromise build-up
 
 **Self-Leveling vs. Non-Sag Behavior:**
 
@@ -788,13 +788,13 @@ particle flocculation.
      - Parameter Requirement
      - Physical Interpretation
    * - Self-leveling floors
-     - Low τ_thix, high Γ
+     - Low :math:`\tau_thix, high \Gamma`
      - Fast breakdown, moderate recovery
    * - Vertical surfaces
-     - High τ_thix, moderate Γ
+     - High :math:`\tau_thix, moderate \Gamma`
      - Slow breakdown, strong recovery
    * - 3D printing
-     - Very high σ_y,0 + Δσ_y
+     - Very high :math:`\sigma_y,0 + \Delta\sigma_y`
      - Immediate yield on deposition
 
 **Yield Stress Aging for Formwork Removal:**
@@ -805,7 +805,7 @@ The time-dependent yield stress evolution determines safe formwork removal:
 
    \sigma_y(t_{cure}) = \sigma_{y,0} + \Delta\sigma_y \cdot (1 - e^{-t_{cure}/\tau_{thix}})
 
-For critical structural applications, τ_thix must be characterized at the
+For critical structural applications, :math:`\tau_thix` must be characterized at the
 curing temperature to predict strength development.
 
 
@@ -824,57 +824,57 @@ Parameters
      - G
      - Pa
      - Elastic shear modulus. Controls initial stiffness and stress overshoot amplitude.
-       Typical range: 10² - 10⁶ Pa for structured fluids.
+       Typical range: :math:`10^2 - 10^6` Pa for structured fluids.
    * - ``eta``
-     - η
+     - :math:`\eta`
      - Pa·s
-     - Maxwell viscosity. Relaxation time τ = η/G. Large values = elastic solid.
-       Setting η → ∞ recovers rate-independent plasticity.
+     - Maxwell viscosity. Relaxation time :math:`\tau = \eta/G`. Large values = elastic solid.
+       Setting :math:`\eta` → ∞ recovers rate-independent plasticity.
    * - ``C``
      - C
      - Pa
      - Kinematic hardening modulus. Controls backstress buildup rate.
        Larger C = stronger Bauschinger effect.
    * - ``gamma_dyn``
-     - γ_dyn
+     - :math:`\gamma_dyn`
      - –
      - Dynamic recovery parameter. Limits backstress saturation.
-       Saturation: α_max = C/γ_dyn.
+       Saturation: :math:`\alpha_max = C/\gamma_dyn`.
    * - ``m``
      - m
      - –
      - AF exponent (typically 1.0). Controls nonlinearity of recovery.
-       m = 1: linear AF; m > 1: accelerated recovery at high α.
+       m = 1: linear AF; m > 1: accelerated recovery at high :math:`\alpha`.
    * - ``sigma_y0``
-     - σ_y0
+     - :math:`\sigma_y0`
      - Pa
-     - Minimal yield stress (fully destructured state, λ=0).
+     - Minimal yield stress (fully destructured state, :math:`\lambda=0`).
        This is the "static" yield stress after prolonged shearing.
    * - ``delta_sigma_y``
-     - Δσ_y
+     - :math:`\Delta\sigma_y`
      - Pa
-     - Structural yield stress contribution. σ_y,max = σ_y0 + Δσ_y when λ=1.
+     - Structural yield stress contribution. :math:`\sigma_y,max = \sigma_y0 + \Delta\sigma_y when \lambda=1`.
        Controls strength of aging effect.
    * - ``tau_thix``
-     - τ_thix
+     - :math:`\tau_thix`
      - s
      - Thixotropic rebuilding time. Time for structure recovery at rest.
-       Typical: 10⁻¹ - 10⁴ s depending on material.
+       Typical: 10\ :math:`^{-1 - 10^4}` s depending on material.
    * - ``Gamma``
-     - Γ
+     - :math:`\Gamma`
      - –
      - Breakdown coefficient. Efficiency of shear-induced destructuring.
-       Higher Γ = faster breakdown under shear.
+       Higher :math:`\Gamma` = faster breakdown under shear.
    * - ``eta_inf``
-     - η_∞
+     - :math:`\eta_{\infty}`
      - Pa·s
      - High-shear viscosity (solvent contribution).
        Dominates at high shear rates where structure is destroyed.
    * - ``mu_p``
-     - μ_p
+     - :math:`\mu_p`
      - Pa·s
      - Plastic viscosity (Perzyna regularization parameter).
-       Small μ_p = sharp yield; large μ_p = smoothed transition.
+       Small :math:`\mu_p` = sharp yield; large :math:`\mu_p` = smoothed transition.
 
 
 Fitting Guidance
@@ -883,9 +883,9 @@ Fitting Guidance
 Initialization Strategy
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-1. **Flow curve first**: Fit σ_y0, Δσ_y, τ_thix, Γ, η_inf from steady-state data
-2. **Startup second**: Fix flow curve params, fit G, C, γ_dyn from transient
-3. **Relaxation/creep**: Fine-tune η (Maxwell viscosity)
+1. **Flow curve first**: Fit :math:`\sigma_y0, \Delta\sigma_y, \tau_thix, \Gamma, \eta_inf` from steady-state data
+2. **Startup second**: Fix flow curve params, fit G, C, :math:`\gamma_dyn` from transient
+3. **Relaxation/creep**: Fine-tune :math:`\eta` (Maxwell viscosity)
 
 Protocol Selection
 ~~~~~~~~~~~~~~~~~~
@@ -897,11 +897,11 @@ Protocol Selection
    * - Protocol
      - Best for
    * - ``flow_curve``
-     - Steady-state parameters (σ_y0, Δσ_y, η_inf)
+     - Steady-state parameters (:math:`\sigma_y0, \Delta\sigma_y, \eta_inf`)
    * - ``startup``
-     - Elasticity (G) and hardening (C, γ_dyn)
+     - Elasticity (G) and hardening (C, :math:`\gamma_dyn`)
    * - ``relaxation``
-     - Maxwell viscosity (η)
+     - Maxwell viscosity (:math:`\eta`)
    * - ``creep``
      - Combined viscoelastic-plastic response
    * - ``laos``
@@ -917,15 +917,15 @@ Troubleshooting
    * - Issue
      - Solution
    * - Poor flow curve fit
-     - Check σ_y0 initialization; ensure γ̇ range spans structure transition
+     - Check :math:`\sigma_y0` initialization; ensure :math:`\dot{\gamma}` range spans structure transition
    * - No stress overshoot
-     - Increase G or decrease Γ (maintain structure during startup)
+     - Increase G or decrease :math:`\Gamma` (maintain structure during startup)
    * - Overshoot too sharp
-     - Increase μ_p (plastic viscosity regularization)
+     - Increase :math:`\mu_p` (plastic viscosity regularization)
    * - No Bauschinger effect
-     - Increase C (hardening) or decrease γ_dyn (less recovery)
+     - Increase C (hardening) or decrease :math:`\gamma_dyn` (less recovery)
    * - Stress doesn't relax
-     - Decrease η (Maxwell viscosity); check τ = η/G vs experiment time
+     - Decrease :math:`\eta` (Maxwell viscosity); check :math:`\tau = \eta/G` vs experiment time
 
 
 Parameter Estimation Methods
@@ -943,11 +943,11 @@ to improve parameter identifiability:
 
 **Stage 1: Flow Curve (Steady State)**
 
-From flow curve data σ(γ̇), fit the steady-state parameters:
+From flow curve data :math:`\sigma(\dot{\gamma})`, fit the steady-state parameters:
 
-- σ_y,0, Δσ_y (yield stress bounds)
-- η_∞ (high-shear viscosity)
-- Γ·τ_thix product (controls shear-thinning curvature)
+- :math:`\sigma_y,0, \Delta\sigma_y` (yield stress bounds)
+- :math:`\eta_{\infty}` (high-shear viscosity)
+- :math:`\Gamma \cdot \tau_thix` product (controls shear-thinning curvature)
 
 .. code-block:: python
 
@@ -965,11 +965,11 @@ From flow curve data σ(γ̇), fit the steady-state parameters:
 
 **Stage 2: Startup Transients**
 
-From startup stress overshoot σ(t; γ̇_0), fit:
+From startup stress overshoot :math:`\sigma(t`; :math:`\dot{\gamma}_0`), fit:
 
 - G (controls initial slope and overshoot magnitude)
-- C, γ_dyn (kinematic hardening, Bauschinger effect)
-- τ_thix (recovery timescale, now separated from Γ)
+- C, :math:`\gamma_dyn` (kinematic hardening, Bauschinger effect)
+- :math:`\tau_thix` (recovery timescale, now separated from :math:`\Gamma`)
 
 .. code-block:: python
 
@@ -981,10 +981,10 @@ From startup stress overshoot σ(t; γ̇_0), fit:
 
 **Stage 3: Relaxation/Creep**
 
-From stress relaxation σ(t)|_{γ=const}, fit:
+From stress relaxation :math:`\sigma(t)|_{\gamma=\text{const}}`, fit:
 
-- η (Maxwell viscosity, determines τ_relax = η/G)
-- μ_p (Perzyna regularization, yield transition sharpness)
+- :math:`\eta` (Maxwell viscosity, determines :math:`\tau_relax = \eta/G`)
+- :math:`\mu_p` (Perzyna regularization, yield transition sharpness)
 
 .. code-block:: python
 
@@ -1012,7 +1012,7 @@ use multi-start optimization:
 - Flow curves spanning >3 decades of shear rate
 - Combined protocol fitting (flow + startup + relaxation)
 - Initial fits show residual structure (systematic over/under-prediction)
-- Materials with unusual parameter combinations (e.g., very high τ_thix)
+- Materials with unusual parameter combinations (e.g., very high :math:`\tau_thix`)
 
 **Global optimization for multi-modal problems:**
 
@@ -1061,30 +1061,30 @@ The choice of priors significantly affects Bayesian inference for the MIKH model
    * - Parameter
      - Recommended Prior
      - Rationale
-   * - τ_thix
-     - LogNormal(μ=log(10), σ=1)
+   * - :math:`\tau_thix`
+     - LogNormal(:math:`\mu=log(10), \sigma=1`)
      - Spans 1-100 s; positive, heavy-tailed
-   * - Γ
-     - HalfNormal(σ=10)
+   * - :math:`\Gamma`
+     - HalfNormal(:math:`\sigma=10`)
      - Positive breakdown coefficient
-   * - σ_y,0, Δσ_y
+   * - :math:`\sigma_y,0, \Delta\sigma_y`
      - TruncatedNormal or Uniform
      - Material-dependent bounds
    * - G
-     - LogNormal(μ=log(1000), σ=1)
+     - LogNormal(:math:`\mu=log(1000), \sigma=1`)
      - Typical modulus range for soft materials
-   * - C/γ_dyn ratio
-     - LogNormal(μ=log(10), σ=0.5)
+   * - C/:math:`\gamma_dyn` ratio
+     - LogNormal(:math:`\mu=log(10), \sigma=0.5`)
      - Backstress saturation constraint
 
 Regularization for Ill-Conditioned Problems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When parameters are correlated (common for G-C, τ_thix-Γ pairs), use:
+When parameters are correlated (common for G-C, :math:`\tau_thix-\Gamma` pairs), use:
 
 **1. Tikhonov Regularization:**
 
-Add penalty λ‖θ‖² to objective function to stabilize optimization:
+Add penalty :math:`\lambda` :math:`\|\theta\|`:math:`^2` to objective function to stabilize optimization:
 
 .. code-block:: python
 
@@ -1159,9 +1159,9 @@ Identify which parameters most influence predictions to guide experimental desig
 
 1. Compute sensitivities at the fitted parameter values
 2. Focus experimental design on regimes where target parameters have high sensitivity
-3. For τ_thix: use startup/recovery data at t ~ τ_thix
-4. For G: use early-time startup data (t ≪ τ_thix)
-5. For Γ: use flow curve data near γ̇ ~ 1/(Γ·τ_thix)
+3. For :math:`\tau_thix`: use startup/recovery data at t ~ :math:`\tau_thix`
+4. For G: use early-time startup data (t ≪ :math:`\tau_thix`)
+5. For :math:`\Gamma`: use flow curve data near :math:`\dot{\gamma}` ~ 1/(:math:`\Gamma \cdot \tau_thix`)
 
 
 Usage
@@ -1175,9 +1175,9 @@ The MIKH model is available via:
 
 **Common workflows**:
 
-1. **Flow curve fitting**: Determine σ_y0, Δσ_y, η_inf from steady-state data
-2. **Startup fitting**: Extract G, C, γ_dyn from transient stress overshoot
-3. **Creep/relaxation**: Constrain η (Maxwell viscosity) and μ_p (plastic viscosity)
+1. **Flow curve fitting**: Determine :math:`\sigma_y0, \Delta\sigma_y, \eta_inf` from steady-state data
+2. **Startup fitting**: Extract G, C, :math:`\gamma_dyn` from transient stress overshoot
+3. **Creep/relaxation**: Constrain :math:`\eta` (Maxwell viscosity) and :math:`\mu_p` (plastic viscosity)
 4. **Bayesian inference**: Quantify uncertainty in thixotropic timescales
 
 **Integration with Pipeline**:
@@ -1285,7 +1285,7 @@ Relation to Other Models
      - Relationship to MIKH
    * - Herschel-Bulkley
      - MIKH reduces to HB at steady state without kinematic hardening (C=0)
-       and with power-law η_inf
+       and with power-law :math:`\eta_inf`
    * - Saramito EVP
      - Similar framework but without kinematic hardening; uses Oldroyd-B
        instead of Maxwell for viscoelasticity

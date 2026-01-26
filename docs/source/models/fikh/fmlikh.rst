@@ -6,7 +6,7 @@ Quick Reference
 
 - **Use when:** Hierarchical thixotropic materials with both distributed timescales AND power-law memory per mode
 
-- **Parameters:** 6 + 5N (shared α) or 6 + 6N (per-mode α)
+- **Parameters:** 6 + 5N (shared :math:`\alpha`) or 6 + 6N (per-mode :math:`\alpha`)
 
 - **Key equation:** :math:`D_t^\alpha \lambda_i = \frac{1-\lambda_i}{\tau_{thix,i}} - \Gamma_i \lambda_i |\dot{\gamma}^p|` (N fractional structure equations)
 
@@ -39,7 +39,7 @@ Notation Guide
      - Caputo fractional derivative (shared or per-mode order)
    * - :math:`\alpha` or :math:`\alpha_i`
      - —
-     - Fractional order for mode i (0 < α < 1)
+     - Fractional order for mode i (0 < :math:`\alpha` < 1)
    * - :math:`\lambda_i`
      - —
      - Structural parameter for mode i (0 = destructured, 1 = structured)
@@ -77,20 +77,20 @@ capturing complex relaxation dynamics:
 This "double spectrum" architecture provides exceptional flexibility for materials
 with hierarchical microstructure where:
 
-- Different structural levels recover on different timescales (captured by τ_thix,i)
-- Each level exhibits power-law relaxation (captured by α or α_i)
+- Different structural levels recover on different timescales (captured by :math:`\tau_thix,i`)
+- Each level exhibits power-law relaxation (captured by :math:`\alpha or \alpha_i`)
 
 **Physical motivation:**
 
-- **Waxy crude oils**: Primary crystals (fast, α₁ ≈ 0.7), crystal clusters (medium, α₂ ≈ 0.5),
-  space-spanning networks (slow, α₃ ≈ 0.4)
+- **Waxy crude oils**: Primary crystals (fast, :math:`\alpha_1` ≈ 0.7), crystal clusters (medium, :math:`\alpha_2` ≈ 0.5),
+  space-spanning networks (slow, :math:`\alpha_3` ≈ 0.4)
 - **Colloidal gels**: Particle-particle bonds, aggregate structure, network connectivity
 - **Cement pastes**: C-S-H gel formation, ettringite crystals, portlandite network
 
 **Shared vs Per-Mode Fractional Order:**
 
-- ``shared_alpha=True`` (default): Single α applies to all modes (fewer parameters)
-- ``shared_alpha=False``: Each mode has its own α_i (maximum flexibility)
+- ``shared_alpha=True`` (default): Single :math:`\alpha` applies to all modes (fewer parameters)
+- ``shared_alpha=False``: Each mode has its own :math:`\alpha_i` (maximum flexibility)
 
 
 Theoretical Background
@@ -111,7 +111,7 @@ FMLIKH addresses both by superposing N fractional modes:
 
    \sigma_y = \sigma_{y,0} + \Delta\sigma_y \sum_{i=1}^{N} w_i \lambda_i
 
-where each λ_i evolves via fractional kinetics:
+where each :math:`\lambda_i` evolves via fractional kinetics:
 
 .. math::
 
@@ -138,8 +138,8 @@ within each mode:
 
 - **ML-IKH**: Recovery clearly follows sum of exponentials (distinct time constants visible)
 - **FMLIKH**: Recovery shows power-law tails that persist beyond any exponential fit
-- **FMLIKH with shared α**: Hierarchical structure with similar memory at each level
-- **FMLIKH with per-mode α**: Different structural levels have distinct memory characteristics
+- **FMLIKH with shared** :math:`\alpha`: Hierarchical structure with similar memory at each level
+- **FMLIKH with per-mode** :math:`\alpha`: Different structural levels have distinct memory characteristics
 
 Connection to Mode-Coupling Theory
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -147,8 +147,8 @@ Connection to Mode-Coupling Theory
 The FMLIKH structure parallels developments in Mode-Coupling Theory (MCT) for
 glass-forming systems:
 
-- **MCT β-relaxation**: Fast cage rattling (analogous to fast FMLIKH modes)
-- **MCT α-relaxation**: Slow structural relaxation (analogous to slow FMLIKH modes)
+- **MCT** :math:`\beta`\ **-relaxation**: Fast cage rattling (analogous to fast FMLIKH modes)
+- **MCT** :math:`\alpha`\ **-relaxation**: Slow structural relaxation (analogous to slow FMLIKH modes)
 - **Fractional kinetics**: Captures the stretched/power-law character of glass relaxation
 
 For materials near glass transition, FMLIKH provides a phenomenological approach
@@ -157,7 +157,7 @@ that captures MCT-like behavior without the full microscopic theory.
 Shared vs Per-Mode Fractional Order
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Shared α (``shared_alpha=True``):**
+**Shared** :math:`\alpha` **(``shared_alpha=True``):**
 
 All modes share a single fractional order:
 
@@ -174,9 +174,9 @@ All modes share a single fractional order:
 - Easier parameter identification
 - Appropriate when different structural levels share similar physics
 
-**Per-mode α (``shared_alpha=False``):**
+**Per-mode** :math:`\alpha` **(``shared_alpha=False``):**
 
-Each mode has its own fractional order α_i:
+Each mode has its own fractional order :math:`\alpha_i`:
 
 .. math::
 
@@ -189,7 +189,7 @@ characteristics (e.g., fast modes are more Markovian, slow modes are glassy).
 
 - Maximum flexibility
 - Can capture hierarchical systems with fundamentally different dynamics at each level
-- Needed when α clearly varies with timescale
+- Needed when :math:`\alpha` clearly varies with timescale
 
 
 Physical Foundations
@@ -204,17 +204,17 @@ In FMLIKH, the total structural parameter is a weighted sum:
 
    \lambda_{total} = \sum_{i=1}^{N} w_i \lambda_i
 
-Each λ_i represents a distinct **structural population** with:
+Each :math:`\lambda_i` represents a distinct **structural population** with:
 
-- Its own recovery timescale τ_thix,i
-- Its own breakdown coefficient Γ_i
-- Its own (or shared) fractional order α_i
+- Its own recovery timescale :math:`\tau_thix,i`
+- Its own breakdown coefficient :math:`\Gamma_i`
+- Its own (or shared) fractional order :math:`\alpha_i`
 
 **Physical examples:**
 
-- **Fast mode** (τ₁ ~ 0.1-1 s, α₁ ~ 0.7-0.9): Local bond reformation, surface contacts
-- **Intermediate mode** (τ₂ ~ 1-10 s, α₂ ~ 0.5-0.7): Aggregate restructuring
-- **Slow mode** (τ₃ ~ 10-1000 s, α₃ ~ 0.3-0.5): Network-scale reorganization, aging
+- **Fast mode** (:math:`\tau_1` ~ 0.1-1 s, :math:`\alpha_1` ~ 0.7-0.9): Local bond reformation, surface contacts
+- **Intermediate mode** (:math:`\tau_2` ~ 1-10 s, :math:`\alpha_2` ~ 0.5-0.7): Aggregate restructuring
+- **Slow mode** (:math:`\tau_3` ~ 10-1000 s, :math:`\alpha_3` ~ 0.3-0.5): Network-scale reorganization, aging
 
 Hierarchical Microstructure Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -227,14 +227,14 @@ Many complex fluids have structure at multiple length scales:
    ┌──────────────────────────────────────────────────┐
    │ Primary         Aggregates       Network         │
    │ particles    →  of particles  →  structure       │
-   │ (λ₁, fast)      (λ₂, medium)     (λ₃, slow)      │
+   │ (λ_1, fast)      (λ_2, medium)     (λ_3, slow)      │
    └──────────────────────────────────────────────────┘
 
 Each level contributes to mechanical properties differently:
 
-- **Primary particles**: Fast kinetics, weak memory (α → 1)
+- **Primary particles**: Fast kinetics, weak memory (:math:`\alpha` → 1)
 - **Aggregates**: Intermediate kinetics, moderate memory
-- **Network**: Slow kinetics, strong memory (α → 0)
+- **Network**: Slow kinetics, strong memory (:math:`\alpha` → 0)
 
 The weighted sum yield stress reflects how each level contributes to
 macroscopic yielding.
@@ -247,9 +247,9 @@ Mode Selection Guidelines
 1. **Start with N=2** and check improvement with N=3
 2. **Use time-domain data**: Count distinct recovery timescales
 3. **Use frequency-domain data**: Count shoulders/features in Cole-Cole plot
-4. **β rule from ML-IKH**: N ~ (1/β)² where β is stretch exponent
+4. :math:`\beta` **rule from ML-IKH**: N ~ (1/:math:`\beta`)\ :math:`^2 where \beta` is stretch exponent
 
-**When to use shared vs per-mode α?**
+**When to use shared vs per-mode** :math:`\alpha` **?**
 
 .. list-table::
    :widths: 40 30 30
@@ -266,10 +266,10 @@ Mode Selection Guidelines
      - Different physics at each scale
    * - Cole-Cole shows uniform depression
      - shared_alpha=True
-     - Single α characterizes spectrum
+     - Single :math:`\alpha` characterizes spectrum
    * - Cole-Cole shows scale-dependent depression
      - shared_alpha=False
-     - α varies with timescale
+     - :math:`\alpha` varies with timescale
 
 
 Mathematical Formulation
@@ -305,7 +305,7 @@ Yield Stress Formulation
 
    \sigma_y = \sigma_{y,0} + \Delta\sigma_y \sum_{i=1}^{N} w_i \lambda_i
 
-where Σw_i = 1 (normalization).
+where :math:`\Sigmaw_i` = 1 (normalization).
 
 **Structure-dependent modulus** (optional):
 
@@ -353,7 +353,7 @@ The stress and backstress follow standard FIKH equations:
 Steady-State Analysis
 ~~~~~~~~~~~~~~~~~~~~~
 
-At steady state (D^α λ = 0 for constant λ):
+At steady state (D\ :math:`^{\alpha \lambda}` = 0 for constant :math:`\lambda`):
 
 .. math::
 
@@ -365,7 +365,7 @@ The weighted yield stress becomes:
 
    \sigma_{y,ss} = \sigma_{y,0} + \Delta\sigma_y \sum_{i=1}^{N} \frac{w_i}{1 + \Gamma_i \tau_{thix,i} |\dot{\gamma}|}
 
-**Note**: Steady-state flow curve is independent of α_i (fractional effects
+**Note**: Steady-state flow curve is independent of :math:`\alpha_i` (fractional effects
 only appear in transients).
 
 
@@ -411,11 +411,11 @@ What You Can Learn
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Per-Mode Timescales τ_thix,i:**
+**Per-Mode Timescales** :math:`\tau_thix,i` **:**
 
 - Span the characteristic recovery times for different structural levels
-- Logarithmic distribution typical: τ₁ < τ₂ < ... < τ_N
-- τ_max/τ_min ratio indicates breadth of timescale distribution
+- Logarithmic distribution typical: :math:`\tau_1 < \tau_2 < ... < \tau_N`
+- :math:`\tau_max/\tau_min` ratio indicates breadth of timescale distribution
 - Compare to experimental timescales to ensure adequate coverage
 
 **Mode Weights w_i:**
@@ -425,18 +425,18 @@ Parameter Interpretation
 - High w_i for slow modes → long-time aging dominates
 - Relate to microstructural composition (e.g., particle size distribution)
 
-**Fractional Orders α_i (per-mode):**
+**Fractional Orders** :math:`\alpha_i` **(per-mode):**
 
-- α_i → 1: Mode i behaves like exponential (Markovian)
-- α_i < 0.5: Mode i has strong memory (glassy)
-- Typically: α decreases with increasing τ (slow modes are more glassy)
+- :math:`\alpha_i` → 1: Mode i behaves like exponential (Markovian)
+- :math:`\alpha_i` < 0.5: Mode i has strong memory (glassy)
+- Typically: :math:`\alpha` decreases with increasing :math:`\tau` (slow modes are more glassy)
 
-**Breakdown Coefficients Γ_i:**
+**Breakdown Coefficients** :math:`\Gamma_i` **:**
 
 - Mode-specific shear sensitivity
-- High Γ_i: Structure i breaks easily under shear
-- Low Γ_i: Structure i is shear-resistant
-- Critical shear rate for mode i: γ̇_crit,i = 1/(Γ_i·τ_thix,i)
+- High :math:`\Gamma_i`: Structure i breaks easily under shear
+- Low :math:`\Gamma_i`: Structure i is shear-resistant
+- Critical shear rate for mode i: :math:`\dot{\gamma}_crit,i = 1/(\Gamma_i \cdot \tau_thix,i)`
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -449,22 +449,22 @@ Material Classification
      - Behavior
      - Typical Materials
      - Recommendations
-   * - N=2, α shared ≈ 0.6
+   * - N=2, :math:`\alpha` shared ≈ 0.6
      - Simple hierarchical
      - Bidisperse colloids
      - Good starting point
-   * - N=3, α shared ≈ 0.5
+   * - N=3, :math:`\alpha` shared ≈ 0.5
      - Complex hierarchical
      - Waxy crude oils
      - Standard FMLIKH
-   * - N=3, α_i decreasing
+   * - N=3, :math:`\alpha_i` decreasing
      - Scale-dependent memory
      - Aging glasses, cements
-     - Use per-mode α
-   * - N=2, α₁ ≈ 0.9, α₂ ≈ 0.4
+     - Use per-mode :math:`\alpha`
+   * - N=2, :math:`\alpha_1 \approx 0.9, \alpha_2` ≈ 0.4
      - Fast exponential + slow glassy
      - Soft glasses
-     - Per-mode α critical
+     - Per-mode :math:`\alpha` critical
 
 
 Industrial Applications
@@ -514,7 +514,7 @@ Hierarchical Colloidal Gels
 
 Colloidal gels with particles aggregating at multiple scales:
 
-**Per-mode α recommended** when bond energies vary with scale:
+**Per-mode** :math:`\alpha` **recommended** when bond energies vary with scale:
 
 .. code-block:: python
 
@@ -540,7 +540,7 @@ Cement hydration creates hierarchical structure with different aging dynamics:
 
 - **C-S-H gel**: Fast formation, moderate memory
 - **Ettringite**: Medium timescale, structure-dependent
-- **Portlandite network**: Slow formation, strong aging (low α)
+- **Portlandite network**: Slow formation, strong aging (low :math:`\alpha`)
 
 **Application**: Predicting workability loss during placement.
 
@@ -562,22 +562,22 @@ Global Parameters
      - Description
    * - ``G``
      - 1000
-     - (0.1, 10⁹)
+     - (0.1, :math:`10^9`)
      - Pa
      - Global shear modulus
    * - ``eta``
-     - 10⁶
-     - (10⁻³, 10¹²)
+     - :math:`10^6`
+     - (10\ :math:`^{-3, 10^1^2}`)
      - Pa·s
-     - Maxwell viscosity (τ = η/G)
+     - Maxwell viscosity (:math:`\tau = \eta/G`)
    * - ``C``
      - 500
-     - (0, 10⁹)
+     - (0, :math:`10^9`)
      - Pa
      - Kinematic hardening modulus
    * - ``gamma_dyn``
      - 1.0
-     - (0, 10⁴)
+     - (0, :math:`10^4`)
      - —
      - Dynamic recovery parameter
    * - ``m``
@@ -587,22 +587,22 @@ Global Parameters
      - AF recovery exponent
    * - ``sigma_y0``
      - 10
-     - (0, 10⁹)
+     - (0, :math:`10^9`)
      - Pa
      - Minimal yield stress (all modes destructured)
    * - ``delta_sigma_y``
      - 50
-     - (0, 10⁹)
+     - (0, :math:`10^9`)
      - Pa
      - Total structural yield contribution
    * - ``eta_inf``
      - 0.1
-     - (0, 10⁹)
+     - (0, :math:`10^9`)
      - Pa·s
      - High-shear (solvent) viscosity
    * - ``mu_p``
-     - 10⁻³
-     - (10⁻⁹, 10³)
+     - :math:`10 \times 10^{-3}`
+     - (10\ :math:`^{-9, 10^3}`)
      - Pa·s
      - Plastic viscosity (Perzyna)
 
@@ -640,12 +640,12 @@ For each mode i = 1, 2, ..., N:
      - Description
    * - ``tau_thix_i``
      - varies
-     - (10⁻⁶, 10¹²)
+     - (10\ :math:`^{-6, 10^1^2}`)
      - s
      - Mode i rebuilding timescale
    * - ``Gamma_i``
      - 0.5
-     - (0, 10⁴)
+     - (0, :math:`10^4`)
      - —
      - Mode i breakdown coefficient
    * - ``w_i``
@@ -659,7 +659,7 @@ For each mode i = 1, 2, ..., N:
      - —
      - Mode i fractional order (if ``shared_alpha=False``)
 
-**Note**: Weights are internally normalized: Σw_i = 1.
+**Note**: Weights are internally normalized: :math:`\Sigmaw_i` = 1.
 
 
 Fitting Guidance
@@ -670,17 +670,17 @@ Choosing Number of Modes
 
 1. **Start with N=2** and check if fit improves significantly with N=3
 2. **Use AIC/BIC** for model selection (same approach as ML-IKH)
-3. **Match experimental timescales**: Ensure τ_min < t_exp,min and τ_max > t_exp,max
+3. **Match experimental timescales**: Ensure :math:`\tau_min` < t_exp,min and :math:`\tau_max` > t_exp,max
 4. **Typical**: N=2-4 sufficient for most materials
 
-**Rule of thumb for combined β and α effects:**
+**Rule of thumb for combined** :math:`\beta and \alpha` **effects:**
 
-If stretched exponential fit gives β_eff < 0.5, you may need either:
+If stretched exponential fit gives :math:`\beta_eff` < 0.5, you may need either:
 
-- Higher N with shared α ≈ β_eff
-- Lower N with per-mode α_i < β_eff for slow modes
+- Higher N with shared :math:`\alpha \approx \beta_eff`
+- Lower N with per-mode :math:`\alpha_i < \beta_eff` for slow modes
 
-Shared vs Per-Mode α Selection
+Shared vs Per-Mode :math:`\alpha` Selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
@@ -698,7 +698,7 @@ Shared vs Per-Mode α Selection
    * - Rich data, need flexibility
      - ``shared_alpha=False``
    * - Fast modes exponential, slow modes glassy
-     - ``shared_alpha=False`` with α₁ > α₂ > ... > α_N
+     - ``shared_alpha=False`` with :math:`\alpha_1 > \alpha_2 > ... > \alpha_N`
 
 Initializing Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -725,7 +725,7 @@ Initializing Parameters
    for i in range(1, n_modes + 1):
        model.parameters.set_value(f"w_{i}", 1.0 / n_modes)
 
-**Per-mode α initialization (if used):**
+**Per-mode** :math:`\alpha` **initialization (if used):**
 
 .. code-block:: python
 
@@ -740,7 +740,7 @@ Sequential Fitting Strategy
 
 **Stage 1: Flow curve (steady state)**
 
-Fit global parameters (σ_y0, Δσ_y, η_inf) and Γ_i·τ_thix,i products:
+Fit global parameters (:math:`\sigma_y0, \Delta\sigma_y, \eta_inf`) and :math:`\Gamma_i \cdot \tau_thix,i` products:
 
 .. code-block:: python
 
@@ -753,7 +753,7 @@ Fit global parameters (σ_y0, Δσ_y, η_inf) and Γ_i·τ_thix,i products:
 
    model.fit(gamma_dot, sigma_ss, test_mode='flow_curve')
 
-**Stage 2: Startup transients (α matters)**
+**Stage 2: Startup transients (** :math:`\alpha` **matters)**
 
 Unfreeze elastic and fractional parameters:
 
@@ -783,14 +783,14 @@ Troubleshooting
 
    * - Issue
      - Solution
-   * - Modes collapse to same τ
+   * - Modes collapse to same :math:`\tau`
      - Use logarithmic initialization; add separation constraint
    * - Weights go to 0 or 1
      - Check data spans all timescales; consider reducing N
-   * - Per-mode α all similar
+   * - Per-mode :math:`\alpha` all similar
      - Switch to ``shared_alpha=True``
    * - Slow convergence
-     - Fix α values first; fit kinetic params only
+     - Fix :math:`\alpha` values first; fit kinetic params only
    * - Memory overflow
      - Reduce n_history; use ``shared_alpha=True``
 
@@ -935,7 +935,7 @@ Basic Initialization
        model.parameters.set_value(f"w_{i}", w)
        model.parameters.set_value(f"Gamma_{i}", 0.5)
 
-Per-Mode α Setup
+Per-Mode :math:`\alpha` Setup
 ~~~~~~~~~~~~~~~~
 
 .. code-block:: python
@@ -1061,9 +1061,9 @@ Limitations and Considerations
 
 **Parameter identifiability:**
 
-- Per-mode α with similar timescales can be poorly identified
+- Per-mode :math:`\alpha` with similar timescales can be poorly identified
 - Weight-timescale correlations possible
-- Use shared α when per-mode α values are similar
+- Use shared :math:`\alpha` when per-mode :math:`\alpha` values are similar
 
 **Physical interpretation:**
 
@@ -1103,5 +1103,5 @@ See Also
 
 - :doc:`fikh` — Single-mode fractional IKH (FMLIKH with N=1)
 - :doc:`../ikh/ml_ikh` — Integer-order multi-mode IKH
-- :doc:`../ikh/mikh` — Single-mode integer-order IKH (α = 1 limit)
+- :doc:`../ikh/mikh` — Single-mode integer-order IKH (:math:`\alpha` = 1 limit)
 - :doc:`../sgr/index` — Soft Glassy Rheology (alternative for aging systems)

@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Creep/retardation analysis, solid with finite equilibrium compliance
-- **Parameters:** 4 (Ge, Gk, α, τ)
+- **Parameters:** 4 (Ge, Gk, :math:`\alpha, \tau`)
 - **Key equation:** :math:`J(t) = \frac{1}{G_e} + \frac{1}{G_k}[1 - E_{\alpha}(-(t/\tau)^{\alpha})]`
 - **Test modes:** Creep, oscillation
 - **Material examples:** Viscoelastic solids with retardation spectra, filled polymers, soft tissues
@@ -32,7 +32,7 @@ Notation Guide
      - Kelvin element modulus (retardation magnitude)
    * - :math:`\alpha`
      - dimensionless
-     - Fractional order (0 < α < 1, spectrum breadth)
+     - Fractional order (0 < :math:`\alpha` < 1, spectrum breadth)
    * - :math:`\tau`
      - s
      - Retardation time (characteristic timescale)
@@ -61,7 +61,7 @@ The FKV-Zener model combines a series spring with a fractional Kelvin-Voigt elem
 
 **Microstructural Interpretation:**
 
-- **Series spring (Ge)**: Instantaneous elastic response (glassy compliance J₀ = 1/Ge)
+- **Series spring (Ge)**: Instantaneous elastic response (glassy compliance :math:`J_0` = 1/Ge)
 - **Kelvin element (Gk)**: Delayed compliance from network rearrangements
 - **SpringPot**: Fractional-order damping with broad relaxation spectrum
 - **Solid behavior**: Equilibrium compliance J∞ = 1/Ge + 1/Gk (finite, bounded)
@@ -161,8 +161,8 @@ Parameter Interpretation
 
    - **For graduate students**: In polymers, :math:`G_e` reflects the glassy modulus from
      short-range chain stretching and bond angle deformations. For crosslinked networks,
-     :math:`G_e \approx G_\infty` (high-frequency plateau). Typical values: 10⁶-10⁹ Pa for
-     glassy polymers, 10³-10⁶ Pa for rubbery materials.
+     :math:`G_e \approx G_\infty` (high-frequency plateau). Typical values: :math:`10^6-10^9` Pa for
+     glassy polymers, :math:`10^3-10^6` Pa for rubbery materials.
    - **For practitioners**: :math:`J_0 = 1/G_e` is the immediate strain upon stress application,
      critical for impact resistance and short-time deformation. Use to assess material stiffness
      and load-bearing capacity.
@@ -176,32 +176,32 @@ Parameter Interpretation
    - **For practitioners**: Lower Gk means more compliant material under sustained load. Critical
      for dimensional stability in structural applications.
 
-**Fractional Order (α)**:
+**Fractional Order (** :math:`\alpha` **)**:
    Governs the power-law character and breadth of the retardation spectrum.
 
-   - **α → 0.2-0.3**: Very broad spectrum, highly heterogeneous (filled elastomers, nanocomposites,
+   - :math:`\alpha` **→ 0.2-0.3**: Very broad spectrum, highly heterogeneous (filled elastomers, nanocomposites,
      asphalt with wide filler size distribution)
-   - **α → 0.4-0.6**: Moderate breadth, typical for polymeric solids with distributed retardation
+   - :math:`\alpha` **→ 0.4-0.6**: Moderate breadth, typical for polymeric solids with distributed retardation
      (semicrystalline polymers, physical gels, soft tissues)
-   - **α → 0.7-0.9**: Narrow spectrum, approaching classical exponential retardation (uniform
+   - :math:`\alpha` **→ 0.7-0.9**: Narrow spectrum, approaching classical exponential retardation (uniform
      crosslinked networks, monodisperse elastomers)
-   - **α → 1**: Classical Zener (single exponential), use simpler model
+   - :math:`\alpha` **→ 1**: Classical Zener (single exponential), use simpler model
 
-   *Physical interpretation*: Lower α indicates broader distribution of retardation times from
+   *Physical interpretation*: Lower :math:`\alpha` indicates broader distribution of retardation times from
    structural heterogeneity (filler distribution, crosslink density variation, morphological
-   polydispersity in semicrystalline polymers). For filled systems, α decreases with increasing
+   polydispersity in semicrystalline polymers). For filled systems, :math:`\alpha` decreases with increasing
    filler volume fraction due to filler-matrix interphase effects.
 
-   *For practitioners*: Monitor α for quality control. Decreased α may indicate poor dispersion
+   *For practitioners*: Monitor :math:`\alpha` for quality control. Decreased :math:`\alpha` may indicate poor dispersion
    of fillers, incomplete curing, or aging-induced microstructural heterogeneity.
 
-**Retardation Time (τ)**:
+**Retardation Time (** :math:`\tau` **)**:
    Characteristic timescale for the transition from instantaneous to equilibrium compliance.
 
    - **Marks creep regime transition**: :math:`J(t \ll \tau) \approx J_0`, :math:`J(t \gg \tau) \approx J_\infty`
-   - **Temperature-dependent**: Follows WLF or Arrhenius behavior; τ decreases with temperature
-   - **For practitioners**: Compare τ to service life. For long-term applications (e.g., gaskets,
-     seals), ensure load duration < τ/10 to minimize creep.
+   - **Temperature-dependent**: Follows WLF or Arrhenius behavior; :math:`\tau` decreases with temperature
+   - **For practitioners**: Compare :math:`\tau` to service life. For long-term applications (e.g., gaskets,
+     seals), ensure load duration < :math:`\tau/10` to minimize creep.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -214,19 +214,19 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - High Ge (>10⁶ Pa), Gk/Ge < 0.1
+   * - High Ge (>\ :math:`10^6` Pa), Gk/Ge < 0.1
      - Stiff solid, minimal creep
      - Thermosets, vulcanized rubber, engineering plastics
      - Excellent dimensional stability
-   * - Moderate Ge (10⁴-10⁶ Pa), Gk/Ge ≈ 0.5
+   * - Moderate Ge (:math:`10^4-10^6` Pa), Gk/Ge ≈ 0.5
      - Balanced solid, moderate creep
      - Filled elastomers, semicrystalline polymers
      - Good for seals, dampers (controlled deformation)
-   * - Low Ge (<10⁴ Pa), Gk/Ge > 1.0
+   * - Low Ge (<:math:`10^4` Pa), Gk/Ge > 1.0
      - Soft solid, significant creep
      - Hydrogels, soft tissues, weak physical gels
      - Poor load-bearing, tissue engineering applications
-   * - Low α (<0.3), any Ge
+   * - Low :math:`\alpha` (<0.3), any Ge
      - Heterogeneous structure
      - Nanocomposites, asphalt, bitumen
      - Broad time-dependent behavior, challenging QC
@@ -238,10 +238,10 @@ Diagnostic Indicators
   model instead to capture viscous flow.
 - **Poor fit at short time**: Insufficient early-time resolution or need for additional instantaneous
   compliance term (glassy contribution).
-- **α near bounds (0.05 or 0.95)**: Data may not support fractional retardation; try classical Zener
-  (α = 1) or pure spring (α → 0).
-- **Strong Gk-τ correlation**: Retardation time well-constrained but magnitude ambiguous. Need broader
-  time coverage spanning 10⁻² to 10⁴ seconds.
+- :math:`\alpha` **near bounds (0.05 or 0.95)**: Data may not support fractional retardation; try classical Zener
+  (:math:`\alpha` = 1) or pure spring (:math:`\alpha` → 0).
+- **Strong Gk-** :math:`\tau` **correlation**: Retardation time well-constrained but magnitude ambiguous. Need broader
+  time coverage spanning 10\ :math:`^{-2 to 10^4}` seconds.
 - **Ge << Gk**: Non-physical (instantaneous stiffer than equilibrium); check data quality or bounds.
 
 Fitting Guidance
@@ -275,7 +275,7 @@ Fitting Guidance
 
 - **Insufficient long-time data**: Cannot determine Gk accurately
 - **Non-monotonic J(t)**: Check for instrument artifacts or nonlinear effects
-- **Strong Gk-τ correlation**: Need better coverage in retardation regime
+- **Strong Gk-** :math:`\tau` **correlation**: Need better coverage in retardation regime
 
 **Troubleshooting Table:**
 
@@ -292,12 +292,12 @@ Fitting Guidance
    * - Poor fit at short times
      - Glassy contribution missing
      - Need higher time resolution or add term
-   * - α near bounds (0.05 or 0.95)
+   * - :math:`\alpha` near bounds (0.05 or 0.95)
      - Not fractional
-     - Try classical Zener (α = 1)
-   * - Strong Gk-τ correlation (>0.9)
+     - Try classical Zener (:math:`\alpha` = 1)
+   * - Strong Gk-:math:`\tau` correlation (>0.9)
      - Narrow time window
-     - Extend to 10⁻² - 10⁴ seconds
+     - Extend to 10\ :math:`^{-2 - 10^4}` seconds
    * - Ge << Gk (non-physical)
      - Data quality or bounds
      - Check instantaneous response
@@ -343,23 +343,23 @@ Compare candidate materials by equilibrium compliance:
    :widths: 25 20 20 20 15
 
    * - Material
-     - J₀ (1/Pa)
+     - :math:`J_0` (1/Pa)
      - J∞ (1/Pa)
-     - τ (s)
-     - α
+     - :math:`\tau` (s)
+     - :math:`\alpha`
    * - EPDM rubber
-     - 1.0×10⁻⁶
-     - 2.5×10⁻⁶
+     - :math:`1.0 \times 10^{-6}`
+     - :math:`2.5 \times 10^{-6}`
      - 100
      - 0.45
    * - Silicone gel
-     - 5.0×10⁻⁴
-     - 8.0×10⁻⁴
+     - :math:`5.0 \times 10^{-4}`
+     - :math:`8.0 \times 10^{-4}`
      - 10
      - 0.55
    * - Polyurethane foam
-     - 1.0×10⁻⁵
-     - 3.0×10⁻⁵
+     - :math:`1.0 \times 10^{-5}`
+     - :math:`3.0 \times 10^{-5}`
      - 50
      - 0.40
 
@@ -367,26 +367,26 @@ Compare candidate materials by equilibrium compliance:
 
 Use fitted parameters for batch consistency:
 
-1. **Instantaneous compliance J₀ = 1/Ge**: Monitors cure state (decreases with crosslinking)
+1. **Instantaneous compliance** :math:`J_0` **= 1/Ge**: Monitors cure state (decreases with crosslinking)
 2. **Equilibrium compliance J∞**: Tracks network integrity (increases with aging/degradation)
-3. **Retardation time τ**: Sensitive to filler content and dispersion
-4. **Fractional order α**: Indicates microstructural heterogeneity (target α > 0.4 for uniformity)
+3. **Retardation time** :math:`\tau`: Sensitive to filler content and dispersion
+4. **Fractional order** :math:`\alpha`: Indicates microstructural heterogeneity (target :math:`\alpha` > 0.4 for uniformity)
 
 **Failure Analysis:**
 
 Diagnose creep failure modes from parameter trends:
 
 - **Increasing J∞ over time**: Network degradation (oxidation, hydrolysis, chain scission)
-- **Decreasing α**: Loss of microstructural homogeneity (filler agglomeration)
-- **Increasing τ**: Molecular weight increase (post-cure, crosslinking)
-- **J∞ approaches J₀**: Loss of delayed response (complete network breakdown)
+- **Decreasing** :math:`\alpha`: Loss of microstructural homogeneity (filler agglomeration)
+- **Increasing** :math:`\tau`: Molecular weight increase (post-cure, crosslinking)
+- **J∞ approaches** :math:`J_0`: Loss of delayed response (complete network breakdown)
 
 Example Calculations
 --------------------
 
 **Creep Compliance Prediction:**
 
-Given fitted parameters Ge = 1.0 MPa, Gk = 2.5 MPa, α = 0.5, τ = 100 s:
+Given fitted parameters Ge = 1.0 MPa, Gk = 2.5 MPa, :math:`\alpha = 0.5, \tau` = 100 s:
 
 .. code-block:: python
 

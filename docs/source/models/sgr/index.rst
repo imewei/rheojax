@@ -18,7 +18,7 @@ Quick Reference
      - Parameters
      - Use Case
    * - :doc:`sgr_conventional`
-     - 3-4 (x, G₀, τ₀, σ_y)
+     - 3-4 (x, G_0, :math:`\tau_0`, :math:`\sigma_y`)
      - Soft glassy materials, aging, yield stress fluids
    * - :doc:`sgr_generic`
      - 4-5
@@ -61,7 +61,7 @@ Model Hierarchy
    │   └── Trap model with Arrhenius hopping
    │   └── Exponential trap depth distribution ρ(E) = e^(-E)
    │   └── Strain-warped time Z(t,t') for flow coupling
-   │   └── 3 core parameters: x, G₀, τ₀
+   │   └── 3 core parameters: x, G_0, τ_0
    │
    └── SGR GENERIC (Fuereder & Ilg 2013)
        └── Thermodynamically consistent extension
@@ -120,11 +120,11 @@ noise temperature x:
    x (noise temperature)
    │
    │  x > 2     Newtonian Fluid
-   │            G' ~ ω², G'' ~ ω
+   │            G' ~ ω^2, G'' ~ ω
    │            Classical liquid behavior
    │
    │  1 < x < 2 Power-Law Fluid
-   │            G' ~ G'' ~ ω^(x-1)
+   │            G' ~ G'' ~ ω^(x-1) 
    │            Flat loss tangent: tan δ = tan(πx/2)
    │            Broad relaxation spectrum
    │
@@ -162,15 +162,15 @@ Key Parameters
      - 0.5–3
      - Controls phase: x < 1 (glass), x > 1 (fluid)
    * - Modulus scale
-     - G₀
-     - 10–10⁴ Pa
+     - G_0
+     - 10–10^4 Pa
      - Sets magnitude of G', G''
    * - Attempt time
-     - τ₀
-     - 10⁻⁶–10⁻² s
+     - :math:`\tau_0`
+     - 10⁻^6–10⁻^2 s
      - Microscopic timescale for trap escape
    * - Yield stress
-     - σ_y
+     - :math:`\sigma_y`
      - 0–100 Pa
      - Finite for x < 1 (glass regime)
 

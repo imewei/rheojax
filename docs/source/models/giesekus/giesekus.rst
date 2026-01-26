@@ -7,9 +7,9 @@ Quick Reference
 ---------------
 
 - **Use when:** Polymer melts/solutions with shear-thinning, normal stress differences, stress overshoot
-- **Parameters:** 4 (η_p, λ, α, η_s)
+- **Parameters:** 4 (:math:`\eta_p`, :math:`\lambda`, :math:`\alpha`, :math:`\eta_s`)
 - **Key equation:** :math:`\boldsymbol{\tau} + \lambda \overset{\nabla}{\boldsymbol{\tau}} + \frac{\alpha \lambda}{\eta_p} \boldsymbol{\tau} \cdot \boldsymbol{\tau} = 2 \eta_p \mathbf{D}`
-- **Diagnostic:** :math:`N_2/N_1 = -\alpha/2` (direct experimental route to α)
+- **Diagnostic:** :math:`N_2/N_1 = -\alpha/2` (direct experimental route to :math:`\alpha`)
 - **Test modes:** Flow curve, oscillation, startup, relaxation, creep, LAOS
 - **Material examples:** Polymer melts, concentrated solutions, wormlike micelles
 
@@ -29,7 +29,7 @@ Notation Guide
    * - :math:`\lambda`
      - Relaxation time (s). Characteristic stress decay time.
    * - :math:`\alpha`
-     - Mobility factor (dimensionless, 0 ≤ α ≤ 0.5). Controls shear-thinning.
+     - Mobility factor (dimensionless, 0 ≤ :math:`\alpha` ≤ 0.5). Controls shear-thinning.
    * - :math:`\eta_s`
      - Solvent viscosity (Pa·s). Newtonian background contribution.
    * - :math:`\eta_0`
@@ -60,7 +60,7 @@ description of:
 
 The model is particularly valuable because it predicts both first and second
 normal stress differences with a fixed ratio :math:`N_2/N_1 = -\alpha/2`, providing
-a direct experimental route to determine the mobility parameter α.
+a direct experimental route to determine the mobility parameter :math:`\alpha`.
 
 Historical Context
 ~~~~~~~~~~~~~~~~~~
@@ -72,9 +72,9 @@ flow experience different friction in different directions.
 
 The model became widely adopted because:
 
-- It uses only one additional parameter (α) beyond the Maxwell model
+- It uses only one additional parameter (:math:`\alpha`) beyond the Maxwell model
 - It captures essential nonlinear features with simple mathematics
-- The parameter α has clear physical interpretation
+- The parameter :math:`\alpha` has clear physical interpretation
 - Predictions agree well with experimental data for many polymeric systems
 
 Physical Foundations
@@ -94,7 +94,7 @@ in a flowing medium. When chains are stretched and aligned by flow:
    Aligned chains slip more easily along their backbone than perpendicular to it.
    Result: Shear-thinning, :math:`N_2 < 0`
 
-The mobility parameter α quantifies this anisotropy:
+The mobility parameter :math:`\alpha` quantifies this anisotropy:
 
 - :math:`\alpha = 0`: Isotropic drag → recovers UCM model
 - :math:`\alpha = 0.5`: Maximum anisotropy → strongest thinning
@@ -201,12 +201,12 @@ With the fundamental diagnostic ratio:
    \frac{N_2}{N_1} = -\frac{\alpha}{2}
 
 This ratio is **independent of shear rate**, making it an excellent experimental
-route to determine α.
+route to determine :math:`\alpha`.
 
 SAOS Response
 ~~~~~~~~~~~~~
 
-Small-amplitude oscillatory shear (SAOS) is independent of α and matches the
+Small-amplitude oscillatory shear (SAOS) is independent of :math:`\alpha` and matches the
 Maxwell model:
 
 .. math::
@@ -227,7 +227,7 @@ the steady-state value. The overshoot:
 
 - Occurs at strain :math:`\gamma \sim O(1)`
 - Increases with Weissenberg number
-- Is more pronounced for larger α
+- Is more pronounced for larger :math:`\alpha`
 
 **Stress relaxation** (cessation of flow):
 
@@ -337,7 +337,7 @@ Validity Range
      - :math:`\dot{\gamma} < 1/\lambda` to :math:`100/\lambda`
      - Power-law region
    * - Strain (startup)
-     - γ ≲ 10
+     - :math:`\gamma` ≲ 10
      - Overshoot captured
    * - Temperature
      - Near reference T
@@ -348,7 +348,7 @@ Limitations
 
 1. **Single relaxation time**: Real polymers have spectra (use multi-mode)
 2. **No extensional hardening**: Underpredicts extensional viscosity
-3. **Fixed N₂/N₁ ratio**: Cannot vary independently
+3. **Fixed** :math:`N_2/N_1` **ratio**: Cannot vary independently
 4. **Numerical stiffness**: High Wi may require adaptive solvers
 
 When NOT to Use
@@ -386,16 +386,16 @@ Weissenberg Number Regimes
      - :math:`\eta \sim \text{Wi}^{n-1}`
      - Strong shear-thinning
 
-Effect of α on Behavior
+Effect of :math:`\alpha` on Behavior
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :widths: 15 25 30 30
    :header-rows: 1
 
-   * - α value
+   * - :math:`\alpha` value
      - Shear-thinning
-     - N₂/N₁
+     - :math:`N_2/N_1`
      - Example materials
    * - 0
      - None (UCM)
@@ -422,13 +422,13 @@ From Flow Curve Fitting
 
 **Primary outputs:**
 
-- **η₀ = η_p + η_s**: Zero-shear viscosity (plateau value)
-- **λ from onset**: Shear rate where thinning begins ≈ 1/λ
+- :math:`\eta_0 = \eta_p + \eta_s`: Zero-shear viscosity (plateau value)
+- :math:`\lambda` **from onset**: Shear rate where thinning begins ≈ :math:`1/\lambda`
 - **Power-law index**: High-Wi slope gives effective n
 
 **What this reveals:**
 
-- Molecular weight (via η₀ and λ scaling)
+- Molecular weight (via :math:`\eta_0 and \lambda` scaling)
 - Entanglement density
 - Solution concentration effects
 
@@ -437,9 +437,9 @@ From SAOS Fitting
 
 **Primary outputs:**
 
-- **G = η_p/λ**: From high-frequency G' plateau
-- **λ from crossover**: Where G' = G''
-- **η_s from G''**: High-frequency slope
+- **G =** :math:`\eta_p/\lambda`: From high-frequency G' plateau
+- :math:`\lambda` **from crossover**: Where G' = G''
+- :math:`\eta_s` **from G''**: High-frequency slope
 
 **What this reveals:**
 
@@ -452,7 +452,7 @@ From Normal Stress Measurements
 
 **Primary output:**
 
-- **α = −2N₂/N₁**: Direct measurement of mobility factor
+- :math:`\alpha = -2N_2/N_1`: Direct measurement of mobility factor
 
 **What this reveals:**
 
@@ -465,8 +465,8 @@ From Startup Flow
 
 **Primary outputs:**
 
-- **Overshoot ratio σ_max/σ_ss**: Increases with Wi
-- **Strain at peak**: γ_peak ~ 1-3 for Giesekus
+- **Overshoot ratio** :math:`\sigma_{\text{max}}/\sigma_{ss}`: Increases with Wi
+- **Strain at peak**: :math:`\gamma_{\text{peak}}` ~ 1-3 for Giesekus
 - **Transient timescale**: Approach to steady state
 
 **What this reveals:**
@@ -484,7 +484,7 @@ When to Use Giesekus
 Use the Giesekus model when your material exhibits:
 
 1. Shear-thinning viscosity
-2. Measurable N₂ (negative second normal stress difference)
+2. Measurable :math:`N_2` (negative second normal stress difference)
 3. Stress overshoot in startup flow
 4. SAOS that fits Maxwell/Generalized Maxwell
 5. Single or narrow relaxation time distribution
@@ -494,8 +494,8 @@ Decision Tree
 
 ::
 
-   Is N₂ measurable (negative)?
-   ├── YES → Giesekus captures N₂/N₁ = −α/2
+   Is N_2 measurable (negative)?
+   ├── YES → Giesekus captures N_2/N_1 = -α/2
    │
    └── NO → Is only shear-thinning needed?
        ├── YES → Consider simpler Carreau/Cross
@@ -504,9 +504,9 @@ Decision Tree
 Recommended Protocol Sequence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. **SAOS first**: Determine η_p, λ, η_s from linear regime
+1. **SAOS first**: Determine :math:`\eta_p`, :math:`\lambda`, :math:`\eta_s` from linear regime
 2. **Flow curve**: Confirm thinning, refine parameters
-3. **Normal stresses**: Measure N₂/N₁ to determine α
+3. **Normal stresses**: Measure :math:`N_2/N_1` to determine :math:`\alpha`
 4. **Startup flow**: Validate overshoot predictions
 5. **Relaxation**: Confirm faster-than-exponential decay
 
@@ -518,13 +518,13 @@ Material-Specific Recommendations
    :header-rows: 1
 
    * - Material
-     - Typical α
+     - Typical :math:`\alpha`
      - n_modes
      - Key protocols
    * - Polymer melts
      - 0.1–0.3
      - 3–5
-     - Flow curve + SAOS + N₂
+     - Flow curve + SAOS + :math:`N_2`
    * - Polymer solutions
      - 0.2–0.4
      - 1–3
@@ -583,7 +583,7 @@ Numerical Considerations
 **Numerical stability:**
 
 - High Wi (>100) may require reduced tolerances
-- Very small α (<0.01) approaches UCM singularities
+- Very small :math:`\alpha` (<0.01) approaches UCM singularities
 - Use log-residuals for fitting flow curves
 
 Fitting Guidance
@@ -611,7 +611,7 @@ Initial Parameter Estimates
    # Onset of thinning
    lambda_1 = 1 / gamma_dot_onset  # Where η starts dropping
 
-**α estimation:**
+:math:`\alpha` **estimation:**
 
 .. code-block:: python
 
@@ -620,14 +620,14 @@ Initial Parameter Estimates
 
    # From thinning slope (rough estimate)
    # High-Wi slope of η vs γ̇ in log-log ≈ (n-1)
-   # For Giesekus: n ≈ 0.5 at α = 0.5
+   # For Giesekus: n ≈ 0.5 at alpha = 0.5
 
 Fitting Strategy
 ~~~~~~~~~~~~~~~~
 
-1. **Fix η_s if known** (pure solvent viscosity)
-2. **Fit SAOS first** for η_p, λ (α-independent)
-3. **Fit flow curve** to refine and get α
+1. **Fix** :math:`\eta_s` **if known** (pure solvent viscosity)
+2. **Fit SAOS first** for :math:`\eta_p`, :math:`\lambda` (:math:`\alpha`-independent)
+3. **Fit flow curve** to refine and get :math:`\alpha`
 4. **Validate with startup** for dynamic behavior
 
 Troubleshooting
@@ -641,16 +641,16 @@ Troubleshooting
      - Likely Cause
      - Solution
    * - Poor flow curve fit
-     - Wrong α
-     - Use N₂/N₁ to fix α, then fit others
+     - Wrong :math:`\alpha`
+     - Use :math:`N_2/N_1` to fix :math:`\alpha`, then fit others
    * - Overshoot too small
-     - α too low
-     - Increase α toward 0.5
+     - :math:`\alpha` too low
+     - Increase :math:`\alpha` toward 0.5
    * - No convergence at high Wi
      - Numerical stiffness
      - Reduce max Wi, use adaptive solver
    * - Relaxation too slow
-     - λ too long
+     - :math:`\lambda` too long
      - Fit SAOS crossover more carefully
    * - SAOS mismatch
      - Single mode inadequate
@@ -686,7 +686,7 @@ Predict SAOS
 
 .. code-block:: python
 
-   # SAOS is α-independent (linear regime)
+   # SAOS is alpha-independent (linear regime)
    omega = np.logspace(-2, 3, 50)
    G_prime, G_double_prime = model.predict_saos(omega)
 
@@ -703,7 +703,7 @@ Normal Stress Prediction
    N1, N2 = model.predict_normal_stresses(gamma_dot)
 
    # Verify diagnostic ratio
-   ratio = N2 / N1  # Should equal -alpha/2 = -0.15
+   ratio = N2 / N1  # Should equal -alpha/2 = -0.15 (for alpha=0.3)
 
 Startup with Overshoot
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -778,15 +778,15 @@ vs. Upper-Convected Maxwell (UCM)
    :header-rows: 1
 
    * - Feature
-     - UCM (α=0)
-     - Giesekus (α>0)
+     - UCM (:math:`\alpha = 0`)
+     - Giesekus (:math:`\alpha > 0`)
    * - Viscosity
      - Constant
      - Shear-thinning
-   * - N₁
+   * - :math:`N_1`
      - Positive
      - Positive
-   * - N₂
+   * - :math:`N_2`
      - Zero
      - Negative
    * - Startup
@@ -809,8 +809,8 @@ vs. Phan-Thien–Tanner (PTT)
    * - Thinning mechanism
      - Anisotropic drag
      - Network destruction
-   * - N₂/N₁
-     - Fixed = −α/2
+   * - :math:`N_2/N_1`
+     - Fixed = :math:`-\alpha/2`
      - Adjustable
    * - Extensional
      - Bounded
@@ -841,18 +841,18 @@ vs. FENE-P
    * - Shear thinning
      - Strong
      - Moderate
-   * - N₂
+   * - :math:`N_2`
      - Nonzero
      - Zero
    * - Best for
-     - Shear + N₂
+     - Shear + :math:`N_2`
      - Extensional flows
 
 When to Choose Each Model
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Giesekus**: Need N₂ prediction, shear-dominated flows
-- **PTT**: Mixed shear-extension, adjustable N₂/N₁
+- **Giesekus**: Need :math:`N_2` prediction, shear-dominated flows
+- **PTT**: Mixed shear-extension, adjustable :math:`N_2/N_1`
 - **FENE-P**: Extension-dominated, fiber spinning
 - **Oldroyd-B/UCM**: Simple validation, teaching
 
@@ -864,8 +864,8 @@ Related Models
 
 - :ref:`model-maxwell` — Linear viscoelastic foundation
 - :ref:`model-generalized-maxwell` — Multi-mode linear model
-- :ref:`model-ptt` — Alternative nonlinear model
-- :ref:`model-fene-p` — Finite extensibility model
+- PTT — Alternative nonlinear model
+- FENE-P — Finite extensibility model
 
 Related Topics
 ~~~~~~~~~~~~~~
@@ -873,7 +873,7 @@ Related Topics
 - :ref:`transform-mastercurve` — Time-temperature superposition
 - :ref:`protocol-saos` — Small-amplitude oscillatory shear
 - :ref:`protocol-startup` — Startup flow experiments
-- :ref:`bayesian-inference` — Parameter uncertainty quantification
+- Bayesian inference — Parameter uncertainty quantification
 
 References
 ----------
@@ -926,7 +926,7 @@ Normal Stress Measurements
     entangled polystyrene solutions and the second normal stress difference."
     *Polymer*, 35, 1187-1194.
 
-11. Lee, C.S., Tripp, B.C., & Magda, J.J. (1992). "Does N₂ depend on the shear
+11. Lee, C.S., Tripp, B.C., & Magda, J.J. (1992). "Does :math:`N_2` depend on the shear
     rate in polymer melts?" *Rheol. Acta*, 31, 306-314.
 
 Multi-Mode Extensions

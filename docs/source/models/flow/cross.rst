@@ -435,10 +435,10 @@ Recommended Test Protocol
 
 **Step 1**: Sample equilibration
    - Load sample, equilibrate at test temperature for 10 min
-   - Pre-shear at moderate rate (10-100 s⁻¹) for 60 s, then rest 5 min
+   - Pre-shear at moderate rate (10-100 s\ :math:`^{-1}`) for 60 s, then rest 5 min
 
 **Step 2**: Flow curve measurement
-   - Shear rate sweep: :math:`10^{-3}` to :math:`10^{3}` s⁻¹
+   - Shear rate sweep: :math:`10^{-3}` to :math:`10^{3}` s\ :math:`^{-1}`
    - Log spacing: 5 points per decade minimum
    - Equilibration: Wait for steady stress (auto or fixed time)
 

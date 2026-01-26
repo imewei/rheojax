@@ -19,19 +19,19 @@ Quick Reference
      - 2 (K, n)
      - Simple shear-thinning/thickening fluids
    * - :doc:`carreau`
-     - 4 (η₀, η∞, λ, n)
+     - 4 (:math:`\eta_0`, :math:`\eta_\infty`, :math:`\lambda`, n)
      - Full flow curve with Newtonian plateaus
    * - :doc:`carreau_yasuda`
      - 5 (+a)
      - Sharper transition region control
    * - :doc:`cross`
-     - 4 (η₀, η∞, K, n)
+     - 4 (:math:`\eta_0, \eta_{\infty}`, K, n)
      - Alternative to Carreau, different transition
    * - :doc:`bingham`
-     - 2 (σ_y, η_p)
+     - 2 (:math:`\sigma_y`, :math:`\eta_p`)
      - Simple yield stress fluids
    * - :doc:`herschel_bulkley`
-     - 3 (σ_y, K, n)
+     - 3 (:math:`\sigma_y`, K, n)
      - Yield stress + power-law flow
 
 
@@ -63,29 +63,29 @@ Model Hierarchy
    │
    ├── Newtonian Region Models (no yield stress)
    │   ├── Power Law (Ostwald-de Waele)
-   │   │   └── σ = K·γ̇^n
+   │   │   └── σ = K · γ̇^n
    │   │   └── Simple, 2 parameters
    │   │   └── No plateaus
    │   │
    │   ├── Carreau
-   │   │   └── η = η∞ + (η₀-η∞)[1+(λγ̇)²]^((n-1)/2)
+   │   │   └── η = η∞ + (η_0-η∞)[1+(λγ̇)^2]^((n-1)/2)
    │   │   └── Both plateaus, smooth transition
    │   │
    │   ├── Carreau-Yasuda
-   │   │   └── η = η∞ + (η₀-η∞)[1+(λγ̇)^a]^((n-1)/a)
+   │   │   └── η = η∞ + (η_0-η∞)[1+(λγ̇)^a]^((n-1)/a)
    │   │   └── Adjustable transition sharpness
    │   │
    │   └── Cross
-   │       └── η = η∞ + (η₀-η∞)/[1+(Kγ̇)^n]
+   │       └── η = η∞ + (η_0-η∞)/[1+(Kγ̇)^n]
    │       └── Different transition shape
    │
    └── Yield Stress Models
        ├── Bingham
-       │   └── σ = σ_y + η_p·γ̇  (if σ > σ_y)
+       │   └── σ = σ_y + η_p · γ̇  (if σ > σ_y)
        │   └── Linear above yield
        │
        └── Herschel-Bulkley
-           └── σ = σ_y + K·γ̇^n  (if σ > σ_y)
+           └── σ = σ_y + K · γ̇^n  (if σ > σ_y)
            └── Power-law above yield
 
 
@@ -174,35 +174,35 @@ Material Examples
      - Industry
    * - Polymer solutions
      - Carreau
-     - η₀ = 1-100 Pa·s, n = 0.3-0.7
+     - :math:`\eta_0` = 1-100 Pa·s, n = 0.3-0.7
      - Plastics, coatings
    * - Polymer melts
      - Carreau-Yasuda
-     - η₀ = 10³-10⁵ Pa·s, a = 2
+     - :math:`\eta_0` = :math:`10^3-10^5` Pa·s, a = 2
      - Extrusion, injection
    * - Blood
      - Carreau
-     - η₀ ≈ 50 mPa·s, n ≈ 0.4
+     - :math:`\eta_0` ≈ 50 mPa·s, n ≈ 0.4
      - Biomedical
    * - Paints
      - Cross or H-B
-     - σ_y = 0.5-10 Pa
+     - :math:`\sigma_y` = 0.5-10 Pa
      - Coatings
    * - Toothpaste
      - Herschel-Bulkley
-     - σ_y = 10-100 Pa
+     - :math:`\sigma_y` = 10-100 Pa
      - Personal care
    * - Drilling mud
      - Herschel-Bulkley
-     - σ_y = 5-50 Pa, n = 0.5-0.8
+     - :math:`\sigma_y` = 5-50 Pa, n = 0.5-0.8
      - Oil & gas
    * - Ketchup
      - Herschel-Bulkley
-     - σ_y ≈ 15 Pa
+     - :math:`\sigma_y` ≈ 15 Pa
      - Food
    * - Concrete
      - Bingham
-     - σ_y = 10-100 Pa
+     - :math:`\sigma_y` = 10-100 Pa
      - Construction
 
 
@@ -218,11 +218,11 @@ Key Parameters
      - Units
      - Physical Meaning
    * - Zero-shear viscosity
-     - η₀
+     - :math:`\eta_0`
      - Pa·s
      - Viscosity at rest (Newtonian plateau)
    * - Infinite-shear viscosity
-     - η∞
+     - :math:`\eta_\infty`
      - Pa·s
      - High-rate limit (often ≈ 0)
    * - Consistency index
@@ -234,11 +234,11 @@ Key Parameters
      - —
      - n < 1: thinning, n > 1: thickening
    * - Relaxation time
-     - λ
+     - :math:`\lambda`
      - s
-     - Onset of shear thinning (1/λ)
+     - Onset of shear thinning (1/:math:`\lambda`)
    * - Yield stress
-     - σ_y
+     - :math:`\sigma_y`
      - Pa
      - Stress to initiate flow
    * - Yasuda parameter

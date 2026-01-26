@@ -16,7 +16,7 @@ due to competing aging and shear-rejuvenation processes. These models capture:
 - **Yield stress behavior**: Solid-like response at rest, liquid-like under flow
 - **Stress overshoot**: Transient peak during startup after aging
 - **Shear banding**: Spatial flow heterogeneity (nonlocal variants)
-- **Normal stresses**: First normal stress difference N₁ (Saramito EVP)
+- **Normal stresses**: First normal stress difference N_1 (Saramito EVP)
 
 These models are well-suited for:
 
@@ -70,7 +70,7 @@ When to Use Which Model
    * - Homogeneous flow
      - ✓ Use this
      - Overkill
-     - ✓ If N₁ needed
+     - ✓ If N_1 needed
    * - Shear banding
      - Cannot capture
      - ✓ Use this
@@ -79,7 +79,7 @@ When to Use Which Model
      - ✓ Scalar
      - ✓ Scalar
      - ✓ Tensorial
-   * - Normal stresses (N₁)
+   * - Normal stresses (N_1)
      - ✗
      - ✗
      - ✓ Use this
@@ -124,21 +124,21 @@ Quick Comparison
      - Key Extension
      - Primary Use
    * - FluidityLocal
-     - Scalar σ
+     - Scalar :math:`\sigma`
      - Base model
      - Thixotropic flow curves
    * - FluidityNonlocal
-     - Scalar σ(y)
-     - Cooperativity ξ
+     - Scalar :math:`\sigma(y)`
+     - Cooperativity :math:`\xi`
      - Shear banding
    * - FluiditySaramitoLocal
-     - Tensor [τ_xx, τ_yy, τ_xy]
+     - Tensor [:math:`\tau_{xx}`, :math:`\tau_{yy}`, :math:`\tau_{xy}`]
      - UCM + Von Mises
-     - EVP with N₁
+     - EVP with N_1
    * - FluiditySaramitoNonlocal
-     - Tensor τ(y)
+     - Tensor :math:`\tau(y)`
      - Spatial + tensorial
-     - Banding with N₁
+     - Banding with N_1
 
 
 Key Equations
@@ -224,10 +224,10 @@ models in the Fluidity family. Use this guide to select the appropriate variant.
    * - **Standard rheometry** (cone-plate, parallel plate)
      - FluidityLocal or FluiditySaramitoLocal
      - Homogeneous flow assumption valid; no spatial resolution needed
-   * - **LAOS with N₁ extraction**
+   * - **LAOS with N_1 extraction**
      - FluiditySaramitoLocal
      - Tensorial stress required for first normal stress difference
-   * - **Microfluidic confinement** (H ~ ξ)
+   * - **Microfluidic confinement** (H ~ :math:`\xi`)
      - FluidityNonlocal
      - Gap-dependent flow curves; spatial fluidity profiles
    * - **Wide-gap Couette** (R_o - R_i)/R_i > 0.1
@@ -235,10 +235,10 @@ models in the Fluidity family. Use this guide to select the appropriate variant.
      - Stress gradient matters; velocity profiles accessible
    * - **Startup with velocity profiles** (PIV, USV)
      - FluiditySaramitoNonlocal
-     - Validates spatial predictions; extracts ξ
+     - Validates spatial predictions; extracts :math:`\xi`
    * - **Creep bifurcation** tests
      - FluidityLocal or FluiditySaramitoLocal
-     - Homogeneous; bifurcation point identifies τ_y
+     - Homogeneous; bifurcation point identifies :math:`\tau_y`
    * - **Extensional flow** (CaBER, filament stretching)
      - FluiditySaramitoLocal
      - Tensorial formulation handles uniaxial extension
@@ -258,19 +258,19 @@ models in the Fluidity family. Use this guide to select the appropriate variant.
        minimal coupling sufficient
    * - **Concentrated emulsion** (mayonnaise, cosmetics)
      - FluiditySaramitoLocal (minimal)
-     - Moderate N₁; clear yield; standard thixotropy
+     - Moderate N_1; clear yield; standard thixotropy
    * - **Emulsion in microchannel**
      - FluidityNonlocal
-     - Strong confinement effects; ξ ~ 10-50 μm typically
+     - Strong confinement effects; :math:`\xi` ~ 10-50 :math:`\mu\text{m}` typically
    * - **Waxy crude oil**
      - FluiditySaramitoLocal (full)
-     - Strong aging-yield coupling; τ_y increases significantly with rest
+     - Strong aging-yield coupling; :math:`\tau_y` increases significantly with rest
    * - **Drilling mud**
      - FluiditySaramitoLocal (full) or DMT
      - Complex thixotropy; may need aging yield coupling
    * - **Cement/concrete**
      - FluiditySaramitoLocal (full)
-     - Hydration-dependent aging; τ_y evolves with time
+     - Hydration-dependent aging; :math:`\tau_y` evolves with time
    * - **Colloidal glass** near jamming
      - FluidityNonlocal or HL Trap
      - Cooperativity important; may need statistical mechanics model
@@ -281,7 +281,7 @@ models in the Fluidity family. Use this guide to select the appropriate variant.
 
    Start
      │
-     ├── Need tensorial stress or N₁? ──Yes──► FluiditySaramito*
+     ├── Need tensorial stress or N_1? ──Yes──► FluiditySaramito*
      │                                              │
      No                                             ├── Spatial profiles? ──Yes──► Nonlocal
      │                                              │

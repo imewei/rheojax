@@ -17,10 +17,10 @@ Quick Reference
      - Use Case
    * - LatticeEPM
      - ``from rheojax.models import LatticeEPM``
-     - Scalar stress (σ_xy), fast avalanche dynamics
+     - Scalar stress (:math:`\sigma_{xy}`), fast avalanche dynamics
    * - TensorialEPM
      - ``from rheojax.models import TensorialEPM``
-     - Full tensor, normal stresses (N₁, N₂), anisotropic yielding
+     - Full tensor, normal stresses (N_1, N_2), anisotropic yielding
 
 
 Overview
@@ -36,7 +36,7 @@ Unlike mean-field approaches (SGR, Hébraud-Lequeux), EPMs explicitly resolve:
 - **Shear banding** from localized yielding
 
 The implementation leverages **JAX** for FFT-accelerated simulations on GPU/TPU,
-achieving O(L² log L) complexity for stress redistribution instead of O(L⁴) direct summation.
+achieving O(L^2 log L) complexity for stress redistribution instead of O(L^4) direct summation.
 
 **Documentation Highlights:**
 
@@ -55,14 +55,14 @@ Model Hierarchy
    │
    ├── LatticeEPM (Scalar)
    │   └── Tracks σ_xy only
-   │   └── O(L² log L) FFT acceleration
+   │   └── O(L^2 log L) FFT acceleration
    │   └── 6 parameters: μ, σ_c_mean, σ_c_std, τ_pl, L, dt
    │
    └── TensorialEPM (Full Tensor)
        │
        ├── von Mises (isotropic)
        │   └── Tracks [σ_xx, σ_yy, σ_xy] + σ_zz
-       │   └── N₁, N₂ predictions
+       │   └── N_1, N_2 predictions
        │   └── 9 parameters
        │
        └── Hill (anisotropic)
@@ -83,7 +83,7 @@ When to Use Which Model
      - TensorialEPM
    * - Flow curve fitting
      - ✓ Fast (3-5x faster)
-     - ✓ Use if N₁ data available
+     - ✓ Use if N_1 data available
    * - Yield stress determination
      - ✓ Sufficient
      - ✓ More accurate for anisotropic
@@ -92,10 +92,10 @@ When to Use Which Model
      - ✓ Quantitative
    * - Normal stress differences
      - ✗ Cannot capture
-     - ✓ N₁, N₂ predictions
+     - ✓ N_1, N_2 predictions
    * - Shear banding analysis
-     - ~ Qualitative (σ_xy gradients)
-     - ✓ Quantitative (N₁ gradients)
+     - ~ Qualitative (:math:`\sigma_{xy}` gradients)
+     - ✓ Quantitative (N_1 gradients)
    * - Anisotropic materials
      - ✗
      - ✓ Hill criterion
@@ -132,7 +132,7 @@ complete mathematical details with boxed governing equations.
      - Math Details
    * - ``flow_curve``
      - Constant shear rate, steady state
-     - σ(γ̇), yield stress σ_y
+     - :math:`\sigma(\dot{\gamma})`, yield stress :math:`\sigma_y`
      - :ref:`epm-flow-curve`
    * - ``startup``
      - Step shear rate from rest
@@ -144,7 +144,7 @@ complete mathematical details with boxed governing equations.
      - :ref:`epm-relaxation`
    * - ``creep``
      - Constant stress (PID controlled)
-     - γ(t), viscosity bifurcation
+     - :math:`\gamma(t)`, viscosity bifurcation
      - :ref:`epm-creep`
    * - ``oscillation``
      - Sinusoidal shear (SAOS/LAOS)
@@ -162,12 +162,12 @@ complete mathematical details with boxed governing equations.
 Physical Context
 ----------------
 
-EPMs operate at the **mesoscopic length scale** ξ (correlation length of plastic events,
+EPMs operate at the **mesoscopic length scale** :math:`\xi` (correlation length of plastic events,
 typically 10-100 particle diameters). At this scale:
 
-- Material is coarse-grained into discrete blocks with local stress σ_ij
+- Material is coarse-grained into discrete blocks with local stress :math:`\sigma_{ij}`
 - Plastic yielding is localized and stochastic (quenched disorder)
-- Stress redistribution follows long-range Eshelby coupling (quadrupolar, ~1/r²)
+- Stress redistribution follows long-range Eshelby coupling (quadrupolar, ~1/r^2)
 - Avalanches emerge from cascading plastic events
 
 **Ideal materials:**
@@ -194,19 +194,19 @@ Key Parameters
      - Typical Range
      - Physical Meaning
    * - Shear modulus
-     - μ
+     - :math:`\mu`
      - 10-10,000 Pa
      - Elastic stiffness of matrix
    * - Mean yield stress
-     - σ_c_mean
-     - 0.5-2× σ_y
+     - :math:`\sigma_c_{mean}`
+     - 0.5-2× :math:`\sigma_y`
      - Local threshold for plastic events
    * - Disorder strength
-     - σ_c_std
-     - 0.1-0.5× σ_c_mean
+     - :math:`\sigma_c_{std}`
+     - 0.1-0.5× :math:`\sigma_c_{mean}`
      - Heterogeneity → avalanche statistics
    * - Plastic time
-     - τ_pl
+     - :math:`\tau_{pl}`
      - 0.01-10 s
      - Relaxation after yielding
    * - Lattice size
@@ -216,7 +216,7 @@ Key Parameters
    * - Time step
      - dt
      - 0.001-0.05
-     - Must resolve τ_pl (dt < τ_pl/10)
+     - Must resolve :math:`\tau_{pl}` (dt < :math:`\tau_{pl}`/10)
 
 **TensorialEPM additional parameters:**
 
@@ -229,17 +229,17 @@ Key Parameters
      - Typical Range
      - Physical Meaning
    * - Poisson ratio
-     - ν
+     - :math:`\nu`
      - 0.40-0.49
-     - Plane strain coupling → N₁ magnitude
+     - Plane strain coupling → N_1 magnitude
    * - Normal relax. time
-     - τ_pl_normal
-     - 0.1-10× τ_pl_shear
+     - :math:`\tau_{pl}_{normal}`
+     - 0.1-10× :math:`\tau_{pl}_{shear}`
      - Can differ for anisotropic materials
-   * - N₁ weight
+   * - N_1 weight
      - w_N1
      - 0.1-10
-     - Prioritize N₁ in combined fitting
+     - Prioritize N_1 in combined fitting
    * - Hill H
      - H
      - 0.5-2.0
