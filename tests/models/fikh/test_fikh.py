@@ -70,9 +70,18 @@ class TestFIKHParameters:
         """Test all base parameters exist."""
         model = FIKH(include_thermal=False)
         expected = [
-            "G", "eta", "C", "gamma_dyn", "m",
-            "sigma_y0", "delta_sigma_y", "tau_thix", "Gamma",
-            "alpha_structure", "eta_inf", "mu_p"
+            "G",
+            "eta",
+            "C",
+            "gamma_dyn",
+            "m",
+            "sigma_y0",
+            "delta_sigma_y",
+            "tau_thix",
+            "Gamma",
+            "alpha_structure",
+            "eta_inf",
+            "mu_p",
         ]
         for param in expected:
             assert param in model.parameters, f"Missing parameter: {param}"
@@ -170,11 +179,7 @@ class TestFIKHPredictions:
     @pytest.mark.smoke
     def test_laos_prediction(self, model):
         """Test LAOS prediction."""
-        result = model.predict_laos(
-            t=jnp.linspace(0, 10, 200),
-            gamma_0=0.5,
-            omega=1.0
-        )
+        result = model.predict_laos(t=jnp.linspace(0, 10, 200), gamma_0=0.5, omega=1.0)
 
         assert "time" in result
         assert "strain" in result
@@ -190,12 +195,13 @@ class TestFIKHPredictions:
         params = thermal_model._get_params_dict()
 
         stress, temperature = fikh_scan_kernel_thermal(
-            t, strain,
+            t,
+            strain,
             n_history=100,
             alpha=0.5,
             use_viscosity=True,
             T_init=298.15,
-            **params
+            **params,
         )
 
         assert temperature.shape == t.shape
@@ -213,7 +219,14 @@ class TestFIKHTestModeValidation:
     def test_valid_test_modes(self):
         """Test all valid test modes are accepted."""
         model = FIKH(include_thermal=False)
-        valid_modes = ["flow_curve", "startup", "relaxation", "creep", "oscillation", "laos"]
+        valid_modes = [
+            "flow_curve",
+            "startup",
+            "relaxation",
+            "creep",
+            "oscillation",
+            "laos",
+        ]
 
         for mode in valid_modes:
             result = model._validate_test_mode(mode)
@@ -260,11 +273,15 @@ class TestFIKHLimitingBehavior:
 
         # High α (weak memory)
         model_high = FIKH(include_thermal=False, alpha_structure=0.9)
-        stress_high = model_high._predict_from_params(t, strain, model_high._get_params_dict())
+        stress_high = model_high._predict_from_params(
+            t, strain, model_high._get_params_dict()
+        )
 
         # Low α (strong memory)
         model_low = FIKH(include_thermal=False, alpha_structure=0.3)
-        stress_low = model_low._predict_from_params(t, strain, model_low._get_params_dict())
+        stress_low = model_low._predict_from_params(
+            t, strain, model_low._get_params_dict()
+        )
 
         # Both should be valid
         assert jnp.isfinite(stress_high).all()

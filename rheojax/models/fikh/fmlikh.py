@@ -152,7 +152,7 @@ class FMLIKH(FIKHBase):
         # Add per-mode parameters
         for i in range(self._n_modes):
             # Modulus - logarithmically spaced defaults
-            G_default = 1e3 / (10 ** i)
+            G_default = 1e3 / (10**i)
             self.parameters.add(
                 f"G_{i}",
                 value=G_default,
@@ -162,7 +162,7 @@ class FMLIKH(FIKHBase):
             )
 
             # Viscosity - also logarithmically spaced
-            eta_default = 1e6 / (10 ** i)
+            eta_default = 1e6 / (10**i)
             self.parameters.add(
                 f"eta_{i}",
                 value=eta_default,
@@ -172,7 +172,7 @@ class FMLIKH(FIKHBase):
             )
 
             # Kinematic hardening
-            C_default = 5e2 / (10 ** i)
+            C_default = 5e2 / (10**i)
             self.parameters.add(
                 f"C_{i}",
                 value=C_default,
@@ -413,7 +413,11 @@ class FMLIKH(FIKHBase):
         Returns:
             Dictionary with per-mode parameters and derived quantities.
         """
-        info = {"n_modes": self._n_modes, "shared_alpha": self.shared_alpha, "modes": []}
+        info = {
+            "n_modes": self._n_modes,
+            "shared_alpha": self.shared_alpha,
+            "modes": [],
+        }
 
         params = self._get_params_dict()
 

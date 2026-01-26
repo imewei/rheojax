@@ -339,7 +339,9 @@ class FIKH(FIKHBase):
     # Protocol-Specific Prediction Methods
     # =========================================================================
 
-    def predict_flow_curve(self, gamma_dot: ArrayLike, T: float | None = None) -> ArrayLike:
+    def predict_flow_curve(
+        self, gamma_dot: ArrayLike, T: float | None = None
+    ) -> ArrayLike:
         """Predict steady-state flow curve.
 
         Args:
@@ -605,13 +607,14 @@ class FIKH(FIKHBase):
         return {
             "fractional_order": alpha,
             "is_near_integer": alpha > 0.95,
-            "memory_type": "weak (near exponential)" if alpha > 0.7 else "strong (power-law)",
+            "memory_type": (
+                "weak (near exponential)" if alpha > 0.7 else "strong (power-law)"
+            ),
             "thermal_coupling": self.include_thermal,
             "arrhenius_enabled": E_a > 0 if self.include_thermal else False,
             "limiting_case_alpha_1": "Classical MIKH behavior",
             "limiting_case_E_a_0": "Isothermal FIKH behavior",
         }
-
 
     def precompile(self, n_points: int = 100, verbose: bool = True) -> float:
         """Precompile JIT kernels for faster subsequent predictions.

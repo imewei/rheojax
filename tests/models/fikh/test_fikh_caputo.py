@@ -12,13 +12,13 @@ import pytest
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.fikh._caputo import (
+    caputo_derivative_l1,
     compute_gl_weights,
     compute_l1_coefficients,
-    caputo_derivative_l1,
     create_history_buffer,
-    update_history_buffer,
-    initialize_history_with_value,
     fractional_derivative_with_short_memory,
+    initialize_history_with_value,
+    update_history_buffer,
 )
 
 jax, jnp = safe_import_jax()

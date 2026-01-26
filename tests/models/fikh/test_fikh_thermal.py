@@ -12,14 +12,14 @@ import pytest
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.fikh._thermal import (
-    arrhenius_viscosity,
-    arrhenius_modulus,
-    thermal_yield_stress,
-    temperature_evolution_rate,
-    steady_state_temperature,
-    update_thermal_parameters,
-    compute_adiabatic_temperature_rise,
     R_GAS,
+    arrhenius_modulus,
+    arrhenius_viscosity,
+    compute_adiabatic_temperature_rise,
+    steady_state_temperature,
+    temperature_evolution_rate,
+    thermal_yield_stress,
+    update_thermal_parameters,
 )
 
 jax, jnp = safe_import_jax()
@@ -221,7 +221,9 @@ class TestAdiabaticTemperatureRise:
         rho_cp = 4e6
         chi = 0.9
 
-        delta_T = compute_adiabatic_temperature_rise(gamma_total, sigma_avg, rho_cp, chi)
+        delta_T = compute_adiabatic_temperature_rise(
+            gamma_total, sigma_avg, rho_cp, chi
+        )
         assert jnp.isclose(delta_T, 0.0)
 
     def test_adiabatic_rise_formula(self):
@@ -231,7 +233,9 @@ class TestAdiabaticTemperatureRise:
         rho_cp = 4e6
         chi = 0.9
 
-        delta_T = compute_adiabatic_temperature_rise(gamma_total, sigma_avg, rho_cp, chi)
+        delta_T = compute_adiabatic_temperature_rise(
+            gamma_total, sigma_avg, rho_cp, chi
+        )
 
         expected = chi * 1000.0 * 10.0 / rho_cp
         assert jnp.isclose(delta_T, expected)

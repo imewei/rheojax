@@ -30,8 +30,6 @@ jax, jnp = safe_import_jax()
 
 from rheojax.models.fikh._caputo import (
     compute_l1_coefficients,
-    create_history_buffer,
-    fractional_derivative_with_short_memory,
     update_history_buffer,
 )
 from rheojax.models.fikh._thermal import (
@@ -436,9 +434,7 @@ def fikh_return_step_thermal(
 
     # Temperature and structure dependent yield stress
     sigma_y_base = sigma_y0 + delta_sigma_y * lam_n
-    sigma_y_current = thermal_yield_stress(
-        sigma_y_base, lam_n, m_y, T_n, T_ref, E_y
-    )
+    sigma_y_current = thermal_yield_stress(sigma_y_base, lam_n, m_y, T_n, T_ref, E_y)
 
     # Shear rate
     dt_safe = jnp.maximum(dt, 1e-15)
@@ -624,10 +620,9 @@ def fikh_maxwell_ode_rhs(
 
     # Backstress rate (Armstrong-Frederick)
     alpha_abs = jnp.abs(alpha)
-    d_alpha = (
-        C * jnp.abs(gamma_dot_p) * sign_xi
-        - gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * jnp.abs(gamma_dot_p)
-    )
+    d_alpha = C * jnp.abs(gamma_dot_p) * sign_xi - gamma_dyn * jnp.power(
+        alpha_abs + 1e-20, m - 1
+    ) * alpha * jnp.abs(gamma_dot_p)
 
     # Plastic strain rate
     d_gamma_p = jnp.abs(gamma_dot_p)
@@ -641,7 +636,9 @@ def fikh_maxwell_ode_rhs(
 
     if include_thermal:
         # Temperature rate
-        d_T = temperature_evolution_rate(T, sigma, jnp.abs(gamma_dot_p), T_env, rho_cp, chi, h)
+        d_T = temperature_evolution_rate(
+            T, sigma, jnp.abs(gamma_dot_p), T_env, rho_cp, chi, h
+        )
         return jnp.array([d_sigma, d_alpha, d_T, d_gamma_p, d_lam])
     else:
         return jnp.array([d_sigma, d_alpha, d_gamma_p, d_lam])
@@ -732,10 +729,9 @@ def fikh_creep_ode_rhs(
 
     # Backstress rate
     alpha_abs = jnp.abs(alpha)
-    d_alpha = (
-        C * jnp.abs(gamma_dot_p) * sign_xi
-        - gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * jnp.abs(gamma_dot_p)
-    )
+    d_alpha = C * jnp.abs(gamma_dot_p) * sign_xi - gamma_dyn * jnp.power(
+        alpha_abs + 1e-20, m - 1
+    ) * alpha * jnp.abs(gamma_dot_p)
 
     # Plastic strain rate
     d_gamma_p = jnp.abs(gamma_dot_p)
@@ -746,7 +742,9 @@ def fikh_creep_ode_rhs(
     d_lam = fractional_structure_rhs(lam, jnp.abs(gamma_dot_p), tau_eff, Gamma_thix)
 
     if include_thermal:
-        d_T = temperature_evolution_rate(T, sigma, jnp.abs(gamma_dot_p), T_env, rho_cp, chi, h)
+        d_T = temperature_evolution_rate(
+            T, sigma, jnp.abs(gamma_dot_p), T_env, rho_cp, chi, h
+        )
         return jnp.array([d_gamma, d_alpha, d_T, d_gamma_p, d_lam])
     else:
         return jnp.array([d_gamma, d_alpha, d_gamma_p, d_lam])

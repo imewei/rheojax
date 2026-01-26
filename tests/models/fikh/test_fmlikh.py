@@ -98,7 +98,15 @@ class TestFMLIKHParameters:
         """Test shared parameters are preserved."""
         model = FMLIKH(n_modes=2, include_thermal=False)
 
-        shared_params = ["sigma_y0", "delta_sigma_y", "tau_thix", "Gamma", "eta_inf", "mu_p", "m"]
+        shared_params = [
+            "sigma_y0",
+            "delta_sigma_y",
+            "tau_thix",
+            "Gamma",
+            "eta_inf",
+            "mu_p",
+            "m",
+        ]
         for param in shared_params:
             assert param in model.parameters, f"Missing shared param: {param}"
 

@@ -19,7 +19,6 @@ import numpy as np
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.core.parameters import ParameterSet
 from rheojax.core.test_modes import TestMode
 from rheojax.logging import get_logger
 from rheojax.models.fractional.fractional_mixin import (
@@ -406,7 +405,10 @@ class FIKHBase(BaseModel, FractionalModelMixin):
         """
         import diffrax
 
-        from rheojax.models.fikh._kernels import fikh_creep_ode_rhs, fikh_maxwell_ode_rhs
+        from rheojax.models.fikh._kernels import (
+            fikh_creep_ode_rhs,
+            fikh_maxwell_ode_rhs,
+        )
 
         # Build args
         args = dict(params)
@@ -415,7 +417,9 @@ class FIKHBase(BaseModel, FractionalModelMixin):
         # Select ODE function and initial state
         if mode == "creep":
             ode_fn = fikh_creep_ode_rhs
-            args["sigma_applied"] = sigma_applied if sigma_applied is not None else 100.0
+            args["sigma_applied"] = (
+                sigma_applied if sigma_applied is not None else 100.0
+            )
             y0 = self._get_initial_state(mode, params, T_init, lambda_0=1.0)
         elif mode == "relaxation":
             ode_fn = fikh_maxwell_ode_rhs
@@ -425,7 +429,9 @@ class FIKHBase(BaseModel, FractionalModelMixin):
                 if sigma_0 is not None
                 else params.get("sigma_y0", 10.0) + params.get("delta_sigma_y", 50.0)
             )
-            y0 = self._get_initial_state(mode, params, T_init, sigma_0=sigma_init, lambda_0=0.5)
+            y0 = self._get_initial_state(
+                mode, params, T_init, sigma_0=sigma_init, lambda_0=0.5
+            )
         else:  # startup
             ode_fn = fikh_maxwell_ode_rhs
             args["gamma_dot"] = gamma_dot if gamma_dot is not None else 1.0
