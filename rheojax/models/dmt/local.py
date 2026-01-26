@@ -1106,3 +1106,298 @@ class DMTLocal(DMTBase):
             self.parameters.set_value(name, value)
 
         return t, jnp.array(stress), jnp.array(lam)
+
+    def model_function(self, X, params, test_mode=None):
+        """NumPyro/BayesianMixin model function for DMT.
+
+        Routes to appropriate JAX-traceable prediction based on test_mode.
+        Required by BayesianMixin for NumPyro NUTS sampling.
+
+        Parameters
+        ----------
+        X : array-like
+            Independent variable (shear rate, time, or frequency)
+        params : array-like
+            Parameter values in ParameterSet order
+        test_mode : str, optional
+            Override stored test mode
+
+        Returns
+        -------
+        jnp.ndarray
+            Predicted response (stress, strain, or complex modulus)
+        """
+        p_values = dict(zip(self.parameters.keys(), params, strict=True))
+        mode = test_mode or self._test_mode
+        if mode is None:
+            mode = "flow_curve"
+
+        X_jax = jnp.asarray(X, dtype=jnp.float64)
+
+        if mode in ["steady_shear", "rotation", "flow_curve"]:
+            return self._model_function_flow_curve(X_jax, p_values)
+        elif mode == "oscillation":
+            return self._model_function_oscillation(X_jax, p_values)
+        elif mode == "startup":
+            return self._model_function_startup(X_jax, p_values)
+        elif mode == "relaxation":
+            return self._model_function_relaxation(X_jax, p_values)
+        elif mode == "creep":
+            return self._model_function_creep(X_jax, p_values)
+        elif mode == "laos":
+            return self._model_function_laos(X_jax, p_values)
+        else:
+            raise ValueError(f"Unsupported test mode for DMT: {mode}")
+
+    def _model_function_flow_curve(self, X_jax, p_values):
+        """Flow curve prediction: σ(γ̇) at steady state."""
+        if self.closure == "exponential":
+            return steady_stress_exponential(
+                X_jax, p_values["eta_0"], p_values["eta_inf"],
+                p_values["a"], p_values["c"],
+            )
+        else:
+            return steady_stress_herschel_bulkley(
+                X_jax, p_values["tau_y0"], p_values["K0"],
+                p_values["n_flow"], p_values["eta_inf"],
+                p_values["a"], p_values["c"],
+                p_values["m1"], p_values["m2"],
+            )
+
+    def _model_function_oscillation(self, X_jax, p_values):
+        """SAOS prediction: G*(ω) = G'(ω) + jG''(ω)."""
+        lam_0 = getattr(self, "_saos_lam_0", 1.0)
+
+        G = elastic_modulus(lam_0, p_values["G0"], p_values["m_G"])
+
+        if self.closure == "exponential":
+            eta = viscosity_exponential(
+                lam_0, p_values["eta_0"], p_values["eta_inf"]
+            )
+        else:
+            eta = viscosity_herschel_bulkley_regularized(
+                lam_0, 1e-6, p_values["tau_y0"], p_values["K0"],
+                p_values["n_flow"], p_values["eta_inf"],
+                p_values["m1"], p_values["m2"],
+            )
+
+        theta_1 = eta / jnp.maximum(G, 1e-10)
+        G_prime, G_double_prime = saos_moduli_maxwell(
+            X_jax, G, theta_1, p_values["eta_inf"]
+        )
+        return G_prime + 1j * G_double_prime
+
+    def _model_function_startup(self, X_jax, p_values):
+        """Startup shear prediction: σ(t) at constant γ̇."""
+        gamma_dot = getattr(self, "_gamma_dot_applied", 1.0)
+        lam_init = getattr(self, "_startup_lam_init", 1.0)
+        dt = X_jax[1] - X_jax[0]
+        n_steps = X_jax.shape[0]
+
+        if self.include_elasticity:
+            def step(state, _):
+                sigma, lam = state
+                dlam = structure_evolution(
+                    lam, gamma_dot, p_values["t_eq"],
+                    p_values["a"], p_values["c"],
+                )
+                lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                G = elastic_modulus(lam_new, p_values["G0"], p_values["m_G"])
+                if self.closure == "exponential":
+                    eta = viscosity_exponential(
+                        lam_new, p_values["eta_0"], p_values["eta_inf"]
+                    )
+                else:
+                    eta = viscosity_herschel_bulkley_regularized(
+                        lam_new, gamma_dot, p_values["tau_y0"], p_values["K0"],
+                        p_values["n_flow"], p_values["eta_inf"],
+                        p_values["m1"], p_values["m2"],
+                    )
+                theta_1 = eta / jnp.maximum(G, 1e-10)
+                dsigma = maxwell_stress_evolution(sigma, gamma_dot, G, theta_1)
+                sigma_new = sigma + dt * dsigma
+                return (sigma_new, lam_new), sigma_new
+
+            init_state = (jnp.float64(0.0), jnp.float64(lam_init))
+            _, stress = jax.lax.scan(step, init_state, None, length=n_steps)
+        else:
+            def step(lam, _):
+                dlam = structure_evolution(
+                    lam, gamma_dot, p_values["t_eq"],
+                    p_values["a"], p_values["c"],
+                )
+                lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                if self.closure == "exponential":
+                    eta = viscosity_exponential(
+                        lam_new, p_values["eta_0"], p_values["eta_inf"]
+                    )
+                else:
+                    eta = viscosity_herschel_bulkley_regularized(
+                        lam_new, gamma_dot, p_values["tau_y0"], p_values["K0"],
+                        p_values["n_flow"], p_values["eta_inf"],
+                        p_values["m1"], p_values["m2"],
+                    )
+                return lam_new, eta * gamma_dot
+
+            _, stress = jax.lax.scan(
+                step, jnp.float64(lam_init), None, length=n_steps
+            )
+
+        return stress
+
+    def _model_function_relaxation(self, X_jax, p_values):
+        """Stress relaxation prediction: σ(t) after cessation of shear."""
+        sigma_init = getattr(self, "_relax_sigma_init", 100.0)
+        lam_init = getattr(self, "_relax_lam_init", 0.5)
+        dt = X_jax[1] - X_jax[0]
+        n_steps = X_jax.shape[0]
+
+        def step(state, _):
+            sigma, lam = state
+            # Structure recovery only (γ̇ = 0)
+            dlam = (1.0 - lam) / p_values["t_eq"]
+            lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+
+            G = elastic_modulus(lam_new, p_values["G0"], p_values["m_G"])
+
+            if self.closure == "exponential":
+                eta = viscosity_exponential(
+                    lam_new, p_values["eta_0"], p_values["eta_inf"]
+                )
+            else:
+                # HB at zero shear rate
+                eta = p_values["eta_inf"]
+
+            theta_1 = eta / jnp.maximum(G, 1e-10)
+            dsigma = -sigma / jnp.maximum(theta_1, 1e-12)
+            sigma_new = sigma + dt * dsigma
+            return (sigma_new, lam_new), sigma_new
+
+        init_state = (jnp.float64(sigma_init), jnp.float64(lam_init))
+        _, stress = jax.lax.scan(step, init_state, None, length=n_steps)
+        return stress
+
+    def _model_function_creep(self, X_jax, p_values):
+        """Creep prediction: γ(t) at constant σ₀."""
+        sigma_0 = getattr(self, "_sigma_applied", 50.0)
+        lam_init = getattr(self, "_creep_lam_init", 1.0)
+        dt = X_jax[1] - X_jax[0]
+        n_steps = X_jax.shape[0]
+
+        if self.include_elasticity:
+            def step(state, _):
+                lam, gamma_v, lam_prev = state
+                G = elastic_modulus(lam, p_values["G0"], p_values["m_G"])
+                gamma_e = sigma_0 / jnp.maximum(G, 1e-10)
+
+                if self.closure == "exponential":
+                    gamma_dot_v = invert_stress_for_gamma_dot_exponential(
+                        sigma_0, lam, p_values["eta_0"], p_values["eta_inf"]
+                    )
+                else:
+                    gamma_dot_v = invert_stress_for_gamma_dot_hb(
+                        sigma_0, lam, p_values["tau_y0"], p_values["K0"],
+                        p_values["n_flow"], p_values["eta_inf"],
+                        p_values["m1"], p_values["m2"],
+                    )
+
+                dlam = structure_evolution(
+                    lam, gamma_dot_v, p_values["t_eq"],
+                    p_values["a"], p_values["c"],
+                )
+                lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                gamma_v_new = gamma_v + dt * gamma_dot_v
+                gamma_total = gamma_e + gamma_v_new
+                return (lam_new, gamma_v_new, lam), gamma_total
+
+            init_state = (
+                jnp.float64(lam_init), jnp.float64(0.0), jnp.float64(lam_init)
+            )
+            _, gamma = jax.lax.scan(step, init_state, None, length=n_steps)
+        else:
+            def step(state, _):
+                lam, gamma = state
+                if self.closure == "exponential":
+                    gamma_dot = invert_stress_for_gamma_dot_exponential(
+                        sigma_0, lam, p_values["eta_0"], p_values["eta_inf"]
+                    )
+                else:
+                    gamma_dot = invert_stress_for_gamma_dot_hb(
+                        sigma_0, lam, p_values["tau_y0"], p_values["K0"],
+                        p_values["n_flow"], p_values["eta_inf"],
+                        p_values["m1"], p_values["m2"],
+                    )
+
+                dlam = structure_evolution(
+                    lam, gamma_dot, p_values["t_eq"],
+                    p_values["a"], p_values["c"],
+                )
+                lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                gamma_new = gamma + dt * gamma_dot
+                return (lam_new, gamma_new), gamma_new
+
+            init_state = (jnp.float64(lam_init), jnp.float64(0.0))
+            _, gamma = jax.lax.scan(step, init_state, None, length=n_steps)
+
+        return gamma
+
+    def _model_function_laos(self, X_jax, p_values):
+        """LAOS prediction: σ(t) under oscillatory strain."""
+        gamma_0 = getattr(self, "_gamma_0", 0.1)
+        omega = getattr(self, "_omega_laos", 1.0)
+        lam_init = getattr(self, "_laos_lam_init", 1.0)
+
+        # Compute strain rate from time array
+        strain_rate = gamma_0 * omega * jnp.cos(omega * X_jax)
+        dt = X_jax[1] - X_jax[0]
+
+        if self.include_elasticity:
+            def step(state, sr):
+                sigma, lam = state
+                dlam = structure_evolution(
+                    lam, sr, p_values["t_eq"],
+                    p_values["a"], p_values["c"],
+                )
+                lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                G = elastic_modulus(lam_new, p_values["G0"], p_values["m_G"])
+                if self.closure == "exponential":
+                    eta = viscosity_exponential(
+                        lam_new, p_values["eta_0"], p_values["eta_inf"]
+                    )
+                else:
+                    eta = viscosity_herschel_bulkley_regularized(
+                        lam_new, sr, p_values["tau_y0"], p_values["K0"],
+                        p_values["n_flow"], p_values["eta_inf"],
+                        p_values["m1"], p_values["m2"],
+                    )
+                theta_1 = eta / jnp.maximum(G, 1e-10)
+                dsigma = maxwell_stress_evolution(sigma, sr, G, theta_1)
+                sigma_new = sigma + dt * dsigma
+                return (sigma_new, lam_new), sigma_new
+
+            init_state = (jnp.float64(0.0), jnp.float64(lam_init))
+            _, stress = jax.lax.scan(step, init_state, strain_rate)
+        else:
+            def step(lam, sr):
+                dlam = structure_evolution(
+                    lam, sr, p_values["t_eq"],
+                    p_values["a"], p_values["c"],
+                )
+                lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                if self.closure == "exponential":
+                    eta = viscosity_exponential(
+                        lam_new, p_values["eta_0"], p_values["eta_inf"]
+                    )
+                else:
+                    eta = viscosity_herschel_bulkley_regularized(
+                        lam_new, sr, p_values["tau_y0"], p_values["K0"],
+                        p_values["n_flow"], p_values["eta_inf"],
+                        p_values["m1"], p_values["m2"],
+                    )
+                return lam_new, eta * sr
+
+            _, stress = jax.lax.scan(
+                step, jnp.float64(lam_init), strain_rate
+            )
+
+        return stress

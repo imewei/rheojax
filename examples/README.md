@@ -14,11 +14,12 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - Advanced transforms for experimental data analysis (including SRFS)
 - **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**29 Tutorial Notebooks** (all complete ✅) organized into 4 learning paths:
+**35 Tutorial Notebooks** (all complete ✅) organized into 5 learning paths:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
 - **Transform Workflows** (7 notebooks ✅) - Data analysis techniques (+ SRFS)
 - **Bayesian Inference** (7 notebooks ✅) - Uncertainty quantification
 - **Advanced Workflows** (9 notebooks ✅) - Production patterns (+ SGR)
+- **DMT Thixotropic Models** (6 notebooks ✅) - Structural-kinetics thixotropy across all 6 protocols
 
 ## Prerequisites
 
@@ -223,6 +224,32 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 - GPU tests marked with `@pytest.mark.gpu` and skip gracefully if unavailable
 - CPU-only execution provided as fallback in all notebooks
 
+### Phase 5: DMT Thixotropic Models
+
+Comprehensive tutorials for the de Souza Mendes-Thompson (DMT) structural-kinetics thixotropic model across all 6 rheological protocols with NLSQ → NUTS Bayesian inference pipelines.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-dmt-flow-curve.ipynb](dmt/01_dmt_flow_curve.ipynb)** | Flow curve | Real emulsion φ=0.80 | Exponential vs HB closure, equilibrium structure λ_eq(γ̇), closure comparison |
+| **[02-dmt-startup-shear.ipynb](dmt/02_dmt_startup_shear.ipynb)** | Startup shear | Synthetic (calibrated) | Stress overshoot, Maxwell backbone, structure breakdown λ(t) |
+| **[03-dmt-stress-relaxation.ipynb](dmt/03_dmt_stress_relaxation.ipynb)** | Relaxation | Real laponite clay | Structure recovery, multi-aging-time analysis, accelerating relaxation |
+| **[04-dmt-creep.ipynb](dmt/04_dmt_creep.ipynb)** | Creep | Real mucus | Viscosity bifurcation, delayed yielding, Maxwell elastic jump |
+| **[05-dmt-saos.ipynb](dmt/05_dmt_saos.ipynb)** | SAOS | Synthetic (calibrated) | G'/G'' crossover, preshear effects, identifiability limits, Cole-Cole |
+| **[06-dmt-laos.ipynb](dmt/06_dmt_laos.ipynb)** | LAOS | Synthetic (calibrated) | Lissajous-Bowditch, Fourier harmonics, intra-cycle structure |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — calibrates parameters for Notebooks 02, 05, 06
+2. **03-relaxation** and **04-creep** use independent real data and can be done in any order
+3. Complete with **05-saos** and **06-laos** for linear/nonlinear oscillatory analysis
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data sources:**
+- Real: emulsion flow curve, laponite clay relaxation (5 aging times), mucus creep compliance
+- Synthetic: startup, SAOS, and LAOS from parameters calibrated to the real emulsion data (3% noise)
+
 ## Quick Reference
 
 ### By Topic
@@ -257,6 +284,12 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 | TRIOS Chunking | [advanced/07-trios_chunked_reading_example](advanced/07-trios_chunked_reading_example.ipynb) | Advanced | ✅ Complete |
 | Generalized Maxwell | [advanced/08-generalized_maxwell_fitting](advanced/08-generalized_maxwell_fitting.ipynb) | Advanced | ✅ Complete |
 | SGR Models | [advanced/09-sgr-soft-glassy-rheology](advanced/09-sgr-soft-glassy-rheology.ipynb) | Advanced | ✅ Complete |
+| DMT Flow Curve | [dmt/01-dmt-flow-curve](dmt/01_dmt_flow_curve.ipynb) | DMT | ✅ Complete |
+| DMT Startup Shear | [dmt/02-dmt-startup-shear](dmt/02_dmt_startup_shear.ipynb) | DMT | ✅ Complete |
+| DMT Stress Relaxation | [dmt/03-dmt-stress-relaxation](dmt/03_dmt_stress_relaxation.ipynb) | DMT | ✅ Complete |
+| DMT Creep | [dmt/04-dmt-creep](dmt/04_dmt_creep.ipynb) | DMT | ✅ Complete |
+| DMT SAOS | [dmt/05-dmt-saos](dmt/05_dmt_saos.ipynb) | DMT | ✅ Complete |
+| DMT LAOS | [dmt/06-dmt-laos](dmt/06_dmt_laos.ipynb) | DMT | ✅ Complete |
 
 ### By API Level
 

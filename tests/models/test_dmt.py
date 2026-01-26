@@ -641,23 +641,137 @@ class TestDMTNonlocal:
 
 
 class TestDMTBayesian:
-    """Test Bayesian inference for DMT models."""
+    """Test model_function and Bayesian inference for DMT models."""
+
+    # --- model_function: flow_curve ---
+
+    def test_model_function_flow_curve_exponential(self, dmt_exponential):
+        """Test model_function returns correct flow curve (exponential)."""
+        gamma_dot = jnp.logspace(-1, 2, 20)
+        params = jnp.array([v.value for v in dmt_exponential.parameters.values()])
+        stress = dmt_exponential.model_function(gamma_dot, params, "flow_curve")
+
+        assert stress.shape == (20,)
+        assert jnp.all(jnp.isfinite(stress))
+        assert jnp.all(stress > 0)
+
+        # Compare with direct kernel
+        ref = dmt_exponential._predict_flow_curve(np.array(gamma_dot))
+        np.testing.assert_allclose(np.array(stress), ref, rtol=1e-6)
+
+    def test_model_function_flow_curve_hb(self, dmt_herschel_bulkley):
+        """Test model_function returns correct flow curve (HB)."""
+        gamma_dot = jnp.logspace(-1, 2, 20)
+        params = jnp.array(
+            [v.value for v in dmt_herschel_bulkley.parameters.values()]
+        )
+        stress = dmt_herschel_bulkley.model_function(
+            gamma_dot, params, "flow_curve"
+        )
+
+        assert stress.shape == (20,)
+        assert jnp.all(jnp.isfinite(stress))
+        assert jnp.all(stress > 0)
+
+    # --- model_function: startup ---
+
+    def test_model_function_startup(self, dmt_exponential):
+        """Test model_function returns correct startup stress."""
+        t = jnp.linspace(0, 10, 100)
+        dmt_exponential._gamma_dot_applied = 10.0
+        dmt_exponential._startup_lam_init = 1.0
+        params = jnp.array([v.value for v in dmt_exponential.parameters.values()])
+
+        stress = dmt_exponential.model_function(t, params, "startup")
+
+        assert stress.shape == (100,)
+        assert jnp.all(jnp.isfinite(stress))
+        # Stress should be positive for positive shear rate
+        assert jnp.all(stress > 0)
+
+    # --- model_function: relaxation ---
+
+    def test_model_function_relaxation(self, dmt_exponential):
+        """Test model_function returns correct relaxation stress."""
+        t = jnp.linspace(0, 50, 200)
+        dmt_exponential._relax_sigma_init = 200.0
+        dmt_exponential._relax_lam_init = 0.5
+        params = jnp.array([v.value for v in dmt_exponential.parameters.values()])
+
+        stress = dmt_exponential.model_function(t, params, "relaxation")
+
+        assert stress.shape == (200,)
+        assert jnp.all(jnp.isfinite(stress))
+        # Stress should decay
+        assert float(stress[-1]) < float(stress[0])
+
+    # --- model_function: oscillation ---
+
+    def test_model_function_oscillation(self, dmt_exponential):
+        """Test model_function returns complex modulus for SAOS."""
+        omega = jnp.logspace(-2, 2, 30)
+        dmt_exponential._saos_lam_0 = 1.0
+        params = jnp.array([v.value for v in dmt_exponential.parameters.values()])
+
+        G_star = dmt_exponential.model_function(omega, params, "oscillation")
+
+        assert G_star.shape == (30,)
+        assert jnp.iscomplexobj(G_star)
+        G_prime = jnp.real(G_star)
+        G_double_prime = jnp.imag(G_star)
+        assert jnp.all(G_prime >= 0)
+        assert jnp.all(G_double_prime >= 0)
+
+    # --- model_function: laos ---
+
+    def test_model_function_laos(self, dmt_exponential):
+        """Test model_function returns LAOS stress waveform."""
+        omega = 1.0
+        gamma_0 = 0.1
+        n_cycles = 3
+        points_per_cycle = 64
+        t = jnp.linspace(
+            0, n_cycles * 2 * np.pi / omega, n_cycles * points_per_cycle
+        )
+        dmt_exponential._gamma_0 = gamma_0
+        dmt_exponential._omega_laos = omega
+        dmt_exponential._laos_lam_init = 1.0
+        params = jnp.array([v.value for v in dmt_exponential.parameters.values()])
+
+        stress = dmt_exponential.model_function(t, params, "laos")
+
+        assert stress.shape == t.shape
+        assert jnp.all(jnp.isfinite(stress))
+
+    # --- fit_bayesian smoke test ---
 
     @pytest.mark.slow
-    def test_bayesian_flow_curve_fit(self, dmt_exponential, mcmc_config):
-        """Test Bayesian fitting to flow curve data."""
-        # Generate synthetic data
-        gamma_dot_true = np.logspace(-1, 2, 15)
-        stress_true = dmt_exponential._predict_flow_curve(gamma_dot_true)
+    def test_fit_bayesian_flow_curve(self, dmt_exponential, mcmc_config):
+        """Smoke test: fit_bayesian works end-to-end for flow curve."""
+        gamma_dot = np.logspace(-1, 2, 15)
+        stress_true = dmt_exponential._predict_flow_curve(gamma_dot)
 
-        # Add noise
         np.random.seed(42)
         stress_noisy = stress_true * (1 + 0.05 * np.random.randn(len(stress_true)))
 
-        # This test would require implementing fit_bayesian for DMT
-        # For now, just verify the model can be fitted with NLSQ
-        dmt_exponential._fit_flow_curve(gamma_dot_true, stress_noisy)
+        # First fit with NLSQ for warm-start
+        dmt_exponential._fit_flow_curve(gamma_dot, stress_noisy)
         assert dmt_exponential._fitted
+
+        # Now run Bayesian inference
+        result = dmt_exponential.fit_bayesian(
+            gamma_dot,
+            stress_noisy,
+            test_mode="flow_curve",
+            num_warmup=mcmc_config["num_warmup"],
+            num_samples=mcmc_config["num_samples"],
+            num_chains=mcmc_config["num_chains"],
+            seed=42,
+        )
+
+        assert result is not None
+        assert result.posterior_samples is not None
+        assert len(result.posterior_samples) > 0
 
 
 # =============================================================================
