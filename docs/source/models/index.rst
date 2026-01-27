@@ -106,3 +106,9 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    :caption: de Souza Mendes-Thompson (DMT)
 
    dmt/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Transient Network Theory (TNT)
+
+   tnt/index

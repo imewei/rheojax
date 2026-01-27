@@ -1,6 +1,6 @@
 """Rheological models package.
 
-This package contains 33 rheological models organized into 13 categories.
+This package contains 37 rheological models organized into 13 categories.
 
 Classical Models (3):
     - Maxwell: Spring and dashpot in series
@@ -68,6 +68,13 @@ FIKH (Fractional IKH) Models (2):
 Giesekus Nonlinear Viscoelastic Models (2):
     - GiesekusSingleMode: Single-mode Giesekus with shear-thinning and normal stresses
     - GiesekusMultiMode: Multi-mode extension with N relaxation times
+
+Transient Network Theory (TNT) Models (5):
+    - TNTSingleMode: Composable single-mode network model (basic, Bell, FENE, NonAffine)
+    - TNTLoopBridge: Two-species loop-bridge kinetics for telechelic polymers
+    - TNTStickyRouse: Multi-mode with sticker kinetics for ionomers
+    - TNTCates: Living polymers (wormlike micelles) with reptation + breakage
+    - TNTMultiSpecies: Multiple bond types with different lifetimes
 
 Usage:
     >>> from rheojax.models import Maxwell, Zener, SpringPot
@@ -171,6 +178,15 @@ from rheojax.models.spp import SPPYieldStress
 # STZ models
 from rheojax.models.stz import STZConventional
 
+# TNT (Transient Network Theory) models
+from rheojax.models.tnt import (
+    TNTCates,
+    TNTLoopBridge,
+    TNTMultiSpecies,
+    TNTSingleMode,
+    TNTStickyRouse,
+)
+
 __all__ = [
     # Classical models
     "Maxwell",
@@ -239,4 +255,10 @@ __all__ = [
     # Giesekus nonlinear viscoelastic models
     "GiesekusSingleMode",
     "GiesekusMultiMode",
+    # TNT (Transient Network Theory) models
+    "TNTSingleMode",
+    "TNTLoopBridge",
+    "TNTStickyRouse",
+    "TNTCates",
+    "TNTMultiSpecies",
 ]

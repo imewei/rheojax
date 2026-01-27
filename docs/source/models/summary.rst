@@ -339,6 +339,88 @@ The table below provides a comprehensive overview of all models across key chara
      - N/A
      - LAOS-based yield stress analysis (Rogers et al.)
 
+   * - :doc:`TNT Tanaka-Edwards </models/tnt/tnt_tanaka_edwards>`
+     - TNT
+     - 3
+     - R, C, O, Flow, Startup, LAOS
+     - Assoc. Polymer
+     - No
+     - ★★☆☆☆
+     - N/A
+     - Baseline transient network (Maxwell via conformation tensor)
+   * - :doc:`TNT Bell </models/tnt/tnt_bell>`
+     - TNT
+     - 4
+     - R, C, O, Flow, Startup, LAOS
+     - Assoc. Polymer
+     - No
+     - ★★★☆☆
+     - :math:`\nu`: 0.01-20
+     - Force-dependent bond breakage, shear-thinning networks
+   * - :doc:`TNT FENE-P </models/tnt/tnt_fene_p>`
+     - TNT
+     - 4
+     - R, C, O, Flow, Startup, LAOS
+     - Assoc. Polymer
+     - No
+     - ★★★☆☆
+     - :math:`L_{max}`: 2-100
+     - Finite extensibility, strain hardening at large deformations
+   * - :doc:`TNT Non-Affine </models/tnt/tnt_non_affine>`
+     - TNT
+     - 4
+     - R, C, O, Flow, Startup, LAOS
+     - Assoc. Polymer
+     - No
+     - ★★★☆☆
+     - :math:`\xi`: 0-1
+     - Non-affine chain slip, non-zero :math:`N_2`
+   * - :doc:`TNT Stretch-Creation </models/tnt/tnt_stretch_creation>`
+     - TNT
+     - 4
+     - R, C, O, Flow, Startup, LAOS
+     - Assoc. Polymer
+     - No
+     - ★★★☆☆
+     - :math:`\kappa`: 0-5
+     - Flow-enhanced bond formation, shear thickening
+   * - :doc:`TNT Loop-Bridge </models/tnt/tnt_loop_bridge>`
+     - TNT
+     - 6
+     - R, C, O, Flow, Startup, LAOS
+     - Telechelic
+     - No
+     - ★★★★☆
+     - N/A
+     - Two-species kinetics (loops + bridges), telechelic polymers
+   * - :doc:`TNT Sticky Rouse </models/tnt/tnt_sticky_rouse>`
+     - TNT
+     - 4-6
+     - R, C, O, Flow, Startup, LAOS
+     - Multi-sticker
+     - No
+     - ★★★★☆
+     - N/A
+     - Multi-mode sticker dynamics, broad relaxation spectrum
+   * - :doc:`TNT Cates </models/tnt/tnt_cates>`
+     - TNT
+     - 4
+     - R, C, O, Flow, Startup, LAOS
+     - Micelles
+     - No
+     - ★★★☆☆
+     - N/A
+     - Living polymers, wormlike micelles (:math:`\tau_d = \sqrt{\tau_{rep} \cdot \tau_{break}}`)
+   * - :doc:`TNT Multi-Species </models/tnt/tnt_multi_species>`
+     - TNT
+     - 2N+1
+     - R, C, O, Flow, Startup, LAOS
+     - Mixed Network
+     - No
+     - ★★★★☆
+     - N/A
+     - Heterogeneous networks with multiple bond types
+
 **Legend:**
 
 * **Test Modes:** R = Relaxation, C = Creep, O = Oscillation, Rot = Rotation (steady shear), Flow = Flow curve, Startup = Startup shear, LAOS = Large-amplitude oscillatory
@@ -666,6 +748,39 @@ DMT Thixotropic Models (2 models)
 **Typical applications:** Drilling muds, waxy crude oils, cement pastes, mayonnaise, ketchup, paints, concentrated suspensions.
 
 
+Transient Network Theory Models (9 variants across 5 classes)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**When to use:** Associating polymers, physical gels, telechelic networks, wormlike micelles, living polymers, bio-networks with reversible crosslinks, any material with bond-mediated viscoelasticity.
+
+**Advantages:**
+
+* Molecular-level physics: conformation tensor tracks chain stretch and orientation
+* Composable variants: Bell + FENE + slip can be combined in a single model
+* Full protocol support: all 6 test modes (flow curve, SAOS, startup, relaxation, creep, LAOS)
+* GPU-accelerated ODE integration via Diffrax with JAX JIT compilation
+* Complete Bayesian inference pipeline (NLSQ → NUTS)
+
+**Key physics:**
+
+* Conformation tensor :math:`\mathbf{S}` evolves via upper-convected derivative + breakage
+* Stress: :math:`\boldsymbol{\sigma} = G \cdot f(\mathbf{S}) + 2\eta_s \mathbf{D}`
+* Bond lifetime :math:`\tau_b` can be constant (Tanaka-Edwards) or force-dependent (Bell)
+* Single mode recovers Maxwell behavior; multi-mode gives broad spectra
+
+**Model selection within TNT family:**
+
+* **Start here:** TNTSingleMode (constant breakage) — 3 params, Maxwell-like baseline
+* **Shear thinning:** TNTSingleMode(breakage="bell") — force-dependent breakage
+* **Strain hardening:** TNTSingleMode(stress_type="fene") — finite extensibility
+* **Telechelic networks:** TNTLoopBridge — loop-bridge population kinetics
+* **Multi-sticker polymers:** TNTStickyRouse — hierarchical Rouse + sticker relaxation
+* **Wormlike micelles:** TNTCates — living polymer scission/recombination
+* **Heterogeneous networks:** TNTMultiSpecies — discrete relaxation spectrum
+
+**Typical applications:** HEUR telechelics, PEG-PEO associating polymers, fibrin and collagen bio-networks, CTAB/CPCl wormlike micelles, PVA-borax gels, supramolecular polymer networks, vitrimers.
+
+
 **Non-Newtonian classification:**
 
 1. **Shear-thinning (pseudoplastic):** Viscosity decreases with shear rate
@@ -764,6 +879,15 @@ By Material Type
    * - Shear Banding Materials
      - FluiditySaramitoNonlocal, FluidityNonlocal
      - Spatially resolved flow, cooperativity length
+   * - Associating Polymers
+     - TNTSingleMode, TNTStickyRouse
+     - Reversible crosslinks; Bell variant for shear thinning
+   * - Wormlike Micelles
+     - TNTCates, TNTSingleMode(bell)
+     - Living polymers; :math:`\tau_d = \sqrt{\tau_{rep} \cdot \tau_{break}}`
+   * - Telechelic Networks
+     - TNTLoopBridge, TNTSingleMode
+     - Loop-bridge kinetics; end-functionalized polymers
 
 By Application
 ~~~~~~~~~~~~~~
@@ -865,7 +989,7 @@ Parameter Count Comparison
 Bayesian Inference Support
 ---------------------------
 
-**All 34+ models support complete Bayesian workflows** via NumPyro NUTS sampling:
+**All 43+ models support complete Bayesian workflows** via NumPyro NUTS sampling:
 
 * `.fit()` - Fast NLSQ point estimation
 * `.fit_bayesian()` - Full posterior sampling with MCMC
@@ -886,6 +1010,7 @@ Next Steps
 * **Compatibility checking:** :doc:`/user_guide/core_concepts` (automatic detection of model-data mismatches)
 * **SGR models:** :doc:`/models/sgr/sgr_conventional` and :doc:`/models/sgr/sgr_generic`
 * **ITT-MCT models:** :doc:`/models/itt_mct/itt_mct_schematic` and :doc:`/models/itt_mct/itt_mct_isotropic` for colloidal glasses
+* **TNT models:** :doc:`/models/tnt/index` for transient network theory (associating polymers, micelles)
 * **SRFS transform:** :doc:`/transforms/srfs` for strain-rate frequency superposition
 * **Example notebooks:** 27 examples in ``examples/`` directory
 
