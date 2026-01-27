@@ -85,7 +85,7 @@ conda-env/
 Pipfile.lock
 
 # UV
-uv.lock
+
 
 # Poetry
 poetry.lock
