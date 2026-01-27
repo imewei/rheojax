@@ -14,7 +14,7 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - Advanced transforms for experimental data analysis (including SRFS)
 - **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**59 Tutorial Notebooks** (all complete ✅) organized into 9 learning paths:
+**102 Tutorial Notebooks** (all complete ✅) organized into 12 learning paths:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
 - **Transform Workflows** (7 notebooks ✅) - Data analysis techniques (+ SRFS)
 - **Bayesian Inference** (7 notebooks ✅) - Uncertainty quantification
@@ -24,6 +24,9 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - **SGR Soft Glassy Models** (6 notebooks ✅) - Soft Glassy Rheology across all 6 protocols
 - **STZ Amorphous Solid Models** (6 notebooks ✅) - Shear Transformation Zones across all 6 protocols
 - **HL Hébraud-Lequeux Models** (6 notebooks ✅) - Mean-field elastoplastic model across all 6 protocols
+- **Giesekus Viscoelastic Models** (7 notebooks ✅) - Nonlinear polymer rheology across all 6 protocols + normal stresses
+- **Fluidity Models** (24 notebooks ✅) - Comprehensive suite for FluidityLocal, FluidityNonlocal, and Saramito EVP models (including shear banding)
+- **IKH Isotropic-Kinematic Hardening Models** (12 notebooks ✅) - MIKH single-mode and MLIKH multi-mode with Armstrong-Frederick hardening
 
 ## Prerequisites
 
@@ -374,6 +377,45 @@ Comprehensive tutorials for the Hébraud-Lequeux (HL) mean-field elastoplastic m
 - Real: emulsion flow curves (6 volume fractions), laponite clay relaxation (5 aging times), polystyrene creep (5 temperatures)
 - Synthetic: SAOS, startup, and LAOS from parameters calibrated to real emulsion data (3% noise)
 
+### Phase 10: Giesekus Viscoelastic Models
+
+Comprehensive tutorials for the Giesekus viscoelastic constitutive model — a nonlinear extension of the Maxwell/UCM model with a quadratic stress term (τ·τ) that captures shear-thinning, normal stress differences, and stress overshoot phenomena in polymer solutions and melts.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-giesekus-flow-curve.ipynb](giesekus/01_giesekus_flow_curve.ipynb)** | Flow curve | Real emulsion φ=0.80 | Shear-thinning from τ·τ term, Wi_c ≈ 1/√α, single vs multi-mode |
+| **[02-giesekus-saos.ipynb](giesekus/02_giesekus_saos.ipynb)** | SAOS | Real polystyrene | α-independent linear regime, Cole-Cole plot, crossover ω_c |
+| **[03-giesekus-startup.ipynb](giesekus/03_giesekus_startup.ipynb)** | Startup shear | Synthetic (calibrated) | Stress overshoot vs Wi, effect of α, transient nonlinearity |
+| **[04-giesekus-normal-stresses.ipynb](giesekus/04_giesekus_normal_stresses.ipynb)** | Normal stresses | Synthetic | **N₂/N₁ = -α/2 relation**, α extraction, rod climbing, die swell |
+| **[05-giesekus-creep.ipynb](giesekus/05_giesekus_creep.ipynb)** | Creep | Real mucus | J(t) compliance, elastic + viscous contributions |
+| **[06-giesekus-relaxation.ipynb](giesekus/06_giesekus_relaxation.ipynb)** | Relaxation | Real polymer | Faster-than-Maxwell decay due to τ·τ dissipation |
+| **[07-giesekus-laos.ipynb](giesekus/07_giesekus_laos.ipynb)** | LAOS | Synthetic (calibrated) | Lissajous-Bowditch curves, Fourier harmonics I₃/I₁ |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — calibrates parameters for Notebooks 03, 04, 07
+2. **02-saos** demonstrates α is NOT identifiable from linear oscillation
+3. **04-normal-stresses** shows the unique N₂/N₁ = -α/2 route to α
+4. **05-creep** and **06-relaxation** use independent real data (any order)
+5. Complete with **07-laos** for full nonlinear oscillatory analysis
+
+**Key Physics:**
+- **Mobility parameter α**: Controls shear-thinning (0 = UCM, 0.5 = maximum thinning)
+- **N₂/N₁ = -α/2**: Exact theoretical relation (shear-rate independent)
+- **Critical Weissenberg**: Wi_c ≈ 1/√α for shear-thinning onset
+- **Faster relaxation**: τ·τ term provides additional dissipation
+
+**Models:**
+- **GiesekusSingleMode**: Primary model (4 parameters: η_p, λ, α, η_s)
+- **GiesekusMultiMode**: Prony spectrum for broad relaxation (NB01, NB02)
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data sources:**
+- Real: emulsion flow curve (φ=0.80), polystyrene SAOS (T=145°C), mucus creep, polymer relaxation
+- Synthetic: startup, normal stresses, and LAOS from NB01-calibrated parameters (3% noise)
+
 ## Quick Reference
 
 ### By Topic
@@ -438,6 +480,112 @@ Comprehensive tutorials for the Hébraud-Lequeux (HL) mean-field elastoplastic m
 | HL SAOS | [hl/04-hl-saos](hl/04_hl_saos.ipynb) | HL | ✅ Complete |
 | HL Startup | [hl/05-hl-startup](hl/05_hl_startup.ipynb) | HL | ✅ Complete |
 | HL LAOS | [hl/06-hl-laos](hl/06_hl_laos.ipynb) | HL | ✅ Complete |
+| Giesekus Flow Curve | [giesekus/01-giesekus-flow-curve](giesekus/01_giesekus_flow_curve.ipynb) | Giesekus | ✅ Complete |
+| Giesekus SAOS | [giesekus/02-giesekus-saos](giesekus/02_giesekus_saos.ipynb) | Giesekus | ✅ Complete |
+| Giesekus Startup Shear | [giesekus/03-giesekus-startup](giesekus/03_giesekus_startup.ipynb) | Giesekus | ✅ Complete |
+| Giesekus Normal Stresses | [giesekus/04-giesekus-normal-stresses](giesekus/04_giesekus_normal_stresses.ipynb) | Giesekus | ✅ Complete |
+| Giesekus Creep | [giesekus/05-giesekus-creep](giesekus/05_giesekus_creep.ipynb) | Giesekus | ✅ Complete |
+| Giesekus Relaxation | [giesekus/06-giesekus-relaxation](giesekus/06_giesekus_relaxation.ipynb) | Giesekus | ✅ Complete |
+| Giesekus LAOS | [giesekus/07-giesekus-laos](giesekus/07_giesekus_laos.ipynb) | Giesekus | ✅ Complete |
+| MIKH Flow Curve | [ikh/01-mikh-flow-curve](ikh/01_mikh_flow_curve.ipynb) | IKH | ✅ Complete |
+| MIKH Startup Shear | [ikh/02-mikh-startup-shear](ikh/02_mikh_startup_shear.ipynb) | IKH | ✅ Complete |
+| MIKH Stress Relaxation | [ikh/03-mikh-stress-relaxation](ikh/03_mikh_stress_relaxation.ipynb) | IKH | ✅ Complete |
+| MIKH Creep | [ikh/04-mikh-creep](ikh/04_mikh_creep.ipynb) | IKH | ✅ Complete |
+| MIKH SAOS | [ikh/05-mikh-saos](ikh/05_mikh_saos.ipynb) | IKH | ✅ Complete |
+| MIKH LAOS | [ikh/06-mikh-laos](ikh/06_mikh_laos.ipynb) | IKH | ✅ Complete |
+| MLIKH Flow Curve | [ikh/07-mlikh-flow-curve](ikh/07_mlikh_flow_curve.ipynb) | IKH | ✅ Complete |
+| MLIKH Startup Shear | [ikh/08-mlikh-startup-shear](ikh/08_mlikh_startup_shear.ipynb) | IKH | ✅ Complete |
+| MLIKH Stress Relaxation | [ikh/09-mlikh-stress-relaxation](ikh/09_mlikh_stress_relaxation.ipynb) | IKH | ✅ Complete |
+| MLIKH Creep | [ikh/10-mlikh-creep](ikh/10_mlikh_creep.ipynb) | IKH | ✅ Complete |
+| MLIKH SAOS | [ikh/11-mlikh-saos](ikh/11_mlikh_saos.ipynb) | IKH | ✅ Complete |
+| MLIKH LAOS | [ikh/12-mlikh-laos](ikh/12_mlikh_laos.ipynb) | IKH | ✅ Complete |
+
+### Phase 11: Fluidity Models (NEW)
+
+Comprehensive tutorials for the Fluidity model family for yield-stress fluids, including the Saramito elastoviscoplastic (EVP) model and non-local shear banding.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-fluidity-local-flow-curve.ipynb](fluidity/01_fluidity_local_flow_curve.ipynb)** | Flow curve | Real emulsion (6 φ) | Structure kinetics, yield stress, volume fraction sweep |
+| **[02-fluidity-local-startup.ipynb](fluidity/02_fluidity_local_startup.ipynb)** | Startup | Synthetic (calibrated) | Stress overshoot, thixotropic structure breakdown |
+| **[03-fluidity-local-creep.ipynb](fluidity/03_fluidity_local_creep.ipynb)** | Creep | Synthetic (calibrated) | Viscosity bifurcation, yield stress validation |
+| **[04-fluidity-local-relaxation.ipynb](fluidity/04_fluidity_local_relaxation.ipynb)** | Relaxation | Real laponite clay | Thixotropic aging, accelerating relaxation |
+| **[05-fluidity-local-saos.ipynb](fluidity/05_fluidity_local_saos.ipynb)** | SAOS | Real polystyrene | Linear viscoelasticity, Maxwell approximation |
+| **[06-fluidity-local-laos.ipynb](fluidity/06_fluidity_local_laos.ipynb)** | LAOS | Synthetic (calibrated) | Nonlinear response, Lissajous curves, harmonics |
+| **[07-fluidity-nonlocal-flow-curve.ipynb](fluidity/07_fluidity_nonlocal_flow_curve.ipynb)** | Flow curve | Real emulsion | Non-local diffusion, cooperativity length ξ, banding |
+| **[08-fluidity-nonlocal-startup.ipynb](fluidity/08_fluidity_nonlocal_startup.ipynb)** | Startup | Synthetic | Fluidity profile f(y,t), shear banding detection |
+| **[09-fluidity-nonlocal-creep.ipynb](fluidity/09_fluidity_nonlocal_creep.ipynb)** | Creep | Synthetic | Spatial creep compliance J(y,t), diffusion effects |
+| **[10-fluidity-nonlocal-relaxation.ipynb](fluidity/10_fluidity_nonlocal_relaxation.ipynb)** | Relaxation | Synthetic | Fluidity homogenization, spatial G(t) decay |
+| **[11-fluidity-nonlocal-saos.ipynb](fluidity/11_fluidity_nonlocal_saos.ipynb)** | SAOS | Synthetic | Spatial moduli G'(y), G''(y), diffusion effects |
+| **[12-fluidity-nonlocal-laos.ipynb](fluidity/12_fluidity_nonlocal_laos.ipynb)** | LAOS | Synthetic | Spatial LAOS, f(y,t) oscillation, harmonics |
+| **[13-saramito-local-flow-curve.ipynb](fluidity/13_saramito_local_flow_curve.ipynb)** | Flow curve | Real emulsion | Tensorial stress, EVP model, coupling modes |
+| **[14-saramito-local-startup.ipynb](fluidity/14_saramito_local_startup.ipynb)** | Startup | Synthetic | Normal stress difference N₁, Weissenberg effect |
+| **[15-saramito-local-creep.ipynb](fluidity/15_saramito_local_creep.ipynb)** | Creep | Synthetic | Elastic jump γₑ(0)=σ₀/G, Maxwell creep |
+| **[16-saramito-local-relaxation.ipynb](fluidity/16_saramito_local_relaxation.ipynb)** | Relaxation | Synthetic | Tensorial relaxation, coupling mode comparison |
+| **[17-saramito-local-saos.ipynb](fluidity/17_saramito_local_saos.ipynb)** | SAOS | Synthetic | Linear viscoelasticity, N₁ from oscillation |
+| **[18-saramito-local-laos.ipynb](fluidity/18_saramito_local_laos.ipynb)** | LAOS | Synthetic | Tensorial LAOS, N₁ evolution during cycle |
+| **[19-saramito-nonlocal-flow-curve.ipynb](fluidity/19_saramito_nonlocal_flow_curve.ipynb)** | Flow curve | Real emulsion | Full EVP + shear banding, N₁(y) localization |
+| **[20-saramito-nonlocal-startup.ipynb](fluidity/20_saramito_nonlocal_startup.ipynb)** | Startup | Synthetic | Spatial N₁(y,t), stress localization |
+| **[21-saramito-nonlocal-creep.ipynb](fluidity/21_saramito_nonlocal_creep.ipynb)** | Creep | Synthetic | Spatial creep, viscosity bifurcation |
+| **[22-saramito-nonlocal-relaxation.ipynb](fluidity/22_saramito_nonlocal_relaxation.ipynb)** | Relaxation | Synthetic | Spatial τ(y,t) decay, N₁ homogenization |
+| **[23-saramito-nonlocal-saos.ipynb](fluidity/23_saramito_nonlocal_saos.ipynb)** | SAOS | Synthetic | Spatial moduli, N₁(y) from oscillation |
+| **[24-saramito-nonlocal-laos.ipynb](fluidity/24_saramito_nonlocal_laos.ipynb)** | LAOS | Synthetic | Full spatial tensorial LAOS, complete suite |
+
+**Models:**
+- **FluidityLocal**: Basic 0D thixotropic model (9 params)
+- **FluidityNonlocal**: 1D spatial model with diffusion length ξ (10 params)
+- **FluiditySaramitoLocal**: Tensorial EVP model with N₁ predictions
+- **FluiditySaramitoNonlocal**: Full spatial tensorial model
+
+**Key Physics:**
+- **Structure Kinetics**: Competition between aging (f→f_eq) and rejuvenation (f→f_inf)
+- **Yield Stress**: Arises naturally from f→0 limit (or explicit in Saramito)
+- **Shear Banding**: Spatial localization due to non-monotonic constitutive curve + diffusion
+- **Normal Stresses**: N₁ from tensorial nature (Saramito models only)
+
+### Phase 12: IKH Isotropic-Kinematic Hardening Models
+
+Comprehensive tutorials for the Isotropic-Kinematic Hardening (IKH) model family — Armstrong-Frederick kinematic hardening with thixotropic structure evolution for complex fluids (pastes, gels, colloidal suspensions).
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-mikh-flow-curve.ipynb](ikh/01_mikh_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | Yield stress + thixotropic plateau, Herschel-Bulkley comparison |
+| **[02-mikh-startup-shear.ipynb](ikh/02_mikh_startup_shear.ipynb)** | Startup | Real (PNAS) | Stress overshoot, Armstrong-Frederick backstress, Perzyna flow |
+| **[03-mikh-stress-relaxation.ipynb](ikh/03_mikh_stress_relaxation.ipynb)** | Relaxation | Synthetic (NB01) | Maxwell backbone + plasticity, stress decomposition |
+| **[04-mikh-creep.ipynb](ikh/04_mikh_creep.ipynb)** | Creep | Real (ML-IKH) | Delayed yielding, viscosity bifurcation, Andrade regime |
+| **[05-mikh-saos.ipynb](ikh/05_mikh_saos.ipynb)** | SAOS | Synthetic (NB01) | Linear viscoelastic moduli from Maxwell backbone |
+| **[06-mikh-laos.ipynb](ikh/06_mikh_laos.ipynb)** | LAOS | Real (PNAS) | Lissajous figures, harmonic analysis, I₃/I₁ ratio |
+| **[07-mlikh-flow-curve.ipynb](ikh/07_mlikh_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | Multi-mode thixotropy, per_mode vs weighted_sum |
+| **[08-mlikh-startup-shear.ipynb](ikh/08_mlikh_startup_shear.ipynb)** | Startup | Real (PNAS) | Multi-mode overshoot, mode decomposition |
+| **[09-mlikh-stress-relaxation.ipynb](ikh/09_mlikh_stress_relaxation.ipynb)** | Relaxation | Synthetic (NB07) | Prony-series-like decay, multi-exponential relaxation |
+| **[10-mlikh-creep.ipynb](ikh/10_mlikh_creep.ipynb)** | Creep | Real (ML-IKH) | Multi-mode delayed yielding, distributed timescales |
+| **[11-mlikh-saos.ipynb](ikh/11_mlikh_saos.ipynb)** | SAOS | Synthetic (NB07) | Broadened spectra, multi-Maxwell behavior |
+| **[12-mlikh-laos.ipynb](ikh/12_mlikh_laos.ipynb)** | LAOS | Real (PNAS) | Multi-mode Lissajous, harmonic enrichment |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — calibrates parameters for Notebooks 03 and 05
+2. **02-startup**, **04-creep**, and **06-laos** use independent real data (any order)
+3. Complete with **07-mlikh-flow-curve** and multi-mode notebooks for advanced analysis
+
+**Models:**
+- **MIKH** (Single-Mode): 11 parameters — G, η, C, γ_dyn, m, σ_y0, Δσ_y, τ_thix, Γ, η_∞, μ_p
+- **MLIKH** (Multi-Mode): Two yield formulations
+  - **per_mode**: 7N + 1 params — each mode has independent yield surface
+  - **weighted_sum**: 5 + 3N params — single global yield surface
+
+**Key Physics:**
+- **Armstrong-Frederick Kinematic Hardening**: α̇ = (2/3)C·ε̇_p - γ_dyn·α·|ε̇_p|
+- **Thixotropic Structure**: λ̇ = (1-λ)/τ_thix - Γ·λ·|γ̇| (structure parameter evolution)
+- **Perzyna Regularization**: Continuous plastic flow, rate-dependent yielding
+- **Maxwell Backbone**: Viscoelastic response with plasticity
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data Sources:**
+- Real: ML-IKH Excel (Wei et al. 2018 J. Rheol), PNAS Digital Rheometer Twin (2022)
+- Synthetic: Relaxation and SAOS from calibrated flow curve parameters (3% noise)
 
 ### By API Level
 
