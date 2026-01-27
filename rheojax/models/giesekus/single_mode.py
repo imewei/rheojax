@@ -46,6 +46,7 @@ import diffrax
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.giesekus._base import GiesekusBase
 from rheojax.models.giesekus._kernels import (
@@ -64,8 +65,28 @@ jax, jnp = safe_import_jax()
 logger = logging.getLogger(__name__)
 
 
-@ModelRegistry.register("giesekus")
-@ModelRegistry.register("giesekus_single")
+@ModelRegistry.register(
+    "giesekus",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.OSCILLATION,
+        Protocol.STARTUP,
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.LAOS,
+    ],
+)
+@ModelRegistry.register(
+    "giesekus_single",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.OSCILLATION,
+        Protocol.STARTUP,
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.LAOS,
+    ],
+)
 class GiesekusSingleMode(GiesekusBase):
     """Single-mode Giesekus nonlinear viscoelastic model.
 

@@ -16,14 +16,19 @@ class TestModelRegistryDecorator:
 
     def setup_method(self):
         """Save and clear registry before each test."""
-        self._saved_state = Registry.get_instance().get_all()
-        Registry.get_instance().clear()
+        registry = Registry.get_instance()
+        # Save full PluginInfo objects, not just class and type
+        self._saved_models = dict(registry._models)
+        self._saved_transforms = dict(registry._transforms)
+        registry.clear()
 
     def teardown_method(self):
         """Restore registry state after each test."""
-        Registry.get_instance().clear()
-        for name, (plugin, plugin_type) in self._saved_state.items():
-            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
+        registry = Registry.get_instance()
+        registry.clear()
+        # Restore full PluginInfo objects directly
+        registry._models.update(self._saved_models)
+        registry._transforms.update(self._saved_transforms)
 
     def test_register_model_with_decorator(self):
         """Test @ModelRegistry.register('name') decorator."""
@@ -87,14 +92,19 @@ class TestModelRegistryFactory:
 
     def setup_method(self):
         """Save and clear registry before each test."""
-        self._saved_state = Registry.get_instance().get_all()
-        Registry.get_instance().clear()
+        registry = Registry.get_instance()
+        # Save full PluginInfo objects, not just class and type
+        self._saved_models = dict(registry._models)
+        self._saved_transforms = dict(registry._transforms)
+        registry.clear()
 
     def teardown_method(self):
         """Restore registry state after each test."""
-        Registry.get_instance().clear()
-        for name, (plugin, plugin_type) in self._saved_state.items():
-            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
+        registry = Registry.get_instance()
+        registry.clear()
+        # Restore full PluginInfo objects directly
+        registry._models.update(self._saved_models)
+        registry._transforms.update(self._saved_transforms)
 
     def test_create_model_by_name(self):
         """Test ModelRegistry.create(name) factory method."""
@@ -150,14 +160,19 @@ class TestModelRegistryDiscovery:
 
     def setup_method(self):
         """Save and clear registry before each test."""
-        self._saved_state = Registry.get_instance().get_all()
-        Registry.get_instance().clear()
+        registry = Registry.get_instance()
+        # Save full PluginInfo objects, not just class and type
+        self._saved_models = dict(registry._models)
+        self._saved_transforms = dict(registry._transforms)
+        registry.clear()
 
     def teardown_method(self):
         """Restore registry state after each test."""
-        Registry.get_instance().clear()
-        for name, (plugin, plugin_type) in self._saved_state.items():
-            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
+        registry = Registry.get_instance()
+        registry.clear()
+        # Restore full PluginInfo objects directly
+        registry._models.update(self._saved_models)
+        registry._transforms.update(self._saved_transforms)
 
     def test_list_models_empty(self):
         """Test listing models when none registered."""
@@ -225,14 +240,19 @@ class TestTransformRegistryDecorator:
 
     def setup_method(self):
         """Save and clear registry before each test."""
-        self._saved_state = Registry.get_instance().get_all()
-        Registry.get_instance().clear()
+        registry = Registry.get_instance()
+        # Save full PluginInfo objects, not just class and type
+        self._saved_models = dict(registry._models)
+        self._saved_transforms = dict(registry._transforms)
+        registry.clear()
 
     def teardown_method(self):
         """Restore registry state after each test."""
-        Registry.get_instance().clear()
-        for name, (plugin, plugin_type) in self._saved_state.items():
-            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
+        registry = Registry.get_instance()
+        registry.clear()
+        # Restore full PluginInfo objects directly
+        registry._models.update(self._saved_models)
+        registry._transforms.update(self._saved_transforms)
 
     def test_register_transform_with_decorator(self):
         """Test @TransformRegistry.register('name') decorator."""
@@ -275,14 +295,19 @@ class TestTransformRegistryFactory:
 
     def setup_method(self):
         """Save and clear registry before each test."""
-        self._saved_state = Registry.get_instance().get_all()
-        Registry.get_instance().clear()
+        registry = Registry.get_instance()
+        # Save full PluginInfo objects, not just class and type
+        self._saved_models = dict(registry._models)
+        self._saved_transforms = dict(registry._transforms)
+        registry.clear()
 
     def teardown_method(self):
         """Restore registry state after each test."""
-        Registry.get_instance().clear()
-        for name, (plugin, plugin_type) in self._saved_state.items():
-            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
+        registry = Registry.get_instance()
+        registry.clear()
+        # Restore full PluginInfo objects directly
+        registry._models.update(self._saved_models)
+        registry._transforms.update(self._saved_transforms)
 
     def test_create_transform_by_name(self):
         """Test TransformRegistry.create(name) factory method."""
@@ -328,14 +353,19 @@ class TestTransformRegistryDiscovery:
 
     def setup_method(self):
         """Save and clear registry before each test."""
-        self._saved_state = Registry.get_instance().get_all()
-        Registry.get_instance().clear()
+        registry = Registry.get_instance()
+        # Save full PluginInfo objects, not just class and type
+        self._saved_models = dict(registry._models)
+        self._saved_transforms = dict(registry._transforms)
+        registry.clear()
 
     def teardown_method(self):
         """Restore registry state after each test."""
-        Registry.get_instance().clear()
-        for name, (plugin, plugin_type) in self._saved_state.items():
-            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
+        registry = Registry.get_instance()
+        registry.clear()
+        # Restore full PluginInfo objects directly
+        registry._models.update(self._saved_models)
+        registry._transforms.update(self._saved_transforms)
 
     def test_list_transforms_empty(self):
         """Test listing transforms when none registered."""
@@ -374,14 +404,19 @@ class TestRegistryIsolation:
 
     def setup_method(self):
         """Save and clear registry before each test."""
-        self._saved_state = Registry.get_instance().get_all()
-        Registry.get_instance().clear()
+        registry = Registry.get_instance()
+        # Save full PluginInfo objects, not just class and type
+        self._saved_models = dict(registry._models)
+        self._saved_transforms = dict(registry._transforms)
+        registry.clear()
 
     def teardown_method(self):
         """Restore registry state after each test."""
-        Registry.get_instance().clear()
-        for name, (plugin, plugin_type) in self._saved_state.items():
-            Registry.get_instance().register(name, plugin, plugin_type=plugin_type)
+        registry = Registry.get_instance()
+        registry.clear()
+        # Restore full PluginInfo objects directly
+        registry._models.update(self._saved_models)
+        registry._transforms.update(self._saved_transforms)
 
     def test_shared_singleton(self):
         """Test that both registries use the same singleton Registry."""

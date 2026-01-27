@@ -61,6 +61,7 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
+from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
@@ -84,8 +85,28 @@ BreakageType = Literal["constant", "bell", "power_law", "stretch_creation"]
 StressType = Literal["linear", "fene"]
 
 
-@ModelRegistry.register("tnt_single_mode")
-@ModelRegistry.register("tnt")
+@ModelRegistry.register(
+    "tnt_single_mode",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.OSCILLATION,
+        Protocol.STARTUP,
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.LAOS,
+    ],
+)
+@ModelRegistry.register(
+    "tnt",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.OSCILLATION,
+        Protocol.STARTUP,
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.LAOS,
+    ],
+)
 class TNTSingleMode(TNTBase):
     """Single-mode Transient Network Theory model.
 

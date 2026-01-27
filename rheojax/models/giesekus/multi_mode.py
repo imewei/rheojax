@@ -51,6 +51,7 @@ import numpy as np
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
+from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.giesekus._kernels import (
     giesekus_multimode_ode_rhs,
@@ -63,8 +64,28 @@ jax, jnp = safe_import_jax()
 logger = logging.getLogger(__name__)
 
 
-@ModelRegistry.register("giesekus_multi")
-@ModelRegistry.register("giesekus_multimode")
+@ModelRegistry.register(
+    "giesekus_multi",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.OSCILLATION,
+        Protocol.STARTUP,
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.LAOS,
+    ],
+)
+@ModelRegistry.register(
+    "giesekus_multimode",
+    protocols=[
+        Protocol.FLOW_CURVE,
+        Protocol.OSCILLATION,
+        Protocol.STARTUP,
+        Protocol.RELAXATION,
+        Protocol.CREEP,
+        Protocol.LAOS,
+    ],
+)
 class GiesekusMultiMode(BaseModel):
     """Multi-mode Giesekus nonlinear viscoelastic model.
 
