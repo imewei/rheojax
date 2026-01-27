@@ -1,6 +1,6 @@
 """Rheological models package.
 
-This package contains 37 rheological models organized into 13 categories.
+This package contains 47 rheological models organized into 19 categories.
 
 Classical Models (3):
     - Maxwell: Spring and dashpot in series
@@ -75,6 +75,17 @@ Transient Network Theory (TNT) Models (5):
     - TNTStickyRouse: Multi-mode with sticker kinetics for ionomers
     - TNTCates: Living polymers (wormlike micelles) with reptation + breakage
     - TNTMultiSpecies: Multiple bond types with different lifetimes
+
+IKH (Isotropic Kinematic Hardening) Models (2):
+    - MIKH: Modified IKH model for thixotropic yield stress fluids
+    - MLIKH: Multi-layer IKH with per-layer structure parameters
+
+Hébraud-Lequeux Model (1):
+    - HebraudLequeux: Stochastic trap model for soft glassy materials
+
+Elasto-Plastic Mesoscopic (EPM) Models (2):
+    - LatticeEPM: Lattice-based elasto-plastic model for amorphous solids
+    - TensorialEPM: Tensorial EPM with full stress tensor evolution
 
 Usage:
     >>> from rheojax.models import Maxwell, Zener, SpringPot

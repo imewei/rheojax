@@ -180,6 +180,9 @@ class ModelService:
             - 'hl': HebraudLequeux
             - 'itt_mct': ITTMCTSchematic, ITTMCTIsotropic
             - 'dmt': DMTLocal, DMTNonlocal
+            - 'giesekus': GiesekusSingleMode, GiesekusMultiMode
+            - 'tnt': TNTSingleMode, TNTLoopBridge, TNTStickyRouse, TNTCates, TNTMultiSpecies
+            - 'fikh': FIKH, FMLIKH
         """
         logger.debug("Getting available models from registry")
         all_models = self._registry.get_all_models()
@@ -203,6 +206,9 @@ class ModelService:
             "hl": [],
             "itt_mct": [],
             "dmt": [],
+            "giesekus": [],
+            "tnt": [],
+            "fikh": [],
             "other": [],
         }
 
@@ -259,6 +265,12 @@ class ModelService:
                 categories["ikh"].append(model_name)
             elif name_lower == "hebraud_lequeux":
                 categories["hl"].append(model_name)
+            elif name_lower.startswith("giesekus"):
+                categories["giesekus"].append(model_name)
+            elif name_lower.startswith("tnt"):
+                categories["tnt"].append(model_name)
+            elif name_lower in ["fikh", "fmlikh"]:
+                categories["fikh"].append(model_name)
             else:
                 categories["other"].append(model_name)
 
