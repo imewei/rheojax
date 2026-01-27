@@ -35,7 +35,6 @@ import numpy as np
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.core.parameters import ParameterSet
 
 jax, jnp = safe_import_jax()
 
@@ -142,7 +141,8 @@ class TNTBase(BaseModel):
         float
             Weissenberg number (dimensionless)
         """
-        tau_b = float(self.parameters.get_value("tau_b"))
+        val = self.parameters.get_value("tau_b")
+        tau_b = float(val) if val is not None else 0.0
         return tau_b * abs(gamma_dot)
 
     def deborah_number(self, omega: float) -> float:
@@ -158,7 +158,8 @@ class TNTBase(BaseModel):
         float
             Deborah number (dimensionless)
         """
-        tau_b = float(self.parameters.get_value("tau_b"))
+        val = self.parameters.get_value("tau_b")
+        tau_b = float(val) if val is not None else 0.0
         return tau_b * omega
 
     # =========================================================================
@@ -173,10 +174,11 @@ class TNTBase(BaseModel):
         dict[str, float]
             Dictionary of parameter name -> value
         """
-        return {
-            name: float(self.parameters.get_value(name))
-            for name in self.parameters.keys()
-        }
+        result: dict[str, float] = {}
+        for name in self.parameters.keys():
+            val = self.parameters.get_value(name)
+            result[name] = float(val) if val is not None else 0.0
+        return result
 
     def set_parameter_dict(self, params: dict[str, float]) -> None:
         """Set parameters from a dictionary.
@@ -347,12 +349,12 @@ class TNTBase(BaseModel):
         raise NotImplementedError
 
     @abstractmethod
-    def _fit(self, x, y, **kwargs):
+    def _fit(self, X, y, **kwargs):
         """Fit model to data. Must be implemented by subclasses."""
         raise NotImplementedError
 
     @abstractmethod
-    def _predict(self, x, **kwargs):
+    def _predict(self, X, **kwargs):
         """Predict response. Must be implemented by subclasses."""
         raise NotImplementedError
 
@@ -362,8 +364,11 @@ class TNTBase(BaseModel):
 
     def __repr__(self) -> str:
         """Return string representation."""
+        def _fmt(name: str) -> str:
+            val = self.parameters.get_value(name)
+            return f"{name}={float(val) if val is not None else 0.0:.3e}"
+
         params_str = ", ".join(
-            f"{name}={float(self.parameters.get_value(name)):.3e}"
-            for name in list(self.parameters.keys())[:4]
+            _fmt(name) for name in list(self.parameters.keys())[:4]
         )
         return f"{self.__class__.__name__}({params_str})"

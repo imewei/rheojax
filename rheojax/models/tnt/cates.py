@@ -77,7 +77,6 @@ from rheojax.core.registry import ModelRegistry
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
     tnt_base_relaxation_vec,
-    tnt_base_steady_conformation,
     tnt_saos_moduli_vec,
     tnt_single_mode_creep_ode_rhs,
     tnt_single_mode_ode_rhs,
@@ -214,22 +213,26 @@ class TNTCates(TNTBase):
     @property
     def G_0(self) -> float:
         """Get plateau modulus G₀ (Pa)."""
-        return float(self.parameters.get_value("G_0"))
+        val = self.parameters.get_value("G_0")
+        return float(val) if val is not None else 0.0
 
     @property
     def tau_rep(self) -> float:
         """Get reptation time τ_rep (s)."""
-        return float(self.parameters.get_value("tau_rep"))
+        val = self.parameters.get_value("tau_rep")
+        return float(val) if val is not None else 0.0
 
     @property
     def tau_break(self) -> float:
         """Get breaking time τ_break (s)."""
-        return float(self.parameters.get_value("tau_break"))
+        val = self.parameters.get_value("tau_break")
+        return float(val) if val is not None else 0.0
 
     @property
     def eta_s(self) -> float:
         """Get solvent viscosity η_s (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))
+        val = self.parameters.get_value("eta_s")
+        return float(val) if val is not None else 0.0
 
     @property
     def tau_d(self) -> float:
@@ -1035,8 +1038,8 @@ class TNTCates(TNTBase):
         )
 
         harmonics = [2 * i + 1 for i in range(n_harmonics)]
-        sigma_prime = []
-        sigma_double_prime = []
+        sigma_prime_list: list[float] = []
+        sigma_double_prime_list: list[float] = []
 
         for n in harmonics:
             sin_basis = np.sin(n * omega * t)
@@ -1050,11 +1053,11 @@ class TNTCates(TNTBase):
                 2 * np.trapezoid(stress * cos_basis, dx=dt) / (t[-1] - t[0])
             )
 
-            sigma_prime.append(sigma_n_prime)
-            sigma_double_prime.append(sigma_n_double_prime)
+            sigma_prime_list.append(sigma_n_prime)
+            sigma_double_prime_list.append(sigma_n_double_prime)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
+        sigma_prime = np.array(sigma_prime_list)
+        sigma_double_prime = np.array(sigma_double_prime_list)
         intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)
 
         return {

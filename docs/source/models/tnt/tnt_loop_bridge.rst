@@ -1828,9 +1828,9 @@ Related TNT Models
 Related Associating Polymer Models
 -----------------------------------------------------------
 
-- :ref:`model-fluidity-saramito`: Thixotropic EVP with fluidity evolution (different mechanism)
-- :ref:`model-dmt`: Structural kinetics with exponential/HB closure (scalar structure parameter)
-- :ref:`model-sgr`: Soft glassy rheology (noise temperature, no explicit bridge-loop)
+- :doc:`/models/fluidity/index`: Thixotropic EVP with fluidity evolution (different mechanism)
+- :doc:`/models/dmt/index`: Structural kinetics with exponential/HB closure (scalar structure parameter)
+- :doc:`/models/sgr/index`: Soft glassy rheology (noise temperature, no explicit bridge-loop)
 
 Experimental Protocols
 -----------------------------------------------------------
@@ -1843,9 +1843,9 @@ Experimental Protocols
 Material Systems
 -----------------------------------------------------------
 
-- :ref:`materials-heur`: Hydrophobically-modified Ethoxylated URethane thickeners
-- :ref:`materials-telechelic`: Telechelic polymers with associating end-groups
-- :ref:`materials-ionomers`: Ionic end-group associating polymers (Surlyn)
+- HEUR (Hydrophobically-modified Ethoxylated URethane thickeners)
+- Telechelic polymers with associating end-groups
+- Ionic end-group associating polymers (Surlyn)
 
 ----
 
@@ -1856,14 +1856,7 @@ Material Systems
    :members:
    :inherited-members:
    :show-inheritance:
-
-   .. automethod:: __init__
-   .. automethod:: fit
-   .. automethod:: predict
-   .. automethod:: get_parameter_values
-   .. automethod:: set_parameter
-   .. automethod:: get_credible_intervals
-   .. automethod:: fit_bayesian
+   :exclude-members: parameters
 
 **Key Methods:**
 

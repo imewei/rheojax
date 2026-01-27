@@ -99,7 +99,6 @@ References
 from __future__ import annotations
 
 import logging
-from functools import partial
 
 import diffrax
 import numpy as np
@@ -110,9 +109,7 @@ from rheojax.core.registry import ModelRegistry
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
     tnt_multimode_ode_rhs,
-    tnt_multimode_relaxation,
     tnt_multimode_relaxation_vec,
-    tnt_multimode_saos_moduli,
     tnt_multimode_saos_moduli_vec,
 )
 from rheojax.utils.optimization import nlsq_curve_fit
@@ -199,12 +196,14 @@ class TNTStickyRouse(TNTBase):
     @property
     def tau_s(self) -> float:
         """Sticker lifetime (s)."""
-        return float(self.parameters.get_value("tau_s"))
+        val = self.parameters.get_value("tau_s")
+        return float(val) if val is not None else 0.0
 
     @property
     def eta_s(self) -> float:
         """Solvent viscosity (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))
+        val = self.parameters.get_value("eta_s")
+        return float(val) if val is not None else 0.0
 
     # =========================================================================
     # Parameter Setup
@@ -272,16 +271,18 @@ class TNTStickyRouse(TNTBase):
         tau_eff : jnp.ndarray
             Effective relaxation times (s), shape (N,)
         """
-        G_modes = jnp.array(
-            [float(self.parameters.get_value(f"G_{k}")) for k in range(self._n_modes)]
-        )
-        tau_R = jnp.array(
-            [
-                float(self.parameters.get_value(f"tau_R_{k}"))
-                for k in range(self._n_modes)
-            ]
-        )
-        tau_s = float(self.parameters.get_value("tau_s"))
+        G_vals = []
+        for k in range(self._n_modes):
+            val = self.parameters.get_value(f"G_{k}")
+            G_vals.append(float(val) if val is not None else 0.0)
+        G_modes = jnp.array(G_vals)
+        tau_vals = []
+        for k in range(self._n_modes):
+            val = self.parameters.get_value(f"tau_R_{k}")
+            tau_vals.append(float(val) if val is not None else 0.0)
+        tau_R = jnp.array(tau_vals)
+        tau_s_val = self.parameters.get_value("tau_s")
+        tau_s = float(tau_s_val) if tau_s_val is not None else 0.0
         tau_eff = jnp.maximum(tau_R, tau_s)
         return G_modes, tau_R, tau_eff
 
@@ -449,7 +450,7 @@ class TNTStickyRouse(TNTBase):
     # Fitting
     # =========================================================================
 
-    def _fit(self, x: np.ndarray, y: np.ndarray, **kwargs) -> None:
+    def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> TNTStickyRouse:
         """Fit model to data using NLSQ optimization.
 
         Parameters
@@ -467,7 +468,7 @@ class TNTStickyRouse(TNTBase):
             raise ValueError("test_mode must be specified for fitting")
 
         # Convert to JAX arrays
-        x_jax = jnp.asarray(x, dtype=jnp.float64)
+        x_jax = jnp.asarray(X, dtype=jnp.float64)
         y_jax = jnp.asarray(y, dtype=jnp.float64)
 
         # For relaxation, store initial stress distribution
@@ -510,12 +511,13 @@ class TNTStickyRouse(TNTBase):
             f"Sticky Rouse fit complete: R²={self._r_squared:.4f}, "
             f"n_modes={self._n_modes}"
         )
+        return self
 
     # =========================================================================
     # Prediction
     # =========================================================================
 
-    def _predict(self, x: np.ndarray, **kwargs) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict response for given input.
 
         Parameters
@@ -543,7 +545,7 @@ class TNTStickyRouse(TNTBase):
         G_modes, tau_R, tau_eff = self._get_mode_arrays()
         eta_s = self.eta_s
 
-        x_jax = jnp.asarray(x, dtype=jnp.float64)
+        x_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Dispatch by protocol
         if test_mode == "oscillation":
@@ -705,7 +707,7 @@ class TNTStickyRouse(TNTBase):
         def ode_rhs(t_val, state, args):
             # Unpack state
             conf_state = state[: 4 * N]
-            gamma = state[4 * N]
+            _gamma = state[4 * N]
 
             # Compute gamma_dot from stress constraint
             conf_reshaped = conf_state.reshape((N, 4))
@@ -906,7 +908,7 @@ class TNTStickyRouse(TNTBase):
             wi2 = wi * wi
             return jnp.sum(2.0 * G_modes * wi2 / (1.0 + wi2))
 
-        if gamma_dot.ndim == 0:
+        if np.ndim(gamma_dot) == 0:
             result = compute_n1(gamma_dot)
         else:
             result = jax.vmap(compute_n1)(gamma_dot)

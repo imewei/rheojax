@@ -68,11 +68,8 @@ from rheojax.models.tnt._kernels import (
     build_tnt_laos_ode_rhs,
     build_tnt_ode_rhs,
     build_tnt_relaxation_ode_rhs,
-    stress_fene_n1,
-    stress_fene_xy,
     tnt_base_relaxation_vec,
     tnt_base_steady_conformation,
-    tnt_base_steady_n1,
     tnt_base_steady_n1_vec,
     tnt_base_steady_stress_vec,
     tnt_saos_moduli_vec,
@@ -260,17 +257,20 @@ class TNTSingleMode(TNTBase):
     @property
     def G(self) -> float:
         """Get network modulus G (Pa)."""
-        return float(self.parameters.get_value("G"))
+        val = self.parameters.get_value("G")
+        return float(val) if val is not None else 0.0
 
     @property
     def tau_b(self) -> float:
         """Get bond lifetime τ_b (s)."""
-        return float(self.parameters.get_value("tau_b"))
+        val = self.parameters.get_value("tau_b")
+        return float(val) if val is not None else 0.0
 
     @property
     def eta_s(self) -> float:
         """Get solvent viscosity η_s (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))
+        val = self.parameters.get_value("eta_s")
+        return float(val) if val is not None else 0.0
 
     @property
     def eta_0(self) -> float:
@@ -341,13 +341,17 @@ class TNTSingleMode(TNTBase):
             "xi": self._xi,
         }
         if self._breakage == "bell":
-            args["nu"] = float(self.parameters.get_value("nu"))
+            val = self.parameters.get_value("nu")
+            args["nu"] = float(val) if val is not None else 0.0
         elif self._breakage == "power_law":
-            args["m_break"] = float(self.parameters.get_value("m_break"))
+            val = self.parameters.get_value("m_break")
+            args["m_break"] = float(val) if val is not None else 0.0
         elif self._breakage == "stretch_creation":
-            args["kappa"] = float(self.parameters.get_value("kappa"))
+            val = self.parameters.get_value("kappa")
+            args["kappa"] = float(val) if val is not None else 0.0
         if self._stress_type == "fene":
-            args["L_max"] = float(self.parameters.get_value("L_max"))
+            val = self.parameters.get_value("L_max")
+            args["L_max"] = float(val) if val is not None else 10.0
         return args
 
     def _unpack_variant_params(self, params) -> dict:
@@ -1204,7 +1208,7 @@ class TNTSingleMode(TNTBase):
         else:
             # Run startup ODE to steady state for variant breakage
             t_ss = jnp.linspace(0.0, 50.0 * self.tau_b, 2000)
-            startup_stress = self._simulate_startup_internal(
+            _ = self._simulate_startup_internal(
                 t_ss, self.G, self.tau_b, self.eta_s,
                 gamma_dot_preshear, vp,
             )
@@ -1523,8 +1527,8 @@ class TNTSingleMode(TNTBase):
         )
 
         harmonics = [2 * i + 1 for i in range(n_harmonics)]
-        sigma_prime = []
-        sigma_double_prime = []
+        sigma_prime_list: list[float] = []
+        sigma_double_prime_list: list[float] = []
 
         for n in harmonics:
             sin_basis = np.sin(n * omega * t)
@@ -1538,11 +1542,11 @@ class TNTSingleMode(TNTBase):
                 2 * np.trapezoid(stress * cos_basis, dx=dt) / (t[-1] - t[0])
             )
 
-            sigma_prime.append(sigma_n_prime)
-            sigma_double_prime.append(sigma_n_double_prime)
+            sigma_prime_list.append(sigma_n_prime)
+            sigma_double_prime_list.append(sigma_n_double_prime)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
+        sigma_prime = np.array(sigma_prime_list)
+        sigma_double_prime = np.array(sigma_double_prime_list)
         intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)
 
         return {

@@ -1708,8 +1708,8 @@ See Also
 **Related TNT model variants:**
 
 - :ref:`model-tnt-bell` — Force-dependent breakage (Bell model) for shear-thinning networks
-- :ref:`model-tnt-catch-slip` — Catch-slip bond kinetics for complex force response
 - :ref:`model-tnt-fene-p` — Finite extensibility (FENE-P) for strain stiffening
+- :ref:`model-tnt-non-affine` — Gordon-Schowalter non-affine motion
 - :ref:`model-tnt-sticky-rouse` — Chain Rouse dynamics between crosslinks
 - :ref:`model-tnt-multi-species` — Multiple chain types with different bond lifetimes
 
@@ -1721,15 +1721,8 @@ See Also
 
 **Theoretical background:**
 
-- :ref:`tnt-theory` — Complete TNT theoretical framework
-- :ref:`tnt-protocols` — Detailed protocol equations for all test modes
-- :ref:`network-kinetics` — Bond breakage and reformation mechanisms
-
-**Computational tools:**
-
-- :ref:`bayesian-inference` — Bayesian workflow for TNT models
-- :ref:`pipeline-api` — Fluent API for fitting and analysis
-- :ref:`optimization-guide` — NLSQ and global optimization strategies
+- :doc:`/models/tnt/tnt_protocols` — Detailed protocol equations for all test modes
+- :doc:`/models/tnt/tnt_knowledge_extraction` — Knowledge extraction guide for TNT models
 
 API Reference
 -------------
@@ -1739,6 +1732,7 @@ API Reference
 .. autoclass:: TNTSingleMode
    :members: fit, predict, fit_bayesian, get_credible_intervals
    :inherited-members:
+   :exclude-members: parameters
 
 **Key methods:**
 

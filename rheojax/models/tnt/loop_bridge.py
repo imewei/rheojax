@@ -62,7 +62,6 @@ References
 from __future__ import annotations
 
 import logging
-from typing import Literal
 
 import diffrax
 import numpy as np
@@ -72,8 +71,6 @@ from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
-    breakage_bell,
-    tnt_saos_moduli,
     tnt_saos_moduli_vec,
     upper_convected_2d,
 )
@@ -208,7 +205,7 @@ def _loop_bridge_creep_ode_rhs(
     """
     f_B = state[0]
     S_xx, S_yy, S_zz, S_xy = state[1], state[2], state[3], state[4]
-    gamma = state[5]
+    _gamma = state[5]
 
     # Elastic stress from bridges
     sigma_elastic = f_B * G * S_xy
@@ -459,32 +456,38 @@ class TNTLoopBridge(TNTBase):
     @property
     def G(self) -> float:
         """Get network modulus G (Pa)."""
-        return float(self.parameters.get_value("G"))
+        val = self.parameters.get_value("G")
+        return float(val) if val is not None else 0.0
 
     @property
     def tau_b(self) -> float:
         """Get bridge detachment time τ_b (s)."""
-        return float(self.parameters.get_value("tau_b"))
+        val = self.parameters.get_value("tau_b")
+        return float(val) if val is not None else 0.0
 
     @property
     def tau_a(self) -> float:
         """Get loop attachment time τ_a (s)."""
-        return float(self.parameters.get_value("tau_a"))
+        val = self.parameters.get_value("tau_a")
+        return float(val) if val is not None else 0.0
 
     @property
     def nu(self) -> float:
         """Get Bell force sensitivity ν (dimensionless)."""
-        return float(self.parameters.get_value("nu"))
+        val = self.parameters.get_value("nu")
+        return float(val) if val is not None else 0.0
 
     @property
     def f_B_eq(self) -> float:
         """Get equilibrium bridge fraction f_B_eq (dimensionless)."""
-        return float(self.parameters.get_value("f_B_eq"))
+        val = self.parameters.get_value("f_B_eq")
+        return float(val) if val is not None else 0.0
 
     @property
     def eta_s(self) -> float:
         """Get solvent viscosity η_s (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))
+        val = self.parameters.get_value("eta_s")
+        return float(val) if val is not None else 0.0
 
     @property
     def G_eff(self) -> float:
@@ -1688,8 +1691,8 @@ class TNTLoopBridge(TNTBase):
         )
 
         harmonics = [2 * i + 1 for i in range(n_harmonics)]
-        sigma_prime = []
-        sigma_double_prime = []
+        sigma_prime_list: list[float] = []
+        sigma_double_prime_list: list[float] = []
 
         for n in harmonics:
             sin_basis = np.sin(n * omega * t)
@@ -1703,11 +1706,11 @@ class TNTLoopBridge(TNTBase):
                 2 * np.trapezoid(stress * cos_basis, dx=dt) / (t[-1] - t[0])
             )
 
-            sigma_prime.append(sigma_n_prime)
-            sigma_double_prime.append(sigma_n_double_prime)
+            sigma_prime_list.append(sigma_n_prime)
+            sigma_double_prime_list.append(sigma_n_double_prime)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
+        sigma_prime = np.array(sigma_prime_list)
+        sigma_double_prime = np.array(sigma_double_prime_list)
         intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)
 
         return {

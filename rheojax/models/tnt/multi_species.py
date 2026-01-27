@@ -63,7 +63,6 @@ References
 from __future__ import annotations
 
 import logging
-from typing import Literal
 
 import diffrax
 import numpy as np
@@ -73,14 +72,9 @@ from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
-    tnt_base_steady_stress,
     tnt_multimode_ode_rhs,
-    tnt_multimode_relaxation,
     tnt_multimode_relaxation_vec,
-    tnt_multimode_saos_moduli,
     tnt_multimode_saos_moduli_vec,
-    tnt_single_mode_creep_ode_rhs,
-    tnt_single_mode_ode_rhs,
 )
 
 jax, jnp = safe_import_jax()
@@ -211,20 +205,23 @@ class TNTMultiSpecies(TNTBase):
         tuple[jnp.ndarray, jnp.ndarray]
             (G_modes, tau_modes) with shape (N,)
         """
-        G_modes = jnp.array(
-            [float(self.parameters.get_value(f"G_{i}")) for i in range(self._n_species)],
-            dtype=jnp.float64,
-        )
-        tau_modes = jnp.array(
-            [float(self.parameters.get_value(f"tau_b_{i}")) for i in range(self._n_species)],
-            dtype=jnp.float64,
-        )
+        G_vals = []
+        for i in range(self._n_species):
+            val = self.parameters.get_value(f"G_{i}")
+            G_vals.append(float(val) if val is not None else 0.0)
+        G_modes = jnp.array(G_vals, dtype=jnp.float64)
+        tau_vals = []
+        for i in range(self._n_species):
+            val = self.parameters.get_value(f"tau_b_{i}")
+            tau_vals.append(float(val) if val is not None else 0.0)
+        tau_modes = jnp.array(tau_vals, dtype=jnp.float64)
         return G_modes, tau_modes
 
     @property
     def eta_s(self) -> float:
         """Get solvent viscosity η_s (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))
+        val = self.parameters.get_value("eta_s")
+        return float(val) if val is not None else 0.0
 
     @property
     def G_total(self) -> float:
@@ -649,7 +646,6 @@ class TNTMultiSpecies(TNTBase):
         )
 
         # Extract S_xy_i for each mode (index 3, 7, 11, ...)
-        N = self._n_species
         S_xy_modes = sol.ys[:, 3::4]  # (T, N)
 
         # Total stress: σ = Σ G_i·S_xy_i + η_s·γ̇
@@ -734,7 +730,7 @@ class TNTMultiSpecies(TNTBase):
             # Unpack state: [S_modes..., gamma]
             N = args["G_modes"].shape[0]
             S_state = yi[: 4 * N]
-            gamma = yi[4 * N]
+            _gamma = yi[4 * N]
 
             # Compute elastic stress contribution from each mode
             S_xy_modes = S_state[3::4]  # Extract S_xy_i
@@ -938,7 +934,6 @@ class TNTMultiSpecies(TNTBase):
         )
 
         # Extract mode components: S_xx_i at indices 0,4,8,...
-        N = self._n_species
         S_xx_modes = sol.ys[:, 0::4]  # (T, N)
         S_yy_modes = sol.ys[:, 1::4]
         S_zz_modes = sol.ys[:, 2::4]
@@ -1030,7 +1025,7 @@ class TNTMultiSpecies(TNTBase):
         def ode_fn(ti, yi, args):
             N = args["G_modes"].shape[0]
             S_state = yi[: 4 * N]
-            gamma = yi[4 * N]
+            _gamma = yi[4 * N]
 
             # Elastic stress
             S_xy_modes = S_state[3::4]
@@ -1090,8 +1085,6 @@ class TNTMultiSpecies(TNTBase):
         }
 
         if return_rate:
-            # Extract S_xy modes
-            N = self._n_species
             S_xy_modes = sol.ys[:, 3::4]
             sigma_elastic = jnp.sum(G_modes[None, :] * S_xy_modes, axis=1)
             eta_s_reg = max(self.eta_s, 1e-10 * float(jnp.max(G_modes * tau_modes)))
@@ -1222,8 +1215,8 @@ class TNTMultiSpecies(TNTBase):
         omega = 2 * np.pi * np.abs(freqs[np.argmax(np.abs(fft_strain[1:])) + 1])
 
         harmonics = [2 * i + 1 for i in range(n_harmonics)]
-        sigma_prime = []
-        sigma_double_prime = []
+        sigma_prime_list: list[float] = []
+        sigma_double_prime_list: list[float] = []
 
         for n in harmonics:
             sin_basis = np.sin(n * omega * t)
@@ -1235,11 +1228,11 @@ class TNTMultiSpecies(TNTBase):
                 2 * np.trapezoid(stress * cos_basis, dx=dt) / (t[-1] - t[0])
             )
 
-            sigma_prime.append(sigma_n_prime)
-            sigma_double_prime.append(sigma_n_double_prime)
+            sigma_prime_list.append(sigma_n_prime)
+            sigma_double_prime_list.append(sigma_n_double_prime)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
+        sigma_prime = np.array(sigma_prime_list)
+        sigma_double_prime = np.array(sigma_double_prime_list)
         intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)
 
         return {

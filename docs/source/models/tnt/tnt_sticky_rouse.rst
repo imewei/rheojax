@@ -32,7 +32,7 @@ Quick Reference
    * - **Typical range:**
      - :math:`\tau_s`: 1e-6 to 1e6 s; :math:`G_k`: 1e-2 to 1e6 Pa; :math:`\tau_{R,k} = \tau_{R,1}/k^2` (Rouse scaling)
    * - **Related models:**
-     - :ref:`model-tnt-tanaka-edwards`, :ref:`model-tnt-multi-species`, :ref:`model-generalized-maxwell`, :ref:`model-rouse`
+     - :ref:`model-tnt-tanaka-edwards`, :ref:`model-tnt-multi-species`, :ref:`model-generalized-maxwell`, Rouse model
 
 ----
 
@@ -1541,7 +1541,7 @@ Related Models
 - :ref:`model-tnt-tanaka-edwards` — Single-mode sticky reptation (simpler, entangled regime)
 - :ref:`model-tnt-multi-species` — Multiple sticker species with heterogeneous lifetimes
 - :ref:`model-generalized-maxwell` — Phenomenological multi-mode relaxation (no physical structure)
-- :ref:`model-rouse` — Pure Rouse model without stickers (limiting case)
+- Rouse model — Pure Rouse model without stickers (limiting case)
 
 Related Transforms
 ------------------
@@ -1552,14 +1552,14 @@ Related Transforms
 Related Utilities
 -----------------
 
-- :ref:`utils-prony` — Prony series decomposition for relaxation spectra
-- :ref:`utils-optimization` — NLSQ optimization strategies
+- Prony series decomposition for relaxation spectra
+- Optimization utilities — NLSQ optimization strategies
 
 Literature
 ----------
 
-- :ref:`theory-associating-polymers` — Overview of sticky reptation theory
-- :ref:`theory-rouse-model` — Foundations of Rouse dynamics
+- Associating polymer theory — Overview of sticky reptation theory
+- Rouse model theory — Foundations of Rouse dynamics
 
 ----
 
@@ -1570,79 +1570,6 @@ API Reference
    :members:
    :undoc-members:
    :show-inheritance:
-
-   .. automethod:: __init__
-
-      **Parameters:**
-
-      - **n_modes** (*int*) — Number of Rouse modes (default: 5)
-      - **constrain_rouse_scaling** (*bool*) — If True, enforce :math:`G_k = G_N^{(0)}/N` and :math:`\tau_{R,k} = \tau_{R,1}/k^2` (default: False)
-
-   .. automethod:: fit
-
-      Fit model to rheological data using NLSQ optimization.
-
-      **Parameters:**
-
-      - **data** (*RheoData*) — Input data (SAOS or relaxation)
-      - **max_iter** (*int*) — Maximum iterations (default: 5000)
-
-      **Returns:**
-
-      - **FitResult** — Contains fitted parameters, R-squared, residuals
-
-   .. automethod:: predict
-
-      Predict rheological response for given test mode.
-
-      **Parameters:**
-
-      - **x** (*array*) — Independent variable (time or frequency)
-      - **test_mode** (*str*) — One of: 'oscillation', 'relaxation', 'startup', 'creep', 'flow_curve', 'laos'
-      - **kwargs** — Protocol-specific parameters (e.g., gamma_dot, gamma_0, omega)
-
-      **Returns:**
-
-      - **array** — Predicted response (stress or modulus)
-
-   .. automethod:: fit_bayesian
-
-      Bayesian inference using NumPyro NUTS sampler.
-
-      **Parameters:**
-
-      - **data** (*RheoData*) — Input data
-      - **num_warmup** (*int*) — MCMC warmup iterations (default: 1000)
-      - **num_samples** (*int*) — Posterior samples (default: 2000)
-      - **num_chains** (*int*) — Parallel chains (default: 4)
-
-      **Returns:**
-
-      - **BayesianResult** — Posterior samples, diagnostics (R-hat, ESS)
-
-   .. automethod:: get_relaxation_spectrum
-
-      Compute discrete relaxation spectrum :math:`\{G_k, \tau_{eff,k}\}`.
-
-      **Returns:**
-
-      - **dict** — Keys: 'G_modes', 'tau_eff_modes'
-
-   .. automethod:: get_zero_shear_viscosity
-
-      Calculate :math:`\eta_0 = \sum_k G_k \tau_{eff,k} + \eta_s`.
-
-      **Returns:**
-
-      - **float** — Zero-shear viscosity (Pa·s)
-
-   .. automethod:: check_rouse_scaling
-
-      Validate if fitted :math:`\tau_{R,k}` follows :math:`1/k^2` scaling.
-
-      **Returns:**
-
-      - **dict** — 'slope' (expect -2), 'R_squared', 'passes' (bool)
 
 ----
 
