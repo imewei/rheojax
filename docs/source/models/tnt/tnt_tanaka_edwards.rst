@@ -415,6 +415,35 @@ normal stress coefficient :math:`\Psi_1 = N_1 / \dot{\gamma}^2 = 2 G \tau_b^2` i
 
 The Tanaka-Edwards model predicts zero second normal stress difference in simple shear.
 
+Physical Insight: :math:`N_2 = 0`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The prediction :math:`N_2 = 0` in simple shear is a direct consequence of the
+**upper-convected derivative** (affine kinematics). The gradient direction (:math:`y`)
+and vorticity direction (:math:`z`) are equivalent because the affine deformation acts
+only through :math:`\boldsymbol{\kappa}`, which has no :math:`yy` or :math:`zz`
+components in simple shear. Therefore :math:`S_{yy}(t) = S_{zz}(t)` for all :math:`t`,
+giving :math:`N_2 = G(S_{yy} - S_{zz}) = 0`.
+
+Experimental observation of :math:`N_2 \neq 0` is a clear indicator that **non-affine
+deformation** is present. See :doc:`tnt_non_affine` for the Gordon-Schowalter extension
+that breaks this symmetry.
+
+Stress Relaxation Non-Exponentiality
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For the base Tanaka-Edwards model, stress relaxation is a perfect single exponential
+:math:`G(t) = G e^{-t/\tau_b}`. However, even within the TNT framework, non-exponential
+relaxation arises naturally from several extensions:
+
+- **Bell breakage**: Initially stretched chains have shorter :math:`\tau_b^{\text{eff}}`,
+  producing fast initial decay that slows as chains relax toward equilibrium. This mimics
+  a **broad spectrum** without requiring multiple modes.
+- **Multi-mode** (StickyRouse, MultiSpecies): Explicit multi-exponential decay from
+  discrete :math:`\{G_k, \tau_k\}` spectrum.
+- **Cates model**: :math:`G(t) \sim \exp(-\sqrt{2t/\tau_b})` in the fast-breaking regime
+  — a stretched exponential from scission/recombination dynamics.
+
 **Weissenberg number dependence:**
 
 The dimensionless Weissenberg number :math:`Wi = \tau_b \dot{\gamma}` controls the
@@ -588,6 +617,31 @@ Stress overshoot requires either:
 - Finite extensibility (strain hardening → overshoot)
 - Nonlinear damping (Giesekus-type nonlinearity)
 
+Startup Phase Decomposition
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The startup transient can be understood in three phases:
+
+1. **Phase 1 — Elastic loading** (:math:`t \ll \tau_b`): Chains stretch affinely with the
+   flow. :math:`S_{xy} \approx \dot{\gamma} t` grows linearly. Stress rises as
+   :math:`\sigma \approx G \dot{\gamma} t` (purely elastic). No bonds have yet broken.
+
+2. **Phase 2 — Bond turnover onset** (:math:`t \sim \tau_b`): Bonds begin breaking at
+   rate :math:`1/\tau_b`. For force-dependent variants (Bell), :math:`\text{tr}(\mathbf{S})`
+   rises and :math:`\tau_b^{\text{eff}}` decreases, accelerating destruction beyond creation.
+   This produces a stress **overshoot** in Bell/FENE variants (but not in the base
+   Tanaka-Edwards model with constant breakage).
+
+3. **Phase 3 — Steady state** (:math:`t \gg \tau_b`): Formation-destruction balance is
+   reached. The conformation tensor settles to its steady-state value. For the base model,
+   this is :math:`S_{xy} = \tau_b \dot{\gamma}`.
+
+.. note::
+
+   The base Tanaka-Edwards model reaches steady state **monotonically** (no overshoot).
+   A stress overshoot requires force-dependent breakage (:doc:`tnt_bell`), finite
+   extensibility (:doc:`tnt_fene_p`), or non-affine slip (:doc:`tnt_non_affine`).
+
 **First normal stress difference in startup:**
 
 The analytical solution for :math:`N_1(t)` involves both :math:`S_{xx}` and :math:`S_{yy}`:
@@ -665,6 +719,23 @@ The non-recoverable (viscous) strain is:
 
    \gamma_{visc} = \frac{\sigma_0 t_1}{\eta_0}
 
+Creep Rupture (Force-Dependent Extension)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+While the base Tanaka-Edwards model with constant breakage always reaches a finite
+steady-state creep rate :math:`\dot{\gamma}_{ss} = \sigma_0/\eta_0`, the introduction
+of force-dependent breakage (Bell variant) creates the possibility of **creep rupture**:
+
+1. Applied stress :math:`\sigma_0` stretches chains → :math:`\text{tr}(\mathbf{S})` increases
+2. Stretch increases :math:`k_{\text{off}}` (Bell) → effective :math:`\tau_b` decreases
+3. Reduced :math:`\tau_b` means lower effective viscosity → :math:`\dot{\gamma}` increases
+4. Higher :math:`\dot{\gamma}` stretches chains further → positive feedback loop
+5. Above a critical stress :math:`\sigma_c`, the system undergoes **delayed yielding**
+   (creep rate accelerates without bound)
+
+This viscosity bifurcation is analogous to the yielding transition in thixotropic fluids.
+See :doc:`tnt_bell` for the full treatment.
+
 LAOS
 ~~~~
 
@@ -720,6 +791,30 @@ Plots of :math:`\sigma` vs. :math:`\gamma` (elastic Lissajous) and :math:`\sigma
 LAOS requires numerical integration of the ODEs over multiple cycles until a periodic
 steady state is reached. The RheoJAX implementation uses Diffrax with adaptive time
 stepping.
+
+LAOS: Linear Stress Response at All Amplitudes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A remarkable property of the base Tanaka-Edwards model (constant breakage, Hookean
+chains) is that the stress response in LAOS is **perfectly sinusoidal** regardless of
+strain amplitude :math:`\gamma_0`. This means:
+
+- :math:`I_3/I_1 = 0` (no third harmonic) at **all** :math:`\gamma_0`
+- The elastic Lissajous curve is always a perfect ellipse
+- The Fourier spectrum contains only the fundamental frequency
+
+This occurs because the constitutive equation is **linear in** :math:`\mathbf{S}` (the
+upper-convected Maxwell model). The time-varying shear rate
+:math:`\dot{\gamma}(t) = \gamma_0 \omega \cos(\omega t)` enters linearly through the
+velocity gradient :math:`\boldsymbol{\kappa}`, and the relaxation term is also linear.
+
+**Consequence for model identification:** If LAOS data show **any** higher harmonics
+(:math:`I_3/I_1 > 0`), the base Tanaka-Edwards model is immediately ruled out. One must
+invoke nonlinear extensions:
+
+- **Bell breakage** → odd harmonics from :math:`\exp[\nu(\text{tr}\mathbf{S} - 3)]`
+- **FENE stress** → harmonics from :math:`L^2/(L^2 - \text{tr}\mathbf{S})` nonlinearity
+- **Non-affine slip** → harmonics from Gordon-Schowalter coupling
 
 Parameters
 ----------
@@ -1707,6 +1802,8 @@ See Also
 
 **Related TNT model variants:**
 
+- :doc:`tnt_protocols` — Full protocol equations, cohort formulation, and numerical methods
+- :doc:`tnt_knowledge_extraction` — Model identification and fitting guidance
 - :ref:`model-tnt-bell` — Force-dependent breakage (Bell model) for shear-thinning networks
 - :ref:`model-tnt-fene-p` — Finite extensibility (FENE-P) for strain stiffening
 - :ref:`model-tnt-non-affine` — Gordon-Schowalter non-affine motion

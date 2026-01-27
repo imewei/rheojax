@@ -1075,23 +1075,162 @@ Each mode :math:`i` has its own :math:`\tau_{b,i}` and could have its own :math:
 
 Typically, a single :math:`\kappa` is used (same mechanism across all modes).
 
+Rheopecty: Anti-Thixotropic Behavior
+=====================================
+
+Rheopecty is the opposite of thixotropy: viscosity *increases* with time under shear, rather than decreasing. While thixotropic materials (modeled by DMT or fluidity kinetics) lose structure under flow, rheopectic materials *build* structure under deformation.
+
+In the stretch-creation model, rheopecty arises naturally from the coupling between chain stretch and bond creation:
+
+1. Flowing chains stretch, increasing :math:`\text{tr}(\mathbf{S})`
+2. Enhanced trace increases the creation rate :math:`k_{on}(\mathbf{S})`
+3. More bonds form, strengthening the network
+4. The strengthened network resists flow more strongly
+
+This constitutes a **positive feedback loop**: more flow leads to more stretch, which leads to more bonds, which leads to more resistance to flow. The material stiffens under sustained deformation rather than softening.
+
+This is fundamentally different from thixotropic models (such as the DMT or fluidity frameworks) where shear *breaks* structure. In the stretch-creation framework, shear *builds* structure. The two behaviors correspond to opposite signs of the feedback between deformation and microstructural evolution:
+
+- **Thixotropy** (negative feedback): shear destroys bonds, reducing viscosity, permitting more shear
+- **Rheopecty** (positive feedback): shear stretches chains, creating more bonds, increasing viscosity, resisting further shear
+
+Experimental systems that exhibit rheopectic or strain-building behavior include:
+
+- **Strain-crystallizing rubbers** (polyisoprene under extension): Chain alignment promotes crystallite nucleation, creating additional physical crosslinks that stiffen the network.
+- **Mechanophore-containing networks** (spiropyran-functionalized gels): Mechanical force activates latent reactive groups, forming new covalent or non-covalent bonds under deformation.
+- **Peptide hydrogels with strain-activated hydrogen bonding**: Mechanical alignment of peptide fibers promotes inter-fiber hydrogen bonding, strengthening the gel under shear.
+
+Physical Mechanisms for Stretch-Dependent Creation
+===================================================
+
+Several distinct physical mechanisms can lead to stretch-dependent bond creation, each corresponding to a different molecular-level process:
+
+1. **Strain-induced crystallization.** Chain alignment promotes crystallite nucleation, and crystallites act as additional crosslinks. The crystal nucleation rate increases with chain orientation, which scales with :math:`\text{tr}(\mathbf{S}) - 3`. This is the dominant mechanism in natural rubber and other strain-crystallizing elastomers.
+
+2. **Mechanochemical activation.** Mechanophore groups along the chain backbone activate under tension, exposing reactive sites that form new bonds. Well-known examples include spiropyran (which isomerizes to the reactive merocyanine form under force) and dioxetane (which cleaves to aldehyde fragments that can recombine). The activation rate depends on the force in the chain, which correlates with stretch.
+
+3. **Proximity-enhanced association.** Chain stretch brings reactive end-groups or side-groups into closer proximity with potential binding partners, increasing the effective encounter rate. In a coiled conformation, reactive groups may be sterically shielded; extension exposes them and reduces the mean distance to neighboring chains.
+
+4. **Alignment-enhanced bonding.** Pre-aligned chains have reduced conformational entropy cost for association, lowering the activation barrier for bond formation. Two parallel, extended chains can zip together more easily than two randomly coiled chains, because the entropic penalty for forming a contact is smaller when the chains are already aligned.
+
+The parameter :math:`\kappa` captures the *net* effect of these mechanisms: :math:`\kappa > 0` means that stretch enhances creation, while :math:`\kappa = 0` recovers the base Tanaka-Edwards model with constant creation rate. The linear form :math:`k_{on} = (1/\tau_b)(1 + \kappa(\text{tr}(\mathbf{S}) - 3))` is the simplest phenomenological coupling; more detailed models could include saturation, activation thresholds, or distinct :math:`\kappa` values for different mechanisms.
+
+Shear Thickening Transient
+===========================
+
+During startup flow at constant shear rate :math:`\dot{\gamma}`, the stretch-creation model predicts that the stress rises *faster* than the linear elastic prediction. This shear thickening transient is a direct consequence of the positive feedback between stretch and bond creation.
+
+The physical sequence during startup is:
+
+1. **Initial elastic loading**: At early times :math:`t \ll \tau_b`, the network deforms affinely and the stress grows linearly with strain: :math:`\sigma(t) \approx G \dot{\gamma} t`.
+
+2. **Stretch enhancement activates**: As chains extend, :math:`\text{tr}(\mathbf{S})` exceeds 3, and the creation rate :math:`k_{on}` begins to increase above its equilibrium value :math:`1/\tau_b`.
+
+3. **Network densification**: The enhanced creation rate produces more elastically active chains than the base model, so the effective modulus increases with time: :math:`G_{\text{eff}}(t) > G_0`.
+
+4. **Super-linear stress growth**: The stress grows faster than the elastic prediction: :math:`\sigma(t) > G \dot{\gamma} t`, reflecting the increasing number of load-bearing chains.
+
+5. **Enhanced steady state**: Eventually the system reaches a steady state where the enhanced creation rate balances the constant breakage rate, yielding a higher effective viscosity than the base Tanaka-Edwards model.
+
+The steady-state stress satisfies:
+
+.. math::
+
+   \sigma_{\text{steady}}(\dot{\gamma}) > \sigma_{\text{TE}}(\dot{\gamma})
+
+where :math:`\sigma_{\text{TE}}` is the base Tanaka-Edwards steady-state stress (with :math:`\kappa = 0`). The ratio :math:`\sigma_{\text{steady}} / \sigma_{\text{TE}}` increases with both :math:`\kappa` and the Weissenberg number :math:`\text{Wi} = \dot{\gamma} \tau_b`.
+
+The transient shear thickening ratio :math:`\sigma_{\text{peak}} / \sigma_{\text{TE,peak}}` can significantly exceed 1 for large :math:`\kappa`, because the peak stress occurs at a time when :math:`\text{tr}(\mathbf{S})` is near its maximum transient value.
+
+This startup behavior contrasts sharply with the Bell model, where startup shows a stress *overshoot*: the stress rises above the steady-state value and then relaxes back down. In the stretch-creation model, the stress rises monotonically to a steady state that is *higher* than the base model prediction, without necessarily overshooting.
+
+Creep Ringing and Hardening
+============================
+
+Under applied constant stress (creep), the stretch-creation model can exhibit a **damped oscillatory approach** to steady state, known as creep ringing. This phenomenon arises from the coupling between deformation, chain stretch, and network creation.
+
+The mechanism proceeds as follows:
+
+1. **Stress application**: Applying a constant stress :math:`\sigma_0` causes chains to stretch in order to carry the load. The trace :math:`\text{tr}(\mathbf{S})` increases.
+
+2. **Enhanced creation**: The increased trace raises the creation rate :math:`k_{on}`, forming additional bonds. The network stiffens, and the strain rate :math:`\dot{\gamma}(t)` *decreases*.
+
+3. **Reduced stretch**: The lower strain rate reduces chain stretch, causing :math:`\text{tr}(\mathbf{S})` to decrease. The creation rate drops, and the network softens slightly.
+
+4. **Oscillatory approach**: This back-and-forth between stiffening and softening creates damped oscillations in :math:`\dot{\gamma}(t)`, analogous to creep ringing in inertial rheometry but arising here from a purely constitutive mechanism.
+
+At long times, the strain rate :math:`\dot{\gamma}(t)` may approach a *lower* steady value than the Tanaka-Edwards prediction, reflecting the hardened network state. For strong coupling (large :math:`\kappa`), the material may effectively arrest: :math:`\dot{\gamma} \to 0` as the network continuously builds under sustained deformation, analogous to a sol-gel transition driven by the applied stress.
+
+This long-time behavior is the opposite of **creep rupture** seen in force-dependent breakage models (Bell), where the applied stress accelerates bond breakage and eventually leads to catastrophic flow. In the stretch-creation model, the applied stress *strengthens* the network rather than weakening it.
+
+Possible Gelation Under Flow
+=============================
+
+For sufficiently large :math:`\kappa`, the positive feedback between stretch and creation can drive a **sol-gel transition under flow**. This is one of the most distinctive predictions of the stretch-creation model.
+
+The mechanism is as follows:
+
+- **At rest**: The network has an equilibrium chain density :math:`n_0 = k_{on}(I) / k_{off} = 1`, and the conformation tensor is :math:`\mathbf{S} = \mathbf{I}`.
+- **Under flow**: Chain stretch increases :math:`\text{tr}(\mathbf{S})`, which enhances the creation rate. If the enhanced creation rate exceeds the destruction rate by a sufficient margin, the network density grows without bound.
+- **Critical condition**: Flow-induced gelation occurs when the stretch-enhanced creation overwhelms the constant breakage. The critical condition can be expressed as:
+
+.. math::
+
+   \kappa \left(\text{tr}(\mathbf{S}_{\text{ss}}) - 3\right) > \kappa_{\text{gel}}
+
+where :math:`\kappa_{\text{gel}}` is a critical threshold that depends on the flow type and the Weissenberg number.
+
+**Flow-induced gelation** is observed experimentally in several systems:
+
+- **Wormlike micelle solutions at high shear rates**: Shear-induced structures (SIS) form above a critical shear rate, dramatically increasing viscosity and sometimes leading to flow instabilities.
+- **Polymer solutions near the theta-point**: Flow-induced crystallization in polyethylene melts and solutions, where extensional flow promotes chain alignment and nucleation.
+- **Associative polymer solutions under extensional flow**: Hydrophobically modified polymers can gel under extension as chain stretch exposes associating groups and promotes intermolecular bridging.
+
+The gelation threshold depends on both :math:`\kappa` and the flow type. Extensional flows are more effective at driving gelation than shear flows because they produce larger chain stretch for the same deformation rate. In simple shear, the rotational component partially mitigates the stretching effect, raising the critical :math:`\kappa` required for gelation.
+
+Failure Mode: Gelation
+=======================
+
+.. admonition:: Failure Mode
+
+   **Mechanism:** Positive feedback between chain stretch and bond creation leads to runaway network formation. The material solidifies under deformation as the creation rate overwhelms the constant breakage rate.
+
+   **Signature:** Stress that grows without bound during startup; strain rate :math:`\dot{\gamma} \to 0` in creep (complete arrest); diverging viscosity with increasing shear rate in the flow curve.
+
+   **Physical origin:** When :math:`\kappa \cdot (\text{tr}(\mathbf{S}) - 3)` exceeds a critical threshold, the creation rate overwhelms destruction, and the network density grows without limit. The system crosses a flow-induced sol-gel transition.
+
+   **Implication:** The model predicts a flow-induced sol-gel transition. Above the critical deformation rate, the material cannot reach a steady-state flow; instead, the stress and network density grow indefinitely.
+
+   **Numerical warning:** Large :math:`\kappa` values (typically :math:`\kappa > 3`) can cause ODE stiffness due to the rapidly increasing creation rate. This may require adaptive time stepping, implicit integrators (BDF methods), or reduced step sizes (:math:`\Delta t < 0.01 \tau_b`).
+
+   **Design insight:** This mechanism is desirable in self-healing materials and injectable hydrogels. During injection, the material flows; at rest (plus under residual stress), enhanced gelation restores and even exceeds the original network strength. The stretch-creation coupling provides a built-in self-reinforcement mechanism.
+
 See Also
 ========
 
-Related Models
---------------
+**TNT Shared Reference:**
 
-- :ref:`model-tnt-tanaka-edwards`: Standard Tanaka-Edwards (no stretch-creation coupling)
-- :ref:`model-tnt-bell`: Force-activated bond breakage (stress-dependent destruction)
-- :ref:`model-tnt-fene-p`: Finite extensibility (elastic stiffening)
-- :doc:`/models/fluidity/index`: Tensorial EVP with thixotropic fluidity evolution
-- :doc:`/models/dmt/index`: Scalar structure parameter with thixotropic kinetics
+- :doc:`tnt_protocols` --- Full protocol equations and numerical methods
+- :doc:`tnt_knowledge_extraction` --- Model identification and fitting guidance
 
-Related Documentation
----------------------
+**TNT Base Model:**
 
-- :ref:`models-tnt`: General framework for transient network models
-- :doc:`/models/tnt/tnt_protocols`: Shared protocol equations for all TNT variants
+- :ref:`model-tnt-tanaka-edwards` --- Base model (constant creation, :math:`\kappa = 0` limit)
+
+**Opposite Physics --- Stress-Activated Destruction:**
+
+- :ref:`model-tnt-bell` --- Force-dependent breakage (shear thinning vs shear thickening)
+- :ref:`model-tnt-fene-p` --- Finite extensibility (elastic hardening vs kinetic hardening)
+
+**Related TNT Variants:**
+
+- :ref:`model-tnt-loop-bridge` --- Topology-dependent creation (loops to bridges)
+- :ref:`model-tnt-multi-species` --- Multiple bond types (can include one stretch-enhanced species)
+
+**External Thixotropic/Rheopectic Models:**
+
+- :doc:`/models/fluidity/index` --- Tensorial EVP with thixotropic fluidity evolution
+- :doc:`/models/dmt/index` --- Scalar structure parameter with thixotropic kinetics
 
 API Reference
 =============

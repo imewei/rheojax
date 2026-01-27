@@ -125,6 +125,130 @@ This gives the **4-component ODE system** (for constant breakage, upper-convecte
 - First normal stress difference: :math:`N_1 = G \cdot [f(S_{xx}) - f(S_{yy})]`
 - Second normal stress: :math:`N_2 = G \cdot [f(S_{yy}) - f(S_{zz})]` (zero for UCM)
 
+History Integral (Cohort) Formulation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The TNT framework admits an equivalent **integral formulation** that tracks cohorts of
+chains born at different times. This perspective is particularly useful for understanding
+step-strain responses and complex deformation histories.
+
+**Deformation measures:**
+
+The deformation gradient :math:`\mathbf{F}(t,t')` maps material elements from
+configuration at time :math:`t'` to time :math:`t`. The **Finger tensor**
+(left Cauchy-Green) is:
+
+.. math::
+
+   \mathbf{B}(t,t') = \mathbf{F}(t,t') \cdot \mathbf{F}^T(t,t')
+
+For simple shear with accumulated strain :math:`\gamma(t,t')`:
+
+.. math::
+
+   \mathbf{B}(t,t') = \begin{bmatrix}
+   1 + \gamma^2 & \gamma & 0 \\
+   \gamma & 1 & 0 \\
+   0 & 0 & 1
+   \end{bmatrix}
+
+**Cohort stress superposition:**
+
+Chains born at time :math:`t'` contribute stress proportional to their birth rate
+:math:`\beta(t')`, survival probability :math:`S(t,t')`, and accumulated deformation:
+
+.. math::
+
+   \boldsymbol{\tau}(t) = \int_{-\infty}^{t} \beta(t') \, S(t,t') \,
+   G \bigl[\mathbf{B}(t,t') - \mathbf{I}\bigr] \, dt'
+
+where:
+
+- :math:`\beta(t')`: Rate of chain creation at time :math:`t'` (at equilibrium,
+  :math:`\beta = 1/\tau_b`)
+- :math:`S(t,t') = \exp\!\bigl[-\int_{t'}^{t} k_d(s)\,ds\bigr]`: Probability that a
+  chain born at :math:`t'` survives to time :math:`t`
+- :math:`k_d(s)` is the destruction rate (variant-dependent)
+
+For constant breakage (:math:`k_d = 1/\tau_b`), the survival probability simplifies to:
+
+.. math::
+
+   S(t,t') = \exp\!\bigl[-(t-t')/\tau_b\bigr]
+
+**Shear stress component:**
+
+.. math::
+
+   \tau_{xy}(t) = G \int_{-\infty}^{t} \frac{1}{\tau_b} \exp\!\left[-\int_{t'}^{t}
+   k_d(s)\,ds\right] \gamma(t,t') \, dt'
+
+**Equivalence with differential form:**
+
+Differentiating the integral form with respect to time recovers the conformation tensor
+ODE. The integral form is the **formal solution** of the differential equation for any
+deformation history.
+
+**Generic protocol formula:**
+
+.. math::
+
+   \tau(t) = \int_{-\infty}^{t} \beta(t') \exp\!\left[-\int_{t'}^{t} k_d(s)\,ds\right]
+   g\bigl(\gamma(t,t')\bigr) \, dt'
+
+where :math:`g(\gamma)` is the strain measure function (linear for Hookean, nonlinear for
+FENE). The specific deformation history :math:`\gamma(t,t')` depends on the protocol:
+
+- **Flow curve**: :math:`\gamma(t,t') = \dot{\gamma}(t - t')`, steady integral
+- **Startup**: Integrate from :math:`t' = 0` to :math:`t` (chains born after flow onset)
+- **Relaxation**: :math:`\gamma(t,t') = \gamma_0` for :math:`t' < 0` (step strain)
+- **Creep**: Solve inverse problem for :math:`\dot{\gamma}(t)` given constant stress
+- **SAOS/LAOS**: :math:`\gamma(t,t') = \gamma(t) - \gamma(t')`, Fourier analysis
+
+Cohort Method — Numerical Template
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The integral (cohort) formulation can be discretized for numerical evaluation, providing
+an alternative to ODE integration that is particularly suited for complex histories:
+
+**Algorithm:**
+
+1. Discretize time: :math:`t_0, t_1, \ldots, t_N` with :math:`\Delta t = t_{i+1} - t_i`
+2. At each time step :math:`t_n`, maintain cohort weights :math:`w_j` for
+   :math:`j = 0, 1, \ldots, n`
+3. Update survival: :math:`w_j \leftarrow w_j \cdot \exp(-k_d(t_n) \cdot \Delta t)`
+4. Add new cohort: :math:`w_n = \beta(t_n) \cdot \Delta t`
+5. Compute stress: :math:`\tau(t_n) = G \sum_{j=0}^{n} w_j \cdot g(\gamma(t_n, t_j))`
+
+**JAX implementation sketch:**
+
+.. code-block:: python
+
+   def cohort_stress(t_eval, gamma_history, params):
+       G, tau_b, nu = params['G'], params['tau_b'], params['nu']
+       dt = t_eval[1] - t_eval[0]
+       n_steps = len(t_eval)
+
+       def scan_fn(weights, i):
+           # Decay existing cohorts
+           k_d = 1.0 / tau_b  # constant breakage; generalize for Bell
+           weights = weights * jnp.exp(-k_d * dt)
+           # Add new cohort
+           weights = weights.at[i].set((1.0 / tau_b) * dt)
+           # Compute strain measures relative to current time
+           gamma_rel = gamma_history[i] - gamma_history[:n_steps]
+           # Stress superposition
+           stress = G * jnp.sum(weights[:i+1] * gamma_rel[:i+1])
+           return weights, stress
+
+       weights_init = jnp.zeros(n_steps)
+       _, stresses = jax.lax.scan(scan_fn, weights_init, jnp.arange(n_steps))
+       return stresses
+
+This cohort approach complements the Diffrax ODE solver. The ODE approach is generally
+preferred for smooth deformation histories, while the cohort method excels for
+**discontinuous histories** (e.g., sequences of step strains, multi-step creep).
+
 Flow Curve (Steady Shear)
 -------------------------
 
@@ -802,6 +926,84 @@ Numerical Stability
 - Check mass balance: :math:`\text{tr}(\mathbf{S}) > 0`
 - Check symmetry: :math:`S_{xy} = S_{yx}` (automatic in 2D reduction)
 - Compare to analytical solutions (constant breakage, SAOS)
+
+Variant × Protocol Effect Matrix
+---------------------------------
+
+Summary of the **dominant physical effect** each variant introduces for each protocol.
+All variants reduce to the base Tanaka-Edwards (constant breakage) prediction in the
+linear limit (:math:`\gamma_0 \ll 1`).
+
+.. list-table::
+   :widths: 14 11 11 11 11 11 11 11 11
+   :header-rows: 1
+
+   * - Protocol
+     - Constant
+     - Bell
+     - FENE
+     - NonAffine
+     - StretchCreate
+     - LoopBridge
+     - Cates
+     - MultiSpecies
+   * - Flow curve
+     - Newtonian
+     - Thinning
+     - Saturation
+     - :math:`N_2 \neq 0`
+     - Thickening
+     - :math:`f_B`-dependent
+     - Non-monotonic
+     - Multi-rate
+   * - SAOS
+     - Maxwell
+     - Maxwell
+     - Maxwell
+     - Maxwell
+     - Maxwell
+     - Reduced :math:`G`
+     - Cole-Cole
+     - Multi-mode
+   * - Startup
+     - Monotonic
+     - Overshoot
+     - Stiffening
+     - Overshoot
+     - Thickening
+     - Two timescales
+     - Large overshoot
+     - Staged
+   * - Relaxation
+     - Exponential
+     - Strain-dep :math:`\tau`
+     - :math:`f`-dep decay
+     - Faster decay
+     - Slow (hardening)
+     - Bridge recovery
+     - Stretched exp
+     - Multi-exp
+   * - Creep
+     - Viscous flow
+     - Yielding
+     - Saturation
+     - Faster flow
+     - Ringing
+     - :math:`f_B` collapse
+     - Banding
+     - Staged flow
+   * - LAOS
+     - Sinusoidal
+     - Odd harmonics
+     - Box Lissajous
+     - :math:`N_2` signal
+     - Hardening
+     - Asymmetric
+     - Plateau
+     - Multi-timescale
+
+See :doc:`tnt_knowledge_extraction` for guidance on using these signatures to identify
+the appropriate variant from experimental data.
 
 See Also
 --------

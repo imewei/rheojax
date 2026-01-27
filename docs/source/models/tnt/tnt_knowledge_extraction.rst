@@ -50,7 +50,7 @@ TNT models provide access to fundamental network physics through fitted paramete
 How to Use This Guide
 ======================
 
-1. **Fit your TNT model** using :ref:`tnt-protocols`
+1. **Fit your TNT model** using :doc:`tnt_protocols`
 2. **Extract parameter values** (point estimates or posteriors)
 3. **Apply parameter-to-physics maps** (Section 2) to get physical properties
 4. **Classify your material** using decision trees (Sections 3, 5)
@@ -67,10 +67,10 @@ TNT family has 10 variants. Decision process:
 2. Check residuals and physical reasonableness
 3. If systematic deviations, add complexity:
 
-   - Shear thinning → :class:`~rheojax.models.TNTBell`
-   - Strain hardening → :class:`~rheojax.models.TNTFENE`
-   - Multiple relaxations → :class:`~rheojax.models.TNTMultiSpecies`
-   - Shear thickening → :class:`~rheojax.models.TNTLoopBridge`
+   - Shear thinning → :class:`~rheojax.models.TNTBell` (:ref:`model-tnt-bell`)
+   - Strain hardening → :class:`~rheojax.models.TNTFENE` (:ref:`model-tnt-fene-p`)
+   - Multiple relaxations → :class:`~rheojax.models.TNTMultiSpecies` (:ref:`model-tnt-multi-species`)
+   - Shear thickening → :class:`~rheojax.models.TNTLoopBridge` (:ref:`model-tnt-loop-bridge`)
 
 4. Compare via WAIC/BIC (Bayesian) or AIC (NLSQ)
 5. Use simplest model within 2 WAIC units of best
@@ -153,6 +153,8 @@ where :math:`\tau_0 \sim 10^{-9}` s is molecular attempt time (phonon frequency)
 Bell Model Extensions
 =====================
 
+*See also:* :ref:`model-tnt-bell` for full variant handbook.
+
 Force Sensitivity Parameter
 ----------------------------
 
@@ -189,6 +191,8 @@ where :math:`F_{\text{char}} = \sigma_c / n_{\text{chains}}^{1/3}` is characteri
 
 FENE Model Extensions
 ======================
+
+*See also:* :ref:`model-tnt-fene-p` for full variant handbook.
 
 Chain Extensibility
 -------------------
@@ -229,6 +233,8 @@ Chain Extensibility
 Non-Affine Model Extensions
 ============================
 
+*See also:* :ref:`model-tnt-non-affine` for full variant handbook.
+
 Entanglement Coupling
 ---------------------
 
@@ -259,6 +265,8 @@ Entanglement Coupling
 
 Stretch-Creation Model Extensions
 ==================================
+
+*See also:* :ref:`model-tnt-stretch-creation` for full variant handbook.
 
 Mechanochemical Coupling
 -------------------------
@@ -292,6 +300,8 @@ where :math:`\lambda` is chain stretch and :math:`k_c^0 = 1/\tau_c` is baseline 
 
 Loop-Bridge Model Extensions
 =============================
+
+*See also:* :ref:`model-tnt-loop-bridge` for full variant handbook.
 
 Network Topology
 ----------------
@@ -330,6 +340,8 @@ where :math:`\nu_{\text{total}} = G/(k_B T)` is total chain density.
 Cates Model Extensions
 ======================
 
+*See also:* :ref:`model-tnt-cates` for full variant handbook.
+
 Living Polymer Parameters
 -------------------------
 
@@ -366,6 +378,8 @@ Living Polymer Parameters
 
 Sticky Rouse Extensions
 ========================
+
+*See also:* :ref:`model-tnt-sticky-rouse` for full variant handbook.
 
 Sticker Dynamics
 ----------------
@@ -477,7 +491,7 @@ Based on breakage time :math:`\tau_b`:
 Shear Response Classification
 ==============================
 
-Based on flow curve shape (from Bell, FENE, or loop-bridge fits):
+Based on flow curve shape (from :ref:`Bell <model-tnt-bell>`, :ref:`FENE-P <model-tnt-fene-p>`, or :ref:`loop-bridge <model-tnt-loop-bridge>` fits):
 
 .. code-block:: text
 
@@ -534,6 +548,19 @@ Based on SAOS Cole-Cole plot (:math:`G''` vs :math:`G'`):
    │   ├─> Try: Fractional models (KWW, Cole-Cole)
    │   └─> Or: Broad distribution (multi-mode)
 
+.. tip::
+
+   **Variant Handbooks:** For detailed physics, equations, protocol predictions, and failure modes of each variant, see:
+
+   - :ref:`model-tnt-bell` (force-dependent breakage)
+   - :ref:`model-tnt-fene-p` (finite extensibility)
+   - :ref:`model-tnt-non-affine` (Gordon-Schowalter slip)
+   - :ref:`model-tnt-stretch-creation` (enhanced reformation)
+   - :ref:`model-tnt-loop-bridge` (two-species topology)
+   - :ref:`model-tnt-sticky-rouse` (multi-mode sticker dynamics)
+   - :ref:`model-tnt-cates` (living polymers)
+   - :ref:`model-tnt-multi-species` (multiple bond types)
+
 Polymer Architecture Inference
 ===============================
 
@@ -548,19 +575,19 @@ Polymer Architecture Inference
      - Single-mode, moderate :math:`\tau_b`
      - PEO with end groups
    * - Telechelic
-     - Loop-bridge, :math:`f_{B,\text{eq}} < 1`, shear thickening
+     - :ref:`Loop-bridge <model-tnt-loop-bridge>`, :math:`f_{B,\text{eq}} < 1`, shear thickening
      - HEUR, PEO-PPO-PEO
    * - Miktoarm Star
-     - Multi-species (different arms)
+     - :ref:`Multi-species <model-tnt-multi-species>` (different arms)
      - ABC star copolymers
    * - Wormlike Micelle
-     - Cates, :math:`\tau_d \ll \tau_{\text{rep}}`
+     - :ref:`Cates <model-tnt-cates>`, :math:`\tau_d \ll \tau_{\text{rep}}`
      - CTAB/NaSal
    * - Reversible Gel
-     - High :math:`G`, slow :math:`\tau_b`, FENE or stretch-creation
+     - High :math:`G`, slow :math:`\tau_b`, :ref:`FENE <model-tnt-fene-p>` or :ref:`stretch-creation <model-tnt-stretch-creation>`
      - Vitrimers, ionomers
    * - Supramolecular
-     - Sticky Rouse, multiple :math:`\tau_s`
+     - :ref:`Sticky Rouse <model-tnt-sticky-rouse>`, multiple :math:`\tau_s`
      - Multi-H-bond systems
 
 ------------
@@ -729,6 +756,8 @@ Complex Viscosity
 Cates Model Scaling
 ===================
 
+*See also:* :ref:`model-tnt-cates` for the full Cates variant handbook.
+
 Living Polymer Relations
 ------------------------
 
@@ -761,6 +790,8 @@ When :math:`\tau_{\text{break}} \gg \tau_{\text{rep}}`:
 Sticky Rouse Scaling
 =====================
 
+*See also:* :ref:`model-tnt-sticky-rouse` for the full Sticky Rouse variant handbook.
+
 Effective Mode Times
 --------------------
 
@@ -791,6 +822,8 @@ For mode :math:`p`:
 Bell Model Scaling
 ===================
 
+*See also:* :ref:`model-tnt-bell` for the full Bell variant handbook.
+
 Shear Thinning Power Law
 -------------------------
 
@@ -815,6 +848,8 @@ where
 
 FENE Model Scaling
 ==================
+
+*See also:* :ref:`model-tnt-fene-p` for the full FENE-P variant handbook.
 
 Strain Hardening Onset
 -----------------------
@@ -960,6 +995,141 @@ Master Decision Tree
                    (Force-   └────────┘  └─────────┘
                    sensitive) (Polydisperse) (Entangle)
 
+.. tip::
+
+   **Variant Handbooks:** For detailed physics, equations, protocol predictions, and failure modes of each variant, see:
+
+   - :ref:`model-tnt-bell` (force-dependent breakage)
+   - :ref:`model-tnt-fene-p` (finite extensibility)
+   - :ref:`model-tnt-non-affine` (Gordon-Schowalter slip)
+   - :ref:`model-tnt-stretch-creation` (enhanced reformation)
+   - :ref:`model-tnt-loop-bridge` (two-species topology)
+   - :ref:`model-tnt-sticky-rouse` (multi-mode sticker dynamics)
+   - :ref:`model-tnt-cates` (living polymers)
+   - :ref:`model-tnt-multi-species` (multiple bond types)
+
+Protocol-Specific Diagnostic Signatures
+=========================================
+
+This section shows how each experimental protocol discriminates between TNT variants.
+Use this table to plan which experiments will be most informative for identifying
+your material's dominant physics.
+
+.. list-table:: Protocol-Specific Diagnostic Signatures
+   :widths: 10 11 11 11 11 11 12 12 11
+   :header-rows: 1
+
+   * - Protocol
+     - :ref:`Bell <model-tnt-bell>`
+     - :ref:`FENE-P <model-tnt-fene-p>`
+     - :ref:`Non-Affine <model-tnt-non-affine>`
+     - :ref:`Stretch-Creation <model-tnt-stretch-creation>`
+     - :ref:`Loop-Bridge <model-tnt-loop-bridge>`
+     - :ref:`Sticky Rouse <model-tnt-sticky-rouse>`
+     - :ref:`Cates <model-tnt-cates>`
+     - :ref:`Multi-Species <model-tnt-multi-species>`
+   * - **SAOS**
+     - Same Maxwell
+     - Same Maxwell
+     - Same Maxwell
+     - Same Maxwell
+     - Reduced :math:`G'` plateau
+     - Multi-mode spectrum
+     - Cole-Cole semicircle
+     - Multi-peak :math:`G''`
+   * - **Flow Curve**
+     - Power-law thinning
+     - Thinning + saturation
+     - :math:`N_2 \neq 0`, same :math:`\sigma(\dot{\gamma})`
+     - Shear thickening
+     - :math:`f_B`-dependent thinning
+     - Cox-Merz failure
+     - Non-monotonic :math:`\to` banding
+     - Staged thinning (staircase)
+   * - **Startup**
+     - Overshoot at :math:`\gamma \approx 1/\sqrt{\nu}`
+     - Strain stiffening (super-linear)
+     - Reduced :math:`N_1`, :math:`N_2 \neq 0`
+     - Super-linear stress rise
+     - Two timescales in :math:`\sigma(t)`
+     - Multi-mode relaxation
+     - Large overshoot :math:`\to` plateau
+     - Sequential yielding
+   * - **Relaxation**
+     - Strain-dependent :math:`\tau_{\text{eff}}`
+     - :math:`f`-dependent initial decay
+     - Same as base TE
+     - Slower decay (hardening)
+     - Bridge recovery (stress :math:`\uparrow`)
+     - Multi-exponential
+     - Stretched exponential
+     - Multi-exponential
+   * - **Creep**
+     - Eventual rupture at :math:`\sigma > \sigma_c`
+     - Strain saturates at :math:`L_{\text{max}}`
+     - Faster creep (slip)
+     - Creep ringing / arrest
+     - :math:`f_B` collapse :math:`\to` rupture
+     - Multi-stage compliance
+     - Viscosity bifurcation
+     - Staged compliance
+   * - **LAOS**
+     - Strong odd harmonics
+     - Box-like Lissajous
+     - :math:`N_2` oscillates at :math:`2\omega`
+     - Enhanced odd harmonics
+     - Asymmetric Lissajous
+     - Complex multi-harmonic
+     - Stress plateau
+     - Double-yielding
+
+.. note::
+
+   Diagnostic power is **highest** when comparing multiple protocols. A single protocol rarely
+   uniquely identifies a variant. Plan experiments to cover at least two rows of this table
+   for unambiguous variant selection.
+
+Master Experimental Fingerprints
+=================================
+
+The following table maps observable experimental signatures to their diagnostic TNT variant
+and the confirmatory test needed to validate the identification.
+
+.. list-table:: Master Experimental Fingerprints
+   :widths: 35 25 40
+   :header-rows: 1
+
+   * - Observable Signature
+     - Diagnostic Variant
+     - Confirmatory Test
+   * - Power-law shear thinning with rate-dependent relaxation
+     - :ref:`Bell <model-tnt-bell>`
+     - Step strain: :math:`\tau_{\text{eff}}(\gamma_0)` decreases with :math:`\gamma_0`
+   * - Strain stiffening at large extensions
+     - :ref:`FENE-P <model-tnt-fene-p>`
+     - Extensional viscosity bounded, Lissajous becomes box-like
+   * - Non-zero :math:`N_2` (negative, proportional to :math:`\xi`)
+     - :ref:`Non-Affine <model-tnt-non-affine>`
+     - Lodge-Meissner violation in step strain
+   * - Shear thickening (viscosity increases with rate)
+     - :ref:`Stretch-Creation <model-tnt-stretch-creation>`
+     - Startup shows super-linear stress growth
+   * - Concentration-dependent viscosity with two timescales
+     - :ref:`Loop-Bridge <model-tnt-loop-bridge>`
+     - Bridge fraction recovery after flow cessation
+   * - :math:`G'(\omega) \sim \omega^{1/2}` at intermediate frequencies
+     - :ref:`Sticky Rouse <model-tnt-sticky-rouse>`
+     - Multiple plateau regions in modulus
+   * - Cole-Cole semicircle in :math:`G''` vs :math:`G'`
+     - :ref:`Cates <model-tnt-cates>`
+     - Non-monotonic flow curve :math:`\to` shear banding
+   * - Multiple peaks in :math:`G''(\omega)`
+     - :ref:`Multi-Species <model-tnt-multi-species>`
+     - Sequential yielding in LAOS, staged flow curve
+   * - Non-zero equilibrium stress after relaxation
+     - :ref:`Multi-Species <model-tnt-multi-species>` (permanent + transient)
+     - Creep saturation: :math:`\gamma \to \gamma_\infty`
+
 ---------------------------
 Cross-Model Comparison
 ---------------------------
@@ -978,7 +1148,7 @@ Single-mode TNT is identical to Maxwell in linear viscoelasticity:
 
    G_{\text{TNT}} = G_{\text{Maxwell}}, \quad \tau_{\text{TNT}} = \tau_{\text{Maxwell}}
 
-**Difference**: TNT provides physical interpretation (bond breakage) and extends to nonlinear (Bell, FENE).
+**Difference**: TNT provides physical interpretation (bond breakage) and extends to nonlinear (:ref:`Bell <model-tnt-bell>`, :ref:`FENE-P <model-tnt-fene-p>`).
 
 **When to Use**:
 
@@ -991,7 +1161,7 @@ TNT vs Giesekus Model
 Shear Thinning Comparison
 --------------------------
 
-Both TNT-Bell and Giesekus produce shear thinning, but via different mechanisms:
+Both :ref:`TNT-Bell <model-tnt-bell>` and Giesekus produce shear thinning, but via different mechanisms:
 
 .. list-table:: Shear Thinning Mechanisms
    :widths: 25 35 40
@@ -1035,11 +1205,95 @@ Structural vs Kinetic Approaches
      - Emergent from network (high :math:`G`, slow :math:`\tau_b`)
      - Explicit :math:`\tau_y(\lambda)` closure
    * - Thixotropy
-     - Via multi-species (different bond types)
+     - Via :ref:`multi-species <model-tnt-multi-species>` (different bond types)
      - Native (aging vs rejuvenation)
    * - Strength
      - Network physics, normal stresses
      - Explicit history-dependence
+
+-----------------------------------------------
+Cohort Method: Alternative Numerical Approach
+-----------------------------------------------
+
+The **cohort (history integral) method** provides an alternative to the standard ODE-based
+approach for computing TNT model predictions. Instead of evolving the conformation tensor
+:math:`\mathbf{S}(t)` forward in time via a differential equation, the cohort method tracks
+individual **cohorts** of chains born at time :math:`t'` and sums their contributions to the
+total stress.
+
+Integral Formulation
+=====================
+
+Each cohort of chains created at time :math:`t'` contributes to the stress at time :math:`t`
+proportionally to their birth rate :math:`\beta(t')`, their survival probability
+:math:`\mathcal{S}(t,t')`, and the deformation they have accumulated since birth. The total
+stress is the integral over all cohorts:
+
+.. math::
+
+   \boldsymbol{\sigma}(t) = \int_{-\infty}^{t} \beta(t') \, \mathcal{S}(t,t') \, G\left[\mathbf{B}(t,t') - \mathbf{I}\right] \, dt' + 2\eta_s \mathbf{D}(t)
+
+where :math:`\beta(t')` is the birth rate, :math:`\mathcal{S}(t,t') = \exp\left(-\int_{t'}^{t} k_d(s) \, ds\right)` is the survival probability, and :math:`\mathbf{B}(t,t')` is the Finger strain tensor.
+
+Each individual cohort contributes:
+
+.. math::
+
+   d\boldsymbol{\sigma}(t) = G \cdot \beta(t') \cdot \mathbf{S}(t,t') \cdot \exp\left(-\int_{t'}^{t} k_d(s) \, ds\right) \cdot dt'
+
+where :math:`k_d(s)` is the destruction rate at time :math:`s`, which may depend on the local
+stress or strain rate (as in the :ref:`Bell <model-tnt-bell>` or
+:ref:`stretch-creation <model-tnt-stretch-creation>` variants).
+
+Mathematical Equivalence
+=========================
+
+The ODE (conformation tensor) and integral (cohort) approaches are **mathematically equivalent** ---
+they give identical predictions. The choice between them is purely one of numerical convenience
+for a given problem. The ODE form evolves a single state variable forward in time, while the
+integral form explicitly sums over the deformation history.
+
+Advantages of the Cohort Method
+================================
+
+- **Complex deformation histories**: Naturally handles step-and-hold sequences, multi-rate
+  protocols, and arbitrary time-dependent flows without special treatment at discontinuities.
+
+- **Embarrassingly parallel on GPU**: Each cohort is independent --- the survival probability
+  and strain accumulation for cohort :math:`t'` can be computed without reference to any other
+  cohort. This maps directly to GPU parallelism.
+
+- **Direct access to age distribution**: The cohort formulation gives immediate access to the
+  age distribution of surviving chains, :math:`P(\text{age}) = \mathcal{S}(t, t-\text{age})`,
+  which is a useful diagnostic for non-equilibrium states.
+
+- **Numerical stability for large strain steps**: The integral form avoids the stiffness issues
+  that can arise in the ODE form when the deformation gradient changes abruptly.
+
+Disadvantages of the Cohort Method
+====================================
+
+- **Memory grows with time steps**: All cohort weights must be stored, leading to
+  :math:`O(N_t)` memory where :math:`N_t` is the number of time steps. For long simulations,
+  this can become prohibitive.
+
+- **Less efficient for steady state**: At steady state, the ODE form reaches a fixed point
+  directly, while the cohort form must still integrate over the full history (or truncate at
+  a sufficiently large age).
+
+- **Deformation gradient computation**: Each cohort pair :math:`(t, t')` requires computing
+  the Finger tensor :math:`\mathbf{B}(t,t')`, which involves the full deformation gradient
+  :math:`\mathbf{F}(t,t')` from :math:`t'` to :math:`t`.
+
+When to Use Each Approach
+==========================
+
+- **ODE (conformation tensor)**: Preferred for steady-state calculations, simple flow histories
+  (constant rate startup, steady shear), and when memory is limited.
+
+- **Cohort (history integral)**: Preferred for complex multi-step protocols (e.g., pre-shear
+  followed by relaxation followed by startup), when age-distribution information is needed,
+  or when GPU parallelism can be exploited to offset the memory cost.
 
 -------------------------------
 Bayesian Knowledge Extraction
@@ -1062,8 +1316,8 @@ Posterior correlations reveal which parameters are physically coupled:
 
 **Moderate Correlation** (:math:`0.3 < |\rho| < 0.7`):
 
-- :math:`\nu` vs :math:`\tau_b` (Bell): Force sensitivity affects apparent lifetime
-- :math:`L_{\text{max}}` vs :math:`G` (FENE): Stiffening strain related to modulus
+- :math:`\nu` vs :math:`\tau_b` (:ref:`Bell <model-tnt-bell>`): Force sensitivity affects apparent lifetime
+- :math:`L_{\text{max}}` vs :math:`G` (:ref:`FENE-P <model-tnt-fene-p>`): Stiffening strain related to modulus
 
 **No Correlation** (:math:`|\rho| < 0.3`):
 
@@ -1140,14 +1394,14 @@ Recipe 1: Determine if Material is a Living Polymer
 1. Perform SAOS: Frequency sweep from 0.01 to 100 rad/s
 2. Plot Cole-Cole: :math:`G''` vs :math:`G'`
 3. Check semicircle: Is :math:`G''_{\text{max}} \approx G/2`?
-4. Fit Cates model
+4. Fit :ref:`Cates model <model-tnt-cates>`
 5. Validate: Calculate :math:`\tau_{\text{rep}}` and :math:`\tau_{\text{break}}`
 
 Recipe 2: Measure Force Sensitivity of Crosslinks
 ==================================================
 
 1. Startup shear: Measure :math:`\sigma` vs :math:`\gamma` at multiple rates
-2. Fit Bell model to extract :math:`\nu`
+2. Fit :ref:`Bell model <model-tnt-bell>` to extract :math:`\nu`
 3. Calculate barrier distance :math:`d_b`
 4. Interpret force sensitivity level
 
@@ -1188,7 +1442,7 @@ See Also
 
 **Protocols and Workflows**:
 
-- :ref:`tnt-protocols`
+- :ref:`tnt-protocols` (:doc:`tnt_protocols`)
 
 ----------
 References

@@ -296,6 +296,44 @@ Scaling Predictions
 
    G'(\omega) \approx \left(\sum_k G_k \tau_{eff,k}\right) \omega^2, \quad G''(\omega) \approx \eta_0 \omega
 
+Leibler-Rubinstein-Colby (LRC) Scaling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The original LRC theory (Leibler, Rubinstein, Colby 1991) provides scaling relations for
+sticky Rouse dynamics:
+
+**Terminal relaxation time:**
+
+.. math::
+
+   \tau_{\text{term}} = \tau_s \left(\frac{N}{N_s}\right)^2
+
+where :math:`\tau_s` is the sticker lifetime and :math:`N_s` is the number of monomers
+between stickers.
+
+**Zero-shear viscosity:**
+
+.. math::
+
+   \eta_0 \sim \tau_s \, N_s^2 \, N^3
+
+The :math:`N^3` scaling (rather than :math:`N^{3.4}` for entangled melts) reflects the
+Rouse-like dynamics between sticker release events.
+
+Sticky Reptation Crossover
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For entangled sticky polymers, there is a crossover between sticky Rouse and sticky
+reptation dynamics:
+
+.. math::
+
+   \tau_{\text{term}} = \max\!\left(\tau_{\text{rep}}, \, \tau_s \cdot n_e\right)
+
+where :math:`n_e` is the number of entanglements per sticker. When :math:`\tau_s \cdot n_e
+> \tau_{\text{rep}}`, sticker dynamics dominate over reptation — the **sticky regime**.
+When reptation is faster, the system crosses over to standard entangled dynamics.
+
 ----
 
 Governing Equations
@@ -716,6 +754,40 @@ Frequency-Domain Map
 - Liquid-like terminal flow
 - :math:`G'' > G'` (viscous dissipation dominates)
 - Longest time :math:`\lambda = \tau_{R,1} + \tau_s`
+
+Intermediate Frequency Signature
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The sticky Rouse model predicts a characteristic **half-power-law** scaling at
+intermediate frequencies:
+
+.. math::
+
+   G'(\omega) \sim \omega^{1/2} \quad \text{for} \quad 1/\tau_{\text{term}} \ll \omega \ll 1/\tau_s
+
+This :math:`\omega^{1/2}` dependence is the Rouse scaling, arising from the
+self-similar relaxation of chain segments between stickers. It appears as a
+characteristic slope in the log-log plot of :math:`G'` vs :math:`\omega`.
+
+**Diagnostic value:** The :math:`\omega^{1/2}` intermediate regime distinguishes sticky
+Rouse from:
+
+- **Single Maxwell** (TNTSingleMode): Sharp transition from :math:`\omega^2` to plateau
+- **Multi-species** (TNTMultiSpecies): Discrete steps between modes
+- **Cates**: Near-perfect Maxwell with single crossover
+
+Plateau Identification
+^^^^^^^^^^^^^^^^^^^^^^^
+
+For entangled sticky polymers, two plateaus may be visible in :math:`G'(\omega)`:
+
+1. **High-frequency plateau** (:math:`G_N^0`): Entanglement plateau — reflects
+   topological constraints between chain entanglements
+2. **Low-frequency plateau** (:math:`G_e`): Sticker network plateau — reflects the
+   elastic contribution of sticker-sticker associations
+
+The ratio :math:`G_e / G_N^0` gives the fraction of stress carried by the sticker
+network relative to entanglements.
 
 Time-Domain Signatures
 ----------------------
@@ -1532,34 +1604,47 @@ Multi-Temperature TTS
 
 ----
 
+Failure Mode: Terminal Flow
+----------------------------
+
+The sticky Rouse model always predicts eventual viscous flow at sufficiently long times
+or low frequencies. When all stickers have released at least once (time :math:`\gg
+\tau_{\text{term}}`), the chain loses all memory of its initial configuration and flows
+as a viscous liquid.
+
+**Physical signatures:**
+
+- :math:`G'(\omega) \sim \omega^2` and :math:`G''(\omega) \sim \omega` at :math:`\omega
+  \ll 1/\tau_{\text{term}}`
+- Steady-state creep rate :math:`\dot{\gamma}_{ss} = \sigma_0/\eta_0`
+- No residual elasticity (unlike multi-species with permanent bonds)
+
+**Distinction from gel behavior:** If the material shows a low-frequency elastic plateau
+(:math:`G'` does not decrease to zero), the sticky Rouse model is inappropriate. Consider
+:ref:`model-tnt-multi-species` with a permanent bond component, or a yield-stress model.
+
+----
+
 See Also
 ========
 
-Related Models
---------------
+**TNT Shared Reference:**
 
-- :ref:`model-tnt-tanaka-edwards` — Single-mode sticky reptation (simpler, entangled regime)
-- :ref:`model-tnt-multi-species` — Multiple sticker species with heterogeneous lifetimes
-- :ref:`model-generalized-maxwell` — Phenomenological multi-mode relaxation (no physical structure)
-- Rouse model — Pure Rouse model without stickers (limiting case)
+- :doc:`tnt_protocols` — Full protocol equations and numerical methods
+- :doc:`tnt_knowledge_extraction` — Model identification and fitting guidance
 
-Related Transforms
-------------------
+**TNT Base Model:**
 
-- :ref:`transform-mastercurve` — Time-temperature superposition for extending frequency range
-- :ref:`transform-fft` — Fourier analysis for LAOS harmonic extraction
+- :ref:`model-tnt-tanaka-edwards` — Base model (single-mode limit)
 
-Related Utilities
------------------
+**Related TNT Variants:**
 
-- Prony series decomposition for relaxation spectra
-- Optimization utilities — NLSQ optimization strategies
+- :ref:`model-tnt-multi-species` — Discrete multi-mode comparison (arbitrary :math:`G_k, \tau_k`)
+- :ref:`model-tnt-loop-bridge` — Two-species topology comparison
 
-Literature
-----------
+**Alternative Models:**
 
-- Associating polymer theory — Overview of sticky reptation theory
-- Rouse model theory — Foundations of Rouse dynamics
+- :ref:`model-tnt-cates` — Living polymers (single effective mode rather than broad spectrum)
 
 ----
 

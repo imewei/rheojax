@@ -8,39 +8,44 @@ Transient Network Theory (TNT)
 Overview
 --------
 
-Transient Network Theory (TNT) provides a constitutive framework for materials with
-**reversible crosslinks** that continuously break and reform. Unlike permanent networks
-(rubber elasticity with fixed crosslinks) or purely viscous fluids, TNT materials combine
-elastic energy storage from chain stretching with viscous dissipation from bond dynamics.
-The framework originated with Green and Tobolsky's (1946) pioneering work on polymer
-networks with labile junctions and was extended by Tanaka and Edwards (1992) to include
-chain conformation dynamics.
-
-The central physical quantity is the **conformation tensor** :math:`\mathbf{S}`, which
-evolves according to a tensorial differential equation coupling flow kinematics, chain
-elasticity, and bond kinetics. The mathematical framework is implemented in JAX with full
-automatic differentiation support, enabling GPU acceleration and Bayesian inference via
-NumPyro NUTS sampling.
-
-**Key Applications:**
-
-- **Physical gels**: Reversibly crosslinked polymer networks (hydrogels, organogels)
-- **Associating polymers**: Telechelic ionomers, multi-sticker systems
-- **Bio-networks**: Fibrin, collagen, actin with dynamic crosslinking
-- **Living polymers**: Wormlike micelles with scission/recombination
-- **Vitrimers**: Covalent adaptable networks with bond exchange
-
-**Distinguishing Features vs Other Model Families:**
-
-- **vs Maxwell**: TNT includes chain stretch and orientation (tensorial), not just scalar relaxation
-- **vs Giesekus**: Bonds break by kinetics (lifetime τ_b), not continuous relaxation
-- **vs DMT/Fluidity**: Network structure is chain-based, not scalar order parameter
-- **vs SGR**: Microscopic trap model replaced by mesoscopic network strands
-
-The RheoJAX implementation provides 5 model classes spanning 9 distinct physical variants,
+The TNT family in RheoJAX provides 5 model classes spanning 9 distinct physical variants,
 from simple single-mode Maxwell analogs to complex multi-species living polymer systems.
 All models support the full suite of rheological protocols (flow curves, SAOS, LAOS,
-startup, creep, relaxation) with validated predictions against experimental data.
+startup, creep, relaxation) with validated predictions against experimental data. The
+mathematical framework is implemented in JAX with full automatic differentiation support,
+enabling GPU acceleration and Bayesian inference via NumPyro NUTS sampling. See the
+foundation box above for the physical basis, key signatures, and constitutive equations
+shared across all TNT variants.
+
+.. admonition:: Dual Formulation — Integral vs Differential
+   :class: tip
+
+   TNT admits two **mathematically equivalent** perspectives:
+
+   **Differential (conformation tensor ODE)** — the primary RheoJAX implementation:
+
+   .. math::
+
+      \frac{D\mathbf{S}}{Dt} = \boldsymbol{\kappa} \cdot \mathbf{S}
+      + \mathbf{S} \cdot \boldsymbol{\kappa}^T
+      - \frac{1}{\tau_b(\mathbf{S})}(\mathbf{S} - \mathbf{I})
+
+   **Integral (history / cohort) formulation** — useful for step-strain analysis and
+   multi-protocol understanding:
+
+   .. math::
+
+      \boldsymbol{\tau}(t) = \int_{-\infty}^{t} \beta(t') \, S(t,t') \,
+      G \bigl[\mathbf{B}(t,t') - \mathbf{I}\bigr] \, dt'
+
+   where :math:`\beta(t')` is the birth rate of chains at time :math:`t'`,
+   :math:`S(t,t') = \exp\!\bigl[-\int_{t'}^{t} k_d(s)\,ds\bigr]` is the survival
+   probability, and :math:`\mathbf{B}(t,t')` is the Finger deformation tensor.
+
+   The integral form tracks **cohorts** of chains born at time :math:`t'`, each carrying
+   its deformation history. The differential form evolves the **ensemble average**
+   conformation :math:`\mathbf{S}(t)`. Both yield identical stress predictions. See
+   :doc:`tnt_protocols` for the full derivation and numerical methods for each approach.
 
 
 Model Hierarchy
@@ -211,6 +216,200 @@ When to Use Which Model
    - Yes, continuous → TNTStickyRouse
    - Yes, discrete peaks → TNTMultiSpecies
    - No, single mode → TNTSingleMode
+
+
+.. _tnt-failure-modes:
+
+Failure Modes
+-------------
+
+Each TNT variant has a characteristic **failure mode** — the dominant nonlinear phenomenon
+that limits the range of validity or produces extreme behavior:
+
+.. list-table::
+   :widths: 18 22 15 20 25
+   :header-rows: 1
+
+   * - Variant
+     - Primary Phenomenon
+     - Key Parameter
+     - Failure Mode
+     - Physical Mechanism
+   * - :doc:`Bell <tnt_bell>`
+     - Shear thinning / banding
+     - :math:`\nu`
+     - Runaway breakage
+     - Exponential bond weakening under stretch
+   * - :doc:`FENE-P <tnt_fene_p>`
+     - Strain stiffening
+     - :math:`L_{\max}`
+     - Chain snap
+     - Stress divergence as chains approach maximum extension
+   * - :doc:`Loop-Bridge <tnt_loop_bridge>`
+     - Concentration-dependent viscosity
+     - :math:`k_{LB}/k_{BL}`
+     - Loop saturation
+     - All chains convert to loops under extreme flow
+   * - :doc:`Cates <tnt_cates>`
+     - Single-mode Maxwellian
+     - :math:`\tau_{\text{break}}`
+     - Shear banding
+     - Non-monotonic flow curve from scission kinetics
+   * - :doc:`Sticky Rouse <tnt_sticky_rouse>`
+     - Self-similar relaxation
+     - :math:`N_{\text{stickers}}`
+     - Terminal flow
+     - All stickers eventually release at long times
+   * - :doc:`Multi-Species <tnt_multi_species>`
+     - Residual elasticity
+     - :math:`G_{\text{chem}}/G_{\text{phys}}`
+     - Bond hierarchy
+     - Sequential failure from weakest to strongest bonds
+   * - :doc:`Non-Affine <tnt_non_affine>`
+     - :math:`N_2 \neq 0`
+     - :math:`\xi`
+     - Wall slip
+     - Extreme non-affinity decouples chains from flow
+   * - :doc:`Stretch-Creation <tnt_stretch_creation>`
+     - Shear thickening
+     - :math:`\alpha`
+     - Gelation
+     - Runaway network formation under sustained deformation
+
+
+.. _tnt-feature-comparison:
+
+Feature Comparison Matrix
+-------------------------
+
+Predicted rheological features across all TNT variants (base Tanaka-Edwards plus 8
+extensions). This matrix summarizes which nonlinear phenomena each variant can capture:
+
+.. list-table::
+   :widths: 16 10 10 10 10 10 10 10 10 10
+   :header-rows: 1
+
+   * - Feature
+     - Base TE
+     - Bell
+     - FENE
+     - NonAffine
+     - StretchCreate
+     - LoopBridge
+     - StickyRouse
+     - Cates
+     - MultiSpecies
+   * - Shear thinning
+     - \-
+     - Yes
+     - Yes
+     - Yes
+     - \-
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+   * - Stress overshoot
+     - \-
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+   * - :math:`N_2 \neq 0`
+     - \-
+     - \-
+     - \-
+     - Yes
+     - \-
+     - \-
+     - \-
+     - \-
+     - \-
+   * - Strain hardening
+     - \-
+     - \-
+     - Yes
+     - \-
+     - Yes
+     - \-
+     - \-
+     - \-
+     - \-
+   * - Higher harmonics
+     - \-
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+   * - Shear thickening
+     - \-
+     - \-
+     - \-
+     - \-
+     - Yes
+     - \-
+     - \-
+     - \-
+     - \-
+   * - Non-monotonic flow
+     - \-
+     - (high :math:`\nu`)
+     - \-
+     - (high :math:`\xi`)
+     - \-
+     - \-
+     - \-
+     - Yes
+     - \-
+   * - Multi-mode spectrum
+     - \-
+     - \-
+     - \-
+     - \-
+     - \-
+     - 2 modes
+     - N modes
+     - \-
+     - N modes
+   * - Residual stress
+     - \-
+     - \-
+     - \-
+     - \-
+     - \-
+     - \-
+     - \-
+     - \-
+     - Yes
+
+
+.. _tnt-decision-framework:
+
+Decision Framework
+------------------
+
+Three complementary decision trees help identify the best TNT variant. Use whichever
+matches your starting point:
+
+1. **Property-based** (above, `Decision Tree`_): Start from known material class
+   (e.g., "telechelic polymer" → LoopBridge). Best when the material type is known.
+
+2. **Observation-based** (:doc:`tnt_knowledge_extraction`, "Master Decision Tree"):
+   Start from raw data features (e.g., "Cole-Cole plot is semicircular" → Cates).
+   Best when you have data but are unsure of the material class.
+
+3. **Residual-based** (:doc:`tnt_knowledge_extraction`, "Iterative Refinement"):
+   Start from a base fit and systematically add physics to reduce residuals
+   (e.g., "startup overshoot too sharp" → add Bell breakage). Best when
+   iterating on model fits.
 
 
 Key Parameters
@@ -492,6 +691,8 @@ Model Documentation
 .. toctree::
    :maxdepth: 1
 
+   tnt_protocols
+   tnt_knowledge_extraction
    tnt_tanaka_edwards
    tnt_bell
    tnt_fene_p
@@ -501,8 +702,6 @@ Model Documentation
    tnt_sticky_rouse
    tnt_cates
    tnt_multi_species
-   tnt_protocols
-   tnt_knowledge_extraction
 
 
 See Also

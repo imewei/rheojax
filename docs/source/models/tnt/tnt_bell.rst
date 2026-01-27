@@ -382,6 +382,39 @@ Starting from :math:`\mathbf{S}(0) = \mathbf{I}`, impose :math:`\dot{\gamma}` at
 - **Peak stress** scales as :math:`\sigma_{\text{peak}} \sim G \mathrm{Wi}^{1/(1+\nu)}`
 - **Approach to steady state** faster than constant breakage (stretch accelerates relaxation)
 
+Overshoot Strain Scaling
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The peak strain in startup scales inversely with force sensitivity:
+
+.. math::
+
+   \gamma_{\text{peak}} \approx \frac{1}{\sqrt{\nu}}
+
+This scaling arises because higher :math:`\nu` means bonds break earlier in the startup
+transient (less strain needed to trigger accelerated breakage). At the overshoot, the
+breakage rate first exceeds the affine stretching rate.
+
+Effective Relaxation Time
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Under finite strain, the relaxation time becomes strain-dependent:
+
+.. math::
+
+   \tau_{\text{eff}}(\gamma_0) = \tau_b \exp\!\left(-\nu\sqrt{1 + \gamma_0^2}\right)
+
+Large strains relax much faster than small strains (Type I damping behavior). The
+**damping function** for step-strain relaxation is:
+
+.. math::
+
+   h(\gamma_0) = \exp\!\left(-\frac{t}{\tau_b}\left[\exp\!\left(\nu\sqrt{1 + \gamma_0^2}\right) - 1\right]\right)
+
+This strain-dependent relaxation is a key signature of Bell kinetics: plotting the
+relaxation modulus :math:`G(t, \gamma_0)` at multiple step strains reveals
+**time-strain separability failure** at large :math:`\gamma_0`.
+
 Stress Relaxation
 ------------------
 
@@ -425,6 +458,34 @@ Extract stress :math:`\sigma(t) = G S_{xy}(t)` and perform Fourier decomposition
    \sigma(t) = \sum_{n=1,3,5,\ldots} \left[G_n'(\omega, \gamma_0) \sin(n\omega t) + G_n''(\omega, \gamma_0) \cos(n\omega t)\right]
 
 **Bell effect:** Nonlinearity from :math:`\exp[\nu(\text{tr}\mathbf{S} - 3)]` generates odd harmonics (:math:`n = 3, 5, 7, \ldots`).
+
+LAOS Mechanism: Oscillating Breakage Rate
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In LAOS, the breakage rate oscillates with the imposed strain:
+
+.. math::
+
+   \beta(t) \approx \beta_0 \exp\!\left(\nu \gamma_0 |\sin \omega t|\right)
+
+This produces **strong odd harmonics** due to "clipping" of the stress waveform — at peak
+strain, the breakage rate spikes and the stress drops relative to the Hookean prediction.
+The Lissajous curve develops a characteristic **intra-cycle softening** (stress drops
+faster at peak strain).
+
+MAOS Third Harmonic Scaling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In the medium-amplitude regime (MAOS, :math:`\gamma_0 \sim 0.1-1`), perturbation analysis
+gives the third-harmonic intensity scaling:
+
+.. math::
+
+   I_{3/1} \approx C(\omega, \beta) \, \gamma_0^2
+
+where :math:`C(\omega, \beta)` is a function of frequency and equilibrium breakage rate.
+The :math:`\gamma_0^2` scaling (intrinsic nonlinearity) is diagnostic: FENE models give
+a different scaling exponent at the same amplitude range.
 
 ---------------
 Parameter Table
@@ -835,13 +896,57 @@ Bell + FENE
 
    model = TNTSingleMode(breakage="bell", stress_type="fene")
 
+-------------------------------
+Failure Mode: Runaway Breakage
+-------------------------------
+
+For sufficiently large :math:`\nu`, the Bell model predicts a **non-monotonic flow curve**
+where stress decreases with increasing shear rate. This occurs because the exponential
+acceleration of bond breakage outpaces the linear increase of chain stretch.
+
+**Shear banding criterion:** The flow curve becomes non-monotonic when
+
+.. math::
+
+   \frac{d\sigma}{d\dot{\gamma}} < 0
+
+This occurs above a critical :math:`\nu` value (typically :math:`\nu \gtrsim 1-2` depending
+on :math:`Wi`). In this regime:
+
+- The material cannot sustain homogeneous flow at intermediate rates
+- **Shear banding** develops: coexistence of high and low shear-rate bands
+- The stress-controlled flow curve shows a plateau (stress selection)
+
+.. warning::
+
+   Non-monotonic flow curves indicate the model predicts **mechanical instability**.
+   Physically, this corresponds to runaway bond breakage where stretched chains break
+   so fast that the network cannot sustain stress. If observed in fits, consider whether
+   the material truly exhibits shear banding, or whether :math:`\nu` is overestimated.
+
 --------
 See Also
 --------
 
-- :ref:`model-tnt-tanaka-edwards`
-- :ref:`model-tnt-fene-p`
-- :ref:`model-tnt-non-affine`
+**TNT Shared Reference:**
+
+- :doc:`tnt_protocols` — Full protocol equations, cohort formulation, and numerical methods
+- :doc:`tnt_knowledge_extraction` — Model identification and fitting guidance
+
+**TNT Base Model:**
+
+- :ref:`model-tnt-tanaka-edwards` — Base model (constant breakage, :math:`\nu = 0` limit)
+
+**Complementary Extensions (combine with Bell):**
+
+- :ref:`model-tnt-fene-p` — Add finite extensibility to force-dependent breakage (Bell+FENE)
+- :ref:`model-tnt-non-affine` — Alternative shear thinning mechanism via slip parameter
+
+**Related TNT Variants:**
+
+- :ref:`model-tnt-stretch-creation` — Opposite effect: strain-enhanced creation (shear thickening)
+- :ref:`model-tnt-loop-bridge` — Two-species kinetics for telechelic polymers
+- :ref:`model-tnt-cates` — Living polymers (scission/recombination)
 
 -------------
 API Reference

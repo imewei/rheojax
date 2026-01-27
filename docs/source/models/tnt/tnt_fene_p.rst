@@ -410,6 +410,28 @@ Effective relaxation time:
 
    \tau_{\text{eff}}(t) = \frac{\tau_b}{f(\mathbf{S}(t))}
 
+FENE Damping Function
+^^^^^^^^^^^^^^^^^^^^^^
+
+The step-strain damping function for the FENE-P TNT model is:
+
+.. math::
+
+   h(\gamma_0) \approx \frac{L_{\max}^2 - 3}{L_{\max}^2 - (2 + \gamma_0^2)}
+
+For small strains (:math:`\gamma_0 \ll L_{\max}`), :math:`h \to 1` (linear regime). As
+:math:`\gamma_0 \to \sqrt{L_{\max}^2 - 2}`, the damping function diverges — reflecting
+the stress stiffening as chains approach maximum extension.
+
+**Initial FENE factor after step strain:**
+
+.. math::
+
+   f_0 = \frac{L_{\max}^2}{L_{\max}^2 - (2 + \gamma_0^2)}
+
+This produces a very fast initial relaxation for large :math:`\gamma_0` approaching
+:math:`L_{\max}`, because the high initial FENE force drives rapid stress decay.
+
 Creep and Recovery
 ------------------
 
@@ -428,6 +450,18 @@ Under constant stress :math:`\sigma_0`, the system evolves via 5 coupled ODEs (f
    \eta(t) = G \, f(\mathbf{S}(t)) \, \tau_b
 
 Unlike the Gaussian case (constant :math:`\eta = G\tau_b`), the FENE-P viscosity **increases** with extension.
+
+Creep Compliance Saturation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The FENE stress function prevents infinite chain extension, which manifests in creep as
+**compliance saturation**: the creep compliance :math:`J(t)` levels off sharply as chains
+approach :math:`L_{\max}`. Unlike the Hookean model where :math:`\gamma \to \infty` under
+constant stress, FENE chains have a maximum recoverable strain set by :math:`L_{\max}`.
+
+At high applied stress, the creep rate :math:`\dot{\gamma}(t)` shows a transient
+acceleration followed by saturation — the FENE spring hardens and resists further
+extension.
 
 Large Amplitude Oscillatory Shear (LAOS)
 -----------------------------------------
@@ -716,6 +750,20 @@ The FENE function diverges:
 
 **Warning:** In practice, sample failure (chain scission, network rupture) often occurs before reaching this limit.
 
+Extensional Viscosity Bound
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Unlike the upper-convected Maxwell (UCM) model which predicts divergent extensional
+viscosity at :math:`Wi = 1/2`, the FENE-P model gives a **bounded** extensional viscosity:
+
+.. math::
+
+   \eta_E \leq 3\eta_0 \frac{L_{\max}^2}{L_{\max}^2 - 3}
+
+This bound is approached as :math:`\dot{\epsilon} \to \infty`. For typical values
+:math:`L_{\max} = 10`, the maximum extensional viscosity is approximately :math:`3.1 \eta_0`
+— a physically realistic prediction.
+
 Steady Shear Regimes
 --------------------
 
@@ -771,6 +819,19 @@ LAOS Regimes
      - Strong higher harmonics, stiffening loops
 
 **Lissajous signature:** Clockwise loops in :math:`\sigma` vs :math:`\gamma` due to **strain stiffening** (elastic dominance).
+
+LAOS Strain-Stiffening Signature
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In LAOS, FENE stress function produces a distinctive **strain-stiffening** signature:
+
+- **Lissajous curves** become rectangular (box-like) at large :math:`\gamma_0` — high
+  stress at peak strain due to the FENE divergence as :math:`\text{tr}(\mathbf{S})
+  \to L_{\max}^2`
+- **Intra-cycle stiffening**: The tangent modulus :math:`G'_L` (large-strain modulus from
+  Ewoldt decomposition) exceeds :math:`G'_M` (minimum-strain modulus)
+- Higher harmonics grow with :math:`\gamma_0`, but the dominant signature is
+  **stiffening** rather than the softening seen in Bell variants
 
 ----
 
@@ -1477,28 +1538,50 @@ Combine all three variants:
 
 ----
 
+Failure Mode: Chain Snap
+=========================
+
+The FENE-P stress function diverges as :math:`\text{tr}(\mathbf{S}) \to L_{\max}^2`:
+
+.. math::
+
+   f(\mathbf{S}) = \frac{L_{\max}^2}{L_{\max}^2 - \text{tr}(\mathbf{S})} \to \infty
+
+This represents **catastrophic chain extension** near the maximum extensibility limit.
+Physically, this corresponds to chains being pulled taut between crosslinks, with the
+entropic spring force diverging as the end-to-end distance approaches the contour length.
+
+**Practical implications:**
+
+- Numerical integration requires clipping: :math:`\text{tr}(\mathbf{S}) < 0.99 L_{\max}^2`
+- Very high :math:`Wi` or :math:`\gamma_0` near :math:`L_{\max}` causes ODE stiffness
+- Physical chains would rupture or detach before reaching this limit (combine with Bell
+  breakage for realistic behavior)
+
+----
+
 See Also
 ========
 
-**Related TNT Model Documentation:**
+**TNT Shared Reference:**
 
-- :ref:`model-tnt-tanaka-edwards` — Base Gaussian transient network model
-- :ref:`model-tnt-bell` — Force-dependent bond breakage variant
-- :ref:`model-tnt-non-affine` — Non-affine deformation variant
-- :ref:`model-tnt-stretch-creation` — Stretch-dependent bond creation variant
-- :ref:`model-tnt-protocols` — Detailed protocol implementations
+- :doc:`tnt_protocols` — Full protocol equations, cohort formulation, and numerical methods
+- :doc:`tnt_knowledge_extraction` — Model identification and fitting guidance
 
-**Related Models:**
+**TNT Base Model:**
 
-- :ref:`model-fluidity-saramito` — Alternative EVP model with tensorial stress
-- :ref:`model-dmt` — Thixotropic model with scalar structure parameter
-- :ref:`model-giesekus` — Polymer model with non-affine motion
+- :ref:`model-tnt-tanaka-edwards` — Base model (constant breakage, Hookean chains)
 
-**Theoretical Background:**
+**Complementary Extensions (combine with FENE):**
 
-- :ref:`theory-transient-networks` — Transient network theory overview
-- :ref:`theory-non-gaussian-chains` — FENE springs and chain extensibility
-- :ref:`guide-nonlinear-rheology` — Experimental nonlinear rheology guide
+- :ref:`model-tnt-bell` — Add force-dependent breakage to finite extensibility (Bell+FENE)
+- :ref:`model-tnt-stretch-creation` — Strain-enhanced creation for shear thickening with hardening
+
+**Related TNT Variants:**
+
+- :ref:`model-tnt-non-affine` — Alternative nonlinear effect (:math:`N_2 \neq 0`)
+- :ref:`model-tnt-loop-bridge` — Two-species topology
+- :ref:`model-tnt-cates` — Living polymers
 
 ----
 

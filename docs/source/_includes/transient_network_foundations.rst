@@ -63,6 +63,7 @@
    - **Sticky Rouse**: Multi-mode relaxation with sticker-limited dynamics
    - **Cates model**: Living polymers with scission/recombination
    - **Non-affine slip**: Gordon-Schowalter parameter :math:`\xi` for partial coupling
+   - **Multi-species networks**: Multiple bond types with different lifetimes and moduli
 
    **Model Selection Guide:**
 
@@ -84,6 +85,22 @@
         - Multi-sticker associating polymers (broad relaxation)
       * - :doc:`TNTCates <tnt_cates>`
         - Wormlike micelles, living polymers
+      * - :doc:`TNTSingleMode <tnt_non_affine>` (Non-Affine)
+        - Networks with imperfect chain-flow coupling (N₂ ≠ 0)
+      * - :doc:`TNTSingleMode <tnt_stretch_creation>` (Stretch-Creation)
+        - Strain-crystallizing or mechanophore-activated networks
+      * - :doc:`TNTMultiSpecies <tnt_multi_species>`
+        - Dual-crosslinked hydrogels, multi-strength assemblies
+
+   **Dual Formulation:**
+
+   TNT models admit two mathematically equivalent formulations:
+
+   - **Differential (conformation tensor ODE):** Evolve :math:`\mathbf{S}(t)` via the constitutive ODE above — efficient for steady-state and simple histories
+   - **Integral (cohort/history):** Track chain cohorts born at each time :math:`t'` and integrate their stress contributions — natural for complex deformation histories
+
+   Both yield identical predictions; the choice is computational convenience.
+   See :doc:`tnt_protocols` for details.
 
    **Typical Parameter Ranges:**
 

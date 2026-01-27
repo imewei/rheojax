@@ -1403,26 +1403,238 @@ Usage
    plt.tight_layout()
    plt.show()
 
+Gordon-Schowalter Derivative --- Explicit Form
+-----------------------------------------------
+
+The Gordon-Schowalter derivative provides a one-parameter family interpolating between
+the **upper-convected** (:math:`\xi=0`) and **corotational** (:math:`\xi=1`) derivatives:
+
+.. math::
+
+   \overset{\nabla_\xi}{\mathbf{S}} = \frac{d\mathbf{S}}{dt}
+   - \mathbf{L} \cdot \mathbf{S} - \mathbf{S} \cdot \mathbf{L}^T
+   + \xi\left(\mathbf{D} \cdot \mathbf{S} + \mathbf{S} \cdot \mathbf{D}\right)
+
+where :math:`\mathbf{L} = \boldsymbol{\kappa}` is the velocity gradient,
+:math:`\mathbf{D} = (\mathbf{L} + \mathbf{L}^T)/2` is the rate of deformation tensor,
+and :math:`\xi \in [0, 1]` is the slip parameter.
+
+**Decomposition.**
+The velocity gradient decomposes as :math:`\mathbf{L} = \mathbf{D} + \mathbf{W}`, where
+:math:`\mathbf{W} = (\mathbf{L} - \mathbf{L}^T)/2` is the vorticity tensor.  In terms
+of this decomposition the derivative separates cleanly into a stretching part (scaled by
+:math:`1 - \xi`) and a rotation part (unscaled):
+
+- :math:`\xi = 0` --- **Upper-convected derivative** (affine motion, chains follow the flow exactly).
+- :math:`\xi = 1` --- **Corotational (Jaumann) derivative** (chains rotate with the vorticity only).
+- :math:`0 < \xi < 1` --- Intermediate slip: chains *partially* decouple from the stretching
+  component of the flow while retaining full coupling to the rotational component.
+
+The TNT non-affine ODE therefore becomes:
+
+.. math::
+
+   \frac{d\mathbf{S}}{dt}
+   = (1-\xi)\bigl(\boldsymbol{\kappa} \cdot \mathbf{S}
+   + \mathbf{S} \cdot \boldsymbol{\kappa}^T\bigr)
+   + \xi\bigl(\mathbf{W} \cdot \mathbf{S} - \mathbf{S} \cdot \mathbf{W}\bigr)
+   - \frac{\mathbf{S} - \mathbf{I}}{\tau_b}
+
+The first group captures the *reduced* affine stretching (factor :math:`1 - \xi`), the
+second group captures the *full* vorticity coupling, and the last term is the usual
+Maxwellian relaxation toward the isotropic rest state :math:`\mathbf{I}`.
+
+Lodge-Meissner Relation Violation
+---------------------------------
+
+The Lodge-Meissner relation is a rigorous identity for any model built on the
+upper-convected derivative.  After an instantaneous step strain of magnitude
+:math:`\gamma_0`, the relation states:
+
+.. math::
+
+   \frac{\sigma_{xy}(t)}{\gamma_0}
+   = \frac{N_1(t)}{\gamma_0^2}
+   = G(t)
+
+where :math:`G(t)` is the linear relaxation modulus.  This equality holds
+**independently** of the magnitude of :math:`\gamma_0` and is thus a powerful
+diagnostic for non-affine effects.
+
+**Violation for** :math:`\xi \neq 0`:
+
+For the non-affine TNT model, the Gordon-Schowalter derivative breaks the
+Lodge-Meissner identity.  After a step strain :math:`\gamma_0`:
+
+.. math::
+
+   \frac{\sigma_{xy}(t)}{\gamma_0} \neq \frac{N_1(t)}{\gamma_0^2}
+
+The departure is proportional to :math:`\xi`.  Define the *Lodge-Meissner ratio*:
+
+.. math::
+
+   \mathcal{R}_{\mathrm{LM}}(t) \;\equiv\;
+   \frac{\sigma_{xy}(t) / \gamma_0}{N_1(t) / \gamma_0^2}
+
+For the affine limit (:math:`\xi = 0`) one has :math:`\mathcal{R}_{\mathrm{LM}} = 1`
+at all times.  For :math:`\xi > 0` the ratio deviates from unity by an amount that
+depends on :math:`\xi` and on the strain amplitude :math:`\gamma_0`:
+
+.. math::
+
+   \mathcal{R}_{\mathrm{LM}} = 1 + O(\xi \gamma_0)
+
+**Experimental protocol.**
+Measure both shear stress :math:`\sigma_{xy}(t)` and first normal stress difference
+:math:`N_1(t)` during step-strain relaxation at several amplitudes
+:math:`\gamma_0`.  Plotting :math:`\mathcal{R}_{\mathrm{LM}}` against :math:`\gamma_0`
+provides an independent route to estimating :math:`\xi` that does not require
+steady-shear :math:`N_2` data.
+
+Normal Stress Differences in LAOS
+---------------------------------
+
+Under large-amplitude oscillatory shear (LAOS) with imposed strain
+:math:`\gamma(t) = \gamma_0 \sin(\omega t)`, the non-affine model makes distinctive
+predictions for the normal stress differences.
+
+**Oscillation frequencies.**
+Because normal stresses are *even* functions of strain, both :math:`N_1(t)` and
+:math:`N_2(t)` oscillate at frequency :math:`2\omega` (the second harmonic of the
+imposed strain frequency):
+
+.. math::
+
+   N_1(t) &\approx N_{1,0} + N_{1,2}\cos(2\omega t - \delta_1) + \cdots
+
+   N_2(t) &\approx N_{2,0} + N_{2,2}\cos(2\omega t - \delta_2) + \cdots
+
+where the amplitudes :math:`N_{i,2}` and phases :math:`\delta_i` depend on
+:math:`\gamma_0`, :math:`\omega`, :math:`G`, :math:`\tau_b`, and :math:`\xi`.
+
+**Johnson-Segalman relation in LAOS.**
+The ratio of the second to first normal stress difference amplitudes obeys the
+approximate relation:
+
+.. math::
+
+   \frac{N_2(t)}{N_1(t)} \approx -\frac{\xi}{2}
+
+even in the nonlinear regime.  The sign of :math:`N_2` is opposite to :math:`N_1`
+(i.e., :math:`N_2 < 0` when :math:`N_1 > 0` for :math:`\xi > 0`).
+
+**Why LAOS is a robust route to** :math:`\xi`:
+
+1. The ratio :math:`N_2/N_1` is **relatively insensitive to strain amplitude**
+   :math:`\gamma_0`, making it a robust observable.
+2. :math:`N_2` can be measured via **cone-partitioned plate** rheometry or
+   **flow birefringence**, both of which are compatible with oscillatory protocols.
+3. The ratio does **not require knowledge** of :math:`G` or :math:`\tau_b`;
+   it depends only on :math:`\xi`.  This makes it particularly useful when other
+   parameters are uncertain or when the sample is available in limited quantities.
+
+Effective Relaxation Under Slip
+-------------------------------
+
+Non-affine motion effectively **accelerates** the relaxation of stress by reducing the
+elastic energy that chains accumulate during flow.
+
+**Rate-dependent effective relaxation time.**
+Under flow at Weissenberg number :math:`Wi = \tau_b \dot{\gamma}`, the apparent
+relaxation time decreases according to:
+
+.. math::
+
+   \tau_{\mathrm{eff}} = \frac{\tau_b}{1 + \xi \, f(Wi)}
+
+where :math:`f(Wi)` is a geometry- and rate-dependent function of order unity.
+
+**Simple shear at moderate rates.**
+For steady simple shear at moderate :math:`Wi`, the effective relaxation time is
+approximately:
+
+.. math::
+
+   \tau_{\mathrm{eff}} \approx \frac{\tau_b}{1 + \xi}
+
+**Physical interpretation.**
+Chains that slip relative to the flow accumulate less elastic (conformational) energy
+per unit time than affinely-deforming chains.  The reduced stored energy means that the
+Maxwellian relaxation term :math:`-(\mathbf{S} - \mathbf{I})/\tau_b` returns the
+conformation tensor to equilibrium more rapidly relative to the (slower) elastic build-up.
+
+**Consequence for parameter estimation.**
+Fitting a non-affine model with :math:`\xi > 0` to experimental data will yield a
+**larger** :math:`\tau_b` than fitting the affine (:math:`\xi = 0`) model to the same
+data.  This is because the non-affine model needs a longer intrinsic bond lifetime to
+compensate for the slip-induced acceleration of relaxation.  The relationship is
+approximately:
+
+.. math::
+
+   \tau_b^{(\xi > 0)} \approx (1 + \xi)\,\tau_b^{(\xi = 0)}
+
+This should be kept in mind when comparing :math:`\tau_b` values obtained from different
+model variants.
+
+Failure Mode: Wall Slip
+-----------------------
+
+.. admonition:: Failure Mode
+
+   **Mechanism:**
+   At large :math:`\xi` values (approaching 1), the model predicts extreme non-affine
+   motion where chains barely stretch in the flow --- this mimics apparent wall slip
+   in the bulk constitutive response.
+
+   **Signature:**
+   Drastically reduced viscosity and normal stresses, with the :math:`N_2/N_1` ratio
+   approaching :math:`-1/2`.
+
+   **Physical origin:**
+   When :math:`\xi \to 1`, the conformation tensor evolution is dominated by rotation
+   (vorticity) rather than stretching --- chains **tumble** rather than extend.  The
+   elastic contribution to stress vanishes in this limit.
+
+   **Implication:**
+   Very large fitted :math:`\xi` values suggest that the network--flow coupling has
+   broken down.  The model may need supplementation with explicit wall slip boundary
+   conditions (e.g., Navier slip at the wall) rather than relying on a bulk
+   non-affinity parameter to capture the effect.
+
+   **Diagnostic:**
+   If the fitted :math:`\xi > 0.5`, verify with an independent :math:`N_2` measurement
+   (e.g., cone-partitioned plate).  A large :math:`\xi` may indicate **true interfacial
+   slip** at the sample--geometry boundary rather than bulk non-affine deformation.
+   Additional diagnostics include velocimetry (particle tracking or NMR) to distinguish
+   bulk and interfacial slip.
+
 See Also
 --------
 
-**Related TNT model variants:**
+**TNT Shared Reference:**
 
-- :ref:`model-tnt-tanaka-edwards` — Base TNT model with affine deformation (ξ=0)
-- :ref:`model-tnt-bell` — Force-dependent breakage for shear thinning
-- :ref:`model-tnt-fene-p` — Finite extensibility for strain stiffening
+- :doc:`tnt_protocols` --- Full protocol equations and numerical methods
+- :doc:`tnt_knowledge_extraction` --- Model identification and fitting guidance
 
-**Related constitutive models with non-affine effects:**
+**TNT Base Model:**
 
-- :doc:`/models/giesekus/index` — Giesekus model (anisotropic drag, also predicts N₂≠0)
-- :doc:`/models/ptt/index` — Phan-Thien-Tanner model (can use Gordon-Schowalter derivative)
-- :doc:`/models/rolie_poly/index` — Rolie-Poly (chain retraction with CCR, different mechanism for N₂)
+- :ref:`model-tnt-tanaka-edwards` --- Base model (affine limit, :math:`\xi=0`)
 
-**Theoretical background:**
+**Complementary Thinning Mechanisms:**
 
-- :ref:`gordon-schowalter-theory` — Detailed derivation of mixed derivative
-- :ref:`johnson-segalman-instability` — Shear banding in non-affine models
-- :ref:`normal-stress-measurements` — Experimental techniques for N₂
+- :ref:`model-tnt-bell` --- Force-dependent breakage (alternative shear thinning via kinetics rather than kinematics)
+- :ref:`model-tnt-fene-p` --- Finite extensibility (:math:`N_2` comparison: FENE-P alone gives :math:`N_2=0`)
+
+**Normal Stress Comparisons:**
+
+- :ref:`model-tnt-stretch-creation` --- Stretch-dependent creation (affects :math:`N_1` magnitude)
+- :ref:`model-tnt-loop-bridge` --- Topology-dependent modulus (indirect effect on normal stresses)
+
+**External Models with Non-Affine Effects:**
+
+- :doc:`/models/giesekus/index` --- Giesekus model (anisotropic drag gives :math:`N_2 \neq 0` via different mechanism)
 
 References
 ----------

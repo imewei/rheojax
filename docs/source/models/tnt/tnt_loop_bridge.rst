@@ -278,6 +278,27 @@ Typical values:
 - :math:`\tau_a < \tau_b` → :math:`f_{B,eq} > 0.5` (most chains are bridges)
 - :math:`\tau_a > \tau_b` → :math:`f_{B,eq} < 0.5` (most chains are loops)
 
+Three-State Chain Population
+-----------------------------------------------------------
+
+The full loop-bridge framework distinguishes three chain states:
+
+- **Bridges**: Both ends attached to *different* junction points — these are the only
+  chains that carry stress (elastically active)
+- **Loops**: Both ends attached to the *same* junction — carry no stress (act as dangling
+  ends contributing viscous drag)
+- **Danglers**: One end free (detached) — carry no stress
+
+The conservation constraint is:
+
+.. math::
+
+   f_B + f_L + f_D = 1
+
+where :math:`f_B`, :math:`f_L`, :math:`f_D` are the fractions of bridges, loops, and
+danglers respectively. In the simplified two-state model implemented in RheoJAX,
+danglers are absorbed into the loop population: :math:`f_B + f_L = 1`.
+
 Stress-Bearing Mechanism
 -----------------------------------------------------------
 
@@ -379,6 +400,36 @@ At equilibrium (:math:`df_B/dt = 0`, :math:`\mathbf{S} = \mathbf{I}`):
    f_{B,eq} = \frac{k_{on}}{k_{on} + k_{off,0}} = \frac{\tau_b}{\tau_a + \tau_b}
 
 This provides a consistency check: :math:`f_{B,eq}` should match the ratio of timescales.
+
+Analytical Bridge Fraction Solution
+-----------------------------------------------------------
+
+For constant shear rate :math:`\dot{\gamma}_0`, the bridge fraction evolves as:
+
+.. math::
+
+   f_B(t) = f_B^{\text{eq}}(\dot{\gamma}_0) + \left[f_B(0) - f_B^{\text{eq}}(\dot{\gamma}_0)\right]
+   \exp\!\left[-(k_{LB} + k_{BL})\,t\right]
+
+where :math:`f_B^{\text{eq}}(\dot{\gamma}_0) = k_{LB} / (k_{LB} + k_{BL})` is the
+equilibrium bridge fraction at shear rate :math:`\dot{\gamma}_0`. The approach to
+equilibrium occurs on the **kinetic timescale** :math:`\tau_{\text{kin}} = 1/(k_{LB} + k_{BL})`,
+which is independent of the chain relaxation time :math:`\tau_b`.
+
+Two Characteristic Timescales
+-----------------------------------------------------------
+
+The loop-bridge model has two distinct timescales:
+
+1. **Chain relaxation** :math:`\tau_b`: Time for individual chain conformation to relax
+   (sets the viscoelastic response of bridges)
+2. **Bridge kinetics** :math:`\tau_{\text{kin}} = 1/(k_{LB} + k_{BL})`: Time for the
+   bridge fraction to equilibrate (sets the population dynamics)
+
+When :math:`\tau_b \ll \tau_{\text{kin}}`, chains relax fast but the bridge fraction
+changes slowly — producing a **two-step relaxation** visible in G(t). When
+:math:`\tau_b \gg \tau_{\text{kin}}`, population dynamics are fast but chain relaxation
+is slow — the effective modulus adjusts quickly to :math:`G_{\text{eff}} = G \cdot f_B^{\text{eq}}`.
 
 Bridge Conformation Evolution
 -----------------------------------------------------------
@@ -520,6 +571,18 @@ For step strain rate :math:`\dot{\gamma}` applied at :math:`t = 0`:
 **Transient thickening:** If :math:`f_B(t)` increases faster than :math:`S_{xy}(t)` initially, stress can exceed the final steady-state value before the overshoot.
 
 This is a signature of loop-to-bridge conversion under flow.
+
+Bridge Recovery During Relaxation
+-----------------------------------------------------------
+
+After cessation of flow, the bridge fraction :math:`f_B` recovers toward its quiescent
+equilibrium value. If flow had depleted bridges (i.e., :math:`f_B < f_B^{\text{eq,0}}`),
+the effective modulus may **increase** during relaxation as bridges reform — a
+counter-intuitive feature where the material appears to stiffen while stress is relaxing.
+
+This produces a characteristic **non-monotonic** stress relaxation: initial rapid decay
+(chain relaxation) followed by partial stress recovery (bridge reformation), then final
+decay to zero.
 
 ----
 
@@ -980,6 +1043,20 @@ Creep Compliance
    J(t) = \frac{\gamma(t)}{\sigma_0}
 
 Shows double-exponential relaxation (bridge relaxation + population adjustment) followed by linear flow.
+
+Creep Rupture Via Bridge Collapse
+-----------------------------------------------------------
+
+Under sustained applied stress, the bridge fraction can progressively decrease:
+
+1. Stress stretches bridge chains, increasing their breakage rate
+2. Reduced :math:`f_B` decreases the effective modulus :math:`G_{\text{eff}} = G \cdot f_B`
+3. Lower modulus means higher strain for the same stress → more chain stretch
+4. Positive feedback: above a critical stress, :math:`f_B \to 0` (all chains become loops)
+
+This **bridge collapse** mechanism produces creep rupture — delayed catastrophic failure
+under sustained load. The critical stress depends on the ratio :math:`k_{BL}/k_{LB}` and
+the force sensitivity of the bridge-to-loop transition.
 
 Oscillatory Shear (SAOS and LAOS)
 -----------------------------------------------------------
@@ -1680,7 +1757,7 @@ For global search (if local minima suspected), use basin-hopping or differential
 
 ----
 
-14. Usage Examples
+15. Usage Examples
 ===========================================================
 
 Example 1: Basic SAOS Prediction
@@ -1815,41 +1892,52 @@ Example 6: Parameter Sensitivity
 
 ----
 
-15. See Also
+14. Failure Mode: Loop Saturation
 ===========================================================
 
-Related TNT Models
------------------------------------------------------------
+Under extreme flow conditions, all bridge chains convert to loops:
 
-- :ref:`model-tnt-tanaka-edwards`: Single-species transient network (no loop-bridge distinction)
-- :ref:`model-tnt-bell`: Force-dependent detachment without population kinetics
-- :ref:`model-tnt-multi-species`: Extension to N species (bridges, loops, danglers, etc.)
+.. math::
 
-Related Associating Polymer Models
------------------------------------------------------------
+   f_B \to 0, \quad f_L \to 1
 
-- :doc:`/models/fluidity/index`: Thixotropic EVP with fluidity evolution (different mechanism)
-- :doc:`/models/dmt/index`: Structural kinetics with exponential/HB closure (scalar structure parameter)
-- :doc:`/models/sgr/index`: Soft glassy rheology (noise temperature, no explicit bridge-loop)
+In this limit, the network loses all elasticity (:math:`G_{\text{eff}} \to 0`) and
+behaves as a viscous fluid. This **loop saturation** represents the complete destruction
+of the stress-bearing network.
 
-Experimental Protocols
------------------------------------------------------------
+**Physical signatures:**
 
-- :ref:`protocol-startup`: Step shear rate with stress overshoot
-- :ref:`protocol-flow-curve`: Steady shear viscosity vs shear rate
-- :ref:`protocol-saos`: Small-amplitude oscillatory shear
-- :ref:`protocol-laos`: Large-amplitude oscillatory shear with harmonics
-
-Material Systems
------------------------------------------------------------
-
-- HEUR (Hydrophobically-modified Ethoxylated URethane thickeners)
-- Telechelic polymers with associating end-groups
-- Ionic end-group associating polymers (Surlyn)
+- Flow curve shows a dramatic viscosity drop at high rates
+- Startup stress overshoot followed by near-complete stress collapse
+- Recovery after flow cessation governed by :math:`\tau_{\text{kin}}` (bridge reformation time)
 
 ----
 
-16. API Reference
+16. See Also
+===========================================================
+
+**TNT Shared Reference:**
+
+- :doc:`tnt_protocols` — Full protocol equations and numerical methods
+- :doc:`tnt_knowledge_extraction` — Model identification and fitting guidance
+
+**TNT Base Model:**
+
+- :ref:`model-tnt-tanaka-edwards` — Base model (constant breakage, single species)
+
+**Generalizations:**
+
+- :ref:`model-tnt-multi-species` — Generalization to N bond types (LoopBridge is 2-species special case)
+- :ref:`model-tnt-sticky-rouse` — Multi-mode alternative for broad relaxation spectra
+
+**Alternative Models for Similar Materials:**
+
+- :ref:`model-tnt-cates` — Living polymer alternative for micellar systems
+- :ref:`model-tnt-bell` — Force-dependent breakage (complementary mechanism)
+
+----
+
+17. API Reference
 ===========================================================
 
 .. autoclass:: rheojax.models.tnt.TNTLoopBridge
@@ -1889,7 +1977,7 @@ Material Systems
 
 ----
 
-17. References
+18. References
 ===========================================================
 
 Foundational Papers

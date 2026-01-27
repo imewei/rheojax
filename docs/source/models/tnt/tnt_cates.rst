@@ -281,6 +281,40 @@ The effective stress relaxation becomes **single-mode** with a geometric mean re
 
 compared to :math:`\tau_\text{rep} \sim L^3` for unbreakable chains.
 
+Fast-Breaking vs Slow-Breaking Regimes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Cates model exhibits two limiting regimes depending on the ratio of breakage time
+:math:`\tau_b` to reptation time :math:`\tau_{\text{rep}}`:
+
+**Fast-breaking regime** (:math:`\tau_b \ll \tau_{\text{rep}}`):
+
+The effective relaxation time is the geometric mean:
+
+.. math::
+
+   \tau_d = \sqrt{\tau_{\text{rep}} \tau_b}
+
+The relaxation modulus follows a stretched exponential:
+
+.. math::
+
+   G(t) = G_0 \exp\!\left(-\sqrt{2t/\tau_b}\right)
+
+This regime produces **near-single-mode Maxwell behavior** — the defining signature of
+wormlike micelles in the fast-breaking limit.
+
+**Slow-breaking regime** (:math:`\tau_b \gg \tau_{\text{rep}}`):
+
+Standard reptation dominates:
+
+.. math::
+
+   G(t) = G_0 \exp(-t/\tau_{\text{rep}})
+
+Breakage has negligible effect; the system behaves like an entangled polymer melt with
+the standard reptation spectrum.
+
 Recombination and Equilibrium
 ------------------------------
 
@@ -441,6 +475,29 @@ where :math:`\dot{\gamma}_\text{max} = 1/\tau_d`.
 
 For :math:`\text{Wi}_d > 1`, the flow curve has **negative slope** :math:`d\sigma/d\dot{\gamma} < 0`. This is mechanically unstable and leads to **shear banding**: coexistence of high and low shear rate bands.
 
+Non-Monotonic Flow Curve and Shear Banding
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A hallmark prediction of the Cates model is a **non-monotonic flow curve**:
+
+.. math::
+
+   \frac{d\sigma}{d\dot{\gamma}} < 0 \quad \text{for} \quad \dot{\gamma} > \dot{\gamma}_c
+
+**Stress maximum:**
+
+.. math::
+
+   \sigma_{\max} \approx G_0 \quad \text{at critical rate} \quad \dot{\gamma}_c \sim 1/\tau_d
+
+Above the stress maximum, the system cannot sustain homogeneous flow. Instead, **shear
+banding** develops: the material separates into coexisting bands of high and low shear
+rate, with a stress plateau :math:`\sigma_{\text{plateau}} < \sigma_{\max}`.
+
+**Physical mechanism:** Scission accelerates with chain stretch. At high rates, chains
+break faster than they can recombine into stress-bearing configurations, causing an
+effective viscosity collapse.
+
 Small Amplitude Oscillatory Shear (SAOS)
 -----------------------------------------
 
@@ -520,6 +577,27 @@ If wormlike micelles truly follow the Cates model (fast-breaking limit), the Col
 - Branching (Y-junctions)
 - Polydispersity in micelle length
 - Multiple relaxation modes
+
+Cole-Cole Diagnostic: Semicircular Plot
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In the fast-breaking regime, the complex modulus takes the approximate form:
+
+.. math::
+
+   G^*(\omega) = \frac{G_0}{1 + \sqrt{\tau_b / (2i\omega)}}
+
+Plotting :math:`G''` vs :math:`G'` (Cole-Cole plot) produces a **nearly perfect
+semicircle** — this is the diagnostic fingerprint of Cates-type living polymers.
+
+Deviations from the semicircle indicate:
+
+- **Flattening at high** :math:`G'`: Additional fast modes (Rouse spectrum at high frequency)
+- **Asymmetry**: Breakage time distribution (polydisperse scission)
+- **Upturn**: Contribution from unentangled chains
+
+The semicircular Cole-Cole plot distinguishes Cates systems from multi-mode Maxwell
+models, which produce distorted or multi-lobed Cole-Cole curves.
 
 Startup Flow
 ------------
@@ -632,6 +710,18 @@ For :math:`\gamma_0 \omega \tau_d > 1`, the stress waveform contains odd harmoni
 **Lissajous curves:**
 
 Stress vs strain and stress vs strain rate curves become ellipses distorted by nonlinearity.
+
+LAOS and Shear Banding
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+At large amplitude, the Cates model in LAOS shows signatures of shear banding:
+
+- **Stress plateau** in the Lissajous curve at large :math:`\gamma_0` — the stress
+  saturates at :math:`\sigma_{\max} \approx G_0` regardless of further strain increase
+- **Secondary loops** in the viscous Lissajous (:math:`\sigma` vs :math:`\dot{\gamma}`)
+  curve indicate transient banding within the oscillation cycle
+- The elastic Lissajous becomes increasingly **rectangular** (box-like) as the system
+  alternates between banded and unbanded states within each half-cycle
 
 Parameter Table
 ===============
@@ -989,15 +1079,47 @@ Basic Fitting
    omega = jnp.logspace(-2, 2, 50)
    result = model.fit(omega, G_star, test_mode='oscillation')
 
+Failure Mode: Shear Banding
+-----------------------------
+
+The non-monotonic flow curve in the Cates model leads to **constitutive instability**:
+
+- Homogeneous flow is unstable for :math:`\dot{\gamma}_c < \dot{\gamma} < \dot{\gamma}_2`
+- The material separates into two coexisting shear rate bands
+- The stress is selected by a **plateau criterion** (equal areas or diffusive selection)
+- Flow becomes spatially inhomogeneous — violating the assumption of homogeneous
+  deformation used in point-wise constitutive models
+
+**Experimental signatures:**
+
+- Stress plateau in flow curve (controlled rate) or strain rate jump (controlled stress)
+- Birefringence banding (optically visible bands in Couette flow)
+- Velocity profiles from PIV or NMR showing discontinuous shear rate
+
+.. note::
+
+   RheoJAX's TNTCates model predicts the **homogeneous** (constitutive) flow curve.
+   For the banded solution, a spatially-resolved (1D) calculation would be needed.
+   The predicted non-monotonic curve should be interpreted as the constitutive relation,
+   with the plateau stress estimated from the stress maximum.
+
 See Also
-========
+--------
 
-Related Models
---------------
+**TNT Shared Reference:**
 
-- :ref:`model-tnt-tanaka-edwards`
-- :ref:`model-tnt-multi-species`
-- :ref:`model-giesekus`
+- :doc:`tnt_protocols` — Full protocol equations and numerical methods
+- :doc:`tnt_knowledge_extraction` — Model identification and fitting guidance
+
+**TNT Base Model:**
+
+- :ref:`model-tnt-tanaka-edwards` — Base model (constant breakage)
+
+**Related TNT Variants:**
+
+- :ref:`model-tnt-loop-bridge` — Alternative two-species model for micellar networks
+- :ref:`model-tnt-multi-species` — Multi-mode generalization for broad relaxation
+- :ref:`model-tnt-bell` — Force-dependent breakage (complementary thinning mechanism)
 
 API Reference
 =============

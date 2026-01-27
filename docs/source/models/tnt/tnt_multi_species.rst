@@ -732,16 +732,174 @@ Model Selection (N=2 vs N=3)
    else:
        print("N=2 is sufficient")
 
+Permanent + Transient Dual Network
+===========================================================
+
+The multi-species model naturally accommodates networks with **both permanent (chemical) and transient (physical) crosslinks**. This is the most common application of the multi-species framework, representing materials such as dual-crosslinked hydrogels, hybrid organogels, and biological tissues with both covalent and non-covalent bonds.
+
+Total Stress Decomposition
+-----------------------------------------------------------
+
+The total stress separates into a non-relaxing permanent contribution and transient species contributions:
+
+.. math::
+
+   \boldsymbol{\sigma}(t) = G_{\text{chem}} \left(\mathbf{B} - \mathbf{I}\right) + \sum_{i=1}^{N_{\text{phys}}} G_i \left(\mathbf{S}_i(t) - \mathbf{I}\right) + 2\eta_s \mathbf{D}
+
+where :math:`G_{\text{chem}}` is the modulus of the permanent (chemical) network and :math:`\mathbf{B}` is the left Cauchy-Green deformation tensor. The permanent species has :math:`\tau_{b} \to \infty` (no breakage), contributing a non-relaxing elastic plateau.
+
+Stress Relaxation With Permanent Bonds
+-----------------------------------------------------------
+
+Under step strain, the relaxation modulus approaches a **non-zero equilibrium**:
+
+.. math::
+
+   G(t) = G_{\text{chem}} + \sum_{i=1}^{N_{\text{phys}}} G_i \exp\left(-\frac{t}{\tau_{b,i}}\right) \quad \xrightarrow{t \to \infty} \quad G_{\text{chem}}
+
+The stress never fully relaxes to zero. This is the fundamental difference from purely physical (transient) networks: the permanent bonds provide a long-time elastic restoring force, so that:
+
+.. math::
+
+   \sigma(t) = G_{\text{chem}} \cdot \gamma_0 + \sum_{i=1}^{N_{\text{phys}}} G_i \exp\left(-\frac{t}{\tau_{b,i}}\right) \cdot \gamma_0 \quad \xrightarrow{t \to \infty} \quad G_{\text{chem}} \cdot \gamma_0
+
+Mathematically, a "permanent" species simply means :math:`\tau_{b,i} \gg t_{\text{exp}}`, where :math:`t_{\text{exp}}` is the experimental timescale. In practice, any species with :math:`\tau_{b,i}` exceeding the longest measurement time by a factor of :math:`\sim 100` is effectively permanent.
+
+Creep Saturation
+===========================================================
+
+Unlike purely transient networks which flow indefinitely under constant stress, dual networks with permanent bonds exhibit **creep saturation**: the strain reaches a finite asymptote rather than growing without bound.
+
+Strain Saturation
+-----------------------------------------------------------
+
+Under constant applied stress :math:`\sigma_0`, the strain saturates at:
+
+.. math::
+
+   \gamma_{\infty} = \frac{\sigma_0}{G_{\text{chem}}}
+
+No steady-state flow occurs because the permanent network acts as a spring in parallel with the transient species, providing an equilibrium restoring force that eventually balances the applied stress.
+
+Creep Compliance
+-----------------------------------------------------------
+
+The creep compliance for a dual network takes the form:
+
+.. math::
+
+   J(t) = \frac{1}{G_{\text{chem}}} - \sum_{i=1}^{N_{\text{phys}}} \frac{G_i}{G_{\text{chem}}\left(G_{\text{chem}} + \sum_j G_j\right)} \exp\left(-\frac{t}{\tau_i^*}\right)
+
+where :math:`\tau_i^*` are the retardation times (related to but distinct from the relaxation times :math:`\tau_{b,i}`).
+
+**Physical insight:** The strain asymptote directly gives the permanent network modulus:
+
+.. math::
+
+   G_{\text{chem}} = \frac{\sigma_0}{\gamma_{\infty}}
+
+This provides a model-independent route to measuring the permanent network contribution from a single creep experiment.
+
+"Double-Yielding" in LAOS
+===========================================================
+
+When bond species have well-separated lifetimes, large amplitude oscillatory shear (LAOS) reveals **sequential yielding** — a phenomenon where different bond populations break at different strain amplitudes.
+
+Sequential Yielding Mechanism
+-----------------------------------------------------------
+
+The progression with increasing strain amplitude :math:`\gamma_0` is:
+
+**Small** :math:`\gamma_0` **(linear regime):**
+   All species remain elastic. The Lissajous figure is a linear ellipse with stiffness reflecting :math:`G_{\text{total}} = \sum_i G_i`.
+
+**Intermediate** :math:`\gamma_0` **(first yielding):**
+   Weak bonds (short :math:`\tau_{b}`) break and reform within a cycle. The first yielding event occurs when :math:`\gamma_0 \dot{\gamma}_{\max} \sim 1/\tau_{b,\text{weak}}`. The Lissajous figure begins to distort, showing the onset of nonlinearity.
+
+**Large** :math:`\gamma_0` **(second yielding):**
+   Strong bonds (long :math:`\tau_{b}`) also break, leading to a second yielding event. The material becomes fully fluidized, and the Lissajous figure shows a characteristic butterfly or rectangular shape.
+
+LAOS Signatures
+-----------------------------------------------------------
+
+The Lissajous figure shows **two distinct stiffness changes** as the strain amplitude increases, corresponding to the progressive loss of each bond population.
+
+This "double-yielding" signature is also visible in the intensity ratio :math:`I_{3/1}` (third harmonic normalized by fundamental) plotted against :math:`\gamma_0`: for :math:`N=2` species, :math:`I_{3/1}(\gamma_0)` shows **two peaks**, one per bond type. Each peak corresponds to the onset of nonlinear response from a specific bond population. More generally, :math:`N` well-separated species produce :math:`N` peaks in :math:`I_{3/1}(\gamma_0)`.
+
+Progressive Loss Under Flow
+===========================================================
+
+The flow curve of a multi-species network shows **staged shear thinning**: each bond species yields at a different critical shear rate, producing a characteristic stepped viscosity profile.
+
+Staged Shear Thinning
+-----------------------------------------------------------
+
+The critical shear rate for each species is:
+
+.. math::
+
+   \dot{\gamma}_{c,i} \approx \frac{1}{\tau_{b,i}}
+
+The flow curve exhibits distinct regimes as the shear rate increases:
+
+**Low rates** (:math:`\dot{\gamma} \ll 1/\tau_{b,\max}`):
+   All bond species are intact. The full network modulus :math:`G_{\text{total}} = \sum_i G_i` is active, and the material exhibits Newtonian behavior with zero-shear viscosity :math:`\eta_0 = \sum_i G_i \tau_{b,i} + \eta_s`.
+
+**Intermediate rates** (:math:`1/\tau_{b,i+1} < \dot{\gamma} < 1/\tau_{b,i}`):
+   Species :math:`i` (and all weaker species) have yielded. The effective modulus is reduced to :math:`G_{\text{eff}} = \sum_{j>i} G_j`, and the viscosity contribution from species :math:`i` is lost.
+
+**High rates** (:math:`\dot{\gamma} \gg 1/\tau_{b,\min}`):
+   All transient species have yielded. Only the solvent viscosity remains: :math:`\sigma \to \eta_s \cdot \dot{\gamma}`.
+
+Staircase Flow Curve
+-----------------------------------------------------------
+
+On a log-log plot, the viscosity :math:`\eta(\dot{\gamma})` shows a **staircase** pattern with :math:`N` steps, each corresponding to the loss of one bond type. The height of each step is proportional to :math:`G_i \tau_{b,i}`, and the transition between steps occurs at :math:`\dot{\gamma} \approx 1/\tau_{b,i}`.
+
+This staircase structure is a direct fingerprint of the discrete multi-species nature and distinguishes it from continuous spectrum models (e.g., KWW stretched exponential) which produce smooth power-law thinning.
+
+Failure Mode: Bond Hierarchy
+===========================================================
+
+.. admonition:: Failure Mode
+
+   **Mechanism:** Under increasing deformation, bond types fail sequentially from weakest (shortest :math:`\tau_{b}`) to strongest (longest :math:`\tau_{b}`). This progressive failure cascade determines the material's nonlinear response.
+
+   **Signature:** Multi-step yielding in flow curves and LAOS, visible as multiple inflection points in :math:`\eta(\dot{\gamma})` and multiple peaks in :math:`I_{3/1}(\gamma_0)`.
+
+   **Physical origin:** Each bond species has a characteristic force scale; exceeding it causes that species to dynamically break faster than it can reform. The critical rate for species :math:`i` is :math:`\dot{\gamma}_{c,i} \approx 1/\tau_{b,i}`.
+
+   **Implication:** The material's response depends on which bonds have "survived" at a given rate — the effective constitutive law changes character as bonds are progressively lost. At low rates the material behaves as a full :math:`N`-species network; at high rates only the strongest (or permanent) species remain.
+
+   **Design insight:** By tuning the ratio :math:`G_{\text{strong}}/G_{\text{weak}}` and :math:`\tau_{\text{strong}}/\tau_{\text{weak}}`, one can engineer materials with prescribed yielding sequences. This is important for self-healing materials (where weak bonds sacrifice first to protect the network), drug delivery gels (where sequential release requires staged degradation), and impact-absorbing materials (where energy dissipation is maximized by progressive bond failure).
+
 See Also
 ===========================================================
 
-Related Models
------------------------------------------------------------
+**TNT Shared Reference:**
 
-- :ref:`model-tnt-tanaka-edwards` — Single-mode TNT (base case, N=1)
-- :ref:`model-tnt-sticky-rouse` — TNT with Rouse dynamics (distributed lifetimes)
-- :ref:`model-generalized-maxwell` — Empirical multi-mode (no network interpretation)
-- :ref:`model-tnt-loop-bridge` — TNT with species coupling (loop to bridge conversion)
+- :doc:`tnt_protocols` — Full protocol equations and numerical methods
+- :doc:`tnt_knowledge_extraction` — Model identification and fitting guidance
+
+**TNT Base Model:**
+
+- :ref:`model-tnt-tanaka-edwards` — Base model (single-mode limit, N=1)
+
+**Closely Related TNT Variants:**
+
+- :ref:`model-tnt-sticky-rouse` — Multi-mode via Rouse dynamics between stickers (spectrum from chain physics rather than discrete species)
+- :ref:`model-tnt-loop-bridge` — Two-species with topology coupling (loops ↔ bridges interconversion)
+- :ref:`model-tnt-cates` — Living polymer limit (scission/recombination as species dynamics)
+
+**Complementary Extensions:**
+
+- :ref:`model-tnt-bell` — Force-dependent breakage (can be applied per species)
+- :ref:`model-tnt-fene-p` — Finite extensibility (can be applied per species)
+
+**External Comparisons:**
+
+- :ref:`model-generalized-maxwell` — Empirical multi-mode model (no network interpretation)
+- :doc:`/models/dmt/index` — Scalar structure parameter with thixotropic kinetics
 
 API Reference
 ===========================================================
