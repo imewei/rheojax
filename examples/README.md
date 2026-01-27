@@ -10,11 +10,11 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - JAX-accelerated numerical optimization (5-270x speedup)
 - Bayesian inference with full convergence diagnostics
 - Flexible API design (Pipeline, Modular, Core layers)
-- All 23 rheological models with examples (including SGR)
+- All 28 rheological models with examples (including SGR, TNT)
 - Advanced transforms for experimental data analysis (including SRFS)
 - **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**102 Tutorial Notebooks** (all complete ✅) organized into 12 learning paths:
+**156 Tutorial Notebooks** (all complete ✅) organized into 15 learning paths:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
 - **Transform Workflows** (7 notebooks ✅) - Data analysis techniques (+ SRFS)
 - **Bayesian Inference** (7 notebooks ✅) - Uncertainty quantification
@@ -27,6 +27,9 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - **Giesekus Viscoelastic Models** (7 notebooks ✅) - Nonlinear polymer rheology across all 6 protocols + normal stresses
 - **Fluidity Models** (24 notebooks ✅) - Comprehensive suite for FluidityLocal, FluidityNonlocal, and Saramito EVP models (including shear banding)
 - **IKH Isotropic-Kinematic Hardening Models** (12 notebooks ✅) - MIKH single-mode and MLIKH multi-mode with Armstrong-Frederick hardening
+- **FIKH Fractional IKH Models** (12 notebooks ✅) - FIKH single-mode and FMLIKH multi-mode with Caputo fractional memory
+- **ITT-MCT Mode-Coupling Theory Models** (12 notebooks ✅) - Schematic F₁₂ and Isotropic ISM models for colloidal glasses
+- **TNT Transient Network Theory Models** (30 notebooks ✅) - 5 TNT model classes (SingleMode, Cates, LoopBridge, MultiSpecies, StickyRouse) across all 6 protocols
 
 ## Prerequisites
 
@@ -499,6 +502,60 @@ Comprehensive tutorials for the Giesekus viscoelastic constitutive model — a n
 | MLIKH Creep | [ikh/10-mlikh-creep](ikh/10_mlikh_creep.ipynb) | IKH | ✅ Complete |
 | MLIKH SAOS | [ikh/11-mlikh-saos](ikh/11_mlikh_saos.ipynb) | IKH | ✅ Complete |
 | MLIKH LAOS | [ikh/12-mlikh-laos](ikh/12_mlikh_laos.ipynb) | IKH | ✅ Complete |
+| FIKH Flow Curve | [fikh/01-fikh-flow-curve](fikh/01_fikh_flow_curve.ipynb) | FIKH | ✅ Complete |
+| FIKH Startup Shear | [fikh/02-fikh-startup-shear](fikh/02_fikh_startup_shear.ipynb) | FIKH | ✅ Complete |
+| FIKH Stress Relaxation | [fikh/03-fikh-stress-relaxation](fikh/03_fikh_stress_relaxation.ipynb) | FIKH | ✅ Complete |
+| FIKH Creep | [fikh/04-fikh-creep](fikh/04_fikh_creep.ipynb) | FIKH | ✅ Complete |
+| FIKH SAOS | [fikh/05-fikh-saos](fikh/05_fikh_saos.ipynb) | FIKH | ✅ Complete |
+| FIKH LAOS | [fikh/06-fikh-laos](fikh/06_fikh_laos.ipynb) | FIKH | ✅ Complete |
+| FMLIKH Flow Curve | [fikh/07-fmlikh-flow-curve](fikh/07_fmlikh_flow_curve.ipynb) | FIKH | ✅ Complete |
+| FMLIKH Startup Shear | [fikh/08-fmlikh-startup-shear](fikh/08_fmlikh_startup_shear.ipynb) | FIKH | ✅ Complete |
+| FMLIKH Stress Relaxation | [fikh/09-fmlikh-stress-relaxation](fikh/09_fmlikh_stress_relaxation.ipynb) | FIKH | ✅ Complete |
+| FMLIKH Creep | [fikh/10-fmlikh-creep](fikh/10_fmlikh_creep.ipynb) | FIKH | ✅ Complete |
+| FMLIKH SAOS | [fikh/11-fmlikh-saos](fikh/11_fmlikh_saos.ipynb) | FIKH | ✅ Complete |
+| FMLIKH LAOS | [fikh/12-fmlikh-laos](fikh/12_fmlikh_laos.ipynb) | FIKH | ✅ Complete |
+| ITT-MCT Schematic Flow Curve | [itt_mct/01-schematic-flow-curve](itt_mct/01_schematic_flow_curve.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Schematic Startup | [itt_mct/02-schematic-startup-shear](itt_mct/02_schematic_startup_shear.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Schematic Relaxation | [itt_mct/03-schematic-stress-relaxation](itt_mct/03_schematic_stress_relaxation.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Schematic Creep | [itt_mct/04-schematic-creep](itt_mct/04_schematic_creep.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Schematic SAOS | [itt_mct/05-schematic-saos](itt_mct/05_schematic_saos.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Schematic LAOS | [itt_mct/06-schematic-laos](itt_mct/06_schematic_laos.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Isotropic Flow Curve | [itt_mct/07-isotropic-flow-curve](itt_mct/07_isotropic_flow_curve.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Isotropic Startup | [itt_mct/08-isotropic-startup-shear](itt_mct/08_isotropic_startup_shear.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Isotropic Relaxation | [itt_mct/09-isotropic-stress-relaxation](itt_mct/09_isotropic_stress_relaxation.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Isotropic Creep | [itt_mct/10-isotropic-creep](itt_mct/10_isotropic_creep.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Isotropic SAOS | [itt_mct/11-isotropic-saos](itt_mct/11_isotropic_saos.ipynb) | ITT-MCT | ✅ Complete |
+| ITT-MCT Isotropic LAOS | [itt_mct/12-isotropic-laos](itt_mct/12_isotropic_laos.ipynb) | ITT-MCT | ✅ Complete |
+| TNT SingleMode Flow Curve | [tnt/01-tnt-single-mode-flow-curve](tnt/01_tnt_single_mode_flow_curve.ipynb) | TNT | ✅ Complete |
+| TNT SingleMode Startup | [tnt/02-tnt-single-mode-startup](tnt/02_tnt_single_mode_startup.ipynb) | TNT | ✅ Complete |
+| TNT SingleMode Relaxation | [tnt/03-tnt-single-mode-relaxation](tnt/03_tnt_single_mode_relaxation.ipynb) | TNT | ✅ Complete |
+| TNT SingleMode Creep | [tnt/04-tnt-single-mode-creep](tnt/04_tnt_single_mode_creep.ipynb) | TNT | ✅ Complete |
+| TNT SingleMode SAOS | [tnt/05-tnt-single-mode-saos](tnt/05_tnt_single_mode_saos.ipynb) | TNT | ✅ Complete |
+| TNT SingleMode LAOS | [tnt/06-tnt-single-mode-laos](tnt/06_tnt_single_mode_laos.ipynb) | TNT | ✅ Complete |
+| TNT Cates Flow Curve | [tnt/07-tnt-cates-flow-curve](tnt/07_tnt_cates_flow_curve.ipynb) | TNT | ✅ Complete |
+| TNT Cates Startup | [tnt/08-tnt-cates-startup](tnt/08_tnt_cates_startup.ipynb) | TNT | ✅ Complete |
+| TNT Cates Relaxation | [tnt/09-tnt-cates-relaxation](tnt/09_tnt_cates_relaxation.ipynb) | TNT | ✅ Complete |
+| TNT Cates Creep | [tnt/10-tnt-cates-creep](tnt/10_tnt_cates_creep.ipynb) | TNT | ✅ Complete |
+| TNT Cates SAOS | [tnt/11-tnt-cates-saos](tnt/11_tnt_cates_saos.ipynb) | TNT | ✅ Complete |
+| TNT Cates LAOS | [tnt/12-tnt-cates-laos](tnt/12_tnt_cates_laos.ipynb) | TNT | ✅ Complete |
+| TNT LoopBridge Flow Curve | [tnt/13-tnt-loop-bridge-flow-curve](tnt/13_tnt_loop_bridge_flow_curve.ipynb) | TNT | ✅ Complete |
+| TNT LoopBridge Startup | [tnt/14-tnt-loop-bridge-startup](tnt/14_tnt_loop_bridge_startup.ipynb) | TNT | ✅ Complete |
+| TNT LoopBridge Relaxation | [tnt/15-tnt-loop-bridge-relaxation](tnt/15_tnt_loop_bridge_relaxation.ipynb) | TNT | ✅ Complete |
+| TNT LoopBridge Creep | [tnt/16-tnt-loop-bridge-creep](tnt/16_tnt_loop_bridge_creep.ipynb) | TNT | ✅ Complete |
+| TNT LoopBridge SAOS | [tnt/17-tnt-loop-bridge-saos](tnt/17_tnt_loop_bridge_saos.ipynb) | TNT | ✅ Complete |
+| TNT LoopBridge LAOS | [tnt/18-tnt-loop-bridge-laos](tnt/18_tnt_loop_bridge_laos.ipynb) | TNT | ✅ Complete |
+| TNT MultiSpecies Flow Curve | [tnt/19-tnt-multi-species-flow-curve](tnt/19_tnt_multi_species_flow_curve.ipynb) | TNT | ✅ Complete |
+| TNT MultiSpecies Startup | [tnt/20-tnt-multi-species-startup](tnt/20_tnt_multi_species_startup.ipynb) | TNT | ✅ Complete |
+| TNT MultiSpecies Relaxation | [tnt/21-tnt-multi-species-relaxation](tnt/21_tnt_multi_species_relaxation.ipynb) | TNT | ✅ Complete |
+| TNT MultiSpecies Creep | [tnt/22-tnt-multi-species-creep](tnt/22_tnt_multi_species_creep.ipynb) | TNT | ✅ Complete |
+| TNT MultiSpecies SAOS | [tnt/23-tnt-multi-species-saos](tnt/23_tnt_multi_species_saos.ipynb) | TNT | ✅ Complete |
+| TNT MultiSpecies LAOS | [tnt/24-tnt-multi-species-laos](tnt/24_tnt_multi_species_laos.ipynb) | TNT | ✅ Complete |
+| TNT StickyRouse Flow Curve | [tnt/25-tnt-sticky-rouse-flow-curve](tnt/25_tnt_sticky_rouse_flow_curve.ipynb) | TNT | ✅ Complete |
+| TNT StickyRouse Startup | [tnt/26-tnt-sticky-rouse-startup](tnt/26_tnt_sticky_rouse_startup.ipynb) | TNT | ✅ Complete |
+| TNT StickyRouse Relaxation | [tnt/27-tnt-sticky-rouse-relaxation](tnt/27_tnt_sticky_rouse_relaxation.ipynb) | TNT | ✅ Complete |
+| TNT StickyRouse Creep | [tnt/28-tnt-sticky-rouse-creep](tnt/28_tnt_sticky_rouse_creep.ipynb) | TNT | ✅ Complete |
+| TNT StickyRouse SAOS | [tnt/29-tnt-sticky-rouse-saos](tnt/29_tnt_sticky_rouse_saos.ipynb) | TNT | ✅ Complete |
+| TNT StickyRouse LAOS | [tnt/30-tnt-sticky-rouse-laos](tnt/30_tnt_sticky_rouse_laos.ipynb) | TNT | ✅ Complete |
 
 ### Phase 11: Fluidity Models (NEW)
 
@@ -587,7 +644,165 @@ Comprehensive tutorials for the Isotropic-Kinematic Hardening (IKH) model family
 - Real: ML-IKH Excel (Wei et al. 2018 J. Rheol), PNAS Digital Rheometer Twin (2022)
 - Synthetic: Relaxation and SAOS from calibrated flow curve parameters (3% noise)
 
-### By API Level
+### Phase 13: FIKH Fractional Isotropic-Kinematic Hardening Models
+
+Extension of IKH with **Caputo fractional derivative** for power-law memory in thixotropic structure evolution. The fractional order α controls the transition between strong power-law memory (slow recovery) and classical exponential behavior.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-fikh-flow-curve.ipynb](fikh/01_fikh_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | Fractional thixotropy, alpha sweep, memory kernel decay |
+| **[02-fikh-startup-shear.ipynb](fikh/02_fikh_startup_shear.ipynb)** | Startup | Real (PNAS) | Stress overshoot, alpha effect on peak timing |
+| **[03-fikh-stress-relaxation.ipynb](fikh/03_fikh_stress_relaxation.ipynb)** | Relaxation | Synthetic (NB01) | Power-law vs exponential tails, Mittag-Leffler |
+| **[04-fikh-creep.ipynb](fikh/04_fikh_creep.ipynb)** | Creep | Real (ML-IKH) | Delayed yielding, alpha effect on creep acceleration |
+| **[05-fikh-saos.ipynb](fikh/05_fikh_saos.ipynb)** | SAOS | Synthetic (NB01) | G'/G'' vs frequency, alpha effect on moduli |
+| **[06-fikh-laos.ipynb](fikh/06_fikh_laos.ipynb)** | LAOS | Real (PNAS) | Lissajous curves, intra-cycle structure evolution |
+| **[07-fmlikh-flow-curve.ipynb](fikh/07_fmlikh_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | Multi-mode fractional thixotropy, mode contributions |
+| **[08-fmlikh-startup-shear.ipynb](fikh/08_fmlikh_startup_shear.ipynb)** | Startup | Real (PNAS) | Multi-mode overshoot, mode decomposition |
+| **[09-fmlikh-stress-relaxation.ipynb](fikh/09_fmlikh_stress_relaxation.ipynb)** | Relaxation | Synthetic (NB07) | Multi-exponential with fractional modifications |
+| **[10-fmlikh-creep.ipynb](fikh/10_fmlikh_creep.ipynb)** | Creep | Real (ML-IKH) | Multi-mode delayed yielding, distributed timescales |
+| **[11-fmlikh-saos.ipynb](fikh/11_fmlikh_saos.ipynb)** | SAOS | Synthetic (NB07) | Broadened spectra, multi-Maxwell with fractional order |
+| **[12-fmlikh-laos.ipynb](fikh/12_fmlikh_laos.ipynb)** | LAOS | Real (PNAS) | Multi-mode Lissajous, harmonic enrichment |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — calibrates parameters for Notebooks 03 and 05
+2. **02-startup**, **04-creep**, and **06-laos** use independent real data (any order)
+3. Complete with **07-fmlikh-flow-curve** and multi-mode notebooks for advanced analysis
+
+**Models:**
+- **FIKH** (Single-Mode): 12 parameters including alpha_structure (0 < α < 1)
+- **FMLIKH** (Multi-Mode): n_modes×4 + 5 shared parameters with optional per-mode alpha
+
+**Key Innovation — `alpha_structure` (0 < α < 1):**
+- α → 0: Strong power-law memory, very slow structure recovery
+- α 0.4-0.6: Moderate fractional behavior
+- α 0.6-0.85: Weak fractional effects
+- α → 1: Classical IKH limit (exponential memory)
+
+**Key Physics:**
+- **Caputo Fractional Derivative**: D^α_C λ = (1-λ)/τ_thix - Γλ|γ̇ᵖ| for structure evolution
+- **Power-Law Memory Kernel**: K(t) = t^(-α)/Γ(1-α) vs exponential in IKH
+- **Mittag-Leffler Relaxation**: E_α(-(t/τ)^α) generalizes exponential decay
+- **Alpha Exploration**: Each notebook includes alpha sweep visualization
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+- Phase 12 IKH notebooks (recommended for classical IKH comparison)
+
+**Data Sources:**
+- Real: ML-IKH Excel (Wei et al. 2018 J. Rheol), PNAS Digital Rheometer Twin (2022)
+- Synthetic: Relaxation and SAOS from calibrated flow curve parameters (3% noise)
+
+### Phase 14: ITT-MCT Mode-Coupling Theory Models
+
+Comprehensive tutorials for the Integration Through Transients Mode-Coupling Theory (ITT-MCT) models — microscopic MCT-based approach for dense colloidal suspensions and glassy materials with cage dynamics and glass transition physics.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-schematic-flow-curve.ipynb](itt_mct/01_schematic_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | F₁₂ memory kernel, v₂ vertex, glass transition at v₂=4 |
+| **[02-schematic-startup-shear.ipynb](itt_mct/02_schematic_startup_shear.ipynb)** | Startup | Real (PNAS) | Stress overshoot, cage breaking, h(γ) decorrelation |
+| **[03-schematic-stress-relaxation.ipynb](itt_mct/03_schematic_stress_relaxation.ipynb)** | Relaxation | Synthetic (NB01) | Two-step β/α relaxation, non-ergodicity parameter f |
+| **[04-schematic-creep.ipynb](itt_mct/04_schematic_creep.ipynb)** | Creep | Synthetic (NB01) | Delayed yielding, σ_y estimation, arrested creep |
+| **[05-schematic-saos.ipynb](itt_mct/05_schematic_saos.ipynb)** | SAOS | Synthetic (NB01) | G' plateau G∞f², glass vs fluid moduli |
+| **[06-schematic-laos.ipynb](itt_mct/06_schematic_laos.ipynb)** | LAOS | Real (PNAS) | Fourier harmonics, get_laos_harmonics(), I₃/I₁ |
+| **[07-isotropic-flow-curve.ipynb](itt_mct/07_isotropic_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | ISM k-resolved, Percus-Yevick S(k), φ_MCT=0.516 |
+| **[08-isotropic-startup-shear.ipynb](itt_mct/08_isotropic_startup_shear.ipynb)** | Startup | Real (PNAS) | k-resolved cage breaking, precompile() |
+| **[09-isotropic-stress-relaxation.ipynb](itt_mct/09_isotropic_stress_relaxation.ipynb)** | Relaxation | Synthetic (NB07) | k-resolved two-step relaxation |
+| **[10-isotropic-creep.ipynb](itt_mct/10_isotropic_creep.ipynb)** | Creep | Synthetic (NB07) | k-resolved delayed yielding |
+| **[11-isotropic-saos.ipynb](itt_mct/11_isotropic_saos.ipynb)** | SAOS | Synthetic (NB07) | S(k) weighted moduli, k-resolved plateau |
+| **[12-isotropic-laos.ipynb](itt_mct/12_isotropic_laos.ipynb)** | LAOS | Real (PNAS) | k-resolved LAOS harmonics |
+
+**Recommended Order:**
+1. Start with **01-flow-curve** — calibrates parameters for Notebooks 03, 04, 05
+2. **02-startup** and **06-laos** use independent real data (any order)
+3. Continue with **07-isotropic-flow-curve** for full k-resolved analysis
+4. Complete with synthetic notebooks (03-05, 09-11) using calibrated parameters
+
+**Models:**
+- **ITTMCTSchematic** (F₁₂): 5 parameters — v₂, Γ, γc, G∞ (v₁=0 fixed)
+- **ITTMCTIsotropic** (ISM): 5 parameters — φ, σ_d, D₀, k_BT, γc
+
+**Key Physics:**
+- **Glass Transition**: Schematic at v₂=4, ISM at φ_MCT ≈ 0.516
+- **Non-Ergodicity Parameter f**: Long-time correlator plateau in glass state
+- **Two-Step Relaxation**: Fast β-process (cage vibration) + slow α-process (cage rearrangement)
+- **Strain Decorrelation**: h(γ) = exp(-(γ/γc)²) for cage breaking
+- **Structure Factor**: Percus-Yevick S(k) for hard-sphere predictions (ISM only)
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data Sources:**
+- Real: ML-IKH carbopol flow curves, PNAS Digital Rheometer Twin startup/LAOS
+- Synthetic: Relaxation, creep, and SAOS from calibrated flow curve parameters (2% noise)
+
+### Phase 15: TNT Transient Network Theory Models
+
+Comprehensive tutorials for the Transient Network Theory (TNT) model family — constitutive models for associative polymers, physical gels, and reversibly crosslinked networks based on conformation tensor evolution with reversible bond kinetics.
+
+| Notebook | Protocol | Data | Key Topics |
+|----------|----------|------|------------|
+| **[01-tnt-single-mode-flow-curve.ipynb](tnt/01_tnt_single_mode_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | Weissenberg analysis, N₁ prediction, constant vs bell vs fene overlay |
+| **[02-tnt-single-mode-startup.ipynb](tnt/02_tnt_single_mode_startup.ipynb)** | Startup | Real (PNAS) | Conformation tensor S evolution, multi-rate predictions, overshoot |
+| **[03-tnt-single-mode-relaxation.ipynb](tnt/03_tnt_single_mode_relaxation.ipynb)** | Relaxation | Real laponite clay | Exponential decay, τ_b extraction, log-log plot |
+| **[04-tnt-single-mode-creep.ipynb](tnt/04_tnt_single_mode_creep.ipynb)** | Creep | Real (ML-IKH) | Compliance J(t), viscosity evolution, strain integration |
+| **[05-tnt-single-mode-saos.ipynb](tnt/05_tnt_single_mode_saos.ipynb)** | SAOS | Real metal network | Cole-Cole plot, crossover ω=1/τ_b, tan(δ) |
+| **[06-tnt-single-mode-laos.ipynb](tnt/06_tnt_single_mode_laos.ipynb)** | LAOS | Real (PNAS) | Lissajous, FFT harmonics I₃/I₁, Bell nonlinearity comparison |
+| **[07-tnt-cates-flow-curve.ipynb](tnt/07_tnt_cates_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | τ_d = √(τ_rep·τ_break), fast-breaking limit, non-monotonic check |
+| **[08-tnt-cates-startup.ipynb](tnt/08_tnt_cates_startup.ipynb)** | Startup | Real (PNAS) | Cates-specific overshoot, scission dynamics during startup |
+| **[09-tnt-cates-relaxation.ipynb](tnt/09_tnt_cates_relaxation.ipynb)** | Relaxation | Real laponite clay | Single-exponential with τ_d, comparison with TE (NB03) |
+| **[10-tnt-cates-creep.ipynb](tnt/10_tnt_cates_creep.ipynb)** | Creep | Real (ML-IKH) | UCM-like creep, τ_d-governed compliance |
+| **[11-tnt-cates-saos.ipynb](tnt/11_tnt_cates_saos.ipynb)** | SAOS | Real metal network | Cole-Cole semicircle diagnostic (Cates signature), ζ = τ_break/τ_rep |
+| **[12-tnt-cates-laos.ipynb](tnt/12_tnt_cates_laos.ipynb)** | LAOS | Real (PNAS) | Nonlinear Cates response, shear banding threshold |
+| **[13-tnt-loop-bridge-flow-curve.ipynb](tnt/13_tnt_loop_bridge_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | Bridge fraction f_B vs γ̇, shear-thinning from force-dependent unbinding |
+| **[14-tnt-loop-bridge-startup.ipynb](tnt/14_tnt_loop_bridge_startup.ipynb)** | Startup | Real (PNAS) | f_B evolution during startup, force-dependent overshoot |
+| **[15-tnt-loop-bridge-relaxation.ipynb](tnt/15_tnt_loop_bridge_relaxation.ipynb)** | Relaxation | Real laponite clay | Bridge re-equilibration dynamics, τ_a/τ_b ratio effects |
+| **[16-tnt-loop-bridge-creep.ipynb](tnt/16_tnt_loop_bridge_creep.ipynb)** | Creep | Real (ML-IKH) | Stress-dependent bridge fraction, delayed yielding |
+| **[17-tnt-loop-bridge-saos.ipynb](tnt/17_tnt_loop_bridge_saos.ipynb)** | SAOS | Real metal network | Effective modulus G_eff = f_B_eq·G, linearized Maxwell |
+| **[18-tnt-loop-bridge-laos.ipynb](tnt/18_tnt_loop_bridge_laos.ipynb)** | LAOS | Real (PNAS) | Bridge fraction oscillation, nonlinear f_B dynamics |
+| **[19-tnt-multi-species-flow-curve.ipynb](tnt/19_tnt_multi_species_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | Per-species stress decomposition, species-resolved thinning |
+| **[20-tnt-multi-species-startup.ipynb](tnt/20_tnt_multi_species_startup.ipynb)** | Startup | Real (PNAS) | Multi-species overshoot (fast species peaks first) |
+| **[21-tnt-multi-species-relaxation.ipynb](tnt/21_tnt_multi_species_relaxation.ipynb)** | Relaxation | Real laponite clay | Bi-exponential decay, spectrum resolution from data |
+| **[22-tnt-multi-species-creep.ipynb](tnt/22_tnt_multi_species_creep.ipynb)** | Creep | Real (ML-IKH) | Multi-mode compliance, sequential species yielding |
+| **[23-tnt-multi-species-saos.ipynb](tnt/23_tnt_multi_species_saos.ipynb)** | SAOS | Real metal network | Multi-mode Maxwell superposition, spectrum fitting quality |
+| **[24-tnt-multi-species-laos.ipynb](tnt/24_tnt_multi_species_laos.ipynb)** | LAOS | Real (PNAS) | Species-resolved nonlinear contributions |
+| **[25-tnt-sticky-rouse-flow-curve.ipynb](tnt/25_tnt_sticky_rouse_flow_curve.ipynb)** | Flow curve | Real (ML-IKH) | Effective time analysis, sticker-limited plateau regime |
+| **[26-tnt-sticky-rouse-startup.ipynb](tnt/26_tnt_sticky_rouse_startup.ipynb)** | Startup | Real (PNAS) | Mode-by-mode buildup, sticker-dominated initial response |
+| **[27-tnt-sticky-rouse-relaxation.ipynb](tnt/27_tnt_sticky_rouse_relaxation.ipynb)** | Relaxation | Real laponite clay | Multi-exponential with τ_eff, sticker-truncated spectrum |
+| **[28-tnt-sticky-rouse-creep.ipynb](tnt/28_tnt_sticky_rouse_creep.ipynb)** | Creep | Real (ML-IKH) | Multi-mode compliance, fast/slow mode separation |
+| **[29-tnt-sticky-rouse-saos.ipynb](tnt/29_tnt_sticky_rouse_saos.ipynb)** | SAOS | Real metal network | Mode spectrum visualization, sticker plateau in G'(ω) |
+| **[30-tnt-sticky-rouse-laos.ipynb](tnt/30_tnt_sticky_rouse_laos.ipynb)** | LAOS | Real (PNAS) | Mode-resolved harmonics, sticker nonlinearity |
+
+**Recommended Order:**
+1. Start with **01-06** (TNTSingleMode) — establishes TNT conformation tensor physics and all protocols
+2. Continue with **07-12** (TNTCates) — living polymer scission/recombination with Cole-Cole diagnostics
+3. Try **13-18** (TNTLoopBridge) — telechelic polymer loop↔bridge kinetics (most parameters: 6)
+4. Explore **19-24** (TNTMultiSpecies) — polydisperse networks with species-resolved stress
+5. Complete with **25-30** (TNTStickyRouse) — ionomer sticker kinetics with Rouse mode hierarchy
+
+**Models:**
+- **TNTSingleMode** (`breakage="constant"`): Tanaka-Edwards conformation tensor — G, τ_b, η_s (3 params)
+- **TNTSingleMode** (`breakage="bell"`): Bell force-dependent breakage — G, τ_b, η_s, ν (4 params)
+- **TNTCates**: Living polymers (wormlike micelles) — G_0, τ_rep, τ_break, η_s (4 params)
+- **TNTLoopBridge**: Telechelic polymer loop↔bridge kinetics — G, τ_b, τ_a, ν, f_B_eq, η_s (6 params)
+- **TNTMultiSpecies** (`n_species=2`): Independent bond species — G_0, τ_b_0, G_1, τ_b_1, η_s (5 params)
+- **TNTStickyRouse** (`n_modes=3`): Rouse modes + sticker lifetime — G_0, τ_R_0, ..., τ_s, η_s (8 params)
+
+**Key Physics:**
+- **Conformation tensor S**: dS/dt = L·S + S·L^T + g₀·I - β(S)·S
+- **Bond kinetics**: Reversible crosslinks with creation rate g₀ and breakage rate β(S)
+- **Bell mechanism**: β(λ) = (1/τ_b)·exp(ν(λ-1)) for force-dependent breakage
+- **Cates τ_d**: τ_d = √(τ_rep·τ_break) for living polymer relaxation
+- **Sticky Rouse**: τ_eff_k = max(τ_R_k, τ_s) sets sticker-dominated plateau
+
+**Prerequisites:**
+- Phase 1 basic/ notebooks (model fitting)
+- Phase 3 bayesian/ notebooks (Bayesian inference fundamentals)
+
+**Data Sources:**
+- Real: ML-IKH carbopol flow curves/creep, PNAS startup/LAOS, metal-organic network SAOS, laponite clay relaxation
+- Note: TNT models target associative polymer networks; carbopol/laponite data used for workflow demonstration
 
 - **Pipeline API** (Easiest): `pipeline.load().fit().plot().save()` - Start here
 - **Modular API** (Medium): `model.fit()` with explicit control
