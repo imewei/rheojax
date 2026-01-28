@@ -246,15 +246,11 @@ class DMTLocal(DMTBase):
         def model_fn(x, params_array):
             if self.closure == "exponential":
                 eta_0, eta_inf, a, c = params_array[:4]
-                return np.array(
-                    steady_stress_exponential(jnp.array(x), eta_0, eta_inf, a, c)
-                )
+                return steady_stress_exponential(jnp.array(x), eta_0, eta_inf, a, c)
             else:
                 tau_y0, K0, n_flow, eta_inf, a, c, m1, m2 = params_array[:8]
-                return np.array(
-                    steady_stress_herschel_bulkley(
-                        jnp.array(x), tau_y0, K0, n_flow, eta_inf, a, c, m1, m2
-                    )
+                return steady_stress_herschel_bulkley(
+                    jnp.array(x), tau_y0, K0, n_flow, eta_inf, a, c, m1, m2
                 )
 
         # Fit using nlsq_curve_fit
@@ -351,9 +347,12 @@ class DMTLocal(DMTBase):
         params = self.get_parameter_dict()
 
         if self.include_elasticity:
-            return self._simulate_startup_maxwell(t, dt, gamma_dot, lam_init, params)
+            t_out, stress, lam = self._simulate_startup_maxwell(t, dt, gamma_dot, lam_init, params)
         else:
-            return self._simulate_startup_viscous(t, dt, gamma_dot, lam_init, params)
+            t_out, stress, lam = self._simulate_startup_viscous(t, dt, gamma_dot, lam_init, params)
+
+        # Convert to numpy for public API
+        return np.array(t_out), np.array(stress), np.array(lam)
 
     def _simulate_startup_viscous(
         self,
@@ -392,7 +391,8 @@ class DMTLocal(DMTBase):
 
         _, (stress, lam) = jax.lax.scan(step, lam_init, None, length=len(t))
 
-        return np.array(t), np.array(stress), np.array(lam)
+        # Return JAX arrays (conversion to numpy happens in public methods)
+        return t, stress, lam
 
     def _simulate_startup_maxwell(
         self,
@@ -402,7 +402,11 @@ class DMTLocal(DMTBase):
         lam_init: float,
         params: dict,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Simulate startup for DMT-Maxwell (with elasticity)."""
+        """Simulate startup for DMT-Maxwell (with elasticity).
+
+        Uses semi-implicit (backward Euler) integration for unconditional
+        stability when dt > theta_1 (relaxation time).
+        """
 
         def step(state, _):
             sigma, lam = state
@@ -434,16 +438,18 @@ class DMTLocal(DMTBase):
             # Relaxation time
             theta_1 = eta / jnp.maximum(G, 1e-10)
 
-            # Stress evolution
-            dsigma = maxwell_stress_evolution(sigma, gamma_dot, G, theta_1)
-            sigma_new = sigma + dt * dsigma
+            # Semi-implicit stress evolution (unconditionally stable)
+            # dsigma/dt = G*gamma_dot - sigma/theta_1
+            # Using backward Euler: sigma_new = (sigma + dt*G*gamma_dot) / (1 + dt/theta_1)
+            sigma_new = (sigma + dt * G * gamma_dot) / (1.0 + dt / theta_1)
 
             return (sigma_new, lam_new), (sigma_new, lam_new)
 
         init_state = (0.0, lam_init)  # Zero initial stress
         _, (stress, lam) = jax.lax.scan(step, init_state, None, length=len(t))
 
-        return np.array(t), np.array(stress), np.array(lam)
+        # Return JAX arrays (conversion to numpy happens in public methods)
+        return t, stress, lam
 
     def _fit_transient(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> DMTLocal:
         """Fit to transient startup data."""
@@ -457,13 +463,19 @@ class DMTLocal(DMTBase):
         stress_jax = jnp.array(stress)
         dt = float(t[1] - t[0])
 
+        # Estimate stress scale for normalization
+        stress_scale = jnp.maximum(jnp.std(stress_jax), 1.0)
+
         def residual_fn(params_array):
             # Reconstruct parameter dict
             param_dict = self._params_array_to_dict(params_array)
             _, stress_pred, _ = self._simulate_with_params(
                 t_jax, dt, gamma_dot, lam_init, param_dict
             )
-            return stress_pred - stress_jax
+            # Clip extreme predictions to avoid NaN gradients
+            stress_pred = jnp.clip(stress_pred, -1e12, 1e12)
+            # Normalize residuals for numerical stability
+            return (stress_pred - stress_jax) / stress_scale
 
         params_array, bounds = self._get_params_for_optimization()
 
@@ -478,10 +490,20 @@ class DMTLocal(DMTBase):
         """Predict startup stress."""
         gamma_dot = kwargs.get("gamma_dot", 1.0)
         lam_init = kwargs.get("lam_init", 1.0)
-        _, stress, _ = self.simulate_startup(
-            gamma_dot, float(t[-1]), float(t[1] - t[0]), lam_init
-        )
-        return stress
+        t_jax = jnp.array(t)
+        dt = float(t[1] - t[0]) if len(t) > 1 else 0.01
+        params = self.get_parameter_dict()
+
+        # Use internal method directly to ensure consistent output length
+        if self.include_elasticity:
+            _, stress, _ = self._simulate_startup_maxwell(
+                t_jax, dt, gamma_dot, lam_init, params
+            )
+        else:
+            _, stress, _ = self._simulate_startup_viscous(
+                t_jax, dt, gamma_dot, lam_init, params
+            )
+        return np.array(stress)
 
     # =========================================================================
     # Stress Relaxation (Maxwell only)
@@ -1065,17 +1087,21 @@ class DMTLocal(DMTBase):
         param_names = list(self.parameters.keys())
         params = jnp.array([self.parameters.get_value(n) for n in param_names])
         bounds_lower = jnp.array(
-            [self.parameters.get_bounds(n)[0] for n in param_names]
+            [self.parameters[n].bounds[0] for n in param_names]
         )
         bounds_upper = jnp.array(
-            [self.parameters.get_bounds(n)[1] for n in param_names]
+            [self.parameters[n].bounds[1] for n in param_names]
         )
         return params, (bounds_lower, bounds_upper)
 
     def _params_array_to_dict(self, params_array: jnp.ndarray) -> dict:
-        """Convert parameter array to dictionary."""
+        """Convert parameter array to dictionary.
+
+        Note: Values are kept as JAX arrays to maintain compatibility with
+        JAX tracing during optimization. Use float() only after optimization.
+        """
         param_names = list(self.parameters.keys())
-        return {name: float(params_array[i]) for i, name in enumerate(param_names)}
+        return {name: params_array[i] for i, name in enumerate(param_names)}
 
     def _set_params_from_array(self, params_array: jnp.ndarray) -> None:
         """Set parameters from array."""
@@ -1091,21 +1117,22 @@ class DMTLocal(DMTBase):
         lam_init: float,
         params: dict,
     ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-        """Simulate with given parameters (for fitting)."""
-        # Temporarily set parameters
-        original_params = self.get_parameter_dict()
-        for name, value in params.items():
-            if name in self.parameters.keys():
-                self.parameters.set_value(name, value)
+        """Simulate with given parameters (for fitting).
 
-        # Simulate
-        _, stress, lam = self.simulate_startup(gamma_dot, float(t[-1]), dt, lam_init)
+        This method directly calls internal simulation methods with the params
+        dict to maintain JAX traceability during optimization.
+        """
+        # Directly call internal methods with params dict (JAX-traceable)
+        if self.include_elasticity:
+            t_out, stress, lam = self._simulate_startup_maxwell(
+                t, dt, gamma_dot, lam_init, params
+            )
+        else:
+            t_out, stress, lam = self._simulate_startup_viscous(
+                t, dt, gamma_dot, lam_init, params
+            )
 
-        # Restore
-        for name, value in original_params.items():
-            self.parameters.set_value(name, value)
-
-        return t, jnp.array(stress), jnp.array(lam)
+        return t_out, jnp.array(stress), jnp.array(lam)
 
     def model_function(self, X, params, test_mode=None):
         """NumPyro/BayesianMixin model function for DMT.

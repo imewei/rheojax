@@ -1570,11 +1570,17 @@ def nlsq_curve_fit(
         objective = create_least_squares_objective(model_fn, x_data_np, y_data_np)
 
         if multistart:
-            return nlsq_multistart_optimize(
+            result = nlsq_multistart_optimize(
                 objective, parameters, n_starts=n_starts, **kwargs
             )
         else:
-            return nlsq_optimize(objective, parameters, **kwargs)
+            result = nlsq_optimize(objective, parameters, **kwargs)
+
+        # Preserve y_data for R² calculation (not set by nlsq_optimize fallback)
+        result.y_data = y_data_np
+        result._model_fn = model_fn
+        result._x_data = x_data_np
+        return result
 
 
 def optimize_with_bounds(
@@ -1616,6 +1622,36 @@ def optimize_with_bounds(
 
     # Use main optimization function
     return nlsq_optimize(objective, params, use_jax=use_jax, **kwargs)
+
+
+def fit_with_nlsq(
+    residual_fn: Callable[[np.ndarray], np.ndarray],
+    x0: np.ndarray,
+    bounds: tuple[np.ndarray, np.ndarray] | None = None,
+    **kwargs,
+) -> OptimizationResult:
+    """Fit using nonlinear least squares with residual function.
+
+    Convenience function for fitting models using a residual function
+    that takes parameter array and returns residual vector.
+
+    Args:
+        residual_fn: Function that takes parameter array and returns residuals
+        x0: Initial parameter values as 1D array
+        bounds: Tuple of (lower, upper) bound arrays, or None for unbounded
+        **kwargs: Additional arguments passed to optimize_with_bounds
+
+    Returns:
+        OptimizationResult with optimal parameters in .x attribute
+    """
+    # Convert bounds format: (lower_array, upper_array) -> list of tuples
+    if bounds is not None:
+        lower, upper = bounds
+        bounds_list = [(float(lo), float(hi)) for lo, hi in zip(lower, upper, strict=False)]
+    else:
+        bounds_list = [(None, None)] * len(x0)
+
+    return optimize_with_bounds(residual_fn, x0, bounds_list, **kwargs)
 
 
 def residual_sum_of_squares(
