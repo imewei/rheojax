@@ -446,7 +446,7 @@ def plot_weissenberg_number_effects(
     tau_b = float(model.parameters.get_value("tau_b"))
     Wi = gamma_dot_range * tau_b
 
-    stress = np.asarray(model.predict_flow_curve(gamma_dot_range))
+    stress = np.asarray(model.predict(gamma_dot_range, test_mode="flow_curve"))
 
     fig, ax = plt.subplots(figsize=figsize)
 
@@ -517,7 +517,7 @@ def plot_variant_comparison(
     for (label, model), color in zip(models.items(), colors):
         try:
             if protocol == "flow_curve":
-                y_pred = np.asarray(model.predict_flow_curve(x_data))
+                y_pred = np.asarray(model.predict(x_data, test_mode="flow_curve"))
             elif protocol == "saos":
                 G_p, G_pp = model.predict_saos(x_data)
                 y_pred = np.sqrt(np.asarray(G_p)**2 + np.asarray(G_pp)**2)
@@ -590,7 +590,7 @@ def plot_bell_nu_sweep(
         model.parameters.set_value("nu", nu)
         try:
             if protocol == "flow_curve":
-                y_pred = np.asarray(model.predict_flow_curve(x_data))
+                y_pred = np.asarray(model.predict(x_data, test_mode="flow_curve"))
             elif protocol == "saos":
                 # SAOS is independent of nu (linear regime)
                 G_p, G_pp = model.predict_saos(x_data)
@@ -651,7 +651,7 @@ def plot_mode_decomposition(
     # Total prediction
     try:
         if protocol == "flow_curve":
-            y_total = np.asarray(model.predict_flow_curve(x_data))
+            y_total = np.asarray(model.predict(x_data, test_mode="flow_curve"))
         elif protocol == "saos":
             G_p, G_pp = model.predict_saos(x_data)
             y_total = np.sqrt(np.asarray(G_p)**2 + np.asarray(G_pp)**2)

@@ -388,6 +388,7 @@ class FMLIKH(FIKHBase):
         X: ArrayLike,
         params: ArrayLike | dict[str, Any],
         test_mode: str | None = None,
+        **kwargs,
     ) -> jnp.ndarray:
         """Model function for Bayesian inference."""
         mode = test_mode or self._test_mode or "startup"
@@ -404,7 +405,7 @@ class FMLIKH(FIKHBase):
             gamma_dot = jnp.asarray(X)
             return self._predict_flow_curve_from_params(gamma_dot, param_dict)
         else:
-            times, strains = self._extract_time_strain(X)
+            times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, param_dict)
 
     def get_mode_info(self) -> dict[str, Any]:

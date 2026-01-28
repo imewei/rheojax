@@ -626,8 +626,8 @@ class TNTMultiSpecies(TNTBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t[0])
-        t1 = float(t[-1])
+        t0 = t[0]
+        t1 = t[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t)
@@ -767,8 +767,8 @@ class TNTMultiSpecies(TNTBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t[0])
-        t1 = float(t[-1])
+        t0 = t[0]
+        t1 = t[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t)
@@ -843,8 +843,8 @@ class TNTMultiSpecies(TNTBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t[0])
-        t1 = float(t[-1])
+        t0 = t[0]
+        t1 = t[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t)
@@ -914,8 +914,8 @@ class TNTMultiSpecies(TNTBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t_jax[0])
-        t1 = float(t_jax[-1])
+        t0 = t_jax[0]
+        t1 = t_jax[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t_jax)
@@ -1058,8 +1058,8 @@ class TNTMultiSpecies(TNTBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t_jax[0])
-        t1 = float(t_jax[-1])
+        t0 = t_jax[0]
+        t1 = t_jax[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t_jax)

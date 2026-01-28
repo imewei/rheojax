@@ -358,8 +358,16 @@ class BayesianMixin:
                     )
 
         # Normalize to TestMode enum
+        # Try model's _validate_test_mode first for special cases (e.g., 'laos' -> STARTUP)
         if isinstance(test_mode, str):
-            test_mode = TestMode(test_mode.lower())
+            if hasattr(self, '_validate_test_mode'):
+                try:
+                    test_mode = self._validate_test_mode(test_mode)
+                except (ValueError, AttributeError):
+                    # Fallback to standard TestMode conversion
+                    test_mode = TestMode(test_mode.lower())
+            else:
+                test_mode = TestMode(test_mode.lower())
 
         logger.debug("Test mode resolved", test_mode=str(test_mode))
         return X_array, y_array, test_mode
@@ -894,6 +902,12 @@ class BayesianMixin:
         # Get model name for logging
         model_name = getattr(self, "__class__", type(self)).__name__
 
+        # Capture protocol-specific arguments from nuts_kwargs
+        protocol_kwargs = {}
+        for key in ["strain", "sigma_0", "sigma_applied", "gamma_0", "gamma_dot"]:
+            if key in nuts_kwargs:
+                protocol_kwargs[key] = nuts_kwargs.pop(key)
+
         with log_bayesian(
             logger,
             model=model_name,
@@ -937,6 +951,7 @@ class BayesianMixin:
                 test_mode=test_mode,
                 is_complex_data=is_complex_data,
                 scale_info=scale_info,
+                **protocol_kwargs,
             )
 
             # Phase 6: Apply NUTS kwargs overrides
@@ -998,6 +1013,7 @@ class BayesianMixin:
         test_mode: TestMode,
         is_complex_data: bool,
         scale_info: dict[str, float | None],
+        **protocol_kwargs,
     ):
         """Build the NumPyro probabilistic model function.
 
@@ -1048,7 +1064,11 @@ class BayesianMixin:
 
             # Convert to array and compute predictions
             params_array = jnp.array([params_dict[name] for name in param_names])
-            predictions_raw = self.model_function(X, params_array, test_mode)
+
+            # Pass protocol_kwargs to model_function
+            predictions_raw = self.model_function(
+                X, params_array, test_mode, **protocol_kwargs
+            )
 
             # Handle complex vs real predictions
             if is_complex_data:

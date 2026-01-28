@@ -180,9 +180,10 @@ class FIKH(FIKHBase):
             return self._fit_flow_curve(X, y, **kwargs)
         elif mode in (TestMode.CREEP, TestMode.RELAXATION):
             return self._fit_ode_formulation(X, y, **kwargs)
-        elif mode in (TestMode.STARTUP, TestMode.LAOS):
+        elif mode == TestMode.STARTUP:
+            # STARTUP and LAOS both use return mapping
             return self._fit_return_mapping(X, y, **kwargs)
-        elif mode in (TestMode.OSCILLATION,):
+        elif mode == TestMode.OSCILLATION:
             return self._fit_oscillation(X, y, **kwargs)
         else:
             return self._fit_return_mapping(X, y, **kwargs)
@@ -273,6 +274,7 @@ class FIKH(FIKHBase):
             fikh_scan_kernel_thermal,
         )
 
+        # Extract alpha (can now be a traced value since it's not in static_argnums)
         alpha = params.get("alpha_structure", self.alpha_structure)
 
         if self.include_thermal:
@@ -545,6 +547,7 @@ class FIKH(FIKHBase):
         X: ArrayLike,
         params: ArrayLike | dict[str, Any],
         test_mode: str | None = None,
+        **kwargs,
     ) -> jnp.ndarray:
         """Model function for NumPyro Bayesian inference.
 
@@ -555,6 +558,7 @@ class FIKH(FIKHBase):
             X: Input data.
             params: Parameter array or dictionary.
             test_mode: Protocol (uses stored _test_mode if None).
+            **kwargs: Protocol-specific arguments (e.g., strain, sigma_0).
 
         Returns:
             Predicted values.
@@ -580,15 +584,17 @@ class FIKH(FIKHBase):
 
         elif mode_enum in (TestMode.CREEP, TestMode.RELAXATION):
             t = jnp.asarray(X)
-            gamma_dot = param_dict.pop("_gamma_dot", 0.0)
-            sigma_applied = param_dict.pop("_sigma_applied", 100.0)
-            sigma_0 = param_dict.pop("_sigma_0", 60.0)
+            gamma_dot = kwargs.get("gamma_dot", param_dict.pop("_gamma_dot", 0.0))
+            sigma_applied = kwargs.get(
+                "sigma_applied", param_dict.pop("_sigma_applied", 100.0)
+            )
+            sigma_0 = kwargs.get("sigma_0", param_dict.pop("_sigma_0", 60.0))
             return self._simulate_transient(
                 t, param_dict, mode_enum.value, gamma_dot, sigma_applied, sigma_0
             )
 
         else:
-            times, strains = self._extract_time_strain(X)
+            times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, param_dict)
 
     # =========================================================================

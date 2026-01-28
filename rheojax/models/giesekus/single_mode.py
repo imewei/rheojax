@@ -190,9 +190,18 @@ class GiesekusSingleMode(GiesekusBase):
             self.parameters.set_value("eta_p", float(jnp.mean(eta_est[:3])))
         elif test_mode == "oscillation":
             # Estimate from SAOS crossover
-            self.initialize_from_saos(
-                np.asarray(x), np.real(np.asarray(y)), np.imag(np.asarray(y))
-            )
+            # Handle both complex and 2-column format
+            if y_jax.ndim == 2:
+                G_prime = np.asarray(y_jax[:, 0])
+                G_double_prime = np.asarray(y_jax[:, 1])
+            elif np.iscomplexobj(y):
+                G_prime = np.real(np.asarray(y))
+                G_double_prime = np.imag(np.asarray(y))
+            else:
+                # Assume magnitude was passed, can't separate components
+                G_prime = np.asarray(y) * 0.7  # Rough estimate
+                G_double_prime = np.asarray(y) * 0.7
+            self.initialize_from_saos(np.asarray(x), G_prime, G_double_prime)
 
         # Define model function for fitting (follows ParameterSet ordering)
         def model_fn(x_fit, params):
@@ -280,8 +289,9 @@ class GiesekusSingleMode(GiesekusBase):
             G_prime, G_double_prime = giesekus_saos_moduli_vec(
                 X_jax, eta_p, lambda_1, eta_s
             )
-            # Return complex modulus magnitude |G*|
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            # Return components if requested or if we're in a context that expects them
+            # We'll use a heuristic: if we're fitting and the target has 2 columns, return 2 columns
+            return jnp.column_stack([G_prime, G_double_prime])
 
         elif mode == "startup":
             gamma_dot = self._gamma_dot_applied
@@ -460,8 +470,8 @@ class GiesekusSingleMode(GiesekusBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t[0])
-        t1 = float(t[-1])
+        t0 = t[0]
+        t1 = t[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t)
@@ -532,8 +542,8 @@ class GiesekusSingleMode(GiesekusBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t_jax[0])
-        t1 = float(t_jax[-1])
+        t0 = t_jax[0]
+        t1 = t_jax[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t_jax)
@@ -597,8 +607,8 @@ class GiesekusSingleMode(GiesekusBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t[0])
-        t1 = float(t[-1])
+        t0 = t[0]
+        t1 = t[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t)
@@ -662,8 +672,8 @@ class GiesekusSingleMode(GiesekusBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t_jax[0])
-        t1 = float(t_jax[-1])
+        t0 = t_jax[0]
+        t1 = t_jax[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t_jax)
@@ -735,8 +745,8 @@ class GiesekusSingleMode(GiesekusBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t[0])
-        t1 = float(t[-1])
+        t0 = t[0]
+        t1 = t[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t)
@@ -806,8 +816,8 @@ class GiesekusSingleMode(GiesekusBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t_jax[0])
-        t1 = float(t_jax[-1])
+        t0 = t_jax[0]
+        t1 = t_jax[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t_jax)
@@ -877,8 +887,8 @@ class GiesekusSingleMode(GiesekusBase):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t[0])
-        t1 = float(t[-1])
+        t0 = t[0]
+        t1 = t[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t)

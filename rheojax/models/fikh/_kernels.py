@@ -755,7 +755,7 @@ def fikh_creep_ode_rhs(
 # =============================================================================
 
 
-@partial(jax.jit, static_argnums=(2, 3, 4))
+@partial(jax.jit, static_argnums=(2, 4))
 def fikh_scan_kernel_isothermal(
     times: jnp.ndarray,
     strains: jnp.ndarray,
@@ -818,7 +818,7 @@ def fikh_scan_kernel_isothermal(
     return stress_series
 
 
-@partial(jax.jit, static_argnums=(2, 3, 4))
+@partial(jax.jit, static_argnums=(2, 4))
 def fikh_scan_kernel_thermal(
     times: jnp.ndarray,
     strains: jnp.ndarray,

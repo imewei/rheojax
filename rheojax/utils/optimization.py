@@ -777,6 +777,9 @@ def nlsq_optimize(
             - "auto": Automatically select based on bounds (default)
             - "trf": Trust Region Reflective (supports bounds)
             - "lm": Levenberg-Marquardt (no bounds)
+            - "scipy": Use SciPy's least_squares directly (bypasses NLSQ).
+              Use this for models that use Diffrax ODE solvers which are
+              incompatible with NLSQ's forward-mode autodiff.
 
             NLSQ internally selects the best algorithm regardless of this parameter.
         use_jax: Whether to use JAX for gradient computation (default: True).
@@ -858,6 +861,87 @@ def nlsq_optimize(
     original_values = np.asarray(x0, dtype=np.float64).copy()
     bounds_list = parameters.get_bounds()
 
+    # Convert bounds to NLSQ/SciPy format: (lower_array, upper_array)
+    lower_bounds = []
+    upper_bounds = []
+    for bound_pair in bounds_list:
+        if bound_pair is None or (bound_pair[0] is None and bound_pair[1] is None):
+            lower_bounds.append(-np.inf)
+            upper_bounds.append(np.inf)
+        else:
+            lower = bound_pair[0] if bound_pair[0] is not None else -np.inf
+            upper = bound_pair[1] if bound_pair[1] is not None else np.inf
+            lower_bounds.append(lower)
+            upper_bounds.append(upper)
+
+    lower_bounds = np.asarray(lower_bounds, dtype=np.float64)
+    upper_bounds = np.asarray(upper_bounds, dtype=np.float64)
+    nlsq_bounds = (lower_bounds, upper_bounds)
+    x0 = np.asarray(x0, dtype=np.float64)
+
+    # If method='scipy', use SciPy directly (bypasses NLSQ autodiff issues with Diffrax)
+    if method == "scipy":
+        logger.info(
+            "Using SciPy least_squares directly (method='scipy')",
+            n_params=len(x0),
+        )
+        from scipy.optimize import least_squares as scipy_least_squares
+
+        def residual_fn(values: np.ndarray) -> np.ndarray:
+            res = objective(values)
+            if isinstance(res, jnp.ndarray):
+                res = np.asarray(res)
+            return np.asarray(res, dtype=np.float64)
+
+        scipy_result = scipy_least_squares(
+            residual_fn,
+            x0,
+            bounds=nlsq_bounds,
+            ftol=ftol,
+            xtol=xtol,
+            gtol=gtol,
+            max_nfev=max_iter * 10,
+            method="trf",
+        )
+
+        # Update parameters with optimized values
+        parameters.set_values(scipy_result.x)
+
+        cost_value = getattr(scipy_result, "cost", None)
+        jac = None
+        pcov = None
+        if scipy_result.jac is not None:
+            jac = np.asarray(scipy_result.jac, dtype=np.float64)
+            residuals = residual_fn(scipy_result.x)
+            pcov = compute_covariance_from_jacobian(jac, residuals)
+
+        return OptimizationResult(
+            x=np.asarray(scipy_result.x, dtype=np.float64),
+            fun=(
+                float(2.0 * scipy_result.cost)
+                if hasattr(scipy_result, "cost")
+                else float(np.sum(residual_fn(scipy_result.x) ** 2))
+            ),
+            jac=jac,
+            pcov=pcov,
+            success=bool(scipy_result.success),
+            message=str(scipy_result.message),
+            nit=int(getattr(scipy_result, "nit", scipy_result.nfev)),
+            nfev=int(scipy_result.nfev),
+            njev=int(getattr(scipy_result, "njev", 0)),
+            optimality=(
+                float(getattr(scipy_result, "optimality", np.nan))
+                if getattr(scipy_result, "optimality", None) is not None
+                else None
+            ),
+            active_mask=(
+                np.asarray(scipy_result.active_mask)
+                if getattr(scipy_result, "active_mask", None) is not None
+                else None
+            ),
+            cost=float(cost_value) if cost_value is not None else None,
+        )
+
     logger.info(
         "Starting NLSQ optimization",
         n_params=len(x0),
@@ -877,27 +961,6 @@ def nlsq_optimize(
         x0=x0.tolist() if hasattr(x0, "tolist") else list(x0),
         bounds=bounds_list,
     )
-
-    # Ensure float64 precision for initial values
-    x0 = np.asarray(x0, dtype=np.float64)
-
-    # Convert bounds to NLSQ format: (lower_array, upper_array)
-    lower_bounds = []
-    upper_bounds = []
-    for bound_pair in bounds_list:
-        if bound_pair is None or (bound_pair[0] is None and bound_pair[1] is None):
-            # Unbounded
-            lower_bounds.append(-np.inf)
-            upper_bounds.append(np.inf)
-        else:
-            lower = bound_pair[0] if bound_pair[0] is not None else -np.inf
-            upper = bound_pair[1] if bound_pair[1] is not None else np.inf
-            lower_bounds.append(lower)
-            upper_bounds.append(upper)
-
-    lower_bounds = np.asarray(lower_bounds, dtype=np.float64)
-    upper_bounds = np.asarray(upper_bounds, dtype=np.float64)
-    nlsq_bounds = (lower_bounds, upper_bounds)
 
     # NLSQ expects a residual function that returns a vector of residuals
     # The objective function from create_least_squares_objective() now returns

@@ -484,12 +484,13 @@ class FIKHBase(BaseModel, FractionalModelMixin):
         if test_mode is None:
             test_mode = self._test_mode or "startup"
 
-        # Handle string conversion, mapping LAOS to OSCILLATION
+        # Handle string conversion
         if isinstance(test_mode, str):
             mode_str = test_mode.lower()
             if mode_str == "laos":
-                # LAOS is handled as oscillation mode internally
-                return TestMode.OSCILLATION
+                # LAOS uses return mapping (like startup), not oscillation
+                # Map to STARTUP for routing purposes
+                return TestMode.STARTUP
             elif mode_str == "saos":
                 return TestMode.OSCILLATION
             test_mode = TestMode(mode_str)

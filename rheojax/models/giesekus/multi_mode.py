@@ -426,7 +426,8 @@ class GiesekusMultiMode(BaseModel):
             G_prime, G_double_prime = self._predict_saos_internal(
                 X_jax, eta_p_modes, lambda_modes, eta_s
             )
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            # Return components for fitting to [G', G''] data
+            return jnp.column_stack([G_prime, G_double_prime])
 
         elif mode in ["flow_curve", "steady_shear", "rotation"]:
             return self._predict_flow_curve_internal(
@@ -446,7 +447,7 @@ class GiesekusMultiMode(BaseModel):
             G_prime, G_double_prime = self._predict_saos_internal(
                 X_jax, eta_p_modes, lambda_modes, eta_s
             )
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return jnp.column_stack([G_prime, G_double_prime])
 
     # =========================================================================
     # Analytical Predictions
@@ -602,8 +603,8 @@ class GiesekusMultiMode(BaseModel):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t[0])
-        t1 = float(t[-1])
+        t0 = t[0]
+        t1 = t[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t)
@@ -680,8 +681,8 @@ class GiesekusMultiMode(BaseModel):
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
-        t0 = float(t_jax[0])
-        t1 = float(t_jax[-1])
+        t0 = t_jax[0]
+        t1 = t_jax[-1]
         dt0 = (t1 - t0) / max(len(t), 1000)
 
         saveat = diffrax.SaveAt(ts=t_jax)
