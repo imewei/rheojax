@@ -176,12 +176,12 @@ def load_ml_ikh_creep(
     col_time = stress_pair_index * 2
     col_rate = stress_pair_index * 2 + 1
 
-    # Row 1 has initial stress, row 2 has final stress
-    initial_stress = float(df.iloc[1, col_rate])
-    final_stress = float(df.iloc[2, col_rate])
+    # Row 2 has initial stress, row 3 has final stress (rows 0-1 are header/units)
+    initial_stress = float(df.iloc[2, col_rate])
+    final_stress = float(df.iloc[3, col_rate])
 
-    # Skip header rows (0-3), then extract data
-    data = df.iloc[4:, [col_time, col_rate]].dropna().astype(float)
+    # Skip header rows (0-4), then extract data (data starts at row 5)
+    data = df.iloc[5:, [col_time, col_rate]].dropna().astype(float)
 
     time = data.iloc[:, 0].values
     shear_rate = data.iloc[:, 1].values
@@ -232,8 +232,8 @@ def load_pnas_startup(
 
     df = pd.read_excel(data_path, sheet_name=sheet, header=None)
 
-    # Column 0: Step time, Column 1: Stress (skip rows 0-1 for headers)
-    data = df.iloc[2:, [0, 1]].dropna().astype(float)
+    # Column 0: Step time, Column 1: Stress (skip rows 0-2: title, headers, units)
+    data = df.iloc[3:, [0, 1]].dropna().astype(float)
 
     time = data.iloc[:, 0].values
     stress = data.iloc[:, 1].values
@@ -303,7 +303,7 @@ def load_pnas_laos(
     col_stress = strain_amplitude_index * 4 + 2
 
     # Skip header rows (0-1)
-    data = df.iloc[2:, [col_time, col_strain, col_stress]].dropna().astype(float)
+    data = df.iloc[3:, [col_time, col_strain, col_stress]].dropna().astype(float)
 
     time = data.iloc[:, 0].values
     strain = data.iloc[:, 1].values

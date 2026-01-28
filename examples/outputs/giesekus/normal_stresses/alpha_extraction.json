@@ -1,0 +1,7 @@
+{
+  "alpha_true": 0.3,
+  "alpha_extracted_mean": 0.34701336547485306,
+  "alpha_extracted_std": 0.40966787948878275,
+  "N2_N1_theory": -0.15,
+  "N2_N1_measured_mean": -0.17350668273742653
+}
