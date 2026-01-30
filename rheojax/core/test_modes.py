@@ -40,6 +40,7 @@ class TestModeEnum(str, Enum):
     RELAXATION = "relaxation"
     CREEP = "creep"
     OSCILLATION = "oscillation"
+    LAOS = "laos"  # Large Amplitude Oscillatory Shear
     ROTATION = "rotation"
     FLOW_CURVE = "flow_curve"  # Steady-state flow curve protocol
     STARTUP = "startup"  # Startup shear protocol
@@ -82,6 +83,8 @@ class TestModeEnum(str, Enum):
             return Protocol.RELAXATION
         elif self == self.OSCILLATION:
             return Protocol.OSCILLATION
+        elif self == self.LAOS:
+            return Protocol.LAOS
         return None
 
 

@@ -904,7 +904,7 @@ class BayesianMixin:
 
         # Capture protocol-specific arguments from nuts_kwargs
         protocol_kwargs = {}
-        for key in ["strain", "sigma_0", "sigma_applied", "gamma_0", "gamma_dot"]:
+        for key in ["strain", "sigma_0", "sigma_applied", "gamma_0", "gamma_dot", "omega", "n_cycles"]:
             if key in nuts_kwargs:
                 protocol_kwargs[key] = nuts_kwargs.pop(key)
 
