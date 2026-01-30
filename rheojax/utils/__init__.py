@@ -13,6 +13,10 @@ from rheojax.utils.device import (
     get_gpu_memory_info,
     print_device_summary,
 )
+from rheojax.utils.metrics import (
+    compute_fit_quality,
+    r2_complex,
+)
 from rheojax.utils.optimization import (
     OptimizationResult,
     create_least_squares_objective,
@@ -37,6 +41,9 @@ __all__ = [
     "get_device_info",
     "get_gpu_memory_info",
     "print_device_summary",
+    # Metrics utilities
+    "compute_fit_quality",
+    "r2_complex",
     # These will be imported as they are implemented
     # "mittag_leffler",
     # "numerical_derivatives",
