@@ -173,7 +173,9 @@ def generate_synthetic_relaxation_isotropic(
 
 def generate_synthetic_saos_schematic(
     model: Any,
-    omega_range: tuple[float, float] = (0.01, 100.0),
+    omega_range: tuple[float, float] | None = None,
+    omega_min: float | None = None,  # Alias for omega_range[0]
+    omega_max: float | None = None,  # Alias for omega_range[1]
     n_points: int = 50,
     noise_level: float = 0.02,
     seed: int = 42,
@@ -183,6 +185,8 @@ def generate_synthetic_saos_schematic(
     Args:
         model: Fitted ITTMCTSchematic model instance.
         omega_range: (min, max) angular frequency range in rad/s.
+        omega_min: Alias for omega_range[0].
+        omega_max: Alias for omega_range[1].
         n_points: Number of frequency points.
         noise_level: Relative noise level.
         seed: Random seed.
@@ -190,6 +194,12 @@ def generate_synthetic_saos_schematic(
     Returns:
         Tuple of (omega, G_prime, G_double_prime) arrays in (rad/s, Pa, Pa).
     """
+    # Handle parameter aliasing
+    if omega_range is None:
+        o_min = omega_min if omega_min is not None else 0.01
+        o_max = omega_max if omega_max is not None else 100.0
+        omega_range = (o_min, o_max)
+
     rng = np.random.default_rng(seed)
 
     omega = np.logspace(np.log10(omega_range[0]), np.log10(omega_range[1]), n_points)
@@ -215,7 +225,9 @@ def generate_synthetic_saos_schematic(
 
 def generate_synthetic_saos_isotropic(
     model: Any,
-    omega_range: tuple[float, float] = (0.01, 100.0),
+    omega_range: tuple[float, float] | None = None,
+    omega_min: float | None = None,  # Alias for omega_range[0]
+    omega_max: float | None = None,  # Alias for omega_range[1]
     n_points: int = 50,
     noise_level: float = 0.02,
     seed: int = 42,
@@ -225,6 +237,8 @@ def generate_synthetic_saos_isotropic(
     Args:
         model: Fitted ITTMCTIsotropic model instance.
         omega_range: (min, max) angular frequency range in rad/s.
+        omega_min: Alias for omega_range[0].
+        omega_max: Alias for omega_range[1].
         n_points: Number of frequency points.
         noise_level: Relative noise level.
         seed: Random seed.
@@ -232,6 +246,12 @@ def generate_synthetic_saos_isotropic(
     Returns:
         Tuple of (omega, G_prime, G_double_prime) arrays in (rad/s, Pa, Pa).
     """
+    # Handle parameter aliasing
+    if omega_range is None:
+        o_min = omega_min if omega_min is not None else 0.01
+        o_max = omega_max if omega_max is not None else 100.0
+        omega_range = (o_min, o_max)
+
     rng = np.random.default_rng(seed)
 
     omega = np.logspace(np.log10(omega_range[0]), np.log10(omega_range[1]), n_points)
@@ -251,7 +271,8 @@ def generate_synthetic_saos_isotropic(
 
 def generate_synthetic_creep_schematic(
     model: Any,
-    sigma_applied: float = 50.0,
+    sigma_applied: float | None = None,
+    sigma_0: float | None = None,  # Alias for sigma_applied
     t_end: float = 100.0,
     n_points: int = 200,
     noise_level: float = 0.02,
@@ -261,7 +282,8 @@ def generate_synthetic_creep_schematic(
 
     Args:
         model: Fitted ITTMCTSchematic model instance.
-        sigma_applied: Applied stress in Pa.
+        sigma_applied: Applied stress in Pa (alternative: sigma_0).
+        sigma_0: Alias for sigma_applied.
         t_end: End time in seconds.
         n_points: Number of time points.
         noise_level: Relative noise level.
@@ -270,6 +292,12 @@ def generate_synthetic_creep_schematic(
     Returns:
         Tuple of (time, compliance) arrays in (s, 1/Pa).
     """
+    # Handle parameter aliasing
+    if sigma_0 is not None and sigma_applied is None:
+        sigma_applied = sigma_0
+    elif sigma_applied is None:
+        sigma_applied = 50.0
+
     rng = np.random.default_rng(seed)
 
     time = np.logspace(-2, np.log10(t_end), n_points)
@@ -286,7 +314,8 @@ def generate_synthetic_creep_schematic(
 
 def generate_synthetic_creep_isotropic(
     model: Any,
-    sigma_applied: float = 50.0,
+    sigma_applied: float | None = None,
+    sigma_0: float | None = None,  # Alias for sigma_applied
     t_end: float = 100.0,
     n_points: int = 200,
     noise_level: float = 0.02,
@@ -296,7 +325,8 @@ def generate_synthetic_creep_isotropic(
 
     Args:
         model: Fitted ITTMCTIsotropic model instance.
-        sigma_applied: Applied stress in Pa.
+        sigma_applied: Applied stress in Pa (alternative: sigma_0).
+        sigma_0: Alias for sigma_applied.
         t_end: End time in seconds.
         n_points: Number of time points.
         noise_level: Relative noise level.
@@ -305,6 +335,12 @@ def generate_synthetic_creep_isotropic(
     Returns:
         Tuple of (time, compliance) arrays in (s, 1/Pa).
     """
+    # Handle parameter aliasing
+    if sigma_0 is not None and sigma_applied is None:
+        sigma_applied = sigma_0
+    elif sigma_applied is None:
+        sigma_applied = 50.0
+
     rng = np.random.default_rng(seed)
 
     time = np.logspace(-2, np.log10(t_end), n_points)
@@ -554,7 +590,7 @@ def save_itt_mct_results(
 
     Args:
         model: Fitted ITT-MCT model.
-        result: Bayesian fit result with posterior_samples attribute.
+        result: Bayesian fit result with posterior_samples attribute, or None if not available.
         model_name: One of 'schematic' or 'isotropic'.
         protocol: Protocol name for labeling files.
         param_names: List of parameter names to save. If None, uses defaults.
@@ -580,11 +616,15 @@ def save_itt_mct_results(
     with open(output_dir / f"nlsq_params_{protocol}.json", "w") as f:
         json.dump(nlsq_params, f, indent=2)
 
-    # Save posterior samples
-    posterior = result.posterior_samples
-    posterior_dict = {k: np.array(v).tolist() for k, v in posterior.items()}
-    with open(output_dir / f"posterior_{protocol}.json", "w") as f:
-        json.dump(posterior_dict, f)
+    # Save posterior samples (only if result is available)
+    if result is not None:
+        posterior = result.posterior_samples
+        posterior_dict = {k: np.array(v).tolist() for k, v in posterior.items()}
+        with open(output_dir / f"posterior_{protocol}.json", "w") as f:
+            json.dump(posterior_dict, f)
+        print(f"  posterior_{protocol}.json: {len(list(posterior.values())[0])} draws")
+    else:
+        print("  Skipping posterior (Bayesian inference not available for ITT-MCT)")
 
     # Save glass transition info
     try:
@@ -598,18 +638,20 @@ def save_itt_mct_results(
 
     print(f"Results saved to {output_dir}/")
     print(f"  nlsq_params_{protocol}.json: {len(nlsq_params)} parameters")
-    print(f"  posterior_{protocol}.json: {len(list(posterior.values())[0])} draws")
 
 
 def load_itt_mct_parameters(
     model_name: Literal["schematic", "isotropic"],
     protocol: str,
+    require_glass: bool = False,
 ) -> dict[str, float]:
     """Load previously calibrated ITT-MCT parameters.
 
     Args:
         model_name: One of 'schematic' or 'isotropic'.
         protocol: Protocol name (e.g., 'flow_curve').
+        require_glass: If True, validates that v2 > 4 for glass state.
+                       Falls back to defaults if fluid state detected.
 
     Returns:
         Dictionary of parameter name to value.
@@ -628,6 +670,18 @@ def load_itt_mct_parameters(
 
     with open(param_file) as f:
         params = json.load(f)
+
+    # Validate glass state if required
+    if require_glass and "v2" in params:
+        v2 = params["v2"]
+        if v2 <= 4.0:
+            print(f"Warning: Loaded v2={v2:.3f} is in fluid state (v2 <= 4).")
+            print("Using default glass-state parameters for yield stress calculations.")
+            # Return defaults for glass state
+            if model_name == "schematic":
+                params = {"v2": 4.2, "Gamma": 1.0, "gamma_c": 0.1, "G_inf": 1000.0}
+            else:
+                params = {"phi": 0.55, "sigma_d": 1.0, "kBT": 1.0, "tau_0": 1.0, "gamma_c": 0.1}
 
     return params
 

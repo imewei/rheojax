@@ -1553,18 +1553,30 @@ def _get_n_modes(model: Any) -> int:
 def _get_mode_params(model: Any, k: int) -> tuple[float, float]:
     """Get (G_k, tau_k) for mode k from multi-mode model."""
     # TNTMultiSpecies: G_k, tau_b_k
+    # TNTStickyRouse: G_k, tau_R_k
     try:
-        G_k = float(model.parameters.get_value(f"G_{k}"))
-    except (KeyError, AttributeError):
+        G_k_val = model.parameters.get_value(f"G_{k}")
+        G_k = float(G_k_val) if G_k_val is not None else 0.0
+    except (KeyError, AttributeError, TypeError):
         G_k = 0.0
 
     # Try tau_b_k (MultiSpecies) then tau_R_k (StickyRouse)
+    tau_k = 1.0
     try:
-        tau_k = float(model.parameters.get_value(f"tau_b_{k}"))
-    except (KeyError, AttributeError):
+        tau_b_val = model.parameters.get_value(f"tau_b_{k}")
+        if tau_b_val is not None:
+            tau_k = float(tau_b_val)
+        else:
+            # Try tau_R_k for StickyRouse
+            tau_R_val = model.parameters.get_value(f"tau_R_{k}")
+            if tau_R_val is not None:
+                tau_k = float(tau_R_val)
+    except (KeyError, AttributeError, TypeError):
         try:
-            tau_k = float(model.parameters.get_value(f"tau_R_{k}"))
-        except (KeyError, AttributeError):
-            tau_k = 1.0
+            tau_R_val = model.parameters.get_value(f"tau_R_{k}")
+            if tau_R_val is not None:
+                tau_k = float(tau_R_val)
+        except (KeyError, AttributeError, TypeError):
+            pass
 
     return G_k, tau_k
