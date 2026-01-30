@@ -556,6 +556,7 @@ class MLIKH(IKHBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,
         )
 
         # Extract primary variable
@@ -570,6 +571,13 @@ class MLIKH(IKHBase):
             else:
                 # Single global stress (first component)
                 result = sol.ys[:, 0]
+
+        # Handle solver failures
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result)
+        )
 
         # Add viscous contribution for startup
         if mode == "startup" and params.get("eta_inf", 0.0) > 0:
@@ -691,17 +699,91 @@ class MLIKH(IKHBase):
         return self
 
     def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MLIKH":
-        """Fit to oscillation data (SAOS/MAOS)."""
-        # For oscillation, we use the return mapping with sinusoidal strain
-        return self._fit_return_mapping(X, y, **kwargs)
+        """Fit to oscillation data (SAOS/MAOS).
 
-    def model_function(self, X, params, test_mode=None):
+        Supports two modes:
+        1. Frequency-domain: X=omega, y=|G*| or complex G* (uses Maxwell analytical solution)
+        2. Time-domain: X=time, y=stress (uses return mapping with sinusoidal strain)
+        """
+        X_arr = jnp.asarray(X)
+
+        # Detect if this is frequency-domain or time-domain
+        is_time_domain = len(X_arr) > 100
+
+        if is_time_domain:
+            return self._fit_return_mapping(X, y, **kwargs)
+        else:
+            return self._fit_saos_frequency_domain(X, y, **kwargs)
+
+    def _fit_saos_frequency_domain(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MLIKH":
+        """Fit to frequency-domain SAOS data using Maxwell analytical expressions.
+
+        Args:
+            X: Angular frequency array (omega)
+            y: Complex modulus G* = G' + i*G'' or magnitude |G*|
+        """
+        from rheojax.utils.optimization import nlsq_optimize
+
+        omega = jnp.asarray(X)
+
+        # Handle different y formats
+        y_arr = jnp.asarray(y)
+        if jnp.iscomplexobj(y_arr):
+            target_magnitude = jnp.abs(y_arr)
+        else:
+            target_magnitude = y_arr
+
+        def objective(param_values):
+            """Compute residual using Maxwell analytical SAOS expressions."""
+            p_names = list(self.parameters.keys())
+            p_dict = dict(zip(p_names, param_values, strict=False))
+
+            # Extract G and eta based on yield_mode
+            if self._yield_mode == "per_mode":
+                # Sum contributions from all modes (parallel Maxwell elements)
+                G_total = jnp.zeros_like(omega)
+                G_prime_total = jnp.zeros_like(omega)
+                G_double_prime_total = jnp.zeros_like(omega)
+
+                for i in range(1, self._n_modes + 1):
+                    G_i = p_dict[f"G_{i}"]
+                    # Estimate eta from bounds or use large value for elastic behavior
+                    eta_i = 1e12  # Effectively infinite for SAOS
+                    tau_i = eta_i / G_i
+
+                    wt_i = omega * tau_i
+                    G_prime_i = G_i * wt_i**2 / (1 + wt_i**2)
+                    G_double_prime_i = G_i * wt_i / (1 + wt_i**2)
+
+                    G_prime_total += G_prime_i
+                    G_double_prime_total += G_double_prime_i
+            else:
+                # Weighted-sum mode: use global G
+                G = p_dict["G"]
+                eta = 1e12  # Effectively infinite
+                tau = eta / G
+
+                wt = omega * tau
+                G_prime_total = G * wt**2 / (1 + wt**2)
+                G_double_prime_total = G * wt / (1 + wt**2)
+
+            G_star_magnitude = jnp.sqrt(G_prime_total**2 + G_double_prime_total**2)
+
+            return G_star_magnitude - target_magnitude
+
+        nlsq_optimize(objective, self.parameters, **kwargs)
+        return self
+
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro model function with protocol-aware dispatch.
+
+        Accepts protocol-specific kwargs (gamma_dot, sigma_applied, sigma_0).
 
         Args:
             X: Input data
             params: Parameter array or dict from NumPyro
             test_mode: Optional protocol override
+            **kwargs: Protocol-specific arguments
 
         Returns:
             Predicted response
@@ -715,13 +797,14 @@ class MLIKH(IKHBase):
 
         mode = test_mode or self._test_mode or "startup"
 
+        # Extract protocol-specific args from kwargs or fall back to instance attrs
+        gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", None))
+        sigma_applied = kwargs.get("sigma_applied", getattr(self, "_fit_sigma_applied", None))
+        sigma_0 = kwargs.get("sigma_0", getattr(self, "_fit_sigma_0", None))
+
         if mode == "flow_curve":
             return self._predict_flow_curve_from_params(jnp.asarray(X), param_dict)
         elif mode in ["creep", "relaxation"]:
-            # For Bayesian, transient modes need stored kwargs
-            gamma_dot = getattr(self, "_fit_gamma_dot", None)
-            sigma_applied = getattr(self, "_fit_sigma_applied", None)
-            sigma_0 = getattr(self, "_fit_sigma_0", None)
             return self._simulate_transient(
                 jnp.asarray(X),
                 param_dict,
@@ -730,8 +813,37 @@ class MLIKH(IKHBase):
                 sigma_applied=sigma_applied,
                 sigma_0=sigma_0,
             )
-        else:  # startup, laos, oscillation
-            times, strains = self._extract_time_strain(X)
+        elif mode == "oscillation":
+            # Frequency-domain SAOS using multi-Maxwell analytical expressions
+            omega = jnp.asarray(X)
+
+            if self._yield_mode == "per_mode":
+                # Sum contributions from all modes (parallel Maxwell elements)
+                G_prime_total = jnp.zeros_like(omega)
+                G_double_prime_total = jnp.zeros_like(omega)
+
+                for i in range(1, self._n_modes + 1):
+                    G_i = param_dict[f"G_{i}"]
+                    eta_i = param_dict.get(f"eta_{i}", 1e12)  # High viscosity if not specified
+                    tau_i = eta_i / G_i
+
+                    wt_i = omega * tau_i
+                    G_prime_total += G_i * wt_i**2 / (1 + wt_i**2)
+                    G_double_prime_total += G_i * wt_i / (1 + wt_i**2)
+            else:
+                # Weighted-sum mode: use global G
+                G = param_dict["G"]
+                eta = param_dict.get("eta", 1e12)  # High viscosity if not specified
+                tau = eta / G
+
+                wt = omega * tau
+                G_prime_total = G * wt**2 / (1 + wt**2)
+                G_double_prime_total = G * wt / (1 + wt**2)
+
+            return jnp.sqrt(G_prime_total**2 + G_double_prime_total**2)
+        else:  # startup, laos
+            # startup/laos modes need strain computed from kwargs
+            times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, param_dict)
 
     @property

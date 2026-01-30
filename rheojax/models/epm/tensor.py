@@ -79,6 +79,7 @@ class TensorialEPM(EPMBase):
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
         yield_criterion: str = "von_mises",
+        n_bayesian_steps: int = 200,
     ):
         """Initialize the Tensorial EPM.
 
@@ -93,6 +94,7 @@ class TensorialEPM(EPMBase):
             sigma_c_mean: Mean yield threshold.
             sigma_c_std: Standard deviation of yield thresholds (disorder).
             yield_criterion: Yield criterion name ("von_mises" or "hill").
+            n_bayesian_steps: Number of time steps for Bayesian inference. Default 200.
         """
         # Initialize base class with common parameters
         super().__init__(
@@ -102,6 +104,7 @@ class TensorialEPM(EPMBase):
             tau_pl=tau_pl,
             sigma_c_mean=sigma_c_mean,
             sigma_c_std=sigma_c_std,
+            n_bayesian_steps=n_bayesian_steps,
         )
 
         # Add tensorial-specific parameters
@@ -171,6 +174,14 @@ class TensorialEPM(EPMBase):
         """
         # Start relaxed (zero stress)
         return jnp.zeros((3, self.L, self.L))
+
+    def _is_scalar_epm(self) -> bool:
+        """Check if this is a scalar (not tensorial) EPM.
+
+        Returns False for TensorialEPM (tensorial stress field).
+        This causes model_function to use general methods instead of scalar JIT kernels.
+        """
+        return False
 
     def _get_param_dict(self) -> dict[str, float]:
         """Extract parameters as dictionary for kernel calls.

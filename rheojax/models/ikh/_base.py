@@ -40,12 +40,28 @@ class IKHBase(BaseModel):
         if "strain" in kwargs:
             return X_arr, jnp.asarray(kwargs["strain"])
 
+        # For startup/laos: auto-compute strain from gamma_dot
+        # strain = gamma_dot * time for constant shear rate startup
+        if "gamma_dot" in kwargs:
+            gamma_dot = kwargs["gamma_dot"]
+            strain = X_arr * gamma_dot
+            return X_arr, strain
+
+        # For LAOS: auto-compute strain from gamma_0 and omega
+        # strain = gamma_0 * sin(omega * t)
+        if "gamma_0" in kwargs and "omega" in kwargs:
+            gamma_0 = kwargs["gamma_0"]
+            omega = kwargs["omega"]
+            strain = gamma_0 * jnp.sin(omega * X_arr)
+            return X_arr, strain
+
         # If X is time (N,) and no strain provided, this is likely an error for these models
         # unless it's a specific protocol (e.g. constant shear rate implicit).
         # For now, require explicit strain.
         raise ValueError(
             "IKH models require both time and strain history. "
-            "Pass RheoData, or X of shape (2, N), or X=time with strain=gamma kwarg."
+            "Pass RheoData, or X of shape (2, N), or X=time with strain=gamma kwarg, "
+            "or gamma_dot for startup, or gamma_0+omega for LAOS."
         )
 
     def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "IKHBase":

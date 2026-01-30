@@ -298,7 +298,7 @@ class SGRConventional(BaseModel):
                     self._fit_relaxation_mode(X, y, **kwargs)
                 elif test_mode == "creep":
                     self._fit_creep_mode(X, y, **kwargs)
-                elif test_mode == "steady_shear":
+                elif test_mode in ("steady_shear", "flow_curve"):
                     self._fit_steady_shear_mode(X, y, **kwargs)
                 elif test_mode == "laos":
                     self._fit_laos_mode(X, y, **kwargs)
@@ -1128,13 +1128,14 @@ class SGRConventional(BaseModel):
 
         return eta
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict based on fitted test mode.
 
         Routes to appropriate prediction method based on stored test_mode.
 
         Args:
             X: Independent variable (frequency or time)
+            **kwargs: Additional arguments including optional test_mode override
 
         Returns:
             Predicted values (complex modulus or relaxation modulus)
@@ -1142,24 +1143,26 @@ class SGRConventional(BaseModel):
         Raises:
             ValueError: If test_mode not set (model not fitted)
         """
-        if self._test_mode is None:
-            raise ValueError("Model not fitted. Call fit() first.")
+        # Get test_mode from kwargs or instance attribute
+        test_mode = kwargs.get("test_mode") or getattr(self, "_test_mode", None)
+        if test_mode is None:
+            raise ValueError("test_mode must be specified for prediction")
 
         # Route to appropriate prediction method
-        if self._test_mode == "oscillation":
+        if test_mode == "oscillation":
             return self._predict_oscillation(X)
-        elif self._test_mode == "relaxation":
+        elif test_mode == "relaxation":
             return self._predict_relaxation(X)
-        elif self._test_mode == "creep":
+        elif test_mode == "creep":
             return self._predict_creep(X)
-        elif self._test_mode == "steady_shear":
+        elif test_mode in ("steady_shear", "flow_curve"):
             return self._predict_steady_shear(X)
-        elif self._test_mode == "laos":
+        elif test_mode == "laos":
             return self._predict_laos(X)
-        elif self._test_mode == "startup":
+        elif test_mode == "startup":
             return self._predict_startup(X)
         else:
-            raise ValueError(f"Unknown test_mode: {self._test_mode}")
+            raise ValueError(f"Unknown test_mode: {test_mode}")
 
     def _predict_oscillation(self, omega: np.ndarray) -> np.ndarray:
         """Predict complex modulus in oscillation mode.
@@ -1566,6 +1569,7 @@ class SGRConventional(BaseModel):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100000,  # Safety limit
+            throw=False,
         )
 
         # Extract trajectory
@@ -1576,6 +1580,13 @@ class SGRConventional(BaseModel):
         if x_trajectory_jax.ndim > 1:
             x_trajectory_jax = x_trajectory_jax.squeeze()
 
+        # Handle solver failures
+        x_trajectory_jax = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            x_trajectory_jax,
+            jnp.nan * jnp.ones_like(x_trajectory_jax)
+        )
+
         # Convert back to numpy
         x_trajectory = np.array(x_trajectory_jax)
 
@@ -1585,7 +1596,7 @@ class SGRConventional(BaseModel):
 
         return x_trajectory
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference with NumPyro NUTS.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -1596,6 +1607,7 @@ class SGRConventional(BaseModel):
             params: Array of parameter values [x, G0, tau0]
                 Length: 3
             test_mode: Optional test mode override. If None, uses stored self._test_mode
+            **kwargs: Protocol-specific arguments (gamma_dot, sigma_applied, etc.)
 
         Returns:
             Model predictions as JAX array
@@ -1635,13 +1647,14 @@ class SGRConventional(BaseModel):
             return self._predict_relaxation_jit(X_jax, x, G0_scale, tau0)
         elif mode == "creep":
             return self._predict_creep_jit(X_jax, x, G0_scale, tau0)
-        elif mode == "steady_shear":
+        elif mode in ("steady_shear", "flow_curve"):
             return self._predict_steady_shear_jit(X_jax, x, G0_scale, tau0)
         elif mode == "laos":
             # For LAOS Bayesian inference, use oscillation response
             return self._predict_oscillation_jit(X_jax, x, G0_scale, tau0)
         elif mode == "startup":
-            gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+            # Get gamma_dot from kwargs or instance attribute
+            gamma_dot = kwargs.get("gamma_dot") or getattr(self, "_startup_gamma_dot", 1.0)
             return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
         else:
             raise ValueError(f"Unsupported test mode: {mode}")

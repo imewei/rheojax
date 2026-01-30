@@ -89,7 +89,7 @@ class STZConventional(STZBase):
             ctx["test_mode"] = test_mode
             ctx["variant"] = self.variant
 
-            if test_mode in ["steady_shear", "rotation"]:
+            if test_mode in ["steady_shear", "rotation", "flow_curve"]:
                 self._fit_steady_shear(X, y, **kwargs)
             elif test_mode in ["relaxation", "creep", "startup"]:
                 self._fit_transient(X, y, mode=cast(str, test_mode), **kwargs)
@@ -348,11 +348,19 @@ class STZConventional(STZBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,
         )
 
         # Extract primary variable (index 0)
         # For creep, this is strain. For others, this is stress.
         result = sol.ys[:, 0]
+
+        # Handle solver failures
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result)
+        )
 
         return result
 
@@ -627,10 +635,18 @@ class STZConventional(STZBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,
         )
 
         # Extract stress
         stress = sol.ys[:, 0]
+
+        # Handle solver failures
+        stress = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            stress,
+            jnp.nan * jnp.ones_like(stress)
+        )
 
         # Compute strain
         strain = gamma_0 * jnp.sin(omega * t)
@@ -741,7 +757,7 @@ class STZConventional(STZBase):
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        if mode in ["steady_shear", "rotation"]:
+        if mode in ["steady_shear", "rotation", "flow_curve"]:
             return self._predict_steady_shear_jit(
                 X_jax,
                 p_values["sigma_y"],
@@ -788,7 +804,7 @@ class STZConventional(STZBase):
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         p_values = {k: self.parameters.get_value(k) for k in self.parameters.keys()}
 
-        if self._test_mode in ["steady_shear", "rotation"]:
+        if self._test_mode in ["steady_shear", "rotation", "flow_curve"]:
             result = self._predict_steady_shear_jit(
                 X_jax,
                 p_values["sigma_y"],

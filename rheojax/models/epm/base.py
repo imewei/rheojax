@@ -5,13 +5,449 @@ tensorial, etc.), extracting common parameters, initialization logic, and protoc
 runner templates.
 """
 
+import time as time_module
 from abc import abstractmethod
+from functools import partial
 
 from rheojax.core.base import BaseModel
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
+
+
+# =============================================================================
+# JIT-compiled EPM core functions for Bayesian inference
+# =============================================================================
+
+
+@partial(jax.jit, static_argnums=(5, 6))
+def _jit_flow_curve_single(
+    gdot: float,
+    key: jax.Array,
+    propagator_q: jax.Array,
+    params_array: jax.Array,
+    dt: float,
+    n_steps: int,
+    L: int,
+) -> jax.Array:
+    """JIT-compiled flow curve for a single shear rate.
+
+    Args:
+        gdot: Shear rate
+        key: PRNG key
+        propagator_q: Propagator in Fourier space
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
+        dt: Time step
+        n_steps: Number of simulation steps
+        L: Lattice size
+
+    Returns:
+        Steady-state stress
+    """
+    # Unpack params
+    mu = params_array[0]
+    tau_pl = params_array[1]
+    sigma_c_mean = params_array[2]
+    sigma_c_std = params_array[3]
+    smoothing_width = params_array[4]
+
+    fluidity = 1.0 / tau_pl
+
+    # Initialize state
+    k1, k2 = jax.random.split(key)
+    stress = jnp.zeros((L, L))
+    thresholds = sigma_c_mean + sigma_c_std * jax.random.normal(k2, (L, L))
+    thresholds = jnp.maximum(thresholds, 1e-4)
+    strain = 0.0
+
+    def body_fn(carrier, _):
+        stress_curr, thresholds_curr, strain_curr, key_curr = carrier
+
+        # Smooth plastic strain rate (differentiable)
+        stress_mag = jnp.abs(stress_curr)
+        activation = 0.5 * (
+            1.0 + jnp.tanh((stress_mag - thresholds_curr) / smoothing_width)
+        )
+        plastic_strain_rate = activation * stress_curr * fluidity
+
+        # Stress evolution
+        loading_rate = mu * gdot
+        relaxation_rate = -mu * plastic_strain_rate
+
+        # FFT-based redistribution
+        plastic_strain_q = jnp.fft.rfft2(plastic_strain_rate)
+        stress_q = propagator_q * plastic_strain_q
+        redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
+
+        # Update
+        new_stress = stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        new_strain = strain_curr + gdot * dt
+
+        return (new_stress, thresholds_curr, new_strain, key_curr), jnp.mean(new_stress)
+
+    _, history = jax.lax.scan(
+        body_fn, (stress, thresholds, strain, k2), None, length=n_steps
+    )
+
+    # Average second half for steady state
+    steady_stress = jnp.mean(history[n_steps // 2:])
+    return steady_stress
+
+
+@partial(jax.jit, static_argnums=(5, 6, 7))
+def _jit_flow_curve_batch(
+    shear_rates: jax.Array,
+    key: jax.Array,
+    propagator_q: jax.Array,
+    params_array: jax.Array,
+    dt: float,
+    n_steps: int,
+    L: int,
+    n_rates: int,
+) -> jax.Array:
+    """JIT-compiled flow curve for batch of shear rates.
+
+    Args:
+        shear_rates: Array of shear rates
+        key: PRNG key
+        propagator_q: Propagator in Fourier space
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
+        dt: Time step
+        n_steps: Number of simulation steps
+        L: Lattice size
+        n_rates: Number of shear rates (static for JIT)
+
+    Returns:
+        Array of steady-state stresses
+    """
+    # Use different keys for each shear rate
+    keys = jax.random.split(key, n_rates)
+
+    def single_rate(gdot_key):
+        gdot, k = gdot_key
+        return _jit_flow_curve_single(gdot, k, propagator_q, params_array, dt, n_steps, L)
+
+    return jax.vmap(single_rate)((shear_rates, keys))
+
+
+@partial(jax.jit, static_argnums=(5, 6, 7))
+def _jit_startup_kernel(
+    time: jax.Array,
+    key: jax.Array,
+    propagator_q: jax.Array,
+    params_array: jax.Array,
+    gamma_dot: float,
+    dt: float,
+    n_steps: int,
+    L: int,
+) -> jax.Array:
+    """JIT-compiled startup shear simulation.
+
+    Args:
+        time: Time array
+        key: PRNG key
+        propagator_q: Propagator in Fourier space
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
+        gamma_dot: Applied shear rate
+        dt: Time step
+        n_steps: Number of time points minus 1
+        L: Lattice size
+
+    Returns:
+        Array of stress over time
+    """
+    mu = params_array[0]
+    tau_pl = params_array[1]
+    sigma_c_mean = params_array[2]
+    sigma_c_std = params_array[3]
+    smoothing_width = params_array[4]
+
+    fluidity = 1.0 / tau_pl
+
+    # Initialize state
+    k1, k2 = jax.random.split(key)
+    stress = jnp.zeros((L, L))
+    thresholds = sigma_c_mean + sigma_c_std * jax.random.normal(k2, (L, L))
+    thresholds = jnp.maximum(thresholds, 1e-4)
+    strain = 0.0
+
+    def body_fn(carrier, _):
+        stress_curr, thresholds_curr, strain_curr, key_curr = carrier
+
+        # Smooth plastic strain rate
+        stress_mag = jnp.abs(stress_curr)
+        activation = 0.5 * (
+            1.0 + jnp.tanh((stress_mag - thresholds_curr) / smoothing_width)
+        )
+        plastic_strain_rate = activation * stress_curr * fluidity
+
+        # Stress evolution
+        loading_rate = mu * gamma_dot
+        relaxation_rate = -mu * plastic_strain_rate
+
+        # FFT-based redistribution
+        plastic_strain_q = jnp.fft.rfft2(plastic_strain_rate)
+        stress_q = propagator_q * plastic_strain_q
+        redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
+
+        # Update
+        new_stress = stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        new_strain = strain_curr + gamma_dot * dt
+
+        return (new_stress, thresholds_curr, new_strain, key_curr), jnp.mean(new_stress)
+
+    initial_stress = jnp.mean(stress)
+    _, stresses_scan = jax.lax.scan(
+        body_fn, (stress, thresholds, strain, k2), None, length=n_steps
+    )
+
+    return jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
+
+
+@partial(jax.jit, static_argnums=(5, 6, 7))
+def _jit_relaxation_kernel(
+    time: jax.Array,
+    key: jax.Array,
+    propagator_q: jax.Array,
+    params_array: jax.Array,
+    strain_step: float,
+    dt: float,
+    n_steps: int,
+    L: int,
+) -> jax.Array:
+    """JIT-compiled stress relaxation simulation.
+
+    Args:
+        time: Time array
+        key: PRNG key
+        propagator_q: Propagator in Fourier space
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
+        strain_step: Applied step strain
+        dt: Time step
+        n_steps: Number of time points minus 1
+        L: Lattice size
+
+    Returns:
+        Array of modulus G(t) over time
+    """
+    mu = params_array[0]
+    tau_pl = params_array[1]
+    sigma_c_mean = params_array[2]
+    sigma_c_std = params_array[3]
+    smoothing_width = params_array[4]
+
+    fluidity = 1.0 / tau_pl
+
+    # Initialize state
+    k1, k2 = jax.random.split(key)
+    stress = jnp.zeros((L, L))
+    thresholds = sigma_c_mean + sigma_c_std * jax.random.normal(k2, (L, L))
+    thresholds = jnp.maximum(thresholds, 1e-4)
+    strain = 0.0
+
+    # Apply step strain at t=0
+    stress = stress + mu * strain_step
+    strain = strain + strain_step
+
+    g_0 = jnp.mean(stress) / strain_step
+
+    def body_fn(carrier, _):
+        stress_curr, thresholds_curr, strain_curr, key_curr = carrier
+
+        # Smooth plastic strain rate
+        stress_mag = jnp.abs(stress_curr)
+        activation = 0.5 * (
+            1.0 + jnp.tanh((stress_mag - thresholds_curr) / smoothing_width)
+        )
+        plastic_strain_rate = activation * stress_curr * fluidity
+
+        # Stress evolution (no loading - relaxation only)
+        relaxation_rate = -mu * plastic_strain_rate
+
+        # FFT-based redistribution
+        plastic_strain_q = jnp.fft.rfft2(plastic_strain_rate)
+        stress_q = propagator_q * plastic_strain_q
+        redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
+
+        # Update (no loading)
+        new_stress = stress_curr + (relaxation_rate + redistribution_rate) * dt
+
+        return (new_stress, thresholds_curr, strain_curr, key_curr), jnp.mean(new_stress) / strain_step
+
+    _, moduli_scan = jax.lax.scan(
+        body_fn, (stress, thresholds, strain, k2), None, length=n_steps
+    )
+
+    return jnp.concatenate([jnp.array([g_0]), moduli_scan])
+
+
+@partial(jax.jit, static_argnums=(5, 6, 7))
+def _jit_creep_kernel(
+    time: jax.Array,
+    key: jax.Array,
+    propagator_q: jax.Array,
+    params_array: jax.Array,
+    target_stress: float,
+    dt: float,
+    n_steps: int,
+    L: int,
+) -> jax.Array:
+    """JIT-compiled creep simulation with P-controller.
+
+    Args:
+        time: Time array
+        key: PRNG key
+        propagator_q: Propagator in Fourier space
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
+        target_stress: Target stress for creep
+        dt: Time step
+        n_steps: Number of time points minus 1
+        L: Lattice size
+
+    Returns:
+        Array of strain over time
+    """
+    mu = params_array[0]
+    tau_pl = params_array[1]
+    sigma_c_mean = params_array[2]
+    sigma_c_std = params_array[3]
+    smoothing_width = params_array[4]
+
+    fluidity = 1.0 / tau_pl
+
+    # P-controller parameters
+    Kp_base = 0.01
+    alpha = 10.0
+
+    # Initialize state
+    k1, k2 = jax.random.split(key)
+    stress = jnp.zeros((L, L))
+    thresholds = sigma_c_mean + sigma_c_std * jax.random.normal(k2, (L, L))
+    thresholds = jnp.maximum(thresholds, 1e-4)
+    strain = 0.0
+
+    # Augmented state: (stress, thresholds, strain, key, gdot)
+    initial_strain = strain
+
+    def body_fn(carrier, _):
+        stress_curr, thresholds_curr, strain_curr, key_curr, gdot = carrier
+
+        # P-controller: adjust shear rate to maintain target stress
+        curr_stress = jnp.mean(stress_curr)
+        error = target_stress - curr_stress
+        rel_error = jnp.abs(error) / (jnp.abs(target_stress) + 1e-6)
+        Kp = Kp_base * (1.0 + alpha * rel_error)
+        gdot_new = jnp.maximum(gdot + Kp * error, 0.0)
+
+        # Smooth plastic strain rate
+        stress_mag = jnp.abs(stress_curr)
+        activation = 0.5 * (
+            1.0 + jnp.tanh((stress_mag - thresholds_curr) / smoothing_width)
+        )
+        plastic_strain_rate = activation * stress_curr * fluidity
+
+        # Stress evolution
+        loading_rate = mu * gdot_new
+        relaxation_rate = -mu * plastic_strain_rate
+
+        # FFT-based redistribution
+        plastic_strain_q = jnp.fft.rfft2(plastic_strain_rate)
+        stress_q = propagator_q * plastic_strain_q
+        redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
+
+        # Update
+        new_stress = stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        new_strain = strain_curr + gdot_new * dt
+
+        return (new_stress, thresholds_curr, new_strain, key_curr, gdot_new), new_strain
+
+    _, strains_scan = jax.lax.scan(
+        body_fn, (stress, thresholds, strain, k2, 0.0), None, length=n_steps
+    )
+
+    return jnp.concatenate([jnp.array([initial_strain]), strains_scan])
+
+
+@partial(jax.jit, static_argnums=(6, 7, 8))
+def _jit_oscillation_kernel(
+    time: jax.Array,
+    key: jax.Array,
+    propagator_q: jax.Array,
+    params_array: jax.Array,
+    gamma0: float,
+    omega: float,
+    dt: float,
+    n_steps: int,
+    L: int,
+) -> jax.Array:
+    """JIT-compiled oscillatory shear simulation.
+
+    Args:
+        time: Time array
+        key: PRNG key
+        propagator_q: Propagator in Fourier space
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
+        gamma0: Strain amplitude
+        omega: Angular frequency
+        dt: Time step
+        n_steps: Number of time points minus 1
+        L: Lattice size
+
+    Returns:
+        Array of stress over time
+    """
+    mu = params_array[0]
+    tau_pl = params_array[1]
+    sigma_c_mean = params_array[2]
+    sigma_c_std = params_array[3]
+    smoothing_width = params_array[4]
+
+    fluidity = 1.0 / tau_pl
+
+    # Initialize state
+    k1, k2 = jax.random.split(key)
+    stress = jnp.zeros((L, L))
+    thresholds = sigma_c_mean + sigma_c_std * jax.random.normal(k2, (L, L))
+    thresholds = jnp.maximum(thresholds, 1e-4)
+    strain = 0.0
+
+    initial_stress = jnp.mean(stress)
+    scan_time = time[:-1]
+
+    def body_fn(carrier, t):
+        stress_curr, thresholds_curr, strain_curr, key_curr = carrier
+
+        # Time-varying shear rate
+        gdot = gamma0 * omega * jnp.cos(omega * t)
+
+        # Smooth plastic strain rate
+        stress_mag = jnp.abs(stress_curr)
+        activation = 0.5 * (
+            1.0 + jnp.tanh((stress_mag - thresholds_curr) / smoothing_width)
+        )
+        plastic_strain_rate = activation * stress_curr * fluidity
+
+        # Stress evolution
+        loading_rate = mu * gdot
+        relaxation_rate = -mu * plastic_strain_rate
+
+        # FFT-based redistribution
+        plastic_strain_q = jnp.fft.rfft2(plastic_strain_rate)
+        stress_q = propagator_q * plastic_strain_q
+        redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
+
+        # Update
+        new_stress = stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        new_strain = strain_curr + gdot * dt
+
+        return (new_stress, thresholds_curr, new_strain, key_curr), jnp.mean(new_stress)
+
+    _, stresses_scan = jax.lax.scan(
+        body_fn, (stress, thresholds, strain, k2), scan_time, length=n_steps
+    )
+
+    return jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
 
 
 class EPMBase(BaseModel):
@@ -34,6 +470,9 @@ class EPMBase(BaseModel):
         tau_pl (float): Plastic relaxation timescale. Default 1.0.
         sigma_c_mean (float): Mean yield threshold. Default 1.0.
         sigma_c_std (float): Yield threshold standard deviation (disorder). Default 0.1.
+        n_bayesian_steps (int): Number of time steps for Bayesian inference.
+            Reduced from simulation default (1000) to speed up JIT compilation.
+            Default 200.
     """
 
     def __init__(
@@ -44,6 +483,7 @@ class EPMBase(BaseModel):
         tau_pl: float = 1.0,
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
+        n_bayesian_steps: int = 200,
     ):
         """Initialize EPM base with common parameters."""
         super().__init__()
@@ -51,10 +491,12 @@ class EPMBase(BaseModel):
         # Configuration (Static)
         self.L = L
         self.dt = dt
+        self.n_bayesian_steps = n_bayesian_steps
+        self._precompiled = False
 
         # Parameters (Optimizable) - use inherited self.parameters from BaseModel
         self.parameters.add(
-            "mu", mu, bounds=(0.1, 100.0), units="Pa", description="Shear modulus"
+            "mu", mu, bounds=(0.1, 10000.0), units="Pa", description="Shear modulus"
         )
         self.parameters.add(
             "tau_pl",
@@ -66,21 +508,21 @@ class EPMBase(BaseModel):
         self.parameters.add(
             "sigma_c_mean",
             sigma_c_mean,
-            bounds=(0.1, 10.0),
+            bounds=(0.1, 1000.0),
             units="Pa",
             description="Mean yield threshold",
         )
         self.parameters.add(
             "sigma_c_std",
             sigma_c_std,
-            bounds=(0.0, 1.0),
+            bounds=(0.0, 100.0),
             units="Pa",
             description="Yield threshold standard deviation (disorder)",
         )
         self.parameters.add(
             "smoothing_width",
             0.1,
-            bounds=(0.01, 1.0),
+            bounds=(0.01, 100.0),
             units="Pa",
             description="Smooth yielding transition width",
         )
@@ -575,31 +1017,122 @@ class EPMBase(BaseModel):
 
     # --- Bayesian / Model Function Interface ---
 
-    def model_function(self, X, params, test_mode=None):
+    def precompile(self, n_points: int = 5, verbose: bool = True) -> float:
+        """Pre-compile JIT kernels for faster Bayesian inference.
+
+        Triggers JAX JIT compilation with dummy data so the first Bayesian
+        inference call doesn't incur compilation overhead.
+
+        Args:
+            n_points: Number of data points for dummy compilation (default 5).
+            verbose: Whether to log compilation progress (default True).
+
+        Returns:
+            Compilation time in seconds.
+
+        Example:
+            >>> model = LatticeEPM(L=16)
+            >>> compile_time = model.precompile()  # Triggers JIT
+            >>> # Now Bayesian inference will be faster
+            >>> result = model.fit_bayesian(x, y, test_mode='flow_curve')
+        """
+        from rheojax.logging import get_logger
+
+        logger = get_logger(__name__)
+
+        if verbose:
+            logger.info(
+                "Precompiling EPM kernels",
+                L=self.L,
+                n_bayesian_steps=self.n_bayesian_steps,
+            )
+
+        start_time = time_module.perf_counter()
+
+        # Get propagator
+        if not hasattr(self, "_propagator_q_norm"):
+            raise NotImplementedError(
+                "Subclass must define _propagator_q_norm. "
+                "Use LatticeEPM or TensorialEPM instead of EPMBase directly."
+            )
+
+        # Dummy data for compilation
+        seed = 42
+        key = jax.random.PRNGKey(seed)
+        shear_rates = jnp.logspace(-1, 1, n_points)
+        params_array = jnp.array([
+            self.parameters.get_value("mu"),
+            self.parameters.get_value("tau_pl"),
+            self.parameters.get_value("sigma_c_mean"),
+            self.parameters.get_value("sigma_c_std"),
+            self.parameters.get_value("smoothing_width"),
+        ])
+
+        # Scale propagator
+        propagator_q = self._propagator_q_norm * params_array[0]
+
+        # Compile flow curve (most expensive)
+        _ = _jit_flow_curve_batch(
+            shear_rates,
+            key,
+            propagator_q,
+            params_array,
+            self.dt,
+            self.n_bayesian_steps,
+            self.L,
+            n_points,
+        )
+
+        # Block until compilation is done
+        jax.block_until_ready(_)
+
+        elapsed = time_module.perf_counter() - start_time
+        self._precompiled = True
+
+        if verbose:
+            logger.info(
+                "EPM kernels precompiled",
+                compile_time_s=f"{elapsed:.2f}",
+                L=self.L,
+                n_steps=self.n_bayesian_steps,
+            )
+
+        return elapsed
+
+    def _is_scalar_epm(self) -> bool:
+        """Check if this is a scalar (not tensorial) EPM.
+
+        Returns True for LatticeEPM (scalar stress field), False for TensorialEPM.
+        This determines whether JIT-optimized scalar kernels can be used.
+        """
+        # Default to True (scalar) - TensorialEPM will override this
+        return True
+
+    def model_function(self, X, params, test_mode=None, **protocol_kwargs):
         """Compute EPM predictions for BayesianMixin integration.
 
         This method provides a pure-function interface for Bayesian inference,
         allowing NumPyro to sample from the parameter space. The implementation
-        is fully JAX-traceable (no numpy conversions).
+        uses JIT-compiled kernels for efficient computation.
 
         Args:
             X: Input array (shear rates, time, frequency depending on mode)
             params: Tuple or array of parameter values in self.parameters order
             test_mode: Protocol mode ('flow_curve', 'startup', 'relaxation',
                       'creep', 'oscillation'). If None, uses cached test_mode.
+            **protocol_kwargs: Protocol-specific parameters (gamma_dot, etc.)
 
         Returns:
             JAX array of predictions (stress, modulus, or strain depending on mode)
         """
-        # Convert params tuple/array to dict using parameter names
-        param_names = list(self.parameters.keys())
-        p_values = dict(zip(param_names, params, strict=True))
-
         # Resolve test mode
         mode = test_mode or getattr(self, "_test_mode", "flow_curve")
 
         # Ensure JAX array (no numpy conversion for traceability)
         X_jax = jnp.asarray(X, dtype=jnp.float64)
+
+        # Convert params to array if needed
+        params_array = jnp.asarray(params, dtype=jnp.float64)
 
         # Get cached seed for reproducibility during MCMC sampling
         seed = getattr(self, "_cached_seed", 42)
@@ -611,9 +1144,71 @@ class EPMBase(BaseModel):
                 "Subclass must define _propagator_q_norm. "
                 "Use LatticeEPM or TensorialEPM instead of EPMBase directly."
             )
-        propagator_q = self._propagator_q_norm * p_values["mu"]
+        # Scale by mu (first parameter)
+        propagator_q = self._propagator_q_norm * params_array[0]
 
-        # Route to JAX-pure prediction functions (no RheoData wrappers)
+        # Use JIT-compiled scalar kernels for LatticeEPM (scalar stress)
+        # TensorialEPM (tensorial stress) uses the general model functions
+        if self._is_scalar_epm():
+            return self._model_function_scalar(
+                X_jax, key, propagator_q, params_array, mode
+            )
+        else:
+            # Convert params array back to dict for general model functions
+            param_names = list(self.parameters.keys())
+            p_values = dict(zip(param_names, params, strict=True))
+            return self._model_function_general(
+                X_jax, key, propagator_q, p_values, mode
+            )
+
+    def _model_function_scalar(
+        self,
+        X_jax: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        mode: str,
+    ) -> jax.Array:
+        """Model function using JIT-compiled scalar kernels (for LatticeEPM)."""
+        if mode in ["flow_curve", "rotation", "steady_shear"]:
+            n_rates = int(X_jax.shape[0])
+            return _jit_flow_curve_batch(
+                X_jax,
+                key,
+                propagator_q,
+                params_array,
+                self.dt,
+                self.n_bayesian_steps,
+                self.L,
+                n_rates,
+            )
+        elif mode == "startup":
+            gamma_dot = getattr(self, "_cached_gamma_dot", 0.1)
+            return self._model_startup_jit(X_jax, key, propagator_q, params_array, gamma_dot)
+        elif mode == "relaxation":
+            gamma = getattr(self, "_cached_gamma", 0.1)
+            return self._model_relaxation_jit(X_jax, key, propagator_q, params_array, gamma)
+        elif mode == "creep":
+            stress = getattr(self, "_cached_stress", 1.0)
+            return self._model_creep_jit(X_jax, key, propagator_q, params_array, stress)
+        elif mode in ["oscillation", "saos"]:
+            gamma0 = getattr(self, "_cached_gamma0", 0.01)
+            omega = getattr(self, "_cached_omega", 1.0)
+            return self._model_oscillation_jit(
+                X_jax, key, propagator_q, params_array, gamma0, omega
+            )
+        else:
+            raise ValueError(f"Unknown test mode: {mode}")
+
+    def _model_function_general(
+        self,
+        X_jax: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        p_values: dict,
+        mode: str,
+    ) -> jax.Array:
+        """Model function using general (non-JIT) methods (for TensorialEPM)."""
         if mode in ["flow_curve", "rotation", "steady_shear"]:
             return self._model_flow_curve(X_jax, key, propagator_q, p_values)
         elif mode == "startup":
@@ -633,6 +1228,148 @@ class EPMBase(BaseModel):
             )
         else:
             raise ValueError(f"Unknown test mode: {mode}")
+
+    # --- JIT-friendly time protocol wrappers ---
+
+    def _model_startup_jit(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        gamma_dot: float,
+    ) -> jax.Array:
+        """JIT-friendly startup simulation."""
+        n_steps = max(0, int(time.shape[0]) - 1)
+        dt = self.dt
+        if n_steps > 0:
+            dt = float(time[1] - time[0])
+
+        return self._run_startup_kernel(
+            time, key, propagator_q, params_array, gamma_dot, dt, n_steps, self.L
+        )
+
+    def _model_relaxation_jit(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        strain_step: float,
+    ) -> jax.Array:
+        """JIT-friendly relaxation simulation."""
+        n_steps = max(0, int(time.shape[0]) - 1)
+        dt = self.dt
+        if n_steps > 0:
+            dt = float(time[1] - time[0])
+
+        return self._run_relaxation_kernel(
+            time, key, propagator_q, params_array, strain_step, dt, n_steps, self.L
+        )
+
+    def _model_creep_jit(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        target_stress: float,
+    ) -> jax.Array:
+        """JIT-friendly creep simulation."""
+        n_steps = max(0, int(time.shape[0]) - 1)
+        dt = self.dt
+        if n_steps > 0:
+            dt = float(time[1] - time[0])
+
+        return self._run_creep_kernel(
+            time, key, propagator_q, params_array, target_stress, dt, n_steps, self.L
+        )
+
+    def _model_oscillation_jit(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        gamma0: float,
+        omega: float,
+    ) -> jax.Array:
+        """JIT-friendly oscillation simulation."""
+        n_steps = max(0, int(time.shape[0]) - 1)
+        dt = self.dt
+        if n_steps > 0:
+            dt = float(time[1] - time[0])
+
+        return self._run_oscillation_kernel(
+            time, key, propagator_q, params_array, gamma0, omega, dt, n_steps, self.L
+        )
+
+    # --- Kernel dispatch methods (call JIT-compiled functions) ---
+
+    def _run_startup_kernel(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        gamma_dot: float,
+        dt: float,
+        n_steps: int,
+        L: int,
+    ) -> jax.Array:
+        """Dispatch to JIT-compiled startup kernel."""
+        return _jit_startup_kernel(
+            time, key, propagator_q, params_array, gamma_dot, dt, n_steps, L
+        )
+
+    def _run_relaxation_kernel(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        strain_step: float,
+        dt: float,
+        n_steps: int,
+        L: int,
+    ) -> jax.Array:
+        """Dispatch to JIT-compiled relaxation kernel."""
+        return _jit_relaxation_kernel(
+            time, key, propagator_q, params_array, strain_step, dt, n_steps, L
+        )
+
+    def _run_creep_kernel(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        target_stress: float,
+        dt: float,
+        n_steps: int,
+        L: int,
+    ) -> jax.Array:
+        """Dispatch to JIT-compiled creep kernel."""
+        return _jit_creep_kernel(
+            time, key, propagator_q, params_array, target_stress, dt, n_steps, L
+        )
+
+    def _run_oscillation_kernel(
+        self,
+        time: jax.Array,
+        key: jax.Array,
+        propagator_q: jax.Array,
+        params_array: jax.Array,
+        gamma0: float,
+        omega: float,
+        dt: float,
+        n_steps: int,
+        L: int,
+    ) -> jax.Array:
+        """Dispatch to JIT-compiled oscillation kernel."""
+        return _jit_oscillation_kernel(
+            time, key, propagator_q, params_array, gamma0, omega, dt, n_steps, L
+        )
 
     # --- JAX-Pure Model Functions for Bayesian Inference ---
 

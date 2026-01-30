@@ -256,9 +256,67 @@ class MIKH(IKHBase):
         return self
 
     def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MIKH":
-        """Fit to oscillatory data (SAOS)."""
-        # For SAOS, use linearized response or small-amplitude LAOS
-        return self._fit_return_mapping(X, y, **kwargs)
+        """Fit to oscillatory data (SAOS).
+
+        Supports two modes:
+        1. Frequency-domain: X=omega, y=|G*| or complex G* (uses Maxwell analytical solution)
+        2. Time-domain: X=time, y=stress (uses return mapping with sinusoidal strain)
+        """
+        X_arr = jnp.asarray(X)
+        y_arr = jnp.asarray(y)
+
+        # Detect if this is frequency-domain (omega array) or time-domain (time series)
+        # Heuristic: time-domain data typically has >100 points for oscillation
+        is_time_domain = len(X_arr) > 100
+
+        if is_time_domain:
+            # Time-domain: use return mapping with sinusoidal strain
+            return self._fit_return_mapping(X, y, **kwargs)
+        else:
+            # Frequency-domain: fit G' and G'' using Maxwell analytical solution
+            return self._fit_saos_frequency_domain(X, y, **kwargs)
+
+    def _fit_saos_frequency_domain(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MIKH":
+        """Fit to frequency-domain SAOS data using Maxwell analytical expressions.
+
+        Args:
+            X: Angular frequency array (omega)
+            y: Complex modulus G* = G' + i*G'' or magnitude |G*|
+        """
+        from rheojax.utils.optimization import nlsq_optimize
+
+        omega = jnp.asarray(X)
+
+        # Handle different y formats
+        y_arr = jnp.asarray(y)
+        if jnp.iscomplexobj(y_arr):
+            # Complex G* provided
+            target_magnitude = jnp.abs(y_arr)
+        else:
+            # Assume magnitude |G*| provided
+            target_magnitude = y_arr
+
+        def objective(param_values):
+            """Compute residual using Maxwell analytical SAOS expressions."""
+            p_names = list(self.parameters.keys())
+            p_dict = dict(zip(p_names, param_values, strict=False))
+
+            G = p_dict["G"]
+            eta = p_dict["eta"]
+            tau = eta / G  # Maxwell relaxation time
+
+            # Maxwell moduli
+            wt = omega * tau
+            G_prime = G * wt**2 / (1 + wt**2)
+            G_double_prime = G * wt / (1 + wt**2)
+
+            # Complex modulus magnitude
+            G_star_magnitude = jnp.sqrt(G_prime**2 + G_double_prime**2)
+
+            return G_star_magnitude - target_magnitude
+
+        nlsq_optimize(objective, self.parameters, **kwargs)
+        return self
 
     def _simulate_transient(
         self,
@@ -339,11 +397,19 @@ class MIKH(IKHBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,
         )
 
         # Extract primary variable (index 0)
         # For creep: strain; for startup/relaxation: stress
         result = sol.ys[:, 0]
+
+        # Handle solver failures
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result)
+        )
 
         # Add viscous contribution for startup
         if mode == "startup" and params.get("eta_inf", 0.0) > 0:
@@ -466,8 +532,11 @@ class MIKH(IKHBase):
             ),
         )
 
-    def model_function(self, X, params, test_mode=None):
-        """NumPyro model function for Bayesian inference."""
+    def model_function(self, X, params, test_mode=None, **kwargs):
+        """NumPyro model function for Bayesian inference.
+        
+        Accepts protocol-specific kwargs (gamma_dot, sigma_applied, sigma_0).
+        """
         # Use stored test_mode if not provided
         mode = test_mode or self._test_mode or "startup"
 
@@ -478,22 +547,37 @@ class MIKH(IKHBase):
         else:
             param_dict = params
 
+        # Extract protocol-specific args from kwargs or fall back to defaults
+        gamma_dot = kwargs.get("gamma_dot", param_dict.get("_gamma_dot", 0.0))
+        sigma_applied = kwargs.get("sigma_applied", param_dict.get("_sigma_applied", 100.0))
+        sigma_0 = kwargs.get("sigma_0", param_dict.get("_sigma_0", 60.0))
+
         if mode == "flow_curve":
-            gamma_dot = jnp.asarray(X)
-            return ikh_flow_curve_steady_state(gamma_dot, **param_dict)
+            gamma_dot_arr = jnp.asarray(X)
+            return ikh_flow_curve_steady_state(gamma_dot_arr, **param_dict)
 
         elif mode in ["creep", "relaxation"]:
-            # For Bayesian with ODE, we need to handle this carefully
-            # X should contain time array
             t = jnp.asarray(X)
-            # Default values - these should be passed via kwargs in fit_bayesian
-            gamma_dot = param_dict.get("_gamma_dot", 0.0)
-            sigma_applied = param_dict.get("_sigma_applied", 100.0)
-            sigma_0 = param_dict.get("_sigma_0", 60.0)
             return self._simulate_transient(
                 t, param_dict, mode, gamma_dot, sigma_applied, sigma_0
             )
 
+        elif mode == "oscillation":
+            # Frequency-domain SAOS using Maxwell analytical expressions
+            omega = jnp.asarray(X)
+            G = param_dict["G"]
+            eta = param_dict["eta"]
+            tau = eta / G  # Maxwell relaxation time
+
+            # Maxwell moduli
+            wt = omega * tau
+            G_prime = G * wt**2 / (1 + wt**2)
+            G_double_prime = G * wt / (1 + wt**2)
+
+            # Return complex modulus magnitude
+            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+
         else:
-            times, strains = self._extract_time_strain(X)
+            # startup/laos modes need strain computed from kwargs
+            times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, param_dict)

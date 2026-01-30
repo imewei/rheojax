@@ -444,11 +444,15 @@ def solve_flow_curve_single(
         stepsize_controller=stepsize_controller,
         saveat=diffrax.SaveAt(t1=True),  # Only save final state
         max_steps=max_steps,
+        throw=False,  # Return partial result on failure (for optimization)
     )
 
     # Extract stress integral from final state
     final_state = solution.ys[0]  # Shape: (state_dim,)
     sigma = final_state[2 + n_modes]  # The integrated stress
+
+    # Handle solver failure by returning NaN (optimization will avoid this)
+    sigma = jnp.where(solution.result == diffrax.RESULTS.successful, sigma, jnp.nan)
 
     return sigma
 

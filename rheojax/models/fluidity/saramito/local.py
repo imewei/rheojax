@@ -439,6 +439,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,  # Return partial result on failure (for optimization)
         )
 
         # Extract primary variable
@@ -451,6 +452,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         else:  # relaxation
             # Return shear stress τ_xy (index 2)
             result = sol.ys[:, 2]
+
+        # Handle solver failure by returning NaN (optimization will avoid this)
+        result = jnp.where(sol.result == diffrax.RESULTS.successful, result, jnp.nan)
 
         return result
 
@@ -551,17 +555,25 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             saveat=diffrax.SaveAt(ts=t_jax),
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,  # Return partial result on failure (for optimization)
         )
 
-        stress = np.array(sol.ys[:, 2])  # τ_xy
-        fluidity = np.array(sol.ys[:, 3])  # f
-        strain = np.array(sol.ys[:, 4])  # γ
+        # Handle solver failure
+        sol_ys = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys,
+            jnp.nan * jnp.ones_like(sol.ys),
+        )
+
+        stress = np.array(sol_ys[:, 2])  # τ_xy
+        fluidity = np.array(sol_ys[:, 3])  # f
+        strain = np.array(sol_ys[:, 4])  # γ
 
         # Store trajectory
         self._trajectory = {
             "t": np.array(t),
-            "tau_xx": np.array(sol.ys[:, 0]),
-            "tau_yy": np.array(sol.ys[:, 1]),
+            "tau_xx": np.array(sol_ys[:, 0]),
+            "tau_yy": np.array(sol_ys[:, 1]),
             "tau_xy": stress,
             "fluidity": fluidity,
             "strain": strain,
@@ -633,10 +645,18 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             saveat=diffrax.SaveAt(ts=t_jax),
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,  # Return partial result on failure (for optimization)
         )
 
-        strain = np.array(sol.ys[:, 0])
-        fluidity = np.array(sol.ys[:, 1])
+        # Handle solver failure
+        sol_ys = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys,
+            jnp.nan * jnp.ones_like(sol.ys),
+        )
+
+        strain = np.array(sol_ys[:, 0])
+        fluidity = np.array(sol_ys[:, 1])
 
         # Store trajectory
         self._trajectory = {
@@ -844,10 +864,14 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             saveat=diffrax.SaveAt(ts=t),
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,  # Return partial result on failure (for optimization)
         )
 
         stress = sol.ys[:, 2]  # τ_xy
         strain = gamma_0 * jnp.sin(omega * t)
+
+        # Handle solver failure by returning NaN
+        stress = jnp.where(sol.result == diffrax.RESULTS.successful, stress, jnp.nan)
 
         return strain, stress
 
@@ -955,10 +979,11 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
     # Bayesian / Model Function Interface
     # =========================================================================
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
 
         Routes to appropriate prediction based on test_mode.
+        Accepts protocol-specific kwargs (gamma_dot, sigma_applied, etc.).
 
         Parameters
         ----------
@@ -968,6 +993,8 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             Parameter values in order
         test_mode : str, optional
             Override stored test mode
+        **kwargs
+            Protocol-specific arguments (gamma_dot, sigma_applied, gamma_0, omega)
 
         Returns
         -------
@@ -980,6 +1007,13 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             mode = "flow_curve"
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
+
+        # Extract protocol-specific args from kwargs or fall back to instance attrs
+        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
+        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
+        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
+        omega = kwargs.get("omega", self._omega_laos)
+        t_wait = kwargs.get("t_wait", self._t_wait)
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             tau_y_coupling = (
@@ -1013,16 +1047,16 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
                 X_jax,
                 p_values,
                 mode,
-                self._gamma_dot_applied,
-                self._sigma_applied,
+                gamma_dot,
+                sigma_applied,
                 None,
-                self._t_wait,
+                t_wait,
             )
         elif mode == "laos":
-            if self._gamma_0 is None or self._omega_laos is None:
+            if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
-                X_jax, p_values, self._gamma_0, self._omega_laos
+                X_jax, p_values, gamma_0, omega
             )
             return stress
 
@@ -1050,10 +1084,15 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         p = self.get_parameter_dict()
 
-        if self._test_mode in ["steady_shear", "rotation", "flow_curve"]:
+        # Get test_mode from kwargs or instance attribute
+        test_mode = kwargs.get("test_mode") or getattr(self, "_test_mode", None)
+        if test_mode is None:
+            raise ValueError("test_mode must be specified for prediction")
+
+        if test_mode in ["steady_shear", "rotation", "flow_curve"]:
             return self._predict_flow_curve(X)
 
-        elif self._test_mode == "oscillation":
+        elif test_mode == "oscillation":
             result = self._predict_saos_jit(
                 X_jax,
                 p["G"],
@@ -1061,10 +1100,10 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             )
             return np.array(result)
 
-        elif self._test_mode in ["startup", "relaxation", "creep"]:
-            return self._predict_transient(X)
+        elif test_mode in ["startup", "relaxation", "creep"]:
+            return self._predict_transient(X, mode=test_mode)
 
-        elif self._test_mode == "laos":
+        elif test_mode == "laos":
             if self._gamma_0 is None or self._omega_laos is None:
                 raise ValueError("LAOS prediction requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(

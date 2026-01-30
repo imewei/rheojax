@@ -351,20 +351,26 @@ class ITTMCTBase(BaseModel):
         # Subclasses can override for specialized fitting
         from rheojax.utils.optimization import fit_with_nlsq
 
-        def residual_func(params, X, y):
-            self.parameters.set_values(params)
-            y_pred = self._predict_flow_curve(X)
-            return y - y_pred
-
         param_names = list(self.parameters.keys())
-        initial_values = [self.parameters.get_value(p) for p in param_names]
-        bounds = self.parameters.get_bounds_array()
+        initial_values = np.array([self.parameters.get_value(p) for p in param_names])
+        # Convert bounds from list of tuples to (lower, upper) arrays
+        param_bounds = self.parameters.get_bounds()
+        lower = np.array([b[0] if b[0] is not None else -np.inf for b in param_bounds])
+        upper = np.array([b[1] if b[1] is not None else np.inf for b in param_bounds])
+        bounds = (lower, upper)
+
+        # Closure captures gamma_dot, sigma, param_names, and bounds
+        def residual_func(params):
+            # Clip params to bounds to handle numerical precision issues
+            params_clipped = jnp.clip(params, lower, upper)
+            param_dict = dict(zip(param_names, params_clipped, strict=True))
+            self.parameters.set_values(param_dict)
+            y_pred = self._predict_flow_curve(gamma_dot)
+            return sigma - y_pred
 
         result = fit_with_nlsq(
             residual_func,
             initial_values,
-            gamma_dot,
-            sigma,
             bounds=bounds,
             **kwargs,
         )
@@ -405,24 +411,30 @@ class ITTMCTBase(BaseModel):
             # Assume |G*|
             y_combined = G_star
 
-        def residual_func(params, X, y):
-            self.parameters.set_values(params)
-            G_pred = self._predict_oscillation(X, return_components=True)
+        param_names = list(self.parameters.keys())
+        initial_values = np.array([self.parameters.get_value(p) for p in param_names])
+        # Convert bounds from list of tuples to (lower, upper) arrays
+        param_bounds = self.parameters.get_bounds()
+        lower = np.array([b[0] if b[0] is not None else -np.inf for b in param_bounds])
+        upper = np.array([b[1] if b[1] is not None else np.inf for b in param_bounds])
+        bounds = (lower, upper)
+
+        # Closure captures omega, y_combined, G_star, param_names, and bounds
+        def residual_func(params):
+            # Clip params to bounds to handle numerical precision issues
+            params_clipped = jnp.clip(params, lower, upper)
+            param_dict = dict(zip(param_names, params_clipped, strict=True))
+            self.parameters.set_values(param_dict)
+            G_pred = self._predict_oscillation(omega, return_components=True)
             if G_star.ndim == 2:
                 y_pred = np.concatenate([G_pred[:, 0], G_pred[:, 1]])
             else:
                 y_pred = np.sqrt(G_pred[:, 0] ** 2 + G_pred[:, 1] ** 2)
-            return y - y_pred
-
-        param_names = list(self.parameters.keys())
-        initial_values = [self.parameters.get_value(p) for p in param_names]
-        bounds = self.parameters.get_bounds_array()
+            return y_combined - y_pred
 
         result = fit_with_nlsq(
             residual_func,
             initial_values,
-            omega,
-            y_combined,
             bounds=bounds,
             **kwargs,
         )
@@ -456,20 +468,26 @@ class ITTMCTBase(BaseModel):
         """
         from rheojax.utils.optimization import fit_with_nlsq
 
-        def residual_func(params, X, y):
-            self.parameters.set_values(params)
-            y_pred = self._predict_startup(X, gamma_dot=gamma_dot)
-            return y - y_pred
-
         param_names = list(self.parameters.keys())
-        initial_values = [self.parameters.get_value(p) for p in param_names]
-        bounds = self.parameters.get_bounds_array()
+        initial_values = np.array([self.parameters.get_value(p) for p in param_names])
+        # Convert bounds from list of tuples to (lower, upper) arrays
+        param_bounds = self.parameters.get_bounds()
+        lower = np.array([b[0] if b[0] is not None else -np.inf for b in param_bounds])
+        upper = np.array([b[1] if b[1] is not None else np.inf for b in param_bounds])
+        bounds = (lower, upper)
+
+        # Closure captures t, sigma, gamma_dot, param_names, and bounds
+        def residual_func(params):
+            # Clip params to bounds to handle numerical precision issues
+            params_clipped = jnp.clip(params, lower, upper)
+            param_dict = dict(zip(param_names, params_clipped, strict=True))
+            self.parameters.set_values(param_dict)
+            y_pred = self._predict_startup(t, gamma_dot=gamma_dot)
+            return sigma - y_pred
 
         result = fit_with_nlsq(
             residual_func,
             initial_values,
-            t,
-            sigma,
             bounds=bounds,
             **kwargs,
         )
@@ -503,20 +521,26 @@ class ITTMCTBase(BaseModel):
         """
         from rheojax.utils.optimization import fit_with_nlsq
 
-        def residual_func(params, X, y):
-            self.parameters.set_values(params)
-            y_pred = self._predict_creep(X, sigma_applied=sigma_applied)
-            return y - y_pred
-
         param_names = list(self.parameters.keys())
-        initial_values = [self.parameters.get_value(p) for p in param_names]
-        bounds = self.parameters.get_bounds_array()
+        initial_values = np.array([self.parameters.get_value(p) for p in param_names])
+        # Convert bounds from list of tuples to (lower, upper) arrays
+        param_bounds = self.parameters.get_bounds()
+        lower = np.array([b[0] if b[0] is not None else -np.inf for b in param_bounds])
+        upper = np.array([b[1] if b[1] is not None else np.inf for b in param_bounds])
+        bounds = (lower, upper)
+
+        # Closure captures t, J, sigma_applied, param_names, and bounds
+        def residual_func(params):
+            # Clip params to bounds to handle numerical precision issues
+            params_clipped = jnp.clip(params, lower, upper)
+            param_dict = dict(zip(param_names, params_clipped, strict=True))
+            self.parameters.set_values(param_dict)
+            y_pred = self._predict_creep(t, sigma_applied=sigma_applied)
+            return J - y_pred
 
         result = fit_with_nlsq(
             residual_func,
             initial_values,
-            t,
-            J,
             bounds=bounds,
             **kwargs,
         )
@@ -550,20 +574,26 @@ class ITTMCTBase(BaseModel):
         """
         from rheojax.utils.optimization import fit_with_nlsq
 
-        def residual_func(params, X, y):
-            self.parameters.set_values(params)
-            y_pred = self._predict_relaxation(X, gamma_pre=gamma_pre)
-            return y - y_pred
-
         param_names = list(self.parameters.keys())
-        initial_values = [self.parameters.get_value(p) for p in param_names]
-        bounds = self.parameters.get_bounds_array()
+        initial_values = np.array([self.parameters.get_value(p) for p in param_names])
+        # Convert bounds from list of tuples to (lower, upper) arrays
+        param_bounds = self.parameters.get_bounds()
+        lower = np.array([b[0] if b[0] is not None else -np.inf for b in param_bounds])
+        upper = np.array([b[1] if b[1] is not None else np.inf for b in param_bounds])
+        bounds = (lower, upper)
+
+        # Closure captures t, sigma, gamma_pre, param_names, and bounds
+        def residual_func(params):
+            # Clip params to bounds to handle numerical precision issues
+            params_clipped = jnp.clip(params, lower, upper)
+            param_dict = dict(zip(param_names, params_clipped, strict=True))
+            self.parameters.set_values(param_dict)
+            y_pred = self._predict_relaxation(t, gamma_pre=gamma_pre)
+            return sigma - y_pred
 
         result = fit_with_nlsq(
             residual_func,
             initial_values,
-            t,
-            sigma,
             bounds=bounds,
             **kwargs,
         )
@@ -600,20 +630,26 @@ class ITTMCTBase(BaseModel):
         """
         from rheojax.utils.optimization import fit_with_nlsq
 
-        def residual_func(params, X, y):
-            self.parameters.set_values(params)
-            y_pred = self._predict_laos(X, gamma_0=gamma_0, omega=omega)
-            return y - y_pred
-
         param_names = list(self.parameters.keys())
-        initial_values = [self.parameters.get_value(p) for p in param_names]
-        bounds = self.parameters.get_bounds_array()
+        initial_values = np.array([self.parameters.get_value(p) for p in param_names])
+        # Convert bounds from list of tuples to (lower, upper) arrays
+        param_bounds = self.parameters.get_bounds()
+        lower = np.array([b[0] if b[0] is not None else -np.inf for b in param_bounds])
+        upper = np.array([b[1] if b[1] is not None else np.inf for b in param_bounds])
+        bounds = (lower, upper)
+
+        # Closure captures t, sigma, gamma_0, omega, param_names, and bounds
+        def residual_func(params):
+            # Clip params to bounds to handle numerical precision issues
+            params_clipped = jnp.clip(params, lower, upper)
+            param_dict = dict(zip(param_names, params_clipped, strict=True))
+            self.parameters.set_values(param_dict)
+            y_pred = self._predict_laos(t, gamma_0=gamma_0, omega=omega)
+            return sigma - y_pred
 
         result = fit_with_nlsq(
             residual_func,
             initial_values,
-            t,
-            sigma,
             bounds=bounds,
             **kwargs,
         )

@@ -56,6 +56,7 @@ class LatticeEPM(EPMBase):
         tau_pl: float = 1.0,
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
+        n_bayesian_steps: int = 200,
     ):
         """Initialize the Lattice EPM."""
         # Initialize base class with common parameters
@@ -66,6 +67,7 @@ class LatticeEPM(EPMBase):
             tau_pl=tau_pl,
             sigma_c_mean=sigma_c_mean,
             sigma_c_std=sigma_c_std,
+            n_bayesian_steps=n_bayesian_steps,
         )
 
         # Precompute Propagator (Cached)

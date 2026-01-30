@@ -452,10 +452,18 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             saveat=diffrax.SaveAt(ts=t),
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,  # Return partial result on failure (for optimization)
         )
 
-        sigma = sol.ys[:, 0]  # Bulk stress
-        f_field_final = sol.ys[-1, 1:]  # Final fluidity profile
+        # Handle solver failure
+        sol_ys = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys,
+            jnp.nan * jnp.ones_like(sol.ys),
+        )
+
+        sigma = sol_ys[:, 0]  # Bulk stress
+        f_field_final = sol_ys[-1, 1:]  # Final fluidity profile
 
         return t, sigma, f_field_final
 
@@ -522,10 +530,18 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             saveat=diffrax.SaveAt(ts=t),
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,  # Return partial result on failure (for optimization)
+        )
+
+        # Handle solver failure
+        sol_ys = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys,
+            jnp.nan * jnp.ones_like(sol.ys),
         )
 
         # Compute strain from average fluidity and stress
-        f_avg = jnp.mean(sol.ys[:, 1:], axis=1)
+        f_avg = jnp.mean(sol_ys[:, 1:], axis=1)
 
         # For stress-controlled, compute plasticity
         tau_y = params["tau_y0"]
@@ -536,7 +552,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         dt_array = jnp.diff(t, prepend=t[0])
         gamma = jnp.cumsum(gamma_dot_t * dt_array)
 
-        f_field_final = sol.ys[-1, 1:]
+        f_field_final = sol_ys[-1, 1:]
 
         return gamma, f_field_final
 
@@ -712,8 +728,10 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
     # Model Function Interface
     # =========================================================================
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
+
+        Accepts protocol-specific kwargs (gamma_dot, sigma_applied, etc.).
 
         Parameters
         ----------
@@ -723,6 +741,8 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             Parameter values
         test_mode : str, optional
             Override stored test mode
+        **kwargs
+            Protocol-specific arguments (gamma_dot, sigma_applied)
 
         Returns
         -------
@@ -736,20 +756,24 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
+        # Extract protocol-specific args from kwargs or fall back to instance attrs
+        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
+        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
+
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             return self._predict_flow_curve_homogeneous(X_jax, p_values)
         elif mode == "startup":
-            if self._gamma_dot_applied is None:
+            if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             _, sigma, _ = self._simulate_startup_internal(
-                X_jax, p_values, self._gamma_dot_applied
+                X_jax, p_values, gamma_dot
             )
             return sigma
         elif mode == "creep":
-            if self._sigma_applied is None:
+            if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
             gamma, _ = self._simulate_creep_internal(
-                X_jax, p_values, self._sigma_applied
+                X_jax, p_values, sigma_applied
             )
             return gamma
 
@@ -770,17 +794,24 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         np.ndarray
             Predicted response
         """
-        if self._test_mode in ["steady_shear", "rotation", "flow_curve"]:
+        # Get test_mode from kwargs or instance attribute
+        test_mode = kwargs.get("test_mode") or getattr(self, "_test_mode", None)
+        if test_mode is None:
+            raise ValueError("test_mode must be specified for prediction")
+
+        if test_mode in ["steady_shear", "rotation", "flow_curve"]:
             return self._predict_flow_curve(X)
-        elif self._test_mode == "startup":
-            if self._gamma_dot_applied is None:
+        elif test_mode == "startup":
+            gamma_dot = kwargs.get("gamma_dot") or getattr(self, "_gamma_dot_applied", None)
+            if gamma_dot is None:
                 raise ValueError("startup prediction requires gamma_dot")
-            _, sigma, _ = self.simulate_startup(X, self._gamma_dot_applied)
+            _, sigma, _ = self.simulate_startup(X, gamma_dot)
             return sigma
-        elif self._test_mode == "creep":
-            if self._sigma_applied is None:
-                raise ValueError("creep prediction requires sigma_applied")
-            gamma, _ = self.simulate_creep(X, self._sigma_applied)
+        elif test_mode == "creep":
+            sigma = kwargs.get("sigma") or getattr(self, "_sigma_applied", None)
+            if sigma is None:
+                raise ValueError("creep prediction requires sigma")
+            gamma, _ = self.simulate_creep(X, sigma)
             return gamma
 
         return np.zeros_like(X)

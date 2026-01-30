@@ -418,6 +418,7 @@ class FluidityNonlocal(FluidityBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,  # Return partial result on failure (for optimization)
         )
 
         # Store trajectory for analysis
@@ -426,6 +427,9 @@ class FluidityNonlocal(FluidityBase):
         # Extract primary variable (index 0)
         # For creep: strain; for startup/relaxation: stress
         result = sol.ys[:, 0]
+
+        # Handle solver failure by returning NaN (optimization will avoid this)
+        result = jnp.where(sol.result == diffrax.RESULTS.successful, result, jnp.nan)
 
         return result
 
@@ -674,10 +678,14 @@ class FluidityNonlocal(FluidityBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,  # Return partial result on failure (for optimization)
         )
 
         stress = sol.ys[:, 0]
         strain = gamma_0 * jnp.sin(omega * t)
+
+        # Handle solver failure by returning NaN
+        stress = jnp.where(sol.result == diffrax.RESULTS.successful, stress, jnp.nan)
 
         # Store trajectory
         self._f_field_trajectory = np.array(sol.ys[:, 1:])
@@ -721,14 +729,23 @@ class FluidityNonlocal(FluidityBase):
     # Bayesian / Model Function Interface
     # =========================================================================
 
-    def model_function(self, X, params, test_mode=None):
-        """NumPyro/BayesianMixin model function."""
+    def model_function(self, X, params, test_mode=None, **kwargs):
+        """NumPyro/BayesianMixin model function.
+        
+        Accepts protocol-specific kwargs (gamma_dot, sigma_applied, etc.).
+        """
         p_values = dict(zip(self.parameters.keys(), params, strict=True))
         mode = test_mode or self._test_mode
         if mode is None:
             mode = "oscillation"
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
+
+        # Extract protocol-specific args from kwargs or fall back to instance attrs
+        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
+        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
+        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
+        omega = kwargs.get("omega", self._omega_laos)
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             return fluidity_nonlocal_steady_state(
@@ -753,15 +770,15 @@ class FluidityNonlocal(FluidityBase):
                 X_jax,
                 p_values,
                 mode,
-                self._gamma_dot_applied,
-                self._sigma_applied,
+                gamma_dot,
+                sigma_applied,
                 None,
             )
         elif mode == "laos":
-            if self._gamma_0 is None or self._omega_laos is None:
+            if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
-                X_jax, p_values, self._gamma_0, self._omega_laos
+                X_jax, p_values, gamma_0, omega
             )
             return stress
 
@@ -776,7 +793,12 @@ class FluidityNonlocal(FluidityBase):
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         p = self.get_parameter_dict()
 
-        if self._test_mode in ["steady_shear", "rotation", "flow_curve"]:
+        # Get test_mode from kwargs or instance attribute
+        test_mode = kwargs.get("test_mode") or getattr(self, "_test_mode", None)
+        if test_mode is None:
+            raise ValueError("test_mode must be specified for prediction")
+
+        if test_mode in ["steady_shear", "rotation", "flow_curve"]:
             result = fluidity_nonlocal_steady_state(
                 X_jax,
                 p["G"],
@@ -789,7 +811,7 @@ class FluidityNonlocal(FluidityBase):
             )
             return np.array(result)
 
-        elif self._test_mode == "oscillation":
+        elif test_mode == "oscillation":
             result = self._predict_saos_jit(
                 X_jax,
                 p["G"],
@@ -798,10 +820,10 @@ class FluidityNonlocal(FluidityBase):
             )
             return np.array(result)
 
-        elif self._test_mode in ["startup", "relaxation", "creep"]:
-            return self._predict_transient(X)
+        elif test_mode in ["startup", "relaxation", "creep"]:
+            return self._predict_transient(X, mode=test_mode)
 
-        elif self._test_mode == "laos":
+        elif test_mode == "laos":
             if self._gamma_0 is None or self._omega_laos is None:
                 raise ValueError("LAOS prediction requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(

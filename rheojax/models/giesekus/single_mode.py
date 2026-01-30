@@ -257,7 +257,7 @@ class GiesekusSingleMode(GiesekusBase):
         params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s])
         return self.model_function(x_jax, params, test_mode=test_mode)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
 
         Routes to appropriate prediction based on test_mode.
@@ -270,6 +270,8 @@ class GiesekusSingleMode(GiesekusBase):
             Parameter values [eta_p, lambda_1, alpha, eta_s]
         test_mode : str, optional
             Override stored test mode
+        **kwargs : dict
+            Protocol-specific arguments (gamma_dot, sigma_applied, gamma_0, etc.)
 
         Returns
         -------
@@ -294,7 +296,8 @@ class GiesekusSingleMode(GiesekusBase):
             return jnp.column_stack([G_prime, G_double_prime])
 
         elif mode == "startup":
-            gamma_dot = self._gamma_dot_applied
+            # Get gamma_dot from kwargs or instance attribute
+            gamma_dot = kwargs.get("gamma_dot") or self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return self._simulate_startup_internal(
@@ -302,7 +305,8 @@ class GiesekusSingleMode(GiesekusBase):
             )
 
         elif mode == "relaxation":
-            gamma_dot = self._gamma_dot_applied
+            # Get gamma_dot from kwargs or instance attribute
+            gamma_dot = kwargs.get("gamma_dot") or self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("relaxation mode requires gamma_dot (pre-shear rate)")
             return self._simulate_relaxation_internal(
@@ -310,7 +314,8 @@ class GiesekusSingleMode(GiesekusBase):
             )
 
         elif mode == "creep":
-            sigma_applied = self._sigma_applied
+            # Get sigma_applied from kwargs or instance attribute
+            sigma_applied = kwargs.get("sigma_applied") or self._sigma_applied
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
             return self._simulate_creep_internal(
@@ -318,10 +323,13 @@ class GiesekusSingleMode(GiesekusBase):
             )
 
         elif mode == "laos":
-            if self._gamma_0 is None or self._omega_laos is None:
+            # Get gamma_0 and omega from kwargs or instance attributes
+            gamma_0 = kwargs.get("gamma_0") or self._gamma_0
+            omega = kwargs.get("omega") or self._omega_laos
+            if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
-                X_jax, eta_p, lambda_1, alpha, self._gamma_0, self._omega_laos
+                X_jax, eta_p, lambda_1, alpha, gamma_0, omega
             )
             return stress
 
@@ -487,10 +495,17 @@ class GiesekusSingleMode(GiesekusBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
         )
 
         # Return τ_xy (index 2)
-        return sol.ys[:, 2]
+        result = sol.ys[:, 2]
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result),
+        )
+        return result
 
     def simulate_startup(
         self,
@@ -559,26 +574,49 @@ class GiesekusSingleMode(GiesekusBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
+        )
+
+        # Handle solver failures
+        tau_xx = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 0],
+            jnp.nan * jnp.ones_like(sol.ys[:, 0]),
+        )
+        tau_yy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 1],
+            jnp.nan * jnp.ones_like(sol.ys[:, 1]),
+        )
+        tau_xy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 2],
+            jnp.nan * jnp.ones_like(sol.ys[:, 2]),
+        )
+        tau_zz = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 3],
+            jnp.nan * jnp.ones_like(sol.ys[:, 3]),
         )
 
         # Store trajectory for debugging
         self._trajectory = {
             "t": np.asarray(t_jax),
-            "tau_xx": np.asarray(sol.ys[:, 0]),
-            "tau_yy": np.asarray(sol.ys[:, 1]),
-            "tau_xy": np.asarray(sol.ys[:, 2]),
-            "tau_zz": np.asarray(sol.ys[:, 3]),
+            "tau_xx": np.asarray(tau_xx),
+            "tau_yy": np.asarray(tau_yy),
+            "tau_xy": np.asarray(tau_xy),
+            "tau_zz": np.asarray(tau_zz),
         }
 
         if return_full:
             return (
-                np.asarray(sol.ys[:, 0]),
-                np.asarray(sol.ys[:, 1]),
-                np.asarray(sol.ys[:, 2]),
-                np.asarray(sol.ys[:, 3]),
+                np.asarray(tau_xx),
+                np.asarray(tau_yy),
+                np.asarray(tau_xy),
+                np.asarray(tau_zz),
             )
 
-        return np.asarray(sol.ys[:, 2])
+        return np.asarray(tau_xy)
 
     def _simulate_relaxation_internal(
         self,
@@ -624,9 +662,16 @@ class GiesekusSingleMode(GiesekusBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
         )
 
-        return sol.ys[:, 2]  # τ_xy
+        result = sol.ys[:, 2]  # τ_xy
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result),
+        )
+        return result
 
     def simulate_relaxation(
         self,
@@ -689,25 +734,48 @@ class GiesekusSingleMode(GiesekusBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
+        )
+
+        # Handle solver failures
+        tau_xx = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 0],
+            jnp.nan * jnp.ones_like(sol.ys[:, 0]),
+        )
+        tau_yy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 1],
+            jnp.nan * jnp.ones_like(sol.ys[:, 1]),
+        )
+        tau_xy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 2],
+            jnp.nan * jnp.ones_like(sol.ys[:, 2]),
+        )
+        tau_zz = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 3],
+            jnp.nan * jnp.ones_like(sol.ys[:, 3]),
         )
 
         self._trajectory = {
             "t": np.asarray(t_jax),
-            "tau_xx": np.asarray(sol.ys[:, 0]),
-            "tau_yy": np.asarray(sol.ys[:, 1]),
-            "tau_xy": np.asarray(sol.ys[:, 2]),
-            "tau_zz": np.asarray(sol.ys[:, 3]),
+            "tau_xx": np.asarray(tau_xx),
+            "tau_yy": np.asarray(tau_yy),
+            "tau_xy": np.asarray(tau_xy),
+            "tau_zz": np.asarray(tau_zz),
         }
 
         if return_full:
             return (
-                np.asarray(sol.ys[:, 0]),
-                np.asarray(sol.ys[:, 1]),
-                np.asarray(sol.ys[:, 2]),
-                np.asarray(sol.ys[:, 3]),
+                np.asarray(tau_xx),
+                np.asarray(tau_yy),
+                np.asarray(tau_xy),
+                np.asarray(tau_zz),
             )
 
-        return np.asarray(sol.ys[:, 2])
+        return np.asarray(tau_xy)
 
     def _simulate_creep_internal(
         self,
@@ -762,9 +830,16 @@ class GiesekusSingleMode(GiesekusBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
         )
 
-        return sol.ys[:, 4]  # γ (strain)
+        result = sol.ys[:, 4]  # γ (strain)
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result),
+        )
+        return result
 
     def simulate_creep(
         self,
@@ -833,10 +908,23 @@ class GiesekusSingleMode(GiesekusBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
         )
 
-        gamma = np.asarray(sol.ys[:, 4])
-        tau_xy = np.asarray(sol.ys[:, 2])
+        # Handle solver failures
+        gamma_result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 4],
+            jnp.nan * jnp.ones_like(sol.ys[:, 4]),
+        )
+        tau_xy_result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 2],
+            jnp.nan * jnp.ones_like(sol.ys[:, 2]),
+        )
+
+        gamma = np.asarray(gamma_result)
+        tau_xy = np.asarray(tau_xy_result)
 
         self._trajectory = {
             "t": np.asarray(t_jax),
@@ -904,11 +992,19 @@ class GiesekusSingleMode(GiesekusBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
+        )
+
+        # Handle solver failures
+        stress_result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 2],
+            jnp.nan * jnp.ones_like(sol.ys[:, 2]),
         )
 
         # Strain and stress
         strain = gamma_0 * jnp.sin(omega * t)
-        stress = sol.ys[:, 2]  # τ_xy
+        stress = stress_result  # τ_xy
 
         return strain, stress
 

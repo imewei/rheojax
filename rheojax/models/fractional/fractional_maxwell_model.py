@@ -193,22 +193,31 @@ class FractionalMaxwellModel(BaseModel):
         # Compute safe values
         t_safe = jnp.maximum(t, epsilon)
         tau_safe = jnp.maximum(tau, epsilon)
+        c1_safe = jnp.maximum(c1, epsilon)
 
         # For general FMM, creep is more complex
         # Approximate using J(t) ≈ (1/c1) t^α E_{α,1+α}((t/τ)^β)
-        z = (t_safe / tau_safe) ** beta_safe
+        # Limit the argument to prevent overflow
+        z_raw = (t_safe / tau_safe) ** beta_safe
+        z = jnp.minimum(z_raw, 50.0)  # Limit argument to prevent ML overflow
 
         # Compute E_{α,1+α}(z) (requires concrete alpha/beta)
         ml_alpha = alpha_safe
         ml_beta = 1.0 + alpha_safe
         ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
 
+        # Limit ML value to prevent overflow
+        ml_value_safe = jnp.minimum(ml_value, 1e15)
+
         # Creep compliance
-        J_t = (1.0 / c1) * (t_safe**alpha_safe) * ml_value
+        J_t = (1.0 / c1_safe) * (t_safe**alpha_safe) * ml_value_safe
+
+        # Clip to reasonable range for compliance values
+        J_t_clipped = jnp.clip(J_t, epsilon, 1e10)
 
         # Ensure monotonicity: creep compliance must increase with time
         # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
-        J_t_monotonic = jnp.maximum.accumulate(J_t)
+        J_t_monotonic = jnp.maximum.accumulate(J_t_clipped)
 
         return J_t_monotonic
 
@@ -317,6 +326,50 @@ class FractionalMaxwellModel(BaseModel):
                 except Exception as e:
                     logger.debug(
                         "Smart initialization failed, using defaults",
+                        error=str(e),
+                    )
+
+            # Smart initialization for creep/relaxation mode
+            elif test_mode in ("creep", "relaxation"):
+                try:
+                    x_np = np.asarray(X) if not isinstance(X, np.ndarray) else X
+                    y_np = np.asarray(y) if not isinstance(y, np.ndarray) else y
+                    y_real = np.abs(y_np) if np.iscomplexobj(y_np) else y_np
+
+                    # Filter valid data points
+                    valid = (x_np > 0) & (y_real > 0) & np.isfinite(y_real)
+                    if np.sum(valid) >= 2:
+                        x_valid = x_np[valid]
+                        y_valid = y_real[valid]
+
+                        # tau: geometric mean of time range (characteristic time)
+                        tau_init = np.sqrt(x_valid.min() * x_valid.max())
+
+                        if test_mode == "creep":
+                            # For creep: J(t) ~ 1/c1, so c1 ~ 1/J_mid
+                            y_mid = np.sqrt(y_valid.min() * y_valid.max())
+                            c1_init = 1.0 / y_mid
+                        else:
+                            # For relaxation: G(t) ~ c1
+                            c1_init = np.sqrt(y_valid.min() * y_valid.max())
+
+                        # Clip to parameter bounds
+                        c1_bounds = self.parameters.get("c1").bounds
+                        tau_bounds = self.parameters.get("tau").bounds
+                        c1_init = np.clip(c1_init, c1_bounds[0], c1_bounds[1])
+                        tau_init = np.clip(tau_init, tau_bounds[0], tau_bounds[1])
+
+                        self.parameters.set_value("c1", float(c1_init))
+                        self.parameters.set_value("tau", float(tau_init))
+
+                        logger.debug(
+                            f"Smart initialization applied for {test_mode} mode",
+                            c1=c1_init,
+                            tau=tau_init,
+                        )
+                except Exception as e:
+                    logger.debug(
+                        f"Smart initialization failed for {test_mode} mode, using defaults",
                         error=str(e),
                     )
 

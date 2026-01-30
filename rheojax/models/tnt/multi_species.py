@@ -340,7 +340,8 @@ class TNTMultiSpecies(TNTBase):
         x : array-like
             Independent variable
         **kwargs
-            Additional arguments including test_mode
+            Additional arguments including test_mode, gamma_dot, sigma_applied,
+            gamma_0, omega
 
         Returns
         -------
@@ -350,6 +351,16 @@ class TNTMultiSpecies(TNTBase):
         test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
+        # Extract and store protocol-specific parameters from kwargs
+        if "gamma_dot" in kwargs:
+            self._gamma_dot_applied = kwargs["gamma_dot"]
+        if "sigma_applied" in kwargs:
+            self._sigma_applied = kwargs["sigma_applied"]
+        if "gamma_0" in kwargs:
+            self._gamma_0 = kwargs["gamma_0"]
+        if "omega" in kwargs:
+            self._omega_laos = kwargs["omega"]
+
         # Build parameter array from ParameterSet (ordering: G_0, tau_b_0, ..., eta_s)
         param_values = [
             float(self.parameters.get_value(name)) for name in self.parameters.keys()
@@ -357,7 +368,7 @@ class TNTMultiSpecies(TNTBase):
         params = jnp.array(param_values)
         return self.model_function(x_jax, params, test_mode=test_mode)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
 
         Routes to appropriate prediction based on test_mode. This is the
@@ -387,6 +398,12 @@ class TNTMultiSpecies(TNTBase):
         eta_s = params[2 * N]
 
         mode = test_mode or self._test_mode or "flow_curve"
+        # Extract protocol parameters from kwargs or fall back to instance attributes
+        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
+        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
+        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
+        omega = kwargs.get("omega", self._omega_laos)
+
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:
@@ -399,7 +416,6 @@ class TNTMultiSpecies(TNTBase):
             return jnp.sqrt(G_prime**2 + G_double_prime**2)
 
         elif mode == "startup":
-            gamma_dot = self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return self._simulate_startup_internal(
@@ -407,7 +423,6 @@ class TNTMultiSpecies(TNTBase):
             )
 
         elif mode == "relaxation":
-            gamma_dot = self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("relaxation mode requires gamma_dot (pre-shear rate)")
             return self._simulate_relaxation_internal(
@@ -415,7 +430,6 @@ class TNTMultiSpecies(TNTBase):
             )
 
         elif mode == "creep":
-            sigma_applied = self._sigma_applied
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
             return self._simulate_creep_internal(
@@ -423,7 +437,7 @@ class TNTMultiSpecies(TNTBase):
             )
 
         elif mode == "laos":
-            if self._gamma_0 is None or self._omega_laos is None:
+            if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
                 X_jax, G_modes, tau_modes, eta_s, self._gamma_0, self._omega_laos
@@ -643,6 +657,7 @@ class TNTMultiSpecies(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         # Extract S_xy_i for each mode (index 3, 7, 11, ...)
@@ -650,6 +665,11 @@ class TNTMultiSpecies(TNTBase):
 
         # Total stress: σ = Σ G_i·S_xy_i + η_s·γ̇
         sigma = jnp.sum(G_modes[None, :] * S_xy_modes, axis=1) + eta_s * gamma_dot
+        sigma = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sigma,
+            jnp.nan * jnp.ones_like(sigma),
+        )
         return sigma
 
     def _simulate_relaxation_internal(
@@ -784,9 +804,16 @@ class TNTMultiSpecies(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
-        return sol.ys[:, -1]  # γ (last component)
+        result = sol.ys[:, -1]  # γ (last component)
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result),
+        )
+        return result
 
     def _simulate_laos_internal(
         self,
@@ -860,6 +887,7 @@ class TNTMultiSpecies(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         # Extract S_xy_i for each mode
@@ -869,6 +897,18 @@ class TNTMultiSpecies(TNTBase):
         strain = gamma_0 * jnp.sin(omega * t)
         gamma_dot_t = gamma_0 * omega * jnp.cos(omega * t)
         stress = jnp.sum(G_modes[None, :] * S_xy_modes, axis=1) + eta_s * gamma_dot_t
+
+        # Handle solver failures
+        strain = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            strain,
+            jnp.nan * jnp.ones_like(strain),
+        )
+        stress = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            stress,
+            jnp.nan * jnp.ones_like(stress),
+        )
 
         return strain, stress
 
@@ -931,6 +971,7 @@ class TNTMultiSpecies(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         # Extract mode components: S_xx_i at indices 0,4,8,...
@@ -938,6 +979,28 @@ class TNTMultiSpecies(TNTBase):
         S_yy_modes = sol.ys[:, 1::4]
         S_zz_modes = sol.ys[:, 2::4]
         S_xy_modes = sol.ys[:, 3::4]
+
+        # Handle solver failures
+        S_xx_modes = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            S_xx_modes,
+            jnp.nan * jnp.ones_like(S_xx_modes),
+        )
+        S_yy_modes = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            S_yy_modes,
+            jnp.nan * jnp.ones_like(S_yy_modes),
+        )
+        S_zz_modes = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            S_zz_modes,
+            jnp.nan * jnp.ones_like(S_zz_modes),
+        )
+        S_xy_modes = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            S_xy_modes,
+            jnp.nan * jnp.ones_like(S_xy_modes),
+        )
 
         self._trajectory = {
             "t": np.asarray(t_jax),
@@ -1075,9 +1138,16 @@ class TNTMultiSpecies(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
-        gamma = np.asarray(sol.ys[:, -1])
+        gamma_jax = sol.ys[:, -1]
+        gamma_jax = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            gamma_jax,
+            jnp.nan * jnp.ones_like(gamma_jax),
+        )
+        gamma = np.asarray(gamma_jax)
 
         self._trajectory = {
             "t": np.asarray(t_jax),
@@ -1086,6 +1156,11 @@ class TNTMultiSpecies(TNTBase):
 
         if return_rate:
             S_xy_modes = sol.ys[:, 3::4]
+            S_xy_modes = jnp.where(
+                sol.result == diffrax.RESULTS.successful,
+                S_xy_modes,
+                jnp.nan * jnp.ones_like(S_xy_modes),
+            )
             sigma_elastic = jnp.sum(G_modes[None, :] * S_xy_modes, axis=1)
             eta_s_reg = max(self.eta_s, 1e-10 * float(jnp.max(G_modes * tau_modes)))
             gamma_dot = (sigma_applied - sigma_elastic) / eta_s_reg

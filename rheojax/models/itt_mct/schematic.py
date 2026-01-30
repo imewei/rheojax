@@ -1130,64 +1130,40 @@ class ITTMCTSchematic(ITTMCTBase):
     def model_function(
         self,
         X: np.ndarray,
-        v1: float,
-        v2: float,
-        Gamma: float,
-        gamma_c: float,
-        G_inf: float,
+        params: np.ndarray,
         test_mode: str = "flow_curve",
         **kwargs,
     ) -> np.ndarray:
         """Static model function for Bayesian inference.
 
-        This function allows the model to be used with NumPyro sampling
-        by accepting parameters as arguments.
+        NOTE: Bayesian inference is not yet supported for ITT-MCT models.
+        The Prony decomposition depends on parameters (v1, v2) and would need
+        to be recomputed for each MCMC sample, which is computationally prohibitive.
+
+        Use NLSQ fitting with bootstrap resampling for uncertainty quantification.
 
         Parameters
         ----------
         X : np.ndarray
             Independent variable
-        v1, v2, Gamma, gamma_c, G_inf : float
-            Model parameters
+        params : np.ndarray
+            Parameter array [v1, v2, Gamma, gamma_c, G_inf] in parameter order
         test_mode : str, default "flow_curve"
             Protocol type
         **kwargs
             Additional protocol-specific parameters
 
-        Returns
-        -------
-        np.ndarray
-            Model predictions
+        Raises
+        ------
+        NotImplementedError
+            Always raised - Bayesian inference not supported for ITT-MCT models
         """
-        # Temporarily set parameters
-        old_values = {
-            "v1": self.parameters.get_value("v1"),
-            "v2": self.parameters.get_value("v2"),
-            "Gamma": self.parameters.get_value("Gamma"),
-            "gamma_c": self.parameters.get_value("gamma_c"),
-            "G_inf": self.parameters.get_value("G_inf"),
-        }
-
-        self.parameters.set_value("v1", v1)
-        self.parameters.set_value("v2", v2)
-        self.parameters.set_value("Gamma", Gamma)
-        self.parameters.set_value("gamma_c", gamma_c)
-        self.parameters.set_value("G_inf", G_inf)
-
-        # Reset Prony modes for new parameters
-        self._prony_amplitudes = None
-        self._prony_times = None
-
-        try:
-            result = self._predict(X, test_mode=test_mode, **kwargs)
-        finally:
-            # Restore original values
-            for name, value in old_values.items():
-                self.parameters.set_value(name, value)
-            self._prony_amplitudes = None
-            self._prony_times = None
-
-        return result
+        raise NotImplementedError(
+            "Bayesian inference is not yet supported for ITT-MCT models. "
+            "The model requires Prony decomposition that depends on parameters "
+            "(v1, v2), making MCMC sampling computationally prohibitive. "
+            "Use NLSQ fitting with bootstrap resampling for uncertainty quantification."
+        )
 
     def precompile(self) -> float:
         """Pre-compile the diffrax ODE solver for fast subsequent calls.

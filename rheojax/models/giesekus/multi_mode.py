@@ -395,7 +395,7 @@ class GiesekusMultiMode(BaseModel):
 
         return self.model_function(x_jax, params, test_mode=test_mode)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
 
         Parameters
@@ -406,6 +406,8 @@ class GiesekusMultiMode(BaseModel):
             All parameter values in order
         test_mode : str, optional
             Override stored test mode
+        **kwargs : dict
+            Protocol-specific arguments (gamma_dot, sigma_applied, etc.)
 
         Returns
         -------
@@ -435,7 +437,8 @@ class GiesekusMultiMode(BaseModel):
             )
 
         elif mode == "startup":
-            gamma_dot = self._gamma_dot_applied
+            # Get gamma_dot from kwargs or instance attribute
+            gamma_dot = kwargs.get("gamma_dot") or self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return self._simulate_startup_internal(
@@ -620,6 +623,7 @@ class GiesekusMultiMode(BaseModel):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
         )
 
         # Sum τ_xy from all modes (index 2 in each mode's 4-element block)
@@ -629,6 +633,13 @@ class GiesekusMultiMode(BaseModel):
 
         # Add solvent contribution
         total_stress = tau_xy_total + self.eta_s * gamma_dot
+
+        # Handle solver failures
+        total_stress = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            total_stress,
+            jnp.nan * jnp.ones_like(total_stress),
+        )
 
         return total_stress
 
@@ -698,6 +709,7 @@ class GiesekusMultiMode(BaseModel):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100_000,
+            throw=False,
         )
 
         if return_full:
@@ -709,7 +721,15 @@ class GiesekusMultiMode(BaseModel):
                 result[f"tau_xy_{i}"] = tau_xy_i
                 tau_xy_total += tau_xy_i
 
-            result["tau_xy_total"] = tau_xy_total + self.eta_s * gamma_dot
+            tau_xy_total_final = tau_xy_total + self.eta_s * gamma_dot
+
+            # Handle solver failures
+            tau_xy_total_final = np.where(
+                sol.result == diffrax.RESULTS.successful,
+                tau_xy_total_final,
+                np.nan * np.ones_like(tau_xy_total_final),
+            )
+            result["tau_xy_total"] = tau_xy_total_final
             return result
 
         # Sum τ_xy from all modes
@@ -717,7 +737,16 @@ class GiesekusMultiMode(BaseModel):
         for i in range(self._n_modes):
             tau_xy_total += np.asarray(sol.ys[:, 4 * i + 2])
 
-        return tau_xy_total + self.eta_s * gamma_dot
+        total_stress = tau_xy_total + self.eta_s * gamma_dot
+
+        # Handle solver failures
+        total_stress = np.where(
+            sol.result == diffrax.RESULTS.successful,
+            total_stress,
+            np.nan * np.ones_like(total_stress),
+        )
+
+        return total_stress
 
     # =========================================================================
     # Analysis Methods

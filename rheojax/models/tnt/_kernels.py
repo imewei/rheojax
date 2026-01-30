@@ -404,9 +404,7 @@ def tnt_base_steady_n1(gamma_dot: float, G: float, tau_b: float) -> float:
     return 2.0 * G * wi * wi
 
 
-tnt_base_steady_n1_vec = jax.jit(
-    jax.vmap(tnt_base_steady_n1, in_axes=(0, None, None))
-)
+tnt_base_steady_n1_vec = jax.jit(jax.vmap(tnt_base_steady_n1, in_axes=(0, None, None)))
 
 
 # =============================================================================
@@ -449,9 +447,7 @@ def tnt_saos_moduli(
     return G_prime, G_double_prime
 
 
-tnt_saos_moduli_vec = jax.jit(
-    jax.vmap(tnt_saos_moduli, in_axes=(0, None, None, None))
-)
+tnt_saos_moduli_vec = jax.jit(jax.vmap(tnt_saos_moduli, in_axes=(0, None, None, None)))
 
 
 @jax.jit
@@ -872,9 +868,7 @@ def build_tnt_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
                 S_xx, S_yy, S_zz, S_xy, gamma_dot, xi
             )
         else:
-            conv_xx, conv_yy, conv_xy = upper_convected_2d(
-                S_xx, S_yy, S_xy, gamma_dot
-            )
+            conv_xx, conv_yy, conv_xy = upper_convected_2d(S_xx, S_yy, S_xy, gamma_dot)
 
         # --- dS/dt = conv + g0*I - beta*S ---
         dS_xx = conv_xx + g0 - beta * S_xx
@@ -887,9 +881,7 @@ def build_tnt_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
     return ode_rhs
 
 
-def build_tnt_creep_ode_rhs(
-    breakage_type="constant", use_fene=False, use_gs=False
-):
+def build_tnt_creep_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
     """Build variant-specific creep ODE RHS (5-state: S + gamma).
 
     Stress is held constant; shear rate derived from stress constraint.
@@ -905,16 +897,23 @@ def build_tnt_creep_ode_rhs(
 
     @jax.jit
     def ode_rhs(
-        t, state, sigma_applied, G, tau_b, eta_s,
-        nu, m_break, kappa, L_max, xi,
+        t,
+        state,
+        sigma_applied,
+        G,
+        tau_b,
+        eta_s,
+        nu,
+        m_break,
+        kappa,
+        L_max,
+        xi,
     ):
         S_xx, S_yy, S_zz, S_xy, gamma = state
 
         # Elastic stress from conformation
         if use_fene:
-            sigma_elastic = stress_fene_xy(
-                S_xx, S_yy, S_zz, S_xy, G, L_max
-            )
+            sigma_elastic = stress_fene_xy(S_xx, S_yy, S_zz, S_xy, G, L_max)
         else:
             sigma_elastic = stress_linear_xy(S_xy, G)
 
@@ -925,8 +924,16 @@ def build_tnt_creep_ode_rhs(
         # Conformation evolution
         conf_state = jnp.array([S_xx, S_yy, S_zz, S_xy])
         d_conf = rate_ode(
-            t, conf_state, gamma_dot, G, tau_b,
-            nu, m_break, kappa, L_max, xi,
+            t,
+            conf_state,
+            gamma_dot,
+            G,
+            tau_b,
+            nu,
+            m_break,
+            kappa,
+            L_max,
+            xi,
         )
 
         return jnp.concatenate([d_conf, jnp.array([gamma_dot])])
@@ -934,9 +941,7 @@ def build_tnt_creep_ode_rhs(
     return ode_rhs
 
 
-def build_tnt_laos_ode_rhs(
-    breakage_type="constant", use_fene=False, use_gs=False
-):
+def build_tnt_laos_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
     """Build variant-specific LAOS ODE RHS.
 
     Oscillatory shear: gamma_dot(t) = gamma_0 * omega * cos(omega * t).
@@ -951,13 +956,30 @@ def build_tnt_laos_ode_rhs(
 
     @jax.jit
     def ode_rhs(
-        t, state, gamma_0, omega, G, tau_b,
-        nu, m_break, kappa, L_max, xi,
+        t,
+        state,
+        gamma_0,
+        omega,
+        G,
+        tau_b,
+        nu,
+        m_break,
+        kappa,
+        L_max,
+        xi,
     ):
         gamma_dot = gamma_0 * omega * jnp.cos(omega * t)
         return rate_ode(
-            t, state, gamma_dot, G, tau_b,
-            nu, m_break, kappa, L_max, xi,
+            t,
+            state,
+            gamma_dot,
+            G,
+            tau_b,
+            nu,
+            m_break,
+            kappa,
+            L_max,
+            xi,
         )
 
     return ode_rhs
@@ -979,8 +1001,16 @@ def build_tnt_relaxation_ode_rhs(
     @jax.jit
     def ode_rhs(t, state, G, tau_b, nu, m_break, kappa, L_max, xi):
         return rate_ode(
-            t, state, 0.0, G, tau_b,
-            nu, m_break, kappa, L_max, xi,
+            t,
+            state,
+            0.0,
+            G,
+            tau_b,
+            nu,
+            m_break,
+            kappa,
+            L_max,
+            xi,
         )
 
     return ode_rhs

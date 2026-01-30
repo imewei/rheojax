@@ -59,9 +59,9 @@ from typing import Literal
 import diffrax
 import numpy as np
 
+from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
-from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
@@ -335,9 +335,7 @@ class TNTSingleMode(TNTBase):
         use_fene = self._stress_type == "fene"
         use_gs = self._xi > 0
 
-        self._variant_ode = build_tnt_ode_rhs(
-            self._breakage, use_fene, use_gs
-        )
+        self._variant_ode = build_tnt_ode_rhs(self._breakage, use_fene, use_gs)
         self._variant_creep_ode = build_tnt_creep_ode_rhs(
             self._breakage, use_fene, use_gs
         )
@@ -474,9 +472,7 @@ class TNTSingleMode(TNTBase):
 
         # Smart initialization based on protocol
         if test_mode in ["flow_curve", "steady_shear", "rotation"]:
-            self.initialize_from_flow_curve(
-                np.asarray(x), np.asarray(y)
-            )
+            self.initialize_from_flow_curve(np.asarray(x), np.asarray(y))
         elif test_mode == "oscillation":
             self.initialize_from_saos(
                 np.asarray(x), np.real(np.asarray(y)), np.imag(np.asarray(y))
@@ -522,7 +518,8 @@ class TNTSingleMode(TNTBase):
         x : array-like
             Independent variable
         **kwargs
-            Additional arguments including test_mode
+            Additional arguments including test_mode, gamma_dot, sigma_applied,
+            gamma_0, omega
 
         Returns
         -------
@@ -532,15 +529,24 @@ class TNTSingleMode(TNTBase):
         test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
+        # Extract and store protocol-specific parameters from kwargs
+        if "gamma_dot" in kwargs:
+            self._gamma_dot_applied = kwargs["gamma_dot"]
+        if "sigma_applied" in kwargs:
+            self._sigma_applied = kwargs["sigma_applied"]
+        if "gamma_0" in kwargs:
+            self._gamma_0 = kwargs["gamma_0"]
+        if "omega" in kwargs:
+            self._omega_laos = kwargs["omega"]
+
         # Build parameter array from ParameterSet (ordering matters)
         param_values = [
-            float(self.parameters.get_value(name))
-            for name in self.parameters.keys()
+            float(self.parameters.get_value(name)) for name in self.parameters.keys()
         ]
         params = jnp.array(param_values)
         return self.model_function(x_jax, params, test_mode=test_mode)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
 
         Routes to appropriate prediction based on test_mode. This is the
@@ -555,6 +561,8 @@ class TNTSingleMode(TNTBase):
             Parameter values in ParameterSet order: [G, tau_b, eta_s, ...]
         test_mode : str, optional
             Override stored test mode
+        **kwargs
+            Protocol-specific parameters: gamma_dot, sigma_applied, gamma_0, omega
 
         Returns
         -------
@@ -572,22 +580,23 @@ class TNTSingleMode(TNTBase):
         mode = test_mode or self._test_mode or "flow_curve"
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
+        # Extract protocol parameters from kwargs or fall back to instance attributes
+        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
+        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
+        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
+        omega = kwargs.get("omega", self._omega_laos)
+
         if mode in ["flow_curve", "steady_shear", "rotation"]:
             if self._is_basic:
                 return tnt_base_steady_stress_vec(X_jax, G, tau_b, eta_s)
-            return self._variant_flow_curve_internal(
-                X_jax, G, tau_b, eta_s, vp
-            )
+            return self._variant_flow_curve_internal(X_jax, G, tau_b, eta_s, vp)
 
         elif mode == "oscillation":
             # All TNT variants linearize to Maxwell in SAOS
-            G_prime, G_double_prime = tnt_saos_moduli_vec(
-                X_jax, G, tau_b, eta_s
-            )
+            G_prime, G_double_prime = tnt_saos_moduli_vec(X_jax, G, tau_b, eta_s)
             return jnp.sqrt(G_prime**2 + G_double_prime**2)
 
         elif mode == "startup":
-            gamma_dot = self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return self._simulate_startup_internal(
@@ -595,17 +604,13 @@ class TNTSingleMode(TNTBase):
             )
 
         elif mode == "relaxation":
-            gamma_dot = self._gamma_dot_applied
             if gamma_dot is None:
-                raise ValueError(
-                    "relaxation mode requires gamma_dot (pre-shear rate)"
-                )
+                raise ValueError("relaxation mode requires gamma_dot (pre-shear rate)")
             return self._simulate_relaxation_internal(
                 X_jax, G, tau_b, eta_s, gamma_dot, vp
             )
 
         elif mode == "creep":
-            sigma_applied = self._sigma_applied
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
             return self._simulate_creep_internal(
@@ -613,22 +618,18 @@ class TNTSingleMode(TNTBase):
             )
 
         elif mode == "laos":
-            if self._gamma_0 is None or self._omega_laos is None:
+            if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
-                X_jax, G, tau_b, eta_s, self._gamma_0, self._omega_laos, vp
+                X_jax, G, tau_b, eta_s, gamma_0, omega, vp
             )
             return stress
 
         else:
-            logger.warning(
-                f"Unknown test_mode '{mode}', defaulting to flow_curve"
-            )
+            logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
             if self._is_basic:
                 return tnt_base_steady_stress_vec(X_jax, G, tau_b, eta_s)
-            return self._variant_flow_curve_internal(
-                X_jax, G, tau_b, eta_s, vp
-            )
+            return self._variant_flow_curve_internal(X_jax, G, tau_b, eta_s, vp)
 
     # =========================================================================
     # Variant Flow Curve (ODE-to-steady-state)
@@ -654,9 +655,16 @@ class TNTSingleMode(TNTBase):
         def solve_single(gdot):
             def ode_fn(ti, yi, args):
                 return variant_ode(
-                    ti, yi, args["gdot"], args["G"], args["tau_b"],
-                    args["nu"], args["m_break"], args["kappa"],
-                    args["L_max"], args["xi"],
+                    ti,
+                    yi,
+                    args["gdot"],
+                    args["G"],
+                    args["tau_b"],
+                    args["nu"],
+                    args["m_break"],
+                    args["kappa"],
+                    args["L_max"],
+                    args["xi"],
                 )
 
             args = {"gdot": gdot, "G": G, "tau_b": tau_b, **vp}
@@ -670,9 +678,17 @@ class TNTSingleMode(TNTBase):
             saveat = diffrax.SaveAt(ts=jnp.array([t_end]))
 
             sol = diffrax.diffeqsolve(
-                term, solver, 0.0, t_end, dt0, y0,
-                args=args, saveat=saveat,
-                stepsize_controller=controller, max_steps=500_000,
+                term,
+                solver,
+                0.0,
+                t_end,
+                dt0,
+                y0,
+                args=args,
+                saveat=saveat,
+                stepsize_controller=controller,
+                max_steps=500_000,
+                throw=False,
             )
 
             S_final = sol.ys[0]
@@ -684,7 +700,11 @@ class TNTSingleMode(TNTBase):
             else:
                 sigma_el = G * S_final[3]
 
-            return sigma_el + eta_s * gdot
+            result = sigma_el + eta_s * gdot
+            result = jnp.where(
+                sol.result == diffrax.RESULTS.successful, result, jnp.nan
+            )
+            return result
 
         return jax.vmap(solve_single)(gamma_dot_arr)
 
@@ -705,9 +725,16 @@ class TNTSingleMode(TNTBase):
         def solve_single(gdot):
             def ode_fn(ti, yi, args):
                 return variant_ode(
-                    ti, yi, args["gdot"], args["G"], args["tau_b"],
-                    args["nu"], args["m_break"], args["kappa"],
-                    args["L_max"], args["xi"],
+                    ti,
+                    yi,
+                    args["gdot"],
+                    args["G"],
+                    args["tau_b"],
+                    args["nu"],
+                    args["m_break"],
+                    args["kappa"],
+                    args["L_max"],
+                    args["xi"],
                 )
 
             args = {"gdot": gdot, "G": G, "tau_b": tau_b, **vp}
@@ -721,11 +748,25 @@ class TNTSingleMode(TNTBase):
             saveat = diffrax.SaveAt(ts=jnp.array([t_end]))
 
             sol = diffrax.diffeqsolve(
-                term, solver, 0.0, t_end, dt0, y0,
-                args=args, saveat=saveat,
-                stepsize_controller=controller, max_steps=500_000,
+                term,
+                solver,
+                0.0,
+                t_end,
+                dt0,
+                y0,
+                args=args,
+                saveat=saveat,
+                stepsize_controller=controller,
+                max_steps=500_000,
+                throw=False,
             )
-            return sol.ys[0]
+            result = sol.ys[0]
+            result = jnp.where(
+                sol.result == diffrax.RESULTS.successful,
+                result,
+                jnp.nan * jnp.ones_like(result),
+            )
+            return result
 
         return jax.vmap(solve_single)(gamma_dot_arr)
 
@@ -758,9 +799,7 @@ class TNTSingleMode(TNTBase):
         gd = jnp.asarray(gamma_dot, dtype=jnp.float64)
 
         if self._is_basic:
-            sigma = tnt_base_steady_stress_vec(
-                gd, self.G, self.tau_b, self.eta_s
-            )
+            sigma = tnt_base_steady_stress_vec(gd, self.G, self.tau_b, self.eta_s)
             if return_components:
                 eta = sigma / jnp.maximum(gd, 1e-20)
                 N1 = tnt_base_steady_n1_vec(gd, self.G, self.tau_b)
@@ -776,9 +815,7 @@ class TNTSingleMode(TNTBase):
         if return_components:
             eta = sigma / jnp.maximum(gd, 1e-20)
             # N1 from steady-state conformation
-            S_ss = self._variant_steady_conformation(
-                gd, self.G, self.tau_b, vp
-            )
+            S_ss = self._variant_steady_conformation(gd, self.G, self.tau_b, vp)
             if self._stress_type == "fene":
                 tr_S = S_ss[:, 0] + S_ss[:, 1] + S_ss[:, 2]
                 L2 = vp["L_max"] ** 2
@@ -814,9 +851,7 @@ class TNTSingleMode(TNTBase):
             (G', G'') if return_components=True, else |G*|
         """
         w = jnp.asarray(omega, dtype=jnp.float64)
-        G_prime, G_double_prime = tnt_saos_moduli_vec(
-            w, self.G, self.tau_b, self.eta_s
-        )
+        G_prime, G_double_prime = tnt_saos_moduli_vec(w, self.G, self.tau_b, self.eta_s)
 
         if return_components:
             return np.asarray(G_prime), np.asarray(G_double_prime)
@@ -853,9 +888,7 @@ class TNTSingleMode(TNTBase):
 
         # Variant: compute from steady-state conformation
         vp = self._get_variant_args()
-        S_ss = self._variant_steady_conformation(
-            gd, self.G, self.tau_b, vp
-        )
+        S_ss = self._variant_steady_conformation(gd, self.G, self.tau_b, vp)
 
         if self._stress_type == "fene":
             tr_S = S_ss[:, 0] + S_ss[:, 1] + S_ss[:, 2]
@@ -887,16 +920,22 @@ class TNTSingleMode(TNTBase):
         Returns total shear stress σ_xy(t).
         """
         if vp is None:
-            vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0,
-                  "L_max": 10.0, "xi": 0.0}
+            vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0, "L_max": 10.0, "xi": 0.0}
 
         variant_ode = self._variant_ode
 
         def ode_fn(ti, yi, args):
             return variant_ode(
-                ti, yi, args["gamma_dot"], args["G"], args["tau_b"],
-                args["nu"], args["m_break"], args["kappa"],
-                args["L_max"], args["xi"],
+                ti,
+                yi,
+                args["gamma_dot"],
+                args["G"],
+                args["tau_b"],
+                args["nu"],
+                args["m_break"],
+                args["kappa"],
+                args["L_max"],
+                args["xi"],
             )
 
         args = {"gamma_dot": gamma_dot, "G": G, "tau_b": tau_b, **vp}
@@ -913,16 +952,35 @@ class TNTSingleMode(TNTBase):
         saveat = diffrax.SaveAt(ts=t)
 
         sol = diffrax.diffeqsolve(
-            term, solver, t0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
-        return self._compute_stress_from_conformation(
-            sol.ys[:, 0], sol.ys[:, 1], sol.ys[:, 2], sol.ys[:, 3],
-            G, eta_s, gamma_dot, vp,
+        result = self._compute_stress_from_conformation(
+            sol.ys[:, 0],
+            sol.ys[:, 1],
+            sol.ys[:, 2],
+            sol.ys[:, 3],
+            G,
+            eta_s,
+            gamma_dot,
+            vp,
         )
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result),
+        )
+        return result
 
     def _simulate_relaxation_internal(
         self,
@@ -939,8 +997,7 @@ class TNTSingleMode(TNTBase):
         For non-constant breakage, uses ODE integration.
         """
         if vp is None:
-            vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0,
-                  "L_max": 10.0, "xi": 0.0}
+            vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0, "L_max": 10.0, "xi": 0.0}
 
         if self._breakage == "constant" and self._stress_type == "linear":
             # Analytical: σ(t) = G·τ_b·γ̇·exp(-t/τ_b)
@@ -958,9 +1015,15 @@ class TNTSingleMode(TNTBase):
 
         def ode_fn(ti, yi, args):
             return variant_relax_ode(
-                ti, yi, args["G"], args["tau_b"],
-                args["nu"], args["m_break"], args["kappa"],
-                args["L_max"], args["xi"],
+                ti,
+                yi,
+                args["G"],
+                args["tau_b"],
+                args["nu"],
+                args["m_break"],
+                args["kappa"],
+                args["L_max"],
+                args["xi"],
             )
 
         args = {"G": G, "tau_b": tau_b, **vp}
@@ -976,16 +1039,35 @@ class TNTSingleMode(TNTBase):
         saveat = diffrax.SaveAt(ts=t)
 
         sol = diffrax.diffeqsolve(
-            term, solver, t0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
-        return self._compute_stress_from_conformation(
-            sol.ys[:, 0], sol.ys[:, 1], sol.ys[:, 2], sol.ys[:, 3],
-            G, eta_s, 0.0, vp,
+        result = self._compute_stress_from_conformation(
+            sol.ys[:, 0],
+            sol.ys[:, 1],
+            sol.ys[:, 2],
+            sol.ys[:, 3],
+            G,
+            eta_s,
+            0.0,
+            vp,
         )
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result),
+        )
+        return result
 
     def _simulate_creep_internal(
         self,
@@ -1001,21 +1083,30 @@ class TNTSingleMode(TNTBase):
         Returns accumulated strain γ(t).
         """
         if vp is None:
-            vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0,
-                  "L_max": 10.0, "xi": 0.0}
+            vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0, "L_max": 10.0, "xi": 0.0}
 
         variant_creep_ode = self._variant_creep_ode
 
         def ode_fn(ti, yi, args):
             return variant_creep_ode(
-                ti, yi, args["sigma_applied"], args["G"], args["tau_b"],
-                args["eta_s"], args["nu"], args["m_break"],
-                args["kappa"], args["L_max"], args["xi"],
+                ti,
+                yi,
+                args["sigma_applied"],
+                args["G"],
+                args["tau_b"],
+                args["eta_s"],
+                args["nu"],
+                args["m_break"],
+                args["kappa"],
+                args["L_max"],
+                args["xi"],
             )
 
         args = {
             "sigma_applied": sigma_applied,
-            "G": G, "tau_b": tau_b, "eta_s": eta_s,
+            "G": G,
+            "tau_b": tau_b,
+            "eta_s": eta_s,
             **vp,
         }
         y0 = jnp.array([1.0, 1.0, 1.0, 0.0, 0.0], dtype=jnp.float64)
@@ -1031,13 +1122,26 @@ class TNTSingleMode(TNTBase):
         saveat = diffrax.SaveAt(ts=t)
 
         sol = diffrax.diffeqsolve(
-            term, solver, t0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
-        return sol.ys[:, 4]  # γ (strain)
+        result = sol.ys[:, 4]  # γ (strain)
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result),
+        )
+        return result
 
     def _simulate_laos_internal(
         self,
@@ -1054,22 +1158,30 @@ class TNTSingleMode(TNTBase):
         Returns (strain, stress) arrays.
         """
         if vp is None:
-            vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0,
-                  "L_max": 10.0, "xi": 0.0}
+            vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0, "L_max": 10.0, "xi": 0.0}
 
         variant_laos_ode = self._variant_laos_ode
 
         def ode_fn(ti, yi, args):
             return variant_laos_ode(
-                ti, yi, args["gamma_0"], args["omega"],
-                args["G"], args["tau_b"],
-                args["nu"], args["m_break"], args["kappa"],
-                args["L_max"], args["xi"],
+                ti,
+                yi,
+                args["gamma_0"],
+                args["omega"],
+                args["G"],
+                args["tau_b"],
+                args["nu"],
+                args["m_break"],
+                args["kappa"],
+                args["L_max"],
+                args["xi"],
             )
 
         args = {
-            "gamma_0": gamma_0, "omega": omega,
-            "G": G, "tau_b": tau_b,
+            "gamma_0": gamma_0,
+            "omega": omega,
+            "G": G,
+            "tau_b": tau_b,
             **vp,
         }
         y0 = jnp.array([1.0, 1.0, 1.0, 0.0], dtype=jnp.float64)
@@ -1085,17 +1197,35 @@ class TNTSingleMode(TNTBase):
         saveat = diffrax.SaveAt(ts=t)
 
         sol = diffrax.diffeqsolve(
-            term, solver, t0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         strain = gamma_0 * jnp.sin(omega * t)
         gamma_dot_t = gamma_0 * omega * jnp.cos(omega * t)
         stress = self._compute_stress_from_conformation(
-            sol.ys[:, 0], sol.ys[:, 1], sol.ys[:, 2], sol.ys[:, 3],
-            G, eta_s, gamma_dot_t, vp,
+            sol.ys[:, 0],
+            sol.ys[:, 1],
+            sol.ys[:, 2],
+            sol.ys[:, 3],
+            G,
+            eta_s,
+            gamma_dot_t,
+            vp,
+        )
+        stress = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            stress,
+            jnp.nan * jnp.ones_like(stress),
         )
 
         return strain, stress
@@ -1132,13 +1262,22 @@ class TNTSingleMode(TNTBase):
 
         def ode_fn(ti, yi, args):
             return variant_ode(
-                ti, yi, args["gamma_dot"], args["G"], args["tau_b"],
-                args["nu"], args["m_break"], args["kappa"],
-                args["L_max"], args["xi"],
+                ti,
+                yi,
+                args["gamma_dot"],
+                args["G"],
+                args["tau_b"],
+                args["nu"],
+                args["m_break"],
+                args["kappa"],
+                args["L_max"],
+                args["xi"],
             )
 
         args = {
-            "gamma_dot": gamma_dot, "G": self.G, "tau_b": self.tau_b,
+            "gamma_dot": gamma_dot,
+            "G": self.G,
+            "tau_b": self.tau_b,
             **vp,
         }
         y0 = jnp.array([1.0, 1.0, 1.0, 0.0], dtype=jnp.float64)
@@ -1154,32 +1293,66 @@ class TNTSingleMode(TNTBase):
         saveat = diffrax.SaveAt(ts=t_jax)
 
         sol = diffrax.diffeqsolve(
-            term, solver, t0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
+        )
+
+        S_xx = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 0],
+            jnp.nan * jnp.ones_like(sol.ys[:, 0]),
+        )
+        S_yy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 1],
+            jnp.nan * jnp.ones_like(sol.ys[:, 1]),
+        )
+        S_zz = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 2],
+            jnp.nan * jnp.ones_like(sol.ys[:, 2]),
+        )
+        S_xy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 3],
+            jnp.nan * jnp.ones_like(sol.ys[:, 3]),
         )
 
         self._trajectory = {
             "t": np.asarray(t_jax),
-            "S_xx": np.asarray(sol.ys[:, 0]),
-            "S_yy": np.asarray(sol.ys[:, 1]),
-            "S_zz": np.asarray(sol.ys[:, 2]),
-            "S_xy": np.asarray(sol.ys[:, 3]),
+            "S_xx": np.asarray(S_xx),
+            "S_yy": np.asarray(S_yy),
+            "S_zz": np.asarray(S_zz),
+            "S_xy": np.asarray(S_xy),
         }
 
         if return_full:
             return (
-                np.asarray(sol.ys[:, 0]),
-                np.asarray(sol.ys[:, 1]),
-                np.asarray(sol.ys[:, 3]),
-                np.asarray(sol.ys[:, 2]),
+                np.asarray(S_xx),
+                np.asarray(S_yy),
+                np.asarray(S_xy),
+                np.asarray(S_zz),
             )
 
         # Total stress: σ = G·f(S)·S_xy + η_s·γ̇ (f=1 for linear, FENE-P otherwise)
         sigma = self._compute_stress_from_conformation(
-            sol.ys[:, 0], sol.ys[:, 1], sol.ys[:, 2], sol.ys[:, 3],
-            self.G, self.eta_s, gamma_dot, vp,
+            S_xx,
+            S_yy,
+            S_zz,
+            S_xy,
+            self.G,
+            self.eta_s,
+            gamma_dot,
+            vp,
         )
         return np.asarray(sigma)
 
@@ -1230,32 +1403,38 @@ class TNTSingleMode(TNTBase):
             # Run startup ODE to steady state for variant breakage
             t_ss = jnp.linspace(0.0, 50.0 * self.tau_b, 2000)
             _ = self._simulate_startup_internal(
-                t_ss, self.G, self.tau_b, self.eta_s,
-                gamma_dot_preshear, vp,
+                t_ss,
+                self.G,
+                self.tau_b,
+                self.eta_s,
+                gamma_dot_preshear,
+                vp,
             )
             # Re-run to get conformation (use trajectory if available)
-            S_xx_0, S_yy_0, S_zz_0, S_xy_0 = (
-                tnt_base_steady_conformation(gamma_dot_preshear, self.tau_b)
+            S_xx_0, S_yy_0, S_zz_0, S_xy_0 = tnt_base_steady_conformation(
+                gamma_dot_preshear, self.tau_b
             )
             # Override with ODE steady state via _variant_steady_conformation
             ss = self._variant_steady_conformation(
                 jnp.array([gamma_dot_preshear]), self.G, self.tau_b, vp
             )
-            S_xx_0, S_yy_0, S_zz_0, S_xy_0 = (
-                ss[0, 0], ss[0, 1], ss[0, 2], ss[0, 3]
-            )
+            S_xx_0, S_yy_0, S_zz_0, S_xy_0 = (ss[0, 0], ss[0, 1], ss[0, 2], ss[0, 3])
 
-        y0 = jnp.array(
-            [S_xx_0, S_yy_0, S_zz_0, S_xy_0], dtype=jnp.float64
-        )
+        y0 = jnp.array([S_xx_0, S_yy_0, S_zz_0, S_xy_0], dtype=jnp.float64)
 
         variant_relax_ode = self._variant_relax_ode
 
         def ode_fn(ti, yi, args):
             return variant_relax_ode(
-                ti, yi, args["G"], args["tau_b"],
-                args["nu"], args["m_break"], args["kappa"],
-                args["L_max"], args["xi"],
+                ti,
+                yi,
+                args["G"],
+                args["tau_b"],
+                args["nu"],
+                args["m_break"],
+                args["kappa"],
+                args["L_max"],
+                args["xi"],
             )
 
         args = {"G": self.G, "tau_b": self.tau_b, **vp}
@@ -1271,32 +1450,66 @@ class TNTSingleMode(TNTBase):
         saveat = diffrax.SaveAt(ts=t_jax)
 
         sol = diffrax.diffeqsolve(
-            term, solver, t0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
+        )
+
+        S_xx = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 0],
+            jnp.nan * jnp.ones_like(sol.ys[:, 0]),
+        )
+        S_yy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 1],
+            jnp.nan * jnp.ones_like(sol.ys[:, 1]),
+        )
+        S_zz = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 2],
+            jnp.nan * jnp.ones_like(sol.ys[:, 2]),
+        )
+        S_xy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 3],
+            jnp.nan * jnp.ones_like(sol.ys[:, 3]),
         )
 
         self._trajectory = {
             "t": np.asarray(t_jax),
-            "S_xx": np.asarray(sol.ys[:, 0]),
-            "S_yy": np.asarray(sol.ys[:, 1]),
-            "S_zz": np.asarray(sol.ys[:, 2]),
-            "S_xy": np.asarray(sol.ys[:, 3]),
+            "S_xx": np.asarray(S_xx),
+            "S_yy": np.asarray(S_yy),
+            "S_zz": np.asarray(S_zz),
+            "S_xy": np.asarray(S_xy),
         }
 
         if return_full:
             return (
-                np.asarray(sol.ys[:, 0]),
-                np.asarray(sol.ys[:, 1]),
-                np.asarray(sol.ys[:, 3]),
-                np.asarray(sol.ys[:, 2]),
+                np.asarray(S_xx),
+                np.asarray(S_yy),
+                np.asarray(S_xy),
+                np.asarray(S_zz),
             )
 
         # Stress from conformation: σ = G·f(S)·S_xy + η_s·γ̇ (γ̇=0 in relaxation)
         sigma = self._compute_stress_from_conformation(
-            sol.ys[:, 0], sol.ys[:, 1], sol.ys[:, 2], sol.ys[:, 3],
-            self.G, self.eta_s, 0.0, vp,
+            S_xx,
+            S_yy,
+            S_zz,
+            S_xy,
+            self.G,
+            self.eta_s,
+            0.0,
+            vp,
         )
         return np.asarray(sigma)
 
@@ -1328,14 +1541,24 @@ class TNTSingleMode(TNTBase):
 
         def ode_fn(ti, yi, args):
             return variant_creep_ode(
-                ti, yi, args["sigma_applied"], args["G"], args["tau_b"],
-                args["eta_s"], args["nu"], args["m_break"],
-                args["kappa"], args["L_max"], args["xi"],
+                ti,
+                yi,
+                args["sigma_applied"],
+                args["G"],
+                args["tau_b"],
+                args["eta_s"],
+                args["nu"],
+                args["m_break"],
+                args["kappa"],
+                args["L_max"],
+                args["xi"],
             )
 
         args = {
             "sigma_applied": sigma_applied,
-            "G": self.G, "tau_b": self.tau_b, "eta_s": self.eta_s,
+            "G": self.G,
+            "tau_b": self.tau_b,
+            "eta_s": self.eta_s,
             **vp,
         }
         y0 = jnp.array([1.0, 1.0, 1.0, 0.0, 0.0], dtype=jnp.float64)
@@ -1361,14 +1584,32 @@ class TNTSingleMode(TNTBase):
         saveat = diffrax.SaveAt(ts=t_jax)
 
         sol = diffrax.diffeqsolve(
-            term, solver, t0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=1_000_000,
+            throw=False,
         )
 
-        gamma = np.asarray(sol.ys[:, 4])
-        S_xy = np.asarray(sol.ys[:, 3])
+        gamma_result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 4],
+            jnp.nan * jnp.ones_like(sol.ys[:, 4]),
+        )
+        S_xy_result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 3],
+            jnp.nan * jnp.ones_like(sol.ys[:, 3]),
+        )
+
+        gamma = np.asarray(gamma_result)
+        S_xy = np.asarray(S_xy_result)
 
         self._trajectory = {
             "t": np.asarray(t_jax),
@@ -1381,9 +1622,11 @@ class TNTSingleMode(TNTBase):
             # For FENE: σ_elastic = G·f(trS)·S_xy, for linear: G·S_xy
             if self._stress_type == "fene":
                 L2 = vp["L_max"] ** 2
-                tr_S = (np.asarray(sol.ys[:, 0])
-                        + np.asarray(sol.ys[:, 1])
-                        + np.asarray(sol.ys[:, 2]))
+                tr_S = (
+                    np.asarray(sol.ys[:, 0])
+                    + np.asarray(sol.ys[:, 1])
+                    + np.asarray(sol.ys[:, 2])
+                )
                 f_pet = L2 / np.maximum(L2 - tr_S, 1e-10)
                 sigma_elastic = self.G * f_pet * S_xy
             else:
@@ -1543,9 +1786,7 @@ class TNTSingleMode(TNTBase):
 
         fft_strain = np.fft.fft(strain)
         freqs = np.fft.fftfreq(len(t), t[1] - t[0])
-        omega = 2 * np.pi * np.abs(
-            freqs[np.argmax(np.abs(fft_strain[1:])) + 1]
-        )
+        omega = 2 * np.pi * np.abs(freqs[np.argmax(np.abs(fft_strain[1:])) + 1])
 
         harmonics = [2 * i + 1 for i in range(n_harmonics)]
         sigma_prime_list: list[float] = []
@@ -1556,9 +1797,7 @@ class TNTSingleMode(TNTBase):
             cos_basis = np.cos(n * omega * t)
 
             dt = t[1] - t[0]
-            sigma_n_prime = (
-                2 * np.trapezoid(stress * sin_basis, dx=dt) / (t[-1] - t[0])
-            )
+            sigma_n_prime = 2 * np.trapezoid(stress * sin_basis, dx=dt) / (t[-1] - t[0])
             sigma_n_double_prime = (
                 2 * np.trapezoid(stress * cos_basis, dx=dt) / (t[-1] - t[0])
             )
@@ -1575,7 +1814,5 @@ class TNTSingleMode(TNTBase):
             "sigma_prime": sigma_prime,
             "sigma_double_prime": sigma_double_prime,
             "intensity": intensity,
-            "I3_I1": (
-                intensity[1] / intensity[0] if intensity[0] > 0 else 0.0
-            ),
+            "I3_I1": (intensity[1] / intensity[0] if intensity[0] > 0 else 0.0),
         }

@@ -283,9 +283,7 @@ class TNTCates(TNTBase):
 
         # Smart initialization based on protocol
         if test_mode in ["flow_curve", "steady_shear", "rotation"]:
-            self.initialize_from_flow_curve(
-                np.asarray(x), np.asarray(y)
-            )
+            self.initialize_from_flow_curve(np.asarray(x), np.asarray(y))
         elif test_mode == "oscillation":
             self.initialize_from_saos(
                 np.asarray(x), np.real(np.asarray(y)), np.imag(np.asarray(y))
@@ -331,7 +329,8 @@ class TNTCates(TNTBase):
         x : array-like
             Independent variable
         **kwargs
-            Additional arguments including test_mode
+            Additional arguments including test_mode, gamma_dot, sigma_applied,
+            gamma_0, omega
 
         Returns
         -------
@@ -341,6 +340,16 @@ class TNTCates(TNTBase):
         test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
+        # Extract and store protocol-specific parameters from kwargs
+        if "gamma_dot" in kwargs:
+            self._gamma_dot_applied = kwargs["gamma_dot"]
+        if "sigma_applied" in kwargs:
+            self._sigma_applied = kwargs["sigma_applied"]
+        if "gamma_0" in kwargs:
+            self._gamma_0 = kwargs["gamma_0"]
+        if "omega" in kwargs:
+            self._omega_laos = kwargs["omega"]
+
         # Build parameter array from ParameterSet (ordering: G_0, tau_rep, tau_break, eta_s)
         param_values = [
             float(self.parameters.get_value(name))
@@ -349,7 +358,7 @@ class TNTCates(TNTBase):
         params = jnp.array(param_values)
         return self.model_function(x_jax, params, test_mode=test_mode)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
 
         Routes to appropriate prediction based on test_mode. This is the
@@ -380,6 +389,12 @@ class TNTCates(TNTBase):
         tau_d = jnp.sqrt(tau_rep * tau_break)
 
         mode = test_mode or self._test_mode or "flow_curve"
+        # Extract protocol parameters from kwargs or fall back to instance attributes
+        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
+        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
+        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
+        omega = kwargs.get("omega", self._omega_laos)
+
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:
@@ -388,31 +403,22 @@ class TNTCates(TNTBase):
 
         elif mode == "oscillation":
             # SAOS with effective τ_d
-            G_prime, G_double_prime = tnt_saos_moduli_vec(
-                X_jax, G_0, tau_d, eta_s
-            )
+            G_prime, G_double_prime = tnt_saos_moduli_vec(X_jax, G_0, tau_d, eta_s)
             return jnp.sqrt(G_prime**2 + G_double_prime**2)
 
         elif mode == "startup":
-            gamma_dot = self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
-            return self._simulate_startup_internal(
-                X_jax, G_0, tau_d, eta_s, gamma_dot
-            )
+            return self._simulate_startup_internal(X_jax, G_0, tau_d, eta_s, gamma_dot)
 
         elif mode == "relaxation":
-            gamma_dot = self._gamma_dot_applied
             if gamma_dot is None:
-                raise ValueError(
-                    "relaxation mode requires gamma_dot (pre-shear rate)"
-                )
+                raise ValueError("relaxation mode requires gamma_dot (pre-shear rate)")
             return self._simulate_relaxation_internal(
                 X_jax, G_0, tau_d, eta_s, gamma_dot
             )
 
         elif mode == "creep":
-            sigma_applied = self._sigma_applied
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
             return self._simulate_creep_internal(
@@ -420,7 +426,7 @@ class TNTCates(TNTBase):
             )
 
         elif mode == "laos":
-            if self._gamma_0 is None or self._omega_laos is None:
+            if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
                 X_jax, G_0, tau_d, eta_s, self._gamma_0, self._omega_laos
@@ -428,9 +434,7 @@ class TNTCates(TNTBase):
             return stress
 
         else:
-            logger.warning(
-                f"Unknown test_mode '{mode}', defaulting to flow_curve"
-            )
+            logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
             return G_0 * tau_d * X_jax + eta_s * X_jax
 
     # =========================================================================
@@ -500,9 +504,7 @@ class TNTCates(TNTBase):
         w = jnp.asarray(omega, dtype=jnp.float64)
         tau_d = self.tau_d
 
-        G_prime, G_double_prime = tnt_saos_moduli_vec(
-            w, self.G_0, tau_d, self.eta_s
-        )
+        G_prime, G_double_prime = tnt_saos_moduli_vec(w, self.G_0, tau_d, self.eta_s)
 
         if return_components:
             return np.asarray(G_prime), np.asarray(G_double_prime)
@@ -585,10 +587,16 @@ class TNTCates(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         # Total stress: σ = G₀·S_xy + η_s·γ̇
         sigma = G_0 * sol.ys[:, 3] + eta_s * gamma_dot
+        sigma = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sigma,
+            jnp.nan * jnp.ones_like(sigma),
+        )
         return sigma
 
     def _simulate_relaxation_internal(
@@ -659,9 +667,16 @@ class TNTCates(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
-        return sol.ys[:, 4]  # γ (strain)
+        strain = sol.ys[:, 4]  # γ (strain)
+        strain = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            strain,
+            jnp.nan * jnp.ones_like(strain),
+        )
+        return strain
 
     def _simulate_laos_internal(
         self,
@@ -716,11 +731,17 @@ class TNTCates(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         strain = gamma_0 * jnp.sin(omega * t)
         gamma_dot_t = gamma_0 * omega * jnp.cos(omega * t)
         stress = G_0 * sol.ys[:, 3] + eta_s * gamma_dot_t
+        stress = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            stress,
+            jnp.nan * jnp.ones_like(stress),
+        )
 
         return strain, stress
 
@@ -782,26 +803,49 @@ class TNTCates(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
+        )
+
+        # Handle solver failures
+        S_xx = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 0],
+            jnp.nan * jnp.ones_like(sol.ys[:, 0]),
+        )
+        S_yy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 1],
+            jnp.nan * jnp.ones_like(sol.ys[:, 1]),
+        )
+        S_zz = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 2],
+            jnp.nan * jnp.ones_like(sol.ys[:, 2]),
+        )
+        S_xy = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 3],
+            jnp.nan * jnp.ones_like(sol.ys[:, 3]),
         )
 
         self._trajectory = {
             "t": np.asarray(t_jax),
-            "S_xx": np.asarray(sol.ys[:, 0]),
-            "S_yy": np.asarray(sol.ys[:, 1]),
-            "S_zz": np.asarray(sol.ys[:, 2]),
-            "S_xy": np.asarray(sol.ys[:, 3]),
+            "S_xx": np.asarray(S_xx),
+            "S_yy": np.asarray(S_yy),
+            "S_zz": np.asarray(S_zz),
+            "S_xy": np.asarray(S_xy),
         }
 
         if return_full:
             return (
-                np.asarray(sol.ys[:, 0]),
-                np.asarray(sol.ys[:, 1]),
-                np.asarray(sol.ys[:, 3]),
-                np.asarray(sol.ys[:, 2]),
+                np.asarray(S_xx),
+                np.asarray(S_yy),
+                np.asarray(S_xy),
+                np.asarray(S_zz),
             )
 
         # Total stress: σ = G₀·S_xy + η_s·γ̇
-        sigma = self.G_0 * sol.ys[:, 3] + self.eta_s * gamma_dot
+        sigma = self.G_0 * S_xy + self.eta_s * gamma_dot
         return np.asarray(sigma)
 
     def simulate_relaxation(
@@ -899,10 +943,23 @@ class TNTCates(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
-        gamma = np.asarray(sol.ys[:, 4])
-        S_xy = np.asarray(sol.ys[:, 3])
+        # Handle solver failures
+        gamma_jax = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 4],
+            jnp.nan * jnp.ones_like(sol.ys[:, 4]),
+        )
+        S_xy_jax = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys[:, 3],
+            jnp.nan * jnp.ones_like(sol.ys[:, 3]),
+        )
+
+        gamma = np.asarray(gamma_jax)
+        S_xy = np.asarray(S_xy_jax)
 
         self._trajectory = {
             "t": np.asarray(t_jax),
@@ -1033,9 +1090,7 @@ class TNTCates(TNTBase):
 
         fft_strain = np.fft.fft(strain)
         freqs = np.fft.fftfreq(len(t), t[1] - t[0])
-        omega = 2 * np.pi * np.abs(
-            freqs[np.argmax(np.abs(fft_strain[1:])) + 1]
-        )
+        omega = 2 * np.pi * np.abs(freqs[np.argmax(np.abs(fft_strain[1:])) + 1])
 
         harmonics = [2 * i + 1 for i in range(n_harmonics)]
         sigma_prime_list: list[float] = []
@@ -1046,9 +1101,7 @@ class TNTCates(TNTBase):
             cos_basis = np.cos(n * omega * t)
 
             dt = t[1] - t[0]
-            sigma_n_prime = (
-                2 * np.trapezoid(stress * sin_basis, dx=dt) / (t[-1] - t[0])
-            )
+            sigma_n_prime = 2 * np.trapezoid(stress * sin_basis, dx=dt) / (t[-1] - t[0])
             sigma_n_double_prime = (
                 2 * np.trapezoid(stress * cos_basis, dx=dt) / (t[-1] - t[0])
             )
@@ -1065,9 +1118,7 @@ class TNTCates(TNTBase):
             "sigma_prime": sigma_prime,
             "sigma_double_prime": sigma_double_prime,
             "intensity": intensity,
-            "I3_I1": (
-                intensity[1] / intensity[0] if intensity[0] > 0 else 0.0
-            ),
+            "I3_I1": (intensity[1] / intensity[0] if intensity[0] > 0 else 0.0),
         }
 
     # =========================================================================
