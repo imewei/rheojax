@@ -341,7 +341,10 @@ class TNTStickyRouse(TNTBase):
         if mode in ["flow_curve", "steady_shear", "rotation"]:
             return self._predict_flow_curve_vec(X_jax, G_modes, tau_eff, eta_s)
         elif mode == "oscillation":
-            return self._predict_oscillation_vec(X_jax, G_modes, tau_eff, eta_s)
+            # Return |G*| magnitude for fitting/Bayesian inference
+            # (complex values not supported by JAX grad)
+            G_star = self._predict_oscillation_vec(X_jax, G_modes, tau_eff, eta_s)
+            return jnp.abs(G_star)
         elif mode == "relaxation":
             # Need initial stress per mode (from fitting context)
             if not hasattr(self, "_sigma_0_modes") or self._sigma_0_modes is None:
@@ -352,9 +355,7 @@ class TNTStickyRouse(TNTBase):
                 sigma_0_modes = self._sigma_0_modes
             return self._predict_relaxation_vec(X_jax, sigma_0_modes, tau_eff)
         else:
-            logger.warning(
-                f"Unknown test_mode '{mode}', defaulting to flow_curve"
-            )
+            logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
             return self._predict_flow_curve_vec(X_jax, G_modes, tau_eff, eta_s)
 
     # =========================================================================
@@ -573,9 +574,7 @@ class TNTStickyRouse(TNTBase):
             if sigma_applied is None:
                 raise ValueError("sigma_applied must be provided for creep")
             self._sigma_applied = sigma_applied
-            result = self._predict_creep(
-                x_jax, sigma_applied, G_modes, tau_eff, eta_s
-            )
+            result = self._predict_creep(x_jax, sigma_applied, G_modes, tau_eff, eta_s)
         elif test_mode == "laos":
             gamma_0 = kwargs.get("gamma_0", self._gamma_0)
             omega = kwargs.get("omega", self._omega_laos)
@@ -646,6 +645,7 @@ class TNTStickyRouse(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         # Extract stress from solution
@@ -655,6 +655,13 @@ class TNTStickyRouse(TNTBase):
         # Stress: σ = Σ G_k·S_xy_k + η_s·γ̇
         S_xy_modes = states_reshaped[:, :, 3]  # Shape: (len(t), N)
         sigma = jnp.sum(G_modes * S_xy_modes, axis=1) + eta_s * gamma_dot
+
+        # Handle solver failures
+        sigma = jnp.where(
+            solution.result == diffrax.RESULTS.successful,
+            sigma,
+            jnp.nan * jnp.ones_like(sigma),
+        )
 
         # Store trajectory
         self._trajectory = {
@@ -743,10 +750,18 @@ class TNTStickyRouse(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         # Extract strain
         gamma = solution.ys[:, 4 * N]
+
+        # Handle solver failures
+        gamma = jnp.where(
+            solution.result == diffrax.RESULTS.successful,
+            gamma,
+            jnp.nan * jnp.ones_like(gamma),
+        )
 
         # Store trajectory
         self._trajectory = {
@@ -815,6 +830,7 @@ class TNTStickyRouse(TNTBase):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=500_000,
+            throw=False,
         )
 
         # Extract stress
@@ -824,6 +840,13 @@ class TNTStickyRouse(TNTBase):
         S_xy_modes = states_reshaped[:, :, 3]
         gamma_dot_arr = gamma_0 * omega * jnp.cos(omega * t)
         sigma = jnp.sum(G_modes * S_xy_modes, axis=1) + eta_s * gamma_dot_arr
+
+        # Handle solver failures
+        sigma = jnp.where(
+            solution.result == diffrax.RESULTS.successful,
+            sigma,
+            jnp.nan * jnp.ones_like(sigma),
+        )
 
         # Store trajectory
         self._trajectory = {
@@ -870,6 +893,42 @@ class TNTStickyRouse(TNTBase):
         eta_s = self.eta_s
         eta_0 = float(jnp.sum(G_modes * tau_eff) + eta_s)
         return eta_0
+
+    def predict_saos(
+        self,
+        omega: np.ndarray,
+        return_components: bool = True,
+    ) -> tuple[np.ndarray, np.ndarray] | np.ndarray:
+        """Predict SAOS storage and loss moduli.
+
+        Analytical superposition for multi-mode Maxwell:
+            G'(ω) = Σ G_k·(ωτ_eff_k)² / (1 + (ωτ_eff_k)²)
+            G''(ω) = Σ G_k·(ωτ_eff_k) / (1 + (ωτ_eff_k)²) + η_s·ω
+
+        Parameters
+        ----------
+        omega : np.ndarray
+            Angular frequency array (rad/s)
+        return_components : bool, default True
+            If True, return (G', G'')
+
+        Returns
+        -------
+        tuple or np.ndarray
+            (G', G'') if return_components=True, else |G*|
+        """
+        w = jnp.asarray(omega, dtype=jnp.float64)
+        G_modes, _, tau_eff = self._get_mode_arrays()
+
+        G_prime, G_double_prime = tnt_multimode_saos_moduli_vec(
+            w, G_modes, tau_eff, self.eta_s
+        )
+
+        if return_components:
+            return np.asarray(G_prime), np.asarray(G_double_prime)
+
+        G_star_mag = jnp.sqrt(G_prime**2 + G_double_prime**2)
+        return np.asarray(G_star_mag)
 
     def predict_terminal_time(self) -> float:
         """Return longest effective relaxation time (terminal mode).
