@@ -303,6 +303,8 @@ class FMLIKH(FIKHBase):
             return self._fit_flow_curve(X, y, **kwargs)
         elif mode in (TestMode.CREEP, TestMode.RELAXATION):
             return self._fit_ode_formulation(X, y, **kwargs)
+        elif mode == TestMode.OSCILLATION:
+            return self._fit_oscillation(X, y, **kwargs)
         else:
             return self._fit_return_mapping(X, y, **kwargs)
 
@@ -370,6 +372,148 @@ class FMLIKH(FIKHBase):
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
 
+    def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FMLIKH":
+        """Fit to oscillatory data (SAOS).
+
+        Fits multi-mode FMLIKH to frequency-domain SAOS data.
+
+        Args:
+            X: Angular frequency array (omega) [rad/s].
+            y: Target modulus data (complex G* or |G*|).
+            **kwargs: Options including gamma_0, n_cycles.
+
+        Returns:
+            Self with fitted parameters.
+        """
+        omega = jnp.asarray(X)
+        y_arr = jnp.asarray(y)
+        gamma_0 = kwargs.get("gamma_0", 0.01)
+        n_cycles = kwargs.get("n_cycles", 5)
+        is_complex = jnp.iscomplexobj(y_arr)
+
+        def objective(param_values):
+            p_names = list(self.parameters.keys())
+            p_dict = dict(zip(p_names, param_values, strict=False))
+            G_star_pred = self._predict_oscillation_from_params(
+                omega, p_dict, gamma_0, n_cycles
+            )
+
+            if is_complex:
+                residuals = jnp.concatenate([
+                    jnp.real(G_star_pred) - jnp.real(y_arr),
+                    jnp.imag(G_star_pred) - jnp.imag(y_arr),
+                ])
+            else:
+                residuals = jnp.abs(G_star_pred) - jnp.abs(y_arr)
+
+            return residuals
+
+        nlsq_optimize(objective, self.parameters, **kwargs)
+        return self
+
+    def _predict_oscillation_from_params(
+        self,
+        omega: jnp.ndarray,
+        params: dict[str, Any],
+        gamma_0: float = 0.01,
+        n_cycles: int = 5,
+    ) -> jnp.ndarray:
+        """Predict complex modulus G* from parameter dictionary.
+
+        Sum contributions from all modes.
+
+        Args:
+            omega: Angular frequency array.
+            params: Parameter dictionary.
+            gamma_0: Strain amplitude.
+            n_cycles: Number of cycles to simulate.
+
+        Returns:
+            Complex modulus G* = G' + i·G'' for each frequency.
+        """
+        from rheojax.models.fikh._kernels import (
+            fikh_scan_kernel_isothermal,
+            fikh_scan_kernel_thermal,
+        )
+
+        # Get shared alpha
+        alpha = params.get("alpha_structure", self.alpha_structure)
+
+        G_star_total = jnp.zeros(len(omega), dtype=complex)
+
+        for w_idx, w in enumerate(omega):
+            # Time array for n_cycles
+            period = 2 * jnp.pi / w
+            t = jnp.linspace(0, n_cycles * period, int(100 * n_cycles))
+            strain = gamma_0 * jnp.sin(w * t)
+
+            total_stress = jnp.zeros_like(t)
+
+            # Sum stress from all modes
+            for i in range(self._n_modes):
+                mode_params = self._get_mode_params(params, i)
+                mode_alpha = mode_params.get("alpha_structure", alpha)
+
+                if self.include_thermal:
+                    T_init = params.get("T_env", params.get("T_ref", 298.15))
+                    stress_i, _ = fikh_scan_kernel_thermal(
+                        t, strain,
+                        n_history=self.n_history,
+                        alpha=mode_alpha,
+                        use_viscosity=(i == self._n_modes - 1),
+                        T_init=T_init,
+                        **mode_params,
+                    )
+                else:
+                    stress_i = fikh_scan_kernel_isothermal(
+                        t, strain,
+                        n_history=self.n_history,
+                        alpha=mode_alpha,
+                        use_viscosity=(i == self._n_modes - 1),
+                        **mode_params,
+                    )
+
+                total_stress = total_stress + stress_i
+
+            # Extract last cycle for Fourier
+            last_cycle_start = int(len(t) * (n_cycles - 1) / n_cycles)
+            t_last = t[last_cycle_start:]
+            stress_last = total_stress[last_cycle_start:]
+
+            T_cycle = 2 * jnp.pi / w
+            dt = t_last[1] - t_last[0]
+
+            G_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
+                stress_last * jnp.sin(w * t_last), dx=dt
+            )
+            G_double_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
+                stress_last * jnp.cos(w * t_last), dx=dt
+            )
+
+            G_star_total = G_star_total.at[w_idx].set(G_prime + 1j * G_double_prime)
+
+        return G_star_total
+
+    def predict_oscillation(
+        self,
+        omega: ArrayLike,
+        gamma_0: float = 0.01,
+        n_cycles: int = 5,
+    ) -> jnp.ndarray:
+        """Predict oscillatory response (SAOS G*) for multi-mode model.
+
+        Args:
+            omega: Angular frequency array.
+            gamma_0: Strain amplitude.
+            n_cycles: Number of cycles to simulate.
+
+        Returns:
+            Complex modulus G* = G' + i·G'' for each frequency.
+        """
+        omega_arr = jnp.asarray(omega)
+        params = self._get_params_dict()
+        return self._predict_oscillation_from_params(omega_arr, params, gamma_0, n_cycles)
+
     def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
         """Predict based on test_mode."""
         test_mode = kwargs.get("test_mode", self._test_mode or "startup")
@@ -379,6 +523,11 @@ class FMLIKH(FIKHBase):
         if mode == TestMode.FLOW_CURVE:
             gamma_dot = jnp.asarray(X)
             return self._predict_flow_curve_from_params(gamma_dot, params)
+        elif mode == TestMode.OSCILLATION:
+            omega = jnp.asarray(X)
+            gamma_0 = kwargs.get("gamma_0", 0.01)
+            n_cycles = kwargs.get("n_cycles", 5)
+            return self._predict_oscillation_from_params(omega, params, gamma_0, n_cycles)
         else:
             times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, params)
@@ -404,6 +553,14 @@ class FMLIKH(FIKHBase):
         if mode_enum == TestMode.FLOW_CURVE:
             gamma_dot = jnp.asarray(X)
             return self._predict_flow_curve_from_params(gamma_dot, param_dict)
+        elif mode_enum == TestMode.OSCILLATION:
+            omega = jnp.asarray(X)
+            gamma_0 = kwargs.get("gamma_0", param_dict.pop("_gamma_0", 0.01))
+            n_cycles = kwargs.get("n_cycles", param_dict.pop("_n_cycles", 5))
+            G_star = self._predict_oscillation_from_params(
+                omega, param_dict, gamma_0, n_cycles
+            )
+            return jnp.abs(G_star)
         else:
             times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, param_dict)

@@ -458,10 +458,18 @@ class FIKHBase(BaseModel, FractionalModelMixin):
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=10_000_000,
+            throw=False,
         )
 
         # Extract primary variable
         result = sol.ys[:, 0]
+
+        # Handle solver failures
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            result,
+            jnp.nan * jnp.ones_like(result)
+        )
 
         # Add viscous background for startup
         if mode == "startup" and params.get("eta_inf", 0.0) > 0:

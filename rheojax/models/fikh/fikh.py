@@ -242,9 +242,132 @@ class FIKH(FIKHBase):
         return self
 
     def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FIKH":
-        """Fit to oscillatory data (SAOS)."""
-        # For SAOS, use small-amplitude LAOS approximation
-        return self._fit_return_mapping(X, y, **kwargs)
+        """Fit to oscillatory data (SAOS).
+
+        This method fits to frequency-domain SAOS data by internally simulating
+        time-domain oscillations at each frequency and extracting G* via Fourier.
+
+        Args:
+            X: Angular frequency array (omega) [rad/s].
+            y: Target modulus data - can be:
+                - Complex G* = G' + i·G'' (uses both components)
+                - Real |G*| magnitude (fits to magnitude)
+            **kwargs: Options including:
+                - gamma_0: Strain amplitude (default 0.01)
+                - n_cycles: Number of cycles per frequency (default 5)
+
+        Returns:
+            Self with fitted parameters.
+        """
+        omega = jnp.asarray(X)
+        y_arr = jnp.asarray(y)
+        gamma_0 = kwargs.get("gamma_0", 0.01)
+        n_cycles = kwargs.get("n_cycles", 5)
+
+        # Determine if fitting to complex or magnitude
+        is_complex = jnp.iscomplexobj(y_arr)
+
+        def objective(param_values):
+            p_names = list(self.parameters.keys())
+            p_dict = dict(zip(p_names, param_values, strict=False))
+
+            # Predict G* at each frequency using time-domain simulation
+            G_star_pred = self._predict_oscillation_from_params(
+                omega, p_dict, gamma_0, n_cycles
+            )
+
+            if is_complex:
+                # Fit both G' and G'' by stacking residuals
+                residuals = jnp.concatenate([
+                    jnp.real(G_star_pred) - jnp.real(y_arr),
+                    jnp.imag(G_star_pred) - jnp.imag(y_arr),
+                ])
+            else:
+                # Fit to magnitude |G*|
+                residuals = jnp.abs(G_star_pred) - jnp.abs(y_arr)
+
+            return residuals
+
+        nlsq_optimize(objective, self.parameters, **kwargs)
+        return self
+
+    def _predict_oscillation_from_params(
+        self,
+        omega: jnp.ndarray,
+        params: dict[str, Any],
+        gamma_0: float = 0.01,
+        n_cycles: int = 5,
+    ) -> jnp.ndarray:
+        """Predict complex modulus G* from parameter dictionary.
+
+        Internal method used by both NLSQ fitting and Bayesian inference.
+
+        Args:
+            omega: Angular frequency array.
+            params: Parameter dictionary.
+            gamma_0: Strain amplitude.
+            n_cycles: Number of cycles to simulate.
+
+        Returns:
+            Complex modulus G* = G' + i·G'' for each frequency.
+        """
+        from rheojax.models.fikh._kernels import (
+            fikh_scan_kernel_isothermal,
+            fikh_scan_kernel_thermal,
+        )
+
+        alpha = params.get("alpha_structure", self.alpha_structure)
+
+        G_star = []
+        for w in omega:
+            # Time array for n_cycles
+            period = 2 * jnp.pi / w
+            t = jnp.linspace(0, n_cycles * period, int(100 * n_cycles))
+
+            # Strain signal
+            strain = gamma_0 * jnp.sin(w * t)
+
+            # Predict stress using appropriate kernel
+            if self.include_thermal:
+                T_init = params.get("T_env", params.get("T_ref", 298.15))
+                stress, _ = fikh_scan_kernel_thermal(
+                    t,
+                    strain,
+                    n_history=self.n_history,
+                    alpha=alpha,
+                    use_viscosity=True,
+                    T_init=T_init,
+                    **params,
+                )
+            else:
+                stress = fikh_scan_kernel_isothermal(
+                    t,
+                    strain,
+                    n_history=self.n_history,
+                    alpha=alpha,
+                    use_viscosity=True,
+                    **params,
+                )
+
+            # Extract last cycle for Fourier analysis
+            last_cycle_start = int(len(t) * (n_cycles - 1) / n_cycles)
+            t_last = t[last_cycle_start:]
+            stress_last = stress[last_cycle_start:]
+
+            # Fourier decomposition (first harmonic)
+            T_cycle = 2 * jnp.pi / w
+            dt = t_last[1] - t_last[0]
+
+            G_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
+                stress_last * jnp.sin(w * t_last), dx=dt
+            )
+            G_double_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
+                stress_last * jnp.cos(w * t_last), dx=dt
+            )
+
+            G_star.append(G_prime + 1j * G_double_prime)
+
+        return jnp.array(G_star)
 
     # =========================================================================
     # Prediction Methods
@@ -332,8 +455,15 @@ class FIKH(FIKHBase):
                 t, params, mode.value, gamma_dot, sigma_applied, sigma_0, T_init
             )
 
+        elif mode == TestMode.OSCILLATION:
+            # Frequency-domain SAOS: X is omega, return G*
+            omega = jnp.asarray(X)
+            gamma_0 = kwargs.get("gamma_0", 0.01)
+            n_cycles = kwargs.get("n_cycles", 5)
+            return self._predict_oscillation_from_params(omega, params, gamma_0, n_cycles)
+
         else:
-            # Strain-driven protocols
+            # Strain-driven protocols (startup, laos)
             times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, params)
 
@@ -593,7 +723,19 @@ class FIKH(FIKHBase):
                 t, param_dict, mode_enum.value, gamma_dot, sigma_applied, sigma_0
             )
 
+        elif mode_enum == TestMode.OSCILLATION:
+            # Frequency-domain SAOS: X is omega, return |G*| for Bayesian fitting
+            omega = jnp.asarray(X)
+            gamma_0 = kwargs.get("gamma_0", param_dict.pop("_gamma_0", 0.01))
+            n_cycles = kwargs.get("n_cycles", param_dict.pop("_n_cycles", 5))
+            G_star = self._predict_oscillation_from_params(
+                omega, param_dict, gamma_0, n_cycles
+            )
+            # Return magnitude for comparison with |G*| target
+            return jnp.abs(G_star)
+
         else:
+            # Strain-driven protocols (startup, laos)
             times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, param_dict)
 
