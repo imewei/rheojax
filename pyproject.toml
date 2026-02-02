@@ -156,9 +156,14 @@ exclude = ["tests*", "docs*", "examples*"]
 [tool.pytest.ini_options]
 minversion = "9.0.2"
 testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
 addopts = [
     "-v",
     "--strict-markers",
+    "--tb=short",
+    "--color=yes",
     "--cov=rheojax",
     "--cov-report=term-missing",
     "--cov-report=html",
@@ -180,6 +185,8 @@ markers = [
     # Execution characteristics
     "slow: marks tests as slow (> 30 seconds each, deselect with '-m \"not slow\"')",
     "gpu: marks tests that require GPU",
+    "macos_only: marks tests specific to macOS platform",
+    "crash_test: marks subprocess-based crash detection tests",
 
     # Notebook tests
     "notebook_smoke: quick notebook smoke tests",
@@ -187,10 +194,14 @@ markers = [
 
     # I/O tests
     "io: file I/O tests",
+    "visual: marks visual regression tests with golden images",
 
     # Model-specific tests
     "sgr: SGR (Soft Glassy Rheology) model tests",
     "spp: SPP (Sequence of Physical Processes) model/transform tests",
+
+    # GUI tests
+    "gui: marks GUI tests (can be skipped if PySide6 not installed)",
 ]
 filterwarnings = [
     # Expected warnings from tests
