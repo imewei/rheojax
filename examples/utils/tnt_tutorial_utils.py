@@ -22,6 +22,41 @@ import pandas as pd
 
 
 # =============================================================================
+# FAST_MODE Configuration
+# =============================================================================
+# Set FAST_MODE = True for quick notebook execution (~10-20 min per notebook)
+# Set FAST_MODE = False for production-quality results (~1-3 hours per notebook)
+#
+# FAST_MODE affects:
+# - Data subsampling: 100-200 points (fast) vs 500-1000 points (full)
+# - MCMC settings: 50 warmup / 100 samples (fast) vs 200 warmup / 500 samples (full)
+#
+# For CI/automated testing, FAST_MODE should be True.
+# For publication-quality figures and uncertainty quantification, use False.
+
+FAST_MODE = True  # Toggle this for fast vs full execution
+
+
+def get_fast_mode() -> bool:
+    """Return current FAST_MODE setting."""
+    return FAST_MODE
+
+
+def get_bayesian_config() -> dict[str, int]:
+    """Return MCMC configuration based on FAST_MODE.
+
+    Returns:
+        Dictionary with num_warmup, num_samples, num_chains.
+    """
+    if FAST_MODE:
+        # Minimal config for quick demos (~1-3 minutes)
+        return {"num_warmup": 25, "num_samples": 50, "num_chains": 1}
+    else:
+        # Full config for publication-quality results (~30-60 minutes)
+        return {"num_warmup": 200, "num_samples": 500, "num_chains": 1}
+
+
+# =============================================================================
 # Section 1: Data Loaders
 # =============================================================================
 
@@ -77,15 +112,22 @@ def load_ml_ikh_flow_curve(
 
 def load_pnas_startup(
     gamma_dot: float = 1.0,
+    fast_mode: bool | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Load startup shear data from PNAS Digital Rheometer Twin dataset.
 
     Args:
         gamma_dot: Shear rate to load. Available: 0.056, 0.32, 1, 56.2, 100.
+        fast_mode: If True, truncate to first 60s and subsample to 50 points
+            for faster fitting/inference. If None (default), uses global
+            FAST_MODE setting.
 
     Returns:
         Tuple of (time, stress) arrays in (s, Pa).
     """
+    if fast_mode is None:
+        fast_mode = FAST_MODE
+
     rate_sheets = {
         0.056: "StartUp_0.056",
         0.32: "StartUp_0.32",
@@ -114,8 +156,19 @@ def load_pnas_startup(
     time = data.iloc[:, 0].values
     stress = data.iloc[:, 1].values
 
-    if len(time) > 500:
-        indices = np.linspace(0, len(time) - 1, 500, dtype=int)
+    if fast_mode:
+        # Fast mode: truncate time span to first 60s for faster ODE integration
+        # and subsample to 50 points
+        mask = time <= 60.0
+        time = time[mask]
+        stress = stress[mask]
+        max_points = 50
+    else:
+        # Full mode: use all data up to 500 points
+        max_points = 500
+
+    if len(time) > max_points:
+        indices = np.linspace(0, len(time) - 1, max_points, dtype=int)
         time = time[indices]
         stress = stress[indices]
 
@@ -168,16 +221,22 @@ def load_ml_ikh_creep(
 def load_pnas_laos(
     omega: float = 1.0,
     strain_amplitude_index: int = 5,
+    fast_mode: bool | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Load LAOS data from PNAS Digital Rheometer Twin dataset.
 
     Args:
         omega: Angular frequency (1, 3, or 5 rad/s).
         strain_amplitude_index: Index for strain amplitude (0-11, increasing).
+        fast_mode: If True, subsample to 200 points for faster fitting/inference.
+            If None (default), uses global FAST_MODE setting.
 
     Returns:
         Tuple of (time, strain, stress) arrays in (s, -, Pa).
     """
+    if fast_mode is None:
+        fast_mode = FAST_MODE
+
     omega_sheets = {
         1.0: "LAOS_w1",
         3.0: "LAOS_w3",
@@ -215,8 +274,10 @@ def load_pnas_laos(
     strain = data.iloc[:, 1].values
     stress = data.iloc[:, 2].values
 
-    if len(time) > 1000:
-        indices = np.linspace(0, len(time) - 1, 1000, dtype=int)
+    # Subsample based on mode: 200 points for fast, 1000 for full
+    max_points = 200 if fast_mode else 1000
+    if len(time) > max_points:
+        indices = np.linspace(0, len(time) - 1, max_points, dtype=int)
         time = time[indices]
         strain = strain[indices]
         stress = stress[indices]

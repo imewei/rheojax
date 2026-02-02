@@ -209,9 +209,14 @@ def generate_synthetic_saos_schematic(
     G_prime = G_components[:, 0]
     G_double_prime = G_components[:, 1]
 
-    # Add noise
-    noise_p = rng.normal(0, noise_level * np.mean(G_prime), size=G_prime.shape)
-    noise_pp = rng.normal(0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape)
+    # Add noise (use absolute mean for scale to handle negative values in fluid state)
+    noise_scale_p = noise_level * np.abs(np.mean(G_prime))
+    noise_scale_pp = noise_level * np.abs(np.mean(G_double_prime))
+    # Ensure positive scale
+    noise_scale_p = max(noise_scale_p, 1e-10)
+    noise_scale_pp = max(noise_scale_pp, 1e-10)
+    noise_p = rng.normal(0, noise_scale_p, size=G_prime.shape)
+    noise_pp = rng.normal(0, noise_scale_pp, size=G_double_prime.shape)
 
     G_prime = G_prime + noise_p
     G_double_prime = G_double_prime + noise_pp

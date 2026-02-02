@@ -1,0 +1,427 @@
+#!/usr/bin/env python
+"""
+TNT Notebook Runner - Specialized runner for RheoJAX TNT tutorial notebooks.
+
+Features:
+- Per-notebook timeout (default 24 hours for Bayesian inference)
+- Warning capture and reporting
+- Detailed per-notebook logging
+- Headless matplotlib handling
+- Single-notebook and batch execution modes
+- Issue inventory generation
+"""
+import argparse
+import io
+import json
+import os
+import sys
+import time
+import traceback
+import warnings
+from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime
+from pathlib import Path
+
+import nbformat
+from nbclient import NotebookClient
+from nbclient.exceptions import CellExecutionError, CellTimeoutError
+
+
+# Categorize warnings by their source/type
+WARNING_CATEGORIES = {
+    "deprecation": ["DeprecationWarning", "PendingDeprecationWarning", "FutureWarning"],
+    "numerical": ["RuntimeWarning", "overflow", "invalid value", "divide by zero"],
+    "jax": ["jax", "jaxlib", "XLA"],
+    "numpyro": ["numpyro", "divergence", "r_hat", "ess"],
+    "matplotlib": ["matplotlib", "Axes", "Figure"],
+    "pandas": ["pandas", "DataFrame", "Series"],
+}
+
+
+def categorize_warning(warning_msg: str) -> str:
+    """Categorize a warning message."""
+    msg_lower = warning_msg.lower()
+    for category, keywords in WARNING_CATEGORIES.items():
+        for kw in keywords:
+            if kw.lower() in msg_lower:
+                return category
+    return "other"
+
+
+class WarningCapture:
+    """Context manager to capture warnings."""
+
+    def __init__(self):
+        self.warnings = []
+        self._old_showwarning = None
+
+    def _showwarning(self, message, category, filename, lineno, file=None, line=None):
+        self.warnings.append({
+            "message": str(message),
+            "category": category.__name__,
+            "filename": str(filename),
+            "lineno": lineno,
+            "line": line,
+            "classified_as": categorize_warning(str(message)),
+        })
+        # Still show the warning in stderr
+        if self._old_showwarning:
+            self._old_showwarning(message, category, filename, lineno, file, line)
+
+    def __enter__(self):
+        self._old_showwarning = warnings.showwarning
+        warnings.showwarning = self._showwarning
+        return self
+
+    def __exit__(self, *args):
+        warnings.showwarning = self._old_showwarning
+
+
+def setup_headless_matplotlib():
+    """Configure matplotlib for headless execution."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.ioff()
+
+
+def run_notebook(
+    notebook_path: Path,
+    timeout: int = 86400,
+    log_dir: Path = None,
+) -> dict:
+    """
+    Run a single notebook and return detailed results.
+
+    Args:
+        notebook_path: Path to the notebook
+        timeout: Per-notebook timeout in seconds (default 24 hours)
+        log_dir: Directory for per-notebook logs
+
+    Returns:
+        Dictionary with execution results
+    """
+    result = {
+        "notebook": str(notebook_path),
+        "status": "UNKNOWN",
+        "runtime_seconds": 0,
+        "warnings": [],
+        "warnings_count": 0,
+        "error": None,
+        "traceback": None,
+        "stdout": "",
+        "stderr": "",
+        "cell_errors": [],
+        "suspected_cause": None,
+        "reproduction_command": f"uv run python scripts/run_tnt_notebooks.py --single {notebook_path}",
+    }
+
+    # Set up headless matplotlib before running
+    setup_headless_matplotlib()
+
+    original_cwd = os.getcwd()
+    start_time = time.time()
+
+    stdout_capture = io.StringIO()
+    stderr_capture = io.StringIO()
+
+    try:
+        # Change to notebook directory for relative paths
+        os.chdir(notebook_path.parent.absolute())
+
+        # Read notebook
+        nb = nbformat.read(notebook_path.name, as_version=4)
+
+        # Create client with long timeout
+        client = NotebookClient(
+            nb,
+            timeout=timeout,
+            kernel_name="python3",
+            allow_errors=False,
+            force_raise_errors=True,
+        )
+
+        # Execute with warning capture
+        with WarningCapture() as wc:
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                client.execute()
+
+        result["status"] = "PASS"
+        result["warnings"] = wc.warnings
+        result["warnings_count"] = len(wc.warnings)
+
+        # Write executed notebook back
+        nbformat.write(nb, notebook_path.name)
+
+    except CellTimeoutError as e:
+        result["status"] = "TIMEOUT"
+        result["error"] = str(e)
+        result["traceback"] = traceback.format_exc()
+        result["suspected_cause"] = "timeout/resource"
+
+    except CellExecutionError as e:
+        result["status"] = "FAIL"
+        result["error"] = str(e)
+        result["traceback"] = traceback.format_exc()
+
+        # Categorize the error
+        error_str = str(e).lower()
+        if "import" in error_str or "module" in error_str:
+            result["suspected_cause"] = "import/API"
+        elif "shape" in error_str or "dtype" in error_str or "broadcast" in error_str:
+            result["suspected_cause"] = "shape/dtype"
+        elif "file" in error_str or "path" in error_str or "not found" in error_str:
+            result["suspected_cause"] = "paths/data"
+        elif "jax" in error_str or "jit" in error_str or "xla" in error_str:
+            result["suspected_cause"] = "jax/compilation"
+        elif "numpyro" in error_str or "mcmc" in error_str or "nuts" in error_str:
+            result["suspected_cause"] = "numpyro/inference"
+        elif "nan" in error_str or "inf" in error_str or "overflow" in error_str:
+            result["suspected_cause"] = "numerical"
+        elif "memory" in error_str or "oom" in error_str:
+            result["suspected_cause"] = "resource/OOM"
+        elif "matplotlib" in error_str or "plot" in error_str or "figure" in error_str:
+            result["suspected_cause"] = "plotting"
+        else:
+            result["suspected_cause"] = "unknown"
+
+    except Exception as e:
+        result["status"] = "FAIL"
+        result["error"] = f"{type(e).__name__}: {e}"
+        result["traceback"] = traceback.format_exc()
+        result["suspected_cause"] = "unknown"
+
+    finally:
+        os.chdir(original_cwd)
+        result["runtime_seconds"] = time.time() - start_time
+        result["stdout"] = stdout_capture.getvalue()
+        result["stderr"] = stderr_capture.getvalue()
+
+    # If passed but has warnings, note it
+    if result["status"] == "PASS" and result["warnings_count"] > 0:
+        result["status"] = "PASS_WITH_WARNINGS"
+
+    # Write per-notebook log
+    if log_dir:
+        log_file = log_dir / f"{notebook_path.stem}.json"
+        with open(log_file, "w") as f:
+            json.dump(result, f, indent=2, default=str)
+
+    return result
+
+
+def generate_issue_inventory(results: list[dict], output_path: Path):
+    """Generate the issue inventory markdown file."""
+    with open(output_path, "w") as f:
+        f.write("# TNT Notebook Issue Inventory\n\n")
+        f.write(f"Generated: {datetime.now().isoformat()}\n\n")
+
+        # Summary
+        total = len(results)
+        passed = sum(1 for r in results if r["status"] == "PASS")
+        passed_warnings = sum(1 for r in results if r["status"] == "PASS_WITH_WARNINGS")
+        failed = sum(1 for r in results if r["status"] == "FAIL")
+        timeout = sum(1 for r in results if r["status"] == "TIMEOUT")
+
+        f.write("## Summary\n\n")
+        f.write(f"- **Total notebooks**: {total}\n")
+        f.write(f"- **PASS**: {passed}\n")
+        f.write(f"- **PASS_WITH_WARNINGS**: {passed_warnings}\n")
+        f.write(f"- **FAIL**: {failed}\n")
+        f.write(f"- **TIMEOUT**: {timeout}\n\n")
+
+        # Detailed per-notebook results
+        f.write("## Detailed Results\n\n")
+
+        for r in results:
+            nb_name = Path(r["notebook"]).name
+            f.write(f"### {nb_name}\n\n")
+            f.write(f"- **Status**: {r['status']}\n")
+            f.write(f"- **Runtime**: {r['runtime_seconds']:.1f}s\n")
+            f.write(f"- **Warnings**: {r['warnings_count']}\n")
+            f.write(f"- **Suspected cause**: {r['suspected_cause'] or 'N/A'}\n")
+            f.write(f"- **Reproduction**: `{r['reproduction_command']}`\n")
+
+            if r["status"] in ("FAIL", "TIMEOUT"):
+                f.write("\n**Error**:\n```\n")
+                if r["error"]:
+                    f.write(r["error"][:2000])
+                f.write("\n```\n")
+
+                if r["traceback"]:
+                    f.write("\n**Traceback** (truncated):\n```\n")
+                    # Show last 30 lines of traceback
+                    tb_lines = r["traceback"].split("\n")[-30:]
+                    f.write("\n".join(tb_lines))
+                    f.write("\n```\n")
+
+            if r["warnings_count"] > 0:
+                f.write("\n**Top Warnings**:\n")
+                # Group warnings by category
+                by_cat = {}
+                for w in r["warnings"][:20]:  # Limit to first 20
+                    cat = w["classified_as"]
+                    if cat not in by_cat:
+                        by_cat[cat] = []
+                    by_cat[cat].append(w)
+
+                for cat, warns in by_cat.items():
+                    f.write(f"\n*{cat}* ({len(warns)}):\n")
+                    for w in warns[:5]:  # Show first 5 per category
+                        msg = w["message"][:200].replace("\n", " ")
+                        f.write(f"- `{w['category']}`: {msg}\n")
+
+            f.write("\n---\n\n")
+
+        # Root cause summary
+        f.write("## Root Cause Categories\n\n")
+        causes = {}
+        for r in results:
+            if r["suspected_cause"]:
+                causes[r["suspected_cause"]] = causes.get(r["suspected_cause"], 0) + 1
+
+        for cause, count in sorted(causes.items(), key=lambda x: -x[1]):
+            f.write(f"- **{cause}**: {count} notebooks\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run TNT notebooks with extended timeout and detailed logging"
+    )
+    parser.add_argument(
+        "--single",
+        type=str,
+        help="Run a single notebook instead of all",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=86400,
+        help="Per-notebook timeout in seconds (default: 86400 = 24 hours)",
+    )
+    parser.add_argument(
+        "--log-dir",
+        type=str,
+        default="examples/tnt/_run_logs",
+        help="Directory for logs",
+    )
+    parser.add_argument(
+        "--no-inventory",
+        action="store_true",
+        help="Skip generating issue inventory",
+    )
+
+    args = parser.parse_args()
+
+    # Ensure we're in project root
+    project_root = Path(__file__).parent.parent
+    os.chdir(project_root)
+
+    log_dir = Path(args.log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Timestamp for this run
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if args.single:
+        # Single notebook mode
+        notebook_path = Path(args.single)
+        if not notebook_path.exists():
+            print(f"Error: Notebook not found: {notebook_path}")
+            sys.exit(1)
+
+        print(f"Running single notebook: {notebook_path}")
+        print(f"Timeout: {args.timeout}s")
+        print("-" * 60)
+
+        result = run_notebook(notebook_path, timeout=args.timeout, log_dir=log_dir)
+
+        print(f"\nStatus: {result['status']}")
+        print(f"Runtime: {result['runtime_seconds']:.1f}s")
+        print(f"Warnings: {result['warnings_count']}")
+
+        if result["error"]:
+            print(f"\nError: {result['error'][:1000]}")
+
+        sys.exit(0 if result["status"] in ("PASS", "PASS_WITH_WARNINGS") else 1)
+
+    else:
+        # Batch mode - run all TNT notebooks
+        notebook_list = log_dir / "notebook_list.txt"
+        if notebook_list.exists():
+            with open(notebook_list) as f:
+                notebooks = [Path(line.strip()) for line in f if line.strip()]
+        else:
+            notebooks = sorted(Path("examples/tnt").glob("*.ipynb"))
+
+        print(f"TNT Notebook Runner")
+        print(f"=" * 60)
+        print(f"Notebooks: {len(notebooks)}")
+        print(f"Timeout per notebook: {args.timeout}s ({args.timeout/3600:.1f}h)")
+        print(f"Log directory: {log_dir}")
+        print(f"=" * 60)
+        print()
+
+        results = []
+
+        for i, nb_path in enumerate(notebooks, 1):
+            print(f"[{i}/{len(notebooks)}] {nb_path.name}", end=" ", flush=True)
+
+            result = run_notebook(nb_path, timeout=args.timeout, log_dir=log_dir)
+            results.append(result)
+
+            status_symbol = {
+                "PASS": "\u2713",
+                "PASS_WITH_WARNINGS": "\u26a0",
+                "FAIL": "\u2717",
+                "TIMEOUT": "\u23f1",
+            }.get(result["status"], "?")
+
+            print(f"{status_symbol} ({result['runtime_seconds']:.1f}s, {result['warnings_count']} warnings)")
+
+            if result["status"] in ("FAIL", "TIMEOUT"):
+                print(f"    Cause: {result['suspected_cause']}")
+                if result["error"]:
+                    error_preview = result["error"][:200].replace("\n", " ")
+                    print(f"    Error: {error_preview}...")
+
+        # Generate inventory
+        if not args.no_inventory:
+            inventory_path = log_dir / "issue_inventory.md"
+            generate_issue_inventory(results, inventory_path)
+            print(f"\nIssue inventory: {inventory_path}")
+
+        # Write master log
+        master_log = log_dir / f"run_{timestamp}.json"
+        with open(master_log, "w") as f:
+            json.dump({
+                "timestamp": timestamp,
+                "timeout": args.timeout,
+                "total": len(results),
+                "passed": sum(1 for r in results if r["status"] == "PASS"),
+                "passed_warnings": sum(1 for r in results if r["status"] == "PASS_WITH_WARNINGS"),
+                "failed": sum(1 for r in results if r["status"] == "FAIL"),
+                "timeout": sum(1 for r in results if r["status"] == "TIMEOUT"),
+                "results": results,
+            }, f, indent=2, default=str)
+        print(f"Master log: {master_log}")
+
+        # Summary
+        print("\n" + "=" * 60)
+        print("SUMMARY")
+        print("=" * 60)
+        passed = sum(1 for r in results if r["status"] == "PASS")
+        passed_warnings = sum(1 for r in results if r["status"] == "PASS_WITH_WARNINGS")
+        failed = sum(1 for r in results if r["status"] == "FAIL")
+        timeout = sum(1 for r in results if r["status"] == "TIMEOUT")
+
+        print(f"PASS: {passed}")
+        print(f"PASS_WITH_WARNINGS: {passed_warnings}")
+        print(f"FAIL: {failed}")
+        print(f"TIMEOUT: {timeout}")
+
+        sys.exit(0 if (failed + timeout) == 0 else 1)
+
+
+if __name__ == "__main__":
+    main()
