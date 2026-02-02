@@ -39,6 +39,7 @@ from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger
 from rheojax.models.itt_mct._base import ITTMCTBase
+from rheojax.models.itt_mct._kernels import extract_laos_harmonics
 from rheojax.utils.structure_factor import (
     hard_sphere_properties,
     interpolate_sk,
@@ -750,6 +751,46 @@ class ITTMCTIsotropic(ITTMCTBase):
             sigma[i] = G_scale * np.trapezoid(stress_k, self.k_grid)
 
         return sigma
+
+    def get_laos_harmonics(
+        self,
+        t: np.ndarray,
+        gamma_0: float = 0.1,
+        omega: float = 1.0,
+        n_harmonics: int = 5,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Extract Fourier harmonics from LAOS response.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array covering at least one full period
+        gamma_0 : float
+            Strain amplitude
+        omega : float
+            Angular frequency
+        n_harmonics : int, default 5
+            Number of odd harmonics to extract
+
+        Returns
+        -------
+        sigma_prime_n : np.ndarray
+            In-phase coefficients [sigma'_1, sigma'_3, sigma'_5, ...]
+        sigma_double_prime_n : np.ndarray
+            Out-of-phase coefficients [sigma''_1, sigma''_3, sigma''_5, ...]
+        """
+        # Compute LAOS response
+        sigma = self._predict_laos(t, gamma_0=gamma_0, omega=omega)
+
+        # Extract harmonics
+        sigma_prime, sigma_double_prime = extract_laos_harmonics(
+            jnp.array(t),
+            jnp.array(sigma),
+            omega,
+            n_harmonics=n_harmonics,
+        )
+
+        return np.array(sigma_prime), np.array(sigma_double_prime)
 
     def __repr__(self) -> str:
         """Return string representation."""

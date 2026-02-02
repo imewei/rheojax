@@ -244,18 +244,18 @@ class GiesekusSingleMode(GiesekusBase):
         x : array-like
             Independent variable
         **kwargs
-            Additional arguments including test_mode
+            Additional arguments including test_mode, sigma_applied, etc.
 
         Returns
         -------
         jnp.ndarray
             Predicted response
         """
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        test_mode = kwargs.pop("test_mode", self._test_mode or "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s])
-        return self.model_function(x_jax, params, test_mode=test_mode)
+        return self.model_function(x_jax, params, test_mode=test_mode, **kwargs)
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.

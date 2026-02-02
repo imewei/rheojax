@@ -677,7 +677,7 @@ class FluidityNonlocal(FluidityBase):
             args=base_args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=16_000_000,
             throw=False,  # Return partial result on failure (for optimization)
         )
 
@@ -687,8 +687,14 @@ class FluidityNonlocal(FluidityBase):
         # Handle solver failure by returning NaN
         stress = jnp.where(sol.result == diffrax.RESULTS.successful, stress, jnp.nan)
 
-        # Store trajectory
-        self._f_field_trajectory = np.array(sol.ys[:, 1:])
+        # Store trajectory only when not in JIT context (concrete arrays)
+        # Check if we're dealing with concrete values, not traced arrays
+        try:
+            # This will fail during JIT tracing
+            self._f_field_trajectory = np.asarray(sol.ys[:, 1:])
+        except (TypeError, jax.errors.TracerArrayConversionError):
+            # During JIT tracing, skip storage
+            pass
 
         return strain, stress
 
@@ -824,10 +830,13 @@ class FluidityNonlocal(FluidityBase):
             return self._predict_transient(X, mode=test_mode)
 
         elif test_mode == "laos":
-            if self._gamma_0 is None or self._omega_laos is None:
+            # Get gamma_0 and omega from kwargs or instance attributes
+            gamma_0 = kwargs.get("gamma_0", self._gamma_0)
+            omega = kwargs.get("omega", self._omega_laos)
+            if gamma_0 is None or omega is None:
                 raise ValueError("LAOS prediction requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
-                X_jax, p, self._gamma_0, self._omega_laos
+                X_jax, p, gamma_0, omega
             )
             return np.array(stress)
 
