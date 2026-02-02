@@ -449,6 +449,123 @@ class TNTLoopBridge(TNTBase):
             description="Solvent viscosity (Newtonian background contribution)",
         )
 
+    def initialize_from_creep(
+        self,
+        t: np.ndarray,
+        strain: np.ndarray,
+        sigma_applied: float = 1.0,
+    ) -> None:
+        """Initialize parameters from creep data for numerical stability.
+
+        Key insight: For creep simulation, eta_s must be non-zero to prevent
+        infinite initial shear rate when S_xy starts at 0.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        strain : np.ndarray
+            Strain array
+        sigma_applied : float
+            Applied constant stress (Pa)
+        """
+        t = np.asarray(t)
+        strain = np.asarray(strain)
+
+        # Estimate strain rate from data (slope at long times)
+        if len(t) > 10:
+            # Use last 30% of data for steady-state slope
+            n_late = max(3, len(t) // 3)
+            t_late = t[-n_late:]
+            strain_late = strain[-n_late:]
+            gamma_dot_est = np.polyfit(t_late, strain_late, 1)[0]
+        else:
+            gamma_dot_est = (strain[-1] - strain[0]) / (t[-1] - t[0])
+
+        # Estimate zero-shear viscosity: η₀ = σ / γ̇
+        eta_0_est = sigma_applied / max(abs(gamma_dot_est), 1e-10)
+
+        # Set eta_s to ~1% of η₀ for numerical stability (prevents initial stiffness)
+        eta_s_est = max(0.01 * eta_0_est, 1e-6 * sigma_applied)
+
+        # Estimate τ_b from characteristic time of strain evolution
+        # At short times, strain ~ σ/G + σ·t/η₀, crossover at t ~ G·τ_b / η₀
+        t_char = t[len(t) // 4] if len(t) > 4 else t[-1] / 4
+        tau_b_est = max(t_char, 0.1)
+
+        # G = η₀ / τ_b
+        G_est = max(eta_0_est / tau_b_est, 10.0)
+
+        # Set parameters
+        self.parameters.set_value("G", np.clip(G_est, 1e0, 1e8))
+        self.parameters.set_value("tau_b", np.clip(tau_b_est, 1e-6, 1e4))
+        self.parameters.set_value("eta_s", np.clip(eta_s_est, 1e-10, 1e4))
+
+        logger.debug(
+            f"Creep initialization: G={G_est:.3e} Pa, τ_b={tau_b_est:.3e} s, "
+            f"η_s={eta_s_est:.3e} Pa·s"
+        )
+
+    def initialize_from_relaxation(
+        self,
+        t: np.ndarray,
+        modulus: np.ndarray,
+    ) -> None:
+        """Initialize parameters from stress relaxation data.
+
+        Uses conservative tau_b estimate to ensure numerical stability with
+        typical pre-shear rates (Wi = gamma_dot * tau_b should be < ~100).
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        modulus : np.ndarray
+            Relaxation modulus G(t) (Pa)
+        """
+        t = np.asarray(t)
+        modulus = np.asarray(modulus)
+
+        # Sort by time
+        sort_idx = np.argsort(t)
+        t = t[sort_idx]
+        modulus = modulus[sort_idx]
+
+        # Estimate initial modulus (plateau)
+        G_0_est = modulus[0]
+
+        # Estimate τ_b from decay to 1/e (where G(τ_b) ≈ G₀·e⁻¹)
+        target = G_0_est / np.e
+        crossings = np.where(modulus < target)[0]
+        if len(crossings) > 0:
+            tau_b_est = t[crossings[0]]
+        else:
+            # Extrapolate from decay rate
+            if len(t) > 5:
+                log_modulus = np.log(np.maximum(modulus, 1e-20))
+                slope = np.polyfit(t[:len(t)//2], log_modulus[:len(t)//2], 1)[0]
+                tau_b_est = -1.0 / slope if slope < 0 else t[-1] / 3
+            else:
+                tau_b_est = t[-1] / 3
+
+        # Limit tau_b to ensure numerical stability with typical pre-shear rates
+        # For gamma_dot ~ 10 s⁻¹, tau_b > 10s gives Wi > 100 which is numerically stiff
+        # Use a conservative upper limit that can be refined by the optimizer
+        tau_b_est = min(tau_b_est, 10.0)
+
+        # G = G₀ / f_B_eq (assuming f_B_eq ~ 0.5)
+        f_B_eq_est = 0.5
+        G_est = G_0_est / f_B_eq_est
+
+        # Set parameters
+        self.parameters.set_value("G", np.clip(G_est, 1e0, 1e8))
+        self.parameters.set_value("tau_b", np.clip(tau_b_est, 1e-6, 1e4))
+        self.parameters.set_value("f_B_eq", f_B_eq_est)
+
+        logger.debug(
+            f"Relaxation initialization: G={G_est:.3e} Pa, τ_b={tau_b_est:.3e} s"
+        )
+
     # =========================================================================
     # Property Accessors
     # =========================================================================
@@ -564,6 +681,13 @@ class TNTLoopBridge(TNTBase):
                 self.initialize_from_saos(
                     np.asarray(x), np.real(np.asarray(y)), np.imag(np.asarray(y))
                 )
+            elif test_mode == "creep":
+                self.initialize_from_creep(
+                    np.asarray(x), np.asarray(y),
+                    sigma_applied=kwargs.get("sigma_applied", 1.0)
+                )
+            elif test_mode == "relaxation":
+                self.initialize_from_relaxation(np.asarray(x), np.asarray(y))
 
         # Define model function for fitting
         def model_fn(x_fit, params):

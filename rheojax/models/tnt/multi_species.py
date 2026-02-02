@@ -188,6 +188,113 @@ class TNTMultiSpecies(TNTBase):
             description="Solvent viscosity (Newtonian background)",
         )
 
+    def initialize_from_creep(
+        self,
+        t: np.ndarray,
+        strain: np.ndarray,
+        sigma_applied: float = 1.0,
+    ) -> None:
+        """Initialize parameters from creep data for numerical stability.
+
+        For multi-species, sets eta_s to prevent infinite initial shear rate.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        strain : np.ndarray
+            Strain array
+        sigma_applied : float
+            Applied constant stress (Pa)
+        """
+        t = np.asarray(t)
+        strain = np.asarray(strain)
+
+        # Estimate strain rate from data (slope at long times)
+        if len(t) > 10:
+            n_late = max(3, len(t) // 3)
+            t_late = t[-n_late:]
+            strain_late = strain[-n_late:]
+            gamma_dot_est = np.polyfit(t_late, strain_late, 1)[0]
+        else:
+            gamma_dot_est = (strain[-1] - strain[0]) / (t[-1] - t[0])
+
+        # Estimate zero-shear viscosity
+        eta_0_est = sigma_applied / max(abs(gamma_dot_est), 1e-10)
+
+        # Set eta_s for numerical stability
+        eta_s_est = max(0.01 * eta_0_est, 1e-6 * sigma_applied)
+
+        # Estimate characteristic time
+        t_char = t[len(t) // 4] if len(t) > 4 else t[-1] / 4
+        tau_b_est = max(t_char, 0.1)
+
+        # G_total = η₀ / τ_b
+        G_total_est = max(eta_0_est / tau_b_est, 10.0)
+
+        # Distribute G and tau across modes
+        for i in range(self._n_species):
+            G_i = G_total_est / self._n_species
+            tau_i = tau_b_est * (10.0 ** (-i))  # Logarithmic spacing
+            self.parameters.set_value(f"G_{i}", np.clip(G_i, 1e0, 1e8))
+            self.parameters.set_value(f"tau_b_{i}", np.clip(tau_i, 1e-6, 1e4))
+
+        self.parameters.set_value("eta_s", np.clip(eta_s_est, 1e-10, 1e4))
+
+        logger.debug(
+            f"Creep initialization: G_total={G_total_est:.3e} Pa, "
+            f"tau_b_0={tau_b_est:.3e} s, η_s={eta_s_est:.3e} Pa·s"
+        )
+
+    def initialize_from_relaxation(
+        self,
+        t: np.ndarray,
+        modulus: np.ndarray,
+    ) -> None:
+        """Initialize parameters from stress relaxation data.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        modulus : np.ndarray
+            Relaxation modulus G(t) (Pa)
+        """
+        t = np.asarray(t)
+        modulus = np.asarray(modulus)
+
+        # Sort by time
+        sort_idx = np.argsort(t)
+        t = t[sort_idx]
+        modulus = modulus[sort_idx]
+
+        # Estimate initial modulus
+        G_0_est = modulus[0]
+
+        # Estimate τ_b from decay to 1/e
+        target = G_0_est / np.e
+        crossings = np.where(modulus < target)[0]
+        if len(crossings) > 0:
+            tau_b_est = t[crossings[0]]
+        else:
+            if len(t) > 5:
+                log_modulus = np.log(np.maximum(modulus, 1e-20))
+                slope = np.polyfit(t[:len(t)//2], log_modulus[:len(t)//2], 1)[0]
+                tau_b_est = -1.0 / slope if slope < 0 else t[-1]
+            else:
+                tau_b_est = t[-1] / 3
+
+        # Distribute across modes
+        for i in range(self._n_species):
+            G_i = G_0_est / self._n_species
+            tau_i = tau_b_est * (10.0 ** (-i))
+            self.parameters.set_value(f"G_{i}", np.clip(G_i, 1e0, 1e8))
+            self.parameters.set_value(f"tau_b_{i}", np.clip(tau_i, 1e-6, 1e4))
+
+        logger.debug(
+            f"Relaxation initialization: G_0={G_0_est:.3e} Pa, τ_b_0={tau_b_est:.3e} s"
+        )
+
     # =========================================================================
     # Property Accessors
     # =========================================================================
@@ -296,6 +403,13 @@ class TNTMultiSpecies(TNTBase):
             self.initialize_from_saos(
                 np.asarray(x), np.real(np.asarray(y)), np.imag(np.asarray(y))
             )
+        elif test_mode == "creep":
+            self.initialize_from_creep(
+                np.asarray(x), np.asarray(y),
+                sigma_applied=kwargs.get("sigma_applied", 1.0)
+            )
+        elif test_mode == "relaxation":
+            self.initialize_from_relaxation(np.asarray(x), np.asarray(y))
 
         # Define model function for fitting
         def model_fn(x_fit, params):
