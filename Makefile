@@ -612,6 +612,13 @@ clean-test:
 		-not -path "./.specify/*" \
 		-not -path "./agent-os/*" \
 		-exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name _run_logs \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
 	rm -rf .coverage
 	rm -rf coverage.xml
 
