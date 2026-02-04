@@ -123,6 +123,10 @@ class HebraudLequeux(BaseModel):
         self.grid_n_bins = 501
         self.grid_sigma_factor = 5.0  # grid extends to sigma_c * factor
 
+        # HL kernels use lax.fori_loop with dynamic bounds for numerical stability,
+        # which requires forward-mode autodiff for NUTS sampling.
+        self._use_forward_mode_ad = True
+
     def _get_grid_params(self, sigma_c_val: float | None = None) -> tuple[float, int]:
         """Get grid parameters based on current or provided sigma_c."""
         if sigma_c_val is None:
@@ -552,7 +556,7 @@ class HebraudLequeux(BaseModel):
             raise ValueError(f"Unknown test mode: {self._test_mode}")
 
     def model_function(
-        self, X: np.ndarray, params: np.ndarray, test_mode: str | None = None
+        self, X: np.ndarray, params: np.ndarray, test_mode: str | None = None, **kwargs
     ):
         """Model function for Bayesian inference (NumPyro NUTS).
 
@@ -560,6 +564,7 @@ class HebraudLequeux(BaseModel):
             X: Input array
             params: Parameter values [alpha, tau, sigma_c]
             test_mode: Override test mode
+            **kwargs: Protocol kwargs (ignored - we read from _last_fit_kwargs)
         """
         mode = test_mode or self._test_mode
         if mode is None:
