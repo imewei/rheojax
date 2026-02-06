@@ -112,3 +112,21 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
    :caption: Transient Network Theory (TNT)
 
    tnt/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: VLB Transient Networks
+
+   vlb/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Hybrid Vitrimer Model (HVM)
+
+   hvm/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Hybrid Vitrimer Nanocomposite (HVNM)
+
+   hvnm/index

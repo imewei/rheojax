@@ -1,7 +1,7 @@
 Models Summary & Selection Guide
 ==================================
 
-This page serves as a comprehensive quick-reference guide for all **36+ rheological models** in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
+This page serves as a comprehensive quick-reference guide for all **53 rheological models** in RheoJAX. Use the comparison matrices and decision flowcharts below to select the appropriate model for your experimental data and material system.
 
 
 Complete Model Comparison Matrix
@@ -421,6 +421,63 @@ The table below provides a comprehensive overview of all models across key chara
      - N/A
      - Heterogeneous networks with multiple bond types
 
+   * - :doc:`VLB Local </models/vlb/vlb>`
+     - VLB
+     - 2
+     - R, C, O, Flow, Startup, LAOS
+     - Assoc. Polymer
+     - No
+     - ★☆☆☆☆
+     - N/A
+     - Single transient network (Maxwell via distribution tensor)
+   * - :doc:`VLB Multi-Network </models/vlb/vlb>`
+     - VLB
+     - 2N+1
+     - R, C, O, Flow, Startup, LAOS
+     - Assoc. Polymer
+     - Configurable
+     - ★★★☆☆
+     - N/A
+     - Multi-network generalized Maxwell with molecular basis
+   * - :doc:`VLB Variant </models/vlb/vlb_variant>`
+     - VLB
+     - 2-6
+     - R, C, O, Flow, Startup, LAOS
+     - Assoc. Polymer
+     - No
+     - ★★★☆☆
+     - N/A
+     - Bell shear thinning, FENE bounded extension, Arrhenius temperature
+   * - :doc:`VLB Nonlocal </models/vlb/vlb_nonlocal>`
+     - VLB
+     - 4-6
+     - Flow, Startup, Creep
+     - Assoc. Polymer
+     - No
+     - ★★★★☆
+     - N/A
+     - Spatially-resolved shear banding with tensor diffusion
+
+   * - :doc:`HVM Local </models/hvm/hvm>`
+     - HVM
+     - 6-10
+     - R, C, O, Flow, Startup, LAOS
+     - Vitrimer
+     - Yes (:math:`G_P`)
+     - ★★★★★
+     - N/A
+     - Hybrid vitrimer: permanent + exchangeable (BER/TST) + dissociative networks
+
+   * - :doc:`HVNM Local </models/hvnm/hvnm>`
+     - HVNM
+     - 13-25
+     - R, C, O, Flow, Startup, LAOS
+     - Filled Vitrimer
+     - Yes (:math:`G_P X`)
+     - ★★★★★
+     - N/A
+     - NP-filled vitrimer: 4 subnetworks, dual TST, Guth-Gold amplification
+
 **Legend:**
 
 * **Test Modes:** R = Relaxation, C = Creep, O = Oscillation, Rot = Rotation (steady shear), Flow = Flow curve, Startup = Startup shear, LAOS = Large-amplitude oscillatory
@@ -781,6 +838,50 @@ Transient Network Theory Models (9 variants across 5 classes)
 **Typical applications:** HEUR telechelics, PEG-PEO associating polymers, fibrin and collagen bio-networks, CTAB/CPCl wormlike micelles, PVA-borax gels, supramolecular polymer networks, vitrimers.
 
 
+VLB Transient Network Models (4 models)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**When to use:** Associating polymers, physical gels, hydrogels, vitrimers, self-healing polymers, any material with reversible cross-links where a molecular-statistical foundation is desired.
+
+**Advantages:**
+
+* Molecular-statistical foundation via distribution tensor :math:`\boldsymbol{\mu}`
+* All-analytical single-network predictions (2 parameters, Maxwell behavior)
+* Multi-network extension for broad relaxation spectra
+* Uniaxial extension predictions (Trouton ratio, extensional viscosity)
+* Bell breakage for shear thinning, stress overshoot, nonlinear LAOS
+* FENE-P for bounded extensional viscosity and strain hardening
+* Arrhenius temperature dependence
+* Nonlocal PDE for shear banding with tensor diffusion
+* Full Bayesian inference pipeline (NLSQ → NUTS)
+
+**Key physics:**
+
+* Distribution tensor :math:`\boldsymbol{\mu} = \langle \mathbf{r}\mathbf{r} \rangle / \langle r_0^2 \rangle` from chain statistics
+* Stress: :math:`\boldsymbol{\sigma} = G_0(\boldsymbol{\mu} - \mathbf{I})`
+* Bond kinetics: :math:`\dot{\boldsymbol{\mu}} = k_d(\mathbf{I} - \boldsymbol{\mu}) + \mathbf{L} \cdot \boldsymbol{\mu} + \boldsymbol{\mu} \cdot \mathbf{L}^T`
+* Single network recovers Maxwell; multi-network gives generalized Maxwell
+* Bell breakage: :math:`k_d(\mu) = k_d^0 \exp(\nu(\lambda_c - 1))`
+* FENE-P: :math:`\sigma = G_0 f(\text{tr}(\mu))(\mu - I)` with bounded extensibility
+* Nonlocal PDE: :math:`+ D_\mu \nabla^2 \mu` for cooperative rearrangements
+
+**Model selection within VLB family:**
+
+* **Start here:** VLBLocal — 2 params (:math:`G_0, k_d`), analytical everywhere
+* **Broad spectrum:** VLBMultiNetwork — N modes + optional permanent network + solvent
+* **Nonlinear:** VLBVariant — Bell shear thinning, FENE bounded extension, temperature
+* **Shear banding:** VLBNonlocal — spatially-resolved PDE with banding detection
+
+**Typical applications:** PVA-borax hydrogels, boronate ester gels, vitrimers, telechelic polymers, supramolecular networks, shear-banding wormlike micelles.
+
+**Comparison with TNT:**
+
+* Mathematically equivalent to TNT at constant :math:`k_d` (both give Maxwell)
+* VLB now has Bell + FENE-P variants (matching TNT's nonlinear extensions)
+* VLB preferred for molecular extensions (Langevin, entropic :math:`k_d`)
+* TNT additionally offers non-affine and loop-bridge variants
+
+
 **Non-Newtonian classification:**
 
 1. **Shear-thinning (pseudoplastic):** Viscosity decreases with shear rate
@@ -888,6 +989,15 @@ By Material Type
    * - Telechelic Networks
      - TNTLoopBridge, TNTSingleMode
      - Loop-bridge kinetics; end-functionalized polymers
+   * - Self-Healing Gels
+     - VLBLocal, VLBMultiNetwork
+     - Molecular-statistical foundation; 2 params for Maxwell-like networks
+   * - Vitrimers/CANs
+     - HVMLocal, VLBMultiNetwork
+     - Evolving natural state, BER/TST kinetics, Arrhenius :math:`k_{BER}`
+   * - NP-Filled Vitrimers
+     - HVNMLocal, HVMLocal (unfilled)
+     - Dual TST kinetics, Guth-Gold amplification, Payne effect
 
 By Application
 ~~~~~~~~~~~~~~
@@ -989,7 +1099,7 @@ Parameter Count Comparison
 Bayesian Inference Support
 ---------------------------
 
-**All 43+ models support complete Bayesian workflows** via NumPyro NUTS sampling:
+**All 53 models support complete Bayesian workflows** via NumPyro NUTS sampling:
 
 * `.fit()` - Fast NLSQ point estimation
 * `.fit_bayesian()` - Full posterior sampling with MCMC
@@ -1011,6 +1121,7 @@ Next Steps
 * **SGR models:** :doc:`/models/sgr/sgr_conventional` and :doc:`/models/sgr/sgr_generic`
 * **ITT-MCT models:** :doc:`/models/itt_mct/itt_mct_schematic` and :doc:`/models/itt_mct/itt_mct_isotropic` for colloidal glasses
 * **TNT models:** :doc:`/models/tnt/index` for transient network theory (associating polymers, micelles)
+* **VLB models:** :doc:`/models/vlb/index` for VLB transient networks (hydrogels, vitrimers, self-healing polymers)
 * **SRFS transform:** :doc:`/transforms/srfs` for strain-rate frequency superposition
 * **Example notebooks:** 27 examples in ``examples/`` directory
 
