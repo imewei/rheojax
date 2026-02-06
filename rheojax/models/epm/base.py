@@ -131,7 +131,7 @@ def _jit_flow_curve_batch(
     return jax.vmap(single_rate)((shear_rates, keys))
 
 
-@partial(jax.jit, static_argnums=(5, 6, 7))
+@partial(jax.jit, static_argnums=(6, 7))
 def _jit_startup_kernel(
     time: jax.Array,
     key: jax.Array,
@@ -205,7 +205,7 @@ def _jit_startup_kernel(
     return jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
 
 
-@partial(jax.jit, static_argnums=(5, 6, 7))
+@partial(jax.jit, static_argnums=(6, 7))
 def _jit_relaxation_kernel(
     time: jax.Array,
     key: jax.Array,
@@ -282,7 +282,7 @@ def _jit_relaxation_kernel(
     return jnp.concatenate([jnp.array([g_0]), moduli_scan])
 
 
-@partial(jax.jit, static_argnums=(5, 6, 7))
+@partial(jax.jit, static_argnums=(6, 7))
 def _jit_creep_kernel(
     time: jax.Array,
     key: jax.Array,
@@ -369,7 +369,7 @@ def _jit_creep_kernel(
     return jnp.concatenate([jnp.array([initial_strain]), strains_scan])
 
 
-@partial(jax.jit, static_argnums=(6, 7, 8))
+@partial(jax.jit, static_argnums=(7, 8))
 def _jit_oscillation_kernel(
     time: jax.Array,
     key: jax.Array,
@@ -1243,7 +1243,8 @@ class EPMBase(BaseModel):
         n_steps = max(0, int(time.shape[0]) - 1)
         dt = self.dt
         if n_steps > 0:
-            dt = float(time[1] - time[0])
+            # Use JAX-compatible array difference (avoids float() on traced arrays)
+            dt = time[1] - time[0]
 
         return self._run_startup_kernel(
             time, key, propagator_q, params_array, gamma_dot, dt, n_steps, self.L
@@ -1261,7 +1262,8 @@ class EPMBase(BaseModel):
         n_steps = max(0, int(time.shape[0]) - 1)
         dt = self.dt
         if n_steps > 0:
-            dt = float(time[1] - time[0])
+            # Use JAX-compatible array difference (avoids float() on traced arrays)
+            dt = time[1] - time[0]
 
         return self._run_relaxation_kernel(
             time, key, propagator_q, params_array, strain_step, dt, n_steps, self.L
@@ -1279,7 +1281,8 @@ class EPMBase(BaseModel):
         n_steps = max(0, int(time.shape[0]) - 1)
         dt = self.dt
         if n_steps > 0:
-            dt = float(time[1] - time[0])
+            # Use JAX-compatible array difference (avoids float() on traced arrays)
+            dt = time[1] - time[0]
 
         return self._run_creep_kernel(
             time, key, propagator_q, params_array, target_stress, dt, n_steps, self.L
@@ -1298,7 +1301,8 @@ class EPMBase(BaseModel):
         n_steps = max(0, int(time.shape[0]) - 1)
         dt = self.dt
         if n_steps > 0:
-            dt = float(time[1] - time[0])
+            # Use JAX-compatible array difference (avoids float() on traced arrays)
+            dt = time[1] - time[0]
 
         return self._run_oscillation_kernel(
             time, key, propagator_q, params_array, gamma0, omega, dt, n_steps, self.L

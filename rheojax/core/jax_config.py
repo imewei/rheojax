@@ -25,7 +25,19 @@ from __future__ import annotations
 
 import sys
 import threading
+import warnings
 from typing import Any
+
+# Suppress matplotlib font glyph warnings globally
+# Justification: These warnings are purely cosmetic - plots render correctly,
+# the glyph is just displayed as a box or skipped. Common when using Unicode
+# subscripts (e.g., σ₀, τ₀) with fonts that lack those glyphs. This is harmless
+# for headless batch runs and provides no actionable information to users.
+warnings.filterwarnings(
+    "ignore",
+    message="Glyph.*missing from.*font",
+    category=UserWarning,
+)
 
 # Thread-safe singleton for validation results
 _validation_lock = threading.Lock()

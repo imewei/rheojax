@@ -1,6 +1,6 @@
 """Rheological models package.
 
-This package contains 47 rheological models organized into 19 categories.
+This package contains 53 rheological models organized into 22 categories.
 
 Classical Models (3):
     - Maxwell: Spring and dashpot in series
@@ -76,9 +76,18 @@ Transient Network Theory (TNT) Models (5):
     - TNTCates: Living polymers (wormlike micelles) with reptation + breakage
     - TNTMultiSpecies: Multiple bond types with different lifetimes
 
+VLB (Vernerey-Long-Brighenti) Transient Network Models (4):
+    - VLBLocal: Single transient network with molecular-statistical foundation
+    - VLBMultiNetwork: Multi-network VLB with N transient + permanent + solvent
+    - VLBVariant: Composable Bell + FENE-P + Temperature extensions
+    - VLBNonlocal: Spatial PDE with tensor diffusion for shear banding
+
 IKH (Isotropic Kinematic Hardening) Models (2):
     - MIKH: Modified IKH model for thixotropic yield stress fluids
     - MLIKH: Multi-layer IKH with per-layer structure parameters
+
+HVM (Hybrid Vitrimer Model) (1):
+    - HVMLocal: Local (0D) hybrid vitrimer model (P + E + D networks)
 
 Hébraud-Lequeux Model (1):
     - HebraudLequeux: Stochastic trap model for soft glassy materials
@@ -171,6 +180,12 @@ from rheojax.models.giesekus import GiesekusMultiMode, GiesekusSingleMode
 # HL models
 from rheojax.models.hl import HebraudLequeux
 
+# HVM (Hybrid Vitrimer Model) models
+from rheojax.models.hvm import HVMLocal
+
+# HVNM (Hybrid Vitrimer Nanocomposite Model) models
+from rheojax.models.hvnm import HVNMLocal
+
 # IKH models
 from rheojax.models.ikh import MIKH, MLIKH
 
@@ -197,6 +212,9 @@ from rheojax.models.tnt import (
     TNTSingleMode,
     TNTStickyRouse,
 )
+
+# VLB (Vernerey-Long-Brighenti) transient network models
+from rheojax.models.vlb import VLBLocal, VLBMultiNetwork, VLBNonlocal, VLBVariant
 
 __all__ = [
     # Classical models
@@ -240,6 +258,10 @@ __all__ = [
     "STZConventional",
     # HL models
     "HebraudLequeux",
+    # HVM (Hybrid Vitrimer Model) models
+    "HVMLocal",
+    # HVNM (Hybrid Vitrimer Nanocomposite Model) models
+    "HVNMLocal",
     # SPP Yield Stress model
     "SPPYieldStress",
     # EPM models
@@ -272,4 +294,9 @@ __all__ = [
     "TNTStickyRouse",
     "TNTCates",
     "TNTMultiSpecies",
+    # VLB (Vernerey-Long-Brighenti) transient network models
+    "VLBLocal",
+    "VLBMultiNetwork",
+    "VLBVariant",
+    "VLBNonlocal",
 ]
