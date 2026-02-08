@@ -312,7 +312,14 @@ class VLBMultiNetwork(VLBBase):
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
-        y_jax = jnp.asarray(y, dtype=jnp.float64)
+
+        # For oscillation mode with complex G* data, convert to |G*|
+        # since model_function returns |G*| for oscillation
+        y_np = np.asarray(y)
+        if test_mode == "oscillation" and np.iscomplexobj(y_np):
+            y_jax = jnp.asarray(np.abs(y_np), dtype=jnp.float64)
+        else:
+            y_jax = jnp.asarray(y_np, dtype=jnp.float64)
 
         # Store protocol-specific inputs
         self._gamma_dot_applied = kwargs.get("gamma_dot")

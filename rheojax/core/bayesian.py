@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
 import numpyro
 import numpyro.distributions as dist
 from numpyro.distributions import transforms as dist_transforms

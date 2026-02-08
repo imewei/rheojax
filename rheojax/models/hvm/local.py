@@ -701,8 +701,9 @@ class HVMLocal(HVMBase):
             [self.parameters.get_value(n) for n in self.parameters.keys()],
             dtype=jnp.float64,
         )
+        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
         return np.asarray(
-            self.model_function(X, param_values, test_mode=test_mode, **kwargs)
+            self.model_function(X, param_values, test_mode=test_mode, **fwd_kwargs)
         )
 
     # =========================================================================
