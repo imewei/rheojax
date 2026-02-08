@@ -65,33 +65,33 @@ requires-python = ">=3.12"
 # ============================================================================
 dependencies = [
     # Core scientific computing
-    "numpy>=2.3.0,<3.0.0",          # Maintain compatibility with Numba 0.63.1
-    "scipy>=1.16.3,<2.0.0",
+    "numpy>=2.3.5,<3.0.0",          # Maintain compatibility with Numba 0.63.1
+    "scipy>=1.17.0,<2.0.0",
     "pandas>=2.3.3,<3.0.0",
     "matplotlib>=3.10.8,<4.0.0",
 
     # GPU-accelerated optimization (CRITICAL: must be imported before JAX)
     # NLSQ v0.3.0+ uses float32 by default with automatic precision fallback
     # RheoJAX explicitly enables float64 via jax.config.update("jax_enable_x64", True)
-    "nlsq>=0.6.6",
+    "nlsq>=0.6.8",
 
     # JAX ecosystem (CPU-only - works on all platforms)
     # GPU users: see installation instructions above
-    "jax>=0.8.2",     # JAX 0.8.0+ for CUDA 12/13 support
-    "jaxlib>=0.8.2",  # jaxlib 0.8.0+ - must be compatible with JAX version
+    "jax>=0.8.3",     # JAX 0.8.0+ for CUDA 12/13 support
+    "jaxlib>=0.8.3",  # jaxlib 0.8.0+ - must be compatible with JAX version
 
     # JAX-compatible scientific computing (§2 Technical Guidelines)
-    "interpax>=0.3.0",    # JIT-safe interpolation (replaces scipy.interpolate)
-    "diffrax>=0.6.0",     # JAX-native ODE solver (replaces jax.experimental.ode)
+    "interpax>=0.3.12",   # JIT-safe interpolation (replaces scipy.interpolate)
+    "diffrax>=0.7.1",     # JAX-native ODE solver (replaces jax.experimental.ode)
 
     # Probabilistic programming
-    "numpyro>=0.19.0,<1.0.0",
+    "numpyro>=0.20.0,<1.0.0",
 
     # Bayesian visualization and diagnostics
-    "arviz>=0.23.0,<1.0.0",
-    "arviz-base>=0.7.0",
-    "arviz-stats>=0.7.0",
-    "arviz-plots>=0.7.0",
+    "arviz>=0.23.4,<1.0.0",
+    "arviz-base>=0.8.2",
+    "arviz-stats>=0.8.0",
+    "arviz-plots>=0.8.0",
 ]
 
 [project.optional-dependencies]
@@ -99,12 +99,12 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
-    "hypothesis>=6.150.0",
-    "black>=25.12.0",
-    "ruff>=0.14.11",
+    "hypothesis>=6.151.5",
+    "black>=26.1.0",
+    "ruff>=0.15.0",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
-    "ipython>=9.9.0",
+    "ipython>=9.10.0",
     "jupyter>=1.1.1",
     "sphinx>=9.1.0",
     "furo>=2025.12.19",
@@ -119,9 +119,9 @@ io = [
     "xlrd>=2.0.2",
 ]
 gui = [
-    "PySide6>=6.10.1",
-    "qtpy>=2.4.0",        # Qt binding abstraction (PyQt/PySide compatibility)
-    "pyqtgraph>=0.13.0",  # Interactive GPU-accelerated plotting
+    "PySide6>=6.10.2",
+    "qtpy>=2.4.3",        # Qt binding abstraction (PyQt/PySide compatibility)
+    "pyqtgraph>=0.14.0",  # Interactive GPU-accelerated plotting
     "matplotlib>=3.10.8",
     "qasync>=0.28.0",
 ]
