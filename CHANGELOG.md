@@ -50,9 +50,163 @@ Implemented the STZ model (Langer 2008) for metallic glasses and colloidal suspe
 - **Model Organization**: Moved models into subpackages by category (`classical`, `flow`, `fractional`, `sgr`, `stz`, `spp`, `multimode`)
 - **Imports**: Updated `rheojax.models` to export all models from a flat namespace for convenience
 
+### Added - Fluidity-Saramito Elastoviscoplastic Models
+**Tensorial Viscoelasticity with Thixotropic Fluidity Evolution**
+
+- **Added** `rheojax/models/fluidity/saramito/local.py`: Local (0D) Fluidity-Saramito model
+- **Added** `rheojax/models/fluidity/saramito/nonlocal.py`: Nonlocal (1D) variant for shear banding
+- **Features**:
+  - Tensorial stress [τ_xx, τ_yy, τ_xy] for normal stress predictions (N₁)
+  - Von Mises yield criterion: α = max(0, 1 - τ_y/|τ|)
+  - Fluidity evolution: df/dt = aging + b·|γ̇|^n · rejuvenation
+  - Two coupling modes: "minimal" (λ = 1/f) and "full" (λ + τ_y(f) aging yield)
+  - 6 protocols: Flow curve, Startup, Creep, Relaxation, Oscillation, LAOS
+
+### Added - Isotropic-Kinematic Hardening (IKH) Models
+**Thixotropic Elasto-Viscoplastic Models for Complex Fluids**
+
+- **Added** `rheojax/models/ikh/`: MIKH and ML-IKH model implementations
+- **Added** `rheojax/models/fikh/`: Fractional IKH variants (FIKH, FMLIKH)
+- **Features**:
+  - Maxwell-IKH (Dimitriou & McKinley 2014) for waxy crude oils, drilling fluids
+  - Multi-mode extension for distributed thixotropic timescales
+  - Fractional variants with memory effects
+  - Full protocol support: Flow curve, Creep, Relaxation, Startup, SAOS, LAOS
+
+### Added - Hébraud-Lequeux Model
+**Mean-Field Model for Concentrated Emulsions**
+
+- **Added** `rheojax/models/hl/hebraud_lequeux.py`: HL model implementation
+- **Features**:
+  - Stress probability distribution evolution via Fokker-Planck equation
+  - Mean-field elastic-to-plastic coupling
+  - 6 protocols: Flow curve, Creep, Relaxation, Startup, SAOS, LAOS
+
+### Added - Giesekus Viscoelastic Models
+**Nonlinear Viscoelastic Models for Polymer Solutions**
+
+- **Added** `rheojax/models/giesekus/`: Single-mode and multi-mode implementations
+- **Features**:
+  - Anisotropic drag via mobility parameter α
+  - Shear-thinning and normal stress predictions
+  - Multi-mode Giesekus for polydisperse systems
+  - 6 protocols with ODE integration via diffrax
+
+### Added - DMT Thixotropic Models (de Souza Mendes-Thompson)
+**Structural-Kinetics Based Thixotropic Models**
+
+- **Added** `rheojax/models/dmt/local.py`: Local (0D) DMT model
+- **Added** `rheojax/models/dmt/nonlocal.py`: Nonlocal (1D) variant for shear banding
+- **Features**:
+  - Structure parameter λ ∈ [0, 1] tracking microstructural state
+  - Two viscosity closures: exponential and Herschel-Bulkley
+  - Optional Maxwell elasticity for stress overshoot and SAOS
+  - Nonlocal model with structure diffusion D_λ∇²λ
+  - 6 protocols: Flow curve, Startup, Creep, Relaxation, SAOS, LAOS
+
+### Added - ITT-MCT Models (Integration Through Transients Mode-Coupling Theory)
+**Microscopic MCT-Based Models for Dense Colloidal Systems**
+
+- **Added** `rheojax/models/itt_mct/schematic.py`: F₁₂ schematic model
+- **Added** `rheojax/models/itt_mct/isotropic.py`: Isotropic ISM model with S(k)
+- **Features**:
+  - Glass transition control: ε = (v₂ - 4)/4 for fluid (ε < 0) vs glass (ε > 0)
+  - Memory kernel: m(Φ) = v₁Φ + v₂Φ² with strain decorrelation
+  - Volterra ODE with O(N) integration via Prony decomposition
+  - ISM model with Percus-Yevick S(k) for quantitative predictions
+  - 6 protocols: Flow curve, SAOS, Startup, Creep, Relaxation, LAOS
+
+### Added - TNT Transient Network Models
+**Vernerey-Long-Brighenti Framework for Transient Networks**
+
+- **Added** `rheojax/models/tnt/`: 5 TNT model variants
+  - `TNTSingleMode`: Single relaxation mode transient network
+  - `TNTLoopBridge`: Loop-bridge topology for associating polymers
+  - `TNTStickyRouse`: Sticky Rouse dynamics for entangled systems
+  - `TNTCates`: Living polymer model (Cates wormlike micelles)
+  - `TNTMultiSpecies`: Multi-species network with independent kinetics
+- **Features**:
+  - Stateless `model_function` for NLSQ/NUTS compatibility
+  - Analytical SAOS + diffrax ODE integration for transient protocols
+  - 6 protocols: Flow curve, SAOS, Startup, Relaxation, Creep, LAOS
+
+### Added - VLB Transient Network Models (Vernerey-Long-Brighenti)
+**Statistical Mechanics Framework for Transient Polymer Networks**
+
+- **Added** `rheojax/models/vlb/local.py`: Single-network VLB model (~550 lines)
+- **Added** `rheojax/models/vlb/multi_network.py`: Multi-network VLB (~550 lines)
+- **Added** `rheojax/models/vlb/variant.py`: Variant with Bell/FENE extensions (~1235 lines)
+- **Added** `rheojax/models/vlb/nonlocal_model.py`: 1D PDE variant for shear banding (~750 lines)
+- **Added** `rheojax/models/vlb/_kernels.py`: JIT-compiled kernels (~1020 lines)
+- **Added** `rheojax/models/vlb/_base.py`: Shared VLBBase class (~290 lines)
+- **Features**:
+  - Distribution-tensor based formulation (full Cauchy stress)
+  - Bell model: force-activated bond dissociation k_d(F) = k_d_0 · exp(F/F_c)
+  - FENE: Finite extensibility with Warner spring function
+  - Multi-network: Independent relaxation modes with coupled stress
+  - Nonlocal PDE: Stress diffusion for shear banding prediction
+  - Analytical SAOS/flow curve + diffrax ODE for transient protocols
+  - Full Bayesian inference support with NLSQ warm-start
+- **Documentation**: 7 docs files (index, vlb, vlb_variant, vlb_nonlocal, vlb_protocols, vlb_knowledge, vlb_extensions)
+- **Examples**: 10 tutorial notebooks (6 protocols + Bayesian + Bell + FENE + Nonlocal)
+- **Tests**: 113 tests (52 Phase 1 + 42 Variant + 19 Nonlocal)
+
+### Added - HVM (Hybrid Vitrimer Model)
+**Constitutive Model for Vitrimers with Associative Exchange**
+
+- **Added** `rheojax/models/hvm/local.py`: Full HVM implementation (~960 lines)
+- **Added** `rheojax/models/hvm/_kernels.py`: JIT-compiled kernels (~600 lines)
+- **Added** `rheojax/models/hvm/_kernels_diffrax.py`: ODE integration kernels (~540 lines)
+- **Added** `rheojax/models/hvm/_base.py`: Shared HVMBase class (~310 lines)
+- **Features**:
+  - 3-subnetwork architecture: Permanent (P) + Exchangeable (E) + Dissociative (D)
+  - Evolving natural-state tensor μ^E_nat tracking deformation via BER
+  - TST kinetics: k_BER = ν₀·exp(-E_a/RT)·cosh(V_act·σ_VM/RT)
+  - Factor-of-2: τ_E_eff = 1/(2·k_BER_0) — both μ^E and μ^E_nat relax toward each other
+  - σ_E → 0 at steady state: Natural state fully tracks deformation
+  - Arrhenius temperature dependence with T_v topology freezing
+  - 5 factory methods: neo-Hookean, Maxwell, Zener, pure vitrimer, partial vitrimer
+  - 6 protocols: Flow curve, SAOS, Startup, Relaxation, Creep, LAOS
+- **Documentation**: 3 docs files (index, hvm, hvm_knowledge)
+- **Examples**: 6 tutorial notebooks (SAOS, relaxation, startup, creep, flow curve, LAOS)
+- **Tests**: 60 tests (10 smoke + 47 standard + 3 Bayesian)
+
+### Added - HVNM (Hybrid Vitrimer Nanocomposite Model)
+**Constitutive Model for NP-Filled Vitrimers**
+
+- **Added** `rheojax/models/hvnm/local.py`: Full HVNM implementation (~1050 lines)
+- **Added** `rheojax/models/hvnm/_kernels.py`: JIT-compiled kernels (~1070 lines)
+- **Added** `rheojax/models/hvnm/_kernels_diffrax.py`: ODE integration kernels (~640 lines)
+- **Added** `rheojax/models/hvnm/_base.py`: Shared HVNMBase class (~430 lines)
+- **Features**:
+  - 4-subnetwork architecture: P + E + D + I (interphase around nanoparticles)
+  - Guth-Gold strain amplification: X(φ) = 1 + 2.5φ + 14.1φ²
+  - Dual TST kinetics: independent k_BER^mat and k_BER^int with separate E_a
+  - Factor-of-2 for both matrix and interphase relaxation times
+  - φ = 0 recovers HVM exactly (verified to machine precision)
+  - Feature flags: include_interfacial_damage, include_diffusion, include_damage
+  - 5 factory methods: unfilled_vitrimer, filled_elastomer, partial_vitrimer_nc, conventional_filled_rubber, matrix_only_exchange
+  - 6 protocols: Flow curve, SAOS, Startup, Relaxation, Creep, LAOS
+- **Documentation**: 3 docs files (index, hvnm, hvnm_knowledge)
+- **Examples**: 7 tutorial notebooks (6 protocols + limiting cases)
+- **Tests**: 73 tests (13 smoke + 60 standard, 2 slow Bayesian)
+
 ### Model Count Update
-- **Updated** Total models: 23 → 25 (added STZConventional, SPPYieldStress)
+- **Updated** Total models: 25 → 53 (added 28 models across 12 new families)
+  - Fluidity-Saramito EVP: +2 (FluiditySaramitoLocal, FluiditySaramitoNonlocal)
+  - IKH: +2 (MIKH, MLIKH)
+  - FIKH: +2 (FIKH, FMLIKH)
+  - Hébraud-Lequeux: +1 (HebraudLequeux)
+  - Giesekus: +2 (GiesekusSingleMode, GiesekusMultiMode)
+  - DMT: +2 (DMTLocal, DMTNonlocal)
+  - ITT-MCT: +2 (ITTMCTSchematic, ITTMCTIsotropic)
+  - TNT: +5 (TNTSingleMode, TNTLoopBridge, TNTStickyRouse, TNTCates, TNTMultiSpecies)
+  - VLB: +4 (VLBLocal, VLBMultiNetwork, VLBVariant, VLBNonlocal)
+  - HVM: +1 (HVMLocal)
+  - HVNM: +1 (HVNMLocal)
+  - EPM: +2 (LatticeEPM, TensorialEPM)
 - **Updated** Total transforms: 6 → 7 (added SPPDecomposer)
+- **Updated** Bayesian support: All 53 models support NumPyro NUTS sampling
 
 ### Changed - Multi-Chain Parallelization (Production Default)
 **Bayesian inference now defaults to 4 chains for production-ready diagnostics**

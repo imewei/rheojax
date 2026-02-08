@@ -6,17 +6,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 32 rheological models (including EPM, SGR, STZ, Fluidity, IKH, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 33 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 56 tutorial notebooks.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **32 Rheological Models**: Classical (3), Flow (6), Fractional Maxwell (3), Fractional Zener (3), Fractional Advanced (5), Multi-Mode (1), SGR (2), STZ (1), EPM (2), Fluidity (2), IKH (2), Hébraud-Lequeux (1), SPP LAOS (1)
+- **53 Rheological Models**: Classical (3), Flow (6), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Multi-Mode (1), SGR (2), STZ (1), EPM (2), Fluidity (2), Fluidity-Saramito (2), IKH (2), FIKH (2), Hébraud-Lequeux (1), SPP LAOS (1), Giesekus (2), DMT (2), ITT-MCT (2), TNT (5), VLB (4), HVM (1), HVNM (1)
 - **7 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition), SPP (Sequence of Physical Processes)
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
-- **Bayesian Inference**: All 32 models support NumPyro NUTS sampling with NLSQ warm-start
+- **Bayesian Inference**: All 53 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
@@ -46,6 +46,28 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 | **IKH** | **MIKH** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | | **ML-IKH** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **SPP** | **SPP Yield Stress** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ (Amp. Sweep) |
+| **Fluidity-Saramito** | **F-S Local** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **F-S Nonlocal** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **FIKH** | **FIKH** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **FMLIKH** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **HL** | **Hébraud-Lequeux** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Giesekus** | **Single-Mode** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **Multi-Mode** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **DMT** | **DMT Local** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **DMT Nonlocal** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **ITT-MCT** | **F₁₂ Schematic** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **ISM Isotropic** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **TNT** | **Single-Mode** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **Loop-Bridge** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **Sticky Rouse** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **Cates** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **Multi-Species** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **VLB** | **VLB Local** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **VLB Multi-Network** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **VLB Variant** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| | **VLB Nonlocal** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **HVM** | **HVM Local** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **HVNM** | **HVNM Local** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### Data & I/O
 - **Data Support**: Automatic test mode detection (relaxation, creep, oscillation, rotation)
@@ -58,12 +80,15 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Plugin System**: Support for custom models and transforms
 
 ### Tutorial Notebooks & Examples
-- **33 Tutorial Notebooks**: Organized in 5 categories
+- **56 Tutorial Notebooks**: Organized in 8 categories
   - `examples/basic/` - 5 notebooks covering fundamental models
   - `examples/transforms/` - 8 notebooks for data transforms and analysis (including SRFS)
   - `examples/bayesian/` - 9 notebooks for Bayesian inference workflows (including SPP LAOS)
   - `examples/advanced/` - 10 notebooks for production patterns (including SGR and SPP)
   - `examples/io/` - 1 notebook for TRIOS complex modulus handling
+  - `examples/vlb/` - 10 notebooks: 6 protocols + Bayesian + Bell + FENE + Nonlocal banding
+  - `examples/hvm/` - 6 notebooks: SAOS, relaxation, startup, creep, flow curve, LAOS
+  - `examples/hvnm/` - 7 notebooks: 6 protocols + limiting cases (phi=0 recovers HVM)
 
 ## Installation
 
@@ -538,9 +563,81 @@ model.fit(gamma_0_array, sigma_y_data, test_mode='oscillation')
 bayes_result = model.fit_bayesian(gamma_0_array, sigma_y_data, num_samples=2000)
 ```
 
+### TNT Transient Network Models
+
+```python
+from rheojax.models import TNTSingleMode, TNTCates
+
+# Single-mode transient network
+tnt = TNTSingleMode()
+tnt.fit(omega, G_star, test_mode='oscillation')
+
+# Cates living polymer model (wormlike micelles)
+cates = TNTCates()
+cates.fit(omega, G_star, test_mode='oscillation')
+
+# Startup shear with stress overshoot
+result = cates.simulate_startup(t, gamma_dot=1.0)
+```
+
+### VLB Transient Network Models
+
+```python
+from rheojax.models import VLBLocal, VLBVariant, VLBNonlocal
+
+# Basic VLB transient network
+vlb = VLBLocal()
+vlb.fit(omega, G_star, test_mode='oscillation')
+
+# VLB Variant with Bell force-activated dissociation
+vlb_bell = VLBVariant(force_model="bell")
+vlb_bell.parameters.set_value("F_c", 10.0)  # Characteristic force
+
+# VLB Nonlocal for shear banding prediction
+vlb_nl = VLBNonlocal(n_points=51)
+result = vlb_nl.simulate_steady_shear(gamma_dot_avg=10.0)
+```
+
+### HVM (Hybrid Vitrimer Model)
+
+```python
+from rheojax.models import HVMLocal
+
+# Full HVM: permanent + exchangeable + dissociative networks
+model = HVMLocal(kinetics="stress", include_dissociative=True)
+model.parameters.set_value("G_P", 5000.0)   # Permanent (covalent)
+model.parameters.set_value("G_E", 3000.0)   # Exchangeable (vitrimer BER)
+model.parameters.set_value("G_D", 1000.0)   # Dissociative (physical)
+
+# SAOS: two Maxwell modes + G_P plateau
+omega = np.logspace(-3, 3, 100)
+G_prime, G_double_prime = model.predict_saos(omega)
+
+# Factory methods for limiting cases
+partial = HVMLocal.partial_vitrimer(G_P=5000, G_E=3000, nu_0=1e10, E_a=80e3)
+```
+
+### HVNM (Hybrid Vitrimer Nanocomposite Model)
+
+```python
+from rheojax.models import HVNMLocal
+
+# Full HVNM: 4 subnetworks (P + E + D + I interphase)
+model = HVNMLocal(kinetics="stress", include_dissociative=True)
+model.parameters.set_value("phi", 0.1)      # NP volume fraction
+model.parameters.set_value("beta_I", 3.0)   # Interphase reinforcement
+
+# Guth-Gold strain amplification: X(phi) = 1 + 2.5*phi + 14.1*phi^2
+omega = np.logspace(-3, 3, 100)
+G_prime, G_double_prime = model.predict_saos(omega)
+
+# phi=0 recovers HVM exactly
+unfilled = HVNMLocal.unfilled_vitrimer(G_P=5000, G_E=3000, G_D=1000)
+```
+
 ## Tutorial Notebooks
 
-33 tutorial notebooks organized by topic:
+56 tutorial notebooks organized by topic:
 
 ```
 examples/
@@ -580,6 +677,32 @@ examples/
 │   ├── 08-generalized_maxwell_fitting.ipynb
 │   ├── 09-sgr-soft-glassy-rheology.ipynb    # SGR models
 │   └── 10-spp-laos-tutorial.ipynb           # SPP tutorial
+├── vlb/                         # 10 notebooks: VLB transient network models
+│   ├── 01_vlb_flow_curve.ipynb
+│   ├── 02_vlb_startup_shear.ipynb
+│   ├── 03_vlb_stress_relaxation.ipynb
+│   ├── 04_vlb_creep.ipynb
+│   ├── 05_vlb_saos.ipynb
+│   ├── 06_vlb_laos.ipynb
+│   ├── 07_vlb_bayesian_workflow.ipynb       # Bayesian inference
+│   ├── 08_vlb_bell_shear_thinning.ipynb     # Bell model extension
+│   ├── 09_vlb_fene_extensional.ipynb        # FENE extensibility
+│   └── 10_vlb_nonlocal_banding.ipynb        # Shear banding PDE
+├── hvm/                         # 6 notebooks: Hybrid Vitrimer Model
+│   ├── 01_hvm_saos.ipynb
+│   ├── 02_hvm_stress_relaxation.ipynb
+│   ├── 03_hvm_startup_shear.ipynb
+│   ├── 04_hvm_creep.ipynb
+│   ├── 05_hvm_flow_curve.ipynb
+│   └── 06_hvm_laos.ipynb
+├── hvnm/                        # 7 notebooks: Hybrid Vitrimer Nanocomposite
+│   ├── 01_hvnm_saos.ipynb
+│   ├── 02_hvnm_stress_relaxation.ipynb
+│   ├── 03_hvnm_startup_shear.ipynb
+│   ├── 04_hvnm_creep.ipynb
+│   ├── 05_hvnm_flow_curve.ipynb
+│   ├── 06_hvnm_laos.ipynb
+│   └── 07_hvnm_limiting_cases.ipynb        # phi=0 → HVM recovery
 └── io/                          # 1 notebook: I/O demonstrations
     └── plot_trios_complex_modulus.ipynb
 ```
@@ -644,8 +767,16 @@ Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 - [STZ Models](https://rheojax.readthedocs.io/models/stz/stz_conventional.html) - Shear Transformation Zone (Langer 2008)
 - [EPM Models](https://rheojax.readthedocs.io/models/epm/lattice_epm.html) - Elasto-Plastic lattice and tensorial models
 - [Fluidity Models](https://rheojax.readthedocs.io/models/fluidity/fluidity_local.html) - Local and nonlocal cooperative flow
+- [Fluidity-Saramito Models](https://rheojax.readthedocs.io/models/fluidity/saramito.html) - Tensorial EVP with thixotropy
 - [IKH Models](https://rheojax.readthedocs.io/models/ikh/index.html) - MIKH and ML-IKH for thixotropic EVP materials
 - [SPP Models](https://rheojax.readthedocs.io/models/spp/spp_decomposer.html) - SPP Decomposer and Yield Stress models
+- [Giesekus Models](https://rheojax.readthedocs.io/models/giesekus/index.html) - Nonlinear viscoelastic polymer solutions
+- [DMT Models](https://rheojax.readthedocs.io/models/dmt/index.html) - de Souza Mendes-Thompson thixotropic models
+- [ITT-MCT Models](https://rheojax.readthedocs.io/models/itt_mct/index.html) - Mode-Coupling Theory for dense colloids
+- [TNT Models](https://rheojax.readthedocs.io/models/tnt/index.html) - Transient network theory (5 variants)
+- [VLB Models](https://rheojax.readthedocs.io/models/vlb/index.html) - Vernerey-Long-Brighenti transient networks
+- [HVM Models](https://rheojax.readthedocs.io/models/hvm/index.html) - Hybrid Vitrimer Model
+- [HVNM Models](https://rheojax.readthedocs.io/models/hvnm/index.html) - Hybrid Vitrimer Nanocomposite Model
 
 ## Performance
 
@@ -704,7 +835,7 @@ If you use rheo in your research, please cite:
 ```bibtex
 @software{rheo2024,
   title = {RheoJAX: JAX-Powered Rheological Analysis with Bayesian Inference},
-  year = {2024-2025},
+  year = {2024-2026},
   author = {Wei Chen},
   url = {https://github.com/imewei/rheojax},
   version = {0.6.0}

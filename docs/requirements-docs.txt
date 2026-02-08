@@ -5,9 +5,9 @@
 # Matches local uv environment versions for consistency
 
 # Core Sphinx and theme (exact versions from uv.lock)
-sphinx==8.2.3
-furo>=2024.0.0
-sphinx-autodoc-typehints==3.5.2
+sphinx==9.1.0
+furo>=2025.12.19
+sphinx-autodoc-typehints==3.6.2
 
 # Sphinx contrib packages (exact versions from uv.lock)
 sphinxcontrib-applehelp==2.0.0
@@ -22,10 +22,10 @@ sphinx-copybutton>=0.5.0      # Copy button for code blocks
 myst-parser>=4.0.0            # Markdown support
 
 # Required for autodoc to parse JAX code (exact versions match codebase)
-jax==0.8.0
-jaxlib==0.8.0
-nlsq>=0.2.1
+jax==0.8.3
+jaxlib==0.8.3
+nlsq>=0.6.8
 
 # Required for intersphinx and examples
-numpyro>=0.19.0,<1.0.0
-arviz>=0.22.0,<1.0.0
+numpyro>=0.20.0,<1.0.0
+arviz>=0.23.4,<1.0.0

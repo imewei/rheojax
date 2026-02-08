@@ -137,17 +137,17 @@ Development Status
    - [done] Visualization with matplotlib
 
 **Phase 2 (Complete)**: Models and Transforms [done]
-   - [done] 25 rheological models (Classical: 3, Fractional Maxwell: 4, Fractional Zener: 4, Fractional Advanced: 3, Flow: 6, Multi-Mode: 1, SGR: 2, STZ: 1, SPP LAOS: 1)
+   - [done] 53 rheological models across 22 families
    - [done] 7 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer)
    - [done] Pipeline API for fluent workflows
-   - [done] 33 tutorial notebooks (basic, transforms, bayesian, advanced, SGR, SPP)
+   - [done] 56 tutorial notebooks (basic, transforms, bayesian, advanced, vlb, hvm, hvnm)
 
 **Phase 3 (Complete)**: Bayesian Inference [done]
    - [done] NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
    - [done] Uncertainty quantification via credible intervals and posterior distributions
    - [done] ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
    - [done] Model comparison (WAIC/LOO)
-   - [done] BayesianMixin: All 25 models support Bayesian inference
+   - [done] BayesianMixin: All 53 models support Bayesian inference
    - [done] BayesianPipeline with fluent API for NLSQ -> NUTS workflows
    - [done] 9 Bayesian inference tutorial notebooks (including SPP LAOS)
 
@@ -188,21 +188,35 @@ Development Status
    - [done] Dual-mode yielding: Hard threshold (simulation) and Smooth yielding (inference)
    - [done] Full protocol support: Flow curve, Creep (adaptive control), Oscillation, Relaxation
 
-**Phase 7 (Complete)**: Elasto-Plastic Models (EPM) [done - v0.6.0]
-   - [done] LatticeEPM: Mesoscopic lattice model with FFT-based stress redistribution
-   - [done] TensorialEPM: Scaffolding for full tensor implementation
-   - [done] EPM Kernels: JAX-accelerated Eshelby propagator and plastic event logic
-   - [done] Visualization: Lattice field plots (stress, thresholds) and evolution animations
-   - [done] Dual-mode yielding: Hard threshold (simulation) and Smooth yielding (inference)
-   - [done] Full protocol support: Flow curve, Creep (adaptive control), Oscillation, Relaxation
+**Phase 8 (Complete)**: Advanced Constitutive Models [done - v0.6.0]
+   - [done] Fluidity-Saramito EVP: Tensorial viscoelasticity with thixotropic fluidity (local + nonlocal)
+   - [done] IKH/FIKH: Isotropic-kinematic hardening with fractional variants (4 models)
+   - [done] Hébraud-Lequeux: Mean-field model for concentrated emulsions
+   - [done] Giesekus: Single-mode and multi-mode nonlinear viscoelastic models
+   - [done] DMT: de Souza Mendes-Thompson thixotropic models (local + nonlocal)
+   - [done] ITT-MCT: Mode-Coupling Theory for dense colloids (schematic + isotropic)
+
+**Phase 9 (Complete)**: Transient Network Models [done - v0.6.0]
+   - [done] TNT: 5 transient network variants (SingleMode, LoopBridge, StickyRouse, Cates, MultiSpecies)
+   - [done] VLB: 4 Vernerey-Long-Brighenti models (Local, MultiNetwork, Variant with Bell/FENE, Nonlocal PDE)
+   - [done] Distribution-tensor formulation with analytical SAOS + diffrax ODE for transients
+   - [done] 10 VLB tutorial notebooks with Bayesian, Bell, FENE, and nonlocal examples
+
+**Phase 10 (Complete)**: Vitrimer and Nanocomposite Models [done - v0.6.0]
+   - [done] HVM: Hybrid Vitrimer Model with 3-subnetwork architecture (P + E + D)
+   - [done] HVNM: Hybrid Vitrimer Nanocomposite Model extending HVM with interphase network
+   - [done] TST kinetics with Arrhenius temperature dependence
+   - [done] Factor-of-2 relaxation, Guth-Gold strain amplification for HVNM
+   - [done] 5 factory methods each for limiting cases
+   - [done] 13 tutorial notebooks (HVM: 6, HVNM: 7)
 
 Technology Stack
 ----------------
 
 **Core Dependencies**
    - Python 3.12+
-   - JAX 0.8.0 for acceleration and automatic differentiation
-   - NLSQ 0.1.6+ for GPU-accelerated optimization
+   - JAX 0.8.0+ for acceleration and automatic differentiation
+   - NLSQ 0.6.6+ for GPU-accelerated optimization
    - NumPyro for Bayesian inference (MCMC NUTS sampling)
    - ArviZ 0.15.0+ for Bayesian visualization and diagnostics
    - NumPy, SciPy for numerical operations
@@ -217,7 +231,7 @@ Performance
 
 RheoJAX delivers exceptional performance through JAX acceleration and systematic optimizations (v0.3.1-v0.3.2):
 
-.. list-table:: Performance Benchmarks (v0.5.0)
+.. list-table:: Performance Benchmarks (v0.6.0)
    :header-rows: 1
    :widths: 40 20 20 20
 
@@ -268,7 +282,7 @@ Community and Support
 
       @software{rheojax2024,
         title = {RheoJAX: JAX-Powered Rheological Analysis with Bayesian Inference},
-        year = {2024-2025},
+        year = {2024-2026},
         author = {Wei Chen},
         url = {https://github.com/imewei/rheojax},
         version = {0.6.0}
