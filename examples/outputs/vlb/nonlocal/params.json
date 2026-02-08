@@ -1,0 +1,9 @@
+{
+  "G0": 1000.0,
+  "k_d_0": 1.0,
+  "nu": 5.0,
+  "D_mu": 1e-06,
+  "gap_width": 0.001,
+  "n_points": 51,
+  "cooperativity_length": 0.001
+}
