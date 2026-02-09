@@ -1,0 +1,97 @@
+# HVM Tutorial Defaults
+# Protocol-specific priors, noise models, optimizer and sampler settings.
+
+# Global settings
+global:
+  seed: 42
+  fast_mode: true
+
+# NLSQ optimizer defaults
+optimizer:
+  method: "lm"
+  max_iter: 5000
+  use_log_residuals: true
+  use_multi_start: true
+  n_starts: 3
+  perturb_factor: 0.5
+
+# NUTS sampler defaults (overridden per-protocol below)
+sampler:
+  fast:
+    num_warmup: 50
+    num_samples: 100
+    num_chains: 1
+  production:
+    num_warmup: 500
+    num_samples: 1000
+    num_chains: 4
+
+# Protocol-specific defaults
+protocols:
+
+  oscillation:
+    dataset: "epstein_saos"
+    test_mode: "oscillation"
+    use_log_residuals: true
+    param_hints:
+      G_P: {value: 500.0, bounds: [10.0, 1.0e+05]}
+      G_E: {value: 200.0, bounds: [1.0, 1.0e+05]}
+      nu_0: {value: 1.0e+10, bounds: [1.0e+06, 1.0e+14]}
+      E_a: {value: 80000.0, bounds: [20000.0, 200000.0]}
+      V_act: {value: 1.0e-05, bounds: [1.0e-08, 0.01]}
+      T: {value: 300.0, bounds: [200.0, 500.0], fixed: true}
+      G_D: {value: 100.0, bounds: [0.0, 1.0e+05]}
+      k_d_D: {value: 10.0, bounds: [0.001, 1.0e+06]}
+
+  flow_curve:
+    dataset: "emulsion_flow"
+    test_mode: "flow_curve"
+    use_log_residuals: true
+    param_hints:
+      G_P: {value: 10.0, bounds: [0.1, 1000.0]}
+      G_E: {value: 5.0, bounds: [0.0, 500.0]}
+      G_D: {value: 2.0, bounds: [0.0, 100.0]}
+      k_d_D: {value: 1.0, bounds: [0.001, 100.0]}
+
+  relaxation:
+    dataset: "fish_muscle_relaxation"
+    test_mode: "relaxation"
+    use_log_residuals: true
+    max_points: 200
+    param_hints:
+      G_P: {value: 5000.0, bounds: [100.0, 1.0e+06]}
+      G_E: {value: 10000.0, bounds: [100.0, 1.0e+06]}
+      G_D: {value: 5000.0, bounds: [0.0, 1.0e+06]}
+      k_d_D: {value: 1.0, bounds: [0.001, 1000.0]}
+
+  creep:
+    dataset: "ps_creep"
+    test_mode: "creep"
+    use_log_residuals: false
+    param_hints:
+      G_P: {value: 50000.0, bounds: [1000.0, 1.0e+07]}
+      G_E: {value: 30000.0, bounds: [100.0, 1.0e+07]}
+      G_D: {value: 10000.0, bounds: [0.0, 1.0e+07]}
+      k_d_D: {value: 0.1, bounds: [1.0e-06, 100.0]}
+
+  startup:
+    dataset: "pnas_startup"
+    test_mode: "startup"
+    use_log_residuals: false
+    max_points: 200
+    param_hints:
+      G_P: {value: 50.0, bounds: [1.0, 10000.0]}
+      G_E: {value: 30.0, bounds: [0.0, 10000.0]}
+      G_D: {value: 20.0, bounds: [0.0, 5000.0]}
+      k_d_D: {value: 1.0, bounds: [0.001, 1000.0]}
+
+  laos:
+    dataset: "pnas_laos"
+    test_mode: "laos"
+    omega: 1.0
+    strain_amplitude_index: 5
+    param_hints:
+      G_P: {value: 50.0, bounds: [1.0, 10000.0]}
+      G_E: {value: 30.0, bounds: [0.0, 10000.0]}
+      G_D: {value: 20.0, bounds: [0.0, 5000.0]}
+      k_d_D: {value: 1.0, bounds: [0.001, 1000.0]}
