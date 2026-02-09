@@ -407,6 +407,54 @@ def laos_kernel(
 # ============================================================================
 
 
+def _compute_dt_and_steps_for_rate(
+    gdot_val: float,
+    tau: float,
+    sigma_c: float,
+    ds: float = 0.02,
+    max_steps: int = 30_000,
+    bucket_size: int = 5_000,
+) -> tuple[float, int]:
+    """Compute adaptive (dt, steps) for a given shear rate.
+
+    Uses larger dt for low shear rates (CFL allows it) so that all rates
+    converge within max_steps outer steps. The CFL sub-stepping inside
+    step_hl handles numerical stability automatically.
+
+    Returns:
+        (dt, steps) tuple where dt is the outer time step and steps is
+        the number of outer lax.scan iterations.
+    """
+    gdot_abs = abs(gdot_val) if not hasattr(gdot_val, "item") else abs(float(gdot_val))
+    gdot_abs = max(gdot_abs, 1e-9)
+
+    # Target simulation time for steady state
+    strain_target = 10.0 * max(1.0, sigma_c)
+    time_strain = strain_target / gdot_abs
+    time_relax = 10.0 * tau
+    t_total = max(time_strain, time_relax)
+
+    # Adaptive dt: scale up to fit t_total in max_steps.
+    # Constraint: keep CFL sub-steps per outer step <= 50
+    # so that fori_loop overhead stays manageable.
+    dt_desired = t_total / max_steps
+    dt_max_cfl = 50 * 0.5 * ds / (gdot_abs + 1e-12)
+
+    dt = max(dt_desired, 0.001)  # minimum dt = 1ms
+    dt = min(dt, dt_max_cfl)  # cap to avoid excessive sub-stepping
+    dt = min(dt, 0.5)  # absolute ceiling
+
+    steps = int(t_total / dt) + 1
+    steps = min(steps, max_steps)
+    steps = max(steps, 5_000)
+
+    # Bucket to nearest bucket_size to minimize JIT recompilations
+    steps = ((steps + bucket_size - 1) // bucket_size) * bucket_size
+    steps = min(steps, max_steps)
+
+    return dt, steps
+
+
 def run_flow_curve(
     gdots: Array,
     alpha: float,
@@ -416,16 +464,36 @@ def run_flow_curve(
     sigma_max: float = 5.0,
     n_bins: int = 501,
     steps: int = 20000,
+    per_rate_schedule: list[tuple[float, int]] | None = None,
 ) -> Array:
-    """Calculate flow curve (steady state stress vs shear rate)."""
-    # Vectorize the kernel over gdots
-    vectorized_kernel = jax.vmap(
-        lambda g: flow_curve_kernel(
-            g, alpha, tau, sigma_c, dt, sigma_max, n_bins, steps
-        )
-    )
+    """Calculate flow curve (steady state stress vs shear rate).
 
-    return vectorized_kernel(gdots)
+    Args:
+        per_rate_schedule: If provided, a list of (dt_i, steps_i) tuples,
+            one per shear rate. Uses adaptive dt so low rates (which need
+            more physical time) use larger dt while high rates use smaller dt.
+            Must be computed outside any JIT context (concrete values).
+    """
+    if per_rate_schedule is not None:
+        # Per-rate adaptive schedule: sequential with per-rate (dt, steps).
+        # Avoids OOM from vmapping all rates at max step count.
+        results = []
+        for i in range(len(gdots)):
+            dt_i, steps_i = per_rate_schedule[i]
+            stress_i = flow_curve_kernel(
+                gdots[i], alpha, tau, sigma_c, dt_i, sigma_max, n_bins,
+                steps_i,
+            )
+            results.append(stress_i)
+        return jnp.array(results)
+    else:
+        # Uniform step count: use vmap for efficiency
+        vectorized_kernel = jax.vmap(
+            lambda g: flow_curve_kernel(
+                g, alpha, tau, sigma_c, dt, sigma_max, n_bins, steps
+            )
+        )
+        return vectorized_kernel(gdots)
 
 
 def run_startup(

@@ -421,8 +421,11 @@ class FluidityNonlocal(FluidityBase):
             throw=False,  # Return partial result on failure (for optimization)
         )
 
-        # Store trajectory for analysis
-        self._f_field_trajectory = np.array(sol.ys[:, 1:])
+        # Store trajectory for analysis (skip during JAX tracing, e.g. NUTS)
+        try:
+            self._f_field_trajectory = np.array(sol.ys[:, 1:])
+        except Exception:
+            pass
 
         # Extract primary variable (index 0)
         # For creep: strain; for startup/relaxation: stress

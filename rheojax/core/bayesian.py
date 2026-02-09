@@ -1242,6 +1242,14 @@ class BayesianMixin:
                 X, params_array, test_mode, **protocol_kwargs
             )
 
+            # Guard against NaN/Inf from ODE-based models (LAOS, startup)
+            # that can diverge for extreme parameter combinations during
+            # NUTS initialization. Replacing with zeros yields very low
+            # likelihood, naturally steering the sampler away.
+            predictions_raw = jnp.where(
+                jnp.isfinite(predictions_raw), predictions_raw, 0.0
+            )
+
             # Handle complex vs real predictions
             if is_complex_data:
                 pred_real = jnp.real(predictions_raw)

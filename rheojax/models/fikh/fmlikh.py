@@ -349,14 +349,32 @@ class FMLIKH(FIKHBase):
         return total_stress
 
     def _fit_ode_formulation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FMLIKH":
-        """Fit using ODE formulation."""
-        # For multi-layer ODE, we'd need coupled system
-        # Simplify by using return mapping approximation
-        logger.warning(
-            "ODE formulation for FMLIKH uses approximation. "
-            "For accurate results, use return mapping protocols."
+        """Fit using ODE formulation for relaxation/creep.
+
+        Uses per-mode _simulate_transient and sums the contributions.
+        """
+        t = jnp.asarray(X)
+        y_target = jnp.asarray(y)
+        mode = self._validate_test_mode(
+            kwargs.get("test_mode", self._test_mode or "startup")
         )
-        return self._fit_return_mapping(X, y, **kwargs)
+
+        # Extract kwargs relevant to transient simulation
+        sim_kwargs = {
+            k: kwargs[k] for k in ("sigma_0", "sigma_applied", "gamma_dot", "T_init")
+            if k in kwargs
+        }
+
+        def objective(param_values):
+            p_names = list(self.parameters.keys())
+            p_dict = dict(zip(p_names, param_values, strict=False))
+            y_pred = self._predict_transient_multimode(
+                t, p_dict, mode, **sim_kwargs
+            )
+            return y_pred - y_target
+
+        nlsq_optimize(objective, self.parameters, **kwargs)
+        return self
 
     def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FMLIKH":
         """Fit using return mapping."""
@@ -528,9 +546,63 @@ class FMLIKH(FIKHBase):
             gamma_0 = kwargs.get("gamma_0", 0.01)
             n_cycles = kwargs.get("n_cycles", 5)
             return self._predict_oscillation_from_params(omega, params, gamma_0, n_cycles)
+        elif mode in (TestMode.CREEP, TestMode.RELAXATION):
+            return self._predict_transient_multimode(X, params, mode, **kwargs)
         else:
             times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, params)
+
+    def _predict_transient_multimode(
+        self,
+        X: ArrayLike,
+        params: dict[str, Any],
+        mode: TestMode,
+        **kwargs,
+    ) -> jnp.ndarray:
+        """Multi-mode transient prediction for relaxation and creep.
+
+        Runs _simulate_transient per mode and sums the result.
+        For relaxation, initial stress is distributed proportional to G_i.
+        """
+        t = jnp.asarray(X)
+        sigma_0 = kwargs.get("sigma_0", 60.0)
+        sigma_applied = kwargs.get("sigma_applied", 100.0)
+        gamma_dot = kwargs.get("gamma_dot", 0.0)
+        T_init = kwargs.get("T_init", None)
+
+        total_result = jnp.zeros_like(t)
+
+        # Compute total G for distributing sigma_0 across modes
+        G_total = sum(
+            params.get(f"G_{i}", 1e3) for i in range(self._n_modes)
+        )
+
+        for i in range(self._n_modes):
+            mode_params = self._get_mode_params(params, i)
+
+            # Only add eta_inf contribution on last mode
+            if i < self._n_modes - 1:
+                mode_params["eta_inf"] = 0.0
+
+            if mode == TestMode.RELAXATION:
+                # Distribute sigma_0 proportional to mode stiffness
+                G_i = mode_params.get("G", 1e3)
+                mode_sigma_0 = sigma_0 * G_i / jnp.maximum(G_total, 1e-10)
+                result_i = self._simulate_transient(
+                    t, mode_params, mode.value,
+                    gamma_dot=0.0, sigma_0=mode_sigma_0,
+                    T_init=T_init,
+                )
+            else:  # CREEP
+                result_i = self._simulate_transient(
+                    t, mode_params, mode.value,
+                    sigma_applied=sigma_applied,
+                    T_init=T_init,
+                )
+
+            total_result = total_result + result_i
+
+        return total_result
 
     def model_function(
         self,
@@ -561,6 +633,10 @@ class FMLIKH(FIKHBase):
                 omega, param_dict, gamma_0, n_cycles
             )
             return jnp.abs(G_star)
+        elif mode_enum in (TestMode.CREEP, TestMode.RELAXATION):
+            return self._predict_transient_multimode(
+                X, param_dict, mode_enum, **kwargs
+            )
         else:
             times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, param_dict)

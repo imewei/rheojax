@@ -123,6 +123,20 @@ class HebraudLequeux(BaseModel):
         self.grid_n_bins = 501
         self.grid_sigma_factor = 5.0  # grid extends to sigma_c * factor
 
+        # Adaptive time-stepping: cap lax.scan length to avoid OOM/slow JIT.
+        # CFL sub-stepping inside step_hl() ensures physics accuracy
+        # regardless of outer dt, so larger dt is safe.
+        self._max_scan_steps = 20000
+        self._min_dt = 0.005
+        # Creep kernel has servo controller feedback loop whose XLA compilation
+        # scales super-linearly with n_steps (~O(n^1.5)):
+        #   500 steps → 0.6s compile, 1000 → 1.9s, 2000 → 5.8s
+        # Cap at 500 for tractable fitting.
+        self._max_scan_steps_creep = 500
+        # Bayesian (forward-mode AD through scan) is much more expensive
+        self._max_scan_steps_bayesian = 2000
+        self._max_scan_steps_bayesian_creep = 500
+
         # HL kernels use lax.fori_loop with dynamic bounds for numerical stability,
         # which requires forward-mode autodiff for NUTS sampling.
         self._use_forward_mode_ad = True
@@ -137,6 +151,17 @@ class HebraudLequeux(BaseModel):
         # Otherwise scale with sigma_c
         sigma_max = max(5.0, sigma_c_val * self.grid_sigma_factor)
         return sigma_max, self.grid_n_bins
+
+    def _adaptive_dt(self, t_max: float) -> tuple[float, int]:
+        """Compute adaptive dt and n_steps to cap scan length.
+
+        The CFL sub-stepping inside step_hl() ensures physics accuracy
+        regardless of outer dt, so we can safely increase dt for long
+        experiments to keep n_steps bounded.
+        """
+        dt = max(self._min_dt, t_max / self._max_scan_steps)
+        n_steps = int(t_max / dt) + 1
+        return dt, n_steps
 
     def _fit(
         self,
@@ -191,60 +216,125 @@ class HebraudLequeux(BaseModel):
         return self
 
     def _fit_steady_shear(self, gdot: np.ndarray, stress: np.ndarray, **kwargs):
-        """Fit flow curve."""
-        from rheojax.utils.optimization import (
-            create_least_squares_objective,
-            nlsq_optimize,
-        )
+        """Fit flow curve using derivative-free optimization.
+
+        The HL PDE solver has sharp gradients near the glass transition
+        (alpha ~ 0.5) that cause overflow in finite-difference Jacobians.
+        We use Nelder-Mead (derivative-free) with multi-start and log-space
+        MSE to robustly fit flow curves spanning multiple decades.
+
+        Stress is normalized by the low-rate plateau so sigma_c ~ 2
+        (HL yield stress ≈ sigma_c/2), and tau is parameterized in
+        log10-space for better scaling.
+        """
+        import time as _time
+
+        from scipy.optimize import minimize
+
+        from rheojax.utils.hl_kernels import _compute_dt_and_steps_for_rate
+
+        # --- Normalize by low-rate stress ---
+        idx_low = int(np.argmin(np.abs(gdot)))
+        stress_scale = max(float(stress[idx_low]), 1e-12)
+        stress_norm = stress / stress_scale
 
         gdot_jax = jnp.asarray(gdot, dtype=jnp.float64)
-        stress_jax = jnp.asarray(stress, dtype=jnp.float64)
+        target = np.asarray(stress_norm, dtype=np.float64)
+        target_safe = np.maximum(target, 1e-10)
+        max_stress_norm = float(np.max(stress_norm))
 
-        # Grid sizing
-        sigma_max, n_bins = self._get_grid_params()
+        # Grid: n_bins=201 for fitting speed (501 for final predictions)
+        n_bins_fit = 201
+        # Minimum sigma_max covers the data stress range
+        sigma_max_min = 1.5 * max_stress_norm
 
-        # Calculate simulation duration for steady state.
-        # Need enough strain to yield: yield strain ~ sigma_c (G=1 normalized).
-        # Safe margin: strain = 20 * max(1, sigma_c). Also need time >> tau.
+        # --- Cost: log-space MSE with dynamic grid per sigma_c ---
+        def cost_fn(x):
+            alpha_v = x[0]
+            tau_v = 10.0 ** x[1]
+            sigma_c_v = x[2]
+            if not (0.01 <= alpha_v <= 0.99):
+                return 1e6
+            if not (0.1 <= sigma_c_v <= 15.0):
+                return 1e6
+            try:
+                # Dynamic sigma_max: always covers yield boundary AND data
+                sigma_max_v = max(5.0 * sigma_c_v, sigma_max_min)
+                ds_v = 2.0 * sigma_max_v / (n_bins_fit - 1)
+                schedule = [
+                    _compute_dt_and_steps_for_rate(
+                        abs(float(g)), tau_v, sigma_c_v, ds=ds_v,
+                        max_steps=5_000, bucket_size=5_000,
+                    )
+                    for g in gdot
+                ]
+                pred = np.array(run_flow_curve(
+                    gdot_jax, alpha_v, tau_v, sigma_c_v,
+                    0.005, sigma_max_v, n_bins_fit,
+                    per_rate_schedule=schedule,
+                ))
+                pred_safe = np.maximum(np.abs(pred), 1e-10)
+                log_resid = np.log10(pred_safe) - np.log10(target_safe)
+                return float(np.mean(log_resid**2))
+            except Exception:
+                return 1e6
 
-        sigma_c_val = self.parameters.get_value("sigma_c") or 1.0
-        tau_val = self.parameters.get_value("tau") or 1.0
+        # --- Multi-start Nelder-Mead ---
+        # x = [alpha, log10(tau), sigma_c_norm]
+        # HL yield stress ≈ sigma_c/2, so sigma_c ~ 2 for normalized data
+        starts = [
+            [0.10, -1.3, 2.5],   # alpha=0.10, tau=0.05, sigma_c=2.5
+            [0.30, -2.0, 3.0],   # alpha=0.30, tau=0.01, sigma_c=3.0
+        ]
 
-        # Estimate min gdot (taking non-zero min)
-        gdot_abs = np.abs(gdot)
-        gdot_min = np.min(gdot_abs[gdot_abs > 1e-9]) if np.any(gdot_abs > 1e-9) else 1.0
+        best_x = starts[0]
+        best_cost = np.inf
+        t0 = _time.time()
 
-        strain_target = 10.0 * max(1.0, sigma_c_val)
-        time_strain = strain_target / gdot_min
-        time_relax = 10.0 * tau_val
+        for i, x0 in enumerate(starts):
+            try:
+                res = minimize(
+                    cost_fn, x0, method="Nelder-Mead",
+                    options={"maxfev": 40, "xatol": 0.02,
+                             "fatol": 0.005, "adaptive": True},
+                )
+                if res.fun < best_cost:
+                    best_cost = res.fun
+                    best_x = res.x.copy()
+                    logger.info(
+                        f"Start {i+1}/{len(starts)}: cost={res.fun:.5f}, "
+                        f"alpha={res.x[0]:.3f}, tau={10**res.x[1]:.3e}, "
+                        f"sigma_c={res.x[2]:.3f} ({res.nfev} evals)"
+                    )
+            except Exception as e:
+                logger.warning(f"Start {i+1} failed: {e}")
 
-        t_total = max(time_strain, time_relax)
-        dt = 0.005
-        steps = int(t_total / dt) + 1
+        elapsed = _time.time() - t0
+        logger.info(f"HL fit: {elapsed:.1f}s, best cost={best_cost:.5f}")
 
-        # Cap steps to avoid freezing
-        steps = min(steps, 1_000_000)
-        steps = max(steps, 5000)
+        # --- Set fitted parameters ---
+        alpha_fit = float(np.clip(best_x[0], 0.01, 0.99))
+        tau_fit = float(10.0 ** np.clip(best_x[1], -6, 4))
+        sigma_c_fit = float(np.clip(best_x[2], 0.1, 15.0))
 
-        def model_fn(x_data, params):
-            alpha, tau, sigma_c = params
-            return run_flow_curve(
-                x_data, alpha, tau, sigma_c, dt, sigma_max, n_bins, steps=steps
-            )
+        self.parameters.set_value("alpha", alpha_fit)
+        self.parameters.set_value("tau", tau_fit)
+        self.parameters.set_value("sigma_c", sigma_c_fit * stress_scale)
 
-        objective = create_least_squares_objective(
-            model_fn, gdot_jax, stress_jax, normalize=True
+        # Store for predict/Bayesian
+        self._last_fit_kwargs["_tau_est"] = float(
+            self.parameters.get_value("tau") or 1.0
         )
-
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            use_jax=kwargs.get("use_jax", True),
-            max_iter=kwargs.get("max_iter", 1000),
+        self._last_fit_kwargs["_sigma_c_est"] = float(
+            self.parameters.get_value("sigma_c") or 1.0
         )
-
-        if not result.success:
-            logger.warning(f"Optimization warning: {result.message}")
+        self._last_fit_kwargs["_stress_scale"] = stress_scale
+        self._last_fit_kwargs["_sigma_max_min_norm"] = sigma_max_min
+        self._last_fit_kwargs["_n_bins_fit"] = n_bins_fit
+        sc_phys = float(self.parameters.get_value("sigma_c") or 1.0)
+        self._last_fit_kwargs["_sigma_max"] = max(
+            5.0, self.grid_sigma_factor * sc_phys
+        )
 
     def _fit_creep(self, t: np.ndarray, compliance: np.ndarray, **kwargs):
         """Fit creep compliance."""
@@ -262,13 +352,18 @@ class HebraudLequeux(BaseModel):
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         J_jax = jnp.asarray(compliance, dtype=jnp.float64)
 
-        # Calculate n_steps statically for the objective function
-        dt = 0.005  # Default from kernels
+        # Calculate n_steps statically for the objective function.
+        # Use creep-specific cap — servo controller causes super-linear
+        # XLA compilation cost with n_steps.
         t_max = float(t[-1])
+        dt = max(self._min_dt, t_max / self._max_scan_steps_creep)
         n_steps = int(t_max / dt) + 1
 
-        # Grid sizing
-        sigma_max, n_bins = self._get_grid_params()
+        # Grid sizing — use coarser grid for fitting speed.
+        # Coarser grid → larger ds → larger dt_stable → fewer CFL sub-steps
+        # per outer step → dramatically faster (O(n_bins * n_sub) per step).
+        sigma_max, _ = self._get_grid_params()
+        n_bins = 51
 
         def model_fn(x_data, params):
             alpha, tau, sigma_c = params
@@ -290,8 +385,9 @@ class HebraudLequeux(BaseModel):
         result = nlsq_optimize(
             objective,
             self.parameters,
+            method="scipy",
             use_jax=True,
-            max_iter=kwargs.get("max_iter", 500),
+            max_iter=kwargs.get("max_iter", 200),
         )
 
         if not result.success:
@@ -313,9 +409,8 @@ class HebraudLequeux(BaseModel):
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         G_jax = jnp.asarray(modulus, dtype=jnp.float64)
 
-        dt = 0.005
         t_max = float(t[-1])
-        n_steps = int(t_max / dt) + 1
+        dt, n_steps = self._adaptive_dt(t_max)
 
         # Grid sizing
         sigma_max, n_bins = self._get_grid_params()
@@ -342,6 +437,7 @@ class HebraudLequeux(BaseModel):
         result = nlsq_optimize(
             objective,
             self.parameters,
+            method="scipy",
             use_jax=True,
             max_iter=kwargs.get("max_iter", 500),
         )
@@ -365,9 +461,8 @@ class HebraudLequeux(BaseModel):
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         stress_jax = jnp.asarray(stress, dtype=jnp.float64)
 
-        dt = 0.005
         t_max = float(t[-1])
-        n_steps = int(t_max / dt) + 1
+        dt, n_steps = self._adaptive_dt(t_max)
 
         # Grid sizing
         sigma_max, n_bins = self._get_grid_params()
@@ -390,6 +485,7 @@ class HebraudLequeux(BaseModel):
         result = nlsq_optimize(
             objective,
             self.parameters,
+            method="scipy",
             use_jax=True,
             max_iter=kwargs.get("max_iter", 500),
         )
@@ -412,9 +508,8 @@ class HebraudLequeux(BaseModel):
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         stress_jax = jnp.asarray(stress, dtype=jnp.float64)
 
-        dt = 0.005
         t_max = float(t[-1])
-        n_steps = int(t_max / dt) + 1
+        dt, n_steps = self._adaptive_dt(t_max)
 
         # Grid sizing
         sigma_max, n_bins = self._get_grid_params()
@@ -437,6 +532,7 @@ class HebraudLequeux(BaseModel):
         result = nlsq_optimize(
             objective,
             self.parameters,
+            method="scipy",
             use_jax=True,
             max_iter=kwargs.get("max_iter", 500),
         )
@@ -461,40 +557,42 @@ class HebraudLequeux(BaseModel):
         # So we can use them directly here as X is provided at runtime.
 
         if self._test_mode == "steady_shear":
-            # For flow curve, we need to pass steps calculated from gdot range
-            # Replicate logic from _fit_steady_shear but for prediction
-            gdot = X_jax
-            gdot_abs = jnp.abs(gdot)
-            # Use JAX-safe estimate (predict usually takes concrete X)
-            gdot_min = jnp.min(jnp.where(gdot_abs > 1e-9, gdot_abs, 1e9))
-            # Fallback if all zero
-            gdot_min = jnp.where(gdot_min > 1e8, 1.0, gdot_min)
+            from rheojax.utils.hl_kernels import _compute_dt_and_steps_for_rate
 
-            strain_target = 10.0 * max(1.0, float(sigma_c or 1.0))
-            time_strain = strain_target / gdot_min
-            time_relax = 10.0 * float(tau or 1.0)
-
-            t_total = jnp.maximum(time_strain, time_relax)
-            dt = 0.005
-            steps = int(t_total / dt) + 1
-            steps = min(steps, 1_000_000)
-            steps = max(steps, 5000)
-
-            return np.array(
-                run_flow_curve(
-                    X_jax,
-                    float(alpha or 0.5),
-                    float(tau or 1.0),
-                    float(sigma_c or 1.0),
-                    dt,
-                    float(sigma_max),
-                    int(n_bins),
-                    steps=int(steps),
-                )
+            # Predict in normalized units (same as fitting) then scale back
+            stress_scale = self._last_fit_kwargs.get("_stress_scale", 1.0)
+            sigma_max_min_norm = self._last_fit_kwargs.get(
+                "_sigma_max_min_norm", 5.0
             )
+            n_bins_pred = self._last_fit_kwargs.get("_n_bins_fit", 501)
+
+            tau_val = float(tau or 1.0)
+            sigma_c_norm = float(sigma_c or 1.0) / stress_scale
+            sigma_max_norm = max(5.0 * sigma_c_norm, sigma_max_min_norm)
+            ds = 2.0 * sigma_max_norm / (n_bins_pred - 1)
+
+            per_rate_schedule = [
+                _compute_dt_and_steps_for_rate(
+                    abs(float(X_jax[i])), tau_val, sigma_c_norm, ds=ds,
+                )
+                for i in range(len(X_jax))
+            ]
+            pred_norm = run_flow_curve(
+                X_jax,
+                float(alpha or 0.5),
+                tau_val,
+                sigma_c_norm,
+                0.005,
+                float(sigma_max_norm),
+                int(n_bins_pred),
+                per_rate_schedule=per_rate_schedule,
+            )
+            return np.array(pred_norm) * stress_scale
 
         elif self._test_mode == "creep":
             stress_target = self._last_fit_kwargs.get("stress_target", 1.0)
+            t_max = float(X_jax[-1])
+            dt_pred = max(self._min_dt, t_max / self._max_scan_steps_creep)
             return np.array(
                 run_creep(
                     X_jax,
@@ -503,13 +601,15 @@ class HebraudLequeux(BaseModel):
                     float(tau or 1.0),
                     float(sigma_c or 1.0),
                     1.0,
-                    0.005,
+                    dt_pred,
                     float(sigma_max),
                     int(n_bins),
                 )
             )
         elif self._test_mode == "relaxation":
             gamma0 = self._last_fit_kwargs.get("gamma0", 1.0)
+            t_max = float(X_jax[-1])
+            dt_pred, _ = self._adaptive_dt(t_max)
             return np.array(
                 run_relaxation(
                     X_jax,
@@ -517,13 +617,15 @@ class HebraudLequeux(BaseModel):
                     float(alpha or 0.5),
                     float(tau or 1.0),
                     float(sigma_c or 1.0),
-                    0.005,
+                    dt_pred,
                     float(sigma_max),
                     int(n_bins),
                 )
             )
         elif self._test_mode == "startup":
             gdot = self._last_fit_kwargs.get("gdot", 1.0)
+            t_max = float(X_jax[-1])
+            dt_pred, _ = self._adaptive_dt(t_max)
             return np.array(
                 run_startup(
                     X_jax,
@@ -531,7 +633,7 @@ class HebraudLequeux(BaseModel):
                     float(alpha or 0.5),
                     float(tau or 1.0),
                     float(sigma_c or 1.0),
-                    0.005,
+                    dt_pred,
                     float(sigma_max),
                     int(n_bins),
                 )
@@ -539,6 +641,8 @@ class HebraudLequeux(BaseModel):
         elif self._test_mode == "laos":
             gamma0 = self._last_fit_kwargs.get("gamma0", 1.0)
             omega = self._last_fit_kwargs.get("omega", 1.0)
+            t_max = float(X_jax[-1])
+            dt_pred, _ = self._adaptive_dt(t_max)
             return np.array(
                 run_laos(
                     X_jax,
@@ -547,7 +651,7 @@ class HebraudLequeux(BaseModel):
                     float(alpha or 0.5),
                     float(tau or 1.0),
                     float(sigma_c or 1.0),
-                    0.005,
+                    dt_pred,
                     float(sigma_max),
                     int(n_bins),
                 )
@@ -574,36 +678,70 @@ class HebraudLequeux(BaseModel):
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Use fixed grid for Bayesian (sigma_c is dynamic tracer, can't resize
-        # in JIT). Choose a large grid covering sigma_c prior range (1e-3 to 1e6).
-        # JIT requires static shapes, so we use a fixed conservative grid.
-        sigma_max = 50.0  # Conservative default for normalized data
-        n_bins = 501
+        # in JIT). Use sigma_max from NLSQ fit if available, else conservative.
+        sigma_max = self._last_fit_kwargs.get("_sigma_max", 50.0)
+        n_bins = 201
 
-        dt = 0.005
-
-        # Helper to get n_steps safely
-        def get_n_steps(x_arr):
-            # If x_arr is concrete, we can calculate n_steps
-            # If it's a tracer, we need the stored metadata
+        # Helper to get adaptive dt and n_steps safely.
+        # Bayesian uses a coarser cap because forward-mode AD through
+        # lax.scan is much more expensive than plain evaluation.
+        def get_dt_and_n_steps(x_arr, creep=False):
             try:
                 t_max = float(x_arr[-1])
-                return int(t_max / dt) + 1
             except Exception as e:
-                # Fallback to stored metadata if available
                 if self._fit_data_metadata and "t_max" in self._fit_data_metadata:
                     t_max = self._fit_data_metadata["t_max"]
-                    return int(t_max / dt) + 1
                 else:
                     raise RuntimeError(
                         "Cannot determine n_steps for Bayesian inference."
                     ) from e
+            cap = self._max_scan_steps_bayesian_creep if creep else self._max_scan_steps_bayesian
+            dt = max(self._min_dt, t_max / cap)
+            n_steps = int(t_max / dt) + 1
+            return dt, n_steps
 
         # Dispatch to kernels
         if mode == "steady_shear":
-            return run_flow_curve(X_jax, alpha, tau, sigma_c, dt, sigma_max, n_bins)
+            from rheojax.utils.hl_kernels import _compute_dt_and_steps_for_rate
+
+            dt = self._min_dt  # default for flow curve (overridden by per_rate_schedule)
+            # Run in normalized units (same as fitting) for consistency
+            stress_scale = self._last_fit_kwargs.get("_stress_scale", 1.0)
+            sigma_max_min_norm = self._last_fit_kwargs.get(
+                "_sigma_max_min_norm", 5.0
+            )
+            n_bins_bayes = self._last_fit_kwargs.get("_n_bins_fit", 501)
+
+            # Use stored NLSQ estimates for schedule (tau/sigma_c are tracers)
+            tau_est = self._last_fit_kwargs.get("_tau_est", 1.0)
+            sc_est = self._last_fit_kwargs.get("_sigma_c_est", 1.0)
+            sc_norm_est = sc_est / stress_scale
+            sigma_max_norm = max(5.0 * sc_norm_est, sigma_max_min_norm)
+            ds = 2.0 * sigma_max_norm / (n_bins_bayes - 1)
+
+            try:
+                schedule = [
+                    _compute_dt_and_steps_for_rate(
+                        abs(float(X_jax[i])), tau_est, sc_norm_est, ds=ds,
+                    )
+                    for i in range(len(X_jax))
+                ]
+                # sigma_c tracer divided by stress_scale to get normalized
+                sigma_c_norm = sigma_c / stress_scale
+                pred_norm = run_flow_curve(
+                    X_jax, alpha, tau, sigma_c_norm,
+                    dt, sigma_max_norm, n_bins_bayes,
+                    per_rate_schedule=schedule,
+                )
+                return pred_norm * stress_scale
+            except Exception:
+                return run_flow_curve(
+                    X_jax, alpha, tau, sigma_c, dt, sigma_max, n_bins,
+                )
 
         elif mode == "creep":
-            n_steps = get_n_steps(X_jax)
+            # Creep uses tighter cap due to super-linear compilation cost
+            dt, n_steps = get_dt_and_n_steps(X_jax, creep=True)
             stress_target = self._last_fit_kwargs.get("stress_target", 1.0)
 
             time_hist, gamma_hist = creep_kernel(
@@ -614,7 +752,7 @@ class HebraudLequeux(BaseModel):
             return jnp.interp(X_jax, time_full, gamma_full) / stress_target
 
         elif mode == "relaxation":
-            n_steps = get_n_steps(X_jax)
+            dt, n_steps = get_dt_and_n_steps(X_jax)
             gamma0 = self._last_fit_kwargs.get("gamma0", 1.0)
 
             time_hist, stress_hist = relaxation_kernel(
@@ -627,7 +765,7 @@ class HebraudLequeux(BaseModel):
             return jnp.interp(X_jax, time_full, stress_full) / gamma0
 
         elif mode == "startup":
-            n_steps = get_n_steps(X_jax)
+            dt, n_steps = get_dt_and_n_steps(X_jax)
             gdot = self._last_fit_kwargs.get("gdot", 1.0)
 
             time_hist, stress_hist = startup_kernel(
@@ -638,7 +776,7 @@ class HebraudLequeux(BaseModel):
             return jnp.interp(X_jax, time_full, stress_full)
 
         elif mode == "laos":
-            n_steps = get_n_steps(X_jax)
+            dt, n_steps = get_dt_and_n_steps(X_jax)
             gamma0 = self._last_fit_kwargs.get("gamma0", 1.0)
             omega = self._last_fit_kwargs.get("omega", 1.0)
 
