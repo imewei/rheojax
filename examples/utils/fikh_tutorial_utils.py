@@ -353,24 +353,8 @@ def generate_synthetic_relaxation(
     # Log-spaced time points for relaxation
     time = np.logspace(-2, np.log10(t_end), n_points)
 
-    # For relaxation: constant strain (from initial stress via G)
-    # σ₀ = G·γ₀, so γ₀ = σ₀/G
-    # Get an effective modulus from the model
-    try:
-        # For FMLIKH, sum the moduli of all modes
-        if hasattr(model, 'n_modes'):
-            G_total = sum(model.parameters.get_value(f'G_{i}') for i in range(model.n_modes))
-        else:
-            G_total = model.parameters.get_value('G')
-    except (KeyError, AttributeError):
-        # Fallback: use a reasonable default
-        G_total = 1000.0
-
-    gamma_0 = sigma_0 / max(G_total, 1.0)
-    strain = np.full_like(time, gamma_0)
-
-    # Use model's prediction method
-    result = model.predict(time, test_mode='relaxation', strain=strain)
+    # Use model's prediction method with sigma_0 for transient relaxation
+    result = model.predict(time, test_mode='relaxation', sigma_0=sigma_0)
     # Handle RheoData or array return
     if hasattr(result, 'y'):
         stress_clean = np.asarray(result.y).flatten()

@@ -34,7 +34,7 @@ import pandas as pd
 # For CI/automated testing, FAST_MODE should be True.
 # For publication-quality figures and uncertainty quantification, use False.
 
-FAST_MODE = True  # Toggle this for fast vs full execution
+FAST_MODE = os.environ.get("FAST_MODE", "1") == "1"
 
 
 def get_fast_mode() -> bool:
