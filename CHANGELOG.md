@@ -236,6 +236,24 @@ Implemented the STZ model (Langer 2008) for metallic glasses and colloidal suspe
 ### Changed
 - Version bump to 0.6.0
 - Removed piblin-jax integration from RheoData
+- **Dependency bumps**: JAX >=0.8.3, jaxlib >=0.8.3, NLSQ >=0.6.8, ArviZ >=0.23.4
+- **GPU support**: Added CUDA 13+ support alongside CUDA 12+ (system CUDA via `-local` packages)
+
+### Documentation
+- **Tutorial expansion**: 56 → 235 example notebooks across 20 categories
+  - Added model family tutorials: DMT (6), EPM (6), FIKH (12), Fluidity (24), Giesekus (7), HL (6), HVM (13), HVNM (15), IKH (12), ITT-MCT (12), SGR (6), STZ (6), TNT (30), VLB (16)
+  - Added verification suite: 31 notebooks for cross-validation against literature data
+- **Models handbook**: Added narrative deep-dive pages for all 18 model families
+- **User guide**: Added advanced topics (constitutive ODE models, dense suspensions, polymer networks, vitrimer models, thixotropy & yielding)
+- **GPU installation guide**: Added CUDA 13 support, GPU compatibility table (Blackwell through Kepler), structured troubleshooting
+- **Updated** `docs/source/examples/index.rst` with all 235 notebooks, 3 learning paths, navigation tables
+- **Updated** `CLAUDE.md` with current dependency versions (JAX >=0.8.3, NLSQ >=0.6.8, ArviZ >=0.23.4)
+- **Updated** all CUDA references codebase-wide from "CUDA 12.1-12.9" to "CUDA 12+ or 13+"
+
+### Test Organization
+- **Reorganized** test files into subdirectories by model family (`tests/models/<family>/`)
+  - classical/, dmt/, epm/, flow/, fractional/, hl/, ikh/, multimode/, sgr/, spp/, vlb/
+- **Test count**: 3576 tests (1077 smoke, 3349 standard, 3576 full suite)
 
 ---
 

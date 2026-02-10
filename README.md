@@ -80,15 +80,27 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Plugin System**: Support for custom models and transforms
 
 ### Tutorial Notebooks & Examples
-- **56 Tutorial Notebooks**: Organized in 8 categories
+- **235 Tutorial Notebooks**: Organized in 20 categories
   - `examples/basic/` - 5 notebooks covering fundamental models
   - `examples/transforms/` - 8 notebooks for data transforms and analysis (including SRFS)
   - `examples/bayesian/` - 9 notebooks for Bayesian inference workflows (including SPP LAOS)
   - `examples/advanced/` - 10 notebooks for production patterns (including SGR and SPP)
   - `examples/io/` - 1 notebook for TRIOS complex modulus handling
-  - `examples/vlb/` - 10 notebooks: 6 protocols + Bayesian + Bell + FENE + Nonlocal banding
-  - `examples/hvm/` - 6 notebooks: SAOS, relaxation, startup, creep, flow curve, LAOS
-  - `examples/hvnm/` - 7 notebooks: 6 protocols + limiting cases (phi=0 recovers HVM)
+  - `examples/dmt/` - 6 notebooks: DMT thixotropic model (6 protocols)
+  - `examples/epm/` - 6 notebooks: Elasto-plastic models (5 protocols + visualization)
+  - `examples/fikh/` - 12 notebooks: FIKH + FMLIKH models (6 protocols each)
+  - `examples/fluidity/` - 24 notebooks: Fluidity local/nonlocal + Saramito local/nonlocal (6 protocols each)
+  - `examples/giesekus/` - 7 notebooks: Giesekus model (6 protocols + normal stresses)
+  - `examples/hl/` - 6 notebooks: Hebraud-Lequeux model (6 protocols)
+  - `examples/hvm/` - 13 notebooks: Hybrid Vitrimer Model (6 basic + 7 advanced tutorials)
+  - `examples/hvnm/` - 15 notebooks: Hybrid Vitrimer Nanocomposite (7 basic + 8 NLSQ/NUTS)
+  - `examples/ikh/` - 12 notebooks: MIKH + MLIKH models (6 protocols each)
+  - `examples/itt_mct/` - 12 notebooks: ITT-MCT Schematic + Isotropic (6 protocols each)
+  - `examples/sgr/` - 6 notebooks: Soft Glassy Rheology (6 protocols)
+  - `examples/stz/` - 6 notebooks: Shear Transformation Zone (6 protocols)
+  - `examples/tnt/` - 30 notebooks: 5 TNT sub-models (6 protocols each)
+  - `examples/vlb/` - 16 notebooks: 6 protocols + Bayesian + Bell + FENE + Nonlocal + 6 NLSQ-to-NUTS
+  - `examples/verification/` - 31 notebooks: Cross-model validation (6 protocol validators + 25 material-specific)
 
 ## Installation
 
@@ -114,82 +126,162 @@ cd rheojax
 pip install -e ".[dev]"
 ```
 
-### GPU Installation (Linux Only)
+### GPU Installation (Linux + System CUDA)
 
 **Performance Impact:** 20-100x speedup for large datasets (>10K points)
 
-#### Option 1: Install via Makefile
+**Prerequisites:**
+- NVIDIA GPU with SM >= 5.2 (Maxwell or newer)
+- System CUDA 12.x or 13.x installed
+- `nvcc` in PATH
 
-From the repository:
+#### Verify Prerequisites
+
+```bash
+# Check CUDA installation
+nvcc --version
+# Should show: Cuda compilation tools, release 12.x or 13.x
+
+# Check GPU
+nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader
+# Should show: GPU name and SM version (e.g., "8.9" for RTX 4090)
+```
+
+#### Option 1: Quick Install via Makefile (Recommended)
 
 ```bash
 git clone https://github.com/imewei/rheojax.git
 cd rheojax
-make install-jax-gpu  # Handles uninstall + GPU install
+
+# Auto-detect system CUDA version and install matching JAX
+make install-jax-gpu
+
+# Or explicitly choose CUDA version:
+make install-jax-gpu-cuda13  # Requires system CUDA 13.x + SM >= 7.5
+make install-jax-gpu-cuda12  # Requires system CUDA 12.x + SM >= 5.2
 ```
 
-This command:
-- Uninstalls CPU-only JAX
-- Installs GPU-enabled JAX with CUDA 12 support
+This:
+- Detects your system CUDA version (via nvcc)
+- Validates GPU compatibility
+- Installs the matching `jax[cudaXX-local]` package
 - Verifies GPU detection
 
 #### Option 2: Manual Installation
 
-For GPU-accelerated computation on Linux systems with CUDA 12+:
+**For System CUDA 13.x (Turing and newer GPUs):**
 
 ```bash
-# Step 1: Uninstall CPU-only version
+# Verify you have CUDA 13.x
+nvcc --version  # Should show release 13.x
+
+# Verify GPU supports CUDA 13 (SM >= 7.5)
+nvidia-smi --query-gpu=compute_cap --format=csv,noheader  # Should be >= 7.5
+
+# Install
 pip uninstall -y jax jaxlib
+pip install "jax[cuda13-local]"
 
-# Step 2: Install JAX with CUDA support
-pip install jax[cuda12-local]==0.8.0 jaxlib==0.8.0
-
-# Step 3: Verify GPU detection
-python -c "import jax; print('Devices:', jax.devices())"
-# Should show: [cuda(id=0)] instead of [CpuDevice(id=0)]
+# Verify
+python -c "import jax; print('Backend:', jax.default_backend())"
+# Should show: Backend: gpu
 ```
 
-**Why separate installation?** JAX with CUDA support is Linux-specific and requires system CUDA 12.1-12.9 pre-installed. Separating the installation avoids dependency conflicts on macOS/Windows.
+**For System CUDA 12.x (Maxwell and newer GPUs):**
+
+```bash
+# Verify you have CUDA 12.x
+nvcc --version  # Should show release 12.x
+
+# Install
+pip uninstall -y jax jaxlib
+pip install "jax[cuda12-local]"
+
+# Verify
+python -c "import jax; print('Backend:', jax.default_backend())"
+```
+
+**Why separate installation?** JAX with CUDA support is Linux-specific and requires system CUDA pre-installed. Separating the installation avoids dependency conflicts on macOS/Windows.
+
+#### GPU Compatibility Guide
+
+| GPU Generation | Example GPUs | SM Version | CUDA 13 | CUDA 12 |
+|----------------|--------------|------------|---------|---------|
+| Blackwell | B100, B200 | 10.0 | Yes | Yes |
+| Hopper | H100, H200 | 9.0 | Yes | Yes |
+| Ada Lovelace | RTX 40xx, L40 | 8.9 | Yes | Yes |
+| Ampere | RTX 30xx, A100 | 8.x | Yes | Yes |
+| Turing | RTX 20xx, T4 | 7.5 | Yes | Yes |
+| Volta | V100, Titan V | 7.0 | No | Yes |
+| Pascal | GTX 10xx, P100 | 6.x | No | Yes |
+| Maxwell | GTX 9xx, Titan X | 5.x | No | Yes |
+| Kepler | GTX 7xx, K80 | 3.x | No | No |
+
+**Recommendation:** SM >= 7.5 (RTX 20xx or newer) → install CUDA 13 for best performance. SM 5.2–7.4 (GTX 9xx/10xx, V100) → install CUDA 12.
 
 #### GPU Troubleshooting
 
-**Issue:** Warning "An NVIDIA GPU may be present... but a CUDA-enabled jaxlib is not installed"
+**Issue: "nvcc not found"**
 
-**Solution:**
+CUDA toolkit not installed or not in PATH:
 ```bash
-# 1. Check GPU hardware
-nvidia-smi  # Should show your GPU
+# Option 1: Install CUDA toolkit
+# Ubuntu/Debian:
+sudo apt install nvidia-cuda-toolkit
 
-# 2. Check CUDA version
-nvcc --version  # Should show CUDA 12.1-12.9
-
-# 3. Reinstall JAX with GPU support
-pip uninstall -y jax jaxlib
-pip install jax[cuda12-local]==0.8.0 jaxlib==0.8.0
-
-# 4. Verify JAX detects GPU
-python -c "import jax; print(jax.devices())"
-# Expected: [cuda(id=0)]
-# If still showing [CpuDevice(id=0)], check CUDA installation
+# Option 2: Add existing CUDA to PATH
+export PATH=/usr/local/cuda/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+# Add to ~/.bashrc for permanent fix
 ```
 
-**Issue:** ImportError or CUDA library not found
+**Issue: "CUDA version mismatch"**
 
-**Solution:**
+JAX package must match your system CUDA version:
 ```bash
-# Set CUDA library path (add to ~/.bashrc for permanent fix)
+# Check your system CUDA version
+nvcc --version
+# Shows: release 12.6 -> use cuda12-local
+# Shows: release 13.x -> use cuda13-local
+
+# Reinstall with correct package
+pip uninstall -y jax jaxlib
+pip install "jax[cuda12-local]"  # or cuda13-local
+```
+
+**Issue: "GPU SM version doesn't support CUDA 13"**
+
+Your GPU is older than Turing architecture:
+```bash
+# Check SM version
+nvidia-smi --query-gpu=compute_cap --format=csv,noheader
+# If < 7.5, you need CUDA 12
+
+# Install CUDA 12.x toolkit, then:
+pip install "jax[cuda12-local]"
+```
+
+**Issue: "libcuda.so not found" or similar library errors**
+
+CUDA libraries not in LD_LIBRARY_PATH:
+```bash
+# Add to ~/.bashrc
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+source ~/.bashrc
 ```
 
 #### Platform Support
 
-- **Linux + NVIDIA GPU + CUDA 12.1-12.9:** Full GPU acceleration (20-100x speedup)
-- **macOS:** CPU-only (Apple Silicon/Intel, no NVIDIA GPU support)
-- **Windows:** CPU-only (CUDA support experimental/unstable)
+| Platform | GPU Support | Notes |
+|----------|-------------|-------|
+| Linux x86_64/aarch64 | Full | Requires system CUDA 12.x or 13.x |
+| Windows WSL2 | Experimental | Use Linux wheels |
+| macOS (any) | CPU-only | No NVIDIA support |
+| Windows native | CPU-only | No pre-built wheels |
 
 **Requirements (Linux GPU):**
-- System CUDA 12.1-12.9 pre-installed
-- NVIDIA driver >= 525
+- System CUDA 12.1+ or 13.x pre-installed
+- NVIDIA driver >= 525 (CUDA 12) or >= 560 (CUDA 13)
 - Linux x86_64 or aarch64
 
 #### Conda/Mamba Users
@@ -637,7 +729,7 @@ unfilled = HVNMLocal.unfilled_vitrimer(G_P=5000, G_E=3000, G_D=1000)
 
 ## Tutorial Notebooks
 
-56 tutorial notebooks organized by topic:
+235 tutorial notebooks organized by topic:
 
 ```
 examples/
@@ -664,9 +756,9 @@ examples/
 │   ├── 05-uncertainty-propagation.ipynb
 │   ├── 06-bayesian_workflow_demo.ipynb
 │   ├── 07-gmm_bayesian_workflow.ipynb
-│   ├── 08-spp-laos.ipynb                    # SPP LAOS analysis
-│   └── 09-spp-rheojax-workflow.ipynb        # SPP Bayesian workflow
-├── advanced/                    # 10 notebooks: Production patterns (including SGR)
+│   ├── 08-spp-laos.ipynb
+│   └── 09-spp-rheojax-workflow.ipynb
+├── advanced/                    # 10 notebooks: Production patterns
 │   ├── 01-multi-technique-fitting.ipynb
 │   ├── 02-batch-processing.ipynb
 │   ├── 03-custom-models.ipynb
@@ -675,9 +767,154 @@ examples/
 │   ├── 06-frequentist-model-selection.ipynb
 │   ├── 07-trios_chunked_reading_example.ipynb
 │   ├── 08-generalized_maxwell_fitting.ipynb
-│   ├── 09-sgr-soft-glassy-rheology.ipynb    # SGR models
-│   └── 10-spp-laos-tutorial.ipynb           # SPP tutorial
-├── vlb/                         # 10 notebooks: VLB transient network models
+│   ├── 09-sgr-soft-glassy-rheology.ipynb
+│   └── 10-spp-laos-tutorial.ipynb
+├── io/                          # 1 notebook: I/O demonstrations
+│   └── plot_trios_complex_modulus.ipynb
+├── dmt/                         # 6 notebooks: DMT thixotropic model
+│   ├── 01_dmt_flow_curve.ipynb
+│   ├── 02_dmt_startup_shear.ipynb
+│   ├── 03_dmt_stress_relaxation.ipynb
+│   ├── 04_dmt_creep.ipynb
+│   ├── 05_dmt_saos.ipynb
+│   └── 06_dmt_laos.ipynb
+├── epm/                         # 6 notebooks: Elasto-plastic models
+│   ├── 01_epm_flow_curve.ipynb
+│   ├── 02_epm_saos.ipynb
+│   ├── 03_epm_startup.ipynb
+│   ├── 04_epm_creep.ipynb
+│   ├── 05_epm_relaxation.ipynb
+│   └── 06_epm_visualization.ipynb
+├── fikh/                        # 12 notebooks: FIKH + FMLIKH models
+│   ├── 01_fikh_flow_curve.ipynb
+│   ├── 02_fikh_startup_shear.ipynb
+│   ├── 03_fikh_stress_relaxation.ipynb
+│   ├── 04_fikh_creep.ipynb
+│   ├── 05_fikh_saos.ipynb
+│   ├── 06_fikh_laos.ipynb
+│   ├── 07_fmlikh_flow_curve.ipynb
+│   ├── 08_fmlikh_startup_shear.ipynb
+│   ├── 09_fmlikh_stress_relaxation.ipynb
+│   ├── 10_fmlikh_creep.ipynb
+│   ├── 11_fmlikh_saos.ipynb
+│   └── 12_fmlikh_laos.ipynb
+├── fluidity/                    # 24 notebooks: Fluidity + Saramito (local & nonlocal)
+│   ├── 01_fluidity_local_flow_curve.ipynb
+│   ├── 02_fluidity_local_startup.ipynb
+│   ├── 03_fluidity_local_creep.ipynb
+│   ├── 04_fluidity_local_relaxation.ipynb
+│   ├── 05_fluidity_local_saos.ipynb
+│   ├── 06_fluidity_local_laos.ipynb
+│   ├── 07_fluidity_nonlocal_flow_curve.ipynb
+│   ├── 08_fluidity_nonlocal_startup.ipynb
+│   ├── 09_fluidity_nonlocal_creep.ipynb
+│   ├── 10_fluidity_nonlocal_relaxation.ipynb
+│   ├── 11_fluidity_nonlocal_saos.ipynb
+│   ├── 12_fluidity_nonlocal_laos.ipynb
+│   ├── 13_saramito_local_flow_curve.ipynb
+│   ├── 14_saramito_local_startup.ipynb
+│   ├── 15_saramito_local_creep.ipynb
+│   ├── 16_saramito_local_relaxation.ipynb
+│   ├── 17_saramito_local_saos.ipynb
+│   ├── 18_saramito_local_laos.ipynb
+│   ├── 19_saramito_nonlocal_flow_curve.ipynb
+│   ├── 20_saramito_nonlocal_startup.ipynb
+│   ├── 21_saramito_nonlocal_creep.ipynb
+│   ├── 22_saramito_nonlocal_relaxation.ipynb
+│   ├── 23_saramito_nonlocal_saos.ipynb
+│   └── 24_saramito_nonlocal_laos.ipynb
+├── giesekus/                    # 7 notebooks: Giesekus constitutive model
+│   ├── 01_giesekus_flow_curve.ipynb
+│   ├── 02_giesekus_saos.ipynb
+│   ├── 03_giesekus_startup.ipynb
+│   ├── 04_giesekus_normal_stresses.ipynb
+│   ├── 05_giesekus_creep.ipynb
+│   ├── 06_giesekus_relaxation.ipynb
+│   └── 07_giesekus_laos.ipynb
+├── hl/                          # 6 notebooks: Hebraud-Lequeux model
+│   ├── 01_hl_flow_curve.ipynb
+│   ├── 02_hl_relaxation.ipynb
+│   ├── 03_hl_creep.ipynb
+│   ├── 04_hl_saos.ipynb
+│   ├── 05_hl_startup.ipynb
+│   └── 06_hl_laos.ipynb
+├── hvm/                         # 13 notebooks: Hybrid Vitrimer Model
+│   ├── 01_hvm_saos.ipynb
+│   ├── 02_hvm_stress_relaxation.ipynb
+│   ├── 03_hvm_startup_shear.ipynb
+│   ├── 04_hvm_creep.ipynb
+│   ├── 05_hvm_flow_curve.ipynb
+│   ├── 06_hvm_laos.ipynb
+│   ├── 07_hvm_overview.ipynb               # Overview tutorial
+│   ├── 08_hvm_flow_curve.ipynb             # Advanced flow curve
+│   ├── 09_hvm_creep.ipynb                  # Advanced creep
+│   ├── 10_hvm_relaxation.ipynb             # Advanced relaxation
+│   ├── 11_hvm_startup.ipynb                # Advanced startup
+│   ├── 12_hvm_saos.ipynb                   # Advanced SAOS
+│   └── 13_hvm_laos.ipynb                   # Advanced LAOS
+├── hvnm/                        # 15 notebooks: Hybrid Vitrimer Nanocomposite
+│   ├── 01_hvnm_saos.ipynb
+│   ├── 02_hvnm_stress_relaxation.ipynb
+│   ├── 03_hvnm_startup_shear.ipynb
+│   ├── 04_hvnm_creep.ipynb
+│   ├── 05_hvnm_flow_curve.ipynb
+│   ├── 06_hvnm_laos.ipynb
+│   ├── 07_hvnm_limiting_cases.ipynb        # phi=0 → HVM recovery
+│   ├── 08_data_intake_and_qc.ipynb         # Data intake & QC
+│   ├── 09_flow_curve_nlsq_nuts.ipynb       # NLSQ → NUTS workflow
+│   ├── 10_creep_compliance_nlsq_nuts.ipynb
+│   ├── 11_stress_relaxation_nlsq_nuts.ipynb
+│   ├── 12_startup_shear_nlsq_nuts.ipynb
+│   ├── 13_saos_nlsq_nuts.ipynb
+│   ├── 14_laos_nlsq_nuts.ipynb
+│   └── 15_global_multi_protocol.ipynb      # Multi-protocol fitting
+├── ikh/                         # 12 notebooks: MIKH + MLIKH models
+│   ├── 01_mikh_flow_curve.ipynb
+│   ├── 02_mikh_startup_shear.ipynb
+│   ├── 03_mikh_stress_relaxation.ipynb
+│   ├── 04_mikh_creep.ipynb
+│   ├── 05_mikh_saos.ipynb
+│   ├── 06_mikh_laos.ipynb
+│   ├── 07_mlikh_flow_curve.ipynb
+│   ├── 08_mlikh_startup_shear.ipynb
+│   ├── 09_mlikh_stress_relaxation.ipynb
+│   ├── 10_mlikh_creep.ipynb
+│   ├── 11_mlikh_saos.ipynb
+│   └── 12_mlikh_laos.ipynb
+├── itt_mct/                     # 12 notebooks: ITT-MCT Schematic + Isotropic
+│   ├── 01_schematic_flow_curve.ipynb
+│   ├── 02_schematic_startup_shear.ipynb
+│   ├── 03_schematic_stress_relaxation.ipynb
+│   ├── 04_schematic_creep.ipynb
+│   ├── 05_schematic_saos.ipynb
+│   ├── 06_schematic_laos.ipynb
+│   ├── 07_isotropic_flow_curve.ipynb
+│   ├── 08_isotropic_startup_shear.ipynb
+│   ├── 09_isotropic_stress_relaxation.ipynb
+│   ├── 10_isotropic_creep.ipynb
+│   ├── 11_isotropic_saos.ipynb
+│   └── 12_isotropic_laos.ipynb
+├── sgr/                         # 6 notebooks: Soft Glassy Rheology
+│   ├── 01_sgr_flow_curve.ipynb
+│   ├── 02_sgr_stress_relaxation.ipynb
+│   ├── 03_sgr_saos.ipynb
+│   ├── 04_sgr_creep.ipynb
+│   ├── 05_sgr_startup.ipynb
+│   └── 06_sgr_laos.ipynb
+├── stz/                         # 6 notebooks: Shear Transformation Zone
+│   ├── 01_stz_flow_curve.ipynb
+│   ├── 02_stz_startup_shear.ipynb
+│   ├── 03_stz_stress_relaxation.ipynb
+│   ├── 04_stz_creep.ipynb
+│   ├── 05_stz_saos.ipynb
+│   └── 06_stz_laos.ipynb
+├── tnt/                         # 30 notebooks: 5 TNT sub-models × 6 protocols
+│   ├── 01-06: SingleMode (flow, startup, relaxation, creep, SAOS, LAOS)
+│   ├── 07-12: Cates (flow, startup, relaxation, creep, SAOS, LAOS)
+│   ├── 13-18: LoopBridge (flow, startup, relaxation, creep, SAOS, LAOS)
+│   ├── 19-24: MultiSpecies (flow, startup, relaxation, creep, SAOS, LAOS)
+│   └── 25-30: StickyRouse (flow, startup, relaxation, creep, SAOS, LAOS)
+├── vlb/                         # 16 notebooks: VLB transient network models
 │   ├── 01_vlb_flow_curve.ipynb
 │   ├── 02_vlb_startup_shear.ipynb
 │   ├── 03_vlb_stress_relaxation.ipynb
@@ -687,24 +924,20 @@ examples/
 │   ├── 07_vlb_bayesian_workflow.ipynb       # Bayesian inference
 │   ├── 08_vlb_bell_shear_thinning.ipynb     # Bell model extension
 │   ├── 09_vlb_fene_extensional.ipynb        # FENE extensibility
-│   └── 10_vlb_nonlocal_banding.ipynb        # Shear banding PDE
-├── hvm/                         # 6 notebooks: Hybrid Vitrimer Model
-│   ├── 01_hvm_saos.ipynb
-│   ├── 02_hvm_stress_relaxation.ipynb
-│   ├── 03_hvm_startup_shear.ipynb
-│   ├── 04_hvm_creep.ipynb
-│   ├── 05_hvm_flow_curve.ipynb
-│   └── 06_hvm_laos.ipynb
-├── hvnm/                        # 7 notebooks: Hybrid Vitrimer Nanocomposite
-│   ├── 01_hvnm_saos.ipynb
-│   ├── 02_hvnm_stress_relaxation.ipynb
-│   ├── 03_hvnm_startup_shear.ipynb
-│   ├── 04_hvnm_creep.ipynb
-│   ├── 05_hvnm_flow_curve.ipynb
-│   ├── 06_hvnm_laos.ipynb
-│   └── 07_hvnm_limiting_cases.ipynb        # phi=0 → HVM recovery
-└── io/                          # 1 notebook: I/O demonstrations
-    └── plot_trios_complex_modulus.ipynb
+│   ├── 10_vlb_nonlocal_banding.ipynb        # Shear banding PDE
+│   ├── 11_vlb_flow_curve_nlsq_to_nuts.ipynb # NLSQ → NUTS workflows
+│   ├── 12_vlb_creep_nlsq_to_nuts.ipynb
+│   ├── 13_vlb_stress_relaxation_nlsq_to_nuts.ipynb
+│   ├── 14_vlb_startup_shear_nlsq_to_nuts.ipynb
+│   ├── 15_vlb_saos_nlsq_to_nuts.ipynb
+│   └── 16_vlb_laos_nlsq_to_nuts.ipynb
+└── verification/                # 31 notebooks: Cross-model validation
+    ├── 00_verification_index.ipynb
+    ├── 01-06: Protocol validators (flow, creep, relaxation, startup, SAOS, LAOS)
+    ├── creep/                   # 3 notebooks (mucus, perihepatic abscess, polystyrene)
+    ├── oscillation/             # 13 notebooks (mastercurves, model evaluation, material-specific)
+    ├── relaxation/              # 7 notebooks (fish muscle, laponite, foams, polyethylene, etc.)
+    └── rotation/                # 1 notebook (emulsion)
 ```
 
 See `examples/README.md` for learning path guide.

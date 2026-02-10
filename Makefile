@@ -394,15 +394,62 @@ endif
 	@echo "$(BOLD)GPU Support:$(RESET)"
 ifeq ($(PLATFORM),linux)
 	@echo "  Platform: ✅ Linux (GPU support available)"
-	@echo "  JAX GPU package: $(JAX_GPU_PKG)"
-	@$(PYTHON) -c "import subprocess; r = subprocess.run(['nvidia-smi', '--query-gpu=name', '--format=csv,noheader'], capture_output=True, text=True, timeout=5); print(f'  GPU hardware: ✓ {r.stdout.strip()}') if r.returncode == 0 else print('  GPU hardware: ✗ Not detected')" 2>/dev/null || echo "  GPU hardware: ✗ nvidia-smi not found"
-	@$(PYTHON) -c "import subprocess; r = subprocess.run(['nvcc', '--version'], capture_output=True, text=True, timeout=5); version = [line for line in r.stdout.split('\\n') if 'release' in line]; print(f'  CUDA: ✓ {version[0].split(\"release\")[1].split(\",\")[0].strip() if version else \"unknown\"}') if r.returncode == 0 else print('  CUDA: ✗ Not found')" 2>/dev/null || echo "  CUDA: ✗ nvcc not found"
+	@echo ""
+	@echo "  System CUDA:"
+	@CUDA_FULL=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+'); \
+	CUDA_MAJOR=$$(echo $$CUDA_FULL | cut -d'.' -f1); \
+	if [ -n "$$CUDA_FULL" ]; then \
+		echo "    Version: $$CUDA_FULL"; \
+		echo "    nvcc path: $$(which nvcc)"; \
+		if [ "$$CUDA_MAJOR" = "13" ]; then \
+			echo "    JAX package: $(JAX_GPU_CUDA13_PKG)"; \
+		elif [ "$$CUDA_MAJOR" = "12" ]; then \
+			echo "    JAX package: $(JAX_GPU_CUDA12_PKG)"; \
+		else \
+			echo "    JAX package: Not supported (need CUDA 12 or 13)"; \
+		fi; \
+	else \
+		echo "    Not found (nvcc not in PATH)"; \
+		echo "    Install CUDA toolkit or add to PATH"; \
+	fi
+	@echo ""
+	@echo "  GPU Hardware:"
+	@$(PYTHON) -c "\
+import subprocess; \
+r = subprocess.run(['nvidia-smi', '--query-gpu=name,compute_cap,driver_version', '--format=csv,noheader'], \
+    capture_output=True, text=True, timeout=5); \
+if r.returncode == 0: \
+    for line in r.stdout.strip().split('\n'): \
+        parts = line.split(', '); \
+        name, sm, driver = parts[0], parts[1], parts[2]; \
+        sm_int = int(sm.replace('.', '')); \
+        cuda_support = 'CUDA 12 and 13' if sm_int >= 75 else 'CUDA 12 only' if sm_int >= 52 else 'Not supported'; \
+        print(f'    Name: {name}'); \
+        print(f'    SM version: {sm} ({cuda_support})'); \
+        print(f'    Driver: {driver}'); \
+else: \
+    print('    Not detected (nvidia-smi failed)')" 2>/dev/null || echo "    nvidia-smi not found"
+	@echo ""
+	@echo "  JAX Status:"
+	@$(PYTHON) -c "\
+import jax; \
+print(f'    Version: {jax.__version__}'); \
+print(f'    Backend: {jax.default_backend()}'); \
+devices = jax.devices(); \
+gpu_count = sum(1 for d in devices if 'cuda' in str(d).lower()); \
+print(f'    GPU devices: {gpu_count}')" 2>/dev/null || echo "    JAX not installed"
 else
 	@echo "  Platform: ❌ $(PLATFORM) (GPU not supported)"
 endif
 	@echo ""
+	@echo "$(BOLD)GPU Compatibility Reference:$(RESET)"
+	@echo "  CUDA 13 (SM 7.5+): RTX 20xx/30xx/40xx, T4, A100, H100"
+	@echo "  CUDA 12 (SM 5.2+): GTX 9xx/10xx, P100, V100, + all above"
+	@echo ""
 	@echo "$(BOLD)Installation Commands:$(RESET)"
-	@echo "  Install GPU: make install-jax-gpu"
+	@echo "  Auto-detect:   make install-jax-gpu"
+	@echo "  Force CUDA 13: make install-jax-gpu-cuda13"
+	@echo "  Force CUDA 12: make install-jax-gpu-cuda12"
 	@echo ""
 
 # ===================
