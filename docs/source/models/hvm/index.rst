@@ -6,6 +6,15 @@ permanent covalent crosslinks, associative (vitrimer-type) exchangeable bonds,
 and optionally dissociative (physical) reversible bonds.
 
 
+.. admonition:: Part of VLB Transient Network Family
+
+   HVM extends the VLB framework (:doc:`/models/vlb/index`) with vitrimer-specific
+   physics: an evolving natural-state tensor and TST kinetics for associative bond
+   exchange.  For NP-filled vitrimers, see :doc:`/models/hvnm/index`.
+
+   Inheritance: ``BaseModel → VLBBase → HVMBase → HVMLocal``
+
+
 Overview
 --------
 
@@ -176,17 +185,10 @@ Quick Start
 Key Physics: Factor-of-2
 -------------------------
 
-The exchangeable network effective relaxation time is:
-
-.. math::
-
-   \tau_{E,eff} = \frac{1}{2 k_{BER,0}}
-
-The factor-of-2 arises because both the distribution tensor :math:`\boldsymbol{\mu}^E`
-and the natural-state tensor :math:`\boldsymbol{\mu}^{E}_{nat}` relax toward each
-other at rate :math:`k_{BER}`, so their **difference** (which determines stress)
-decays at :math:`2 k_{BER}`.  This is the vitrimer hallmark: a standard Maxwell
-fit to relaxation data will yield :math:`\tau_{fit} = \tau_E / 2`, not :math:`\tau_E`.
+The exchangeable network relaxes with effective time constant
+:math:`\tau_{E,eff} = 1/(2k_{BER,0})` because both
+:math:`\boldsymbol{\mu}^E` and :math:`\boldsymbol{\mu}^E_{nat}` relax
+toward each other at rate :math:`k_{BER}`.  See :ref:`hvm-factor-of-2` in the model reference for the full derivation.
 
 
 Model Documentation
@@ -196,6 +198,8 @@ Model Documentation
    :maxdepth: 1
 
    hvm
+   hvm_protocols
+   hvm_advanced
    hvm_knowledge
 
 
@@ -206,16 +210,11 @@ References
    continuum theory for polymers with transient networks." *J. Mech. Phys.
    Solids*, 107, 1-20.
 
-2. Meng, F., Simon, S.L., Niu, R., McKenna, G.B. & Hallinan, D.T. (2019).
-   "Poly(ethylene oxide)/Poly(ether-thiourea) vitrimers from a single monomer."
-   *Macromolecules*, 52(8), 3065-3072.
+2. Meng, F., Saed, M.O. & Terentjev, E.M. (2019). "Elasticity and Relaxation
+   in Full and Partial Vitrimer Networks." *Macromolecules*, 52(19), 7423-7429.
 
-3. Denissen, W., Winne, J.M. & Du Prez, F.E. (2016). "Vitrimers: permanent
-   organic networks with glass-like fluidity." *Chem. Sci.*, 7, 30-38.
-
-4. Dyre, J.C. (2006). "Colloquium: The glass transition and relaxation in
-   supercooled liquids and glasses." *Rev. Mod. Phys.*, 78, 953.
-
-5. Montarnal, D., Capelot, M., Tournilhac, F. & Leibler, L. (2011).
+3. Montarnal, D., Capelot, M., Tournilhac, F. & Leibler, L. (2011).
    "Silica-like malleable materials from permanent organic networks."
    *Science*, 334, 965-968.
+
+See :doc:`hvm_advanced` for the full reference list (12 citations).

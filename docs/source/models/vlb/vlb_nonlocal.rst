@@ -37,7 +37,9 @@ Overview
 ``VLBNonlocal`` solves the VLB constitutive equation in one spatial dimension,
 modeling the gap of a Couette rheometer.  The distribution tensor
 :math:`\boldsymbol{\mu}(y, t)` varies across the gap, coupled by a diffusion
-term that represents cooperative rearrangements in the network.
+term that represents cooperative rearrangements in the network.  For the
+underlying nonlocal PDE theory, see the nonlocal formulation section in
+:doc:`vlb_advanced`.
 
 The PDE is:
 
@@ -240,6 +242,16 @@ Limitations
 - Computational cost scales as :math:`O(N_y \times N_t)` where :math:`N_y`
   is the number of spatial points.
 - Only 1D (planar Couette) geometry is supported.
+
+
+See Also
+========
+
+- :doc:`vlb_advanced` — Nonlocal PDE theory, cooperativity length derivation
+- :class:`~rheojax.models.dmt.DMTNonlocal` — DMT thixotropic model with similar
+  nonlocal PDE structure (structure parameter diffusion instead of tensor diffusion)
+- :class:`~rheojax.models.fluidity.FluidityNonlocal` — Fluidity model with
+  spatial diffusion of fluidity variable
 
 
 API Reference

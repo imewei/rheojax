@@ -9,7 +9,7 @@ Quick Reference
 - **Use when:** Solid-like behavior with equilibrium plateau and fractional relaxation tails
 - **Parameters:** 4 (Ge, :math:`c_{\alpha, \alpha, \tau}`)
 - **Key equation:** :math:`G(t) = G_e + c_\alpha t^{-\alpha} E_{1-\alpha,1}(-(t/\tau)^{1-\alpha})`
-- **Test modes:** Oscillation, relaxation
+- **Test modes:** Oscillation, relaxation, creep
 - **Material examples:** Viscoelastic solids with finite equilibrium modulus and power-law relaxation
 
 .. include:: /_includes/fractional_seealso.rst

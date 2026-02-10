@@ -8,7 +8,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Soft glassy materials (foams, emulsions, pastes, colloidal gels), yield stress fluids, aging materials
-- **Parameters:** 3-4 (x, G0, tau0, optional sigma_y)
+- **Parameters:** 3 (x, G0, tau0)
 - **Key equation:** :math:`G'(\omega) \sim G''(\omega) \sim \omega^{x-1}` for :math:`1 < x < 2`
 - **Test modes:** Oscillation, relaxation, creep, steady shear, LAOS
 - **Material examples:** Concentrated emulsions, colloidal suspensions, foams, pastes, mayonnaise, hair gel
@@ -1185,11 +1185,6 @@ Parameters
      - s
      - :math:`\tau_0 > 0`
      - Microscopic attempt time
-   * - ``sigma_y``
-     - :math:`\sigma_y`
-     - Pa
-     - :math:`\sigma_y \geq 0`
-     - Yield stress (optional, for :math:`x < 1`)
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~

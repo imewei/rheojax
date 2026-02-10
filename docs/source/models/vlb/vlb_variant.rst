@@ -111,7 +111,8 @@ The Bell model (1978) makes the dissociation rate force-dependent:
    k_d(\boldsymbol{\mu}) = k_d^0 \exp\!\left(\nu \cdot (\lambda_c - 1)\right)
 
 where :math:`\lambda_c = \sqrt{\text{tr}(\boldsymbol{\mu})/3}` is the
-normalized average chain stretch.
+normalized average chain stretch.  For the detailed theory including slip-bond
+and catch-bond formulations, see :doc:`vlb_advanced`.
 
 **Physical effects:**
 
@@ -275,6 +276,17 @@ VLBVariant supports the standard NLSQ + NUTS pipeline:
 
 The ``model_function`` is fully JAX-traceable, enabling gradient-based
 NUTS sampling for all parameter combinations.
+
+
+See Also
+========
+
+- :doc:`vlb_advanced` — Full theoretical foundations for Bell, FENE-P,
+  Langevin, and temperature extensions
+- :doc:`/models/hvm/hvm` — HVM uses related TST kinetics
+  (:math:`k_{BER} = \nu_0 e^{-E_a/RT} \cosh(V_{act} \sigma_{VM}/RT)`)
+  for vitrimer bond exchange, which is conceptually similar to Bell breakage
+  but operates on the natural-state evolution rather than the dissociation rate
 
 
 API Reference

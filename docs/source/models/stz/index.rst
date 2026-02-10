@@ -109,7 +109,7 @@ Key Parameters
      - Units
      - Physical Meaning
    * - Shear modulus
-     - G
+     - G0
      - Pa
      - Elastic stiffness
    * - Yield stress
@@ -121,19 +121,15 @@ Key Parameters
      - —
      - Configurational disorder (0 = ordered)
    * - Attempt time
-     - :math:`\tau_0`
+     - tau0
      - s
      - Microscopic attempt frequency
    * - STZ strain
-     - :math:`\varepsilon_0`
+     - epsilon0
      - —
      - Strain per STZ flip (~0.1-1)
-   * - Activation volume
-     - V*
-     - :math:`\text{n}m^3`
-     - Volume of STZ (~1 :math:`\text{n}m^3`)
    * - Steady-state :math:`\chi`
-     - :math:`\chi_ss`
+     - :math:`\chi_{ss}`
      - —
      - Disorder level under flow
 
@@ -178,33 +174,29 @@ Quick Start
    model = STZConventional()
 
    # Set parameters for a metallic glass
-   model.parameters.set_value('G', 40e9)        # Pa (metallic glass)
+   model.parameters.set_value('G0', 40e9)        # Pa (metallic glass)
    model.parameters.set_value('sigma_y', 1e9)   # Pa
-   model.parameters.set_value('chi_0', 0.1)     # Initial disorder
-   model.parameters.set_value('tau_0', 1e-12)   # s (atomic timescale)
+   model.parameters.set_value('chi_inf', 0.1)   # Steady-state disorder
+   model.parameters.set_value('tau0', 1e-12)    # s (atomic timescale)
 
    # Fit to flow curve
    gamma_dot = np.logspace(-4, 2, 50)
    model.fit(gamma_dot, stress_data, test_mode='flow_curve')
 
-   # Get steady-state effective temperature
-   chi_ss = model.get_steady_state_chi(gamma_dot=1.0)
-
-**Startup flow simulation:**
+**Startup flow prediction:**
 
 .. code-block:: python
 
-   # Simulate startup with stress overshoot
+   # Fit startup data with stress overshoot
    t = np.linspace(0, 10, 1000)
-   gamma_dot = 0.1  # Constant shear rate
+   model.fit(t, stress_data, test_mode='startup', gamma_dot=1.0)
 
-   result = model.simulate_startup(t, gamma_dot)
-   stress = result.stress
-   chi = result.chi  # Effective temperature evolution
+   # Predict startup stress
+   stress = model.predict(t)
 
    # Find stress overshoot
    stress_peak = np.max(stress)
-   strain_peak = t[np.argmax(stress)] * gamma_dot
+   strain_peak = t[np.argmax(stress)] * 1.0
 
 **Bayesian inference:**
 
@@ -222,7 +214,7 @@ Quick Start
 
    # Parameter correlations
    import arviz as az
-   az.plot_pair(result.inference_data, var_names=['sigma_y', 'chi_0'])
+   az.plot_pair(result.inference_data, var_names=['sigma_y', 'chi_inf'])
 
 
 Model Documentation

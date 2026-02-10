@@ -1,7 +1,7 @@
 Transforms Summary & Workflow Guide
 ====================================
 
-This page provides a comprehensive quick-reference guide for all 5 data transforms in RheoJAX. Use the comparison matrices and workflow examples below to select and chain transforms for your rheological analysis pipelines.
+This page provides a comprehensive quick-reference guide for all 7 data transforms in RheoJAX. Use the comparison matrices and workflow examples below to select and chain transforms for your rheological analysis pipelines.
 
 
 Complete Transforms Comparison Matrix
@@ -56,6 +56,20 @@ The table below provides a comprehensive overview of all transforms across key c
      - Low-Medium
      - Yes
      - Strain rate from strain, noisy data, multi-order derivatives
+   * - :doc:`SRFS </transforms/srfs>`
+     - Strain-Rate Frequency Superposition, shear banding detection
+     - Multi-rate frequency sweeps with metadata
+     - Merged master curve + shift factors
+     - Medium
+     - No
+     - Soft glassy materials, thixotropic fluids, shear banding
+   * - :doc:`SPP Decomposer </transforms/spp>`
+     - Sequence of Physical Processes decomposition for LAOS amplitude sweeps
+     - LAOS amplitude sweep (stress, strain, strain rate)
+     - SPP trajectories, yield stress parameters
+     - Medium-High
+     - No
+     - LAOS yield stress extraction, static vs dynamic yield
 
 **Legend:**
 

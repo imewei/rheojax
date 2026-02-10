@@ -175,6 +175,54 @@ behavior vanishes. Use ``model.compute_ber_rate_at_equilibrium()`` to check
 whether BER is active at your experimental temperature.
 
 
+Cross-Protocol Validation
+--------------------------
+
+Use multiple protocols to validate the HVM fit:
+
+.. list-table::
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Check
+     - Criterion
+     - Failing Suggests
+   * - :math:`G_P` from SAOS = :math:`G(\infty)` from relaxation
+     - :math:`\lim_{\omega \to 0} G' \approx G(t \to \infty)`
+     - Incorrect :math:`G_P` or hidden slow mode
+   * - :math:`\tau_{E,eff}` from SAOS = :math:`\tau_{E,eff}` from relaxation
+     - Loss peak frequency :math:`\approx 1/\tau_{E,eff}`
+     - TST feedback distorting linear regime
+   * - :math:`\sigma_E \to 0` at steady state
+     - E-network stress vanishes in long startup
+     - BER rate too slow; increase :math:`\nu_0` or reduce :math:`E_a`
+   * - Arrhenius :math:`\ln k_{BER,0}` vs :math:`1/T` is linear
+     - :math:`R^2 > 0.99` for 3+ temperatures
+     - Non-Arrhenius exchange; consider WLF kinetics
+
+This is analogous to the VLB cross-protocol validation workflow
+(:ref:`vlb-cross-protocol-validation`).
+
+
+When to Upgrade to HVNM
+-------------------------
+
+Consider upgrading from HVM to HVNM (:doc:`/models/hvnm/index`) when:
+
+- **NP fillers present**: material contains silica, carbon black, clay, or
+  other nanoparticles at :math:`\phi > 0.01`
+- **Phi-dependent modulus**: :math:`G'` increases with filler loading beyond
+  what :math:`G_P` alone can explain
+- **Payne effect**: strain-amplitude-dependent modulus (nonlinear LAOS shows
+  :math:`G'_1` decrease at moderate :math:`\gamma_0`)
+- **Dual relaxation separation**: two well-separated loss peaks in :math:`G''`
+  that respond differently to temperature (dual :math:`E_a`)
+- **Interfacial signature**: slow relaxation mode that depends on NP surface
+  treatment
+
+If none of these apply, HVM is simpler and preferred.
+
+
 Vitrimer vs Conventional Transient Network
 ------------------------------------------
 
@@ -203,3 +251,52 @@ Vitrimer vs Conventional Transient Network
    * - Temperature
      - :math:`k_d \sim T` (simple)
      - Arrhenius :math:`k_{BER} \sim e^{-E_a/RT}` (TST)
+
+
+.. _hvm-cross-protocol-validation:
+
+Troubleshooting
+----------------
+
+**SAOS fit gives wrong relaxation time:**
+Check for the :ref:`factor-of-2 <hvm-factor-of-2>`: the fitted time constant
+from a Maxwell fit is :math:`\tau_{E,eff} = 1/(2k_{BER,0})`, not the bond
+exchange time :math:`\tau_E = 1/k_{BER,0}`.
+
+**Steady-state stress grows without bound:**
+The permanent network stress :math:`\sigma_P = G_P \gamma` grows linearly
+with strain.  This is physical for bounded strain protocols (relaxation, LAOS)
+but produces unbounded stress in flow curve mode.  Use
+``return_components=True`` to isolate contributions.
+
+**ODE diverges at high shear rates:**
+TST kinetics can create very stiff ODEs at high stress.  Reduce
+``gamma_dot`` or switch to ``kinetics="stretch"`` (less stiff coupling).
+See :ref:`hvm-numerical` for solver details.
+
+**Damage produces unphysical behavior:**
+Ensure :math:`\lambda_{crit} > 1` (damage only activates under stretch
+beyond equilibrium).  Set ``Gamma_0`` small initially and increase
+gradually.
+
+
+Application Examples
+---------------------
+
+**Processing window estimation:**
+Use the Arrhenius BER rate (:ref:`hvm-temperature`) to compute the
+temperature range where :math:`\tau_{BER}` falls within the processing
+window (:math:`1`--:math:`10^3` s).  Below :math:`T_v`, the material is
+a thermoset; above :math:`T_v`, it flows.
+
+**Shape-memory programming:**
+Program a temporary shape by deforming at :math:`T > T_v` (BER active)
+and cooling below :math:`T_v` (BER frozen).  The natural state
+:math:`\boldsymbol{\mu}^E_{nat}` records the deformation, and the
+permanent network :math:`G_P` provides the recovery driving force.
+
+**Vitrimer reprocessing:**
+Estimate reprocessing time from :math:`t_{reprocess} \sim 5/k_{BER,0}(T)`.
+At high :math:`T`, BER rapidly equilibrates stress, enabling
+remolding.  The creep compliance :math:`J(\infty) = 1/G_P`
+(:ref:`hvm-creep`) sets the long-time deformation limit.

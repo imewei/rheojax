@@ -8,7 +8,7 @@ Quick Reference
 
 - **Use when:** Spatially-resolved modeling of amorphous solids, plastic avalanches, shear banding
 
-- **Parameters:** 6 (:math:`\mu, \sigma_c_mean, \sigma_c_std, \tau_pl`, L, dt)
+- **Parameters:** 6 (:math:`\mu, \sigma_{c,\text{mean}}, \sigma_{c,\text{std}}, \tau_{\text{pl}}`, L, dt)
 
 - **Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma}(t) - \mu \dot{\gamma}^{pl}_{ij} + \sum_{kl} \mathcal{G}_{ij,kl} \dot{\gamma}^{pl}_{kl}`
 
@@ -393,13 +393,13 @@ Parameter Interpretation
    *For graduate students*: :math:`\sigma_c` represents the energy barrier for local plastic rearrangements in the free energy landscape. For colloidal gels, :math:`\sigma_c` ~ bond strength; for glasses, :math:`\sigma_c` ~ activation barrier height.
    *For practitioners*: Use :math:`\sigma_c` to predict onset of yielding in processing. Lower :math:`\sigma_c` = easier to flow but potentially less stable structures.
 
-:math:`\sigma_c_std` **(Disorder Strength)**:
+:math:`\sigma_{c,\text{std}}` **(Disorder Strength)**:
    Standard deviation of local yield thresholds across the material, quantifying microstructural heterogeneity.
-   *For graduate students*: Disorder drives avalanche criticality. Larger :math:`\sigma_c_std` → broader avalanche size distributions, power-law exponents closer to :math:`\tau` ≈ 2.0 (with disorder) vs. 1.5 (mean-field). Controls correlation length :math:`\xi_corr` of yielding events.
-   *For practitioners*: High disorder correlates with pronounced shear banding. Monitor :math:`\sigma_c_std/\sigma_c` ratio to predict flow instabilities.
+   *For graduate students*: Disorder drives avalanche criticality. Larger :math:`\sigma_{c,\text{std}}` → broader avalanche size distributions, power-law exponents closer to :math:`\tau` ≈ 2.0 (with disorder) vs. 1.5 (mean-field). Controls correlation length :math:`\xi_{\text{corr}}` of yielding events.
+   *For practitioners*: High disorder correlates with pronounced shear banding. Monitor :math:`\sigma_{c,\text{std}}/\sigma_c` ratio to predict flow instabilities.
 
 :math:`\alpha` **(Disorder Parameter)**:
-   Related parameter quantifying yield threshold variability, :math:`\alpha = \sigma_c_std/\sigma_c`.
+   Related parameter quantifying yield threshold variability, :math:`\alpha = \sigma_{c,\text{std}}/\sigma_c`.
    *For graduate students*: Critical parameter in mean-field elastoplastic theory. :math:`\alpha` → 0 recovers deterministic plasticity; :math:`\alpha` >> 1 leads to extreme heterogeneity and arrested dynamics.
    *For practitioners*: :math:`\alpha` > 0.3 indicates strong spatial heterogeneity requiring spatially-resolved models.
 
@@ -426,11 +426,11 @@ Material Classification
      - Strong heterogeneity, avalanches
      - Metallic glasses, dense granular media
      - Shear localization, stick-slip
-   * - :math:`\tau_pl` < 0.1 s
+   * - :math:`\tau_{\text{pl}}` < 0.1 s
      - Fast plastic relaxation
      - Soft colloids, concentrated emulsions
      - Rapid stress relaxation, smooth flow
-   * - :math:`\tau_pl` > 1 s
+   * - :math:`\tau_{\text{pl}}` > 1 s
      - Slow plastic relaxation
      - Glassy polymers, hard colloids
      - Stress overshoots, memory effects
@@ -822,7 +822,7 @@ Parameter Bounds and Physical Constraints
      - Fitting: 8-16; Production: 32-128
    * - ``dt``
      - 0.001-0.05
-     - Must resolve :math:`\tau_pl (dt < \tau_pl/10)`
+     - Must resolve :math:`\tau_{\text{pl}}` (dt < :math:`\tau_{\text{pl}}`/10)
 
 Common Fitting Issues
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1579,7 +1579,7 @@ with dynamical exponent z ≈ 2.
 
 **Disorder corrections:**
 
-Strong disorder (:math:`\sigma_c_std/\sigma_c_mean` > 0.3) modifies these exponents:
+Strong disorder (:math:`\sigma_{c,\text{std}}/\sigma_{c,\text{mean}}` > 0.3) modifies these exponents:
 
 - :math:`\tau` increases toward 2.0 (broader avalanche distribution)
 - :math:`\nu` decreases (shorter correlations)
@@ -1620,7 +1620,7 @@ Localization Criteria
 
 Shear banding in EPM arises from two mechanisms:
 
-1. **Disorder-driven localization**: High disorder (:math:`\alpha = \sigma_c_std/\sigma_c_mean` > 0.3)
+1. **Disorder-driven localization**: High disorder (:math:`\alpha = \sigma_{c,\text{std}}/\sigma_{c,\text{mean}}` > 0.3)
    leads to heterogeneous yield thresholds. Regions with low :math:`\sigma_c` yield first,
    creating stress concentrations that nucleate bands.
 
@@ -1640,7 +1640,7 @@ Shear banding in EPM arises from two mechanisms:
 
    w_{band} \sim \xi_{corr} \sim L / \sqrt{\text{disorder}}
 
-where :math:`\xi_corr` is the correlation length of plastic events.
+where :math:`\xi_{\text{corr}}` is the correlation length of plastic events.
 
 Detection Methods
 ~~~~~~~~~~~~~~~~~
@@ -1713,7 +1713,7 @@ SGR and EPM describe similar physics from different perspectives:
      - Spatially resolved lattice
    * - Noise temperature
      - x (thermal + mechanical)
-     - :math:`\sigma_c_std` (quenched disorder)
+     - :math:`\sigma_{c,\text{std}}` (quenched disorder)
    * - Yielding
      - Thermally activated escape
      - Stress-driven (athermal)
@@ -1762,7 +1762,7 @@ STZ theory views plastic events as activated transitions of local structural zon
 
 Each EPM lattice block represents a **mesoscopic ensemble of STZs**. The yield
 threshold :math:`\sigma_c` corresponds to the activation barrier, and the plastic relaxation
-time :math:`\tau_pl` to the STZ flip rate.
+time :math:`\tau_{\text{pl}}` to the STZ flip rate.
 
 .. math::
 
@@ -1932,8 +1932,8 @@ The stress overshoot in startup shear contains information about disorder streng
 **Physical basis:**
 
 - Higher disorder → larger overshoot amplitude
-- Overshoot position (peak strain) → :math:`\tau_pl` × :math:`\dot{\gamma}`
-- Overshoot variability across runs → :math:`\sigma_c_std`
+- Overshoot position (peak strain) → :math:`\tau_{\text{pl}}` × :math:`\dot{\gamma}`
+- Overshoot variability across runs → :math:`\sigma_{c,\text{std}}`
 
 .. code-block:: python
 

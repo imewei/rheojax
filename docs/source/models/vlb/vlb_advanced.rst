@@ -1,11 +1,12 @@
-.. _vlb_extensions:
+.. _vlb_advanced:
 
-======================================
-VLB — Theory Extensions
-======================================
+==============================================
+VLB Advanced Theory & Numerical Methods
+==============================================
 
-This page documents the theoretical foundations for VLB extensions.
-Four extensions are now implemented in RheoJAX; one (Langevin chains) remains
+This page documents the theoretical foundations for VLB extensions and
+the numerical methods used in their implementation.
+Four extensions are implemented in RheoJAX; one (Langevin chains) remains
 as a theory reference for future development.
 
 For usage, see :doc:`vlb_variant` (Bell, FENE-P, Temperature) and
@@ -14,11 +15,167 @@ For usage, see :doc:`vlb_variant` (Bell, FENE-P, Temperature) and
 
 .. admonition:: Implementation Status
 
-   - **Bell breakage:** Implemented in :class:`~rheojax.models.vlb.VLBVariant` and :class:`~rheojax.models.vlb.VLBNonlocal`
-   - **FENE-P stress:** Implemented in :class:`~rheojax.models.vlb.VLBVariant` and :class:`~rheojax.models.vlb.VLBNonlocal`
-   - **Temperature dependence:** Implemented in :class:`~rheojax.models.vlb.VLBVariant`
-   - **Nonlocal PDE:** Implemented in :class:`~rheojax.models.vlb.VLBNonlocal`
-   - **Langevin chains:** Theory reference only (not yet implemented)
+   .. list-table::
+      :widths: 30 20 50
+      :header-rows: 1
+
+      * - Extension
+        - Status
+        - Classes
+      * - Bell breakage
+        - Implemented
+        - :class:`~rheojax.models.vlb.VLBVariant`, :class:`~rheojax.models.vlb.VLBNonlocal`
+      * - FENE-P stress
+        - Implemented
+        - :class:`~rheojax.models.vlb.VLBVariant`, :class:`~rheojax.models.vlb.VLBNonlocal`
+      * - Temperature dependence
+        - Implemented
+        - :class:`~rheojax.models.vlb.VLBVariant`
+      * - Nonlocal PDE
+        - Implemented
+        - :class:`~rheojax.models.vlb.VLBNonlocal`
+      * - Langevin chains
+        - Theory reference
+        - (not yet implemented)
+
+
+Chain Distribution Decomposition
+==================================
+
+The chain distribution function :math:`\varphi(\mathbf{r},t)` admits a
+factorization into density and shape:
+
+.. math::
+
+   \varphi(\mathbf{r},t) = c(t) \cdot P(\mathbf{r},t)
+
+where :math:`c(t) = \int \varphi \, d^3r` is the total chain density
+(number of elastically active chains per unit volume) and :math:`P(\mathbf{r},t)`
+is the normalized probability density of the end-to-end vector.
+
+**Angle-bracket operator:**  For any quantity :math:`f(\mathbf{r})`, the
+ensemble average over the distribution is:
+
+.. math::
+
+   \langle f \rangle = \frac{1}{c} \int f(\mathbf{r}) \, \varphi(\mathbf{r},t) \, d^3r
+   = \int f(\mathbf{r}) \, P(\mathbf{r},t) \, d^3r
+
+The distribution tensor is therefore:
+
+.. math::
+
+   \boldsymbol{\mu} = \frac{3}{\langle r_0^2 \rangle} \langle \mathbf{r} \otimes \mathbf{r} \rangle
+
+**Master evolution equation:**  The Smoluchowski equation for :math:`\varphi`
+under affine convection with source/sink kinetics:
+
+.. math::
+
+   \frac{\partial \varphi}{\partial t}
+   + \nabla_r \cdot (\mathbf{L} \cdot \mathbf{r} \, \varphi)
+   = k_a \varphi_0 - k_d \varphi
+
+Taking the second moment of this equation (multiplying by
+:math:`\mathbf{r} \otimes \mathbf{r}` and integrating) directly yields the
+distribution tensor evolution equation used in the VLB model.
+
+At equilibrium :math:`k_a = k_d` (detailed balance), and the equilibrium
+distribution :math:`\varphi_0` is isotropic Gaussian with
+:math:`\boldsymbol{\mu}_{eq} = \mathbf{I}`.
+
+
+.. _vlb-numerical-methods:
+
+Numerical Methods
+=================
+
+Semi-Implicit Exponential Integrator
+--------------------------------------
+
+For the ODE-based protocols (LAOS, startup/relaxation with nonlinear
+:math:`k_d`), RheoJAX uses the ``diffrax.Tsit5`` explicit Runge-Kutta solver
+with adaptive stepping.  For finite-element or custom integration contexts,
+a **semi-implicit exponential integrator** is recommended:
+
+**Step 1 — Explicit convective update:**
+
+.. math::
+
+   \boldsymbol{\mu}^* = \boldsymbol{\mu}^n
+   + \Delta t \bigl(\mathbf{D} \cdot \boldsymbol{\mu}^n
+   + \boldsymbol{\mu}^n \cdot \mathbf{D}\bigr)
+
+**Step 2 — Exponential kinetic decay:**
+
+.. math::
+
+   \boldsymbol{\mu}^{n+1} = \mathbf{I} + (\boldsymbol{\mu}^* - \mathbf{I})
+   e^{-k_d \Delta t}
+
+This scheme is **exact** for the kinetic part (exponential decay toward
+:math:`\mathbf{I}`) and explicit for the convective part, providing
+unconditional stability for the relaxation term regardless of :math:`k_d \Delta t`.
+
+Symmetry Enforcement
+---------------------
+
+After each time step, enforce the symmetry of the distribution tensor:
+
+.. math::
+
+   \boldsymbol{\mu} \leftarrow \frac{1}{2}(\boldsymbol{\mu} + \boldsymbol{\mu}^T)
+
+This is necessary because floating-point arithmetic can introduce asymmetric
+errors, particularly in the off-diagonal components.  In JAX:
+
+.. code-block:: python
+
+   mu = 0.5 * (mu + mu.T)
+
+Time Step Selection
+--------------------
+
+For stability and accuracy, the time step should satisfy:
+
+.. math::
+
+   \Delta t < \min\!\left(\frac{1}{|\mathbf{D}|}, \quad
+   \frac{\pi}{10 \omega}\right)
+
+where :math:`|\mathbf{D}|` is the largest eigenvalue of the deformation rate
+tensor.  The second condition ensures at least 20 time points per oscillation
+cycle in LAOS/SAOS simulations.
+
+For multi-network models with widely separated :math:`k_d` values, the stiffest
+mode (largest :math:`k_d`) sets the stability limit.  The semi-implicit scheme
+avoids this restriction for the kinetic term.
+
+Steady-State Detection
+-----------------------
+
+For flow curve and other steady-state protocols, convergence is declared when:
+
+.. math::
+
+   \frac{|\dot{\boldsymbol{\mu}}|}{|\boldsymbol{\mu}|} < \varepsilon
+
+where :math:`\varepsilon = 10^{-8}` is the default tolerance and
+:math:`|\cdot|` is the Frobenius norm.  For multi-network models, all modes
+must satisfy this criterion.
+
+Multiple Time-Scale Handling
+-----------------------------
+
+Multi-network VLB models with :math:`k_d` values spanning several decades
+create stiff ODE systems.  RheoJAX handles this via:
+
+1. **Adaptive stepping** (``diffrax.PIDController``): automatic step size
+   reduction near fast transients
+2. **Mode-ordered initialization**: log-spaced :math:`k_d` values ensure
+   well-separated time scales
+3. **Separate analytical/ODE split**: fast modes that have reached steady state
+   can be treated analytically while slow modes continue integrating
 
 
 Force-Dependent Dissociation Rate
@@ -314,19 +471,19 @@ Summary of Extensions
    * - Bell :math:`k_d`
      - :math:`\nu`
      - Shear thinning, overshoot, LAOS harmonics
-     - Planned (Phase 2)
+     - Implemented (:class:`~rheojax.models.vlb.VLBVariant`)
    * - Langevin/FENE
      - :math:`L_{max}`
      - Extensional hardening, bounded stress
-     - Planned (Phase 2)
+     - Implemented (:class:`~rheojax.models.vlb.VLBVariant`)
    * - Nonlocal
      - :math:`D_\mu`, :math:`n_{pts}`, :math:`L_{gap}`
      - Shear banding
-     - Planned (Phase 3)
+     - Implemented (:class:`~rheojax.models.vlb.VLBNonlocal`)
    * - Temperature
      - :math:`E_a` or :math:`C_1, C_2, T_r`
      - TTS, Arrhenius/WLF
-     - Planned (Phase 3)
+     - Implemented (:class:`~rheojax.models.vlb.VLBVariant`)
    * - Catch-bond
      - :math:`k_s, k_c, \delta_s, \delta_c`
      - Non-monotonic :math:`k_d(F)`

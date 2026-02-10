@@ -37,7 +37,7 @@ Model Hierarchy
    │
    ├── FluidityLocal (0D Homogeneous)
    │   └── Scalar stress σ
-   │   └── 6 parameters: G, f_eq, f_inf, tau_age, a, n
+   │   └── 9 parameters: G, tau_y, K, n_flow, f_eq, f_inf, theta, a, n_rejuv
    │   └── Maxwell-like viscoelasticity
    │
    ├── FluidityNonlocal (1D Spatial)
@@ -96,8 +96,8 @@ When to Use Which Model
      - ✓
      - ✓ (enhanced)
    * - Parameters
-     - 6
-     - 7
+     - 9
+     - 10
      - 10-12
    * - Computational cost
      - 1× (baseline)

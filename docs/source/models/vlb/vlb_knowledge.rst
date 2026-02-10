@@ -56,6 +56,8 @@ the thermal energy (:math:`\approx 4.1 \times 10^{-21}` J at room temperature).
      - Permanent networks (VLB limit :math:`k_d \to 0`)
 
 
+.. _vlb-kd-regimes:
+
 Dissociation Rate :math:`k_d`
 -------------------------------
 
@@ -104,6 +106,21 @@ identify the frequency where :math:`G' = G''`.
 Quantifies relative importance of deformation vs relaxation.  :math:`\text{Wi} > 1`
 means the material is being deformed faster than it can relax.
 
+**Pressure (normal force data):**
+
+In incompressible materials the pressure :math:`p` is a Lagrange multiplier
+determined by boundary conditions.  For confined geometries (parallel plates,
+cone-and-plate), the thrust force :math:`F_N` is related to the first normal
+stress difference:
+
+.. math::
+
+   F_N = \frac{\pi R^2}{2} N_1 = \frac{\pi R^2}{2} G_0(\mu_{xx} - \mu_{yy})
+
+where :math:`R` is the plate radius.  If normal force data is available, this
+provides an independent check on :math:`G_0` and the steady-state
+Weissenberg number.
+
 
 Diagnostic Signatures
 =====================
@@ -129,7 +146,7 @@ Newtonian Flow Curve
 **If deviation:**
 
 - **Shear thinning**: :math:`k_d` increases with stress → need force-dependent
-  :math:`k_d` (Bell model, see :doc:`vlb_extensions`)
+  :math:`k_d` (Bell model, see :doc:`vlb_advanced`)
 - **Shear thickening**: formation-enhanced kinetics
   (stretch-creation model, TNT family)
 - **Yield stress**: permanent network component or DMT/Fluidity model needed
@@ -262,6 +279,8 @@ Batch Quality Control
    - :math:`k_d/k_d^{ref} < 0.5`: kinetic trapping
 
 
+.. _vlb-cross-protocol-validation:
+
 Cross-Protocol Validation Workflow
 ====================================
 
@@ -340,4 +359,12 @@ recognize them and which extension to consider:
    * - Shear banding
      - Homogeneous
      - Banded profiles
-     - Nonlocal VLB (future)
+     - :class:`~rheojax.models.vlb.VLBNonlocal`
+   * - Vitrimer BER kinetics
+     - N/A (no evolving natural state)
+     - Associative exchange, topology rearrangement
+     - :doc:`/models/hvm/index` (HVM)
+   * - NP-filled vitrimer
+     - N/A (no filler effects)
+     - Payne effect, dual freezing temperatures
+     - :doc:`/models/hvnm/index` (HVNM)

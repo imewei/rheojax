@@ -3,13 +3,13 @@ Models Handbook
 
 The RheoJAX model handbook gathers narrative deep dives for every rheological model
 implemented in :mod:`rheojax.models`. Use it alongside the API reference for
-parameter signatures and the :doc:`/user_guide/model_selection` tree for high-level guidance.
+parameter signatures and the :doc:`/user_guide/02_model_usage/model_selection` tree for high-level guidance.
 
 .. note::
 
    Each page follows a consistent template (overview, governing equations, parameter
    table, regimes/assumptions, usage snippets, troubleshooting, and references) so you
-   can quickly compare models across classical, fractional, and flow families.
+   can quickly compare models across families.
 
 .. toctree::
    :maxdepth: 1
@@ -17,116 +17,106 @@ parameter signatures and the :doc:`/user_guide/model_selection` tree for high-le
 
    summary
 
+----
+
+Linear Viscoelastic Models
+--------------------------
+
+Classical spring-dashpot elements, fractional generalizations, and multi-mode models
+for fitting small-amplitude oscillatory and relaxation data.
+
 .. toctree::
    :maxdepth: 2
-   :caption: Classical Models
+   :caption: Classical & Fractional
 
    classical/index
+   fractional/index
+   multi_mode/generalized_maxwell
+
+----
+
+Nonlinear & Flow Models
+------------------------
+
+Models for large deformations, steady-state flow curves, and constitutive ODE systems
+including Giesekus, flow viscoplastic, and kinematic hardening.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Nonlinear Viscoelastic (Giesekus)
+   :caption: Nonlinear Viscoelastic
 
    giesekus/index
 
 .. toctree::
    :maxdepth: 2
-   :caption: Fractional Models
-
-   fractional/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Flow & Viscoplastic Models
+   :caption: Flow & Viscoplastic
 
    flow/index
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Multi-Mode Models
+   :maxdepth: 2
+   :caption: Elasto-Viscoplastic (IKH/FIKH)
 
-   multi_mode/generalized_maxwell
+   ikh/index
+   fikh/index
+
+----
+
+Thixotropy, Yielding & Soft Glassy Models
+-------------------------------------------
+
+Structural-kinetics models (DMT, Fluidity), mean-field emulsion models (HL),
+shear transformation zones (STZ), elasto-plastic lattice models (EPM),
+soft glassy rheology (SGR), and mode-coupling theory (ITT-MCT).
 
 .. toctree::
    :maxdepth: 2
-   :caption: Soft Glassy Rheology (SGR)
+   :caption: Thixotropic & Yield Stress
 
-   sgr/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Shear Transformation Zone (STZ)
-
-   stz/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Hébraud–Lequeux (HL)
-
+   dmt/index
+   fluidity/index
    hl/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Elasto-Plastic Models (EPM)
-
+   stz/index
    epm/index
 
 .. toctree::
    :maxdepth: 2
-   :caption: Fluidity Models
+   :caption: Soft Glassy & Mode-Coupling
 
-   fluidity/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Sequence of Physical Processes (SPP)
-
-   spp/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Elasto-Viscoplastic (IKH) Models
-
-   ikh/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Fractional IKH (FIKH) Models
-
-   fikh/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Mode-Coupling Theory (ITT-MCT)
-
+   sgr/index
    itt_mct/index
 
+----
+
+Transient Networks & Vitrimer Models
+--------------------------------------
+
+Distribution-tensor polymer network models (TNT, VLB), hybrid vitrimer models
+with BER kinetics (HVM), and nanoparticle-filled nanocomposite extensions (HVNM).
+
 .. toctree::
    :maxdepth: 2
-   :caption: de Souza Mendes-Thompson (DMT)
-
-   dmt/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Transient Network Theory (TNT)
+   :caption: Transient Networks
 
    tnt/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: VLB Transient Networks
-
    vlb/index
 
 .. toctree::
    :maxdepth: 2
-   :caption: Hybrid Vitrimer Model (HVM)
+   :caption: Vitrimer & Nanocomposite
 
    hvm/index
+   hvnm/index
+
+----
+
+LAOS Analysis
+--------------
+
+Specialized tools for large-amplitude oscillatory shear analysis.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Hybrid Vitrimer Nanocomposite (HVNM)
+   :caption: LAOS
 
-   hvnm/index
+   spp/index

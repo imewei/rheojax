@@ -27,8 +27,10 @@ Quick Reference
      - Elastoviscoplastic with thixotropic fluidity
    * - **Coupling Modes**
      - ``"minimal"``, ``"full"``
-   * - **Protocols**
+   * - **Protocols (Local)**
      - FLOW_CURVE, CREEP, RELAXATION, STARTUP, OSCILLATION, LAOS
+   * - **Protocols (Nonlocal)**
+     - FLOW_CURVE, CREEP, STARTUP
    * - **Key Features**
      - Tensorial stress, Von Mises yield, normal stresses, shear banding
 

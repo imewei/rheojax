@@ -140,6 +140,110 @@ The following table summarizes which rheological test protocols are supported by
      - ❌
      - ❌
      - ✅ (Amp. Sweep)
+   * - **Giesekus**
+     - Single-Mode / Multi-Mode
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **Fluidity**
+     - Local / Nonlocal
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **Saramito**
+     - Local / Nonlocal
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **IKH**
+     - MIKH / MLIKH
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **FIKH**
+     - FIKH / FMLIKH
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **DMT**
+     - Local / Nonlocal
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **HL**
+     - Hébraud-Lequeux
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **EPM**
+     - Lattice / Tensorial
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **ITT-MCT**
+     - Schematic / Isotropic
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **TNT**
+     - 5 variants
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **VLB**
+     - 4 variants
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **HVM**
+     - HVM Local
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - **HVNM**
+     - HVNM Local
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
 
 Detailed Capabilities
 ---------------------
@@ -176,10 +280,48 @@ These models are the most versatile, capable of simulating complex non-linear tr
 
 *   **Specialization:** Specifically designed to analyze LAOS **Amplitude Sweeps** and extract yield stress parameters (Static vs. Dynamic yield stress). It bridges the gap between oscillatory data and flow curves.
 
+6. Nonlinear Constitutive Models (Giesekus, Saramito)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*   **Giesekus:** Full tensorial ODE for polymer solutions/melts. Predicts shear thinning, first and second normal stress differences (N₁, N₂), stress overshoot in startup, and LAOS harmonics. Mobility parameter α controls nonlinearity.
+*   **Saramito-Fluidity:** Tensorial elastoviscoplastic model with Von Mises yield criterion and thixotropic fluidity evolution. Predicts yield stress, normal stresses, viscosity bifurcation in creep, and shear banding (nonlocal variant).
+
+7. Thixotropic Models (DMT, IKH, FIKH, Fluidity, HL)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*   **DMT:** Structure parameter λ ∈ [0,1] with exponential or Herschel-Bulkley viscosity closure. Models time-dependent viscosity, stress overshoot, and delayed yielding.
+*   **IKH/FIKH:** Isotropic-kinematic hardening with optional fractional derivatives for power-law memory. Backstress tensor evolves with deformation history.
+*   **Fluidity:** Cooperative flow models where fluidity f = 1/η evolves under shear. Nonlocal variant includes spatial cooperativity for shear banding.
+*   **HL:** Mean-field model for dense suspensions. Stress distribution P(σ,t) evolves via Fokker-Planck equation with yielding events creating noise for neighbors.
+
+8. Amorphous Solid Models (EPM)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*   **EPM (Lattice):** Mesoscopic lattice of elasto-plastic blocks with Eshelby stress redistribution after plastic events. FFT-accelerated spatial correlations for avalanche dynamics.
+
+9. Dense Suspension Models (ITT-MCT)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*   **Schematic (F₁₂):** Memory kernel from mode-coupling theory with strain decorrelation. Captures glass transition, cage effect, and yield stress from first principles. Semi-quantitative.
+*   **Isotropic:** Uses Percus-Yevick structure factor S(k) for quantitative hard-sphere predictions.
+
+10. Transient Network Models (TNT, VLB)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*   **TNT:** Five variants for different network architectures: single-mode, wormlike micelles (Cates), telechelic loop-bridge, multi-species, and sticky Rouse chains.
+*   **VLB:** Distribution tensor formulation tracking chain end-to-end vector statistics. Variants include Bell force-sensitivity, FENE chain extensibility, and nonlocal PDE for shear banding.
+
+11. Vitrimer Models (HVM, HVNM)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*   **HVM:** Three-subnetwork model (Permanent + Exchangeable + Dissociative) with transition state theory kinetics for bond exchange reactions. Captures topology-freezing transition, temperature-dependent relaxation, and the vitrimer hallmark: σ_E → 0 at steady state.
+*   **HVNM:** Extends HVM with a fourth interphase subnetwork for nanoparticle-filled vitrimers. Guth-Gold strain amplification and dual TST kinetics for matrix and interphase exchange.
+
 Protocol-Driven Architecture
 ----------------------------
 
 RheoJAX uses a ``TestMode`` enum (e.g., ``ROTATION``, ``OSCILLATION``) to dispatch valid predictions.
 
-*   **Universal Models**: Models like **SGR** and **STZ** are constitutive equations that can predict responses for any flow history.
+*   **Universal Models**: Models like **SGR**, **STZ**, **Giesekus**, **DMT**, **TNT**, **VLB**, **HVM**, **HVNM**, and **ITT-MCT** are constitutive equations that can predict responses for any flow history (all 6 protocols).
 *   **Empirical Models**: **Flow** models are empirical curve fits restricted to steady-state conditions.
+*   **Linear Models**: **Classical** and **Fractional** models describe linear viscoelastic response (SAOS, relaxation, creep) but not nonlinear behavior.

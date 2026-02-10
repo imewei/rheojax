@@ -1,4 +1,4 @@
-Contributing to rheo
+Contributing to RheoJAX
 ====================
 
 We welcome contributions! This guide will help you get started.
@@ -14,8 +14,8 @@ Development Setup
    .. code-block:: bash
 
        # Fork on GitHub, then clone your fork
-       git clone https://github.com/YOUR_USERNAME/rheojax.git
-       cd rheo
+       git clone https://github.com/imewei/rheojax.git
+       cd rheojax
 
 2. **Create Virtual Environment**
 

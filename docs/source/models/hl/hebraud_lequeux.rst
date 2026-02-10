@@ -8,7 +8,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Mean-field modeling of soft glassy materials, yield-stress fluids, foams, emulsions, pastes
-- **Parameters:** 4 (G_0, :math:`\alpha`, :math:`\sigma_c`, :math:`\tau`)
+- **Parameters:** 3 (:math:`\alpha`, :math:`\sigma_c`, :math:`\tau`)
 - **Key equation:** :math:`\partial_t P(\sigma, t) = -\dot{\gamma}(t) \partial_\sigma P + D(t) \partial^2_\sigma P - \frac{1}{\tau} \Theta(|\sigma|-\sigma_c) P + \Gamma(t) \delta(\sigma)`
 - **Test modes:** Flow curve, creep, relaxation, startup, oscillation (SAOS/LAOS)
 - **Material examples:** Foams, emulsions, pastes, concentrated colloidal suspensions, soft glassy materials
@@ -35,9 +35,6 @@ Notation Guide
    * - :math:`\dot{\gamma}`
      - 1/s
      - Macroscopic applied shear rate
-   * - :math:`G_0`
-     - Pa
-     - Elastic shear modulus
    * - :math:`\tau`
      - s
      - Plastic relaxation time (microscopic yield time)
@@ -450,11 +447,11 @@ Basic Usage
    # Fit to flow curve data
    gamma_dot = np.logspace(-2, 1, 20)
    sigma_data = np.array([...])  # Experimental stress data
-   model.fit(gamma_dot, sigma_data, test_mode='flow_curve')
+   model.fit(gamma_dot, sigma_data, test_mode='steady_shear')
 
    # Predict at new shear rates
    gamma_dot_pred = np.logspace(-3, 2, 50)
-   sigma_pred = model.predict(gamma_dot_pred, test_mode='flow_curve')
+   sigma_pred = model.predict(gamma_dot_pred, test_mode='steady_shear')
 
 Glassy State Example
 ~~~~~~~~~~~~~~~~~~~~~
@@ -468,14 +465,13 @@ Glassy State Example
    model = HebraudLequeux()
    model.parameters.set_value("alpha", 0.3)     # Glassy phase (< 0.5)
    model.parameters.set_value("sigma_c", 10.0)  # Pa
-   model.parameters.set_value("G0", 100.0)      # Pa
    model.parameters.set_value("tau", 0.1)       # s
 
    # Fit Flow Curve
    gdot = np.logspace(-2, 1, 20)
    # Load experimental data: stress_data = load_data(...)
    stress_data = 10.0 + 5.0 * gdot**0.5  # Example: Herschel-Bulkley
-   model.fit(gdot, stress_data, test_mode="flow_curve")
+   model.fit(gdot, stress_data, test_mode="steady_shear")
 
    # Predict Creep
    time = np.linspace(0, 100, 1000)
@@ -502,7 +498,7 @@ predictions. Quantifying uncertainty in :math:`\alpha` is therefore critical.
    # Bayesian inference with NUTS
    result = model.fit_bayesian(
        gdot, stress_data,
-       test_mode="flow_curve",
+       test_mode="steady_shear",
        num_warmup=1000,
        num_samples=2000,
        num_chains=4
@@ -588,14 +584,14 @@ Advanced Usage: Multiple Protocols
    # 1. Fit Flow Curve
    gdot = np.logspace(-2, 1, 20)
    stress_data = 10.0 + 5.0 * gdot**0.5  # Example data
-   model.fit(gdot, stress_data, test_mode="flow_curve")
+   model.fit(gdot, stress_data, test_mode="steady_shear")
 
    # 2. Predict multiple protocols
    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
    # Flow curve
    gdot_pred = np.logspace(-3, 2, 50)
-   sigma_pred = model.predict(gdot_pred, test_mode='flow_curve')
+   sigma_pred = model.predict(gdot_pred, test_mode='steady_shear')
    axes[0, 0].loglog(gdot_pred, sigma_pred)
    axes[0, 0].set_xlabel('Shear rate (1/s)')
    axes[0, 0].set_ylabel('Stress (Pa)')
@@ -761,7 +757,6 @@ Initialization Strategy
 
 **Step 3: Fit transient data**
 - ``tau``: Controls relaxation speed.
-- ``G0``: Match initial elastic modulus.
 
 Parameter Bounds
 ~~~~~~~~~~~~~~~~
@@ -773,9 +768,6 @@ Parameter Bounds
    * - Parameter
      - Typical Range
      - Physical Constraint
-   * - ``G0``
-     - 10-10000 Pa
-     - Match SAOS plateau modulus
    * - ``alpha``
      - 0.1-1.5
      - :math:`\alpha` < 0.5 (glass), :math:`\alpha` ≥ 0.5 (fluid)
@@ -834,7 +826,7 @@ For reliable parameter estimation, fit multiple protocols simultaneously:
        # Flow curve
        if 'flow_curve' in data_dict:
            gdot, stress = data_dict['flow_curve']
-           stress_pred = model.predict(gdot, test_mode='flow_curve')
+           stress_pred = model.predict(gdot, test_mode='steady_shear')
            residuals.append((stress - stress_pred) / stress.std())
 
        # Startup

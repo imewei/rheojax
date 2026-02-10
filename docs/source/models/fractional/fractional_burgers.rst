@@ -9,7 +9,7 @@ Quick Reference
 - **Use when:** Complex creep with glassy compliance, fractional retardation, and viscous flow
 - **Parameters:** 5 (Jg, Jk, :math:`\alpha, \tauk, \eta_1`)
 - **Key equation:** :math:`J(t) = J_g + \frac{t^{\alpha}}{\eta_1\Gamma(1+\alpha)} + J_k[1 - E_{\alpha}(-(t/\tau_k)^{\alpha})]`
-- **Test modes:** Creep, oscillation
+- **Test modes:** Relaxation, creep, oscillation
 - **Material examples:** Polymer composites, asphalt binders, bituminous materials, viscoelastic solids under load
 
 .. include:: /_includes/fractional_seealso.rst

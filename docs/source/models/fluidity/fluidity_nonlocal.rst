@@ -8,7 +8,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Shear banding, wall slip, non-homogeneous flows in yield-stress fluids
-- **Parameters:** 8+ (G, tau_y, eta_bg, f_eq, f_inf, theta, xi, + BCs)
+- **Parameters:** 10 (G, tau_y, K, n_flow, f_eq, f_inf, theta, a, n_rejuv, xi); gap_width is a constructor arg
 - **Key equation:** :math:`\partial_t f = (f_{\rm loc}(\sigma) - f)/\theta + \xi^2 \nabla^2 f`
 - **Test modes:** Rotation, start-up, creep, oscillation (with spatial profiles)
 - **Material examples:** Concentrated emulsions, Carbopol gels, colloidal pastes, suspensions in microchannels
@@ -276,7 +276,7 @@ The nonlocal term regularizes the interface:
 
    from rheojax.models import FluidityNonlocal
 
-   model = FluidityNonlocal(xi=0.1)
+   model = FluidityNonlocal(N_y=64, gap_width=1e-3)
    is_banding, band_profile = model.detect_shear_banding(gamma_dot=0.1)
 
    if is_banding:
@@ -753,47 +753,57 @@ Parameters
      - :math:`G`
      - Pa
      - :math:`G > 0`
-     - Elastic modulus (for viscoelastic extension)
+     - Elastic modulus
    * - ``tau_y``
      - :math:`\tau_y`
      - Pa
      - :math:`\tau_y \geq 0`
      - Yield stress
-   * - ``eta_bg``
-     - :math:`\eta_{\rm bg}`
-     - Pa·s
-     - :math:`\eta_{\rm bg} > 0`
-     - Background (plastic) viscosity
+   * - ``K``
+     - :math:`K`
+     - Pa·s\ :sup:`n`
+     - :math:`K > 0`
+     - Flow consistency (Herschel-Bulkley K parameter)
+   * - ``n_flow``
+     - :math:`n_{\rm flow}`
+     - —
+     - :math:`0.1 \leq n \leq 2`
+     - Flow exponent (Herschel-Bulkley n parameter)
    * - ``f_eq``
      - :math:`f_{\rm eq}`
-     - s\ :sup:`-1`
+     - 1/(Pa·s)
      - :math:`f_{\rm eq} \geq 0`
      - Equilibrium fluidity at rest
    * - ``f_inf``
      - :math:`f_\infty`
-     - s\ :sup:`-1`
+     - 1/(Pa·s)
      - :math:`f_\infty > 0`
-     - Infinite-shear fluidity (optional, for kinetic model)
+     - Infinite-shear fluidity (rejuvenation limit)
    * - ``theta``
      - :math:`\theta`
      - s
      - :math:`\theta > 0`
-     - Structural reorganization time
+     - Structural reorganization time (aging timescale)
+   * - ``a``
+     - :math:`a`
+     - —
+     - :math:`a \geq 0`
+     - Rejuvenation amplitude
+   * - ``n_rejuv``
+     - :math:`n_{\rm rejuv}`
+     - —
+     - :math:`0 \leq n \leq 2`
+     - Rejuvenation exponent
    * - ``xi``
      - :math:`\xi`
      - m
      - :math:`\xi > 0`
-     - Cooperativity length; typically 3-10× particle size
-   * - ``H``
-     - :math:`H`
-     - m
-     - :math:`H > 0`
-     - Gap width (geometry parameter)
-   * - ``f_w``
-     - :math:`f_w`
-     - s\ :sup:`-1`
-     - :math:`f_w \geq 0`
-     - Wall fluidity (Dirichlet BC); 0 for no-flux
+     - Cooperativity length; typically 3-10x particle size
+
+.. note::
+
+   The gap width ``H`` is a **constructor argument** (``gap_width``), not a fittable
+   parameter. Pass it when creating the model: ``FluidityNonlocal(N_y=64, gap_width=1e-3)``.
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -936,18 +946,14 @@ Basic Example
    import numpy as np
    from rheojax.models import FluidityNonlocal
 
-   # Setup geometry
-   gap_width = 1e-3  # 1 mm
+   # Create model with geometry
+   model = FluidityNonlocal(N_y=64, gap_width=1e-3)
 
-   # Create model
-   model = FluidityNonlocal(
-       xi=50e-6,        # 50 micron cooperativity length
-       theta=10.0,      # 10 s reorganization time
-       tau_y=50.0,      # 50 Pa yield stress
-       eta_bg=10.0,     # 10 Pa.s background viscosity
-       H=gap_width,
-       n_y=100          # Spatial grid points
-   )
+   # Set physical parameters
+   model.parameters.set_value("xi", 50e-6)     # 50 micron cooperativity length
+   model.parameters.set_value("theta", 10.0)   # 10 s reorganization time
+   model.parameters.set_value("tau_y", 50.0)   # 50 Pa yield stress
+   model.parameters.set_value("K", 10.0)       # Consistency index
 
    # Compute flow curve
    gamma_dot = np.logspace(-3, 2, 50)
@@ -964,9 +970,6 @@ Gap-Dependence Study
    from rheojax.models import FluidityNonlocal
    import numpy as np
 
-   # Fixed bulk parameters
-   base_params = dict(xi=50e-6, theta=10.0, tau_y=50.0, eta_bg=10.0)
-
    # Multiple gap widths
    gaps = [0.1e-3, 0.5e-3, 1e-3, 5e-3]  # 0.1 to 5 mm
 
@@ -974,7 +977,11 @@ Gap-Dependence Study
    flow_curves = {}
 
    for H in gaps:
-       model = FluidityNonlocal(**base_params, H=H)
+       model = FluidityNonlocal(N_y=64, gap_width=H)
+       model.parameters.set_value("xi", 50e-6)
+       model.parameters.set_value("theta", 10.0)
+       model.parameters.set_value("tau_y", 50.0)
+       model.parameters.set_value("K", 10.0)
        sigma = model.predict(gamma_dot, test_mode='steady_shear')
        flow_curves[H] = sigma
        print(f"Gap {H*1e3:.1f} mm: apparent yield stress = {sigma.min():.1f} Pa")
@@ -988,7 +995,7 @@ Transient Start-Up with Profiles
    import numpy as np
    import matplotlib.pyplot as plt
 
-   model = FluidityNonlocal(xi=50e-6, theta=10.0, tau_y=50.0, eta_bg=10.0, H=1e-3)
+   model = FluidityNonlocal(N_y=64, gap_width=1e-3)
 
    # Start-up at constant shear rate
    t = np.linspace(0, 100, 1000)
@@ -1023,7 +1030,7 @@ Shear Banding Analysis
 
    from rheojax.models import FluidityNonlocal
 
-   model = FluidityNonlocal(xi=50e-6, theta=10.0, tau_y=50.0, eta_bg=10.0, H=1e-3)
+   model = FluidityNonlocal(N_y=64, gap_width=1e-3)
 
    # Detect banding at multiple shear rates
    for gdot in [0.01, 0.1, 1.0, 10.0]:

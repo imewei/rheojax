@@ -367,7 +367,7 @@ Optimization
 
 - **Bounds (recommended)**:
    - :math:`K`: [1e-6, 1e6] Pa·s\ :sup:`n`
-   - :math:`n`: [0.01, 3.0]
+   - :math:`n`: (0.01, 2.0)
 - **Loss function**: Standard least squares suitable for mid-range data
 - **Weighted fitting**: Optional weights to emphasize process-relevant shear rate range
 

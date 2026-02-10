@@ -16,6 +16,26 @@ intuitive API for seamless end-to-end analysis.
    :target: https://opensource.org/licenses/MIT
    :alt: MIT License
 
+----
+
+At a Glance
+------------
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 0
+
+   * - **Models**
+     - 53 models across 22 families (classical, fractional, flow, constitutive ODE, transient network, vitrimer, and more)
+   * - **Bayesian**
+     - Full MCMC inference (NumPyro NUTS) with NLSQ warm-start for all models
+   * - **Transforms**
+     - 7 transforms (FFT, mastercurve/TTS, SRFS, SPP, OWChirp, derivatives, mutation number)
+   * - **Performance**
+     - 10-100x speedups via JAX; 5-270x optimization via NLSQ
+   * - **Notebooks**
+     - 170+ tutorial notebooks across all model families and protocols
+
 Key Features
 ------------
 
@@ -81,6 +101,8 @@ Working with Parameters
    E = params.get_value("E")
    params.set_value("tau", 2.5)
 
+----
+
 Contents
 --------
 
@@ -123,157 +145,21 @@ Contents
    installation
    quickstart
    contributing
+   development_status
 
-Development Status
-------------------
-
-**Phase 1 (Complete)**: Core Infrastructure [done]
-   - [done] Base abstractions (BaseModel, BaseTransform, RheoData, Parameters)
-   - [done] Test mode detection system
-   - [done] Mittag-Leffler functions for fractional calculus
-   - [done] Optimization integration with JAX gradients (NLSQ 5-270x speedup)
-   - [done] Model and Transform registry system
-   - [done] File I/O (TRIOS, CSV, Excel, Anton Paar readers; HDF5, Excel writers)
-   - [done] Visualization with matplotlib
-
-**Phase 2 (Complete)**: Models and Transforms [done]
-   - [done] 53 rheological models across 22 families
-   - [done] 7 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer)
-   - [done] Pipeline API for fluent workflows
-   - [done] 56 tutorial notebooks (basic, transforms, bayesian, advanced, vlb, hvm, hvnm)
-
-**Phase 3 (Complete)**: Bayesian Inference [done]
-   - [done] NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
-   - [done] Uncertainty quantification via credible intervals and posterior distributions
-   - [done] ArviZ integration (6 diagnostic plot types: pair, forest, energy, autocorr, rank, ESS)
-   - [done] Model comparison (WAIC/LOO)
-   - [done] BayesianMixin: All 53 models support Bayesian inference
-   - [done] BayesianPipeline with fluent API for NLSQ -> NUTS workflows
-   - [done] 9 Bayesian inference tutorial notebooks (including SPP LAOS)
-
-**Phase 4 (Complete)**: Performance & Correctness [done - v0.3.0-v0.4.0]
-   - [done] **v0.3.0**: Generalized Maxwell Model with transparent element minimization (R²-based)
-   - [done] **v0.3.0**: Automatic shift factors for time-temperature superposition (TTS)
-   - [done] **v0.3.0**: Bayesian prior safety mechanism (tiered hard_failure/suspicious/good)
-   - [done] **v0.3.1**: JAX-native foundation (30-45% improvement) - 5 foundational optimizations
-   - [done] **v0.3.2**: Vectorization optimizations (50-75% cumulative) - intelligent convergence & batching
-   - [done] **v0.4.0**: Mode-aware Bayesian inference (CRITICAL correctness fix for creep/oscillation)
-   - [done] **v0.4.0**: GMM element search optimization (2-5x speedup with warm-start)
-   - [done] **v0.4.0**: TRIOS auto-chunking for large files (50-70% memory reduction)
-
-**Phase 5 (Complete)**: Soft Glassy Rheology & SPP [done - v0.5.0]
-   - [done] SGRConventional model (Sollich 1998) for soft glassy materials
-   - [done] SGRGeneric model (GENERIC thermodynamic framework, Fuereder & Ilg 2013)
-   - [done] SGR kernel functions (Fourier transforms, yield stress, aging dynamics)
-   - [done] SRFS transform (Strain-Rate Frequency Superposition for flow curves)
-   - [done] Shear banding detection and coexistence analysis utilities
-   - [done] SPPDecomposer transform (Sequence of Physical Processes for LAOS)
-   - [done] SPPYieldStress model with Bayesian inference support
-   - [done] SPPAmplitudeSweepPipeline for amplitude sweep workflows
-   - [done] Comprehensive Sphinx documentation for all SGR and SPP features
-
-**Phase 6 (Complete)**: Shear Transformation Zone (STZ) [done - v0.6.0]
-   - [done] STZConventional model (Langer 2008 effective temperature formulation)
-   - [done] Three complexity variants: minimal, standard, full
-   - [done] Multi-protocol support: steady shear, transient, SAOS, LAOS
-   - [done] State evolution: effective temperature (χ), STZ density (Λ), orientation (m)
-   - [done] ODE integration via diffrax for transient simulations
-   - [done] Comprehensive Sphinx documentation and handbook
-
-**Phase 7 (Complete)**: Elasto-Plastic Models (EPM) [done - v0.6.0]
-   - [done] LatticeEPM: Mesoscopic lattice model with FFT-based stress redistribution
-   - [done] TensorialEPM: Scaffolding for full tensor implementation
-   - [done] EPM Kernels: JAX-accelerated Eshelby propagator and plastic event logic
-   - [done] Visualization: Lattice field plots (stress, thresholds) and evolution animations
-   - [done] Dual-mode yielding: Hard threshold (simulation) and Smooth yielding (inference)
-   - [done] Full protocol support: Flow curve, Creep (adaptive control), Oscillation, Relaxation
-
-**Phase 8 (Complete)**: Advanced Constitutive Models [done - v0.6.0]
-   - [done] Fluidity-Saramito EVP: Tensorial viscoelasticity with thixotropic fluidity (local + nonlocal)
-   - [done] IKH/FIKH: Isotropic-kinematic hardening with fractional variants (4 models)
-   - [done] Hébraud-Lequeux: Mean-field model for concentrated emulsions
-   - [done] Giesekus: Single-mode and multi-mode nonlinear viscoelastic models
-   - [done] DMT: de Souza Mendes-Thompson thixotropic models (local + nonlocal)
-   - [done] ITT-MCT: Mode-Coupling Theory for dense colloids (schematic + isotropic)
-
-**Phase 9 (Complete)**: Transient Network Models [done - v0.6.0]
-   - [done] TNT: 5 transient network variants (SingleMode, LoopBridge, StickyRouse, Cates, MultiSpecies)
-   - [done] VLB: 4 Vernerey-Long-Brighenti models (Local, MultiNetwork, Variant with Bell/FENE, Nonlocal PDE)
-   - [done] Distribution-tensor formulation with analytical SAOS + diffrax ODE for transients
-   - [done] 10 VLB tutorial notebooks with Bayesian, Bell, FENE, and nonlocal examples
-
-**Phase 10 (Complete)**: Vitrimer and Nanocomposite Models [done - v0.6.0]
-   - [done] HVM: Hybrid Vitrimer Model with 3-subnetwork architecture (P + E + D)
-   - [done] HVNM: Hybrid Vitrimer Nanocomposite Model extending HVM with interphase network
-   - [done] TST kinetics with Arrhenius temperature dependence
-   - [done] Factor-of-2 relaxation, Guth-Gold strain amplification for HVNM
-   - [done] 5 factory methods each for limiting cases
-   - [done] 13 tutorial notebooks (HVM: 6, HVNM: 7)
-
-Technology Stack
-----------------
-
-**Core Dependencies**
-   - Python 3.12+
-   - JAX 0.8.0+ for acceleration and automatic differentiation
-   - NLSQ 0.6.6+ for GPU-accelerated optimization
-   - NumPyro for Bayesian inference (MCMC NUTS sampling)
-   - ArviZ 0.15.0+ for Bayesian visualization and diagnostics
-   - NumPy, SciPy for numerical operations
-   - Matplotlib for visualization
-   - h5py, pandas, openpyxl for I/O
-
-**Optional Dependencies**
-   - CUDA 12.1-12.9 for GPU acceleration (Linux only)
-
-Performance
------------
-
-RheoJAX delivers exceptional performance through JAX acceleration and systematic optimizations (v0.3.1-v0.3.2):
-
-.. list-table:: Performance Benchmarks (v0.6.0)
-   :header-rows: 1
-   :widths: 40 20 20 20
-
-   * - Operation
-     - Baseline (NumPy/SciPy)
-     - v0.4.0 (JAX + Optimizations)
-     - Speedup
-   * - Mittag-Leffler (1000 points)
-     - 45 ms
-     - 0.8 ms
-     - 56x
-   * - NLSQ Parameter Optimization
-     - 2.5 s (scipy)
-     - 0.08 s (NLSQ)
-     - 30x
-   * - Mastercurve Transform (10 datasets)
-     - 8.5 s
-     - 1.7 s (v0.3.2 vectorization)
-     - 5x
-   * - GMM Element Minimization (N=10)
-     - 50 s (cold-start)
-     - 10 s (v0.4.0 warm-start)
-     - 5x
-   * - TRIOS Large File Load (50k points)
-     - 35 MB peak memory
-     - 11 MB (v0.4.0 auto-chunk)
-     - 68% reduction
-
-**Cumulative Improvements v0.3.1-v0.3.2**: 50-75% end-to-end latency reduction through JAX-native foundation, JIT compilation, vectorization, and intelligent convergence.
+----
 
 Community and Support
 ---------------------
 
 **Getting Help**
-   - Read the :doc:`user_guide/getting_started`
+   - Read the :doc:`user_guide/index`
    - Report issues on `GitHub <https://github.com/imewei/rheojax/issues>`_
    - Contact: wchen@anl.gov
 
 **Contributing**
    - See :doc:`developer/contributing` for guidelines
    - Check :doc:`developer/architecture` for design principles
-   - Review open issues for contribution ideas
 
 **Citation**
    If you use RheoJAX in your research, please cite:

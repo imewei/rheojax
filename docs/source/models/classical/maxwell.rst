@@ -7,9 +7,9 @@ Quick Reference
 ---------------
 
 - **Use when:** Single relaxation time, exponential stress decay, viscoelastic liquids
-- **Parameters:** 2 (G, :math:`\eta`)
+- **Parameters:** 2 (G0, :math:`\eta`)
 - **Key equation:** :math:`G(t) = G \exp(-t/\tau)` where :math:`\tau = \eta/G`
-- **Test modes:** Oscillation, relaxation
+- **Test modes:** Oscillation, relaxation, creep, flow curve
 - **Material examples:** Polymer melts (PS, PDMS), viscoelastic liquids, dilute solutions
 
 Notation Guide
@@ -243,7 +243,7 @@ Parameters
      - Units
      - Bounds
      - Notes
-   * - ``G``
+   * - ``G0``
      - :math:`G`
      - Pa
      - :math:`G > 0`
@@ -908,7 +908,7 @@ Advanced Usage: Bayesian Inference
 
    # 3. Get credible intervals
    intervals = model.get_credible_intervals(result.posterior_samples, credibility=0.95)
-   print(f"G: [{intervals['G'][0]:.2e}, {intervals['G'][1]:.2e}] Pa")
+   print(f"G0: [{intervals['G0'][0]:.2e}, {intervals['G0'][1]:.2e}] Pa")
    print(f"eta: [{intervals['eta'][0]:.2e}, {intervals['eta'][1]:.2e}] Pa·s")
 
 Examples

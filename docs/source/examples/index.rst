@@ -2,8 +2,9 @@
 Tutorial Notebooks
 ==================
 
-RheoJAX includes 33 comprehensive tutorial notebooks organized into five learning paths:
-**Basic Model Fitting** (5), **Transform Workflows** (8), **Bayesian Inference** (9), **Advanced Patterns** (10), and **I/O** (1).
+RheoJAX includes 235 comprehensive tutorial notebooks organized into 20 categories:
+**Basic** (5), **Transforms** (8), **Bayesian** (9), **Advanced** (10), **I/O** (1),
+plus 14 model family tutorial suites and a 31-notebook verification suite.
 
 All notebooks are located in the ``examples/`` directory and demonstrate best practices with
 real-world datasets and synthetic data generation patterns.
@@ -11,7 +12,7 @@ real-world datasets and synthetic data generation patterns.
 Quick Navigation
 ================
 
-.. list-table:: Learning Paths
+.. list-table:: General Tutorials
    :header-rows: 1
    :widths: 25 50 25
 
@@ -33,6 +34,67 @@ Quick Navigation
    * - **I/O**
      - Data I/O demonstrations
      - 1 notebook
+
+.. list-table:: Model Family Tutorials
+   :header-rows: 1
+   :widths: 25 50 25
+
+   * - Family
+     - Description
+     - Notebooks
+   * - **DMT**
+     - de Souza Mendes-Thompson thixotropic models
+     - 6 notebooks
+   * - **EPM**
+     - Elasto-plastic models (Lattice + Tensorial)
+     - 6 notebooks
+   * - **FIKH**
+     - Fredrickson-IKH + FMLIKH models
+     - 12 notebooks
+   * - **Fluidity**
+     - Fluidity local/nonlocal + Saramito EVP local/nonlocal
+     - 24 notebooks
+   * - **Giesekus**
+     - Giesekus constitutive model (single-mode)
+     - 7 notebooks
+   * - **HL**
+     - Hebraud-Lequeux stochastic model
+     - 6 notebooks
+   * - **HVM**
+     - Hybrid Vitrimer Model (basic + advanced tutorials)
+     - 13 notebooks
+   * - **HVNM**
+     - Hybrid Vitrimer Nanocomposite Model (basic + NLSQ/NUTS)
+     - 15 notebooks
+   * - **IKH**
+     - Isotropic kinematic hardening (MIKH + MLIKH)
+     - 12 notebooks
+   * - **ITT-MCT**
+     - Integration Through Transients Mode-Coupling Theory
+     - 12 notebooks
+   * - **SGR**
+     - Soft Glassy Rheology (Conventional + Generic)
+     - 6 notebooks
+   * - **STZ**
+     - Shear Transformation Zone theory
+     - 6 notebooks
+   * - **TNT**
+     - Transient Network Theory (5 sub-models)
+     - 30 notebooks
+   * - **VLB**
+     - Vasquez-Cook-McKinley transient network (basic + NLSQ/NUTS)
+     - 16 notebooks
+
+.. list-table:: Verification Suite
+   :header-rows: 1
+   :widths: 25 50 25
+
+   * - Category
+     - Description
+     - Notebooks
+   * - **Verification**
+     - Cross-model protocol validation + material-specific benchmarks
+     - 31 notebooks
 
 Basic Model Fitting
 ===================
@@ -708,6 +770,254 @@ Production patterns, custom model development, and performance optimization.
    - Extract physical parameters from LAOS cycles
    - Understand SPP vs Fourier trade-offs
 
+I/O Demonstrations
+===================
+
+27. TRIOS Complex Modulus Plot
+------------------------------
+
+**File**: ``examples/io/plot_trios_complex_modulus.ipynb``
+
+**Content**:
+   - TRIOS file format loading and visualization
+   - Complex modulus (G', G'') plotting
+
+Model Family Tutorials
+======================
+
+Each model family provides 6 protocol-specific notebooks covering: flow curve, startup shear,
+stress relaxation, creep, SAOS, and LAOS. Models with multiple sub-models (e.g., FIKH/FMLIKH,
+MIKH/MLIKH) have 12 notebooks (6 per sub-model). All notebooks follow a consistent pattern:
+synthetic data generation, NLSQ fitting, Bayesian inference (FAST_MODE-aware), and visualization.
+
+DMT — Thixotropic Models (6 notebooks)
+---------------------------------------
+
+**Directory**: ``examples/dmt/``
+
+**Model**: de Souza Mendes-Thompson structural-kinetics model with scalar structure parameter.
+
+**Notebooks**:
+   1. ``01_dmt_flow_curve.ipynb`` — Steady-state flow curve
+   2. ``02_dmt_startup_shear.ipynb`` — Stress overshoot in startup
+   3. ``03_dmt_stress_relaxation.ipynb`` — Structural relaxation
+   4. ``04_dmt_creep.ipynb`` — Delayed yielding under constant stress
+   5. ``05_dmt_saos.ipynb`` — Small-amplitude oscillatory shear
+   6. ``06_dmt_laos.ipynb`` — Large-amplitude oscillatory shear
+
+EPM — Elasto-Plastic Models (6 notebooks)
+------------------------------------------
+
+**Directory**: ``examples/epm/``
+
+**Models**: Lattice EPM (mesoscale) and Tensorial EPM (continuum).
+
+**Notebooks**:
+   1. ``01_epm_flow_curve.ipynb`` — Flow curve with yield stress
+   2. ``02_epm_saos.ipynb`` — Linear viscoelastic response
+   3. ``03_epm_startup.ipynb`` — Startup shear and overshoot
+   4. ``04_epm_creep.ipynb`` — Creep compliance
+   5. ``05_epm_relaxation.ipynb`` — Stress relaxation
+   6. ``06_epm_visualization.ipynb`` — Spatial visualization of plastic events
+
+FIKH — Fredrickson-IKH Models (12 notebooks)
+---------------------------------------------
+
+**Directory**: ``examples/fikh/``
+
+**Models**: FIKH (Fredrickson IKH, 6 notebooks) and FMLIKH (multi-lambda variant, 6 notebooks).
+
+**Notebooks**:
+   1–6. ``01–06_fikh_*.ipynb`` — FIKH: flow curve, startup, relaxation, creep, SAOS, LAOS
+   7–12. ``07–12_fmlikh_*.ipynb`` — FMLIKH: flow curve, startup, relaxation, creep, SAOS, LAOS
+
+Fluidity — Fluidity & Saramito EVP Models (24 notebooks)
+---------------------------------------------------------
+
+**Directory**: ``examples/fluidity/``
+
+**Models**: Four model variants × 6 protocols each:
+
+- **Fluidity Local** (01–06): Homogeneous thixotropic fluidity model
+- **Fluidity Nonlocal** (07–12): Shear-banding capable with diffusion
+- **Saramito Local** (13–18): Elastoviscoplastic with tensorial stress
+- **Saramito Nonlocal** (19–24): EVP with spatial coupling
+
+Each set of 6 covers: flow curve, startup, creep, relaxation, SAOS, LAOS.
+
+Giesekus — Constitutive Model (7 notebooks)
+--------------------------------------------
+
+**Directory**: ``examples/giesekus/``
+
+**Model**: Giesekus model with anisotropic drag (mobility factor α).
+
+**Notebooks**:
+   1. ``01_giesekus_flow_curve.ipynb`` — Shear-thinning flow curve
+   2. ``02_giesekus_saos.ipynb`` — Linear viscoelastic response
+   3. ``03_giesekus_startup.ipynb`` — Stress overshoot dynamics
+   4. ``04_giesekus_normal_stresses.ipynb`` — N₁, N₂ predictions
+   5. ``05_giesekus_creep.ipynb`` — Creep compliance
+   6. ``06_giesekus_relaxation.ipynb`` — Stress relaxation
+   7. ``07_giesekus_laos.ipynb`` — Nonlinear LAOS response
+
+HL — Hebraud-Lequeux Model (6 notebooks)
+-----------------------------------------
+
+**Directory**: ``examples/hl/``
+
+**Model**: Stochastic mean-field model for soft glassy materials (PDE-based).
+
+**Notebooks**:
+   1. ``01_hl_flow_curve.ipynb`` — Yield stress and flow curve
+   2. ``02_hl_relaxation.ipynb`` — Stress relaxation
+   3. ``03_hl_creep.ipynb`` — Creep with viscosity bifurcation
+   4. ``04_hl_saos.ipynb`` — Linear viscoelastic moduli
+   5. ``05_hl_startup.ipynb`` — Startup shear
+   6. ``06_hl_laos.ipynb`` — LAOS nonlinear response
+
+HVM — Hybrid Vitrimer Model (13 notebooks)
+-------------------------------------------
+
+**Directory**: ``examples/hvm/``
+
+**Model**: Constitutive model for vitrimers with permanent, exchangeable (BER/TST), and dissociative subnetworks.
+
+**Notebooks** (Basic, 01–06):
+   1. ``01_hvm_saos.ipynb`` — SAOS with dual-Maxwell modes + plateau
+   2. ``02_hvm_stress_relaxation.ipynb`` — Multi-timescale relaxation
+   3. ``03_hvm_startup_shear.ipynb`` — TST-driven stress overshoot
+   4. ``04_hvm_creep.ipynb`` — Creep with evolving natural state
+   5. ``05_hvm_flow_curve.ipynb`` — Steady-state flow curve
+   6. ``06_hvm_laos.ipynb`` — Nonlinear LAOS
+
+**Notebooks** (Advanced tutorials, 07–13):
+   7. ``07_hvm_overview.ipynb`` — Model overview and parameter guide
+   8–13. Advanced flow curve, creep, relaxation, startup, SAOS, LAOS tutorials
+
+HVNM — Hybrid Vitrimer Nanocomposite Model (15 notebooks)
+----------------------------------------------------------
+
+**Directory**: ``examples/hvnm/``
+
+**Model**: Extends HVM with interphase subnetwork around nanoparticles (Guth-Gold amplification).
+
+**Notebooks** (Basic, 01–07):
+   1–6. ``01–06_hvnm_*.ipynb`` — SAOS, relaxation, startup, creep, flow curve, LAOS
+   7. ``07_hvnm_limiting_cases.ipynb`` — phi=0 recovers HVM exactly
+
+**Notebooks** (NLSQ→NUTS workflows, 08–15):
+   8. ``08_data_intake_and_qc.ipynb`` — Data intake and quality control
+   9. ``09_flow_curve_nlsq_nuts.ipynb`` — Flow curve NLSQ → NUTS
+   10. ``10_creep_compliance_nlsq_nuts.ipynb`` — Creep NLSQ → NUTS
+   11. ``11_stress_relaxation_nlsq_nuts.ipynb`` — Relaxation NLSQ → NUTS
+   12. ``12_startup_shear_nlsq_nuts.ipynb`` — Startup NLSQ → NUTS
+   13. ``13_saos_nlsq_nuts.ipynb`` — SAOS NLSQ → NUTS
+   14. ``14_laos_nlsq_nuts.ipynb`` — LAOS NLSQ → NUTS
+   15. ``15_global_multi_protocol.ipynb`` — Multi-protocol global fitting
+
+IKH — Isotropic Kinematic Hardening (12 notebooks)
+---------------------------------------------------
+
+**Directory**: ``examples/ikh/``
+
+**Models**: MIKH (modified IKH, 6 notebooks) and MLIKH (multi-lambda IKH, 6 notebooks).
+
+**Notebooks**:
+   1–6. ``01–06_mikh_*.ipynb`` — MIKH: flow curve, startup, relaxation, creep, SAOS, LAOS
+   7–12. ``07–12_mlikh_*.ipynb`` — MLIKH: flow curve, startup, relaxation, creep, SAOS, LAOS
+
+ITT-MCT — Mode-Coupling Theory (12 notebooks)
+----------------------------------------------
+
+**Directory**: ``examples/itt_mct/``
+
+**Models**: F₁₂ Schematic (6 notebooks) and Isotropic with S(k) input (6 notebooks).
+
+**Notebooks**:
+   1–6. ``01–06_schematic_*.ipynb`` — Schematic: flow curve, startup, relaxation, creep, SAOS, LAOS
+   7–12. ``07–12_isotropic_*.ipynb`` — Isotropic: flow curve, startup, relaxation, creep, SAOS, LAOS
+
+SGR — Soft Glassy Rheology (6 notebooks)
+-----------------------------------------
+
+**Directory**: ``examples/sgr/``
+
+**Models**: SGRConventional (Sollich 1998) and SGRGeneric (Fuereder & Ilg 2013).
+
+**Notebooks**:
+   1. ``01_sgr_flow_curve.ipynb`` — Flow curve with noise temperature x
+   2. ``02_sgr_stress_relaxation.ipynb`` — Power-law relaxation
+   3. ``03_sgr_saos.ipynb`` — Linear viscoelastic moduli
+   4. ``04_sgr_creep.ipynb`` — Creep compliance
+   5. ``05_sgr_startup.ipynb`` — Startup shear
+   6. ``06_sgr_laos.ipynb`` — Nonlinear LAOS
+
+STZ — Shear Transformation Zone (6 notebooks)
+----------------------------------------------
+
+**Directory**: ``examples/stz/``
+
+**Model**: STZ theory for amorphous solids (Falk & Langer).
+
+**Notebooks**:
+   1. ``01_stz_flow_curve.ipynb`` — Flow curve with yield stress
+   2. ``02_stz_startup_shear.ipynb`` — Startup transient
+   3. ``03_stz_stress_relaxation.ipynb`` — Stress relaxation
+   4. ``04_stz_creep.ipynb`` — Creep compliance
+   5. ``05_stz_saos.ipynb`` — Linear viscoelastic response
+   6. ``06_stz_laos.ipynb`` — LAOS nonlinear response
+
+TNT — Transient Network Theory (30 notebooks)
+----------------------------------------------
+
+**Directory**: ``examples/tnt/``
+
+**Models**: 5 sub-models × 6 protocols each:
+
+- **SingleMode** (01–06): Single relaxation mode
+- **Cates** (07–12): Living polymer reptation-reaction model
+- **LoopBridge** (13–18): Loop-bridge topology switching
+- **MultiSpecies** (19–24): Multi-species reaction network
+- **StickyRouse** (25–30): Sticky Rouse dynamics
+
+Each set covers: flow curve, startup, relaxation, creep, SAOS, LAOS.
+
+VLB — Transient Network Models (16 notebooks)
+----------------------------------------------
+
+**Directory**: ``examples/vlb/``
+
+**Models**: Vasquez-Cook-McKinley (VLB) transient network with Bell, FENE, and Nonlocal extensions.
+
+**Notebooks** (Basic, 01–10):
+   1–6. ``01–06_vlb_*.ipynb`` — Flow curve, startup, relaxation, creep, SAOS, LAOS
+   7. ``07_vlb_bayesian_workflow.ipynb`` — Bayesian inference workflow
+   8. ``08_vlb_bell_shear_thinning.ipynb`` — Bell model (force-enhanced breakage)
+   9. ``09_vlb_fene_extensional.ipynb`` — FENE finite extensibility
+   10. ``10_vlb_nonlocal_banding.ipynb`` — Shear banding PDE
+
+**Notebooks** (NLSQ→NUTS workflows, 11–16):
+   11–16. ``11–16_vlb_*_nlsq_to_nuts.ipynb`` — NLSQ → NUTS for 6 protocols
+
+Verification Suite (31 notebooks)
+=================================
+
+**Directory**: ``examples/verification/``
+
+Cross-model validation notebooks that verify protocol implementations against known analytical
+solutions and experimental data.
+
+**Protocol validators** (7 notebooks):
+   - ``00_verification_index.ipynb`` — Verification suite overview
+   - ``01–06_validate_*.ipynb`` — Flow curve, creep, relaxation, startup, SAOS, LAOS
+
+**Material-specific benchmarks** (24 notebooks):
+   - ``creep/`` — 3 notebooks (mucus, perihepatic abscess, polystyrene)
+   - ``oscillation/`` — 13 notebooks (mastercurves, model evaluation, 11 material-specific)
+   - ``relaxation/`` — 7 notebooks (fish muscle, laponite, foams, polyethylene, polypropylene, polystyrene, time master)
+   - ``rotation/`` — 1 notebook (emulsion flow curve)
+
 Running the Notebooks
 =====================
 
@@ -759,7 +1069,7 @@ Some transform notebooks require experimental data files from ``examples/data/ex
 GPU Acceleration (Optional)
 ---------------------------
 
-For GPU acceleration (Linux + CUDA 12.1-12.9):
+For GPU acceleration (Linux + CUDA 12+ or 13+):
 
 .. code-block:: bash
 
@@ -861,6 +1171,36 @@ Deep dive into fractional models and custom development:
 3. ``advanced/03-custom-models.ipynb``
 4. ``advanced/05-performance-optimization.ipynb``
 
+For Constitutive ODE Models
+---------------------------
+
+Models based on ODE/PDE integration with diffrax:
+
+1. ``giesekus/01_giesekus_flow_curve.ipynb`` — Start with a single ODE model
+2. ``vlb/01_vlb_flow_curve.ipynb`` — Transient network theory
+3. ``hvm/07_hvm_overview.ipynb`` — Vitrimer model overview
+4. ``hvnm/08_data_intake_and_qc.ipynb`` — Full NLSQ→NUTS pipeline
+
+For Thixotropy & Yielding
+--------------------------
+
+Models for thixotropic, yield-stress, and glassy materials:
+
+1. ``dmt/01_dmt_flow_curve.ipynb`` — Thixotropic structure kinetics
+2. ``fluidity/01_fluidity_local_flow_curve.ipynb`` — Fluidity model
+3. ``ikh/01_mikh_flow_curve.ipynb`` — Kinematic hardening
+4. ``stz/01_stz_flow_curve.ipynb`` — Amorphous solids
+
+For Dense Suspensions & Glasses
+-------------------------------
+
+Microscopic and mesoscale models:
+
+1. ``sgr/01_sgr_flow_curve.ipynb`` — Soft Glassy Rheology
+2. ``itt_mct/01_schematic_flow_curve.ipynb`` — MCT schematic model
+3. ``hl/01_hl_flow_curve.ipynb`` — Hebraud-Lequeux stochastic model
+4. ``epm/01_epm_flow_curve.ipynb`` — Elasto-plastic models
+
 For Production Workflows
 ------------------------
 
@@ -882,7 +1222,7 @@ Additional Resources
 
 **Example Data**
    - ``examples/data/README.md`` - Dataset catalog and loading instructions
-   - ``examples/README.md`` - Overview of all 33 notebooks
+   - ``examples/README.md`` - Overview of all 235 notebooks
 
 **External Resources**
    - JAX Documentation: https://jax.readthedocs.io/

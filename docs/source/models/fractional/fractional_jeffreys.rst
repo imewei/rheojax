@@ -9,7 +9,7 @@ Quick Reference
 - **Use when:** Viscoelastic liquid with fractional relaxation, terminal viscous flow
 - **Parameters:** 4 (:math:`\eta_1`, :math:`\eta_2`, :math:`\alpha`, :math:`\tau_1`)
 - **Key equation:** :math:`G^*(\omega) = \eta_1(i\omega) \frac{1 + (i\omega\tau_2)^{\alpha}}{1 + (i\omega\tau_1)^{\alpha}}`
-- **Test modes:** Oscillation, relaxation, rotation (steady shear)
+- **Test modes:** Oscillation, relaxation, creep, flow curve
 - **Material examples:** Polymer solutions with broad relaxation spectra, complex fluids with viscous flow
 
 .. include:: /_includes/fractional_seealso.rst

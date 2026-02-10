@@ -36,14 +36,15 @@ For development, clone the repository and install in editable mode:
 Optional Dependencies
 ---------------------
 
-GPU Support (Linux + CUDA 12.1-12.9 Only)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GPU Support (Linux + CUDA 12+ or 13+)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 GPU acceleration provides 20-100x speedup for large datasets.
 
 **Platform Requirements:**
 
-* ✅ Linux + NVIDIA GPU + CUDA 12.1-12.9: Full GPU acceleration
+* ✅ Linux + NVIDIA GPU + CUDA 12.1+: Full GPU acceleration
+* ✅ Linux + NVIDIA GPU + CUDA 13.x: Full GPU acceleration with latest toolkit
 * ❌ macOS: CPU-only (Apple Silicon/Intel, no NVIDIA GPU support)
 * ❌ Windows: CPU-only (CUDA support experimental/unstable)
 
@@ -51,19 +52,24 @@ GPU acceleration provides 20-100x speedup for large datasets.
 
 .. code-block:: bash
 
-   make install-jax-gpu
+   make install-jax-gpu  # Auto-detects CUDA 12 or 13
 
 **Manual Install:**
 
 .. code-block:: bash
 
    pip uninstall -y jax jaxlib
+
+   # For CUDA 12.x:
    pip install jax[cuda12-local]==0.8.0 jaxlib==0.8.0
+
+   # For CUDA 13.x:
+   pip install jax[cuda13-local]==0.8.0 jaxlib==0.8.0
 
 **Requirements:**
 
-* System CUDA 12.1-12.9 pre-installed (not bundled)
-* NVIDIA driver >= 525
+* System CUDA 12.1+ or 13.x pre-installed (not bundled)
+* NVIDIA driver >= 525 (CUDA 12) or >= 560 (CUDA 13)
 * Linux x86_64 or aarch64
 
 **Verify GPU Detection:**
@@ -129,7 +135,7 @@ If you encounter issues with JAX installation, refer to the
 
 **GPU Support:**
 
-* GPU acceleration requires Linux + CUDA 12.1-12.9 + NVIDIA driver >= 525
+* GPU acceleration requires Linux + CUDA 12.1+ or 13.x + NVIDIA driver >= 525 (CUDA 12) or >= 560 (CUDA 13)
 * macOS and Windows only support CPU mode
 * JAX and jaxlib versions must match exactly (both 0.8.0)
 

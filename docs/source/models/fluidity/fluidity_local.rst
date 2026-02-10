@@ -8,7 +8,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Yield-stress fluids, thixotropic materials, aging systems with homogeneous (spatially uniform) flow
-- **Parameters:** 6 (G, f_eq, f_inf, tau_age, a, n)
+- **Parameters:** 9 (G, tau_y, K, n_flow, f_eq, f_inf, theta, a, n_rejuv)
 - **Key equation:** :math:`\dot{\sigma} = G\dot{\gamma} - f(t)\sigma`
 - **Test modes:** Oscillation, relaxation, creep, steady shear, start-up, LAOS
 - **Material examples:** Mayonnaise, drilling muds, waxy crude oils, colloidal gels, greases, thixotropic paints
@@ -446,30 +446,45 @@ Parameters
      - Pa
      - :math:`G > 0`
      - Elastic modulus; sets stress scale
+   * - ``tau_y``
+     - :math:`\tau_y`
+     - Pa
+     - :math:`\tau_y \geq 0`
+     - Yield stress
+   * - ``K``
+     - :math:`K`
+     - Pa·s\ :sup:`n`
+     - :math:`K > 0`
+     - Flow consistency (Herschel-Bulkley K parameter)
+   * - ``n_flow``
+     - :math:`n_{\rm flow}`
+     - —
+     - :math:`0.1 \leq n_{\rm flow} \leq 2`
+     - Flow exponent (Herschel-Bulkley n parameter)
    * - ``f_eq``
      - :math:`f_{\rm eq}`
-     - s\ :sup:`-1`
+     - 1/(Pa·s)
      - :math:`f_{\rm eq} \geq 0`
      - Equilibrium fluidity; :math:`\approx 0` for yield-stress fluids
    * - ``f_inf``
      - :math:`f_\infty`
-     - s\ :sup:`-1`
+     - 1/(Pa·s)
      - :math:`f_\infty > f_{\rm eq}`
      - Infinite-shear fluidity; sets minimum viscosity
-   * - ``tau_age``
-     - :math:`\tau_{\rm age}`
+   * - ``theta``
+     - :math:`\theta`
      - s
-     - :math:`\tau_{\rm age} > 0`
+     - :math:`\theta > 0`
      - Aging timescale; controls buildup rate at rest
    * - ``a``
      - :math:`a`
-     - s\ :sup:`n-1`
-     - :math:`a > 0`
-     - Rejuvenation rate coefficient
-   * - ``n``
-     - :math:`n`
      - —
-     - :math:`n > 0`
+     - :math:`a \geq 0`
+     - Rejuvenation amplitude
+   * - ``n_rejuv``
+     - :math:`n_{\rm rejuv}`
+     - —
+     - :math:`0 \leq n_{\rm rejuv} \leq 2`
      - Rejuvenation exponent; typically :math:`0.5 \leq n \leq 2`
 
 Parameter Interpretation

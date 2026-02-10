@@ -627,7 +627,7 @@ Shared Fractional Order (``shared_alpha=True``)
 Per-Mode Parameters
 ~~~~~~~~~~~~~~~~~~~
 
-For each mode i = 1, 2, ..., N:
+For each mode i = 0, 1, ..., N-1:
 
 .. list-table::
    :widths: 18 12 15 12 43
@@ -638,28 +638,34 @@ For each mode i = 1, 2, ..., N:
      - Bounds
      - Units
      - Description
-   * - ``tau_thix_i``
-     - varies
-     - (10\ :math:`^{-6, 10^1^2}`)
-     - s
-     - Mode i rebuilding timescale
-   * - ``Gamma_i``
-     - 0.5
+   * - ``G_i``
+     - :math:`10^3 / 10^i`
+     - (10\ :math:`^{-3}`, :math:`10^9`)
+     - Pa
+     - Shear modulus for mode i
+   * - ``eta_i``
+     - :math:`10^6 / 10^i`
+     - (10\ :math:`^{-3}`, :math:`10^{12}`)
+     - Pa·s
+     - Viscosity for mode i
+   * - ``C_i``
+     - :math:`5 \times 10^2 / 10^i`
+     - (0, :math:`10^9`)
+     - Pa
+     - Kinematic hardening modulus for mode i
+   * - ``gamma_dyn_i``
+     - 1.0
      - (0, :math:`10^4`)
      - —
-     - Mode i breakdown coefficient
-   * - ``w_i``
-     - 1/N
-     - (0, 1)
-     - —
-     - Mode i weight in yield stress
-   * - ``alpha_structure_i``
+     - Dynamic recovery parameter for mode i
+   * - ``alpha_i``
      - 0.5
      - (0.05, 0.99)
      - —
-     - Mode i fractional order (if ``shared_alpha=False``)
+     - Per-mode fractional order (only if ``shared_alpha=False``)
 
-**Note**: Weights are internally normalized: :math:`\Sigmaw_i` = 1.
+**Note**: The global parameters ``tau_thix``, ``Gamma``, and ``alpha_structure`` (when
+``shared_alpha=True``) are shared across all modes and are NOT per-mode parameters.
 
 
 Fitting Guidance

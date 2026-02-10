@@ -562,7 +562,10 @@ The following bounds ensure well-posed GENERIC dynamics:
 
    from rheojax.models import SGRGeneric
 
-   model = SGRGeneric(x=1.3, G0=100.0, tau0=0.01)
+   model = SGRGeneric()
+   model.parameters.set_value('x', 1.3)
+   model.parameters.set_value('G0', 100.0)
+   model.parameters.set_value('tau0', 0.01)
 
    # Enable consistency checks (adds ~10% overhead)
    model.enable_thermodynamic_checks(
@@ -869,11 +872,6 @@ Parameters
      - s
      - :math:`\tau_0 > 0`
      - Attempt time (inverse of :math:`\Gamma_0`)
-   * - ``k``
-     - :math:`k`
-     - Pa
-     - :math:`k > 0`
-     - Local elastic constant (often set equal to :math:`G_0`)
 
 What You Can Learn
 ------------------
@@ -1009,7 +1007,10 @@ Entropy Production Analysis
 
    from rheojax.models import SGRGeneric
 
-   model = SGRGeneric(x=1.3, G0=100.0, tau0=0.01)
+   model = SGRGeneric()
+   model.parameters.set_value('x', 1.3)
+   model.parameters.set_value('G0', 100.0)
+   model.parameters.set_value('tau0', 0.01)
 
    # Compute entropy production under steady shear
    gamma_dot = 1.0  # s^-1
@@ -1028,7 +1029,10 @@ Free Energy Landscape
    import numpy as np
    from rheojax.models import SGRGeneric
 
-   model = SGRGeneric(x=0.8, G0=100.0, tau0=0.01)
+   model = SGRGeneric()
+   model.parameters.set_value('x', 0.8)
+   model.parameters.set_value('G0', 100.0)
+   model.parameters.set_value('tau0', 0.01)
 
    # Compute free energy as function of mean strain
    strains = np.linspace(-1, 1, 100)
@@ -1044,7 +1048,10 @@ Fluctuation-Dissipation Verification
    from rheojax.models import SGRGeneric
    import numpy as np
 
-   model = SGRGeneric(x=1.5, G0=100.0, tau0=0.01)
+   model = SGRGeneric()
+   model.parameters.set_value('x', 1.5)
+   model.parameters.set_value('G0', 100.0)
+   model.parameters.set_value('tau0', 0.01)
    omega = np.logspace(-2, 2, 50)
 
    # Compute complex modulus
@@ -1054,9 +1061,6 @@ Fluctuation-Dissipation Verification
    # Fluctuation-dissipation: G'' relates to thermal fluctuations
    # For SGR: G''(omega) ~ omega * S_omega / (x * omega)
    # where S_omega is the strain fluctuation spectrum
-   fdt_ratio = model.verify_fluctuation_dissipation(omega)
-
-   print(f"FDT ratio (should be ~1): {fdt_ratio:.3f}")
 
 Fitting Guidance
 ----------------
@@ -1065,11 +1069,10 @@ Same strategy as conventional SGR (see :doc:`sgr_conventional`), with additional
 thermodynamic validation steps:
 
 1. **Initial fit**: Use NLSQ with oscillatory or flow curve data to estimate :math:`x, G_0, \tau_0`
-2. **Verify GENERIC structure**: Call ``validate_generic_structure()`` to check all degeneracy conditions
-3. **Check entropy production**: Ensure :math:`\dot{S}_{\text{prod}} \geq 0` for all flow rates
-4. **Bayesian with thermodynamic priors**: Use informative priors based on calorimetric data if available
+2. **Check entropy production**: Ensure :math:`\dot{S}_{\text{prod}} \geq 0` for all flow rates
+3. **Bayesian with thermodynamic priors**: Use informative priors based on calorimetric data if available
 
-**Troubleshooting**: If GENERIC validation fails, the parameter values may be
+**Troubleshooting**: If entropy production is negative, the parameter values may be
 unphysical (e.g., negative :math:`\tau_0` or :math:`G_0`). Re-fit with tighter bounds.
 
 Usage
@@ -1090,10 +1093,10 @@ Basic Example
    omega = np.logspace(-2, 2, 50)
    model.fit(omega, G_star_data, test_mode='oscillation')
 
-   # Access thermodynamic functions
-   E = model.internal_energy()
-   S = model.entropy()
-   F = model.free_energy()
+   # Access thermodynamic functions (require a state argument)
+   E = model.internal_energy(state)
+   S = model.entropy(state)
+   F = model.free_energy(state)
 
    print(f"Internal energy: {E:.2e} J/m³")
    print(f"Entropy: {S:.2e} J/(K·m³)")
@@ -1106,17 +1109,15 @@ Thermodynamic Validation
 
    from rheojax.models import SGRGeneric
 
-   model = SGRGeneric(x=1.3, G0=100.0, tau0=0.01)
+   model = SGRGeneric()
+   model.parameters.set_value('x', 1.3)
+   model.parameters.set_value('G0', 100.0)
+   model.parameters.set_value('tau0', 0.01)
 
-   # Verify GENERIC structure
-   validation = model.validate_generic_structure()
-
-   print(f"Poisson bracket antisymmetry: {validation['poisson_antisymmetric']}")
-   print(f"Friction matrix positive: {validation['friction_positive']}")
-   print(f"Energy degeneracy: {validation['energy_degeneracy']}")
-   print(f"Entropy degeneracy: {validation['entropy_degeneracy']}")
-
-   # All should be True for thermodynamic consistency
+   # Fit to data, then check entropy production for thermodynamic consistency
+   model.fit(omega, G_star_data, test_mode='oscillation')
+   S_prod = model.entropy_production(gamma_dot=1.0)
+   print(f"Entropy production rate: {S_prod:.4f} (should be >= 0)")
 
 Comparison with Conventional SGR
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1129,8 +1130,15 @@ Comparison with Conventional SGR
    # Both models give identical rheological predictions
    omega = np.logspace(-2, 2, 50)
 
-   conv = SGRConventional(x=1.3, G0=100.0, tau0=0.01)
-   generic = SGRGeneric(x=1.3, G0=100.0, tau0=0.01)
+   conv = SGRConventional()
+   conv.parameters.set_value('x', 1.3)
+   conv.parameters.set_value('G0', 100.0)
+   conv.parameters.set_value('tau0', 0.01)
+
+   generic = SGRGeneric()
+   generic.parameters.set_value('x', 1.3)
+   generic.parameters.set_value('G0', 100.0)
+   generic.parameters.set_value('tau0', 0.01)
 
    G_conv = conv.predict(omega, test_mode='oscillation')
    G_generic = generic.predict(omega, test_mode='oscillation')

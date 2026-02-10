@@ -99,12 +99,20 @@ Key Features
 
 **Supported Protocols:**
 
+*DMTLocal* (all 6 protocols):
+
 - Flow curve (steady state) with viscosity bifurcation
 - Startup shear with stress overshoot mechanism
 - Stress relaxation after cessation (arrested by structure recovery)
 - Creep with delayed yielding and avalanche effect
 - Small amplitude oscillatory shear (SAOS) with Maxwell moduli
 - Large amplitude oscillatory shear (LAOS) with Fourier/Chebyshev analysis
+
+*DMTNonlocal* (3 protocols):
+
+- Flow curve (steady state)
+- Startup shear
+- Creep
 
 
 Quick Start

@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Rigid below yield stress, Newtonian flow after yielding
-- **Parameters:** 2 (:math:`\tau_y`, :math:`\eta_p`)
+- **Parameters:** 2 (:math:`\sigma_y`, :math:`\eta_p`)
 - **Key equation:** :math:`\tau = \tau_y + \eta_p \dot{\gamma}` for :math:`|\tau| > \tau_y`
 - **Test modes:** Flow (steady shear)
 - **Material examples:** Cement pastes, drilling muds, mayonnaise, ketchup, toothpaste
@@ -102,7 +102,7 @@ Parameters
    * - Name
      - Units
      - Description / Constraints
-   * - ``tau_y``
+   * - ``sigma_y``
      - Pa
      - Yield stress; ≥ 0. Sets the plateau torque required to initiate motion. Typical range: 1-500 Pa.
    * - ``eta_p``
@@ -301,11 +301,13 @@ Usage
    tau_exp = 120.0 + 2.5 * gamma_dot + jnp.random.normal(0, 3, size=gamma_dot.shape)
 
    # Initialize and fit
-   model = Bingham(tau_y=120.0, eta_p=2.5)
+   model = Bingham()
+   model.parameters.set_value('sigma_y', 120.0)
+   model.parameters.set_value('eta_p', 2.5)
    model.fit(gamma_dot, tau_exp, loss="huber", ftol=1e-6)
 
    # Inspect fitted parameters
-   print(f"Yield stress: {model.parameters.get_value('tau_y'):.2f} Pa")
+   print(f"Yield stress: {model.parameters.get_value('sigma_y'):.2f} Pa")
    print(f"Plastic viscosity: {model.parameters.get_value('eta_p'):.3f} Pa·s")
 
    # Predict and plot

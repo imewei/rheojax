@@ -39,44 +39,30 @@ The guide is designed for:
 Learning Pathway Overview
 --------------------------
 
-The guide progresses through five sections over 16 weeks:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
 
-.. raw:: html
+   * - Section
+     - Timeline
+     - Focus
+   * - 1. Fundamentals
+     - Weeks 1-2
+     - Core rheological concepts and terminology
+   * - 2. Model Usage
+     - Weeks 3-6
+     - Practical model fitting and selection
+   * - 3. Advanced Topics
+     - Weeks 7-12
+     - Bayesian inference, fractional calculus, multi-technique
+   * - 4. Practical Guides
+     - Weeks 13-16
+     - Workflows, data I/O, visualization, batch processing
+   * - 5. Appendices
+     - Reference
+     - Experimental design, materials database, troubleshooting
 
-   <div style="margin: 20px 0;">
-   <table style="width: 100%; border-collapse: collapse;">
-   <tr style="background-color: #f0f0f0;">
-     <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Section</th>
-     <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Timeline</th>
-     <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Focus</th>
-   </tr>
-   <tr>
-     <td style="padding: 10px; border: 1px solid #ddd;">1. Fundamentals</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Weeks 1-2</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Core rheological concepts and terminology</td>
-   </tr>
-   <tr style="background-color: #f9f9f9;">
-     <td style="padding: 10px; border: 1px solid #ddd;">2. Model Usage</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Weeks 3-6</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Practical model fitting and selection</td>
-   </tr>
-   <tr>
-     <td style="padding: 10px; border: 1px solid #ddd;">3. Advanced Topics</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Weeks 7-12</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Bayesian inference, fractional calculus, multi-technique</td>
-   </tr>
-   <tr style="background-color: #f9f9f9;">
-     <td style="padding: 10px; border: 1px solid #ddd;">4. Practical Guides</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Weeks 13-16</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Workflows, data I/O, visualization, batch processing</td>
-   </tr>
-   <tr>
-     <td style="padding: 10px; border: 1px solid #ddd;">5. Appendices</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Reference</td>
-     <td style="padding: 10px; border: 1px solid #ddd;">Experimental design, materials database, troubleshooting</td>
-   </tr>
-   </table>
-   </div>
+----
 
 Section 1: Fundamentals (Weeks 1-2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -199,71 +185,120 @@ model fitting, and Bayesian inference with ArviZ diagnostics.
 - Bayesian inference and diagnostics
 - Transforms and exporting
 
+----
+
 Alternative Learning Paths
 ---------------------------
 
-**Path 1: Rapid Onboarding (1 week)**
+Not following the 16-week course? Choose a path that matches your goals:
 
-For experienced rheologists familiar with commercial software:
+.. admonition:: Rapid Onboarding (1 week)
+   :class: tip
 
-1. :doc:`02_model_usage/getting_started` — RheoJAX basics
-2. :doc:`02_model_usage/model_selection` — Choose the right model
-3. :doc:`04_practical_guides/pipeline_api` — Build workflows
-4. :doc:`04_practical_guides/data_io` — Import your data
+   For experienced rheologists familiar with commercial software:
 
-**Path 2: Bayesian Focus (4 weeks)**
+   1. :doc:`02_model_usage/getting_started` — RheoJAX basics
+   2. :doc:`02_model_usage/model_selection` — Choose the right model
+   3. :doc:`04_practical_guides/pipeline_api` — Build workflows
+   4. :doc:`04_practical_guides/data_io` — Import your data
 
-For researchers interested in uncertainty quantification:
+.. admonition:: Bayesian Focus (4 weeks)
+   :class: note
 
-1. :doc:`01_fundamentals/index` — Core concepts
-2. :doc:`02_model_usage/getting_started` — Basic fitting
-3. :doc:`03_advanced_topics/bayesian_inference` — Bayesian workflow
-4. :doc:`04_practical_guides/visualization` — Posterior diagnostics
+   For researchers interested in uncertainty quantification:
 
-**Path 3: Fractional Viscoelasticity Deep Dive (6 weeks)**
+   1. :doc:`01_fundamentals/index` — Core concepts
+   2. :doc:`02_model_usage/getting_started` — Basic fitting
+   3. :doc:`03_advanced_topics/bayesian_inference` — Bayesian workflow
+   4. :doc:`04_practical_guides/visualization` — Posterior diagnostics
 
-For advanced users studying complex materials:
+.. admonition:: Fractional Viscoelasticity (6 weeks)
+   :class: note
 
-1. :doc:`01_fundamentals/material_classification` — Material types
-2. :doc:`02_model_usage/model_families` — Model overview
-3. :doc:`03_advanced_topics/fractional_viscoelasticity_reference` — Fractional calculus
-4. :doc:`02_model_usage/fitting_strategies` — Initialization and validation
+   For advanced users studying complex materials:
 
-**Path 4: High-Throughput Analysis (2 weeks)**
+   1. :doc:`01_fundamentals/material_classification` — Material types
+   2. :doc:`02_model_usage/model_families` — Model overview
+   3. :doc:`03_advanced_topics/fractional_viscoelasticity_reference` — Fractional calculus
+   4. :doc:`02_model_usage/fitting_strategies` — Initialization and validation
 
-For labs processing many samples:
+.. admonition:: High-Throughput Analysis (2 weeks)
+   :class: tip
 
-1. :doc:`04_practical_guides/data_io` — Auto-detect file formats
-2. :doc:`04_practical_guides/pipeline_api` — Automated workflows
-3. :doc:`04_practical_guides/batch_processing` — Process multiple datasets
-4. :doc:`05_appendices/troubleshooting` — Handle edge cases
+   For labs processing many samples:
 
-**Path 5: Soft Glassy & LAOS Analysis (4 weeks)**
+   1. :doc:`04_practical_guides/data_io` — Auto-detect file formats
+   2. :doc:`04_practical_guides/pipeline_api` — Automated workflows
+   3. :doc:`04_practical_guides/batch_processing` — Process multiple datasets
+   4. :doc:`05_appendices/troubleshooting` — Handle edge cases
 
-For researchers working with yield stress fluids, gels, and nonlinear rheology:
+.. admonition:: Soft Glassy & LAOS Analysis (4 weeks)
+   :class: note
 
-1. :doc:`01_fundamentals/material_classification` — Understanding soft materials
-2. :doc:`03_advanced_topics/sgr_analysis` — SGR framework for soft glassy materials
-3. :doc:`03_advanced_topics/spp_analysis` — SPP for LAOS yield stress extraction
-4. :doc:`03_advanced_topics/bayesian_inference` — Uncertainty in SGR/SPP parameters
+   For researchers working with yield stress fluids, gels, and nonlinear rheology:
+
+   1. :doc:`01_fundamentals/material_classification` — Understanding soft materials
+   2. :doc:`03_advanced_topics/sgr_analysis` — SGR framework for soft glassy materials
+   3. :doc:`03_advanced_topics/spp_analysis` — SPP for LAOS yield stress extraction
+   4. :doc:`03_advanced_topics/bayesian_inference` — Uncertainty in SGR/SPP parameters
+
+.. admonition:: Thixotropy & Yield Stress (4 weeks)
+   :class: note
+
+   For researchers working with drilling muds, waxy oils, emulsions, and structured fluids:
+
+   1. :doc:`01_fundamentals/material_classification` — Material behavior fundamentals
+   2. :doc:`03_advanced_topics/thixotropy_yielding` — DMT, Fluidity, HL, STZ, EPM models
+   3. :doc:`03_advanced_topics/constitutive_ode_models` — IKH/FIKH kinematic hardening
+   4. :doc:`03_advanced_topics/bayesian_inference` — Uncertainty quantification
+
+.. admonition:: Polymer Network Theory (4 weeks)
+   :class: note
+
+   For researchers studying associative polymers, wormlike micelles, and biological gels:
+
+   1. :doc:`02_model_usage/getting_started` — Basic fitting workflow
+   2. :doc:`03_advanced_topics/constitutive_ode_models` — Giesekus nonlinear viscoelasticity
+   3. :doc:`03_advanced_topics/polymer_network_models` — TNT and VLB frameworks
+   4. :doc:`03_advanced_topics/vitrimer_models` — HVM/HVNM for covalent adaptable networks
+
+.. admonition:: Smart Materials & Nanocomposites (3 weeks)
+   :class: note
+
+   For researchers working with vitrimers, nanocomposites, and adaptive materials:
+
+   1. :doc:`03_advanced_topics/polymer_network_models` — VLB distribution tensor foundations
+   2. :doc:`03_advanced_topics/vitrimer_models` — HVM and HVNM models
+   3. :doc:`03_advanced_topics/bayesian_inference` — Bayesian parameter estimation
+
+.. admonition:: Dense Suspensions & Glasses (4 weeks)
+   :class: note
+
+   For researchers studying colloidal glasses, metallic glasses, and amorphous solids:
+
+   1. :doc:`03_advanced_topics/sgr_analysis` — SGR soft glassy framework
+   2. :doc:`03_advanced_topics/dense_suspensions_glasses` — ITT-MCT mode-coupling theory
+   3. :doc:`03_advanced_topics/thixotropy_yielding` — STZ and EPM for amorphous solids
+   4. :doc:`03_advanced_topics/bayesian_inference` — Phase classification with uncertainty
+
+----
 
 Related Documentation
 ---------------------
 
 - :doc:`/quickstart` — 5-minute installation and first fit
-- :doc:`/models/index` — Comprehensive Model Handbook (all equations and theory)
-- :doc:`/transforms/index` — Transform Reference (mathematical details)
+- :doc:`/models/index` — Comprehensive Model Handbook (53 models, all equations and theory)
+- :doc:`/transforms/index` — Transform Reference (7 transforms, mathematical details)
 - :doc:`/api_reference` — Complete API documentation
-- :doc:`/examples/index` — 24 example notebooks
+- :doc:`/examples/index` — 170+ example notebooks across all model families
 
 Getting Help
 ------------
 
-- **Self-Check Questions**: Test understanding throughout each section
 - **Troubleshooting Guide**: :doc:`05_appendices/troubleshooting`
 - **Glossary**: :doc:`05_appendices/glossary`
 - **GitHub Issues**: Report bugs or request features
-- **Examples**: :doc:`/examples/index` — 24 worked notebooks
+- **Examples**: :doc:`/examples/index` — 170+ worked notebooks across all model families
 
 Next Steps
 ----------

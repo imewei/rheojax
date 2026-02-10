@@ -8,7 +8,7 @@ Quick Reference
 
 - **Use when:** Full stress tensor modeling, normal stress differences (:math:`N_1, N_2`), anisotropic yielding, flow instabilities
 
-- **Parameters:** 9 (:math:`\mu, \nu, \tau_pl_shear, \tau_pl_normal, \sigma_c_mean, \sigma_c_std`, w_N1, hill_H, hill_N)
+- **Parameters:** 9 (:math:`\mu, \nu, \tau_{\text{pl,shear}}, \tau_{\text{pl,normal}}, \sigma_{c,\text{mean}}, \sigma_{c,\text{std}}`, w_N1, hill_H, hill_N)
 
 - **Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma} \delta_{ij} - \frac{\sigma_{ij}}{\tau_{ij}^{pl}} f(\sigma_{eff}, \sigma_c) + \sum_{kl} \mathcal{G}_{ij,kl}(\mathbf{q}) \dot{\gamma}^{pl}_{kl}`
 
@@ -133,7 +133,7 @@ Plastic flow is component-wise with independent timescales:
 
     \dot{\gamma}^{pl}_{ij} = \frac{\sigma'_{ij}}{\tau^{pl}_{ij}} \Theta(\sigma_{eff} - \sigma_c)
 
-where :math:`\sigma'_{ij}` is the deviatoric stress. Separate :math:`\tau_pl_shear and \tau_pl_normal` allow modeling materials with different relaxation times for shear and dilation.
+where :math:`\sigma'_{ij}` is the deviatoric stress. Separate :math:`\tau_{\text{pl,shear}}` and :math:`\tau_{\text{pl,normal}}` allow modeling materials with different relaxation times for shear and dilation.
 
 Physical Foundations
 --------------------
@@ -653,7 +653,7 @@ Troubleshooting
 :math:`N_1` Predictions Are Too Small
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Cause**: Insufficient disorder (:math:`\sigma_c_std` too low) or :math:`\nu` too high (approaching incompressible limit)
+- **Cause**: Insufficient disorder (:math:`\sigma_{c,\text{std}}` too low) or :math:`\nu` too high (approaching incompressible limit)
 - **Fix**: Increase ``sigma_c_std`` to 0.2-0.5 or reduce ``nu`` to 0.40-0.45
 
 Fitting Fails to Converge
@@ -792,16 +792,16 @@ TensorialEPM uses weakly informative priors tailored to the tensor structure:
    * - :math:`\nu` (Poisson ratio)
      - Beta(8, 2) scaled to [0.3, 0.5]
      - Constrained near incompressible
-   * - :math:`\sigma_c_mean`
+   * - :math:`\sigma_{c,\text{mean}}`
      - HalfNormal(10)
      - Positive, order of yield stress
-   * - :math:`\sigma_c_std`
+   * - :math:`\sigma_{c,\text{std}}`
      - HalfNormal(2)
      - Positive, smaller than mean
-   * - :math:`\tau_pl_shear`
+   * - :math:`\tau_{\text{pl,shear}}`
      - LogNormal(log(1), 1)
      - Positive, log-uniform over decades
-   * - :math:`\tau_pl_normal`
+   * - :math:`\tau_{\text{pl,normal}}`
      - LogNormal(log(1), 1)
      - Often similar to shear, but free
    * - w_N1
@@ -899,8 +899,8 @@ Fitting to both shear and normal stress data requires careful balancing:
 
 **Strategy 1: Sequential fitting**
 
-1. Fit :math:`\sigma_xy` only (w_N1 = 0) to get :math:`\mu, \sigma_c, \tau_pl`
-2. Fix shear parameters, fit :math:`\nu, \tau_pl_normal from N_1`
+1. Fit :math:`\sigma_{xy}` only (w_N1 = 0) to get :math:`\mu, \sigma_c, \tau_{\text{pl}}`
+2. Fix shear parameters, fit :math:`\nu, \tau_{\text{pl,normal}}` from :math:`N_1`
 3. Joint refinement with w_N1 = 1
 
 .. code-block:: python

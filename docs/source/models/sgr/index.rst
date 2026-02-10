@@ -18,7 +18,7 @@ Quick Reference
      - Parameters
      - Use Case
    * - :doc:`sgr_conventional`
-     - 3-4 (x, G_0, :math:`\tau_0`, :math:`\sigma_y`)
+     - 3 (x, G_0, :math:`\tau_0`)
      - Soft glassy materials, aging, yield stress fluids
    * - :doc:`sgr_generic`
      - 4-5
@@ -169,10 +169,6 @@ Key Parameters
      - :math:`\tau_0`
      - 10⁻^6–10⁻^2 s
      - Microscopic timescale for trap escape
-   * - Yield stress
-     - :math:`\sigma_y`
-     - 0–100 Pa
-     - Finite for x < 1 (glass regime)
 
 
 Quick Start

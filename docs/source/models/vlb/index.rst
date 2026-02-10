@@ -5,6 +5,19 @@ This section documents the Vernerey-Long-Brighenti (VLB) family of models
 for polymers with dynamic (reversible) cross-links.
 
 
+.. admonition:: VLB Transient Network Family
+
+   The VLB framework serves as the foundation for a hierarchy of models:
+
+   - **VLB** — Base transient network theory (this section)
+   - **HVM** — Hybrid Vitrimer Model: extends VLB with evolving natural-state tensor
+     and TST kinetics for vitrimers (:doc:`/models/hvm/index`)
+   - **HVNM** — Hybrid Vitrimer Nanocomposite Model: extends HVM with a 4th
+     interphase subnetwork for NP-filled vitrimers (:doc:`/models/hvnm/index`)
+
+   Inheritance: ``BaseModel → VLBBase → HVMBase → HVNMBase``
+
+
 Overview
 --------
 
@@ -258,7 +271,7 @@ Model Documentation
    vlb_nonlocal
    vlb_protocols
    vlb_knowledge
-   vlb_extensions
+   vlb_advanced
 
 
 References

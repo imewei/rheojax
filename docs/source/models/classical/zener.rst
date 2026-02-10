@@ -7,9 +7,9 @@ Quick Reference
 ---------------
 
 - **Use when:** Viscoelastic solid with finite equilibrium modulus, creep-recovery tests
-- **Parameters:** 3 (Gs, Gp, :math:`\etap`)
+- **Parameters:** 3 (Ge, Gm, :math:`\eta`)
 - **Key equation:** :math:`G(t) = G_s + G_p \exp(-t/\tau)` where :math:`\tau = \eta_p/G_p`
-- **Test modes:** Oscillation, relaxation, creep
+- **Test modes:** Oscillation, relaxation, creep, flow curve
 - **Material examples:** Cross-linked PDMS, vulcanized rubber, hydrogels, biological tissues
 
 Notation Guide
@@ -323,13 +323,13 @@ Parameters
    * - Name
      - Units
      - Description / Constraints
-   * - ``G_s``
+   * - ``Ge``
      - Pa
      - Equilibrium modulus; > 0 to retain solid plateau.
-   * - ``G_p``
+   * - ``Gm``
      - Pa
      - Maxwell spring modulus; > 0 controls relaxation magnitude.
-   * - ``eta_p``
+   * - ``eta``
      - Pa·s
      - Maxwell dashpot viscosity; > 0 sets relaxation time :math:`\tau = \eta_p/G_p`.
 
@@ -1094,9 +1094,12 @@ Basic Fitting Example
    omega = jnp.logspace(-1, 3, 160)
    G_data = measured_modulus(omega)
 
-   model = Zener(G_s=2.5e4, G_p=9.0e4, eta_p=4.2e3)
-   params = model.fit(omega, G_data, bounds={"G_s": (1e3, 1e7)})
-   prediction = model.predict(omega, params=params)
+   model = Zener()
+   model.parameters.set_value('Ge', 2.5e4)
+   model.parameters.set_value('Gm', 9.0e4)
+   model.parameters.set_value('eta', 4.2e3)
+   model.fit(omega, G_data)
+   prediction = model.predict(omega)
 
 Advanced: Stress Relaxation Fitting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1116,11 +1119,14 @@ Advanced: Stress Relaxation Fitting
    G_p_init = G_0_init - G_s_init
 
    # Fit
-   model = Zener(G_s=G_s_init, G_p=G_p_init, eta_p=1e4)
+   model = Zener()
+   model.parameters.set_value('Ge', G_s_init)
+   model.parameters.set_value('Gm', G_p_init)
+   model.parameters.set_value('eta', 1e4)
    model.fit(time, G_relaxation, test_mode='relaxation')
 
-   print(f"Equilibrium modulus: {model.parameters.get_value('G_s'):.2e} Pa")
-   print(f"Relaxation time: {model.parameters.get_value('eta_p') / model.parameters.get_value('G_p'):.3f} s")
+   print(f"Equilibrium modulus: {model.parameters.get_value('Ge'):.2e} Pa")
+   print(f"Relaxation time: {model.parameters.get_value('eta') / model.parameters.get_value('Gm'):.3f} s")
 
 Bayesian Inference with Uncertainty Quantification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1140,30 +1146,30 @@ Bayesian Inference with Uncertainty Quantification
        num_samples=3000
    )
 
-   # 3. Check parameter correlations (Gs and Gp often correlated)
-   posterior_Gs = result.posterior_samples['G_s']
-   posterior_Gp = result.posterior_samples['G_p']
+   # 3. Check parameter correlations (Ge and Gm often correlated)
+   posterior_Ge = result.posterior_samples['Ge']
+   posterior_Gm = result.posterior_samples['Gm']
 
    import matplotlib.pyplot as plt
-   plt.scatter(posterior_Gs, posterior_Gp, alpha=0.3)
-   plt.xlabel('Gs (Pa)')
-   plt.ylabel('Gp (Pa)')
+   plt.scatter(posterior_Ge, posterior_Gm, alpha=0.3)
+   plt.xlabel('Ge (Pa)')
+   plt.ylabel('Gm (Pa)')
    plt.title('Parameter correlation')
 
    # 4. Credible intervals
    intervals = model.get_credible_intervals(result.posterior_samples, credibility=0.95)
-   print(f"Gs: [{intervals['G_s'][0]:.2e}, {intervals['G_s'][1]:.2e}] Pa")
+   print(f"Ge: [{intervals['Ge'][0]:.2e}, {intervals['Ge'][1]:.2e}] Pa")
 
 Tips & Pitfalls
 ---------------
 
 - Normalize frequency data so that :math:`\omega \tau` spans both < 1 and > 1; otherwise
-  ``eta_p`` and ``G_p`` become unidentifiable.
+  ``eta`` and ``Gm`` become unidentifiable.
 - If the data show residual flow, augment with a dashpot in series
-  (:class:`rheojax.models.Maxwell`) instead of forcing ``G_s`` to zero.
+  (:class:`rheojax.models.Maxwell`) instead of forcing ``Ge`` to zero.
 - Use log-scale residuals when fitting :math:`G'` and :math:`G''` together so high-
   frequency points do not dominate.
-- Keep ``G_s`` and ``G_p`` strictly positive; unconstrained optimizers can otherwise dip
+- Keep ``Ge`` and ``Gm`` strictly positive; unconstrained optimizers can otherwise dip
   below zero and destabilize the ODE.
 - Seed :math:`\tau` from the peak of :math:`G''` or crossover of :math:`G'` and
   :math:`G''` to reduce optimizer iterations.

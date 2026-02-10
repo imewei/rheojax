@@ -151,7 +151,7 @@ Parameters
      - Symbol
      - Units
      - Description / Constraints
-   * - ``eta_0``
+   * - ``eta0``
      - :math:`\eta_0`
      - Pa·s
      - Zero-shear viscosity. Must be > 0 and typically ≥ ``eta_inf``.
@@ -183,20 +183,20 @@ Parameter Bounds
      - Bounds
      - Physical Rationale
    * - :math:`\eta_0`
-     - [1e-3, 1e7]
+     - (1e-3, 1e12)
      - Must exceed solvent viscosity
    * - :math:`\eta_\infty`
-     - [0, 1e4]
+     - (1e-6, 1e6)
      - Cannot exceed :math:`\eta_0`; often ~solvent viscosity
    * - :math:`\lambda`
-     - [1e-6, 1e4]
+     - (1e-6, 1e6)
      - Must capture transition in measured range
    * - :math:`n`
-     - [0.01, 2.0]
-     - <0.01 unphysical; >2 rare (extreme thickening)
+     - (0.01, 1.0)
+     - <0.01 unphysical; >1 rare (shear thickening)
    * - :math:`a`
-     - [0.1, 5.0]
-     - <0.1 too sharp (numerical issues); >5 nearly Newtonian transition
+     - (0.1, 2.0)
+     - <0.1 too sharp (numerical issues); >2 nearly Newtonian transition
 
 Material Behavior Guide
 -----------------------
@@ -542,7 +542,7 @@ Basic Fitting
    model.fit(gamma_dot, eta, test_mode='flow_curve')
 
    # Extract parameters
-   print(f"eta_0 = {model.parameters.get_value('eta_0'):.1f} Pa·s")
+   print(f"eta0 = {model.parameters.get_value('eta0'):.1f} Pa·s")
    print(f"eta_inf = {model.parameters.get_value('eta_inf'):.3f} Pa·s")
    print(f"lambda = {model.parameters.get_value('lambda_'):.4f} s")
    print(f"n = {model.parameters.get_value('n'):.3f}")
@@ -599,7 +599,7 @@ Bayesian Inference
    )
 
    intervals = model.get_credible_intervals(result.posterior_samples)
-   for param in ['eta_0', 'eta_inf', 'lambda_', 'n', 'a']:
+   for param in ['eta0', 'eta_inf', 'lambda_', 'n', 'a']:
        ci = intervals[param]
        print(f"{param}: {ci['mean']:.3f} [{ci['hdi_2.5%']:.3f}, {ci['hdi_97.5%']:.3f}]")
 

@@ -6,6 +6,14 @@ nanoparticle-filled vitrimers — polymer networks containing rigid NP fillers
 that create an interphase subnetwork with distinct kinetics.
 
 
+.. admonition:: Part of VLB Transient Network Family
+
+   HVNM extends HVM (:doc:`/models/hvm/index`), which itself builds on VLB
+   (:doc:`/models/vlb/index`).  Full lineage: VLB → HVM → HVNM.
+
+   Inheritance: ``BaseModel → VLBBase → HVMBase → HVNMBase → HVNMLocal``
+
+
 Overview
 --------
 
@@ -183,27 +191,14 @@ Key Physics
 -----------
 
 **Dual Factor-of-2:**
-
-Both the matrix and interphase effective relaxation times are:
-
-.. math::
-
-   \tau_{E,eff} = \frac{1}{2 k_{BER,0}^{mat}}, \quad
-   \tau_{I,eff} = \frac{1}{2 k_{BER,0}^{int}}
-
-This arises because both the distribution tensor and natural-state tensor relax
-toward each other at rate :math:`k_{BER}`, so their difference decays at :math:`2k_{BER}`.
+Both matrix and interphase relax with
+:math:`\hat{\tau}_E = 1/(2k_{BER,0}^{mat})` and
+:math:`\hat{\tau}_I = 1/(2k_{BER,0}^{int})`.
+See :ref:`hvnm-dual-factor-of-2` in the model reference.
 
 **Guth-Gold Strain Amplification:**
-
-Rigid NP inclusions amplify the local strain field:
-
-.. math::
-
-   X(\phi) = 1 + 2.5\phi + 14.1\phi^2
-
-The permanent network experiences amplified stress :math:`\sigma_P = (1-D) G_P X \gamma`,
-and the interphase affine deformation is :math:`X_I \dot{\gamma}`.
+Rigid NPs amplify strain: :math:`X(\phi) = 1 + 2.5\phi + 14.1\phi^2`.
+See :doc:`hvnm` for the full derivation.
 
 
 Model Documentation
@@ -213,6 +208,8 @@ Model Documentation
    :maxdepth: 1
 
    hvnm
+   hvnm_protocols
+   hvnm_advanced
    hvnm_knowledge
 
 
@@ -223,13 +220,12 @@ References
    continuum theory for polymers with transient networks." *J. Mech. Phys.
    Solids*, 107, 1-20.
 
-2. Guth, E. (1945). "Theory of filler reinforcement." *J. Appl. Phys.*, 16, 20-25.
+2. Karim, M.R., Vernerey, F. & Sain, T. (2025). "Constitutive Modeling of
+   Vitrimers and Their Nanocomposites Based on Transient Network Theory."
+   *Macromolecules*, 58(10), 4899-4912.
 
-3. Smallwood, H.M. (1944). "Limiting law of the reinforcement of rubber."
-   *J. Appl. Phys.*, 15(11), 758-766.
+3. Li, Z., Zhao, H., Duan, P., Zhang, L. & Liu, J. (2024). "Manipulating
+   the Properties of Polymer Vitrimer Nanocomposites by Designing Dual Dynamic
+   Covalent Bonds." *Langmuir*, 40(14), 7550-7560.
 
-4. Denissen, W., Winne, J.M. & Du Prez, F.E. (2016). "Vitrimers: permanent
-   organic networks with glass-like fluidity." *Chem. Sci.*, 7, 30-38.
-
-5. Payne, A.R. (1962). "The dynamic properties of carbon black-loaded natural
-   rubber vulcanizates." *J. Appl. Polym. Sci.*, 6(19), 57-63.
+See :doc:`hvnm_advanced` for the full reference list (18 citations).

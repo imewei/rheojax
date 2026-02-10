@@ -202,6 +202,30 @@ equilibrium.
 - :math:`\text{tr}(\boldsymbol{\mu})/3` measures average chain stretch relative
   to equilibrium
 
+**Eigenvalue interpretation:**
+
+Since :math:`\boldsymbol{\mu}` is symmetric and positive-definite, it has three
+real positive eigenvalues :math:`\lambda_1^2, \lambda_2^2, \lambda_3^2`.  Each
+eigenvalue represents the **normalized mean-square stretch** in the
+corresponding principal direction:
+
+.. math::
+
+   \lambda_i^2 = \frac{\langle r_i^2 \rangle}{\langle r_{0,i}^2 \rangle}
+
+where :math:`r_i` is the projection of the end-to-end vector onto the
+:math:`i`-th principal axis.
+
+- :math:`\lambda_i > 1`: chains are stretched beyond equilibrium in direction :math:`i`
+- :math:`\lambda_i < 1`: chains are compressed relative to equilibrium
+- :math:`\lambda_i = 1`: equilibrium configuration
+
+The eigenvectors of :math:`\boldsymbol{\mu}` define the **principal axes of
+anisotropy** in the chain distribution — the directions along which the network
+is most and least stretched.  For simple shear, the principal axes rotate by
+an angle :math:`\theta = \frac{1}{2}\arctan(2\mu_{xy}/(\mu_{xx}-\mu_{yy}))`
+from the flow direction.
+
 
 Governing Equations
 ===================
@@ -292,6 +316,30 @@ The mechanical dissipation rate is:
 
 which is non-negative by the convexity of :math:`f(x) = x - \ln x - 1` for
 :math:`x > 0`, guaranteeing thermodynamic consistency.
+
+
+Entropy
+-------
+
+The entropy density of the network (per unit volume) is:
+
+.. math::
+
+   s = s_0 + \gamma_v \ln\!\left(\frac{T}{T_0}\right)
+   - \frac{1}{2} c k_B \bigl[\text{tr}(\boldsymbol{\mu}) - 3\bigr]
+
+where :math:`s_0` is the reference entropy, :math:`\gamma_v` is the volumetric
+heat capacity coefficient, and :math:`c k_B = G_0/T` is the entropic modulus.
+
+The second term captures the **entropic penalty of chain stretching**: chains
+that are stretched beyond equilibrium (:math:`\text{tr}(\boldsymbol{\mu}) > 3`)
+have reduced conformational entropy.  This is the molecular origin of rubber
+elasticity in the VLB framework — the restoring force is entropic, not
+energetic.
+
+At equilibrium (:math:`\boldsymbol{\mu} = \mathbf{I}`), the chain contribution
+vanishes (:math:`\text{tr}(\mathbf{I}) - 3 = 0`), recovering the maximum
+entropy state.
 
 
 Parameters
@@ -410,193 +458,80 @@ The VLB model reduces to several well-known models under special conditions:
      - Solvent + single viscoelastic mode + equilibrium
 
 
-Protocol Equations
-==================
+UCM Equivalence
+---------------
 
-Flow Curve (Steady Shear)
--------------------------
-
-At steady state (:math:`\dot{\boldsymbol{\mu}} = 0`), the shear components give:
-
-.. math::
-
-   \mu_{xy}^{ss} = \frac{\dot{\gamma}}{k_d}, \qquad
-   \mu_{xx}^{ss} - \mu_{yy}^{ss} = \frac{2\dot{\gamma}^2}{k_d^2}
-
-**Steady-state viscometric functions:**
+The single-mode VLB with constant :math:`k_d` is **mathematically identical**
+to the Upper-Convected Maxwell (UCM) model.  To see this, define the polymer
+extra stress :math:`\boldsymbol{\tau} = G_0(\boldsymbol{\mu} - \mathbf{I})`
+and substitute into the VLB evolution equation :eq:`mu_evolution`:
 
 .. math::
 
-   \sigma_{12} &= G_0 \frac{\dot{\gamma}}{k_d} = \eta_0 \dot{\gamma} \\
-   N_1 &= 2 G_0 \left(\frac{\dot{\gamma}}{k_d}\right)^2
+   \dot{\boldsymbol{\tau}} + k_d \boldsymbol{\tau}
+   = G_0\bigl(\mathbf{L} \cdot \boldsymbol{\mu}
+   + \boldsymbol{\mu} \cdot \mathbf{L}^T\bigr)
 
-The flow curve is **Newtonian** (constant :math:`k_d`) — a key signature.
-Non-Newtonian behavior requires force-dependent :math:`k_d(\boldsymbol{\mu})`
-(see :doc:`vlb_extensions`).
-
-**Multi-network:**
+In the UCM form with relaxation time :math:`\lambda = 1/k_d` and modulus
+:math:`G = G_0`:
 
 .. math::
 
-   \sigma = \left(\sum_{I=0}^{M-1} \frac{G_I}{k_{d,I}} + \eta_s\right) \dot{\gamma}
+   \boldsymbol{\tau} + \lambda \stackrel{\nabla}{\boldsymbol{\tau}} = 2 G \lambda \mathbf{D}
+
+where :math:`\stackrel{\nabla}{\boldsymbol{\tau}}` is the upper-convected
+derivative.  These are the same equation.  This equivalence guarantees that:
+
+- All standard UCM results (Pipkin diagram, asymptotic limits) apply directly
+- VLB inherits the UCM extensional singularity at :math:`\text{Wi}_{ext} = 1/2`
+- Existing UCM validation benchmarks serve as VLB test cases
 
 
-Startup Shear
--------------
+.. _vlb-protocol-summary:
 
-For startup from equilibrium (:math:`\boldsymbol{\mu}(0) = \mathbf{I}`) at
-constant :math:`\dot{\gamma}`:
+Protocol Summary
+================
 
-.. math::
+For complete step-by-step derivations including the full ODE solutions, see
+:doc:`vlb_protocols`.
 
-   \sigma_{12}(t) = \frac{G_0 \dot{\gamma}}{k_d} \left(1 - e^{-k_d t}\right)
+.. list-table::
+   :widths: 18 35 47
+   :header-rows: 1
 
-.. math::
+   * - Protocol
+     - Single Network Result
+     - Multi-Network Generalization
+   * - :ref:`Flow Curve <vlb-flow-curve>`
+     - :math:`\sigma = G_0 \dot{\gamma} / k_d` (Newtonian)
+     - :math:`\sigma = \bigl(\sum G_I/k_{d,I} + \eta_s\bigr)\dot{\gamma}`
+   * - :ref:`Startup <vlb-startup>`
+     - :math:`\sigma_{12}(t) = \frac{G_0 \dot{\gamma}}{k_d}(1-e^{-k_d t})`
+     - Superposition of exponentials + :math:`\eta_s \dot{\gamma}`
+   * - :ref:`Relaxation <vlb-relaxation>`
+     - :math:`G(t) = G_0 e^{-k_d t}` (single exponential)
+     - :math:`G(t) = G_e + \sum G_I e^{-k_{d,I} t}`
+   * - :ref:`Creep <vlb-creep>`
+     - :math:`J(t) = (1 + k_d t)/G_0` (Maxwell)
+     - SLS analytical (M=1+perm); general: ODE
+   * - :ref:`SAOS <vlb-saos>`
+     - :math:`G'=G_0\omega^2 t_R^2/(1+\omega^2 t_R^2)`
+     - Sum of Maxwell modes + :math:`G_e` + :math:`\eta_s \omega`
+   * - :ref:`LAOS <vlb-laos>`
+     - :math:`\sigma_{12}` exactly sinusoidal; :math:`N_1` has :math:`2\omega`
+     - ODE integration required
+   * - :ref:`Extension <vlb-extension>`
+     - Singularity at :math:`\dot{\varepsilon} = k_d/2`; Tr → 3 at low rate
+     - Sum over modes
 
-   N_1(t) = 2G_0 \left(\frac{\dot{\gamma}}{k_d}\right)^2
-   \left(1 - e^{-k_d t}\right)
-   - 2G_0 \frac{\dot{\gamma}}{k_d} t \, e^{-k_d t}
+**Key signatures of constant** :math:`k_d`:
 
-**Characteristics:**
-
-- :math:`\sigma_{12}(0) = 0`, monotonic rise to :math:`\sigma^{ss} = G_0 \dot{\gamma}/k_d`
-- No stress overshoot (constant :math:`k_d`)
-- Time constant is :math:`t_R = 1/k_d` regardless of :math:`\dot{\gamma}`
-- :math:`N_1` is non-monotonic when :math:`\dot{\gamma}/k_d > 1`
-
-**Multi-network (superposition):**
-
-.. math::
-
-   \sigma_{12}(t) = \sum_{I=0}^{M-1} \frac{G_I \dot{\gamma}}{k_{d,I}}
-   \left(1 - e^{-k_{d,I} t}\right) + \eta_s \dot{\gamma}
-
-
-Stress Relaxation
------------------
-
-After step strain :math:`\gamma_0`:
-
-.. math::
-
-   G(t) = G_0 \, e^{-k_d t}
-
-**Characteristics:**
-
-- :math:`G(0) = G_0` (instantaneous modulus)
-- :math:`G(\infty) = 0` (liquid-like, no equilibrium modulus)
-- Single exponential with time constant :math:`t_R = 1/k_d`
-- :math:`\ln G(t)` is linear in :math:`t` with slope :math:`-k_d`
-
-**Multi-network (Prony series):**
-
-.. math::
-
-   G(t) = G_e + \sum_{I=0}^{M-1} G_I \, e^{-k_{d,I} t}
-
-
-Creep Compliance
-----------------
-
-Under constant stress :math:`\sigma_0`:
-
-.. math::
-
-   J(t) = \frac{1 + k_d t}{G_0}
-
-**Characteristics:**
-
-- :math:`J(0) = 1/G_0` (instantaneous elastic compliance)
-- :math:`dJ/dt = k_d/G_0 = 1/\eta_0` (viscous flow rate)
-- Linear in time — characteristic of Maxwell liquid
-- From creep: :math:`G_0 = 1/J(0)`, :math:`k_d = G_0 \cdot dJ/dt`
-
-**Dual-network (1 transient + permanent):**
-
-.. math::
-
-   J(t) = \frac{1}{G_0 + G_e} + \frac{G_0}{G_e(G_0 + G_e)}
-   \left(1 - e^{-t/\tau_{ret}}\right)
-
-where :math:`\tau_{ret} = (G_0 + G_e)/(G_e \cdot k_d)` is the retardation time.
-
-
-Small-Amplitude Oscillatory Shear (SAOS)
------------------------------------------
-
-For oscillatory strain :math:`\gamma(t) = \gamma_0 e^{i\omega t}`:
-
-.. math::
-
-   G'(\omega) &= G_0 \frac{\omega^2 t_R^2}{1 + \omega^2 t_R^2} \\
-   G''(\omega) &= G_0 \frac{\omega t_R}{1 + \omega^2 t_R^2}
-
-where :math:`t_R = 1/k_d`.  This is exactly the **Maxwell model**.
-
-**Crossover:**  :math:`G'(\omega_c) = G''(\omega_c)` at :math:`\omega_c = k_d`,
-with :math:`G'(\omega_c) = G''(\omega_c) = G_0/2`.
-
-**Multi-network:**
-
-.. math::
-
-   G'(\omega) &= G_e + \sum_{I=0}^{M-1} G_I \frac{\omega^2/k_{d,I}^2}{1 + \omega^2/k_{d,I}^2} \\
-   G''(\omega) &= \eta_s \omega + \sum_{I=0}^{M-1} G_I \frac{\omega/k_{d,I}}{1 + \omega^2/k_{d,I}^2}
-
-
-Large-Amplitude Oscillatory Shear (LAOS)
------------------------------------------
-
-Under :math:`\gamma(t) = \gamma_0 \sin(\omega t)`, the full ODE system
-:eq:`mu_evolution` is integrated numerically.
-
-**Key result for constant** :math:`k_d`:
-
-- :math:`\sigma_{12}(t)` is **purely linear** (no higher harmonics)
-  because the ODE is linear in :math:`\boldsymbol{\mu}` for constant
-  :math:`k_d`.
-- :math:`N_1(t)` contains a :math:`2\omega` (second harmonic) component even
-  at constant :math:`k_d`, because :math:`N_1 = G_0(\mu_{xx} - \mu_{yy})` is
-  a quadratic function of the strain.
-
-This means:
-
-- :math:`I_3/I_1 \approx 0` for :math:`\sigma_{12}` (linear response)
-- :math:`N_1` oscillates at :math:`2\omega` with a nonzero mean
-
-**LAOS becomes truly nonlinear** when :math:`k_d` depends on
-:math:`\boldsymbol{\mu}` (Bell model, see :doc:`vlb_extensions`).
-
-
-Uniaxial Extension
-------------------
-
-For uniaxial extension with rate :math:`\dot{\varepsilon}`, the velocity
-gradient is :math:`L_{11} = \dot{\varepsilon}`, :math:`L_{22} = L_{33}
-= -\dot{\varepsilon}/2`.
-
-**Steady-state extensional stress:**
-
-.. math::
-
-   \sigma_E = G_0 \dot{\varepsilon}
-   \left(\frac{1}{k_d - \dot{\varepsilon}} + \frac{1}{k_d + \dot{\varepsilon}/2}\right)
-
-**Trouton ratio:**
-
-.. math::
-
-   \text{Tr} = \frac{\eta_E}{\eta_0} = \frac{k_d}{k_d - \dot{\varepsilon}}
-   + \frac{k_d}{k_d + \dot{\varepsilon}/2}
-   - \frac{2k_d}{k_d}
-
-At low extension rates (:math:`\dot{\varepsilon} \ll k_d`):
-:math:`\text{Tr} \to 3` (Newtonian Trouton ratio).
-
-**Singularity:**  At :math:`\dot{\varepsilon} = k_d`, the axial component
-diverges — this is the extensional catastrophe, analogous to coil-stretch
-transition.  Finite extensibility (Langevin chains) regularizes this
-singularity (see :doc:`vlb_extensions`).
+- Flow curve is Newtonian. Non-Newtonian behavior requires force-dependent
+  :math:`k_d(\boldsymbol{\mu})` (see :doc:`vlb_advanced`).
+- Startup is monotonic (no overshoot).
+- LAOS :math:`\sigma_{12}` has no higher harmonics (:math:`I_3/I_1 = 0`).
+- Extension diverges at :math:`\dot{\varepsilon} = k_d/2`; Langevin finite
+  extensibility regularizes this (see :doc:`vlb_advanced`).
 
 
 Multi-Network Model
@@ -648,9 +583,9 @@ Validity & Assumptions
    * - Assumption
      - Details & Limitations
    * - **Gaussian chains**
-     - Chains follow Gaussian statistics (:math:`P(r) \propto \exp(-3r^2/2\langle r_0^2 \rangle)`). Breaks down for highly stretched chains. See Langevin extension in :doc:`vlb_extensions`.
+     - Chains follow Gaussian statistics (:math:`P(r) \propto \exp(-3r^2/2\langle r_0^2 \rangle)`). Breaks down for highly stretched chains. See Langevin extension in :doc:`vlb_advanced`.
    * - **Constant** :math:`k_d`
-     - Bond lifetime is independent of chain stretch or force.  Results in Newtonian flow curve and linear LAOS. Force-dependent :math:`k_d` introduces shear thinning (see :doc:`vlb_extensions`).
+     - Bond lifetime is independent of chain stretch or force.  Results in Newtonian flow curve and linear LAOS. Force-dependent :math:`k_d` introduces shear thinning (see :doc:`vlb_advanced`).
    * - **Affine deformation**
      - Chains deform affinely with the macroscopic flow (:math:`\dot{\mathbf{r}} = \mathbf{L} \cdot \mathbf{r}`).  Non-affine effects (fluctuations, excluded volume) are neglected.
    * - **Incompressibility**
@@ -666,35 +601,11 @@ Validity & Assumptions
 When to Use VLB
 ===============
 
-**Ideal materials:**
+For a decision table comparing all VLB variants (Local, MultiNetwork,
+Variant, Nonlocal), see the :doc:`index`.
 
-- **Hydrogels** with dynamic cross-links (e.g., boronate ester, Diels-Alder)
-- **Vitrimers** and covalent adaptable networks (CAN)
-- **Telechelic polymers** with associating end groups
-- **Self-healing polymers** with reversible bonds
-- **Supramolecular networks** with hydrogen bonding or metal-ligand coordination
-- **Physical gels** (PVA-borax, gelatin, agarose at low concentrations)
-
-**Use VLBLocal when:**
-
-- Material shows single-exponential relaxation
-- SAOS data has a clear crossover frequency
-- Two parameters (:math:`G_0, k_d`) suffice
-- You want the simplest physically-grounded model
-
-**Use VLBMultiNetwork when:**
-
-- Relaxation spectrum is broad (multiple time scales)
-- SAOS shows features at multiple frequencies
-- Material has both reversible and permanent cross-links
-- You need an equilibrium modulus (:math:`G_e > 0`)
-
-**Do NOT use VLB when:**
-
-- Material shows significant shear thinning (need force-dependent :math:`k_d`)
-- Stress overshoot is present (need Bell variant or similar)
-- Material is entangled (use reptation-based models)
-- Yield stress behavior is dominant (use DMT or Fluidity models)
+For detailed material classification by :math:`k_d` regime and diagnostic
+signatures, see :doc:`vlb_knowledge`.
 
 
 What You Can Learn
@@ -717,27 +628,8 @@ From VLBLocal Parameters
      - 10\ :sup:`-3` - 10\ :sup:`3` 1/s
      - Bond kinetics.  Small :math:`k_d` = long-lived bonds (permanent-like).  Large :math:`k_d` = fast turnover (liquid-like).
 
-**Material classification by** :math:`k_d`:
-
-.. list-table::
-   :widths: 25 25 50
-   :header-rows: 1
-
-   * - :math:`k_d` Range
-     - Material Type
-     - Examples
-   * - :math:`< 10^{-2}` 1/s
-     - Permanent-like gel
-     - Chemical gels, vulcanized rubber
-   * - :math:`10^{-2}` — :math:`1` 1/s
-     - Physical gel
-     - PVA-borax, gelatin, associative polymers
-   * - :math:`1` — :math:`10^2` 1/s
-     - Viscoelastic liquid
-     - Telechelic polymers, supramolecular networks
-   * - :math:`> 10^2` 1/s
-     - Liquid-like
-     - Dilute associative solutions, fast-exchanging systems
+For material classification by :math:`k_d` regime, see the
+:ref:`kinetic regimes table <vlb-kd-regimes>` in :doc:`vlb_knowledge`.
 
 
 From Multi-Network Spectrum
@@ -756,27 +648,9 @@ of bond lifetimes in the network:
 Cross-Protocol Validation
 -------------------------
 
-Consistency checks between protocols:
-
-.. list-table::
-   :widths: 25 25 50
-   :header-rows: 1
-
-   * - Check
-     - Criterion
-     - Failing Suggests
-   * - :math:`\eta_0` from flow = :math:`\eta_0` from SAOS
-     - :math:`\eta_{flow} = \lim_{\omega \to 0} G''/\omega`
-     - Shear-rate dependence of :math:`k_d`
-   * - :math:`G_0` from relaxation = :math:`G_0` from SAOS
-     - :math:`G(0) = \lim_{\omega \to \infty} G'`
-     - Multiple time scales present
-   * - :math:`t_R` from relaxation = :math:`1/\omega_c`
-     - :math:`-1/\text{slope}[\ln G(t)] = 1/\omega_c`
-     - Non-Maxwell relaxation
-   * - :math:`\sigma^{ss}` from startup = :math:`\sigma` from flow
-     - :math:`\sigma(t \to \infty) = \eta_0 \dot{\gamma}`
-     - Time-dependent structure
+For cross-protocol consistency checks and the recommended multi-protocol
+validation workflow, see :ref:`vlb-cross-protocol-validation` in
+:doc:`vlb_knowledge`.
 
 
 API Reference
@@ -785,10 +659,12 @@ API Reference
 .. autoclass:: rheojax.models.vlb.VLBLocal
    :members:
    :inherited-members:
+   :exclude-members: parameters
 
 .. autoclass:: rheojax.models.vlb.VLBMultiNetwork
    :members:
    :inherited-members:
+   :exclude-members: parameters
 
 
 References

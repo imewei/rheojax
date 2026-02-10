@@ -42,6 +42,8 @@ four independent components: :math:`\mu_{xx}, \mu_{yy}, \mu_{zz}, \mu_{xy}`.
 - :math:`\mu_{xx}` is driven by :math:`2\dot{\gamma}\mu_{xy}`
 
 
+.. _vlb-flow-curve:
+
 Flow Curve Derivation
 =====================
 
@@ -81,6 +83,8 @@ Flow Curve Derivation
 - :math:`\eta_0 = G_0/k_d` (Green-Kubo relation)
 - :math:`\Psi_1 = N_1/\dot{\gamma}^2 = 2G_0/k_d^2 = 2\eta_0 t_R` (first normal stress coefficient)
 
+
+.. _vlb-startup:
 
 Startup Shear Derivation
 =========================
@@ -133,6 +137,8 @@ This is a linear ODE whose solution gives:
   (the :math:`t \, e^{-k_d t}` term creates a transient undershoot)
 
 
+.. _vlb-relaxation:
+
 Stress Relaxation Derivation
 =============================
 
@@ -173,6 +179,9 @@ Solution from initial condition :math:`\mu_{xy}(0^+) = \gamma_0`
 
    G(t) = G_e + \sum_{I=0}^{M-1} G_I \, e^{-k_{d,I} t}
 
+
+.. _vlb-creep:
+.. _vlb-creep-multi:
 
 Creep Derivation
 ================
@@ -223,6 +232,9 @@ constraint :math:`\sigma_0 = \sum G_I \mu_{xy,I} + \eta_s \dot{\gamma}`
 creates implicit coupling between modes.  RheoJAX solves this via
 ``diffrax`` with fixed-point stress balance at each time step.
 
+
+.. _vlb-saos:
+.. _vlb-saos-multi:
 
 SAOS Derivation
 ===============
@@ -288,6 +300,8 @@ This provides a visual diagnostic: deviation from a semicircle indicates
 non-Maxwell behavior.
 
 
+.. _vlb-laos:
+
 LAOS Implementation
 ===================
 
@@ -326,6 +340,8 @@ quantities and therefore contains :math:`2\omega` harmonics:
 - Returns :math:`\sigma_{12}(t)`, :math:`N_1(t)`, and FFT harmonics
 - Verifies linearity via :math:`I_3/I_1` ratio for :math:`\sigma_{12}`
 
+
+.. _vlb-extension:
 
 Uniaxial Extension
 ==================
@@ -380,6 +396,198 @@ enough to compensate the extensional stretching.  This divergence is:
 - Analogous to the coil-stretch transition in dilute solutions
 - A useful diagnostic: if data shows extensional hardening, VLB with constant
   :math:`k_d` is insufficient
+
+
+.. _vlb-general-solution:
+
+General Analytical Solution
+===========================
+
+The full tensorial evolution equation :eq:`mu_evolution` (see :doc:`vlb`) admits
+a compact integral-form solution through the substitution:
+
+.. math::
+
+   \mathbf{A} = \mathbf{F}^{-1} \cdot \boldsymbol{\mu} \cdot \mathbf{F}^{-T}
+
+where :math:`\mathbf{F}(t)` is the deformation gradient.  Under this change of
+variables, the convective terms cancel and the evolution reduces to:
+
+.. math::
+
+   \dot{\mathbf{A}} = k_d\!\left(\mathbf{F}^{-1}\mathbf{F}^{-T} - \mathbf{A}\right)
+
+This is a first-order linear ODE in :math:`\mathbf{A}` with solution:
+
+.. math::
+
+   \mathbf{A}(t) = \mathbf{A}(0) e^{-k_d t}
+   + k_d \int_0^t e^{-k_d(t-s)} \mathbf{F}^{-1}(s) \mathbf{F}^{-T}(s) \, ds
+
+Transforming back:
+
+.. math::
+
+   \boldsymbol{\mu}(t) = \mathbf{F}(t) \cdot \mathbf{A}(t) \cdot \mathbf{F}^T(t)
+
+This integral form is the basis for all closed-form solutions in the VLB
+model.  For constant velocity gradient :math:`\mathbf{L}`, the deformation
+gradient is :math:`\mathbf{F}(t) = e^{\mathbf{L} t}` and the integral can be
+evaluated analytically for each protocol.
+
+
+.. _vlb-laos-sinusoidal-proof:
+
+LAOS: Exact Sinusoidal Proof
+=============================
+
+**Theorem:** For constant :math:`k_d`, the VLB shear stress
+:math:`\sigma_{12}(t)` under LAOS is purely sinusoidal at the fundamental
+frequency :math:`\omega`, with zero higher harmonics.
+
+**Proof:** The :math:`\mu_{xy}` component satisfies (with :math:`\mu_{yy} = 1`):
+
+.. math::
+
+   \dot{\mu}_{xy} + k_d \mu_{xy} = \dot{\gamma}(t) = \gamma_0 \omega \cos(\omega t)
+
+This is a **linear** first-order ODE with constant coefficients.  The
+steady-state (post-transient) particular solution is:
+
+.. math::
+
+   \mu_{xy}^{ss}(t) = \frac{\gamma_0 \omega}{k_d^2 + \omega^2}
+   \bigl[k_d \cos(\omega t) + \omega \sin(\omega t)\bigr]
+
+which is a pure sinusoid at frequency :math:`\omega`.  Since
+:math:`\sigma_{12} = G_0 \mu_{xy}`, the shear stress contains **only** the
+fundamental frequency.  No harmonic generation occurs because the ODE is
+linear — there is no mechanism to couple :math:`\omega` to :math:`n\omega`.
+
+**Corollary:** The intrinsic nonlinearity ratio :math:`I_3/I_1 = 0` exactly
+for the VLB model with constant :math:`k_d`.  Any measured :math:`I_3/I_1 > 0`
+in experimental data indicates that :math:`k_d` depends on deformation.
+
+.. note::
+
+   This linearity is a property of the constant-:math:`k_d` model only.
+   The VLBVariant with Bell breakage (:math:`k_d = k_d(\boldsymbol{\mu})`)
+   produces nonlinear coupling and :math:`I_3/I_1 > 0`.
+
+
+.. _vlb-laos-n1-harmonics:
+
+LAOS: :math:`N_1` Harmonic Structure
+=====================================
+
+While :math:`\sigma_{12}` is purely sinusoidal, the first normal stress
+difference :math:`N_1 = G_0(\mu_{xx} - \mu_{yy}) = G_0(\mu_{xx} - 1)` has
+a richer harmonic content.
+
+The :math:`\mu_{xx}` equation is driven by :math:`2\dot{\gamma}\mu_{xy}`,
+which is a product of the driving frequency and the fundamental response:
+
+.. math::
+
+   2\dot{\gamma}(t) \cdot \mu_{xy}^{ss}(t) \propto
+   \cos(\omega t) \cdot [\cos(\omega t) + \ldots]
+
+This product generates a **DC offset** (constant term) and a
+:math:`2\omega` component via the trigonometric identity
+:math:`\cos^2(\omega t) = \frac{1}{2}(1 + \cos(2\omega t))`.
+
+**Explicit solution** (steady state):
+
+.. math::
+
+   N_1(t) = \overline{N}_1 + N_1^{(2c)} \cos(2\omega t) + N_1^{(2s)} \sin(2\omega t)
+
+where the nonzero mean :math:`\overline{N}_1 > 0` reflects the time-averaged
+normal stress, and the :math:`2\omega` oscillation captures the
+stretch-compression asymmetry within each cycle.
+
+**Key features:**
+
+- :math:`N_1` oscillates at :math:`2\omega` (not :math:`\omega`)
+- Nonzero mean :math:`\overline{N}_1 = 2G_0 \gamma_0^2 \omega^2 / (k_d^2 + \omega^2)^2 \cdot k_d^2`
+- No higher harmonics (:math:`4\omega, 6\omega, \ldots`) for constant :math:`k_d`
+- Amplitude grows as :math:`\gamma_0^2` — quadratic in strain amplitude
+
+
+.. _vlb-laos-linearity-validation:
+
+LAOS Linearity Validation
+==========================
+
+In practice, verifying :math:`I_3/I_1 \approx 0` for the VLB model serves as
+both a correctness check on the numerical implementation and a diagnostic for
+the constant-:math:`k_d` assumption.
+
+**Validation methodology:**
+
+1. **Numerical integration:** Simulate LAOS via the ODE system for 10+ cycles
+   using ``diffrax.Tsit5`` with tight tolerances (``rtol=1e-8``, ``atol=1e-10``)
+2. **Transient removal:** Discard the first 5 cycles to eliminate initial
+   transients
+3. **FFT analysis:** Compute the Fourier spectrum of :math:`\sigma_{12}(t)`
+   over the last 5 cycles
+4. **Harmonic ratio:** :math:`I_3/I_1 = |a_3|/|a_1|` where :math:`a_n` are
+   Fourier coefficients
+
+**Expected results:**
+
+- :math:`I_3/I_1 < 10^{-10}` (machine precision) for constant :math:`k_d`
+- :math:`I_3/I_1 \sim 10^{-3}` to :math:`10^{-1}` for Bell :math:`k_d`
+  with moderate :math:`\nu`
+
+**Diagnostic use:** If :math:`I_3/I_1 > 10^{-6}` is measured experimentally,
+the constant-:math:`k_d` VLB is insufficient and force-dependent breakage
+(VLBVariant with ``breakage="bell"``) should be considered.
+
+
+.. _vlb-extension-singularity:
+
+Extensional Singularity and Safety
+===================================
+
+The steady-state axial component :math:`\mu_{11}^{ss} = k_d/(k_d - 2\dot{\varepsilon})`
+diverges at the critical Weissenberg number:
+
+.. math::
+
+   \text{Wi}_{ext} = \frac{\dot{\varepsilon}}{k_d} = \frac{1}{2}
+
+This is the **extensional catastrophe**: chains are stretched faster than they
+can relax, and the Gaussian chain assumption breaks down.
+
+**Physical interpretation:**
+
+- For :math:`\text{Wi}_{ext} < 0.5`: steady state exists, Trouton ratio is finite
+- At :math:`\text{Wi}_{ext} = 0.5`: transition to unbounded stretch
+- For :math:`\text{Wi}_{ext} > 0.5`: no steady state; transient stress grows without bound
+
+**Safety clamping in RheoJAX:**
+
+The implementation clamps :math:`\mu_{11}` to prevent numerical overflow:
+
+.. code-block:: python
+
+   # In _kernels.py: safety clamp for extensional flows
+   mu_11 = jnp.minimum(mu_11, L_max_sq)  # FENE-P bound
+   # Or for Gaussian chains:
+   mu_11 = jnp.minimum(mu_11, 1e6)  # numerical safety
+
+**Regularization options:**
+
+1. **FENE-P** (``VLBVariant(stress_type="fene")``): Bounds stress via
+   :math:`f = L_{\max}^2/(L_{\max}^2 - \text{tr}(\boldsymbol{\mu}) + 3)`,
+   which diverges at finite :math:`\text{tr}(\boldsymbol{\mu}) = L_{\max}^2 + 3`
+   rather than at :math:`\text{Wi}_{ext} = 0.5`
+2. **Bell breakage** (``VLBVariant(breakage="bell")``): Enhanced breakage at
+   high stretch softens the singularity but does not fully remove it
+
+For extensional rheology applications, the FENE-P variant is strongly
+recommended.
 
 
 Multi-Network Protocol Summary

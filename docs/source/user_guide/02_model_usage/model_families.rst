@@ -24,7 +24,7 @@ Model Families Overview
 The Model Families
 -------------------
 
-RheoJAX provides **34+ rheological models** organized into families based on their theoretical foundations:
+RheoJAX provides **53 rheological models** organized into families based on their theoretical foundations:
 
 .. list-table:: Model Families Overview
    :header-rows: 1
@@ -75,6 +75,33 @@ RheoJAX provides **34+ rheological models** organized into families based on the
    * - ``spp_laos``
      - SPPYieldStress
      - Sequence of Physical Processes (LAOS)
+   * - ``giesekus``
+     - GiesekusSingleMode, GiesekusMultiMode
+     - Nonlinear viscoelastic polymer (tensor ODE)
+   * - ``fluidity_saramito``
+     - FluiditySaramitoLocal, Nonlocal
+     - Tensorial EVP with thixotropic fluidity
+   * - ``fikh``
+     - FIKHLocal, FMLIKHLocal
+     - Fractional isotropic-kinematic hardening
+   * - ``dmt``
+     - DMTLocal, DMTNonlocal
+     - Structure-parameter thixotropy (de Souza Mendes)
+   * - ``itt_mct``
+     - ITTMCTSchematic, ITTMCTIsotropic
+     - Mode-coupling theory (dense suspensions)
+   * - ``tnt``
+     - SingleMode, Cates, LoopBridge, MultiSpecies, StickyRouse
+     - Transient network theory (5 variants)
+   * - ``vlb``
+     - VLBLocal, MultiNetwork, Variant, Nonlocal
+     - Distribution tensor network (4 variants)
+   * - ``hvm``
+     - HVMLocal
+     - Hybrid Vitrimer Model (3 subnetworks)
+   * - ``hvnm``
+     - HVNMLocal
+     - Vitrimer Nanocomposite (4 subnetworks)
 
 Quick Reference Table
 ---------------------
@@ -127,6 +154,42 @@ Quick Reference Table
      - LAOS
      - Yield stress fluids
      - Physical process decomposition
+   * - Giesekus
+     - All 6 protocols
+     - Polymer solutions/melts
+     - Nonlinear shear thinning + N₁
+   * - Saramito
+     - All 6 protocols
+     - EVP fluids
+     - Tensorial yield + thixotropy
+   * - FIKH
+     - All 6 protocols
+     - Complex thixotropic
+     - Fractional memory + hardening
+   * - DMT
+     - All 6 protocols
+     - Structured fluids
+     - Structure parameter λ
+   * - ITT-MCT
+     - All 6 protocols
+     - Dense colloids, glasses
+     - Memory kernel, glass transition
+   * - TNT
+     - All 6 protocols
+     - Associative polymers
+     - Network attachment/detachment
+   * - VLB
+     - All 6 protocols
+     - Transient networks
+     - Distribution tensor μ
+   * - HVM
+     - All 6 protocols
+     - Vitrimers
+     - Bond exchange reactions
+   * - HVNM
+     - All 6 protocols
+     - Filled vitrimers
+     - Interphase + Guth-Gold
 
 Family 1: Classical Viscoelastic Models
 ----------------------------------------
@@ -549,6 +612,226 @@ The SPP Model
 
 **For detailed equations**: :doc:`/models/spp/spp_yield_stress`
 
+Family 11: Giesekus Models
+---------------------------
+
+**Who they're for**: Polymer solutions and melts exhibiting shear thinning and normal stresses
+
+**Test modes**: All 6 (flow curve, SAOS, startup, relaxation, creep, LAOS)
+
+**Key characteristic**: **Nonlinear tensor ODE** with mobility parameter α
+
+The 2 Giesekus Models
+~~~~~~~~~~~~~~~~~~~~~~
+
+1. **Giesekus Single-Mode** (3 parameters: G, λ₁, α)
+
+   - Upper-convected Maxwell + anisotropic drag (α controls nonlinearity)
+   - α = 0: recovers upper-convected Maxwell; α = 0.5: maximum shear thinning
+   - Predicts first and second normal stress differences (N₁, N₂)
+   - Use for: Polymer solutions, dilute/semi-dilute systems
+
+2. **Giesekus Multi-Mode** (3N parameters)
+
+   - N parallel Giesekus elements with solvent viscosity
+   - Use for: Polydisperse polymers, entangled melts
+
+**For detailed equations**: :doc:`/models/giesekus/index`
+
+**For tutorial**: :doc:`../03_advanced_topics/constitutive_ode_models`
+
+Family 12: Fluidity-Saramito EVP Models
+-----------------------------------------
+
+**Who they're for**: Elastoviscoplastic materials with thixotropy
+
+**Test modes**: All 6 protocols
+
+**Key characteristic**: **Tensorial stress** with Von Mises yield + thixotropic fluidity evolution
+
+The 2 Saramito-Fluidity Models
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. **Fluidity-Saramito Local** (7-8 parameters)
+
+   - Tensorial stress [τ_xx, τ_yy, τ_xy] with Von Mises yielding α = max(0, 1 - τ_y/|τ|)
+   - Coupling modes: "minimal" (λ=1/f) or "full" (λ + τ_y(f) aging yield)
+   - Predicts normal stresses N₁, stress overshoot, creep bifurcation
+   - Use for: Yield stress fluids, carbopol gels, soft solids
+
+2. **Fluidity-Saramito Nonlocal** (8-9 parameters + n_points)
+
+   - Includes spatial cooperativity for shear banding
+   - Use for: Systems showing heterogeneous flow
+
+**For detailed equations**: :doc:`/models/fluidity/saramito_evp`
+
+**For tutorial**: :doc:`../03_advanced_topics/constitutive_ode_models`
+
+Family 13: FIKH (Fractional IKH) Models
+-----------------------------------------
+
+**Who they're for**: Complex thixotropic materials with long-term memory
+
+**Test modes**: All 6 protocols
+
+**Key characteristic**: **Fractional derivatives** + kinematic hardening for power-law memory
+
+The 2 FIKH Models
+~~~~~~~~~~~~~~~~~
+
+1. **FIKH Local** — Fractional IKH
+
+   - Combines structure-parameter thixotropy with fractional Caputo derivatives
+   - Power-law memory captures long-time relaxation tails
+   - Use for: Waxy crude oils, drilling muds with complex aging
+
+2. **FMLIKH Local** — Fractional Modified Leonov IKH
+
+   - Extended fractional variant with Leonov constitutive equation
+   - Use for: Highly nonlinear thixotropic materials
+
+**For detailed equations**: :doc:`/models/fikh/fmlikh`
+
+**For tutorial**: :doc:`../03_advanced_topics/constitutive_ode_models`
+
+Family 14: DMT (de Souza Mendes-Thompson) Models
+--------------------------------------------------
+
+**Who they're for**: Thixotropic materials with structure buildup and breakdown
+
+**Test modes**: All 6 protocols
+
+**Key characteristic**: **Structure parameter** λ ∈ [0, 1] with viscosity closure
+
+The 2 DMT Models
+~~~~~~~~~~~~~~~~~
+
+1. **DMT Local** (5-7 parameters)
+
+   - Structure kinetics: dλ/dt = (1-λ)/t_eq - aλ|γ̇|^c/t_eq
+   - Two closures: "exponential" (smooth) or "herschel_bulkley" (explicit yield)
+   - Optional Maxwell elasticity for stress overshoot and SAOS
+   - Use for: Drilling muds, waxy crude oils, food products
+
+2. **DMT Nonlocal** (6-8 parameters + n_points)
+
+   - Structure diffusion D_λ∇²λ for spatial heterogeneity
+   - Use for: Shear-banding thixotropic materials
+
+**For detailed equations**: :doc:`/models/dmt/index`
+
+**For tutorial**: :doc:`../03_advanced_topics/thixotropy_yielding`
+
+Family 15: ITT-MCT (Mode-Coupling Theory) Models
+--------------------------------------------------
+
+**Who they're for**: Dense colloidal suspensions and glass-forming systems
+
+**Test modes**: All 6 protocols
+
+**Key characteristic**: **Memory kernel** from microscopic pair correlations; glass transition
+
+The 2 ITT-MCT Models
+~~~~~~~~~~~~~~~~~~~~~
+
+1. **ITT-MCT Schematic (F₁₂)** (5-6 parameters)
+
+   - Memory kernel m(Φ) = v₁Φ + v₂Φ² with strain decorrelation
+   - Glass transition at v₂ = 4: epsilon = (v₂ - 4)/4
+   - Semi-quantitative; first JIT compile takes 30-90s
+   - Use for: Generic glass-forming systems, fast exploration
+
+2. **ITT-MCT Isotropic** (4-5 parameters)
+
+   - Uses Percus-Yevick structure factor S(k) for quantitative predictions
+   - Volume fraction φ as primary control parameter
+   - Use for: Hard-sphere colloids, quantitative comparison with experiments
+
+**For detailed equations**: :doc:`/models/itt_mct/index`
+
+**For tutorial**: :doc:`../03_advanced_topics/dense_suspensions_glasses`
+
+Family 16: TNT (Transient Network Theory) Models
+--------------------------------------------------
+
+**Who they're for**: Associative polymers, wormlike micelles, telechelic polymers, biological gels
+
+**Test modes**: All 6 protocols
+
+**Key characteristic**: **Dynamic crosslinks** with attachment/detachment kinetics
+
+The 5 TNT Models
+~~~~~~~~~~~~~~~~~
+
+1. **TNT SingleMode** (3 params) — Simplest transient network
+2. **TNT Cates** (3-4 params) — Living polymers (wormlike micelles)
+3. **TNT LoopBridge** (4-5 params) — Telechelic loop↔bridge dynamics
+4. **TNT MultiSpecies** (2N+1 params) — Multiple chain populations
+5. **TNT StickyRouse** (4-5 params) — Rouse chains with sticky associations
+
+**For detailed equations**: :doc:`/models/tnt/index`
+
+**For tutorial**: :doc:`../03_advanced_topics/polymer_network_models`
+
+Family 17: VLB (Vernerey-Long-Brighenti) Models
+-------------------------------------------------
+
+**Who they're for**: Transient polymer networks with distribution tensor formulation
+
+**Test modes**: All 6 protocols
+
+**Key characteristic**: **Chain distribution tensor** μ tracks end-to-end vector statistics
+
+The 4 VLB Models
+~~~~~~~~~~~~~~~~~
+
+1. **VLB Local** (3-4 params) — Basic distribution tensor network
+2. **VLB MultiNetwork** (3N params) — Multiple interacting networks
+3. **VLB Variant** (5-6 params) — Bell force sensitivity + FENE extensibility
+4. **VLB Nonlocal** (4-5 params + n_points) — PDE for shear banding
+
+**For detailed equations**: :doc:`/models/vlb/index`
+
+**For tutorial**: :doc:`../03_advanced_topics/polymer_network_models`
+
+Family 18: HVM (Hybrid Vitrimer Model)
+----------------------------------------
+
+**Who they're for**: Vitrimers — polymers with covalent + exchangeable crosslinks
+
+**Test modes**: All 6 protocols
+
+**Key characteristic**: **3 subnetworks** (Permanent + Exchangeable + Dissociative) with TST kinetics
+
+- Bond Exchange Reactions (BER) via transition state theory
+- Factor-of-2 relaxation: τ_E = 1/(2k_BER) — both μ and μ_nat relax
+- σ_E → 0 at steady state (natural state tracks deformation)
+- 5 factory methods for limiting cases (neo-Hookean, Maxwell, Zener, etc.)
+
+**For detailed equations**: :doc:`/models/hvm/index`
+
+**For tutorial**: :doc:`../03_advanced_topics/vitrimer_models`
+
+Family 19: HVNM (Hybrid Vitrimer Nanocomposite Model)
+------------------------------------------------------
+
+**Who they're for**: Nanoparticle-filled vitrimers with interphase reinforcement
+
+**Test modes**: All 6 protocols
+
+**Key characteristic**: **4 subnetworks** (P + E + D + Interphase) with Guth-Gold amplification
+
+- Extends HVM with a 4th interphase subnetwork at NP-polymer interface
+- X(φ) = 1 + 2.5φ + 14.1φ² modulus amplification
+- Dual TST kinetics: independent matrix and interphase exchange rates
+- phi=0 recovers HVM exactly (machine precision verified)
+- 5 factory methods for limiting cases
+
+**For detailed equations**: :doc:`/models/hvnm/index`
+
+**For tutorial**: :doc:`../03_advanced_topics/vitrimer_models`
+
 Model Selection Flowchart
 --------------------------
 
@@ -561,16 +844,44 @@ Model Selection Flowchart
       │     ├─→ Simple exponential decay?
       │     │      └─→ YES: Classical (Maxwell, Zener)
       │     │
-      │     └─→ Power-law / gel-like / complex?
-      │            └─→ YES: Fractional (FML, FZSS, FMG)
+      │     ├─→ Power-law / gel-like / complex?
+      │     │      └─→ YES: Fractional (FML, FZSS, FMG)
+      │     │
+      │     └─→ Multiple relaxation processes?
+      │            └─→ YES: TNT MultiSpecies, VLB MultiNetwork, GeneralizedMaxwell
       │
-      └─→ Steady Shear Flow (nonlinear)
+      ├─→ Steady Shear Flow (nonlinear)
+      │     │
+      │     ├─→ Shear thinning without yield stress?
+      │     │      └─→ YES: PowerLaw, Carreau, Giesekus
+      │     │
+      │     ├─→ Yield stress present?
+      │     │      └─→ YES: Bingham, Herschel-Bulkley, Saramito
+      │     │
+      │     └─→ Thixotropic (time-dependent)?
+      │            └─→ YES: DMT, Fluidity, IKH
+      │
+      ├─→ Transient (Startup / Stress Overshoot)
+      │     │
+      │     ├─→ Polymer solution/melt?
+      │     │      └─→ YES: Giesekus, TNT
+      │     │
+      │     ├─→ Thixotropic fluid?
+      │     │      └─→ YES: DMT, IKH, Fluidity-Saramito
+      │     │
+      │     └─→ Vitrimer / adaptive material?
+      │            └─→ YES: HVM, HVNM
+      │
+      └─→ Dense suspension / Glass?
             │
-            ├─→ Shear thinning without yield stress?
-            │      └─→ YES: PowerLaw, Carreau
+            ├─→ Colloidal glass?
+            │      └─→ YES: ITT-MCT, SGR
             │
-            └─→ Yield stress present?
-                   └─→ YES: Bingham, Herschel-Bulkley
+            ├─→ Metallic glass / amorphous solid?
+            │      └─→ YES: STZ, EPM
+            │
+            └─→ Soft glass (foam, emulsion)?
+                   └─→ YES: SGR, HL
 
 Complexity Ladder: When to Upgrade Models
 ------------------------------------------
@@ -610,15 +921,23 @@ Key Concepts
 
    3. **Flow models** (PowerLaw, Carreau, HB): Nonlinear viscosity, steady shear
 
-   4. **Soft matter physics** (SGR, HL, Fluidity): Statistical mechanics approaches
+   4. **Nonlinear viscoelastic** (Giesekus, Saramito): Tensor ODE, normal stresses, yielding
 
-   5. **Elasto-plastic** (EPM, STZ, IKH): Yielding dynamics and thixotropy
+   5. **Thixotropic** (DMT, IKH/FIKH, Fluidity): Structure parameter, time-dependent viscosity
 
-   6. **LAOS analysis** (SPP): Nonlinear oscillatory characterization
+   6. **Soft matter physics** (SGR, HL, ITT-MCT): Statistical mechanics, glass transition
 
-   7. **Start simple**: Try classical first, upgrade to more complex models if needed
+   7. **Elasto-plastic** (EPM, STZ): Amorphous solid yielding dynamics
 
-   8. **Test mode determines family**: Linear (classical/fractional) vs. nonlinear (flow) vs. transient (startup)
+   8. **Transient networks** (TNT, VLB): Dynamic crosslink attachment/detachment
+
+   9. **Vitrimers** (HVM, HVNM): Bond exchange reactions, nanocomposite reinforcement
+
+   10. **LAOS analysis** (SPP): Nonlinear oscillatory characterization
+
+   11. **Start simple**: Try classical first, upgrade only if needed
+
+   12. **Physics determines family**: Linear (classical/fractional) → nonlinear (flow/Giesekus) → thixotropic (DMT/IKH) → network (TNT/VLB) → vitrimer (HVM/HVNM)
 
 .. admonition:: Self-Check Questions
    :class: tip
@@ -656,34 +975,58 @@ Further Reading
 - :doc:`/models/classical/index` — 3 classical models
 - :doc:`/models/fractional/index` — 11 fractional models
 - :doc:`/models/flow/index` — 6 flow models
-- :doc:`/models/sgr/sgr_conventional` — SGR models
-- :doc:`/models/fluidity/fluidity_local` — Fluidity models
-- :doc:`/models/epm/lattice_epm` — EPM models
-- :doc:`/models/ikh/mikh` — IKH models
-- :doc:`/models/hl/hebraud_lequeux` — HL model
-- :doc:`/models/stz/stz_conventional` — STZ model
-- :doc:`/models/spp/spp_yield_stress` — SPP model
+- :doc:`/models/giesekus/index` — 2 Giesekus models
+- :doc:`/models/sgr/index` — 2 SGR models
+- :doc:`/models/fluidity/index` — Fluidity + Saramito models
+- :doc:`/models/epm/index` — 2 EPM models
+- :doc:`/models/ikh/index` — 2 IKH models
+- :doc:`/models/fikh/index` — 2 FIKH models
+- :doc:`/models/dmt/index` — 2 DMT models
+- :doc:`/models/hl/index` — HL model
+- :doc:`/models/stz/index` — STZ model
+- :doc:`/models/spp/index` — SPP model
+- :doc:`/models/itt_mct/index` — 2 ITT-MCT models
+- :doc:`/models/tnt/index` — 5 TNT models
+- :doc:`/models/vlb/index` — 4 VLB models
+- :doc:`/models/hvm/index` — HVM model
+- :doc:`/models/hvnm/index` — HVNM model
 
-**Advanced theory**:
+**Advanced tutorials**:
 
 - :doc:`../03_advanced_topics/fractional_viscoelasticity_reference` — Fractional calculus
 - :doc:`../03_advanced_topics/sgr_analysis` — Soft glassy rheology
+- :doc:`../03_advanced_topics/constitutive_ode_models` — Giesekus, IKH, Saramito
+- :doc:`../03_advanced_topics/thixotropy_yielding` — DMT, Fluidity, HL, STZ, EPM
+- :doc:`../03_advanced_topics/dense_suspensions_glasses` — ITT-MCT
+- :doc:`../03_advanced_topics/polymer_network_models` — TNT and VLB
+- :doc:`../03_advanced_topics/vitrimer_models` — HVM and HVNM
+- :doc:`../03_advanced_topics/transforms_complete` — All 7 data transforms
 
 Summary
 -------
 
-RheoJAX provides **32+ rheological models** across 10+ families:
+RheoJAX provides **53 rheological models** across 19 families:
 
-- **Classical** (Maxwell, Zener): Exponential relaxation, simple materials
-- **Fractional** (FML, FZSS, FMG): Power-law relaxation, complex materials
-- **Flow** (PowerLaw, Carreau, HB): Nonlinear viscosity, steady shear
-- **SGR** (Conventional, GENERIC): Soft glassy materials, noise temperature
-- **Fluidity** (Local, Nonlocal): Cooperative flow models
-- **EPM** (Lattice, Tensorial): Elasto-plastic yielding
-- **IKH** (MIKH, MLIKH): Thixotropic materials
-- **HL** (Hébraud-Lequeux): Mean-field soft matter
-- **STZ**: Shear transformation zones
-- **SPP**: LAOS analysis and yield stress
+- **Classical** (3): Maxwell, Zener, SpringPot — exponential relaxation, simple materials
+- **Fractional** (11): FML, FZSS, FMG, Burgers, Jeffreys, etc. — power-law relaxation
+- **Flow** (6): PowerLaw, Carreau, HB, Bingham, Cross — nonlinear viscosity
+- **Multi-Mode** (1): Generalized Maxwell — discrete relaxation spectrum
+- **Giesekus** (2): Single/multi-mode — nonlinear viscoelastic tensor ODE
+- **SGR** (2): Conventional, GENERIC — soft glassy materials
+- **Fluidity** (2): Local, Nonlocal — cooperative flow
+- **Saramito** (2): Local, Nonlocal — tensorial EVP + thixotropy
+- **EPM** (2): Lattice, Tensorial — elasto-plastic yielding
+- **IKH** (2): MIKH, MLIKH — isotropic-kinematic hardening
+- **FIKH** (2): FIKH, FMLIKH — fractional kinematic hardening
+- **DMT** (2): Local, Nonlocal — structure parameter thixotropy
+- **HL** (1): Hébraud-Lequeux — mean-field soft matter
+- **STZ** (1): Shear transformation zones — amorphous solids
+- **SPP** (1): LAOS yield stress analysis
+- **ITT-MCT** (2): Schematic, Isotropic — mode-coupling theory
+- **TNT** (5): SingleMode, Cates, LoopBridge, MultiSpecies, StickyRouse
+- **VLB** (4): Local, MultiNetwork, Variant, Nonlocal
+- **HVM** (1): Hybrid vitrimer — 3 subnetworks + TST kinetics
+- **HVNM** (1): Vitrimer nanocomposite — 4 subnetworks + Guth-Gold
 
 Always start simple and add complexity only when necessary.
 

@@ -92,16 +92,16 @@ Model Hierarchy
    │   │   Equilibrium: f_B(eq) = bridge fraction
    │   │   Kinetics: df_B/dt = k_loop→bridge - k_bridge→loop
    │   │
-   │   └── Parameters: G_B, G_L, τ_B, τ_L, f_B_eq, k_ex
+   │   └── Parameters: G, τ_b, τ_a, ν, f_B_eq, η_s
    │       Only bridges contribute to stress
    │       Loops act as dangling ends (viscous)
-   │       7-8 parameters (richer dynamics than SingleMode)
+   │       6 parameters (richer dynamics than SingleMode)
    │
    ├── TNTStickyRouse (Multi-mode sticker dynamics)
    │   │   Rouse modes limited by sticker lifetime
    │   │   τ_p = τ_s + (N/p²)·τ_Rouse (hybrid timescale)
    │   │
-   │   └── Parameters: G_N, τ_s, N (chain length), n_modes
+   │   └── Parameters: G_k (N moduli), τ_R_k (N Rouse times), τ_s, η_s (2N+2 parameters)
    │       Broad relaxation spectrum
    │       Terminal time: τ_terminal ≈ τ_s + N·τ_Rouse
    │       For multi-sticker associating polymers
@@ -110,7 +110,7 @@ Model Hierarchy
    │   │   Scission/recombination kinetics
    │   │   Effective relaxation: τ_d = √(τ_rep · τ_break)
    │   │
-   │   └── Parameters: G_N, τ_rep, τ_break, η_s
+   │   └── Parameters: G_0, τ_rep, τ_break, η_s
    │       Single effective mode (faster of rep/break)
    │       Shear-thinning from reduced effective length
    │       For micellar solutions (CTAB, CPCl, etc.)
@@ -119,7 +119,7 @@ Model Hierarchy
        │   Distinct G_i, τ_i for each species
        │   Additive stress: σ_total = Σ_i σ_i
        │
-       └── Parameters: {G_i, τ_i} for i=1..N, η_s
+       └── Parameters: {G_i, τ_b_i} for i=0..N-1, η_s
            Discrete relaxation spectrum
            For heterogeneous crosslink populations
            N typically 2-5 (more = fit flexibility vs physics)

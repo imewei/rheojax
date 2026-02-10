@@ -146,20 +146,33 @@ intersphinx_mapping = {
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
-# html_static_path = ['../_static']  # Commented out - directory does not exist
+html_static_path = ["_static"]
 html_logo = None
 html_favicon = None
 
-# Theme options
+# Furo theme options for better readability
 html_theme_options = {
-    # Furo-specific options can be added here
-    # "sidebar_hide_name": True,
+    "sidebar_hide_name": False,
+    "navigation_with_keys": True,
+    "top_of_page_button": "edit",
+    "light_css_variables": {
+        "font-stack": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
+        "font-stack--monospace": "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+        "color-brand-primary": "#2962FF",
+        "color-brand-content": "#2962FF",
+        "color-admonition-title--tip": "#00897B",
+        "color-admonition-title-background--tip": "#00897B18",
+        "color-admonition-title--note": "#1565C0",
+        "color-admonition-title-background--note": "#1565C018",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#82B1FF",
+        "color-brand-content": "#82B1FF",
+    },
 }
 
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_css_files = []
+# Custom CSS for improved table readability and visual hierarchy
+html_css_files = ["custom.css"]
 
 # -- Options for LaTeX output ------------------------------------------------
 latex_elements = {

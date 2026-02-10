@@ -4,6 +4,14 @@ HVM Model Reference
 This page provides the complete mathematical formulation and implementation
 details for the Hybrid Vitrimer Model (HVM).
 
+.. note::
+
+   HVM builds on VLB transient network theory.  For foundational distribution
+   tensor derivations and the governing ODE, see :doc:`/models/vlb/vlb`.  For
+   shared protocol methodology (flow curve, SAOS, startup, etc.), see
+   :doc:`/models/vlb/vlb_protocols`.  The D-network in HVM follows the same
+   evolution equation as a single VLB transient network.
+
 
 Quick Reference
 ---------------
@@ -228,6 +236,8 @@ The :math:`(1 - D)` factor provides cooperative shielding: damage slows as the
 network degrades, preventing unphysical complete fracture.
 
 
+.. _hvm-factor-of-2:
+
 Factor-of-2 in Relaxation
 --------------------------
 
@@ -249,37 +259,40 @@ A naive Maxwell fit yields :math:`\tau_{fit} = \tau_{E,eff} = \tau_E / 2`.
 This is a fundamental vitrimer signature.
 
 
-Analytical Solutions (Constant :math:`k_{BER}`)
-------------------------------------------------
+Protocol Summary
+-----------------
 
-When TST feedback is negligible (linear regime, small deformations), the HVM
-admits closed-form solutions.
+The HVM supports six rheological protocols.  For complete derivations and
+closed-form solutions, see :doc:`hvm_protocols`.
 
-**SAOS moduli:**
+.. list-table::
+   :widths: 15 15 70
+   :header-rows: 1
 
-.. math::
+   * - Protocol
+     - Method
+     - Key Result
+   * - :ref:`Flow Curve <hvm-flow-curve>`
+     - Analytical
+     - :math:`\sigma_E = 0` at steady state; :math:`\sigma^{ss} = G_P\gamma + \eta_D\dot{\gamma}`
+   * - :ref:`SAOS <hvm-saos>`
+     - Analytical
+     - Two Maxwell modes + :math:`G_P` plateau; :math:`\hat{\tau}_E = 1/(2k_{BER,0})`
+   * - :ref:`Startup <hvm-startup>`
+     - ODE
+     - TST creates stress overshoot; analytical constant-rate solution
+   * - :ref:`Relaxation <hvm-relaxation>`
+     - ODE
+     - Bi-exponential + :math:`G_P` plateau; TST gives KWW-like decay
+   * - :ref:`Creep <hvm-creep>`
+     - ODE
+     - Two retardation times + vitrimer plastic creep :math:`\delta J(t)`
+   * - :ref:`LAOS <hvm-laos>`
+     - ODE
+     - TST generates odd harmonics; :math:`N_1` at :math:`2\omega`
 
-   G'(\omega) &= G_P + \frac{G_E \omega^2 \tau_{E,eff}^2}{1 + \omega^2 \tau_{E,eff}^2}
-   + \frac{G_D \omega^2 \tau_D^2}{1 + \omega^2 \tau_D^2} \\[6pt]
-   G''(\omega) &= \frac{G_E \omega \tau_{E,eff}}{1 + \omega^2 \tau_{E,eff}^2}
-   + \frac{G_D \omega \tau_D}{1 + \omega^2 \tau_D^2}
-
-where :math:`\tau_{E,eff} = 1/(2 k_{BER,0})` and :math:`\tau_D = 1/k_d^D`.
-
-**Relaxation modulus:**
-
-.. math::
-
-   G(t) = (1-D) \, G_P + G_E \, e^{-2 k_{BER,0} t} + G_D \, e^{-k_d^D t}
-
-**Steady-state flow curve:**
-
-At steady state, :math:`\sigma_E = 0` (the natural state fully tracks the
-deformation), so:
-
-.. math::
-
-   \sigma_{ss} = G_P \gamma + \frac{G_D}{k_d^D} \dot{\gamma}
+For the HVM vs VLB comparison and the thermodynamic framework, see
+:doc:`hvm_advanced`.
 
 
 Limiting Cases
@@ -297,9 +310,9 @@ Limiting Cases
      - :math:`G_E=0, G_D=0`
      - Pure elastic
      - ``HVMLocal.neo_hookean(G_P)``
-   * - Maxwell
+   * - Maxwell / VLBLocal
      - :math:`G_P=0, G_E=0`
-     - Single Maxwell element
+     - Single Maxwell element (equivalent to :class:`~rheojax.models.vlb.VLBLocal`)
      - ``HVMLocal.maxwell(G_D, k_d_D)``
    * - Zener (SLS)
      - :math:`G_E=0`
@@ -383,93 +396,12 @@ Parameter Table
      - Critical stretch for damage onset (when ``include_damage=True``)
 
 
-Usage Examples
---------------
+Advanced Theory
+----------------
 
-**SAOS with component decomposition:**
+For thermodynamic foundations (Helmholtz energy, Clausius-Duhem derivation),
+upper-convected kinematics, topological freezing, and numerical implementation
+details, see :doc:`hvm_advanced`.
 
-.. code-block:: python
-
-   from rheojax.models import HVMLocal
-   import numpy as np
-
-   model = HVMLocal()
-   model.parameters.set_value("G_P", 5000.0)
-   model.parameters.set_value("G_E", 3000.0)
-   model.parameters.set_value("G_D", 1000.0)
-
-   omega = np.logspace(-3, 3, 100)
-   G_prime, G_double_prime = model.predict_saos(omega)
-
-**Stress relaxation:**
-
-.. code-block:: python
-
-   t = np.logspace(-2, 3, 200)
-   G_t = model.simulate_relaxation(t, gamma_step=0.01)
-
-**Startup with full trajectory output:**
-
-.. code-block:: python
-
-   t = np.linspace(0.01, 50, 300)
-   result = model.simulate_startup(t, gamma_dot=1.0, return_full=True)
-   # result keys: 'stress', 'strain', 'mu_E', 'mu_E_nat', 'mu_D', 'damage'
-
-**Temperature sweep (Arrhenius):**
-
-.. code-block:: python
-
-   inv_T, log_k = model.arrhenius_plot_data(T_range=np.linspace(300, 450, 50))
-
-**LAOS with harmonic extraction:**
-
-.. code-block:: python
-
-   t = np.linspace(0, 20 * 2 * np.pi, 2000)
-   result = model.simulate_laos(t, gamma_0=0.5, omega=1.0)
-   harmonics = model.extract_laos_harmonics(result, n_harmonics=5)
-
-
-Numerical Implementation
--------------------------
-
-**ODE state vector** (11 components in simple shear):
-
-.. code-block:: text
-
-   [mu_E_xx, mu_E_yy, mu_E_xy,           # E-network distribution (3)
-    mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy, # E-network natural state (3)
-    mu_D_xx, mu_D_yy, mu_D_xy,           # D-network distribution (3)
-    gamma,                                 # accumulated strain (1)
-    D]                                     # damage variable (1)
-
-**Solver**: diffrax ``Tsit5`` (explicit Runge-Kutta) with ``PIDController``
-adaptive stepping (``rtol=1e-8``, ``atol=1e-10``).
-
-**Initial conditions**: All tensors at identity
-(:math:`\mu_{xx} = \mu_{yy} = 1`, :math:`\mu_{xy} = 0`),
-:math:`\gamma = 0`, :math:`D = 0`.
-
-
-Troubleshooting
----------------
-
-**SAOS fit gives wrong relaxation time:**
-Check for the factor-of-2: the fitted time constant from a Maxwell fit is
-:math:`\tau_{E,eff} = 1/(2k_{BER,0})`, not the bond exchange time
-:math:`\tau_E = 1/k_{BER,0}`.
-
-**Steady-state stress grows without bound:**
-The permanent network stress :math:`\sigma_P = G_P \gamma` grows linearly with
-strain. This is physical for bounded strain protocols (relaxation, LAOS) but
-produces unbounded stress in flow curve mode. Use subnetwork decomposition
-to isolate contributions.
-
-**ODE diverges at high shear rates:**
-TST kinetics can create very stiff ODEs at high stress. Reduce ``gamma_dot``
-or switch to ``kinetics="stretch"`` (less stiff coupling).
-
-**Damage produces unphysical behavior:**
-Ensure :math:`\lambda_{crit} > 1` (damage only activates under stretch beyond
-equilibrium). Set ``Gamma_0`` small initially and increase gradually.
+For troubleshooting, cross-protocol validation, and knowledge extraction
+workflows, see :doc:`hvm_knowledge`.

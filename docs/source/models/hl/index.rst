@@ -18,7 +18,7 @@ Quick Reference
      - Parameters
      - Use Case
    * - :doc:`hebraud_lequeux`
-     - 4-5 (G, :math:`\sigma_c`, :math:`\tau`, :math:`\alpha`, D)
+     - 3 (:math:`\alpha`, :math:`\sigma_c`, :math:`\tau`)
      - Mean-field plasticity, noise-activated flow, soft glasses
 
 
@@ -89,26 +89,18 @@ Key Parameters
      - Symbol
      - Units
      - Physical Meaning
-   * - Elastic modulus
-     - G
-     - Pa
-     - Stiffness of mesoscopic elements
-   * - Yield threshold
-     - :math:`\sigma_c`
-     - Pa
-     - Local stress for plastic yielding
-   * - Noise amplitude
-     - D
-     - Pa^2
-     - Strength of mechanical noise
-   * - Relaxation time
-     - :math:`\tau`
-     - s
-     - Microscopic relaxation timescale
    * - Noise coupling
      - :math:`\alpha`
      - —
      - Rate of plastic events generating noise
+   * - Yield threshold
+     - :math:`\sigma_c`
+     - Pa
+     - Local stress for plastic yielding
+   * - Relaxation time
+     - :math:`\tau`
+     - s
+     - Microscopic relaxation timescale
 
 
 Model Predictions
@@ -122,7 +114,7 @@ The HL model predicts a yield stress with continuous transition:
 
    \sigma(\dot{\gamma}) = \sigma_y + \eta_{eff}\dot{\gamma}^n
 
-where :math:`\sigma_y` depends on G, :math:`\sigma_c`, and D.
+where :math:`\sigma_y` depends on :math:`\alpha` and :math:`\sigma_c`.
 
 **Oscillatory Response:**
 
@@ -151,14 +143,13 @@ Quick Start
    model = HebraudLequeux()
 
    # Set parameters
-   model.parameters.set_value('G', 1000.0)      # Pa
-   model.parameters.set_value('sigma_c', 50.0)  # Pa
-   model.parameters.set_value('D', 100.0)       # Pa²
-   model.parameters.set_value('tau', 1.0)       # s
+   model.parameters.set_value('alpha', 0.3)      # Noise coupling (< 0.5 = glass)
+   model.parameters.set_value('sigma_c', 50.0)   # Pa
+   model.parameters.set_value('tau', 1.0)         # s
 
    # Fit to flow curve
    gamma_dot = np.logspace(-2, 1, 30)
-   model.fit(gamma_dot, stress_data, test_mode='flow_curve')
+   model.fit(gamma_dot, stress_data, test_mode='steady_shear')
 
    # Extract yield stress
    sigma_y = model.get_yield_stress()
@@ -171,7 +162,7 @@ Quick Start
    # Bayesian with NLSQ warm-start
    result = model.fit_bayesian(
        gamma_dot, stress_data,
-       test_mode='flow_curve',
+       test_mode='steady_shear',
        num_warmup=1000,
        num_samples=2000,
        num_chains=4,

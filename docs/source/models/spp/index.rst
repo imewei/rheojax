@@ -144,7 +144,7 @@ Quick Start
 
 .. code-block:: python
 
-   from rheojax.models import SPPDecomposer
+   from rheojax.transforms import SPPDecomposer
    import numpy as np
 
    # Create decomposer

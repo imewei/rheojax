@@ -1008,13 +1008,13 @@ the appropriate variant from experimental data.
 See Also
 --------
 
-- :ref:`tnt-base` - Constant breakage rate (upper-convected Maxwell)
-- :ref:`tnt-bell` - Force-dependent breakage (shear thinning)
-- :ref:`tnt-fene` - Finite extensibility (strain hardening)
-- :ref:`tnt-bell-fene` - Combined Bell and FENE
-- :ref:`tnt-nonaffine` - Gordon-Schowalter slip
-- :ref:`tnt-stickyrouse` - Multi-mode Rouse model
-- :ref:`tnt-multispecies` - Polydisperse network
+- :ref:`model-tnt-tanaka-edwards` - Constant breakage rate (upper-convected Maxwell)
+- :ref:`model-tnt-bell` - Force-dependent breakage (shear thinning)
+- :ref:`model-tnt-fene-p` - Finite extensibility (strain hardening)
+- :ref:`model-tnt-stretch-creation` - Combined Bell and FENE
+- :ref:`model-tnt-non-affine` - Gordon-Schowalter slip
+- :ref:`model-tnt-sticky-rouse` - Multi-mode Rouse model
+- :ref:`model-tnt-multi-species` - Polydisperse network
 
 **External References**:
 

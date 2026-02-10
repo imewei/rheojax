@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Power-law behavior, broad relaxation spectra, fractional viscoelasticity
-- **Parameters:** 2 (V, :math:`\alpha`)
+- **Parameters:** 2 (c_alpha, :math:`\alpha`)
 - **Key equation:** :math:`G^*(\omega) = V (i\omega)^{\alpha}`, :math:`G'(\omega) \sim G''(\omega) \sim \omega^{\alpha}`
 - **Test modes:** Oscillation, relaxation, creep
 - **Material examples:** Critical gels (:math:`\alpha=0.5`), polymer melts near Tg, soft glassy materials, biological tissues
@@ -196,7 +196,7 @@ Parameters
    * - Name
      - Units
      - Description / Constraints
-   * - ``V``
+   * - ``c_alpha``
      - Pa·s\ :sup:`\alpha`
      - Fractional stiffness; > 0. Sets vertical placement of :math:`G^*` on log-log plots.
    * - ``alpha``
@@ -432,8 +432,8 @@ Optimization Algorithm Selection
    - 5-270× faster than scipy.optimize
 
 **Bounds:**
-   - :math:`V`: [1e-2, 1e8] Pa·s\ :math:`^{\alpha}` (adjust based on material)
-   - :math:`\alpha`: [0.05, 0.95] (avoid singularities at 0 and 1)
+   - :math:`c\_{\alpha}`: (1e-3, 1e9) Pa·s\ :math:`^{\alpha}` (adjust based on material)
+   - :math:`\alpha`: (0.0, 1.0) (avoid singularities at exact 0 and 1)
 
 **Fitting strategy:**
    - Use log-spaced data to avoid early/late time dominance
@@ -515,13 +515,15 @@ Basic Fitting Example
    G_star = measure_complex_modulus(omega)
 
    # Initialize and fit
-   model = SpringPot(V=1.0e3, alpha=0.5)
+   model = SpringPot()
+   model.parameters.set_value('c_alpha', 1.0e3)
+   model.parameters.set_value('alpha', 0.5)
    model.fit(omega, G_star, test_mode='oscillation')
 
    # Check fitted parameters
-   V = model.parameters.get_value('V')
+   c_alpha = model.parameters.get_value('c_alpha')
    alpha = model.parameters.get_value('alpha')
-   print(f"V = {V:.2e} Pa·s^{alpha:.3f}")
+   print(f"c_alpha = {c_alpha:.2e} Pa·s^{alpha:.3f}")
    print(f"alpha = {alpha:.3f}")
 
    # Verify gel point (alpha should be ~0.5)

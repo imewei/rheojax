@@ -4,18 +4,12 @@ Section 3: Advanced Topics (Weeks 7-12)
 ========================================
 
 **Deep dives into Bayesian inference, fractional viscoelasticity, multi-technique analysis,
-and specialized frameworks (SGR, SPP)**
+constitutive modeling, transient networks, vitrimers, and specialized frameworks**
 
-.. admonition:: Section Overview
+.. admonition:: Prerequisites
    :class: note
 
-   This section covers advanced analysis techniques for uncertainty quantification,
-   fractional calculus applications, simultaneous multi-technique fitting, and
-   specialized frameworks for soft glassy materials (SGR) and LAOS analysis (SPP).
-
-   **Timeline**: Weeks 7-12 (18-24 hours)
-
-   **Prerequisites**: Sections 1-2 (Fundamentals and Model Usage)
+   Sections 1-2 (Fundamentals and Model Usage). Timeline: Weeks 7-16 (30-40 hours).
 
 Learning Objectives
 -------------------
@@ -29,48 +23,61 @@ By completing this section, you will be able to:
 5. Interpret credible intervals and posterior distributions
 6. Classify soft glassy materials using the SGR framework
 7. Extract yield stresses and cage moduli from LAOS using SPP
+8. Work with ODE-based constitutive models (Giesekus, IKH, Saramito)
+9. Analyze thixotropic and yield stress materials (DMT, Fluidity, HL, STZ, EPM)
+10. Apply transient polymer network models (TNT, VLB)
+11. Model vitrimer and nanocomposite rheology (HVM, HVNM)
+12. Understand dense suspension dynamics via mode-coupling theory (ITT-MCT)
+13. Apply all 7 data transforms to experimental data
 
-Section Contents
-----------------
+----
+
+Core Advanced Topics
+--------------------
 
 .. toctree::
    :maxdepth: 2
-   :caption: Core Advanced Topics
 
    bayesian_inference
    fractional_viscoelasticity_reference
    multi_technique_fitting
    time_temperature_superposition
 
+Specialized Frameworks
+----------------------
+
 .. toctree::
    :maxdepth: 2
-   :caption: Specialized Frameworks
 
    sgr_analysis
    spp_analysis
 
-Section Roadmap
+Constitutive Models & Networks
+------------------------------
+
+.. toctree::
+   :maxdepth: 2
+
+   constitutive_ode_models
+   thixotropy_yielding
+   dense_suspensions_glasses
+   polymer_network_models
+   vitrimer_models
+
+Data Transforms
 ---------------
 
-**Weeks 7-9: Bayesian Inference**
+.. toctree::
+   :maxdepth: 2
 
-- :doc:`bayesian_inference` — MCMC sampling and uncertainty quantification
+   transforms_complete
 
-**Weeks 10-11: Fractional Viscoelasticity**
-
-- :doc:`fractional_viscoelasticity_reference` — Fractional calculus theory
-
-**Week 12: Advanced Fitting & Specialized Frameworks**
-
-- :doc:`multi_technique_fitting` — Simultaneous SAOS + relaxation fitting
-- :doc:`time_temperature_superposition` — Mastercurve construction
-- :doc:`sgr_analysis` — Soft Glassy Rheology for complex fluids
-- :doc:`spp_analysis` — Sequence of Physical Processes for LAOS
+----
 
 Key Skills Summary
 ------------------
 
-**Bayesian Workflow** (NLSQ → NUTS):
+**Bayesian Workflow** (NLSQ -> NUTS):
 
 .. code-block:: python
 
@@ -126,8 +133,6 @@ Key Skills Summary
 Next Steps
 ----------
 
-After completing advanced topics, proceed to:
-
-**Section 4: Practical Guides** (:doc:`../04_practical_guides/index`)
-
-Learn production workflows, data I/O, visualization, and batch processing.
+After completing advanced topics, proceed to
+**Section 4: Practical Guides** (:doc:`../04_practical_guides/index`) for
+production workflows, data I/O, visualization, and batch processing.

@@ -198,12 +198,12 @@ Key Parameters
      - 10-10,000 Pa
      - Elastic stiffness of matrix
    * - Mean yield stress
-     - :math:`\sigma_c_{mean}`
+     - :math:`\sigma_{c,\text{mean}}`
      - 0.5-2× :math:`\sigma_y`
      - Local threshold for plastic events
    * - Disorder strength
-     - :math:`\sigma_c_{std}`
-     - 0.1-0.5× :math:`\sigma_c_{mean}`
+     - :math:`\sigma_{c,\text{std}}`
+     - 0.1-0.5× :math:`\sigma_{c,\text{mean}}`
      - Heterogeneity → avalanche statistics
    * - Plastic time
      - :math:`\tau_{pl}`

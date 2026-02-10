@@ -1085,7 +1085,7 @@ Amplitude Sweep Analysis
 
 .. code-block:: python
 
-   from rheojax.pipeline.spp import SPPAmplitudeSweepPipeline
+   from rheojax.pipeline import SPPAmplitudeSweepPipeline
    import numpy as np
 
    # Define amplitude sweep

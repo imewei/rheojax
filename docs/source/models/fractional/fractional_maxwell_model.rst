@@ -9,7 +9,7 @@ Quick Reference
 - **Use when:** Multi-scale relaxation, hierarchical structures requiring two fractional orders
 - **Parameters:** 4 (:math:`c_1, \alpha, \beta, \tau`)
 - **Key equation:** :math:`G^*(\omega) = c_1 \frac{(i\omega)^\alpha}{1 + (i\omega\tau)^\beta}`
-- **Test modes:** Oscillation, relaxation
+- **Test modes:** Oscillation, relaxation, creep
 - **Material examples:** Materials with hierarchical structures, multi-scale relaxation processes
 
 .. include:: /_includes/fractional_seealso.rst

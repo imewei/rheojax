@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Yield stress fluids (pastes, gels, foams), shear-thinning after yielding
-- **Parameters:** 3 (:math:`\tau_y`, :math:`K`, :math:`n`)
+- **Parameters:** 3 (:math:`\sigma_y`, :math:`K`, :math:`n`)
 - **Key equation:** :math:`\sigma = \sigma_y + K \dot{\gamma}^n` for :math:`\sigma > \sigma_y`
 - **Test modes:** Flow curve (Steady Shear), Stress Ramp
 - **Material examples:** Toothpaste, mayonnaise, drilling muds, fresh concrete, paints
@@ -102,7 +102,7 @@ Parameters
      - Symbol
      - Units
      - Description
-   * - ``tau_y``
+   * - ``sigma_y``
      - :math:`\sigma_y`
      - Pa
      - **Yield Stress**. Critical stress for flow. High :math:`\sigma_y` means "stiff" paste.
@@ -478,10 +478,10 @@ Basic Fitting
    model.fit(gamma_dot[:6], sigma, test_mode='flow_curve')
 
    # Extract parameters
-   tau_y = model.parameters.get_value('tau_y')
+   sigma_y = model.parameters.get_value('sigma_y')
    K = model.parameters.get_value('K')
    n = model.parameters.get_value('n')
-   print(f"σ_y = {tau_y:.1f} Pa, K = {K:.2f} Pa·s^n, n = {n:.3f}")
+   print(f"σ_y = {sigma_y:.1f} Pa, K = {K:.2f} Pa·s^n, n = {n:.3f}")
 
 With Custom Initialization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -492,7 +492,7 @@ With Custom Initialization
 
    # Initialize with estimates from data inspection
    model = HerschelBulkley()
-   model.parameters.set_value('tau_y', 50.0)  # From low-rate plateau
+   model.parameters.set_value('sigma_y', 50.0)  # From low-rate plateau
    model.parameters.set_value('K', 10.0)
    model.parameters.set_value('n', 0.4)
 
@@ -522,8 +522,8 @@ Bayesian Inference
 
    # Get credible intervals
    intervals = model.get_credible_intervals(result.posterior_samples)
-   print(f"σ_y: {intervals['tau_y']['mean']:.1f} "
-         f"[{intervals['tau_y']['hdi_2.5%']:.1f}, {intervals['tau_y']['hdi_97.5%']:.1f}] Pa")
+   print(f"σ_y: {intervals['sigma_y']['mean']:.1f} "
+         f"[{intervals['sigma_y']['hdi_2.5%']:.1f}, {intervals['sigma_y']['hdi_97.5%']:.1f}] Pa")
 
 Comparing with Bingham
 ~~~~~~~~~~~~~~~~~~~~~~
