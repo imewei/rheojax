@@ -74,7 +74,8 @@ The coupling parameter α controls material behavior:
 ```bash
 pip install rheojax arviz matplotlib numpy
 # For GPU acceleration (Linux + CUDA only):
-pip install jax[cuda12-local]==0.8.0
+pip install jax[cuda12-local]==0.8.0   # CUDA 12.x
+pip install jax[cuda13-local]==0.8.0   # CUDA 13.x
 ```
 
 ## Data Sources

@@ -43,7 +43,8 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 ```bash
 pip install rheojax
 # For GPU acceleration (Linux + CUDA only):
-pip install jax[cuda12-local]==0.8.0
+pip install jax[cuda12-local]==0.8.0   # CUDA 12.x
+pip install jax[cuda13-local]==0.8.0   # CUDA 13.x
 ```
 
 See [CLAUDE.md](../CLAUDE.md) for detailed installation instructions.
@@ -229,7 +230,7 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 - Interpret noise temperature x and classify material regimes
 
 **GPU Requirements (Notebook 05):**
-- **Linux + CUDA 12.1-12.9 only** (GPU acceleration not available on macOS/Windows)
+- **Linux + CUDA 12+ or 13+** (GPU acceleration not available on macOS/Windows)
 - Installation: `make install-jax-gpu` or see [CLAUDE.md](../CLAUDE.md)
 - GPU tests marked with `@pytest.mark.gpu` and skip gracefully if unavailable
 - CPU-only execution provided as fallback in all notebooks
@@ -906,7 +907,7 @@ If you see this error, ensure you're using this pattern, not direct imports.
 
 **Problem:** `jax.devices()` shows CPU only
 
-**Solution:** GPU requires Linux + CUDA 12.1-12.9. See [CLAUDE.md](../CLAUDE.md) for GPU installation:
+**Solution:** GPU requires Linux + CUDA 12+ or 13+. See [CLAUDE.md](../CLAUDE.md) for GPU installation:
 ```bash
 make install-jax-gpu
 ```

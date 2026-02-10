@@ -67,7 +67,7 @@ examples/outputs/hvm/
 
 - `examples/utils/hvm_data.py` — Data loaders with dataset registry (9 datasets, 6 protocols)
 - `examples/utils/hvm_fit.py` — Fit pipeline: `run_nlsq_saos()`, `run_nuts()`, `posterior_predictive_saos()`
-- `examples/configs/hvm_defaults.yaml` — Protocol-specific parameter hints and sampler config
+- `examples/hvm/hvm_defaults.yaml` — Protocol-specific parameter hints and sampler config
 
 ## Requirements
 

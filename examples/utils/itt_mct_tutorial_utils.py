@@ -20,11 +20,18 @@ from typing import Any, Literal
 import numpy as np
 
 # Reuse IKH data loaders
-from ikh_tutorial_utils import (
-    load_ml_ikh_flow_curve,
-    load_pnas_startup,
-    load_pnas_laos,
-)
+try:
+    from ikh_tutorial_utils import (
+        load_ml_ikh_flow_curve,
+        load_pnas_startup,
+        load_pnas_laos,
+    )
+except ModuleNotFoundError:
+    from utils.ikh_tutorial_utils import (
+        load_ml_ikh_flow_curve,
+        load_pnas_startup,
+        load_pnas_laos,
+    )
 
 
 # =============================================================================

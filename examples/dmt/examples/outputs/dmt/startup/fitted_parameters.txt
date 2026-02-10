@@ -1,8 +1,8 @@
 DMT Startup Shear - Fitted Parameters
 ==================================================
 
-Shear rate: 10.0 s⁻¹
-NLSQ R²: 0.999126
+Shear rate: 10.0 s^-1
+NLSQ R2: 0.999126
 
 Parameter         Value       Unit
 -----------------------------------
