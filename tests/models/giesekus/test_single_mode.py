@@ -426,7 +426,7 @@ class TestBayesianInterface:
 
         y = model.model_function(X, params, test_mode="oscillation")
 
-        assert y.shape == X.shape
+        assert y.shape == (len(X), 2)  # G_prime and G_double_prime
         assert np.all(y > 0)
 
 

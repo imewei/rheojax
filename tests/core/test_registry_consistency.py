@@ -158,9 +158,13 @@ class TestRegistryConsistency:
 
     def test_all_models_have_protocols_declared(self):
         """Every registered model should declare at least one protocol."""
+        # Exclude test fixture models registered in test files
+        test_models = {"simple_test_model"}
         models_without_protocols = []
 
         for model_name in ModelRegistry.list_models():
+            if model_name in test_models:
+                continue
             info = ModelRegistry.get_info(model_name)
             if not info or not info.protocols:
                 models_without_protocols.append(model_name)

@@ -342,5 +342,5 @@ class TestModelFunction:
         omega = jnp.logspace(-1, 1, 10)
         y = model.model_function(omega, params, test_mode="oscillation")
 
-        assert y.shape == omega.shape
+        assert y.shape == (len(omega), 2)  # G_prime and G_double_prime
         assert np.all(y > 0)

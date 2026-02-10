@@ -345,22 +345,17 @@ class TestModelFunction:
 
     @pytest.mark.smoke
     def test_model_function_flow_curve(self):
-        """Test model_function for flow curve."""
+        """Test model_function raises NotImplementedError (Bayesian not supported)."""
         model = ITTMCTSchematic()
         gamma_dot = np.logspace(-1, 2, 10)
 
-        sigma = model.model_function(
-            gamma_dot,
-            v1=0.0,
-            v2=4.5,
-            Gamma=1.0,
-            gamma_c=0.1,
-            G_inf=1e6,
-            test_mode="flow_curve",
-        )
-
-        assert sigma.shape == gamma_dot.shape
-        assert np.all(sigma >= 0)
+        params = np.array([0.0, 4.5, 1.0, 0.1, 1e6])
+        with pytest.raises(NotImplementedError, match="Bayesian inference is not yet supported"):
+            model.model_function(
+                gamma_dot,
+                params,
+                test_mode="flow_curve",
+            )
 
     def test_model_function_restores_parameters(self):
         """Test that model_function restores original parameters."""

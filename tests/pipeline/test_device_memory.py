@@ -50,7 +50,7 @@ class SimpleModel(BaseModel):
 
 
 # Register mock model
-ModelRegistry.register("simple_test_model")(SimpleModel)
+ModelRegistry.register("simple_test_model", protocols=[])(SimpleModel)
 
 
 @pytest.fixture
