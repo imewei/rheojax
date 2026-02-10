@@ -438,11 +438,12 @@ class FractionalMaxwellModel(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Internal predict implementation.
 
         Args:
             X: RheoData object or array of x-values
+            **kwargs: Additional arguments (test_mode handled via self._test_mode)
 
         Returns:
             Predicted values
@@ -451,14 +452,22 @@ class FractionalMaxwellModel(BaseModel):
         if isinstance(X, RheoData):
             return self.predict_rheodata(X)
 
-        # Handle raw array input (assume relaxation mode)
+        # Handle raw array input
+        from rheojax.core.test_modes import TestMode
+
         x = jnp.asarray(X)
         c1 = self.parameters.get_value("c1")
         alpha = self.parameters.get_value("alpha")
         beta = self.parameters.get_value("beta")
         tau = self.parameters.get_value("tau")
 
-        result = self._predict_relaxation_jax(x, c1, alpha, beta, tau)
+        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        if test_mode in ("oscillation", TestMode.OSCILLATION):
+            result = self._predict_oscillation_jax(x, c1, alpha, beta, tau)
+        elif test_mode in ("creep", TestMode.CREEP):
+            result = self._predict_creep_jax(x, c1, alpha, beta, tau)
+        else:
+            result = self._predict_relaxation_jax(x, c1, alpha, beta, tau)
         return np.array(result)
 
     def model_function(self, X, params, test_mode=None):
@@ -560,13 +569,14 @@ class FractionalMaxwellModel(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None):
+    def predict(self, X, test_mode: str | None = None, **kwargs):
         """Predict response.
 
         Args:
             X: RheoData object or array of x-values
             test_mode: Test mode for prediction ('relaxation', 'creep', 'oscillation')
                        Required when X is a raw array. If None, defaults to 'relaxation'.
+            **kwargs: Additional arguments (ignored for compatibility)
 
         Returns:
             Predicted values (RheoData if input is RheoData, else array)
@@ -581,8 +591,12 @@ class FractionalMaxwellModel(BaseModel):
             tau = self.parameters.get_value("tau")
             x = jnp.asarray(X)
 
-            # Route to appropriate prediction method based on test_mode
+            # Normalize test_mode to string
             mode = test_mode or "relaxation"
+            if hasattr(mode, "value"):
+                mode = mode.value
+
+            # Route to appropriate prediction method based on test_mode
             if mode == "relaxation":
                 result = self._predict_relaxation_jax(x, c1, alpha, beta, tau)
             elif mode == "creep":

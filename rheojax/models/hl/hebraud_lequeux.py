@@ -556,7 +556,7 @@ class HebraudLequeux(BaseModel):
         # handle t_max/n_steps correctly (computes it from X array)
         # So we can use them directly here as X is provided at runtime.
 
-        if self._test_mode == "steady_shear":
+        if self._test_mode in ("steady_shear", "flow_curve"):
             from rheojax.utils.hl_kernels import _compute_dt_and_steps_for_rate
 
             # Predict in normalized units (same as fitting) then scale back

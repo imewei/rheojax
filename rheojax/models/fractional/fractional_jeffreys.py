@@ -526,27 +526,41 @@ class FractionalJeffreysModel(BaseModel):
 
         return self
 
-    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
+    def _predict(self, X: jnp.ndarray, **kwargs) -> jnp.ndarray:
         """Predict response for given input.
 
         Parameters
         ----------
         X : jnp.ndarray
             Independent variable
+        **kwargs
+            Additional arguments (test_mode handled via self._test_mode)
 
         Returns
         -------
         jnp.ndarray
             Predicted values
         """
-        # Get parameters
-        params = self.parameters.to_dict()
-        eta1 = params["eta1"]
-        eta2 = params["eta2"]
-        alpha = params["alpha"]
-        tau1 = params["tau1"]
+        from rheojax.core.test_modes import TestMode
 
-        # Auto-detect test mode
+        # Get parameters
+        eta1 = self.parameters.get_value("eta1")
+        eta2 = self.parameters.get_value("eta2")
+        alpha = self.parameters.get_value("alpha")
+        tau1 = self.parameters.get_value("tau1")
+
+        # Dispatch based on test_mode if set, otherwise auto-detect
+        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        if test_mode in ("oscillation", TestMode.OSCILLATION):
+            return self._predict_oscillation(X, eta1, eta2, alpha, tau1)
+        elif test_mode in ("relaxation", TestMode.RELAXATION):
+            return self._predict_relaxation(X, eta1, eta2, alpha, tau1)
+        elif test_mode in ("creep", TestMode.CREEP):
+            return self._predict_creep(X, eta1, eta2, alpha, tau1)
+        elif test_mode in ("flow_curve", "rotation", TestMode.FLOW_CURVE, TestMode.ROTATION):
+            return self._predict_rotation(X, eta1, eta2, alpha, tau1)
+
+        # Auto-detect test mode (legacy fallback)
         if jnp.all(X > 0) and len(X) > 1:
             log_range = jnp.log10(jnp.max(X)) - jnp.log10(jnp.min(X) + 1e-12)
             if log_range > 3:

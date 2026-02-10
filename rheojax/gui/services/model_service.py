@@ -68,6 +68,26 @@ def normalize_model_name(model_name: str) -> str:
         "fluidity saramito local": "fluidity_saramito_local",
         "fluidity saramito nonlocal": "fluidity_saramito_nonlocal",
         "evp": "fluidity_saramito_local",
+        # VLB
+        "vlb": "vlb_local",
+        "vlb local": "vlb_local",
+        "vlb multi": "vlb_multi_network",
+        "vlb multi network": "vlb_multi_network",
+        "vlb multi-network": "vlb_multi_network",
+        "vlb variant": "vlb_variant",
+        "vlb nonlocal": "vlb_nonlocal",
+        "vlb bell": "vlb_variant",
+        "vlb fene": "vlb_variant",
+        # HVM
+        "hvm": "hvm_local",
+        "hvm local": "hvm_local",
+        "vitrimer": "hvm_local",
+        "hybrid vitrimer": "hvm_local",
+        # HVNM
+        "hvnm": "hvnm_local",
+        "hvnm local": "hvnm_local",
+        "vitrimer nanocomposite": "hvnm_local",
+        "hybrid vitrimer nanocomposite": "hvnm_local",
     }
 
     if key in alias_map.values():
@@ -182,6 +202,9 @@ class ModelService:
             - 'dmt': DMTLocal, DMTNonlocal
             - 'giesekus': GiesekusSingleMode, GiesekusMultiMode
             - 'tnt': TNTSingleMode, TNTLoopBridge, TNTStickyRouse, TNTCates, TNTMultiSpecies
+            - 'vlb': VLBLocal, VLBMultiNetwork, VLBVariant, VLBNonlocal
+            - 'hvm': HVMLocal
+            - 'hvnm': HVNMLocal
             - 'fikh': FIKH, FMLIKH
         """
         logger.debug("Getting available models from registry")
@@ -208,6 +231,9 @@ class ModelService:
             "dmt": [],
             "giesekus": [],
             "tnt": [],
+            "vlb": [],
+            "hvm": [],
+            "hvnm": [],
             "fikh": [],
             "other": [],
         }
@@ -269,6 +295,13 @@ class ModelService:
                 categories["giesekus"].append(model_name)
             elif name_lower.startswith("tnt"):
                 categories["tnt"].append(model_name)
+            elif name_lower.startswith("vlb"):
+                categories["vlb"].append(model_name)
+            # Check hvnm before hvm (more specific prefix first)
+            elif name_lower.startswith("hvnm"):
+                categories["hvnm"].append(model_name)
+            elif name_lower.startswith("hvm"):
+                categories["hvm"].append(model_name)
             elif name_lower in ["fikh", "fmlikh"]:
                 categories["fikh"].append(model_name)
             else:

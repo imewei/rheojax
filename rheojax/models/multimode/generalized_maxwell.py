@@ -982,11 +982,12 @@ class GeneralizedMaxwell(BaseModel):
         J_t = self._predict_creep_jit(jnp.asarray(t), E_inf, E_i, tau_i, sigma_0)
         return J_t
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict based on fitted test mode.
 
         Args:
             X: Independent variable (time or frequency)
+            **kwargs: Additional arguments (test_mode handled via self._test_mode)
 
         Returns:
             Predicted values (modulus or compliance)
@@ -994,24 +995,29 @@ class GeneralizedMaxwell(BaseModel):
         Raises:
             ValueError: If test_mode not set (model not fitted)
         """
-        if self._test_mode is None:
+        test_mode = self._test_mode or kwargs.get("test_mode")
+        if test_mode is None:
             raise ValueError("Model not fitted. Call fit() first.")
 
+        # Normalize test_mode to string
+        if hasattr(test_mode, "value"):
+            test_mode = test_mode.value
+
         # Route to appropriate prediction method
-        if self._test_mode == "relaxation":
+        if test_mode == "relaxation":
             return self._predict_relaxation(X)
-        elif self._test_mode == "oscillation":
+        elif test_mode == "oscillation":
             return self._predict_oscillation(X)
-        elif self._test_mode == "creep":
+        elif test_mode == "creep":
             return self._predict_creep(X)
-        elif self._test_mode == "steady_shear":
+        elif test_mode in ("steady_shear", "flow_curve"):
             return self._predict_steady_shear(X)
-        elif self._test_mode == "startup":
+        elif test_mode == "startup":
             return self._predict_startup(X)
-        elif self._test_mode == "laos":
+        elif test_mode == "laos":
             return self._predict_laos(X)
         else:
-            raise ValueError(f"Unknown test_mode: {self._test_mode}")
+            raise ValueError(f"Unknown test_mode: {test_mode}")
 
     @staticmethod
     @jax.jit

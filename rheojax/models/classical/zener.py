@@ -271,7 +271,7 @@ class Zener(BaseModel):
             return self._predict_creep(x_data, Ge, Gm, eta)
         elif test_mode == TestMode.OSCILLATION:
             return self._predict_oscillation(x_data, Ge, Gm, eta)
-        elif test_mode == TestMode.ROTATION:
+        elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             return self._predict_rotation(x_data, Ge, Gm, eta)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")

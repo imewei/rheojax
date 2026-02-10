@@ -89,6 +89,9 @@ IKH (Isotropic Kinematic Hardening) Models (2):
 HVM (Hybrid Vitrimer Model) (1):
     - HVMLocal: Local (0D) hybrid vitrimer model (P + E + D networks)
 
+HVNM (Hybrid Vitrimer Nanocomposite Model) (1):
+    - HVNMLocal: Local (0D) NP-filled vitrimer model (P + E + D + I networks)
+
 Hébraud-Lequeux Model (1):
     - HebraudLequeux: Stochastic trap model for soft glassy materials
 

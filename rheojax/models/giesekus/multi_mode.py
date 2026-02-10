@@ -70,9 +70,6 @@ logger = logging.getLogger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.OSCILLATION,
         Protocol.STARTUP,
-        Protocol.RELAXATION,
-        Protocol.CREEP,
-        Protocol.LAOS,
     ],
 )
 @ModelRegistry.register(
@@ -81,9 +78,6 @@ logger = logging.getLogger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.OSCILLATION,
         Protocol.STARTUP,
-        Protocol.RELAXATION,
-        Protocol.CREEP,
-        Protocol.LAOS,
     ],
 )
 class GiesekusMultiMode(BaseModel):
@@ -393,7 +387,9 @@ class GiesekusMultiMode(BaseModel):
             [self.parameters.get_value(n) for n in param_names], dtype=jnp.float64
         )
 
-        return self.model_function(x_jax, params, test_mode=test_mode)
+        # Forward kwargs (gamma_dot, sigma_applied, etc.) to model_function
+        predict_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
+        return self.model_function(x_jax, params, test_mode=test_mode, **predict_kwargs)
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
@@ -417,12 +413,14 @@ class GiesekusMultiMode(BaseModel):
         mode = test_mode or self._test_mode or "oscillation"
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        # Parse parameters
+        # Parse parameters - interleaved order:
+        # [eta_s, eta_p_0, lambda_0, alpha_0, eta_p_1, lambda_1, alpha_1, ...]
         eta_s = params[0]
 
-        eta_p_modes = params[1 : 1 + self._n_modes]
-        lambda_modes = params[1 + self._n_modes : 1 + 2 * self._n_modes]
-        alpha_modes = params[1 + 2 * self._n_modes : 1 + 3 * self._n_modes]
+        # Use stride-3 slicing matching _setup_parameters() order
+        eta_p_modes = params[1::3][: self._n_modes]
+        lambda_modes = params[2::3][: self._n_modes]
+        alpha_modes = params[3::3][: self._n_modes]
 
         if mode == "oscillation":
             G_prime, G_double_prime = self._predict_saos_internal(

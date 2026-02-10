@@ -484,11 +484,12 @@ class FractionalMaxwellLiquid(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Internal predict implementation.
 
         Args:
             X: RheoData object or array of x-values
+            **kwargs: Additional arguments (test_mode handled via self._test_mode)
 
         Returns:
             Predicted values
@@ -497,13 +498,24 @@ class FractionalMaxwellLiquid(BaseModel):
         if isinstance(X, RheoData):
             return self.predict_rheodata(X)
 
-        # Handle raw array input (assume relaxation mode)
+        # Handle raw array input
+        from rheojax.core.test_modes import TestMode
+
         x = jnp.asarray(X)
         Gm = self.parameters.get_value("Gm")
         alpha = self.parameters.get_value("alpha")
         tau_alpha = self.parameters.get_value("tau_alpha")
 
-        result = self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
+        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        if test_mode in ("oscillation", TestMode.OSCILLATION):
+            result = self._predict_oscillation_jax(x, Gm, alpha, tau_alpha)
+        elif test_mode in ("creep", TestMode.CREEP):
+            result = self._predict_creep_jax(x, Gm, alpha, tau_alpha)
+        elif test_mode in ("flow_curve", "rotation", TestMode.FLOW_CURVE, TestMode.ROTATION):
+            # Flow curve: use relaxation-based prediction
+            result = self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
+        else:
+            result = self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
         return np.array(result)
 
     def model_function(self, X, params, test_mode=None):
@@ -596,13 +608,14 @@ class FractionalMaxwellLiquid(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None):
+    def predict(self, X, test_mode: str | None = None, **kwargs):
         """Predict response.
 
         Args:
             X: RheoData object or array of x-values
-            test_mode: Test mode for prediction ('relaxation', 'creep', 'oscillation')
-                       Required when X is a raw array. If None, defaults to 'relaxation'.
+            test_mode: Test mode for prediction ('relaxation', 'creep', 'oscillation',
+                       'flow_curve'). If None, defaults to 'relaxation'.
+            **kwargs: Additional arguments (ignored for compatibility)
 
         Returns:
             Predicted values (RheoData if input is RheoData, else array)
@@ -616,17 +629,23 @@ class FractionalMaxwellLiquid(BaseModel):
             tau_alpha = self.parameters.get_value("tau_alpha")
             x = jnp.asarray(X)
 
-            # Route to appropriate prediction method based on test_mode
+            # Normalize test_mode to string
             mode = test_mode or "relaxation"
+            if hasattr(mode, "value"):
+                mode = mode.value
+
+            # Route to appropriate prediction method based on test_mode
             if mode == "relaxation":
                 result = self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
             elif mode == "creep":
                 result = self._predict_creep_jax(x, Gm, alpha, tau_alpha)
             elif mode == "oscillation":
                 result = self._predict_oscillation_jax(x, Gm, alpha, tau_alpha)
+            elif mode in ("flow_curve", "rotation"):
+                result = self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
             else:
                 raise ValueError(
                     f"Unknown test mode: {mode}. "
-                    f"Must be 'relaxation', 'creep', or 'oscillation'"
+                    f"Must be 'relaxation', 'creep', 'oscillation', or 'flow_curve'"
                 )
             return np.array(result)

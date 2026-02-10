@@ -37,7 +37,7 @@ Supported Protocols
 Special Cases
 -------------
 - α = 0: Recovers Upper-Convected Maxwell (UCM) model
-- α = 0.5: Maximum anisotropy, approaches Oldroyd-B behavior
+- α = 0.5: Maximum anisotropy limit of the Giesekus model
 
 Diagnostic Relationship
 -----------------------

@@ -445,27 +445,39 @@ class FractionalPoyntingThomson(BaseModel):
         )
         return self
 
-    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
+    def _predict(self, X: jnp.ndarray, **kwargs) -> jnp.ndarray:
         """Predict response for given input.
 
         Parameters
         ----------
         X : jnp.ndarray
             Independent variable
+        **kwargs
+            Additional arguments (test_mode handled via self._test_mode)
 
         Returns
         -------
         jnp.ndarray
             Predicted values
         """
-        # Get parameters
-        params = self.parameters.to_dict()
-        Ge = params["Ge"]
-        Gk = params["Gk"]
-        alpha = params["alpha"]
-        tau = params["tau"]
+        from rheojax.core.test_modes import TestMode
 
-        # Auto-detect test mode
+        # Get parameters
+        Ge = self.parameters.get_value("Ge")
+        Gk = self.parameters.get_value("Gk")
+        alpha = self.parameters.get_value("alpha")
+        tau = self.parameters.get_value("tau")
+
+        # Dispatch based on test_mode if set, otherwise auto-detect
+        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        if test_mode in ("oscillation", TestMode.OSCILLATION):
+            return self._predict_oscillation(X, Ge, Gk, alpha, tau)
+        elif test_mode in ("relaxation", TestMode.RELAXATION):
+            return self._predict_relaxation(X, Ge, Gk, alpha, tau)
+        elif test_mode in ("creep", TestMode.CREEP):
+            return self._predict_creep(X, Ge, Gk, alpha, tau)
+
+        # Auto-detect test mode (legacy fallback)
         if jnp.all(X > 0) and len(X) > 1:
             log_range = jnp.log10(jnp.max(X)) - jnp.log10(jnp.min(X) + 1e-12)
             if log_range > 3:

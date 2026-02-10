@@ -585,6 +585,38 @@ class BaseModel(BayesianMixin, ABC):
         """
         return self._nlsq_result
 
+    @property
+    def pcov_(self):
+        """Parameter covariance matrix from NLSQ fit.
+
+        Returns:
+            ndarray of shape (n_params, n_params), or None if not fitted
+        """
+        return self._nlsq_result.pcov if self._nlsq_result else None
+
+    @property
+    def popt_(self):
+        """Optimal parameter values from NLSQ fit.
+
+        Returns:
+            ndarray of shape (n_params,), or None if not fitted
+        """
+        return self._nlsq_result.x if self._nlsq_result else None
+
+    def get_parameter_uncertainties(self):
+        """Get standard errors for fitted parameters from NLSQ covariance.
+
+        Returns:
+            dict of {param_name: std_error}, or None if covariance unavailable
+        """
+        if self._nlsq_result is None or self._nlsq_result.pcov is None:
+            return None
+        std_errors = self._nlsq_result.get_parameter_uncertainties()
+        if std_errors is None:
+            return None
+        param_names = list(self.parameters.keys())
+        return dict(zip(param_names, std_errors))
+
     def get_bayesian_result(self) -> BayesianResult | None:
         """Get stored Bayesian inference result.
 

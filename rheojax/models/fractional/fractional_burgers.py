@@ -478,13 +478,15 @@ class FractionalBurgersModel(BaseModel):
         )
         return self
 
-    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
+    def _predict(self, X: jnp.ndarray, **kwargs) -> jnp.ndarray:
         """Predict response for given input.
 
         Parameters
         ----------
         X : jnp.ndarray
             Independent variable
+        **kwargs
+            Additional arguments (test_mode handled via self._test_mode)
 
         Returns
         -------
@@ -492,14 +494,24 @@ class FractionalBurgersModel(BaseModel):
             Predicted values
         """
         # Get parameters
-        params = self.parameters.to_dict()
-        Jg = params["Jg"]
-        eta1 = params["eta1"]
-        Jk = params["Jk"]
-        alpha = params["alpha"]
-        tau_k = params["tau_k"]
+        Jg = self.parameters.get_value("Jg")
+        eta1 = self.parameters.get_value("eta1")
+        Jk = self.parameters.get_value("Jk")
+        alpha = self.parameters.get_value("alpha")
+        tau_k = self.parameters.get_value("tau_k")
 
-        # Auto-detect test mode
+        # Dispatch based on test_mode if set, otherwise auto-detect
+        from rheojax.core.test_modes import TestMode
+
+        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        if test_mode in ("oscillation", TestMode.OSCILLATION):
+            return self._predict_oscillation(X, Jg, eta1, Jk, alpha, tau_k)
+        elif test_mode in ("relaxation", TestMode.RELAXATION):
+            return self._predict_relaxation(X, Jg, eta1, Jk, alpha, tau_k)
+        elif test_mode in ("creep", TestMode.CREEP):
+            return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
+
+        # Auto-detect test mode (legacy fallback)
         if jnp.all(X > 0) and len(X) > 1:
             log_range = jnp.log10(jnp.max(X)) - jnp.log10(jnp.min(X) + 1e-12)
             if log_range > 3:

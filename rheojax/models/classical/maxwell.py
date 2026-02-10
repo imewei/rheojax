@@ -361,11 +361,12 @@ class Maxwell(BaseModel):
             )
             return False
 
-    def _predict(self, X):
+    def _predict(self, X, **kwargs):
         """Predict response based on input data.
 
         Args:
             X: RheoData object or independent variable array
+            **kwargs: Additional arguments (ignored for Maxwell)
 
         Returns:
             Predicted values as JAX array
@@ -393,7 +394,7 @@ class Maxwell(BaseModel):
             return self._predict_creep(x_data, G0, eta)
         elif test_mode == TestMode.OSCILLATION:
             return self._predict_oscillation(x_data, G0, eta)
-        elif test_mode == TestMode.ROTATION:
+        elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             return self._predict_rotation(x_data, G0, eta)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
