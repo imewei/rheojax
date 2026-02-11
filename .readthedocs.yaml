@@ -21,10 +21,9 @@ sphinx:
   # Fail on warnings to catch broken links and references
   fail_on_warning: false
 
-# Optionally build your docs in additional formats (PDF, ePub)
-formats:
-  - pdf
-  - epub
+# PDF/ePub disabled: 161-file LaTeX compilation exceeds RTD build timeout.
+# Generate locally with: make latexpdf (in docs/)
+formats: []
 
 # Python configuration
 python:
