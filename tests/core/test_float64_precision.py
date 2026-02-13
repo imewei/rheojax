@@ -1,7 +1,7 @@
 """Tests for float64 precision enforcement in JAX.
 
 This test suite validates that NLSQ-before-JAX import order is enforced
-and that JAX operates in float64 mode throughout the Rheo package.
+and that JAX operates in float64 mode throughout the RheoJAX package.
 """
 
 import importlib
@@ -24,8 +24,8 @@ class TestFloat64ImportOrder:
             nlsq_module = None
 
         # Remove jax_config from cache to force re-import
-        if "rheo.core.jax_config" in sys.modules:
-            del sys.modules["rheo.core.jax_config"]
+        if "rheojax.core.jax_config" in sys.modules:
+            del sys.modules["rheojax.core.jax_config"]
 
         try:
             # This should raise an ImportError
@@ -50,8 +50,8 @@ class TestFloat64ImportOrder:
         import nlsq  # noqa: F401
 
         # Remove jax_config from cache to force re-import
-        if "rheo.core.jax_config" in sys.modules:
-            del sys.modules["rheo.core.jax_config"]
+        if "rheojax.core.jax_config" in sys.modules:
+            del sys.modules["rheojax.core.jax_config"]
 
         from rheojax.core.jax_config import safe_import_jax
 
@@ -69,8 +69,8 @@ class TestFloat64ImportOrder:
         import nlsq  # noqa: F401
 
         # Remove jax_config from cache to force re-import
-        if "rheo.core.jax_config" in sys.modules:
-            del sys.modules["rheo.core.jax_config"]
+        if "rheojax.core.jax_config" in sys.modules:
+            del sys.modules["rheojax.core.jax_config"]
 
         from rheojax.core.jax_config import safe_import_jax
 
@@ -89,8 +89,8 @@ class TestFloat64ImportOrder:
         import nlsq  # noqa: F401
 
         # Remove jax_config from cache to force re-import
-        if "rheo.core.jax_config" in sys.modules:
-            del sys.modules["rheo.core.jax_config"]
+        if "rheojax.core.jax_config" in sys.modules:
+            del sys.modules["rheojax.core.jax_config"]
 
         from rheojax.core.jax_config import verify_float64
 
@@ -107,8 +107,8 @@ class TestFloat64ImportOrder:
             nlsq_module = None
 
         # Remove jax_config from cache to force re-import
-        if "rheo.core.jax_config" in sys.modules:
-            del sys.modules["rheo.core.jax_config"]
+        if "rheojax.core.jax_config" in sys.modules:
+            del sys.modules["rheojax.core.jax_config"]
 
         try:
             from rheojax.core.jax_config import reset_validation, safe_import_jax
@@ -140,8 +140,8 @@ class TestFloat64ImportOrder:
         import nlsq  # noqa: F401
 
         # Remove jax_config from cache to force re-import
-        if "rheo.core.jax_config" in sys.modules:
-            del sys.modules["rheo.core.jax_config"]
+        if "rheojax.core.jax_config" in sys.modules:
+            del sys.modules["rheojax.core.jax_config"]
 
         from rheojax.core.jax_config import safe_import_jax
 
@@ -160,8 +160,8 @@ class TestFloat64ImportOrder:
         import nlsq  # noqa: F401
 
         # Remove jax_config from cache to force re-import
-        if "rheo.core.jax_config" in sys.modules:
-            del sys.modules["rheo.core.jax_config"]
+        if "rheojax.core.jax_config" in sys.modules:
+            del sys.modules["rheojax.core.jax_config"]
 
         from rheojax.core.jax_config import safe_import_jax
 

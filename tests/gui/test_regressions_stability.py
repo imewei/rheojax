@@ -58,12 +58,12 @@ def test_export_raw_data_converts_dataset(qtbot, tmp_path):
         metadata={"domain": "time"},
     )
 
-    rheo = page._dataset_to_rheodata(ds)
-    assert np.allclose(rheo.x, ds.x_data)
-    assert np.allclose(rheo.y, ds.y_data)
+    rheojax = page._dataset_to_rheodata(ds)
+    assert np.allclose(rheojax.x, ds.x_data)
+    assert np.allclose(rheojax.y, ds.y_data)
 
     out = tmp_path / "data.csv"
-    page._export_service.export_data(rheo, out, "csv")
+    page._export_service.export_data(rheojax, out, "csv")
     assert out.exists()
 
 

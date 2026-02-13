@@ -1,1 +1,1 @@
-"""Test suite for rheo.core module."""
+"""Test suite for rheojax.core module."""

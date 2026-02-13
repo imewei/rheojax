@@ -1,4 +1,4 @@
-"""Integration tests for rheo package.
+"""Integration tests for rheojax package.
 
 These tests verify end-to-end workflows and interactions between components:
 - Data loading and transformation pipelines
