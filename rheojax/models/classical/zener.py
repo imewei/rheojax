@@ -29,7 +29,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
 from rheojax.logging import get_logger, log_fit
 
 # Module logger
@@ -43,6 +43,12 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class Zener(BaseModel):
@@ -240,7 +246,7 @@ class Zener(BaseModel):
 
         return self
 
-    def _predict(self, X):
+    def _predict(self, X, **kwargs):
         """Predict response based on input data.
 
         Args:
@@ -418,7 +424,7 @@ class Zener(BaseModel):
         """
         Gm = self.parameters.get_value("Gm")
         eta = self.parameters.get_value("eta")
-        return eta / Gm
+        return eta / Gm # type: ignore[operator]
 
     def get_retardation_time(self) -> float:
         """Get characteristic retardation time for creep.
@@ -431,7 +437,7 @@ class Zener(BaseModel):
         Ge = self.parameters.get_value("Ge")
         Gm = self.parameters.get_value("Gm")
         eta = self.parameters.get_value("eta")
-        return eta * (Ge + Gm) / (Ge * Gm)
+        return eta * (Ge + Gm) / (Ge * Gm) # type: ignore[operator]
 
     def __repr__(self) -> str:
         """String representation of Zener model."""

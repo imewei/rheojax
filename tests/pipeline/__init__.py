@@ -1,1 +1,1 @@
-"""Tests for rheo.pipeline module."""
+"""Tests for rheojax.pipeline module."""

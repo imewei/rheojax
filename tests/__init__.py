@@ -1,1 +1,1 @@
-"""Test suite for the rheo package."""
+"""Test suite for the rheojax package."""

@@ -13,9 +13,9 @@ windowing, and leakage control for arbitrary-waveform SAOS experiments.
 
 **Key Capabilities:**
 
-- **Time-frequency interconversion:** G(t) ↔ G*(ω) transformations
-- **LAOS harmonic extraction:** Nonlinear moduli (G₃', G₃'', I₃/I₁)
-- **Kramers-Kronig verification:** Validate G', G'' data consistency
+- **Time-frequency interconversion:** :math:`G(t) \leftrightarrow G^*(\omega)` transformations
+- **LAOS harmonic extraction:** Nonlinear moduli (:math:`G_3'`, :math:`G_3''`, :math:`I_3/I_1`)
+- **Kramers-Kronig verification:** Validate :math:`G'`, :math:`G''` data consistency
 - **Noise-robust processing:** Windowing, detrending, zero-padding
 
 Mathematical Theory
@@ -37,8 +37,8 @@ Fourier transform (DFT)** is:
 
    \hat{x}[k] = \sum_{n=0}^{N-1} x[n] e^{-i 2\pi kn / N}, \quad k = 0, 1, \ldots, N-1
 
-The **Fast Fourier Transform (FFT)** is an efficient O(N log N) algorithm for computing the DFT,
-compared to O(N²) for direct evaluation.
+The **Fast Fourier Transform (FFT)** is an efficient :math:`O(N \log N)` algorithm for computing the DFT,
+compared to :math:`O(N^2)` for direct evaluation.
 
 **Frequency grid:** The discrete frequencies corresponding to each FFT bin are:
 
@@ -46,7 +46,7 @@ compared to O(N²) for direct evaluation.
 
    \omega_k = \frac{2\pi k f_s}{N_{\text{fft}}}, \quad k = 0, 1, \ldots, N_{\text{fft}}/2
 
-Only the **positive frequencies** (k ≤ N/2) are retained due to signal symmetry for real-valued data.
+Only the **positive frequencies** (:math:`k \le N/2`) are retained due to signal symmetry for real-valued data.
 
 Nyquist Sampling Criterion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -60,7 +60,7 @@ must satisfy the **Nyquist criterion**:
 
 where :math:`f_{\max}` is the highest frequency present in the signal. For rheological measurements:
 
-- **SAOS at 1 Hz:** :math:`f_s \ge 50` Hz (25× oversampling recommended)
+- **SAOS at 1 Hz:** :math:`f_s \ge 50` Hz (:math:`25\times` oversampling recommended)
 - **Chirp 0.1-100 Hz:** :math:`f_s \ge 500` Hz (accounts for harmonics)
 - **LAOS:** :math:`f_s \ge 10 \times n \times f_{\max}` (n harmonics)
 
@@ -98,7 +98,7 @@ the sampling window. Energy "leaks" from the true frequency into adjacent bins.
      - Excellent (-92 dB)
      - Poor (2× wider)
      - High dynamic range
-   * - **Tukey (α=0.2)**
+   * - **Tukey** (:math:`\alpha = 0.2`)
      - Moderate (-20 dB)
      - Good (1.2× wider)
      - Low distortion
@@ -107,7 +107,7 @@ the sampling window. Energy "leaks" from the true frequency into adjacent bins.
      - Poor (3.8× wider)
      - Amplitude accuracy
 
-**Trade-off:** Reduced leakage → wider main lobe → poorer frequency resolution.
+**Trade-off:** Reduced leakage leads to wider main lobe and poorer frequency resolution.
 
 Zero Padding and Frequency Resolution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,10 +133,10 @@ the spectrum for smoother visualization and peak identification.
 Rheological Applications: Time-Domain Interconversion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**1. Stress Relaxation → Dynamic Moduli**
+**1. Stress Relaxation to Dynamic Moduli**
 
 From the **Boltzmann superposition principle**, the dynamic moduli can be computed from the
-relaxation modulus G(t) via:
+relaxation modulus :math:`G(t)` via:
 
 .. math::
 
@@ -154,9 +154,9 @@ relaxation modulus G(t) via:
 
 **FFT approach:** Faster for large datasets, computes all frequencies simultaneously.
 
-**2. Creep Compliance → Dynamic Compliance**
+**2. Creep Compliance to Dynamic Compliance**
 
-Similarly, from creep compliance J(t):
+Similarly, from creep compliance :math:`J(t)`:
 
 .. math::
 
@@ -166,7 +166,7 @@ Similarly, from creep compliance J(t):
 
 **3. Kramers-Kronig Relations**
 
-For **causal linear systems**, G' and G'' are not independent—they satisfy the
+For **causal linear systems**, :math:`G'` and :math:`G''` are not independent---they satisfy the
 **Kramers-Kronig integral relations**:
 
 .. math::
@@ -179,8 +179,8 @@ where :math:`G_\infty = \lim_{\omega \to \infty} G'(\omega)`.
 
 **Applications:**
 
-- **Data validation:** Check if experimental G', G'' satisfy causality
-- **Extrapolation:** Estimate G' from measured G'' (or vice versa)
+- **Data validation:** Check if experimental :math:`G'`, :math:`G''` satisfy causality
+- **Extrapolation:** Estimate :math:`G'` from measured :math:`G''` (or vice versa)
 - **Model verification:** Ensure fitted models obey physical principles
 
 LAOS: Higher Harmonic Extraction
@@ -195,7 +195,7 @@ In **Large Amplitude Oscillatory Shear (LAOS)**, the stress response to sinusoid
 
 **FFT extracts odd harmonics:**
 
-- **n = 1:** Linear response (G₁', G₁'' ≈ SAOS moduli for small γ₀)
+- **n = 1:** Linear response (:math:`G_1'`, :math:`G_1'' \approx` SAOS moduli for small :math:`\gamma_0`)
 - **n = 3, 5, 7, ...:** Nonlinear contributions
 
 **Nonlinearity quantification:**
@@ -204,8 +204,8 @@ In **Large Amplitude Oscillatory Shear (LAOS)**, the stress response to sinusoid
 
    I_{3/1} = \frac{G_3''}{G_1''} \quad \text{(third-harmonic intensity ratio)}
 
-- **I₃/₁ < 0.01:** Linear viscoelastic region (LVR)
-- **I₃/₁ > 0.1:** Significant nonlinearity (yielding, strain-stiffening)
+- :math:`I_{3/1} < 0.01`: Linear viscoelastic region (LVR)
+- :math:`I_{3/1} > 0.1`: Significant nonlinearity (yielding, strain-stiffening)
 
 Processing Pipeline
 -------------------
@@ -283,11 +283,11 @@ Step-by-Step Procedure
 Computational Complexity
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **FFT:** O(N log N)
-- **Windowing, detrending:** O(N)
-- **Total:** O(N log N)
+- **FFT:** :math:`O(N \log N)`
+- **Windowing, detrending:** :math:`O(N)`
+- **Total:** :math:`O(N \log N)`
 
-**Speedup over DFT:** ~100× for N = 1024, ~1000× for N = 8192.
+**Speedup over DFT:** :math:`\sim 100\times` for :math:`N = 1024`, :math:`\sim 1000\times` for :math:`N = 8192`.
 
 Edge Effects and Artifacts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -371,15 +371,15 @@ Applications and Use Cases
 When to Use FFT Transform
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**1. Time-domain → Frequency-domain conversion**
+**1. Time-domain to Frequency-domain conversion**
 
-- Convert G(t) from stress relaxation → G'(ω), G''(ω) for model fitting
-- Convert J(t) from creep → J'(ω), J''(ω) for compliance analysis
+- Convert :math:`G(t)` from stress relaxation to :math:`G'(\omega)`, :math:`G''(\omega)` for model fitting
+- Convert :math:`J(t)` from creep to :math:`J'(\omega)`, :math:`J''(\omega)` for compliance analysis
 - **Advantage:** Single measurement spans decades in frequency
 
 **2. LAOS higher harmonics extraction**
 
-- Quantify nonlinearity via I₃/I₁, I₅/I₁ intensity ratios
+- Quantify nonlinearity via :math:`I_3/I_1`, :math:`I_5/I_1` intensity ratios
 - Identify yield point, strain-stiffening, strain-softening
 - **Advantage:** Full harmonic decomposition from single waveform
 
@@ -391,7 +391,7 @@ When to Use FFT Transform
 
 **4. Kramers-Kronig validation**
 
-- Verify experimental G', G'' data consistency
+- Verify experimental :math:`G'`, :math:`G''` data consistency
 - Detect measurement artifacts (inertia, compliance, slip)
 - **Advantage:** Independent check of data quality
 
@@ -401,8 +401,8 @@ Input Data Requirements
 **Minimum requirements:**
 
 - **Uniform sampling:** Timestamps equally spaced (±1%)
-- **Sufficient duration:** T ≥ 10/fₘᵢₙ (at least 10 periods of lowest frequency)
-- **Adequate sampling rate:** fₛ ≥ 50 × fₘₐₓ (Nyquist + safety margin)
+- **Sufficient duration:** :math:`T \ge 10/f_{\min}` (at least 10 periods of lowest frequency)
+- **Adequate sampling rate:** :math:`f_s \ge 50 f_{\max}` (Nyquist + safety margin)
 - **Stable baseline:** No drift, offset, or low-frequency noise
 
 **Recommended:**
@@ -432,9 +432,9 @@ Output Interpretation
 
    \tan \delta(\omega) = \frac{G''(\omega)}{G'(\omega)}
 
-- **tan δ < 1:** Solid-like (G' > G'')
-- **tan δ = 1:** Balanced viscoelastic (crossover point)
-- **tan δ > 1:** Liquid-like (G'' > G')
+- :math:`\tan \delta < 1`: Solid-like (:math:`G' > G''`)
+- :math:`\tan \delta = 1`: Balanced viscoelastic (crossover point)
+- :math:`\tan \delta > 1`: Liquid-like (:math:`G'' > G'`)
 
 Integration with RheoJAX Models
 --------------------------------
@@ -444,17 +444,17 @@ Pre-Processing Recommendations
 
 **Before model fitting:**
 
-1. **FFT G(t) → G*(ω)** to obtain broadband frequency-domain data
+1. **FFT** :math:`G(t) \to G^*(\omega)` to obtain broadband frequency-domain data
 2. **Select frequency range** where SNR > 10 dB
 3. **Apply Kramers-Kronig check** to validate data consistency
-4. **Fit fractional models** (FMG, FML, FZSS) to G'(ω), G''(ω)
+4. **Fit fractional models** (FMG, FML, FZSS) to :math:`G'(\omega)`, :math:`G''(\omega)`
 
 **Workflow:**
 
 .. code-block:: python
 
    from rheojax.transforms import FFTAnalysis
-   from rheojax.models.fractional_maxwell_gel import FractionalMaxwellGel
+   from rheojax.models import FractionalMaxwellGel
 
    # 1. Transform time-domain relaxation data
    fft = FFTAnalysis(window="hann", n_fft=2048, detrend="linear")
@@ -475,40 +475,40 @@ Models That Benefit from FFT
 
 **Fractional models:**
 
-- :doc:`../models/fractional/fractional_maxwell_gel` — Power-law relaxation → parallel G', G'' scaling
-- :doc:`../models/fractional/fractional_maxwell_liquid` — Broad relaxation spectrum
-- :doc:`../models/fractional/fractional_zener_ss` — Solid-like with finite Ge
+- :doc:`../models/fractional/fractional_maxwell_gel` --- Power-law relaxation with parallel :math:`G'`, :math:`G''` scaling
+- :doc:`../models/fractional/fractional_maxwell_liquid` --- Broad relaxation spectrum
+- :doc:`../models/fractional/fractional_zener_ss` --- Solid-like with finite :math:`G_e`
 
 **Classical models:**
 
-- :doc:`../models/classical/maxwell` — Exponential relaxation → Lorentzian spectrum
-- :doc:`../models/classical/zener` — Relaxation to equilibrium modulus
+- :doc:`../models/classical/maxwell` --- Exponential relaxation with Lorentzian spectrum
+- :doc:`../models/classical/zener` --- Relaxation to equilibrium modulus
 
 Post-Transform Fitting Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **1. Frequency-domain fitting (recommended):**
 
-- Fit G'(ω), G''(ω) directly from FFT output
+- Fit :math:`G'(\omega)`, :math:`G''(\omega)` directly from FFT output
 - **Advantage:** Models naturally expressed in frequency domain
 - **Disadvantage:** Frequency bins may be unevenly weighted
 
 **2. Time-domain fitting with FFT verification:**
 
-- Fit G(t) in time domain
-- FFT-transform fitted model → compare with experimental FFT
+- Fit :math:`G(t)` in time domain
+- FFT-transform fitted model and compare with experimental FFT
 - **Advantage:** Direct comparison with raw relaxation data
 - **Disadvantage:** Requires inverse FFT for model predictions
 
 **3. Hybrid approach:**
 
-- Use FFT to **initialize parameters** (identify α, τ from slopes)
+- Use FFT to **initialize parameters** (identify :math:`\alpha`, :math:`\tau` from slopes)
 - Refine via **time-domain fitting** for better noise robustness
 
 Common Workflows
 ~~~~~~~~~~~~~~~~
 
-**Workflow 1: Relaxation → Oscillation interconversion**
+**Workflow 1: Relaxation to Oscillation interconversion**
 
 .. code-block:: python
 
@@ -569,13 +569,13 @@ Diagnostic Checks
 
    \text{SNR (dB)} = 10 \log_{10} \frac{P_{\text{signal}}}{P_{\text{noise}}}
 
-- **SNR > 30 dB:** Excellent (clean harmonics, reliable G₃', G₅')
-- **SNR 20-30 dB:** Good (G₁', G₁'' reliable)
+- **SNR > 30 dB:** Excellent (clean harmonics, reliable :math:`G_3'`, :math:`G_5'`)
+- **SNR 20-30 dB:** Good (:math:`G_1'`, :math:`G_1''` reliable)
 - **SNR < 20 dB:** Poor (high-frequency noise dominates)
 
 **3. Kramers-Kronig compliance:**
 
-Compute G'_KK from G'' using Kramers-Kronig transform, compare with measured G':
+Compute :math:`G'_{\text{KK}}` from :math:`G''` using Kramers-Kronig transform, compare with measured :math:`G'`:
 
 .. math::
 
@@ -593,12 +593,12 @@ Common Failure Modes
 **2. Aliasing:**
 
 - **Symptom:** High-frequency noise folded into low frequencies
-- **Cause:** fₛ < 2fₘₐₓ (Nyquist violation)
+- **Cause:** :math:`f_s < 2 f_{\max}` (Nyquist violation)
 - **Fix:** Increase sampling rate, apply anti-aliasing filter
 
 **3. Noise amplification:**
 
-- **Symptom:** G'(ω), G''(ω) noisy at high frequencies
+- **Symptom:** :math:`G'(\omega)`, :math:`G''(\omega)` noisy at high frequencies
 - **Cause:** Inherent FFT sensitivity to high-frequency noise
 - **Fix:** Apply low-pass filter, average multiple acquisitions, reduce frequency range
 
@@ -613,8 +613,8 @@ Parameter Sensitivity
 
 **Window function sensitivity:**
 
-- **Hann vs Rectangular:** -31 dB leakage suppression, 1.5× main-lobe widening
-- **Blackman-Harris:** -92 dB suppression but 2× wider main lobe (poorer resolution)
+- **Hann vs Rectangular:** -31 dB leakage suppression, :math:`1.5\times` main-lobe widening
+- **Blackman-Harris:** -92 dB suppression but :math:`2\times` wider main lobe (poorer resolution)
 
 **Zero padding sensitivity:**
 
@@ -677,14 +677,14 @@ Usage
 Worked Example
 --------------
 
-**Scenario:** Convert stress relaxation G(t) to frequency-domain G'(ω), G''(ω) for fractional
+**Scenario:** Convert stress relaxation :math:`G(t)` to frequency-domain :math:`G'(\omega)`, :math:`G''(\omega)` for fractional
 model fitting.
 
 **Input Data:**
 
-- Relaxation modulus: G(t) = 1e5 Pa at t=0.01s → 5e3 Pa at t=10s
-- Sampling: 1000 points over 10s (fs = 100 Hz)
-- Noise: ~1% RMS
+- Relaxation modulus: :math:`G(t) = 10^5` Pa at :math:`t = 0.01` s to :math:`5 \times 10^3` Pa at :math:`t = 10` s
+- Sampling: 1000 points over 10 s (:math:`f_s = 100` Hz)
+- Noise: :math:`\sim 1\%` RMS
 
 **Step-by-step transformation:**
 
@@ -739,9 +739,9 @@ model fitting.
 
 **Interpretation:**
 
-- **Power-law scaling:** G'(ω) ~ G''(ω) ~ ω^α (parallel in log-log plot) → fractional model
-- **α ≈ 0.3:** Gel-like behavior (0 < α < 0.5)
-- **Recommended model:** FractionalMaxwellGel with α ≈ 0.3
+- **Power-law scaling:** :math:`G'(\omega) \sim G''(\omega) \sim \omega^\alpha` (parallel in log-log plot), indicating a fractional model
+- :math:`\alpha \approx 0.3`: Gel-like behavior (:math:`0 < \alpha < 0.5`)
+- **Recommended model:** FractionalMaxwellGel with :math:`\alpha \approx 0.3`
 
 Troubleshooting
 ---------------
@@ -760,15 +760,16 @@ References
 ----------
 
 - J. D. Ferry, *Viscoelastic Properties of Polymers*, 3rd ed. Wiley, 1980.
-- M. Wilhelm, P. Reinheimer, & M. Ortseifen, "Fourier-transform rheology." *Rheol. Acta*
-  37, 387-397 (1998).
-- R. S. Lakes, "Fourier transform methods in rheology." *Mech. Time-Depend. Mater.* 1,
-  247-269 (1997).
-- Booij, H.C., Thoone, G.P.J.M. (1982). "Generalization of Kramers-Kronig Transforms."
-  *Rheologica Acta*, 21(1), 15-24.
+- M. Wilhelm, D. Maring, & H. W. Spiess, "Fourier-transform rheology." *Rheol. Acta*
+  37, 399-405 (1998). https://doi.org/10.1007/s003970050126
+- M. Wilhelm, P. Reinheimer, & M. Ortseifer, "High sensitivity Fourier-transform
+  rheology." *Rheol. Acta* 38, 349-356 (1999). https://doi.org/10.1007/s003970050185
+- Booij, H.C., Thoone, G.P.J.M. (1982). "Generalization of Kramers-Kronig Transforms
+  and Some Approximations of Relations between Viscoelastic Quantities."
+  *Rheologica Acta*, 21(1), 15-24. https://doi.org/10.1007/BF01520701
 - Hyun, K., Wilhelm, M., Klein, C.O., et al. (2011). "A Review of Nonlinear Oscillatory
   Shear Tests: Analysis and Application of LAOS." *Progress in Polymer Science*, 36(12),
-  1697-1753.
+  1697-1753. https://doi.org/10.1016/j.progpolymsci.2011.02.002
 
 See also
 --------

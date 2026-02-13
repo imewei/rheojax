@@ -24,6 +24,7 @@ from rheojax.core.base import ArrayLike
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.ikh._base import IKHBase
 from rheojax.models.ikh._kernels import (
     ikh_creep_ode_rhs,
@@ -44,6 +45,12 @@ jax, jnp = safe_import_jax()
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class MIKH(IKHBase):
@@ -263,7 +270,6 @@ class MIKH(IKHBase):
         2. Time-domain: X=time, y=stress (uses return mapping with sinusoidal strain)
         """
         X_arr = jnp.asarray(X)
-        y_arr = jnp.asarray(y)
 
         # Detect if this is frequency-domain (omega array) or time-domain (time series)
         # Heuristic: time-domain data typically has >100 points for oscillation
@@ -534,7 +540,7 @@ class MIKH(IKHBase):
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro model function for Bayesian inference.
-        
+
         Accepts protocol-specific kwargs (gamma_dot, sigma_applied, sigma_0).
         """
         # Use stored test_mode if not provided

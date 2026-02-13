@@ -111,6 +111,24 @@ COLUMN_MAPPINGS: dict[str, tuple[list[str], str, list[str]]] = {
         "Pa",
         ["oscillation"],
     ),
+    "tensile_storage_modulus": (
+        [
+            r"^e'$", r"^e_prime$", r"^e_stor$",
+            r"^tensile[\s_]?storage[\s_]?modulus$",
+            r"^young'?s?[\s_]?storage[\s_]?modulus$",
+        ],
+        "Pa",
+        ["oscillation"],
+    ),
+    "tensile_loss_modulus": (
+        [
+            r"^e''$", r'^e"$', r"^e_double_prime$", r"^e_loss$",
+            r"^tensile[\s_]?loss[\s_]?modulus$",
+            r"^young'?s?[\s_]?loss[\s_]?modulus$",
+        ],
+        "Pa",
+        ["oscillation"],
+    ),
     "viscosity": (
         [r"^viscosity$", r"^η$", r"^eta$"],
         "Pa.s",
@@ -276,8 +294,12 @@ def _normalize_numeric_text(text: str, decimal_sep: str) -> str:
         text = text.replace(".", "")
         text = text.replace(",", ".")
     else:
-        # Remove thousands separator (comma)
-        text = re.sub(r"(\d),(\d{3})", r"\1\2", text)
+        # Remove thousands separator (comma) — repeat to handle "1,234,567"
+        while True:
+            new_text = re.sub(r"(\d),(\d{3})\b", r"\1\2", text)
+            if new_text == text:
+                break
+            text = new_text
     return text
 
 
@@ -564,8 +586,9 @@ def parse_rheocompass_intervals(
 
     logger.debug("Found interval boundaries", n_intervals=len(boundaries))
 
-    # Parse each interval
+    # Parse each interval, tracking skipped intervals for data integrity
     blocks = []
+    skipped_intervals = []
     for i, (start_idx, interval_idx, _n_points) in enumerate(boundaries):
         end_idx = boundaries[i + 1][0] if i + 1 < len(boundaries) else None
         try:
@@ -573,18 +596,44 @@ def parse_rheocompass_intervals(
             blocks.append(block)
         except ValueError as e:
             logger.warning(
-                "Failed to parse interval", interval=interval_idx, error=str(e)
+                "Skipping unparseable interval — data will be incomplete",
+                filepath=str(filepath),
+                interval=interval_idx,
+                error=str(e),
             )
+            skipped_intervals.append((interval_idx, str(e)))
             continue
 
     if not blocks:
         logger.error("Failed to parse any interval blocks", filepath=str(filepath))
         raise ValueError("Failed to parse any interval blocks from file")
 
+    # Warn loudly if a significant fraction of intervals was lost
+    n_total = len(boundaries)
+    n_skipped = len(skipped_intervals)
+    if n_skipped > 0:
+        skip_pct = 100.0 * n_skipped / n_total
+        logger.warning(
+            "Some intervals could not be parsed",
+            filepath=str(filepath),
+            skipped=n_skipped,
+            total=n_total,
+            skip_percent=f"{skip_pct:.0f}%",
+            skipped_ids=[s[0] for s in skipped_intervals],
+        )
+        if n_skipped > n_total / 2:
+            raise ValueError(
+                f"More than half of the intervals ({n_skipped}/{n_total}) "
+                f"failed to parse. The file may be corrupt or in an "
+                f"unsupported format. Skipped intervals: "
+                f"{[s[0] for s in skipped_intervals]}"
+            )
+
     logger.info(
         "File parsed",
         filepath=str(filepath),
         n_intervals=len(blocks),
+        n_skipped=n_skipped,
     )
 
     return global_metadata, blocks
@@ -731,20 +780,32 @@ def _compute_relaxation_modulus(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _compute_complex_modulus(df: pd.DataFrame) -> np.ndarray | None:
-    """Calculate complex modulus G* = G' + i*G'' when absent.
+def _compute_complex_modulus(
+    df: pd.DataFrame,
+) -> tuple[np.ndarray | None, str | None]:
+    """Calculate complex modulus G* = G' + i*G'' or E* = E' + i*E''.
+
+    Checks shear modulus columns first, then tensile modulus columns.
 
     Args:
         df: DataFrame with canonical column names
 
     Returns:
-        Complex array G* or None if cannot compute
+        Tuple of (complex array, deformation_mode) where deformation_mode
+        is "shear", "tension", or None if cannot compute.
     """
     if "storage_modulus" in df.columns and "loss_modulus" in df.columns:
         g_prime = df["storage_modulus"].values
         g_double_prime = df["loss_modulus"].values
-        return g_prime + 1j * g_double_prime
-    return None
+        return g_prime + 1j * g_double_prime, "shear"
+    if (
+        "tensile_storage_modulus" in df.columns
+        and "tensile_loss_modulus" in df.columns
+    ):
+        e_prime = df["tensile_storage_modulus"].values
+        e_double_prime = df["tensile_loss_modulus"].values
+        return e_prime + 1j * e_double_prime, "tension"
+    return None, None
 
 
 # =============================================================================
@@ -791,11 +852,14 @@ def _detect_test_type(df: pd.DataFrame) -> str | None:
     """
     columns = set(df.columns)
 
-    # Priority 1: Oscillatory (frequency domain)
+    # Priority 1: Oscillatory (frequency domain) — includes tensile moduli (DMTA)
     has_frequency = "angular_frequency" in columns
     has_moduli = "storage_modulus" in columns or "loss_modulus" in columns
+    has_tensile_moduli = (
+        "tensile_storage_modulus" in columns or "tensile_loss_modulus" in columns
+    )
 
-    if has_frequency and has_moduli:
+    if has_frequency and (has_moduli or has_tensile_moduli):
         return "oscillation"
 
     # Priority 2: Creep (time domain, constant stress)
@@ -1078,19 +1142,23 @@ def _interval_to_rheodata_oscillation(
         else np.arange(len(mapped_df))
     )
 
-    # Compute complex modulus G* = G' + i*G''
-    g_star = _compute_complex_modulus(mapped_df)
-    if g_star is not None:
-        y = g_star
+    # Compute complex modulus G* = G' + i*G'' or E* = E' + i*E''
+    modulus_star, deformation_mode = _compute_complex_modulus(mapped_df)
+    if modulus_star is not None:
+        y = modulus_star
     elif "complex_modulus" in mapped_df.columns:
         y = mapped_df["complex_modulus"].values
+        deformation_mode = "shear"
     else:
-        # Fallback to storage modulus only
-        y = (
-            mapped_df["storage_modulus"].values
-            if "storage_modulus" in mapped_df.columns
-            else np.zeros(len(mapped_df))
-        )
+        # Fallback to storage modulus only (shear or tensile)
+        if "storage_modulus" in mapped_df.columns:
+            y = mapped_df["storage_modulus"].values
+            deformation_mode = "shear"
+        elif "tensile_storage_modulus" in mapped_df.columns:
+            y = mapped_df["tensile_storage_modulus"].values
+            deformation_mode = "tension"
+        else:
+            y = np.zeros(len(mapped_df))
 
     x_units = mapped_units.get("angular_frequency", "rad/s")
     y_units = "Pa"  # Complex modulus in Pa
@@ -1106,6 +1174,10 @@ def _interval_to_rheodata_oscillation(
         "columns": list(mapped_df.columns),
         "global_metadata": global_meta,
     }
+
+    # Set deformation_mode if detected from column names
+    if deformation_mode is not None:
+        metadata["deformation_mode"] = deformation_mode
 
     return RheoData(
         x=x,
@@ -1440,7 +1512,7 @@ def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:
         rows.append(
             {
                 "Property": f"Interval {interval_idx} - Points",
-                "Value": str(len(rheo_data.x)),
+                "Value": str(len(rheo_data.x)),  # type: ignore[arg-type]
                 "Interval": str(interval_idx),
             }
         )
@@ -1507,7 +1579,7 @@ def _create_interval_dataframe(rheo_data: RheoData) -> pd.DataFrame:
     for aux_col in ["temperature_data", "normal_force", "torque", "phase_angle"]:
         if aux_col in rheo_data.metadata:
             aux_data = rheo_data.metadata[aux_col]
-            if len(aux_data) == len(rheo_data.x):
+            if len(aux_data) == len(rheo_data.x):  # type: ignore[arg-type]
                 col_name = _format_aux_column_name(aux_col, rheo_data.metadata)
                 data[col_name] = np.asarray(aux_data)
 

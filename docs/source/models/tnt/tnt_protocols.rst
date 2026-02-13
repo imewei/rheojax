@@ -850,7 +850,7 @@ Diffrax automatically adjusts :math:`dt` based on error estimates:
 - **rtol**: Relative tolerance (default :math:`10^{-6}`)
 - **atol**: Absolute tolerance (default :math:`10^{-8}`)
 
-**Dense output**: Use :math:`\texttt{SaveAt(ts=t_eval)}` to evaluate at specific times
+**Dense output**: Use ``SaveAt(ts=t_eval)`` to evaluate at specific times
 without interpolation error.
 
 Multi-Mode Parallelization
@@ -1029,31 +1029,41 @@ References
 
 1. **Tanaka, F., & Edwards, S. F.** (1992). Viscoelastic properties of physically crosslinked
    networks: Transient network theory. *Macromolecules*, 25(5), 1516-1523.
+   DOI: 10.1021/ma00031a024
 
 2. **Inkson, N. J., McLeish, T. C. B., Harlen, O. G., & Groves, D. J.** (1999). Predicting
    low density polyethylene melt rheology in elongational and shear flows with "pom-pom"
    constitutive equations. *Journal of Rheology*, 43(4), 873-896.
+   DOI: 10.1122/1.551036
 
 3. **Bird, R. B., Curtiss, C. F., Armstrong, R. C., & Hassager, O.** (1987). *Dynamics of
    Polymeric Liquids, Volume 2: Kinetic Theory* (2nd ed.). Wiley.
+   ISBN: 978-0471802440
 
 4. **Phan-Thien, N., & Tanner, R. I.** (1977). A new constitutive equation derived from
    network theory. *Journal of Non-Newtonian Fluid Mechanics*, 2(4), 353-365.
+   DOI: 10.1016/0377-0257(77)80021-9
 
 5. **Cho, K. S., Hyun, K., Ahn, K. H., & Lee, S. J.** (2005). A geometrical interpretation
    of large amplitude oscillatory shear response. *Journal of Rheology*, 49(3), 747-758.
+   DOI: 10.1122/1.1895801
 
 6. **Ewoldt, R. H., Hosoi, A. E., & McKinley, G. H.** (2008). New measures for characterizing
    nonlinear viscoelasticity in large amplitude oscillatory shear. *Journal of Rheology*,
    52(6), 1427-1458.
+   DOI: 10.1122/1.2970095
 
 7. **Doi, M., & Edwards, S. F.** (1986). *The Theory of Polymer Dynamics*. Oxford University
    Press.
+   ISBN: 978-0198519768
 
 8. **Rubinstein, M., & Colby, R. H.** (2003). *Polymer Physics*. Oxford University Press.
+   ISBN: 978-0198520597
 
 9. **Larson, R. G.** (1999). *The Structure and Rheology of Complex Fluids*. Oxford University
    Press.
+   ISBN: 978-0195121971
 
 10. **Macosko, C. W.** (1994). *Rheology: Principles, Measurements, and Applications*.
     Wiley-VCH.
+    ISBN: 978-0471185758

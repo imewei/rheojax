@@ -16,7 +16,6 @@ from typing import Any, Literal
 import numpy as np
 import pandas as pd
 
-
 # =============================================================================
 # Data Loaders (Real Experimental Data)
 # =============================================================================
@@ -404,7 +403,7 @@ def generate_synthetic_saos(
             last_cycle_start = 2 * n_points_cycle
             t_cycle = t[last_cycle_start:]
             stress_cycle = stress[last_cycle_start:]
-            strain_cycle = gamma_0 * np.sin(w * t_cycle)
+            _strain_cycle = gamma_0 * np.sin(w * t_cycle)
 
             # Fit to extract G' and G''
             # σ(t) = G'γ₀sin(ωt) + G''γ₀cos(ωt)

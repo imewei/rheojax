@@ -311,41 +311,63 @@ References
 1. Vernerey, F.J., Long, R. & Brighenti, R. (2017). "A statistically-based
    continuum theory for polymers with transient networks." *J. Mech. Phys.
    Solids*, 107, 1--20.
+   https://doi.org/10.1016/j.jmps.2017.05.016
 
 2. Vernerey, F.J. (2018). "Transient response of nonlinear polymer networks:
    A kinetic theory." *J. Mech. Phys. Solids*, 115, 230--247.
+   https://doi.org/10.1016/j.jmps.2018.02.018
+   :download:`PDF <../../../reference/vernerey_2018_tnt_kinetic_theory.pdf>`
 
 3. Vernerey, F.J., Brighenti, R., Long, R. & Shen, T. (2018). "Statistical
    Damage Mechanics of Polymer Networks." *Macromolecules*, 51(17), 6609--6622.
+   https://doi.org/10.1021/acs.macromol.8b01052
 
 4. Meng, F., Saed, M.O. & Terentjev, E.M. (2019). "Elasticity and Relaxation
    in Full and Partial Vitrimer Networks." *Macromolecules*, 52(19), 7423--7429.
+   https://doi.org/10.1021/acs.macromol.9b01123
 
 5. Shen, T., Song, Z., Cai, S. & Vernerey, F.J. (2021). "Nonsteady fracture
    of transient networks: The case of vitrimer." *PNAS*, 118(29), e2105974118.
+   https://doi.org/10.1073/pnas.2105974118
 
 6. Wagner, R.J., Hobbs, E. & Vernerey, F.J. (2021). "A network model of
    transient polymers: exploring the micromechanics of nonlinear
    viscoelasticity." *Soft Matter*, 17, 8742.
+   https://doi.org/10.1039/D1SM00753J
+   :download:`PDF <../../../reference/wagner_2021_tnt_network_model.pdf>`
 
 7. Lamont, S.C., Mulderrig, J., Bouklas, N. & Vernerey, F.J. (2021).
    "Rate-Dependent Damage Mechanics of Polymer Networks with Reversible
    Bonds." *Macromolecules*, 54(23), 10801--10813.
+   https://doi.org/10.1021/acs.macromol.1c01943
 
 8. Meng, F., Saed, M.O. & Terentjev, E.M. (2022). "Rheology of vitrimers."
    *Nature Communications*, 13, 5753.
+   https://doi.org/10.1038/s41467-022-33321-w
 
 9. Vernerey, F.J., Rezaei, B. & Lamont, S.C. (2024). "A kinetic theory for
    the mechanics and remodeling of transient anisotropic networks." *J. Mech.
    Phys. Solids*, 190, 105713.
+   https://doi.org/10.1016/j.jmps.2024.105713
 
 10. Wagner, R.J. & Silberstein, M.N. (2025). "A foundational framework for
     the mesoscale modeling of dynamic elastomers and gels." *J. Mech. Phys.
     Solids*, 194, 105914.
+    https://doi.org/10.1016/j.jmps.2024.105914
 
 11. Karim, M.R., Vernerey, F. & Sain, T. (2025). "Constitutive Modeling of
     Vitrimers and Their Nanocomposites Based on Transient Network Theory."
     *Macromolecules*, 58(10), 4899--4912.
+    https://doi.org/10.1021/acs.macromol.4c02872
+    :download:`PDF <../../../reference/karim_2025_vitrimer_nanocomposites.pdf>`
 
-12. Alkhoury, K., Chester, S.A. & Vernerey, F.J. (2025). "Dynamic networks
-    containing multiple bond types." *J. Mech. Phys. Solids*.
+12. Alkhoury, K. & Chester, S.A. (2025). "A chemo-thermo-mechanically coupled
+    theory of photo-reacting polymers: Application to modeling photo-degradation
+    with irradiation-driven heat transfer." *J. Mech. Phys. Solids*, 197, 106050.
+    https://doi.org/10.1016/j.jmps.2025.106050
+
+13. White, Z.T., Smith, A.M. & Vernerey, F.J. (2025). "Mechanical cooperation
+    between time-dependent and covalent bonds in molecular damage of polymer
+    networks." *Communications Physics*, 8, 265.
+    https://doi.org/10.1038/s42005-025-02192-0
+    :download:`PDF <../../../reference/white_2025_molecular_damage.pdf>`

@@ -28,7 +28,7 @@ Let's fit a **Maxwell model** to stress relaxation data:
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
    import numpy as np
 
    # Load experimental data (time, stress)
@@ -63,15 +63,15 @@ The **Maxwell model** represents a viscoelastic liquid with a single relaxation 
 
    G(t) = G_0 e^{-t/\tau}
 
-where τ = η / G₀ is the relaxation time.
+where :math:`\tau = \eta / G_0` is the relaxation time.
 
 **Key parameters**:
 
-- **G₀** (Pa): Instantaneous modulus (stiffness at short times)
-- **η** (Pa·s): Viscosity (resistance to flow)
-- **τ** (s): Relaxation time (timescale of stress decay)
+- :math:`G_0` (Pa): Instantaneous modulus (stiffness at short times)
+- :math:`\eta` (Pa·s): Viscosity (resistance to flow)
+- :math:`\tau` (s): Relaxation time (timescale of stress decay)
 
-**Physical interpretation**: Material behaves like an elastic solid at t << τ, flows like a viscous liquid at t >> τ.
+**Physical interpretation**: Material behaves like an elastic solid at :math:`t \ll \tau`, flows like a viscous liquid at :math:`t \gg \tau`.
 
 For detailed model equations, see :doc:`/models/classical/maxwell`.
 
@@ -134,7 +134,7 @@ Quantify fit quality:
 - Mean error < 5%: Excellent fit
 - Mean error 5-10%: Good fit
 - Mean error > 10%: Poor fit, try different model
-- R² > 0.95: Good fit
+- :math:`R^2` > 0.95: Good fit
 
 3. Parameter Reasonableness
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -156,9 +156,9 @@ Check if fitted parameters are physically plausible:
 
 **Typical ranges**:
 
-- G₀: 10² - 10⁸ Pa (soft gels to stiff polymers)
-- η: 10⁻³ - 10¹⁰ Pa·s (water to polymer melts)
-- τ: 10⁻⁶ - 10⁴ s (fast liquids to slow relaxation)
+- :math:`G_0`: :math:`10^2 - 10^8` Pa (soft gels to stiff polymers)
+- :math:`\eta`: :math:`10^{-3} - 10^{10}` Pa·s (water to polymer melts)
+- :math:`\tau`: :math:`10^{-6} - 10^4` s (fast liquids to slow relaxation)
 
 If parameters are outside these ranges, suspect fitting errors or wrong model.
 
@@ -182,13 +182,13 @@ RheoJAX models support multiple experimental techniques. The **test_mode** param
 2. Oscillation (SAOS)
 ~~~~~~~~~~~~~~~~~~~~~
 
-**Data**: Frequency vs. G' and G"
+**Data**: Frequency vs. :math:`G'` and :math:`G''`
 
-**Input**: Frequency (1D) + complex modulus G* = [G', G"] (2D array)
+**Input**: Frequency (1D) + complex modulus :math:`G^* = [G', G'']` (2D array)
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
 
    omega = np.array([0.1, 1.0, 10.0, 100.0])  # rad/s
    G_prime = np.array([100, 500, 2000, 5000])   # Storage modulus (Pa)
@@ -201,7 +201,7 @@ RheoJAX models support multiple experimental techniques. The **test_mode** param
    model = Maxwell()
    model.fit(omega, G_star, test_mode='oscillation')
 
-**Note**: For oscillation mode, y must be a 2D array with shape (N, 2) where column 0 is G' and column 1 is G".
+**Note**: For oscillation mode, y must be a 2D array with shape (N, 2) where column 0 is :math:`G'` and column 1 is :math:`G''`.
 
 3. Creep
 ~~~~~~~~
@@ -219,7 +219,7 @@ RheoJAX models support multiple experimental techniques. The **test_mode** param
 
 .. code-block:: python
 
-   from rheojax.models.power_law import PowerLaw
+   from rheojax.models import PowerLaw
 
    shear_rate = np.array([0.1, 1.0, 10.0, 100.0])  # s⁻¹
    viscosity = np.array([1000, 500, 200, 100])      # Pa·s
@@ -276,7 +276,7 @@ Let's fit a Maxwell model to real relaxation data with full validation:
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
    import numpy as np
    import matplotlib.pyplot as plt
 
@@ -358,7 +358,7 @@ Pitfall 1: Wrong Test Mode
 .. code-block:: python
 
    # WRONG: Using viscoelastic model for flow data
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
    model = Maxwell()
    model.fit(shear_rate, viscosity, test_mode='rotation')  # Will fail!
 
@@ -366,7 +366,7 @@ Pitfall 1: Wrong Test Mode
 
 .. code-block:: python
 
-   from rheojax.models.power_law import PowerLaw
+   from rheojax.models import PowerLaw
    model = PowerLaw()
    model.fit(shear_rate, viscosity, test_mode='rotation')  # ✓
 
@@ -378,7 +378,7 @@ Pitfall 2: Incorrect Data Shape for Oscillation
    # WRONG: Passing G' and G" separately
    model.fit(omega, G_prime, test_mode='oscillation')  # Missing G"!
 
-**Solution**: Stack G' and G" into 2D array:
+**Solution**: Stack :math:`G'` and :math:`G''` into 2D array:
 
 .. code-block:: python
 
@@ -415,16 +415,16 @@ Key Concepts
 
    2. **Always validate**: Visual inspection + residual analysis + parameter reasonableness
 
-   3. **Test modes matter**: relaxation (time vs G), oscillation (freq vs G*/G"), rotation (shear rate vs η)
+   3. **Test modes matter**: relaxation (time vs :math:`G`), oscillation (freq vs :math:`G^*` / :math:`G''`), rotation (shear rate vs :math:`\eta`)
 
    4. **NLSQ is default**: GPU-accelerated, 5-270x faster than scipy
 
-   5. **Parameters have physical meaning**: G₀ (stiffness), η (viscosity), τ (timescale)
+   5. **Parameters have physical meaning**: :math:`G_0` (stiffness), :math:`\eta` (viscosity), :math:`\tau` (timescale)
 
 .. admonition:: Self-Check Questions
    :class: tip
 
-   1. **You fit a Maxwell model and get τ = 10⁻⁹ s. Should you trust this value?**
+   1. **You fit a Maxwell model and get** :math:`\tau = 10^{-9}` **s. Should you trust this value?**
 
       Hint: Check typical relaxation time ranges
 
@@ -432,7 +432,7 @@ Key Concepts
 
       Hint: Try a different model (more complex) or check data quality
 
-   3. **How do you fit oscillation data with G' and G"?**
+   3. **How do you fit oscillation data with** :math:`G'` **and** :math:`G''` **?**
 
       Hint: Stack into 2D array with `np.column_stack()`
 
@@ -449,7 +449,7 @@ Further Reading
 
 **Within this documentation**:
 
-- :doc:`model_families` — Overview of all 20 models (classical, fractional, flow)
+- :doc:`model_families` — Overview of all 53 models across 22 families
 - :doc:`model_selection` — How to choose the right model for your data
 - :doc:`fitting_strategies` — Advanced initialization and troubleshooting
 

@@ -60,7 +60,7 @@ Experimental Signatures
 
 **Use FIKH when you observe**:
 
-1. **Power-law stress relaxation** at long times: G(t) ~ t^(-:math:`\alpha`), not exp(-t/:math:`\tau`)
+1. **Power-law stress relaxation** at long times: :math:`G(t) \sim t^{-\alpha}`, not exp(-t/:math:`\tau`)
 2. **Stretched exponential recovery** after shear cessation
 3. **Broad relaxation spectrum** in frequency sweep (Cole-Cole depression)
 4. **Delayed yielding** in creep tests below apparent yield stress
@@ -106,7 +106,7 @@ Model Comparison
    * - Hierarchical structure
      - Limited
      - ✓ Use this
-   * - When :math:`\alpha` → 1 (exponential)
+   * - When :math:`\alpha \to 1` (exponential)
      - Consider MIKH
      - Consider ML-IKH
 

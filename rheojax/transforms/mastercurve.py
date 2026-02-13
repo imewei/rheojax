@@ -176,7 +176,14 @@ class Mastercurve(BaseTransform):
             Shift factor a_T
         """
         # WLF equation: log(a_T) = -C1(T-T_ref)/(C2+(T-T_ref))
-        log_aT = -C1 * (T - T_ref) / (C2 + (T - T_ref))
+        denominator = C2 + (T - T_ref)
+        # Guard against division by zero at WLF singularity (T = T_ref - C2)
+        safe_denom = jnp.where(jnp.abs(denominator) < 1e-12, 1.0, denominator)
+        log_aT = jnp.where(
+            jnp.abs(denominator) < 1e-12,
+            0.0,
+            -C1 * (T - T_ref) / safe_denom,
+        )
         return jnp.power(10.0, log_aT)
 
     def _calculate_arrhenius_shift(
@@ -255,7 +262,7 @@ class Mastercurve(BaseTransform):
             try:
                 jtj = result.jac.T @ result.jac
                 cov = np.linalg.inv(jtj)
-                perr = np.sqrt(np.diag(cov))
+                perr = np.sqrt(np.maximum(np.diag(cov), 0.0))
             except np.linalg.LinAlgError:
                 # Singular matrix, use large uncertainties
                 logger.debug("Jacobian singular, using large uncertainties")
@@ -373,11 +380,17 @@ class Mastercurve(BaseTransform):
         a_top, b_top, e_top = popt_top
         a_bot, b_bot, e_bot = popt_bot
 
-        # Inverse power-law for top curve
-        x_top_inv = np.power((y_samples - e_top) / a_top, 1.0 / b_top)
+        # Inverse power-law for top curve (guard against a≈0, negative base, b≈0)
+        a_top_safe = np.sign(a_top) * max(abs(a_top), 1e-20)
+        base_top = np.maximum((y_samples - e_top) / a_top_safe, 1e-20)
+        b_top_safe = np.sign(b_top) * max(abs(b_top), 1e-10)
+        x_top_inv = np.power(base_top, 1.0 / b_top_safe)
 
-        # Inverse power-law for bottom curve
-        x_bot_inv = np.power((y_samples - e_bot) / a_bot, 1.0 / b_bot)
+        # Inverse power-law for bottom curve (guard against a≈0, negative base, b≈0)
+        a_bot_safe = np.sign(a_bot) * max(abs(a_bot), 1e-20)
+        base_bot = np.maximum((y_samples - e_bot) / a_bot_safe, 1e-20)
+        b_bot_safe = np.sign(b_bot) * max(abs(b_bot), 1e-10)
+        x_bot_inv = np.power(base_bot, 1.0 / b_bot_safe)
 
         # Compute log shift factors and average
         log_shift_factors = np.log10(x_top_inv / x_bot_inv)
@@ -700,7 +713,7 @@ class Mastercurve(BaseTransform):
         )
 
         return RheoData(
-            x=x_shifted,
+            x=x_shifted,  # type: ignore[arg-type]
             y=y_shifted,
             x_units=data.x_units,
             y_units=data.y_units,
@@ -709,7 +722,7 @@ class Mastercurve(BaseTransform):
             validate=False,
         )
 
-    def _transform(
+    def _transform(  # type: ignore[override]
         self, data: RheoData | list[RheoData]
     ) -> RheoData | tuple[RheoData, dict[float, float]]:
         """Apply horizontal shift to single-temperature data or create mastercurve.
@@ -734,7 +747,7 @@ class Mastercurve(BaseTransform):
         if isinstance(data, list):
             input_shape = (len(data),)
         else:
-            input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
+            input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)  # type: ignore[arg-type]
 
         with log_transform(
             logger,
@@ -749,13 +762,13 @@ class Mastercurve(BaseTransform):
                 result = self.create_mastercurve(data, return_shifts=True)
                 if isinstance(result, tuple):
                     mastercurve, shift_factors = result
-                    ctx["output_shape"] = (len(mastercurve.x),)
+                    ctx["output_shape"] = (len(mastercurve.x),)  # type: ignore[arg-type]
                     ctx["n_temperatures"] = len(shift_factors)
                 return result  # type: ignore[return-value]
 
             # Handle single dataset
             result = self._transform_single(data)
-            ctx["output_shape"] = (len(result.x),)
+            ctx["output_shape"] = (len(result.x),)  # type: ignore[arg-type]
             return result
 
     def create_mastercurve(
@@ -819,7 +832,7 @@ class Mastercurve(BaseTransform):
         # Compute shift factors
         if self._auto_shift:
             # Use automatic shift factor calculation
-            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)
+            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)  # type: ignore[arg-type]
             shift_factors = {
                 T: 10.0**log_aT
                 for T, log_aT in zip(temperatures, log_aT_array, strict=False)
@@ -976,8 +989,10 @@ class Mastercurve(BaseTransform):
                 # Interpolate both datasets to common x-axis in overlap region
                 x_common = np.linspace(x_min, x_max, 50)
 
-                y_i_interp = np.interp(x_common, x_i, data_i.y)
-                y_j_interp = np.interp(x_common, x_j, data_j.y)
+                sort_i = np.argsort(x_i)
+                sort_j = np.argsort(x_j)
+                y_i_interp = np.interp(x_common, x_i[sort_i], np.asarray(data_i.y)[sort_i])
+                y_j_interp = np.interp(x_common, x_j[sort_j], np.asarray(data_j.y)[sort_j])
 
                 # Compute RMSE
                 error = np.sqrt(np.mean((y_i_interp - y_j_interp) ** 2))

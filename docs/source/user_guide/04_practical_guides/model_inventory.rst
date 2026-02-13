@@ -98,6 +98,23 @@ Finding Compatible Models
     model_name = creep_models[0]
     model = ModelRegistry.create(model_name)
 
+Finding DMTA-Compatible Models
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.core.registry import ModelRegistry
+    from rheojax.core.test_modes import DeformationMode
+    from rheojax.core.inventory import Protocol
+
+    # Find all models that support tensile (DMTA) oscillation
+    dmta_models = ModelRegistry.find(
+        protocol=Protocol.OSCILLATION,
+        deformation_mode=DeformationMode.TENSION,
+    )
+    print(f"{len(dmta_models)} DMTA-compatible models")
+    # Output: 41 DMTA-compatible models
+
 Finding Transforms
 ^^^^^^^^^^^^^^^^^^
 
@@ -132,7 +149,7 @@ Protocols (Models)
    * - ``STARTUP``
      - Stress growth vs. time at constant shear rate (Transient)
    * - ``OSCILLATION``
-     - Small Amplitude Oscillatory Shear (SAOS) - G', G" vs. frequency
+     - Small Amplitude Oscillatory Shear (SAOS) - :math:`G'`, :math:`G''` vs. frequency
    * - ``LAOS``
      - Large Amplitude Oscillatory Shear - Lissajous curves, Harmonics
 

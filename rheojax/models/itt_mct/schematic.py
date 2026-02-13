@@ -29,6 +29,8 @@ Götze W. (2009) "Complex Dynamics of Glass-Forming Liquids", Chapter 4
 Fuchs M. & Cates M.E. (2002) Phys. Rev. Lett. 89, 248304
 """
 
+from __future__ import annotations
+
 from typing import Any, Literal
 
 import numpy as np
@@ -38,6 +40,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 from rheojax.models.itt_mct._base import ITTMCTBase
 from rheojax.models.itt_mct._kernels import (
@@ -66,7 +69,7 @@ try:
 except ImportError:
     _HAS_DIFFRAX = False
 
-    def precompile_flow_curve_solver(*args, **kwargs):
+    def precompile_flow_curve_solver(*args, **kwargs):  # type: ignore[misc]
         """Stub when diffrax not available."""
         return 0.0
 
@@ -85,6 +88,12 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.RELAXATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class ITTMCTSchematic(ITTMCTBase):
@@ -136,10 +145,6 @@ class ITTMCTSchematic(ITTMCTBase):
         - Gamma: Bare relaxation rate (default 1.0 s⁻¹)
         - gamma_c: Critical strain (default 0.1)
         - G_inf: High-frequency modulus (default 1e6 Pa)
-    memory_form : str
-        The memory kernel form ("simplified" or "full")
-    stress_form : str
-        The stress computation form ("schematic" or "microscopic")
 
     Examples
     --------
@@ -244,6 +249,7 @@ class ITTMCTSchematic(ITTMCTBase):
         if stress_form == "microscopic":
             from rheojax.utils.mct_kernels import get_microscopic_stress_prefactor
 
+            assert phi_volume is not None
             self._microscopic_stress_prefactor = get_microscopic_stress_prefactor(
                 phi_volume, k_BT=k_BT
             )
@@ -258,6 +264,7 @@ class ITTMCTSchematic(ITTMCTBase):
             raise ValueError("Specify either epsilon or v2, not both")
 
         v1 = self.parameters.get_value("v1")
+        assert v1 is not None
         v2_critical = self._get_v2_critical(v1)
 
         if epsilon is not None:
@@ -371,7 +378,7 @@ class ITTMCTSchematic(ITTMCTBase):
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
-        # Initial state: [Φ, K₁, K₂, ..., Kₙ]
+        # Initial state: [Φ, K₁, K₂, ..., K_n]
         state0 = np.zeros(1 + self.n_prony_modes)
         state0[0] = 1.0  # Φ(0) = 1
 
@@ -437,6 +444,8 @@ class ITTMCTSchematic(ITTMCTBase):
         """
         v1 = self.parameters.get_value("v1")
         v2 = self.parameters.get_value("v2")
+        assert v1 is not None
+        assert v2 is not None
         return glass_transition_criterion(v1, v2)
 
     @property
@@ -444,6 +453,8 @@ class ITTMCTSchematic(ITTMCTBase):
         """Get separation parameter ε = (v₂ - v₂_c)/v₂_c."""
         v1 = self.parameters.get_value("v1")
         v2 = self.parameters.get_value("v2")
+        assert v1 is not None
+        assert v2 is not None
         v2_c = self._get_v2_critical(v1)
         return (v2 - v2_c) / v2_c
 
@@ -451,6 +462,7 @@ class ITTMCTSchematic(ITTMCTBase):
     def epsilon(self, value: float) -> None:
         """Set separation parameter and update v₂ accordingly."""
         v1 = self.parameters.get_value("v1")
+        assert v1 is not None
         v2_c = self._get_v2_critical(v1)
         v2_new = v2_c * (1 + value)
         self.parameters.set_value("v2", v2_new)
@@ -489,12 +501,21 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        # Assert parameters are not None
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         # Initialize Prony modes if needed
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
         g = self._prony_amplitudes
         tau = self._prony_times
+        assert g is not None
+        assert tau is not None
 
         # Determine which solver to use
         should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
@@ -652,6 +673,12 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         # Use microscopic prefactor if stress_form is microscopic
         G_eff = G_inf
         if (
@@ -663,6 +690,8 @@ class ITTMCTSchematic(ITTMCTBase):
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
@@ -674,7 +703,7 @@ class ITTMCTSchematic(ITTMCTBase):
             t_max = 50.0 * tau_eff
             t_max = max(10.0, min(t_max, 500.0))
 
-        # Initial state: [Φ, K₁..Kₙ, γ, σ_integral]
+        # Initial state: [Φ, K₁..K_n, γ, σ_integral]
         state0 = np.zeros(3 + self.n_prony_modes)
         state0[0] = 1.0  # Φ(0) = 1
         # γ(0) = 0, σ_integral(0) = 0
@@ -754,6 +783,7 @@ class ITTMCTSchematic(ITTMCTBase):
         """
         omega = np.asarray(omega)
         G_inf = self.parameters.get_value("G_inf")
+        assert G_inf is not None
 
         # Need equilibrium correlator over sufficient time range
         omega_min = omega.min()
@@ -807,13 +837,21 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
-        # Initial state: [Φ, K₁..Kₙ, γ, σ]
+        # Initial state: [Φ, K₁..K_n, γ, σ]
         state0 = np.zeros(3 + self.n_prony_modes)
         state0[0] = 1.0  # Φ(0) = 1
         state0[-2] = 0.0  # γ(0) = 0
@@ -880,13 +918,21 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
-        # Initial state: [Φ, K₁..Kₙ, γ, γ̇]
+        # Initial state: [Φ, K₁..K_n, γ, γ̇]
         state0 = np.zeros(3 + self.n_prony_modes)
         state0[0] = 1.0  # Φ(0) = 1
         state0[-2] = 0.0  # γ(0) = 0
@@ -954,13 +1000,21 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
-        # Initial state after pre-shear: [Φ, K₁..Kₙ, σ]
+        # Initial state after pre-shear: [Φ, K₁..K_n, σ]
         # Use model's decorrelation form
         if self._use_lorentzian:
             h_gamma = 1.0 / (1.0 + (gamma_pre / gamma_c) ** 2)
@@ -1041,13 +1095,21 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
-        # Initial state: [Φ, K₁..Kₙ, γ_acc, σ]
+        # Initial state: [Φ, K₁..K_n, γ_acc, σ]
         state0 = np.zeros(3 + self.n_prony_modes)
         state0[0] = 1.0  # Φ(0) = 1
         state0[-2] = 0.0  # γ_acc(0) = 0

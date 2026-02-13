@@ -42,7 +42,7 @@ class LogEntry:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
-        result = {
+        result: dict[str, Any] = {
             "timestamp": self.timestamp,
             "level": self.level,
             "logger": self.logger,
@@ -132,8 +132,8 @@ class OpenTelemetryLogExporter(LogExporter):
         self.insecure = insecure
         self.headers = headers or {}
         self._otel_available = self._check_otel_available()
-        self._logger_provider = None
-        self._log_emitter = None
+        self._logger_provider: Any = None
+        self._log_emitter: Any = None
 
         if self._otel_available:
             self._setup_otel()
@@ -358,7 +358,7 @@ class BatchingExporter(LogExporter):
 
     def _flush(self) -> None:
         """Flush pending entries to the inner exporter."""
-        entries = []
+        entries: list[LogEntry] = []
         while not self._queue.empty() and len(entries) < self._batch_size:
             try:
                 entries.append(self._queue.get_nowait())

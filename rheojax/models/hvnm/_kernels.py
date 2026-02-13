@@ -982,7 +982,6 @@ def hvnm_creep_compliance_linear(
     J_inst = 1.0 / jnp.maximum(G_tot, 1e-30)
 
     # E-network retardation
-    tau_E_eff = 1.0 / (2.0 * jnp.maximum(k_BER_mat_0, 1e-30))
     tau_ret_E = G_tot / (G_P_safe * 2.0 * jnp.maximum(k_BER_mat_0, 1e-30))
     J_E = G_E / (G_P_safe * G_tot) * (1.0 - jnp.exp(-t / tau_ret_E))
 
@@ -991,7 +990,6 @@ def hvnm_creep_compliance_linear(
     J_D = G_D / (G_P_safe * G_tot) * (1.0 - jnp.exp(-t / tau_ret_D))
 
     # I-network retardation (NEW)
-    tau_I_eff = 1.0 / (2.0 * jnp.maximum(k_BER_int_0, 1e-30))
     tau_ret_I = G_tot / (G_P_safe * 2.0 * jnp.maximum(k_BER_int_0, 1e-30))
     J_I = G_I_amp / (G_P_safe * G_tot) * (1.0 - jnp.exp(-t / tau_ret_I))
 

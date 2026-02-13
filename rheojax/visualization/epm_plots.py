@@ -1,5 +1,12 @@
 """Visualization tools for Lattice Elasto-Plastic Models."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import jax
+
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
@@ -253,7 +260,7 @@ def plot_tensorial_fields(
         if not isinstance(ax, (list, np.ndarray)) or len(ax) != 3:
             raise ValueError("If ax provided, must be list/array of 3 axes")
         axes = ax
-        fig = axes[0].get_figure()
+        fig = axes[0].get_figure()  # type: ignore[assignment]
 
     # Find global stress scale for consistent colormaps
     max_stress = np.max(np.abs(stress))
@@ -313,7 +320,7 @@ def plot_normal_stress_field(
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
-        fig = ax.get_figure()
+        fig = ax.get_figure()  # type: ignore[assignment]
 
     # Plot with symmetric colormap centered at 0
     max_N1 = np.max(np.abs(N1))
@@ -381,7 +388,7 @@ def plot_von_mises_field(
         if not isinstance(ax, (list, np.ndarray)) or len(ax) != 2:
             raise ValueError("If ax provided, must be list/array of 2 axes")
         axes = ax
-        fig = axes[0].get_figure()
+        fig = axes[0].get_figure()  # type: ignore[assignment]
 
     # Left panel: σ_eff with viridis (sequential)
     im1 = axes[0].imshow(sigma_eff, cmap="viridis", origin="lower", **kwargs)
@@ -443,7 +450,7 @@ def plot_normal_stress_ratio(
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
-        fig = ax.get_figure()
+        fig = ax.get_figure()  # type: ignore[assignment]
 
     # Log-log plot
     ax.loglog(shear_rates, ratio, marker="o", **kwargs)
@@ -602,11 +609,11 @@ def animate_tensorial_evolution(
             sigma_eff = compute_von_mises_stress(stress_jax, nu)
             vm_history.append(np.array(sigma_eff))
 
-        vm_history = np.array(vm_history)
-        max_vm = np.max(vm_history)
+        vm_history_arr = np.array(vm_history)
+        max_vm = np.max(vm_history_arr)
 
         im = ax.imshow(
-            vm_history[0],
+            vm_history_arr[0],
             cmap="viridis",
             vmin=0,
             vmax=max_vm,
@@ -617,7 +624,7 @@ def animate_tensorial_evolution(
         plt.colorbar(im, ax=ax, label=r"$\sigma_{\mathrm{eff}}$")
 
         def update(frame):
-            im.set_array(vm_history[frame])
+            im.set_array(vm_history_arr[frame])
             ax.set_title(f"$\\sigma_{{\\mathrm{{eff}}}}$ - t={time[frame]:.3f}")
             return (im,)
 

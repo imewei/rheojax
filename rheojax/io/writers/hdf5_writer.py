@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +13,9 @@ from rheojax.core.data import RheoData
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
+
+# Types that HDF5 can natively store as attributes
+_HDF5_SCALAR_TYPES = (str, int, float, bool, np.integer, np.floating, np.bool_)
 
 
 def save_hdf5(
@@ -69,96 +74,176 @@ def save_hdf5(
         )
 
     with log_io(logger, "write", filepath=str(filepath)) as ctx:
-        # Write to HDF5
-        with h5py.File(filepath, "w") as f:
-            # Store x and y data
-            logger.debug(
-                "Writing data arrays",
-                x_shape=data.x.shape,
-                y_shape=data.y.shape,
-                compression=compression_algorithm,
+        # Atomic write: write to a temp file in the same directory, then rename.
+        # This prevents corrupt files from interrupted writes.
+        tmp_fd = None
+        tmp_path = None
+        try:
+            tmp_fd, tmp_path = tempfile.mkstemp(
+                dir=filepath.parent, suffix=".h5.tmp"
             )
-            f.create_dataset(
-                "x",
-                data=np.array(data.x),
-                compression=compression_algorithm,
-                compression_opts=compression_opts,
-            )
+            os.close(tmp_fd)
+            tmp_fd = None
 
-            f.create_dataset(
-                "y",
-                data=np.array(data.y),
-                compression=compression_algorithm,
-                compression_opts=compression_opts,
-            )
+            with h5py.File(tmp_path, "w") as f:
+                # Store x and y data with explicit float64 preservation
+                x_arr = np.asarray(data.x, dtype=np.float64)
+                y_arr = np.asarray(data.y)
+                # Preserve complex dtype; ensure real arrays are float64
+                if not np.issubdtype(y_arr.dtype, np.complexfloating):
+                    y_arr = np.asarray(y_arr, dtype=np.float64)
 
-            # Store units as attributes
-            if data.x_units is not None:
-                f["x"].attrs["units"] = data.x_units
-            if data.y_units is not None:
-                f["y"].attrs["units"] = data.y_units
-            logger.debug(
-                "Units stored",
-                x_units=data.x_units,
-                y_units=data.y_units,
-            )
-
-            # Store domain
-            f.attrs["domain"] = data.domain
-            logger.debug("Domain stored", domain=data.domain)
-
-            # Store metadata
-            if data.metadata:
-                metadata_group = f.create_group("metadata")
-                _write_metadata_recursive(metadata_group, data.metadata)
                 logger.debug(
-                    "Metadata written",
-                    metadata_keys=list(data.metadata.keys()),
+                    "Writing data arrays",
+                    x_shape=x_arr.shape,
+                    x_dtype=str(x_arr.dtype),
+                    y_shape=y_arr.shape,
+                    y_dtype=str(y_arr.dtype),
+                    compression=compression_algorithm,
+                )
+                f.create_dataset(
+                    "x",
+                    data=x_arr,
+                    compression=compression_algorithm,
+                    compression_opts=compression_opts,
                 )
 
-            # Store rheojax version
-            try:
-                import rheojax
+                f.create_dataset(
+                    "y",
+                    data=y_arr,
+                    compression=compression_algorithm,
+                    compression_opts=compression_opts,
+                )
 
-                f.attrs["rheojax_version"] = rheojax.__version__
-                logger.debug("Version stored", rheojax_version=rheojax.__version__)
-            except ImportError:
-                pass
+                # Store units as attributes
+                if data.x_units is not None:
+                    f["x"].attrs["units"] = data.x_units
+                if data.y_units is not None:
+                    f["y"].attrs["units"] = data.y_units
+                logger.debug(
+                    "Units stored",
+                    x_units=data.x_units,
+                    y_units=data.y_units,
+                )
 
-        ctx["data_points"] = len(data.x)
+                # Store domain
+                f.attrs["domain"] = data.domain
+                logger.debug("Domain stored", domain=data.domain)
+
+                # Store metadata
+                if data.metadata:
+                    metadata_group = f.create_group("metadata")
+                    dropped = _write_metadata_recursive(
+                        metadata_group, data.metadata
+                    )
+                    logger.debug(
+                        "Metadata written",
+                        metadata_keys=list(data.metadata.keys()),
+                    )
+                    if dropped:
+                        logger.warning(
+                            "Some metadata keys could not be serialized "
+                            "and were dropped from the HDF5 file",
+                            dropped_keys=dropped,
+                        )
+
+                # Store rheojax version
+                try:
+                    import rheojax
+
+                    f.attrs["rheojax_version"] = rheojax.__version__
+                    logger.debug(
+                        "Version stored", rheojax_version=rheojax.__version__
+                    )
+                except ImportError:
+                    pass
+
+            # Atomic rename: only overwrites target after successful write
+            os.replace(tmp_path, filepath)
+            tmp_path = None  # Prevent cleanup since rename succeeded
+
+        finally:
+            # Clean up temp file if rename didn't happen (write failed)
+            if tmp_path is not None:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+        ctx["data_points"] = len(data.x)  # type: ignore[arg-type]
         ctx["compression"] = compression
         ctx["has_metadata"] = bool(data.metadata)
 
 
-def _write_metadata_recursive(group: Any, metadata: dict[str, Any]) -> None:
+def _write_metadata_recursive(
+    group: Any,
+    metadata: dict[str, Any],
+    _path: str = "",
+) -> list[str]:
     """Recursively write metadata to HDF5 group.
 
     Args:
         group: HDF5 group
         metadata: Metadata dictionary
+        _path: Internal path prefix for logging (do not set externally)
+
+    Returns:
+        List of metadata key paths that could not be serialized.
     """
+    dropped_keys: list[str] = []
+
     for key, value in metadata.items():
+        full_key = f"{_path}/{key}" if _path else key
+
+        if value is None:
+            # None is not HDF5-storable; store as sentinel string
+            group.attrs[key] = "__None__"
+            continue
+
         if isinstance(value, dict):
             subgroup = group.create_group(key)
-            _write_metadata_recursive(subgroup, value)
+            dropped_keys.extend(
+                _write_metadata_recursive(subgroup, value, _path=full_key)
+            )
             continue
 
         if isinstance(value, (list, tuple)):
-            group.attrs[key] = np.array(value)
+            try:
+                group.attrs[key] = np.array(value)
+            except (TypeError, ValueError):
+                # Lists of mixed types — fall back to string
+                group.attrs[key] = str(value)
+                logger.debug(
+                    "Metadata stored as string (mixed-type list)",
+                    key=full_key,
+                )
             continue
 
         if isinstance(value, np.ndarray):
             group.attrs[key] = value
             continue
 
-        if isinstance(value, (str, int, float, bool)):
+        if isinstance(value, _HDF5_SCALAR_TYPES):
             group.attrs[key] = value
             continue
 
+        # Last resort: stringify
         try:
             group.attrs[key] = str(value)
-        except Exception:
-            pass  # Skip values that can't be serialized
+            logger.debug(
+                "Metadata stringified for storage",
+                key=full_key,
+                original_type=type(value).__name__,
+            )
+        except (TypeError, ValueError, OSError):
+            dropped_keys.append(full_key)
+            logger.warning(
+                "Could not serialize metadata key — value dropped",
+                key=full_key,
+                value_type=type(value).__name__,
+            )
+
+    return dropped_keys
 
 
 def load_hdf5(filepath: str | Path) -> RheoData:
@@ -254,11 +339,15 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
     Returns:
         Metadata dictionary
     """
-    metadata = {}
+    metadata: dict[str, Any] = {}
 
     # Read attributes
     for key, value in group.attrs.items():
-        metadata[key] = value
+        # Restore None values from sentinel
+        if isinstance(value, str) and value == "__None__":
+            metadata[key] = None
+        else:
+            metadata[key] = value
 
     # Read subgroups
     for key in group.keys():

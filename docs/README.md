@@ -292,7 +292,7 @@ START: What data do you have?
 - Automatic JIT compilation via JAX
 
 ### **Bayesian Inference** (NEW in v0.2.0)
-- **All 20 models** support complete Bayesian workflows
+- **All 53 models** support complete Bayesian workflows
 - NLSQ → NUTS warm-start for 2-5x faster convergence
 - NumPyro integration with comprehensive diagnostics
 - ArviZ visualization (6 MCMC diagnostic plots)

@@ -224,6 +224,9 @@ class PlotService:
             x = np.asarray(data.x)
             y = np.asarray(data.y)
             y_fit = fit_result.y_fit
+            if y_fit is None:
+                raise ValueError("FitResult does not contain y_fit data")
+            y_fit = np.asarray(y_fit)
 
             # Check for covariance matrix (for uncertainty bands)
             pcov = getattr(fit_result, "pcov", None)
@@ -444,6 +447,9 @@ class PlotService:
 
             x = np.asarray(data.x)
             residuals = fit_result.residuals
+            if residuals is None:
+                raise ValueError("FitResult does not contain residuals")
+            residuals = np.asarray(residuals)
 
             logger.debug(
                 "Residual plot data", data_points=len(x), residual_shape=residuals.shape

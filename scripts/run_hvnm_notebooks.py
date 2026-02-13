@@ -16,13 +16,12 @@ import re
 import sys
 import time
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import nbformat
 from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, CellTimeoutError
-
 
 # Configuration
 CELL_TIMEOUT = 172800  # 48 hours in seconds
@@ -174,10 +173,10 @@ def main():
         print("No HVNM notebooks found!")
         return 1
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     master_log_path = LOGS_DIR / f"master_{timestamp}.log"
 
-    print(f"HVNM Notebook Runner")
+    print("HVNM Notebook Runner")
     print(f"{'=' * 60}")
     print(f"Found {len(notebooks)} notebooks")
     print(f"Cell timeout: {CELL_TIMEOUT}s ({CELL_TIMEOUT/3600:.0f}h)")
@@ -215,7 +214,7 @@ def main():
     total_warnings = sum(r["warning_count"] for r in all_results)
 
     print(f"\n{'=' * 60}")
-    print(f"SUMMARY")
+    print("SUMMARY")
     print(f"{'=' * 60}")
     print(f"Total:    {len(all_results)}")
     print(f"Passed:   {len(passed)}")

@@ -1,4 +1,4 @@
-"""Shared fixtures and configuration for rheo test suite.
+"""Shared fixtures and configuration for rheojax test suite.
 
 This module provides:
 - Shared test data fixtures for common rheological patterns

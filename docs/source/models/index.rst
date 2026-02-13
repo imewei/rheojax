@@ -110,6 +110,22 @@ with BER kinetics (HVM), and nanoparticle-filled nanocomposite extensions (HVNM)
 
 ----
 
+DMTA / DMA Analysis
+---------------------
+
+Support for Dynamic Mechanical (Thermal) Analysis data via automatic
+E* |leftrightarrow| G* modulus conversion.
+
+.. |leftrightarrow| unicode:: U+2194
+
+.. toctree::
+   :maxdepth: 2
+   :caption: DMTA
+
+   dmta/index
+
+----
+
 LAOS Analysis
 --------------
 

@@ -25,23 +25,25 @@ Example:
     >>> sigma_pred = model.predict(t_new, strain=strain_new)
 """
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import Protocol, TestMode
+from rheojax.core.test_modes import DeformationMode, Protocol, TestMode
 from rheojax.logging import get_logger
 from rheojax.models.fikh._base import FIKHBase
 from rheojax.utils.optimization import nlsq_optimize
 
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike
+
 jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
-
-# Type alias
-ArrayLike = np.ndarray | jnp.ndarray | list | tuple
 
 
 @ModelRegistry.register(
@@ -53,6 +55,12 @@ ArrayLike = np.ndarray | jnp.ndarray | list | tuple
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FIKH(FIKHBase):
@@ -155,7 +163,7 @@ class FIKH(FIKHBase):
     # Fitting Methods
     # =========================================================================
 
-    def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FIKH":
+    def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FIKH:
         """Fit model parameters using protocol-aware optimization.
 
         Args:
@@ -188,7 +196,7 @@ class FIKH(FIKHBase):
         else:
             return self._fit_return_mapping(X, y, **kwargs)
 
-    def _fit_flow_curve(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FIKH":
+    def _fit_flow_curve(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FIKH:
         """Fit to steady-state flow curve data."""
         from rheojax.models.fikh._kernels import fikh_flow_curve_steady_state
 
@@ -206,7 +214,7 @@ class FIKH(FIKHBase):
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
 
-    def _fit_ode_formulation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FIKH":
+    def _fit_ode_formulation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FIKH:
         """Fit using ODE formulation (creep/relaxation)."""
         t = jnp.asarray(X)
         y_target = jnp.asarray(y)
@@ -227,7 +235,7 @@ class FIKH(FIKHBase):
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
 
-    def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FIKH":
+    def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FIKH:
         """Fit using return mapping (startup/LAOS)."""
         times, strains = self._extract_time_strain(X, **kwargs)
         sigma_target = jnp.asarray(y)
@@ -241,7 +249,7 @@ class FIKH(FIKHBase):
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
 
-    def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FIKH":
+    def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FIKH:
         """Fit to oscillatory data (SAOS).
 
         This method fits to frequency-domain SAOS data by internally simulating
@@ -423,7 +431,7 @@ class FIKH(FIKHBase):
 
         return sigma_series
 
-    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
+    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike: # type: ignore[override]
         """Predict based on test_mode.
 
         Args:
@@ -568,7 +576,6 @@ class FIKH(FIKHBase):
             Complex modulus G* = G' + i·G'' for each frequency.
         """
         omega_arr = jnp.asarray(omega)
-        n_omega = len(omega_arr)
         params = self._get_params_dict()
 
         # Simulate each frequency
@@ -588,7 +595,6 @@ class FIKH(FIKHBase):
             last_cycle_start = int(len(t) * (n_cycles - 1) / n_cycles)
             t_last = t[last_cycle_start:]
             stress_last = stress[last_cycle_start:]
-            strain_last = strain[last_cycle_start:]
 
             # Fourier decomposition (first harmonic)
             # G' = (1/γ₀) · (2/T) ∫ σ·sin(ωt) dt
@@ -700,7 +706,7 @@ class FIKH(FIKHBase):
             param_names = list(self.parameters.keys())
             param_dict = dict(zip(param_names, params, strict=False))
         else:
-            param_dict = dict(params)
+            param_dict = dict(params) # type: ignore[arg-type]
 
         mode_enum = self._validate_test_mode(mode)
 
@@ -729,7 +735,7 @@ class FIKH(FIKHBase):
             gamma_0 = kwargs.get("gamma_0", param_dict.pop("_gamma_0", 0.01))
             n_cycles = kwargs.get("n_cycles", param_dict.pop("_n_cycles", 5))
             G_star = self._predict_oscillation_from_params(
-                omega, param_dict, gamma_0, n_cycles
+                omega, param_dict, gamma_0, n_cycles # type: ignore[arg-type]
             )
             # Return magnitude for comparison with |G*| target
             return jnp.abs(G_star)
@@ -754,12 +760,12 @@ class FIKH(FIKHBase):
 
         return {
             "fractional_order": alpha,
-            "is_near_integer": alpha > 0.95,
+            "is_near_integer": alpha > 0.95, # type: ignore[operator]
             "memory_type": (
-                "weak (near exponential)" if alpha > 0.7 else "strong (power-law)"
+                "weak (near exponential)" if alpha > 0.7 else "strong (power-law)" # type: ignore[operator]
             ),
             "thermal_coupling": self.include_thermal,
-            "arrhenius_enabled": E_a > 0 if self.include_thermal else False,
+            "arrhenius_enabled": E_a > 0 if self.include_thermal else False, # type: ignore[operator]
             "limiting_case_alpha_1": "Classical MIKH behavior",
             "limiting_case_E_a_0": "Isothermal FIKH behavior",
         }

@@ -21,7 +21,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 # =============================================================================
 # Data Loaders (Reuse IKH Patterns)
 # =============================================================================
@@ -576,7 +575,7 @@ def plot_alpha_sweep(
     colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(alpha_values)))
 
     # Left panel: Predictions for each alpha
-    for alpha, color in zip(alpha_values, colors):
+    for alpha, color in zip(alpha_values, colors, strict=False):
         model.parameters.set_value("alpha_structure", alpha)
 
         # Get prediction based on protocol
@@ -627,10 +626,10 @@ def plot_alpha_sweep(
     ax1.grid(True, alpha=0.3, which="both")
 
     # Right panel: Memory kernel comparison
-    tau_thix = model.parameters.get_value("tau_thix")
+    _tau_thix = model.parameters.get_value("tau_thix")
     t_kernel = np.linspace(0.01, 10, 500)
 
-    for alpha, color in zip(alpha_values, colors):
+    for alpha, color in zip(alpha_values, colors, strict=False):
         kernel = compute_memory_kernel_decay(alpha, t_kernel, tau_thix=1.0)
         ax2.semilogy(t_kernel, kernel, "-", color=color, lw=2, label=f"α = {alpha:.2f}")
 
@@ -705,7 +704,7 @@ def compare_fikh_to_ikh(
     original_alpha = fikh_model.parameters.get_value("alpha_structure")
     colors = plt.cm.coolwarm(np.linspace(0.2, 0.8, len(alpha_values)))
 
-    for alpha, color in zip(alpha_values, colors):
+    for alpha, color in zip(alpha_values, colors, strict=False):
         fikh_model.parameters.set_value("alpha_structure", alpha)
 
         if protocol == "flow_curve":
@@ -767,7 +766,7 @@ def plot_structure_recovery(
     fig, ax = plt.subplots(figsize=figsize)
     colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(alpha_values)))
 
-    for alpha, color in zip(alpha_values, colors):
+    for alpha, color in zip(alpha_values, colors, strict=False):
         # Mittag-Leffler function approximation for recovery
         # λ(t) = 1 - E_α(-(t/τ)^α) ≈ 1 - exp(-(t/τ)^α / Γ(1+α))
         t_norm = t / tau_thix

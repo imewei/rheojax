@@ -77,7 +77,7 @@ The GMM consists of **N Maxwell elements in parallel**, each contributing a dist
 
    ┌──────────┬──────────┬─────┬──────────┐
    │ Maxwell 1│ Maxwell 2│ ... │ Maxwell N│
-   │ (E₁, τ₁) │ (E₂, τ₂) │     │ (Eₙ, τₙ)│
+   │ (E_1, τ_1)│ (E_2, τ_2)│     │ (E_N, τ_N)│
    └──────────┴──────────┴─────┴──────────┘
             ↓
    Plus equilibrium spring E_∞ (optional, can be zero for liquids)
@@ -431,7 +431,7 @@ Parameter Interpretation
    *For graduate students*: G_i approximates the continuous spectrum: :math:`G_i \approx H(\tau_i) \Delta(\log \tau_i)`.
    For entangled polymers: G_i ∝ w(M_i) where w is the molecular weight distribution.
    Sum rule: :math:`\Sigma` G_i = total relaxed modulus. Plateau modulus G_N^0 ≈ E_∞ for crosslinked
-   systems relates to entanglement density via G_N^0 = :math:`\rhoRT/M_e`.
+   systems relates to entanglement density via G_N^0 = :math:`\rho RT/M_e`.
 
    *For practitioners*: Extract from dynamic moduli fitting. Typical: narrow MWD (1-2
    dominant modes), broad MWD (5-15 modes spanning decades). Monitor G_i changes for
@@ -440,7 +440,7 @@ Parameter Interpretation
 :math:`\tau_i` **(Relaxation Times)**:
    Characteristic timescales for each relaxation mode, typically logarithmically spaced.
 
-   *For graduate students*: For polymers: :math:`\tau_i` ~ M_i^3.4 (reptation) or M_i^2 (Rouse).
+   *For graduate students*: For polymers: :math:`\tau_i \sim M_i^{3.4}` (reptation) or :math:`M_i^2` (Rouse).
    Logarithmic spacing: :math:`\tau_i = \tau_min \cdot (\tau_max/\tau_min)^((i-1)/(N-1))`. Zero-shear viscosity:
    :math:`\eta_0 = \Sigma G_i \cdot \tau_i`. Temperature dependence via WLF or Arrhenius shift factors.
 
@@ -455,7 +455,7 @@ Parameter Interpretation
    crosslinks, infinite :math:`\eta`). For rubber elasticity: :math:`G_{\infty} = \nu k T` where :math:`\nu` is crosslink density.
    Relates to gel point: E_∞ appears at percolation threshold.
 
-   *For practitioners*: Measure from G' low-frequency plateau. Uncrosslinked melts:
+   *For practitioners*: Measure from :math:`G'` low-frequency plateau. Uncrosslinked melts:
    E_∞ = 0. Elastomers/gels: E_∞ = 10^3-10^6 Pa. Monitor E_∞ during curing to track gelation.
 
 **N (Number of Modes)**:
@@ -1957,7 +1957,7 @@ References
    https://doi.org/10.1021/ja01619a008
 
 .. [6] Tassieri, M. "Linear viscoelasticity in the frequency domain." In *Microrheology
-   with Optical Tweezers*. Pan Stanford Publishing, pp. 31-58 (2018).
+   with Optical Tweezers*. Pan Stanford Publishing, pp. 31-58 (2016).
    https://doi.org/10.1201/9781315364872
 
 .. [7] Hoffman, M. D. and Gelman, A. "The No-U-Turn Sampler: Adaptively Setting Path
@@ -1965,7 +1965,7 @@ References
    15(1), 1593-1623 (2014). https://jmlr.org/papers/v15/hoffman14a.html
 
 .. [8] Doi, M. and Edwards, S. F. *The Theory of Polymer Dynamics*. Oxford University
-   Press (1986). ISBN: 978-0198520009
+   Press (1986). ISBN: 978-0198520337
 
 .. [9] Rubinstein, M. and Colby, R. H. *Polymer Physics*. Oxford University Press (2003).
    ISBN: 978-0198520597
@@ -1984,3 +1984,11 @@ References
 .. [13] Anderssen, R. S. and Davies, A. R. "Simple moving-average formulae for the direct
    recovery of the relaxation spectrum." *Journal of Rheology*, 45(1), 1-27 (2001).
    https://doi.org/10.1122/1.1332787
+
+.. [14] Springer, M. "pyvisco." ReadTheDocs (2026).
+   :download:`PDF <../../../reference/springer_2026_pyvisco.pdf>`
+
+.. [15] Miranda-Valdez, I. Y., Niinistö, A., Mäkinen, T., Lejon, J., Koivisto, J.
+   and Alava, M. J. "pyRheo: an open-source Python package for complex rheology."
+   *Digital Discovery*, 4, 1075-1082 (2025). https://doi.org/10.1039/d5dd00021a
+   :download:`PDF <../../../reference/miranda-valdez_2025_pyrheo.pdf>`

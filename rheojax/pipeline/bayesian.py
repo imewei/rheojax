@@ -124,13 +124,13 @@ class BayesianPipeline(Pipeline):
         logger.debug(
             "Starting NLSQ fit",
             model=model_name,
-            data_shape=X.shape,
+            data_shape=X.shape,  # type: ignore[union-attr]
         )
 
         with log_fit(
             logger,
             model=model_name,
-            data_shape=X.shape,
+            data_shape=X.shape,  # type: ignore[union-attr]
             test_mode=(
                 self.data.metadata.get("test_mode", "unknown")
                 if hasattr(self.data, "metadata") and self.data.metadata
@@ -260,13 +260,13 @@ class BayesianPipeline(Pipeline):
             num_chains=num_chains,
         ) as ctx:
             result = self._last_model.fit_bayesian(
-                X,
-                y,
+                X,  # type: ignore[arg-type]
+                y,  # type: ignore[arg-type]
                 test_mode=test_mode,
                 num_warmup=num_warmup,
                 num_samples=num_samples,
                 num_chains=num_chains,
-                initial_values=initial_values,
+                initial_values=initial_values,  # type: ignore[arg-type]
                 **nuts_kwargs,
             )
 
@@ -438,10 +438,11 @@ class BayesianPipeline(Pipeline):
             ax = axes_flat[idx]
             samples = posterior_samples[param]
 
-            # Plot histogram
-            bins = plot_kwargs.pop("bins", 30)
-            alpha = plot_kwargs.pop("alpha", 0.7)
-            ax.hist(samples, bins=bins, alpha=alpha, **plot_kwargs)
+            # Plot histogram (copy kwargs to avoid mutating caller's dict)
+            _kwargs = plot_kwargs.copy()
+            bins = _kwargs.pop("bins", 30)
+            alpha = _kwargs.pop("alpha", 0.7)
+            ax.hist(samples, bins=bins, alpha=alpha, **_kwargs)
 
             # Add summary statistics
             mean = self._bayesian_result.summary[param]["mean"]

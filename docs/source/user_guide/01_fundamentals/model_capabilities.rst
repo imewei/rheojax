@@ -245,6 +245,25 @@ The following table summarizes which rheological test protocols are supported by
      - ✅
      - ✅
 
+DMTA / DMA Support (Deformation Modes)
+---------------------------------------
+
+All **41 oscillation-capable models** support DMTA/DMA data through automatic :math:`E^* \leftrightarrow G^*` modulus conversion at the ``BaseModel`` boundary. Pass ``deformation_mode='tension'`` and ``poisson_ratio`` to ``fit()`` and ``predict()``:
+
+.. code-block:: python
+
+   model = Maxwell()
+   model.fit(omega, E_star, test_mode='oscillation',
+             deformation_mode='tension', poisson_ratio=0.5)
+
+**Supported deformation modes**: ``shear`` (default), ``tension``, ``bending``, ``compression``.
+
+**Models that do NOT support DMTA** (shear-only): Flow models (Carreau, PowerLaw, Bingham, HB, Cross, Carreau-Yasuda), SPP Yield Stress, Fluidity Nonlocal PDE variants, and EPM lattice models — these are either flow-curve-only or require explicit shear geometry.
+
+**Poisson ratio presets**: rubber :math:`\approx 0.5`, glassy polymer :math:`\approx 0.35`, semicrystalline :math:`\approx 0.40`.
+
+For the full DMTA reference including conversion theory and workflows, see :doc:`/models/dmta/index`.
+
 Detailed Capabilities
 ---------------------
 
@@ -254,7 +273,7 @@ Detailed Capabilities
 These models are the most versatile, capable of simulating complex non-linear transient behaviors using JAX-accelerated ODE solvers (``Diffrax``).
 
 *   **SGR (Soft Glassy Rheology):** Supports all protocols. Includes thixotropy, aging, and rejuvenation. Can simulate full LAOS cycles using Monte Carlo methods or SAOS approximations.
-*   **STZ (Shear Transformation Zone):** Supports all protocols. Uses internal state variables (effective temperature) to capture plasticity, yield stress, and transient responses like stress overshoot in start-up flow.
+*   **STZ (Shear Transformation Zone):** Supports all protocols. Uses internal state variables (effective temperature) to capture plasticity, yield stress, and transient responses like stress overshoot in startup flow.
 
 2. Generalized Maxwell (Multi-mode)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

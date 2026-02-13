@@ -35,7 +35,7 @@ Use Bayesian When You Need
 
 [done] **Credible intervals** - "95% probability the parameter is in this range"
 
-[done] **Parameter correlations** - "Are G_0 and eta identifiable with my data?"
+[done] **Parameter correlations** - "Are :math:`G_0` and :math:`\eta` identifiable with my data?"
 
 [done] **Prediction uncertainty** - "Error bands on model predictions"
 
@@ -58,7 +58,7 @@ Basic Bayesian Workflow
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
    import numpy as np
 
    # 1. Prepare data
@@ -113,7 +113,7 @@ NLSQ provides fast, GPU-accelerated optimization:
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
 
    model = Maxwell()
    model.fit(t, G_data, method='nlsq')
@@ -207,7 +207,7 @@ Compute highest density intervals (HDI):
 ArviZ Diagnostic Plots
 ======================
 
-Rheo integrates ArviZ for comprehensive MCMC diagnostics. All plotting methods support
+RheoJAX integrates ArviZ for comprehensive MCMC diagnostics. All plotting methods support
 the fluent API pattern with ``show`` parameter and ``.save_figure()`` chaining.
 
 1. Pair Plot (Parameter Correlations)
@@ -696,7 +696,7 @@ Example 2: Comparing Credibility Levels
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
    import numpy as np
 
    model = Maxwell()
@@ -722,7 +722,7 @@ Example 3: Advanced ArviZ Analysis
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
    import arviz as az
    import numpy as np
 
@@ -844,7 +844,7 @@ Issue 4: Strong Parameter Correlations
 
 **This is often EXPECTED for rheological models:**
 
-- Maxwell: G_0 and eta both affect relaxation time tau = eta/G_0
+- Maxwell: :math:`G_0` and :math:`\eta` both affect relaxation time :math:`\tau = \eta/G_0`
 - This is a physical correlation, not a problem
 - If correlation > 0.9, consider collecting data at different time scales
 

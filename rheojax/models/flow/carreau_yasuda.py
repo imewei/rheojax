@@ -31,14 +31,14 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
 from rheojax.logging import get_logger, log_fit
 
 # Module logger
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("carreau_yasuda", protocols=[Protocol.FLOW_CURVE])
+@ModelRegistry.register("carreau_yasuda", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR])
 class CarreauYasuda(BaseModel):
     """Carreau-Yasuda model for non-Newtonian flow (ROTATION only).
 
@@ -219,7 +219,7 @@ class CarreauYasuda(BaseModel):
                 )
                 raise
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
         """Predict viscosity for given shear rates.
 
         Args:

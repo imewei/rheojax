@@ -14,6 +14,7 @@ from rheojax.io.readers._utils import (
     VALID_TEST_MODES,
     VALID_TRANSFORMS,
     construct_complex_modulus,
+    detect_deformation_mode_from_columns,
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
@@ -37,10 +38,12 @@ def load_csv(
     y_units: str | None = None,
     domain: str | None = None,
     test_mode: str | None = None,
+    deformation_mode: str | None = None,
     temperature: float | None = None,
     metadata: dict | None = None,
     intended_transform: str | None = None,
     delimiter: str | None = None,
+    encoding: str | None = None,
     header: int | None = 0,
     **kwargs,
 ) -> RheoData:
@@ -51,19 +54,26 @@ def load_csv(
         x_col: Column name or index for x-axis data.
         y_col: Column name or index for y-axis data (single column).
             Mutually exclusive with y_cols.
-        y_cols: List of two column names/indices for complex modulus [G', G''].
-            First column is storage modulus (G'), second is loss modulus (G'').
+        y_cols: List of two column names/indices for complex modulus [G', G'']
+            or [E', E''].
+            First column is storage modulus, second is loss modulus.
             Mutually exclusive with y_col.
         x_units: Units for x-axis (auto-detected from header if None).
         y_units: Units for y-axis (auto-detected from header if None).
         domain: Data domain ('time' or 'frequency', auto-detected if None).
         test_mode: Test mode ('relaxation', 'creep', 'oscillation', 'rotation').
             Auto-detected if None.
+        deformation_mode: Deformation mode ('shear', 'tension', 'bending',
+            'compression'). Auto-detected from column names if None.
+            If 'tension'/'bending'/'compression', sets metadata for DMTA support.
         temperature: Temperature in Kelvin for TTS workflows.
         metadata: Additional metadata dict to merge.
         intended_transform: Transform type for metadata validation. One of
             'mastercurve', 'srfs', 'owchirp', 'spp', 'fft', 'mutation', 'derivative'.
         delimiter: Column delimiter (auto-detected if None).
+        encoding: File encoding (e.g. 'utf-8', 'latin-1', 'cp1252').
+            Auto-detected if None. Use this to override detection for files
+            with known encoding.
         header: Row number for column headers (None if no header).
         **kwargs: Additional arguments passed to pandas.read_csv.
 
@@ -131,19 +141,23 @@ def load_csv(
         delimiter = detect_csv_delimiter(filepath)
         logger.debug("Auto-detected delimiter", delimiter=repr(delimiter))
 
-    # Choose encoding based on BOM/byte sniffing
-    default_encoding = "utf-8-sig"
-    try:
-        head_bytes = filepath.read_bytes()[:4]
-        if (
-            b"\xff\xfe" in head_bytes
-            or b"\xfe\xff" in head_bytes
-            or b"\x00" in head_bytes
-        ):
-            default_encoding = "utf-16"
-        logger.debug("Detected encoding", encoding=default_encoding)
-    except FileNotFoundError:
-        raise
+    # Choose encoding: explicit parameter > BOM/byte sniffing > default
+    if encoding is not None:
+        default_encoding = encoding
+        logger.debug("Using explicit encoding", encoding=encoding)
+    else:
+        default_encoding = "utf-8-sig"
+        try:
+            head_bytes = filepath.read_bytes()[:4]
+            if (
+                b"\xff\xfe" in head_bytes
+                or b"\xfe\xff" in head_bytes
+                or b"\x00" in head_bytes
+            ):
+                default_encoding = "utf-16"
+            logger.debug("Auto-detected encoding", encoding=default_encoding)
+        except FileNotFoundError:
+            raise
 
     # Build list of columns to load (memory optimization for wide files)
     # Only use usecols when all column specifiers are strings (not indices)
@@ -170,6 +184,8 @@ def load_csv(
     )
     tried_utf16 = False
 
+    used_encoding = default_encoding
+
     with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
         try:
             logger.debug("Reading CSV file", encoding=default_encoding)
@@ -177,33 +193,52 @@ def load_csv(
         except UnicodeDecodeError:
             read_kwargs["encoding"] = "utf-16le"
             tried_utf16 = True
-            logger.debug("Retrying with UTF-16LE encoding")
+            logger.info(
+                "Encoding fallback triggered",
+                filepath=str(filepath),
+                from_encoding=default_encoding,
+                to_encoding="utf-16le",
+            )
             df = pd.read_csv(filepath, **read_kwargs)
+            used_encoding = "utf-16le"
         except Exception as e:
             # If UTF-8 path failed and we haven't tried utf-16, attempt before giving up
             if not tried_utf16:
                 try:
                     read_kwargs["encoding"] = "utf-16le"
-                    logger.debug("Retrying with UTF-16LE encoding after error")
+                    logger.info(
+                        "Encoding fallback triggered",
+                        filepath=str(filepath),
+                        from_encoding=default_encoding,
+                        to_encoding="utf-16le",
+                    )
                     df = pd.read_csv(filepath, **read_kwargs)
+                    used_encoding = "utf-16le"
                 except Exception:
                     logger.error(
                         "Failed to parse CSV file",
                         filepath=str(filepath),
+                        tried_encodings=[default_encoding, "utf-16le"],
                         exc_info=True,
                     )
                     raise ValueError(f"Failed to parse CSV file: {e}") from e
             else:
                 logger.error(
-                    "Failed to parse CSV file", filepath=str(filepath), exc_info=True
+                    "Failed to parse CSV file",
+                    filepath=str(filepath),
+                    tried_encodings=[default_encoding, "utf-16le"],
+                    exc_info=True,
                 )
                 raise ValueError(f"Failed to parse CSV file: {e}") from e
 
         io_ctx["rows"] = len(df)
         io_ctx["columns"] = len(df.columns)
-        io_ctx["encoding"] = read_kwargs.get("encoding", default_encoding)
+        io_ctx["encoding"] = used_encoding
         logger.debug(
-            "CSV file read successfully", n_rows=len(df), n_cols=len(df.columns)
+            "CSV file read successfully",
+            n_rows=len(df),
+            n_cols=len(df.columns),
+            encoding=used_encoding,
         )
 
     # Get column headers for detection
@@ -219,19 +254,19 @@ def load_csv(
     # Extract y data (single column or complex modulus)
     is_complex = y_cols is not None
     if is_complex:
-        y_headers = [_get_column_header(df, col) for col in y_cols]
+        y_headers = [_get_column_header(df, col) for col in y_cols]  # type: ignore[union-attr]
         try:
-            g_prime_data = _get_column_data(df, y_cols[0])
-            g_double_prime_data = _get_column_data(df, y_cols[1])
+            g_prime_data = _get_column_data(df, y_cols[0])  # type: ignore[index]
+            g_double_prime_data = _get_column_data(df, y_cols[1])  # type: ignore[index]
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
         logger.debug("Constructed complex modulus from G' and G''")
     else:
-        y_headers = [_get_column_header(df, y_col)]
+        y_headers = [_get_column_header(df, y_col)]  # type: ignore[arg-type]
         try:
-            y_data = _get_column_data(df, y_col)
+            y_data = _get_column_data(df, y_col)  # type: ignore[arg-type]
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_col=y_col, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
@@ -284,12 +319,13 @@ def load_csv(
     else:
         detected_test_mode = test_mode.lower()
 
-    # Build source metadata
+    # Build source metadata (includes encoding provenance for debugging)
     source_metadata = {
         "source_file": str(filepath.absolute()),
         "file_type": "csv" if filepath.suffix.lower() in {".csv", ""} else "txt",
         "x_column": x_col,
         "y_column": y_cols if is_complex else y_col,
+        "encoding": used_encoding,
     }
 
     # Merge with user metadata
@@ -299,7 +335,7 @@ def load_csv(
 
     # Add temperature if provided
     if temperature is not None:
-        final_metadata["temperature"] = temperature
+        final_metadata["temperature"] = temperature  # type: ignore[assignment]
 
     # Add intended_transform if provided
     if intended_transform is not None:
@@ -315,12 +351,28 @@ def load_csv(
         for msg in warning_messages:
             warnings.warn(msg, UserWarning, stacklevel=2)
 
+    # Auto-detect deformation mode from y column names if not provided
+    if deformation_mode is None:
+        detected_deformation = detect_deformation_mode_from_columns(
+            y_headers, y_units
+        )
+        if detected_deformation is not None:
+            deformation_mode = detected_deformation
+            logger.debug(
+                "Auto-detected deformation mode", deformation_mode=deformation_mode
+            )
+
+    # Store deformation mode in metadata for BaseModel.fit() auto-detection
+    if deformation_mode is not None:
+        final_metadata["deformation_mode"] = deformation_mode
+
     logger.info(
         "File parsed",
         filepath=str(filepath),
         n_records=len(x_data),
         test_mode=detected_test_mode,
         domain=domain,
+        deformation_mode=deformation_mode,
     )
 
     return RheoData(
@@ -360,12 +412,13 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
 
 def _detect_delimiter(filepath: Path) -> str:
     """Auto-detect CSV delimiter using csv.Sniffer with fallbacks."""
+    sample = ""
     try:
         with open(filepath, encoding="utf-8-sig", errors="replace") as f:
             sample = f.read(4096)
             try:
                 dialect = csv.Sniffer().sniff(
-                    sample, delimiters=[",", "\t", ";", "|", " "]
+                    sample, delimiters=[",", "\t", ";", "|", " "]  # type: ignore[arg-type]
                 )
                 return dialect.delimiter
             except Exception:
@@ -376,7 +429,7 @@ def _detect_delimiter(filepath: Path) -> str:
     # Fallback heuristic - check for common delimiters
     delimiters = [",", "\t", ";", "|"]
     counts = {d: sample.count(d) for d in delimiters}
-    best = max(counts, key=counts.get)
+    best = max(counts, key=counts.get)  # type: ignore[arg-type]
 
     # If no common delimiter found, check for space-delimited
     if counts[best] == 0:

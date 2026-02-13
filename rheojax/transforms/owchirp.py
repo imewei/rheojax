@@ -170,7 +170,7 @@ class OWChirp(BaseTransform):
         n_freqs = len(frequencies)
 
         # Initialize coefficient array
-        coefficients = jnp.zeros((n_freqs, n_times), dtype=jnp.complex64)
+        coefficients = jnp.zeros((n_freqs, n_times), dtype=jnp.complex128)
 
         # Compute wavelet transform at each frequency
         for i, freq in enumerate(frequencies):
@@ -179,7 +179,8 @@ class OWChirp(BaseTransform):
             for j, t_center in enumerate(t):
                 wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)
                 # Inner product
-                coeff = jnp.sum(signal * jnp.conj(wavelet)) * (t[1] - t[0])
+                dt = t[1] - t[0] if len(t) > 1 else 1.0
+                coeff = jnp.sum(signal * jnp.conj(wavelet)) * dt
                 coefficients = coefficients.at[i, j].set(coeff)
 
         return coefficients
@@ -205,15 +206,16 @@ class OWChirp(BaseTransform):
         Array
             Wavelet coefficients
         """
+        if len(t) < 2:
+            raise ValueError("Wavelet transform requires at least 2 time points")
         dt = t[1] - t[0]
-        len(t)
 
         coefficients_list = []
 
         for freq in frequencies:
             # Create wavelet centered at middle
             t_center = (t[0] + t[-1]) / 2.0
-            wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)
+            wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)  # type: ignore[arg-type]
 
             # FFT-based convolution
             signal_fft = jnp.fft.fft(signal)
@@ -226,7 +228,7 @@ class OWChirp(BaseTransform):
 
         return coefficients * dt
 
-    def _transform(self, data: RheoData) -> RheoData:
+    def _transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
         """Apply OWChirp transform to LAOS data.
 
         Parameters
@@ -269,7 +271,7 @@ class OWChirp(BaseTransform):
 
         logger.debug(
             "Input data extracted",
-            data_points=len(t),
+            data_points=len(t),  # type: ignore[arg-type]
             domain=data.domain,
         )
 
@@ -406,9 +408,9 @@ class OWChirp(BaseTransform):
         )
 
         # Get frequency spectrum
-        freq_data = self.transform(data)
-        freqs = freq_data.x
-        spectrum = freq_data.y
+        freq_data = self.transform(data)  # type: ignore[arg-type]
+        freqs = freq_data.x  # type: ignore[attr-defined]
+        spectrum = freq_data.y  # type: ignore[attr-defined]
 
         # Convert to numpy for peak detection
         if isinstance(freqs, Array):

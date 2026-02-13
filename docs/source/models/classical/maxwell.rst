@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Single relaxation time, exponential stress decay, viscoelastic liquids
-- **Parameters:** 2 (G0, :math:`\eta`)
+- **Parameters:** 2 (:math:`G_0`, :math:`\eta`)
 - **Key equation:** :math:`G(t) = G \exp(-t/\tau)` where :math:`\tau = \eta/G`
 - **Test modes:** Oscillation, relaxation, creep, flow curve
 - **Material examples:** Polymer melts (PS, PDMS), viscoelastic liquids, dilute solutions
@@ -250,7 +250,7 @@ Parameters
      - Spring modulus
    * - ``eta``
      - :math:`\eta`
-     - Pa*s
+     - Pa·s
      - :math:`\eta > 0`
      - Dashpot viscosity
    * - (derived)
@@ -296,7 +296,7 @@ For **linear polymer melts**:
    \eta_0 = \frac{\pi^2}{12} \rho \frac{RT}{M_e} \tau_e \left(\frac{M}{M_e}\right)^3
 
 where:
-   - :math:`M_e` ≈ 1800 g/mol (polyethylene), 13000 g/mol (polystyrene)
+   - :math:`M_e \approx 1800` g/mol (polyethylene), 13000 g/mol (polystyrene)
    - :math:`\tau_e` = Rouse time of entanglement strand
    - :math:`\rho` = density
 
@@ -351,7 +351,7 @@ Limiting Cases
 
 **Interpretation**: Viscous liquid-like behavior dominates. Energy dissipation (:math:`G''`) exceeds storage (:math:`G'`).
 
-**High frequency (** :math:`\omega` **→ ∞, glassy region)**:
+**High frequency (** :math:`\omega \to \infty` **, glassy region)**:
 
 .. math::
 
@@ -383,7 +383,7 @@ Asymptotic Behavior Summary
    * - Low :math:`\omega \ll 1/\tau`
      - :math:`\sim \omega^2`
      - :math:`\sim \omega`
-     - Viscous liquid (tan :math:`\delta` ≫ 1)
+     - Viscous liquid (:math:`\tan \delta \gg 1`)
    * - :math:`\omega \approx 1/\tau`
      - :math:`\approx G/2`
      - :math:`\approx G/2`
@@ -391,7 +391,7 @@ Asymptotic Behavior Summary
    * - High :math:`\omega \gg 1/\tau`
      - :math:`\to G`
      - :math:`\to 0`
-     - Elastic solid (tan :math:`\delta` → 0)
+     - Elastic solid (:math:`\tan \delta \to 0`)
 
 Diagnostic Signatures
 ~~~~~~~~~~~~~~~~~~~~~
@@ -587,7 +587,7 @@ Sample Preparation Considerations
 
 **Polymer solutions**:
    - Dissolve at :math:`T > T_g` with gentle stirring (avoid degradation)
-   - Filter through 0.45 :math:`\mum` PTFE filter to remove aggregates
+   - Filter through 0.45 :math:`\mu\text{m}` PTFE filter to remove aggregates
    - Equilibrate at test temperature for 30 min
    - Use solvent trap to prevent evaporation
 
@@ -858,7 +858,7 @@ Connection to Advanced Models
    Maxwell model: :math:`|\eta^*| = \eta / \sqrt{1 + (\omega\tau)^2}`
 
 **Winter-Chambon criterion**:
-   Maxwell model does **not** satisfy gel point criterion (tan :math:`\delta` ≠ constant). Use FMG for critical gels.
+   Maxwell model does **not** satisfy gel point criterion (:math:`\tan \delta \neq \text{constant}`). Use FMG for critical gels.
 
 API References
 --------------

@@ -18,12 +18,12 @@ complex time-dependent behavior combining solid-like elasticity and liquid-like 
 
    Transient networks are characterized by two competing timescales:
    
-   - **Network relaxation time** (τ_net): How quickly crosslinks reform
-   - **Applied deformation rate** (1/γ̇): How quickly the material is deformed
-   
-   When τ_net << 1/γ̇, the network relaxes faster than deformation → **liquid-like**
-   
-   When τ_net >> 1/γ̇, the network is frozen on deformation timescale → **solid-like**
+   - **Network relaxation time** (:math:`\tau_{\text{net}}`): How quickly crosslinks reform
+   - **Applied deformation rate** (:math:`1/\dot{\gamma}`): How quickly the material is deformed
+
+   When :math:`\tau_{\text{net}} \ll 1/\dot{\gamma}`, the network relaxes faster than deformation → **liquid-like**
+
+   When :math:`\tau_{\text{net}} \gg 1/\dot{\gamma}`, the network is frozen on deformation timescale → **solid-like**
 
 RheoJAX provides two complementary theoretical frameworks with 9 total model variants:
 
@@ -95,28 +95,28 @@ The Transient Network Concept
 ------------------------------
 
 A transient network consists of polymer chains connected by **temporary crosslinks**
-that can break and reform. Each crosslink has a characteristic **lifetime** τ before
+that can break and reform. Each crosslink has a characteristic **lifetime** :math:`\tau` before
 detaching, and a characteristic **attachment time** before reforming.
 
 .. math::
 
    \text{Network lifetime: } \tau_{\text{net}} = \frac{1}{k_d} \quad \text{where } k_d = \text{detachment rate}
 
-The network's rheological behavior depends on how τ_net compares to experimental timescales:
+The network's rheological behavior depends on how :math:`\tau_{\text{net}}` compares to experimental timescales:
 
 **Small Amplitude Oscillatory Shear (SAOS):**
 
-At low frequencies (ω << k_d): Material flows like a liquid, G'' > G'
+At low frequencies (:math:`\omega \ll k_d`): Material flows like a liquid, :math:`G'' > G'`
 
-At high frequencies (ω >> k_d): Network is frozen, elastic response, G' > G''
+At high frequencies (:math:`\omega \gg k_d`): Network is frozen, elastic response, :math:`G' > G''`
 
-Crossover frequency: ω_c ≈ k_d
+Crossover frequency: :math:`\omega_c \approx k_d`
 
 **Steady Shear Flow:**
 
-At low shear rates (γ̇ << k_d): Newtonian plateau viscosity
+At low shear rates (:math:`\dot{\gamma} \ll k_d`): Newtonian plateau viscosity
 
-At high shear rates (γ̇ >> k_d): Shear thinning as bonds break faster than they reform
+At high shear rates (:math:`\dot{\gamma} \gg k_d`): Shear thinning as bonds break faster than they reform
 
 **Startup Shear:**
 
@@ -127,22 +127,22 @@ Overshoot magnitude controlled by chain stretch before bond rupture
 Distribution Tensor Concept (VLB Framework)
 -------------------------------------------
 
-The VLB framework uses a **distribution tensor** μ(t) to represent the ensemble-averaged
+The VLB framework uses a **distribution tensor** :math:`\mu(t)` to represent the ensemble-averaged
 end-to-end vector distribution of network chains:
 
 .. math::
 
    \mu_{ij}(t) = \frac{\langle R_i R_j \rangle}{R_0^2}
 
-where R is the end-to-end vector and R₀ is the equilibrium length. The stress is:
+where :math:`R` is the end-to-end vector and :math:`R_0` is the equilibrium length. The stress is:
 
 .. math::
 
    \sigma = G_0 (\mu - I)
 
-For an equilibrium network: μ = I (isotropic distribution)
+For an equilibrium network: :math:`\mu = I` (isotropic distribution)
 
-Under deformation: μ ≠ I (chains stretch/orient)
+Under deformation: :math:`\mu \neq I` (chains stretch/orient)
 
 **Evolution equation** (stationary chains):
 
@@ -151,10 +151,10 @@ Under deformation: μ ≠ I (chains stretch/orient)
    \frac{D\mu}{Dt} = \kappa \cdot \mu + \mu \cdot \kappa^T - k_d(\mu - I) + k_a(I - \mu)
 
 where:
-   - Dμ/Dt: Material derivative (advection with flow)
-   - κ: Velocity gradient tensor
-   - k_d: Detachment rate (bond breaking)
-   - k_a: Attachment rate (bond formation)
+   - :math:`D\mu/Dt`: Material derivative (advection with flow)
+   - :math:`\kappa`: Velocity gradient tensor
+   - :math:`k_d`: Detachment rate (bond breaking)
+   - :math:`k_a`: Attachment rate (bond formation)
 
 Attachment vs Detachment Kinetics
 ----------------------------------
@@ -173,7 +173,7 @@ Suitable for: Weak forces, low strain rates, thermoactivated processes
 
    k_d = k_{d,0} \exp\left(\frac{F}{F_{\text{ref}}}\right)
 
-where F is the force on the chain. Higher force → faster detachment → shear thinning
+where :math:`F` is the force on the chain. Higher force → faster detachment → shear thinning
 
 Suitable for: Load-bearing networks, materials with force-sensitive bonds
 
@@ -183,7 +183,7 @@ Suitable for: Load-bearing networks, materials with force-sensitive bonds
 
    F = \frac{k_B T}{b} \frac{r/r_{\max}}{1 - (r/r_{\max})^2}
 
-Chains stiffen as they approach maximum extension r_max
+Chains stiffen as they approach maximum extension :math:`r_{\max}`
 
 Suitable for: Materials showing strain stiffening at large deformations
 
@@ -215,19 +215,19 @@ detachment.
 
 **Parameters:**
 
-- **G_0** (Pa): Network modulus (number density × k_B T)
-- **k_d_0** (s⁻¹): Baseline detachment rate (inverse lifetime)
+- :math:`G_0` (Pa): Network modulus (number density :math:`\times k_B T`)
+- **k_d_0** (:math:`\text{s}^{-1}`): Baseline detachment rate (inverse lifetime)
 - **beta** (dimensionless): Nonlinearity parameter (stress-enhanced detachment)
 
 **Physics:**
 
-Chain population φ evolves as:
+Chain population :math:`\phi` evolves as:
 
 .. math::
 
    \frac{d\phi}{dt} = -k_d(\sigma) \phi + k_a (1 - \phi)
 
-where k_d = k_d_0 × (1 + β|σ/G_0|)
+where :math:`k_d = k_{d,0} \times (1 + \beta|\sigma/G_0|)`
 
 **Use for:**
 
@@ -261,7 +261,7 @@ scission and recombination. Key feature: **geometric mean relaxation time**.
 
 **Parameters:**
 
-- **G_0** (Pa): Plateau modulus
+- :math:`G_0` (Pa): Plateau modulus
 - **tau_rep** (s): Reptation time (chain sliding along tube)
 - **tau_break** (s): Breakage time (scission/recombination)
 
@@ -272,13 +272,13 @@ Chains relax via two competing mechanisms:
 1. **Reptation**: Chain diffuses along its contour (slow)
 2. **Breakage**: Chain breaks and reforms into shorter segments (fast)
 
-When τ_break << τ_rep: Breakage dominates → τ_eff ≈ √(τ_rep × τ_break)
+When :math:`\tau_{\text{break}} \ll \tau_{\text{rep}}`: Breakage dominates → :math:`\tau_{\text{eff}} \approx \sqrt{\tau_{\text{rep}} \times \tau_{\text{break}}}`
 
 This gives **single effective mode** despite two processes.
 
 **Characteristic features:**
 
-- Single Maxwell peak in G', G'' vs ω
+- Single Maxwell peak in :math:`G'`, :math:`G''` vs :math:`\omega`
 - Shear thinning at high rates (breakage accelerated)
 - Stress plateau in startup shear
 
@@ -319,9 +319,9 @@ Only bridges contribute to stress.
 
 **Parameters:**
 
-- **G_0** (Pa): Modulus scale (bridge contribution)
-- **k_detach** (s⁻¹): Bridge → loop detachment rate
-- **k_attach** (s⁻¹): Loop → bridge attachment rate  
+- :math:`G_0` (Pa): Modulus scale (bridge contribution)
+- **k_detach** (:math:`\text{s}^{-1}`): Bridge → loop detachment rate
+- **k_attach** (:math:`\text{s}^{-1}`): Loop → bridge attachment rate
 - **phi_bridge_0** (dimensionless): Equilibrium bridge fraction
 
 **Physics:**
@@ -356,7 +356,7 @@ Under flow:
 TNT MultiSpecies — Multi-Population Networks
 ---------------------------------------------
 
-General framework for **N distinct chain populations** with different kinetics. Captures
+General framework for :math:`N` **distinct chain populations** with different kinetics. Captures
 broad relaxation spectra without assuming specific microstructure.
 
 .. code-block:: python
@@ -374,11 +374,11 @@ broad relaxation spectra without assuming specific microstructure.
 
 **Parameters:**
 
-- **G_i** (Pa): Modulus contribution of species i
-- **k_d_i** (s⁻¹): Detachment rate of species i
+- **G_i** (Pa): Modulus contribution of species :math:`i`
+- **k_d_i** (:math:`\text{s}^{-1}`): Detachment rate of species :math:`i`
 - **(Optional) beta** (dimensionless): Shared nonlinearity parameter
 
-Total: **2N + 1** parameters for N species
+Total: :math:`2N + 1` parameters for :math:`N` species
 
 **Physics:**
 
@@ -388,7 +388,7 @@ Each species evolves independently:
 
    \frac{d\phi_i}{dt} = -k_{d,i}(\sigma_i) \phi_i + k_{a,i} (1 - \phi_i)
 
-Total stress: σ_total = Σ G_i φ_i
+Total stress: :math:`\sigma_{\text{total}} = \sum G_i \phi_i`
 
 **Use for:**
 
@@ -401,8 +401,8 @@ Total stress: σ_total = Σ G_i φ_i
 
 .. warning::
 
-   Multi-species models have many parameters (2N+1). Use Bayesian inference to
-   quantify parameter uncertainty and avoid overfitting. Start with N=2-3 species
+   Multi-species models have many parameters (:math:`2N+1`). Use Bayesian inference to
+   quantify parameter uncertainty and avoid overfitting. Start with :math:`N=2\text{--}3` species
    and increase only if diagnostics show clear improvement.
 
 TNT StickyRouse — Sticky Rouse Chains
@@ -429,7 +429,7 @@ the backbone. Captures both chain relaxation and association/dissociation.
 
 **Parameters:**
 
-- **G_0** (Pa): Plateau modulus
+- :math:`G_0` (Pa): Plateau modulus
 - **tau_R** (s): Longest Rouse relaxation time
 - **tau_s** (s): Sticker association lifetime
 - **N_s** (dimensionless): Number of stickers per chain
@@ -438,10 +438,10 @@ the backbone. Captures both chain relaxation and association/dissociation.
 
 Two contributions to stress:
 
-1. **Rouse modes**: Chain internal relaxation (modes p = 1, 2, ..., N_s)
+1. **Rouse modes**: Chain internal relaxation (modes :math:`p = 1, 2, \ldots, N_s`)
 2. **Sticker network**: Elastic contribution from associations
 
-Relaxation times: τ_p = τ_R / p² (Rouse spectrum)
+Relaxation times: :math:`\tau_p = \tau_R / p^2` (Rouse spectrum)
 
 Effective modulus combines Rouse + sticker contributions
 
@@ -464,7 +464,7 @@ Effective modulus combines Rouse + sticker contributions
 VLB Framework (4 Variants)
 ===========================
 
-VLB models use a **distribution tensor** μ to describe chain end-to-end vector statistics.
+VLB models use a **distribution tensor** :math:`\mu` to describe chain end-to-end vector statistics.
 More mathematically sophisticated than TNT but provides unified treatment of force effects.
 
 VLB Local — Basic Distribution Tensor
@@ -491,9 +491,9 @@ variants extend this base model.
 
 **Parameters:**
 
-- **G_0** (Pa): Network modulus
-- **k_d_0** (s⁻¹): Baseline detachment rate
-- **k_a_0** (s⁻¹): Attachment rate
+- :math:`G_0` (Pa): Network modulus
+- **k_d_0** (:math:`\text{s}^{-1}`): Baseline detachment rate
+- **k_a_0** (:math:`\text{s}^{-1}`): Attachment rate
 - **(Optional) beta** (dimensionless): Nonlinearity parameter
 
 **Governing equations:**
@@ -510,13 +510,13 @@ Stress:
 
    \sigma = G_0 (\mu - I)
 
-For SAOS at frequency ω:
+For SAOS at frequency :math:`\omega`:
 
 .. math::
 
    G^*(\omega) = \frac{G_0 i\omega}{i\omega + k_d + k_a}
 
-This gives single Maxwell mode with τ = 1/(k_d + k_a)
+This gives single Maxwell mode with :math:`\tau = 1/(k_d + k_a)`
 
 **Use for:**
 
@@ -529,13 +529,13 @@ This gives single Maxwell mode with τ = 1/(k_d + k_a)
 
 .. note::
 
-   VLB Local with constant k_d, k_a is mathematically equivalent to TNT SingleMode
-   with beta=0. The difference is formalism: tensor (VLB) vs population (TNT).
+   VLB Local with constant :math:`k_d`, :math:`k_a` is mathematically equivalent to TNT SingleMode
+   with :math:`\beta=0`. The difference is formalism: tensor (VLB) vs population (TNT).
 
 VLB MultiNetwork — Multiple Parallel Networks
 ----------------------------------------------
 
-Extension to **N independent networks**, each with its own distribution tensor. Useful
+Extension to :math:`N` **independent networks**, each with its own distribution tensor. Useful
 for polydisperse systems or multi-component materials.
 
 .. code-block:: python
@@ -553,17 +553,17 @@ for polydisperse systems or multi-component materials.
 
 **Parameters:**
 
-- **G_0_i** (Pa): Modulus of network i
-- **k_d_0_i** (s⁻¹): Detachment rate of network i  
-- **k_a_0_i** (s⁻¹): Attachment rate of network i
+- **G_0_i** (Pa): Modulus of network :math:`i`
+- **k_d_0_i** (:math:`\text{s}^{-1}`): Detachment rate of network :math:`i`
+- **k_a_0_i** (:math:`\text{s}^{-1}`): Attachment rate of network :math:`i`
 
-Total: **3N** parameters for N networks
+Total: :math:`3N` parameters for :math:`N` networks
 
 **Physics:**
 
-Each network i has independent μ_i evolving according to VLB equation.
+Each network :math:`i` has independent :math:`\mu_i` evolving according to VLB equation.
 
-Total stress: σ_total = Σ G_0_i (μ_i - I)
+Total stress: :math:`\sigma_{\text{total}} = \sum G_{0,i} (\mu_i - I)`
 
 **Use for:**
 
@@ -607,9 +607,9 @@ Captures shear thinning and strain stiffening.
 
 **Bell model physics:**
 
-Force on chain: F = G_0 × |μ - I|
+Force on chain: :math:`F = G_0 \times |\mu - I|`
 
-Detachment rate: k_d = k_d_0 × exp(F / F_ref)
+Detachment rate: :math:`k_d = k_{d,0} \times \exp(F / F_{\text{ref}})`
 
 Higher stretch → higher force → faster detachment → shear thinning
 
@@ -621,15 +621,15 @@ Chain spring force:
 
    F = \frac{k_B T}{b} \frac{\lambda}{1 - \lambda^2}
 
-where λ = r/r_max is normalized extension
+where :math:`\lambda = r/r_{\max}` is normalized extension
 
-As λ → 1: Force diverges (chains cannot extend beyond r_max) → strain stiffening
+As :math:`\lambda \to 1`: Force diverges (chains cannot extend beyond :math:`r_{\max}`) → strain stiffening
 
 **Characteristic features:**
 
-- **Bell only**: Shear thinning in flow curves, stress plateau at high γ̇
+- **Bell only**: Shear thinning in flow curves, stress plateau at high :math:`\dot{\gamma}`
 - **FENE only**: Strain stiffening at large deformations
-- **Bell + FENE**: Both shear thinning (low γ̇) and stiffening (large strain)
+- **Bell + FENE**: Both shear thinning (low :math:`\dot{\gamma}`) and stiffening (large strain)
 
 **Use for:**
 
@@ -671,12 +671,12 @@ banding when constitutive curve is non-monotonic.
 **Additional parameters:**
 
 - **n_points** (int): Spatial discretization (default: 51)
-- **D** (m²/s): Stress diffusion coefficient
+- **D** (:math:`\text{m}^2/\text{s}`): Stress diffusion coefficient
 - **gap_width** (m): Gap width for spatial domain
 
 **Physics:**
 
-Distribution tensor varies in space: μ(y, t)
+Distribution tensor varies in space: :math:`\mu(y, t)`
 
 PDE evolution:
 
@@ -686,7 +686,7 @@ PDE evolution:
 
 Stress diffusion term couples neighboring spatial points.
 
-When dσ/dγ̇ < 0 (non-monotonic constitutive curve): **Instability** → shear banding
+When :math:`d\sigma/d\dot{\gamma} < 0` (non-monotonic constitutive curve): **Instability** → shear banding
 
 Material separates into coexisting bands:
    - Low-rate band: high viscosity
@@ -839,14 +839,14 @@ depend on network kinetics.
 
 **Key insights:**
 
-- Overshoot time scales with network relaxation: t_overshoot ≈ τ_net
+- Overshoot time scales with network relaxation: :math:`t_{\text{overshoot}} \approx \tau_{\text{net}}`
 - Higher shear rate → larger overshoot (more chain stretch before breaking)
 - In strain-space (not time), overshoot occurs at similar strain across rates
 
 Bayesian Inference for Network Parameters
 ==========================================
 
-Network parameters (k_d, k_a, G_0) often exhibit correlations. Bayesian inference
+Network parameters (:math:`k_d`, :math:`k_a`, :math:`G_0`) often exhibit correlations. Bayesian inference
 quantifies parameter uncertainty and identifies non-identifiability.
 
 Basic Bayesian Workflow
@@ -930,14 +930,14 @@ Network parameters often show correlations:
 
 **Interpretation:**
 
-- **|ρ| < 0.5**: Parameters well-identified
-- **0.5 < |ρ| < 0.8**: Moderate correlation (acceptable)
-- **|ρ| > 0.8**: Strong correlation (consider reparameterization)
+- :math:`|\rho| < 0.5`: Parameters well-identified
+- :math:`0.5 < |\rho| < 0.8`: Moderate correlation (acceptable)
+- :math:`|\rho| > 0.8`: Strong correlation (consider reparameterization)
 
 **Common correlations:**
 
-- G_0 and k_d: Both affect modulus magnitude and timescale
-- k_d and k_a: Combined determine network relaxation time
+- :math:`G_0` and :math:`k_d`: Both affect modulus magnitude and timescale
+- :math:`k_d` and :math:`k_a`: Combined determine network relaxation time
 
 Visualization and Analysis
 ===========================
@@ -1129,7 +1129,7 @@ Model Comparison Table
      - Not available
      - Nonlocal PDE variant
    * - **Parameter Count**
-     - 3-5 (single mode), 2N+1 (multi)
+     - 3--5 (single mode), :math:`2N+1` (multi)
      - 3-4 (basic), 5-6 (Bell+FENE)
    * - **Best For**
      - Discrete microstructures
@@ -1188,7 +1188,7 @@ relaxation time**. Real materials often have:
 - **Broad relaxation spectra** (chain length polydispersity)
 - **Multiple kinetic processes** (fast + slow associations)
 
-Use MultiSpecies/MultiNetwork for materials with broad G', G'' peaks.
+Use MultiSpecies/MultiNetwork for materials with broad :math:`G'`, :math:`G''` peaks.
 
 Shear Banding Prediction Limitations
 -------------------------------------
@@ -1197,7 +1197,7 @@ VLB Nonlocal predicts banding from **constitutive instability** (non-monotonic f
 but real shear banding involves:
 
 - **Concentration coupling** (density variations)
-- **Normal stress effects** (N₁, N₂)
+- **Normal stress effects** (:math:`N_1`, :math:`N_2`)
 - **Structural heterogeneity** (pre-existing defects)
 
 Nonlocal VLB is a starting point; compare with experiments for validation.
@@ -1208,13 +1208,13 @@ No Entanglement Effects
 Transient network models do not include **reptation/entanglement** physics. For
 entangled transient networks (e.g., entangled wormlike micelles), use:
 
-- **TNT Cates**: Includes reptation time τ_rep explicitly
+- **TNT Cates**: Includes reptation time :math:`\tau_{\text{rep}}` explicitly
 - **Hybrid approaches**: Combine transient network + tube model
 
 Parameter Identifiability
 --------------------------
 
-Network parameters (G_0, k_d, k_a) can be **correlated**, especially from SAOS data alone.
+Network parameters (:math:`G_0`, :math:`k_d`, :math:`k_a`) can be **correlated**, especially from SAOS data alone.
 
 **Best practices:**
 
@@ -1250,7 +1250,7 @@ Same structure, with analysis of loop/bridge populations
 
 **TNT MultiSpecies** (6 notebooks): ``examples/tnt/19-24``
 
-Fitting multi-modal data with N=2-4 species
+Fitting multi-modal data with :math:`N=2\text{--}4` species
 
 **TNT StickyRouse** (6 notebooks): ``examples/tnt/25-30``
 
@@ -1289,6 +1289,7 @@ References
 
 - Tanaka, F., & Edwards, S. F. (1992). "Viscoelastic properties of physically crosslinked
   networks: Part 3. Time-dependent phenomena." *J. Non-Newtonian Fluid Mech.* 43(2-3), 289-309.
+  https://doi.org/10.1016/0377-0257(92)80029-W
 
 **Wormlike Micelles (Cates Model):**
 
@@ -1298,6 +1299,7 @@ References
 
 - Cates, M. E. (1990). "Nonlinear viscoelasticity of wormlike micelles (and other
   reversibly breakable polymers)." *J. Phys. Chem.* 94(1), 371-375.
+  https://doi.org/10.1021/j100364a063
 
 **Telechelic Polymers (Loop-Bridge):**
 
@@ -1313,6 +1315,7 @@ References
 
 - Long, R., Mayumi, K., Creton, C., Narita, T., & Hui, C.-Y. (2014). "Time dependent
   behavior of a dual cross-link self-healing gel." *Macromolecules* 47(20), 7243-7250.
+  https://doi.org/10.1021/ma501290h
 
 **Force-Sensitive Kinetics:**
 
@@ -1321,6 +1324,7 @@ References
 
 - Evans, E., & Ritchie, K. (1997). "Dynamic strength of molecular adhesion bonds."
   *Biophys. J.* 72(4), 1541-1555.
+  https://doi.org/10.1016/S0006-3495(97)78802-7
 
 **Shear Banding:**
 
@@ -1332,8 +1336,8 @@ References
 
 **Bayesian Inference for Rheology:**
 
-- Boudara, V. A. H., et al. (2020). "Nonlinear rheology of polydisperse blends of
-  entangled linear polymers." *J. Rheol.* 64(5), 1049-1069.
+- Boudara, V. A. H., Read, D. J., & Ramirez, J. (2019). "Nonlinear rheology of polydisperse blends of
+  entangled linear polymers." *J. Rheol.*, 63(1), 71-91. https://doi.org/10.1122/1.5052320
 
 See Also
 ========

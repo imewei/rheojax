@@ -39,23 +39,23 @@ grounded in different physical mechanisms:
      - Characteristic Signature
    * - **DMT**
      - Structure parameter kinetics
-     - λ ∈ [0,1] (structure)
+     - :math:`\lambda \in [0,1]` (structure)
      - Stress overshoot, viscosity bifurcation
    * - **Fluidity**
      - Cooperative flow dynamics
-     - f = 1/η (fluidity)
+     - :math:`f = 1/\eta` (fluidity)
      - Shear banding, nonlocal effects
    * - **Hébraud-Lequeux**
      - Mean-field stress distribution
-     - P(σ, t) (stress PDF)
+     - :math:`P(\sigma, t)` (stress PDF)
      - Yield stress, dense suspension dynamics
    * - **STZ**
      - Disorder temperature
-     - χ (effective temperature)
-     - Metallic glass physics, χ > χ₀ flow
+     - :math:`\chi` (effective temperature)
+     - Metallic glass physics, :math:`\chi > \chi_0` flow
    * - **EPM**
      - Mesoscopic plastic events
-     - Local σ, σ_y threshold
+     - Local :math:`\sigma`, :math:`\sigma_y` threshold
      - Avalanches, spatial heterogeneity
 
 When to Use Thixotropic Models
@@ -116,7 +116,7 @@ Diagnostic questions to identify thixotropic behavior:
    * - Stress overshoot in startup shear
      - Yes
      - DMT, Fluidity, STZ
-   * - Viscosity decreases with time at constant γ̇
+   * - Viscosity decreases with time at constant :math:`\dot{\gamma}`
      - Yes
      - All frameworks
    * - Flow curve shows hysteresis (up-down ramps)
@@ -125,13 +125,13 @@ Diagnostic questions to identify thixotropic behavior:
    * - Creep shows viscosity bifurcation (flows or arrests)
      - Yes
      - DMT, Fluidity
-   * - LAOS intracycle yielding with G' collapse
+   * - LAOS intracycle yielding with :math:`G'` collapse
      - Yes
      - SPP + DMT/Fluidity
    * - Shear banding (stress plateau)
      - Yes
      - Fluidity Nonlocal, DMT Nonlocal
-   * - Recovery: η increases after cessation
+   * - Recovery: :math:`\eta` increases after cessation
      - Yes
      - All frameworks
    * - Aging: properties drift with waiting time
@@ -144,7 +144,7 @@ Theoretical Foundations
 The Structure Parameter Concept
 --------------------------------
 
-Most thixotropic models use a **scalar structure parameter** λ that tracks the degree of
+Most thixotropic models use a **scalar structure parameter** :math:`\lambda` that tracks the degree of
 microstructural order:
 
 .. math::
@@ -153,23 +153,23 @@ microstructural order:
                        - \underbrace{a \lambda |\dot{\gamma}|^c / t_{\text{eq}}}_{\text{breakdown under shear}}
 
 where:
-   - λ = 1: fully structured (rest state)
-   - λ = 0: fully broken down (high-shear steady state)
-   - t_eq: equilibrium timescale (seconds to minutes)
-   - a, c: breakdown parameters (material-specific)
+   - :math:`\lambda = 1`: fully structured (rest state)
+   - :math:`\lambda = 0`: fully broken down (high-shear steady state)
+   - :math:`t_\text{eq}`: equilibrium timescale (seconds to minutes)
+   - :math:`a, c`: breakdown parameters (material-specific)
 
 **Physical interpretation:**
 
-- At rest (γ̇ = 0): λ → 1 exponentially with time constant t_eq
-- Under steady shear: λ → λ_∞ where buildup = breakdown
-- Transient response: λ evolves during the experiment itself
+- At rest (:math:`\dot{\gamma} = 0`): :math:`\lambda \to 1` exponentially with time constant :math:`t_\text{eq}`
+- Under steady shear: :math:`\lambda \to \lambda_\infty` where buildup = breakdown
+- Transient response: :math:`\lambda` evolves during the experiment itself
 
 This structure parameter then modulates viscosity, yield stress, or modulus.
 
 Viscosity Closures
 ------------------
 
-Different models connect λ to macroscopic properties differently:
+Different models connect :math:`\lambda` to macroscopic properties differently:
 
 **DMT Exponential Closure:**
 
@@ -177,8 +177,8 @@ Different models connect λ to macroscopic properties differently:
 
    \eta(\lambda) = \eta_\infty \left( \frac{\eta_0}{\eta_\infty} \right)^\lambda
 
-Smooth transition from η₀ (structured) to η_∞ (broken). No explicit yield stress, but
-effective yield emerges from high η at λ ≈ 1.
+Smooth transition from :math:`\eta_0` (structured) to :math:`\eta_\infty` (broken). No explicit yield stress, but
+effective yield emerges from high :math:`\eta` at :math:`\lambda \approx 1`.
 
 **DMT Herschel-Bulkley Closure:**
 
@@ -186,7 +186,7 @@ effective yield emerges from high η at λ ≈ 1.
 
    \eta(\dot{\gamma}, \lambda) = \frac{\tau_y(\lambda)}{|\dot{\gamma}|} + K(\lambda) |\dot{\gamma}|^{n-1}
 
-Explicit yield stress τ_y(λ) that decreases as structure breaks (λ → 0).
+Explicit yield stress :math:`\tau_y(\lambda)` that decreases as structure breaks (:math:`\lambda \to 0`).
 
 **Fluidity Model:**
 
@@ -194,8 +194,8 @@ Explicit yield stress τ_y(λ) that decreases as structure breaks (λ → 0).
 
    f = \frac{1}{\eta}, \quad \frac{df}{dt} = \frac{f_{\text{eq}} - f}{\tau_f} + D \nabla^2 f
 
-Fluidity f (inverse viscosity) as the primary variable. Nonlocal variant includes spatial
-diffusion D∇²f, enabling shear banding.
+Fluidity :math:`f` (inverse viscosity) as the primary variable. Nonlocal variant includes spatial
+diffusion :math:`D\nabla^2 f`, enabling shear banding.
 
 Elasticity and Stress Overshoot
 --------------------------------
@@ -207,7 +207,7 @@ backbone** is often added:
 
    \dot{\sigma} + \frac{\sigma}{\tau(\lambda)} = G \dot{\gamma}
 
-where the relaxation time τ depends on structure:
+where the relaxation time :math:`\tau` depends on structure:
 
 .. math::
 
@@ -222,7 +222,7 @@ Five Thixotropic Frameworks
 1. DMT (de Souza Mendes-Thompson)
 ----------------------------------
 
-**Physical basis**: Structural kinetics with scalar parameter λ
+**Physical basis**: Structural kinetics with scalar parameter :math:`\lambda`
 
 **Import:**
 
@@ -239,8 +239,8 @@ Five Thixotropic Frameworks
 
 **Two viscosity closures:**
 
-1. ``closure="exponential"``: η = η_∞(η₀/η_∞)^λ (smooth)
-2. ``closure="herschel_bulkley"``: Explicit yield stress τ_y(λ)
+1. ``closure="exponential"``: :math:`\eta = \eta_\infty(\eta_0/\eta_\infty)^\lambda` (smooth)
+2. ``closure="herschel_bulkley"``: Explicit yield stress :math:`\tau_y(\lambda)`
 
 **Optional elasticity:** ``include_elasticity=True`` adds Maxwell backbone for stress overshoot
 
@@ -254,7 +254,7 @@ Five Thixotropic Frameworks
 
 **Key strengths:**
    - Simple, well-established framework (de Souza Mendes 2009)
-   - Clear physical interpretation of λ
+   - Clear physical interpretation of :math:`\lambda`
    - Captures stress overshoot, viscosity bifurcation, hysteresis
    - Nonlocal variant for shear banding
 
@@ -289,7 +289,7 @@ Five Thixotropic Frameworks
 2. Fluidity Models
 ------------------
 
-**Physical basis**: Cooperative flow with fluidity f = 1/η as primary variable
+**Physical basis**: Cooperative flow with fluidity :math:`f = 1/\eta` as primary variable
 
 **Import:**
 
@@ -312,10 +312,10 @@ Five Thixotropic Frameworks
 
 **Saramito EVP features:**
 
-- **Tensorial stress**: [τ_xx, τ_yy, τ_xy] → normal stress differences (N₁)
-- **Von Mises yield criterion**: α = max(0, 1 - τ_y/|τ|)
-- **Fluidity aging**: df/dt = aging + b|γ̇|^n * rejuvenation
-- **Two coupling modes**: "minimal" (λ = 1/f only) vs "full" (λ + τ_y(f) aging yield)
+- **Tensorial stress**: [:math:`\tau_{xx}`, :math:`\tau_{yy}`, :math:`\tau_{xy}`] for normal stress differences (:math:`N_1`)
+- **Von Mises yield criterion**: :math:`\alpha = \max(0, 1 - \tau_y/|\tau|)`
+- **Fluidity aging**: :math:`df/dt = \text{aging} + b|\dot{\gamma}|^n \cdot \text{rejuvenation}`
+- **Two coupling modes**: "minimal" (:math:`\lambda = 1/f` only) vs "full" (:math:`\lambda + \tau_y(f)` aging yield)
 
 **Protocols supported:** FLOW_CURVE, STARTUP, CREEP, RELAXATION, OSCILLATION, LAOS
 
@@ -323,11 +323,11 @@ Five Thixotropic Frameworks
    - Soft glassy materials (foams, concentrated emulsions)
    - Dense colloidal suspensions
    - Pastes, gels with shear banding
-   - Materials showing cooperativity (length scale ξ)
+   - Materials showing cooperativity (length scale :math:`\xi`)
 
 **Key strengths:**
    - Nonlocal formulation captures shear banding naturally
-   - Cooperativity length ξ controls spatial correlations
+   - Cooperativity length :math:`\xi` controls spatial correlations
    - Saramito variant predicts normal stresses
    - Well-suited for spatial gradients in rheometry (Couette, cone-plate)
 
@@ -361,7 +361,7 @@ Five Thixotropic Frameworks
 3. Hébraud-Lequeux (HL)
 ------------------------
 
-**Physical basis**: Mean-field theory of stress distribution P(σ, t) evolution
+**Physical basis**: Mean-field theory of stress distribution :math:`P(\sigma, t)` evolution
 
 **Import:**
 
@@ -377,7 +377,7 @@ Five Thixotropic Frameworks
                                    + D \frac{\partial^2 P}{\partial \sigma^2}
                                    + \text{yielding terms}
 
-where P(σ, t) is the probability density of local stress values.
+where :math:`P(\sigma, t)` is the probability density of local stress values.
 
 **Mean-field coupling:**
    When an element yields, it creates stress redistribution on neighbors, acting as
@@ -423,14 +423,14 @@ where P(σ, t) is the probability density of local stress values.
 
 **Warning:**
    HL model requires PDE solver (JAX lax.scan). Memory-intensive for large grids;
-   recommend n_points ≤ 100 for stability.
+   recommend ``n_points`` :math:`\leq` 100 for stability.
 
 **See:** :doc:`/models/hl/index`, :doc:`/examples/hl/index`
 
 4. STZ (Shear Transformation Zone)
 -----------------------------------
 
-**Physical basis**: Disorder temperature χ tracks effective thermal excitation
+**Physical basis**: Disorder temperature :math:`\chi` tracks effective thermal excitation
 
 **Import:**
 
@@ -440,9 +440,9 @@ where P(σ, t) is the probability density of local stress values.
 
 **Three variants:**
 
-- ``variant="minimal"``: χ only (2 parameters)
-- ``variant="standard"``: χ + Λ (STZ density, 4 parameters)
-- ``variant="full"``: χ + Λ + m (orientation, 6 parameters)
+- ``variant="minimal"``: :math:`\chi` only (2 parameters)
+- ``variant="standard"``: :math:`\chi + \Lambda` (STZ density, 4 parameters)
+- ``variant="full"``: :math:`\chi + \Lambda + m` (orientation, 6 parameters)
 
 **Effective temperature evolution:**
 
@@ -451,7 +451,7 @@ where P(σ, t) is the probability density of local stress values.
    \frac{d\chi}{dt} = \frac{1}{\tau_0} \left[ \Delta_0 \dot{\gamma}^2
                     - \frac{\chi - \chi_0}{1 + c \dot{\gamma}^2} \right]
 
-where χ₀ is the "configurational temperature" and χ > χ₀ enables flow.
+where :math:`\chi_0` is the "configurational temperature" and :math:`\chi > \chi_0` enables flow.
 
 **Protocols supported:** FLOW_CURVE, STARTUP, CREEP, RELAXATION, OSCILLATION, LAOS
 
@@ -463,8 +463,8 @@ where χ₀ is the "configurational temperature" and χ > χ₀ enables flow.
 
 **Key strengths:**
    - Grounded in Falk-Langer theory (Phys. Rev. E 1998)
-   - χ has clear physical meaning (disorder)
-   - Predicts flow when χ > χ₀ (temperature-activated)
+   - :math:`\chi` has clear physical meaning (disorder)
+   - Predicts flow when :math:`\chi > \chi_0` (temperature-activated)
    - Successfully describes metallic glass phenomenology
 
 **Example:**
@@ -506,17 +506,17 @@ where χ₀ is the "configurational temperature" and χ > χ₀ enables flow.
 
 **Mesoscopic picture:**
 
-- **Lattice of blocks**: Each block i has local stress σᵢ and yield threshold σ_y,i
-- **Eshelby stress redistribution**: When block i yields, stress redistributes to neighbors
+- **Lattice of blocks**: Each block :math:`i` has local stress :math:`\sigma_i` and yield threshold :math:`\sigma_{y,i}`
+- **Eshelby stress redistribution**: When block :math:`i` yields, stress redistributes to neighbors
   via elastic Green's function
-- **Plastic events**: σᵢ > σ_y,i triggers local yielding, creating an avalanche
+- **Plastic events**: :math:`\sigma_i > \sigma_{y,i}` triggers local yielding, creating an avalanche
 
 **FFT-accelerated stress redistribution:**
-   Uses FFT convolution for O(N log N) stress propagation instead of O(N²) direct summation.
+   Uses FFT convolution for :math:`O(N \log N)` stress propagation instead of :math:`O(N^2)` direct summation.
 
 **Two modes:**
 
-1. **Hard threshold** (simulation): σ_y = constant, discrete avalanches
+1. **Hard threshold** (simulation): :math:`\sigma_y = \text{constant}`, discrete avalanches
 2. **Smooth yielding** (inference): Rate-dependent plasticity for gradient-based fitting
 
 **Protocols supported:** FLOW_CURVE, STARTUP, CREEP, RELAXATION, OSCILLATION, LAOS
@@ -530,7 +530,7 @@ where χ₀ is the "configurational temperature" and χ > χ₀ enables flow.
 **Key strengths:**
    - Captures spatial heterogeneity naturally
    - Avalanche statistics emerge from local rules
-   - FFT acceleration enables large lattices (128 × 128)
+   - FFT acceleration enables large lattices (:math:`128 \times 128`)
    - Reproduces power-law avalanche distributions
 
 **Example:**
@@ -804,7 +804,7 @@ NLSQ → NUTS Workflow
 Parameter Correlation Analysis
 -------------------------------
 
-Thixotropic models often have correlated parameters (e.g., t_eq and a are trade-offs).
+Thixotropic models often have correlated parameters (e.g., :math:`t_\text{eq}` and :math:`a` are trade-offs).
 Use pair plots to diagnose:
 
 .. code-block:: python
@@ -1123,7 +1123,7 @@ Scalar Structure Parameter Limitations
 ---------------------------------------
 
 Most thixotropic models (DMT, Fluidity, HL minimal, STZ minimal) use a **scalar** structure
-parameter λ or f. This is a drastic simplification:
+parameter :math:`\lambda` or :math:`f`. This is a drastic simplification:
 
 - Real microstructure is **tensorial**: networks orient under shear
 - **Anisotropy** not captured: structure breaks differently in different directions
@@ -1159,10 +1159,10 @@ Most models assume **instantaneous elastic response** compared to structural rel
 
    \tau_{\text{elastic}} \ll \tau_{\text{structural}} = t_{\text{eq}}
 
-If this separation fails (e.g., τ_elastic ≈ t_eq), stress and structure evolve on similar
+If this separation fails (e.g., :math:`\tau_\text{elastic} \approx t_\text{eq}`), stress and structure evolve on similar
 timescales, complicating analysis.
 
-**Diagnostic**: If startup overshoot time ≈ structural relaxation time, models may struggle.
+**Diagnostic**: If startup overshoot time :math:`\approx` structural relaxation time, models may struggle.
 
 LAOS Limitations
 ----------------

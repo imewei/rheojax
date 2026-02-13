@@ -535,7 +535,7 @@ def generate_issue_inventory(
                 f.write(f"- **Category**: {r['category']}\n")
 
                 if r["warnings"]:
-                    f.write(f"\n**Top Warnings**:\n")
+                    f.write("\n**Top Warnings**:\n")
                     for w in r["warnings"][:15]:
                         # Truncate long warnings
                         w_display = w[:200] + "..." if len(w) > 200 else w
@@ -547,20 +547,20 @@ def generate_issue_inventory(
                 if r["traceback"]:
                     # Extract most relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [l for l in tb_lines if "rheojax" in l.lower() or "Error" in l or "Exception" in l][:15]
+                    relevant = [line for line in tb_lines if "rheojax" in line.lower() or "Error" in line or "Exception" in line][:15]
                     if relevant:
-                        f.write(f"\n**Traceback (relevant)**:\n```\n")
+                        f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))
                         f.write("\n```\n")
 
                 # Reproduction command
                 rel_path = Path(r["path"]).relative_to(examples_dir.parent)
-                f.write(f"\n**Reproduce**:\n")
-                f.write(f"```bash\n")
+                f.write("\n**Reproduce**:\n")
+                f.write("```bash\n")
                 f.write(
                     f"cd /Users/b80985/Projects/rheojax && uv run python scripts/run_examples_notebooks_24h.py --single {rel_path}\n"
                 )
-                f.write(f"```\n\n")
+                f.write("```\n\n")
                 f.write("---\n\n")
 
     print(f"Issue inventory written to: {output_path}")
@@ -579,12 +579,12 @@ def print_summary(results: list[dict[str, Any]]) -> None:
     timeouts = sum(1 for r in results if r["status"] == "TIMEOUT")
     total_runtime = sum(r["runtime_seconds"] for r in results)
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Clean PASS:          {clean_pass:4d}")
     print(f"  PASS with warnings:  {pass_with_warnings:4d}")
     print(f"  FAIL:                {failed:4d}")
     print(f"  TIMEOUT:             {timeouts:4d}")
-    print(f"  ─────────────────────────")
+    print("  ─────────────────────────")
     print(f"  Total:               {total:4d}")
     print(f"\n  Total runtime: {total_runtime:.1f}s ({total_runtime/3600:.2f} hours)")
 

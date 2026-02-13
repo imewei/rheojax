@@ -78,7 +78,7 @@ Material-Specific Recommendations
 
 **Polymers (Molten and Solid)**
 
-For thermoplastic polymers above T_g:
+For thermoplastic polymers above :math:`T_g`:
 
 1. **Simple characterization**: Start with :class:`Maxwell` (2 parameters)
 
@@ -201,10 +201,10 @@ Advantages:
 
 Models:
 
-- :class:`Maxwell`: G_s, eta_s
-- :class:`SpringPot`: V, alpha
-- :class:`PowerLaw`: K, n
-- :class:`Bingham`: tau_0, eta_pl
+- :class:`Maxwell`: :math:`G_s`, :math:`\eta_s`
+- :class:`SpringPot`: :math:`V`, :math:`\alpha`
+- :class:`PowerLaw`: :math:`K`, :math:`n`
+- :class:`Bingham`: :math:`\tau_0`, :math:`\eta_{pl}`
 
 Best for: Initial characterization, simple materials, limited data
 
@@ -218,10 +218,10 @@ Advantages:
 
 Models:
 
-- :class:`Zener`: G_s, G_p, eta_p
-- :class:`FractionalMaxwellGel`: G_s, V, alpha
-- :class:`FractionalMaxwellLiquid`: V, alpha, eta_s
-- :class:`HerschelBulkley`: tau_0, K, n
+- :class:`Zener`: :math:`G_s`, :math:`G_p`, :math:`\eta_p`
+- :class:`FractionalMaxwellGel`: :math:`G_s`, :math:`V`, :math:`\alpha`
+- :class:`FractionalMaxwellLiquid`: :math:`V`, :math:`\alpha`, :math:`\eta_s`
+- :class:`HerschelBulkley`: :math:`\tau_0`, :math:`K`, :math:`n`
 
 Best for: Most engineering applications, moderate data quality
 
@@ -236,9 +236,9 @@ Advantages:
 Models:
 
 - :class:`FractionalMaxwellModel`: Two SpringPots in series
-- :class:`FractionalKelvinVoigt`: G_p, V, alpha, eta_p
-- :class:`Carreau`: eta_0, eta_inf, lambda, m
-- :class:`Cross`: eta_0, eta_inf, K, m
+- :class:`FractionalKelvinVoigt`: :math:`G_p`, :math:`V`, :math:`\alpha`, :math:`\eta_p`
+- :class:`Carreau`: :math:`\eta_0`, :math:`\eta_\infty`, :math:`\lambda`, :math:`m`
+- :class:`Cross`: :math:`\eta_0`, :math:`\eta_\infty`, :math:`K`, :math:`m`
 - Most Fractional Zener variants: 4 parameters
 
 Best for: High-quality data, wide frequency/shear rate range, publication results
@@ -395,17 +395,17 @@ Fractional Models (Fractional-Order Derivatives)
 
 **Physical Interpretation**:
 
-The fractional order alpha has physical meaning:
+The fractional order :math:`\alpha` has physical meaning:
 
-- alpha = 0: Pure elastic (spring)
-- alpha = 1: Pure viscous (dashpot)
-- 0 < alpha < 1: Fractional viscoelastic (intermediate)
+- :math:`\alpha = 0`: Pure elastic (spring)
+- :math:`\alpha = 1`: Pure viscous (dashpot)
+- :math:`0 < \alpha < 1`: Fractional viscoelastic (intermediate)
 
 For polymers and soft matter:
 
-- alpha approx 0.1-0.3: Highly entangled systems, strong caging
-- alpha approx 0.4-0.6: Moderate entanglement, broad relaxation spectrum
-- alpha approx 0.7-0.9: Weakly entangled, approaching liquid-like
+- :math:`\alpha \approx 0.1\text{--}0.3`: Highly entangled systems, strong caging
+- :math:`\alpha \approx 0.4\text{--}0.6`: Moderate entanglement, broad relaxation spectrum
+- :math:`\alpha \approx 0.7\text{--}0.9`: Weakly entangled, approaching liquid-like
 
 **Example comparison**:
 
@@ -483,15 +483,15 @@ Classical Models (3 models)
      - Test Modes
      - Material Types
    * - **Maxwell**
-     - G_s (Pa), eta_s (Pa*s)
+     - :math:`G_s` (Pa), :math:`\eta_s` (Pa·s)
      - Relaxation, Oscillation
      - Polymer melts, simple viscoelastic
    * - **Zener**
-     - G_s, G_p (Pa), eta_p (Pa*s)
+     - :math:`G_s`, :math:`G_p` (Pa), :math:`\eta_p` (Pa·s)
      - Relaxation, Creep, Oscillation
      - Viscoelastic solids, SLS
    * - **SpringPot**
-     - V (Pa*s^alpha), alpha (-)
+     - :math:`V` (Pa·s\ :sup:`α`), :math:`\alpha` (-)
      - Oscillation, Relaxation
      - Power-law materials, gels
 
@@ -507,11 +507,11 @@ Fractional Maxwell Family (4 models)
      - Best For
      - Complexity
    * - **FractionalMaxwellGel**
-     - 3: G_s, V, alpha
+     - 3: :math:`G_s`, :math:`V`, :math:`\alpha`
      - Gels with elastic component
      - Low
    * - **FractionalMaxwellLiquid**
-     - 3: V, alpha, eta_s
+     - 3: :math:`V`, :math:`\alpha`, :math:`\eta_s`
      - Polymer solutions with memory
      - Low
    * - **FractionalMaxwellModel**
@@ -519,7 +519,7 @@ Fractional Maxwell Family (4 models)
      - Wide frequency range, general
      - Medium
    * - **FractionalKelvinVoigt**
-     - 3-4: G_p, V, alpha, (eta_p)
+     - 3-4: :math:`G_p`, :math:`V`, :math:`\alpha`, (:math:`\eta_p`)
      - Solid-like with slow relaxation
      - Medium
 
@@ -535,15 +535,15 @@ Fractional Zener Family (4 models)
      - Physical Meaning
      - Use Case
    * - **FractionalZenerSolidLiquid (FZSL)**
-     - 4: G_s, eta_s, V, alpha
+     - 4: :math:`G_s`, :math:`\eta_s`, :math:`V`, :math:`\alpha`
      - Solid + fractional liquid
      - Polymer melts with plateau
    * - **FractionalZenerSolidSolid (FZSS)**
-     - 4: G_s, G_p, V, alpha
+     - 4: :math:`G_s`, :math:`G_p`, :math:`V`, :math:`\alpha`
      - Two solids + fractional
      - Filled polymers, composites
    * - **FractionalZenerLiquidLiquid (FZLL)**
-     - 4: eta_s, eta_p, V, alpha
+     - 4: :math:`\eta_s`, :math:`\eta_p`, :math:`V`, :math:`\alpha`
      - Most general
      - Complex polymer systems
    * - **FractionalKelvinVoigtZener (FKVZ)**
@@ -587,27 +587,27 @@ Non-Newtonian Flow Models (6 models)
      - Flow Behavior
      - Typical Applications
    * - **PowerLaw**
-     - K (Pa*s^n), n (-)
+     - :math:`K` (Pa·s\ :sup:`n`), :math:`n` (-)
      - Shear thinning/thickening
      - Simple shear rate dependence
    * - **Carreau**
-     - eta_0, eta_inf, lambda, m
+     - :math:`\eta_0`, :math:`\eta_\infty`, :math:`\lambda`, :math:`m`
      - Smooth Newtonian -> power-law
      - Polymer solutions
    * - **CarreauYasuda**
-     - Carreau + parameter 'a'
+     - Carreau + parameter :math:`a`
      - Sharper transition control
      - Complex polymer solutions
    * - **Cross**
-     - eta_0, eta_inf, K, m
+     - :math:`\eta_0`, :math:`\eta_\infty`, :math:`K`, :math:`m`
      - Alternative to Carreau
      - Polymer melts, alternatives
    * - **HerschelBulkley**
-     - tau_0, K, n
+     - :math:`\tau_0`, :math:`K`, :math:`n`
      - Yield stress + power-law
      - Pastes, suspensions, food
    * - **Bingham**
-     - tau_0, eta_pl
+     - :math:`\tau_0`, :math:`\eta_{pl}`
      - Yield stress + Newtonian
      - Drilling fluids, cements
 
@@ -727,17 +727,17 @@ Based on Relaxation Modulus G(t)
 Based on Complex Modulus G*(omega)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Low-frequency slope in log(G') vs log(omega)**:
+**Low-frequency slope in** :math:`\log(G')` **vs** :math:`\log(\omega)`:
 
-- Slope approx 2: Liquid -> **Maxwell**, **FML**
-- Slope approx 0: Solid -> **Zener**, **FZSS**, **FKV**
-- Slope approx alpha (0 < alpha < 1): Gel -> **FractionalMaxwellGel**
+- Slope :math:`\approx 2`: Liquid -> **Maxwell**, **FML**
+- Slope :math:`\approx 0`: Solid -> **Zener**, **FZSS**, **FKV**
+- Slope :math:`\approx \alpha` (:math:`0 < \alpha < 1`): Gel -> **FractionalMaxwellGel**
 
-**G'/G" crossover**:
+:math:`G'` / :math:`G''` **crossover**:
 
 - Present: Relaxation time identifiable -> **Maxwell**, **Zener**
-- Absent (G' > G" always): Strong solid -> **FKV**, **FZSS**
-- Absent (G" > G' always): Strong liquid -> **Maxwell**, **FML**
+- Absent (:math:`G' > G''` always): Strong solid -> **FKV**, **FZSS**
+- Absent (:math:`G'' > G'` always): Strong liquid -> **Maxwell**, **FML**
 
 Based on Creep Compliance J(t)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -792,7 +792,7 @@ Parameter Bounds Reference
 All models have physically reasonable default bounds:
 
 - **Moduli (G, E)**: 1 Pa to 1 GPa
-- **Viscosity (eta)**: 1 mPa*s to 1 MPa*s
+- **Viscosity (eta)**: 1 mPa·s to 1 MPa·s
 - **Time constants (tau)**: 1 mus to 1 Ms
 - **Fractional orders (alpha)**: 0 to 1
 

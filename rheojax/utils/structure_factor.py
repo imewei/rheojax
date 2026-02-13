@@ -13,14 +13,20 @@ sk_derivatives
     Compute derivatives dS/dk needed for MCT vertex functions
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from functools import partial
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.interpolate import CubicSpline
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
+
+if TYPE_CHECKING:
+    import jax
 
 jax, jnp = safe_import_jax()
 
@@ -115,8 +121,8 @@ def percus_yevick_sk(
     # Direct correlation function in k-space
     c_k = -24 * eta * (term1 + term2 + term3)
 
-    # Structure factor
-    S_k = 1.0 / (1.0 - c_k)
+    # Structure factor (guard against divergence when c_k → 1 near MCT transition)
+    S_k = 1.0 / np.maximum(1.0 - c_k, 1e-10)
 
     # Handle k=0 limit: S(0) = kT χT (compressibility)
     S_0 = (1 - eta) ** 4 / ((1 + 2 * eta) ** 2 + eta3 * (eta - 4))
@@ -127,15 +133,15 @@ def percus_yevick_sk(
 
 @partial(jax.jit, static_argnames=())
 def percus_yevick_sk_jax(
-    k: jnp.ndarray,
+    k: jax.Array,
     phi: float,
     sigma: float = 1.0,
-) -> jnp.ndarray:
+) -> jax.Array:
     """JAX-compatible Percus-Yevick S(k) computation.
 
     Parameters
     ----------
-    k : jnp.ndarray
+    k : jax.Array
         Wave vector magnitudes
     phi : float
         Volume fraction
@@ -144,7 +150,7 @@ def percus_yevick_sk_jax(
 
     Returns
     -------
-    jnp.ndarray
+    jax.Array
         Structure factor S(k)
     """
     q = k * sigma
@@ -174,7 +180,7 @@ def percus_yevick_sk_jax(
     )
 
     c_k = -24 * eta * (term1 + term2 + term3)
-    S_k = 1.0 / (1.0 - c_k)
+    S_k = 1.0 / jnp.maximum(1.0 - c_k, 1e-10)
 
     # k=0 limit
     S_0 = (1 - eta) ** 4 / ((1 + 2 * eta) ** 2 + eta3 * (eta - 4))

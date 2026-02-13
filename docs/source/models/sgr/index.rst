@@ -18,7 +18,7 @@ Quick Reference
      - Parameters
      - Use Case
    * - :doc:`sgr_conventional`
-     - 3 (x, G_0, :math:`\tau_0`)
+     - 3 (:math:`x`, :math:`G_0`, :math:`\tau_0`)
      - Soft glassy materials, aging, yield stress fluids
    * - :doc:`sgr_generic`
      - 4-5
@@ -40,11 +40,11 @@ metastability similar to glasses but with interaction energies of order :math:`k
 
 **Key physics captured:**
 
-- **Noise-activated hopping**: Elements escape energy traps via effective noise temperature x
-- **Glass transition**: Phase transition at x = 1 (fluid ↔ glass)
+- **Noise-activated hopping**: Elements escape energy traps via effective noise temperature :math:`x`
+- **Glass transition**: Phase transition at :math:`x = 1` (fluid :math:`\leftrightarrow` glass)
 - **Aging**: Time-dependent evolution of trapped state distribution
 - **Power-law rheology**: :math:`G' \sim G'' \sim \omega^{x-1}` in fluid regime
-- **Yield stress**: Emerges in glass regime (x < 1)
+- **Yield stress**: Emerges in glass regime (:math:`x < 1`)
 
 The model was developed by Sollich, Lequeux, Hébraud, and Cates based on
 Bouchaud's trap model for structural glasses.
@@ -113,7 +113,7 @@ SGR Phase Diagram
 -----------------
 
 The SGR model exhibits a genuine phase transition controlled by the effective
-noise temperature x:
+noise temperature :math:`x`:
 
 ::
 
@@ -132,18 +132,18 @@ noise temperature x:
    │            Logarithmic aging, critical slowing
    │
    │  x < 1     Soft Glass
-   │            Yield stress σ_y emerges
+   │            Yield stress emerges
    │            G' >> G'', weak frequency dependence
    │            Aging without equilibration
    │
    └─────────────────────────────────────────────
 
-**Physical interpretation of x:**
+**Physical interpretation of** :math:`x` **:**
 
-- **x represents the ratio of "noise energy" to typical trap depth**
-- High x: Frequent hopping, equilibrium attained, liquid-like
-- Low x: Rare hopping, aging dominates, solid-like
-- x ≈ 1: Marginal stability, critical dynamics
+- :math:`x` **represents the ratio of "noise energy" to typical trap depth**
+- High :math:`x`: Frequent hopping, equilibrium attained, liquid-like
+- Low :math:`x`: Rare hopping, aging dominates, solid-like
+- :math:`x \approx 1`: Marginal stability, critical dynamics
 
 
 Key Parameters
@@ -158,16 +158,16 @@ Key Parameters
      - Typical Range
      - Physical Meaning
    * - Noise temperature
-     - x
+     - :math:`x`
      - 0.5–3
-     - Controls phase: x < 1 (glass), x > 1 (fluid)
+     - Controls phase: :math:`x < 1` (glass), :math:`x > 1` (fluid)
    * - Modulus scale
-     - G_0
-     - 10–10^4 Pa
-     - Sets magnitude of G', G''
+     - :math:`G_0`
+     - :math:`10\text{--}10^4` Pa
+     - Sets magnitude of :math:`G'`, :math:`G''`
    * - Attempt time
      - :math:`\tau_0`
-     - 10⁻^6–10⁻^2 s
+     - :math:`10^{-6}`–:math:`10^{-2}` s
      - Microscopic timescale for trap escape
 
 
@@ -265,9 +265,9 @@ References
    materials." *J. Rheol.*, 44, 323–369.
    https://doi.org/10.1122/1.551088
 
-4. Fuereder, I. & Ilg, P. (2013). "GENERIC compliance of the SGR model."
-   *J. Non-Newtonian Fluid Mech.*, 191, 1–8.
-   https://doi.org/10.1016/j.jnnfm.2012.10.004
+4. Fuereder, I. & Ilg, P. (2013). "Nonequilibrium thermodynamics of the soft glassy
+   rheology model." *Phys. Rev. E*, 88, 042134.
+   https://doi.org/10.1103/PhysRevE.88.042134
 
 5. Sollich, P. & Cates, M.E. (2012). "Thermodynamic interpretation of soft glassy
    rheology models." *Phys. Rev. E*, 85, 031127.

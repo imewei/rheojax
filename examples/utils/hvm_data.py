@@ -21,13 +21,10 @@ Dataset Registry:
         - PNAS Digital Rheometer Twin (ω = 1, 3, 5 rad/s)
 """
 
-import os
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 import pandas as pd
-
 
 # =============================================================================
 # Paths

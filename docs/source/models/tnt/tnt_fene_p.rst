@@ -1614,21 +1614,21 @@ API Reference
 References
 ==========
 
-.. [Warner1972] Warner, H. R. (1972). "Kinetic Theory and Rheology of Dilute Suspensions of Finitely Extendible Dumbbells". *Industrial & Engineering Chemistry Fundamentals*, 11(3), 379-387.
+.. [Warner1972] Warner, H. R. (1972). "Kinetic Theory and Rheology of Dilute Suspensions of Finitely Extendible Dumbbells". *Industrial & Engineering Chemistry Fundamentals*, 11(3), 379-387. https://doi.org/10.1021/i160043a017
 
-.. [Peterlin1966] Peterlin, A. (1966). "Hydrodynamics of Linear Macromolecules". *Journal of Polymer Science Part B: Polymer Physics*, 4(1), 287-291.
+.. [Peterlin1966] Peterlin, A. (1966). "Hydrodynamics of Linear Macromolecules". *Pure and Applied Chemistry*, 12(1-4), 563-586. https://doi.org/10.1351/pac196612010563
 
-.. [Bird1980] Bird, R. B., Dotson, P. J., & Johnson, N. L. (1980). "Polymer Solution Rheology Based on a Finitely Extensible Bead-Spring Chain Model". *Journal of Non-Newtonian Fluid Mechanics*, 7(2-3), 213-235.
+.. [Bird1980] Bird, R. B., Dotson, P. J., & Johnson, N. L. (1980). "Polymer Solution Rheology Based on a Finitely Extensible Bead-Spring Chain Model". *Journal of Non-Newtonian Fluid Mechanics*, 7(2-3), 213-235. https://doi.org/10.1016/0377-0257(80)85007-5
 
-.. [TanakaEdwards1992] Tanaka, F., & Edwards, S. F. (1992). "Viscoelastic Properties of Physically Crosslinked Networks". *Macromolecules*, 25(5), 1516-1523.
+.. [TanakaEdwards1992] Tanaka, F., & Edwards, S. F. (1992). "Viscoelastic Properties of Physically Crosslinked Networks". *Macromolecules*, 25(5), 1516-1523. https://doi.org/10.1021/ma00031a024
 
-.. [Keunings1997] Keunings, R. (1997). "On the Peterlin Approximation for Finitely Extensible Dumbbells". *Journal of Non-Newtonian Fluid Mechanics*, 68(1), 85-100.
+.. [Keunings1997] Keunings, R. (1997). "On the Peterlin Approximation for Finitely Extensible Dumbbells". *Journal of Non-Newtonian Fluid Mechanics*, 68(1), 85-100. https://doi.org/10.1016/S0377-0257(96)01497-8
 
-.. [Wiest1989] Wiest, J. M. (1989). "A Differential Constitutive Equation for Polymer Melts". *Rheologica Acta*, 28(1), 4-12.
+.. [Wiest1989] Wiest, J. M. (1989). "A Differential Constitutive Equation for Polymer Melts". *Rheologica Acta*, 28(1), 4-12. https://doi.org/10.1007/BF01354763
 
-.. [DoiEdwards1986] Doi, M., & Edwards, S. F. (1986). *The Theory of Polymer Dynamics*. Oxford University Press.
+.. [DoiEdwards1986] Doi, M., & Edwards, S. F. (1986). *The Theory of Polymer Dynamics*. Oxford University Press. ISBN: 978-0198519768
 
-.. [Bird1987] Bird, R. B., Armstrong, R. C., & Hassager, O. (1987). *Dynamics of Polymeric Liquids, Volume 1: Fluid Mechanics* (2nd ed.). Wiley.
+.. [Bird1987] Bird, R. B., Armstrong, R. C., & Hassager, O. (1987). *Dynamics of Polymeric Liquids, Volume 1: Fluid Mechanics* (2nd ed.). Wiley. ISBN: 978-0471802457
 
 **Recommended Reading Order:**
 

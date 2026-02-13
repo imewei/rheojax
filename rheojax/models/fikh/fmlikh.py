@@ -21,23 +21,26 @@ Example:
     >>> model.fit(omega, G_star, test_mode='oscillation')
 """
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import Protocol, TestMode
+from rheojax.core.test_modes import DeformationMode, Protocol, TestMode
 from rheojax.logging import get_logger
 from rheojax.models.fikh._base import FIKHBase
 from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 from rheojax.utils.optimization import nlsq_optimize
 
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike
+
 jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
-
-ArrayLike = np.ndarray | jnp.ndarray | list | tuple
 
 
 @ModelRegistry.register(
@@ -49,6 +52,12 @@ ArrayLike = np.ndarray | jnp.ndarray | list | tuple
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FMLIKH(FIKHBase):
@@ -292,7 +301,7 @@ class FMLIKH(FIKHBase):
 
         return total_stress
 
-    def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FMLIKH":
+    def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FMLIKH:
         """Fit multi-layer model."""
         test_mode = kwargs.get("test_mode", "startup")
         self._test_mode = test_mode
@@ -308,7 +317,7 @@ class FMLIKH(FIKHBase):
         else:
             return self._fit_return_mapping(X, y, **kwargs)
 
-    def _fit_flow_curve(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FMLIKH":
+    def _fit_flow_curve(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FMLIKH:
         """Fit to flow curve data."""
         gamma_dot = jnp.asarray(X)
         sigma_target = jnp.asarray(y)
@@ -348,7 +357,7 @@ class FMLIKH(FIKHBase):
 
         return total_stress
 
-    def _fit_ode_formulation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FMLIKH":
+    def _fit_ode_formulation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FMLIKH:
         """Fit using ODE formulation for relaxation/creep.
 
         Uses per-mode _simulate_transient and sums the contributions.
@@ -376,7 +385,7 @@ class FMLIKH(FIKHBase):
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
 
-    def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FMLIKH":
+    def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FMLIKH:
         """Fit using return mapping."""
         times, strains = self._extract_time_strain(X, **kwargs)
         sigma_target = jnp.asarray(y)
@@ -390,7 +399,7 @@ class FMLIKH(FIKHBase):
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
 
-    def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "FMLIKH":
+    def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FMLIKH:
         """Fit to oscillatory data (SAOS).
 
         Fits multi-mode FMLIKH to frequency-domain SAOS data.
@@ -532,7 +541,7 @@ class FMLIKH(FIKHBase):
         params = self._get_params_dict()
         return self._predict_oscillation_from_params(omega_arr, params, gamma_0, n_cycles)
 
-    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
+    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike: # type: ignore[override]
         """Predict based on test_mode."""
         test_mode = kwargs.get("test_mode", self._test_mode or "startup")
         mode = self._validate_test_mode(test_mode)
@@ -567,7 +576,6 @@ class FMLIKH(FIKHBase):
         t = jnp.asarray(X)
         sigma_0 = kwargs.get("sigma_0", 60.0)
         sigma_applied = kwargs.get("sigma_applied", 100.0)
-        gamma_dot = kwargs.get("gamma_dot", 0.0)
         T_init = kwargs.get("T_init", None)
 
         total_result = jnp.zeros_like(t)
@@ -618,7 +626,7 @@ class FMLIKH(FIKHBase):
             param_names = list(self.parameters.keys())
             param_dict = dict(zip(param_names, params, strict=False))
         else:
-            param_dict = dict(params)
+            param_dict = dict(params) # type: ignore[arg-type]
 
         mode_enum = self._validate_test_mode(mode)
 
@@ -630,7 +638,7 @@ class FMLIKH(FIKHBase):
             gamma_0 = kwargs.get("gamma_0", param_dict.pop("_gamma_0", 0.01))
             n_cycles = kwargs.get("n_cycles", param_dict.pop("_n_cycles", 5))
             G_star = self._predict_oscillation_from_params(
-                omega, param_dict, gamma_0, n_cycles
+                omega, param_dict, gamma_0, n_cycles # type: ignore[arg-type]
             )
             return jnp.abs(G_star)
         elif mode_enum in (TestMode.CREEP, TestMode.RELAXATION):
@@ -675,7 +683,7 @@ class FMLIKH(FIKHBase):
             if not self.shared_alpha:
                 mode_info["alpha"] = params.get(f"alpha_{i}", self.alpha_structure)
 
-            info["modes"].append(mode_info)
+            info["modes"].append(mode_info) # type: ignore[attr-defined]
 
         if self.shared_alpha:
             info["alpha_shared"] = params.get("alpha_structure", self.alpha_structure)

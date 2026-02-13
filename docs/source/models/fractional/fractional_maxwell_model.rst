@@ -163,7 +163,7 @@ The generalized model is characterized by four parameters:
      - Notes
    * - ``c1``
      - :math:`c_1`
-     - Pa*s^alpha
+     - Pa·s\ :sup:`α`
      - [1e-3, 1e9]
      - Material constant
    * - ``alpha``
@@ -327,7 +327,7 @@ Fitting Guidance
 **Optimization Tips:**
 
 - This is a complex 4-parameter model; ensure data quality is high
-- Fit simultaneously to G' and G" with equal weighting
+- Fit simultaneously to :math:`G'` and :math:`G''` with equal weighting
 - Use log-weighted least squares for better conditioning
 - Verify that both power-law regimes are clearly visible in data
 - Compare to simpler models (FMG, FML) using AIC/BIC criteria
@@ -357,7 +357,7 @@ Usage
    model = FractionalMaxwellModel()
 
    # Set parameters for a multi-scale viscoelastic material
-   model.parameters.set_value('c1', 1e5)      # Pa*s^alpha
+   model.parameters.set_value('c1', 1e5)      # Pa·s^α
    model.parameters.set_value('alpha', 0.5)   # dimensionless
    model.parameters.set_value('beta', 0.7)    # dimensionless
    model.parameters.set_value('tau', 1.0)     # s
@@ -407,7 +407,7 @@ Usage
    model = FractionalMaxwellModel()
 
    # Set parameters for a multi-scale viscoelastic material
-   model.parameters.set_value('c1', 1e5)      # Pa*s^alpha
+   model.parameters.set_value('c1', 1e5)      # Pa·s^α
    model.parameters.set_value('alpha', 0.5)   # dimensionless
    model.parameters.set_value('beta', 0.7)    # dimensionless
    model.parameters.set_value('tau', 1.0)     # s

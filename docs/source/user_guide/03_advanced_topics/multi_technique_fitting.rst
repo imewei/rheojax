@@ -62,7 +62,7 @@ The :class:`SharedParameterSet` class enables multiple models to share parameter
 
    # Add shared parameters
    shared.add_shared('G_s', value=1e5, bounds=(1e3, 1e7), units='Pa')
-   shared.add_shared('eta_s', value=1e3, bounds=(1e1, 1e5), units='Pa*s')
+   shared.add_shared('eta_s', value=1e3, bounds=(1e1, 1e5), units='Pa·s')
 
    # Link models
    from rheojax.models import Maxwell
@@ -96,9 +96,9 @@ Scenario
 You have:
 
 1. Stress relaxation data: sigma(t) at fixed strain
-2. Frequency sweep data: G'(omega), G''(omega) from SAOS
+2. Frequency sweep data: :math:`G'(\omega)`, :math:`G''(\omega)` from SAOS
 
-You want to fit a Maxwell model to both datasets with consistent G_s and eta_s.
+You want to fit a Maxwell model to both datasets with consistent :math:`G_s` and :math:`\eta_s`.
 
 Step-by-Step Implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,7 +134,7 @@ Step-by-Step Implementation
                      bounds=(1e3, 1e7), units='Pa',
                      description='Shear modulus')
    shared.add_shared('eta_s', value=eta_s_init,
-                     bounds=(1e1, 1e5), units='Pa*s',
+                     bounds=(1e1, 1e5), units='Pa·s',
                      description='Viscosity')
 
 **Step 3: Create and link models**
@@ -214,7 +214,7 @@ Step-by-Step Implementation
    shared.set_values({'G_s': G_s_opt, 'eta_s': eta_s_opt})
 
    print(f"Optimized G_s = {G_s_opt:.2e} Pa")
-   print(f"Optimized eta_s = {eta_s_opt:.2e} Pa*s")
+   print(f"Optimized eta_s = {eta_s_opt:.2e} Pa·s")
    print(f"Relaxation time tau = {eta_s_opt/G_s_opt:.3f} s")
 
 **Step 6: Validate and visualize**
@@ -393,7 +393,7 @@ Implementation
    # Create shared parameters
    shared = SharedParameterSet()
    shared.add_shared('G_s', value=1e5, bounds=(1e3, 1e7), units='Pa')
-   shared.add_shared('V', value=1e3, bounds=(1e2, 1e5), units='Pa*s^alpha')
+   shared.add_shared('V', value=1e3, bounds=(1e2, 1e5), units='Pa·s^α')
    shared.add_shared('alpha', value=0.5, bounds=(0.1, 0.9), units='-')
 
    # Create models
@@ -442,7 +442,7 @@ Implementation
 
    print(f"Optimized parameters:")
    print(f"  G_s = {G_s_opt:.2e} Pa")
-   print(f"  V = {V_opt:.2e} Pa*s^{alpha_opt:.2f}")
+   print(f"  V = {V_opt:.2e} Pa·s^{alpha_opt:.2f}")
    print(f"  alpha = {alpha_opt:.3f}")
 
    # Validate
@@ -529,7 +529,7 @@ Implementation
        G_s_T = model.parameters.get_value('G_s')
        V_T = model.parameters.get_value('V')
 
-       print(f"T = {T} degC: G_s = {G_s_T:.2e} Pa, V = {V_T:.2e} Pa*s^alpha")
+       print(f"T = {T} degC: G_s = {G_s_T:.2e} Pa, V = {V_T:.2e} Pa·s^alpha")
 
 Best Practices
 --------------
@@ -540,7 +540,7 @@ Parameter Selection for Sharing
 **Good candidates for sharing**:
 
 - Fractional orders (alpha) - often material-intrinsic
-- Elastic moduli (G_s, G_p) - if temperature constant
+- Elastic moduli (:math:`G_s`, :math:`G_p`) - if temperature constant
 - Structural parameters (network parameters)
 
 **Poor candidates for sharing**:

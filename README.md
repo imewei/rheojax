@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, and 56 tutorial notebooks.
+JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, DMTA/DMA support (E* ↔ G* conversion for 41+ oscillation models), and 240+ tutorial notebooks across 21 categories.
 
 ## Features
 
@@ -18,6 +18,7 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Bayesian Inference**: All 53 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
+- **DMTA/DMA Support**: All 41+ oscillation-capable models support tensile modulus (E*) via automatic E* ↔ G* conversion
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
 
 ### Model Protocol Support Matrix
@@ -79,13 +80,14 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Plugin System**: Support for custom models and transforms
 
 ### Tutorial Notebooks & Examples
-- **235 Tutorial Notebooks**: Organized in 20 categories
+- **240+ Tutorial Notebooks**: Organized in 21 categories
   - `examples/basic/` - 5 notebooks covering fundamental models
   - `examples/transforms/` - 8 notebooks for data transforms and analysis (including SRFS)
   - `examples/bayesian/` - 9 notebooks for Bayesian inference workflows (including SPP LAOS)
   - `examples/advanced/` - 10 notebooks for production patterns (including SGR and SPP)
   - `examples/io/` - 1 notebook for TRIOS complex modulus handling
   - `examples/dmt/` - 6 notebooks: DMT thixotropic model (6 protocols)
+  - `examples/dmta/` - 8 notebooks: DMTA/DMA analysis (modulus conversion, GMM fitting, real data workflows)
   - `examples/epm/` - 6 notebooks: Elasto-plastic models (5 protocols + visualization)
   - `examples/fikh/` - 12 notebooks: FIKH + FMLIKH models (6 protocols each)
   - `examples/fluidity/` - 24 notebooks: Fluidity local/nonlocal + Saramito local/nonlocal (6 protocols each)
@@ -728,7 +730,7 @@ unfilled = HVNMLocal.unfilled_vitrimer(G_P=5000, G_E=3000, G_D=1000)
 
 ## Tutorial Notebooks
 
-235 tutorial notebooks organized by topic:
+240+ tutorial notebooks organized by topic:
 
 ```
 examples/
@@ -777,6 +779,15 @@ examples/
 │   ├── 04_dmt_creep.ipynb
 │   ├── 05_dmt_saos.ipynb
 │   └── 06_dmt_laos.ipynb
+├── dmta/                        # 8 notebooks: DMTA/DMA analysis
+│   ├── 01_dmta_basics.ipynb
+│   ├── 02_dmta_master_curve.ipynb
+│   ├── 03_dmta_fractional_models.ipynb
+│   ├── 04_dmta_relaxation.ipynb
+│   ├── 05_dmta_vitrimer.ipynb
+│   ├── 06_dmta_model_selection.ipynb
+│   ├── 07_dmta_tts_pipeline.ipynb
+│   └── 08_dmta_cross_domain.ipynb
 ├── epm/                         # 6 notebooks: Elasto-plastic models
 │   ├── 01_epm_flow_curve.ipynb
 │   ├── 02_epm_saos.ipynb
@@ -1062,7 +1073,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Citation
 
-If you use rheo in your research, please cite:
+If you use rheojax in your research, please cite:
 
 ```bibtex
 @software{rheo2024,

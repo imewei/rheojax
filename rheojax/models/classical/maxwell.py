@@ -28,7 +28,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
 from rheojax.logging import get_logger, log_fit
 
 # Module logger
@@ -42,6 +42,12 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class Maxwell(BaseModel):
@@ -291,8 +297,8 @@ class Maxwell(BaseModel):
             baseline = float(np.median(g_sorted[-tail:]))
             transient = g_sorted - baseline
 
-            g0_bounds = self.parameters.get("G0").bounds or (1e-3, 1e9)
-            eta_bounds = self.parameters.get("eta").bounds or (1e-6, 1e12)
+            g0_bounds = self.parameters.get("G0").bounds or (1e-3, 1e9) # type: ignore[union-attr]
+            eta_bounds = self.parameters.get("eta").bounds or (1e-6, 1e12) # type: ignore[union-attr]
 
             # Attempt to estimate parameters from the first two signal-dominant points
             positive_mask = transient > 0
@@ -531,7 +537,7 @@ class Maxwell(BaseModel):
         """
         G0 = self.parameters.get_value("G0")
         eta = self.parameters.get_value("eta")
-        return eta / G0
+        return eta / G0 # type: ignore[operator]
 
     def __repr__(self) -> str:
         """String representation of Maxwell model."""

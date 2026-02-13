@@ -41,25 +41,25 @@ When to Use Transforms
      - I Want...
      - Use This Transform
    * - LAOS time-domain data
-     - Harmonic amplitudes I₁, I₃, I₅...
+     - Harmonic amplitudes :math:`I_1, I_3, I_5, \ldots`
      - :ref:`FFTAnalysis <fft_transform>`
    * - Freq sweeps at multiple T
      - Single master curve
      - :ref:`Mastercurve <mastercurve_transform>` (TTS)
-   * - Flow curves at multiple γ̇
+   * - Flow curves at multiple :math:`\dot{\gamma}`
      - Flow curve master + noise temp
      - :ref:`SRFS <srfs_transform>`
    * - LAOS waveform data
      - Yield stress, cage modulus
      - :ref:`SPPDecomposer <spp_transform>`
    * - Noisy experimental data
-     - Smooth derivative dG/dt
+     - Smooth derivative :math:`dG/dt`
      - :ref:`SmoothDerivative <smooth_derivative_transform>`
    * - Any rheological data
-     - Linearity check (Δ)
+     - Linearity check (:math:`\Delta`)
      - :ref:`MutationNumber <mutation_number_transform>`
    * - Chirp oscillatory data
-     - G'(ω), G''(ω) from single test
+     - :math:`G'(\omega)`, :math:`G''(\omega)` from single test
      - :ref:`OWChirp <owchirp_transform>`
 
 .. _fft_transform:
@@ -83,7 +83,7 @@ nonsinusoidal and contains higher harmonics:
 where:
 - :math:`\omega`: Fundamental frequency (rad/s)
 - :math:`n`: Harmonic number (odd integers for symmetric strain)
-- :math:`\sigma'_n, \sigma''_n`: Elastic and viscous stress components at harmonic n
+- :math:`\sigma'_n, \sigma''_n`: Elastic and viscous stress components at harmonic :math:`n`
 
 **Key Nonlinearity Metrics:**
 
@@ -93,12 +93,12 @@ where:
 
    \text{Total harmonic distortion} = \frac{\sqrt{\sum_{n=3,5,...} I_n^2}}{I_1}
 
-where :math:`I_n = \sqrt{(\sigma'_n)^2 + (\sigma''_n)^2}` is the intensity of harmonic n.
+where :math:`I_n = \sqrt{(\sigma'_n)^2 + (\sigma''_n)^2}` is the intensity of harmonic :math:`n`.
 
 **Physical Interpretation:**
 - :math:`I_3/I_1 < 0.01`: Linear viscoelastic regime (SAOS)
 - :math:`I_3/I_1 \sim 0.1`: Weakly nonlinear (MAOS)
-- :math:`I_3/I_1 > 0.5`: Strongly nonlinear (LAOS)—yield, flow, cage breaking
+- :math:`I_3/I_1 > 0.5`: Strongly nonlinear (LAOS) --- yield, flow, cage breaking
 
 Usage
 -----
@@ -182,15 +182,15 @@ allowing horizontal shifting of frequency sweeps to create a **mastercurve**:
 
    G''(\omega, T) = G''(\omega \cdot a_T, T_{\text{ref}})
 
-**Williams-Landel-Ferry (WLF) Equation** (for polymers near T_g):
+**Williams-Landel-Ferry (WLF) Equation** (for polymers near :math:`T_g`):
 
 .. math::
 
    \log_{10}(a_T) = \frac{-C_1 (T - T_{\text{ref}})}{C_2 + (T - T_{\text{ref}})}
 
-**Universal constants** (T_ref = T_g): :math:`C_1 = 17.44`, :math:`C_2 = 51.6` K
+**Universal constants** (:math:`T_{\text{ref}} = T_g`): :math:`C_1 = 17.44`, :math:`C_2 = 51.6` K
 
-**Arrhenius Equation** (for high-temperature melts, T ≫ T_g):
+**Arrhenius Equation** (for high-temperature melts, :math:`T \gg T_g`):
 
 .. math::
 
@@ -295,12 +295,12 @@ For SGR materials, the shift factor follows a power-law:
 where :math:`x` is the **effective noise temperature** (SGR parameter):
 - :math:`x < 1`: Glass (aging, yield stress)
 - :math:`1 < x < 2`: Power-law fluid
-- :math:`x \geq 2`: Newtonian liquid
+- :math:`x \ge 2`: Newtonian liquid
 
-**Physical Interpretation**: The exponent :math:`2-x` reveals the material's proximity to the
+**Physical Interpretation**: The exponent :math:`2 - x` reveals the material's proximity to the
 glass transition. Materials near :math:`x = 1` exhibit strong shear thinning and SRFS collapse.
 
-**Shear Banding Detection**: SRFS automatically detects **coexistence plateaus** in flow curves—
+**Shear Banding Detection**: SRFS automatically detects **coexistence plateaus** in flow curves ---
 signatures of spatial heterogeneity (banding) where two flow states coexist at the same stress.
 
 Usage
@@ -373,7 +373,7 @@ Usage
 
    **Shear Banding** occurs in wormlike micelles, colloidal glasses, and other soft materials
    under shear. The flow curve develops a **stress plateau** where high-shear and low-shear
-   bands coexist in the gap, violating the monotonic stress-rate relationship.
+   bands coexist in the gap, violating the monotonic stress--rate relationship.
 
 .. _spp_transform:
 
@@ -411,7 +411,7 @@ from elastic to viscous behavior.
 - :math:`G_{\text{cage}}`: Maximum elastic modulus (cage stiffness)
 - :math:`\sigma_{sy}`: **Static yield stress** (onset of flow from rest)
 - :math:`\sigma_{dy}`: **Dynamic yield stress** (flow cessation during oscillation)
-- :math:`\eta_{\min}`: Minimum viscosity (maximum fluidization)
+- :math:`\eta_{\text{min}}`: Minimum viscosity (maximum fluidization)
 
 Usage
 -----
@@ -509,12 +509,12 @@ Usage
 
    **Use SPP when:**
    - Material has yield stress (foam, paste, gel)
-   - You need transient moduli G'(t), η'(t) within cycle
+   - You need transient moduli :math:`G'(t)`, :math:`\eta'(t)` within cycle
    - Physical interpretation is priority (cage, yield, flow)
 
    **Use FFT when:**
    - Broadband frequency characterization needed
-   - Comparing to literature (harmonic ratios I₃/I₁)
+   - Comparing to literature (harmonic ratios :math:`I_3/I_1`)
    - Material is thermorheologically simple
 
 .. _smooth_derivative_transform:
@@ -589,10 +589,10 @@ Usage
      - Effect
    * - ``window``
      - 5-21 (odd)
-     - Larger → smoother, less detail
+     - Larger means smoother, less detail
    * - ``order``
      - 2-5
-     - Higher → preserves peaks
+     - Higher preserves peaks
    * - ``method``
      - 'savgol', 'spline'
      - savgol for peaks, spline for trends
@@ -638,7 +638,7 @@ For oscillatory tests:
 **Physical Interpretation:**
 - :math:`\Delta \to 0`: Material remains **elastic** (solid-like)
 - :math:`\Delta \to 1`: Material fully **relaxes** (liquid-like)
-- :math:`\Delta \sim 0.1`: **Transition regime** (critical for accurate measurements)
+- :math:`\Delta \approx 0.1`: **Transition regime** (critical for accurate measurements)
 
 **Practical Use**: Mutation number assesses **measurement validity**. If :math:`\Delta > 0.1`,
 the material structure evolves significantly during the test, potentially invalidating linear
@@ -717,7 +717,7 @@ oscillation frequency varies continuously (chirp signal) rather than stepping di
 - **Better time resolution**: Captures transient behavior
 - **Lower sample requirement**: One loading vs multiple frequency steps
 
-**Challenge**: Extracting frequency-dependent moduli G'(ω), G''(ω) from time-domain chirp data
+**Challenge**: Extracting frequency-dependent moduli :math:`G'(\omega)`, :math:`G''(\omega)` from time-domain chirp data
 requires specialized **time-frequency analysis** (short-time Fourier transform, wavelets).
 
 **Mathematical Formulation**:
@@ -928,7 +928,7 @@ General Limitations
 
 2. **Sampling Requirements**: Adequate data density needed:
 
-   - FFT: Nyquist criterion (sample rate ≥ 2× highest frequency)
+   - FFT: Nyquist criterion (sample rate :math:`\ge 2 \times` highest frequency)
    - TTS/SRFS: At least 3-5 temperatures/rates for robust shifting
    - SPP: 5-10 steady-state cycles minimum
 
@@ -1026,19 +1026,19 @@ References
 
 **Foundational Papers:**
 
-1. **FFT & LAOS**: Hyun et al. (2002). "A review of nonlinear oscillatory shear tests." *J. Non-Newt. Fluid Mech.* 107, 51-65.
+1. **FFT & LAOS**: Hyun et al. (2002). "Large amplitude oscillatory shear as a way to classify the complex fluids." *J. Non-Newt. Fluid Mech.* 107, 51-65. https://doi.org/10.1016/S0377-0257(02)00141-6
 
-2. **Time-Temperature Superposition**: Ferry, J.D. (1980). *Viscoelastic Properties of Polymers*, 3rd ed. Wiley.
+2. **Time-Temperature Superposition**: Ferry, J.D. (1980). *Viscoelastic Properties of Polymers*, 3rd ed. Wiley. ISBN: 978-0-471-04894-7
 
-3. **SPP Framework**: Rogers, S.A. et al. (2011). "Sequence of physical processes determined by the medium amplitude oscillatory shear." *J. Rheol.* 55, 435-458.
+3. **SPP Framework**: Rogers, S.A. et al. (2011). "Sequence of physical processes determined by the medium amplitude oscillatory shear." *J. Rheol.* 55, 435-458. https://doi.org/10.1122/1.3544591
 
-4. **Mutation Number**: Rogers, S.A. & Vlassopoulos, D. (2010). "Frieze group analysis of asymmetric response to large amplitude oscillatory shear." *J. Rheol.* 54, 859-880.
+4. **Mutation Number**: Rogers, S.A. & Vlassopoulos, D. (2010). "Frieze group analysis of asymmetric response to large amplitude oscillatory shear." *J. Rheol.* 54, 859-880. https://doi.org/10.1122/1.3445064
 
-5. **SRFS & SGR**: Divoux, T. et al. (2016). "Stress overshoot in a simple yield stress fluid." *Soft Matter* 12, 5249-5262.
+5. **SRFS & SGR**: Divoux, T., Barentin, C. & Manneville, S. (2011). "Stress overshoot in a simple yield stress fluid: An extensive study combining rheology and velocimetry." *Soft Matter*, 7, 9335-9349. https://doi.org/10.1039/C1SM05740E
 
-6. **OWChirp**: Ghiringhelli, L.M. et al. (2012). "Optimal time resolved rheometry." *Meas. Sci. Technol.* 23, 065401.
+6. **OWChirp**: Ghiringhelli, E., Roux, D., Bleses, D., Galliard, H. & Caton, F. (2012). "Optimal Fourier rheometry: Application to the gelation of an alginate." *Rheologica Acta*, 51, 413-420. https://doi.org/10.1007/s00397-012-0616-z
 
-7. **Soft Glassy Rheology**: Sollich, P. et al. (1997). "Rheology of soft glassy materials." *Phys. Rev. Lett.* 78, 2020-2023.
+7. **Soft Glassy Rheology**: Sollich, P. et al. (1997). "Rheology of soft glassy materials." *Phys. Rev. Lett.* 78, 2020-2023. https://doi.org/10.1103/PhysRevLett.78.2020
 
 See Also
 ========

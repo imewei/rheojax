@@ -7,6 +7,7 @@ when they have GPU hardware available but are using CPU-only JAX.
 from __future__ import annotations
 
 import subprocess
+from typing import Any
 
 from rheojax.logging import get_logger
 
@@ -234,7 +235,7 @@ def get_device_info() -> dict:
         - system_cuda_major: System CUDA major version (int)
         - recommended_package: Recommended JAX package
     """
-    info = {
+    info: dict[str, Any] = {
         "jax_version": None,
         "jax_backend": None,
         "devices": [],

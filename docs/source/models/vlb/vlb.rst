@@ -36,11 +36,11 @@ Quick Reference
 
    # Single transient network
    model = VLBLocal()
-   model.fit(omega, G_star, test_mode="oscillation")
+   model.fit(omega, G_star, test_mode='oscillation')
 
    # Multi-network (generalized Maxwell via VLB)
    model = VLBMultiNetwork(n_modes=3, include_permanent=True)
-   model.fit(omega, G_star, test_mode="oscillation")
+   model.fit(omega, G_star, test_mode='oscillation')
 
 
 Notation Guide
@@ -521,7 +521,7 @@ For complete step-by-step derivations including the full ODE solutions, see
      - :math:`\sigma_{12}` exactly sinusoidal; :math:`N_1` has :math:`2\omega`
      - ODE integration required
    * - :ref:`Extension <vlb-extension>`
-     - Singularity at :math:`\dot{\varepsilon} = k_d/2`; Tr → 3 at low rate
+     - Singularity at :math:`\dot{\varepsilon} = k_d/2`; :math:`\text{Tr} \to 3` at low rate
      - Sum over modes
 
 **Key signatures of constant** :math:`k_d`:
@@ -641,8 +641,8 @@ of bond lifetimes in the network:
 - **Well-separated modes**: distinct bond populations with different chemistry
 - **Closely-spaced modes**: quasi-continuous distribution (polydispersity)
 - **Dominant mode**: controls the terminal relaxation
-- **G_e > 0**: permanent cross-links present (solid-like long-time behavior)
-- **η_s > 0**: un-networked polymer or solvent background
+- :math:`G_e > 0`: permanent cross-links present (solid-like long-time behavior)
+- :math:`\eta_s > 0`: un-networked polymer or solvent background
 
 
 Cross-Protocol Validation
@@ -673,16 +673,22 @@ References
 1. Vernerey, F.J., Long, R. & Brighenti, R. (2017). "A statistically-based
    continuum theory for polymers with transient networks." *J. Mech. Phys.
    Solids*, 107, 1-20.
+   https://doi.org/10.1016/j.jmps.2017.05.016
 
 2. Green, M.S. & Tobolsky, A.V. (1946). "A New Approach to the Theory of
    Relaxing Polymeric Media." *J. Chem. Phys.*, 14(2), 80-92.
+   https://doi.org/10.1063/1.1724109
 
 3. Tanaka, F. & Edwards, S.F. (1992). "Viscoelastic properties of physically
    crosslinked networks." *J. Non-Newtonian Fluid Mech.*, 43(2-3), 247-271.
+   https://doi.org/10.1016/0377-0257(92)80027-U
 
 4. Vernerey, F.J. (2018). "Transient response of nonlinear polymer networks:
    A kinetic theory." *J. Mech. Phys. Solids*, 115, 230-247.
+   https://doi.org/10.1016/j.jmps.2018.02.018
+   :download:`PDF <../../../reference/vernerey_2018_tnt_kinetic_theory.pdf>`
 
 5. Long, R., Qi, H.J. & Dunn, M.L. (2013). "Modeling the mechanics of
    covalently adaptable polymer networks with temperature-dependent bond
    exchange reactions." *Soft Matter*, 9, 4083-4096.
+   https://doi.org/10.1039/C3SM27945F

@@ -122,7 +122,7 @@ Material Classification
      - Stiff crosslinked solid
      - Thermosets, vulcanized rubber
      - Minimal creep, strong damping
-   * - Moderate Ge (:math:`10^3-10^5 Pa`), :math:`\alpha` ~ 0.4
+   * - Moderate Ge (:math:`10^3-10^5 Pa`), :math:`\alpha \sim 0.4`
      - Soft viscoelastic solid
      - Hydrogels, elastomers
      - Balanced elasticity/damping
@@ -251,7 +251,7 @@ The Fractional Kelvin-Voigt model has three parameters:
      - Equilibrium modulus
    * - ``c_alpha``
      - :math:`c_\alpha`
-     - Pa*s^alpha
+     - Pa·s\ :sup:`α`
      - [1e-3, 1e9]
      - SpringPot constant
    * - ``alpha``
@@ -336,7 +336,7 @@ Usage
 
    # Set parameters for a filled polymer composite
    model.parameters.set_value('Ge', 1e6)         # Pa
-   model.parameters.set_value('c_alpha', 1e4)    # Pa*s^alpha
+   model.parameters.set_value('c_alpha', 1e4)    # Pa·s^α
    model.parameters.set_value('alpha', 0.5)      # dimensionless
 
    # Predict relaxation modulus

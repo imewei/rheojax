@@ -7,7 +7,7 @@ data characteristics, units, and metadata.
 from __future__ import annotations
 
 import warnings
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -25,7 +25,41 @@ if TYPE_CHECKING:
     from rheojax.core.data import RheoData
 
 
-class TestModeEnum(str, Enum):
+class DeformationMode(StrEnum):
+    """Deformation geometry mode for rheological measurements.
+
+    This enum classifies the type of mechanical deformation applied during
+    a rheological measurement. Shear-based instruments (rotational rheometers)
+    measure G*(w), while tensile/bending/compression instruments (DMTA/DMA)
+    measure E*(w). The relationship is:
+
+        E*(w) = 2(1 + v) * G*(w)
+
+    where v is Poisson's ratio of the material.
+    """
+
+    SHEAR = "shear"
+    TENSION = "tension"
+    BENDING = "bending"
+    COMPRESSION = "compression"
+
+    def __str__(self) -> str:
+        return self.value
+
+    def is_tensile(self) -> bool:
+        """True if this deformation mode produces Young's modulus E*.
+
+        Tension, bending, and compression geometries all measure E*,
+        while shear measures G*.
+        """
+        return self in (
+            DeformationMode.TENSION,
+            DeformationMode.BENDING,
+            DeformationMode.COMPRESSION,
+        )
+
+
+class TestModeEnum(StrEnum):
     """Enumeration of rheological test modes.
 
     Note: Named TestModeEnum (not TestMode) to avoid pytest collection warnings.
@@ -63,11 +97,11 @@ class TestModeEnum(str, Enum):
             return cls.STARTUP
         elif protocol == Protocol.OSCILLATION:
             return cls.OSCILLATION
-        elif protocol == Protocol.SAOS:
+        elif protocol == Protocol.SAOS:  # type: ignore[attr-defined]
             return cls.OSCILLATION
         elif protocol == Protocol.LAOS:
             return cls.OSCILLATION  # LAOS is a type of oscillation
-        return cls.UNKNOWN
+        return cls.UNKNOWN  # type: ignore[unreachable]
 
     def to_protocol(self) -> Protocol | None:
         """Convert TestModeEnum to inventory Protocol (best effort)."""
@@ -375,7 +409,7 @@ def get_compatible_test_modes(model_name: str) -> list[TestMode]:
             model_cls, "_fit_rotation_mode"
         ):
             modes.append(TestMode.ROTATION)
-        return modes
+        return modes  # type: ignore[return-value]
 
     return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
 

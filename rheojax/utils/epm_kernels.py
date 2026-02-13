@@ -5,9 +5,15 @@ It includes the FFT-based elastic propagator for stress redistribution, logic
 for plastic events (dual-mode: hard/smooth), and the full time-stepping kernel.
 """
 
+from __future__ import annotations
+
 from functools import partial
+from typing import TYPE_CHECKING
 
 from rheojax.core.jax_config import safe_import_jax
+
+if TYPE_CHECKING:
+    import jax
 
 jax, jnp = safe_import_jax()
 

@@ -49,10 +49,11 @@ import diffrax
 import numpy as np
 
 from rheojax.core.base import BaseModel
+from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
-from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.giesekus._kernels import (
     giesekus_multimode_ode_rhs,
     giesekus_multimode_saos_moduli,
@@ -71,6 +72,12 @@ logger = logging.getLogger(__name__)
         Protocol.OSCILLATION,
         Protocol.STARTUP,
     ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
+    ],
 )
 @ModelRegistry.register(
     "giesekus_multimode",
@@ -78,6 +85,12 @@ logger = logging.getLogger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.OSCILLATION,
         Protocol.STARTUP,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class GiesekusMultiMode(BaseModel):
@@ -216,13 +229,13 @@ class GiesekusMultiMode(BaseModel):
     @property
     def eta_s(self) -> float:
         """Get solvent viscosity η_s (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))
+        return float(self.parameters.get_value("eta_s"))  # type: ignore[arg-type]
 
     @property
     def eta_0(self) -> float:
         """Get zero-shear viscosity η₀ = η_s + Σ η_p,i (Pa·s)."""
         eta_p_total = sum(
-            self.parameters.get_value(f"eta_p_{i}") for i in range(self._n_modes)
+            self.parameters.get_value(f"eta_p_{i}") for i in range(self._n_modes)  # type: ignore[misc]
         )
         return self.eta_s + eta_p_total
 
@@ -243,9 +256,9 @@ class GiesekusMultiMode(BaseModel):
             raise IndexError(f"Mode index {mode_idx} out of range [0, {self._n_modes})")
 
         return {
-            "eta_p": float(self.parameters.get_value(f"eta_p_{mode_idx}")),
-            "lambda_1": float(self.parameters.get_value(f"lambda_{mode_idx}")),
-            "alpha": float(self.parameters.get_value(f"alpha_{mode_idx}")),
+            "eta_p": float(self.parameters.get_value(f"eta_p_{mode_idx}")),  # type: ignore[arg-type]
+            "lambda_1": float(self.parameters.get_value(f"lambda_{mode_idx}")),  # type: ignore[arg-type]
+            "alpha": float(self.parameters.get_value(f"alpha_{mode_idx}")),  # type: ignore[arg-type]
         }
 
     def set_mode_params(
@@ -388,7 +401,10 @@ class GiesekusMultiMode(BaseModel):
         )
 
         # Forward kwargs (gamma_dot, sigma_applied, etc.) to model_function
-        predict_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
+        predict_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
+        }
         return self.model_function(x_jax, params, test_mode=test_mode, **predict_kwargs)
 
     def model_function(self, X, params, test_mode=None, **kwargs):

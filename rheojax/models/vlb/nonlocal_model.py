@@ -44,12 +44,12 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.vlb._base import VLBBase
 from rheojax.models.vlb._kernels import (
-    vlb_breakage_bell,
-    vlb_fene_factor,
-    vlb_stress_fene_xy,
     laplacian_1d_neumann_vlb,
+    vlb_breakage_bell,
+    vlb_stress_fene_xy,
 )
 
 jax, jnp = safe_import_jax()
@@ -67,6 +67,7 @@ StressType = Literal["linear", "fene"]
         Protocol.STARTUP,
         Protocol.CREEP,
     ],
+    deformation_modes=[DeformationMode.SHEAR],
 )
 class VLBNonlocal(VLBBase):
     """Nonlocal VLB with tensor diffusion for shear banding.

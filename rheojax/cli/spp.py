@@ -206,6 +206,13 @@ def _add_batch_args(parser: argparse.ArgumentParser) -> None:
 
 def run_analyze(args: Namespace) -> int:
     """Run SPP analysis on a single file."""
+    if args.omega <= 0:
+        print("Error: --omega must be positive", file=sys.stderr)
+        return 1
+    if args.gamma_0 <= 0:
+        print("Error: --gamma-0 must be positive", file=sys.stderr)
+        return 1
+
     logger.info(
         "Running SPP analyze command",
         command="spp analyze",
@@ -236,6 +243,8 @@ def run_analyze(args: Namespace) -> int:
         )
         # Handle potential list return (take first dataset if list)
         if isinstance(loaded, list):
+            if not loaded:
+                raise ValueError("File was parsed but returned no datasets")
             rheo_data = loaded[0]
         else:
             rheo_data = loaded
@@ -285,11 +294,17 @@ def run_analyze(args: Namespace) -> int:
 
     # Print summary
     print("\n=== SPP Analysis Results ===")
-    print(f"Static yield stress (σ_sy):  {results['sigma_sy']:.2f} Pa")
-    print(f"Dynamic yield stress (σ_dy): {results['sigma_dy']:.2f} Pa")
-    print(f"Cage modulus (G_cage):       {results['G_cage_mean']:.2f} Pa")
+    sigma_sy = results.get("sigma_sy")
+    sigma_dy = results.get("sigma_dy")
+    G_cage = results.get("G_cage_mean")
+    if sigma_sy is not None:
+        print(f"Static yield stress (σ_sy):  {float(sigma_sy):.2f} Pa")
+    if sigma_dy is not None:
+        print(f"Dynamic yield stress (σ_dy): {float(sigma_dy):.2f} Pa")
+    if G_cage is not None:
+        print(f"Cage modulus (G_cage):       {float(G_cage):.2f} Pa")
     if "I3_I1_ratio" in results:
-        print(f"I3/I1 ratio:                 {results['I3_I1_ratio']:.4f}")
+        print(f"I3/I1 ratio:                 {float(results['I3_I1_ratio']):.4f}")
 
     # Output file
     if args.output:
@@ -364,6 +379,10 @@ def run_analyze(args: Namespace) -> int:
 
 def run_batch(args: Namespace) -> int:
     """Run SPP analysis on multiple files."""
+    if args.omega <= 0:
+        print("Error: --omega must be positive", file=sys.stderr)
+        return 1
+
     input_dir = args.input_dir
     if not input_dir.is_dir():
         print(f"Error: {input_dir} is not a directory", file=sys.stderr)
@@ -394,14 +413,21 @@ def run_batch(args: Namespace) -> int:
             loaded = load_data(str(file_path))
             # Handle potential list return (take first dataset if list)
             if isinstance(loaded, list):
+                if not loaded:
+                    raise ValueError("File was parsed but returned no datasets")
                 rheo_data = loaded[0]
             else:
                 rheo_data = loaded
             rheo_data.metadata["omega"] = args.omega
             rheo_data.metadata["test_mode"] = "oscillation"
 
-            # Extract gamma_0 from filename or use default
+            # Extract gamma_0 from metadata or use default
             gamma_0 = rheo_data.metadata.get("gamma_0", 1.0)
+            if "gamma_0" not in rheo_data.metadata:
+                logger.warning(
+                    "gamma_0 not found in file metadata, using default=1.0",
+                    file=str(file_path),
+                )
 
             spp = SPPDecomposer(
                 omega=args.omega,
@@ -415,10 +441,12 @@ def run_batch(args: Namespace) -> int:
             output_path = output_dir / f"{file_path.stem}_spp.csv"
             _save_results(results, output_path, matlab_format=False, omega=args.omega)
 
-            print(f"σ_sy={results['sigma_sy']:.1f} Pa")
+            sigma_sy = results.get("sigma_sy")
+            print(f"σ_sy={float(sigma_sy):.1f} Pa" if sigma_sy is not None else "Done")
             success_count += 1
 
         except Exception as e:
+            logger.error("Batch file processing failed", file=str(file_path), exc_info=True)
             print(f"FAILED: {e}")
 
     print(f"\nCompleted: {success_count}/{len(files)} files processed successfully")
@@ -443,16 +471,21 @@ def _save_results(
         export_spp_txt(str(output_path), results, omega)
     else:
         # Standard CSV format
-        # Extract scalar metrics
+        # Extract scalar metrics (convert JAX arrays to Python floats)
+        def _to_float(v):
+            if v is None:
+                return np.nan
+            return float(np.asarray(v))
+
         metrics = {
-            "sigma_sy": results.get("sigma_sy", np.nan),
-            "sigma_dy": results.get("sigma_dy", np.nan),
-            "G_cage_mean": results.get("G_cage_mean", np.nan),
-            "Gp_t_mean": results.get("Gp_t_mean", np.nan),
-            "Gpp_t_mean": results.get("Gpp_t_mean", np.nan),
-            "I3_I1_ratio": results.get("I3_I1_ratio", np.nan),
-            "S_factor": results.get("S_factor", np.nan),
-            "T_factor": results.get("T_factor", np.nan),
+            "sigma_sy": _to_float(results.get("sigma_sy")),
+            "sigma_dy": _to_float(results.get("sigma_dy")),
+            "G_cage_mean": _to_float(results.get("G_cage_mean")),
+            "Gp_t_mean": _to_float(results.get("Gp_t_mean")),
+            "Gpp_t_mean": _to_float(results.get("Gpp_t_mean")),
+            "I3_I1_ratio": _to_float(results.get("I3_I1_ratio")),
+            "S_factor": _to_float(results.get("S_factor")),
+            "T_factor": _to_float(results.get("T_factor")),
         }
 
         df = pd.DataFrame([metrics])

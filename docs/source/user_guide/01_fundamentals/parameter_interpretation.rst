@@ -8,7 +8,7 @@ Parameter Interpretation
 
    After completing this section, you will be able to:
 
-   1. Explain the physical meaning of G', G", η, τ, and α
+   1. Explain the physical meaning of :math:`G'`, :math:`G''`, :math:`\eta`, :math:`\tau`, and :math:`\alpha`
    2. Relate rheological parameters to material microstructure
    3. Interpret fitted parameters in terms of molecular or network properties
    4. Recognize when parameter values are physically reasonable
@@ -26,11 +26,11 @@ The Challenge: What Do Numbers Mean?
 
 When you fit a rheological model, you get parameter values like:
 
-- G' = 5000 Pa
-- G" = 1200 Pa
-- η = 1.5 × 10⁵ Pa·s
-- τ = 2.3 s
-- α = 0.42
+- :math:`G' = 5000` Pa
+- :math:`G'' = 1200` Pa
+- :math:`\eta = 1.5 \times 10^5` Pa·s
+- :math:`\tau = 2.3` s
+- :math:`\alpha = 0.42`
 
 **But what do these numbers tell you about the material?**
 
@@ -44,8 +44,8 @@ This section connects mathematical parameters to:
 Core Rheological Parameters
 ----------------------------
 
-1. Storage Modulus (G')
-~~~~~~~~~~~~~~~~~~~~~~~~
+1. Storage Modulus (:math:`G'`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Definition**: Elastic component of complex modulus—energy stored and recovered per cycle
 
@@ -66,34 +66,34 @@ Core Rheological Parameters
    :widths: 40 30 30
 
    * - Material
-     - G' (Pa)
+     - :math:`G'` (Pa)
      - Physical State
    * - Water
      - 0
      - Liquid (no elasticity)
    * - Yogurt
-     - 10² - 10³
+     - :math:`10^2` -- :math:`10^3`
      - Soft gel
    * - Silly Putty
-     - 10⁴ - 10⁵
+     - :math:`10^4` -- :math:`10^5`
      - Viscoelastic solid
    * - Rubber
-     - 10⁵ - 10⁶
+     - :math:`10^5` -- :math:`10^6`
      - Elastic solid
    * - Polystyrene (glassy)
-     - 10⁹
+     - :math:`10^9`
      - Hard plastic
 
 **What it tells you**:
 
-- **High G'** (>10⁵ Pa): Material resists deformation, solid-like
-- **Low G'** (< 10³ Pa): Material easily deforms, soft or weak
-- **G' > G"**: More solid-like than liquid-like at that frequency/timescale
+- **High** :math:`G'` (:math:`> 10^5` Pa): Material resists deformation, solid-like
+- **Low** :math:`G'` (:math:`< 10^3` Pa): Material easily deforms, soft or weak
+- :math:`G' > G''`: More solid-like than liquid-like at that frequency/timescale
 
-**Example**: A rubber band has G' ≈ 10⁶ Pa → resists stretching, stores energy, snaps back
+**Example**: A rubber band has :math:`G' \approx 10^6` Pa --- resists stretching, stores energy, snaps back
 
-2. Loss Modulus (G")
-~~~~~~~~~~~~~~~~~~~~~
+2. Loss Modulus (:math:`G''`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Definition**: Viscous component of complex modulus—energy dissipated as heat per cycle
 
@@ -107,28 +107,28 @@ Core Rheological Parameters
 - **Gels**: Internal friction, structural rearrangement
 - **Suspensions**: Particle rearrangement, fluid drag
 
-**Typical ranges**: Similar to G', but interpretation differs
+**Typical ranges**: Similar to :math:`G'`, but interpretation differs
 
 **What it tells you**:
 
-- **High G"**: Material dissipates energy, damps vibrations
-- **Low G"**: Little internal friction, efficient energy storage
-- **G" > G'**: More liquid-like than solid-like
+- **High** :math:`G''`: Material dissipates energy, damps vibrations
+- **Low** :math:`G''`: Little internal friction, efficient energy storage
+- :math:`G'' > G'`: More liquid-like than solid-like
 
-**Loss tangent (tan δ)**:
+**Loss tangent** (:math:`\tan \delta`):
 
 .. math::
 
    \tan(\delta) = \frac{G"}{G'}
 
-- tan δ << 1: Elastic solid (low damping)
-- tan δ ≈ 1: Balanced viscoelastic material
-- tan δ >> 1: Viscous liquid (high damping)
+- :math:`\tan \delta \ll 1`: Elastic solid (low damping)
+- :math:`\tan \delta \approx 1`: Balanced viscoelastic material
+- :math:`\tan \delta \gg 1`: Viscous liquid (high damping)
 
-**Example**: Car shock absorber fluid has high G" → dissipates vibration energy as heat
+**Example**: Car shock absorber fluid has high :math:`G''` --- dissipates vibration energy as heat
 
-3. Viscosity (η)
-~~~~~~~~~~~~~~~~
+3. Viscosity (:math:`\eta`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Definition**: Resistance to flow under shear
 
@@ -149,17 +149,17 @@ Core Rheological Parameters
    :widths: 40 30
 
    * - Material
-     - η (Pa·s)
+     - :math:`\eta` (Pa·s)
    * - Water
      - 0.001
    * - Honey
      - 10
    * - Ketchup (at rest)
-     - 10³
+     - :math:`10^3`
    * - Polymer melt
-     - 10³ - 10⁵
+     - :math:`10^3` -- :math:`10^5`
    * - Asphalt
-     - 10⁸
+     - :math:`10^8`
 
 **Complex viscosity** (from SAOS):
 
@@ -167,18 +167,18 @@ Core Rheological Parameters
 
    \eta^*(\omega) = \frac{\sqrt{(G')^2 + (G")^2}}{\omega}
 
-**Zero-shear viscosity** (η₀): Viscosity at very low shear rates (Newtonian plateau)
+**Zero-shear viscosity** (:math:`\eta_0`): Viscosity at very low shear rates (Newtonian plateau)
 
 **What it tells you**:
 
-- **High η** (>10³ Pa·s): Thick, slow flow, hard to pump
-- **Low η** (<1 Pa·s): Thin, fast flow, easy to pump
-- **Shear-dependent**: η(γ̇) decreases → shear thinning (most complex fluids)
+- **High** :math:`\eta` (:math:`> 10^3` Pa·s): Thick, slow flow, hard to pump
+- **Low** :math:`\eta` (:math:`< 1` Pa·s): Thin, fast flow, easy to pump
+- **Shear-dependent**: :math:`\eta(\dot{\gamma})` decreases --- shear thinning (most complex fluids)
 
-**Example**: Ketchup has high η at rest (stays in bottle), low η under shear (pours when squeezed)
+**Example**: Ketchup has high :math:`\eta` at rest (stays in bottle), low :math:`\eta` under shear (pours when squeezed)
 
-4. Relaxation Time (τ)
-~~~~~~~~~~~~~~~~~~~~~~~
+4. Relaxation Time (:math:`\tau`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Definition**: Characteristic timescale for stress to relax to 1/e (~37%) of initial value
 
@@ -199,15 +199,15 @@ Core Rheological Parameters
    :widths: 40 30
 
    * - Material
-     - τ (s)
+     - :math:`\tau` (s)
    * - Water
-     - 10⁻¹²
+     - :math:`10^{-12}`
    * - Low-MW polymer solution
-     - 10⁻³ - 10⁻¹
+     - :math:`10^{-3}` -- :math:`10^{-1}`
    * - Polymer melt
-     - 1 - 100
+     - 1 -- 100
    * - Viscoelastic solid
-     - 10³ - ∞
+     - :math:`10^3` -- :math:`\infty`
 
 **Relationship to frequency**:
 
@@ -215,15 +215,15 @@ Core Rheological Parameters
 
    \omega_c \approx \frac{1}{\tau}
 
-where ω_c is the crossover frequency (G' = G")
+where :math:`\omega_c` is the crossover frequency (:math:`G' = G''`)
 
 **What it tells you**:
 
-- **Short τ** (<0.1 s): Material responds quickly, liquid-like at accessible timescales
-- **Long τ** (>10 s): Material responds slowly, solid-like at accessible timescales
-- **Multiple τ**: Complex materials have a spectrum of relaxation times
+- **Short** :math:`\tau` (<0.1 s): Material responds quickly, liquid-like at accessible timescales
+- **Long** :math:`\tau` (>10 s): Material responds slowly, solid-like at accessible timescales
+- **Multiple** :math:`\tau`: Complex materials have a spectrum of relaxation times
 
-**Example**: Silly Putty has τ ≈ 1 s → flows slowly, but bounces if deformed fast
+**Example**: Silly Putty has :math:`\tau \approx 1` s --- flows slowly, but bounces if deformed fast
 
 **Deborah number revisited**:
 
@@ -231,13 +231,13 @@ where ω_c is the crossover frequency (G' = G")
 
    \text{De} = \frac{\tau}{t_{\text{obs}}}
 
-- De >> 1: Material appears solid (τ >> observation time)
-- De << 1: Material appears liquid (τ << observation time)
+- :math:`\text{De} \gg 1`: Material appears solid (:math:`\tau \gg` observation time)
+- :math:`\text{De} \ll 1`: Material appears liquid (:math:`\tau \ll` observation time)
 
-5. Fractional Order (α)
-~~~~~~~~~~~~~~~~~~~~~~~~
+5. Fractional Order (:math:`\alpha`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Definition**: Exponent characterizing power-law viscoelasticity (0 < α < 1)
+**Definition**: Exponent characterizing power-law viscoelasticity (:math:`0 < \alpha < 1`)
 
 **Units**: Dimensionless
 
@@ -255,16 +255,16 @@ where ω_c is the crossover frequency (G' = G")
    :header-rows: 1
    :widths: 20 20 40
 
-   * - α
+   * - :math:`\alpha`
      - Behavior
      - Interpretation
-   * - α → 0
+   * - :math:`\alpha \to 0`
      - Solid-like
      - Narrow relaxation spectrum, single timescale
-   * - α = 0.5
+   * - :math:`\alpha = 0.5`
      - Critical gel
      - Power-law, fractal network
-   * - α → 1
+   * - :math:`\alpha \to 1`
      - Liquid-like
      - Very broad relaxation spectrum
 
@@ -276,11 +276,11 @@ where ω_c is the crossover frequency (G' = G")
 
 **What it tells you**:
 
-- **α ≈ 1**: Nearly Newtonian liquid (single relaxation time)
-- **α ≈ 0.5**: Gel-like (critical gel, broad relaxation spectrum)
-- **α ≈ 0**: Solid-like (narrow relaxation spectrum)
+- :math:`\alpha \approx 1`: Nearly Newtonian liquid (single relaxation time)
+- :math:`\alpha \approx 0.5`: Gel-like (critical gel, broad relaxation spectrum)
+- :math:`\alpha \approx 0`: Solid-like (narrow relaxation spectrum)
 
-**Example**: Polymer melt with α = 0.7 → moderately broad molecular weight distribution
+**Example**: Polymer melt with :math:`\alpha = 0.7` --- moderately broad molecular weight distribution
 
 Parameter Relationships
 -----------------------
@@ -294,14 +294,14 @@ For **Zener model** (viscoelastic solid):
 
    G(t) = G_e + G_m \exp(-t/\tau)
 
-- **G_e**: Equilibrium modulus (long-time plateau)
-- **G_m**: Modulus of relaxing arm
-- **G₀ = G_e + G_m**: Instantaneous modulus (short-time limit)
+- :math:`G_e`: Equilibrium modulus (long-time plateau)
+- :math:`G_m`: Modulus of relaxing arm
+- :math:`G_0 = G_e + G_m`: Instantaneous modulus (short-time limit)
 
 **Physical interpretation**:
 
-- **G_e > 0**: Solid (crosslinked network, doesn't flow)
-- **G_e = 0**: Liquid (all stress eventually relaxes)
+- :math:`G_e > 0`: Solid (crosslinked network, doesn't flow)
+- :math:`G_e = 0`: Liquid (all stress eventually relaxes)
 
 Viscosity from Modulus and Time
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -312,7 +312,7 @@ Viscosity from Modulus and Time
 
    \eta_0 = G \cdot \tau
 
-Higher modulus OR longer relaxation time → higher viscosity
+Higher modulus OR longer relaxation time leads to higher viscosity
 
 **Practical use**: Estimate processing viscosity from SAOS data
 
@@ -322,18 +322,18 @@ Microstructural Connections
 Polymers: Entanglements and Molecular Weight
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Plateau modulus** (G_N⁰):
+**Plateau modulus** (:math:`G_N^0`):
 
 .. math::
 
    G_N^0 \approx \frac{\rho RT}{M_e}
 
-- ρ: Density
-- R: Gas constant
-- T: Temperature
-- **M_e**: Entanglement molecular weight (material constant)
+- :math:`\rho`: Density
+- :math:`R`: Gas constant
+- :math:`T`: Temperature
+- :math:`M_e`: Entanglement molecular weight (material constant)
 
-**Higher G_N⁰ → tighter entanglement network**
+**Higher** :math:`G_N^0` --- **tighter entanglement network**
 
 **Reptation time** (Doi-Edwards theory):
 
@@ -341,9 +341,9 @@ Polymers: Entanglements and Molecular Weight
 
    \tau_d \sim M_w^{3.4}
 
-- **M_w**: Weight-average molecular weight
+- :math:`M_w`: Weight-average molecular weight
 
-**Higher M_w → much longer relaxation time**
+**Higher** :math:`M_w` --- **much longer relaxation time**
 
 Gels: Crosslink Density
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -354,8 +354,8 @@ Gels: Crosslink Density
 
    G_e = \nu RT
 
-- **ν**: Crosslink density (moles of elastically active network chains per volume)
-- **Higher G_e → more crosslinks**
+- :math:`\nu`: Crosslink density (moles of elastically active network chains per volume)
+- **Higher** :math:`G_e` --- **more crosslinks**
 
 **Example**: Doubling crosslink density doubles equilibrium modulus
 
@@ -368,11 +368,11 @@ Suspensions: Volume Fraction
 
    \eta_r = \left(1 - \frac{\phi}{\phi_{\text{max}}}\right)^{-[\eta] \phi_{\text{max}}}
 
-- **φ**: Particle volume fraction
-- **φ_max**: Maximum packing fraction
-- **[η]**: Intrinsic viscosity
+- :math:`\phi`: Particle volume fraction
+- :math:`\phi_{\text{max}}`: Maximum packing fraction
+- :math:`[\eta]`: Intrinsic viscosity
 
-**Higher φ → much higher viscosity** (especially near φ_max)
+**Higher** :math:`\phi` --- **much higher viscosity** (especially near :math:`\phi_{\text{max}}`)
 
 Recognizing Physically Reasonable Parameters
 ---------------------------------------------
@@ -386,34 +386,34 @@ Recognizing Physically Reasonable Parameters
    * - Parameter
      - Suspicious Value
      - Likely Issue
-   * - G'
+   * - :math:`G'`
      - < 0.1 Pa
      - Below instrument sensitivity
-   * - G'
-     - > 10¹⁰ Pa
+   * - :math:`G'`
+     - :math:`> 10^{10}` Pa
      - Glassy material, wrong model
-   * - τ
-     - < 10⁻⁶ s
+   * - :math:`\tau`
+     - :math:`< 10^{-6}` s
      - Unphysical (beyond molecular timescales)
-   * - τ
-     - > 10⁶ s
+   * - :math:`\tau`
+     - :math:`> 10^6` s
      - Essentially infinite (use solid model)
-   * - α
+   * - :math:`\alpha`
      - < 0 or > 1
-     - Fitting error (α must be in [0, 1])
-   * - η
-     - < 10⁻⁶ Pa·s
+     - Fitting error (:math:`\alpha` must be in [0, 1])
+   * - :math:`\eta`
+     - :math:`< 10^{-6}` Pa·s
      - Less viscous than water (unlikely)
-   * - η
-     - > 10¹⁵ Pa·s
+   * - :math:`\eta`
+     - :math:`> 10^{15}` Pa·s
      - Essentially solid (wrong test mode)
 
 **Sanity checks**:
 
 1. **Modulus order of magnitude**: Compare to known materials
 2. **Relaxation time vs. experimental range**: Should be within accessible frequencies
-3. **Consistency**: η₀ ≈ G × τ (for simple models)
-4. **Temperature dependence**: Higher T → lower η, shorter τ (usually)
+3. **Consistency**: :math:`\eta_0 \approx G \times \tau` (for simple models)
+4. **Temperature dependence**: Higher T --- lower :math:`\eta`, shorter :math:`\tau` (usually)
 
 Worked Example: Interpreting Fitted Parameters
 -----------------------------------------------
@@ -422,41 +422,41 @@ Worked Example: Interpreting Fitted Parameters
 
 **Fitted parameters**:
 
-- G₀ = 1.2 × 10⁵ Pa
-- τ = 5.8 s
-- α = 0.68
+- :math:`G_0 = 1.2 \times 10^5` Pa
+- :math:`\tau = 5.8` s
+- :math:`\alpha = 0.68`
 
 **Interpretation**:
 
-1. **Modulus (G₀ = 1.2 × 10⁵ Pa)**:
+1. **Modulus** (:math:`G_0 = 1.2 \times 10^5` Pa):
 
    - Moderate stiffness, typical for polymer melts
    - Suggests entangled network (not crosslinked—would be solid)
    - Comparable to polyethylene or polystyrene melts
 
-2. **Relaxation time (τ = 5.8 s)**:
+2. **Relaxation time** (:math:`\tau = 5.8` s):
 
    - Moderate molecular weight (not very high or very low)
-   - Crossover frequency: ω_c ≈ 1/τ ≈ 0.17 rad/s
+   - Crossover frequency: :math:`\omega_c \approx 1/\tau \approx 0.17` rad/s
    - Material behaves liquid-like below ~0.17 rad/s, solid-like above
 
-3. **Fractional order (α = 0.68)**:
+3. **Fractional order** (:math:`\alpha = 0.68`):
 
    - Moderately broad relaxation spectrum
    - Indicates molecular weight distribution (polydispersity)
-   - Not narrow (α → 1) or gel-like (α → 0.5)
+   - Not narrow (:math:`\alpha \to 1`) or gel-like (:math:`\alpha \to 0.5`)
 
 4. **Zero-shear viscosity**:
 
-   - η₀ ≈ G₀ × τ = 1.2 × 10⁵ Pa × 5.8 s ≈ **7 × 10⁵ Pa·s**
-   - High viscosity → difficult to process (extrusion would be slow)
+   - :math:`\eta_0 \approx G_0 \times \tau = 1.2 \times 10^5 \text{ Pa} \times 5.8 \text{ s} \approx` **7** :math:`\times 10^5` **Pa·s**
+   - High viscosity --- difficult to process (extrusion would be slow)
    - May need heating or dilution for processing
 
 **Practical implications**:
 
 - **Processing**: High viscosity requires high pressure/temperature for molding
 - **Application**: Material will flow under sustained load (liquid), but resist fast deformation (viscoelastic)
-- **Molecular structure**: Likely high molecular weight (long τ) with moderate polydispersity (α = 0.68)
+- **Molecular structure**: Likely high molecular weight (long :math:`\tau`) with moderate polydispersity (:math:`\alpha = 0.68`)
 
 Key Concepts
 ------------
@@ -464,40 +464,40 @@ Key Concepts
 .. admonition:: Main Takeaways
    :class: tip
 
-   1. **G'**: Stiffness, elastic storage (higher → more solid-like)
+   1. :math:`G'`: Stiffness, elastic storage (higher --- more solid-like)
 
-   2. **G"**: Damping, energy dissipation (tan δ = G"/G')
+   2. :math:`G''`: Damping, energy dissipation (:math:`\tan \delta = G''/G'`)
 
-   3. **η**: Viscosity, resistance to flow (higher → thicker, harder to process)
+   3. :math:`\eta`: Viscosity, resistance to flow (higher --- thicker, harder to process)
 
-   4. **τ**: Relaxation time, response timescale (ω_c ≈ 1/τ)
+   4. :math:`\tau`: Relaxation time, response timescale (:math:`\omega_c \approx 1/\tau`)
 
-   5. **α**: Fractional order, breadth of relaxation spectrum (0 = solid-like, 1 = liquid-like)
+   5. :math:`\alpha`: Fractional order, breadth of relaxation spectrum (0 = solid-like, 1 = liquid-like)
 
    6. **Parameters connect to microstructure**: Crosslink density, molecular weight, particle volume fraction
 
 .. admonition:: Self-Check Questions
    :class: tip
 
-   1. **A gel has G_e = 500 Pa. You double the crosslink density. What is the new G_e?**
+   1. **A gel has** :math:`G_e = 500` **Pa. You double the crosslink density. What is the new** :math:`G_e` **?**
 
-      Hint: G_e ~ crosslink density (linear relationship)
+      Hint: :math:`G_e \sim` crosslink density (linear relationship)
 
-   2. **Two polymer melts have the same G₀ but different τ (1 s vs. 10 s). Which has higher viscosity?**
+   2. **Two polymer melts have the same** :math:`G_0` **but different** :math:`\tau` **(1 s vs. 10 s). Which has higher viscosity?**
 
-      Hint: η₀ = G₀ × τ
+      Hint: :math:`\eta_0 = G_0 \times \tau`
 
-   3. **A material has α = 0.9. Is the relaxation spectrum narrow or broad?**
+   3. **A material has** :math:`\alpha = 0.9`. **Is the relaxation spectrum narrow or broad?**
 
-      Hint: α → 1 means narrow (nearly single relaxation time)
+      Hint: :math:`\alpha \to 1` means narrow (nearly single relaxation time)
 
-   4. **You fit G' and find G' = 1000 Pa at all frequencies. What does this mean physically?**
+   4. **You fit** :math:`G'` **and find** :math:`G' = 1000` **Pa at all frequencies. What does this mean physically?**
 
-      Hint: Frequency-independent G' → elastic solid
+      Hint: Frequency-independent :math:`G'` --- elastic solid
 
-   5. **A fitted model gives τ = 10⁻⁸ s. Should you trust this value?**
+   5. **A fitted model gives** :math:`\tau = 10^{-8}` **s. Should you trust this value?**
 
-      Hint: Check if it's physically reasonable (molecular timescales ~10⁻¹² s for liquids)
+      Hint: Check if it's physically reasonable (molecular timescales :math:`\sim 10^{-12}` s for liquids)
 
 Further Reading
 ---------------
@@ -517,7 +517,7 @@ Further Reading
 Summary
 -------
 
-Rheological parameters have physical meaning connected to material microstructure: **G'** (stiffness, network strength), **G"** (damping, friction), **η** (viscosity, flow resistance), **τ** (relaxation time, response timescale), and **α** (relaxation spectrum breadth). Understanding these connections enables prediction of processing behavior and interpretation of fitted models.
+Rheological parameters have physical meaning connected to material microstructure: :math:`G'` (stiffness, network strength), :math:`G''` (damping, friction), :math:`\eta` (viscosity, flow resistance), :math:`\tau` (relaxation time, response timescale), and :math:`\alpha` (relaxation spectrum breadth). Understanding these connections enables prediction of processing behavior and interpretation of fitted models.
 
 Next Steps
 ----------

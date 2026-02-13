@@ -12,10 +12,16 @@ Key Components:
 - Full tensorial EPM time-stepping kernel
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from functools import partial
+from typing import TYPE_CHECKING
 
 from rheojax.core.jax_config import safe_import_jax
+
+if TYPE_CHECKING:
+    import jax
 
 jax, jnp = safe_import_jax()
 
@@ -61,7 +67,7 @@ def make_tensorial_propagator_q(L: int, nu: float, mu: float = 1.0) -> jax.Array
     # Plane strain elastic constants
     # For plane strain: E' = E/(1-ν²), ν' = ν/(1-ν)
     # Lame parameters for plane strain
-    lambda_ps = 2 * mu * nu / (1 - 2 * nu)
+    lambda_ps = 2 * mu * nu / jnp.maximum(1 - 2 * nu, 1e-10)
 
     # Initialize propagator tensor (3, 3, L, L//2+1)
     propagator = jnp.zeros((3, 3, L, L // 2 + 1))

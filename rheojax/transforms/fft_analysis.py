@@ -159,7 +159,7 @@ class FFTAnalysis(BaseTransform):
         trend = slope * x + intercept
         return y - trend
 
-    def _transform(self, data: RheoData) -> RheoData:
+    def _transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
         """Apply FFT transform to time-domain data.
 
         Parameters
@@ -179,7 +179,7 @@ class FFTAnalysis(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
-        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
+        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)  # type: ignore[arg-type]
 
         with log_transform(
             logger,
@@ -231,7 +231,14 @@ class FFTAnalysis(BaseTransform):
 
             # Compute frequencies
             n = len(t)
+            if n < 2:
+                raise ValueError("FFT requires at least 2 data points")
             dt = (t[-1] - t[0]) / (n - 1)  # Average sampling interval
+            if dt <= 0:
+                raise ValueError(
+                    "Time array must be monotonically increasing for FFT "
+                    f"(got dt={float(dt):.3e})"
+                )
             freqs = jnp.fft.rfftfreq(n, d=dt)
 
             # Compute magnitude or PSD
@@ -247,7 +254,8 @@ class FFTAnalysis(BaseTransform):
             # Normalize if requested
             if self.normalize and not self.return_psd:
                 logger.debug("Normalizing spectrum")
-                spectrum = spectrum / jnp.max(spectrum)
+                max_val = jnp.max(spectrum)
+                spectrum = jnp.where(max_val > 1e-12, spectrum / max_val, spectrum)
 
             # Create metadata
             new_metadata = data.metadata.copy()
@@ -279,7 +287,7 @@ class FFTAnalysis(BaseTransform):
                 validate=False,
             )
 
-    def _inverse_transform(self, data: RheoData) -> RheoData:
+    def _inverse_transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
         """Apply inverse FFT to return to time domain.
 
         Parameters
@@ -391,7 +399,8 @@ class FFTAnalysis(BaseTransform):
         from scipy.signal import find_peaks as scipy_find_peaks
 
         # Normalize spectrum for prominence calculation
-        spectrum_norm = spectrum / np.max(spectrum)
+        max_val = np.max(spectrum)
+        spectrum_norm = spectrum / max_val if max_val > 1e-12 else spectrum
 
         # Find peaks
         peak_indices, properties = scipy_find_peaks(

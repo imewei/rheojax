@@ -27,7 +27,7 @@ Sample Preparation
      - Special Considerations
    * - Polymer melts
      - Parallel plate (25-50 mm)
-     - Prevent oxidation (N₂ purge)
+     - Prevent oxidation (:math:`N_2` purge)
    * - Soft gels
      - Parallel plate (20-40 mm)
      - Minimize gap (<2 mm), avoid slip
@@ -53,8 +53,8 @@ SAOS Frequency Sweep
 
 **Common Artifacts**:
 
-- Instrument inertia: G' increases at high ω (>100 rad/s)
-- Torque limit: Erratic data at low ω for soft materials
+- Instrument inertia: :math:`G'` increases at high :math:`\omega` (>100 rad/s)
+- Torque limit: Erratic data at low :math:`\omega` for soft materials
 - Edge fracture: Solid samples at large strain
 
 Stress Relaxation
@@ -69,7 +69,7 @@ Stress Relaxation
 
 **Common Artifacts**:
 
-- Inertia: Oscillations at t < 0.1 s
+- Inertia: Oscillations at :math:`t < 0.1` s
 - Sample slip: Sudden stress drop
 - Instrument compliance: Long-time artifacts
 
@@ -78,7 +78,7 @@ Steady Shear Flow
 
 **Recommended Protocol**:
 
-1. **Shear rate range**: 0.01 - 1000 s⁻¹ (for polymers)
+1. **Shear rate range**: 0.01 - 1000 :math:`\text{s}^{-1}` (for polymers)
 2. **Steady-state criterion**: Viscosity constant for >30 s
 3. **Pre-shear**: Essential to erase history
 4. **Sequence**: Low → high rate (reduces fracture)

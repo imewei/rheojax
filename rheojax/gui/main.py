@@ -119,7 +119,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         epilog="""
 Examples:
   rheojax-gui                              # Launch GUI
-  rheojax-gui --project analysis.rheo     # Open project file
+  rheojax-gui --project analysis.rheojax     # Open project file
   rheojax-gui --import data.xlsx          # Import data on startup
   rheojax-gui --maximized                 # Start maximized (per-window manager)
   rheojax-gui --verbose                   # Enable verbose logging
@@ -133,7 +133,7 @@ For more information, visit: https://github.com/imewei/rheojax
         "-p",
         type=Path,
         metavar="FILE",
-        help="Project file to open on startup (.rheo)",
+        help="Project file to open on startup (.rheojax)",
     )
 
     parser.add_argument(

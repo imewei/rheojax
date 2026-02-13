@@ -31,7 +31,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
 from rheojax.logging import get_logger, log_fit
 
 # Module logger
@@ -44,6 +44,12 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class SpringPot(BaseModel):
@@ -246,7 +252,7 @@ class SpringPot(BaseModel):
 
         return self
 
-    def _predict(self, X):
+    def _predict(self, X, **kwargs):
         """Predict response based on input data.
 
         Args:
@@ -421,11 +427,11 @@ class SpringPot(BaseModel):
         alpha = self.parameters.get_value("alpha")
 
         # Avoid division by zero for alpha=0
-        if alpha < 1e-10:
+        if alpha < 1e-10: # type: ignore[operator]
             return float("inf")
 
-        gamma_factor = float(jax_gamma(1.0 - alpha))
-        return (c_alpha / (reference_value * gamma_factor)) ** (1.0 / alpha)
+        gamma_factor = float(jax_gamma(1.0 - alpha)) # type: ignore[operator]
+        return (c_alpha / (reference_value * gamma_factor)) ** (1.0 / alpha) # type: ignore[operator]
 
     def __repr__(self) -> str:
         """String representation of SpringPot model."""

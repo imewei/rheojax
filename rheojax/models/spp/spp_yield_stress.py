@@ -35,7 +35,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
 from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
@@ -55,6 +55,7 @@ if TYPE_CHECKING:
         Protocol.FLOW_CURVE,
         Protocol.LAOS,
     ],
+    deformation_modes=[DeformationMode.SHEAR],
 )
 class SPPYieldStress(BaseModel):
     """SPP-based yield stress model for LAOS analysis.
@@ -361,7 +362,7 @@ class SPPYieldStress(BaseModel):
         self.parameters.set_value("n_power_law", np.clip(n_est, 0.01, 2.0))
         self.parameters.set_value("eta_inf", np.clip(eta_est, 1e-9, 1e6))
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
         """Predict stress using fitted parameters.
 
         Parameters
@@ -708,7 +709,7 @@ class SPPYieldStress(BaseModel):
             test_mode = detect_test_mode(rheo_data)
 
         X = rheo_data.x
-        predictions = self._predict(X)
+        predictions = self._predict(X)  # type: ignore[arg-type]
 
         return RheoData(
             x=np.array(X),

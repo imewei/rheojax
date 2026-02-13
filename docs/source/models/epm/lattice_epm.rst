@@ -19,7 +19,7 @@ Quick Reference
 Overview
 --------
 
-The Elasto-Plastic Model (EPM) is a mesoscopic lattice-based framework for modeling the rheology of amorphous solids (glasses, gels, pastes, dense suspensions). Unlike mean-field models (like Hebraud-Lequeux or Soft Glassy Rheology), EPMs explicitly resolve **spatial heterogeneity**, **plastic avalanches**, and **non-local stress redistribution**.
+The Elasto-Plastic Model (EPM) is a mesoscopic lattice-based framework for modeling the rheology of amorphous solids (glasses, gels, pastes, dense suspensions). Unlike mean-field models (like Hébraud-Lequeux or Soft Glassy Rheology), EPMs explicitly resolve **spatial heterogeneity**, **plastic avalanches**, and **non-local stress redistribution**.
 
 This implementation leverages **JAX** for high-performance FFT-based computations on GPU/TPU.
 
@@ -376,7 +376,7 @@ Validity and Assumptions
 
 **Not appropriate for:**
 
-- Thermal systems where k_B T ~ barrier heights
+- Thermal systems where :math:`k_B T` ~ barrier heights
 - High-frequency dynamics (inertial effects)
 - Systems where plasticity is diffusive rather than avalanche-like
 
@@ -708,13 +708,13 @@ Example: NLSQ → NUTS Pipeline
     stress = 10.0 * gamma_dot**0.5 + 5.0  # Herschel-Bulkley-like
 
     # Step 1: NLSQ fitting (fast point estimation)
-    model.fit(gamma_dot, stress, test_mode="flow_curve", max_iter=500)
+    model.fit(gamma_dot, stress, test_mode='flow_curve', max_iter=500)
 
     # Step 2: Bayesian inference (warm-started from NLSQ)
     result = model.fit_bayesian(
         gamma_dot,
         stress,
-        test_mode="flow_curve",
+        test_mode='flow_curve',
         num_warmup=500,
         num_samples=1000,
         num_chains=4,  # Multiple chains for R-hat diagnostics
@@ -807,7 +807,7 @@ Parameter Bounds and Physical Constraints
      - Physical Constraint
    * - ``mu``
      - 10-10000 Pa
-     - Match SAOS elastic modulus G' if available
+     - Match SAOS elastic modulus :math:`G'` if available
    * - ``sigma_c_mean``
      - 0.5-2× macroscopic :math:`\sigma_y`
      - Lower bound: :math:`\sigma_y/2`; upper bound: :math:`2\sigma_y`
@@ -945,7 +945,7 @@ Basic Flow Curve Fitting
                            11.2, 13.6, 16.3, 19.4, 22.8, 26.5, 30.6, 35.0, 39.8, 44.9])
 
     # NLSQ fitting (fast)
-    model.fit(gamma_dot, stress_exp, test_mode="flow_curve", max_iter=500)
+    model.fit(gamma_dot, stress_exp, test_mode='flow_curve', max_iter=500)
 
     print(f"Fitted σ_c: {model.params.get_value('sigma_c_mean'):.2f} Pa")
     print(f"Fitted disorder: {model.params.get_value('sigma_c_std'):.3f} Pa")
@@ -962,7 +962,7 @@ Startup Shear with Stress Overshoot
     # Predict using fitted parameters
     stress_startup = model.predict(
         t,
-        test_mode="startup",
+        test_mode='startup',
         gamma_dot=gamma_dot_startup
     )
 
@@ -981,7 +981,7 @@ Bayesian Inference with Uncertainty
     result = model.fit_bayesian(
         gamma_dot,
         stress_exp,
-        test_mode="flow_curve",
+        test_mode='flow_curve',
         num_warmup=500,
         num_samples=1000,
         num_chains=4,
@@ -1020,7 +1020,7 @@ Visualizing Spatial Fields
     # Simulate and extract stress field
     stress_field = model_viz.predict(
         t,
-        test_mode="startup",
+        test_mode='startup',
         gamma_dot=1.0,
         return_fields=True  # Returns spatial arrays
     )
@@ -1566,16 +1566,16 @@ with dynamical exponent z ≈ 2.
      - Physical Meaning
    * - :math:`\tau` (avalanche)
      - 3/2
-     - Avalanche size distribution P(S) ~ S^(-:math:`\tau`)
+     - Avalanche size distribution :math:`P(S) \sim S^{-\tau}`
    * - :math:`\nu` (correlation)
      - 1
-     - Correlation length :math:`\xi` ~ (:math:`\sigma-\sigma_y`)^(-:math:`\nu`)
+     - Correlation length :math:`\xi \sim (\sigma-\sigma_y)^{-\nu}`
    * - :math:`\beta` (order param)
      - 1
-     - Plastic rate :math:`\dot{\gamma}_pl` ~ (:math:`\sigma-\sigma_y`)\ :math:`^{\beta}`
+     - Plastic rate :math:`\dot{\gamma}_{\text{pl}} \sim (\sigma-\sigma_y)^{\beta}`
    * - z (dynamical)
      - 2
-     - Relaxation time :math:`\tau` ~ :math:`\xi^z`
+     - Relaxation time :math:`\tau \sim \xi^z`
 
 **Disorder corrections:**
 
@@ -1718,7 +1718,7 @@ SGR and EPM describe similar physics from different perspectives:
      - Thermally activated escape
      - Stress-driven (athermal)
    * - Avalanches
-     - Implicit (x < 1)
+     - Implicit (:math:`x < 1`)
      - Explicit cascades
    * - Correlations
      - None (mean-field)
@@ -1799,7 +1799,7 @@ The yielding transition in EPM belongs to the **depinning universality class**
 **Shared features:**
 
 - Power-law avalanche distributions
-- Finite-size scaling: :math:`\xi` ~ L at criticality
+- Finite-size scaling: :math:`\xi \sim L` at criticality
 - Hysteresis in rate-controlled protocols
 
 This connection enables use of field-theoretic methods from depinning transitions
@@ -1870,9 +1870,9 @@ For robust parameter estimation, fit EPM to multiple protocols simultaneously:
    import numpy as np
 
    # Load multi-protocol data
-   flow_data = RheoData.from_csv("flow_curve.csv", test_mode="flow_curve")
-   startup_data = RheoData.from_csv("startup.csv", test_mode="startup")
-   creep_data = RheoData.from_csv("creep.csv", test_mode="creep")
+   flow_data = RheoData.from_csv("flow_curve.csv", test_mode='flow_curve')
+   startup_data = RheoData.from_csv("startup.csv", test_mode='startup')
+   creep_data = RheoData.from_csv("creep.csv", test_mode='creep')
 
    # Create model with small lattice for fitting
    model = LatticeEPM(L=12, dt=0.01)
@@ -1895,7 +1895,7 @@ For robust parameter estimation, fit EPM to multiple protocols simultaneously:
    )
 
    # Validate on held-out protocol (LAOS)
-   laos_data = RheoData.from_csv("laos.csv", test_mode="oscillation")
+   laos_data = RheoData.from_csv("laos.csv", test_mode='oscillation')
    laos_pred = model.predict(laos_data)
 
 
@@ -1949,7 +1949,7 @@ The stress overshoot in startup shear contains information about disorder streng
            peaks = []
            for seed in range(n_repeats):
                t = np.linspace(0, 50/gamma_dot, 500)
-               stress = model.predict(t, test_mode="startup",
+               stress = model.predict(t, test_mode='startup',
                                        gamma_dot=gamma_dot, seed=seed)
                peaks.append(np.max(stress))
 
@@ -1978,7 +1978,7 @@ Complete pipeline from data loading to uncertainty quantification:
        .load("experimental_data.csv",
              x_col="gamma_dot",
              y_col="stress",
-             test_mode="flow_curve")
+             test_mode='flow_curve')
        .model(LatticeEPM, L=12, dt=0.01)  # Small lattice for fitting
        .fit_nlsq(max_iter=500)            # Fast point estimate
        .fit_bayesian(                     # Full Bayesian
@@ -2013,4 +2013,4 @@ Complete pipeline from data loading to uncertainty quantification:
    model_prod = LatticeEPM(L=64, dt=0.01)
    model_prod.params = pipeline.model.params.copy()
    gamma_dot_fine = np.logspace(-2, 1, 100)
-   stress_pred = model_prod.predict(gamma_dot_fine, test_mode="flow_curve")
+   stress_pred = model_prod.predict(gamma_dot_fine, test_mode='flow_curve')

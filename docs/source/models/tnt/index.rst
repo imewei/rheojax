@@ -426,7 +426,7 @@ Key Parameters
    * - Network modulus
      - G
      - 1-10⁶ Pa
-     - Elastic modulus at short times (G ~ n·k_B·T, n = crosslink density)
+     - Elastic modulus at short times (:math:`G \sim n k_B T`, n = crosslink density)
    * - Bond lifetime
      - τ_b
      - 10⁻⁶-10⁴ s
@@ -442,7 +442,7 @@ Key Parameters
    * - FENE extensibility
      - L_max
      - 2-100
-     - Maximum chain stretch ratio (L_max² ~ N_Kuhn, chain stiffness)
+     - Maximum chain stretch ratio (:math:`L_{\max}^2 \sim N_{\text{Kuhn}}`, chain stiffness)
    * - Slip parameter
      - ξ
      - 0-1
@@ -462,7 +462,7 @@ Key Parameters
    * - Chain length
      - N
      - 10-1000
-     - Number of Kuhn segments (StickyRouse, sets τ_Rouse ~ N²)
+     - Number of Kuhn segments (StickyRouse, sets :math:`\tau_{\text{Rouse}} \sim N^2`)
    * - Reptation time
      - τ_rep
      - 10⁻³-10³ s
@@ -470,7 +470,7 @@ Key Parameters
    * - Breakage time
      - τ_break
      - 10⁻³-10³ s
-     - Mean time for chain scission (Cates model, τ_d ~ √(τ_rep·τ_break))
+     - Mean time for chain scission (Cates model, :math:`\tau_d \sim \sqrt{\tau_{\text{rep}} \cdot \tau_{\text{break}}}`)
 
 
 Quick Start
@@ -638,7 +638,7 @@ All TNT models support the full suite of rheological test protocols:
      - Steady shear stress σ(γ̇), shear thinning from network disruption
    * - SAOS (oscillatory)
      - 'oscillation'
-     - G'(ω), G''(ω), single-mode shows G' ~ G'' ~ ω² at low ω
+     - :math:`G'(\omega)`, :math:`G''(\omega)`, single-mode shows :math:`G' \sim G'' \sim \omega^2` at low :math:`\omega`
    * - Startup shear
      - 'startup'
      - Transient σ(t, γ̇), stress overshoot from chain orientation
@@ -655,9 +655,9 @@ All TNT models support the full suite of rheological test protocols:
 **Protocol-specific features:**
 
 - **Flow curve**: Shear thinning η(γ̇) from reduced effective τ_b at high rates
-- **SAOS**: G'(ω) crossover at ω ≈ 1/τ_b, tan(δ) = G''/G' diagnostic
+- **SAOS**: :math:`G'(\omega)` crossover at :math:`\omega \approx 1/\tau_b`, :math:`\tan(\delta) = G''/G'` diagnostic
 - **Startup**: Overshoot at γ ≈ 1-2 (network orientation saturation)
-- **Relaxation**: Single exponential G(t) ~ exp(-t/τ_b) for constant breakage
+- **Relaxation**: Single exponential :math:`G(t) \sim \exp(-t/\tau_b)` for constant breakage
 - **Creep**: Power-law at short times, viscous flow at long times
 - **LAOS**: Strain softening (I₃/I₁ ratio) from FENE-P or Bell kinetics
 
@@ -717,7 +717,7 @@ See Also
 **Transforms and Utilities:**
 
 - :doc:`/transforms/mastercurve` — Time-temperature superposition for thermorheology
-- :doc:`/transforms/derivatives` — Numerical differentiation for G(t) → G', G''
+- :doc:`/transforms/derivatives` — Numerical differentiation for :math:`G(t)` → :math:`G'`, :math:`G''`
 - :doc:`/utils/prony` — Prony series decomposition for multi-mode fitting
 
 **User Guides:**
@@ -735,8 +735,8 @@ References
    https://doi.org/10.1063/1.1724109
 
 2. Tanaka, F. & Edwards, S. F. (1992). "Viscoelastic properties of physically crosslinked
-   networks: Transient network theory." *J. Chem. Soc., Faraday Trans.*, 88, 2979–2990.
-   https://doi.org/10.1039/FT9928802979
+   networks. 1. Transient network theory." *Macromolecules*, 25, 1516–1523.
+   https://doi.org/10.1021/ma00031a024
 
 3. Bell, G. I. (1978). "Models for the specific adhesion of cells to cells."
    *Science*, 200, 618–627.
@@ -753,7 +753,7 @@ References
 
 6. Vaccaro, A. & Marrucci, G. (2000). "A model for the nonlinear rheology of associating
    polymers." *J. Non-Newtonian Fluid Mech.*, 92, 261–273.
-   https://doi.org/10.1016/S0377-0257(00)00094-1
+   https://doi.org/10.1016/S0377-0257(00)00095-1
 
 7. Tripathi, A., Tam, K. C., & McKinley, G. H. (2006). "Rheology and dynamics of
    associative polymers in shear and extension: Theory and experiments."
@@ -771,3 +771,15 @@ References
 10. Wang, S.-Q. (1992). "Transient network theory for shear-thickening fluids and
     physically crosslinked networks." *Macromolecules*, 25, 7003–7010.
     https://doi.org/10.1021/ma00051a043
+
+11. Vernerey, F.J. (2022). "Mechanics of transient semi-flexible networks:
+    Soft-elasticity, stress relaxation and remodeling." *J. Mech. Phys. Solids*,
+    160, 104776.
+    https://doi.org/10.1016/j.jmps.2022.104776
+    :download:`PDF <../../../reference/vernerey_2022_semiflexible_networks.pdf>`
+
+12. Lamont, S. & Vernerey, F.J. (2022). "A Transient Microsphere Model for
+    Nonlinear Viscoelasticity in Dynamic Polymer Networks." *J. Appl. Mech.*
+    (ASME), 89, 011009.
+    https://doi.org/10.1115/1.4052375
+    :download:`PDF <../../../reference/lamont_vernerey_2022_transient_microsphere.pdf>`

@@ -35,6 +35,7 @@ import numpy as np
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import log_fit
 from rheojax.models.fluidity.saramito._base import FluiditySaramitoBase
 from rheojax.models.fluidity.saramito._kernels import (
@@ -57,6 +58,7 @@ logger = logging.getLogger(__name__)
         Protocol.CREEP,
         Protocol.STARTUP,
     ],
+    deformation_modes=[DeformationMode.SHEAR],
 )
 class FluiditySaramitoNonlocal(FluiditySaramitoBase):
     """Nonlocal (1D) Fluidity-Saramito Model with spatial diffusion.
@@ -808,10 +810,10 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             _, sigma, _ = self.simulate_startup(X, gamma_dot)
             return sigma
         elif test_mode == "creep":
-            sigma = kwargs.get("sigma") or getattr(self, "_sigma_applied", None)
+            sigma = kwargs.get("sigma") or getattr(self, "_sigma_applied", None)  # type: ignore[assignment]
             if sigma is None:
                 raise ValueError("creep prediction requires sigma")
-            gamma, _ = self.simulate_creep(X, sigma)
+            gamma, _ = self.simulate_creep(X, sigma)  # type: ignore[arg-type]
             return gamma
 
         return np.zeros_like(X)

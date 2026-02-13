@@ -18,7 +18,7 @@
    2. **Shear thinning**: Viscosity decreases as flow disrupts network structure
    3. **Strain softening**: Modulus reduction under large deformations (chain stretch)
    4. **Transient overshoot**: Stress peaks during startup as network orientation saturates
-   5. **Normal stress differences**: N₁ > 0 from chain anisotropy (extensional resistance)
+   5. **Normal stress differences**: :math:`N_1 > 0` from chain anisotropy (extensional resistance)
 
    **Fundamental Constitutive Equation:**
 
@@ -59,7 +59,7 @@
 
    **Advanced Extensions:**
 
-   - **Loop-bridge equilibrium**: Two-species kinetics (f_B equilibrium bridge fraction)
+   - **Loop-bridge equilibrium**: Two-species kinetics (:math:`f_B` equilibrium bridge fraction)
    - **Sticky Rouse**: Multi-mode relaxation with sticker-limited dynamics
    - **Cates model**: Living polymers with scission/recombination
    - **Non-affine slip**: Gordon-Schowalter parameter :math:`\xi` for partial coupling
@@ -86,7 +86,7 @@
       * - :doc:`TNTCates <tnt_cates>`
         - Wormlike micelles, living polymers
       * - :doc:`TNTSingleMode <tnt_non_affine>` (Non-Affine)
-        - Networks with imperfect chain-flow coupling (N₂ ≠ 0)
+        - Networks with imperfect chain-flow coupling (:math:`N_2 \neq 0`)
       * - :doc:`TNTSingleMode <tnt_stretch_creation>` (Stretch-Creation)
         - Strain-crystallizing or mechanophore-activated networks
       * - :doc:`TNTMultiSpecies <tnt_multi_species>`
@@ -104,8 +104,8 @@
 
    **Typical Parameter Ranges:**
 
-   - Network modulus **G**: 1-10⁶ Pa (depends on crosslink density)
-   - Bond lifetime **τ_b**: 10⁻⁶-10⁴ s (wide range across materials)
-   - Bell parameter **ν**: 0.01-20 (bond sensitivity to force)
-   - FENE extensibility **L_max**: 2-100 (chain contour length ratio)
-   - Slip parameter **ξ**: 0 (affine) to 1 (full slip)
+   - Network modulus :math:`G`: 1--:math:`10^6` Pa (depends on crosslink density)
+   - Bond lifetime :math:`\tau_b`: :math:`10^{-6}`--:math:`10^4` s (wide range across materials)
+   - Bell parameter :math:`\nu`: 0.01--20 (bond sensitivity to force)
+   - FENE extensibility :math:`L_{\max}`: 2--100 (chain contour length ratio)
+   - Slip parameter :math:`\xi`: 0 (affine) to 1 (full slip)

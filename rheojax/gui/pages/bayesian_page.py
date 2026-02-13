@@ -456,12 +456,22 @@ class BayesianPage(QWidget):
             warm_start=warm_start_dict,
         )
 
-        # Connect signals properly (worker.signals.X, not worker.X)
-        self._current_worker.signals.progress.connect(self._on_worker_progress)
-        self._current_worker.signals.stage_changed.connect(self._on_stage_changed)
-        self._current_worker.signals.completed.connect(self._on_finished)
-        self._current_worker.signals.failed.connect(self._on_error)
-        self._current_worker.signals.divergence_detected.connect(self._on_divergence)
+        # Connect signals with QueuedConnection to ensure slots run on GUI thread
+        self._current_worker.signals.progress.connect(
+            self._on_worker_progress, Qt.ConnectionType.QueuedConnection
+        )
+        self._current_worker.signals.stage_changed.connect(
+            self._on_stage_changed, Qt.ConnectionType.QueuedConnection
+        )
+        self._current_worker.signals.completed.connect(
+            self._on_finished, Qt.ConnectionType.QueuedConnection
+        )
+        self._current_worker.signals.failed.connect(
+            self._on_error, Qt.ConnectionType.QueuedConnection
+        )
+        self._current_worker.signals.divergence_detected.connect(
+            self._on_divergence, Qt.ConnectionType.QueuedConnection
+        )
 
         # Use submit() method, not start()
         self._worker_pool.submit(self._current_worker)

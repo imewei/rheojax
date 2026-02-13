@@ -29,6 +29,8 @@ Fuchs M. & Cates M.E. (2009) J. Rheol. 53, 957
 Brader J.M. et al. (2009) Proc. Natl. Acad. Sci. 106, 15186
 """
 
+from __future__ import annotations
+
 from typing import Any, Literal
 
 import numpy as np
@@ -37,6 +39,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 from rheojax.models.itt_mct._base import ITTMCTBase
 from rheojax.models.itt_mct._kernels import extract_laos_harmonics
@@ -61,6 +64,12 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.RELAXATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class ITTMCTIsotropic(ITTMCTBase):
@@ -210,6 +219,9 @@ class ITTMCTIsotropic(ITTMCTBase):
         phi = self.parameters.get_value("phi")
         sigma_d = self.parameters.get_value("sigma_d")
 
+        assert phi is not None
+        assert sigma_d is not None
+
         # Create k-grid (dimensionless, k*σ)
         # Cover range from 0.1 to 50 in k*σ (peak at ~7)
         self.k_grid = np.linspace(0.1, 50.0, self._n_k) / sigma_d
@@ -240,6 +252,8 @@ class ITTMCTIsotropic(ITTMCTBase):
     def _compute_vertex(self) -> None:
         """Compute MCT vertex function V(k,q)."""
         phi = self.parameters.get_value("phi")
+
+        assert phi is not None
 
         # Simplified vertex computation
         self.vertex = mct_vertex_isotropic(
@@ -294,6 +308,8 @@ class ITTMCTIsotropic(ITTMCTBase):
         # Simplified: use single-mode approximation
         D0 = self.parameters.get_value("D0")
 
+        assert D0 is not None
+
         t_np = np.array(t)
         n_t = len(t_np)
         n_k = len(self.k_grid)
@@ -332,6 +348,9 @@ class ITTMCTIsotropic(ITTMCTBase):
         """
         phi = self.parameters.get_value("phi")
         sigma_d = self.parameters.get_value("sigma_d")
+
+        assert phi is not None
+        assert sigma_d is not None
 
         # S(k) at this wave vector
         S_k_val = percus_yevick_sk(np.array([k]), phi, sigma=sigma_d)[0]
@@ -382,6 +401,7 @@ class ITTMCTIsotropic(ITTMCTBase):
             - S_max: peak of S(k)
         """
         phi = self.parameters.get_value("phi")
+        assert phi is not None
         properties = hard_sphere_properties(phi)
         return {
             "is_glass": properties["is_glassy"],
@@ -439,6 +459,11 @@ class ITTMCTIsotropic(ITTMCTBase):
         D0 = self.parameters.get_value("D0")
         kBT = self.parameters.get_value("kBT")
         gamma_c = self.parameters.get_value("gamma_c")
+
+        assert sigma_d is not None
+        assert D0 is not None
+        assert kBT is not None
+        assert gamma_c is not None
 
         # Bare relaxation rates
         Gamma_k = self.k_grid**2 * D0 / self.S_k
@@ -504,6 +529,10 @@ class ITTMCTIsotropic(ITTMCTBase):
         kBT = self.parameters.get_value("kBT")
         sigma_d = self.parameters.get_value("sigma_d")
 
+        assert D0 is not None
+        assert kBT is not None
+        assert sigma_d is not None
+
         # Bare relaxation rates
         Gamma_k = self.k_grid**2 * D0 / self.S_k
 
@@ -565,6 +594,11 @@ class ITTMCTIsotropic(ITTMCTBase):
         sigma_d = self.parameters.get_value("sigma_d")
         gamma_c = self.parameters.get_value("gamma_c")
 
+        assert D0 is not None
+        assert kBT is not None
+        assert sigma_d is not None
+        assert gamma_c is not None
+
         Gamma_k = self.k_grid**2 * D0 / self.S_k
         G_scale = kBT / sigma_d**3
 
@@ -617,6 +651,10 @@ class ITTMCTIsotropic(ITTMCTBase):
         kBT = self.parameters.get_value("kBT")
         sigma_d = self.parameters.get_value("sigma_d")
 
+        assert D0 is not None
+        assert kBT is not None
+        assert sigma_d is not None
+
         Gamma_k = self.k_grid**2 * D0 / self.S_k
         G_scale = kBT / sigma_d**3
 
@@ -662,6 +700,11 @@ class ITTMCTIsotropic(ITTMCTBase):
         kBT = self.parameters.get_value("kBT")
         sigma_d = self.parameters.get_value("sigma_d")
         gamma_c = self.parameters.get_value("gamma_c")
+
+        assert D0 is not None
+        assert kBT is not None
+        assert sigma_d is not None
+        assert gamma_c is not None
 
         Gamma_k = self.k_grid**2 * D0 / self.S_k
         G_scale = kBT / sigma_d**3
@@ -717,6 +760,11 @@ class ITTMCTIsotropic(ITTMCTBase):
         kBT = self.parameters.get_value("kBT")
         sigma_d = self.parameters.get_value("sigma_d")
         gamma_c = self.parameters.get_value("gamma_c")
+
+        assert D0 is not None
+        assert kBT is not None
+        assert sigma_d is not None
+        assert gamma_c is not None
 
         Gamma_k = self.k_grid**2 * D0 / self.S_k
         G_scale = kBT / sigma_d**3

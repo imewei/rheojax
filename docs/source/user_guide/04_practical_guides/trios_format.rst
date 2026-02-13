@@ -116,11 +116,11 @@ RheoJAX automatically detects and handles these TRIOS test types:
      - Domain
    * - **Frequency sweep (SAOS)**
      - Angular frequency (rad/s)
-     - G'(ω), G''(ω) → G*(ω)
+     - :math:`G'(\omega)`, :math:`G''(\omega)` → :math:`G^*(\omega)`
      - ``frequency``
    * - **Amplitude sweep**
      - Strain (%) or Stress (Pa)
-     - G'(γ), G''(γ)
+     - :math:`G'(\gamma)`, :math:`G''(\gamma)`
      - ``frequency``
    * - **Flow ramp**
      - Shear rate (1/s)
@@ -136,7 +136,7 @@ RheoJAX automatically detects and handles these TRIOS test types:
      - ``time``
    * - **Temperature sweep**
      - Temperature (°C)
-     - G'(T), G''(T)
+     - :math:`G'(T)`, :math:`G''(T)`
      - ``frequency``
    * - **Arbitrary wave (LAOS)**
      - Time (s)
@@ -296,8 +296,8 @@ Priority-Based Detection
 
 **Y-axis priorities** (in order):
 
-1. Storage modulus (G')
-2. Loss modulus (G'')
+1. Storage modulus (:math:`G'`)
+2. Loss modulus (:math:`G''`)
 3. Stress
 4. Strain
 5. Viscosity
@@ -309,7 +309,7 @@ Priority-Based Detection
 Complex Modulus Construction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When both Storage modulus (G') and Loss modulus (G'') columns are present,
+When both Storage modulus (:math:`G'`) and Loss modulus (:math:`G''`) columns are present,
 RheoJAX automatically constructs the complex modulus:
 
 .. math::

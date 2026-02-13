@@ -58,13 +58,13 @@ Physical Framework
 The material is coarse-grained into identical mesoscopic elements, each
 characterized by local stress :math:`\sigma_{el}`. Elements:
 
-1. **Load elastically**: :math:`d\sigma_{el}`/dt = G\ :math:`\cdot \dot{\gamma}` under macroscopic shear
-2. **Yield plastically**: Reset to :math:`\sigma_{el}` = 0 when :math:`|\sigma_{el}|` > :math:`\sigma_c`
-3. **Relax via noise**: Activated hopping with rate ~ exp(-U/D) where D is noise
+1. **Load elastically**: :math:`d\sigma_{el}/dt = G \cdot \dot{\gamma}` under macroscopic shear
+2. **Yield plastically**: Reset to :math:`\sigma_{el} = 0` when :math:`|\sigma_{el}| > \sigma_c`
+3. **Relax via noise**: Activated hopping with rate :math:`\sim \exp(-U/D)` where :math:`D` is noise
 
 **Stress Distribution:**
 
-The probability distribution P(:math:`\sigma_{el}`, t) of local stresses evolves according to a
+The probability distribution :math:`P(\sigma_{el}, t)` of local stresses evolves according to a
 Fokker-Planck equation with:
 
 - Convective flux from elastic loading
@@ -118,7 +118,7 @@ where :math:`\sigma_y` depends on :math:`\alpha` and :math:`\sigma_c`.
 
 **Oscillatory Response:**
 
-- **Low frequency**: G' plateau, G'' peak near yield
+- **Low frequency**: :math:`G'` plateau, :math:`G''` peak near yield
 - **High frequency**: Classical Maxwell-like behavior
 - **Strain amplitude**: Smooth transition from linear to nonlinear
 

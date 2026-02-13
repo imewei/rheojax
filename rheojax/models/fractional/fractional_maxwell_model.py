@@ -40,6 +40,7 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
 
 # Module logger
@@ -52,6 +53,12 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FractionalMaxwellModel(BaseModel):
@@ -354,8 +361,12 @@ class FractionalMaxwellModel(BaseModel):
                             c1_init = np.sqrt(y_valid.min() * y_valid.max())
 
                         # Clip to parameter bounds
-                        c1_bounds = self.parameters.get("c1").bounds
-                        tau_bounds = self.parameters.get("tau").bounds
+                        c1_param = self.parameters.get("c1")
+                        tau_param = self.parameters.get("tau")
+                        assert c1_param is not None and c1_param.bounds is not None
+                        assert tau_param is not None and tau_param.bounds is not None
+                        c1_bounds = c1_param.bounds
+                        tau_bounds = tau_param.bounds
                         c1_init = np.clip(c1_init, c1_bounds[0], c1_bounds[1])
                         tau_init = np.clip(tau_init, tau_bounds[0], tau_bounds[1])
 
@@ -450,7 +461,7 @@ class FractionalMaxwellModel(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)
+            return self.predict_rheodata(X)  # type: ignore[return-value]
 
         # Handle raw array input
         from rheojax.core.test_modes import TestMode
@@ -460,6 +471,7 @@ class FractionalMaxwellModel(BaseModel):
         alpha = self.parameters.get_value("alpha")
         beta = self.parameters.get_value("beta")
         tau = self.parameters.get_value("tau")
+        assert c1 is not None and alpha is not None and beta is not None and tau is not None
 
         test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
         if test_mode in ("oscillation", TestMode.OSCILLATION):
@@ -540,6 +552,7 @@ class FractionalMaxwellModel(BaseModel):
         alpha = self.parameters.get_value("alpha")
         beta = self.parameters.get_value("beta")
         tau = self.parameters.get_value("tau")
+        assert c1 is not None and alpha is not None and beta is not None and tau is not None
 
         # Convert input to JAX
         x = jnp.asarray(rheo_data.x)
@@ -569,7 +582,7 @@ class FractionalMaxwellModel(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None, **kwargs):
+    def predict(self, X, test_mode: str | None = None, **kwargs):  # type: ignore[override]
         """Predict response.
 
         Args:
@@ -589,6 +602,7 @@ class FractionalMaxwellModel(BaseModel):
             alpha = self.parameters.get_value("alpha")
             beta = self.parameters.get_value("beta")
             tau = self.parameters.get_value("tau")
+            assert c1 is not None and alpha is not None and beta is not None and tau is not None
             x = jnp.asarray(X)
 
             # Normalize test_mode to string

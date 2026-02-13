@@ -26,14 +26,17 @@ Development Setup
        source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
        # Or using conda
-       conda create -n rheo python=3.12
-       conda activate rheo
+       conda create -n rheojax python=3.12
+       conda activate rheojax
 
 3. **Install in Development Mode**
 
    .. code-block:: bash
 
-       # Install with development dependencies
+       # Install with uv (preferred — manages venv + dependencies)
+       uv sync
+
+       # Or with pip (legacy)
        pip install -e ".[dev]"
 
 4. **Install Pre-commit Hooks**
@@ -50,8 +53,17 @@ Development Setup
 
    .. code-block:: bash
 
-       # Run tests
-       pytest
+       # Run smoke tests (1077 tests, ~30s-2min)
+       uv run pytest -n auto -m "smoke"
+
+       # Run standard tests (3349 tests, ~5-10 min)
+       uv run pytest -n auto -m "not slow"
+
+       # Run full suite (3576 tests)
+       uv run pytest -n auto
+
+       # Quick format + lint + smoke
+       make format && make quick
 
        # Check imports
        python -c "import rheojax; print(rheojax.__version__)"
@@ -292,25 +304,33 @@ Every new feature needs tests:
 Running Tests
 ~~~~~~~~~~~~~
 
+RheoJAX uses a **tiered testing strategy** with pytest markers:
+
 .. code-block:: bash
 
-    # Run all tests
-    pytest
+    # Tier 1: Smoke tests (~1077 tests, ~30s-2min) — used in CI
+    uv run pytest -n auto -m "smoke"
+
+    # Tier 2: Standard tests (~3349 tests, ~5-10 min)
+    uv run pytest -n auto -m "not slow"
+
+    # Tier 3: Full suite (~3576 tests, includes Bayesian slow tests)
+    uv run pytest -n auto
+
+    # Quick format + lint + smoke
+    make format && make quick
 
     # Run specific test file
-    pytest tests/core/test_data.py
+    uv run pytest tests/core/test_data.py
 
     # Run specific test
-    pytest tests/core/test_data.py::test_rheodata_creation
+    uv run pytest tests/core/test_data.py::test_rheodata_creation
 
     # Run with coverage
-    pytest --cov=rheo --cov-report=html
+    uv run pytest --cov=rheojax --cov-report=html
 
-    # Run with verbose output
-    pytest -v
-
-    # Run only fast tests (skip slow)
-    pytest -m "not slow"
+    # Run notebooks (set FAST_MODE=1 for CI-friendly execution)
+    FAST_MODE=1 uv run python scripts/run_notebooks.py --subdir examples/hvm
 
 Test Markers
 ~~~~~~~~~~~~
@@ -321,9 +341,15 @@ Use markers for different test categories:
 
     import pytest
 
+    @pytest.mark.smoke
+    def test_model_creation():
+        """Smoke test — runs in CI tier 1."""
+        model = Maxwell()
+        assert model is not None
+
     @pytest.mark.slow
-    def test_expensive_computation():
-        """Slow test, skipped in quick runs."""
+    def test_bayesian_inference():
+        """Slow test — skipped in quick runs, only in tier 3."""
         pass
 
     @pytest.mark.unit
@@ -386,7 +412,7 @@ Add documentation for new features:
 
        .. code-block:: python
 
-           from rheo import new_feature
+           from rheojax import new_feature
            result = new_feature(data)
 
 3. **Include Examples**
@@ -417,7 +443,7 @@ Adding a Model
 
    .. code-block:: python
 
-       # rheo/models/new_model.py
+       # rheojax/models/new_model.py
        from rheojax.core import BaseModel, ParameterSet
        import jax.numpy as jnp
 
@@ -501,7 +527,7 @@ Adding a Model
 
    .. code-block:: python
 
-       # rheo/models/__init__.py
+       # rheojax/models/__init__.py
        from .new_model import NewModel
 
        __all__ = [..., "NewModel"]
@@ -513,7 +539,7 @@ Adding a Transform
 
    .. code-block:: python
 
-       # rheo/transforms/new_transform.py
+       # rheojax/transforms/new_transform.py
        from rheojax.core import BaseTransform, RheoData
        import jax.numpy as jnp
 
@@ -555,7 +581,7 @@ Adding a Reader
 
 .. code-block:: python
 
-    # rheo/io/readers/new_reader.py
+    # rheojax/io/readers/new_reader.py
     import numpy as np
     from rheojax.core import RheoData
 
@@ -629,7 +655,7 @@ Example PR Description
     Closes #123
 
     ## Changes
-    - Added `CarreauYasuda` model in `rheo/models/carreau_yasuda.py`
+    - Added `CarreauYasuda` model in `rheojax/models/carreau_yasuda.py`
     - Implemented JAX-compatible prediction and fitting
     - Added comprehensive unit tests
     - Updated model documentation
@@ -722,7 +748,7 @@ Community Guidelines
 - Give constructive feedback
 - Celebrate contributions
 
-Thank you for contributing to rheo!
+Thank you for contributing to rheojax!
 
 See Also
 --------

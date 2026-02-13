@@ -1,7 +1,7 @@
 """Plugin registry system for models and transforms.
 
 This module provides a registry system for discovering, registering, and managing
-models and transforms as plugins, enabling extensibility of the rheo package.
+models and transforms as plugins, enabling extensibility of the rheojax package.
 """
 
 from __future__ import annotations
@@ -9,11 +9,13 @@ from __future__ import annotations
 import importlib
 import inspect
 import os
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 from rheojax.core.inventory import Protocol, TransformType
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,6 +38,7 @@ class PluginInfo:
     metadata: dict[str, Any]
     doc: str | None = None
     protocols: list[Protocol] = field(default_factory=list)
+    deformation_modes: list[DeformationMode] = field(default_factory=list)
     transform_type: TransformType | None = None
 
     def __post_init__(self):
@@ -48,19 +51,22 @@ class Registry:
     """Central registry for models and transforms.
 
     This class manages plugin registration, discovery, and retrieval
-    for all models and transforms in the rheo package.
+    for all models and transforms in the rheojax package.
     """
 
     _instance: Registry | None = None
+    _lock: threading.Lock = threading.Lock()
     _models: dict[str, PluginInfo]
     _transforms: dict[str, PluginInfo]
 
     def __new__(cls):
-        """Ensure singleton pattern."""
+        """Ensure singleton pattern (thread-safe)."""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._models = {}
-            cls._instance._transforms = {}
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._models = {}
+                    cls._instance._transforms = {}
         return cls._instance
 
     def _normalize_plugin_type(self, plugin_type: PluginType | str) -> PluginType:
@@ -103,6 +109,7 @@ class Registry:
         validate: bool = False,
         force: bool = False,
         protocols: list[Protocol | str] | None = None,
+        deformation_modes: list[DeformationMode | str] | None = None,
         transform_type: TransformType | str | None = None,
     ):
         """Register a plugin in the registry.
@@ -127,6 +134,12 @@ class Registry:
             raise ValueError(
                 f"Plugin '{name}' is already registered as a {plugin_enum.value}"
             )
+        elif name in registry and force:
+            logger.warning(
+                "Overwriting existing registration",
+                name=name,
+                plugin_type=plugin_enum.value,
+            )
 
         # Validate interface if requested
         if validate:
@@ -141,8 +154,22 @@ class Registry:
                         normalized_protocols.append(Protocol(p))
                     except ValueError:
                         logger.warning(f"Invalid protocol '{p}' for plugin '{name}'")
-                elif isinstance(p, Protocol):
+                elif isinstance(p, Protocol):  # type: ignore[unreachable]
                     normalized_protocols.append(p)
+
+        # Normalize deformation_modes
+        normalized_deformation_modes: list[DeformationMode] = []
+        if deformation_modes:
+            for dm in deformation_modes:
+                if isinstance(dm, str):
+                    try:
+                        normalized_deformation_modes.append(DeformationMode(dm))
+                    except ValueError:
+                        logger.warning(
+                            f"Invalid deformation_mode '{dm}' for plugin '{name}'"
+                        )
+                elif isinstance(dm, DeformationMode):  # type: ignore[unreachable]
+                    normalized_deformation_modes.append(dm)
 
         # Normalize transform_type
         normalized_transform_type = None
@@ -154,7 +181,7 @@ class Registry:
                     logger.warning(
                         f"Invalid transform_type '{transform_type}' for plugin '{name}'"
                     )
-            elif isinstance(transform_type, TransformType):
+            elif isinstance(transform_type, TransformType):  # type: ignore[unreachable]
                 normalized_transform_type = transform_type
 
         # Create plugin info
@@ -164,6 +191,7 @@ class Registry:
             plugin_type=plugin_enum,
             metadata=metadata or {},
             protocols=normalized_protocols,
+            deformation_modes=normalized_deformation_modes,
             transform_type=normalized_transform_type,
         )
 
@@ -390,6 +418,7 @@ class Registry:
     def find_compatible(
         self,
         protocol: Protocol | str | None = None,
+        deformation_mode: DeformationMode | str | None = None,
         transform_type: TransformType | str | None = None,
         **criteria,
     ) -> list[str]:
@@ -397,6 +426,7 @@ class Registry:
 
         Args:
             protocol: Filter models by supported protocol
+            deformation_mode: Filter models by supported deformation mode
             transform_type: Filter transforms by type
             **criteria: Additional criteria to match against plugin metadata
 
@@ -415,6 +445,25 @@ class Registry:
                     )
                     if target_proto not in info.protocols:
                         continue
+
+                # Deformation mode filtering
+                if deformation_mode:
+                    target_dm = (
+                        DeformationMode(deformation_mode)
+                        if isinstance(deformation_mode, str)
+                        else deformation_mode
+                    )
+                    if info.deformation_modes and target_dm not in info.deformation_modes:
+                        continue
+                    elif not info.deformation_modes:
+                        # Models without explicit deformation_modes are shear-only
+                        if target_dm != DeformationMode.SHEAR:
+                            logger.debug(
+                                "Excluding model without deformation_modes for non-shear query",
+                                model=name,
+                                requested_mode=str(target_dm),
+                            )
+                            continue
 
                 if self._matches_criteria(info.metadata, criteria):
                     compatible.append(name)
@@ -467,6 +516,7 @@ class Registry:
                     "module": info.plugin_class.__module__,
                     "metadata": info.metadata,
                     "protocols": [str(p) for p in info.protocols],
+                    "deformation_modes": [str(dm) for dm in info.deformation_modes],
                 }
                 for name, info in self._models.items()
             },
@@ -529,7 +579,7 @@ class Registry:
         Returns:
             Dictionary with models (by protocol) and transforms (by type)
         """
-        inventory = {
+        inventory: dict[str, Any] = {
             "models": {p.value: [] for p in Protocol},
             "transforms": {t.value: [] for t in TransformType},
             "all_models": [],
@@ -543,6 +593,7 @@ class Registry:
                 "class": info.plugin_class.__name__,
                 "description": info.doc.split("\n")[0] if info.doc else "",
                 "protocols": [p.value for p in info.protocols],
+                "deformation_modes": [dm.value for dm in info.deformation_modes],
             }
             inventory["all_models"].append(model_entry)
             for p in info.protocols:
@@ -650,20 +701,29 @@ class ModelRegistry:
 
     @classmethod
     def register(
-        cls, name: str, protocols: list[Protocol | str] | None = None, **metadata
+        cls,
+        name: str,
+        protocols: list[Protocol | str] | None = None,
+        deformation_modes: list[DeformationMode | str] | None = None,
+        **metadata,
     ):
         """Decorator for registering a model.
 
         Args:
             name: Name for the model
             protocols: List of supported protocols
+            deformation_modes: List of supported deformation modes (shear, tension,
+                bending, compression). Models with oscillation protocol that work
+                in G-space can support all 4 modes via automatic E*<->G* conversion.
             **metadata: Additional metadata for the model
 
         Returns:
             Decorator function
 
         Example:
-            >>> @ModelRegistry.register('maxwell', protocols=['relaxation', 'oscillation'])
+            >>> @ModelRegistry.register('maxwell',
+            ...     protocols=['relaxation', 'oscillation'],
+            ...     deformation_modes=['shear', 'tension', 'bending', 'compression'])
             >>> class Maxwell(BaseModel):
             ...     pass
         """
@@ -676,6 +736,7 @@ class ModelRegistry:
                 PluginType.MODEL,
                 metadata=metadata,
                 protocols=protocols,
+                deformation_modes=deformation_modes,
             )
             return model_class
 
@@ -718,18 +779,26 @@ class ModelRegistry:
         return registry.get_all_models()
 
     @classmethod
-    def find(cls, protocol: Protocol | str | None = None, **criteria) -> list[str]:
+    def find(
+        cls,
+        protocol: Protocol | str | None = None,
+        deformation_mode: DeformationMode | str | None = None,
+        **criteria,
+    ) -> list[str]:
         """Find models matching criteria.
 
         Args:
             protocol: Filter by supported protocol
+            deformation_mode: Filter by supported deformation mode
             **criteria: Additional metadata criteria
 
         Returns:
             List of matching model names
         """
         registry = cls._get_registry()
-        return registry.find_compatible(protocol=protocol, **criteria)
+        return registry.find_compatible(
+            protocol=protocol, deformation_mode=deformation_mode, **criteria
+        )
 
     @classmethod
     def get_info(cls, name: str) -> PluginInfo | None:

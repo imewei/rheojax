@@ -1,7 +1,7 @@
 Quickstart Guide
 ================
 
-This guide will get you started with rheo in minutes.
+This guide will get you started with rheojax in minutes.
 
 Basic Workflow
 --------------
@@ -50,7 +50,7 @@ For more control, use the Modular API:
    # Get parameters
    params = model.parameters
    print(f"G_s = {params.get_value('G_s'):.2e} Pa")
-   print(f"eta_s = {params.get_value('eta_s'):.2e} Pa*s")
+   print(f"eta_s = {params.get_value('eta_s'):.2e} Pa·s")
 
    # Make predictions
    predictions = model.predict(data.x)
@@ -71,6 +71,18 @@ Non-Newtonian flow models:
 * ``HerschelBulkley``, ``Bingham``, ``PowerLaw``
 * ``CarreauYasuda``, ``Cross``, ``Casson``
 
+DMTA / DMA Data
+~~~~~~~~~~~~~~~~
+
+For Dynamic Mechanical Analyzer data in tension, compression, or bending:
+
+.. code-block:: python
+
+   model.fit(omega, E_star, test_mode='oscillation',
+             deformation_mode='tension', poisson_ratio=0.5)
+
+See :doc:`models/dmta/index` for the complete DMTA guide.
+
 Working with Transforms
 -----------------------
 
@@ -78,14 +90,14 @@ Apply transforms to process raw data:
 
 .. code-block:: python
 
-   from rheojax.transforms import RheoAnalysis
+   from rheojax.transforms import FFTAnalysis
    from rheojax.io import load_trios
 
    # Load raw time-series data
    data = load_trios('chirp_experiment.txt')
 
    # Apply FFT analysis
-   analysis = RheoAnalysis()
+   analysis = FFTAnalysis()
    processed = analysis.transform(data)
 
    # Now data is in frequency domain with G', G''
@@ -95,13 +107,13 @@ Mastercurve Generation
 
 .. code-block:: python
 
-   from rheojax.transforms import AutomatedMasterCurve
+   from rheojax.transforms import Mastercurve
 
    # Load multi-temperature data
    data_list = [load_trios(f'temp_{t}C.txt') for t in [25, 35, 45, 55]]
 
    # Generate mastercurve
-   mastercurve = AutomatedMasterCurve(reference_temperature=25)
+   mastercurve = Mastercurve(reference_temp=25)
    result = mastercurve.transform(data_list)
 
 File I/O

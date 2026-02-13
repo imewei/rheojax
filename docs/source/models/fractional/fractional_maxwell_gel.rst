@@ -205,7 +205,7 @@ Validity and Assumptions
 - **Supported test modes**: Oscillation, relaxation, creep
 - **Fractional order bounds**: 0.05 < :math:`\alpha` < 0.95 for numerical stability
 - **Liquid-like behavior**: Zero equilibrium modulus (material flows under stress)
-- **Terminal flow**: Dashpot ensures G(t → ∞) → 0 and unbounded creep
+- **Terminal flow**: Dashpot ensures :math:`G(t \to \infty) \to 0` and unbounded creep
 
 Material Examples
 -----------------
@@ -299,7 +299,7 @@ Model Comparison
 **FMG vs Classical Maxwell:**
 
 - **Maxwell**: Exponential relaxation (:math:`\alpha = 1`)
-- **FMG**: Power-law relaxation (0 < :math:`\alpha` < 1, broad spectrum)
+- **FMG**: Power-law relaxation (:math:`0 < \alpha < 1`, broad spectrum)
 - FMG reduces to Maxwell as :math:`\alpha \to 1`
 
 **FMG vs Fractional Burgers:**
@@ -316,6 +316,7 @@ Limiting Behavior
 - :math:`\eta \to \infty`: Reduces to pure SpringPot (:math:`G^*(\omega) = c_\alpha (i\omega)^\alpha`)
 - :math:`\eta \to 0`: Non-physical (no dissipation mechanism)
 - :math:`c_\alpha \to 0`: Pure dashpot (:math:`G^*(\omega) = i\omega\eta`)
+
 
 What You Can Learn
 ------------------
@@ -336,7 +337,7 @@ Parameter Interpretation
    - **0.3 <** :math:`\alpha` **< 0.5**: Intermediate behavior. Typical for physical gels with
      moderate cross-link density or entangled polymer solutions.
 
-   - :math:`\alpha` **≈ 0.5**: Critical gel signature (Winter-Chambon criterion). Material
+   - :math:`\alpha \approx 0.5`: Critical gel signature (Winter-Chambon criterion). Material
      is at or near the gel point with :math:`G' \approx G'' \propto \omega^{0.5}`.
 
    - **0.5 <** :math:`\alpha` **< 0.7**: Liquid-dominant behavior. Typical for wormlike micelles
@@ -418,7 +419,7 @@ Diagnostic Indicators
 
 Warning signs in fitted parameters:
 
-- :math:`\alpha` **→ 0 or → 1**: Model may be inappropriate. Check if SpringPot-only or
+- :math:`\alpha \to 0` **or** :math:`\to 1`: Model may be inappropriate. Check if SpringPot-only or
   classical Maxwell fits better.
 
 - **Large uncertainty in** :math:`\alpha`: Data don't span sufficient frequency range.
@@ -427,15 +428,15 @@ Warning signs in fitted parameters:
 - :math:`\eta` **poorly constrained**: Low-frequency data insufficient. Extend to lower
   frequencies or use creep tests to capture terminal flow.
 
-- :math:`c_{\alpha and \eta}` **strongly correlated**: The characteristic time :math:`\tau` is well-
+- :math:`c_{\alpha}` **and** :math:`\eta` **strongly correlated**: The characteristic time :math:`\tau` is well-
   determined but individual parameters are not. Report :math:`\tau` instead.
 
 Application Examples
 ~~~~~~~~~~~~~~~~~~~~
 
 **Gel Formulation Development**:
-   Track :math:`\alpha` as crosslinker is added. Approach to :math:`\alpha` ≈ 0.5 indicates proximity to
-   gel point. For stable gels, target :math:`\alpha` < 0.45 with sufficient margin from
+   Track :math:`\alpha` as crosslinker is added. Approach to :math:`\alpha \approx 0.5` indicates proximity to
+   gel point. For stable gels, target :math:`\alpha < 0.45` with sufficient margin from
    the transition.
 
 **Quality Control**:
@@ -479,7 +480,7 @@ Fitting Guidance
 
 - **Insufficient low-frequency data**: Cannot determine :math:`\eta` accurately
 - **Missing power-law regime**: Need broader frequency coverage
-- :math:`\alpha` **near 1**: Use classical Maxwell for simpler interpretation
+- :math:`\alpha \approx 1`: Use classical Maxwell for simpler interpretation
 
 Usage
 -----
@@ -537,7 +538,7 @@ Troubleshooting
    * - **Poor fit in terminal regime**
      - Insufficient low-frequency data
      - Extend frequency sweep to lower :math:`\omega` or use longer relaxation test.
-   * - :math:`\alpha` **closes to 1**
+   * - :math:`\alpha \to 1`
      - Material is nearly Maxwellian
      - Use classical **Maxwell** model instead (narrow spectrum).
    * - **Oscillatory residuals at high** :math:`\omega`
@@ -575,7 +576,8 @@ References
    https://doi.org/10.1007/978-3-662-43930-2
 
 .. [5] Hilfer, R. (ed.) *Applications of Fractional Calculus in Physics*.
-   World Scientific (2000). ISBN: 978-9810234577
+   World Scientific (2000). ISBN: 978-9810234577.
+   https://doi.org/10.1142/3779
 
 .. [6] Scott Blair, G. W., Veinoglou, B. C., and Caffyn, J. E. "Limitations of
    the Newtonian time scale in relation to non-equilibrium rheological states."
@@ -606,7 +608,7 @@ Related Models
 ~~~~~~~~~~~~~~
 
 - :doc:`fractional_maxwell_liquid` — complementary model with spring instead of dashpot (solid-like equilibrium)
-- :doc:`fractional_maxwell_model` — generalized two-order formulation with independent :math:`\alpha and \beta`
+- :doc:`fractional_maxwell_model` — generalized two-order formulation with independent :math:`\alpha` and :math:`\beta`
 - :doc:`fractional_burgers` — adds Kelvin branch for delayed elasticity and creep
 - :doc:`../classical/maxwell` — classical limit (:math:`\alpha` → 1, exponential relaxation)
 - :doc:`../classical/springpot` — fundamental SpringPot element theory

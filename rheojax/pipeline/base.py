@@ -149,7 +149,7 @@ class Pipeline:
                     self.data = result
 
                 self._apply_test_mode_metadata(self.data, explicit_mode)
-                ctx["n_points"] = len(self.data.x) if self.data else 0
+                ctx["n_points"] = len(self.data.x) if self.data else 0  # type: ignore[arg-type]
                 ctx["test_mode"] = explicit_mode
 
             except Exception as e:
@@ -209,7 +209,7 @@ class Pipeline:
                 # Apply transform to x and y data
                 # The transform operates on the y data
                 self.data.y = transform_obj.transform(self.data.y)
-                ctx["input_shape"] = len(self.data.x)
+                ctx["input_shape"] = len(self.data.x)  # type: ignore[arg-type]
             except Exception as e:
                 logger.error(
                     "Transform failed",
@@ -232,7 +232,7 @@ class Pipeline:
             return
 
         if data.metadata is None:
-            data.metadata = {}
+            data.metadata = {}  # type: ignore[unreachable]
 
         data.metadata["test_mode"] = mode
         data.metadata.setdefault("detected_test_mode", mode)
@@ -300,7 +300,7 @@ class Pipeline:
             "fit",
             pipeline_id=self._id,
             model=model_name,
-            data_shape=X.shape,
+            data_shape=X.shape,  # type: ignore[union-attr]
         ) as ctx:
             try:
                 model_obj.fit(X, y, **fit_kwargs)
@@ -350,7 +350,7 @@ class Pipeline:
         if X is None:
             if self.data is None:
                 raise ValueError("No data available for prediction.")
-            X = self.data.x
+            X = self.data.x  # type: ignore[assignment]
 
         # Convert to numpy for prediction
         if isinstance(X, jnp.ndarray):
@@ -360,10 +360,10 @@ class Pipeline:
             "Generating predictions",
             pipeline_id=self._id,
             model=model.__class__.__name__,
-            n_points=len(X),
+            n_points=len(X),  # type: ignore[arg-type]
         )
 
-        predictions = model.predict(X)
+        predictions = model.predict(X)  # type: ignore[arg-type]
 
         return RheoData(
             x=X,
@@ -505,7 +505,7 @@ class Pipeline:
                 else:
                     raise ValueError(f"Unknown format: {format}")
 
-                ctx["n_points"] = len(self.data.x)
+                ctx["n_points"] = len(self.data.x)  # type: ignore[arg-type]
             except Exception as e:
                 logger.error(
                     "Failed to save data",
@@ -531,7 +531,7 @@ class Pipeline:
         Save the most recent plot to file.
 
         Convenience method for exporting plots with publication-quality defaults.
-        Wraps rheo.visualization.plotter.save_figure() to enable fluent API chaining.
+        Wraps rheojax.visualization.plotter.save_figure() to enable fluent API chaining.
 
         Parameters
         ----------
@@ -543,7 +543,7 @@ class Pipeline:
             Resolution for raster formats (PNG).
         **kwargs : dict
             Additional arguments passed to save_figure().
-            See rheo.visualization.plotter.save_figure() for details.
+            See rheojax.visualization.plotter.save_figure() for details.
 
         Returns
         -------
@@ -580,7 +580,7 @@ class Pipeline:
         See Also
         --------
         plot : Generate plot with automatic type selection
-        rheo.visualization.plotter.save_figure : Core export function
+        rheojax.visualization.plotter.save_figure : Core export function
 
         Notes
         -----
@@ -699,8 +699,8 @@ class Pipeline:
 
         # Extract all parameter values from the model's ParameterSet
         return {
-            name: self._last_model.parameters.get_value(name)
-            for name in self._last_model.parameters._parameters.keys()
+            name: self._last_model.parameters.get_value(name)  # type: ignore[misc]
+            for name in self._last_model.parameters.keys()
         }
 
     def clone(self) -> Pipeline:

@@ -252,7 +252,7 @@ def suggest_optimization_strategy(
             rule="default",
         )
 
-    strategy = {
+    strategy: dict[str, bool | str | float] = {
         "use_log_residuals": use_log_residuals,
         "use_multi_start": use_multi_start,
         "use_subset_init": use_subset_init,

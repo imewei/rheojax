@@ -19,6 +19,7 @@ Quick Reference
 .. autoclass:: FMLIKH
    :members:
    :show-inheritance:
+   :no-index:
 
 
 Notation Guide
@@ -77,13 +78,13 @@ capturing complex relaxation dynamics:
 This "double spectrum" architecture provides exceptional flexibility for materials
 with hierarchical microstructure where:
 
-- Different structural levels recover on different timescales (captured by :math:`\tau_thix,i`)
-- Each level exhibits power-law relaxation (captured by :math:`\alpha or \alpha_i`)
+- Different structural levels recover on different timescales (captured by :math:`\tau_{\text{thix},i}`)
+- Each level exhibits power-law relaxation (captured by :math:`\alpha` or :math:`\alpha_i`)
 
 **Physical motivation:**
 
-- **Waxy crude oils**: Primary crystals (fast, :math:`\alpha_1` ≈ 0.7), crystal clusters (medium, :math:`\alpha_2` ≈ 0.5),
-  space-spanning networks (slow, :math:`\alpha_3` ≈ 0.4)
+- **Waxy crude oils**: Primary crystals (fast, :math:`\alpha_1 \approx 0.7`), crystal clusters (medium, :math:`\alpha_2 \approx 0.5`),
+  space-spanning networks (slow, :math:`\alpha_3 \approx 0.4`)
 - **Colloidal gels**: Particle-particle bonds, aggregate structure, network connectivity
 - **Cement pastes**: C-S-H gel formation, ettringite crystals, portlandite network
 
@@ -206,14 +207,14 @@ In FMLIKH, the total structural parameter is a weighted sum:
 
 Each :math:`\lambda_i` represents a distinct **structural population** with:
 
-- Its own recovery timescale :math:`\tau_thix,i`
+- Its own recovery timescale :math:`\tau_{\text{thix},i}`
 - Its own breakdown coefficient :math:`\Gamma_i`
 - Its own (or shared) fractional order :math:`\alpha_i`
 
 **Physical examples:**
 
-- **Fast mode** (:math:`\tau_1` ~ 0.1-1 s, :math:`\alpha_1` ~ 0.7-0.9): Local bond reformation, surface contacts
-- **Intermediate mode** (:math:`\tau_2` ~ 1-10 s, :math:`\alpha_2` ~ 0.5-0.7): Aggregate restructuring
+- **Fast mode** (:math:`\tau_1 \sim 0.1-1` s, :math:`\alpha_1 \sim 0.7-0.9`): Local bond reformation, surface contacts
+- **Intermediate mode** (:math:`\tau_2 \sim 1-10` s, :math:`\alpha_2 \sim 0.5-0.7`): Aggregate restructuring
 - **Slow mode** (:math:`\tau_3` ~ 10-1000 s, :math:`\alpha_3` ~ 0.3-0.5): Network-scale reorganization, aging
 
 Hierarchical Microstructure Interpretation
@@ -232,9 +233,9 @@ Many complex fluids have structure at multiple length scales:
 
 Each level contributes to mechanical properties differently:
 
-- **Primary particles**: Fast kinetics, weak memory (:math:`\alpha` → 1)
+- **Primary particles**: Fast kinetics, weak memory (:math:`\alpha \to 1`)
 - **Aggregates**: Intermediate kinetics, moderate memory
-- **Network**: Slow kinetics, strong memory (:math:`\alpha` → 0)
+- **Network**: Slow kinetics, strong memory (:math:`\alpha \to 0`)
 
 The weighted sum yield stress reflects how each level contributes to
 macroscopic yielding.
@@ -247,7 +248,7 @@ Mode Selection Guidelines
 1. **Start with N=2** and check improvement with N=3
 2. **Use time-domain data**: Count distinct recovery timescales
 3. **Use frequency-domain data**: Count shoulders/features in Cole-Cole plot
-4. :math:`\beta` **rule from ML-IKH**: N ~ (1/:math:`\beta`)\ :math:`^2 where \beta` is stretch exponent
+4. :math:`\beta` **rule from ML-IKH**: :math:`N \sim (1/\beta)^2` where :math:`\beta` is stretch exponent
 
 **When to use shared vs per-mode** :math:`\alpha` **?**
 
@@ -305,7 +306,7 @@ Yield Stress Formulation
 
    \sigma_y = \sigma_{y,0} + \Delta\sigma_y \sum_{i=1}^{N} w_i \lambda_i
 
-where :math:`\Sigmaw_i` = 1 (normalization).
+where :math:`\sum w_i = 1` (normalization).
 
 **Structure-dependent modulus** (optional):
 
@@ -411,24 +412,24 @@ What You Can Learn
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Per-Mode Timescales** :math:`\tau_thix,i` **:**
+**Per-Mode Timescales** :math:`\tau_{\text{thix},i}` **:**
 
 - Span the characteristic recovery times for different structural levels
-- Logarithmic distribution typical: :math:`\tau_1 < \tau_2 < ... < \tau_N`
-- :math:`\tau_max/\tau_min` ratio indicates breadth of timescale distribution
+- Logarithmic distribution typical: :math:`\tau_1 < \tau_2 < \ldots < \tau_N`
+- :math:`\tau_{\max}/\tau_{\min}` ratio indicates breadth of timescale distribution
 - Compare to experimental timescales to ensure adequate coverage
 
-**Mode Weights w_i:**
+**Mode Weights** :math:`w_i` **:**
 
 - Relative contribution of each structural level to yield stress
-- High w_i for fast modes → rapid initial recovery dominates
-- High w_i for slow modes → long-time aging dominates
+- High :math:`w_i` for fast modes :math:`\to` rapid initial recovery dominates
+- High :math:`w_i` for slow modes :math:`\to` long-time aging dominates
 - Relate to microstructural composition (e.g., particle size distribution)
 
 **Fractional Orders** :math:`\alpha_i` **(per-mode):**
 
-- :math:`\alpha_i` → 1: Mode i behaves like exponential (Markovian)
-- :math:`\alpha_i` < 0.5: Mode i has strong memory (glassy)
+- :math:`\alpha_i \to 1`: Mode i behaves like exponential (Markovian)
+- :math:`\alpha_i < 0.5`: Mode i has strong memory (glassy)
 - Typically: :math:`\alpha` decreases with increasing :math:`\tau` (slow modes are more glassy)
 
 **Breakdown Coefficients** :math:`\Gamma_i` **:**
@@ -436,7 +437,7 @@ Parameter Interpretation
 - Mode-specific shear sensitivity
 - High :math:`\Gamma_i`: Structure i breaks easily under shear
 - Low :math:`\Gamma_i`: Structure i is shear-resistant
-- Critical shear rate for mode i: :math:`\dot{\gamma}_crit,i = 1/(\Gamma_i \cdot \tau_thix,i)`
+- Critical shear rate for mode i: :math:`\dot{\gamma}_{\text{crit},i} = 1/(\Gamma_i \cdot \tau_{\text{thix},i})`
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -449,11 +450,11 @@ Material Classification
      - Behavior
      - Typical Materials
      - Recommendations
-   * - N=2, :math:`\alpha` shared ≈ 0.6
+   * - N=2, :math:`\alpha` shared :math:`\approx 0.6`
      - Simple hierarchical
      - Bidisperse colloids
      - Good starting point
-   * - N=3, :math:`\alpha` shared ≈ 0.5
+   * - N=3, :math:`\alpha` shared :math:`\approx 0.5`
      - Complex hierarchical
      - Waxy crude oils
      - Standard FMLIKH
@@ -461,7 +462,7 @@ Material Classification
      - Scale-dependent memory
      - Aging glasses, cements
      - Use per-mode :math:`\alpha`
-   * - N=2, :math:`\alpha_1 \approx 0.9, \alpha_2` ≈ 0.4
+   * - N=2, :math:`\alpha_1 \approx 0.9`, :math:`\alpha_2 \approx 0.4`
      - Fast exponential + slow glassy
      - Soft glasses
      - Per-mode :math:`\alpha` critical
@@ -505,9 +506,9 @@ structure benefit from FMLIKH's dual-spectrum approach:
 
 **Pipeline restart implications:**
 
-- Mode 1 recovers quickly → initial startup feasible
-- Mode 3 recovers slowly → full gelation takes hours
-- Fractional kinetics → restart pressure grows as power-law of rest time
+- Mode 1 recovers quickly; initial startup feasible
+- Mode 3 recovers slowly; full gelation takes hours
+- Fractional kinetics: restart pressure grows as power-law of rest time
 
 Hierarchical Colloidal Gels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -567,7 +568,7 @@ Global Parameters
      - Global shear modulus
    * - ``eta``
      - :math:`10^6`
-     - (10\ :math:`^{-3, 10^1^2}`)
+     - (:math:`10^{-3}`, :math:`10^{12}`)
      - Pa·s
      - Maxwell viscosity (:math:`\tau = \eta/G`)
    * - ``C``
@@ -746,7 +747,7 @@ Sequential Fitting Strategy
 
 **Stage 1: Flow curve (steady state)**
 
-Fit global parameters (:math:`\sigma_y0, \Delta\sigma_y, \eta_inf`) and :math:`\Gamma_i \cdot \tau_thix,i` products:
+Fit global parameters (:math:`\sigma_{y0}, \Delta\sigma_y, \eta_\infty`) and :math:`\Gamma_i \cdot \tau_{\text{thix},i}` products:
 
 .. code-block:: python
 
@@ -882,7 +883,7 @@ FMLIKH maintains N separate history buffers for the L1 scheme:
    ]
    Shape: (N, n_history)
 
-**Memory scaling**: O(N × n_history) ≈ O(N × 100-500) bytes per state
+**Memory scaling**: :math:`O(N \times n_{\text{history}}) \approx O(N \times 100\text{--}500)` bytes per state
 
 JAX vmap Parallelization
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1044,10 +1045,10 @@ FMLIKH with N=1 is equivalent to FIKH:
 
 **Parameter mapping:**
 
-- ``sigma_y0`` (FMLIKH) ↔ ``sigma_y0`` (FIKH)
-- ``delta_sigma_y`` (FMLIKH) ↔ ``delta_sigma_y`` (FIKH)
-- ``alpha_structure`` (shared) ↔ ``alpha_structure`` (FIKH)
-- ``tau_thix_1``, ``Gamma_1`` ↔ ``tau_thix``, ``Gamma``
+- ``sigma_y0`` (FMLIKH) :math:`\leftrightarrow` ``sigma_y0`` (FIKH)
+- ``delta_sigma_y`` (FMLIKH) :math:`\leftrightarrow` ``delta_sigma_y`` (FIKH)
+- ``alpha_structure`` (shared) :math:`\leftrightarrow` ``alpha_structure`` (FIKH)
+- ``tau_thix_1``, ``Gamma_1`` :math:`\leftrightarrow` ``tau_thix``, ``Gamma``
 - ``w_1 = 1.0`` implicitly
 
 **When to use which:**
@@ -1061,8 +1062,8 @@ Limitations and Considerations
 
 **Computational cost:**
 
-- N modes require N history buffers → O(N × n_history) memory
-- Fractional derivatives computed per mode → O(N × n_history) per step
+- N modes require N history buffers: :math:`O(N \times n_{\text{history}})` memory
+- Fractional derivatives computed per mode: :math:`O(N \times n_{\text{history}})` per step
 - With JAX vmap: near-linear scaling, but still more expensive than ML-IKH
 
 **Parameter identifiability:**
@@ -1090,18 +1091,23 @@ See :doc:`fikh` references [1-10] for fractional calculus and IKH background.
 .. [11] Wei, Y., Solomon, M. J., and Larson, R. G. (2018). "A multimode structural
    kinetics constitutive equation for the transient rheology of thixotropic
    elasto-viscoplastic fluids." *J. Rheol.*, 62(1), 321-342.
+   https://doi.org/10.1122/1.4996752
+   :download:`PDF <../../../reference/wei_solomon_larson_2018_multimode_ikh.pdf>`
 
-.. [12] Fielding, S. M., et al. (2009). "Aging and rheology in soft materials."
-   *J. Rheol.*, 53(1), 39-64.
+.. [12] Fielding, S. M., Sollich, P., and Cates, M. E. (2000). "Aging and rheology
+   in soft materials." *J. Rheol.*, 44(2), 323-369.
+   https://doi.org/10.1122/1.551088
 
 **Stretched Exponentials:**
 
 .. [13] Kohlrausch, R. (1854). "Theorie des elektrischen Rückstandes in der
    Leidener Flasche." *Ann. Phys.*, 167(2), 179-214.
+   https://doi.org/10.1002/andp.18541670203
 
 .. [14] Williams, G. and Watts, D. C. (1970). "Non-symmetrical dielectric relaxation
    behaviour arising from a simple empirical decay function." *Trans. Faraday Soc.*,
    66, 80-85.
+   https://doi.org/10.1039/tf9706600080
 
 
 See Also

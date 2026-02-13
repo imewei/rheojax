@@ -20,7 +20,7 @@ Where:
 
 - :math:`\boldsymbol{\tau}` is the polymer extra stress tensor
 - :math:`\lambda` is the relaxation time
-- :math:`\alpha` is the mobility factor (0 ≤ :math:`\alpha` ≤ 0.5)
+- :math:`\alpha` is the mobility factor (:math:`0 \leq \alpha \leq 0.5`)
 - :math:`\eta_p` is the polymer viscosity
 - :math:`\overset{\nabla}{\boldsymbol{\tau}}` is the upper-convected derivative
 - :math:`\mathbf{D}` is the rate-of-deformation tensor
@@ -102,7 +102,7 @@ Supported Protocols
      - Steady shear :math:`\sigma(\dot{\gamma})`, :math:`\eta(\dot{\gamma})`
    * - OSCILLATION
      - Analytical
-     - SAOS G'(:math:`\omega`), G''(:math:`\omega`) (:math:`\alpha`-independent)
+     - SAOS :math:`G'(\omega)`, :math:`G''(\omega)` (:math:`\alpha`-independent)
    * - STARTUP
      - ODE (diffrax)
      - Stress overshoot at constant rate

@@ -180,9 +180,9 @@ Quick Start
 .. code-block:: python
 
    model = HVNMLocal()
-   model.fit(omega, G_star, test_mode="oscillation")
+   model.fit(omega, G_star, test_mode='oscillation')
    result = model.fit_bayesian(
-       omega, G_star, test_mode="oscillation",
+       omega, G_star, test_mode='oscillation',
        num_warmup=1000, num_samples=2000,
    )
 
@@ -219,13 +219,17 @@ References
 1. Vernerey, F.J., Long, R. & Brighenti, R. (2017). "A statistically-based
    continuum theory for polymers with transient networks." *J. Mech. Phys.
    Solids*, 107, 1-20.
+   https://doi.org/10.1016/j.jmps.2017.05.016
 
 2. Karim, M.R., Vernerey, F. & Sain, T. (2025). "Constitutive Modeling of
    Vitrimers and Their Nanocomposites Based on Transient Network Theory."
    *Macromolecules*, 58(10), 4899-4912.
+   https://doi.org/10.1021/acs.macromol.4c02872
+   :download:`PDF <../../../reference/karim_2025_vitrimer_nanocomposites.pdf>`
 
 3. Li, Z., Zhao, H., Duan, P., Zhang, L. & Liu, J. (2024). "Manipulating
    the Properties of Polymer Vitrimer Nanocomposites by Designing Dual Dynamic
-   Covalent Bonds." *Langmuir*, 40(14), 7550-7560.
+   Covalent Bonds." *Langmuir*, 40(14), 7769-7780.
+   https://doi.org/10.1021/acs.langmuir.4c00699
 
 See :doc:`hvnm_advanced` for the full reference list (18 citations).

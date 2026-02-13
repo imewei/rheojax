@@ -500,7 +500,7 @@ def plot_3d_trajectory(
         ax.plot(strain, rate_normalized, stress, linewidth=1.5, **kwargs)
 
         # Add start/end markers
-        ax.scatter(
+        ax.scatter(  # type: ignore[misc]
             [strain[0]],
             [rate_normalized[0]],
             [stress[0]],
@@ -508,7 +508,7 @@ def plot_3d_trajectory(
             s=100,
             label="Start",
         )
-        ax.scatter(
+        ax.scatter(  # type: ignore[misc]
             [strain[-1]],
             [rate_normalized[-1]],
             [stress[-1]],
@@ -543,7 +543,7 @@ def plot_3d_trajectory(
 
         ax.set_xlabel(r"$\gamma$")
         ax.set_ylabel(r"$\dot{\gamma}/\omega$")
-        ax.set_zlabel(r"$\sigma$ (Pa)")
+        ax.set_zlabel(r"$\sigma$ (Pa)")  # type: ignore[union-attr]
         ax.set_title("3D Response Trajectory", fontsize=14)
         ax.legend()
 

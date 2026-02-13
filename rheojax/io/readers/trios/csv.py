@@ -596,7 +596,7 @@ def load_trios_csv(
             x_col, y_col, y2_col = select_xy_columns(seg_df, detected_mode)
 
             if x_col is None or y_col is None:
-                logger.warning(
+                logger.warning(  # type: ignore[unreachable]
                     "Could not determine x/y columns",
                     segment_index=seg_idx,
                     available_columns=list(seg_df.columns),

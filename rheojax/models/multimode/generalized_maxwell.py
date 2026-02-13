@@ -32,7 +32,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode
+from rheojax.core.test_modes import DeformationMode, TestMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.optimization import OptimizationResult
 from rheojax.utils.prony import (
@@ -46,7 +46,7 @@ from rheojax.utils.prony import (
 try:
     import diffrax
 except ImportError:
-    diffrax = None  # Optional dependency for LAOS/startup
+    diffrax = None  # type: ignore[assignment]  # Optional dependency for LAOS/startup
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -69,6 +69,12 @@ logger = get_logger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.STARTUP,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class GeneralizedMaxwell(BaseModel):
@@ -148,7 +154,7 @@ class GeneralizedMaxwell(BaseModel):
         # Store element minimization diagnostics
         self._element_minimization_diagnostics: dict[str, object] | None = None
 
-    def _fit(
+    def _fit(  # type: ignore[override]
         self,
         X: np.ndarray,
         y: np.ndarray,
@@ -296,13 +302,13 @@ class GeneralizedMaxwell(BaseModel):
 
         # Convert to OptimizationResult
         result = OptimizationResult(
-            x=np.asarray(nlsq_result.x),
-            fun=nlsq_result.cost,
-            jac=np.asarray(nlsq_result.jac) if nlsq_result.jac is not None else None,
-            success=nlsq_result.success,
-            message=nlsq_result.message,
-            nit=nlsq_result.nfev,
-            nfev=nlsq_result.nfev,
+            x=np.asarray(nlsq_result.x),  # type: ignore[attr-defined]
+            fun=nlsq_result.cost,  # type: ignore[attr-defined]
+            jac=np.asarray(nlsq_result.jac) if nlsq_result.jac is not None else None,  # type: ignore[attr-defined]
+            success=nlsq_result.success,  # type: ignore[attr-defined]
+            message=nlsq_result.message,  # type: ignore[attr-defined]
+            nit=nlsq_result.nfev,  # type: ignore[attr-defined]
+            nfev=nlsq_result.nfev,  # type: ignore[attr-defined]
             njev=nlsq_result.njev if hasattr(nlsq_result, "njev") else 0,
             optimality=(
                 nlsq_result.optimality if hasattr(nlsq_result, "optimality") else None
@@ -310,7 +316,7 @@ class GeneralizedMaxwell(BaseModel):
             active_mask=(
                 nlsq_result.active_mask if hasattr(nlsq_result, "active_mask") else None
             ),
-            cost=nlsq_result.cost,
+            cost=nlsq_result.cost,  # type: ignore[attr-defined]
             grad=(
                 np.asarray(nlsq_result.grad)
                 if hasattr(nlsq_result, "grad") and nlsq_result.grad is not None
@@ -501,11 +507,11 @@ class GeneralizedMaxwell(BaseModel):
 
             try:
                 # Extract warm-start parameters if available
-                initial_params_n: dict | None
+                initial_params_n: np.ndarray | None
                 if best_params is not None:
-                    initial_params_n = warm_start_from_n_modes(
+                    initial_params_n = np.asarray(warm_start_from_n_modes(
                         best_params, n_target=n, modulus_type=self._modulus_type
-                    )
+                    ))
                 else:
                     initial_params_n = None
 
@@ -1301,7 +1307,11 @@ class GeneralizedMaxwell(BaseModel):
         params_near_bounds = {}
         for param_name in self.parameters.keys():
             value = self.parameters.get_value(param_name)
-            bounds = self.parameters.get(param_name).bounds
+            assert value is not None
+            param = self.parameters.get(param_name)
+            assert param is not None
+            bounds = param.bounds
+            assert bounds is not None
             lower, upper = bounds
 
             # Check if within 10% of bounds
@@ -1339,6 +1349,7 @@ class GeneralizedMaxwell(BaseModel):
         high_uncertainty_count = 0
         for param_name, std_dev in diagnostics["param_uncertainties"].items():
             value = self.parameters.get_value(param_name)
+            assert value is not None
             if abs(value) > 1e-12 and std_dev / abs(value) > 1.0:
                 high_uncertainty_count += 1
 
@@ -1400,7 +1411,10 @@ class GeneralizedMaxwell(BaseModel):
 
             # Use parameter bounds as guides for generic priors
             for param_name in self.parameters.keys():
-                bounds = self.parameters.get(param_name).bounds
+                param = self.parameters.get(param_name)
+                assert param is not None
+                bounds = param.bounds
+                assert bounds is not None
                 lower, upper = bounds
                 mean = (lower + upper) / 2
                 std = (upper - lower) / 4  # Wide prior covering ~95% of bounds
@@ -1419,7 +1433,11 @@ class GeneralizedMaxwell(BaseModel):
                 # Center at NLSQ, inflate std
                 for param_name in self.parameters.keys():
                     value = self.parameters.get_value(param_name)
-                    bounds = self.parameters.get(param_name).bounds
+                    assert value is not None
+                    param = self.parameters.get(param_name)
+                    assert param is not None
+                    bounds = param.bounds
+                    assert bounds is not None
                     lower, upper = bounds
 
                     # Inflate std to 50% of estimate or 10% of bounds, whichever is larger
@@ -1436,7 +1454,11 @@ class GeneralizedMaxwell(BaseModel):
 
                 for param_name in self.parameters.keys():
                     value = self.parameters.get_value(param_name)
-                    bounds = self.parameters.get(param_name).bounds
+                    assert value is not None
+                    param = self.parameters.get(param_name)
+                    assert param is not None
+                    bounds = param.bounds
+                    assert bounds is not None
                     lower, upper = bounds
 
                     # Use 20% of bounds range as std
@@ -1450,6 +1472,7 @@ class GeneralizedMaxwell(BaseModel):
 
             for param_name in self.parameters.keys():
                 value = self.parameters.get_value(param_name)
+                assert value is not None
 
                 # Get uncertainty from Hessian if available
                 if param_name in diagnostics["param_uncertainties"]:
@@ -1459,7 +1482,10 @@ class GeneralizedMaxwell(BaseModel):
                     std = max(std, min_std)
                 else:
                     # Fallback: use 5% of parameter value or 5% of bounds
-                    bounds = self.parameters.get(param_name).bounds
+                    param = self.parameters.get(param_name)
+                    assert param is not None
+                    bounds = param.bounds
+                    assert bounds is not None
                     lower, upper = bounds
                     std = max(0.05 * abs(value), 0.05 * (upper - lower))
 
@@ -1523,10 +1549,9 @@ class GeneralizedMaxwell(BaseModel):
         if test_mode == "relaxation":
             return self._predict_relaxation_jit(jnp.asarray(X), E_inf, E_i, tau_i)
         elif test_mode == "oscillation":
-            # Return complex modulus as (M, 2) for Bayesian likelihood
+            # _predict_oscillation_jit returns (2, M); transpose to (M, 2)
             E_star = self._predict_oscillation_jit(jnp.asarray(X), E_inf, E_i, tau_i)
-            # E_star is now (M, 2) from the updated _predict_oscillation_jit
-            return E_star
+            return E_star.T
         elif test_mode == "creep":
             return self._predict_creep_jit(
                 jnp.asarray(X), E_inf, E_i, tau_i, sigma_0=1.0

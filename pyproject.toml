@@ -109,6 +109,8 @@ dev = [
     "sphinx>=9.1.0",
     "furo>=2025.12.19",
     "sphinx-autodoc-typehints>=3.6.2",
+    "h5py>=3.15.1",
+    "openpyxl>=3.1.5",
 ]
 ml = [
     "scikit-learn>=1.8.0",
@@ -264,6 +266,7 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
+    "examples/**/*.ipynb",
 ]
 
 [tool.ruff.lint]
@@ -290,7 +293,7 @@ ignore = [
 "rheojax/utils/mittag_leffler.py" = ["E402"]  # safe_import_jax() must precede JAX imports
 "rheojax/transforms/*.py" = ["E402"]  # safe_import_jax() may precede other imports
 "rheojax/utils/initialization/*.py" = ["E402"]  # initialization modules
-"examples/**/*.ipynb" = ["B", "C", "E", "F", "W"]  # Example notebooks have looser style requirements
+"examples/**/*.ipynb" = ["B", "C", "E", "F", "W", "I", "UP"]  # Example notebooks: suppress all lint rules (syntax errors from shell/magic cells)
 "docs/source/conf.py" = ["F401"]  # Sphinx config checks imports for availability
 
 [tool.mypy]
@@ -314,14 +317,3 @@ disable_error_code = ["name-defined", "no-any-return"]
 module = ["rheojax.gui.*", "rheojax.cli.*"]
 ignore_errors = true  # GUI/CLI modules have PySide6 stub issues
 
-[[tool.mypy.overrides]]
-module = [
-    "rheojax.logging.exporters",
-    "rheojax.utils.data_quality",
-    "rheojax.utils.device",
-    "rheojax.transforms.*",
-    "rheojax.io.*",
-    "rheojax.pipeline.*",
-    "rheojax.visualization.*",
-]
-ignore_errors = true  # Pre-existing type issues to be addressed incrementally

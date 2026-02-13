@@ -8,7 +8,7 @@ Quick Reference
 
 - **Use when:** Full stress tensor modeling, normal stress differences (:math:`N_1, N_2`), anisotropic yielding, flow instabilities
 
-- **Parameters:** 9 (:math:`\mu, \nu, \tau_{\text{pl,shear}}, \tau_{\text{pl,normal}}, \sigma_{c,\text{mean}}, \sigma_{c,\text{std}}`, w_N1, hill_H, hill_N)
+- **Parameters:** 9 (:math:`\mu, \nu, \tau_{\text{pl,shear}}, \tau_{\text{pl,normal}}, \sigma_{c,\text{mean}}, \sigma_{c,\text{std}}`, :math:`w_{N1}`, :math:`H_{\text{Hill}}`, :math:`N_{\text{Hill}}`)
 
 - **Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma} \delta_{ij} - \frac{\sigma_{ij}}{\tau_{ij}^{pl}} f(\sigma_{eff}, \sigma_c) + \sum_{kl} \mathcal{G}_{ij,kl}(\mathbf{q}) \dot{\gamma}^{pl}_{kl}`
 
@@ -67,11 +67,11 @@ Tensorial vs Scalar EPM
 
 The scalar EPM models only the shear component :math:`\sigma_xy`. While this captures flow curves and avalanches, it misses:
 
-- **Normal stress differences**: :math:`N_1 = \sigma_xx - \sigma_yy` (rod climbing) and :math:`N_2 = \sigma_yy - \sigma_zz` (secondary flows)
+- **Normal stress differences**: :math:`N_1 = \sigma_{xx} - \sigma_{yy}` (rod climbing) and :math:`N_2 = \sigma_{yy} - \sigma_{zz}` (secondary flows)
 - **Anisotropic yielding**: Materials with directional microstructure (fiber suspensions, liquid crystals)
 - **Flow instabilities**: Edge fracture, shear banding driven by normal stress gradients
 
-The Tensorial EPM tracks [:math:`\sigma_xx, \sigma_yy, \sigma_xy`] at each lattice site, with :math:`\sigma_zz = \nu(\sigma_xx + \sigma_yy)` from the plane strain constraint.
+The Tensorial EPM tracks [:math:`\sigma_{xx}, \sigma_{yy}, \sigma_{xy}`] at each lattice site, with :math:`\sigma_{zz} = \nu(\sigma_{xx} + \sigma_{yy})` from the plane strain constraint.
 
 Tensorial Eshelby Propagator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -147,9 +147,9 @@ Many complex fluids exhibit **normal stress differences** during shear flow:
 - **Fiber suspensions**: Normal stresses from fiber orientation and rotation
 - **Anisotropic gels**: Directional microstructure leads to non-isotropic yielding
 
-The scalar EPM (:math:`\sigma_xy` only) misses these phenomena because:
+The scalar EPM (:math:`\sigma_{xy}` only) misses these phenomena because:
 
-1. Normal components :math:`\sigma_xx, \sigma_yy` evolve independently under shear
+1. Normal components :math:`\sigma_{xx}, \sigma_{yy}` evolve independently under shear
 2. Yielding in one direction affects stress redistribution in all directions
 3. Anisotropic yield criteria (Hill) require full tensor
 
@@ -174,12 +174,12 @@ where C is the elastic stiffness tensor. For isotropic elasticity with shear mod
 
     C_{ijkl} = \mu \left[ \delta_{ik}\delta_{jl} + \delta_{il}\delta_{jk} + \frac{2\nu}{1-2\nu} \delta_{ij}\delta_{kl} \right]
 
-**Key property**: The propagator couples all stress components, so a plastic event in :math:`\sigma_xy affects \sigma_xx and \sigma_yy`, and vice versa.
+**Key property**: The propagator couples all stress components, so a plastic event in :math:`\sigma_{xy}` affects :math:`\sigma_{xx}` and :math:`\sigma_{yy}`, and vice versa.
 
 Plane Strain and Normal Stress Generation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In 2D flow with out-of-plane confinement (e.g., narrow gap rheometry), the strain :math:`\varepsilon_zz` = 0 but stress :math:`\sigma_zz` ≠ 0. The constraint is:
+In 2D flow with out-of-plane confinement (e.g., narrow gap rheometry), the strain :math:`\varepsilon_{zz} = 0` but stress :math:`\sigma_{zz} \neq 0`. The constraint is:
 
 .. math::
 
@@ -191,7 +191,7 @@ This coupling generates **non-zero** :math:`N_2`:
 
     N_2 = \sigma_{yy} - \sigma_{zz} = (1 - \nu) \sigma_{yy} - \nu \sigma_{xx}
 
-even when :math:`N_1 = \sigma_xx - \sigma_yy` might be small. This is a purely geometric effect of confinement.
+even when :math:`N_1 = \sigma_{xx} - \sigma_{yy}` might be small. This is a purely geometric effect of confinement.
 
 Governing Equations
 ------------------------
@@ -225,7 +225,7 @@ Normal Stress Differences
     }
 
 Typical experimental observations:
-- Polymer melts: :math:`N_1` > 0 (rod climbing), :math:`|N_2|` ≪ :math:`N_1`
+- Polymer melts: :math:`N_1 > 0` (rod climbing), :math:`|N_2| \ll N_1`
 - Shear banding: Large gradients in :math:`N_1` correlate with band boundaries
 
 Fitting to Normal Stress Data
@@ -244,23 +244,23 @@ Validity and Assumptions
 
 **Valid for:**
 
-- Materials where **normal stresses are measurable** and significant (:math:`N_1/\sigma_xy` > 0.1)
+- Materials where **normal stresses are measurable** and significant (:math:`N_1/\sigma_{xy} > 0.1`)
 - **Anisotropic materials** with directional microstructure (fibers, liquid crystals)
 - **Flow instabilities** driven by normal stress gradients (shear banding, edge fracture)
 - **Confined geometries** where plane strain applies (narrow gap, slit flow)
 
 **Assumptions:**
 
-- **Plane strain constraint**: :math:`\varepsilon_zz` = 0 (appropriate for 2D confined flow)
+- **Plane strain constraint**: :math:`\varepsilon_{zz} = 0` (appropriate for 2D confined flow)
 - **Isotropic elasticity** (unless Hill criterion used for anisotropy)
 - **Quenched disorder** in yield thresholds (same as scalar EPM)
 - **No inertia** (overdamped dynamics)
 
 **Not appropriate for:**
 
-- Pure shear measurements where :math:`N_1` is not measured (use LatticeEPM instead)
+- Pure shear measurements where :math:`N_1` is not measured (use ``LatticeEPM`` instead)
 - 3D bulk flows without confinement (requires full 3D tensor implementation)
-- Very compressible materials (model assumes :math:`\nu` ≈ 0.4-0.5)
+- Very compressible materials (model assumes :math:`\nu \approx 0.4\text{--}0.5`)
 
 What You Can Learn
 ------------------
@@ -276,13 +276,13 @@ Parameter Interpretation
    *For practitioners*: Design parameter for processing stresses. :math:`\sigma_c` sets minimum stress for continuous flow.
 
 :math:`N_1, N_2` **(Normal Stress Differences)**:
-   First (:math:`N_1 = \sigma_xx - \sigma_yy`) and second (:math:`N_2 = \sigma_yy - \sigma_zz`) normal stress differences from tensorial stress state.
-   *For graduate students*: :math:`N_1` arises from upper-convected Maxwell backbone (chain stretching, particle alignment). :math:`N_2` from plane strain constraint: :math:`N_2 = (1-\nu)\sigma_yy - \nu\sigma_xx. Ratio N_1/\sigma_xy` ~ Wi (Weissenberg number) quantifies elasticity.
-   *For practitioners*: Measure :math:`N_1` to predict rod climbing (Weissenberg effect), die swell, and edge fracture. :math:`N_1/\sigma_xy` > 0.5 indicates strong elastic effects.
+   First (:math:`N_1 = \sigma_{xx} - \sigma_{yy}`) and second (:math:`N_2 = \sigma_{yy} - \sigma_{zz}`) normal stress differences from tensorial stress state.
+   *For graduate students*: :math:`N_1` arises from upper-convected Maxwell backbone (chain stretching, particle alignment). :math:`N_2` from plane strain constraint: :math:`N_2 = (1-\nu)\sigma_{yy} - \nu\sigma_{xx}`. Ratio :math:`N_1/\sigma_{xy} \sim \text{Wi}` (Weissenberg number) quantifies elasticity.
+   *For practitioners*: Measure :math:`N_1` to predict rod climbing (Weissenberg effect), die swell, and edge fracture. :math:`N_1/\sigma_{xy} > 0.5` indicates strong elastic effects.
 
 **Hill H, N (Anisotropy Parameters)**:
    Hill criterion parameters quantifying directional yield resistance (H for normal, N for shear).
-   *For graduate students*: Effective stress: :math:`\sigma_eff,Hill =` √[H(:math:`\sigma_xx-\sigma_yy`)\ :math:`^2 + 2N\sigma_xy^2`]. H=1, N=3 recovers von Mises. Microstructurally, H and N relate to fiber orientation tensor or crystallographic texture.
+   *For graduate students*: Effective stress: :math:`\sigma_{\text{eff,Hill}} = \sqrt{H(\sigma_{xx}-\sigma_{yy})^2 + 2N\sigma_{xy}^2}`. :math:`H=1, N=3` recovers von Mises. Microstructurally, :math:`H` and :math:`N` relate to fiber orientation tensor or crystallographic texture.
    *For practitioners*: Fit H and N from biaxial or combined loading tests. Use to predict forming limits and failure modes in anisotropic materials.
 
 Material Classification
@@ -296,15 +296,15 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - :math:`N_1/\sigma_xy` < 0.1
+   * - :math:`N_1/\sigma_{xy} < 0.1`
      - Weakly elastic
      - Pastes, concentrated suspensions
      - Minimal normal stress effects
-   * - :math:`N_1/\sigma_xy` = 0.1-1
+   * - :math:`N_1/\sigma_{xy} = 0.1\text{--}1`
      - Moderate elasticity
      - Emulsions, soft colloids
      - Rod climbing, moderate die swell
-   * - :math:`N_1/\sigma_xy` > 1
+   * - :math:`N_1/\sigma_{xy} > 1`
      - Strongly elastic
      - Polymer melts, fiber suspensions
      - Strong Weissenberg effect, edge fracture
@@ -312,7 +312,7 @@ Material Classification
      - von Mises yielding
      - Isotropic gels, foams
      - Symmetric flow patterns
-   * - H≠1 or N≠3 (anisotropic)
+   * - :math:`H \neq 1` or :math:`N \neq 3` (anisotropic)
      - Directional yielding
      - Fiber composites, liquid crystals
      - Asymmetric instabilities, orientation-dependent strength
@@ -333,14 +333,14 @@ This is equivalent to scalar EPM fitting.
 
 **Step 2: Add normal stress constraint (w_N1 = 1)**
 
-Refine parameters to match both :math:`\sigma_xy and N_1`:
+Refine parameters to match both :math:`\sigma_{xy}` and :math:`N_1`:
 
 - Adjust ``nu`` (Poisson ratio) to control :math:`N_1` magnitude
 - Adjust ``tau_pl_normal`` if :math:`N_1` relaxation differs from shear
 
 **Step 3: Test anisotropy (Hill criterion)**
 
-If isotropic fit fails (:math:`R^2` < 0.9 for :math:`N_1`):
+If isotropic fit fails (:math:`R^2 < 0.9` for :math:`N_1`):
 
 - Switch to ``yield_criterion='hill'``
 - Fit ``hill_H`` and ``hill_N`` while holding other parameters fixed
@@ -366,7 +366,7 @@ Parameter Bounds and Physical Constraints
      - Often similar, but can differ for anisotropic materials
    * - ``w_N1``
      - 0.1-10
-     - Higher weight = prioritize :math:`N_1 fit over \sigma_xy`
+     - Higher weight = prioritize :math:`N_1` fit over :math:`\sigma_{xy}`
    * - ``hill_H``
      - 0.5-2.0
      - H = 1, N = 3 recovers von Mises (isotropic)
@@ -425,11 +425,11 @@ Parameters
    * - ``tau_pl_shear``
      - s
      - [0.01, 100.0]
-     - Plastic relaxation time for shear components (:math:`\sigma_xy`)
+     - Plastic relaxation time for shear components (:math:`\sigma_{xy}`)
    * - ``tau_pl_normal``
      - s
      - [0.01, 100.0]
-     - Plastic relaxation time for normal stresses (:math:`\sigma_xx, \sigma_yy`)
+     - Plastic relaxation time for normal stresses (:math:`\sigma_{xx}, \sigma_{yy}`)
    * - ``sigma_c_mean``
      - Pa
      - [0.1, 10.0]
@@ -514,7 +514,7 @@ Basic Flow Curve with :math:`N_1` Prediction
 
     # Define shear rates
     shear_rates = np.logspace(-2, 1, 10)
-    data = RheoData(x=shear_rates, y=None, initial_test_mode="flow_curve")
+    data = RheoData(x=shear_rates, y=None, initial_test_mode='flow_curve')
 
     # Predict flow curve (returns σ_xy with N₁ in metadata)
     result = model.predict(data, smooth=True)
@@ -531,7 +531,7 @@ Fitting to Shear-Only Data (Backward Compatible)
     gamma_dot = np.array([0.01, 0.1, 1.0, 10.0])
     sigma_xy_exp = np.array([0.5, 1.2, 2.8, 5.1])
 
-    rheo_data = RheoData(x=gamma_dot, y=sigma_xy_exp, initial_test_mode="flow_curve")
+    rheo_data = RheoData(x=gamma_dot, y=sigma_xy_exp, initial_test_mode='flow_curve')
 
     # Fit model to shear stress only (standard workflow)
     model = TensorialEPM(L=32)  # Smaller L for faster fitting
@@ -555,7 +555,7 @@ Fitting to Combined [:math:`\sigma_xy, N_1`] Data
     # Option 2: Manually construct multi-objective loss
 
     # Current best practice: Fit shear first, then validate N₁
-    rheo_data = RheoData(x=gamma_dot, y=sigma_xy_exp, initial_test_mode="flow_curve")
+    rheo_data = RheoData(x=gamma_dot, y=sigma_xy_exp, initial_test_mode='flow_curve')
     model = TensorialEPM(L=32, w_N1=2.0)  # Higher weight for N₁
     model.fit(rheo_data, max_iter=200)
 
@@ -596,7 +596,7 @@ Visualization
 
     # Run a startup simulation to get stress field history
     t = np.linspace(0, 10, 100)
-    startup_data = RheoData(x=t, y=None, initial_test_mode="startup")
+    startup_data = RheoData(x=t, y=None, initial_test_mode='startup')
     startup_data.metadata = {"gamma_dot": 1.0}
 
     result = model.predict(startup_data, smooth=False)
@@ -615,9 +615,9 @@ When to Use TensorialEPM vs LatticeEPM
    * - Use Case
      - LatticeEPM (Scalar)
      - TensorialEPM
-   * - Flow curves (:math:`\sigma vs \dot{\gamma}`)
+   * - Flow curves (:math:`\sigma` vs :math:`\dot{\gamma}`)
      - ✓ Faster (3-5x)
-     - ✓ More accurate if :math:`N_1` ≠ 0
+     - ✓ More accurate if :math:`N_1 \neq 0`
    * - Yield stress determination
      - ✓ Sufficient
      - ✓ Accounts for anisotropy
@@ -666,7 +666,7 @@ Von Mises vs Hill Give Similar Results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **Cause**: Hill parameters (H, N) default to isotropic values
-- **Fix**: Set ``hill_H`` ≠ 1 or ``hill_N`` ≠ 3 to activate anisotropy
+- **Fix**: Set ``hill_H`` :math:`\neq` 1 or ``hill_N`` :math:`\neq` 3 to activate anisotropy
 
 GPU Memory Overflow
 ~~~~~~~~~~~~~~~~~~~
@@ -755,13 +755,13 @@ NLSQ → NUTS Workflow
    )
 
    # Step 1: NLSQ fitting for point estimates
-   rheo_data = RheoData(x=gamma_dot, y=sigma_xy_exp, initial_test_mode="flow_curve")
+   rheo_data = RheoData(x=gamma_dot, y=sigma_xy_exp, initial_test_mode='flow_curve')
    model.fit(rheo_data, max_iter=300)
 
    # Step 2: Bayesian inference with 4 chains
    result = model.fit_bayesian(
        rheo_data,
-       test_mode="flow_curve",
+       test_mode='flow_curve',
        num_warmup=1000,
        num_samples=2000,
        num_chains=4,
@@ -965,13 +965,13 @@ Normal stress differences arise from **microstructural anisotropy** induced by s
 
 - Particles align along the compression axis (45° to flow)
 - Cage distortion creates asymmetric stress distribution
-- :math:`N_1` > 0: Extension along flow direction dominates
+- :math:`N_1 > 0`: Extension along flow direction dominates
 
 **In polymer melts:**
 
 - Chain stretching and orientation along flow
 - Entropic elasticity: stretched chains exert restoring force
-- Classic result: :math:`N_1 \approx 2G`':math:`\gamma` for linear regime
+- Classic result: :math:`N_1 \approx 2G'\gamma` for linear regime
 
 **In fiber suspensions:**
 
@@ -982,7 +982,7 @@ Normal stress differences arise from **microstructural anisotropy** induced by s
 Rate-Dependence of Normal Stresses
 ----------------------------------
 
-The ratio :math:`N_1/\sigma_xy` typically shows characteristic rate-dependence:
+The ratio :math:`N_1/\sigma_{xy}` typically shows characteristic rate-dependence:
 
 **Low shear rates (linear regime):**
 
@@ -990,7 +990,7 @@ The ratio :math:`N_1/\sigma_xy` typically shows characteristic rate-dependence:
 
    N_1 \sim \gamma \cdot \sigma_{xy} \sim \dot{\gamma}^2
 
-In this regime, :math:`N_1/\sigma_xy` ~ Wi (Weissenberg number).
+In this regime, :math:`N_1/\sigma_{xy} \sim \text{Wi}` (Weissenberg number).
 
 **Intermediate rates (non-linear):**
 
@@ -1008,7 +1008,7 @@ Power-law scaling with exponent depending on microstructure.
 
 Plateau ratio indicates fully aligned microstructure.
 
-**Diagnostic:** :math:`N_1/\sigma_xy` **ratio**
+**Diagnostic:** :math:`N_1/\sigma_{xy}` **ratio**
 
 .. code-block:: python
 
@@ -1057,7 +1057,7 @@ For materials with principal axes of anisotropy, Hill (1948) proposed:
    \sigma_{eff}^2 = F(\sigma_{yy} - \sigma_{zz})^2 + G(\sigma_{zz} - \sigma_{xx})^2
                    + H(\sigma_{xx} - \sigma_{yy})^2 + 2L\sigma_{yz}^2 + 2M\sigma_{zx}^2 + 2N\sigma_{xy}^2
 
-In plane stress (:math:`\sigma_zz = \sigma_xz = \sigma_yz` = 0):
+In plane stress (:math:`\sigma_{zz} = \sigma_{xz} = \sigma_{yz} = 0`):
 
 .. math::
 
@@ -1065,11 +1065,11 @@ In plane stress (:math:`\sigma_zz = \sigma_xz = \sigma_yz` = 0):
 
 **Parameter interpretation:**
 
-- **H**: Resistance to normal stress difference (:math:`\sigma_xx - \sigma_yy`)
-- **N**: Resistance to shear stress :math:`\sigma_xy`
+- **H**: Resistance to normal stress difference (:math:`\sigma_{xx} - \sigma_{yy}`)
+- **N**: Resistance to shear stress :math:`\sigma_{xy}`
 - **H = 1, N = 3**: Recovers von Mises (isotropic)
-- **H > 1**: Stronger in normal direction (resists :math:`N_1` generation)
-- **N > 3**: Stronger in shear (higher yield stress for same :math:`\sigma_xy`)
+- :math:`H > 1`: Stronger in normal direction (resists :math:`N_1` generation)
+- :math:`N > 3`: Stronger in shear (higher yield stress for same :math:`\sigma_{xy}`)
 
 Connection to Fiber Orientation Tensor
 --------------------------------------
@@ -1138,12 +1138,12 @@ Normal Stress Measurement Techniques
 **Cone-plate geometry:**
 
 - Preferred for :math:`N_1` measurement (uniform shear rate)
-- Edge fracture limits high rates (:math:`N_1` ~ :math:`\sigma_xy` at critical Wi)
+- Edge fracture limits high rates (:math:`N_1 \sim \sigma_{xy}` at critical Wi)
 - Requires thrust bearing calibration
 
 **Parallel plates:**
 
-- :math:`N_1` requires correction: :math:`N_1 = 2F_N/(\piR^2)` (1 + d ln F_N / d ln :math:`\dot{\gamma}`)
+- :math:`N_1` requires correction: :math:`N_1 = 2F_N/(\pi R^2)(1 + d \ln F_N / d \ln \dot{\gamma})`
 - Gap variation affects accuracy
 - Useful for temperature sweeps
 
@@ -1179,13 +1179,13 @@ Shear Banding Detection
 
 TensorialEPM can capture shear banding driven by normal stress gradients. Detection methods:
 
-**Rheo-PIV (Particle Image Velocimetry):**
+**RheoJAX-PIV (Particle Image Velocimetry):**
 
 - Direct velocity profile measurement
 - Banding: linear profile with sharp gradient
-- Resolution: ~10 :math:`\mum` typical
+- Resolution: ~10 :math:`\mu\text{m}` typical
 
-**Rheo-SANS (Small-Angle Neutron Scattering):**
+**RheoJAX-SANS (Small-Angle Neutron Scattering):**
 
 - Microstructure orientation during flow
 - Bands have different alignment signatures
@@ -1208,7 +1208,7 @@ Before fitting TensorialEPM, verify data quality:
    * - Check
      - Requirement
    * - Steady state reached
-     - Wait 5-10× :math:`\tau_relax` before recording
+     - Wait 5-10x :math:`\tau_{\text{relax}}` before recording
    * - :math:`N_1` noise level
      - < 10% of signal at each rate
    * - Edge fracture

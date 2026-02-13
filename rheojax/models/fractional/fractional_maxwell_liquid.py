@@ -44,6 +44,7 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.utils.mittag_leffler import mittag_leffler_e2
 
 # Module logger
@@ -57,6 +58,12 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FractionalMaxwellLiquid(BaseModel):
@@ -496,7 +503,7 @@ class FractionalMaxwellLiquid(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)
+            return self.predict_rheodata(X)  # type: ignore[return-value]
 
         # Handle raw array input
         from rheojax.core.test_modes import TestMode
@@ -608,7 +615,7 @@ class FractionalMaxwellLiquid(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None, **kwargs):
+    def predict(self, X, test_mode: str | None = None, **kwargs):  # type: ignore[override]
         """Predict response.
 
         Args:

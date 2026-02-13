@@ -15,7 +15,7 @@ creep, stress relaxation, and large-amplitude oscillatory shear (LAOS) protocols
 ODE-based models capture rich physics including:
 
 * **Stress overshoot** in startup shear (thixotropic/structural evolution)
-* **Normal stress differences** (N₁, N₂) in shear flow
+* **Normal stress differences** (:math:`N_1`, :math:`N_2`) in shear flow
 * **Yield stress behavior** with Von Mises criterion
 * **Thixotropic loops** (buildup/breakdown cycles)
 * **Nonlinear viscoelasticity** beyond linear response theory
@@ -39,7 +39,7 @@ When to Use ODE-Based Models
 Choose ODE-based models when:
 
 * **Transient phenomena dominate**: Stress overshoot, creep acceleration, thixotropic loops
-* **Normal stress predictions needed**: Giesekus predicts N₁/N₂ from shear flow
+* **Normal stress predictions needed**: Giesekus predicts :math:`N_1/N_2` from shear flow
 * **Yield stress with elasticity**: Saramito EVP combines Bingham yield with viscoelastic backbone
 * **Fractional memory in thixotropy**: FIKH/FMLIKH for long-time structural memory
 * **Shear banding** (nonlocal variants): Spatial heterogeneity in flow
@@ -113,7 +113,7 @@ The Giesekus model describes **nonlinear viscoelastic polymers** (solutions, mel
 
 * Anisotropic drag coefficient (mobility parameter :math:`\alpha`)
 * Shear thinning via stress-dependent relaxation
-* Normal stress differences (N₁ > 0, N₂ < 0)
+* Normal stress differences (:math:`N_1 > 0`, :math:`N_2 < 0`)
 
 Constitutive equation:
 
@@ -142,7 +142,7 @@ Parameters and Protocols
 **Supported protocols** (6):
 
 * FLOW_CURVE: Steady-state shear stress vs. shear rate
-* OSCILLATION: SAOS (G', G'' vs. frequency)
+* OSCILLATION: SAOS (:math:`G'`, :math:`G''` vs. frequency)
 * STARTUP: Transient stress growth at constant shear rate
 * RELAXATION: Stress decay after step strain
 * CREEP: Strain growth under constant stress
@@ -700,7 +700,7 @@ Comparison Table
      - Fit Time
    * - Giesekus (single)
      - Polymer solutions
-     - Shear thinning + N₁
+     - Shear thinning + :math:`N_1`
      - 3
      - 5
      - ~30s (startup)
@@ -817,9 +817,9 @@ Giesekus Notebooks
 ------------------
 
 * ``examples/giesekus/01_giesekus_flow_curve.ipynb``: Steady shear viscosity
-* ``examples/giesekus/02_giesekus_saos.ipynb``: Linear viscoelasticity (G', G'')
+* ``examples/giesekus/02_giesekus_saos.ipynb``: Linear viscoelasticity (:math:`G'`, :math:`G''`)
 * ``examples/giesekus/03_giesekus_startup.ipynb``: Stress overshoot prediction
-* ``examples/giesekus/04_giesekus_normal_stresses.ipynb``: N₁, N₂ in shear flow
+* ``examples/giesekus/04_giesekus_normal_stresses.ipynb``: :math:`N_1`, :math:`N_2` in shear flow
 * ``examples/giesekus/05_giesekus_creep.ipynb``: Creep compliance
 * ``examples/giesekus/06_giesekus_relaxation.ipynb``: Stress relaxation
 * ``examples/giesekus/07_giesekus_laos.ipynb``: Nonlinear oscillatory response
@@ -850,32 +850,32 @@ References
 Giesekus Model
 --------------
 
-* Giesekus, H. (1982). "A simple constitutive equation for polymer fluids based on the concept of deformation-dependent tensorial mobility." *Journal of Non-Newtonian Fluid Mechanics*, 11(1-2), 69-109.
-* Bird, R. B., Armstrong, R. C., & Hassager, O. (1987). *Dynamics of Polymeric Liquids, Vol. 1: Fluid Mechanics* (2nd ed.). Wiley.
+* Giesekus, H. (1982). "A simple constitutive equation for polymer fluids based on the concept of deformation-dependent tensorial mobility." *Journal of Non-Newtonian Fluid Mechanics*, 11(1-2), 69-109. https://doi.org/10.1016/0377-0257(82)85016-7
+* Bird, R. B., Armstrong, R. C., & Hassager, O. (1987). *Dynamics of Polymeric Liquids, Vol. 1: Fluid Mechanics* (2nd ed.). Wiley. ISBN: 978-0-471-80245-7
 
 IKH Models
 ----------
 
-* Mujumdar, A., Beris, A. N., & Metzner, A. B. (2002). "Transient phenomena in thixotropic systems." *Journal of Non-Newtonian Fluid Mechanics*, 102(2), 157-178.
-* de Souza Mendes, P. R., & Thompson, R. L. (2013). "A unified approach to model elasto-viscoplastic thixotropic yield-stress materials and apparent yield-stress fluids." *Rheologica Acta*, 52(7), 673-694.
+* Mujumdar, A., Beris, A. N., & Metzner, A. B. (2002). "Transient phenomena in thixotropic systems." *Journal of Non-Newtonian Fluid Mechanics*, 102(2), 157-178. https://doi.org/10.1016/S0377-0257(01)00176-8
+* de Souza Mendes, P. R., & Thompson, R. L. (2013). "A unified approach to model elasto-viscoplastic thixotropic yield-stress materials and apparent yield-stress fluids." *Rheologica Acta*, 52(7), 673-694. https://doi.org/10.1007/s00397-013-0699-1
 
 Fractional Extensions
 ---------------------
 
-* Bagley, R. L., & Torvik, P. J. (1983). "A theoretical basis for the application of fractional calculus to viscoelasticity." *Journal of Rheology*, 27(3), 201-210.
-* Palade, L. I., Verney, V., & Attané, P. (1996). "A modified fractional model to describe the entire viscoelastic behavior of polybutadienes from flow to glassy regime." *Rheologica Acta*, 35(3), 265-273.
+* Bagley, R. L., & Torvik, P. J. (1983). "A theoretical basis for the application of fractional calculus to viscoelasticity." *Journal of Rheology*, 27(3), 201-210. https://doi.org/10.1122/1.549724
+* Palade, L. I., Verney, V., & Attané, P. (1996). "A modified fractional model to describe the entire viscoelastic behavior of polybutadienes from flow to glassy regime." *Rheologica Acta*, 35(3), 265-273. https://doi.org/10.1007/BF00366913
 
 Saramito EVP Model
 ------------------
 
-* Saramito, P. (2007). "A new constitutive equation for elastoviscoplastic fluid flows." *Journal of Non-Newtonian Fluid Mechanics*, 145(1), 1-14.
-* Saramito, P. (2009). "A new elastoviscoplastic model based on the Herschel–Bulkley viscoplastic model." *Journal of Non-Newtonian Fluid Mechanics*, 158(1-3), 154-161.
+* Saramito, P. (2007). "A new constitutive equation for elastoviscoplastic fluid flows." *Journal of Non-Newtonian Fluid Mechanics*, 145(1), 1-14. https://doi.org/10.1016/j.jnnfm.2007.04.004
+* Saramito, P. (2009). "A new elastoviscoplastic model based on the Herschel–Bulkley viscoplastic model." *Journal of Non-Newtonian Fluid Mechanics*, 158(1-3), 154-161. https://doi.org/10.1016/j.jnnfm.2008.12.001
 
 Fluidity Approach
 -----------------
 
-* Derec, C., Ducouret, G., Ajdari, A., & Lequeux, F. (2003). "Aging and nonlinear rheology in suspensions of polyethylene oxide–protected silica particles." *Physical Review E*, 67(6), 061403.
-* Moorcroft, R. L., & Fielding, S. M. (2014). "Criteria for shear banding in time-dependent flows of complex fluids." *Physical Review Letters*, 110(8), 086001.
+* Derec, C., Ducouret, G., Ajdari, A., & Lequeux, F. (2003). "Aging and nonlinear rheology in suspensions of polyethylene oxide–protected silica particles." *Physical Review E*, 67(6), 061403. https://doi.org/10.1103/PhysRevE.67.061403
+* Moorcroft, R. L., & Fielding, S. M. (2013). "Criteria for shear banding in time-dependent flows of complex fluids." *Physical Review Letters*, 110(8), 086001. https://doi.org/10.1103/PhysRevLett.110.086001
 
 
 See Also

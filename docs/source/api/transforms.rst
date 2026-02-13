@@ -150,3 +150,38 @@ or total-variation methods plus optional pre/post smoothing.
    :members:
    :undoc-members:
    :show-inheritance:
+
+SRFS (Strain-Rate Frequency Superposition)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.transforms.srfs.SRFS` | Handbook: :doc:`/transforms/srfs`
+Collapses flow curves at different shear rates onto a master curve, analogous to
+time-temperature superposition but in the shear rate domain.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Parameter (default)
+     - Description
+   * - ``reference_gamma_dot`` (``1.0``)
+     - Reference shear rate for the master curve.
+   * - ``auto_shift`` (``False``)
+     - Automatically compute optimal shift factors using SGR power-law theory.
+
+.. autoclass:: rheojax.transforms.srfs.SRFS
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+SPP Decomposer
+~~~~~~~~~~~~~~
+
+:class:`rheojax.transforms.spp_decomposer.SPPDecomposer` | Full API: :doc:`/api/spp_models`
+Time-domain LAOS decomposition into cage modulus, yield stresses, power-law flow,
+and nonlinearity metrics using the Sequence of Physical Processes framework.
+
+.. autoclass:: rheojax.transforms.spp_decomposer.SPPDecomposer
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -61,19 +61,19 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.vlb._base import VLBBase
 from rheojax.models.vlb._kernels import (
+    build_vlb_creep_ode_rhs,
+    build_vlb_laos_ode_rhs,
+    build_vlb_ode_rhs,
+    build_vlb_relaxation_ode_rhs,
     vlb_arrhenius_shift,
     vlb_breakage_bell,
     vlb_fene_factor,
     vlb_saos_moduli_vec,
     vlb_stress_fene_n1,
-    vlb_stress_fene_xy,
     vlb_thermal_modulus,
-    build_vlb_creep_ode_rhs,
-    build_vlb_laos_ode_rhs,
-    build_vlb_ode_rhs,
-    build_vlb_relaxation_ode_rhs,
 )
 
 jax, jnp = safe_import_jax()
@@ -93,6 +93,12 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class VLBVariant(VLBBase):
@@ -269,7 +275,7 @@ class VLBVariant(VLBBase):
         Returns params in ParameterSet order: [G0, k_d_0, eta_s, (nu), (L_max), (E_a, T_ref)].
         """
         param_values = [
-            float(self.parameters.get_value(name))
+            float(self.parameters.get_value(name)) # type: ignore[arg-type]
             for name in self.parameters.keys()
         ]
         return jnp.array(param_values, dtype=jnp.float64)
@@ -438,7 +444,10 @@ class VLBVariant(VLBBase):
         ]
         params = jnp.array(param_values)
 
-        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
+        fwd_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
+        }
         return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
 
     # =========================================================================
@@ -1083,7 +1092,7 @@ class VLBVariant(VLBBase):
             't', 'strain', 'stress', 'gamma_dot'
         """
         if t is None:
-            period = 2 * np.pi / omega
+            period = 2 * np.pi / omega # type: ignore[unreachable]
             t = np.linspace(0, n_cycles * period, n_cycles * 200)
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)

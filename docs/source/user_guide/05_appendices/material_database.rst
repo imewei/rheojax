@@ -17,7 +17,7 @@ Liquids (Newtonian)
    :widths: 30 25 25 20
 
    * - Material
-     - Viscosity η (Pa·s)
+     - Viscosity :math:`\eta` (Pa·s)
      - Temperature (°C)
      - Notes
    * - Water
@@ -45,20 +45,20 @@ Polymer Melts
    :widths: 30 20 20 30
 
    * - Material
-     - G' (Pa at 1 Hz)
-     - η₀ (Pa·s)
-     - τ (s)
+     - :math:`G'` (Pa at 1 Hz)
+     - :math:`\eta_0` (Pa·s)
+     - :math:`\tau` (s)
    * - Polyethylene (LDPE)
-     - 10⁴ - 10⁵
-     - 10³ - 10⁵
+     - :math:`10^4 - 10^5`
+     - :math:`10^3 - 10^5`
      - 1 - 100
    * - Polystyrene (PS)
-     - 10⁴ - 10⁶
-     - 10⁴ - 10⁶
+     - :math:`10^4 - 10^6`
+     - :math:`10^4 - 10^6`
      - 0.1 - 10
    * - Polydimethylsiloxane (PDMS)
-     - 10³ - 10⁵
-     - 10² - 10⁴
+     - :math:`10^3 - 10^5`
+     - :math:`10^2 - 10^4`
      - 0.01 - 1
 
 Gels and Soft Solids
@@ -69,23 +69,23 @@ Gels and Soft Solids
    :widths: 30 25 25 20
 
    * - Material
-     - G' (Pa)
-     - G"/G'
+     - :math:`G'` (Pa)
+     - :math:`G''/G'`
      - Classification
    * - Gelatin (5%)
-     - 10² - 10³
+     - :math:`10^2 - 10^3`
      - 0.1 - 0.3
      - Physical gel
    * - Agar (2%)
-     - 10⁴ - 10⁵
+     - :math:`10^4 - 10^5`
      - 0.05 - 0.15
      - Strong gel
    * - Yogurt
-     - 10² - 10³
+     - :math:`10^2 - 10^3`
      - 0.2 - 0.5
      - Weak gel
    * - Hydrogels (PEG)
-     - 10² - 10⁴
+     - :math:`10^2 - 10^4`
      - 0.1 - 0.5
      - Chemical gel
 
@@ -97,8 +97,8 @@ Suspensions
    :widths: 30 25 25 20
 
    * - Material
-     - η (Pa·s at 1 s⁻¹)
-     - φ (vol%)
+     - :math:`\eta` (Pa·s at 1 :math:`\text{s}^{-1}`)
+     - :math:`\phi` (vol%)
      - Flow Type
    * - Blood
      - 0.003 - 0.015
@@ -121,8 +121,8 @@ Biological Materials
    :widths: 30 25 25 20
 
    * - Material
-     - G' (Pa at 1 Hz)
-     - G"/G'
+     - :math:`G'` (Pa at 1 Hz)
+     - :math:`G''/G'`
      - Temperature (°C)
    * - Collagen gel
      - 10 - 100
@@ -145,44 +145,44 @@ Classical Models
 
 **Maxwell** (liquids):
 
-- G₀: 10³ - 10⁶ Pa
-- η: 1 - 10⁶ Pa·s
-- τ: 0.001 - 100 s
+- :math:`G_0`: :math:`10^3 - 10^6` Pa
+- :math:`\eta`: :math:`1 - 10^6` Pa·s
+- :math:`\tau`: 0.001 - 100 s
 
 **Zener** (solids):
 
-- G_e: 10³ - 10⁷ Pa
-- G_m: 10³ - 10⁶ Pa
-- τ: 0.1 - 1000 s
+- :math:`G_e`: :math:`10^3 - 10^7` Pa
+- :math:`G_m`: :math:`10^3 - 10^6` Pa
+- :math:`\tau`: 0.1 - 1000 s
 
 Fractional Models
 ~~~~~~~~~~~~~~~~~
 
 **Fractional Maxwell Liquid**:
 
-- G₀: 10⁴ - 10⁶ Pa
-- τ: 0.01 - 100 s
-- α: 0.5 - 0.95
+- :math:`G_0`: :math:`10^4 - 10^6` Pa
+- :math:`\tau`: 0.01 - 100 s
+- :math:`\alpha`: 0.5 - 0.95
 
 **Fractional Zener Solid-Solid**:
 
-- G_e: 10³ - 10⁶ Pa
-- G_m: 10³ - 10⁵ Pa
-- α: 0.3 - 0.8
+- :math:`G_e`: :math:`10^3 - 10^6` Pa
+- :math:`G_m`: :math:`10^3 - 10^5` Pa
+- :math:`\alpha`: 0.3 - 0.8
 
 Flow Models
 ~~~~~~~~~~~
 
 **PowerLaw**:
 
-- K: 0.01 - 100 Pa·s^n
-- n: 0.2 - 1.0 (shear thinning)
+- :math:`K`: 0.01 - 100 :math:`\text{Pa·s}^n`
+- :math:`n`: 0.2 - 1.0 (shear thinning)
 
 **Herschel-Bulkley**:
 
-- σ_y: 1 - 1000 Pa
-- K: 0.1 - 10 Pa·s^n
-- n: 0.3 - 0.9
+- :math:`\sigma_y`: 1 - 1000 Pa
+- :math:`K`: 0.1 - 10 :math:`\text{Pa·s}^n`
+- :math:`n`: 0.3 - 0.9
 
 Using This Database
 -------------------
@@ -212,10 +212,10 @@ Using This Database
 Temperature Dependence
 ----------------------
 
-**WLF Parameters** (polymers near T_g):
+**WLF Parameters** (polymers near :math:`T_g`):
 
-- C₁: 10 - 20 (typical: 17.44 for many polymers)
-- C₂: 30 - 100 K (typical: 51.6 K)
+- :math:`C_1`: 10 - 20 (typical: 17.44 for many polymers)
+- :math:`C_2`: 30 - 100 K (typical: 51.6 K)
 
 **Arrhenius Activation Energy**:
 

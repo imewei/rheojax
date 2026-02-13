@@ -97,7 +97,7 @@ Key Features
 
 - Quantitative parameter ranges from field studies and laboratory characterization
 - Application-specific guidance for pipeline operations, drilling, lubrication
-- Mode selection rules for multi-timescale materials (:math:`\beta` → N mapping)
+- Mode selection rules for multi-timescale materials (:math:`\beta` to :math:`N` mapping)
 
 **Parameter Estimation:**
 
@@ -169,10 +169,13 @@ References
 
 1. Dimitriou, C.J. & McKinley, G.H. (2014). "A comprehensive constitutive law for
    waxy crude oil: a thixotropic yield stress fluid." *Soft Matter*, 10, 6619-6644.
+   https://doi.org/10.1039/C4SM00578C
 
 2. Geri, M. et al. (2017). "Thermokinematic memory and the thixotropic
    elasto‐viscoplasticity of waxy crude oils." *J. Rheol.*, 61(3), 427-454.
+   https://doi.org/10.1122/1.4978259
 
 3. Wei, Y., Solomon, M.J., & Larson, R.G. (2018). "A multimode structural kinetics
    constitutive equation for the transient rheology of thixotropic elasto‐viscoplastic
    fluids." *J. Rheol.*, 62(1), 321-342.
+   https://doi.org/10.1122/1.4996752

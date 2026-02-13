@@ -78,9 +78,6 @@ RheoJAX provides **53 rheological models** organized into families based on thei
    * - ``giesekus``
      - GiesekusSingleMode, GiesekusMultiMode
      - Nonlinear viscoelastic polymer (tensor ODE)
-   * - ``fluidity_saramito``
-     - FluiditySaramitoLocal, Nonlocal
-     - Tensorial EVP with thixotropic fluidity
    * - ``fikh``
      - FIKHLocal, FMLIKHLocal
      - Fractional isotropic-kinematic hardening
@@ -129,7 +126,7 @@ Quick Reference Table
    * - SGR
      - SAOS, Relaxation
      - Soft glasses
-     - Noise temperature x
+     - Noise temperature :math:`x`
    * - Fluidity
      - SAOS, Flow
      - Cooperative systems
@@ -157,7 +154,7 @@ Quick Reference Table
    * - Giesekus
      - All 6 protocols
      - Polymer solutions/melts
-     - Nonlinear shear thinning + N₁
+     - Nonlinear shear thinning + :math:`N_1`
    * - Saramito
      - All 6 protocols
      - EVP fluids
@@ -169,7 +166,7 @@ Quick Reference Table
    * - DMT
      - All 6 protocols
      - Structured fluids
-     - Structure parameter λ
+     - Structure parameter :math:`\lambda`
    * - ITT-MCT
      - All 6 protocols
      - Dense colloids, glasses
@@ -181,7 +178,7 @@ Quick Reference Table
    * - VLB
      - All 6 protocols
      - Transient networks
-     - Distribution tensor μ
+     - Distribution tensor :math:`\boldsymbol{\mu}`
    * - HVM
      - All 6 protocols
      - Vitrimers
@@ -206,21 +203,21 @@ The Models
 1. **Maxwell** (2 parameters)
 
    - **Type**: Viscoelastic liquid
-   - **Equation**: G(t) = G₀ exp(-t/τ)
+   - **Equation**: :math:`G(t) = G_0 \exp(-t/\tau)`
    - **Use for**: Single relaxation time, simple liquids
    - **Example**: Low molecular weight polymer melts
 
 2. **Zener** (3 parameters)
 
    - **Type**: Viscoelastic solid (Standard Linear Solid)
-   - **Equation**: G(t) = Ge + Gm exp(-t/τ)
+   - **Equation**: :math:`G(t) = G_e + G_m \exp(-t/\tau)`
    - **Use for**: Materials with equilibrium modulus (crosslinked)
    - **Example**: Lightly crosslinked rubbers
 
 3. **SpringPot** (2 parameters)
 
    - **Type**: Pure fractional element (bridges solid and liquid)
-   - **Equation**: G(t) ~ t^(-α)
+   - **Equation**: :math:`G(t) \sim t^{-\alpha}`
    - **Use for**: Power-law behavior, conceptual studies
    - **Example**: Critical gels
 
@@ -246,7 +243,7 @@ Example: Fitting Maxwell Model
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
 
    # Stress relaxation data
    model = Maxwell()
@@ -277,12 +274,12 @@ Real materials often have **distributions of relaxation times** due to:
 - Branching and entanglements
 - Fractal or heterogeneous structure
 
-**Fractional calculus** captures these distributions with a single parameter α (fractional order).
+**Fractional calculus** captures these distributions with a single parameter :math:`\alpha` (fractional order).
 
 **Power-law signatures**:
 
-- Relaxation: G(t) ~ t^(-α)
-- Oscillation: G', G" ~ ω^α (parallel scaling)
+- Relaxation: :math:`G(t) \sim t^{-\alpha}`
+- Oscillation: :math:`G', G'' \sim \omega^\alpha` (parallel scaling)
 
 The 11 Fractional Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -312,7 +309,7 @@ When to Use Fractional Models
 
 ✅ **Use fractional models when**:
 
-- Log-log plot shows parallel G' and G" lines (power-law)
+- Log-log plot shows parallel :math:`G'` and :math:`G''` lines (power-law)
 - Material has broad molecular weight distribution
 - Relaxation is NOT purely exponential
 - Classical models fail to capture curvature
@@ -324,21 +321,21 @@ When to Use Fractional Models
 - You have very few data points (< 10)
 - Single exponential fits perfectly well
 
-The Fractional Order Parameter (α)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Fractional Order Parameter (:math:`\alpha`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**α** characterizes the breadth of the relaxation spectrum:
+:math:`\alpha` characterizes the breadth of the relaxation spectrum:
 
-- **α → 1**: Narrow spectrum (nearly liquid-like, approaches Maxwell)
-- **α ≈ 0.5**: Broad spectrum (gel-like, power-law)
-- **α → 0**: Narrow spectrum (nearly solid-like, approaches elastic)
+- :math:`\alpha \to 1`: Narrow spectrum (nearly liquid-like, approaches Maxwell)
+- :math:`\alpha \approx 0.5`: Broad spectrum (gel-like, power-law)
+- :math:`\alpha \to 0`: Narrow spectrum (nearly solid-like, approaches elastic)
 
 **Typical values**:
 
-- Monodisperse polymers: α = 0.8 - 0.95
-- Polydisperse polymers: α = 0.5 - 0.7
-- Gels: α = 0.3 - 0.6
-- Soft glassy materials: α = 0.1 - 0.3
+- Monodisperse polymers: :math:`\alpha = 0.8 - 0.95`
+- Polydisperse polymers: :math:`\alpha = 0.5 - 0.7`
+- Gels: :math:`\alpha = 0.3 - 0.6`
+- Soft glassy materials: :math:`\alpha = 0.1 - 0.3`
 
 Example: Fitting Fractional Zener Solid-Solid
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -369,15 +366,15 @@ Family 3: Flow Models
 
 **Test modes**: Steady shear flow (rotation)
 
-**Key characteristic**: **Nonlinear viscosity** η(γ̇)
+**Key characteristic**: **Nonlinear viscosity** :math:`\eta(\dot{\gamma})`
 
 Why Flow Models?
 ~~~~~~~~~~~~~~~~
 
 Most complex fluids exhibit **shear-dependent viscosity**:
 
-- **Shear thinning**: η decreases with shear rate (polymers, suspensions)
-- **Shear thickening**: η increases with shear rate (dense suspensions)
+- **Shear thinning**: :math:`\eta` decreases with shear rate (polymers, suspensions)
+- **Shear thickening**: :math:`\eta` increases with shear rate (dense suspensions)
 - **Yield stress**: Material doesn't flow below critical stress (pastes, gels)
 
 **These are nonlinear effects** not captured by linear viscoelastic models.
@@ -389,13 +386,13 @@ The 6 Flow Models
 
 1. **PowerLaw** (2 parameters) — Simple shear thinning
 
-   - η(γ̇) = K γ̇^(n-1)
-   - n < 1: Shear thinning
-   - n = 1: Newtonian
+   - :math:`\eta(\dot{\gamma}) = K \dot{\gamma}^{n-1}`
+   - :math:`n < 1`: Shear thinning
+   - :math:`n = 1`: Newtonian
 
 2. **Carreau** (4 parameters) — Shear thinning with Newtonian plateaus
 
-   - η(γ̇) = η∞ + (η₀ - η∞) [1 + (λ γ̇)²]^((n-1)/2)
+   - :math:`\eta(\dot{\gamma}) = \eta_\infty + (\eta_0 - \eta_\infty) [1 + (\lambda \dot{\gamma})^2]^{(n-1)/2}`
    - Most flexible for polymers
 
 3. **Carreau-Yasuda** (5 parameters) — Extended Carreau
@@ -406,12 +403,12 @@ The 6 Flow Models
 
 5. **Bingham** (2 parameters) — Newtonian above yield stress
 
-   - σ = σ_y + η_p γ̇ (for σ > σ_y)
+   - :math:`\sigma = \sigma_y + \eta_p \dot{\gamma}` (for :math:`\sigma > \sigma_y`)
    - Use for: Drilling fluids, simple pastes
 
 6. **Herschel-Bulkley** (3 parameters) — Power-law above yield stress
 
-   - σ = σ_y + K γ̇^n
+   - :math:`\sigma = \sigma_y + K \dot{\gamma}^n`
    - Use for: Soft solids, yield-stress fluids
 
 When to Use Flow Models
@@ -428,14 +425,14 @@ When to Use Flow Models
 
 - You have oscillation or relaxation data (use viscoelastic models)
 - Material is in linear regime
-- You need to predict elastic behavior (G')
+- You need to predict elastic behavior (:math:`G'`)
 
 Example: Fitting PowerLaw Model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   from rheojax.models.power_law import PowerLaw
+   from rheojax.models import PowerLaw
 
    # Steady shear data (shear rate, viscosity)
    model = PowerLaw()
@@ -461,7 +458,7 @@ Family 4: Soft Glassy Rheology (SGR) Models
 
 **Test modes**: SAOS, stress relaxation
 
-**Key characteristic**: **Noise temperature** x parameterizes material state
+**Key characteristic**: **Noise temperature** :math:`x` parameterizes material state
 
 The SGR models are based on Sollich's trap model (1998), treating soft glassy materials
 as ensembles of mesoscopic elements that hop between energy traps.
@@ -469,16 +466,16 @@ as ensembles of mesoscopic elements that hop between energy traps.
 The 2 SGR Models
 ~~~~~~~~~~~~~~~~~
 
-1. **SGR Conventional** (3 parameters: x, G₀, τ₀)
+1. **SGR Conventional** (3 parameters: :math:`x, G_0, \tau_0`)
 
    - Original Sollich formulation
-   - x < 1: Glass (aging), x > 1: Ergodic (flows)
+   - :math:`x < 1`: Glass (aging), :math:`x > 1`: Ergodic (flows)
    - Use for: Foams, emulsions, pastes
 
 2. **SGR GENERIC** (3 parameters)
 
    - Thermodynamically consistent (Fuereder & Ilg 2013)
-   - Better stability near x → 1
+   - Better stability near :math:`x \to 1`
    - Use for: Systems near glass transition
 
 **For detailed equations**: :doc:`/models/sgr/sgr_conventional`
@@ -619,19 +616,19 @@ Family 11: Giesekus Models
 
 **Test modes**: All 6 (flow curve, SAOS, startup, relaxation, creep, LAOS)
 
-**Key characteristic**: **Nonlinear tensor ODE** with mobility parameter α
+**Key characteristic**: **Nonlinear tensor ODE** with mobility parameter :math:`\alpha`
 
 The 2 Giesekus Models
 ~~~~~~~~~~~~~~~~~~~~~~
 
-1. **Giesekus Single-Mode** (3 parameters: G, λ₁, α)
+1. **Giesekus Single-Mode** (3 parameters: :math:`G, \lambda_1, \alpha`)
 
-   - Upper-convected Maxwell + anisotropic drag (α controls nonlinearity)
-   - α = 0: recovers upper-convected Maxwell; α = 0.5: maximum shear thinning
-   - Predicts first and second normal stress differences (N₁, N₂)
+   - Upper-convected Maxwell + anisotropic drag (:math:`\alpha` controls nonlinearity)
+   - :math:`\alpha = 0`: recovers upper-convected Maxwell; :math:`\alpha = 0.5`: maximum shear thinning
+   - Predicts first and second normal stress differences (:math:`N_1, N_2`)
    - Use for: Polymer solutions, dilute/semi-dilute systems
 
-2. **Giesekus Multi-Mode** (3N parameters)
+2. **Giesekus Multi-Mode** (:math:`3N` parameters)
 
    - N parallel Giesekus elements with solvent viscosity
    - Use for: Polydisperse polymers, entangled melts
@@ -654,9 +651,9 @@ The 2 Saramito-Fluidity Models
 
 1. **Fluidity-Saramito Local** (7-8 parameters)
 
-   - Tensorial stress [τ_xx, τ_yy, τ_xy] with Von Mises yielding α = max(0, 1 - τ_y/|τ|)
-   - Coupling modes: "minimal" (λ=1/f) or "full" (λ + τ_y(f) aging yield)
-   - Predicts normal stresses N₁, stress overshoot, creep bifurcation
+   - Tensorial stress :math:`[\tau_{xx}, \tau_{yy}, \tau_{xy}]` with Von Mises yielding :math:`\alpha = \max(0, 1 - \tau_y/|\tau|)`
+   - Coupling modes: "minimal" (:math:`\lambda = 1/f`) or "full" (:math:`\lambda + \tau_y(f)` aging yield)
+   - Predicts normal stresses :math:`N_1`, stress overshoot, creep bifurcation
    - Use for: Yield stress fluids, carbopol gels, soft solids
 
 2. **Fluidity-Saramito Nonlocal** (8-9 parameters + n_points)
@@ -702,21 +699,21 @@ Family 14: DMT (de Souza Mendes-Thompson) Models
 
 **Test modes**: All 6 protocols
 
-**Key characteristic**: **Structure parameter** λ ∈ [0, 1] with viscosity closure
+**Key characteristic**: **Structure parameter** :math:`\lambda \in [0, 1]` with viscosity closure
 
 The 2 DMT Models
 ~~~~~~~~~~~~~~~~~
 
 1. **DMT Local** (5-7 parameters)
 
-   - Structure kinetics: dλ/dt = (1-λ)/t_eq - aλ|γ̇|^c/t_eq
+   - Structure kinetics: :math:`d\lambda/dt = (1-\lambda)/t_{eq} - a\lambda|\dot{\gamma}|^c/t_{eq}`
    - Two closures: "exponential" (smooth) or "herschel_bulkley" (explicit yield)
    - Optional Maxwell elasticity for stress overshoot and SAOS
    - Use for: Drilling muds, waxy crude oils, food products
 
 2. **DMT Nonlocal** (6-8 parameters + n_points)
 
-   - Structure diffusion D_λ∇²λ for spatial heterogeneity
+   - Structure diffusion :math:`D_\lambda \nabla^2 \lambda` for spatial heterogeneity
    - Use for: Shear-banding thixotropic materials
 
 **For detailed equations**: :doc:`/models/dmt/index`
@@ -735,17 +732,17 @@ Family 15: ITT-MCT (Mode-Coupling Theory) Models
 The 2 ITT-MCT Models
 ~~~~~~~~~~~~~~~~~~~~~
 
-1. **ITT-MCT Schematic (F₁₂)** (5-6 parameters)
+1. **ITT-MCT Schematic** (:math:`F_{12}`) (5-6 parameters)
 
-   - Memory kernel m(Φ) = v₁Φ + v₂Φ² with strain decorrelation
-   - Glass transition at v₂ = 4: epsilon = (v₂ - 4)/4
+   - Memory kernel :math:`m(\Phi) = v_1 \Phi + v_2 \Phi^2` with strain decorrelation
+   - Glass transition at :math:`v_2 = 4`: :math:`\epsilon = (v_2 - 4)/4`
    - Semi-quantitative; first JIT compile takes 30-90s
    - Use for: Generic glass-forming systems, fast exploration
 
 2. **ITT-MCT Isotropic** (4-5 parameters)
 
-   - Uses Percus-Yevick structure factor S(k) for quantitative predictions
-   - Volume fraction φ as primary control parameter
+   - Uses Percus-Yevick structure factor :math:`S(k)` for quantitative predictions
+   - Volume fraction :math:`\varphi` as primary control parameter
    - Use for: Hard-sphere colloids, quantitative comparison with experiments
 
 **For detailed equations**: :doc:`/models/itt_mct/index`
@@ -767,7 +764,7 @@ The 5 TNT Models
 1. **TNT SingleMode** (3 params) — Simplest transient network
 2. **TNT Cates** (3-4 params) — Living polymers (wormlike micelles)
 3. **TNT LoopBridge** (4-5 params) — Telechelic loop↔bridge dynamics
-4. **TNT MultiSpecies** (2N+1 params) — Multiple chain populations
+4. **TNT MultiSpecies** (:math:`2N+1` params) — Multiple chain populations
 5. **TNT StickyRouse** (4-5 params) — Rouse chains with sticky associations
 
 **For detailed equations**: :doc:`/models/tnt/index`
@@ -781,13 +778,13 @@ Family 17: VLB (Vernerey-Long-Brighenti) Models
 
 **Test modes**: All 6 protocols
 
-**Key characteristic**: **Chain distribution tensor** μ tracks end-to-end vector statistics
+**Key characteristic**: **Chain distribution tensor** :math:`\boldsymbol{\mu}` tracks end-to-end vector statistics
 
 The 4 VLB Models
 ~~~~~~~~~~~~~~~~~
 
 1. **VLB Local** (3-4 params) — Basic distribution tensor network
-2. **VLB MultiNetwork** (3N params) — Multiple interacting networks
+2. **VLB MultiNetwork** (:math:`3N` params) — Multiple interacting networks
 3. **VLB Variant** (5-6 params) — Bell force sensitivity + FENE extensibility
 4. **VLB Nonlocal** (4-5 params + n_points) — PDE for shear banding
 
@@ -805,8 +802,8 @@ Family 18: HVM (Hybrid Vitrimer Model)
 **Key characteristic**: **3 subnetworks** (Permanent + Exchangeable + Dissociative) with TST kinetics
 
 - Bond Exchange Reactions (BER) via transition state theory
-- Factor-of-2 relaxation: τ_E = 1/(2k_BER) — both μ and μ_nat relax
-- σ_E → 0 at steady state (natural state tracks deformation)
+- Factor-of-2 relaxation: :math:`\tau_E = 1/(2k_{BER})` — both :math:`\boldsymbol{\mu}` and :math:`\boldsymbol{\mu}_{nat}` relax
+- :math:`\sigma_E \to 0` at steady state (natural state tracks deformation)
 - 5 factory methods for limiting cases (neo-Hookean, Maxwell, Zener, etc.)
 
 **For detailed equations**: :doc:`/models/hvm/index`
@@ -823,9 +820,9 @@ Family 19: HVNM (Hybrid Vitrimer Nanocomposite Model)
 **Key characteristic**: **4 subnetworks** (P + E + D + Interphase) with Guth-Gold amplification
 
 - Extends HVM with a 4th interphase subnetwork at NP-polymer interface
-- X(φ) = 1 + 2.5φ + 14.1φ² modulus amplification
+- :math:`X(\varphi) = 1 + 2.5\varphi + 14.1\varphi^2` modulus amplification
 - Dual TST kinetics: independent matrix and interphase exchange rates
-- phi=0 recovers HVM exactly (machine precision verified)
+- :math:`\varphi = 0` recovers HVM exactly (machine precision verified)
 - 5 factory methods for limiting cases
 
 **For detailed equations**: :doc:`/models/hvnm/index`
@@ -942,25 +939,25 @@ Key Concepts
 .. admonition:: Self-Check Questions
    :class: tip
 
-   1. **You observe G' and G" scaling as ω^0.4 (parallel lines). Which family?**
+   1. **You observe** :math:`G'` **and** :math:`G''` **scaling as** :math:`\omega^{0.4}` **(parallel lines). Which family?**
 
-      Hint: Power-law scaling → fractional
+      Hint: Power-law scaling indicates fractional
 
    2. **Your material shows exponential stress relaxation. Start with classical or fractional?**
 
-      Hint: Exponential → classical (simpler)
+      Hint: Exponential indicates classical (simpler)
 
    3. **Can you use a Maxwell model for steady shear flow data?**
 
       Hint: Maxwell is linear viscoelastic, not for flow
 
-   4. **What does α = 0.9 tell you about the material?**
+   4. **What does** :math:`\alpha = 0.9` **tell you about the material?**
 
-      Hint: Close to 1 → narrow relaxation spectrum, nearly liquid-like
+      Hint: Close to 1 means narrow relaxation spectrum, nearly liquid-like
 
-   5. **You fit PowerLaw and get n = 0.6. What does this mean?**
+   5. **You fit PowerLaw and get** :math:`n = 0.6`. **What does this mean?**
 
-      Hint: n < 1 → shear thinning
+      Hint: :math:`n < 1` indicates shear thinning
 
 Further Reading
 ---------------
@@ -1005,7 +1002,9 @@ Further Reading
 Summary
 -------
 
-RheoJAX provides **53 rheological models** across 19 families:
+RheoJAX provides **53 rheological models** across 22 families (20 listed below; Fractional
+Maxwell, Fractional Zener, and Fractional Advanced are sub-families counted separately in
+some contexts):
 
 - **Classical** (3): Maxwell, Zener, SpringPot — exponential relaxation, simple materials
 - **Fractional** (11): FML, FZSS, FMG, Burgers, Jeffreys, etc. — power-law relaxation
@@ -1027,6 +1026,10 @@ RheoJAX provides **53 rheological models** across 19 families:
 - **VLB** (4): Local, MultiNetwork, Variant, Nonlocal
 - **HVM** (1): Hybrid vitrimer — 3 subnetworks + TST kinetics
 - **HVNM** (1): Vitrimer nanocomposite — 4 subnetworks + Guth-Gold
+
+**DMTA/DMA Support:** All 41+ oscillation-capable models also support tensile modulus (E*)
+via automatic E* ↔ G* conversion when ``deformation_mode='tension'`` is specified.
+See :doc:`/models/dmta/index` for details.
 
 Always start simple and add complexity only when necessary.
 

@@ -133,15 +133,15 @@ When to Use Which Model
    * - Gel (terminal flow)
      - FMG
      - FZSL
-     - G'' > G' at low :math:`\omega`
+     - :math:`G'' > G'` at low :math:`\omega`
    * - Polymer melt
      - FML
      - FMG, FZSL
-     - G'' crosses G' once
+     - :math:`G''` crosses :math:`G'` once
    * - Crosslinked gel
      - FKV, FZSS
      - —
-     - G' plateau both limits
+     - :math:`G'` plateau both limits
    * - Biological tissue
      - FKV
      - FZSS
@@ -153,15 +153,15 @@ When to Use Which Model
    * - Critical gel (gel point)
      - SpringPot
      - FMG (:math:`\alpha` ≈ 0.5)
-     - tan :math:`\delta` ≈ const
+     - :math:`\tan\delta \approx` const
 
 **Decision Flowchart:**
 
-1. Does material flow at long times (G'' > G' as :math:`\omega \to 0`)?
+1. Does material flow at long times (:math:`G'' > G'` as :math:`\omega \to 0`)?
    - **Yes** :math:`\to` Maxwell family (FMG, FML, FZSL, FZLL)
    - **No** :math:`\to` Kelvin-Voigt family or FZSS
 
-2. Is there a high-frequency plateau in G'?
+2. Is there a high-frequency plateau in :math:`G'`?
    - **Yes** :math:`\to` Models with spring in series (FML, FZSS, FZSL)
    - **No** :math:`\to` Models starting with SpringPot (FMG, FKV)
 
@@ -190,7 +190,7 @@ Key Parameters
      - Pa·s\ :math:`^{\alpha}`
      - Sets magnitude (unusual units)
    * - Shear modulus
-     - G
+     - :math:`G`
      - Pa
      - Elastic plateau stiffness
    * - Viscosity

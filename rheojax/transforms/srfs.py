@@ -230,7 +230,7 @@ class SRFS(BaseTransform):
         logger.debug(
             "Applying SRFS shift to single dataset",
             gamma_dot_ref=gamma_dot_ref,
-            data_points=len(data.x),
+            data_points=len(data.x),  # type: ignore[arg-type]
         )
 
         # Compute shift factor
@@ -254,7 +254,7 @@ class SRFS(BaseTransform):
         logger.debug(
             "Single dataset shifted",
             shift_factor=float(a_gamma_dot),
-            original_x_range=(float(data.x[0]), float(data.x[-1])),
+            original_x_range=(float(data.x[0]), float(data.x[-1])),  # type: ignore[index]
             shifted_x_range=(float(x_shifted[0]), float(x_shifted[-1])),
         )
 
@@ -268,7 +268,7 @@ class SRFS(BaseTransform):
             validate=False,
         )
 
-    def _transform(
+    def _transform(  # type: ignore[override]
         self,
         data: RheoData | list[RheoData],
         x: float | None = None,
@@ -299,7 +299,7 @@ class SRFS(BaseTransform):
         logger.info(
             "Starting SRFS transformation",
             is_list=is_list,
-            n_datasets=len(data) if is_list else 1,
+            n_datasets=len(data) if is_list else 1,  # type: ignore[arg-type]
             reference_gamma_dot=self.reference_gamma_dot,
             sgr_x=x,
             sgr_tau0=tau0,
@@ -319,7 +319,7 @@ class SRFS(BaseTransform):
 
         return self.create_mastercurve(data, x, tau0, return_shifts=return_shifts)
 
-    def transform(
+    def transform(  # type: ignore[override]
         self,
         data: RheoData | list[RheoData],
         x: float | None = None,
@@ -589,6 +589,10 @@ def detect_shear_banding(
         threshold=threshold,
     )
 
+    if len(gamma_dot) < 2:
+        logger.debug("Insufficient data for banding detection (need >= 2 points)")
+        return False, None
+
     # Sort by shear rate
     sort_idx = np.argsort(gamma_dot)
     gamma_dot = gamma_dot[sort_idx]
@@ -747,7 +751,10 @@ def compute_shear_band_coexistence(
     high_idx = np.searchsorted(gamma_dot_sorted, gamma_dot_high_bound)
 
     # Estimate stress plateau as average in banding region
-    stress_plateau = np.mean(sigma_sorted[low_idx : high_idx + 1])
+    banding_slice = sigma_sorted[low_idx : high_idx + 1]
+    if len(banding_slice) == 0:
+        return None
+    stress_plateau = np.mean(banding_slice)
 
     # Find coexisting shear rates at stress plateau
     # These are the intersections of horizontal line at stress_plateau
@@ -1037,7 +1044,9 @@ def compute_thixotropic_stress(
 
     # Viscosity from power-law (SGR-like)
     gamma_dot_safe = np.maximum(np.abs(gamma_dot), 1e-12)
-    eta_factor = np.power(gamma_dot_safe * tau0, x - 2.0)
+    exponent = np.clip(x - 2.0, -10.0, 10.0)
+    eta_factor = np.power(gamma_dot_safe * tau0, exponent)
+    eta_factor = np.clip(eta_factor, 1e-30, 1e30)
 
     # Stress = G_eff * gamma_dot * tau0 * eta_factor
     sigma = G_eff * gamma_dot * tau0 * eta_factor

@@ -499,17 +499,29 @@ References
 
 1. Vernerey, F.J. (2018). "Transient response of nonlinear polymer networks:
    A kinetic theory." *J. Mech. Phys. Solids*, 115, 230-247.
+   https://doi.org/10.1016/j.jmps.2018.02.018
+   :download:`PDF <../../../reference/vernerey_2018_tnt_kinetic_theory.pdf>`
 
 2. Bell, G.I. (1978). "Models for the specific adhesion of cells to cells."
    *Science*, 200(4342), 618-627.
+   https://doi.org/10.1126/science.347575
 
 3. Rubinstein, M. & Semenov, A.N. (2001). "Dynamics of entangled solutions of
    associating polymers." *Macromolecules*, 34(4), 1058-1068.
+   https://doi.org/10.1021/ma0013049
 
 4. Meng, F. & Pritchard, R.H. & Terentjev, E.M. (2016). "Stress relaxation,
    dynamics, and plasticity of transient polymer networks."
    *Macromolecules*, 49(7), 2843-2852.
+   https://doi.org/10.1021/acs.macromol.5b02667
 
 5. Long, R., Qi, H.J. & Dunn, M.L. (2013). "Modeling the mechanics of
    covalently adaptable polymer networks with temperature-dependent bond
    exchange reactions." *Soft Matter*, 9, 4083-4096.
+   https://doi.org/10.1039/C3SM27945F
+
+6. Hui, C.-Y., Cui, F., Zehnder, A. & Vernerey, F.J. (2021). "Physically
+   motivated models of polymer networks with dynamic cross-links: comparative
+   study and future outlook." *Proc. R. Soc. A*, 477, 20210608.
+   https://doi.org/10.1098/rspa.2021.0608
+   :download:`PDF <../../../reference/hui_2021_dynamic_crosslinks_review.pdf>`

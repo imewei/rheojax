@@ -67,7 +67,7 @@ consists of:
   molecular motion (chain reptation, solvent flow)
 - **Series branch**: SpringPot + dashpot combination creates fractional
   relaxation with characteristic time :math:`\tau_1`
-- **Liquid behavior**: Both branches dissipate energy :math:`\to` zero equilibrium modulus
+- **Liquid behavior**: Both branches dissipate energy; zero equilibrium modulus
 
 This configuration is particularly suited for polymer solutions where the parallel
 dashpot represents the solvent contribution and the series branch captures polymer
@@ -113,12 +113,12 @@ Parameters
      - Notes
    * - ``eta1``
      - :math:`\eta_1`
-     - Pa*s
+     - Pa·s
      - [1e-6, 1e12]
      - First viscosity
    * - ``eta2``
      - :math:`\eta_2`
-     - Pa*s
+     - Pa·s
      - [1e-6, 1e12]
      - Second viscosity
    * - ``alpha``
@@ -143,9 +143,9 @@ Validity and Assumptions
 Regimes and Behavior
 --------------------
 
-- Low omega: liquid-like; :math:`G' \ll G''\approx \eta_{\mathrm{eff}}\omega`.
+- Low :math:`\omega`: liquid-like; :math:`G' \ll G'' \approx \eta_{\mathrm{eff}}\omega`.
 - Intermediate: fractional dispersion with order :math:`\alpha`.
-- High omega: elastic upturn from branch dynamics.
+- High :math:`\omega`: elastic upturn from branch dynamics.
 
 Limiting Behavior
 -----------------
@@ -186,16 +186,16 @@ Parameter Interpretation
 **Fractional Order (** :math:`\alpha` **)**:
    Governs the breadth of the relaxation spectrum and power-law character.
 
-   - :math:`\alpha` **→ 0.2-0.4**: Very broad spectrum, highly polydisperse or complex microstructure
+   - :math:`\alpha \approx 0.2\text{--}0.4`: Very broad spectrum, highly polydisperse or complex microstructure
      (wormlike micelles with broad contour length distribution, blended polymer solutions)
-   - :math:`\alpha` **→ 0.5-0.7**: Moderate breadth, typical for commercial polymer solutions with
+   - :math:`\alpha \approx 0.5\text{--}0.7`: Moderate breadth, typical for commercial polymer solutions with
      moderate polydispersity (PDI = 2-4)
-   - :math:`\alpha` **→ 0.8-0.95**: Narrow spectrum, nearly monodisperse systems (fractionated polymers)
-   - :math:`\alpha` **→ 1**: Classical Jeffreys (single exponential), use simpler model
+   - :math:`\alpha \approx 0.8\text{--}0.95`: Narrow spectrum, nearly monodisperse systems (fractionated polymers)
+   - :math:`\alpha \to 1`: Classical Jeffreys (single exponential), use simpler model
 
    *Physical interpretation*: Lower :math:`\alpha` indicates greater polydispersity in relaxation times
    arising from molecular weight distribution, chain architecture (branching), or structural
-   heterogeneity. For polymers, :math:`\alpha` ≈ 1/(1 + PDI/4) approximately.
+   heterogeneity. For polymers, :math:`\alpha \approx 1/(1 + \text{PDI}/4)` approximately.
 
    *For practitioners*: Use :math:`\alpha` as a QC metric for batch consistency. A sudden drop in :math:`\alpha` suggests
    contamination, degradation (chain scission), or aggregation.
@@ -224,7 +224,7 @@ Material Classification
      - Highly entangled viscoelastic
      - Concentrated polymer solutions, melts
      - High die swell, elastic instabilities
-   * - Moderate :math:`\eta_1/\eta_2` (0.2-0.8), :math:`\alpha` ≈ 0.5
+   * - Moderate :math:`\eta_1/\eta_2` (0.2-0.8), :math:`\alpha \approx 0.5`
      - Balanced viscoelastic liquid
      - Wormlike micelles, associative polymers
      - Moderate shear thinning, extensional thickening
@@ -232,7 +232,7 @@ Material Classification
      - Weakly viscoelastic
      - Dilute polymer solutions, oligomers
      - Easy flow, minimal elastic effects
-   * - :math:`\alpha \approx 1 (any \eta_1)`
+   * - :math:`\alpha \approx 1` (any :math:`\eta_1`)
      - Near-Maxwellian
      - Monodisperse linear polymers
      - Use classical Jeffreys for simplicity
@@ -296,16 +296,16 @@ Fitting Guidance
 
 **Optimization Tips:**
 
-- Fit simultaneously to G' and G" for better constraint
+- Fit simultaneously to :math:`G'` and :math:`G''` for better constraint
 - Use log-weighted least squares
-- Verify terminal flow region (G" ~ :math:`\omega`, G' ~ :math:`\omega^2`) at low frequencies
+- Verify terminal flow region (:math:`G'' \sim \omega`, :math:`G' \sim \omega^2`) at low frequencies
 - Check residuals for systematic deviations
 
 **Common Pitfalls:**
 
 - **Insufficient low-frequency data**: Cannot determine :math:`\eta_1` accurately
 - **High-frequency artifacts**: Instrument inertia effects can bias :math:`\alpha`
-- **Wrong model choice**: If G' plateaus at low :math:`\omega`, use solid model instead
+- **Wrong model choice**: If :math:`G'` plateaus at low :math:`\omega`, use solid model instead
 
 **Troubleshooting Table:**
 
@@ -316,13 +316,13 @@ Fitting Guidance
    * - Issue
      - Likely Cause
      - Solution
-   * - G' plateaus at low :math:`\omega`
+   * - :math:`G'` plateaus at low :math:`\omega`
      - Solid-like behavior
      - Use FZSL or FMG instead
    * - :math:`\eta_1` hits upper bound
      - Yield stress present
      - Use Bingham/Herschel-Bulkley
-   * - Poor terminal fit (G" ~ :math:`\omega`)
+   * - Poor terminal fit (:math:`G'' \sim \omega`)
      - Terminal region not reached
      - Extend to :math:`\omega` < 0.01 rad/s
    * - :math:`\alpha` near 1.0
@@ -482,7 +482,7 @@ See Also
 - :doc:`fractional_kelvin_voigt` — parallel SpringPot + spring element providing the other
   branch
 - :doc:`fractional_burgers` — combines Maxwell and fractional Kelvin-Voigt in series
-- :doc:`../../transforms/fft` — obtain :math:`G'/G''` prior to fitting Jeffreys
+- :doc:`../../transforms/fft` — obtain :math:`G'` and :math:`G''` prior to fitting Jeffreys
   spectra
 - :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
   Jeffreys, Burgers, and Maxwell families
@@ -695,7 +695,7 @@ See also
 - :doc:`fractional_kelvin_voigt` — parallel SpringPot + spring element providing the other
   branch.
 - :doc:`fractional_burgers` — combines Maxwell and fractional Kelvin-Voigt in series.
-- :doc:`../../transforms/fft` — obtain :math:`G'/G''` prior to fitting Jeffreys
+- :doc:`../../transforms/fft` — obtain :math:`G'` and :math:`G''` prior to fitting Jeffreys
   spectra.
 - :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
   Jeffreys, Burgers, and Maxwell families.
@@ -706,8 +706,8 @@ References
 .. [1] Mainardi, F. *Fractional Calculus and Waves in Linear Viscoelasticity*.
    Imperial College Press (2010). https://doi.org/10.1142/p614
 
-.. [2] Jeffreys, H. *The Earth*. Cambridge University Press (1929).
-   ISBN: 978-0521568890
+.. [2] Jeffreys, H. *The Earth: Its Origin, History and Physical Constitution*.
+   Cambridge University Press (1929; 6th ed. 1976). ISBN: 978-0521206488
 
 .. [3] Friedrich, C. "Relaxation and retardation functions of the Maxwell model
    with fractional derivatives." *Rheologica Acta*, 30, 151–158 (1991).

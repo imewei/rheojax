@@ -11,7 +11,7 @@ def update_notebook(notebook_path: Path) -> tuple[bool, str]:
     Returns:
         Tuple of (success, message).
     """
-    with open(notebook_path, "r") as f:
+    with open(notebook_path) as f:
         nb = json.load(f)
 
     updated = False
@@ -56,8 +56,6 @@ def update_notebook(notebook_path: Path) -> tuple[bool, str]:
 
                 # Build the replacement source
                 # Extract any model-specific context from the existing cell
-                lines = cell["source"]
-
                 # Find the fit_bayesian call to preserve its parameters
                 fit_bayesian_match = re.search(
                     r"(\w+)\.fit_bayesian\s*\([^)]+\)",

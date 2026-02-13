@@ -226,9 +226,9 @@ def generate_synthetic_startup(
         Tuple of (time, stress) arrays.
     """
     # Import here to avoid circular imports and allow use in Colab
+    from rheojax.core.data import RheoData
     from rheojax.core.jax_config import safe_import_jax
     from rheojax.models.epm.lattice import LatticeEPM
-    from rheojax.core.data import RheoData
 
     jax, jnp = safe_import_jax()
 

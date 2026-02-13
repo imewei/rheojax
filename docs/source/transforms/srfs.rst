@@ -217,6 +217,8 @@ See also
 - :doc:`../models/sgr/sgr_conventional` — SGR model underlying SRFS theory
 - :doc:`../models/sgr/sgr_generic` — Thermodynamically consistent SGR
 - :doc:`mastercurve` — Time-temperature superposition (analogous technique)
+- ``examples/transforms/07-srfs-strain-rate-superposition.ipynb`` — Tutorial notebook for SRFS
+  master curve construction and SGR integration
 
 API References
 --------------

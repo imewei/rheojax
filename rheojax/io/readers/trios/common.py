@@ -199,6 +199,31 @@ TRIOS_COLUMN_MAPPINGS: dict[str, ColumnMapping] = {
         is_y_candidate=True,
         priority=5,
     ),
+    # Tensile moduli (y-axis for oscillation — DMTA/DMA)
+    "tensile_storage_modulus": ColumnMapping(
+        canonical_name="tensile_storage_modulus",
+        patterns=[
+            r"^e'$", r"^e_prime$", r"^e_stor$",
+            r"^tensile[\s_]?storage[\s_]?modulus$",
+            r"^young'?s?[\s_]?storage[\s_]?modulus$",
+        ],
+        si_unit="Pa",
+        applicable_modes=["oscillation"],
+        is_y_candidate=True,
+        priority=5,
+    ),
+    "tensile_loss_modulus": ColumnMapping(
+        canonical_name="tensile_loss_modulus",
+        patterns=[
+            r"^e''$", r'^e"$', r"^e_double_prime$", r"^e_loss$",
+            r"^tensile[\s_]?loss[\s_]?modulus$",
+            r"^young'?s?[\s_]?loss[\s_]?modulus$",
+        ],
+        si_unit="Pa",
+        applicable_modes=["oscillation"],
+        is_y_candidate=True,
+        priority=5,
+    ),
     # Stress/Strain (y-axis for creep/relaxation)
     "compliance": ColumnMapping(
         canonical_name="compliance",
@@ -275,7 +300,7 @@ TRIOS_UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
     "kPa": ("Pa", 1000.0),
     "kpa": ("Pa", 1000.0),
     "MPa": ("Pa", 1e6),
-    "mPa": ("Pa", 1e6),
+    "mPa": ("Pa", 0.001),
     # Viscosity
     "mPa·s": ("Pa.s", 0.001),
     "mPa.s": ("Pa.s", 0.001),
@@ -340,10 +365,12 @@ def detect_test_type(
                     return True
         return False
 
-    # Check for oscillation (highest priority)
-    if has_column("angular_frequency") and (
-        has_column("storage_modulus") or has_column("loss_modulus")
-    ):
+    # Check for oscillation (highest priority) — includes tensile moduli (DMTA)
+    has_shear_moduli = has_column("storage_modulus") or has_column("loss_modulus")
+    has_tensile_moduli = (
+        has_column("tensile_storage_modulus") or has_column("tensile_loss_modulus")
+    )
+    if has_column("angular_frequency") and (has_shear_moduli or has_tensile_moduli):
         logger.debug("Detected test type: oscillation")
         return "oscillation"
 
@@ -477,20 +504,32 @@ def select_xy_columns(
     x_col = x_candidates[0][1] if x_candidates else None
     y_col = y_candidates[0][1] if y_candidates else None
 
-    # Check for complex modulus case (oscillation with both G' and G'')
+    # Check for complex modulus case (oscillation with both G'/G'' or E'/E'')
     y2_col = None
     if test_mode == "oscillation":
         storage_col = None
         loss_col = None
+        tensile_storage_col = None
+        tensile_loss_col = None
         for _, col, name in y_candidates:
             if name == "storage_modulus":
                 storage_col = col
             elif name == "loss_modulus":
                 loss_col = col
+            elif name == "tensile_storage_modulus":
+                tensile_storage_col = col
+            elif name == "tensile_loss_modulus":
+                tensile_loss_col = col
 
+        # Prefer shear (G'/G'') if both present; fall back to tensile (E'/E'')
         if storage_col and loss_col:
             y_col = storage_col
             y2_col = loss_col
+        elif tensile_storage_col and tensile_loss_col:
+            y_col = tensile_storage_col
+            y2_col = tensile_loss_col
+
+        if y2_col is not None:
             logger.debug(
                 "Selected complex modulus columns",
                 x_col=x_col,
@@ -511,7 +550,7 @@ def select_xy_columns(
             y2_col=y2_col,
         )
 
-    return x_col, y_col, y2_col
+    return x_col, y_col, y2_col  # type: ignore[return-value]
 
 
 def convert_unit(
@@ -646,6 +685,13 @@ def segment_to_rheodata(
     metadata["x_column"] = segment.x_column
     metadata["y_column"] = segment.y_column
     metadata["is_complex"] = segment.is_complex
+
+    # Propagate deformation_mode from segment metadata (set by column detection)
+    # If not explicitly set, infer from y_column name
+    if "deformation_mode" not in metadata:
+        y_col_lower = (segment.y_column or "").lower()
+        if "tensile" in y_col_lower or y_col_lower.startswith("e"):
+            metadata["deformation_mode"] = "tension"
 
     if segment.auxiliary_columns:
         metadata["auxiliary_columns"] = {

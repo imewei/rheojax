@@ -17,12 +17,12 @@ What is Rheology?
    :class: important
 
    - Basic understanding of stress and strain
-   - Familiarity with Hooke's law (F = kx) and Newton's law of viscosity
+   - Familiarity with Hooke's law (:math:`F = kx`) and Newton's law of viscosity
 
 The Study of Flow and Deformation
 ----------------------------------
 
-**Rheology** (from Greek *rheo* = flow, *logos* = study) is the science of deformation and flow of matter.
+**Rheology** (from Ancient Greek ῥέω (rhéō) 'flow' and -λoγία (-logía) 'study of') is the science of deformation and flow of matter.
 It describes how materials respond when forces are applied—whether they stretch, flow, bounce back, or break.
 
 Rheology sits at the intersection of:
@@ -86,7 +86,7 @@ All materials can be classified rheologically based on their response to stress:
 
    \sigma = G \gamma
 
-where σ is stress, G is elastic modulus, γ is strain
+where :math:`\sigma` is stress, :math:`G` is elastic modulus, :math:`\gamma` is strain
 
 **Examples**:
 
@@ -109,7 +109,7 @@ where σ is stress, G is elastic modulus, γ is strain
 
    \sigma = \eta \dot{\gamma}
 
-where η is viscosity, γ̇ is shear rate
+where :math:`\eta` is viscosity, :math:`\dot{\gamma}` is shear rate
 
 **Examples**:
 
@@ -148,20 +148,20 @@ The **Deborah number** (De) captures this concept:
 
    \text{De} = \frac{\text{material relaxation time}}{\text{observation time}}
 
-**De >> 1**: Material behaves like a **solid** (observation is fast compared to relaxation)
+:math:`\text{De} \gg 1`: Material behaves like a **solid** (observation is fast compared to relaxation)
 
-**De << 1**: Material behaves like a **liquid** (observation is slow compared to relaxation)
+:math:`\text{De} \ll 1`: Material behaves like a **liquid** (observation is slow compared to relaxation)
 
-**De ≈ 1**: **Viscoelastic** behavior is prominent
+:math:`\text{De} \approx 1`: **Viscoelastic** behavior is prominent
 
 Classic Example: Silly Putty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Slow deformation** (De << 1):
+**Slow deformation** (:math:`\text{De} \ll 1`):
 
 - Pull gently → flows like honey (liquid-like)
 
-**Fast deformation** (De >> 1):
+**Fast deformation** (:math:`\text{De} \gg 1`):
 
 - Throw against wall → bounces like rubber (solid-like)
 - Strike with hammer → shatters like glass (brittle solid)
@@ -191,32 +191,32 @@ What Rheology Measures
 
 Rheology characterizes material response through:
 
-**1. Storage Modulus (G')** — Elastic component
+**1. Storage Modulus (** :math:`G'` **)** — Elastic component
 
 - Energy stored and recovered
 - "Solid-like" behavior
 - Related to stiffness
 
-**2. Loss Modulus (G")** — Viscous component
+**2. Loss Modulus (** :math:`G''` **)** — Viscous component
 
 - Energy dissipated as heat
 - "Liquid-like" behavior
 - Related to damping
 
-**3. Complex Viscosity (η*)** — Resistance to flow
+**3. Complex Viscosity (** :math:`\eta^*` **)** — Resistance to flow
 
 - Frequency-dependent viscosity
 - Combines elastic and viscous effects
 
-**4. Relaxation Time (τ)** — Timescale of response
+**4. Relaxation Time (** :math:`\tau` **)** — Timescale of response
 
 - How long does material "remember" deformation?
 - Critical for processing and application
 
-**5. Fractional Order (α)** — Distribution of relaxation times
+**5. Fractional Order (** :math:`\alpha` **)** — Distribution of relaxation times
 
 - Simple liquids: Single relaxation time
-- Complex materials: Broad distribution (characterized by α)
+- Complex materials: Broad distribution (characterized by :math:`\alpha`)
 
 These parameters connect to **material microstructure** and **processing behavior**.
 
@@ -232,7 +232,7 @@ Key Concepts
 
    3. **Timescale matters**: The same material can behave as solid OR liquid depending on observation timescale (Deborah number)
 
-   4. **Rheological parameters** (G', G", η, τ, α) quantify material response and connect to microstructure
+   4. **Rheological parameters** (:math:`G'`, :math:`G''`, :math:`\eta`, :math:`\tau`, :math:`\alpha`) quantify material response and connect to microstructure
 
    5. **Applications span industries**: Polymers, food, pharma, bio, geo
 
@@ -243,27 +243,27 @@ Imagine three materials at room temperature:
 
 **Material A**: Steel
 
-- Elastic modulus G ~ 80 GPa
-- Relaxation time τ ~ ∞ (essentially infinite on human timescales)
+- Elastic modulus :math:`G \sim 80` GPa
+- Relaxation time :math:`\tau \sim \infty` (essentially infinite on human timescales)
 - Classification: **Elastic solid**
 
 **Material B**: Water
 
-- Viscosity η ~ 1 mPa·s
-- Relaxation time τ ~ 10⁻¹² s (picoseconds)
+- Viscosity :math:`\eta \sim 1` mPa·s
+- Relaxation time :math:`\tau \sim 10^{-12}` s (picoseconds)
 - Classification: **Viscous liquid**
 
 **Material C**: Polymer melt (polyethylene at 200°C)
 
-- Storage modulus G' ~ 10⁴ Pa (at 1 Hz)
-- Loss modulus G" ~ 10⁴ Pa (at 1 Hz)
-- Relaxation time τ ~ 0.1 s
-- Classification: **Viscoelastic** (G' ≈ G" at accessible frequencies)
+- Storage modulus :math:`G' \sim 10^4` Pa (at 1 Hz)
+- Loss modulus :math:`G'' \sim 10^4` Pa (at 1 Hz)
+- Relaxation time :math:`\tau \sim 0.1` s
+- Classification: **Viscoelastic** (:math:`G' \approx G''` at accessible frequencies)
 
 For Material C:
 
-- Rapid deformation (t << 0.1 s): Behaves like solid
-- Slow deformation (t >> 0.1 s): Behaves like liquid
+- Rapid deformation (:math:`t \ll 0.1` s): Behaves like solid
+- Slow deformation (:math:`t \gg 0.1` s): Behaves like liquid
 
 .. admonition:: Self-Check Questions
    :class: tip
@@ -280,7 +280,7 @@ For Material C:
 
       Hint: Same material, different timescales
 
-   4. **A material has G' = 1000 Pa and G" = 100 Pa at 1 Hz. Is it more solid-like or liquid-like at this frequency?**
+   4. **A material has** :math:`G' = 1000` **Pa and** :math:`G'' = 100` **Pa at 1 Hz. Is it more solid-like or liquid-like at this frequency?**
 
       Hint: Compare magnitudes of storage vs. loss modulus
 
@@ -311,7 +311,7 @@ Further Reading
 Summary
 -------
 
-Rheology is the study of deformation and flow, focusing on **viscoelastic materials** that exhibit both solid-like and liquid-like behavior depending on timescale. The **Deborah number** captures whether a material appears solid (De >> 1) or liquid (De << 1) for a given observation time. Rheological measurements (G', G", η, τ, α) quantify material response and connect to microstructure and processing behavior.
+Rheology is the study of deformation and flow, focusing on **viscoelastic materials** that exhibit both solid-like and liquid-like behavior depending on timescale. The **Deborah number** captures whether a material appears solid (:math:`\text{De} \gg 1`) or liquid (:math:`\text{De} \ll 1`) for a given observation time. Rheological measurements (:math:`G'`, :math:`G''`, :math:`\eta`, :math:`\tau`, :math:`\alpha`) quantify material response and connect to microstructure and processing behavior.
 
 Next Steps
 ----------

@@ -45,9 +45,10 @@ import logging
 import diffrax
 import numpy as np
 
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.inventory import Protocol
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.giesekus._base import GiesekusBase
 from rheojax.models.giesekus._kernels import (
     giesekus_creep_ode_rhs,
@@ -75,6 +76,12 @@ logger = logging.getLogger(__name__)
         Protocol.CREEP,
         Protocol.LAOS,
     ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
+    ],
 )
 @ModelRegistry.register(
     "giesekus_single",
@@ -85,6 +92,12 @@ logger = logging.getLogger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class GiesekusSingleMode(GiesekusBase):
@@ -255,7 +268,12 @@ class GiesekusSingleMode(GiesekusBase):
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s])
-        return self.model_function(x_jax, params, test_mode=test_mode, **kwargs)
+        # Filter out BaseModel kwargs that model_function doesn't expect
+        fwd_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in ("deformation_mode", "poisson_ratio")
+        }
+        return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
@@ -1124,9 +1142,9 @@ class GiesekusSingleMode(GiesekusBase):
             sigma_prime.append(sigma_n_prime)
             sigma_double_prime.append(sigma_n_double_prime)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
-        intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)
+        sigma_prime = np.array(sigma_prime)  # type: ignore[assignment]
+        sigma_double_prime = np.array(sigma_double_prime)  # type: ignore[assignment]
+        intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)  # type: ignore[operator]
 
         return {
             "n": np.array(harmonics),

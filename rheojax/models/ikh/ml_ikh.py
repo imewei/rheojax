@@ -23,6 +23,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.ikh._base import IKHBase
 from rheojax.models.ikh._kernels import (
     ml_ikh_creep_ode_rhs_per_mode,
@@ -47,6 +48,12 @@ jax, jnp = safe_import_jax()
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class MLIKH(IKHBase):
@@ -741,7 +748,6 @@ class MLIKH(IKHBase):
             # Extract G and eta based on yield_mode
             if self._yield_mode == "per_mode":
                 # Sum contributions from all modes (parallel Maxwell elements)
-                G_total = jnp.zeros_like(omega)
                 G_prime_total = jnp.zeros_like(omega)
                 G_double_prime_total = jnp.zeros_like(omega)
 

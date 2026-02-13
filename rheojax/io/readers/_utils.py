@@ -29,6 +29,7 @@ __all__ = [
     "extract_unit_from_header",
     "detect_domain",
     "detect_test_mode_from_columns",
+    "detect_deformation_mode_from_columns",
     "validate_transform",
     "construct_complex_modulus",
 ]
@@ -72,10 +73,19 @@ TRANSFORM_REQUIREMENTS: dict[str, dict] = {
 _TEST_MODE_PATTERNS: dict[str, list[re.Pattern]] = {
     "oscillation": [
         re.compile(p, re.IGNORECASE)
-        for p in [r"G['\"]", r"G\*", r"omega", r"frequency", r"angular"]
+        for p in [
+            r"[EG]['\"]",
+            r"[EG]\*",
+            r"E[-_]?stor",
+            r"E[-_]?loss",
+            r"omega",
+            r"frequency",
+            r"angular",
+        ]
     ],
     "relaxation": [
-        re.compile(p, re.IGNORECASE) for p in [r"G\s*\(\s*t\s*\)", r"relaxation"]
+        re.compile(p, re.IGNORECASE)
+        for p in [r"[EG]\s*\(\s*t\s*\)", r"relaxation"]
     ],
     "creep": [
         re.compile(p, re.IGNORECASE)
@@ -93,8 +103,36 @@ _TEST_MODE_PATTERNS: dict[str, list[re.Pattern]] = {
     ],
 }
 
-# Pre-compiled pattern for G'/G'' detection in domain detection
-_MODULUS_PATTERN = re.compile(r"G['\"]", re.IGNORECASE)
+# Pre-compiled pattern for G'/G'' or E'/E'' detection in domain detection
+_MODULUS_PATTERN = re.compile(r"[EG]['\"]", re.IGNORECASE)
+
+# Pre-compiled patterns for deformation mode detection (DMTA/DMA)
+_TENSILE_MODULUS_PATTERNS: list[re.Pattern] = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"E['\"]",           # E' or E''
+        r"E\*",              # E*
+        r"E[-_]?stor",       # E_stor, Estor, E-stor
+        r"E[-_]?loss",       # E_loss, Eloss, E-loss
+        r"Young",            # Young's modulus
+        r"tensile",          # Tensile modulus
+        r"storage\s+modulus.*E",  # "Storage Modulus E'"
+        r"loss\s+modulus.*E",    # "Loss Modulus E'"
+    ]
+]
+
+_SHEAR_MODULUS_PATTERNS: list[re.Pattern] = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"G['\"]",           # G' or G''
+        r"G\*",              # G*
+        r"G[-_]?stor",       # G_stor
+        r"G[-_]?loss",       # G_loss
+        r"shear\s+modulus",  # Shear modulus
+        r"storage\s+modulus.*G",  # "Storage Modulus G'"
+        r"loss\s+modulus.*G",    # "Loss Modulus G'"
+    ]
+]
 
 # Unit pattern for extraction
 _UNIT_PATTERN = re.compile(r"^(.+?)\s*\(([^)]+)\)$")
@@ -313,6 +351,64 @@ def detect_test_mode_from_columns(
                 return "rotation"  # viscosity units like Pa*s or Pa·s
 
     logger.debug("Test mode could not be determined from columns")
+    return None
+
+
+# =============================================================================
+# Deformation Mode Detection (DMTA/DMA)
+# =============================================================================
+
+
+def detect_deformation_mode_from_columns(
+    y_headers: list[str],
+    y_units: str | None = None,
+) -> str | None:
+    """Detect deformation mode (shear vs tensile) from column names.
+
+    Checks y-axis column names for E' / E'' (tensile/DMTA) vs G' / G'' (shear)
+    patterns. If both are present or neither is found, returns None.
+
+    Args:
+        y_headers: Y column header(s)
+        y_units: Y units string (optional, for additional context)
+
+    Returns:
+        'tension' if tensile modulus detected, 'shear' if shear modulus
+        detected, None if ambiguous or unknown.
+    """
+    all_text = " ".join(y_headers)
+
+    tensile_score = sum(1 for p in _TENSILE_MODULUS_PATTERNS if p.search(all_text))
+    shear_score = sum(1 for p in _SHEAR_MODULUS_PATTERNS if p.search(all_text))
+
+    # Also check units string for E or G indicators
+    if y_units:
+        if re.search(r"\bE['\"\*]", y_units):
+            tensile_score += 1
+        if re.search(r"\bG['\"\*]", y_units):
+            shear_score += 1
+
+    if tensile_score > 0 and shear_score == 0:
+        logger.debug(
+            "Deformation mode detected as tension",
+            tensile_score=tensile_score,
+            y_headers=y_headers,
+        )
+        return "tension"
+    elif shear_score > 0 and tensile_score == 0:
+        logger.debug(
+            "Deformation mode detected as shear",
+            shear_score=shear_score,
+            y_headers=y_headers,
+        )
+        return "shear"
+
+    logger.debug(
+        "Deformation mode ambiguous or unknown",
+        tensile_score=tensile_score,
+        shear_score=shear_score,
+        y_headers=y_headers,
+    )
     return None
 
 

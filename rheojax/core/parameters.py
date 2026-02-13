@@ -64,6 +64,10 @@ class ParameterConstraint:
         Returns:
             True if constraint is satisfied
         """
+        # NaN/Inf bypass IEEE 754 comparisons — reject unconditionally
+        if not np.isfinite(value):
+            return False
+
         if self.type == "bounds":
             if self.min_value is not None and value < self.min_value:
                 logger.debug(
@@ -143,7 +147,7 @@ class Parameter:
         constraints: list[ParameterConstraint] | None = None,
     ) -> None:
         self.name = name
-        self.bounds = bounds
+        self._bounds: tuple[float, float] | None = bounds
         self.units = units
         self.description = description
         self.constraints = list(constraints) if constraints else []
@@ -157,6 +161,24 @@ class Parameter:
             units=units,
         )
         self._initialize(value)
+
+    @property
+    def bounds(self) -> tuple[float, float] | None:
+        """Get parameter bounds."""
+        return self._bounds
+
+    @bounds.setter
+    def bounds(self, new_bounds: tuple[float, float] | None) -> None:
+        """Set parameter bounds and sync any bounds constraint."""
+        self._bounds = new_bounds
+        # Sync bounds constraint if constraints list exists
+        if hasattr(self, "constraints"):
+            for c in self.constraints:
+                if hasattr(c, "type") and c.type == "bounds":
+                    if new_bounds is not None:
+                        c.min_value = new_bounds[0]
+                        c.max_value = new_bounds[1]
+                    break
 
     def _initialize(self, value: float | None) -> None:
         """Validate parameter after initialization."""
@@ -176,14 +198,16 @@ class Parameter:
                 )
             self.bounds = (lower, upper)
 
-        # Add bounds as constraint if specified
+        # Add bounds as constraint if specified and not already present
         if self.bounds:
-            self.constraints.insert(
-                0,
-                ParameterConstraint(
-                    type="bounds", min_value=self.bounds[0], max_value=self.bounds[1]
-                ),
-            )
+            has_bounds_constraint = any(c.type == "bounds" for c in self.constraints)
+            if not has_bounds_constraint:
+                self.constraints.insert(
+                    0,
+                    ParameterConstraint(
+                        type="bounds", min_value=self.bounds[0], max_value=self.bounds[1]
+                    ),
+                )
 
         if value is not None:
             self._clamp_on_set = True
@@ -568,7 +592,7 @@ class ParameterSet:
             params=list(self._parameters.keys()),
             num_params=len(values),
         )
-        return np.array(values)
+        return np.array(values, dtype=np.float64)
 
     def set_values(self, values: ArrayLike | dict[str, float]):
         """Set parameter values from array or dictionary.
@@ -616,7 +640,7 @@ class ParameterSet:
         Returns:
             List of (min, max) tuples
         """
-        bounds = []
+        bounds: list[tuple[float | None, float | None]] = []
         for name in self._order:
             param = self._parameters[name]
             if param.bounds:

@@ -18,43 +18,70 @@ Core Concepts
    Regime where stress is proportional to strain (small deformations).
 
 **Deborah Number (De)**
-   Ratio of material relaxation time to observation time: De = τ/t_obs
+   Ratio of material relaxation time to observation time: :math:`\text{De} = \tau / t_{\text{obs}}`
 
 Moduli and Mechanical Properties
 ---------------------------------
 
-**Storage Modulus (G')**
+**Storage Modulus** (:math:`G'`)
    Elastic component of complex modulus; energy stored per cycle (Pa).
 
-**Loss Modulus (G")**
+**Loss Modulus** (:math:`G''`)
    Viscous component of complex modulus; energy dissipated per cycle (Pa).
 
-**Complex Modulus (G\\*)**
-   G\\* = G' + iG"; combines storage and loss moduli.
+**Complex Modulus** (:math:`G^*`)
+   :math:`G^* = G' + iG''`; combines storage and loss moduli.
 
-**Loss Tangent (tan δ)**
-   Ratio of loss to storage modulus: tan δ = G"/G'; damping factor.
+**Loss Tangent** (:math:`\tan\delta`)
+   Ratio of loss to storage modulus: :math:`\tan\delta = G''/G'`; damping factor.
 
-**Relaxation Modulus (G(t))**
+**Relaxation Modulus** (:math:`G(t)`)
    Stress response to step strain as a function of time (Pa).
 
-**Equilibrium Modulus (G_e)**
+**Equilibrium Modulus** (:math:`G_e`)
    Long-time plateau in relaxation modulus (viscoelastic solids, Pa).
 
-**Compliance (J)**
-   Inverse of modulus; strain per unit stress (Pa⁻¹).
+**Compliance** (:math:`J`)
+   Inverse of modulus; strain per unit stress (:math:`\text{Pa}^{-1}`).
+
+**Young's Modulus** (:math:`E`)
+   Tensile (axial) modulus; ratio of tensile stress to tensile strain (Pa).
+
+**Complex Young's Modulus** (:math:`E^*`)
+   :math:`E^* = E' + iE''`; tensile analog of the complex shear modulus :math:`G^*`.
+
+**Storage Modulus (tensile)** (:math:`E'`)
+   In-phase (elastic) component of the complex Young's modulus from DMTA (Pa).
+
+**Loss Modulus (tensile)** (:math:`E''`)
+   Out-of-phase (viscous) component of the complex Young's modulus from DMTA (Pa).
+
+**Poisson's Ratio** (:math:`\nu`)
+   Ratio of transverse to axial strain; relates :math:`E` and :math:`G` via :math:`E = 2(1+\nu)G`. Typical values: rubber :math:`\approx 0.5`, glassy polymer :math:`\approx 0.35`.
+
+DMTA / DMA
+----------
+
+**DMTA (Dynamic Mechanical Thermal Analysis)**
+   Oscillatory technique measuring :math:`E^*(\omega, T)` under tensile, bending, or compression deformation. Widely used for polymer glass transitions and temperature sweeps.
+
+**DMA (Dynamic Mechanical Analysis)**
+   Synonym for DMTA; sometimes specifically refers to isothermal frequency sweeps in tensile geometry.
+
+**Deformation Mode**
+   The type of mechanical loading applied to the sample: shear, tension, bending, or compression. In RheoJAX, set via ``deformation_mode='tension'`` in ``fit()`` / ``predict()``.
 
 Viscosity
 ---------
 
-**Viscosity (η)**
+**Viscosity** (:math:`\eta`)
    Resistance to flow under shear; stress/shear-rate ratio (Pa·s).
 
-**Zero-Shear Viscosity (η₀)**
+**Zero-Shear Viscosity** (:math:`\eta_0`)
    Viscosity at vanishingly small shear rates (Newtonian plateau, Pa·s).
 
-**Complex Viscosity (η\\*)**
-   Frequency-dependent viscosity from SAOS: η\\* = \|G\\*\|/ω (Pa·s).
+**Complex Viscosity** (:math:`\eta^*`)
+   Frequency-dependent viscosity from SAOS: :math:`\eta^* = |G^*|/\omega` (Pa·s).
 
 **Shear Thinning**
    Decrease in viscosity with increasing shear rate (pseudoplastic).
@@ -65,52 +92,52 @@ Viscosity
 Timescales
 ----------
 
-**Relaxation Time (τ)**
-   Characteristic timescale for stress to decay to 1/e (~37%) of initial value (s).
+**Relaxation Time** (:math:`\tau`)
+   Characteristic timescale for stress to decay to :math:`1/e` (~37%) of initial value (s).
 
-**Crossover Frequency (ω_c)**
-   Frequency where G' = G"; related to relaxation time by ω_c ≈ 1/τ (rad/s).
+**Crossover Frequency** (:math:`\omega_c`)
+   Frequency where :math:`G' = G''`; related to relaxation time by :math:`\omega_c \approx 1/\tau` (rad/s).
 
 Fractional Parameters
 ---------------------
 
-**Fractional Order (α)**
-   Exponent in fractional derivative; characterizes breadth of relaxation spectrum (0 < α < 1).
+**Fractional Order** (:math:`\alpha`)
+   Exponent in fractional derivative; characterizes breadth of relaxation spectrum (:math:`0 < \alpha < 1`).
 
 **SpringPot**
-   Fractional viscoelastic element interpolating between spring (α=0) and dashpot (α=1).
+   Fractional viscoelastic element interpolating between spring (:math:`\alpha=0`) and dashpot (:math:`\alpha=1`).
 
-**Mittag-Leffler Function (E_α)**
+**Mittag-Leffler Function** (:math:`E_\alpha`)
    Generalization of exponential function for fractional models.
 
 Test Modes
 ----------
 
 **SAOS (Small-Amplitude Oscillatory Shear)**
-   Sinusoidal strain input; measures G'(ω) and G"(ω) in frequency domain.
+   Sinusoidal strain input; measures :math:`G'(\omega)` and :math:`G''(\omega)` in frequency domain.
 
 **Stress Relaxation**
-   Step strain input; measures G(t) in time domain.
+   Step strain input; measures :math:`G(t)` in time domain.
 
 **Creep**
-   Step stress input; measures compliance J(t) in time domain.
+   Step stress input; measures compliance :math:`J(t)` in time domain.
 
 **Steady Shear Flow**
-   Constant shear rate; measures viscosity η(γ̇) (nonlinear regime).
+   Constant shear rate; measures viscosity :math:`\eta(\dot{\gamma})` (nonlinear regime).
 
 Material Types
 --------------
 
 **Viscoelastic Liquid**
-   Material with zero equilibrium modulus; flows at long times (G" > G' at low ω).
+   Material with zero equilibrium modulus; flows at long times (:math:`G'' > G'` at low :math:`\omega`).
 
 **Viscoelastic Solid**
-   Material with finite equilibrium modulus; does not flow (G' > G" everywhere).
+   Material with finite equilibrium modulus; does not flow (:math:`G' > G''` everywhere).
 
 **Gel**
-   Material with power-law relaxation (G' ≈ G" ~ ω^α).
+   Material with power-law relaxation (:math:`G' \approx G'' \sim \omega^\alpha`).
 
-**Yield Stress (σ_y)**
+**Yield Stress** (:math:`\sigma_y`)
    Critical stress below which material behaves as solid, above which it flows (Pa).
 
 Models
@@ -126,7 +153,7 @@ Models
    Models using fractional derivatives to capture distributed relaxation spectra.
 
 **PowerLaw Model**
-   Shear thinning/thickening flow model: η = K γ̇^(n-1).
+   Shear thinning/thickening flow model: :math:`\eta = K\dot{\gamma}^{n-1}`.
 
 Experimental
 ------------
@@ -184,42 +211,54 @@ Symbols Quick Reference
      - Meaning
      - Units
      - Typical Range
-   * - G'
+   * - :math:`G'`
      - Storage modulus
      - Pa
-     - 10² - 10⁸
-   * - G"
+     - :math:`10^2 - 10^8`
+   * - :math:`G''`
      - Loss modulus
      - Pa
-     - 10² - 10⁸
-   * - η
+     - :math:`10^2 - 10^8`
+   * - :math:`\eta`
      - Viscosity
      - Pa·s
-     - 10⁻³ - 10¹⁰
-   * - τ
+     - :math:`10^{-3} - 10^{10}`
+   * - :math:`\tau`
      - Relaxation time
      - s
-     - 10⁻⁶ - 10⁴
-   * - α
+     - :math:`10^{-6} - 10^4`
+   * - :math:`\alpha`
      - Fractional order
      - dimensionless
      - 0 - 1
-   * - ω
+   * - :math:`\omega`
      - Angular frequency
      - rad/s
-     - 10⁻² - 10³
-   * - γ
+     - :math:`10^{-2} - 10^3`
+   * - :math:`\gamma`
      - Strain
      - dimensionless
      - 0 - 1
-   * - γ̇
+   * - :math:`\dot{\gamma}`
      - Shear rate
-     - s⁻¹
-     - 10⁻³ - 10³
-   * - σ
+     - :math:`\text{s}^{-1}`
+     - :math:`10^{-3} - 10^3`
+   * - :math:`\sigma`
      - Stress
      - Pa
-     - 10⁰ - 10⁶
+     - :math:`10^0 - 10^6`
+   * - :math:`E'`
+     - Storage modulus (tensile)
+     - Pa
+     - :math:`10^6 - 10^{10}`
+   * - :math:`E''`
+     - Loss modulus (tensile)
+     - Pa
+     - :math:`10^6 - 10^{10}`
+   * - :math:`\nu`
+     - Poisson's ratio
+     - dimensionless
+     - 0.3 - 0.5
 
 See Also
 --------

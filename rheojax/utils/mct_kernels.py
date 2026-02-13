@@ -15,13 +15,19 @@ glass_transition_criterion
     Compute glass transition point from MCT vertex parameters
 """
 
+from __future__ import annotations
+
 from functools import partial
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.optimize import least_squares
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
+
+if TYPE_CHECKING:
+    import jax
 
 jax, jnp = safe_import_jax()
 
@@ -35,10 +41,10 @@ logger = get_logger(__name__)
 
 @partial(jax.jit, static_argnames=())
 def f12_memory_kernel(
-    phi: jnp.ndarray,
+    phi: jax.Array,
     v1: float,
     v2: float,
-) -> jnp.ndarray:
+) -> jax.Array:
     """Compute F₁₂ schematic model memory kernel.
 
     The memory kernel for the F₁₂ model is a quadratic function of the
@@ -51,7 +57,7 @@ def f12_memory_kernel(
 
     Parameters
     ----------
-    phi : jnp.ndarray
+    phi : jax.Array
         Density correlator Φ(t) or array of correlator values
     v1 : float
         Linear vertex coefficient (typically 0 for standard F₁₂)
@@ -60,7 +66,7 @@ def f12_memory_kernel(
 
     Returns
     -------
-    jnp.ndarray
+    jax.Array
         Memory kernel m(Φ) with same shape as phi
 
     Notes
@@ -78,17 +84,17 @@ def f12_memory_kernel(
 
 @partial(jax.jit, static_argnames=())
 def f12_memory_kernel_derivative(
-    phi: jnp.ndarray,
+    phi: jax.Array,
     v1: float,
     v2: float,
-) -> jnp.ndarray:
+) -> jax.Array:
     """Compute derivative of F₁₂ memory kernel with respect to Φ.
 
     dm/dΦ = v₁ + 2v₂Φ
 
     Parameters
     ----------
-    phi : jnp.ndarray
+    phi : jax.Array
         Density correlator values
     v1 : float
         Linear vertex coefficient
@@ -97,7 +103,7 @@ def f12_memory_kernel_derivative(
 
     Returns
     -------
-    jnp.ndarray
+    jax.Array
         Derivative dm/dΦ with same shape as phi
     """
     return v1 + 2.0 * v2 * phi
@@ -110,9 +116,9 @@ def f12_memory_kernel_derivative(
 
 @partial(jax.jit, static_argnames=())
 def advected_memory_decorrelation(
-    gamma: jnp.ndarray,
+    gamma: jax.Array,
     gamma_c: float,
-) -> jnp.ndarray:
+) -> jax.Array:
     """Compute strain decorrelation function h(γ).
 
     Under shear, the correlator decays due to advection of density fluctuations.
@@ -125,14 +131,14 @@ def advected_memory_decorrelation(
 
     Parameters
     ----------
-    gamma : jnp.ndarray
+    gamma : jax.Array
         Accumulated strain γ(t,t') = ∫_{t'}^t γ̇(s) ds
     gamma_c : float
         Critical strain parameter (typically 0.05-0.2)
 
     Returns
     -------
-    jnp.ndarray
+    jax.Array
         Decorrelation factor h(γ) ∈ [0, 1]
 
     Notes
@@ -147,10 +153,10 @@ def advected_memory_decorrelation(
 
 @partial(jax.jit, static_argnames=())
 def advected_correlator(
-    phi_eq: jnp.ndarray,
-    gamma: jnp.ndarray,
+    phi_eq: jax.Array,
+    gamma: jax.Array,
     gamma_c: float,
-) -> jnp.ndarray:
+) -> jax.Array:
     """Compute advected correlator Φ(t,t') under shear.
 
     The advected correlator is the equilibrium correlator multiplied by the
@@ -160,16 +166,16 @@ def advected_correlator(
 
     Parameters
     ----------
-    phi_eq : jnp.ndarray
+    phi_eq : jax.Array
         Equilibrium (quiescent) correlator Φ_eq(τ)
-    gamma : jnp.ndarray
+    gamma : jax.Array
         Accumulated strain between t' and t
     gamma_c : float
         Critical strain parameter
 
     Returns
     -------
-    jnp.ndarray
+    jax.Array
         Advected correlator Φ(t,t')
     """
     h_gamma = advected_memory_decorrelation(gamma, gamma_c)
@@ -178,11 +184,11 @@ def advected_correlator(
 
 @partial(jax.jit, static_argnames=("use_lorentzian",))
 def two_time_strain_decorrelation(
-    gamma_total: jnp.ndarray,
-    gamma_since_s: jnp.ndarray,
+    gamma_total: jax.Array,
+    gamma_since_s: jax.Array,
     gamma_c: float,
     use_lorentzian: bool = False,
-) -> jnp.ndarray:
+) -> jax.Array:
     """Compute two-time strain decorrelation for full ITT-MCT memory kernel.
 
     The full ITT-MCT memory kernel (Fuchs & Cates 2002) requires two separate
@@ -199,9 +205,9 @@ def two_time_strain_decorrelation(
 
     Parameters
     ----------
-    gamma_total : jnp.ndarray
+    gamma_total : jax.Array
         Accumulated strain γ(t,t₀) since flow started (reference time t₀)
-    gamma_since_s : jnp.ndarray
+    gamma_since_s : jax.Array
         Strain accumulated since memory time s: γ(t,s) = ∫_s^t γ̇(τ) dτ.
         For Prony formulation, this is approximated as γ̇ × τᵢ per mode.
     gamma_c : float
@@ -212,7 +218,7 @@ def two_time_strain_decorrelation(
 
     Returns
     -------
-    jnp.ndarray
+    jax.Array
         Two-time decorrelation factor h[γ_total] × h[γ_since_s] in [0, 1]
 
     Notes
@@ -276,9 +282,9 @@ def prony_decompose_memory(
     Returns
     -------
     g : np.ndarray
-        Prony mode amplitudes [g₁, ..., gₙ]
+        Prony mode amplitudes [g₁, ..., g_n]
     tau : np.ndarray
-        Prony mode relaxation times [τ₁, ..., τₙ]
+        Prony mode relaxation times [τ₁, ..., τ_n]
 
     Notes
     -----
@@ -376,10 +382,10 @@ def _prony_smart_init(
         # Find time point closest to tau_i
         idx = np.argmin(np.abs(t_valid - tau_i))
         # Estimate g from m(τ) ≈ g * exp(-1) = g * 0.368
-        g_init[i] = m_valid[idx] / 0.368 / n_modes
+        g_init[i] = m_valid[idx] / 0.368 / max(n_modes, 1)
 
     # Ensure positive and scale to match total kernel area
-    g_init = np.maximum(g_init, m_valid[0] / n_modes / 10)
+    g_init = np.maximum(g_init, m_valid[0] / max(n_modes, 1) / 10)
 
     return g_init, tau_init
 
@@ -546,7 +552,7 @@ def _prony_multistart(
         raise RuntimeError("All multi-start iterations failed")
 
     logger.debug(f"Multi-start Prony fit: best cost = {best_cost:.2e}")
-    return best_g, best_tau
+    return best_g, best_tau  # type: ignore[return-value]
 
 
 # =============================================================================
@@ -725,17 +731,17 @@ def setup_microscopic_stress_weights(
 
 @partial(jax.jit, static_argnames=())
 def compute_microscopic_stress(
-    phi_squared_integrated: jnp.ndarray,
-    weights: jnp.ndarray,
+    phi_squared_integrated: jax.Array,
+    weights: jax.Array,
 ) -> float:
     """Compute microscopic stress from integrated correlator and weights.
 
     Parameters
     ----------
-    phi_squared_integrated : jnp.ndarray
+    phi_squared_integrated : jax.Array
         Time-integrated Φ² values at each k-point, shape (n_k,).
         For schematic models, this is a scalar broadcast to all k.
-    weights : jnp.ndarray
+    weights : jax.Array
         Pre-computed stress weights from setup_microscopic_stress_weights()
 
     Returns
@@ -801,12 +807,12 @@ def get_microscopic_stress_prefactor(
 
 @partial(jax.jit, static_argnames=("n_steps",))
 def solve_equilibrium_correlator_f12(
-    t_array: jnp.ndarray,
+    t_array: jax.Array,
     v1: float,
     v2: float,
     Gamma: float,
     n_steps: int = 10000,
-) -> jnp.ndarray:
+) -> jax.Array:
     """Solve for equilibrium (quiescent) correlator Φ_eq(t) for F₁₂ model.
 
     Solves the MCT equation:
@@ -817,7 +823,7 @@ def solve_equilibrium_correlator_f12(
 
     Parameters
     ----------
-    t_array : jnp.ndarray
+    t_array : jax.Array
         Time points at which to evaluate correlator
     v1 : float
         Linear vertex coefficient
@@ -830,7 +836,7 @@ def solve_equilibrium_correlator_f12(
 
     Returns
     -------
-    jnp.ndarray
+    jax.Array
         Equilibrium correlator Φ_eq(t) at requested times
 
     Notes

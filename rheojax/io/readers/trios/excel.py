@@ -31,7 +31,7 @@ try:
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
-    load_workbook = None  # type: ignore[misc,assignment]
+    load_workbook = None
 
 try:
     import xlrd
@@ -481,7 +481,7 @@ def parse_trios_excel(
                 )
             sheets_to_parse = [sheet_names.index(sheet_name)]
         else:
-            logger.error(
+            logger.error(  # type: ignore[unreachable]
                 "Invalid sheet_name type",
                 filepath=str(filepath),
                 sheet_name_type=type(sheet_name).__name__,
@@ -644,7 +644,7 @@ def load_trios_excel(
             x_col, y_col, y2_col = select_xy_columns(seg_df, detected_mode)
 
             if x_col is None or y_col is None:
-                logger.warning(
+                logger.warning(  # type: ignore[unreachable]
                     f"Could not determine x/y columns for segment {seg_idx} "
                     f"in sheet '{sheet_name_str}'. "
                     f"Available columns: {list(seg_df.columns)}"

@@ -7,7 +7,7 @@
 All tutorial notebooks are now in the `examples/` directory at the project root:
 
 ```
-Rheo/
+RheoJAX/
 └── examples/
     ├── README.md              # Complete tutorial guide
     ├── basic/                 # Basic model fitting (5 notebooks)
@@ -83,7 +83,7 @@ jupyter notebook examples/basic/01-maxwell-fitting.ipynb
 
 ## Questions?
 
-- **Issues**: [GitHub Issues](https://github.com/imewei/Rheo/issues)
+- **Issues**: [GitHub Issues](https://github.com/imewei/RheoJAX/issues)
 - **Documentation**: [Read the Docs](https://rheojax.readthedocs.io/)
 - **Examples**: `examples/README.md`
 

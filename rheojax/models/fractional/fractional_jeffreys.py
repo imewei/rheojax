@@ -55,6 +55,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.mittag_leffler import mittag_leffler_e2
 
@@ -69,6 +70,12 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FractionalJeffreysModel(BaseModel):
@@ -550,6 +557,7 @@ class FractionalJeffreysModel(BaseModel):
         tau1 = self.parameters.get_value("tau1")
 
         # Dispatch based on test_mode if set, otherwise auto-detect
+        assert eta1 is not None and eta2 is not None and alpha is not None and tau1 is not None
         test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             return self._predict_oscillation(X, eta1, eta2, alpha, tau1)

@@ -13,7 +13,7 @@ Overview
 Mode-Coupling Theory (MCT) provides a first-principles approach to understanding
 the dynamics of dense particulate systems. The theory predicts:
 
-- **Glass transition** at a critical volume fraction (:math:`\phi` ≈ 0.516 for hard spheres)
+- **Glass transition** at a critical volume fraction (:math:`\phi \approx 0.516` for hard spheres)
 - **Two-step relaxation** with :math:`\beta` (in-cage) and :math:`\alpha` (cage-breaking) processes
 - **Yield stress** in the glass state from arrested structure
 - **Shear thinning** from flow-induced cage breaking
@@ -31,12 +31,12 @@ Available Models
    * - Model
      - Description
    * - :ref:`ITTMCTSchematic <model-itt-mct-schematic>`
-     - F_1_2 schematic model with scalar correlator. Fast computation, captures
+     - :math:`F_{12}` schematic model with scalar correlator. Fast computation, captures
        essential physics with ~6 parameters. Best for qualitative understanding
        and fitting experimental data.
    * - :ref:`ITTMCTIsotropic <model-itt-mct-isotropic>`
      - Full isotropically sheared model with k-resolved correlators :math:`\Phi(k,t)`.
-       Uses structure factor S(k) input. More quantitative but computationally
+       Uses structure factor :math:`S(k)` input. More quantitative but computationally
        expensive.
 
 Model Selection Guide
@@ -47,12 +47,12 @@ Model Selection Guide
 - You need fast computations for fitting or exploration
 - Qualitative understanding of glass/yield phenomena is sufficient
 - You want to explore parameter space quickly
-- Working with systems where S(k) is unknown
+- Working with systems where :math:`S(k)` is unknown
 
 **Use ITTMCTIsotropic when:**
 
 - Quantitative predictions are needed
-- S(k) is available (measured or from simulation)
+- :math:`S(k)` is available (measured or from simulation)
 - Wave-vector-dependent relaxation is important
 - Comparing with microscopic measurements (DLS, X-ray scattering)
 
@@ -105,38 +105,43 @@ from the cage effect, independent of specific interparticle interactions.
 Key Parameters
 --------------
 
-**F_1_2 Schematic Model:**
+:math:`F_{12}` **Schematic Model:**
 
 - :math:`\varepsilon` **(epsilon)**: Separation parameter controlling distance from glass transition
-  
-  - :math:`\varepsilon` < 0: Ergodic fluid
-  - :math:`\varepsilon` = 0: Critical point
-  - :math:`\varepsilon` > 0: Glass state
+
+  - :math:`\varepsilon < 0`: Ergodic fluid
+  - :math:`\varepsilon = 0`: Critical point
+  - :math:`\varepsilon > 0`: Glass state
 
 - :math:`\gamma_c`: Critical strain for cage breaking (~0.05-0.2)
 - :math:`\Gamma`: Bare relaxation rate (microscopic timescale)
-- **G_∞**: High-frequency modulus
+- :math:`G_\infty`: High-frequency modulus
 
 **ISM Model:**
 
-- :math:`\phi` **(phi)**: Volume fraction (glass at :math:`\phi` ≈ 0.516)
-- **S(k)**: Structure factor (from Percus-Yevick or experiment)
-- **D_0**: Bare diffusion coefficient
+- :math:`\phi` **(phi)**: Volume fraction (glass at :math:`\phi \approx 0.516`)
+- :math:`S(k)`: Structure factor (from Percus-Yevick or experiment)
+- :math:`D_0`: Bare diffusion coefficient
 
 References
 ----------
 
-.. [Gotze2009] Götze W. (2009) "Complex Dynamics of Glass-Forming Liquids",
-   Cambridge University Press.
+.. [Gotze2009] Götze W. (2009) "Complex Dynamics of Glass-Forming Liquids: A
+   Mode-Coupling Theory", Oxford University Press.
+   https://doi.org/10.1093/acprof:oso/9780199235346.001.0001
 
 .. [Fuchs2002] Fuchs M. & Cates M.E. (2002) "Theory of Nonlinear Rheology
    and Yielding of Dense Colloidal Suspensions", Phys. Rev. Lett. 89, 248304.
+   https://doi.org/10.1103/PhysRevLett.89.248304
 
 .. [Fuchs2009] Fuchs M. & Cates M.E. (2009) "A mode coupling theory for
    Brownian particles in homogeneous steady shear flow", J. Rheol. 53, 957.
+   https://doi.org/10.1122/1.3119084
 
-.. [Brader2008] Brader J.M. et al. (2008) "Glass rheology: From mode-coupling
-   theory to a dynamical yield criterion", J. Phys.: Condens. Matter 20, 494243.
+.. [Brader2008] Brader J.M., Voigtmann T., Fuchs M., Larson R.G. & Cates M.E.
+   (2009) "Glass rheology: From mode-coupling theory to a dynamical yield
+   criterion", Proc. Natl. Acad. Sci. USA 106, 15186-15191.
+   https://doi.org/10.1073/pnas.0905330106
 
 .. toctree::
    :maxdepth: 2

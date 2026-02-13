@@ -1013,7 +1013,7 @@ Secondary: Flow Curves
 **Protocol:**
 
 1. Steady shear sweep: 0.001 to 1000 1/s
-2. Wait > 10 tau_d for equilibration
+2. Wait > 10 :math:`\tau_d` for equilibration
 3. Look for stress plateau
 
 Computational Implementation
@@ -1056,11 +1056,11 @@ Fitting Guidance
 Step-by-Step Protocol
 ---------------------
 
-**Step 1:** Fit SAOS to single Maxwell (G_0, tau_d, eta_s).
+**Step 1:** Fit SAOS to single Maxwell (:math:`G_0`, :math:`\tau_d`, :math:`\eta_s`).
 
 **Step 2:** Validate with Cole-Cole plot.
 
-**Step 3:** Decompose tau_d using temperature or concentration series.
+**Step 3:** Decompose :math:`\tau_d` using temperature or concentration series.
 
 **Step 4:** Fit flow curve (optional validation).
 
@@ -1133,10 +1133,18 @@ References
 ==========
 
 1. Cates (1987) Macromolecules 20:2289-2296
+   https://doi.org/10.1021/ma00175a038
 2. Cates (1990) J Phys Chem 94:371-375
+   https://doi.org/10.1021/j100364a063
 3. Cates and Candau (1990) J Phys Condens Matter 2:6869-6892
+   https://doi.org/10.1088/0953-8984/2/33/001
 4. Turner and Cates (1991) Langmuir 7:1590-1594
+   https://doi.org/10.1021/la00056a009
 5. Rehage and Hoffmann (1991) Mol Phys 74:933-973
+   https://doi.org/10.1080/00268979100102721
 6. Berret (2006) Molecular Gels, Springer
+   https://doi.org/10.1007/1-4020-3689-2_20
 7. Fielding (2007) Soft Matter 3:1262-1279
+   https://doi.org/10.1039/b707980j
 8. Doi and Edwards (1986) Theory of Polymer Dynamics, Oxford
+   ISBN: 978-0198519768

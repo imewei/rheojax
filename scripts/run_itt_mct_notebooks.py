@@ -13,7 +13,6 @@ Features:
 import argparse
 import json
 import os
-import subprocess
 import sys
 import traceback
 import warnings
@@ -254,13 +253,13 @@ def run_suite(
             and ".ipynb_checkpoints" not in str(nb)
         ]
 
-    print(f"\nITT-MCT Notebook Suite Runner")
-    print(f"=" * 60)
+    print("\nITT-MCT Notebook Suite Runner")
+    print("=" * 60)
     print(f"Directory: {notebook_dir}")
     print(f"Log directory: {log_dir}")
     print(f"Timeout per notebook: {timeout}s ({timeout/3600:.1f} hours)")
     print(f"Notebooks found: {len(notebooks)}")
-    print(f"=" * 60)
+    print("=" * 60)
 
     results = []
     start_time = datetime.now()
@@ -362,7 +361,7 @@ def generate_issue_inventory(results: list[dict[str, Any]], output_path: Path) -
                 f.write(f"- **Category**: {r['category']}\n")
 
                 if r["warnings"]:
-                    f.write(f"\n**Top Warnings**:\n")
+                    f.write("\n**Top Warnings**:\n")
                     for w in r["warnings"][:10]:
                         f.write(f"- `{w[:150]}`\n")
 
@@ -372,19 +371,19 @@ def generate_issue_inventory(results: list[dict[str, Any]], output_path: Path) -
                 if r["traceback"]:
                     # Extract most relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [l for l in tb_lines if "rheojax" in l or "Error" in l][:10]
+                    relevant = [line for line in tb_lines if "rheojax" in line or "Error" in line][:10]
                     if relevant:
-                        f.write(f"\n**Traceback (relevant)**:\n```\n")
+                        f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))
                         f.write("\n```\n")
 
                 # Reproduction command
-                f.write(f"\n**Reproduce**:\n")
-                f.write(f"```bash\n")
+                f.write("\n**Reproduce**:\n")
+                f.write("```bash\n")
                 f.write(
                     f"cd /Users/b80985/Projects/rheojax && uv run python scripts/run_itt_mct_notebooks.py --single {r['notebook']}\n"
                 )
-                f.write(f"```\n\n")
+                f.write("```\n\n")
 
     print(f"Issue inventory written to: {output_path}")
 

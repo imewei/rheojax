@@ -30,14 +30,14 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
 from rheojax.logging import get_logger, log_fit
 
 # Module logger
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("carreau", protocols=[Protocol.FLOW_CURVE])
+@ModelRegistry.register("carreau", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR])
 class Carreau(BaseModel):
     """Carreau model for non-Newtonian flow (ROTATION only).
 
@@ -224,7 +224,7 @@ class Carreau(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
         """Predict viscosity for given shear rates.
 
         Args:

@@ -65,7 +65,7 @@ Key Skills You'll Develop
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
    import numpy as np
 
    # Load data (time, stress)
@@ -166,7 +166,7 @@ If you're already familiar with rheology and just need RheoJAX syntax:
 For comprehensive model understanding:
 
 1. :doc:`getting_started` — Basics
-2. :doc:`model_families` — All 20 models
+2. :doc:`model_families` — All 53 models across 22 families
 3. :doc:`model_selection` — Decision framework
 4. :doc:`fitting_strategies` — Advanced techniques
 5. :doc:`../03_advanced_topics/fractional_viscoelasticity_reference` — Fractional calculus
@@ -188,12 +188,12 @@ Common Pitfalls and How to Avoid Them
 .. code-block:: python
 
    # WRONG: Fitting flow data with viscoelastic model
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
    model = Maxwell()
    model.fit(shear_rate, viscosity, test_mode='rotation')  # Will fail!
 
    # CORRECT: Use flow model for steady shear data
-   from rheojax.models.power_law import PowerLaw
+   from rheojax.models import PowerLaw
    model = PowerLaw()
    model.fit(shear_rate, viscosity, test_mode='rotation')  # ✓
 
@@ -231,7 +231,7 @@ Common Pitfalls and How to Avoid Them
    model.fit(omega, G_star)  # Data only has 10 points → overfitting!
 
    # CORRECT: Start with simplest model
-   from rheojax.models.maxwell import Maxwell  # 2 parameters
+   from rheojax.models import Maxwell  # 2 parameters
    model.fit(omega, G_star)
 
    # Add complexity only if needed

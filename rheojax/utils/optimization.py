@@ -5,7 +5,7 @@ This module provides GPU-accelerated optimization using the NLSQ package
 through JAX JIT compilation and automatic differentiation.
 
 Critical: This module imports NLSQ, which must be imported before JAX to
-enable float64 precision mode. The rheo package handles this automatically
+enable float64 precision mode. The rheojax package handles this automatically
 in __init__.py.
 
 Example:
@@ -271,8 +271,8 @@ class OptimizationResult:
         if r2 is None:
             return None
 
-        n = self.n_data or (len(self.y_data) if self.y_data is not None else None)
-        if n is None:
+        n = self.n_data if self.n_data is not None else (len(self.y_data) if self.y_data is not None else None)
+        if n is None or n == 0:
             return None
 
         p = len(self.x)
@@ -334,7 +334,7 @@ class OptimizationResult:
         if self.residuals is None:
             return None
 
-        n = self.n_data or (len(self.residuals) if self.residuals is not None else None)
+        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else None)
         if n is None or n == 0:
             return None
 
@@ -367,7 +367,7 @@ class OptimizationResult:
         if self.residuals is None:
             return None
 
-        n = self.n_data or (len(self.residuals) if self.residuals is not None else None)
+        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else None)
         if n is None or n == 0:
             return None
 
@@ -414,7 +414,7 @@ class OptimizationResult:
 
         from scipy import stats
 
-        n = self.n_data or (len(self.residuals) if self.residuals is not None else 0)
+        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else 0)
         p = len(self.x)
 
         # Degrees of freedom
@@ -516,7 +516,7 @@ class OptimizationResult:
         from scipy import stats
 
         x_eval = np.asarray(x_eval, dtype=np.float64)
-        n = self.n_data or (len(self.residuals) if self.residuals is not None else 0)
+        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else 0)
         p = len(self.x)
         dof = max(n - p, 1)
 
@@ -616,7 +616,8 @@ class OptimizationResult:
         if residuals is not None:
             rss = float(np.sum(residuals**2))
         elif cost is not None:
-            rss = float(cost)
+            # scipy/NLSQ convention: cost = 0.5 * sum(residuals²)
+            rss = float(2.0 * cost)
         else:
             rss = 0.0
 
@@ -862,20 +863,20 @@ def nlsq_optimize(
     bounds_list = parameters.get_bounds()
 
     # Convert bounds to NLSQ/SciPy format: (lower_array, upper_array)
-    lower_bounds = []
-    upper_bounds = []
+    lower_bounds_list: list[float] = []
+    upper_bounds_list: list[float] = []
     for bound_pair in bounds_list:
         if bound_pair is None or (bound_pair[0] is None and bound_pair[1] is None):
-            lower_bounds.append(-np.inf)
-            upper_bounds.append(np.inf)
+            lower_bounds_list.append(-np.inf)
+            upper_bounds_list.append(np.inf)
         else:
             lower = bound_pair[0] if bound_pair[0] is not None else -np.inf
             upper = bound_pair[1] if bound_pair[1] is not None else np.inf
-            lower_bounds.append(lower)
-            upper_bounds.append(upper)
+            lower_bounds_list.append(lower)
+            upper_bounds_list.append(upper)
 
-    lower_bounds = np.asarray(lower_bounds, dtype=np.float64)
-    upper_bounds = np.asarray(upper_bounds, dtype=np.float64)
+    lower_bounds = np.asarray(lower_bounds_list, dtype=np.float64)
+    upper_bounds = np.asarray(upper_bounds_list, dtype=np.float64)
     nlsq_bounds = (lower_bounds, upper_bounds)
     x0 = np.asarray(x0, dtype=np.float64)
 
@@ -1061,7 +1062,7 @@ def nlsq_optimize(
     try:
         logger.debug("Creating NLSQ optimizer instance")
         optimizer = nlsq.LeastSquares()
-        nlsq_result = optimizer.least_squares(**nlsq_kwargs)
+        nlsq_result = optimizer.least_squares(**nlsq_kwargs)  # type: ignore[arg-type]
         logger.debug(
             "NLSQ optimization completed",
             success=nlsq_result.get("success", False),
@@ -1078,8 +1079,8 @@ def nlsq_optimize(
 
     # Compute residuals at optimal point for covariance scaling
     x_opt = np.asarray(nlsq_result.get("x", x0), dtype=np.float64)
-    residuals = objective(x_opt)
-    residuals_np = np.asarray(residuals, dtype=np.float64)
+    residuals_raw = objective(x_opt)
+    residuals_np: np.ndarray = np.asarray(residuals_raw, dtype=np.float64)
 
     # Convert NLSQ result to OptimizationResult (with residuals for covariance)
     result = OptimizationResult.from_nlsq(nlsq_result, residuals=residuals_np)
@@ -1103,10 +1104,9 @@ def nlsq_optimize(
     result.x = np.asarray(result.x, dtype=np.float64)
 
     # Compute RSS = sum(residuals²)
-    result.fun = float(jnp.sum(residuals**2))
+    result.fun = float(jnp.sum(residuals_np**2))
 
     # Guard against false "success" with astronomically large residuals
-    residuals_np = np.asarray(residuals)
     residual_count = residuals_np.size if residuals_np.size else 1
     mean_squared_error = result.fun / residual_count
     if not np.isfinite(mean_squared_error) or mean_squared_error > 1e6:
@@ -1256,7 +1256,11 @@ def nlsq_multistart_optimize(
         for orig_val, bounds in zip(original_values, bounds_list, strict=True):
             if bounds is None or (bounds[0] is None and bounds[1] is None):
                 perturbation = rng.uniform(-perturb_factor, perturb_factor)
-                new_val = orig_val * (1.0 + perturbation)
+                if abs(orig_val) < 1e-30:
+                    # Additive perturbation for zero-valued parameters
+                    new_val = perturbation
+                else:
+                    new_val = orig_val * (1.0 + perturbation)
             else:
                 lower = bounds[0] if bounds[0] is not None else orig_val - abs(orig_val)
                 upper = bounds[1] if bounds[1] is not None else orig_val + abs(orig_val)
@@ -1273,7 +1277,12 @@ def nlsq_multistart_optimize(
         # Create a fresh ParameterSet copy for thread-safe operation
         params_copy = ParameterSet()
         for name, bounds in zip(param_names, bounds_list, strict=True):
-            params_copy.add(name=name, value=0.0, bounds=bounds)
+            # Handle None values in bounds
+            bounds_tuple: tuple[float, float] | None = None
+            if bounds is not None:
+                if bounds[0] is not None and bounds[1] is not None:
+                    bounds_tuple = (float(bounds[0]), float(bounds[1]))
+            params_copy.add(name=name, value=0.0, bounds=bounds_tuple)
         params_copy.set_values(initial_values)
 
         try:
@@ -1580,7 +1589,7 @@ def nlsq_curve_fit(
     try:
         # Call nlsq.curve_fit() - returns CurveFitResult (tuple unpacking compatible)
         curve_fit_result = nlsq_module.curve_fit(
-            f_wrapper, x_data_np, y_data_np, **curve_fit_kwargs
+            f_wrapper, x_data_np, y_data_np, **curve_fit_kwargs  # type: ignore[arg-type]
         )
 
         # CurveFitResult supports both tuple unpacking and attribute access
@@ -1755,8 +1764,13 @@ def optimize_with_bounds(
     # Create temporary ParameterSet for interface consistency
 
     params = ParameterSet()
-    for i, (val, bound) in enumerate(zip(x0, bounds, strict=False)):
-        params.add(name=f"p{i}", value=val, bounds=bound)
+    for i, (val, bound) in enumerate(zip(x0, bounds, strict=True)):
+        # Handle None values in bounds
+        bounds_tuple: tuple[float, float] | None = None
+        if bound is not None:
+            if bound[0] is not None and bound[1] is not None:
+                bounds_tuple = (float(bound[0]), float(bound[1]))
+        params.add(name=f"p{i}", value=val, bounds=bounds_tuple)
 
     # Use main optimization function
     return nlsq_optimize(objective, params, use_jax=use_jax, **kwargs)
@@ -1785,7 +1799,9 @@ def fit_with_nlsq(
     # Convert bounds format: (lower_array, upper_array) -> list of tuples
     if bounds is not None:
         lower, upper = bounds
-        bounds_list = [(float(lo), float(hi)) for lo, hi in zip(lower, upper, strict=False)]
+        bounds_list: list[tuple[float | None, float | None]] = [
+            (float(lo), float(hi)) for lo, hi in zip(lower, upper, strict=True)
+        ]
     else:
         bounds_list = [(None, None)] * len(x0)
 
@@ -1950,7 +1966,7 @@ def create_least_squares_objective(
     to the optimizer, which enables proper gradient computation and weighting.
 
     For complex data (e.g., G* = G' + iG"), returns stacked real and imaginary
-    residuals: [real₁, ..., realₙ, imag₁, ..., imagₙ] with shape (2N,).
+    residuals: [real₁, ..., real_n, imag₁, ..., imag_n] with shape (2N,).
 
     For real data, returns residuals with shape (N,).
 

@@ -31,6 +31,6 @@ Quick Access
 
 **Reference Tables**:
 
-- 100+ materials with typical G', η, τ values
+- 100+ materials with typical :math:`G'`, :math:`\eta`, :math:`\tau` values
 - Troubleshooting flowcharts for 15+ common issues
 - 50+ rheological terms defined

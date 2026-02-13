@@ -14,7 +14,7 @@ State Vector (simple shear, 11 components)
 
 Solver Selection
 -----------------
-- TST active (kinetics='stress'/'stretch'): Kvaerno5 (implicit, stiff-capable)
+- TST active (kinetics='stress'/'stretch'): Tsit5 with tighter tolerances
   with PIDController(rtol=1e-8, atol=1e-10)
 - Constant rates / SAOS regime: Tsit5 (explicit, faster)
   with PIDController(rtol=1e-6, atol=1e-8)
@@ -26,12 +26,10 @@ import diffrax
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.hvm._kernels import (
-    hvm_ber_rate_constant,
     hvm_ber_rate_stress,
     hvm_ber_rate_stretch,
     hvm_damage_rhs,
     hvm_exchangeable_rhs_shear,
-    hvm_exchangeable_stress,
     hvm_total_stress_shear,
 )
 from rheojax.models.vlb._kernels import vlb_mu_rhs_shear
@@ -154,7 +152,6 @@ def _make_startup_vector_field(
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
         mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy = y[3], y[4], y[5]
         mu_D_xx, mu_D_yy, mu_D_xy = y[6], y[7], y[8]
-        gamma = y[9]
         D_val = y[10]
 
         # Compute BER rate
@@ -215,7 +212,6 @@ def _make_relaxation_vector_field(
 
     def vector_field(t, y, args):
         G_E = args["G_E"]
-        G_D = args["G_D"]
         k_d_D = args["k_d_D"]
         nu_0 = args["nu_0"]
         E_a = args["E_a"]
@@ -452,7 +448,7 @@ def _solve_hvm_ode(
     args : dict
         Parameters for the vector field
     use_stiff_solver : bool
-        If True, use Kvaerno5 (implicit); otherwise Tsit5 (explicit)
+        If True, use tighter tolerances (1e-8/1e-10); otherwise standard (1e-6/1e-8)
     max_steps : int
         Maximum ODE steps
 
@@ -464,7 +460,9 @@ def _solve_hvm_ode(
     term = diffrax.ODETerm(vector_field)
 
     if use_stiff_solver:
-        solver = diffrax.Kvaerno5()
+        # Use Tsit5 instead of Kvaerno5 to avoid lineax LU transpose
+        # TracerBoolConversionError during JAX tracing (NUTS/JIT)
+        solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-8, atol=1e-10)
     else:
         solver = diffrax.Tsit5()

@@ -63,7 +63,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode
+from rheojax.core.test_modes import DeformationMode, TestMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.sgr_kernels import G0, Gp
 
@@ -88,6 +88,12 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class SGRGeneric(BaseModel):
@@ -226,6 +232,7 @@ class SGRGeneric(BaseModel):
         U = self.internal_energy(state)
         S = self.entropy(state)
         T = self.parameters.get_value("x")  # Noise temperature as effective temperature
+        assert T is not None
 
         return U - T * S
 
@@ -251,6 +258,8 @@ class SGRGeneric(BaseModel):
 
         G0_val = self.parameters.get_value("G0")
         x = self.parameters.get_value("x")
+        assert G0_val is not None
+        assert x is not None
 
         # Compute dimensionless equilibrium modulus
         G0_dim = float(G0(x))
@@ -319,6 +328,9 @@ class SGRGeneric(BaseModel):
         G0_val = self.parameters.get_value("G0")
         tau0 = self.parameters.get_value("tau0")
         x = self.parameters.get_value("x")
+        assert G0_val is not None
+        assert tau0 is not None
+        assert x is not None
         G0_dim = float(G0(x))
 
         # Coupling strength for stress-strain relationship
@@ -358,6 +370,9 @@ class SGRGeneric(BaseModel):
         G0_val = self.parameters.get_value("G0")
         tau0 = self.parameters.get_value("tau0")
         x = self.parameters.get_value("x")
+        assert G0_val is not None
+        assert tau0 is not None
+        assert x is not None
         G0_dim = float(G0(x))
 
         # Effective modulus and relaxation rate
@@ -474,6 +489,7 @@ class SGRGeneric(BaseModel):
 
         # dS/dt = W / T for dissipative processes at temperature T
         W = self.compute_entropy_production(state)
+        assert T is not None
 
         return W / (T + 1e-20)
 
@@ -481,7 +497,7 @@ class SGRGeneric(BaseModel):
     # BaseModel Interface Implementation
     # =========================================================================
 
-    def _fit(
+    def _fit(  # type: ignore[override]
         self,
         X: np.ndarray,
         y: np.ndarray,
@@ -1056,6 +1072,8 @@ class SGRGeneric(BaseModel):
         G0_init = sigma_max / gamma_0
         x_init = self.parameters.get_value("x")
         tau0_init = self.parameters.get_value("tau0")
+        assert x_init is not None
+        assert tau0_init is not None
 
         # Normalize target stress for residual calculation
         sigma_norm = sigma / (sigma_max + 1e-12)
@@ -1493,6 +1511,7 @@ class SGRGeneric(BaseModel):
             Phase regime string: 'glass', 'power-law', or 'newtonian'
         """
         x = self.parameters.get_value("x")
+        assert x is not None
 
         if x < 1.0:
             return "glass"
@@ -1754,6 +1773,10 @@ class SGRGeneric(BaseModel):
         tau0 = self.parameters.get_value("tau0")
         x = self.parameters.get_value("x")
         n_struct = self.parameters.get_value("n_struct")
+        assert G0_val is not None
+        assert tau0 is not None
+        assert x is not None
+        assert n_struct is not None
 
         # Effective modulus from structure
         G_eff = G0_val * np.power(lambda_t, n_struct)
@@ -2246,6 +2269,9 @@ class SGRGeneric(BaseModel):
 
         G0_val = self.parameters.get_value("G0")
         tau0 = self.parameters.get_value("tau0")
+        assert G0_val is not None
+        assert tau0 is not None
+        assert x is not None
         G0_dim = float(G0(x))
 
         # Coupling strength for stress-strain relationship
@@ -2279,6 +2305,9 @@ class SGRGeneric(BaseModel):
 
         G0_val = self.parameters.get_value("G0")
         tau0 = self.parameters.get_value("tau0")
+        assert G0_val is not None
+        assert tau0 is not None
+        assert x is not None
         G0_dim = float(G0(x))
 
         # Effective modulus and relaxation rate
@@ -2355,9 +2384,15 @@ class SGRGeneric(BaseModel):
         beta_rejuv = self.parameters.get_value("beta_rejuv")
         x_ss_A = self.parameters.get_value("x_ss_A")
         x_ss_n = self.parameters.get_value("x_ss_n")
+        assert x_eq is not None
+        assert alpha_aging is not None
+        assert beta_rejuv is not None
+        assert x_ss_A is not None
+        assert x_ss_n is not None
 
         if x0 is None:
             x0 = self.parameters.get_value("x")
+        assert x0 is not None
 
         # Integrate using Euler method
         dt = np.diff(t)
@@ -2407,6 +2442,8 @@ class SGRGeneric(BaseModel):
             x = self.parameters.get_value("x")
 
         G0_val = self.parameters.get_value("G0")
+        assert G0_val is not None
+        assert x is not None
         G0_dim = float(G0(x))
         G_eff = G0_val * G0_dim * lam
 

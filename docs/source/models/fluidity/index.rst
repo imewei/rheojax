@@ -16,7 +16,7 @@ due to competing aging and shear-rejuvenation processes. These models capture:
 - **Yield stress behavior**: Solid-like response at rest, liquid-like under flow
 - **Stress overshoot**: Transient peak during startup after aging
 - **Shear banding**: Spatial flow heterogeneity (nonlocal variants)
-- **Normal stresses**: First normal stress difference N_1 (Saramito EVP)
+- **Normal stresses**: First normal stress difference :math:`N_1` (Saramito EVP)
 
 These models are well-suited for:
 
@@ -70,7 +70,7 @@ When to Use Which Model
    * - Homogeneous flow
      - ✓ Use this
      - Overkill
-     - ✓ If N_1 needed
+     - ✓ If :math:`N_1` needed
    * - Shear banding
      - Cannot capture
      - ✓ Use this
@@ -79,7 +79,7 @@ When to Use Which Model
      - ✓ Scalar
      - ✓ Scalar
      - ✓ Tensorial
-   * - Normal stresses (N_1)
+   * - Normal stresses (:math:`N_1`)
      - ✗
      - ✗
      - ✓ Use this
@@ -134,11 +134,11 @@ Quick Comparison
    * - FluiditySaramitoLocal
      - Tensor [:math:`\tau_{xx}`, :math:`\tau_{yy}`, :math:`\tau_{xy}`]
      - UCM + Von Mises
-     - EVP with N_1
+     - EVP with :math:`N_1`
    * - FluiditySaramitoNonlocal
      - Tensor :math:`\tau(y)`
      - Spatial + tensorial
-     - Banding with N_1
+     - Banding with :math:`N_1`
 
 
 Key Equations
@@ -175,7 +175,7 @@ Quick Start
    from rheojax.models.fluidity import FluidityLocal
 
    model = FluidityLocal()
-   model.fit(gamma_dot, sigma, test_mode="flow_curve")
+   model.fit(gamma_dot, sigma, test_mode='flow_curve')
 
    # Simulate startup with stress overshoot
    t, stress, fluidity = model.simulate_startup(t, gamma_dot=1.0, t_wait=100)
@@ -200,7 +200,7 @@ Quick Start
 
    # Minimal coupling (most identifiable)
    model = FluiditySaramitoLocal(coupling="minimal")
-   model.fit(gamma_dot, sigma, test_mode="flow_curve")
+   model.fit(gamma_dot, sigma, test_mode='flow_curve')
 
    # Note: tensorial stress (τ_xx, τ_yy, τ_xy) is tracked internally;
    # access N1 via transient simulations (simulate_startup, simulate_laos)
@@ -224,13 +224,13 @@ models in the Fluidity family. Use this guide to select the appropriate variant.
    * - **Standard rheometry** (cone-plate, parallel plate)
      - FluidityLocal or FluiditySaramitoLocal
      - Homogeneous flow assumption valid; no spatial resolution needed
-   * - **LAOS with N_1 extraction**
+   * - **LAOS with** :math:`N_1` **extraction**
      - FluiditySaramitoLocal
      - Tensorial stress required for first normal stress difference
-   * - **Microfluidic confinement** (H ~ :math:`\xi`)
+   * - **Microfluidic confinement** (:math:`H \sim \xi`)
      - FluidityNonlocal
      - Gap-dependent flow curves; spatial fluidity profiles
-   * - **Wide-gap Couette** (R_o - R_i)/R_i > 0.1
+   * - **Wide-gap Couette** :math:`(R_o - R_i)/R_i > 0.1`
      - FluidityNonlocal (with curvature)
      - Stress gradient matters; velocity profiles accessible
    * - **Startup with velocity profiles** (PIV, USV)
@@ -258,10 +258,10 @@ models in the Fluidity family. Use this guide to select the appropriate variant.
        minimal coupling sufficient
    * - **Concentrated emulsion** (mayonnaise, cosmetics)
      - FluiditySaramitoLocal (minimal)
-     - Moderate N_1; clear yield; standard thixotropy
+     - Moderate :math:`N_1`; clear yield; standard thixotropy
    * - **Emulsion in microchannel**
      - FluidityNonlocal
-     - Strong confinement effects; :math:`\xi` ~ 10-50 :math:`\mu\text{m}` typically
+     - Strong confinement effects; :math:`\xi \sim` 10-50 :math:`\mu\text{m}` typically
    * - **Waxy crude oil**
      - FluiditySaramitoLocal (full)
      - Strong aging-yield coupling; :math:`\tau_y` increases significantly with rest
@@ -310,16 +310,20 @@ References
 
 1. Coussot, P., Nguyen, Q. D., Huynh, H. T., and Bonn, D. (2002). "Viscosity bifurcation
    in thixotropic, yielding fluids." *J. Rheol.*, 46(3), 573-589.
+   https://doi.org/10.1122/1.1459447
 
 2. Bocquet, L., Colin, A., and Ajdari, A. (2009). "Kinetic theory of plastic flow
    in soft glassy materials." *Phys. Rev. Lett.*, 103, 036001.
+   https://doi.org/10.1103/PhysRevLett.103.036001
 
 3. Saramito, P. (2007). "A new constitutive equation for elastoviscoplastic
    fluid flows." *J. Non-Newtonian Fluid Mech.*, 145, 1-14.
+   https://doi.org/10.1016/j.jnnfm.2007.04.004
 
 4. de Souza Mendes, P. R. & Thompson, R. L. (2012). "A critical overview of
    elasto-viscoplastic thixotropic modeling." *J. Non-Newtonian Fluid Mech.*,
    187-188, 8-15.
+   https://doi.org/10.1016/j.jnnfm.2012.08.006
 
 
 See Also

@@ -477,7 +477,6 @@ def fikh_return_step_thermal(
 
     # Isotropic hardening update (optional)
     Q_iso = params.get("Q_iso", 0.0)
-    b_iso = params.get("b_iso", 1.0)
     d_R = Q_iso * (1.0 - R_n / jnp.maximum(Q_iso, 1e-12)) * d_gamma_p
     R_next = R_n + d_R
 
@@ -565,9 +564,9 @@ def fikh_maxwell_ode_rhs(
     include_thermal = args.get("include_thermal", True)
 
     if include_thermal:
-        sigma, alpha, T, gamma_p, lam = y[0], y[1], y[2], y[3], y[4]
+        sigma, alpha, T, _gamma_p, lam = y[0], y[1], y[2], y[3], y[4]
     else:
-        sigma, alpha, gamma_p, lam = y[0], y[1], y[2], y[3]
+        sigma, alpha, _gamma_p, lam = y[0], y[1], y[2], y[3]
         T = args.get("T_ref", 298.15)
 
     # Parameters
@@ -667,9 +666,9 @@ def fikh_creep_ode_rhs(
     include_thermal = args.get("include_thermal", True)
 
     if include_thermal:
-        gamma, alpha, T, gamma_p, lam = y[0], y[1], y[2], y[3], y[4]
+        _gamma, alpha, T, _gamma_p, lam = y[0], y[1], y[2], y[3], y[4]
     else:
-        gamma, alpha, gamma_p, lam = y[0], y[1], y[2], y[3]
+        _gamma, alpha, _gamma_p, lam = y[0], y[1], y[2], y[3]
         T = args.get("T_ref", 298.15)
 
     # Applied stress
@@ -677,7 +676,6 @@ def fikh_creep_ode_rhs(
     sigma = sigma_applied
 
     # Parameters
-    G = args["G"]
     eta = args.get("eta", 1e6)
     C = args.get("C", 0.0)
     gamma_dyn = args.get("gamma_dyn", 1.0)
@@ -724,7 +722,6 @@ def fikh_creep_ode_rhs(
     # For creep with constant σ: γ̇ = γ̇ᵖ + σ/(η + η_inf) (Maxwell-like)
     # More rigorously: σ = σ_elastic + σ_viscous = G·(γ-γᵖ-γᵛ) + η·γ̇ᵛ
     # Simplification for EVP creep:
-    tau_relax = eta_T / jnp.maximum(G, 1e-12)
     d_gamma = gamma_dot_p + sigma / eta_T + eta_inf * gamma_dot_p / eta_T
 
     # Backstress rate
@@ -909,16 +906,12 @@ def fikh_flow_curve_steady_state(
     Returns:
         Steady-state stress values.
     """
-    G = params.get("G", 1e3)
-    eta = params.get("eta", 1e6)
     sigma_y0 = params.get("sigma_y0", 10.0)
     delta_sigma_y = params.get("delta_sigma_y", 50.0)
     tau_thix = params.get("tau_thix", 1.0)
     Gamma_thix = params.get("Gamma", 0.5)
     eta_inf = params.get("eta_inf", 0.1)
     mu_p = params.get("mu_p", 1e-3)
-    alpha = params.get("alpha_structure", 0.5)
-
     gamma_dot_abs = jnp.abs(gamma_dot)
 
     # Steady-state structure parameter

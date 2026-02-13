@@ -107,12 +107,12 @@ Physical interpretation:
   weights contributions from different length scales
 - **Relaxation is controlled by cage breaking**: As density correlators
   :math:`\Phi_k` decay (cages break), the modulus decreases
-- **S(k) weighting**: Modes near the S(k) peak contribute most to stress
+- :math:`S(k)` **weighting**: Modes near the :math:`S(k)` peak contribute most to stress
 
 Schematic Approximation
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-For the F\ :sub:`12` schematic model:
+For the :math:`F_{12}` schematic model:
 
 .. math::
    :label: schematic-modulus
@@ -410,7 +410,7 @@ MCT Predictions
    :header-rows: 1
 
    * - State
-     - G*(:math:`\omega`) Behavior
+     - :math:`G^*(\omega)` Behavior
    * - **Fluid** (:math:`\varepsilon < 0`)
      - :math:`G' \sim \omega^2` at low :math:`\omega`, crossover to plateau at high :math:`\omega`
    * - **Glass** (:math:`\varepsilon > 0`)
@@ -493,8 +493,8 @@ ITT-MCT predictions:
 - **Intra-cycle yielding**: stress peak occurs before strain peak
 - **Strain softening**: :math:`G'_1` decreases with increasing :math:`\gamma_0`
 
-Schematic F\ :sub:`12` Protocol Implementations
------------------------------------------------
+Schematic :math:`F_{12}` Protocol Implementations
+--------------------------------------------------
 
 For the schematic model, the protocol equations simplify considerably.
 
@@ -506,8 +506,8 @@ Scalar Correlator Equation
    \partial_t \Phi(t,t_0) + \Gamma \left[\Phi(t,t_0) +
    \int_{t_0}^{t} ds\; m(t,s,t_0)\;\partial_s\Phi(s,t_0)\right] = 0
 
-F\ :sub:`12` Memory with Strain Cutoff
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+:math:`F_{12}` Memory with Strain Cutoff
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. math::
 
@@ -536,18 +536,21 @@ This schematic model is widely used for:
 See Also
 --------
 
-- :doc:`itt_mct_schematic` — F\ :sub:`12` schematic model theory and implementation
-- :doc:`itt_mct_isotropic` — Full k-resolved ISM model with S(k) input
-- :doc:`../index` — ITT-MCT models overview
+- :doc:`itt_mct_schematic` --- :math:`F_{12}` schematic model theory and implementation
+- :doc:`itt_mct_isotropic` --- Full :math:`k`-resolved ISM model with :math:`S(k)` input
+- :doc:`../index` --- ITT-MCT models overview
 
 References
 ----------
 
 .. [1] Fuchs, M. & Cates, M. E. "Theory of nonlinear rheology and yielding of
    dense colloidal suspensions." *Phys. Rev. Lett.* **89**, 248304 (2002).
+   https://doi.org/10.1103/PhysRevLett.89.248304
 
-.. [2] Brader, J. M. et al. "First-principles constitutive equation for
-   suspension rheology." *PNAS* **106**, 15186-15191 (2009).
+.. [2] Brader, J. M., Cates, M. E. & Fuchs, M. "First-Principles Constitutive
+   Equation for Suspension Rheology." *Phys. Rev. Lett.* **101**, 138301 (2008).
+   https://doi.org/10.1103/PhysRevLett.101.138301
 
 .. [3] Voigtmann, T. "Nonlinear glassy rheology." *Curr. Opin. Colloid
    Interface Sci.* **19**, 549-560 (2014).
+   https://doi.org/10.1016/j.cocis.2014.11.001

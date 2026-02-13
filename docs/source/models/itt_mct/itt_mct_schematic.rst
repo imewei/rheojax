@@ -9,9 +9,9 @@ Quick Reference
 - **Use when:** Dense colloidal suspensions, glassy materials, yield-stress fluids,
 materials showing glass transition behavior
 
-- **Parameters:** 5 (v_1, v_2, :math:`\Gamma`, :math:`\gamma_c`, G_∞) or equivalently (:math:`\varepsilon`, v_1, :math:`\Gamma`, :math:`\gamma_c`, G_∞)
+- **Parameters:** 5 (:math:`v_1`, :math:`v_2`, :math:`\Gamma`, :math:`\gamma_c`, :math:`G_\infty`) or equivalently (:math:`\varepsilon`, :math:`v_1`, :math:`\Gamma`, :math:`\gamma_c`, :math:`G_\infty`)
 
-- **Key equation:** Memory kernel m(:math:`\Phi`) = :math:`v_1\Phi` + :math:`v_2\Phi^2` with glass transition at v_2 = 4
+- **Key equation:** Memory kernel :math:`m(\Phi) = v_1\Phi + v_2\Phi^2` with glass transition at :math:`v_2 = 4`
 
 - **Test modes:** Flow curve, oscillation, startup, creep, relaxation, LAOS
 
@@ -35,7 +35,7 @@ Notation Guide
    * - :math:`v_1, v_2`
      - Vertex coefficients (coupling constants)
    * - :math:`v_{2,c}`
-     - Critical vertex coefficient (= 4 for v_1 = 0)
+     - Critical vertex coefficient (= 4 for :math:`v_1 = 0`)
    * - :math:`\varepsilon`
      - Separation parameter, :math:`\varepsilon = (v_2 - v_{2,c})/v_{2,c}`
    * - :math:`\Gamma`
@@ -54,15 +54,15 @@ Notation Guide
 Overview
 --------
 
-The F_1_2 schematic model is a simplified Mode-Coupling Theory (MCT) that captures
+The :math:`F_{12}` schematic model is a simplified Mode-Coupling Theory (MCT) that captures
 the essential physics of the colloidal glass transition with minimal parameters.
 
 **Historical Context:**
 
 MCT was developed in the 1980s by Götze and collaborators to describe the dynamics
 of supercooled liquids and dense colloids. The full MCT involves coupled integro-
-differential equations for density correlators at all wave vectors k. The schematic
-F_1_2 model reduces this to a single scalar equation by replacing the k-dependent
+differential equations for density correlators at all wave vectors :math:`k`. The schematic
+:math:`F_{12}` model reduces this to a single scalar equation by replacing the :math:`k`-dependent
 memory kernel with a polynomial form.
 
 **The Cage Effect:**
@@ -72,9 +72,9 @@ particles rattle within their cages (:math:`\beta`-relaxation). At long times, c
 rearrangements allow cage escape (:math:`\alpha`-relaxation). The glass transition occurs when
 the :math:`\alpha`-relaxation time diverges - particles become permanently trapped.
 
-**Why "F_1_2":**
+**Why "** :math:`F_{12}` **":**
 
-The name comes from the memory kernel having terms proportional to :math:`\Phi^1` and :math:`\Phi^2` -
+The name comes from the memory kernel having terms proportional to :math:`\Phi^1` and :math:`\Phi^2` ---
 the "1-2" notation. This quadratic form is the simplest that captures the feedback
 mechanism responsible for the glass transition.
 
@@ -92,7 +92,7 @@ In a dilute suspension, particles diffuse freely with diffusion coefficient:
 
 where :math:`a` is the particle radius and :math:`\eta_s` is the solvent viscosity.
 
-At high volume fractions (:math:`\phi` > 0.4), particles begin to interfere with each other's
+At high volume fractions (:math:`\phi > 0.4`), particles begin to interfere with each other's
 motion. The "cage" of nearest neighbors slows down diffusion:
 
 .. math::
@@ -101,7 +101,7 @@ motion. The "cage" of nearest neighbors slows down diffusion:
 
 where S(0) is the zero-wavevector structure factor (compressibility).
 
-As :math:`\phi` → :math:`\phi_g` ≈ 0.516, the cage becomes so strong that particles cannot escape on
+As :math:`\phi \to \phi_g \approx 0.516`, the cage becomes so strong that particles cannot escape on
 any experimental timescale - the system is a glass.
 
 Green-Kubo and the Memory Function
@@ -113,7 +113,7 @@ The dynamics can be described through the density correlator:
 
    \Phi(k,t) = \frac{\langle \rho_k(t) \rho_{-k}(0) \rangle}{\langle |\rho_k|^2 \rangle}
 
-which measures how density fluctuations at wave vector k decorrelate over time.
+which measures how density fluctuations at wave vector :math:`k` decorrelate over time.
 
 The equation of motion involves a memory kernel:
 
@@ -150,24 +150,24 @@ approximation:
 
 where :math:`\mathbf{p} = \mathbf{q} - \mathbf{k}`.
 
-For the schematic F_1_2 model, this complicated k-space integral is replaced by a
+For the schematic :math:`F_{12}` model, this complicated :math:`k`-space integral is replaced by a
 polynomial approximation:
 
 .. math::
 
    m(\Phi) = v_1 \Phi + v_2 \Phi^2
 
-The quadratic term (:math:`v_2\Phi^2`) is essential for the glass transition—it creates the
+The quadratic term (:math:`v_2\Phi^2`) is essential for the glass transition --- it creates the
 feedback mechanism where slow relaxation leads to stronger caging, which leads
 to even slower relaxation.
 
-The F_1_2 Schematic Model
------------------------
+The :math:`F_{12}` Schematic Model
+----------------------------------
 
 Reduction to Scalar Equation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For the schematic model, we ignore the k-dependence and write:
+For the schematic model, we ignore the :math:`k`-dependence and write:
 
 .. math::
 
@@ -182,7 +182,7 @@ with the polynomial memory kernel:
 **Why this form works:**
 
 1. The linear term (:math:`v_1\Phi`) allows for standard viscoelastic relaxation
-2. The quadratic term (:math:`v_2\Phi^2`) creates the feedback: slow relaxation → strong cage → slower relaxation
+2. The quadratic term (:math:`v_2\Phi^2`) creates the feedback: slow relaxation :math:`\to` strong cage :math:`\to` slower relaxation
 3. Together, they capture the divergence of the relaxation time at the glass transition
 
 Glass Transition Criterion
@@ -206,7 +206,7 @@ has a non-zero solution, i.e., when:
 
    v_2 > v_{2,c} = \frac{4}{(1-v_1)^2}
 
-For v_1 = 0: v_2,c = 4.
+For :math:`v_1 = 0`: :math:`v_{2,c} = 4`.
 
 The **separation parameter** :math:`\varepsilon` measures distance from the transition:
 
@@ -214,9 +214,9 @@ The **separation parameter** :math:`\varepsilon` measures distance from the tran
 
    \varepsilon = \frac{v_2 - v_{2,c}}{v_{2,c}}
 
-- :math:`\varepsilon` < 0: Ergodic fluid (:math:`\Phi` → 0 at long times)
-- :math:`\varepsilon` = 0: Critical point (power-law decay)
-- :math:`\varepsilon` > 0: Glass state (:math:`\Phi` → f > 0)
+- :math:`\varepsilon < 0`: Ergodic fluid (:math:`\Phi \to 0` at long times)
+- :math:`\varepsilon = 0`: Critical point (power-law decay)
+- :math:`\varepsilon > 0`: Glass state (:math:`\Phi \to f > 0`)
 
 Two-Step Relaxation
 ~~~~~~~~~~~~~~~~~~~
@@ -229,7 +229,7 @@ Near the glass transition, the correlator shows characteristic two-step decay:
 
       \Phi(t) \approx f_c + h \cdot (t/t_0)^{-a}
 
-2. **Plateau regime**: Correlator "stuck" near f
+2. **Plateau regime**: Correlator "stuck" near :math:`f`
 
 3. :math:`\alpha` **-relaxation** (long times): Final decay from plateau
 
@@ -237,13 +237,13 @@ Near the glass transition, the correlator shows characteristic two-step decay:
 
       \Phi(t) \approx f \cdot \exp\left[-(t/\tau_\alpha)^b\right]
 
-The MCT exponents a and b are related to the "exponent parameter" :math:`\lambda`:
+The MCT exponents :math:`a` and :math:`b` are related to the "exponent parameter" :math:`\lambda`:
 
 .. math::
 
    \frac{\Gamma(1-a)^2}{\Gamma(1-2a)} = \frac{\Gamma(1+b)^2}{\Gamma(1+2b)} = \lambda
 
-For F_1_2 with v_1 = 0: :math:`\lambda` = 1.
+For :math:`F_{12}` with :math:`v_1 = 0`: :math:`\lambda = 1`.
 
 Integration Through Transients (ITT)
 ------------------------------------
@@ -346,9 +346,9 @@ breaks down the correlation. Two functional forms are available:
 
 Physical interpretation:
 
-- At :math:`\gamma` = 0: h = 1 (full correlation)
-- At :math:`\gamma` >> :math:`\gamma_c`: h → 0 (cage is destroyed)
-- :math:`\gamma_c` ≈ 0.1 corresponds to the "cage strain"
+- At :math:`\gamma = 0`: :math:`h = 1` (full correlation)
+- At :math:`\gamma \gg \gamma_c`: :math:`h \to 0` (cage is destroyed)
+- :math:`\gamma_c \approx 0.1` corresponds to the "cage strain"
 
 **Choosing between forms:** The Gaussian form (default) is most common in the
 ITT-MCT literature and gives faster decay. The Lorentzian form may better
@@ -442,7 +442,7 @@ This gives physically reasonable results with the single modulus parameter
    \sigma = \frac{k_B T}{60\pi^2} \int_0^\infty dk \, k^4
    \left[\frac{S'(k)}{S(k)^2}\right]^2 \Phi^2
 
-The microscopic form uses the Percus-Yevick structure factor S(k) to weight
+The microscopic form uses the Percus-Yevick structure factor :math:`S(k)` to weight
 contributions from different length scales. This provides quantitative stress
 predictions in physical units when the volume fraction is known.
 
@@ -460,7 +460,7 @@ predictions in physical units when the volume fraction is known.
    )
 
 **Note:** When ``stress_form="microscopic"``, the ``phi_volume`` parameter is
-required. This is the colloidal volume fraction used to compute S(k) via the
+required. This is the colloidal volume fraction used to compute :math:`S(k)` via the
 Percus-Yevick approximation.
 
 **When to use microscopic form:** Use microscopic stress when you need
@@ -487,7 +487,7 @@ Both forms can be combined for maximum physical accuracy:
 
    # Predict flow curve
    gamma_dot = np.logspace(-3, 3, 50)
-   sigma = model.predict(gamma_dot, test_mode="flow_curve")
+   sigma = model.predict(gamma_dot, test_mode='flow_curve')
 
 The model's ``__repr__`` shows all form selections:
 
@@ -508,9 +508,9 @@ At steady state with constant :math:`\dot{\gamma}`, the stress is:
 
    \sigma_{ss} = \dot{\gamma} \int_0^\infty G(s) \cdot h(\dot{\gamma} s) ds
 
-where G(s) = G_∞ :math:`\Phi_{eq}(s)` is the equilibrium relaxation modulus.
+where :math:`G(s) = G_\infty \Phi_{\text{eq}}(s)` is the equilibrium relaxation modulus.
 
-**Yield stress** (glass state, :math:`\varepsilon` > 0):
+**Yield stress** (glass state, :math:`\varepsilon > 0`):
 
 .. math::
 
@@ -526,7 +526,7 @@ viscosity decreases:
 Small Amplitude Oscillation (SAOS)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For small strain :math:`\gamma_0` << :math:`\gamma_c`, we can linearize around equilibrium:
+For small strain :math:`\gamma_0 \ll \gamma_c`, we can linearize around equilibrium:
 
 .. math::
 
@@ -542,7 +542,7 @@ This gives the storage and loss moduli:
 
    G''(\omega) = \omega \int_0^\infty G_{\text{eq}}(t) \cos(\omega t) dt
 
-**Glass plateau**: For :math:`\varepsilon > 0`, :math:`G'(\omega \to 0) \to G_\infty f` (non-zero plateau)
+**Glass plateau**: For :math:`\varepsilon > 0`, :math:`G'(\omega \to 0) \to G_\infty f` (non-zero plateau).
 
 Startup Flow
 ~~~~~~~~~~~~
@@ -553,7 +553,7 @@ Starting from rest with constant :math:`\dot{\gamma}`:
 
    \sigma(t) = \dot{\gamma} \int_0^t G(t-s) \cdot h(\dot{\gamma}(t-s)) ds
 
-This shows a characteristic **stress overshoot** when :math:`\dot{\gamma} \tau_{\alpha}` > 1, where :math:`\tau_{\alpha}`
+This shows a characteristic **stress overshoot** when :math:`\dot{\gamma} \tau_{\alpha} > 1`, where :math:`\tau_{\alpha}`
 is the structural relaxation time.
 
 Creep
@@ -565,8 +565,8 @@ At constant applied stress :math:`\sigma_0`, the strain rate adjusts to maintain
 
    \sigma_0 = \int_0^t \dot{\gamma}(t') G(t,t') dt'
 
-In the glass state (:math:`\sigma_0` < :math:`\sigma_y`): bounded deformation (solid-like)
-Above yield (:math:`\sigma_0` > :math:`\sigma_y`): continuous flow (fluidization)
+In the glass state (:math:`\sigma_0 < \sigma_y`): bounded deformation (solid-like).
+Above yield (:math:`\sigma_0 > \sigma_y`): continuous flow (fluidization).
 
 This leads to **viscosity bifurcation** - a sharp transition between solid
 and fluid behavior at the yield stress.
@@ -574,7 +574,7 @@ and fluid behavior at the yield stress.
 Stress Relaxation
 ~~~~~~~~~~~~~~~~~
 
-After cessation of flow at t = 0:
+After cessation of flow at :math:`t = 0`:
 
 .. math::
 
@@ -597,7 +597,7 @@ The stress is non-sinusoidal and can be decomposed into Fourier harmonics:
 
    \sigma(t) = \sum_{n=1,3,5,...} [\sigma'_n \sin(n\omega t) + \sigma''_n \cos(n\omega t)]
 
-Higher harmonics (n = 3, 5, ...) quantify nonlinearity. The ratio :math:`\sigma_3/\sigma_1`
+Higher harmonics (:math:`n = 3, 5, \ldots`) quantify nonlinearity. The ratio :math:`\sigma_3/\sigma_1`
 increases with :math:`\gamma_0/\gamma_c`.
 
 Parameters
@@ -612,42 +612,42 @@ Parameters
      - Bounds
      - Units
      - Physical Meaning
-   * - v_1
+   * - :math:`v_1`
      - 0.0
      - (0, 5)
-     - —
-     - Linear vertex coefficient. Usually 0 for pure F_1_2.
-   * - v_2
+     - ---
+     - Linear vertex coefficient. Usually 0 for pure :math:`F_{12}`.
+   * - :math:`v_2`
      - 2.0
      - (0.5, 10)
-     - —
-     - Quadratic vertex coefficient. Glass at v_2 > 4.
+     - ---
+     - Quadratic vertex coefficient. Glass at :math:`v_2 > 4`.
    * - :math:`\Gamma`
      - 1.0
-     - (10⁻^6, 10^6)
+     - (:math:`10^{-6}`, :math:`10^6`)
      - 1/s
      - Bare relaxation rate. Sets microscopic timescale.
    * - :math:`\gamma_c`
      - 0.1
      - (0.01, 0.5)
-     - —
-     - Critical strain for cage breaking. Typically 0.05-0.2.
-   * - G_∞
-     - 10^6
-     - (1, 10^1^2)
+     - ---
+     - Critical strain for cage breaking. Typically 0.05--0.2.
+   * - :math:`G_\infty`
+     - :math:`10^6`
+     - (1, :math:`10^{12}`)
      - Pa
      - High-frequency elastic modulus.
 
 **Alternative parameterization with** :math:`\varepsilon` **:**
 
-Instead of specifying v_2 directly, use the separation parameter :math:`\varepsilon`:
+Instead of specifying :math:`v_2` directly, use the separation parameter :math:`\varepsilon`:
 
 .. code-block:: python
 
    model = ITTMCTSchematic(epsilon=0.1)  # Glass state
    model = ITTMCTSchematic(epsilon=-0.1)  # Fluid state
 
-This automatically sets v_2 = v_2,c × (1 + :math:`\varepsilon`).
+This automatically sets :math:`v_2 = v_{2,c} \times (1 + \varepsilon)`.
 
 Typical Parameter Values
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -659,27 +659,27 @@ Typical Parameter Values
    * - System
      - :math:`\varepsilon`
      - :math:`\gamma_c`
-     - G_∞ (Pa)
+     - :math:`G_\infty` (Pa)
      - Notes
-   * - PMMA colloids (:math:`\phi` = 0.55)
+   * - PMMA colloids (:math:`\phi = 0.55`)
      - 0.1
      - 0.08
-     - 10^2
+     - :math:`10^2`
      - Hard-sphere reference
    * - Carbopol microgels
      - 0.05
      - 0.15
-     - 10^3
+     - :math:`10^3`
      - Soft particles
    * - Mayonnaise
      - 0.02
      - 0.10
-     - 10^2
+     - :math:`10^2`
      - Dense emulsion
    * - Silica suspensions
      - 0.15
      - 0.05
-     - 10^4
+     - :math:`10^4`
      - Strong glass
 
 Validity and Assumptions
@@ -687,8 +687,8 @@ Validity and Assumptions
 
 **When the model works well:**
 
-- Dense suspensions (:math:`\phi` > 0.4 for hard spheres)
-- Near the glass transition (:math:`|\varepsilon|` < 0.3)
+- Dense suspensions (:math:`\phi > 0.4` for hard spheres)
+- Near the glass transition (:math:`|\varepsilon| < 0.3`)
 - Monodisperse or narrow size distribution
 - No attractive interactions (hard-sphere-like)
 - Brownian timescales (colloidal, not granular)
@@ -697,7 +697,7 @@ Validity and Assumptions
 
 - Does not capture crystallization
 - Underestimates relaxation times in deeply supercooled regime
-- No hopping/activated processes (important at low T or high :math:`\varepsilon`)
+- No hopping/activated processes (important at low :math:`T` or high :math:`\varepsilon`)
 - Assumes isotropic structure (no shear-induced ordering)
 
 What You Can Learn
@@ -709,25 +709,25 @@ Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 :math:`\varepsilon` **(Separation Parameter)**:
-   The distance from the glass transition, defined as :math:`\varepsilon` = (v_2 - v_2,c)/v_2,c where v_2,c = 4 for the F_1_2 model.
+   The distance from the glass transition, defined as :math:`\varepsilon = (v_2 - v_{2,c})/v_{2,c}` where :math:`v_{2,c} = 4` for the :math:`F_{12}` model.
 
-   *For graduate students*: :math:`\varepsilon` is the control parameter in the MCT bifurcation analysis. At :math:`\varepsilon = 0`, the self-consistent equation :math:`f = v_1 f + v_2 f^2` undergoes a fold bifurcation, creating a non-zero long-time limit :math:`f > 0` for :math:`\varepsilon > 0`. The :math:`\alpha`-relaxation time diverges as :math:`\tau_\alpha \sim |\varepsilon|^{-\gamma}` with :math:`\gamma \approx 2.5` (MCT universal exponent). The power-law exponents a and b for :math:`\beta`-relaxation and :math:`\alpha`-relaxation are determined by the exponent parameter :math:`\lambda = \Gamma(1-a)^2 / \Gamma(1-2a)`.
+   *For graduate students*: :math:`\varepsilon` is the control parameter in the MCT bifurcation analysis. At :math:`\varepsilon = 0`, the self-consistent equation :math:`f = v_1 f + v_2 f^2` undergoes a fold bifurcation, creating a non-zero long-time limit :math:`f > 0` for :math:`\varepsilon > 0`. The :math:`\alpha`-relaxation time diverges as :math:`\tau_\alpha \sim |\varepsilon|^{-\gamma}` with :math:`\gamma \approx 2.5` (MCT universal exponent). The power-law exponents :math:`a` and :math:`b` for :math:`\beta`-relaxation and :math:`\alpha`-relaxation are determined by the exponent parameter :math:`\lambda = \Gamma(1-a)^2 / \Gamma(1-2a)`.
 
-   *For practitioners*: :math:`\varepsilon` < 0 means fluid (full relaxation), :math:`\varepsilon` > 0 means glass (permanent caging). Fitting :math:`\varepsilon` from oscillatory or flow curve data immediately tells you if the material has a yield stress. :math:`\varepsilon` ≈ 0.1 is a typical moderately strong glass, :math:`\varepsilon` ≈ 0.5 is a very strong glass. Near :math:`\varepsilon` = 0, expect extreme slowing down and sensitivity to temperature or concentration.
+   *For practitioners*: :math:`\varepsilon < 0` means fluid (full relaxation), :math:`\varepsilon > 0` means glass (permanent caging). Fitting :math:`\varepsilon` from oscillatory or flow curve data immediately tells you if the material has a yield stress. :math:`\varepsilon \approx 0.1` is a typical moderately strong glass, :math:`\varepsilon \approx 0.5` is a very strong glass. Near :math:`\varepsilon = 0`, expect extreme slowing down and sensitivity to temperature or concentration.
 
 :math:`\gamma_c` **(Critical Strain)**:
    The strain scale at which the cage structure is destroyed by shear.
 
-   *For graduate students*: :math:`\gamma_c` appears in the strain decorrelation function :math:`h(\gamma) = \exp[-(\gamma/\gamma_c)^2]`, which describes how accumulated strain breaks down density correlations. Physically, :math:`\gamma_c` is related to the Lindemann criterion: when a particle is displaced by ~\ :math:`\gamma_c` times the cage size (≈ particle diameter), the cage loses memory of its initial configuration. For hard spheres, :math:`\gamma_c \approx 0.05\text{--}0.1` corresponds to the amplitude of thermal vibrations in the cage.
+   *For graduate students*: :math:`\gamma_c` appears in the strain decorrelation function :math:`h(\gamma) = \exp[-(\gamma/\gamma_c)^2]`, which describes how accumulated strain breaks down density correlations. Physically, :math:`\gamma_c` is related to the Lindemann criterion: when a particle is displaced by :math:`{\sim}\gamma_c` times the cage size (:math:`\approx` particle diameter), the cage loses memory of its initial configuration. For hard spheres, :math:`\gamma_c \approx 0.05\text{--}0.1` corresponds to the amplitude of thermal vibrations in the cage.
 
    *For practitioners*: :math:`\gamma_c` controls the onset of shear thinning in flow curves. Smaller :math:`\gamma_c` means the material yields more easily under strain. Fitting :math:`\gamma_c` from the crossover shear rate :math:`\dot{\gamma}^*` (where viscosity drops) via :math:`\dot{\gamma}^* \approx 1/(\tau_\alpha \gamma_c)` reveals the cage stiffness.
 
-**v_1, v_2 (Vertex Coefficients)**:
+:math:`v_1, v_2` **(Vertex Coefficients)**:
    The mode-coupling constants determining the memory kernel :math:`m(\Phi) = v_1 \Phi + v_2 \Phi^2`.
 
-   *For graduate students*: v_1 and v_2 arise from the k-space convolution integral in the full MCT vertex V(k,q,\|k-q\|) ∝ S(k)S(q)S(\|k-q\|)[k·q c(q)/k^2 + k·p c(p)/k^2]^2. The F_1_2 schematic replaces this with a polynomial approximation. For pure F_1_2, v_1 = 0 and v_2 controls the distance from the glass transition. Higher v_2 means stronger coupling → stronger caging → higher glass transition.
+   *For graduate students*: :math:`v_1` and :math:`v_2` arise from the :math:`k`-space convolution integral in the full MCT vertex :math:`V(k,q,|k-q|) \propto S(k)S(q)S(|k-q|)[\mathbf{k}\cdot\mathbf{q}\, c(q)/k^2 + \mathbf{k}\cdot\mathbf{p}\, c(p)/k^2]^2`. The :math:`F_{12}` schematic replaces this with a polynomial approximation. For pure :math:`F_{12}`, :math:`v_1 = 0` and :math:`v_2` controls the distance from the glass transition. Higher :math:`v_2` means stronger coupling :math:`\to` stronger caging :math:`\to` higher glass transition.
 
-   *For practitioners*: Usually keep v_1 = 0 (default) and fit only v_2 or equivalently :math:`\varepsilon`. If v_1 ≠ 0, the critical point shifts: v_2,c = 4/(1-v_1)^2. Only adjust v_1 if the model fails with v_1 = 0.
+   *For practitioners*: Usually keep :math:`v_1 = 0` (default) and fit only :math:`v_2` or equivalently :math:`\varepsilon`. If :math:`v_1 \neq 0`, the critical point shifts: :math:`v_{2,c} = 4/(1-v_1)^2`. Only adjust :math:`v_1` if the model fails with :math:`v_1 = 0`.
 
 :math:`\Gamma` **(Bare Relaxation Rate)**:
    The inverse microscopic timescale, :math:`\Gamma = 1/\tau_0`.
@@ -736,10 +736,10 @@ Parameter Interpretation
 
    *For practitioners*: :math:`\Gamma` determines the high-frequency behavior in oscillatory tests. From the crossover frequency :math:`\omega^*` in :math:`G'(\omega)`, estimate :math:`\Gamma \approx \omega^*`. Typical values: :math:`10^3`-:math:`10^6` s\ :sup:`-1` for colloids (diffusion-limited), :math:`10^{-2}`-:math:`10^2` s\ :sup:`-1` for pastes.
 
-**G_∞ (High-Frequency Modulus)**:
+:math:`G_\infty` **(High-Frequency Modulus)**:
    The elastic modulus at frequencies above all relaxation processes.
 
-   *For graduate students*: :math:`G_\infty` is the plateau modulus in the schematic stress formula :math:`\sigma = G_\infty \int \Phi^2 h(\gamma) \, dt'`. It corresponds to the k-space integral :math:`G_\infty = (k_B T / 60\pi^2) \int dk \, k^4 [S'(k)/S(k)^2]^2` in the full MCT. For hard spheres, :math:`G_\infty \approx n k_B T` where n is number density.
+   *For graduate students*: :math:`G_\infty` is the plateau modulus in the schematic stress formula :math:`\sigma = G_\infty \int \Phi^2 h(\gamma) \, dt'`. It corresponds to the :math:`k`-space integral :math:`G_\infty = (k_B T / 60\pi^2) \int dk \, k^4 [S'(k)/S(k)^2]^2` in the full MCT. For hard spheres, :math:`G_\infty \approx n k_B T` where :math:`n` is number density.
 
    *For practitioners*: :math:`G_\infty` is fitted from the high-frequency plateau in :math:`G'(\omega)` or from the yield stress magnitude. Unlike phenomenological models, :math:`G_\infty` has a microscopic interpretation tied to particle stiffness and number density.
 
@@ -756,24 +756,24 @@ Material Classification
      - Flow Characteristics
    * - :math:`\varepsilon` **< -0.2**
      - Deep fluid
-     - Dilute colloids (:math:`\phi` < 0.4), weak suspensions
-     - No yield stress, Newtonian or weakly shear-thinning, G'' > G' at all :math:`\omega`
+     - Dilute colloids (:math:`\phi < 0.4`), weak suspensions
+     - No yield stress, Newtonian or weakly shear-thinning, :math:`G'' > G'` at all :math:`\omega`
    * - **-0.2 <** :math:`\varepsilon` **< 0**
      - Near-critical fluid
-     - Moderate colloids (0.4 < :math:`\phi` < 0.516), pre-jammed emulsions
-     - Zero yield stress but very slow relaxation (:math:`\tau_{\alpha}` → ∞), G' ≈ G'' at low :math:`\omega`, extreme shear thinning
+     - Moderate colloids (:math:`0.4 < \phi < 0.516`), pre-jammed emulsions
+     - Zero yield stress but very slow relaxation (:math:`\tau_{\alpha} \to \infty`), :math:`G' \approx G''` at low :math:`\omega`, extreme shear thinning
    * - **0 <** :math:`\varepsilon` **< 0.1**
      - Marginal glass
-     - Dense colloids (:math:`\phi` ≈ 0.52-0.55), soft microgel pastes
-     - Small yield stress (10-100 Pa), fragile caging, strong overshoot in startup, G' > G'' with small plateau
+     - Dense colloids (:math:`\phi \approx 0.52\text{--}0.55`), soft microgel pastes
+     - Small yield stress (10--100 Pa), fragile caging, strong overshoot in startup, :math:`G' > G''` with small plateau
    * - **0.1 <** :math:`\varepsilon` **< 0.3**
      - Moderate glass
-     - Hard-sphere colloids (:math:`\phi` ≈ 0.55-0.58), carbopol gels
-     - Clear yield stress (100-1000 Pa), robust caging, pronounced plateau in G'(:math:`\omega`)
+     - Hard-sphere colloids (:math:`\phi \approx 0.55\text{--}0.58`), carbopol gels
+     - Clear yield stress (100--1000 Pa), robust caging, pronounced plateau in :math:`G'(\omega)`
    * - :math:`\varepsilon` **> 0.3**
      - Deep glass
-     - Jammed colloids (:math:`\phi` > 0.58), concentrated emulsions
-     - Large yield stress (>1000 Pa), rigid caging, nearly frequency-independent G'
+     - Jammed colloids (:math:`\phi > 0.58`), concentrated emulsions
+     - Large yield stress (>1000 Pa), rigid caging, nearly frequency-independent :math:`G'`
 
 Connection to Cage Breaking
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -787,9 +787,9 @@ Connection to Cage Breaking
 The strain decorrelation function :math:`h(\gamma) = \exp[-(\gamma/\gamma_c)^2]`
 describes how accumulated strain destroys the structural correlation:
 
-- At :math:`\gamma < \gamma_c`: Cage is intact, correlations persist
-- At :math:`\gamma \sim \gamma_c`: Cage begins to break, correlations decay rapidly
-- At :math:`\gamma \gg \gamma_c`: Cage is destroyed, system is fully fluidized
+- At :math:`\gamma < \gamma_c`: cage is intact, correlations persist
+- At :math:`\gamma \sim \gamma_c`: cage begins to break, correlations decay rapidly
+- At :math:`\gamma \gg \gamma_c`: cage is destroyed, system is fully fluidized
 
 **Physical Interpretation**: :math:`\gamma_c` represents the typical strain needed
 to displace a particle by one particle diameter and escape the cage. It is related
@@ -807,9 +807,9 @@ In the glass state (:math:`\varepsilon > 0`), the model predicts a dynamic yield
 where :math:`f` is the non-ergodicity parameter (glass plateau height). This
 connects the yield stress to three microscopic quantities:
 
-1. **G_∞**: High-frequency modulus (single-particle stiffness)
+1. :math:`G_\infty`: High-frequency modulus (single-particle stiffness)
 2. :math:`\gamma_c`: Cage escape strain (local rearrangement threshold)
-3. **f**: Degree of caging (structural arrest parameter)
+3. :math:`f`: Degree of caging (structural arrest parameter)
 
 **Diagnostic use**: If fitted :math:`\sigma_y` is much larger than expected from
 :math:`G_\infty \gamma_c f`, additional yield mechanisms (e.g., attractive forces,
@@ -824,7 +824,7 @@ The model distinguishes multiple timescales:
 2. :math:`\beta` **-relaxation**: Short-time rattling in cage, :math:`\tau_\beta \sim \tau_0`
 3. :math:`\alpha` **-relaxation**: Cage escape time, :math:`\tau_\alpha \sim \tau_0 |\varepsilon|^{-\gamma}` (diverges as :math:`\varepsilon \to 0`)
 
-Near the glass transition, :math:`\tau_\alpha` can be 10^6-10^1^0 times larger than
+Near the glass transition, :math:`\tau_\alpha` can be :math:`10^6`-:math:`10^{10}` times larger than
 :math:`\tau_0`, explaining why materials appear "glassy" on experimental timescales
 yet are technically ergodic.
 
@@ -854,16 +854,16 @@ flow-microstructure coupling:
 Regimes and Behavior
 --------------------
 
-Fluid State (:math:`\varepsilon` < 0)
-~~~~~~~~~~~~~~~~~~~
+Fluid State (:math:`\varepsilon < 0`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Long-time correlator: :math:`\Phi(∞)` = 0
+- Long-time correlator: :math:`\Phi(\infty) = 0`
 - Zero yield stress
-- Terminal viscosity: :math:`\eta_0` = G_∞ / :math:`\Gamma`
+- Terminal viscosity: :math:`\eta_0 = G_\infty / \Gamma`
 - Newtonian at low rates, shear-thinning at high rates
 
-Glass State (:math:`\varepsilon` > 0)
-~~~~~~~~~~~~~~~~~~~
+Glass State (:math:`\varepsilon > 0`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Non-ergodicity: :math:`\Phi(\infty) = f > 0`
 - Yield stress: :math:`\sigma_y \approx G_\infty \gamma_c f`
@@ -871,10 +871,10 @@ Glass State (:math:`\varepsilon` > 0)
 - Stress overshoot in startup
 - Residual stress in relaxation
 
-Critical Point (:math:`\varepsilon` = 0)
-~~~~~~~~~~~~~~~~~~~~~~
+Critical Point (:math:`\varepsilon = 0`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Power-law decay: :math:`\Phi(t)` ~ t⁻ᵃ
+- Power-law decay: :math:`\Phi(t) \sim t^{-a}`
 - Diverging relaxation time
 - Maximum susceptibility
 - Singular behavior in rheology
@@ -885,9 +885,9 @@ Fitting Guidance
 Initialization Strategy
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-1. **Start with SAOS**: Fit G'(:math:`\omega`), G''(:math:`\omega`) to estimate:
-   
-   - G_∞ from high-frequency plateau
+1. **Start with SAOS**: Fit :math:`G'(\omega)`, :math:`G''(\omega)` to estimate:
+
+   - :math:`G_\infty` from high-frequency plateau
    - :math:`\varepsilon` from low-frequency plateau (glass) or terminal regime (fluid)
    - :math:`\Gamma` from crossover frequency
 
@@ -916,7 +916,7 @@ Troubleshooting
 **Problem: No stress overshoot in startup**
 
 - Solution: Increase :math:`\dot{\gamma}` or reduce :math:`\varepsilon`
-- Overshoot requires Wi = :math:`\dot{\gamma} \tau_{\alpha}` > 1
+- Overshoot requires :math:`Wi = \dot{\gamma} \tau_{\alpha} > 1`
 
 Model Comparison
 ----------------
@@ -935,11 +935,11 @@ ITT-MCT vs SGR
      - Cage effect, density correlators
      - Energy landscape, trap escape
    * - Control parameter
-     - Volume fraction / v_2
-     - Noise temperature x
+     - Volume fraction / :math:`v_2`
+     - Noise temperature :math:`x`
    * - Glass transition
-     - Sharp (v_2_c = 4)
-     - Continuous (x → 1)
+     - Sharp (:math:`v_{2,c} = 4`)
+     - Continuous (:math:`x \to 1`)
    * - Shear melting
      - Strain decorrelation
      - Shear-induced trap escape
@@ -959,16 +959,16 @@ ITT-MCT vs Fluidity Models
      - Fluidity
    * - Foundation
      - Microscopic correlators
-     - Phenomenological fluidity f
+     - Phenomenological fluidity :math:`f`
    * - Parameters
      - ~5 (schematic)
-     - ~8-10
+     - ~8--10
    * - Glass transition
      - From MCT vertex
      - From fluidity bounds
    * - Aging
      - Implicit in correlator
-     - Explicit df/dt term
+     - Explicit :math:`df/dt` term
    * - Shear banding
      - Not in schematic
      - In nonlocal version
@@ -1126,7 +1126,7 @@ and don't require precompilation.
 Prony Decomposition
 ~~~~~~~~~~~~~~~~~~~
 
-The Volterra ODE approach converts the O(N^2) memory integral to O(N) using
+The Volterra ODE approach converts the :math:`O(N^2)` memory integral to :math:`O(N)` using
 Prony series decomposition of the memory kernel. The quality of the Prony
 fit affects accuracy:
 
@@ -1143,14 +1143,14 @@ ill-conditioned. Solutions:
 
 1. Increase ``n_prony_modes`` (default: 10)
 2. Adjust the time range in ``initialize_prony_modes()``
-3. Check if the system is very close to the glass transition (:math:`\varepsilon` ≈ 0)
+3. Check if the system is very close to the glass transition (:math:`\varepsilon \approx 0`)
 
 Memory Usage
 ~~~~~~~~~~~~
 
 For large batch predictions, memory scales with:
 
-- Number of shear rates × Prony modes × time steps
+- Number of shear rates :math:`\times` Prony modes :math:`\times` time steps
 
 Typical usage: ~100 MB for 50 shear rates with 10 Prony modes.
 
@@ -1174,7 +1174,7 @@ These patterns illustrate the core algorithms used internally by RheoJAX.
 Memory Kernel Computation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The F_1_2 memory kernel with strain decorrelation:
+The :math:`F_{12}` memory kernel with strain decorrelation:
 
 .. code-block:: python
 
@@ -1308,26 +1308,23 @@ Extracting Fourier harmonics from LAOS stress response:
 See Also
 --------
 
-- :doc:`itt_mct_isotropic` — Full k-resolved MCT for quantitative predictions with S(k) input
-- :doc:`../sgr/sgr_conventional` — Alternative glass transition model (trap-based, no S(k) required)
-- :doc:`../fluidity/fluidity_saramito_local` — Simpler thixotropic yield stress model
-- :doc:`../stz/stz_conventional` — Shear transformation zone theory (effective temperature approach)
+- :doc:`itt_mct_isotropic` --- Full :math:`k`-resolved MCT for quantitative predictions with :math:`S(k)` input
+- :doc:`../sgr/sgr_conventional` --- Alternative glass transition model (trap-based, no :math:`S(k)` required)
+- :doc:`../fluidity/fluidity_saramito_local` --- Simpler thixotropic yield stress model
+- :doc:`../stz/stz_conventional` --- Shear transformation zone theory (effective temperature approach)
 
 **Choosing between ITT-MCT and SGR:**
 
 - **Use ITT-MCT** if: You have colloidal systems, know the volume fraction, want
-  to connect to microscopic structure factor S(k)
+  to connect to microscopic structure factor :math:`S(k)`
 - **Use SGR** if: You have generic soft glasses (foams, emulsions, pastes), want
   simpler parameterization, focus on aging/rejuvenation dynamics
 
 API Reference
 -------------
 
-.. autoclass:: rheojax.models.itt_mct.ITTMCTSchematic
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :no-index:
+See :class:`~rheojax.models.itt_mct.schematic.ITTMCTSchematic` in the :doc:`/api/models` reference
+for the full class documentation, including all methods and attributes.
 
 References
 ----------
@@ -1335,9 +1332,9 @@ References
 .. [1] Götze, W. *Complex Dynamics of Glass-Forming Liquids: A Mode-Coupling Theory*.
    Oxford University Press (2009). https://doi.org/10.1093/acprof:oso/9780199235346.001.0001
 
-.. [2] Götze, W. and Sjögren, L. "Scaling properties in the β-relaxation regime
-   of the glass transition." *Journal of Physics C*, 17, 5759 (1984).
-   https://doi.org/10.1088/0022-3719/17/32/016
+.. [2] Bengtzelius, U., Götze, W. & Sjölander, A. (1984). "Dynamics of supercooled
+   liquids and the glass transition." *J. Phys. C: Solid State Phys.*, 17, 5915-5934.
+   https://doi.org/10.1088/0022-3719/17/33/005
 
 .. [3] Fuchs, M. and Cates, M. E. "Theory of Nonlinear Rheology and Yielding of
    Dense Colloidal Suspensions." *Physical Review Letters*, 89, 248304 (2002).
@@ -1349,19 +1346,20 @@ References
 
 .. [5] Brader, J. M., Voigtmann, T., Fuchs, M., Larson, R. G., and Cates, M. E.
    "Glass rheology: From mode-coupling theory to a dynamical yield criterion."
-   *Journal of Physics: Condensed Matter*, 20, 494243 (2008).
-   https://doi.org/10.1088/0953-8984/20/49/494243
+   *Proc. Natl. Acad. Sci. USA*, 106, 15186-15191 (2009).
+   https://doi.org/10.1073/pnas.0905330106
 
 .. [6] Siebenbürger, M., Ballauff, M., and Voigtmann, T. "Creep in colloidal glasses."
-   *Journal of Rheology*, 53, 707 (2009). https://doi.org/10.1122/1.3093067
+   *Phys. Rev. Lett.*, 108, 255701 (2012). https://doi.org/10.1103/PhysRevLett.108.255701
 
-.. [7] Brader, J. M., Cates, M. E., and Fuchs, M. "First-principles constitutive
-   equation for suspension rheology." *Proceedings of the National Academy of
-   Sciences*, 106, 15186 (2009). https://doi.org/10.1073/pnas.0905330106
+.. [7] Brader, J. M., Cates, M. E., and Fuchs, M. "First-Principles Constitutive
+   Equation for Suspension Rheology." *Phys. Rev. Lett.*, 101, 138301 (2008).
+   https://doi.org/10.1103/PhysRevLett.101.138301
 
-.. [8] Henrich, O., Varnik, F., and Fuchs, M. "Extended mode-coupling theory for
-   dense colloidal suspensions under shear." *Physical Review E*, 76, 031404 (2007).
-   https://doi.org/10.1103/PhysRevE.76.031404
+.. [8] Henrich, O., Weysser, F., Cates, M. E., and Fuchs, M. "Hard discs under steady
+   shear: comparison of Brownian dynamics simulations and mode coupling theory."
+   *Phil. Trans. R. Soc. A*, 367, 5033-5050 (2009).
+   https://doi.org/10.1098/rsta.2009.0191
 
 .. [9] Amann, C. P., Siebenbürger, M., Ballauff, M., and Fuchs, M. "Nonlinear
    rheology of glass-forming colloidal dispersions: Transient stress-strain
@@ -1369,4 +1367,5 @@ References
    Condensed Matter*, 27, 194121 (2015). https://doi.org/10.1088/0953-8984/27/19/194121
 
 .. [10] Mewis, J. and Wagner, N. J. "Colloidal Suspension Rheology." Cambridge
-   University Press (2012). ISBN: 978-0521515368
+   University Press (2012). ISBN: 978-0-521-51599-3.
+   https://doi.org/10.1017/CBO9780511977978

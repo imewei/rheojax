@@ -852,16 +852,12 @@ def power_law_fit(
     valid_stress = jnp.where(mask, stress_arr, jnp.nan)
 
     # Log-log linear regression: log(stress) = log(K) + n * log(strain_rate)
-    log_rate = jnp.log(jnp.where(jnp.isnan(valid_rates), 1.0, valid_rates))
-    log_stress = jnp.log(jnp.where(jnp.isnan(valid_stress), 1.0, valid_stress))
-
-    # Mask invalid values
     valid = ~jnp.isnan(valid_rates) & ~jnp.isnan(valid_stress)
     n_valid = jnp.sum(valid)
 
-    # Compute regression coefficients
-    log_rate_valid = jnp.where(valid, log_rate, 0.0)
-    log_stress_valid = jnp.where(valid, log_stress, 0.0)
+    # Compute log only for valid points; use 0.0 for invalid (excluded by valid mask)
+    log_rate_valid = jnp.where(valid, jnp.log(jnp.maximum(strain_rate_arr, 1e-30)), 0.0)
+    log_stress_valid = jnp.where(valid, jnp.log(jnp.maximum(stress_arr, 1e-30)), 0.0)
 
     sum_x = jnp.sum(log_rate_valid)
     sum_y = jnp.sum(log_stress_valid)
@@ -884,9 +880,9 @@ def power_law_fit(
 
     # Compute R² for fit quality
     y_mean = sum_y / jnp.maximum(n_valid, 1.0)
-    ss_tot = jnp.sum(jnp.where(valid, (log_stress - y_mean) ** 2, 0.0))
-    y_pred = log_K + n_exponent * log_rate
-    ss_res = jnp.sum(jnp.where(valid, (log_stress - y_pred) ** 2, 0.0))
+    ss_tot = jnp.sum(jnp.where(valid, (log_stress_valid - y_mean) ** 2, 0.0))
+    y_pred = log_K + n_exponent * log_rate_valid
+    ss_res = jnp.sum(jnp.where(valid, (log_stress_valid - y_pred) ** 2, 0.0))
     r_squared = jnp.where(ss_tot > 1e-10, 1.0 - ss_res / ss_tot, 0.0)
 
     return K, n_exponent, r_squared

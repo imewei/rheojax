@@ -66,7 +66,7 @@ viscoelastic model with three independent fractional orders:
 **Microstructural Interpretation:**
 
 - **Primary branch (** :math:`c_1, \alpha, \beta` **)**: Captures main relaxation mechanism with
-  characteristic time :math:`\tau`. The two orders :math:`\alpha and \beta` control high-frequency and
+  characteristic time :math:`\tau`. The two orders :math:`\alpha` and :math:`\beta` control high-frequency and
   crossover behavior, respectively.
 - **Secondary branch (** :math:`c_2, \gamma` **)**: Provides additional relaxation mode at different
   timescale. Order :math:`\gamma` controls low-frequency terminal behavior.
@@ -116,12 +116,12 @@ Parameters
      - Notes
    * - ``c1``
      - :math:`c_1`
-     - Pa*s^alpha
+     - Pa·s\ :sup:`α`
      - [1e-3, 1e9]
      - First SpringPot constant
    * - ``c2``
      - :math:`c_2`
-     - Pa*s^gamma
+     - Pa·s\ :sup:`γ`
      - [1e-3, 1e9]
      - Second SpringPot constant
    * - ``alpha``
@@ -156,14 +156,14 @@ Validity and Assumptions
 Regimes and Behavior
 --------------------
 
-- Liquid-like at low omega (no equilibrium plateau).
+- Liquid-like at low :math:`\omega` (no equilibrium plateau).
 - Multiple fractional slopes in :math:`G'` and :math:`G''` controlled by :math:`\alpha,\beta,\gamma`.
 - Captures complex crossover patterns not possible with single-order models.
 
 Limiting Behavior
 -----------------
 
-- :math:`\alpha,\beta,\gamma \to 1`: tends to classical viscoelastic liquid combinations.
+- :math:`\alpha, \beta, \gamma \to 1`: tends to classical viscoelastic liquid combinations.
 - :math:`c_2 \to 0`: reduces to a generalized fractional Maxwell form.
 - Equal orders collapse to two-parameter Mittag-Leffler responses.
 
@@ -189,7 +189,7 @@ Parameter Interpretation
    Determine the relative strength of the two parallel relaxation branches.
 
    - :math:`c_1/c_2` **> 10**: Primary branch (:math:`\alpha, \beta`) dominates; secondary (:math:`\gamma`) is a correction
-   - :math:`c_1/c_2` **≈ 1**: Both mechanisms contribute equally; true two-mode behavior
+   - :math:`c_1/c_2 \approx 1`: Both mechanisms contribute equally; true two-mode behavior
    - :math:`c_1/c_2` **< 0.1**: Secondary branch (:math:`\gamma`) dominates; consider simpler model
 
    *For graduate students*: The ratio :math:`c_1/c_2` relates to the partition of energy dissipation between fast (primary) and slow (secondary) mechanisms.
@@ -211,7 +211,7 @@ This 6-parameter model is the most flexible fractional Zener variant. Use only w
 3. **Complex fluids**: Polymer blends, filled systems, colloidal suspensions, or hierarchical structures
 4. **High-quality data**: At least 5 decades in frequency with >100 points
 
-**Critical Warning**: With 6 parameters, overfitting is highly probable. Always compare to simpler models using information criteria (AIC, BIC). Prefer simpler models unless FZLL provides statistically significant improvement (:math:`\DeltaAIC` > 10).
+**Critical Warning**: With 6 parameters, overfitting is highly probable. Always compare to simpler models using information criteria (AIC, BIC). Prefer simpler models unless FZLL provides statistically significant improvement (:math:`\Delta\text{AIC}` > 10).
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -241,8 +241,8 @@ Material Classification
    :widths: 25 25 25 25
 
    * - Parameter
-     - → 0 Limit
-     - → 1 Limit
+     - :math:`\to 0` Limit
+     - :math:`\to 1` Limit
      - Typical Range
    * - :math:`\alpha`
      - Solid-like (fast)
@@ -311,7 +311,7 @@ Fitting Guidance
    * - :math:`\alpha \approx \beta \approx \gamma`
      - Single relaxation mode
      - Use FMG or FML instead
-   * - :math:`c_2/c_1` < 0.01 or > 100
+   * - :math:`c_2/c_1 < 0.01` or :math:`> 100`
      - One branch dominates
      - Simplify to single-branch model
    * - Fit diverges
@@ -334,7 +334,7 @@ Use FZLL only if ALL of the following are true:
 1. **Data quality**: 5+ decades in frequency, >100 points, SNR > 20 dB
 2. **Simpler models fail**: FMG/FML show systematic deviations (:math:`R^2` < 0.95)
 3. **Multiple power-law regimes**: Clearly distinct slopes :math:`\alpha, \beta, \gamma` in log-log plot
-4. **Statistical justification**: :math:`\DeltaAIC` > 10 compared to best 4-parameter model
+4. **Statistical justification**: :math:`\Delta\text{AIC}` > 10 compared to best 4-parameter model
 5. **Physical interpretation**: Can explain three orders from microstructure
 
 **Comparison Workflow:**
@@ -404,7 +404,7 @@ Example Calculations
 
 **Multi-Order Spectrum Analysis:**
 
-Given fitted parameters :math:`c_1` = 500 Pa·s\ :math:`^{\alpha, c_2}` = 100 Pa·s\ :math:`^{\gamma, \alpha = 0.4, \beta = 0.6, \gamma = 0.8, \tau}` = 10 s:
+Given fitted parameters :math:`c_1 = 500` Pa·s\ :math:`^{\alpha}`, :math:`c_2 = 100` Pa·s\ :math:`^{\gamma}`, :math:`\alpha = 0.4`, :math:`\beta = 0.6`, :math:`\gamma = 0.8`, :math:`\tau = 10` s:
 
 .. code-block:: python
 

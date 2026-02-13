@@ -29,14 +29,14 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
 from rheojax.logging import get_logger, log_fit
 
 # Module logger
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("power_law", protocols=[Protocol.FLOW_CURVE])
+@ModelRegistry.register("power_law", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR])
 class PowerLaw(BaseModel):
     """Power Law model for non-Newtonian flow (ROTATION only).
 
@@ -109,8 +109,8 @@ class PowerLaw(BaseModel):
                 # log(σ) = log(K) + n*log(γ̇) for stress
 
                 # Assume viscosity data by default
-                log_gamma_dot = np.log(np.abs(X))
-                log_y = np.log(np.abs(y))
+                log_gamma_dot = np.log(np.maximum(np.abs(X), 1e-30))
+                log_y = np.log(np.maximum(np.abs(y), 1e-30))
 
                 logger.debug("Performing log-log linear regression")
 
@@ -162,7 +162,7 @@ class PowerLaw(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
         """Predict viscosity for given shear rates.
 
         Args:
@@ -218,7 +218,7 @@ class PowerLaw(BaseModel):
         Returns:
             Viscosity (Pa·s)
         """
-        return K * jnp.power(jnp.abs(gamma_dot), n - 1.0)
+        return K * jnp.power(jnp.maximum(jnp.abs(gamma_dot), 1e-30), n - 1.0)
 
     @partial(jax.jit, static_argnums=(0,))
     def _predict_stress(
@@ -234,7 +234,7 @@ class PowerLaw(BaseModel):
         Returns:
             Shear stress (Pa)
         """
-        return K * jnp.power(jnp.abs(gamma_dot), n)
+        return K * jnp.power(jnp.maximum(jnp.abs(gamma_dot), 1e-30), n)
 
     def predict_stress(self, gamma_dot: np.ndarray) -> np.ndarray:
         """Predict shear stress for given shear rates.

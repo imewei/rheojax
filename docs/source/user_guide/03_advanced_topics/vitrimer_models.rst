@@ -21,7 +21,7 @@ RheoJAX provides two constitutive models for vitrimers:
 
 .. admonition:: Key Insight
 
-   The vitrimer hallmark is that the exchangeable stress **σ_E → 0** at steady state, even though the network remains connected. The natural state tensor μ_nat tracks deformation through BER, eliminating driving forces for stress relaxation.
+   The vitrimer hallmark is that the exchangeable stress :math:`\sigma_E \to 0` at steady state, even though the network remains connected. The natural state tensor :math:`\boldsymbol{\mu}_{\text{nat}}` tracks deformation through BER, eliminating driving forces for stress relaxation.
 
 When to Use These Models
 =========================
@@ -47,12 +47,12 @@ Use **HVNM** for:
 
 - Vitrimer nanocomposites (CNT, silica, graphene-filled)
 - Materials with distinct matrix vs interphase kinetics
-- Systems requiring Guth-Gold strain amplification X(φ)
-- Nanoparticle-reinforced vitrimers (φ < 0.3)
+- Systems requiring Guth-Gold strain amplification :math:`X(\phi)`
+- Nanoparticle-reinforced vitrimers (:math:`\phi < 0.3`)
 - Applications needing to study interfacial exchange dynamics
 
 .. note::
-   HVNM reduces to HVM exactly at φ=0, verified to machine precision. This makes it suitable for studying reinforcement effects systematically.
+   HVNM reduces to HVM exactly at :math:`\phi = 0`, verified to machine precision. This makes it suitable for studying reinforcement effects systematically.
 
 Theoretical Foundations
 ========================
@@ -73,9 +73,9 @@ Unlike dissociative CANs (where bonds break before reforming), vitrimers maintai
 
    The vitrimer "sweet spot" combines:
 
-   - **Slow exchange** (τ_BER >> τ_obs) → thermoset behavior
-   - **Fast exchange** (τ_BER << τ_obs) → thermoplastic behavior
-   - **Arrhenius temperature dependence** → processable above T_v
+   - **Slow exchange** (:math:`\tau_{\text{BER}} \gg \tau_{\text{obs}}`) --- thermoset behavior
+   - **Fast exchange** (:math:`\tau_{\text{BER}} \ll \tau_{\text{obs}}`) --- thermoplastic behavior
+   - **Arrhenius temperature dependence** --- processable above :math:`T_v`
 
 HVM Architecture: Three Subnetworks
 ------------------------------------
@@ -95,7 +95,7 @@ The HVM decomposes total stress into three parallel contributions:
 
    \boldsymbol{\sigma}_P = G_P \, \boldsymbol{\mu}
 
-where **μ** is the left Cauchy-Green strain tensor.
+where :math:`\boldsymbol{\mu}` is the left Cauchy-Green strain tensor.
 
 **2. Exchangeable Subnetwork (E)**
 
@@ -108,7 +108,7 @@ where **μ** is the left Cauchy-Green strain tensor.
    \frac{d\boldsymbol{\mu}^E_{\text{nat}}}{dt} &= - 2 k_{\text{BER}} \, \boldsymbol{\mu}^E_{\text{nat}}
 
 - Stress: :math:`\boldsymbol{\sigma}_E = G_E (\boldsymbol{\mu}^E - \boldsymbol{\mu}^E_{\text{nat}})`
-- **Factor-of-2**: Both μ^E and μ^E_nat relax toward each other, doubling the effective rate
+- **Factor-of-2**: Both :math:`\boldsymbol{\mu}^E` and :math:`\boldsymbol{\mu}^E_{\text{nat}}` relax toward each other, doubling the effective rate
 
 **3. Dissociative Subnetwork (D)**
 
@@ -136,7 +136,7 @@ where:
 
 - :math:`\nu_0` = attempt frequency (Hz)
 - :math:`E_a` = activation energy (J/mol)
-- :math:`V_{\text{act}}` = activation volume (m³)
+- :math:`V_{\text{act}}` = activation volume (:math:`\text{m}^3`)
 - :math:`\sigma_{\text{VM}}` = von Mises stress
 
 **Stretch-Dependent (alternative)**
@@ -176,9 +176,9 @@ The I-subnetwork follows the same BER form as E, but with independent parameters
 
 This allows modeling scenarios where:
 
-- **Slow interfacial exchange** (:math:`E_{a,\text{int}} \gg E_a`) → constrained interphase
-- **Fast interfacial exchange** (:math:`E_{a,\text{int}} \ll E_a`) → mobile interphase
-- **Frozen interphase** (:math:`E_{a,\text{int}} \to \infty`) → permanent reinforcement
+- **Slow interfacial exchange** (:math:`E_{a,\text{int}} \gg E_a`) --- constrained interphase
+- **Fast interfacial exchange** (:math:`E_{a,\text{int}} \ll E_a`) --- mobile interphase
+- **Frozen interphase** (:math:`E_{a,\text{int}} \to \infty`) --- permanent reinforcement
 
 Practical Implementation
 =========================
@@ -208,7 +208,7 @@ HVM: Basic Usage
    omega = np.logspace(-3, 3, 100)
    G_prime, G_double_prime = model.predict_saos(omega)
 
-At low frequencies, **G' → G_P** (permanent network dominates). At high frequencies, both E and D subnetworks contribute elasticity.
+At low frequencies, :math:`G' \to G_P` (permanent network dominates). At high frequencies, both E and D subnetworks contribute elasticity.
 
 HVM Factory Methods
 -------------------
@@ -304,7 +304,7 @@ HVNM: Nanocomposite Usage
 HVNM Factory Methods
 ---------------------
 
-**1. Unfilled Vitrimer (φ = 0, recovers HVM)**
+**1. Unfilled Vitrimer** (:math:`\phi = 0`, recovers HVM)
 
 .. code-block:: python
 
@@ -387,9 +387,9 @@ Vitrimers exhibit stress overshoot during startup due to BER relaxation:
 
 **Physical Interpretation:**
 
-- **Early time**: μ^E builds faster than μ^E_nat → σ_E increases
-- **Overshoot peak**: Maximum σ_E when BER rate catches up
-- **Steady state**: μ^E_nat tracks deformation → σ_E → 0, only σ_P remains
+- **Early time**: :math:`\boldsymbol{\mu}^E` builds faster than :math:`\boldsymbol{\mu}^E_{\text{nat}}` --- :math:`\sigma_E` increases
+- **Overshoot peak**: Maximum :math:`\sigma_E` when BER rate catches up
+- **Steady state**: :math:`\boldsymbol{\mu}^E_{\text{nat}}` tracks deformation --- :math:`\sigma_E \to 0`, only :math:`\sigma_P` remains
 
 Temperature Sweep: Arrhenius Behavior
 --------------------------------------
@@ -422,9 +422,9 @@ Temperature Sweep: Arrhenius Behavior
 
 **Physical Interpretation:**
 
-- **Low T**: k_BER → 0 → E subnetwork behaves elastically → G' plateau at G_P + G_E
-- **High T**: k_BER → ∞ → fast exchange → G' plateau at G_P only
-- **Topology freezing T_v**: Temperature where k_BER ~ ω_obs (experiment-dependent)
+- **Low T**: :math:`k_{\text{BER}} \to 0` --- E subnetwork behaves elastically --- :math:`G'` plateau at :math:`G_P + G_E`
+- **High T**: :math:`k_{\text{BER}} \to \infty` --- fast exchange --- :math:`G'` plateau at :math:`G_P` only
+- **Topology freezing** :math:`T_v`: Temperature where :math:`k_{\text{BER}} \sim \omega_{\text{obs}}` (experiment-dependent)
 
 Comparison: Neat vs Filled Vitrimers
 -------------------------------------
@@ -508,7 +508,7 @@ HVM: Oscillatory Fitting
        print(f"{name}: [{lower:.2e}, {upper:.2e}]")
 
 .. warning::
-   HVM has 8-9 parameters. Ensure sufficient data (N > 50) and tight priors to avoid posterior degeneracies (e.g., G_P vs G_E tradeoff).
+   HVM has 8-9 parameters. Ensure sufficient data (N > 50) and tight priors to avoid posterior degeneracies (e.g., :math:`G_P` vs :math:`G_E` tradeoff).
 
 HVNM: Startup Fitting
 ---------------------
@@ -570,7 +570,7 @@ ArviZ Integration
 
 **Key Diagnostics:**
 
-- **plot_pair()**: Posterior correlations (watch for G_P-G_E degeneracy)
+- **plot_pair()**: Posterior correlations (watch for :math:`G_P`-:math:`G_E` degeneracy)
 - **plot_forest()**: 95% HDI intervals (ensure tight bounds)
 - **plot_trace()**: MCMC chains (check mixing, no drift)
 - **plot_energy()**: BFMI > 0.3 (good sampler efficiency)
@@ -620,9 +620,9 @@ Subnetwork Decomposition
 
    At steady state:
 
-   - **σ_P** → constant (elastic contribution)
-   - **σ_E** → 0 (vitrimer signature!)
-   - **σ_D** → 0 (physical bonds fully relaxed)
+   - :math:`\sigma_P` --- constant (elastic contribution)
+   - :math:`\sigma_E \to 0` (vitrimer signature!)
+   - :math:`\sigma_D \to 0` (physical bonds fully relaxed)
 
 Comparison with Classical Models
 =================================
@@ -644,14 +644,14 @@ HVM vs Zener Model
      - Evolves via BER
      - Fixed reference config
    * - Steady stress
-     - σ_E → 0, only σ_P
-     - σ_spring + σ_Maxwell
+     - :math:`\sigma_E \to 0`, only :math:`\sigma_P`
+     - :math:`\sigma_{\text{spring}} + \sigma_{\text{Maxwell}}`
    * - Temperature
-     - Arrhenius k_BER(T)
+     - Arrhenius :math:`k_{\text{BER}}(T)`
      - Time-temp superposition
    * - Relaxation time
-     - τ_E = 1/(2k_BER)
-     - τ = η/G
+     - :math:`\tau_E = 1/(2 k_{\text{BER}})`
+     - :math:`\tau = \eta/G`
    * - Best for
      - Vitrimers, CANs
      - Standard viscoelastics
@@ -689,7 +689,7 @@ HVM vs Zener Model
    plt.title("HVM vs Zener: Stress Relaxation")
    plt.show()
 
-**Key Difference:** Zener relaxes to G_e + G_eq/(1 + t/τ), while HVM relaxes to G_P only (σ_E → 0).
+**Key Difference:** Zener relaxes to :math:`G_e + G_{eq}/(1 + t/\tau)`, while HVM relaxes to :math:`G_P` only (:math:`\sigma_E \to 0`).
 
 HVNM vs Filled Rubber Models
 -----------------------------
@@ -706,13 +706,13 @@ HVNM vs Filled Rubber Models
      - P + D (2)
    * - Interphase
      - Explicit I-subnetwork
-     - Implicit in X(φ)
+     - Implicit in :math:`X(\phi)`
    * - Exchange
      - Matrix + interface BER
      - None (permanent + physical)
    * - Moduli amplification
-     - Guth-Gold X(φ)
-     - Guth-Gold X(φ)
+     - Guth-Gold :math:`X(\phi)`
+     - Guth-Gold :math:`X(\phi)`
    * - Relaxation
      - Dual TST kinetics
      - Single Maxwell mode
@@ -729,15 +729,15 @@ Computational Constraints
 .. warning::
    **Memory Requirements:**
 
-   - HVM: 11-component ODE → 8-12 GB RAM for NUTS
-   - HVNM: 17-18-component ODE → 12-16 GB RAM for NUTS
+   - HVM: 11-component ODE --- 8-12 GB RAM for NUTS
+   - HVNM: 17-18-component ODE --- 12-16 GB RAM for NUTS
    - LAOS with NUTS may OOM on 16 GB systems
 
 **Mitigation strategies:**
 
 1. Use **FAST_MODE** (50+100 warmup/samples) for exploratory analysis
 2. Reduce **num_chains=2** instead of default 4
-3. Subsample data for LAOS (1000 → 200 points)
+3. Subsample data for LAOS (1000 to 200 points)
 4. Use **NLSQ only** for parameter estimation if posteriors not needed
 
 Physical Limitations
@@ -757,7 +757,7 @@ Physical Limitations
 
 **3. No Damage Evolution**
 
-- Permanent bonds never break (G_P constant)
+- Permanent bonds never break (:math:`G_P` constant)
 - No fatigue or cyclic degradation
 - No void nucleation under large strains
 
@@ -771,12 +771,12 @@ Parameter Sensitivity
 ---------------------
 
 .. note::
-   **Critical parameters** (small changes → large effects):
+   **Critical parameters** (small changes lead to large effects):
 
    - **V_act**: Bounds (1e-8, 0.01), default 1e-5. Never use 1e-28 (unphysical)
-   - **E_a**: Typical 60-120 kJ/mol for vitrimers. Higher → slower exchange
-   - **beta_I**: Typical 1-5. Higher → stronger interphase reinforcement
-   - **phi**: Guth-Gold nonlinear above 0.2 (14.1φ² term dominates)
+   - **E_a**: Typical 60--120 kJ/mol for vitrimers. Higher means slower exchange
+   - **beta_I**: Typical 1--5. Higher means stronger interphase reinforcement
+   - **phi**: Guth-Gold nonlinear above 0.2 (:math:`14.1\phi^2` term dominates)
 
 Example Notebooks
 =================
@@ -806,7 +806,7 @@ RheoJAX provides 13 HVM example notebooks:
 **Key notebooks:**
 
 - **07**: Comprehensive overview with all 6 protocols
-- **02**: Demonstrates σ_E → 0 signature
+- **02**: Demonstrates :math:`\sigma_E \to 0` signature
 - **03**: TST stress overshoot mechanism
 
 HVNM Tutorials
@@ -834,7 +834,7 @@ HVNM Tutorials
 **Key notebooks:**
 
 - **07**: Demonstrates all 5 factory methods and limiting cases
-- **09-14**: Full NLSQ → NUTS workflow for each protocol
+- **09-14**: Full NLSQ to NUTS workflow for each protocol
 - **15**: Global fitting across multiple protocols (advanced)
 
 References
@@ -865,7 +865,7 @@ Foundational Papers
 
    Guth, E., & Gold, O. (1938). On the hydrodynamical theory of the viscosity of suspensions. *Physical Review*, 53(2), 322.
 
-   DOI: `10.1103/PhysRev.53.322 <https://doi.org/10.1103/PhysRev.53.322>`_
+   *Note: Conference abstract; no DOI registered with CrossRef.*
 
 Advanced Topics
 ---------------
@@ -874,17 +874,21 @@ Advanced Topics
 
    Capelot, M., Unterlass, M. M., Tournilhac, F., & Leibler, L. (2012). Catalytic control of the vitrimer glass transition. *ACS Macro Letters*, 1(7), 789-792.
 
+   DOI: `10.1021/mz300239f <https://doi.org/10.1021/mz300239f>`_
+
 6. **Stress-dependent exchange kinetics**
 
    Johlitz, M., Diebels, S., Possart, W., & Steinmann, P. (2008). Modelling of thermo-viscoelastic material behaviour of polyurethane close to the glass transition temperature. *ZAMM*, 88(8), 606-623.
+   https://doi.org/10.1002/zamm.200900361
 
 7. **Vitrimer nanocomposites (experimental)**
 
-   Long, R., Qi, H. J., & Dunn, M. L. (2018). Modeling the mechanics of covalently adaptable polymer networks with temperature-dependent bond exchange reactions. *Macromolecules*, 51(17), 6813-6825.
+   Long, R., Qi, H. J., & Dunn, M. L. (2013). Modeling the mechanics of covalently adaptable polymer networks with temperature-dependent bond exchange reactions. *Soft Matter*, 9, 4083-4096. https://doi.org/10.1039/C3SM27945F
 
 8. **Natural state formulation**
 
    Rajagopal, K. R., & Srinivasa, A. R. (2004). On thermomechanical restrictions of continua. *Proceedings of the Royal Society A*, 460(2042), 631-651.
+   https://doi.org/10.1098/rspa.2002.1111
 
 See Also
 ========

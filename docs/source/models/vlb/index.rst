@@ -60,7 +60,7 @@ Model Variants
    * - :class:`~rheojax.models.vlb.VLBLocal`
      - Single transient network (2 params: :math:`G_0, k_d`). All protocols analytical.
    * - :class:`~rheojax.models.vlb.VLBMultiNetwork`
-     - M transient + optional permanent network + solvent viscosity (2M + 1 or 2M + 2 params).
+     - M transient + optional permanent network + solvent viscosity (:math:`2M+1` or :math:`2M+2` params).
    * - :class:`~rheojax.models.vlb.VLBVariant`
      - Bell breakage + FENE-P + temperature flags (2-6 params). Shear thinning, bounded extension.
    * - :class:`~rheojax.models.vlb.VLBNonlocal`
@@ -90,7 +90,7 @@ Model Hierarchy
    ├── VLBVariant (Bell + FENE-P + Temperature)
    │   ├── Bell breakage: k_d(μ) = k_d₀·exp(ν·(λ_c - 1))
    │   ├── FENE-P stress: σ = G₀·f(tr(μ))·(μ - I)
-   │   ├── Temperature: Arrhenius k_d(T), G₀(T) = G₀ᵣₑf·T/Tᵣₑf
+   │   ├── Temperature: Arrhenius k_d(T), G_0(T) = G_0_ref·T/T_ref
    │   └── All 6 protocols via ODE (SAOS analytical)
    │
    └── VLBNonlocal (Spatial PDE)
@@ -144,7 +144,7 @@ When to Use Which Model
      - No
    * - Fewest parameters
      - 2 params
-     - 2N + 1 or 2N + 2
+     - :math:`2N+1` or :math:`2N+2`
      - 2-6 params
      - 4-6 params
 
@@ -189,7 +189,7 @@ Quick Start
    from rheojax.models import VLBLocal
 
    model = VLBLocal()
-   model.fit(omega, G_star, test_mode="oscillation")
+   model.fit(omega, G_star, test_mode='oscillation')
 
    # Properties
    print(f"G₀ = {model.G0:.1f} Pa")
@@ -204,7 +204,7 @@ Quick Start
    from rheojax.models import VLBMultiNetwork
 
    model = VLBMultiNetwork(n_modes=3, include_permanent=True)
-   model.fit(omega, G_star, test_mode="oscillation")
+   model.fit(omega, G_star, test_mode='oscillation')
 
    # Relaxation spectrum
    spectrum = model.get_relaxation_spectrum()
@@ -216,9 +216,9 @@ Quick Start
 .. code-block:: python
 
    model = VLBLocal()
-   model.fit(omega, G_star, test_mode="oscillation")  # NLSQ warm start
+   model.fit(omega, G_star, test_mode='oscillation')  # NLSQ warm start
    result = model.fit_bayesian(
-       omega, G_star, test_mode="oscillation",
+       omega, G_star, test_mode='oscillation',
        num_warmup=1000, num_samples=2000,
    )
 

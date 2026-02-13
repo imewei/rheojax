@@ -1,25 +1,28 @@
-# Rheo Examples and Tutorials
+# RheoJAX Examples and Tutorials
 
-Welcome to the Rheo example notebooks! This directory contains comprehensive, hands-on tutorials for learning the Rheo package.
+Welcome to the RheoJAX example notebooks! This directory contains comprehensive, hands-on tutorials for learning the RheoJAX package.
 
 ## Overview
 
-Rheo provides a unified framework for analyzing experimental rheology data with modern computational patterns. These examples progress from basic model fitting through advanced analysis techniques, all leveraging JAX acceleration and Bayesian inference.
+RheoJAX provides a unified framework for analyzing experimental rheology data with modern computational patterns. These examples progress from basic model fitting through advanced analysis techniques, all leveraging JAX acceleration and Bayesian inference.
 
 **Key Features Demonstrated:**
 - JAX-accelerated numerical optimization (5-270x speedup)
 - Bayesian inference with full convergence diagnostics
 - Flexible API design (Pipeline, Modular, Core layers)
-- All 28 rheological models with examples (including SGR, TNT)
-- Advanced transforms for experimental data analysis (including SRFS)
+- All 53 rheological models with examples across 22 families
+- Advanced transforms for experimental data analysis (including SRFS, SPP)
+- DMTA/DMA support with E* ↔ G* conversion workflows
 - **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**156 Tutorial Notebooks** (all complete ✅) organized into 15 learning paths:
+**240+ Tutorial Notebooks** (all complete ✅) organized into 21 categories:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
-- **Transform Workflows** (7 notebooks ✅) - Data analysis techniques (+ SRFS)
-- **Bayesian Inference** (7 notebooks ✅) - Uncertainty quantification
-- **Advanced Workflows** (9 notebooks ✅) - Production patterns (+ SGR)
+- **Transform Workflows** (8 notebooks ✅) - Data analysis techniques (FFT, TTS, SRFS, SPP)
+- **Bayesian Inference** (9 notebooks ✅) - Uncertainty quantification (including SPP LAOS)
+- **Advanced Workflows** (10 notebooks ✅) - Production patterns (including SGR and SPP)
+- **I/O** (1 notebook ✅) - TRIOS complex modulus handling
 - **DMT Thixotropic Models** (6 notebooks ✅) - Structural-kinetics thixotropy across all 6 protocols
+- **DMTA/DMA Analysis** (8 notebooks ✅) - Modulus conversion, GMM fitting, real-data workflows
 - **EPM Mesoscopic Models** (6 notebooks ✅) - Elasto-Plastic Model for amorphous solids across 5 protocols + visualization
 - **SGR Soft Glassy Models** (6 notebooks ✅) - Soft Glassy Rheology across all 6 protocols
 - **STZ Amorphous Solid Models** (6 notebooks ✅) - Shear Transformation Zones across all 6 protocols
@@ -30,6 +33,10 @@ Rheo provides a unified framework for analyzing experimental rheology data with 
 - **FIKH Fractional IKH Models** (12 notebooks ✅) - FIKH single-mode and FMLIKH multi-mode with Caputo fractional memory
 - **ITT-MCT Mode-Coupling Theory Models** (12 notebooks ✅) - Schematic F₁₂ and Isotropic ISM models for colloidal glasses
 - **TNT Transient Network Theory Models** (30 notebooks ✅) - 5 TNT model classes (SingleMode, Cates, LoopBridge, MultiSpecies, StickyRouse) across all 6 protocols
+- **VLB Transient Network Models** (16 notebooks ✅) - 6 protocols + Bayesian + Bell + FENE + Nonlocal + NLSQ-to-NUTS
+- **HVM Hybrid Vitrimer Models** (13 notebooks ✅) - 6 basic + 7 advanced tutorials (TST kinetics, factory methods)
+- **HVNM Vitrimer Nanocomposite Models** (15 notebooks ✅) - 7 basic + 8 NLSQ/NUTS (dual TST, Guth-Gold)
+- **Verification Suite** (31 notebooks ✅) - Cross-model validation (6 protocol validators + 25 material-specific)
 
 ## Prerequisites
 
@@ -225,7 +232,7 @@ Tackle complex, production-ready analysis patterns for advanced rheological char
 - Select appropriate fractional models based on data characteristics
 - Optimize computational performance using GPU and JIT compilation
 - Scale analyses to 10K+ data points efficiently
-- Integrate Rheo into production workflows
+- Integrate RheoJAX into production workflows
 - Apply SGR models to soft glassy materials (foams, emulsions, pastes)
 - Interpret noise temperature x and classify material regimes
 
@@ -936,7 +943,7 @@ Once you've completed these examples:
 1. **Read the Documentation:** https://rheojax.readthedocs.io/
 2. **Explore Source Code:** `/Users/b80985/Projects/rheojax/rheojax/`
 3. **Run Tests:** `make test` to verify your installation
-4. **Contribute:** Help improve Rheo or add new examples
+4. **Contribute:** Help improve RheoJAX or add new examples
 
 ## Key Concepts Reference
 
@@ -959,7 +966,7 @@ Once you've completed these examples:
 - **Creep** (SC): Strain evolution under constant stress
 - **Rotation** (SS): Steady shear (viscosity) at various shear rates
 
-### Modern Rheo Advantages
+### Modern RheoJAX Advantages
 
 - **NLSQ Optimization:** 5-270x faster than scipy
 - **JAX Acceleration:** 20-100x speedup on GPU

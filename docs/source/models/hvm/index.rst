@@ -175,9 +175,9 @@ Quick Start
 .. code-block:: python
 
    model = HVMLocal()
-   model.fit(omega, G_star, test_mode="oscillation")     # NLSQ warm start
+   model.fit(omega, G_star, test_mode='oscillation')     # NLSQ warm start
    result = model.fit_bayesian(
-       omega, G_star, test_mode="oscillation",
+       omega, G_star, test_mode='oscillation',
        num_warmup=1000, num_samples=2000,
    )
 
@@ -209,12 +209,15 @@ References
 1. Vernerey, F.J., Long, R. & Brighenti, R. (2017). "A statistically-based
    continuum theory for polymers with transient networks." *J. Mech. Phys.
    Solids*, 107, 1-20.
+   https://doi.org/10.1016/j.jmps.2017.05.016
 
 2. Meng, F., Saed, M.O. & Terentjev, E.M. (2019). "Elasticity and Relaxation
    in Full and Partial Vitrimer Networks." *Macromolecules*, 52(19), 7423-7429.
+   https://doi.org/10.1021/acs.macromol.9b01123
 
 3. Montarnal, D., Capelot, M., Tournilhac, F. & Leibler, L. (2011).
    "Silica-like malleable materials from permanent organic networks."
    *Science*, 334, 965-968.
+   https://doi.org/10.1126/science.1212648
 
 See :doc:`hvm_advanced` for the full reference list (12 citations).

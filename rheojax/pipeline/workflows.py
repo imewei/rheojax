@@ -163,7 +163,7 @@ class MastercurvePipeline(Pipeline):
         all_y = np.concatenate([np.array(d.y) for d in datasets])
         all_temps = np.concatenate(
             [
-                np.full(len(d.x), temp)
+                np.full(len(d.x), temp)  # type: ignore[arg-type]
                 for d, temp in zip(datasets, temperatures, strict=False)
             ]
         )
@@ -204,12 +204,22 @@ class MastercurvePipeline(Pipeline):
             if temp == self.reference_temp:
                 shift = 1.0
             else:
-                log_shift = (
-                    -C1
-                    * (temp - self.reference_temp)
-                    / (C2 + temp - self.reference_temp)
-                )
-                shift = 10**log_shift
+                denominator = C2 + temp - self.reference_temp
+                if abs(denominator) < 1e-10:
+                    logger.warning(
+                        "Temperature at WLF singularity",
+                        temp=temp,
+                        reference_temp=self.reference_temp,
+                        C2=C2,
+                    )
+                    shift = np.inf
+                else:
+                    log_shift = (
+                        -C1
+                        * (temp - self.reference_temp)
+                        / denominator
+                    )
+                    shift = 10**log_shift
 
             self.shift_factors[float(temp)] = shift
 
@@ -319,9 +329,9 @@ class ModelComparisonPipeline(Pipeline):
                 if nlsq_result is not None and nlsq_result.rmse is not None:
                     # Use NLSQ 0.6.0 CurveFitResult-compatible properties
                     rmse = nlsq_result.rmse
-                    r_squared = nlsq_result.r_squared or 0.0
-                    aic = nlsq_result.aic
-                    bic = nlsq_result.bic
+                    r_squared = nlsq_result.r_squared if nlsq_result.r_squared is not None else 0.0
+                    aic = nlsq_result.aic if nlsq_result.aic is not None else np.inf
+                    bic = nlsq_result.bic if nlsq_result.bic is not None else np.inf
                 else:
                     # Fallback: Calculate metrics manually
                     rmse = np.sqrt(np.mean(residuals**2))
@@ -334,16 +344,20 @@ class ModelComparisonPipeline(Pipeline):
                     # Calculate AIC/BIC manually
                     n = len(y)
                     k = len(model.parameters) if hasattr(model, "parameters") else 0
-                    if n > 0 and rmse > 0:
-                        rss = np.sum(residuals**2)
+                    rss = np.sum(residuals**2)
+                    if n > 0 and rss > 0:
                         aic = 2 * k + n * np.log(rss / n)
                         bic = k * np.log(n) + n * np.log(rss / n)
+                    elif n > 0 and rss == 0:
+                        aic = -np.inf  # Perfect fit
+                        bic = -np.inf
                     else:
                         aic = np.inf
                         bic = np.inf
 
                 # Calculate relative RMSE
-                rel_rmse = rmse / np.mean(np.abs(y))
+                mean_abs_y = np.mean(np.abs(y))
+                rel_rmse = rmse / mean_abs_y if mean_abs_y > 1e-15 else np.inf
 
                 # Store results
                 n_params = len(model.parameters) if hasattr(model, "parameters") else 0
@@ -484,7 +498,7 @@ class CreepToRelaxationPipeline(Pipeline):
         logger.info(
             "Starting creep to relaxation conversion",
             method=method,
-            data_points=len(creep_data.x),
+            data_points=len(creep_data.x),  # type: ignore[arg-type]
         )
         start_time = time.perf_counter()
 
@@ -605,7 +619,7 @@ class FrequencyToTimePipeline(Pipeline):
         logger.info(
             "Starting frequency to time conversion",
             n_points=n_points,
-            input_points=len(frequency_data.x),
+            input_points=len(frequency_data.x),  # type: ignore[arg-type]
         )
         start_time = time.perf_counter()
 
@@ -618,6 +632,10 @@ class FrequencyToTimePipeline(Pipeline):
                 # Auto-generate from frequency range
                 w_min = np.min(np.array(frequency_data.x))
                 w_max = np.max(np.array(frequency_data.x))
+                if w_min <= 0 or w_max <= 0:
+                    raise ValueError(
+                        "Frequency data must be positive for time conversion"
+                    )
                 t_min = 1.0 / w_max
                 t_max = 1.0 / w_min
             else:
@@ -822,7 +840,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
 
             # Ensure required metadata is present for downstream transforms/models
             if data.metadata is None:
-                data.metadata = {}
+                data.metadata = {}  # type: ignore[unreachable]
             data.metadata.setdefault("test_mode", "oscillation")
             data.metadata.setdefault("gamma_0", gamma_0)
             data.metadata.setdefault("omega", self.omega)
@@ -843,7 +861,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
             )
 
             try:
-                decomposer.transform(data)
+                decomposer.transform(data)  # type: ignore[arg-type]
                 results = decomposer.get_results()
                 self.results[float(gamma_0)] = results
 

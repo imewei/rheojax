@@ -1873,11 +1873,11 @@ Flow Curve Fitting
 
    # Fit with exponential closure
    model = DMTLocal(closure="exponential", include_elasticity=True)
-   model.fit(gamma_dot, stress, test_mode="flow_curve")
+   model.fit(gamma_dot, stress, test_mode='flow_curve')
 
    # Predict flow curve
    gamma_dot_pred = np.logspace(-3, 3, 100)
-   stress_pred = model.predict(gamma_dot_pred, test_mode="flow_curve")
+   stress_pred = model.predict(gamma_dot_pred, test_mode='flow_curve')
 
 Startup Shear with Stress Overshoot
 -----------------------------------
@@ -2130,35 +2130,42 @@ Literature References
 
 .. [deSouzaMendes2009] de Souza Mendes, P. R. (2009). "Modeling the thixotropic behavior
    of structured fluids." *Journal of Non-Newtonian Fluid Mechanics*, 164(1-3), 66-75.
+   https://doi.org/10.1016/j.jnnfm.2009.08.005
 
 .. [Mendes2011] de Souza Mendes, P. R., & Thompson, R. L. (2012). "A critical overview
    of elasto-viscoplastic thixotropic modeling." *Journal of Non-Newtonian Fluid
    Mechanics*, 187-188, 8-15.
+   https://doi.org/10.1016/j.jnnfm.2012.08.006
 
-.. [Thompson2014] Thompson, R. L., & de Souza Mendes, P. R. (2014). "Thixotropic behavior
-   of elasto-viscoplastic materials." *Physics of Fluids*, 26(2), 023101.
+.. [Thompson2014] de Souza Mendes, P. R., & Thompson, R. L. (2013). "A unified approach
+   to model elasto-viscoplastic thixotropic yield-stress materials and apparent yield-stress
+   fluids." *Rheologica Acta*, 52(7), 673-694.
+   https://doi.org/10.1007/s00397-013-0699-1
 
 .. [Coussot2002] Coussot, P., Nguyen, Q. D., Huynh, H. T., & Bonn, D. (2002). "Avalanche
    behavior in yield stress fluids." *Physical Review Letters*, 88(17), 175501.
+   https://doi.org/10.1103/PhysRevLett.88.175501
 
 .. [Mujumdar2002] Mujumdar, A., Beris, A. N., & Metzner, A. B. (2002). "Transient phenomena
    in thixotropic systems." *Journal of Non-Newtonian Fluid Mechanics*, 102(2), 157-178.
+   https://doi.org/10.1016/S0377-0257(01)00176-8
 
 .. [Dullaert2006] Dullaert, K., & Mewis, J. (2006). "A structural kinetics model for
    thixotropy." *Journal of Non-Newtonian Fluid Mechanics*, 139(1-2), 21-30.
+   https://doi.org/10.1016/j.jnnfm.2006.06.002
 
 .. [Larson2019] Larson, R. G., & Wei, Y. (2019). "A review of thixotropy and its
    rheological modeling." *Journal of Rheology*, 63(3), 477-501.
-
-.. [Mendes2013] de Souza Mendes, P. R., & Thompson, R. L. (2013). "A unified approach
-   to model elasto-viscoplastic thixotropic yield-stress materials and apparent
-   yield-stress fluids." *Rheologica Acta*, 52(7), 673-694.
+   https://doi.org/10.1122/1.5055031
 
 .. [MewisWagner2009] Mewis, J., & Wagner, N. J. (2009). "Thixotropy." *Advances in
    Colloid and Interface Science*, 147-148, 214-227.
+   https://doi.org/10.1016/j.cis.2008.09.005
 
 .. [Sollich1997] Sollich, P., Lequeux, F., Hébraud, P., & Cates, M. E. (1997).
    "Rheology of soft glassy materials." *Physical Review Letters*, 78(10), 2020-2023.
+   https://doi.org/10.1103/PhysRevLett.78.2020
 
 .. [SoftMatter2011] de Souza Mendes, P. R. (2011). "Thixotropic elasto-viscoplastic
    model for structured fluids." *Soft Matter*, 7(6), 2471-2483.
+   https://doi.org/10.1039/C0SM01021A

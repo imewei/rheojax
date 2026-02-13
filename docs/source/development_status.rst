@@ -3,7 +3,7 @@
 Development Status & Performance
 ================================
 
-This page tracks the development history of RheoJAX across 10 completed phases
+This page tracks the development history of RheoJAX across 11 completed phases
 and provides performance benchmarks.
 
 Development Phases
@@ -22,7 +22,7 @@ Development Phases
    - 53 rheological models across 22 families
    - 7 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer)
    - Pipeline API for fluent workflows
-   - 56 tutorial notebooks (basic, transforms, bayesian, advanced, vlb, hvm, hvnm)
+   - 246 tutorial notebooks across 21 categories (basic, transforms, bayesian, advanced, dmta, and 16 model family suites)
 
 **Phase 3 (Complete)**: Bayesian Inference
    - NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
@@ -67,7 +67,7 @@ Development Phases
 **Phase 8 (Complete)**: Advanced Constitutive Models (v0.6.0)
    - Fluidity-Saramito EVP: Tensorial viscoelasticity with thixotropic fluidity
    - IKH/FIKH: Isotropic-kinematic hardening with fractional variants (4 models)
-   - Hebraud-Lequeux: Mean-field model for concentrated emulsions
+   - Hébraud-Lequeux: Mean-field model for concentrated emulsions
    - Giesekus: Single-mode and multi-mode nonlinear viscoelastic models
    - DMT: de Souza Mendes-Thompson thixotropic models (local + nonlocal)
    - ITT-MCT: Mode-Coupling Theory for dense colloids (schematic + isotropic)
@@ -83,6 +83,18 @@ Development Phases
    - TST kinetics with Arrhenius temperature dependence
    - Factor-of-2 relaxation, Guth-Gold strain amplification for HVNM
    - 5 factory methods each for limiting cases
+
+**Phase 11 (Complete)**: DMTA / DMA Support (v0.6.0)
+   - DeformationMode enum (SHEAR, TENSION, BENDING, COMPRESSION) in ``core.test_modes``
+   - ``convert_modulus()`` utility for array-level E* ↔ G* conversion via Poisson's ratio
+   - BaseModel ``fit()``/``predict()``/``fit_bayesian()`` accept ``deformation_mode`` and ``poisson_ratio``
+   - Automatic E* → G* conversion at model boundary; G* → E* reconversion in ``predict()``
+   - CSV reader auto-detects E'/E'' columns and sets deformation metadata
+   - ModelRegistry ``find(deformation_mode=)`` filtering — 49 models support TENSION, 10 shear-only
+   - Poisson ratio presets: rubber (0.5), glassy polymer (0.35), semicrystalline (0.40)
+   - 8 DMTA handbook pages (theory, workflows, models, protocols, knowledge, numerical, extensions)
+   - 8 DMTA tutorial notebooks covering basics through cross-domain validation
+   - 33 new tests (modulus conversion, deformation mode enum, registry integration)
 
 ----
 
@@ -127,10 +139,10 @@ Technology Stack
 
 **Core Dependencies**
    - Python 3.12+
-   - JAX 0.8.0+ for acceleration and automatic differentiation
-   - NLSQ 0.6.6+ for GPU-accelerated optimization
-   - NumPyro for Bayesian inference (MCMC NUTS sampling)
-   - ArviZ 0.15.0+ for Bayesian visualization and diagnostics
+   - JAX >=0.8.3 for acceleration and automatic differentiation
+   - NLSQ >=0.6.8 for GPU-accelerated optimization (workflow system, prediction intervals)
+   - NumPyro for Bayesian inference (MCMC NUTS sampling, multi-chain parallelization)
+   - ArviZ >=0.23.4 for Bayesian visualization and diagnostics
    - NumPy, SciPy for numerical operations
    - Matplotlib for visualization
    - h5py, pandas, openpyxl for I/O

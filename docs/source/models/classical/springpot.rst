@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Power-law behavior, broad relaxation spectra, fractional viscoelasticity
-- **Parameters:** 2 (c_alpha, :math:`\alpha`)
+- **Parameters:** 2 (:math:`c_\alpha`, :math:`\alpha`)
 - **Key equation:** :math:`G^*(\omega) = V (i\omega)^{\alpha}`, :math:`G'(\omega) \sim G''(\omega) \sim \omega^{\alpha}`
 - **Test modes:** Oscillation, relaxation, creep
 - **Material examples:** Critical gels (:math:`\alpha=0.5`), polymer melts near Tg, soft glassy materials, biological tissues
@@ -111,9 +111,9 @@ correlations (unlike exponential memory in Maxwell models).
 
 **Physical interpretation of** :math:`\alpha` **:**
 
-- :math:`\alpha` → 0: Short-range memory (elastic, spring-like)
-- :math:`\alpha` = 0.5: Self-similar memory (critical gel)
-- :math:`\alpha` → 1: Long-range memory (viscous, dashpot-like)
+- :math:`\alpha \to 0`: Short-range memory (elastic, spring-like)
+- :math:`\alpha = 0.5`: Self-similar memory (critical gel)
+- :math:`\alpha \to 1`: Long-range memory (viscous, dashpot-like)
 
 Physical Foundation
 -------------------
@@ -143,7 +143,7 @@ The fractional order :math:`\alpha` quantifies the **width of the relaxation spe
 - :math:`\alpha \to 1`: Nearly viscous (dashpot-like), narrow spectrum
 - :math:`0 < \alpha < 1`: Broad distribution of relaxation times, **power-law behavior**
 
-Materials with hierarchical structures, fractal networks, or significant polydispersity exhibit intermediate :math:`\alpha` values (0.2 < :math:`\alpha` < 0.8).
+Materials with hierarchical structures, fractal networks, or significant polydispersity exhibit intermediate :math:`\alpha` values (:math:`0.2 < \alpha < 0.8`).
 
 Governing Equations
 -------------------
@@ -225,7 +225,7 @@ Limitations
    Real materials exhibit power-law behavior only over limited frequency/time windows. SpringPot should be restricted to the range where :math:`\log(G')` vs :math:`\log(\omega)` is linear.
 
 **Singular limits:**
-   :math:`\alpha \to 0 or \alpha` → 1 are numerically unstable. Use bounds [0.05, 0.95] in fitting. For :math:`\alpha` < 0.1, use spring model; for :math:`\alpha` > 0.9, use dashpot model.
+   :math:`\alpha \to 0` or :math:`\alpha \to 1` are numerically unstable. Use bounds [0.05, 0.95] in fitting. For :math:`\alpha < 0.1`, use spring model; for :math:`\alpha > 0.9`, use dashpot model.
 
 **Temperature dependence:**
    Both V and :math:`\alpha` may depend on temperature. For time-temperature superposition, use composite models where :math:`\alpha` can remain constant while timescales shift.
@@ -253,13 +253,13 @@ Parameter Interpretation
    Fitted :math:`\alpha` quantifies spectrum breadth and material state:
 
    - **Low** :math:`\alpha` **(<0.2)**: Narrow spectrum, nearly elastic solid
-   - :math:`\alpha` **≈ 0.5**: Critical gel (Winter-Chambon criterion), self-similar structure
+   - :math:`\alpha \approx 0.5`: Critical gel (Winter-Chambon criterion), self-similar structure
    - **High** :math:`\alpha` **(>0.8)**: Broad spectrum, nearly viscous liquid
 
    *For researchers*: :math:`\alpha` relates to structural complexity:
-      - Monodisperse systems: :math:`\alpha` → 0 or 1 (single timescale)
-      - Polydisperse/hierarchical systems: 0.2 < :math:`\alpha` < 0.8 (broad spectrum)
-      - At gel point: :math:`\alpha` = 0.5 exactly (percolation threshold)
+      - Monodisperse systems: :math:`\alpha \to 0` or :math:`1` (single timescale)
+      - Polydisperse/hierarchical systems: :math:`0.2 < \alpha < 0.8` (broad spectrum)
+      - At gel point: :math:`\alpha = 0.5` exactly (percolation threshold)
 
    *For quality control*: Track :math:`\alpha` to monitor gelation progress or structural degradation.
 
@@ -288,11 +288,11 @@ Material Classification
      - Polymer melts near T\ :sub:`g`
 
 **Winter-Chambon Gel Point Criterion:**
-   At gelation, :math:`\alpha` = 0.5 exactly and :math:`\tan\delta = 1` (G' = G'').
+   At gelation, :math:`\alpha = 0.5` exactly and :math:`\tan\delta = 1` (:math:`G' = G''`).
 
    To verify gel point:
       1. Fit SpringPot to frequency sweep
-      2. Check :math:`\alpha` ≈ 0.5 (within ±0.05)
+      2. Check :math:`\alpha \approx 0.5` (within :math:`\pm 0.05`)
       3. Verify :math:`\tan\delta` is frequency-independent
       4. Confirm :math:`G' \approx G''` across decades
 
@@ -301,7 +301,7 @@ Diagnostic Indicators
 
 **Warning signs in fitted parameters:**
 
-- **If** :math:`\alpha < 0.1 or \alpha` **> 0.9**: Power-law regime too narrow; SpringPot not appropriate. Use Maxwell (:math:`\alpha` → 1) or spring (:math:`\alpha` → 0) instead.
+- **If** :math:`\alpha < 0.1` **or** :math:`\alpha > 0.9`: Power-law regime too narrow; SpringPot not appropriate. Use Maxwell (:math:`\alpha \to 1`) or spring (:math:`\alpha \to 0`) instead.
 - **If fit quality poor (** :math:`R^2` **< 0.95)**: Material exhibits plateaus or terminal flow. Use Fractional Maxwell or Fractional Zener models.
 - **If** :math:`\alpha` **varies with temperature**: Material is thermorheologically complex. Cannot use simple time-temperature superposition.
 - **If tan** :math:`\delta` **not constant**: Pure SpringPot inadequate; mixture of relaxation processes. Use composite models.
@@ -310,7 +310,7 @@ Diagnostic Indicators
 
 1. **Log-log linearity**: Plot :math:`\log(G')` vs :math:`\log(\omega)` → slope should equal :math:`\alpha` across entire range
 2. **Loss tangent constancy**: :math:`\tan\delta = \tan(\pi\alpha/2)` should be frequency-independent
-3. **G'/G'' ratio**: Should satisfy :math:`G'/G'' = \cot(\pi\alpha/2)` at all frequencies
+3. :math:`G'/G''` **ratio**: Should satisfy :math:`G'/G'' = \cot(\pi\alpha/2)` at all frequencies
 4. **Relaxation modulus**: :math:`\log(G(t))` vs :math:`\log(t)` → slope = -:math:`\alpha`
 
 Application Examples
@@ -318,13 +318,13 @@ Application Examples
 
 **Gel Point Determination:**
    - Track :math:`\alpha` during crosslinking/gelation
-   - Gel point occurs when :math:`\alpha` = 0.5 (±0.05)
+   - Gel point occurs when :math:`\alpha = 0.5` (:math:`\pm 0.05`)
    - Confirms percolation transition
 
 **Material Development:**
    - Tune crosslink density to achieve target :math:`\alpha`
-   - :math:`\alpha` = 0.3-0.4 for soft tissue mimics
-   - :math:`\alpha` = 0.5 for self-healing gels at rest state
+   - :math:`\alpha = 0.3\text{--}0.4` for soft tissue mimics
+   - :math:`\alpha = 0.5` for self-healing gels at rest state
 
 **Quality Control:**
    - Monitor :math:`\alpha` batch-to-batch for consistency
@@ -438,7 +438,7 @@ Optimization Algorithm Selection
 **Fitting strategy:**
    - Use log-spaced data to avoid early/late time dominance
    - Fit in log-space: minimize :math:`\sum (\log|G^*_{\text{data}}| - \log|G^*_{\text{fit}}|)^2`
-   - Weight G' and G'' equally in log-space
+   - Weight :math:`G'` and :math:`G''` equally in log-space
 
 Troubleshooting Common Fitting Problems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -452,7 +452,7 @@ Troubleshooting Common Fitting Problems
      - Solution
    * - :math:`\alpha` converges to bounds (0.05 or 0.95)
      - Power-law regime too narrow
-     - Use Maxwell (:math:`\alpha` → 1) or spring (:math:`\alpha` → 0) model instead
+     - Use Maxwell (:math:`\alpha \to 1`) or spring (:math:`\alpha \to 0`) model instead
    * - Poor fit despite linear log-log plot
      - Transition regions at data edges
      - Restrict fitting to middle decade where slope is constant
@@ -488,7 +488,7 @@ If :math:`\tan\delta` varies > 10% across frequency range, SpringPot is inadequa
 
 Residuals in log-space should be:
    - Random (no systematic curvature)
-   - Equal magnitude for G' and G''
+   - Equal magnitude for :math:`G'` and :math:`G''`
    - RMSE < 0.1 (10% error in log-space)
 
 **4. Cross-validation**
@@ -685,7 +685,7 @@ References
 .. [7] Muthukumar, M. "Screening effect on viscoelasticity near the gel point."
    *Macromolecules*, 22, 4656–4658 (1989). https://doi.org/10.1021/ma00202a050
 
-.. [8] Lakes, R. S. *Viscoelastic Solids*. CRC Press (1999). ISBN: 978-0849396588
+.. [8] Lakes, R. S. *Viscoelastic Solids*. CRC Press (1998). ISBN: 978-0849396588
 
 .. [9] Fung, Y. C. *Biomechanics: Mechanical Properties of Living Tissues*, 2nd ed.
    Springer (1993). https://doi.org/10.1007/978-1-4757-2257-4

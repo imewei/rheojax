@@ -597,10 +597,10 @@ class DataPage(QWidget):
     def _reset_mapping(self) -> None:
         """Reset column mapping to defaults."""
         if self._preview_data:
-            headers = [
-                self._preview_table.horizontalHeaderItem(i).text()
-                for i in range(self._preview_table.columnCount())
-            ]
+            headers = []
+            for i in range(self._preview_table.columnCount()):
+                item = self._preview_table.horizontalHeaderItem(i)
+                headers.append(item.text() if item is not None else f"Column {i}")
             self._update_column_mappers(headers)
 
     def _apply_import(self) -> None:
@@ -727,9 +727,9 @@ class DataPage(QWidget):
             return
 
         # Build a simple table view from stored data
-        x_vals = dataset.x_data or []
-        y_vals = dataset.y_data or []
-        y2_vals = dataset.y2_data or []
+        x_vals = dataset.x_data if dataset.x_data is not None else []
+        y_vals = dataset.y_data if dataset.y_data is not None else []
+        y2_vals = dataset.y2_data if dataset.y2_data is not None else []
 
         # Determine columns
         headers = ["x", "y"]

@@ -60,7 +60,7 @@ def test_project_save_load_round_trip(tmp_path: Path):
         "parameters": result.parameters,
     }
 
-    proj_path = tmp_path / "sample.rheo"
+    proj_path = tmp_path / "sample.rheojax"
     exporter.save_project(state, proj_path)
 
     loaded = exporter.load_project(proj_path)

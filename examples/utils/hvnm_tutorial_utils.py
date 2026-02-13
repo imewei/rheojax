@@ -21,7 +21,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 # =============================================================================
 # FAST_MODE Configuration
 # =============================================================================
@@ -434,7 +433,7 @@ def load_multi_technique() -> dict[str, ProtocolData]:
         lines = section.strip().split("\n")
         step_name = lines[0].strip()
         header_line = lines[1].strip()
-        units_line = lines[2].strip()
+        _units_line = lines[2].strip()
         headers = header_line.split("\t")
         data_lines = lines[3:]
 

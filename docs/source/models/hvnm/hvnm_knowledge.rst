@@ -65,12 +65,12 @@ Parameter-to-Physics Map
 Diagnostic Decision Tree
 -------------------------
 
-1. **Single relaxation mode in G''** → use HVM (no interphase needed)
+1. **Single relaxation mode in :math:`G''`** → use HVM (no interphase needed)
 2. **Two relaxation modes + phi dependence** → use HVNM
-3. **Third slow mode in G''** → ``include_diffusion=True``
+3. **Third slow mode in :math:`G''`** → ``include_diffusion=True``
 4. **Stress softening in cyclic tests** → ``include_interfacial_damage=True``
-5. **Monotonic G'(phi) matching Guth-Gold** → standard HVNM
-6. **G'(phi) deviates from Guth-Gold** → investigate NP aggregation
+5. **Monotonic :math:`G'(\phi)` matching Guth-Gold** → standard HVNM
+6. **:math:`G'(\phi)` deviates from Guth-Gold** → investigate NP aggregation
 
 
 Multi-Protocol Fitting Strategy

@@ -1,7 +1,7 @@
 """Base classes for models and transforms with JAX support.
 
 This module provides abstract base classes that define consistent interfaces
-for all models and transforms in the rheo package, with full JAX support.
+for all models and transforms in the rheojax package, with full JAX support.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import numpy as np
 from rheojax.core.bayesian import BayesianMixin, BayesianResult
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import Parameter, ParameterSet
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 
 # Module-level logger
@@ -52,6 +53,8 @@ class BaseModel(BayesianMixin, ABC):
         self._bayesian_result = None  # Store Bayesian inference result
         self.X_data = None  # Store data for Bayesian inference
         self.y_data = None
+        self._deformation_mode: DeformationMode | None = None
+        self._poisson_ratio: float = 0.5
 
     @abstractmethod
     def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> BaseModel:
@@ -106,7 +109,7 @@ class BaseModel(BayesianMixin, ABC):
             from rheojax.utils.data_quality import detect_data_range_decades
 
             x_array = X.x if isinstance(X, RheoData) else X
-            decades = detect_data_range_decades(x_array)
+            decades = detect_data_range_decades(x_array)  # type: ignore[arg-type]
 
             if use_log_residuals is None:
                 if decades > 8.0:
@@ -171,7 +174,12 @@ class BaseModel(BayesianMixin, ABC):
                 G_star=y if test_mode == "oscillation" else None,
                 test_mode=test_mode,
             )
-        except Exception:
+        except Exception as exc:
+            logger.debug(
+                "Compatibility check failed",
+                model=self.__class__.__name__,
+                error=str(exc),
+            )
             return None
 
     def _enhance_error_with_compatibility(
@@ -230,6 +238,8 @@ class BaseModel(BayesianMixin, ABC):
         use_multi_start: bool | None = None,
         n_starts: int = 5,
         perturb_factor: float = 0.3,
+        deformation_mode: str | DeformationMode | None = None,
+        poisson_ratio: float = 0.5,
         **kwargs,
     ) -> BaseModel:
         """Fit the model to data using NLSQ optimization.
@@ -280,6 +290,39 @@ class BaseModel(BayesianMixin, ABC):
             data_shape=data_shape,
             method=method,
         )
+
+        # Handle deformation mode: auto-detect from RheoData or explicit parameter
+        if deformation_mode is None:
+            from rheojax.core.data import RheoData
+
+            if isinstance(X, RheoData):
+                deformation_mode = X.metadata.get("deformation_mode", None)
+                # When auto-detecting tensile mode from RheoData, extract x/y
+                # so that downstream _fit() uses the converted y, not RheoData.y
+                if deformation_mode is not None:
+                    if y is None:
+                        y = X.y  # type: ignore[unreachable]
+                    X = X.x  # type: ignore[assignment]
+
+        if deformation_mode is not None:
+            if isinstance(deformation_mode, str):
+                deformation_mode = DeformationMode(deformation_mode)
+            self._deformation_mode = deformation_mode
+            self._poisson_ratio = poisson_ratio
+
+            # Convert E* -> G* if tensile deformation mode
+            if deformation_mode.is_tensile() and y is not None:
+                from rheojax.utils.modulus_conversion import convert_modulus
+
+                y = convert_modulus(y, deformation_mode, DeformationMode.SHEAR, poisson_ratio)
+                logger.info(
+                    "Converted tensile modulus to shear for fitting",
+                    model=self.__class__.__name__,
+                    from_mode=str(deformation_mode),
+                    poisson_ratio=poisson_ratio,
+                )
+        else:
+            self._deformation_mode = None
 
         # Store data for potential Bayesian inference
         self.X_data = X
@@ -360,7 +403,7 @@ class BaseModel(BayesianMixin, ABC):
 
         return self
 
-    def fit_bayesian(
+    def fit_bayesian(  # type: ignore[override]
         self,
         X: ArrayLike,
         y: ArrayLike | None = None,
@@ -370,6 +413,8 @@ class BaseModel(BayesianMixin, ABC):
         initial_values: dict[str, float] | None = None,
         test_mode: str | None = None,
         seed: int | None = None,
+        deformation_mode: str | DeformationMode | None = None,
+        poisson_ratio: float = 0.5,
         **nuts_kwargs,
     ) -> BayesianResult:
         """Perform Bayesian inference using NumPyro NUTS sampler.
@@ -436,6 +481,37 @@ class BaseModel(BayesianMixin, ABC):
             test_mode=test_mode,
         )
 
+        # Handle deformation mode for Bayesian: convert E* -> G* before NUTS
+        if deformation_mode is None:
+            from rheojax.core.data import RheoData
+
+            if isinstance(X, RheoData):
+                deformation_mode = X.metadata.get("deformation_mode", None)
+                if deformation_mode is not None:
+                    if y is None:
+                        y = X.y  # type: ignore[assignment]
+                    # Preserve test_mode from RheoData before stripping to raw array
+                    if test_mode is None:
+                        test_mode = X.metadata.get("test_mode", None)
+                    X = X.x  # type: ignore[assignment]
+
+        if deformation_mode is not None:
+            if isinstance(deformation_mode, str):
+                deformation_mode = DeformationMode(deformation_mode)
+            self._deformation_mode = deformation_mode
+            self._poisson_ratio = poisson_ratio
+
+            if deformation_mode.is_tensile() and y is not None:
+                from rheojax.utils.modulus_conversion import convert_modulus
+
+                y = convert_modulus(y, deformation_mode, DeformationMode.SHEAR, poisson_ratio)
+                logger.info(
+                    "Converted tensile modulus to shear for Bayesian inference",
+                    model=self.__class__.__name__,
+                    from_mode=str(deformation_mode),
+                    poisson_ratio=poisson_ratio,
+                )
+
         # Store data for model_function access
         self.X_data = X
         self.y_data = y
@@ -444,7 +520,7 @@ class BaseModel(BayesianMixin, ABC):
         if initial_values is None and self.fitted_:
             # Extract current parameter values as initial values
             initial_values = {
-                name: self.parameters.get_value(name) for name in self.parameters
+                name: self.parameters.get_value(name) for name in self.parameters  # type: ignore[misc]
             }
             logger.debug(
                 "Using NLSQ warm-start for Bayesian inference",
@@ -499,7 +575,12 @@ class BaseModel(BayesianMixin, ABC):
             raise
 
     def predict(
-        self, X: ArrayLike, test_mode: str | None = None, **kwargs
+        self,
+        X: ArrayLike,
+        test_mode: str | None = None,
+        deformation_mode: str | DeformationMode | None = None,
+        poisson_ratio: float | None = None,
+        **kwargs,
     ) -> ArrayLike:
         """Make predictions.
 
@@ -508,10 +589,15 @@ class BaseModel(BayesianMixin, ABC):
             test_mode: Optional test mode ('oscillation', 'relaxation', 'creep', 'flow').
                       If provided, sets model's test_mode before prediction.
                       Useful for data generation without fitting.
+            deformation_mode: Optional deformation mode for output conversion.
+                If None, uses the mode stored from fit(). If tensile, converts
+                G* predictions to E* space.
+            poisson_ratio: Poisson's ratio for conversion. If None, uses value
+                stored from fit() (default 0.5).
             **kwargs: Additional arguments passed to the internal _predict method.
 
         Returns:
-            Model predictions
+            Model predictions (in E* space if deformation_mode is tensile)
         """
         x_shape = getattr(X, "shape", None) or (len(X),)
         logger.debug(
@@ -526,17 +612,45 @@ class BaseModel(BayesianMixin, ABC):
             # Check if we have parameters set manually
             if not any(p.value is None for p in self.parameters._parameters.values()):
                 # Parameters are set, consider it fitted
+                logger.debug(
+                    "Auto-marking model as fitted (parameters set manually)",
+                    model=self.__class__.__name__,
+                )
                 self.fitted_ = True
 
         # Set test_mode if provided (for data generation without fitting)
         if test_mode is not None:
             if hasattr(self, "_test_mode"):
                 self._test_mode = test_mode
-            # Ensure test_mode is passed to _predict
+            # Pass test_mode via kwargs for models that read it from kwargs
             kwargs["test_mode"] = test_mode
 
         try:
-            result = self._predict(X, **kwargs)
+            try:
+                result = self._predict(X, **kwargs)
+            except TypeError as e:
+                if "unexpected keyword argument" in str(e) and "test_mode" in str(e):
+                    # Some models' _predict() don't accept **kwargs
+                    # (e.g., Zener._predict(self, X)). Remove test_mode
+                    # since self._test_mode was already set above.
+                    kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
+                    result = self._predict(X, **kwargs)
+                else:
+                    raise
+
+            # Convert G* -> E* if tensile deformation mode
+            dm = deformation_mode
+            if dm is None:
+                dm = self._deformation_mode
+            if dm is not None:
+                if isinstance(dm, str):
+                    dm = DeformationMode(dm)
+                if dm.is_tensile():
+                    from rheojax.utils.modulus_conversion import convert_modulus
+
+                    nu = poisson_ratio if poisson_ratio is not None else self._poisson_ratio
+                    result = convert_modulus(result, DeformationMode.SHEAR, dm, nu)
+
             logger.debug(
                 "Predict completed",
                 model=self.__class__.__name__,
@@ -615,7 +729,7 @@ class BaseModel(BayesianMixin, ABC):
         if std_errors is None:
             return None
         param_names = list(self.parameters.keys())
-        return dict(zip(param_names, std_errors))
+        return dict(zip(param_names, std_errors, strict=True))
 
     def get_bayesian_result(self) -> BayesianResult | None:
         """Get stored Bayesian inference result.
@@ -692,8 +806,9 @@ class BaseModel(BayesianMixin, ABC):
 
         # Handle edge cases
         if ss_tot == 0:
-            # All y values are the same
-            return 1.0 if ss_res == 0 else 0.0
+            # All y values are constant — R² is undefined
+            logger.warning("R² undefined for constant data (ss_tot=0)")
+            return np.nan
 
         # Handle NaN case
         r2 = 1 - (ss_res / ss_tot)

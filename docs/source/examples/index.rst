@@ -2,7 +2,7 @@
 Tutorial Notebooks
 ==================
 
-RheoJAX includes 235 comprehensive tutorial notebooks organized into 20 categories:
+RheoJAX includes 244 comprehensive tutorial notebooks organized into 21 categories:
 **Basic** (5), **Transforms** (8), **Bayesian** (9), **Advanced** (10), **I/O** (1),
 plus 14 model family tutorial suites and a 31-notebook verification suite.
 
@@ -45,6 +45,9 @@ Quick Navigation
    * - **DMT**
      - de Souza Mendes-Thompson thixotropic models
      - 6 notebooks
+   * - **DMTA**
+     - Dynamic Mechanical Thermal Analysis (E* ↔ G* workflows)
+     - 8 notebooks
    * - **EPM**
      - Elasto-plastic models (Lattice + Tensorial)
      - 6 notebooks
@@ -58,7 +61,7 @@ Quick Navigation
      - Giesekus constitutive model (single-mode)
      - 7 notebooks
    * - **HL**
-     - Hebraud-Lequeux stochastic model
+     - Hébraud-Lequeux stochastic model
      - 6 notebooks
    * - **HVM**
      - Hybrid Vitrimer Model (basic + advanced tutorials)
@@ -115,7 +118,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 
 **Content**:
    - Stress relaxation data (synthetic, 50 points)
-   - Two-parameter fitting: G_0 (elastic modulus), eta (viscosity)
+   - Two-parameter fitting: :math:`G_0` (elastic modulus), :math:`\eta` (viscosity)
    - Analytical solution validation
    - Parameter bounds and optimization
 
@@ -139,8 +142,8 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 
 **Content**:
    - Frequency-domain oscillation data (complex modulus)
-   - Three-parameter fitting: G_0, G_inf, tau
-   - Storage (G') and loss (G'') modulus
+   - Three-parameter fitting: :math:`G_0`, :math:`G_\infty`, :math:`\tau`
+   - Storage (:math:`G'`) and loss (:math:`G''`) modulus
    - Real and imaginary components
 
 **Key Concepts**:
@@ -163,7 +166,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 
 **Content**:
    - Power-law relaxation (fractional derivative behavior)
-   - Two-parameter fitting: alpha (fractional order), tau (relaxation time)
+   - Two-parameter fitting: :math:`\alpha` (fractional order), :math:`\tau` (relaxation time)
    - Mittag-Leffler function evaluation
    - Fractional calculus introduction
 
@@ -187,7 +190,7 @@ Foundation tutorials for fundamental rheological models. Each notebook demonstra
 
 **Content**:
    - Steady shear flow curves (viscosity vs. shear rate)
-   - Two-parameter fitting: tau_0 (yield stress), eta_p (plastic viscosity)
+   - Two-parameter fitting: :math:`\tau_0` (yield stress), :math:`\eta_p` (plastic viscosity)
    - Yield stress materials (pastes, gels, slurries)
    - Flow curve analysis
 
@@ -239,7 +242,7 @@ Data analysis techniques for advanced rheological characterization.
 **Transform**: Fast Fourier Transform (time <-> frequency domain)
 
 **Content**:
-   - Time-domain relaxation -> frequency-domain G'(omega), G''(omega)
+   - Time-domain relaxation -> frequency-domain :math:`G'(\omega)`, :math:`G''(\omega)`
    - FFT validation with Maxwell analytical solution
    - Nyquist frequency and sampling considerations
    - Inverse FFT: frequency -> time
@@ -271,7 +274,7 @@ Data analysis techniques for advanced rheological characterization.
 **Key Concepts**:
    - Time-temperature equivalence
    - Horizontal shifting
-   - WLF parameters (C_1, C_2, T_ref)
+   - WLF parameters (:math:`C_1`, :math:`C_2`, :math:`T_\text{ref}`)
    - Master curve construction
 
 **Dataset**: ``data/experimental/frequency_sweep_tts.txt`` (TRIOS format)
@@ -290,7 +293,7 @@ Data analysis techniques for advanced rheological characterization.
 
 **Content**:
    - Synthetic multi-temperature data with **known WLF parameters**
-   - WLF parameter extraction accuracy validation (C_1=17.44, C_2=51.6K)
+   - WLF parameter extraction accuracy validation (:math:`C_1 = 17.44`, :math:`C_2 = 51.6\,\text{K}`)
    - Fractional Maxwell liquid fitting to mastercurve
    - Temperature-by-temperature prediction validation
    - Shift factor visualization and WLF linearization checks
@@ -315,7 +318,7 @@ Data analysis techniques for advanced rheological characterization.
 
 **Content**:
    - Material classification: solid, viscoelastic, fluid
-   - Mutation number from G'(omega) and G''(omega)
+   - Mutation number from :math:`G'(\omega)` and :math:`G''(\omega)`
    - Three synthetic materials demonstration
    - Gelation point detection
 
@@ -402,7 +405,7 @@ All notebooks use NLSQ -> NUTS warm-start workflow (2-5x faster convergence).
    - Credible intervals (95%, 68%)
 
 **Learning Objectives**:
-   - Understand Bayesian workflow in Rheo
+   - Understand Bayesian workflow in RheoJAX
    - Compare point estimates vs. posterior distributions
    - Interpret credible intervals
 
@@ -515,7 +518,7 @@ All notebooks use NLSQ -> NUTS warm-start workflow (2-5x faster convergence).
 
 **Key Concepts**:
    - Time-domain LAOS analysis (no Fourier)
-   - Cage modulus G_cage
+   - Cage modulus :math:`G_\text{cage}`
    - Static and dynamic yield stress
    - SPP vs Fourier comparison
 
@@ -613,7 +616,7 @@ Production patterns, custom model development, and performance optimization.
 
 **Learning Objectives**:
    - Create custom rheological models
-   - Integrate models into Rheo ecosystem
+   - Integrate models into RheoJAX ecosystem
    - Use model registry for discovery
 
 20. Fractional Models Deep Dive
@@ -761,7 +764,7 @@ Production patterns, custom model development, and performance optimization.
 
 **Key Concepts**:
    - SPP framework (Rogers 2012)
-   - Cage modulus G_cage
+   - Cage modulus :math:`G_\text{cage}`
    - Static and dynamic yield stress
    - Phase angle evolution in LAOS
 
@@ -780,7 +783,7 @@ I/O Demonstrations
 
 **Content**:
    - TRIOS file format loading and visualization
-   - Complex modulus (G', G'') plotting
+   - Complex modulus (:math:`G'`, :math:`G''`) plotting
 
 Model Family Tutorials
 ======================
@@ -804,6 +807,23 @@ DMT — Thixotropic Models (6 notebooks)
    4. ``04_dmt_creep.ipynb`` — Delayed yielding under constant stress
    5. ``05_dmt_saos.ipynb`` — Small-amplitude oscillatory shear
    6. ``06_dmt_laos.ipynb`` — Large-amplitude oscillatory shear
+
+DMTA — Dynamic Mechanical Thermal Analysis (8 notebooks)
+---------------------------------------------------------
+
+**Directory**: ``examples/dmta/``
+
+**Feature**: Automatic E* ↔ G* modulus conversion for tensile, bending, and compression oscillatory data.
+
+**Notebooks**:
+   1. ``01_dmta_basics.ipynb`` — DMTA fundamentals and deformation modes
+   2. ``02_dmta_master_curve.ipynb`` — Temperature-frequency mastercurves for E*
+   3. ``03_dmta_fractional_models.ipynb`` — Fractional models for broad relaxation spectra
+   4. ``04_dmta_relaxation.ipynb`` — Relaxation modulus from DMTA data
+   5. ``05_dmta_vitrimer.ipynb`` — Vitrimer DMTA with HVM model
+   6. ``06_dmta_model_selection.ipynb`` — Systematic model selection for E* data
+   7. ``07_dmta_tts_pipeline.ipynb`` — TTS pipeline with tensile modulus
+   8. ``08_dmta_cross_domain.ipynb`` — Cross-domain fitting (tension + shear)
 
 EPM — Elasto-Plastic Models (6 notebooks)
 ------------------------------------------
@@ -861,7 +881,7 @@ Giesekus — Constitutive Model (7 notebooks)
    6. ``06_giesekus_relaxation.ipynb`` — Stress relaxation
    7. ``07_giesekus_laos.ipynb`` — Nonlinear LAOS response
 
-HL — Hebraud-Lequeux Model (6 notebooks)
+HL — Hébraud-Lequeux Model (6 notebooks)
 -----------------------------------------
 
 **Directory**: ``examples/hl/``
@@ -1024,7 +1044,7 @@ Running the Notebooks
 Prerequisites
 -------------
 
-Install Rheo with all dependencies:
+Install RheoJAX with all dependencies:
 
 .. code-block:: bash
 
@@ -1110,7 +1130,7 @@ Most notebooks generate synthetic data in-notebook:
 .. code-block:: python
 
    import numpy as np
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
 
    # Set seed for reproducibility
    np.random.seed(42)
@@ -1120,7 +1140,7 @@ Most notebooks generate synthetic data in-notebook:
 
    # Known parameters for validation
    G0_true = 1e5  # Pa
-   eta_true = 1e3  # Pa*s
+   eta_true = 1e3  # Pa·s
 
    # Generate clean data
    model = Maxwell()
@@ -1198,7 +1218,7 @@ Microscopic and mesoscale models:
 
 1. ``sgr/01_sgr_flow_curve.ipynb`` — Soft Glassy Rheology
 2. ``itt_mct/01_schematic_flow_curve.ipynb`` — MCT schematic model
-3. ``hl/01_hl_flow_curve.ipynb`` — Hebraud-Lequeux stochastic model
+3. ``hl/01_hl_flow_curve.ipynb`` — Hébraud-Lequeux stochastic model
 4. ``epm/01_epm_flow_curve.ipynb`` — Elasto-plastic models
 
 For Production Workflows
@@ -1222,7 +1242,7 @@ Additional Resources
 
 **Example Data**
    - ``examples/data/README.md`` - Dataset catalog and loading instructions
-   - ``examples/README.md`` - Overview of all 235 notebooks
+   - ``examples/README.md`` - Overview of all 240+ notebooks
 
 **External Resources**
    - JAX Documentation: https://jax.readthedocs.io/

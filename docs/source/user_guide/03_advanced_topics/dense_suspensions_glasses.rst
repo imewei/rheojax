@@ -8,7 +8,7 @@ Integration Through Transients Mode-Coupling Theory (ITT-MCT) provides a first-p
 .. admonition:: Key Insight
    :class: tip
 
-   ITT-MCT connects microscopic cage dynamics to macroscopic rheology through the non-equilibrium correlator Φ(t,t'), which tracks how particles become trapped and escape from their neighbors under flow.
+   ITT-MCT connects microscopic cage dynamics to macroscopic rheology through the non-equilibrium correlator :math:`\Phi(t,t')`, which tracks how particles become trapped and escape from their neighbors under flow.
 
 Overview
 --------
@@ -25,7 +25,7 @@ Mode-Coupling Theory (MCT) was originally developed to describe the glass transi
 
 **Two Model Variants:**
 
-- **Schematic MCT (F₁₂)**: Fast, semi-quantitative, 5-6 parameters
+- **Schematic MCT** (:math:`F_{12}`): Fast, semi-quantitative, 5-6 parameters
 - **Isotropic MCT (ISM)**: Quantitative with structure factor S(k), more expensive
 
 When to Use This Model
@@ -37,7 +37,7 @@ When to Use This Model
 
    * - Use ITT-MCT When
      - Use Alternatives When
-   * - Dense colloidal suspensions (φ > 0.45)
+   * - Dense colloidal suspensions (:math:`\phi > 0.45`)
      - Dilute suspensions (Einstein viscosity)
    * - Hard-sphere or near-hard-sphere systems
      - Soft particles (use SGR)
@@ -72,8 +72,8 @@ where:
 - :math:`m(\Phi)` is the memory kernel encoding particle interactions
 - Integration from :math:`t'` (past) to :math:`t` (present) captures memory effects
 
-F₁₂ Schematic Memory Kernel
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+:math:`F_{12}` Schematic Memory Kernel
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The schematic MCT model uses a simplified memory kernel:
 
@@ -81,7 +81,7 @@ The schematic MCT model uses a simplified memory kernel:
 
    m(\Phi) = v_1 \Phi + v_2 \Phi^2
 
-The glass transition occurs at the critical point :math:`v_2 = 4` (for F₁₂ model). The distance from the glass transition is:
+The glass transition occurs at the critical point :math:`v_2 = 4` (for :math:`F_{12}` model). The distance from the glass transition is:
 
 .. math::
 
@@ -122,8 +122,8 @@ Glass Transition Phenomenology
 
 Near the glass transition, MCT predicts:
 
-- **β-relaxation**: Fast cage rattling, time scale :math:`\sim 1/\Gamma_0`
-- **α-relaxation**: Slow cage escape, time scale :math:`\tau_\alpha \sim |\epsilon|^{-\gamma}` (power-law divergence)
+- :math:`\beta`\ **-relaxation**: Fast cage rattling, time scale :math:`\sim 1/\Gamma_0`
+- :math:`\alpha`\ **-relaxation**: Slow cage escape, time scale :math:`\tau_\alpha \sim |\epsilon|^{-\gamma}` (power-law divergence)
 - **Non-ergodicity parameter**: :math:`f_{\text{neq}} = \lim_{t \to \infty} \Phi(t,0)` jumps from 0 (fluid) to :math:`>0` (glass)
 
 For :math:`\epsilon > 0`, the system cannot fully relax and develops a yield stress:
@@ -192,7 +192,7 @@ Flow Curves: Yield Stress Prediction
 .. admonition:: Key Insight
    :class: tip
 
-   In the glass state (ε > 0), the flow curve exhibits a finite yield stress followed by shear thinning. In the fluid state (ε < 0), stress scales smoothly from Newtonian at low rates to shear thinning at high rates.
+   In the glass state (:math:`\varepsilon > 0`), the flow curve exhibits a finite yield stress followed by shear thinning. In the fluid state (:math:`\varepsilon < 0`), stress scales smoothly from Newtonian at low rates to shear thinning at high rates.
 
 Small-Amplitude Oscillatory Shear (SAOS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -226,7 +226,7 @@ Small-Amplitude Oscillatory Shear (SAOS)
    plt.show()
 
 .. note::
-   For glasses (ε > 0), G' dominates at low frequencies (elastic plateau). For fluids (ε < 0), G'' dominates (viscous behavior). The crossover frequency relates to the structural relaxation time τ_α.
+   For glasses (:math:`\varepsilon > 0`), :math:`G'` dominates at low frequencies (elastic plateau). For fluids (:math:`\varepsilon < 0`), :math:`G''` dominates (viscous behavior). The crossover frequency relates to the structural relaxation time :math:`\tau_\alpha`.
 
 Startup Shear: Stress Overshoot
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -435,7 +435,7 @@ Phase Classification with Uncertainty
 .. admonition:: Key Insight
    :class: tip
 
-   Bayesian inference provides probabilistic phase classification. If the 95% credible interval for ε spans zero, the data cannot definitively classify the system as glass or fluid — more data or different protocols needed.
+   Bayesian inference provides probabilistic phase classification. If the 95% credible interval for :math:`\varepsilon` spans zero, the data cannot definitively classify the system as glass or fluid — more data or different protocols needed.
 
 Diagnostics and Convergence
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -473,7 +473,7 @@ Diagnostics and Convergence
    plt.show()
 
 .. note::
-   High R-hat (>1.01) or low ESS (<400) indicates poor convergence. Increase ``num_warmup`` or ``num_samples``. Check for divergences (yellow in pair plot) — may indicate difficult posterior geometry.
+   High :math:`\hat{R}` (>1.01) or low ESS (<400) indicates poor convergence. Increase ``num_warmup`` or ``num_samples``. Check for divergences (yellow in pair plot) — may indicate difficult posterior geometry.
 
 Visualization and Interpretation
 ---------------------------------
@@ -564,13 +564,13 @@ ITT-MCT vs SGR
      - Microscopic (particle interactions via MCT)
      - Mesoscopic (trap model)
    * - Glass transition
-     - v₂ = 4 (calculated from S(k))
+     - :math:`v_2 = 4` (calculated from S(k))
      - x = 1 (noise temperature, fitted)
    * - Yield stress origin
      - Cage elasticity
      - Trap depth distribution
    * - Aging/rejuvenation
-     - Through Φ(t,t') memory
+     - Through :math:`\Phi(t,t')` memory
      - Through x(t) temperature
    * - Quantitative accuracy
      - Yes (with ISM + S(k))
@@ -624,14 +624,14 @@ ITT-MCT vs Thixotropic Models (DMT, Fluidity)
      - ITT-MCT
      - DMT/Fluidity
    * - Structure tracking
-     - Correlator Φ(t,t')
-     - Scalar λ(t) or f(t)
+     - Correlator :math:`\Phi(t,t')`
+     - Scalar :math:`\lambda(t)` or f(t)
    * - Microstructure
      - Cage dynamics (physical)
      - Phenomenological
    * - Yield stress
      - Emergent from cages
-     - Explicit τ_y parameter
+     - Explicit :math:`\tau_y` parameter
    * - Predictive power
      - Can predict from volume fraction
      - Requires fitting to specific material
@@ -647,13 +647,13 @@ Known Limitations
 
 1. **Computational Cost**: Volterra integral equations are expensive. First JIT compilation 30-90s, subsequent evaluations still slower than phenomenological models.
 
-2. **MCT Glass Transition Overestimate**: Predicts φ_MCT ≈ 0.515 for hard spheres vs experimental φ_exp ≈ 0.58. Use empirical corrections if quantitative φ_g needed.
+2. **MCT Glass Transition Overestimate**: Predicts :math:`\phi_{\text{MCT}} \approx 0.515` for hard spheres vs experimental :math:`\phi_{\text{exp}} \approx 0.58`. Use empirical corrections if quantitative :math:`\phi_g` needed.
 
 3. **Hopping Neglected**: MCT assumes particles escape cages only through collective relaxation. Real systems have activated hopping at low T (handled by Extended MCT, not yet implemented).
 
 4. **Thermal Fluctuations**: Linear response regime neglects thermal noise. Stochastic extensions exist but not in RheoJAX.
 
-5. **Schematic Model Limitations**: F₁₂ schematic is semi-quantitative only. For quantitative predictions, use ISM with measured S(k).
+5. **Schematic Model Limitations**: :math:`F_{12}` schematic is semi-quantitative only. For quantitative predictions, use ISM with measured S(k).
 
 6. **Monodisperse Assumption**: ISM assumes identical particles. Polydisperse systems require different S(k).
 
@@ -700,7 +700,7 @@ Related Jupyter Notebooks
 
 RheoJAX provides comprehensive tutorials for ITT-MCT models:
 
-**Schematic MCT (F₁₂):**
+**Schematic MCT** (:math:`F_{12}`):
 
 - ``examples/itt_mct/01_schematic_flow_curve.ipynb`` — Yield stress prediction
 - ``examples/itt_mct/02_schematic_startup_shear.ipynb`` — Stress overshoot
@@ -730,22 +730,22 @@ References
 
 **Foundational MCT:**
 
-- Götze, W. (2009). *Complex Dynamics of Glass-Forming Liquids: A Mode-Coupling Theory*. Oxford University Press.
-- Bengtzelius, U., Götze, W., & Sjölander, A. (1984). Dynamics of supercooled liquids and the glass transition. *J. Phys. C: Solid State Phys.* 17, 5915–5934.
+- Götze, W. (2009). *Complex Dynamics of Glass-Forming Liquids: A Mode-Coupling Theory*. Oxford University Press. ISBN: 978-0-19-923534-6
+- Bengtzelius, U., Götze, W., & Sjölander, A. (1984). Dynamics of supercooled liquids and the glass transition. *J. Phys. C: Solid State Phys.* 17, 5915–5934. https://doi.org/10.1088/0022-3719/17/33/005
 
 **ITT Framework:**
 
-- Fuchs, M., & Cates, M. E. (2002). Theory of nonlinear rheology and yielding of dense colloidal suspensions. *Phys. Rev. Lett.* 89, 248304.
-- Fuchs, M., & Cates, M. E. (2009). A mode coupling theory for Brownian particles in homogeneous steady shear flow. *J. Rheol.* 53, 957–1000.
+- Fuchs, M., & Cates, M. E. (2002). Theory of nonlinear rheology and yielding of dense colloidal suspensions. *Phys. Rev. Lett.* 89, 248304. https://doi.org/10.1103/PhysRevLett.89.248304
+- Fuchs, M., & Cates, M. E. (2009). A mode coupling theory for Brownian particles in homogeneous steady shear flow. *J. Rheol.* 53, 957–1000. https://doi.org/10.1122/1.3119084
 
 **Experimental Validation:**
 
-- Brader, J. M., Voigtmann, Th., Fuchs, M., Larson, R. G., & Cates, M. E. (2009). Glass rheology: From mode-coupling theory to a dynamical yield criterion. *Proc. Natl. Acad. Sci. USA* 106, 15186–15191.
-- Petekidis, G., Vlassopoulos, D., & Pusey, P. N. (2004). Yielding and flow of sheared colloidal glasses. *J. Phys.: Condens. Matter* 16, S3955–S3963.
+- Brader, J. M., Voigtmann, Th., Fuchs, M., Larson, R. G., & Cates, M. E. (2009). Glass rheology: From mode-coupling theory to a dynamical yield criterion. *Proc. Natl. Acad. Sci. USA* 106, 15186–15191. https://doi.org/10.1073/pnas.0905330106
+- Petekidis, G., Vlassopoulos, D., & Pusey, P. N. (2004). Yielding and flow of sheared colloidal glasses. *J. Phys.: Condens. Matter* 16, S3955–S3963. https://doi.org/10.1088/0953-8984/16/38/013
 
 **Structure Factor Calculations:**
 
-- Hansen, J. P., & McDonald, I. R. (2013). *Theory of Simple Liquids* (4th ed.). Academic Press. (Chapter 5: Percus-Yevick equation)
+- Hansen, J. P., & McDonald, I. R. (2013). *Theory of Simple Liquids* (4th ed.). Academic Press. ISBN: 978-0-12-387032-2 (Chapter 5: Percus-Yevick equation)
 
 See Also
 --------

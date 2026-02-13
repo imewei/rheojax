@@ -52,6 +52,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.utils.compatibility import format_compatibility_message
 from rheojax.utils.mittag_leffler import mittag_leffler_e
 
@@ -65,6 +66,12 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FractionalZenerSolidSolid(BaseModel):
@@ -466,12 +473,18 @@ class FractionalZenerSolidSolid(BaseModel):
             gm_guess = float(np.median(g_sorted[:head]) - ge_guess)
             gm_guess = max(gm_guess, 1e-3)
 
-            ge_bounds = self.parameters.get("Ge").bounds or (1e-3, 1e9)
-            gm_bounds = self.parameters.get("Gm").bounds or (1e-3, 1e9)
-            tau_bounds = self.parameters.get("tau_alpha").bounds or (1e-6, 1e6)
-            alpha_bounds = (
-                self.parameters.get("alpha").bounds or FRACTIONAL_ORDER_BOUNDS
-            )
+            ge_param = self.parameters.get("Ge")
+            gm_param = self.parameters.get("Gm")
+            tau_param = self.parameters.get("tau_alpha")
+            alpha_param = self.parameters.get("alpha")
+            assert ge_param is not None and ge_param.bounds is not None
+            assert gm_param is not None and gm_param.bounds is not None
+            assert tau_param is not None and tau_param.bounds is not None
+            assert alpha_param is not None and alpha_param.bounds is not None
+            ge_bounds = ge_param.bounds
+            gm_bounds = gm_param.bounds
+            tau_bounds = tau_param.bounds
+            alpha_bounds = alpha_param.bounds
 
             ge_guess = float(np.clip(ge_guess, ge_bounds[0], ge_bounds[1]))
             gm_guess = float(np.clip(gm_guess, gm_bounds[0], gm_bounds[1]))
@@ -499,7 +512,7 @@ class FractionalZenerSolidSolid(BaseModel):
             logging.debug(f"Relaxation initialization failed: {exc}")
             return False
 
-    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
+    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:  # type: ignore[override]
         """Predict response for given input.
 
         Parameters
@@ -517,6 +530,7 @@ class FractionalZenerSolidSolid(BaseModel):
         Gm = self.parameters.get_value("Gm")
         alpha = self.parameters.get_value("alpha")
         tau_alpha = self.parameters.get_value("tau_alpha")
+        assert Ge is not None and Gm is not None and alpha is not None and tau_alpha is not None
 
         # Auto-detect test mode based on input characteristics
         # NOTE: This is a heuristic - explicit test_mode is recommended
