@@ -275,7 +275,7 @@ class VLBVariant(VLBBase):
         Returns params in ParameterSet order: [G0, k_d_0, eta_s, (nu), (L_max), (E_a, T_ref)].
         """
         param_values = [
-            float(self.parameters.get_value(name))
+            float(self.parameters.get_value(name)) # type: ignore[arg-type]
             for name in self.parameters.keys()
         ]
         return jnp.array(param_values, dtype=jnp.float64)
@@ -1092,7 +1092,7 @@ class VLBVariant(VLBBase):
             't', 'strain', 'stress', 'gamma_dot'
         """
         if t is None:
-            period = 2 * np.pi / omega
+            period = 2 * np.pi / omega # type: ignore[unreachable]
             t = np.linspace(0, n_cycles * period, n_cycles * 200)
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)

@@ -713,7 +713,7 @@ class Mastercurve(BaseTransform):
         )
 
         return RheoData(
-            x=x_shifted,
+            x=x_shifted,  # type: ignore[arg-type]
             y=y_shifted,
             x_units=data.x_units,
             y_units=data.y_units,
@@ -722,7 +722,7 @@ class Mastercurve(BaseTransform):
             validate=False,
         )
 
-    def _transform(
+    def _transform(  # type: ignore[override]
         self, data: RheoData | list[RheoData]
     ) -> RheoData | tuple[RheoData, dict[float, float]]:
         """Apply horizontal shift to single-temperature data or create mastercurve.
@@ -747,7 +747,7 @@ class Mastercurve(BaseTransform):
         if isinstance(data, list):
             input_shape = (len(data),)
         else:
-            input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
+            input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)  # type: ignore[arg-type]
 
         with log_transform(
             logger,
@@ -762,13 +762,13 @@ class Mastercurve(BaseTransform):
                 result = self.create_mastercurve(data, return_shifts=True)
                 if isinstance(result, tuple):
                     mastercurve, shift_factors = result
-                    ctx["output_shape"] = (len(mastercurve.x),)
+                    ctx["output_shape"] = (len(mastercurve.x),)  # type: ignore[arg-type]
                     ctx["n_temperatures"] = len(shift_factors)
                 return result  # type: ignore[return-value]
 
             # Handle single dataset
             result = self._transform_single(data)
-            ctx["output_shape"] = (len(result.x),)
+            ctx["output_shape"] = (len(result.x),)  # type: ignore[arg-type]
             return result
 
     def create_mastercurve(
@@ -832,7 +832,7 @@ class Mastercurve(BaseTransform):
         # Compute shift factors
         if self._auto_shift:
             # Use automatic shift factor calculation
-            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)
+            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)  # type: ignore[arg-type]
             shift_factors = {
                 T: 10.0**log_aT
                 for T, log_aT in zip(temperatures, log_aT_array, strict=False)

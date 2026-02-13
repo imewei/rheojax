@@ -254,19 +254,19 @@ def load_csv(
     # Extract y data (single column or complex modulus)
     is_complex = y_cols is not None
     if is_complex:
-        y_headers = [_get_column_header(df, col) for col in y_cols]
+        y_headers = [_get_column_header(df, col) for col in y_cols]  # type: ignore[union-attr]
         try:
-            g_prime_data = _get_column_data(df, y_cols[0])
-            g_double_prime_data = _get_column_data(df, y_cols[1])
+            g_prime_data = _get_column_data(df, y_cols[0])  # type: ignore[index]
+            g_double_prime_data = _get_column_data(df, y_cols[1])  # type: ignore[index]
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
         logger.debug("Constructed complex modulus from G' and G''")
     else:
-        y_headers = [_get_column_header(df, y_col)]
+        y_headers = [_get_column_header(df, y_col)]  # type: ignore[arg-type]
         try:
-            y_data = _get_column_data(df, y_col)
+            y_data = _get_column_data(df, y_col)  # type: ignore[arg-type]
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_col=y_col, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
@@ -335,7 +335,7 @@ def load_csv(
 
     # Add temperature if provided
     if temperature is not None:
-        final_metadata["temperature"] = temperature
+        final_metadata["temperature"] = temperature  # type: ignore[assignment]
 
     # Add intended_transform if provided
     if intended_transform is not None:
@@ -418,7 +418,7 @@ def _detect_delimiter(filepath: Path) -> str:
             sample = f.read(4096)
             try:
                 dialect = csv.Sniffer().sniff(
-                    sample, delimiters=[",", "\t", ";", "|", " "]
+                    sample, delimiters=[",", "\t", ";", "|", " "]  # type: ignore[arg-type]
                 )
                 return dialect.delimiter
             except Exception:
@@ -429,7 +429,7 @@ def _detect_delimiter(filepath: Path) -> str:
     # Fallback heuristic - check for common delimiters
     delimiters = [",", "\t", ";", "|"]
     counts = {d: sample.count(d) for d in delimiters}
-    best = max(counts, key=counts.get)
+    best = max(counts, key=counts.get)  # type: ignore[arg-type]
 
     # If no common delimiter found, check for space-delimited
     if counts[best] == 0:

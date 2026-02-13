@@ -144,7 +144,7 @@ class MutationNumber(BaseTransform):
 
             return float(trapezoid(y, x))
         else:
-            logger.error(
+            logger.error(  # type: ignore[unreachable]
                 "Unknown integration method",
                 method=self.integration_method,
             )
@@ -266,8 +266,8 @@ class MutationNumber(BaseTransform):
 
         logger.debug(
             "Data extracted",
-            data_points=len(t),
-            time_range=(float(t[0]), float(t[-1])),
+            data_points=len(t),  # type: ignore[arg-type]
+            time_range=(float(t[0]), float(t[-1])),  # type: ignore[index]
         )
 
         # Convert to JAX arrays
@@ -553,7 +553,7 @@ class MutationNumber(BaseTransform):
 
         return delta
 
-    def _transform(self, data: RheoData) -> RheoData:
+    def _transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
         """Transform relaxation data to mutation number.
 
         This returns a scalar RheoData with single mutation number value.

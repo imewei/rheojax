@@ -380,7 +380,7 @@ def plot_breakage_rate_comparison(
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
     colors = plt.cm.plasma(np.linspace(0.2, 0.9, len(nu_values)))
 
-    for nu, color in zip(nu_values, colors):
+    for nu, color in zip(nu_values, colors, strict=False):
         # Bell model: beta = (1/tau_b) * exp(nu * (stretch - 1))
         beta = (1.0 / tau_b) * np.exp(nu * (stretch - 1.0))
         tau_eff = tau_b * np.exp(-nu * (stretch - 1.0))
@@ -435,15 +435,15 @@ def plot_conformation_tensor_evolution(
     try:
         result = model.simulate_startup(time, gamma_dot=gamma_dot)
         if isinstance(result, tuple) and len(result) >= 2:
-            stress = np.asarray(result[1]) if len(result) > 1 else np.asarray(result[0])
+            _stress = np.asarray(result[1]) if len(result) > 1 else np.asarray(result[0])
         else:
-            stress = np.asarray(result)
+            _stress = np.asarray(result)
     except (AttributeError, TypeError):
-        stress = np.asarray(model.predict(time, test_mode="startup", gamma_dot=gamma_dot))
+        _stress = np.asarray(model.predict(time, test_mode="startup", gamma_dot=gamma_dot))
 
     # Analytical conformation tensor for constant breakage (Tanaka-Edwards)
     tau_b = float(model.parameters.get_value("tau_b"))
-    G = float(model.parameters.get_value("G"))
+    _G = float(model.parameters.get_value("G"))
     Wi = gamma_dot * tau_b
 
     # S_xx(t) = 1 + 2*Wi^2*(1 - exp(-t/tau_b))
@@ -574,7 +574,7 @@ def plot_variant_comparison(
 
     colors = plt.cm.tab10(np.linspace(0, 0.6, len(models)))
 
-    for (label, model), color in zip(models.items(), colors):
+    for (label, model), color in zip(models.items(), colors, strict=False):
         try:
             if protocol == "flow_curve":
                 y_pred = np.asarray(model.predict(x_data, test_mode="flow_curve"))
@@ -646,7 +646,7 @@ def plot_bell_nu_sweep(
 
     original_nu = float(model.parameters.get_value("nu"))
 
-    for nu, color in zip(nu_values, colors):
+    for nu, color in zip(nu_values, colors, strict=False):
         model.parameters.set_value("nu", nu)
         try:
             if protocol == "flow_curve":
@@ -971,7 +971,7 @@ def plot_multi_species_spectrum(
     )
 
     # Add tau labels on bars
-    for i, (bar, tau) in enumerate(zip(bars, tau_vals)):
+    for _i, (bar, tau) in enumerate(zip(bars, tau_vals, strict=False)):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + max(G_vals) * 0.02,
@@ -1521,7 +1521,7 @@ def compute_multi_mode_moduli(
     G_prime = np.zeros_like(omega)
     G_double_prime = eta_s * omega
 
-    for G_k, tau_k in zip(G_arr, tau_arr):
+    for G_k, tau_k in zip(G_arr, tau_arr, strict=False):
         wt = omega * tau_k
         wt2 = wt**2
         G_prime += G_k * wt2 / (1.0 + wt2)

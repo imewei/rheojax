@@ -278,6 +278,7 @@ class HVMLocal(HVMBase):
 
         # Use ODE solver for TST feedback
         params = self._get_params_dict()
+        assert params is not None
         sol = hvm_solve_startup(
             t_jax, gamma_dot, params,
             kinetics=self._kinetics,
@@ -286,6 +287,7 @@ class HVMLocal(HVMBase):
         )
 
         ys = sol.ys  # (n_times, 11)
+        assert ys is not None
 
         # Compute stress from state
         stress = jax.vmap(
@@ -358,6 +360,7 @@ class HVMLocal(HVMBase):
         """
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         params = self._get_params_dict()
+        assert params is not None
 
         sol = hvm_solve_relaxation(
             t_jax, gamma_step, params,
@@ -367,6 +370,7 @@ class HVMLocal(HVMBase):
         )
 
         ys = sol.ys
+        assert ys is not None
 
         # G(t) = sigma(t) / gamma_step
         stress = jax.vmap(
@@ -424,6 +428,7 @@ class HVMLocal(HVMBase):
         self._sigma_applied = sigma_0
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         params = self._get_params_dict()
+        assert params is not None
 
         sol = hvm_solve_creep(
             t_jax, sigma_0, params,
@@ -433,6 +438,7 @@ class HVMLocal(HVMBase):
         )
 
         ys = sol.ys
+        assert ys is not None
         gamma = ys[:, 9]
         gamma = jnp.where(
             sol.result == diffrax.RESULTS.successful,
@@ -483,6 +489,7 @@ class HVMLocal(HVMBase):
         self._omega_laos = omega
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         params = self._get_params_dict()
+        assert params is not None
 
         sol = hvm_solve_laos(
             t_jax, gamma_0, omega, params,
@@ -492,6 +499,7 @@ class HVMLocal(HVMBase):
         )
 
         ys = sol.ys
+        assert ys is not None
         strain = gamma_0 * jnp.sin(omega * t_jax)
         gamma_dot_arr = gamma_0 * omega * jnp.cos(omega * t_jax)
 

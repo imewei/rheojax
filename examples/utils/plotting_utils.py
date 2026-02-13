@@ -209,7 +209,7 @@ def plot_nlsq_fit(
     # Annotation text box
     if show_annotation and param_names:
         text = format_param_annotation(model, param_names)
-        props = dict(boxstyle="round,pad=0.4", facecolor="wheat", alpha=0.7)
+        props = {"boxstyle": "round,pad=0.4", "facecolor": "wheat", "alpha": 0.7}
         ax.text(
             0.03,
             0.97,
@@ -512,6 +512,6 @@ def display_arviz_diagnostics(result, param_names, fast_mode=False):
     from IPython.display import display
 
     figs = plot_arviz_diagnostics(result, param_names, fast_mode=fast_mode)
-    for name, fig in figs.items():
+    for _name, fig in figs.items():
         display(fig)
         plt.close(fig)

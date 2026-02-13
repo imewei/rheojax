@@ -216,7 +216,7 @@ def load_trios(
 def _log_parse_result(filepath: Path, result: RheoData | list[RheoData]) -> None:
     """Log parse completion with record count."""
     if isinstance(result, list):
-        total_records = sum(len(r.x) for r in result)
+        total_records = sum(len(r.x) for r in result)  # type: ignore[arg-type, misc]
         logger.info(
             "File parsed",
             filepath=str(filepath),
@@ -227,7 +227,7 @@ def _log_parse_result(filepath: Path, result: RheoData | list[RheoData]) -> None
         logger.info(
             "File parsed",
             filepath=str(filepath),
-            n_records=len(result.x),
+            n_records=len(result.x),  # type: ignore[arg-type]
             test_mode=result.test_mode,
         )
 

@@ -29,6 +29,8 @@ Götze W. (2009) "Complex Dynamics of Glass-Forming Liquids", Chapter 4
 Fuchs M. & Cates M.E. (2002) Phys. Rev. Lett. 89, 248304
 """
 
+from __future__ import annotations
+
 from typing import Any, Literal
 
 import numpy as np
@@ -67,7 +69,7 @@ try:
 except ImportError:
     _HAS_DIFFRAX = False
 
-    def precompile_flow_curve_solver(*args, **kwargs):
+    def precompile_flow_curve_solver(*args, **kwargs):  # type: ignore[misc]
         """Stub when diffrax not available."""
         return 0.0
 
@@ -247,6 +249,7 @@ class ITTMCTSchematic(ITTMCTBase):
         if stress_form == "microscopic":
             from rheojax.utils.mct_kernels import get_microscopic_stress_prefactor
 
+            assert phi_volume is not None
             self._microscopic_stress_prefactor = get_microscopic_stress_prefactor(
                 phi_volume, k_BT=k_BT
             )
@@ -261,6 +264,7 @@ class ITTMCTSchematic(ITTMCTBase):
             raise ValueError("Specify either epsilon or v2, not both")
 
         v1 = self.parameters.get_value("v1")
+        assert v1 is not None
         v2_critical = self._get_v2_critical(v1)
 
         if epsilon is not None:
@@ -440,6 +444,8 @@ class ITTMCTSchematic(ITTMCTBase):
         """
         v1 = self.parameters.get_value("v1")
         v2 = self.parameters.get_value("v2")
+        assert v1 is not None
+        assert v2 is not None
         return glass_transition_criterion(v1, v2)
 
     @property
@@ -447,6 +453,8 @@ class ITTMCTSchematic(ITTMCTBase):
         """Get separation parameter ε = (v₂ - v₂_c)/v₂_c."""
         v1 = self.parameters.get_value("v1")
         v2 = self.parameters.get_value("v2")
+        assert v1 is not None
+        assert v2 is not None
         v2_c = self._get_v2_critical(v1)
         return (v2 - v2_c) / v2_c
 
@@ -454,6 +462,7 @@ class ITTMCTSchematic(ITTMCTBase):
     def epsilon(self, value: float) -> None:
         """Set separation parameter and update v₂ accordingly."""
         v1 = self.parameters.get_value("v1")
+        assert v1 is not None
         v2_c = self._get_v2_critical(v1)
         v2_new = v2_c * (1 + value)
         self.parameters.set_value("v2", v2_new)
@@ -492,12 +501,21 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        # Assert parameters are not None
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         # Initialize Prony modes if needed
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
         g = self._prony_amplitudes
         tau = self._prony_times
+        assert g is not None
+        assert tau is not None
 
         # Determine which solver to use
         should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
@@ -655,6 +673,12 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         # Use microscopic prefactor if stress_form is microscopic
         G_eff = G_inf
         if (
@@ -666,6 +690,8 @@ class ITTMCTSchematic(ITTMCTBase):
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
@@ -757,6 +783,7 @@ class ITTMCTSchematic(ITTMCTBase):
         """
         omega = np.asarray(omega)
         G_inf = self.parameters.get_value("G_inf")
+        assert G_inf is not None
 
         # Need equilibrium correlator over sufficient time range
         omega_min = omega.min()
@@ -810,9 +837,17 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
@@ -883,9 +918,17 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
@@ -957,9 +1000,17 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 
@@ -1044,9 +1095,17 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
 

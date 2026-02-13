@@ -109,7 +109,7 @@ class BaseModel(BayesianMixin, ABC):
             from rheojax.utils.data_quality import detect_data_range_decades
 
             x_array = X.x if isinstance(X, RheoData) else X
-            decades = detect_data_range_decades(x_array)
+            decades = detect_data_range_decades(x_array)  # type: ignore[arg-type]
 
             if use_log_residuals is None:
                 if decades > 8.0:
@@ -301,8 +301,8 @@ class BaseModel(BayesianMixin, ABC):
                 # so that downstream _fit() uses the converted y, not RheoData.y
                 if deformation_mode is not None:
                     if y is None:
-                        y = X.y
-                    X = X.x
+                        y = X.y  # type: ignore[unreachable]
+                    X = X.x  # type: ignore[assignment]
 
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):
@@ -403,7 +403,7 @@ class BaseModel(BayesianMixin, ABC):
 
         return self
 
-    def fit_bayesian(
+    def fit_bayesian(  # type: ignore[override]
         self,
         X: ArrayLike,
         y: ArrayLike | None = None,
@@ -489,11 +489,11 @@ class BaseModel(BayesianMixin, ABC):
                 deformation_mode = X.metadata.get("deformation_mode", None)
                 if deformation_mode is not None:
                     if y is None:
-                        y = X.y
+                        y = X.y  # type: ignore[assignment]
                     # Preserve test_mode from RheoData before stripping to raw array
                     if test_mode is None:
                         test_mode = X.metadata.get("test_mode", None)
-                    X = X.x
+                    X = X.x  # type: ignore[assignment]
 
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):
@@ -520,7 +520,7 @@ class BaseModel(BayesianMixin, ABC):
         if initial_values is None and self.fitted_:
             # Extract current parameter values as initial values
             initial_values = {
-                name: self.parameters.get_value(name) for name in self.parameters
+                name: self.parameters.get_value(name) for name in self.parameters  # type: ignore[misc]
             }
             logger.debug(
                 "Using NLSQ warm-start for Bayesian inference",

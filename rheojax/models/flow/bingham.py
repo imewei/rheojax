@@ -177,7 +177,7 @@ class Bingham(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
         """Predict stress for given shear rates.
 
         Args:

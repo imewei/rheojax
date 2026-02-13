@@ -248,7 +248,7 @@ class SPPDecomposer(BaseTransform):
 
         return mask, actual_start, actual_end
 
-    def _transform(self, data: RheoData) -> RheoData:
+    def _transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
         """Apply SPP decomposition to LAOS stress data.
 
         Parameters
@@ -305,8 +305,8 @@ class SPPDecomposer(BaseTransform):
         stress = data.y
 
         # Validate time steps uniformity
-        if len(t) > 2:
-            dt_all = np.diff(t)
+        if len(t) > 2:  # type: ignore[arg-type]
+            dt_all = np.diff(t)  # type: ignore[arg-type]
             dt_mean = np.mean(dt_all)
             dt_std = np.std(dt_all)
             if dt_mean > 0 and (dt_std / dt_mean > 0.05):  # 5% tolerance
@@ -319,7 +319,7 @@ class SPPDecomposer(BaseTransform):
 
         logger.debug(
             "Input data extracted",
-            data_points=len(t),
+            data_points=len(t),  # type: ignore[arg-type]
             domain=data.domain,
         )
 
@@ -809,7 +809,7 @@ def spp_analyze(
 
     # Apply decomposer
     decomposer = SPPDecomposer(omega=omega, gamma_0=gamma_0, n_harmonics=n_harmonics)
-    decomposer.transform(data)
+    decomposer.transform(data)  # type: ignore[arg-type]
 
     return decomposer.get_results()
 

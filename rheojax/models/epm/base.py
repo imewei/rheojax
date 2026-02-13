@@ -549,12 +549,22 @@ class EPMBase(BaseModel):
         Returns:
             Dictionary with all EPM parameters (mu, tau_pl, sigma_c_mean, etc.).
         """
+        mu = self.parameters.get_value("mu")
+        tau_pl = self.parameters.get_value("tau_pl")
+        sigma_c_mean = self.parameters.get_value("sigma_c_mean")
+        sigma_c_std = self.parameters.get_value("sigma_c_std")
+        smoothing_width = self.parameters.get_value("smoothing_width")
+        assert mu is not None
+        assert tau_pl is not None
+        assert sigma_c_mean is not None
+        assert sigma_c_std is not None
+        assert smoothing_width is not None
         return {
-            "mu": self.parameters.get_value("mu"),
-            "tau_pl": self.parameters.get_value("tau_pl"),
-            "sigma_c_mean": self.parameters.get_value("sigma_c_mean"),
-            "sigma_c_std": self.parameters.get_value("sigma_c_std"),
-            "smoothing_width": self.parameters.get_value("smoothing_width"),
+            "mu": mu,
+            "tau_pl": tau_pl,
+            "sigma_c_mean": sigma_c_mean,
+            "sigma_c_std": sigma_c_std,
+            "smoothing_width": smoothing_width,
         }
 
     @abstractmethod
@@ -692,11 +702,12 @@ class EPMBase(BaseModel):
             RheoData with x=time, y=stress.
         """
         time = data.x
+        assert time is not None
 
         # Calculate dt from data if possible
         dt = self.dt
         if len(time) > 1:
-            dt = time[1] - time[0]
+            dt = float(time[1] - time[0])
 
         # Constant shear rate from metadata
         gdot = data.metadata.get("gamma_dot", 0.1)
@@ -743,11 +754,12 @@ class EPMBase(BaseModel):
             RheoData with x=time, y=modulus.
         """
         time = data.x
+        assert time is not None
 
         # Calculate dt from data
         dt = self.dt
         if len(time) > 1:
-            dt = time[1] - time[0]
+            dt = float(time[1] - time[0])
 
         # Step strain magnitude from metadata
         strain_step = data.metadata.get("gamma", 0.1)
@@ -803,11 +815,12 @@ class EPMBase(BaseModel):
             RheoData with x=time, y=strain.
         """
         time = data.x
+        assert time is not None
 
         # Calculate dt from data
         dt = self.dt
         if len(time) > 1:
-            dt = time[1] - time[0]
+            dt = float(time[1] - time[0])
 
         # Target stress from metadata or mean of y
         if data.y is not None:
@@ -881,11 +894,12 @@ class EPMBase(BaseModel):
             RheoData with x=time, y=stress.
         """
         time = data.x
+        assert time is not None
 
         # Calculate dt from data
         dt = self.dt
         if len(time) > 1:
-            dt = time[1] - time[0]
+            dt = float(time[1] - time[0])
 
         # Params
         gamma0 = data.metadata.get("gamma0", 1.0)

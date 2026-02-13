@@ -170,7 +170,7 @@ def save_hdf5(
                 except OSError:
                     pass
 
-        ctx["data_points"] = len(data.x)
+        ctx["data_points"] = len(data.x)  # type: ignore[arg-type]
         ctx["compression"] = compression
         ctx["has_metadata"] = bool(data.metadata)
 
@@ -339,7 +339,7 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
     Returns:
         Metadata dictionary
     """
-    metadata = {}
+    metadata: dict[str, Any] = {}
 
     # Read attributes
     for key, value in group.attrs.items():

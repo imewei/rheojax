@@ -154,7 +154,7 @@ class Registry:
                         normalized_protocols.append(Protocol(p))
                     except ValueError:
                         logger.warning(f"Invalid protocol '{p}' for plugin '{name}'")
-                elif isinstance(p, Protocol):
+                elif isinstance(p, Protocol):  # type: ignore[unreachable]
                     normalized_protocols.append(p)
 
         # Normalize deformation_modes
@@ -168,7 +168,7 @@ class Registry:
                         logger.warning(
                             f"Invalid deformation_mode '{dm}' for plugin '{name}'"
                         )
-                elif isinstance(dm, DeformationMode):
+                elif isinstance(dm, DeformationMode):  # type: ignore[unreachable]
                     normalized_deformation_modes.append(dm)
 
         # Normalize transform_type
@@ -181,7 +181,7 @@ class Registry:
                     logger.warning(
                         f"Invalid transform_type '{transform_type}' for plugin '{name}'"
                     )
-            elif isinstance(transform_type, TransformType):
+            elif isinstance(transform_type, TransformType):  # type: ignore[unreachable]
                 normalized_transform_type = transform_type
 
         # Create plugin info
@@ -579,7 +579,7 @@ class Registry:
         Returns:
             Dictionary with models (by protocol) and transforms (by type)
         """
-        inventory = {
+        inventory: dict[str, Any] = {
             "models": {p.value: [] for p in Protocol},
             "transforms": {t.value: [] for t in TransformType},
             "all_models": [],

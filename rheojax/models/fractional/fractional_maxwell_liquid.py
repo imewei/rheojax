@@ -503,7 +503,7 @@ class FractionalMaxwellLiquid(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)
+            return self.predict_rheodata(X)  # type: ignore[return-value]
 
         # Handle raw array input
         from rheojax.core.test_modes import TestMode
@@ -615,7 +615,7 @@ class FractionalMaxwellLiquid(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None, **kwargs):
+    def predict(self, X, test_mode: str | None = None, **kwargs):  # type: ignore[override]
         """Predict response.
 
         Args:

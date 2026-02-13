@@ -12,10 +12,16 @@ Key Components:
 - Full tensorial EPM time-stepping kernel
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from functools import partial
+from typing import TYPE_CHECKING
 
 from rheojax.core.jax_config import safe_import_jax
+
+if TYPE_CHECKING:
+    import jax
 
 jax, jnp = safe_import_jax()
 

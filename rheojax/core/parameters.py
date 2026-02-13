@@ -640,7 +640,7 @@ class ParameterSet:
         Returns:
             List of (min, max) tuples
         """
-        bounds = []
+        bounds: list[tuple[float | None, float | None]] = []
         for name in self._order:
             param = self._parameters[name]
             if param.bounds:

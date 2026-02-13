@@ -557,6 +557,7 @@ class FractionalJeffreysModel(BaseModel):
         tau1 = self.parameters.get_value("tau1")
 
         # Dispatch based on test_mode if set, otherwise auto-detect
+        assert eta1 is not None and eta2 is not None and alpha is not None and tau1 is not None
         test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             return self._predict_oscillation(X, eta1, eta2, alpha, tau1)

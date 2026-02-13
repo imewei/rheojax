@@ -427,11 +427,11 @@ class SpringPot(BaseModel):
         alpha = self.parameters.get_value("alpha")
 
         # Avoid division by zero for alpha=0
-        if alpha < 1e-10:
+        if alpha < 1e-10: # type: ignore[operator]
             return float("inf")
 
-        gamma_factor = float(jax_gamma(1.0 - alpha))
-        return (c_alpha / (reference_value * gamma_factor)) ** (1.0 / alpha)
+        gamma_factor = float(jax_gamma(1.0 - alpha)) # type: ignore[operator]
+        return (c_alpha / (reference_value * gamma_factor)) ** (1.0 / alpha) # type: ignore[operator]
 
     def __repr__(self) -> str:
         """String representation of SpringPot model."""

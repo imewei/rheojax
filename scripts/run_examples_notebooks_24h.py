@@ -547,7 +547,7 @@ def generate_issue_inventory(
                 if r["traceback"]:
                     # Extract most relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [l for l in tb_lines if "rheojax" in l.lower() or "Error" in l or "Exception" in l][:15]
+                    relevant = [line for line in tb_lines if "rheojax" in line.lower() or "Error" in line or "Exception" in line][:15]
                     if relevant:
                         f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))

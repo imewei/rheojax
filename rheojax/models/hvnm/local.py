@@ -276,13 +276,18 @@ class HVNMLocal(HVNMBase):
         np.ndarray or dict
             Steady-state stress (Pa) or component dict
         """
+        G_D = self.G_D
+        k_d_D = self.k_d_D
+        assert G_D is not None
+        assert k_d_D is not None
+
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
         sigma = hvnm_steady_shear_stress_vec(
-            gamma_dot_jax, self.G_D, self.k_d_D
+            gamma_dot_jax, G_D, k_d_D
         )
 
         if return_components:
-            eta_D = self.G_D / max(self.k_d_D, 1e-30)
+            eta_D = G_D / max(k_d_D, 1e-30)
             sigma_D = eta_D * gamma_dot_jax
             return {
                 "stress": np.asarray(sigma),
@@ -317,15 +322,24 @@ class HVNMLocal(HVNMBase):
         tuple of (np.ndarray, np.ndarray) or np.ndarray
             (G', G'') or |G*|
         """
+        G_P = self.G_P
+        G_E = self.G_E
+        G_D = self.G_D
+        k_d_D = self.k_d_D
+        assert G_P is not None
+        assert G_E is not None
+        assert G_D is not None
+        assert k_d_D is not None
+
         omega_jax = jnp.asarray(omega, dtype=jnp.float64)
         p = self._get_params_dict()
         d = self._get_derived_params(p)
 
         G_prime, G_double_prime = hvnm_saos_moduli_vec(
             omega_jax,
-            self.G_P, self.G_E, self.G_D, d["G_I_eff"],
+            G_P, G_E, G_D, d["G_I_eff"],
             d["X_phi"], d["X_I"],
-            d["k_BER_mat_0"], self.k_d_D, d["k_BER_int_0"],
+            d["k_BER_mat_0"], k_d_D, d["k_BER_int_0"],
             0.0, 0.0,  # D=0, D_int=0
         )
 
@@ -359,6 +373,13 @@ class HVNMLocal(HVNMBase):
         np.ndarray or dict
             Stress array or full trajectory dict
         """
+        G_P = self.G_P
+        G_E = self.G_E
+        G_D = self.G_D
+        assert G_P is not None
+        assert G_E is not None
+        assert G_D is not None
+
         self._gamma_dot_applied = gamma_dot
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         args = self._get_ode_args()
@@ -372,6 +393,7 @@ class HVNMLocal(HVNMBase):
         )
 
         ys = sol.ys
+        assert ys is not None
         D_int_col = jnp.where(
             self._include_interfacial_damage, ys[:, 17], jnp.zeros(len(t_jax))
         ) if self._include_interfacial_damage else jnp.zeros(len(t_jax))
@@ -389,7 +411,7 @@ class HVNMLocal(HVNMBase):
                 y_D_int[0][8],     # mu_D_xy
                 y_D_int[0][13],    # mu_I_xy
                 y_D_int[0][16],    # mu_I_nat_xy
-                self.G_P, self.G_E, self.G_D, G_I_eff,
+                G_P, G_E, G_D, G_I_eff,
                 X_phi, X_I,
                 y_D_int[0][10],    # D
                 y_D_int[1],        # D_int
@@ -454,6 +476,13 @@ class HVNMLocal(HVNMBase):
         np.ndarray or dict
             G(t) relaxation modulus or trajectory dict
         """
+        G_P = self.G_P
+        G_E = self.G_E
+        G_D = self.G_D
+        assert G_P is not None
+        assert G_E is not None
+        assert G_D is not None
+
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         args = self._get_ode_args()
 
@@ -466,6 +495,7 @@ class HVNMLocal(HVNMBase):
         )
 
         ys = sol.ys
+        assert ys is not None
         D_int_col = (
             ys[:, 17] if self._include_interfacial_damage
             else jnp.zeros(len(t_jax))
@@ -478,7 +508,7 @@ class HVNMLocal(HVNMBase):
             lambda y_D_int: hvnm_total_stress_shear(
                 y_D_int[0][9], y_D_int[0][2], y_D_int[0][5], y_D_int[0][8],
                 y_D_int[0][13], y_D_int[0][16],
-                self.G_P, self.G_E, self.G_D, G_I_eff,
+                G_P, G_E, G_D, G_I_eff,
                 X_phi, X_I, y_D_int[0][10], y_D_int[1],
             )
         )((ys, D_int_col))
@@ -533,6 +563,7 @@ class HVNMLocal(HVNMBase):
         self._sigma_applied = sigma_0
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         args = self._get_ode_args()
+        assert args is not None
 
         sol = hvnm_solve_creep(
             t_jax, sigma_0, args,
@@ -543,6 +574,7 @@ class HVNMLocal(HVNMBase):
         )
 
         ys = sol.ys
+        assert ys is not None
         gamma = ys[:, 9]
         gamma = jnp.where(
             sol.result == diffrax.RESULTS.successful,
@@ -597,6 +629,13 @@ class HVNMLocal(HVNMBase):
             mu_E_xy, mu_E_nat_xy, mu_D_xy, mu_I_xy, mu_I_nat_xy,
             damage, damage_int
         """
+        G_P = self.G_P
+        G_E = self.G_E
+        G_D = self.G_D
+        assert G_P is not None
+        assert G_E is not None
+        assert G_D is not None
+
         self._gamma_0 = gamma_0
         self._omega_laos = omega
         t_jax = jnp.asarray(t, dtype=jnp.float64)
@@ -611,6 +650,7 @@ class HVNMLocal(HVNMBase):
         )
 
         ys = sol.ys
+        assert ys is not None
         D_int_col = (
             ys[:, 17] if self._include_interfacial_damage
             else jnp.zeros(len(t_jax))
@@ -625,7 +665,7 @@ class HVNMLocal(HVNMBase):
             lambda y_D_int: hvnm_total_stress_shear(
                 y_D_int[0][9], y_D_int[0][2], y_D_int[0][5], y_D_int[0][8],
                 y_D_int[0][13], y_D_int[0][16],
-                self.G_P, self.G_E, self.G_D, G_I_eff,
+                G_P, G_E, G_D, G_I_eff,
                 X_phi, X_I, y_D_int[0][10], y_D_int[1],
             )
         )((ys, D_int_col))
@@ -635,7 +675,7 @@ class HVNMLocal(HVNMBase):
                 y_D_int[0][0], y_D_int[0][1], y_D_int[0][3], y_D_int[0][4],
                 y_D_int[0][6], y_D_int[0][7],
                 y_D_int[0][11], y_D_int[0][12], y_D_int[0][14], y_D_int[0][15],
-                self.G_E, self.G_D, G_I_eff, X_I, y_D_int[1],
+                G_E, G_D, G_I_eff, X_I, y_D_int[1],
             )
         )((ys, D_int_col))
 
@@ -683,9 +723,14 @@ class HVNMLocal(HVNMBase):
         tuple of (np.ndarray, np.ndarray)
             (N1, N2) arrays (Pa)
         """
+        G_D = self.G_D
+        k_d_D = self.k_d_D
+        assert G_D is not None
+        assert k_d_D is not None
+
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
-        Wi_D = gamma_dot_jax / max(self.k_d_D, 1e-30)
-        N1 = 2.0 * self.G_D * Wi_D**2
+        Wi_D = gamma_dot_jax / max(k_d_D, 1e-30)
+        N1 = 2.0 * G_D * Wi_D**2
         N2 = jnp.zeros_like(N1)
         return np.asarray(N1), np.asarray(N2)
 
@@ -760,10 +805,17 @@ class HVNMLocal(HVNMBase):
             G_inf: high-strain modulus (X*G_P only)
             gamma_c: approximate critical strain (1/X_I)
         """
+        G_P = self.G_P
+        G_E = self.G_E
+        G_D = self.G_D
+        assert G_P is not None
+        assert G_E is not None
+        assert G_D is not None
+
         d = self._get_derived_params(self._get_params_dict())
         G_I_amp = d["G_I_eff"] * d["X_I"]
-        G_0 = self.G_P * d["X_phi"] + self.G_E + self.G_D + G_I_amp
-        G_inf = self.G_P * d["X_phi"]  # Only permanent plateau at large strain
+        G_0 = G_P * d["X_phi"] + G_E + G_D + G_I_amp
+        G_inf = G_P * d["X_phi"]  # Only permanent plateau at large strain
         gamma_c = 1.0 / max(d["X_I"], 1.0)  # Critical strain ~ 1/X_I
         return {"G_0": float(G_0), "G_inf": float(G_inf), "gamma_c": float(gamma_c)}
 

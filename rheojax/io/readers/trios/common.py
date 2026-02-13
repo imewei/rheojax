@@ -550,7 +550,7 @@ def select_xy_columns(
             y2_col=y2_col,
         )
 
-    return x_col, y_col, y2_col
+    return x_col, y_col, y2_col  # type: ignore[return-value]
 
 
 def convert_unit(

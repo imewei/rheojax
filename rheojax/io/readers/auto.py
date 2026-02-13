@@ -97,10 +97,10 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
 
         # Add record count to context
         if isinstance(result, list):
-            io_ctx["records"] = sum(len(r.x) for r in result)
+            io_ctx["records"] = sum(len(r.x) for r in result)  # type: ignore[arg-type, misc]
             io_ctx["segments"] = len(result)
         else:
-            io_ctx["records"] = len(result.x)
+            io_ctx["records"] = len(result.x)  # type: ignore[arg-type]
 
         return result
 

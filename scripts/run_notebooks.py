@@ -212,7 +212,7 @@ def run_notebook_isolated(
     import tempfile
 
     result_file = tempfile.mktemp(suffix=".json")
-    log_dir_str = str(log_dir) if log_dir else ""
+    _log_dir_str = str(log_dir) if log_dir else ""
     script = f"""
 import json, sys
 sys.path.insert(0, '.')

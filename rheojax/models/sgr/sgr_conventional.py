@@ -248,7 +248,7 @@ class SGRConventional(BaseModel):
         self._gamma_0: float | None = None
         self._omega_laos: float | None = None
 
-    def _fit(
+    def _fit(  # type: ignore[override]
         self,
         X: np.ndarray,
         y: np.ndarray,
@@ -777,6 +777,8 @@ class SGRConventional(BaseModel):
         G0_init = sigma_max / gamma_0
         x_init = self.parameters.get_value("x")
         tau0_init = self.parameters.get_value("tau0")
+        assert x_init is not None
+        assert tau0_init is not None
 
         # Normalize target stress for residual calculation
         sigma_norm = sigma / (sigma_max + 1e-12)
@@ -1396,6 +1398,7 @@ class SGRConventional(BaseModel):
             'glass'
         """
         x = self.parameters.get_value("x")
+        assert x is not None
 
         if x < 1.0:
             return "glass"
@@ -1429,6 +1432,9 @@ class SGRConventional(BaseModel):
         x_eq = self.parameters.get_value("x_eq")
         A = self.parameters.get_value("x_ss_A")
         n = self.parameters.get_value("x_ss_n")
+        assert x_eq is not None
+        assert A is not None
+        assert n is not None
 
         # Dimensionless shear rate
         gamma_dot_dim = gamma_dot * tau0
@@ -2186,6 +2192,10 @@ class SGRConventional(BaseModel):
         tau0 = self.parameters.get_value("tau0")
         x = self.parameters.get_value("x")
         n_struct = self.parameters.get_value("n_struct")
+        assert G0_val is not None
+        assert tau0 is not None
+        assert x is not None
+        assert n_struct is not None
 
         # Effective modulus from structure
         G_eff = G0_val * np.power(lambda_t, n_struct)

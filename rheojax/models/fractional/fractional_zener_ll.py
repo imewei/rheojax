@@ -323,9 +323,15 @@ class FractionalZenerLiquidLiquid(BaseModel):
             tau_guess = float(t_sorted[0])
 
             # Get bounds
-            c1_bounds = self.parameters.get("c1").bounds or (1e-3, 1e9)
-            c2_bounds = self.parameters.get("c2").bounds or (1e-3, 1e9)
-            tau_bounds = self.parameters.get("tau").bounds or (1e-6, 1e6)
+            c1_param = self.parameters.get("c1")
+            c2_param = self.parameters.get("c2")
+            tau_param = self.parameters.get("tau")
+            assert c1_param is not None and c1_param.bounds is not None
+            assert c2_param is not None and c2_param.bounds is not None
+            assert tau_param is not None and tau_param.bounds is not None
+            c1_bounds = c1_param.bounds
+            c2_bounds = c2_param.bounds
+            tau_bounds = tau_param.bounds
 
             c1_guess = float(np.clip(c1_guess, c1_bounds[0], c1_bounds[1]))
             c2_guess = float(np.clip(c2_guess, c2_bounds[0], c2_bounds[1]))
@@ -519,7 +525,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         )
         return self
 
-    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:
+    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:  # type: ignore[override]
         """Predict response for given input.
 
         Parameters

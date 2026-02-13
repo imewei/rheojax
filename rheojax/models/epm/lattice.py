@@ -119,7 +119,7 @@ class LatticeEPM(EPMBase):
         """
         return epm_step(state, propagator_q, shear_rate, dt, params, smooth)
 
-    def _predict(self, X, **kwargs) -> RheoData:
+    def _predict(self, X, **kwargs) -> RheoData:  # type: ignore[override]
         """Simulate the model for the given protocol.
 
         Args:

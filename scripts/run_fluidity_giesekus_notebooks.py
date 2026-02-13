@@ -241,7 +241,7 @@ def generate_issue_inventory(results: list[dict], output_path: Path, title: str 
         f.write(f"- **TIMEOUT**: {timeout}\n\n")
 
         # Per-suite summary
-        suites = set(r.get("suite", "unknown") for r in results)
+        suites = {r.get("suite", "unknown") for r in results}
         if len(suites) > 1:
             f.write("### Per-Suite Summary\n\n")
             for suite in sorted(suites):

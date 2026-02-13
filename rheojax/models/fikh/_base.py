@@ -13,9 +13,9 @@ Inheritance:
     BaseModel + FractionalModelMixin → FIKHBase → FIKH, FMLIKH
 """
 
-from typing import Any
+from __future__ import annotations
 
-import numpy as np
+from typing import TYPE_CHECKING, Any
 
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
@@ -26,12 +26,12 @@ from rheojax.models.fractional.fractional_mixin import (
     FractionalModelMixin,
 )
 
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike
+
 jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
-
-# Type alias for ArrayLike
-ArrayLike = np.ndarray | jnp.ndarray | list | tuple
 
 
 class FIKHBase(BaseModel, FractionalModelMixin):
@@ -438,7 +438,7 @@ class FIKHBase(BaseModel, FractionalModelMixin):
             y0 = self._get_initial_state(mode, params, T_init, lambda_0=1.0)
 
         # Diffrax setup
-        term = diffrax.ODETerm(lambda ti, yi, args_i: ode_fn(ti, yi, args_i))
+        term = diffrax.ODETerm(lambda ti, yi, args_i: ode_fn(ti, yi, args_i)) # type: ignore[arg-type]
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
 

@@ -362,7 +362,7 @@ class SPPYieldStress(BaseModel):
         self.parameters.set_value("n_power_law", np.clip(n_est, 0.01, 2.0))
         self.parameters.set_value("eta_inf", np.clip(eta_est, 1e-9, 1e6))
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
         """Predict stress using fitted parameters.
 
         Parameters
@@ -709,7 +709,7 @@ class SPPYieldStress(BaseModel):
             test_mode = detect_test_mode(rheo_data)
 
         X = rheo_data.x
-        predictions = self._predict(X)
+        predictions = self._predict(X)  # type: ignore[arg-type]
 
         return RheoData(
             x=np.array(X),

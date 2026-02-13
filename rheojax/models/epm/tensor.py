@@ -201,12 +201,22 @@ class TensorialEPM(EPMBase):
         base_params = super()._get_param_dict()
 
         # Add tensorial-specific parameters
+        nu = self.parameters.get_value("nu")
+        tau_pl_shear = self.parameters.get_value("tau_pl_shear")
+        tau_pl_normal = self.parameters.get_value("tau_pl_normal")
+        hill_H = self.parameters.get_value("hill_H")
+        hill_N = self.parameters.get_value("hill_N")
+        assert nu is not None
+        assert tau_pl_shear is not None
+        assert tau_pl_normal is not None
+        assert hill_H is not None
+        assert hill_N is not None
         tensorial_params = {
-            "nu": self.parameters.get_value("nu"),
-            "tau_pl_shear": self.parameters.get_value("tau_pl_shear"),
-            "tau_pl_normal": self.parameters.get_value("tau_pl_normal"),
-            "hill_H": self.parameters.get_value("hill_H"),
-            "hill_N": self.parameters.get_value("hill_N"),
+            "nu": nu,
+            "tau_pl_shear": tau_pl_shear,
+            "tau_pl_normal": tau_pl_normal,
+            "hill_H": hill_H,
+            "hill_N": hill_N,
         }
 
         return {**base_params, **tensorial_params}
@@ -393,7 +403,7 @@ class TensorialEPM(EPMBase):
             metadata=result_metadata,
         )
 
-    def _predict(self, X, **kwargs) -> RheoData:
+    def _predict(self, X, **kwargs) -> RheoData:  # type: ignore[override]
         """Simulate the model for the given protocol.
 
         Args:
@@ -484,11 +494,12 @@ class TensorialEPM(EPMBase):
         Extracts shear component from tensorial stress.
         """
         time = data.x
+        assert time is not None
 
         # Calculate dt from data if possible
         dt = self.dt
         if len(time) > 1:
-            dt = time[1] - time[0]
+            dt = float(time[1] - time[0])
 
         # Constant shear rate from metadata
         gdot = data.metadata.get("gamma_dot", 0.1)
@@ -528,11 +539,12 @@ class TensorialEPM(EPMBase):
         Extracts shear component from tensorial stress.
         """
         time = data.x
+        assert time is not None
 
         # Calculate dt from data
         dt = self.dt
         if len(time) > 1:
-            dt = time[1] - time[0]
+            dt = float(time[1] - time[0])
 
         # Step strain magnitude from metadata
         strain_step = data.metadata.get("gamma", 0.1)
@@ -580,11 +592,12 @@ class TensorialEPM(EPMBase):
         Extracts shear component from tensorial stress.
         """
         time = data.x
+        assert time is not None
 
         # Calculate dt from data
         dt = self.dt
         if len(time) > 1:
-            dt = time[1] - time[0]
+            dt = float(time[1] - time[0])
 
         # Target stress from metadata or mean of y
         if data.y is not None:
@@ -651,11 +664,12 @@ class TensorialEPM(EPMBase):
         Extracts shear component from tensorial stress.
         """
         time = data.x
+        assert time is not None
 
         # Calculate dt from data
         dt = self.dt
         if len(time) > 1:
-            dt = time[1] - time[0]
+            dt = float(time[1] - time[0])
 
         # Params
         gamma0 = data.metadata.get("gamma0", 1.0)

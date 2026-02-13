@@ -290,7 +290,7 @@ def main():
         ("06_hl_laos.ipynb", "laos"),
     ]
 
-    for nb_name, protocol in notebooks:
+    for nb_name, _protocol in notebooks:
         path = os.path.join(HL_DIR, nb_name)
         if not os.path.exists(path):
             print(f"SKIP: {nb_name} not found")

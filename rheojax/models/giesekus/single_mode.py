@@ -1142,9 +1142,9 @@ class GiesekusSingleMode(GiesekusBase):
             sigma_prime.append(sigma_n_prime)
             sigma_double_prime.append(sigma_n_double_prime)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
-        intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)
+        sigma_prime = np.array(sigma_prime)  # type: ignore[assignment]
+        sigma_double_prime = np.array(sigma_double_prime)  # type: ignore[assignment]
+        intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)  # type: ignore[operator]
 
         return {
             "n": np.array(harmonics),

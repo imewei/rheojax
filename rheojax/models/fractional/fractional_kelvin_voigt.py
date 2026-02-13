@@ -401,6 +401,7 @@ class FractionalKelvinVoigt(BaseModel):
             fitted_alpha = self.parameters.get_value("alpha")
 
             # Compute characteristic time
+            assert fitted_Ge is not None and fitted_c_alpha is not None and fitted_alpha is not None
             tau_epsilon = self._compute_tau_epsilon(
                 fitted_Ge, fitted_c_alpha, fitted_alpha
             )
@@ -419,7 +420,7 @@ class FractionalKelvinVoigt(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
         """Internal predict implementation.
 
         Args:
@@ -430,13 +431,14 @@ class FractionalKelvinVoigt(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)
+            return self.predict_rheodata(X)  # type: ignore[return-value]
 
         # Handle raw array input (assume relaxation mode)
         x = jnp.asarray(X)
         Ge = self.parameters.get_value("Ge")
         c_alpha = self.parameters.get_value("c_alpha")
         alpha = self.parameters.get_value("alpha")
+        assert Ge is not None and c_alpha is not None and alpha is not None
 
         result = self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
         return np.array(result)
@@ -534,7 +536,7 @@ class FractionalKelvinVoigt(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None):
+    def predict(self, X, test_mode: str | None = None):  # type: ignore[override]
         """Predict response.
 
         Args:
@@ -552,6 +554,7 @@ class FractionalKelvinVoigt(BaseModel):
             Ge = self.parameters.get_value("Ge")
             c_alpha = self.parameters.get_value("c_alpha")
             alpha = self.parameters.get_value("alpha")
+            assert Ge is not None and c_alpha is not None and alpha is not None
             x = jnp.asarray(X)
 
             # Route to appropriate prediction method based on test_mode

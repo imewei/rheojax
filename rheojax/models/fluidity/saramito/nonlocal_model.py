@@ -810,10 +810,10 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             _, sigma, _ = self.simulate_startup(X, gamma_dot)
             return sigma
         elif test_mode == "creep":
-            sigma = kwargs.get("sigma") or getattr(self, "_sigma_applied", None)
+            sigma = kwargs.get("sigma") or getattr(self, "_sigma_applied", None)  # type: ignore[assignment]
             if sigma is None:
                 raise ValueError("creep prediction requires sigma")
-            gamma, _ = self.simulate_creep(X, sigma)
+            gamma, _ = self.simulate_creep(X, sigma)  # type: ignore[arg-type]
             return gamma
 
         return np.zeros_like(X)

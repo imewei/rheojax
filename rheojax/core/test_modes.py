@@ -97,11 +97,11 @@ class TestModeEnum(StrEnum):
             return cls.STARTUP
         elif protocol == Protocol.OSCILLATION:
             return cls.OSCILLATION
-        elif protocol == Protocol.SAOS:
+        elif protocol == Protocol.SAOS:  # type: ignore[attr-defined]
             return cls.OSCILLATION
         elif protocol == Protocol.LAOS:
             return cls.OSCILLATION  # LAOS is a type of oscillation
-        return cls.UNKNOWN
+        return cls.UNKNOWN  # type: ignore[unreachable]
 
     def to_protocol(self) -> Protocol | None:
         """Convert TestModeEnum to inventory Protocol (best effort)."""
@@ -409,7 +409,7 @@ def get_compatible_test_modes(model_name: str) -> list[TestMode]:
             model_cls, "_fit_rotation_mode"
         ):
             modes.append(TestMode.ROTATION)
-        return modes
+        return modes  # type: ignore[return-value]
 
     return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
 

@@ -92,9 +92,9 @@ class RheoData:
             validate=self.validate,
         )
 
-        # Normalize metadata container
+        # Normalize metadata container (defensive — callers may pass None explicitly)
         if self.metadata is None:
-            self.metadata = {}
+            self.metadata = {}  # type: ignore[unreachable]
 
         # Persist explicitly provided test mode into metadata and internal cache
         if initial_test_mode is not None:
@@ -281,8 +281,8 @@ class RheoData:
         """
         logger.debug("Creating copy of RheoData")
         return RheoData(
-            x=self.x.copy() if hasattr(self.x, "copy") else self.x,
-            y=self.y.copy() if hasattr(self.y, "copy") else self.y,
+            x=self.x.copy() if hasattr(self.x, "copy") else self.x,  # type: ignore[union-attr]
+            y=self.y.copy() if hasattr(self.y, "copy") else self.y,  # type: ignore[union-attr]
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
@@ -307,8 +307,8 @@ class RheoData:
             Dictionary with data and metadata
         """
         logger.debug("Converting RheoData to dictionary")
-        x_data = self.x.tolist() if hasattr(self.x, "tolist") else list(self.x)
-        y_data = self.y.tolist() if hasattr(self.y, "tolist") else list(self.y)
+        x_data = self.x.tolist() if hasattr(self.x, "tolist") else list(self.x)  # type: ignore[union-attr,arg-type]
+        y_data = self.y.tolist() if hasattr(self.y, "tolist") else list(self.y)  # type: ignore[union-attr,arg-type]
 
         data_dict = {
             "x": x_data,
@@ -379,14 +379,14 @@ class RheoData:
     def modulus(self) -> np.ndarray | None:
         """Get modulus of complex data."""
         if self.is_complex:
-            return np.abs(self.y)
+            return np.abs(self.y)  # type: ignore[arg-type]
         return None
 
     @property
     def phase(self) -> np.ndarray | None:
         """Get phase of complex data."""
         if self.is_complex:
-            return np.angle(self.y)
+            return np.angle(self.y)  # type: ignore[arg-type]
         return None
 
     @property
@@ -407,8 +407,8 @@ class RheoData:
         if self.is_complex:
             if isinstance(self.y, jnp.ndarray):
                 return jnp.real(self.y)
-            return np.real(self.y)
-        return self.y
+            return np.real(self.y)  # type: ignore[arg-type]
+        return self.y  # type: ignore[return-value]
 
     @property
     def y_imag(self) -> np.ndarray:
@@ -428,7 +428,7 @@ class RheoData:
         if self.is_complex:
             if isinstance(self.y, jnp.ndarray):
                 return jnp.imag(self.y)
-            return np.imag(self.y)
+            return np.imag(self.y)  # type: ignore[arg-type]
         if isinstance(self.y, jnp.ndarray):
             return jnp.zeros_like(self.y)
         return np.zeros_like(self.y)
@@ -681,7 +681,7 @@ class RheoData:
             new_y = jnp.interp(new_x, self.x, self.y)
         else:
             # Use NumPy interpolation
-            new_y = np.interp(new_x, self.x, self.y)
+            new_y = np.interp(new_x, self.x, self.y)  # type: ignore[arg-type]
 
         return RheoData(
             x=new_x,
@@ -739,7 +739,7 @@ class RheoData:
             smoothed_y = jnp.convolve(self.y, kernel, mode="same")
         else:
             # Use NumPy convolution
-            smoothed_y = np.convolve(self.y, kernel, mode="same")
+            smoothed_y = np.convolve(self.y, kernel, mode="same")  # type: ignore[call-overload]
 
         return RheoData(
             x=self.x,
@@ -764,7 +764,7 @@ class RheoData:
             dy_dx = jnp.gradient(self.y, self.x)
         else:
             # Use NumPy gradient
-            dy_dx = np.gradient(self.y, self.x)
+            dy_dx = np.gradient(self.y, self.x)  # type: ignore[arg-type]
 
         return RheoData(
             x=self.x,
@@ -790,7 +790,9 @@ class RheoData:
         logger.debug("Computing numerical integral")
         if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
             # Use JAX cumulative trapezoid
-            from jax.scipy.integrate import cumulative_trapezoid
+            from jax.scipy.integrate import (  # type: ignore[attr-defined]
+                cumulative_trapezoid,
+            )
 
             integrated = cumulative_trapezoid(self.y, self.x, initial=0)
         else:

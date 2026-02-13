@@ -426,7 +426,7 @@ def generate_combined_inventory(
                 if r["traceback"]:
                     # Extract most relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [l for l in tb_lines if "rheojax" in l or "Error" in l][:10]
+                    relevant = [line for line in tb_lines if "rheojax" in line or "Error" in line][:10]
                     if relevant:
                         f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))

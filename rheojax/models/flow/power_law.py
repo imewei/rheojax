@@ -162,7 +162,7 @@ class PowerLaw(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
         """Predict viscosity for given shear rates.
 
         Args:

@@ -1512,7 +1512,7 @@ def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:
         rows.append(
             {
                 "Property": f"Interval {interval_idx} - Points",
-                "Value": str(len(rheo_data.x)),
+                "Value": str(len(rheo_data.x)),  # type: ignore[arg-type]
                 "Interval": str(interval_idx),
             }
         )
@@ -1579,7 +1579,7 @@ def _create_interval_dataframe(rheo_data: RheoData) -> pd.DataFrame:
     for aux_col in ["temperature_data", "normal_force", "torque", "phase_angle"]:
         if aux_col in rheo_data.metadata:
             aux_data = rheo_data.metadata[aux_col]
-            if len(aux_data) == len(rheo_data.x):
+            if len(aux_data) == len(rheo_data.x):  # type: ignore[arg-type]
                 col_name = _format_aux_column_name(aux_col, rheo_data.metadata)
                 data[col_name] = np.asarray(aux_data)
 

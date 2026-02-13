@@ -152,6 +152,7 @@ class FractionalMaxwellGel(BaseModel):
             # tau^(1-alpha) = eta / c_alpha
             # tau = (eta / c_alpha)^(1/(1-alpha))
 
+            assert eta is not None and c_alpha is not None
             exponent = 1.0 / (1.0 - alpha + epsilon)
             base = eta / c_alpha
 
@@ -400,6 +401,7 @@ class FractionalMaxwellGel(BaseModel):
                 c_alpha_val = self.parameters.get_value("c_alpha")
                 alpha_val = self.parameters.get_value("alpha")
                 eta_val = self.parameters.get_value("eta")
+                assert c_alpha_val is not None and alpha_val is not None
                 tau_val = self._compute_tau(c_alpha_val, alpha_val)
 
                 ctx["c_alpha"] = c_alpha_val
@@ -441,7 +443,7 @@ class FractionalMaxwellGel(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)
+            return self.predict_rheodata(X)  # type: ignore[return-value]
 
         # Handle raw array input
         from rheojax.core.test_modes import TestMode
@@ -547,7 +549,7 @@ class FractionalMaxwellGel(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None, **kwargs):
+    def predict(self, X, test_mode: str | None = None, **kwargs):  # type: ignore[override]
         """Predict response.
 
         Args:

@@ -9,6 +9,8 @@ ITTMCTBase
     Abstract base class for ITT-MCT models (F₁₂ schematic and ISM)
 """
 
+from __future__ import annotations
+
 from abc import abstractmethod
 from typing import Any, Literal
 
@@ -184,7 +186,7 @@ class ITTMCTBase(BaseModel):
         y: np.ndarray,
         test_mode: str | None = None,
         **kwargs,
-    ) -> "ITTMCTBase":
+    ) -> ITTMCTBase:
         """Internal fit implementation.
 
         Parameters
@@ -215,7 +217,7 @@ class ITTMCTBase(BaseModel):
         # Detect or validate protocol
         if test_mode is None:
             test_mode = self._detect_protocol(X, y, **kwargs)
-        self._last_protocol = test_mode
+        self._last_protocol = test_mode  # type: ignore[assignment]
 
         # Dispatch to protocol-specific fitting
         protocol_dispatch = {
@@ -234,7 +236,7 @@ class ITTMCTBase(BaseModel):
                 f"Supported: {list(protocol_dispatch.keys())}"
             )
 
-        return fit_method(X, y, **kwargs)
+        return fit_method(X, y, **kwargs)  # type: ignore[operator]
 
     def _predict(
         self,
@@ -277,7 +279,7 @@ class ITTMCTBase(BaseModel):
         if predict_method is None:
             raise ValueError(f"Unknown test_mode '{test_mode}'")
 
-        return predict_method(X, **kwargs)
+        return predict_method(X, **kwargs)  # type: ignore[operator]
 
     def _detect_protocol(
         self,
@@ -332,7 +334,7 @@ class ITTMCTBase(BaseModel):
         gamma_dot: np.ndarray,
         sigma: np.ndarray,
         **kwargs,
-    ) -> "ITTMCTBase":
+    ) -> ITTMCTBase:
         """Fit to steady-state flow curve data.
 
         Parameters
@@ -384,7 +386,7 @@ class ITTMCTBase(BaseModel):
         omega: np.ndarray,
         G_star: np.ndarray,
         **kwargs,
-    ) -> "ITTMCTBase":
+    ) -> ITTMCTBase:
         """Fit to SAOS (G', G'') data.
 
         Parameters
@@ -449,7 +451,7 @@ class ITTMCTBase(BaseModel):
         sigma: np.ndarray,
         gamma_dot: float = 1.0,
         **kwargs,
-    ) -> "ITTMCTBase":
+    ) -> ITTMCTBase:
         """Fit to startup flow data (stress growth).
 
         Parameters
@@ -502,7 +504,7 @@ class ITTMCTBase(BaseModel):
         J: np.ndarray,
         sigma_applied: float = 1.0,
         **kwargs,
-    ) -> "ITTMCTBase":
+    ) -> ITTMCTBase:
         """Fit to creep compliance data.
 
         Parameters
@@ -555,7 +557,7 @@ class ITTMCTBase(BaseModel):
         sigma: np.ndarray,
         gamma_pre: float = 0.01,
         **kwargs,
-    ) -> "ITTMCTBase":
+    ) -> ITTMCTBase:
         """Fit to stress relaxation data.
 
         Parameters
@@ -609,7 +611,7 @@ class ITTMCTBase(BaseModel):
         gamma_0: float = 0.1,
         omega: float = 1.0,
         **kwargs,
-    ) -> "ITTMCTBase":
+    ) -> ITTMCTBase:
         """Fit to LAOS data.
 
         Parameters
@@ -871,6 +873,8 @@ class ITTMCTBase(BaseModel):
         """
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
+        assert self._prony_amplitudes is not None
+        assert self._prony_times is not None
         return self._prony_amplitudes, self._prony_times
 
     def __repr__(self) -> str:

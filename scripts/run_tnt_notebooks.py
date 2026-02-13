@@ -400,7 +400,7 @@ def main():
                 "passed": sum(1 for r in results if r["status"] == "PASS"),
                 "passed_warnings": sum(1 for r in results if r["status"] == "PASS_WITH_WARNINGS"),
                 "failed": sum(1 for r in results if r["status"] == "FAIL"),
-                "timeout": sum(1 for r in results if r["status"] == "TIMEOUT"),
+                "timed_out": sum(1 for r in results if r["status"] == "TIMEOUT"),
                 "results": results,
             }, f, indent=2, default=str)
         print(f"Master log: {master_log}")

@@ -163,7 +163,7 @@ class DMTNonlocal(DMTBase):
         """
         D_lambda = self.parameters.get_value("D_lambda")
         t_eq = self.parameters.get_value("t_eq")
-        return np.sqrt(D_lambda * t_eq)
+        return np.sqrt(D_lambda * t_eq)  # type: ignore[operator]
 
     # =========================================================================
     # Required Abstract Methods
@@ -479,7 +479,7 @@ class DMTNonlocal(DMTBase):
         # Copy parameters
         for name in local_model.parameters.keys():
             if name in self.parameters.keys():
-                self.parameters.set_value(name, local_model.parameters.get_value(name))
+                self.parameters.set_value(name, local_model.parameters.get_value(name))  # type: ignore[arg-type]
 
         self._fitted = True
         return self
@@ -504,7 +504,7 @@ class DMTNonlocal(DMTBase):
             for name in self.parameters.keys():
                 if name in local_model.parameters.keys():
                     local_model.parameters.set_value(
-                        name, self.parameters.get_value(name)
+                        name, self.parameters.get_value(name)  # type: ignore[arg-type]
                     )
             return local_model._predict_flow_curve(gamma_dot)
         else:
@@ -560,7 +560,7 @@ class DMTNonlocal(DMTBase):
 
         for i, idx in enumerate(time_indices):
             t_val = result["t"][idx]
-            color = plt.cm.viridis(i / (len(time_indices) - 1))
+            color = plt.cm.viridis(i / (len(time_indices) - 1))  # type: ignore[attr-defined]
 
             # Structure profile
             axes[0].plot(

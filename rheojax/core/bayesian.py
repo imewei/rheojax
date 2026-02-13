@@ -369,7 +369,7 @@ class BayesianMixin:
                 test_mode = TestMode(test_mode.lower())
 
         logger.debug("Test mode resolved", test_mode=str(test_mode))
-        return X_array, y_array, test_mode
+        return X_array, y_array, test_mode  # type: ignore[return-value]
 
     def _prepare_jax_data(
         self, X_array: np.ndarray, y_array: np.ndarray
@@ -782,7 +782,7 @@ class BayesianMixin:
         for param_name in self.parameters:
             param = self.parameters.get(param_name)
 
-            if param.bounds is None:
+            if param is None or param.bounds is None:
                 logger.error(
                     "Parameter missing bounds for prior sampling", parameter=param_name
                 )
@@ -1094,7 +1094,7 @@ class BayesianMixin:
             # to fit_bayesian(). Never clear protocol kwargs from _fit() —
             # they are the ground truth for the model_function.
             if protocol_kwargs:
-                if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:
+                if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:  # type: ignore[has-type]
                     self._last_fit_kwargs = {}
                 self._last_fit_kwargs.update(protocol_kwargs)
 
@@ -1108,7 +1108,7 @@ class BayesianMixin:
             )
 
             # Phase 3: Prepare JAX data
-            jax_data = self._prepare_jax_data(X_array, y_array)
+            jax_data = self._prepare_jax_data(X_array, y_array)  # type: ignore[arg-type]
             X_jax = jax_data["X_jax"]
             y_jax = jax_data["y_jax"]
             is_complex_data = jax_data["is_complex"]
@@ -1116,7 +1116,7 @@ class BayesianMixin:
 
             # Phase 4: Get parameter bounds
             param_names = list(self.parameters)
-            param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
+            param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)  # type: ignore[arg-type]
 
             # Phase 5: Build NumPyro model (closure captures test_mode)
             numpyro_model = self._build_numpyro_model(

@@ -1057,8 +1057,8 @@ class DMTLocal(DMTBase):
             sigma_prime.append(sp)
             sigma_double_prime.append(spp)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
+        sigma_prime = np.array(sigma_prime)  # type: ignore[assignment]
+        sigma_double_prime = np.array(sigma_double_prime)  # type: ignore[assignment]
 
         # Normalized intensities I_n/I_1
         I_1 = np.sqrt(sigma_prime[0] ** 2 + sigma_double_prime[0] ** 2)
@@ -1070,8 +1070,8 @@ class DMTLocal(DMTBase):
         )
 
         return {
-            "sigma_prime": sigma_prime,
-            "sigma_double_prime": sigma_double_prime,
+            "sigma_prime": sigma_prime,  # type: ignore[dict-item]
+            "sigma_double_prime": sigma_double_prime,  # type: ignore[dict-item]
             "I_n_1": I_n_1,
         }
 
@@ -1094,10 +1094,10 @@ class DMTLocal(DMTBase):
         param_names = list(self.parameters.keys())
         params = jnp.array([self.parameters.get_value(n) for n in param_names])
         bounds_lower = jnp.array(
-            [self.parameters[n].bounds[0] for n in param_names]
+            [self.parameters[n].bounds[0] for n in param_names]  # type: ignore[index]
         )
         bounds_upper = jnp.array(
-            [self.parameters[n].bounds[1] for n in param_names]
+            [self.parameters[n].bounds[1] for n in param_names]  # type: ignore[index]
         )
         return params, (bounds_lower, bounds_upper)
 

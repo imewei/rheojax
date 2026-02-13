@@ -289,7 +289,7 @@ def write_issue_inventory(
                 if r["traceback"] and r["status"] == "FAIL":
                     # Extract relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [l for l in tb_lines if "rheojax" in l.lower() or "Error" in l or "Exception" in l][:10]
+                    relevant = [line for line in tb_lines if "rheojax" in line.lower() or "Error" in line or "Exception" in line][:10]
                     if relevant:
                         f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))

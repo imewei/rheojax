@@ -424,7 +424,7 @@ class Zener(BaseModel):
         """
         Gm = self.parameters.get_value("Gm")
         eta = self.parameters.get_value("eta")
-        return eta / Gm
+        return eta / Gm # type: ignore[operator]
 
     def get_retardation_time(self) -> float:
         """Get characteristic retardation time for creep.
@@ -437,7 +437,7 @@ class Zener(BaseModel):
         Ge = self.parameters.get_value("Ge")
         Gm = self.parameters.get_value("Gm")
         eta = self.parameters.get_value("eta")
-        return eta * (Ge + Gm) / (Ge * Gm)
+        return eta * (Ge + Gm) / (Ge * Gm) # type: ignore[operator]
 
     def __repr__(self) -> str:
         """String representation of Zener model."""

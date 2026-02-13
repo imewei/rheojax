@@ -43,7 +43,7 @@ def main():
     print(f"Scanning for notebooks in: {base_dir}")
 
     notebook_files = []
-    for root, dirs, files in os.walk(base_dir):
+    for root, _dirs, files in os.walk(base_dir):
         for file in files:
             if file.endswith('.ipynb') and not file.startswith('.'):
                 notebook_files.append(os.path.join(root, file))
