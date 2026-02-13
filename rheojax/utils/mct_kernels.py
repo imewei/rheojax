@@ -276,9 +276,9 @@ def prony_decompose_memory(
     Returns
     -------
     g : np.ndarray
-        Prony mode amplitudes [g₁, ..., gₙ]
+        Prony mode amplitudes [g₁, ..., g_n]
     tau : np.ndarray
-        Prony mode relaxation times [τ₁, ..., τₙ]
+        Prony mode relaxation times [τ₁, ..., τ_n]
 
     Notes
     -----
@@ -376,10 +376,10 @@ def _prony_smart_init(
         # Find time point closest to tau_i
         idx = np.argmin(np.abs(t_valid - tau_i))
         # Estimate g from m(τ) ≈ g * exp(-1) = g * 0.368
-        g_init[i] = m_valid[idx] / 0.368 / n_modes
+        g_init[i] = m_valid[idx] / 0.368 / max(n_modes, 1)
 
     # Ensure positive and scale to match total kernel area
-    g_init = np.maximum(g_init, m_valid[0] / n_modes / 10)
+    g_init = np.maximum(g_init, m_valid[0] / max(n_modes, 1) / 10)
 
     return g_init, tau_init
 

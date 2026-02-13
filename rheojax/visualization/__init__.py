@@ -9,6 +9,31 @@ This module provides:
 
 import warnings
 
+from rheojax.visualization.epm_plots import (
+    animate_stress_evolution,
+    animate_tensorial_evolution,
+    plot_lattice_fields,
+    plot_normal_stress_field,
+    plot_normal_stress_ratio,
+    plot_tensorial_fields,
+    plot_von_mises_field,
+)
+from rheojax.visualization.plotter import (
+    plot_flow_curve,
+    plot_frequency_domain,
+    plot_residuals,
+    plot_rheo_data,
+    plot_time_domain,
+    save_figure,
+)
+from rheojax.visualization.templates import (
+    apply_template_style,
+    plot_mastercurve,
+    plot_model_fit,
+    plot_modulus_frequency,
+    plot_stress_strain,
+)
+
 # Automatically suppress font glyph warnings on module import
 # Justification: These warnings are purely cosmetic - plots render correctly,
 # the glyph is just displayed as a box or skipped. This is harmless for
@@ -72,31 +97,6 @@ def configure_matplotlib(
             category=UserWarning,
         )
 
-
-from rheojax.visualization.epm_plots import (
-    animate_stress_evolution,
-    animate_tensorial_evolution,
-    plot_lattice_fields,
-    plot_normal_stress_field,
-    plot_normal_stress_ratio,
-    plot_tensorial_fields,
-    plot_von_mises_field,
-)
-from rheojax.visualization.plotter import (
-    plot_flow_curve,
-    plot_frequency_domain,
-    plot_residuals,
-    plot_rheo_data,
-    plot_time_domain,
-    save_figure,
-)
-from rheojax.visualization.templates import (
-    apply_template_style,
-    plot_mastercurve,
-    plot_model_fit,
-    plot_modulus_frequency,
-    plot_stress_strain,
-)
 
 __all__ = [
     # Configuration

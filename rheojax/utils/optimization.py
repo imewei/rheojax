@@ -5,7 +5,7 @@ This module provides GPU-accelerated optimization using the NLSQ package
 through JAX JIT compilation and automatic differentiation.
 
 Critical: This module imports NLSQ, which must be imported before JAX to
-enable float64 precision mode. The rheo package handles this automatically
+enable float64 precision mode. The rheojax package handles this automatically
 in __init__.py.
 
 Example:
@@ -271,8 +271,8 @@ class OptimizationResult:
         if r2 is None:
             return None
 
-        n = self.n_data or (len(self.y_data) if self.y_data is not None else None)
-        if n is None:
+        n = self.n_data if self.n_data is not None else (len(self.y_data) if self.y_data is not None else None)
+        if n is None or n == 0:
             return None
 
         p = len(self.x)
@@ -334,7 +334,7 @@ class OptimizationResult:
         if self.residuals is None:
             return None
 
-        n = self.n_data or (len(self.residuals) if self.residuals is not None else None)
+        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else None)
         if n is None or n == 0:
             return None
 
@@ -367,7 +367,7 @@ class OptimizationResult:
         if self.residuals is None:
             return None
 
-        n = self.n_data or (len(self.residuals) if self.residuals is not None else None)
+        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else None)
         if n is None or n == 0:
             return None
 
@@ -414,7 +414,7 @@ class OptimizationResult:
 
         from scipy import stats
 
-        n = self.n_data or (len(self.residuals) if self.residuals is not None else 0)
+        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else 0)
         p = len(self.x)
 
         # Degrees of freedom
@@ -516,7 +516,7 @@ class OptimizationResult:
         from scipy import stats
 
         x_eval = np.asarray(x_eval, dtype=np.float64)
-        n = self.n_data or (len(self.residuals) if self.residuals is not None else 0)
+        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else 0)
         p = len(self.x)
         dof = max(n - p, 1)
 
@@ -1256,7 +1256,11 @@ def nlsq_multistart_optimize(
         for orig_val, bounds in zip(original_values, bounds_list, strict=True):
             if bounds is None or (bounds[0] is None and bounds[1] is None):
                 perturbation = rng.uniform(-perturb_factor, perturb_factor)
-                new_val = orig_val * (1.0 + perturbation)
+                if abs(orig_val) < 1e-30:
+                    # Additive perturbation for zero-valued parameters
+                    new_val = perturbation
+                else:
+                    new_val = orig_val * (1.0 + perturbation)
             else:
                 lower = bounds[0] if bounds[0] is not None else orig_val - abs(orig_val)
                 upper = bounds[1] if bounds[1] is not None else orig_val + abs(orig_val)
@@ -1755,7 +1759,7 @@ def optimize_with_bounds(
     # Create temporary ParameterSet for interface consistency
 
     params = ParameterSet()
-    for i, (val, bound) in enumerate(zip(x0, bounds, strict=False)):
+    for i, (val, bound) in enumerate(zip(x0, bounds, strict=True)):
         params.add(name=f"p{i}", value=val, bounds=bound)
 
     # Use main optimization function
@@ -1785,7 +1789,7 @@ def fit_with_nlsq(
     # Convert bounds format: (lower_array, upper_array) -> list of tuples
     if bounds is not None:
         lower, upper = bounds
-        bounds_list = [(float(lo), float(hi)) for lo, hi in zip(lower, upper, strict=False)]
+        bounds_list = [(float(lo), float(hi)) for lo, hi in zip(lower, upper, strict=True)]
     else:
         bounds_list = [(None, None)] * len(x0)
 
@@ -1950,7 +1954,7 @@ def create_least_squares_objective(
     to the optimizer, which enables proper gradient computation and weighting.
 
     For complex data (e.g., G* = G' + iG"), returns stacked real and imaginary
-    residuals: [real₁, ..., realₙ, imag₁, ..., imagₙ] with shape (2N,).
+    residuals: [real₁, ..., real_n, imag₁, ..., imag_n] with shape (2N,).
 
     For real data, returns residuals with shape (N,).
 

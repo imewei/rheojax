@@ -183,11 +183,15 @@ def create_prony_parameter_set(
     symbol = "G" if modulus_type == "shear" else "E"
     units = "Pa"
 
+    # Tensile moduli (E) are ~3x shear moduli (G) and real DMTA polymer
+    # data can reach ~10 GPa, so tensile bounds must be wider.
+    modulus_upper = 1e12 if modulus_type == "tensile" else 1e9
+
     # Add equilibrium modulus (can be zero for liquids)
     param_set.add(
         name=f"{symbol}_inf",
         value=1e3,
-        bounds=(0.0, 1e9),
+        bounds=(0.0, modulus_upper),
         units=units,
         description=f"Equilibrium {modulus_type} modulus",
     )
@@ -197,7 +201,7 @@ def create_prony_parameter_set(
         param_set.add(
             name=f"{symbol}_{i}",
             value=1e5,
-            bounds=(1e-3, 1e9),
+            bounds=(1e-3, modulus_upper),
             units=units,
             description=f"Mode {i} strength",
         )
@@ -295,9 +299,9 @@ def compute_r_squared(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     # Total sum of squares
     ss_tot = jnp.sum((y_true_arr - jnp.mean(y_true_arr)) ** 2)
 
-    # Handle edge case where all y_true are identical
+    # Handle edge case where all y_true are identical (R² undefined)
     if ss_tot == 0.0:
-        return 1.0 if ss_res == 0.0 else 0.0
+        return 1.0 if ss_res == 0.0 else -1.0
 
     r2 = 1.0 - ss_res / ss_tot
     return float(r2)
