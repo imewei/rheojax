@@ -11,7 +11,7 @@ def update_notebook(notebook_path: Path) -> tuple[bool, str]:
     Returns:
         Tuple of (success, message).
     """
-    with open(notebook_path, "r") as f:
+    with open(notebook_path) as f:
         nb = json.load(f)
 
     updated = False

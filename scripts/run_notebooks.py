@@ -16,7 +16,6 @@ Usage:
 """
 import argparse
 import gc
-import io
 import json
 import os
 import re
@@ -25,8 +24,7 @@ import subprocess
 import sys
 import time
 import traceback
-from contextlib import redirect_stderr, redirect_stdout
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import nbformat
@@ -317,7 +315,7 @@ def main():
     print()
 
     # Master log
-    run_timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    run_timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     master_log_path = None
     if log_dir:
         log_dir.mkdir(parents=True, exist_ok=True)

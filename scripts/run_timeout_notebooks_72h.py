@@ -29,7 +29,6 @@ import nbformat
 from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, CellTimeoutError
 
-
 # Notebooks that timeout in normal runs
 TIMEOUT_NOTEBOOKS = [
     ("hl", "01_hl_flow_curve.ipynb"),
@@ -170,10 +169,10 @@ def run_notebook(
         # Write detailed log
         log_dir.mkdir(parents=True, exist_ok=True)
         with open(log_file, "w") as f:
-            f.write(f"=" * 70 + "\n")
+            f.write("=" * 70 + "\n")
             f.write(f"NOTEBOOK: {notebook_path.name}\n")
             f.write(f"SUITE: {result['suite']}\n")
-            f.write(f"=" * 70 + "\n\n")
+            f.write("=" * 70 + "\n\n")
             f.write(f"Started: {start_time.isoformat()}\n")
             f.write(f"Finished: {end_time.isoformat()}\n")
             f.write(f"Runtime: {result['runtime_human']}\n")

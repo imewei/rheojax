@@ -9,7 +9,6 @@ Notebooks run from examples/<family>/, so dirname(abspath("")) = examples/.
 """
 
 import glob
-import sys
 
 old = 'os.path.join(os.path.dirname(os.path.abspath("")), "examples")'
 new = 'os.path.dirname(os.path.abspath(""))'
@@ -23,7 +22,7 @@ checked = 0
 
 for f in sorted(glob.glob("examples/**/*.ipynb", recursive=True)):
     checked += 1
-    with open(f, "r") as fh:
+    with open(f) as fh:
         content = fh.read()
 
     if old_json in content:

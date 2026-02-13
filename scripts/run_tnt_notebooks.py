@@ -26,7 +26,6 @@ import nbformat
 from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, CellTimeoutError
 
-
 # Categorize warnings by their source/type
 WARNING_CATEGORIES = {
     "deprecation": ["DeprecationWarning", "PendingDeprecationWarning", "FutureWarning"],
@@ -354,12 +353,12 @@ def main():
         else:
             notebooks = sorted(Path("examples/tnt").glob("*.ipynb"))
 
-        print(f"TNT Notebook Runner")
-        print(f"=" * 60)
+        print("TNT Notebook Runner")
+        print("=" * 60)
         print(f"Notebooks: {len(notebooks)}")
         print(f"Timeout per notebook: {args.timeout}s ({args.timeout/3600:.1f}h)")
         print(f"Log directory: {log_dir}")
-        print(f"=" * 60)
+        print("=" * 60)
         print()
 
         results = []

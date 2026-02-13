@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 """Test notebooks and capture errors."""
 import sys
+from pathlib import Path
+
 import nbformat
 from nbclient import NotebookClient
-from pathlib import Path
-import traceback
+
 
 def test_notebook(nb_path: str, timeout: int = 120) -> dict:
     """Test a single notebook and return result."""
@@ -45,12 +46,12 @@ if __name__ == "__main__":
     # Summary
     passed = sum(1 for r in results.values() if r["status"] == "PASS")
     failed = sum(1 for r in results.values() if r["status"] == "FAIL")
-    print(f"\n=== SUMMARY ===")
+    print("\n=== SUMMARY ===")
     print(f"Passed: {passed}/{len(results)}")
     print(f"Failed: {failed}/{len(results)}")
 
     if failed > 0:
-        print(f"\nFailed notebooks:")
+        print("\nFailed notebooks:")
         for nb, r in results.items():
             if r["status"] == "FAIL":
                 print(f"  - {nb}")

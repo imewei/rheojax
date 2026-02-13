@@ -12,8 +12,6 @@ Applies:
 import json
 import os
 import re
-import sys
-
 
 HL_DIR = os.path.join(os.path.dirname(__file__), "..", "examples", "hl")
 

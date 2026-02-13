@@ -27,7 +27,6 @@ import nbformat
 from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, CellTimeoutError
 
-
 # Categorize warnings by their source/type
 WARNING_CATEGORIES = {
     "deprecation": ["DeprecationWarning", "PendingDeprecationWarning", "FutureWarning"],
@@ -461,14 +460,14 @@ def main():
         if args.suite in ("giesekus", "both"):
             suites_to_run.append(("giesekus", Path("examples/giesekus"), Path("examples/giesekus/_run_logs")))
 
-        print(f"Fluidity + Giesekus Notebook Runner")
-        print(f"=" * 60)
+        print("Fluidity + Giesekus Notebook Runner")
+        print("=" * 60)
         print(f"Suites: {', '.join(s[0] for s in suites_to_run)}")
         print(f"Timeout per notebook: {args.timeout}s ({args.timeout/3600:.1f}h)")
         print(f"Cell timeout: {args.cell_timeout or args.timeout}s")
         if args.quick:
-            print(f"Mode: QUICK (5 min cell timeout)")
-        print(f"=" * 60)
+            print("Mode: QUICK (5 min cell timeout)")
+        print("=" * 60)
         print()
 
         for suite_name, suite_dir, log_dir in suites_to_run:

@@ -22,7 +22,6 @@ import nbformat
 from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, DeadKernelError
 
-
 # Default timeout: 24 hours per notebook
 DEFAULT_TIMEOUT = 86400
 
@@ -297,7 +296,7 @@ def write_issue_inventory(
                         f.write("\n```\n")
 
                 # Reproduction command
-                f.write(f"\n**Reproduce**:\n```bash\n")
+                f.write("\n**Reproduce**:\n```bash\n")
                 f.write(f"cd /Users/b80985/Projects/rheojax && uv run python scripts/run_ikh_fikh_notebooks.py --suite {suite} --single {r['notebook']}\n")
                 f.write("```\n\n")
 

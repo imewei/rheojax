@@ -261,7 +261,7 @@ def run_suite(
         ]
 
     print(f"\n{suite_name.upper()} Notebook Suite")
-    print(f"-" * 60)
+    print("-" * 60)
     print(f"Directory: {notebook_dir}")
     print(f"Log directory: {log_dir}")
     print(f"Notebooks found: {len(notebooks)}")
@@ -416,7 +416,7 @@ def generate_combined_inventory(
                 f.write(f"- **Category**: {r['category']}\n")
 
                 if r["warnings"]:
-                    f.write(f"\n**Top Warnings**:\n")
+                    f.write("\n**Top Warnings**:\n")
                     for w in r["warnings"][:10]:
                         f.write(f"- `{w[:150]}`\n")
 
@@ -428,17 +428,17 @@ def generate_combined_inventory(
                     tb_lines = r["traceback"].split("\n")
                     relevant = [l for l in tb_lines if "rheojax" in l or "Error" in l][:10]
                     if relevant:
-                        f.write(f"\n**Traceback (relevant)**:\n```\n")
+                        f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))
                         f.write("\n```\n")
 
                 # Reproduction command
-                f.write(f"\n**Reproduce**:\n")
-                f.write(f"```bash\n")
+                f.write("\n**Reproduce**:\n")
+                f.write("```bash\n")
                 f.write(
                     f"cd /Users/b80985/Projects/rheojax && uv run python scripts/run_hl_stz_notebooks.py --suite {r['suite']} --single {r['notebook']}\n"
                 )
-                f.write(f"```\n\n")
+                f.write("```\n\n")
 
     print(f"\nCombined issue inventory written to: {output_path}")
 
@@ -473,7 +473,7 @@ def print_summary(hl_results: list[dict[str, Any]], stz_results: list[dict[str, 
     clean_pass = sum(1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] == 0)
     total_runtime = sum(r["runtime_seconds"] for r in all_results)
 
-    print(f"\nCombined:")
+    print("\nCombined:")
     print(f"  Total notebooks: {total}")
     print(f"  Fully clean: {clean_pass}/{total}")
     print(f"  Total runtime: {total_runtime:.1f}s ({total_runtime/60:.1f} min)")

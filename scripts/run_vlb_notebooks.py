@@ -10,7 +10,6 @@ Usage:
 import argparse
 import datetime
 import io
-import json
 import os
 import sys
 import time
@@ -22,7 +21,6 @@ from pathlib import Path
 import nbformat
 from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, CellTimeoutError
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -248,14 +246,14 @@ def write_issue_inventory(results: list[NotebookResult], log_dir: Path) -> None:
     ts = _ts()
 
     with open(inv_path, "w") as f:
-        f.write(f"# VLB Notebook Issue Inventory\n\n")
+        f.write("# VLB Notebook Issue Inventory\n\n")
         f.write(f"Generated: {ts}\n\n")
 
         passed = sum(1 for r in results if r.status == "PASS")
         failed = sum(1 for r in results if r.status == "FAIL")
         timeout = sum(1 for r in results if r.status == "TIMEOUT")
-        f.write(f"## Summary\n\n")
-        f.write(f"| Metric | Value |\n|--------|-------|\n")
+        f.write("## Summary\n\n")
+        f.write("| Metric | Value |\n|--------|-------|\n")
         f.write(f"| Total notebooks | {len(results)} |\n")
         f.write(f"| PASS | {passed} |\n")
         f.write(f"| FAIL | {failed} |\n")
@@ -268,7 +266,7 @@ def write_issue_inventory(results: list[NotebookResult], log_dir: Path) -> None:
             f.write(f"- **Warnings**: {len(r.warnings)}\n")
 
             if r.warnings:
-                f.write(f"- **Top warnings**:\n")
+                f.write("- **Top warnings**:\n")
                 seen = set()
                 for w in r.warnings[:15]:
                     if w not in seen:
@@ -279,10 +277,10 @@ def write_issue_inventory(results: list[NotebookResult], log_dir: Path) -> None:
                 f.write(f"- **Error**: `{r.error_summary[:300]}`\n")
                 f.write(f"- **Traceback** (key frames):\n```\n{r.error_tb[:3000]}\n```\n")
 
-            f.write(f"- **Reproduction**:\n")
-            f.write(f"  ```bash\n")
+            f.write("- **Reproduction**:\n")
+            f.write("  ```bash\n")
             f.write(f"  python scripts/run_vlb_notebooks.py --single {r.path.stem[:2]}\n")
-            f.write(f"  ```\n\n")
+            f.write("  ```\n\n")
 
     print(f"Issue inventory: {inv_path}")
 
