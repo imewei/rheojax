@@ -225,7 +225,11 @@ class BaseModel(BayesianMixin, ABC):
                 f"to fail when their underlying physics doesn't match the material behavior."
             )
             return RuntimeError(enhanced_msg)
-        except Exception:
+        except Exception as exc:
+            logger.debug(
+                "Failed to enhance error with compatibility info",
+                error=str(exc),
+            )
             return error
 
     def fit(
@@ -353,8 +357,11 @@ class BaseModel(BayesianMixin, ABC):
                         model=self.__class__.__name__,
                         message=message,
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug(
+                        "Failed to format compatibility message",
+                        error=str(exc),
+                    )
 
         # Call subclass implementation (which uses NLSQ via optimization module)
         try:
@@ -365,8 +372,12 @@ class BaseModel(BayesianMixin, ABC):
             r2 = None
             try:
                 r2 = self.score(X, y)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "R² computation failed after fit",
+                    model=self.__class__.__name__,
+                    error=str(exc),
+                )
 
             logger.info(
                 "Fit completed",
@@ -403,7 +414,7 @@ class BaseModel(BayesianMixin, ABC):
 
         return self
 
-    def fit_bayesian(  # type: ignore[override]
+    def fit_bayesian(  # type: ignore[override]  # extends BayesianMixin signature with DMTA params
         self,
         X: ArrayLike,
         y: ArrayLike | None = None,
@@ -810,10 +821,14 @@ class BaseModel(BayesianMixin, ABC):
             logger.warning("R² undefined for constant data (ss_tot=0)")
             return np.nan
 
-        # Handle NaN case
+        # Handle NaN case (e.g. predictions contain NaN/Inf)
         r2 = 1 - (ss_res / ss_tot)
         if np.isnan(r2):
-            return 0.0
+            logger.warning(
+                "R² is NaN — predictions may contain NaN/Inf values",
+                model=self.__class__.__name__,
+            )
+            return np.nan
 
         return float(np.real(r2))
 

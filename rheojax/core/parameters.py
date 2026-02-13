@@ -560,21 +560,8 @@ class ParameterSet:
             )
 
         param = self._parameters[name]
+        # bounds.setter auto-syncs the associated bounds constraint
         param.bounds = bounds
-
-        # Update or add bounds constraint
-        # Remove existing bounds constraints
-        param.constraints = [c for c in param.constraints if c.type != "bounds"]
-
-        # Add new bounds constraint
-        param.constraints.insert(
-            0,
-            ParameterConstraint(
-                type="bounds",
-                min_value=min_val,
-                max_value=max_val,
-            ),
-        )
 
     def get_values(self) -> np.ndarray:
         """Get all parameter values as array.
@@ -585,7 +572,15 @@ class ParameterSet:
         values = []
         for name in self._order:
             param = self._parameters[name]
-            values.append(param.value if param.value is not None else 0.0)
+            if param.value is not None:
+                values.append(param.value)
+            else:
+                logger.warning(
+                    "Parameter has no value set, defaulting to 0.0",
+                    parameter=name,
+                    bounds=param.bounds,
+                )
+                values.append(0.0)
         logger.debug(
             "Getting all parameter values",
             operation="get_values",

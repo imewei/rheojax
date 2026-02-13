@@ -1069,13 +1069,15 @@ def nlsq_optimize(
             nfev=nlsq_result.get("nfev", 0),
             cost=float(nlsq_result.get("cost", 0.0)),
         )
-    except Exception as e:
+    except (RuntimeError, ValueError, FloatingPointError, OverflowError) as e:
         logger.warning(
             "NLSQ optimization raised exception, falling back to SciPy",
             error=str(e),
             exc_info=True,
         )
-        return _scipy_fallback(x0)
+        result = _scipy_fallback(x0)
+        result.message = f"[SciPy fallback] {result.message} (NLSQ failed: {e})"
+        return result
 
     # Compute residuals at optimal point for covariance scaling
     x_opt = np.asarray(nlsq_result.get("x", x0), dtype=np.float64)
@@ -1706,7 +1708,7 @@ def nlsq_curve_fit(
 
         return result
 
-    except Exception as e:
+    except (RuntimeError, ValueError, FloatingPointError, OverflowError) as e:
         logger.warning(
             "nlsq.curve_fit() failed, falling back to nlsq_optimize",
             error=str(e),
