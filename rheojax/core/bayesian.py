@@ -161,7 +161,11 @@ class BayesianResult:
             except TypeError:
                 # Older NumPyro versions may not support group_by_chain kwarg.
                 extra_fields = self.mcmc.get_extra_fields()
-            except Exception:
+            except Exception as exc:
+                logger.debug(
+                    "Failed to extract energy diagnostic from MCMC extra fields",
+                    error=str(exc),
+                )
                 return idata
             energy_field = None
             if isinstance(extra_fields, dict):
@@ -851,12 +855,27 @@ class BayesianMixin:
                 # NumPyro's hpdi returns (lower, upper)
                 hdi = hpdi(samples, prob=credibility)
                 intervals[param_name] = (float(hdi[0]), float(hdi[1]))
-            except (ImportError, AttributeError):
-                # Fallback to equal-tailed credible interval
+            except ImportError:
+                # hpdi not available — use equal-tailed credible interval
+                logger.debug(
+                    "numpyro.diagnostics.hpdi not available, "
+                    "using equal-tailed intervals",
+                )
                 alpha = 1 - credibility
                 lower_percentile = (alpha / 2) * 100
                 upper_percentile = (1 - alpha / 2) * 100
-
+                lower = float(np.percentile(samples, lower_percentile))
+                upper = float(np.percentile(samples, upper_percentile))
+                intervals[param_name] = (lower, upper)
+            except AttributeError as exc:
+                logger.warning(
+                    "hpdi computation failed, using equal-tailed intervals",
+                    parameter=param_name,
+                    error=str(exc),
+                )
+                alpha = 1 - credibility
+                lower_percentile = (alpha / 2) * 100
+                upper_percentile = (1 - alpha / 2) * 100
                 lower = float(np.percentile(samples, lower_percentile))
                 upper = float(np.percentile(samples, upper_percentile))
                 intervals[param_name] = (lower, upper)
@@ -979,9 +998,12 @@ class BayesianMixin:
             )
         except Exception as e:
             logger.warning(
-                "Precompilation sampling failed (this is often OK)",
+                "Precompilation sampling failed — subsequent fit_bayesian() "
+                "may also fail",
                 error=str(e),
             )
+            # Do NOT mark as precompiled if sampling failed
+            return time.perf_counter() - start_time
 
         compile_time = time.perf_counter() - start_time
 
@@ -1249,13 +1271,13 @@ class BayesianMixin:
             # Guard against NaN/Inf from ODE-based models (LAOS, startup)
             # that can diverge for extreme parameter combinations during
             # NUTS exploration. Two-part strategy:
-            # 1) Explicit log-probability penalty to reject NaN regions
+            # 1) Per-element log-probability penalty to reject NaN regions
             # 2) Replace NaN with 0.0 to prevent downstream tracing errors
             is_finite = jnp.isfinite(predictions_raw)
-            all_finite = jnp.all(is_finite)
-            numpyro.factor(
-                "finite_check", jnp.where(all_finite, 0.0, -1e18)
-            )
+            # Per-element penalty: each NaN contributes -1e12 to log-prob,
+            # ensuring NUTS strongly rejects parameter regions producing NaN.
+            finite_penalty = jnp.where(is_finite, 0.0, -1e12).sum()
+            numpyro.factor("finite_check", finite_penalty)
             numpyro.deterministic(
                 "num_nonfinite", jnp.sum(~is_finite).astype(jnp.float64)
             )
@@ -1341,7 +1363,9 @@ class BayesianMixin:
                             num_chains, num_samples
                         )
                     else:
-                        # Single chain: split_gelman_rubin will split in half
+                        # Single chain: split_gelman_rubin will split in half.
+                        # This provides approximate diagnostics but is less
+                        # reliable than multi-chain R-hat.
                         samples_shaped = samples_flat.reshape(1, -1)
                     r_hat_value = numpyro.diagnostics.split_gelman_rubin(
                         samples_shaped
@@ -1391,9 +1415,10 @@ class BayesianMixin:
                 num_divergences = int(np.sum(divergences))
             except (KeyError, AttributeError):
                 logger.warning(
-                    "Divergence information not available from MCMC extra fields"
+                    "Divergence information not available from MCMC extra fields. "
+                    "Divergence count is unknown — inspect trace plots manually."
                 )
-                num_divergences = 0
+                num_divergences = -1
                 all_valid = False
 
             diagnostics["divergences"] = num_divergences
