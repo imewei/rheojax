@@ -1,5 +1,5 @@
 # ============================================================================
-# Python Package .gitignore - Optimized for rheo_unified
+# Python Package .gitignore - Optimized for rheojax
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -146,8 +146,11 @@ docs/source/api/generated/
 # *.png
 # *.jpg
 # *.pdf
-# figures/
-# plots/
+figures/
+plots/
+output/
+outputs/
+results/
 
 # ----------------------------------------------------------------------------
 # Type Checkers & Linters

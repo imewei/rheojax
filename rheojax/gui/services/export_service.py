@@ -29,7 +29,7 @@ class ExportService:
     Features:
         - Multi-format export (HDF5, Excel, CSV, JSON)
         - Figure export (PNG, SVG, PDF)
-        - Project file support (.rheo files)
+        - Project file support (.rheojax files)
         - Posterior sample export
         - Report generation
 
@@ -46,7 +46,7 @@ class ExportService:
         self._supported_formats = {
             "data": [".hdf5", ".h5", ".xlsx", ".csv", ".json"],
             "figure": [".png", ".pdf", ".svg", ".eps"],
-            "project": [".rheo"],
+            "project": [".rheojax"],
         }
         logger.debug(
             "ExportService initialized",
@@ -89,14 +89,18 @@ class ExportService:
         )
 
         try:
-            # Extract parameters
+            # Extract parameters (convert JAX/NumPy arrays to Python floats)
             if hasattr(result, "parameters"):
-                params = result.parameters
+                params = {
+                    k: float(np.asarray(v)) if hasattr(v, "__array__") else v
+                    for k, v in result.parameters.items()
+                }
                 logger.debug("Extracted parameters from result.parameters")
             elif hasattr(result, "posterior_samples"):
                 # For Bayesian results, use posterior means
                 params = {
-                    k: float(np.mean(v)) for k, v in result.posterior_samples.items()
+                    k: float(np.mean(np.asarray(v)))
+                    for k, v in result.posterior_samples.items()
                 }
                 logger.debug(
                     "Extracted parameters from posterior_samples means",
@@ -114,12 +118,12 @@ class ExportService:
                 logger.debug("Wrote parameters to CSV")
 
             elif format == "json":
-                # Convert numpy types to Python types
+                # Convert numpy/JAX types to Python types
                 params_json = {
-                    k: float(v) if isinstance(v, np.ndarray) else v
+                    k: float(v) if isinstance(v, (np.ndarray, np.floating, float)) or hasattr(v, "__jax_array__") else v
                     for k, v in params.items()
                 }
-                with open(path, "w") as f:
+                with open(path, "w", encoding="utf-8") as f:
                     json.dump(params_json, f, indent=2)
                 logger.debug("Wrote parameters to JSON")
 
@@ -136,7 +140,7 @@ class ExportService:
                 with h5py.File(path, "w") as f:
                     params_group = f.create_group("parameters")
                     for key, value in params.items():
-                        params_group.create_dataset(key, data=value)
+                        params_group.create_dataset(key, data=np.asarray(value))
                 logger.debug("Wrote parameters to HDF5")
 
             else:
@@ -264,7 +268,10 @@ class ExportService:
                 logger.error("Result does not contain posterior samples")
                 raise ValueError("Result does not contain posterior samples")
 
-            posterior_samples = result.posterior_samples
+            # Convert JAX arrays to NumPy at the I/O boundary
+            posterior_samples = {
+                k: np.asarray(v) for k, v in result.posterior_samples.items()
+            }
             num_samples = len(next(iter(posterior_samples.values())))
             logger.debug(
                 "Exporting posterior samples",
@@ -340,14 +347,14 @@ class ExportService:
         state: dict[str, Any],
         path: Path | str,
     ) -> None:
-        """Save project as .rheo file (ZIP with JSON + HDF5).
+        """Save project as .rheojax file (ZIP with JSON + HDF5).
 
         Parameters
         ----------
         state : dict
             Application state (data, models, results, etc.)
         path : Path or str
-            Output .rheo file path
+            Output .rheojax file path
         """
         logger.debug(
             "Entering save_project",
@@ -358,7 +365,7 @@ class ExportService:
 
         logger.info(
             "Starting export",
-            format="rheo",
+            format="rheojax",
             filepath=str(path),
             export_type="project",
         )
@@ -379,7 +386,7 @@ class ExportService:
                     "timestamp": str(np.datetime64("now")),
                 }
 
-                with open(metadata_path, "w") as f:
+                with open(metadata_path, "w", encoding="utf-8") as f:
                     json.dump(metadata, f, indent=2)
                 logger.debug("Wrote project metadata")
 
@@ -393,10 +400,10 @@ class ExportService:
                 if "parameters" in state and state["parameters"]:
                     params_path = tmpdir_path / "parameters.json"
                     params_json = {
-                        k: float(v) if isinstance(v, np.ndarray) else v
+                        k: float(np.asarray(v)) if hasattr(v, "__array__") else v
                         for k, v in state["parameters"].items()
                     }
-                    with open(params_path, "w") as f:
+                    with open(params_path, "w", encoding="utf-8") as f:
                         json.dump(params_json, f, indent=2)
                     logger.debug("Wrote project parameters")
 
@@ -409,7 +416,7 @@ class ExportService:
             file_size = os.path.getsize(path)
             logger.info(
                 "Export complete",
-                format="rheo",
+                format="rheojax",
                 filepath=str(path),
                 file_size=file_size,
                 export_type="project",
@@ -426,12 +433,12 @@ class ExportService:
             raise RuntimeError(f"Save failed: {e}") from e
 
     def load_project(self, path: Path | str) -> dict[str, Any]:
-        """Load project from .rheo file.
+        """Load project from .rheojax file.
 
         Parameters
         ----------
         path : Path or str
-            .rheo file path
+            .rheojax file path
 
         Returns
         -------
@@ -446,7 +453,7 @@ class ExportService:
 
         logger.info(
             "Starting load",
-            format="rheo",
+            format="rheojax",
             filepath=str(path),
             operation="load_project",
         )
@@ -489,7 +496,7 @@ class ExportService:
             file_size = os.path.getsize(path)
             logger.info(
                 "Load complete",
-                format="rheo",
+                format="rheojax",
                 filepath=str(path),
                 file_size=file_size,
                 operation="load_project",
@@ -707,7 +714,7 @@ class ExportService:
                     ),
                     "metadata": data.metadata,
                 }
-                with open(path, "w") as f:
+                with open(path, "w", encoding="utf-8") as f:
                     json.dump(export_dict, f, indent=2)
                 logger.debug("Wrote data to JSON")
 

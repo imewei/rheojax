@@ -438,10 +438,11 @@ class BayesianPipeline(Pipeline):
             ax = axes_flat[idx]
             samples = posterior_samples[param]
 
-            # Plot histogram
-            bins = plot_kwargs.pop("bins", 30)
-            alpha = plot_kwargs.pop("alpha", 0.7)
-            ax.hist(samples, bins=bins, alpha=alpha, **plot_kwargs)
+            # Plot histogram (copy kwargs to avoid mutating caller's dict)
+            _kwargs = plot_kwargs.copy()
+            bins = _kwargs.pop("bins", 30)
+            alpha = _kwargs.pop("alpha", 0.7)
+            ax.hist(samples, bins=bins, alpha=alpha, **_kwargs)
 
             # Add summary statistics
             mean = self._bayesian_result.summary[param]["mean"]

@@ -25,6 +25,7 @@ SPPDecomposer
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 
 SPPYieldStress Model

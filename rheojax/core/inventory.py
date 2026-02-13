@@ -8,10 +8,10 @@ in the RheoJAX registry. It provides the type system for:
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class Protocol(str, Enum):
+class Protocol(StrEnum):
     """Rheological experimental protocols supported by models.
 
     A protocol defines a specific type of experiment or measurement that a model
@@ -29,7 +29,7 @@ class Protocol(str, Enum):
         return self.value
 
 
-class TransformType(str, Enum):
+class TransformType(StrEnum):
     """Categories of data transformation operations.
 
     Transforms are classified by their mathematical operation on the data domain.

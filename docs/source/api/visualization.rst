@@ -38,7 +38,7 @@ Specialized Plot Types
 
    Plot frequency-domain data (oscillatory tests).
 
-   For complex data (G*), creates two subplots for G' and G".
+   For complex data (G*), creates two subplots for :math:`G'` and :math:`G''`.
    For real data, creates a single plot.
 
 .. autofunction:: rheojax.visualization.plotter.plot_flow_curve
@@ -94,7 +94,6 @@ Templates
    :show-inheritance:
 
 The templates module provides reusable plot templates for common visualization tasks.
-This will be expanded in Phase 2.
 
 EPM Visualization
 -----------------
@@ -272,7 +271,7 @@ Viscosity vs Shear Rate
         x_units="1/s",
         y_units="Pa.s",
         x_label="Shear Rate (1/s)",
-        y_label="Viscosity (Pa*s)",
+        y_label="Viscosity (Pa·s)",
         style='publication'
     )
 
@@ -373,7 +372,7 @@ Advanced Styling
     # Custom figure size
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Manual plotting with rheo data
+    # Manual plotting with rheojax data
     ax.semilogy(data.x, data.y, 'o-', label='Data')
 
     # Customize
@@ -412,7 +411,7 @@ Multi-Panel Figures
     # Bottom-right: Flow curve
     axes[1, 1].loglog(shear_rate, viscosity, '^-')
     axes[1, 1].set_xlabel('Shear Rate (1/s)')
-    axes[1, 1].set_ylabel('Viscosity (Pa*s)')
+    axes[1, 1].set_ylabel('Viscosity (Pa·s)')
 
     fig.tight_layout()
 

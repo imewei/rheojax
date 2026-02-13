@@ -32,8 +32,8 @@ How It Works
 
 For SAOS frequency sweep data, RheoJAX automatically estimates:
 
-1. **Moduli** from low/high-frequency plateaus (G_e, G_m)
-2. **Fractional order (α)** from slope of log(G') vs. log(ω)
+1. **Moduli** from low/high-frequency plateaus (:math:`G_e`, :math:`G_m`)
+2. **Fractional order (α)** from slope of :math:`\log(G')` vs. :math:`\log(\omega)`
 3. **Characteristic time (τ)** from crossover frequency
 
 .. code-block:: python

@@ -4,6 +4,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.epm.base import EPMBase
 from rheojax.utils.epm_kernels import (
     epm_step,
@@ -21,6 +22,12 @@ jax, jnp = safe_import_jax()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class LatticeEPM(EPMBase):

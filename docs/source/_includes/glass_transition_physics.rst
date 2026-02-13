@@ -12,8 +12,8 @@
    - **Cage effect**: Particles trapped by neighbors, requiring cooperative rearrangements
    - **Aging**: Properties evolve with waiting time (time since preparation)
    - **Yield stress**: Finite stress required for macroscopic flow
-   - **Power-law rheology**: G'(ω) ~ G''(ω) ~ ω^n with weak frequency dependence
-   - **Structural relaxation**: α-relaxation timescale diverges at glass transition
+   - **Power-law rheology**: :math:`G'(\omega) \sim G''(\omega) \sim \omega^n` with weak frequency dependence
+   - **Structural relaxation**: :math:`\alpha`-relaxation timescale diverges at glass transition
 
    **Key Control Parameters:**
 
@@ -25,27 +25,27 @@
         - Parameter
         - Physical meaning
       * - SGR
-        - x (noise temperature)
+        - :math:`x` (noise temperature)
         - Ratio of activation energy to trap depth
       * - ITT-MCT
-        - ε (separation parameter)
+        - :math:`\varepsilon` (separation parameter)
         - Distance from ideal glass transition
       * - STZ
-        - χ (effective temperature)
+        - :math:`\chi` (effective temperature)
         - Configurational disorder
       * - EPM
-        - σ/σ_y (stress ratio)
+        - :math:`\sigma/\sigma_y` (stress ratio)
         - Proximity to yield
 
    **Glass Transition Regimes:**
 
-   - **Liquid regime** (above Tg or critical point): Equilibrium relaxation, aging absent
-   - **Glass regime** (below Tg): Frozen structure, aging, yield stress emerges
+   - **Liquid regime** (above :math:`T_g` or critical point): Equilibrium relaxation, aging absent
+   - **Glass regime** (below :math:`T_g`): Frozen structure, aging, yield stress emerges
    - **Critical point**: Power-law divergences, scale-free avalanches
 
    **Related Concepts:**
 
    - :doc:`/user_guide/soft_glassy_materials` — Introduction to SGMs
-   - :doc:`/transforms/mastercurve` — Time-temperature superposition near Tg
+   - :doc:`/transforms/mastercurve` — Time-temperature superposition near :math:`T_g`
    - :doc:`/models/sgr/index` — SGR model family
    - :doc:`/models/itt_mct/index` — Mode-coupling theory approach

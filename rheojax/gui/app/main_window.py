@@ -619,8 +619,20 @@ class RheoJAXMainWindow(QMainWindow):
                 event.ignore()
                 return
 
-        # Cleanup
+        # Cleanup: stop workers and disconnect state signals to prevent
+        # callbacks during teardown
         self.log("Shutting down...")
+        try:
+            if hasattr(self, "worker_pool"):
+                self.worker_pool.cancel_all()
+        except Exception:
+            pass
+        try:
+            signals = self.store.signals
+            if signals is not None:
+                signals.state_changed.disconnect()
+        except (TypeError, RuntimeError):
+            pass
         logger.info("Application shutdown complete")
         event.accept()
 
@@ -689,7 +701,7 @@ class RheoJAXMainWindow(QMainWindow):
             self,
             "Open Project",
             "",
-            "RheoJAX Project (*.rheo);;HDF5 Files (*.h5 *.hdf5);;All Files (*.*)",
+            "RheoJAX Project (*.rheojax);;HDF5 Files (*.h5 *.hdf5);;All Files (*.*)",
         )
         if file_path:
             self.log(f"Opening project: {file_path}")
@@ -714,7 +726,7 @@ class RheoJAXMainWindow(QMainWindow):
             self,
             "Save Project As",
             "",
-            "RheoJAX Project (*.rheo);;HDF5 Files (*.h5 *.hdf5);;All Files (*.*)",
+            "RheoJAX Project (*.rheojax);;HDF5 Files (*.h5 *.hdf5);;All Files (*.*)",
         )
         if file_path:
             self.log(f"Saving project as: {file_path}")

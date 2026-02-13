@@ -8,7 +8,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Soft glassy materials (foams, emulsions, pastes, colloidal gels), yield stress fluids, aging materials
-- **Parameters:** 3 (x, G0, tau0)
+- **Parameters:** 3 (:math:`x`, :math:`G_0`, :math:`\tau_0`)
 - **Key equation:** :math:`G'(\omega) \sim G''(\omega) \sim \omega^{x-1}` for :math:`1 < x < 2`
 - **Test modes:** Oscillation, relaxation, creep, steady shear, LAOS
 - **Material examples:** Concentrated emulsions, colloidal suspensions, foams, pastes, mayonnaise, hair gel
@@ -51,12 +51,12 @@ The Soft Glassy Rheology model emerged from the intersection of statistical phys
 
 **Origins in Bouchaud's Trap Model**
 
-The SGR model is based upon Bouchaud's trap model of structural glasses [26]_, developed in the early 1990s to describe aging phenomena in disordered systems. Bouchaud's key insight was that the combination of:
+The SGR model is based upon Bouchaud's trap model of structural glasses [34]_, developed in the early 1990s to describe aging phenomena in disordered systems. Bouchaud's key insight was that the combination of:
 
 1. An exponential distribution of trap depths :math:`\rho(E) = e^{-E}`
 2. Arrhenius-activated hopping dynamics :math:`\tau(E) = \tau_0 e^{E/x}`
 
-is sufficient to produce a genuine dynamical phase transition—a glass transition—at :math:`x = x_g = 1`. The exponential form and activated hopping should be viewed *jointly* as a tactic that allows glassy dynamics to be modeled in the simplest possible way [11]_ [12]_.
+is sufficient to produce a genuine dynamical phase transition—a glass transition—at :math:`x = x_g = 1`. The exponential form and activated hopping should be viewed *jointly* as a tactic that allows glassy dynamics to be modeled in the simplest possible way [1]_ [2]_.
 
 **Connection to Spin Glass Mean-Field Theories**
 
@@ -64,7 +64,7 @@ The effective noise temperature :math:`x` has deep connections to theories of ou
 
 **Evolution of the "Noise Temperature" Concept**
 
-The parameter :math:`x` was originally introduced as an effective "noise temperature" to capture the athermal fluctuations in soft materials—energy releases from neighboring rearrangements that activate hopping even when thermal energy :math:`k_B T` is negligible compared to barrier heights :math:`E`. Whether it is fully consistent to have :math:`x \gg k_B T` was initially debated [11]_ [12]_, but subsequent thermodynamic analyses [15]_ have established that :math:`x` can be rigorously interpreted as the true nonequilibrium thermodynamic temperature of the slow configurational degrees of freedom (see :doc:`sgr_generic` for the GENERIC framework treatment).
+The parameter :math:`x` was originally introduced as an effective "noise temperature" to capture the athermal fluctuations in soft materials—energy releases from neighboring rearrangements that activate hopping even when thermal energy :math:`k_B T` is negligible compared to barrier heights :math:`E`. Whether it is fully consistent to have :math:`x \gg k_B T` was initially debated [1]_ [2]_, but subsequent thermodynamic analyses [15]_ have established that :math:`x` can be rigorously interpreted as the true nonequilibrium thermodynamic temperature of the slow configurational degrees of freedom (see :doc:`sgr_generic` for the GENERIC framework treatment).
 
 **Key Publications Timeline**
 
@@ -418,9 +418,8 @@ For the standard exponential trap distribution :math:`\rho(E) = \exp(-E)` (setti
 
 .. math::
 
-   G_\rho(z) &= \int_0^\infty e^{-E} \exp(-z e^{-E/x}) \, dE
-
-            &= x \, z^{-x} \, \gamma(x, z)
+   G_\rho(z) &= \int_0^\infty e^{-E} \exp(-z e^{-E/x}) \, dE \\
+             &= x \, z^{-x} \, \gamma(x, z)
 
 where :math:`\gamma(s, z) = \int_0^z t^{s-1} e^{-t} dt` is the lower incomplete gamma function.
 
@@ -475,8 +474,8 @@ For step strain with amplitude :math:`\gamma_0 \ll 1`, the linearized step strai
 
    G(t - t_w, t_w) = 1 - \int_{t_w}^{t} Y(t') G_\rho(t - t') \, dt'
 
-Equilibrium (x > 1)
-~~~~~~~~~~~~~~~~~~~
+Equilibrium (:math:`x > 1`)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For :math:`x > 1`, the system reaches equilibrium at long times. The steady-state viscoelastic spectrum is:
 
@@ -525,7 +524,7 @@ The storage and loss moduli are related to the relaxation spectrum by:
 
 where :math:`G_e` is the equilibrium modulus (zero for fluids).
 
-**SGR Relaxation Spectrum for 1 < x < 2**
+**SGR Relaxation Spectrum for** :math:`1 < x < 2`
 
 For equilibrated SGR in the power-law fluid regime, the relaxation spectrum has the form:
 
@@ -549,7 +548,7 @@ This derivation shows why the exponent in :math:`H(\tau)` differs from that in :
 
 **Asymptotic Forms**
 
-.. list-table:: Frequency Asymptotes for SGR (x > 1)
+.. list-table:: Frequency Asymptotes for SGR (:math:`x > 1`)
    :widths: 20 40 40
    :header-rows: 1
 
@@ -792,7 +791,7 @@ For steady shear at rate :math:`\dot{\gamma} \ll 1` started at time :math:`t_w`,
 
    \gamma_{\text{peak}} \sim \sqrt{2x \ln(\dot{\gamma} t_w)}
 
-The height of the stress overshoot also increases with age before settling into the age-independent steady state flow stress :math:`\sigma_{\text{ss}}` [12]_.
+The height of the stress overshoot also increases with age before settling into the age-independent steady state flow stress :math:`\sigma_{\text{ss}}` [2]_.
 
 **Steady State**: For :math:`t \gg 1/\dot{\gamma}`, aging is "interrupted" by flow, and the stress approaches the steady-state flow curve value (Herschel-Bulkley for :math:`x<1`).
 
@@ -916,9 +915,9 @@ where :math:`\eta^* = G^*/i\omega` is the complex viscosity.
 
 **SGR predictions for Cox-Merz**:
 
-- **x > 2** (Newtonian): Cox-Merz holds approximately
-- **1 < x < 2** (power-law fluid): Cox-Merz fails due to infinite zero-shear viscosity
-- **x < 1** (glass): Strong violation— :math:`|\eta^*|` diverges as :math:`\omega \to 0`, but
+- **:math:`x > 2`** (Newtonian): Cox-Merz holds approximately
+- **:math:`1 < x < 2`** (power-law fluid): Cox-Merz fails due to infinite zero-shear viscosity
+- **:math:`x < 1`** (glass): Strong violation— :math:`|\eta^*|` diverges as :math:`\omega \to 0`, but
   :math:`\eta(\dot{\gamma})` remains finite due to yield stress
 
 The failure of Cox-Merz is a signature of yield stress behavior and is commonly observed
@@ -1214,7 +1213,7 @@ Parameter Interpretation
 What You Can Learn
 ------------------
 
-The SGR model provides deep insights into the structural state and flow behavior of soft glassy materials through the lens of the effective noise temperature x and its connection to the mesoscopic energy landscape.
+The SGR model provides deep insights into the structural state and flow behavior of soft glassy materials through the lens of the effective noise temperature :math:`x` and its connection to the mesoscopic energy landscape.
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1222,30 +1221,30 @@ Parameter Interpretation
 **x (Effective Noise Temperature)**:
    The ratio of thermal-like noise energy to the mean trap depth, controlling the fundamental phase behavior of the material.
 
-   *For graduate students*: x represents the dimensionless "configurational temperature" that governs the statistical mechanics of mesoscopic elements in an energy landscape. When x < x_g = 1, the equilibrium Boltzmann distribution P_eq(E) ∝ :math:`\rho(E)exp(E/x)` is non-normalizable, meaning no steady state exists and the system must age. The glass transition at x = 1 is a genuine dynamical phase transition where the relaxation time diverges.
+   *For graduate students*: :math:`x` represents the dimensionless "configurational temperature" that governs the statistical mechanics of mesoscopic elements in an energy landscape. When :math:`x < x_g = 1`, the equilibrium Boltzmann distribution :math:`P_{eq}(E) \propto \rho(E)\exp(E/x)` is non-normalizable, meaning no steady state exists and the system must age. The glass transition at :math:`x = 1` is a genuine dynamical phase transition where the relaxation time diverges.
 
-   *For practitioners*: x < 1 means your material behaves as a solid (yield stress, aging, thixotropic recovery). 1 < x < 2 means it flows but with infinite zero-shear viscosity and power-law rheology. x ≥ 2 means conventional Newtonian behavior. Fitting x from the slope of log(G') vs log(:math:`\omega`) immediately classifies your material's phase.
+   *For practitioners*: :math:`x < 1` means your material behaves as a solid (yield stress, aging, thixotropic recovery). :math:`1 < x < 2` means it flows but with infinite zero-shear viscosity and power-law rheology. :math:`x \geq 2` means conventional Newtonian behavior. Fitting :math:`x` from the slope of :math:`\log(G')` vs :math:`\log(\omega)` immediately classifies your material's phase.
 
-**G_0 (Plateau Modulus)**:
+**:math:`G_0` (Plateau Modulus)**:
    The characteristic elastic stress scale arising from local element deformation.
 
-   *For graduate students*: G_0 sets the energy scale of elastic strain energy (½kl^2). In the trap model, it corresponds to the spring constant k of mesoscopic elements. For foams and emulsions, G_0 ≈ :math:`\gamma`/R where :math:`\gamma` is interfacial tension and R is bubble/droplet radius. For colloidal glasses, G_0 ≈ n k_B T where n is number density.
+   *For graduate students*: :math:`G_0` sets the energy scale of elastic strain energy :math:`(\frac{1}{2}kl^2)`. In the trap model, it corresponds to the spring constant :math:`k` of mesoscopic elements. For foams and emulsions, :math:`G_0 \approx \gamma/R` where :math:`\gamma` is interfacial tension and :math:`R` is bubble/droplet radius. For colloidal glasses, :math:`G_0 \approx n k_B T` where :math:`n` is number density.
 
-   *For practitioners*: G_0 is the high-frequency plateau in oscillatory tests (when accessible) or can be extracted from the low-rate flow stress. Typical values: 10-1000 Pa for foams, 100-10000 Pa for pastes, 1-100 Pa for colloidal glasses.
+   *For practitioners*: :math:`G_0` is the high-frequency plateau in oscillatory tests (when accessible) or can be extracted from the low-rate flow stress. Typical values: 10--1000 Pa for foams, 100--10000 Pa for pastes, 1--100 Pa for colloidal glasses.
 
 :math:`\tau_0` **(Attempt Time)**:
    The microscopic timescale for rearrangement attempts (yield events).
 
-   *For graduate students*: :math:`\tau_0` is the inverse of the bare hopping rate :math:`\Gamma_0` = 1/:math:`\tau_0`. For Brownian systems, :math:`\tau_0` ≈ :math:`\eta_s` a^3/(k_B T) where :math:`\eta_s` is solvent viscosity and a is the element size. For non-Brownian systems, :math:`\tau_0` may reflect vibration or diffusion timescales.
+   *For graduate students*: :math:`\tau_0` is the inverse of the bare hopping rate :math:`\Gamma_0 = 1/\tau_0`. For Brownian systems, :math:`\tau_0 \approx \eta_s a^3/(k_B T)` where :math:`\eta_s` is solvent viscosity and :math:`a` is the element size. For non-Brownian systems, :math:`\tau_0` may reflect vibration or diffusion timescales.
 
-   *For practitioners*: :math:`\tau_0` determines the absolute frequency scale of rheology. Fitting both :math:`\tau_0` and x allows prediction of G'(:math:`\omega`), G''(:math:`\omega`) across decades in frequency. Typical values: 10⁻^6-10⁻^2 s for colloids, 10⁻^4-10⁻^1 s for emulsions, 10⁻^3-1 s for pastes.
+   *For practitioners*: :math:`\tau_0` determines the absolute frequency scale of rheology. Fitting both :math:`\tau_0` and :math:`x` allows prediction of :math:`G'(\omega)`, :math:`G''(\omega)` across decades in frequency. Typical values: :math:`10^{-6}\text{--}10^{-2}` s for colloids, :math:`10^{-4}\text{--}10^{-1}` s for emulsions, :math:`10^{-3}\text{--}1` s for pastes.
 
-:math:`\sigma_y` **(Yield Stress, x < 1 only)**:
+:math:`\sigma_y` **(Yield Stress,** :math:`x < 1` **only)**:
    The dynamic yield stress emerging from non-ergodicity.
 
    *For graduate students*: Unlike phenomenological Bingham models, :math:`\sigma_y` in SGR arises from the divergence of the relaxation time as :math:`x \to 1`. The true yield stress is :math:`\sigma_y = \lim_{\dot{\gamma} \to 0} \sigma(\dot{\gamma}) > 0` when :math:`x < 1`, reflecting the inability of the system to equilibrate on experimental timescales. The "yieldedness" is a consequence of broken ergodicity, not a material constant.
 
-   *For practitioners*: If x < 1 from your fit, expect a measurable yield stress. If experimental :math:`\sigma_y` is much larger than model predictions, additional physics (attractive forces, network structure) may be present beyond SGR caging.
+   *For practitioners*: If :math:`x < 1` from your fit, expect a measurable yield stress. If experimental :math:`\sigma_y` is much larger than model predictions, additional physics (attractive forces, network structure) may be present beyond SGR caging.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1258,31 +1257,31 @@ Material Classification
      - Phase Behavior
      - Typical Materials
      - Rheological Signatures
-   * - **x < 0.5**
+   * - **:math:`x < 0.5`**
      - Deep glass
      - Highly concentrated pastes, aged colloidal gels, arrested emulsions
      - Large yield stress (>100 Pa), strong aging (hours-days), brittle yielding, no flow below :math:`\sigma_y`
-   * - **0.5 < x < 1**
+   * - **:math:`0.5 < x < 1`**
      - Marginal glass
      - Fresh colloidal suspensions, carbopol gels, moderately concentrated foams
      - Moderate yield stress (10-100 Pa), aging on experimental timescales, ductile yielding with overshoot
-   * - **1 < x < 1.5**
+   * - **:math:`1 < x < 1.5`**
      - Weak power-law fluid
      - Dilute emulsions, soft foams, near-critical suspensions
-     - No true yield stress, G' ≈ G'' ≈ :math:`\omega^{(x-1)}`  with weak frequency dependence, tan(:math:`\delta`) ≈ 0.5-1.0 (constant)
-   * - **1.5 < x < 2**
+     - No true yield stress, :math:`G' \approx G'' \approx \omega^{(x-1)}` with weak frequency dependence, :math:`\tan(\delta) \approx 0.5\text{--}1.0` (constant)
+   * - **:math:`1.5 < x < 2`**
      - Strong power-law fluid
      - Low-concentration surfactant solutions, polymer-colloid mixtures
-     - Fluid-like (G'' > G' at low :math:`\omega`), stronger frequency dependence, tan(:math:`\delta`) > 1 (constant), infinite viscosity but fast equilibration
-   * - **x ≥ 2**
+     - Fluid-like (:math:`G'' > G'` at low :math:`\omega`), stronger frequency dependence, :math:`\tan(\delta) > 1` (constant), infinite viscosity but fast equilibration
+   * - :math:`x \geq 2`
      - Newtonian/Maxwell liquid
      - Dilute suspensions, simple liquids, polymer solutions below overlap
-     - Exponential relaxation, finite viscosity, G'' ∼ :math:`\omega` at low frequencies, single Maxwell time
+     - Exponential relaxation, finite viscosity, :math:`G'' \sim \omega` at low frequencies, single Maxwell time
 
 Connection to Aging and Rejuvenation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Aging (x < 1)**: The waiting-time dependence of relaxation reveals:
+**Aging (:math:`x < 1`)**: The waiting-time dependence of relaxation reveals:
 
 - Characteristic timescale :math:`\tau_{\text{eff}} \sim t_w` (age-dependent)
 - Over-aging phenomenon: Large-amplitude shear can make samples appear "older"
@@ -1304,7 +1303,7 @@ Structural Evolution
 **Trap Depth Distribution**: The exponential form :math:`\rho(E) \propto \exp(-E)`
 represents the energy landscape structure:
 
-- Broad distribution → heterogeneous local environments
+- Broad distribution indicates heterogeneous local environments
 - Mean trap depth :math:`\langle E \rangle = 1` (normalized units)
 - Connection to structural relaxation heterogeneity
 
@@ -1321,7 +1320,7 @@ on the balance of shallow vs deep trap dynamics).
 Predictive Power
 ~~~~~~~~~~~~~~~~
 
-From a single parameter (x) and two scales (G_0, :math:`\tau_0`), the SGR model predicts:
+From a single parameter (:math:`x`) and two scales (:math:`G_0`, :math:`\tau_0`), the SGR model predicts:
 
 1. **Frequency-dependent moduli** with correct power-law exponents
 2. **Flow curve shape** (yield stress + power-law or shear thinning)
@@ -1329,8 +1328,8 @@ From a single parameter (x) and two scales (G_0, :math:`\tau_0`), the SGR model 
 4. **Stress relaxation after step strain** with aging dependence
 5. **LAOS nonlinearity** through Chebyshev coefficients
 
-**Fitting Strategy**: Start with oscillatory data to extract x from the slope
-of log(G') vs log(:math:`\omega`). Then verify consistency with flow curve and transient
+**Fitting Strategy**: Start with oscillatory data to extract :math:`x` from the slope
+of :math:`\log(G')` vs :math:`\log(\omega)`. Then verify consistency with flow curve and transient
 experiments. Discrepancies indicate additional physics (e.g., thixotropy,
 shear banding) requiring extended models.
 
@@ -1564,7 +1563,7 @@ Troubleshooting
    * - Fitted :math:`\tau_0 > 1` s
      - Unphysical attempt time
      - Fix :math:`\tau_0` from diffusion estimate, fit :math:`x, G_0` only
-   * - Noisy G' and G'' data
+   * - Noisy :math:`G'` and :math:`G''` data
      - Instrument inertia or torque limit
      - SGR applies to soft materials; check raw phase angle and torque limits.
 
@@ -1703,12 +1702,17 @@ References
    *Physical Review E*, **58**, 738-759 (1998).
    https://doi.org/10.1103/PhysRevE.58.738
 
+.. [15] Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
+   *Physical Review E*, **85**, 031127 (2012).
+   https://doi.org/10.1103/PhysRevE.85.031127
+
 .. [16] Viasnoff, V. & Lequeux, F. "Rejuvenation and overaging in a colloidal glass under shear."
    *Physical Review Letters*, **89**, 065701 (2002).
    https://doi.org/10.1103/PhysRevLett.89.065701
 
-.. [17] Viasnoff, V., Jurine, S., & Lequeux, F. "How colloidal suspensions that age are rejuvenated by strain application."
+.. [17] Viasnoff, V., Jurine, S., & Lequeux, F. "How are colloidal suspensions that age rejuvenated by strain application?"
    *Faraday Discussions*, **123** (2003).
+   https://doi.org/10.1039/B204377G
 
 .. [19] Fielding, S. M., Sollich, P., & Cates, M. E. "Aging and rheology in soft materials."
    *Journal of Rheology*, **44**\ (2), 323-369 (2000).
@@ -1716,19 +1720,26 @@ References
 
 .. [20] Cates, M. E. & Sollich, P. "Tensorial constitutive models for disordered foams, dense emulsions, and other soft nonergodic materials."
    *Journal of Rheology*, **48**\ (1), 193-207 (2004).
-   https://doi.org/10.1122/1.1634987
+   https://doi.org/10.1122/1.1634985
 
 .. [26] Cugliandolo, L. F. & Kurchan, J. "Weak ergodicity breaking in mean-field spin-glass models."
    *Philosophical Magazine B*, **71**\ (4), 501-514 (1995).
+   https://doi.org/10.1080/01418639508238541
 
 .. [27] Kurchan, J. "Rheology, and how to stop aging."
    Preprint cond-mat/9812347 (1998).
 
+.. [34] Bouchaud, J.-P. "Weak ergodicity breaking and aging in disordered systems."
+   *Journal de Physique I*, **2**\ (9), 1705-1713 (1992).
+   https://doi.org/10.1051/jp1:1992238
+
 .. [36] Head, D. A., Ajdari, A., & Cates, M. E. "Jamming, hysteresis, and oscillation in scalar models for shear thickening."
    *Physical Review E*, **64**, 061509 (2001).
+   https://doi.org/10.1103/PhysRevE.64.061509
 
 .. [37] Head, D. A., Ajdari, A., & Cates, M. E. "Rheological instability in a simple shear-thickening model."
    *Europhysics Letters*, **57**\ (1), 120-126 (2002).
+   https://doi.org/10.1209/epl/i2002-00550-y
 
 .. [38] Hébraud, P. & Lequeux, F. "Mode-coupling theory for the pasty rheology of soft glassy materials."
    *Physical Review Letters*, **81**\ (14), 2934-2937 (1998).
@@ -1736,12 +1747,15 @@ References
 
 .. [39] Derec, C., Ajdari, A., & Lequeux, F. "Mechanics near a jamming transition: a minimalist model."
    *Faraday Discussions*, **112**, 195-207 (1999).
+   https://doi.org/10.1039/A809307E
 
 .. [40] Derec, C., Ajdari, A., Ducouret, G., & Lequeux, F. "Rheological characterization of aging in a concentrated colloidal suspension."
    *Comptes Rendus de l'Académie des Sciences - Series IV*, **1**\ (8), 1115-1119 (2000).
+   https://doi.org/10.1016/S1296-2147(00)01106-9
 
 .. [41] Derec, C., Ajdari, A., & Lequeux, F. "Rheology and aging: a simple approach."
    *European Physical Journal E*, **4**\ (3), 355-361 (2001).
+   https://doi.org/10.1007/s101890170118
 
 .. [42] Coussot, P., Nguyen, Q. D., Huynh, H. T., & Bonn, D. "Avalanche behavior in yield stress fluids."
    *Physical Review Letters*, **88**, 175501 (2002).
@@ -1760,18 +1774,29 @@ Further Reading
 
 - Mason, T. G., Bibette, J., & Weitz, D. A. "Elasticity of compressed emulsions."
   *Physical Review Letters*, **75**\ (10), 2051-2054 (1995).
+  https://doi.org/10.1103/PhysRevLett.75.2051
 
 - Mason, T. G. & Weitz, D. A. "Linear viscoelasticity of colloidal hard-sphere suspensions near the glass-transition."
   *Physical Review Letters*, **75**\ (14), 2770-2773 (1995).
+  https://doi.org/10.1103/PhysRevLett.75.2770
 
-- Cloître, M., Borrega, R., & Leibler, L. "Rheological aging and rejuvenation in microgel pastes."
+- Cloitre, M., Borrega, R., & Leibler, L. "Rheological aging and rejuvenation in microgel pastes."
   *Physical Review Letters*, **85**\ (22), 4819-4822 (2000).
+  https://doi.org/10.1103/PhysRevLett.85.4819
 
-- Höhler, R., Cohen-Addad, S., & Asnacios, A. "Rheological memory effect in aqueous foam."
+- Hohler, R., Cohen-Addad, S., & Asnacios, A. "Rheological memory effect in aqueous foam."
   *Europhysics Letters*, **48**\ (1), 93-98 (1999).
+  https://doi.org/10.1209/epl/i1999-00119-4
 
 - Bouchaud, J. P. "Weak ergodicity breaking and aging in disordered systems."
   *Journal de Physique I (France)*, **2**\ (9), 1705-1713 (1992).
+  https://doi.org/10.1051/jp1:1992238
+
+- Sollich, P. "Soft Glassy Rheology." In *Molecular Gels: Materials with
+  Self-Assembled Fibrillar Networks* (eds. R. G. Weiss & P. Terech),
+  pp. 161--192. Springer, Dordrecht (2006).
+  https://doi.org/10.1007/1-4020-3689-2_6
+  :download:`PDF <../../../reference/sollich_2005_soft_glass_rheology.pdf>`
 
 - Struik, L. C. E. *Physical Aging in Amorphous Polymers and Other Materials*.
-  Elsevier, Houston (1978).
+  Elsevier, Amsterdam (1978). ISBN: 978-0444416551

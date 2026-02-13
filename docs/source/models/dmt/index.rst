@@ -87,7 +87,7 @@ Key Features
 - **Fluidity-Maxwell formulation**: Jeffreys/Oldroyd-B backbone with structure-dependent
   relaxation and retardation times for true stress relaxation and SAOS moduli
 - **Nonlocal fluidity**: Spatial diffusion for shear band regularization with
-  cooperativity length :math:`\xi` ~ √(:math:`D_{\lambda}` · t_eq)
+  cooperativity length :math:`\xi \sim \sqrt{D_{\lambda} \cdot t_{\text{eq}}}`
 - **Complete protocol equations**: Full mathematical derivations for all rheological
   tests with closed-form solutions where available
 
@@ -125,7 +125,7 @@ Quick Start
    from rheojax.models import DMTLocal
 
    model = DMTLocal(closure="exponential", include_elasticity=True)
-   model.fit(gamma_dot, stress, test_mode="flow_curve")
+   model.fit(gamma_dot, stress, test_mode='flow_curve')
 
 **Herschel-Bulkley closure:**
 
@@ -134,7 +134,7 @@ Quick Start
    from rheojax.models import DMTLocal
 
    model = DMTLocal(closure="herschel_bulkley", include_elasticity=True)
-   model.fit(gamma_dot, stress, test_mode="flow_curve")
+   model.fit(gamma_dot, stress, test_mode='flow_curve')
 
 **Nonlocal for shear banding:**
 
@@ -166,5 +166,7 @@ References
    elasto-viscoplastic thixotropic modeling." *J. Non-Newtonian Fluid Mech.*,
    187-188, 8-15.
 
-3. Thompson, R. L. & de Souza Mendes, P. R. (2014). "Thixotropic behavior of
-   elasto-viscoplastic materials." *Phys. Fluids*, 26, 023101.
+3. de Souza Mendes, P. R. & Thompson, R. L. (2013). "A unified approach to model
+   elasto-viscoplastic thixotropic yield-stress materials and apparent yield-stress
+   fluids." *Rheologica Acta*, 52(7), 673-694.
+   https://doi.org/10.1007/s00397-013-0699-1

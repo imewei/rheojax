@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Thermodynamic consistency required, entropy production analysis, nonequilibrium thermodynamics research
-- **Parameters:** 4+ (x, G0, tau0, dissipation parameters)
+- **Parameters:** 4+ (:math:`x`, :math:`G_0`, :math:`\tau_0`, dissipation parameters)
 - **Key equation:** GENERIC framework with Poisson bracket + friction matrix
 - **Test modes:** Oscillation, relaxation, nonequilibrium thermodynamics validation
 - **Material examples:** Same as SGR Conventional, plus thermodynamic model validation
@@ -556,7 +556,7 @@ The following bounds ensure well-posed GENERIC dynamics:
      - :math:`\int \rho(E) \, dE = 1`
      - Proper normalization
 
-**Automated Consistency Monitoring**
+**Thermodynamic Consistency Verification**
 
 .. code-block:: python
 
@@ -567,18 +567,7 @@ The following bounds ensure well-posed GENERIC dynamics:
    model.parameters.set_value('G0', 100.0)
    model.parameters.set_value('tau0', 0.01)
 
-   # Enable consistency checks (adds ~10% overhead)
-   model.enable_thermodynamic_checks(
-       check_entropy_production=True,
-       check_probability_conservation=True,
-       check_energy_conservation=True,
-       tolerance=1e-10
-   )
-
-   # Warnings raised if violations detected during simulation
-   result = model.simulate_shear(gamma_dot=1.0, t_end=100.0)
-
-   # Explicit verification
+   # Verify thermodynamic consistency of the model configuration
    consistency_report = model.verify_thermodynamic_consistency()
    print(consistency_report)
 
@@ -803,7 +792,7 @@ Model A: Strain-Activated Hopping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Enhances yielding at large absolute strains. Useful for fitting **stress overshoots**
-in start-up flow:
+in startup flow:
 
 .. math::
    h(\ell) = 1 + \left( \frac{|\ell|}{\gamma_c} \right)^\nu
@@ -837,8 +826,8 @@ LAOS Observables
    v_3 \approx \frac{G''_3}{G''_1} \quad \text{(viscous nonlinearity)}
 
 **Lissajous-Bowditch Figures**:
-   - Elastic projection (:math:`\sigma` vs :math:`\gamma`): Ellipse → Parallelogram
-   - Viscous projection (:math:`\sigma` vs :math:`\dot{\gamma}`): Ellipse → Sigmoidal
+   - Elastic projection (:math:`\sigma` vs :math:`\gamma`): Ellipse :math:`\to` Parallelogram
+   - Viscous projection (:math:`\sigma` vs :math:`\dot{\gamma}`): Ellipse :math:`\to` Sigmoidal
 
 .. note::
    For LAOS simulations with strain-dependent extensions, **use the PDE solver**
@@ -876,31 +865,31 @@ Parameters
 What You Can Learn
 ------------------
 
-The GENERIC formulation of SGR extends all insights from the conventional model with rigorous thermodynamic validation capabilities. The same parameters (x, G_0, :math:`\tau_0`) appear, but with additional thermodynamic interpretation.
+The GENERIC formulation of SGR extends all insights from the conventional model with rigorous thermodynamic validation capabilities. The same parameters (:math:`x`, :math:`G_0`, :math:`\tau_0`) appear, but with additional thermodynamic interpretation.
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**x (Effective Noise Temperature)**:
-   In the GENERIC framework, x is the configurational temperature that couples energy and entropy evolution.
+**:math:`x` (Effective Noise Temperature)**:
+   In the GENERIC framework, :math:`x` is the configurational temperature that couples energy and entropy evolution.
 
-   *For graduate students*: x appears in the free energy F = E - xS as the Lagrange multiplier enforcing the constraint that reversible dynamics (Poisson bracket) conserve entropy while irreversible dynamics (friction matrix) conserve energy. The degeneracy conditions L·∂S/∂z = 0 and M·∂E/∂z = 0 ensure thermodynamic consistency. The glass transition at x = 1 is where the entropy functional S[P] becomes unbounded, making equilibrium impossible.
+   *For graduate students*: :math:`x` appears in the free energy :math:`F = E - xS` as the Lagrange multiplier enforcing the constraint that reversible dynamics (Poisson bracket) conserve entropy while irreversible dynamics (friction matrix) conserve energy. The degeneracy conditions :math:`L \cdot \partial S/\partial z = 0` and :math:`M \cdot \partial E/\partial z = 0` ensure thermodynamic consistency. The glass transition at :math:`x = 1` is where the entropy functional :math:`S[P]` becomes unbounded, making equilibrium impossible.
 
-   *For practitioners*: Same interpretation as conventional SGR (x < 1 is glass, 1 < x < 2 is power-law fluid, x ≥ 2 is Newtonian), but GENERIC provides additional validation: you can check that entropy production Ṡ_prod ≥ 0 for all deformation histories. If this fails, your fitted parameters are thermodynamically inconsistent.
+   *For practitioners*: Same interpretation as conventional SGR (:math:`x < 1` is glass, :math:`1 < x < 2` is power-law fluid, :math:`x \geq 2` is Newtonian), but GENERIC provides additional validation: you can check that entropy production :math:`\dot{S}_{\text{prod}} \geq 0` for all deformation histories. If this fails, your fitted parameters are thermodynamically inconsistent.
 
-**G_0 (Plateau Modulus)**:
-   The elastic modulus scale, appearing in the energy functional E[P].
+**:math:`G_0` (Plateau Modulus)**:
+   The elastic modulus scale, appearing in the energy functional :math:`E[P]`.
 
-   *For graduate students*: G_0 sets the elastic strain energy contribution ½k∫l^2P(E,l)dEdl to the total energy. In GENERIC, the Poisson bracket generates affine deformation (∂_t l = :math:`\dot{\gamma}`), which is purely reversible (energy-conserving). The friction matrix generates yielding (l → 0), which is dissipative (entropy-producing).
+   *For graduate students*: :math:`G_0` sets the elastic strain energy contribution :math:`\frac{1}{2}k\int l^2 P(E,l)\,dE\,dl` to the total energy. In GENERIC, the Poisson bracket generates affine deformation (:math:`\partial_t l = \dot{\gamma}`), which is purely reversible (energy-conserving). The friction matrix generates yielding (:math:`l \to 0`), which is dissipative (entropy-producing).
 
-   *For practitioners*: Same as conventional SGR. GENERIC adds the guarantee that the predicted G_0 is consistent with thermodynamic stability (positive definite friction matrix M ≥ 0).
+   *For practitioners*: Same as conventional SGR. GENERIC adds the guarantee that the predicted :math:`G_0` is consistent with thermodynamic stability (positive definite friction matrix :math:`M \geq 0`).
 
 :math:`\tau_0` **(Attempt Time)**:
    The microscopic timescale for dissipative transitions.
 
-   *For graduate students*: In GENERIC, 1/:math:`\tau_0` = :math:`\Gamma_0` appears in the friction matrix M as the rate coefficient for yield transitions. The detailed balance condition ensures that M satisfies Onsager reciprocity, connecting forward and reverse transition rates via the equilibrium distribution :math:`\rho(E)`.
+   *For graduate students*: In GENERIC, :math:`1/\tau_0 = \Gamma_0` appears in the friction matrix :math:`M` as the rate coefficient for yield transitions. The detailed balance condition ensures that :math:`M` satisfies Onsager reciprocity, connecting forward and reverse transition rates via the equilibrium distribution :math:`\rho(E)`.
 
-   *For practitioners*: Same as conventional SGR. GENERIC provides validation that :math:`\tau_0` is consistent with equilibrium fluctuation-dissipation (FDT) relations if x equals thermal temperature.
+   *For practitioners*: Same as conventional SGR. GENERIC provides validation that :math:`\tau_0` is consistent with equilibrium fluctuation-dissipation (FDT) relations if :math:`x` equals thermal temperature.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -913,23 +902,23 @@ Material Classification
      - Thermodynamic State
      - Typical Materials
      - GENERIC Diagnostics
-   * - **x < 0.5**
+   * - **:math:`x < 0.5`**
      - Deep non-equilibrium glass
      - Highly aged colloidal gels, arrested emulsions, structural glasses
-     - Large Ṡ_prod during flow, multiple F[P] minima, no normalizable P_eq(E)
-   * - **0.5 < x < 1**
+     - Large :math:`\dot{S}_{\text{prod}}` during flow, multiple :math:`F[P]` minima, no normalizable :math:`P_{eq}(E)`
+   * - **:math:`0.5 < x < 1`**
      - Marginal non-equilibrium glass
      - Fresh colloidal suspensions, carbopol gels, foams
-     - Moderate Ṡ_prod, metastable F[P], equilibrium exists but unreachable
-   * - **1 < x < 1.5**
+     - Moderate :math:`\dot{S}_{\text{prod}}`, metastable :math:`F[P]`, equilibrium exists but unreachable
+   * - **:math:`1 < x < 1.5`**
      - Near-equilibrium fluid
      - Dilute emulsions, soft foams, near-critical suspensions
-     - Low Ṡ_prod, single F[P] minimum, FDT approximately satisfied
-   * - **1.5 < x < 2**
+     - Low :math:`\dot{S}_{\text{prod}}`, single :math:`F[P]` minimum, FDT approximately satisfied
+   * - **:math:`1.5 < x < 2`**
      - Equilibrium fluid
      - Surfactant solutions, polymer-colloid mixtures
-     - Ṡ_prod → 0 as :math:`\dot{\gamma}` → 0, FDT satisfied, unique equilibrium state
-   * - **x ≥ 2**
+     - :math:`\dot{S}_{\text{prod}} \to 0` as :math:`\dot{\gamma} \to 0`, FDT satisfied, unique equilibrium state
+   * - :math:`x \geq 2`
      - Thermalized fluid
      - Dilute suspensions, simple liquids
      - Exponential relaxation to equilibrium, full FDT, thermal noise dominates
@@ -949,8 +938,8 @@ Thermodynamic Validation
 
 **Free Energy Landscape**: Compute the nonequilibrium free energy :math:`F = E - xS`:
 
-- **Glass phase (x < 1)**: Multiple metastable minima (aging attracts system to deeper states)
-- **Fluid phase (x > 1)**: Single global minimum (equilibrium state)
+- **Glass phase (:math:`x < 1`)**: Multiple metastable minima (aging attracts system to deeper states)
+- **Fluid phase (:math:`x > 1`)**: Single global minimum (equilibrium state)
 - **Barrier heights**: Quantify activation energies for structural rearrangements
 
 **Fluctuation-Dissipation Verification**: Check consistency between:
@@ -1014,7 +1003,7 @@ Entropy Production Analysis
 
    # Compute entropy production under steady shear
    gamma_dot = 1.0  # s^-1
-   S_dot = model.entropy_production(gamma_dot)
+   S_dot = model.entropy_production_rate(gamma_dot)
 
    print(f"Entropy production rate: {S_dot:.4f} J/(K·m³·s)")
 
@@ -1116,7 +1105,7 @@ Thermodynamic Validation
 
    # Fit to data, then check entropy production for thermodynamic consistency
    model.fit(omega, G_star_data, test_mode='oscillation')
-   S_prod = model.entropy_production(gamma_dot=1.0)
+   S_prod = model.entropy_production_rate(gamma_dot=1.0)
    print(f"Entropy production rate: {S_prod:.4f} (should be >= 0)")
 
 Comparison with Conventional SGR
@@ -1147,7 +1136,7 @@ Comparison with Conventional SGR
    np.testing.assert_allclose(G_conv, G_generic, rtol=1e-10)
 
    # But SGRGeneric provides additional thermodynamic information
-   S_prod = generic.entropy_production(gamma_dot=1.0)
+   S_prod = generic.entropy_production_rate(gamma_dot=1.0)
    print(f"Entropy production: {S_prod:.4f}")
 
 See Also
@@ -1156,7 +1145,7 @@ See Also
 - :doc:`sgr_conventional` — Standard SGR model (simpler, same rheological predictions; start here)
 - :doc:`../../transforms/srfs` — Strain-Rate Frequency Superposition transform
 - :doc:`../multi_mode/generalized_maxwell` — Alternative multi-mode approach for viscoelastic spectra
-- :doc:`../fractional/fractional_maxwell_gel` — Fractional models for power-law gels (alternative to SGR for x ~ 1.5)
+- :doc:`../fractional/fractional_maxwell_gel` — Fractional models for power-law gels (alternative to SGR for :math:`x \sim 1.5`)
 
 **Related advanced models:**
 
@@ -1172,13 +1161,15 @@ API References
 References
 ----------
 
-.. [1] Fuereder, I. & Ilg, P. "GENERIC treatment of soft glassy rheology."
-   *Physical Review E*, **88**, 042134 (2013).
+.. [1] Fuereder, I. & Ilg, P. "Nonequilibrium thermodynamics of the soft glassy
+   rheology model." *Physical Review E*, **88**, 042134 (2013).
    https://doi.org/10.1103/PhysRevE.88.042134
+   :download:`PDF <../../../reference/fuereder_ilg_2013_sgr_thermodynamics.pdf>`
 
 .. [2] Grmela, M. & Öttinger, H. C. "Dynamics and thermodynamics of complex fluids. I.
    Development of a general formalism." *Physical Review E*, **56**, 6620 (1997).
    https://doi.org/10.1103/PhysRevE.56.6620
+   :download:`PDF <../../../reference/grmela_ottinger_1997_generic.pdf>`
 
 .. [3] Öttinger, H. C. *Beyond Equilibrium Thermodynamics*. Wiley (2005).
    ISBN: 978-0471666585
@@ -1186,6 +1177,7 @@ References
 .. [4] Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
    *Physical Review E*, **85**, 031127 (2012).
    https://doi.org/10.1103/PhysRevE.85.031127
+   :download:`PDF <../../../reference/sollich_cates_2012_sgr_thermo.pdf>`
 
 .. [5] Sollich, P. "Rheological constitutive equation for a model of soft glassy materials."
    *Physical Review E*, **58**, 738 (1998).
@@ -1208,4 +1200,9 @@ References
 .. [10] Nicolas, A., Ferrero, E. E., Martens, K., & Barrat, J.-L. "Deformation and flow of amorphous solids: Insights from elastoplastic models."
    *Reviews of Modern Physics*, **90**, 045006 (2018).
    https://doi.org/10.1103/RevModPhys.90.045006
+
+.. [11] Öttinger, H. C. "Nonequilibrium thermodynamics for open systems."
+   *Physical Review E*, **73**, 036126 (2006).
+   https://doi.org/10.1103/PhysRevE.73.036126
+   :download:`PDF <../../../reference/ottinger_2006_generic_open_systems.pdf>`
 

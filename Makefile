@@ -84,7 +84,7 @@ CYAN := \033[36m
 # Help target
 # ===================
 help:
-	@echo "$(BOLD)$(BLUE)Rheo Development Commands$(RESET)"
+	@echo "$(BOLD)$(BLUE)RheoJAX Development Commands$(RESET)"
 	@echo ""
 	@echo "$(BOLD)Usage:$(RESET) make $(CYAN)<target>$(RESET)"
 	@echo ""
@@ -671,7 +671,7 @@ clean-test:
 
 clean: clean-build clean-pyc clean-test
 	@echo "$(BOLD)$(BLUE)Removing temporary work directories...$(RESET)"
-	rm -rf fix-imports/ 2>/dev/null || true
+	rm -rf fix-imports/ .nlsq_cache/ 2>/dev/null || true
 	@echo "$(BOLD)$(GREEN)✓ Cleaned!$(RESET)"
 	@echo "$(BOLD)Protected directories preserved:$(RESET) .venv/, venv/, .claude/, .specify/, agent-os/"
 

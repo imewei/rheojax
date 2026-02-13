@@ -1,7 +1,7 @@
 Contributing
 ============
 
-We welcome contributions to rheo! This guide will help you get started.
+We welcome contributions to rheojax! This guide will help you get started.
 
 Development Setup
 -----------------
@@ -12,7 +12,7 @@ Development Setup
    .. code-block:: bash
 
       git clone https://github.com/your-username/rheojax.git
-      cd rheo
+      cd rheojax
 
 3. Install development dependencies:
 
@@ -40,9 +40,9 @@ Run all checks:
 
 .. code-block:: bash
 
-   black rheo tests
-   ruff check rheo tests
-   mypy rheo
+   black rheojax tests
+   ruff check rheojax tests
+   mypy rheojax
 
 Pre-commit hooks will automatically run these checks before each commit.
 
@@ -57,7 +57,7 @@ All new code should include tests. We use pytest for testing:
    pytest
 
    # Run with coverage
-   pytest --cov=rheo --cov-report=html
+   pytest --cov=rheojax --cov-report=html
 
    # Run specific test
    pytest tests/core/test_base.py::test_base_model
@@ -118,4 +118,4 @@ Questions?
 * Join discussions in GitHub Discussions
 * Contact maintainers
 
-Thank you for contributing to rheo!
+Thank you for contributing to rheojax!

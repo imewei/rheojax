@@ -957,7 +957,7 @@ Reversible Network Rheology
 5. **Skrzeszewska, P. J., Sprakel, J., de Wolf, F. A., et al.** (2010).
    Fracture and self-healing in a well-defined self-assembled polymer network.
    *Macromolecules*, 43(7), 3542-3548.
-   DOI: `10.1021/ma100055d <https://doi.org/10.1021/ma100055d>`_
+   DOI: `10.1021/ma1000173 <https://doi.org/10.1021/ma1000173>`_
 
 6. **Long, R., Mayumi, K., Creton, C., Narita, T., & Hui, C.-Y.** (2014).
    Time dependent behavior of a dual cross-link self-healing gel: Theory and experiments.

@@ -31,7 +31,7 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import Protocol, TestMode
+from rheojax.core.test_modes import DeformationMode, Protocol, TestMode
 from rheojax.logging import get_logger
 from rheojax.models.fikh._base import FIKHBase
 from rheojax.utils.optimization import nlsq_optimize
@@ -53,6 +53,12 @@ ArrayLike = np.ndarray | jnp.ndarray | list | tuple
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FIKH(FIKHBase):
@@ -568,7 +574,6 @@ class FIKH(FIKHBase):
             Complex modulus G* = G' + i·G'' for each frequency.
         """
         omega_arr = jnp.asarray(omega)
-        n_omega = len(omega_arr)
         params = self._get_params_dict()
 
         # Simulate each frequency
@@ -588,7 +593,6 @@ class FIKH(FIKHBase):
             last_cycle_start = int(len(t) * (n_cycles - 1) / n_cycles)
             t_last = t[last_cycle_start:]
             stress_last = stress[last_cycle_start:]
-            strain_last = strain[last_cycle_start:]
 
             # Fourier decomposition (first harmonic)
             # G' = (1/γ₀) · (2/T) ∫ σ·sin(ωt) dt

@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Stress-relaxation with instantaneous modulus and fractional retardation
-- **Parameters:** 4 (Ge, Gk, :math:`\alpha, \tau`)
+- **Parameters:** 4 (:math:`G_e, G_k, \alpha, \tau`)
 - **Key equation:** :math:`G(t) = G_{\mathrm{eq}} + (G_e - G_{\mathrm{eq}}) E_{\alpha}(-(t/\tau)^{\alpha})` where :math:`G_{\mathrm{eq}} = \frac{G_e G_k}{G_e + G_k}`
 - **Test modes:** Relaxation, creep, oscillation
 - **Material examples:** Viscoelastic solids emphasizing stress-relaxation interpretations
@@ -62,11 +62,11 @@ in relaxation form) consists of:
 
 **Microstructural Interpretation:**
 
-- **Instantaneous spring (Ge)**: Immediate elastic response from bond stretching
-  and glassy contributions. Sets G(t=0) = Ge.
+- **Instantaneous spring (** :math:`G_e` **)**: Immediate elastic response from bond stretching
+  and glassy contributions. Sets :math:`G(t=0) = G_e`.
 - **Kelvin element**: Provides delayed relaxation from network rearrangements.
-  The spring Gk and SpringPot work together to create power-law stress relaxation.
-- **Equilibrium behavior**: Material relaxes to Geq = Ge Gk / (Ge + Gk)
+  The spring :math:`G_k` and SpringPot work together to create power-law stress relaxation.
+- **Equilibrium behavior**: Material relaxes to :math:`G_{\text{eq}} = G_e G_k / (G_e + G_k)`
 - **Solid-like**: Finite equilibrium modulus (no flow)
 
 The series configuration makes this model natural for stress relaxation experiments
@@ -168,33 +168,33 @@ emphasizing stress-relaxation interpretations and the dual-modulus solid structu
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Instantaneous Modulus (Ge)**:
-   The modulus at t = 0⁺, representing the material's immediate elastic response upon loading.
+**Instantaneous Modulus (** :math:`G_e` **)**:
+   The modulus at :math:`t = 0^+`, representing the material's immediate elastic response upon loading.
 
-   *For graduate students*: Ge includes both entropic (network) and enthalpic (glassy) contributions to elasticity. It represents the sum of all elastic contributions before any relaxation occurs.
-   *For practitioners*: Ge is the initial stiffness for impact loading design. Use this value for short-time mechanical response calculations.
+   *For graduate students*: :math:`G_e` includes both entropic (network) and enthalpic (glassy) contributions to elasticity. It represents the sum of all elastic contributions before any relaxation occurs.
+   *For practitioners*: :math:`G_e` is the initial stiffness for impact loading design. Use this value for short-time mechanical response calculations.
 
-**Retarded Modulus (Gk)**:
-   Controls the amount of stress relaxation from Ge to Geq. The equilibrium modulus is given by Geq = Ge·Gk/(Ge + Gk).
+**Retarded Modulus (** :math:`G_k` **)**:
+   Controls the amount of stress relaxation from :math:`G_e` to :math:`G_{\text{eq}}`. The equilibrium modulus is given by :math:`G_{\text{eq}} = G_e \cdot G_k / (G_e + G_k)`.
 
-   *For graduate students*: Gk represents the spring stiffness in the Kelvin element. The harmonic mean relationship for Geq arises from the series-parallel spring configuration.
-   *For practitioners*: Relaxation magnitude :math:`\DeltaG` = Ge - Geq is directly determined by the Ge/Gk ratio. Higher Gk → less relaxation.
+   *For graduate students*: :math:`G_k` represents the spring stiffness in the Kelvin element. The harmonic mean relationship for :math:`G_{\text{eq}}` arises from the series-parallel spring configuration.
+   *For practitioners*: Relaxation magnitude :math:`\Delta G = G_e - G_{\text{eq}}` is directly determined by the :math:`G_e/G_k` ratio. Higher :math:`G_k` means less relaxation.
 
 **Fractional Order (** :math:`\alpha` **)**:
    Governs the power-law character of stress relaxation between instantaneous and equilibrium values. Values closer to 0 indicate more solid-like continuous relaxation, while values closer to 1 indicate more liquid-like narrow relaxation.
 
-   - :math:`\alpha` **→ 0**: Very slow, broad-spectrum relaxation approaching plateau behavior
-   - :math:`\alpha` **→ 0.5**: Typical fractional solid, balanced spectrum breadth
-   - :math:`\alpha` **→ 1**: Exponential relaxation (classical Poynting-Thomson/Zener)
+   - :math:`\alpha \to 0`: Very slow, broad-spectrum relaxation approaching plateau behavior
+   - :math:`\alpha \approx 0.5`: Typical fractional solid, balanced spectrum breadth
+   - :math:`\alpha \to 1`: Exponential relaxation (classical Poynting-Thomson/Zener)
 
    *For graduate students*: :math:`\alpha` quantifies polydispersity in the retardation time spectrum. Lower :math:`\alpha` indicates greater microstructural heterogeneity.
    *For practitioners*: Lower :math:`\alpha` means relaxation spreads over more time decades—important for long-term load-bearing applications.
 
 **Retardation Time (** :math:`\tau` **)**:
-   Characteristic timescale for the transition from Ge to Geq.
+   Characteristic timescale for the transition from :math:`G_e` to :math:`G_{eq}`.
 
    *For graduate students*: :math:`\tau` is temperature-dependent (WLF/Arrhenius), enabling time-temperature superposition for master curve construction.
-   *For practitioners*: Compare :math:`\tau` to service timescales. If service time << :math:`\tau`, use Ge; if >> :math:`\tau`, use Geq.
+   *For practitioners*: Compare :math:`\tau` to service timescales. If service time :math:`\ll \tau`, use :math:`G_e`; if :math:`\gg \tau`, use :math:`G_{eq}`.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -203,7 +203,7 @@ Material Classification
    :header-rows: 1
    :widths: 25 25 25 25
 
-   * - Ge/Geq Ratio
+   * - :math:`G_e/G_{eq}` Ratio
      - Relaxation Character
      - Typical Materials
      - Design Implications
@@ -245,7 +245,7 @@ Diagnostic Indicators
 ~~~~~~~~~~~~~~~~~~~~~
 
 - **G(t) continues decreasing at longest time**: Equilibrium not reached; extend measurement time or consider liquid model (FMG/FML)
-- **Ge/Gk near 1**: Minimal relaxation; simpler elastic model may suffice
+- :math:`G_e/G_k` **near 1**: Minimal relaxation; simpler elastic model may suffice
 - :math:`\alpha` **hits bounds (0.05 or 0.95)**: Data may not support fractional behavior; try classical Zener
 - **Non-monotonic residuals**: Check for multiple relaxation mechanisms or nonlinear effects
 
@@ -275,8 +275,8 @@ Fitting Guidance
 
 - Fit in modulus space (natural for relaxation)
 - Use log-weighted least squares
-- Verify monotonic decay from Ge to Geq
-- Check that Geq > 0 (solid-like behavior)
+- Verify monotonic decay from :math:`G_e` to :math:`G_{eq}`
+- Check that :math:`G_{eq} > 0` (solid-like behavior)
 
 **Common Pitfalls:**
 
@@ -293,10 +293,10 @@ Fitting Guidance
    * - Issue
      - Likely Cause
      - Solution
-   * - G(t) → 0 at long times
+   * - :math:`G(t) \to 0` at long times
      - Liquid-like behavior
      - Use FML or FMG model instead
-   * - Ge/Gk ≈ 1
+   * - :math:`G_e/G_k \approx 1`
      - Minimal relaxation
      - Consider simple elastic model
    * - :math:`\alpha` near upper bound (0.95+)
@@ -305,13 +305,13 @@ Fitting Guidance
    * - Non-monotonic residuals
      - Multiple relaxation modes
      - Consider GMM or add second mode
-   * - Poor fit at t → 0
+   * - Poor fit at :math:`t \to 0`
      - Instrument response time
      - Exclude first few points
-   * - Geq < 0 (non-physical)
+   * - :math:`G_{eq} < 0` (non-physical)
      - Fitting error or wrong model
      - Check data quality, verify solid-like
-   * - High Ge-Gk correlation
+   * - High :math:`G_e`--:math:`G_k` correlation
      - Insufficient time coverage
      - Need broader range (4+ decades)
 
@@ -348,8 +348,8 @@ Compare candidates by relaxation characteristics:
    :widths: 20 15 15 15 15 20
 
    * - Material
-     - Ge (MPa)
-     - Geq (MPa)
+     - :math:`G_e` (MPa)
+     - :math:`G_{eq}` (MPa)
      - :math:`\tau` (s)
      - :math:`\alpha`
      - Relaxation
@@ -382,17 +382,17 @@ Compare candidates by relaxation characteristics:
 
 Monitor relaxation parameters for product consistency:
 
-1. **Instantaneous modulus (Ge)**: Sensitive to cure state and crosslink density
-2. **Equilibrium modulus (Geq)**: Tracks permanent network structure
-3. **Relaxation magnitude (Ge - Geq)**: Indicates temporary vs. permanent structure balance
+1. **Instantaneous modulus (** :math:`G_e` **)**: Sensitive to cure state and crosslink density
+2. **Equilibrium modulus (** :math:`G_{eq}` **)**: Tracks permanent network structure
+3. **Relaxation magnitude (** :math:`G_e - G_{eq}` **)**: Indicates temporary vs. permanent structure balance
 4. **Fractional order (** :math:`\alpha` **)**: QC metric for microstructural uniformity
 
 **Design Guidelines:**
 
 For applications requiring sustained stress:
 
-- **Critical applications** (pressure vessels, structural): Target Ge/Geq < 1.5 for minimal relaxation
-- **Sealing applications**: Ge/Geq = 2-5 acceptable if recompression possible
+- **Critical applications** (pressure vessels, structural): Target :math:`G_e/G_{eq} < 1.5` for minimal relaxation
+- **Sealing applications**: :math:`G_e/G_{eq} = 2`--5 acceptable if recompression possible
 - **Damping applications**: Maximize tan(:math:`\delta`) at operating frequency (:math:`\omega \approx 1/\tau`)
 - **Service life**: Ensure measurement time > 10× service time for reliable extrapolation
 
@@ -401,7 +401,7 @@ Example Calculations
 
 **Stress Relaxation Prediction:**
 
-Given fitted parameters Ge = 2.0 MPa, Gk = 5.0 MPa, :math:`\alpha = 0.55, \tau` = 500 s:
+Given fitted parameters :math:`G_e = 2.0` MPa, :math:`G_k = 5.0` MPa, :math:`\alpha = 0.55`, :math:`\tau = 500` s:
 
 .. code-block:: python
 

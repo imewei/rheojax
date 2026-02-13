@@ -32,7 +32,7 @@ Notation Guide
    * - :math:`\lambda`
      - Relaxation time (s). Characteristic stress decay time.
    * - :math:`\alpha`
-     - Mobility factor (dimensionless, 0 ≤ :math:`\alpha` ≤ 0.5). Controls shear-thinning.
+     - Mobility factor (dimensionless, :math:`0 \leq \alpha \leq 0.5`). Controls shear-thinning.
    * - :math:`\eta_s`
      - Solvent viscosity (Pa·s). Newtonian background contribution.
    * - :math:`\eta_0`
@@ -115,8 +115,8 @@ in a flowing medium. When chains are stretched and aligned by flow:
 
 The mobility parameter :math:`\alpha` quantifies this anisotropy:
 
-- :math:`\alpha = 0`: Isotropic drag → recovers UCM model
-- :math:`\alpha = 0.5`: Maximum anisotropy → strongest thinning
+- :math:`\alpha = 0`: Isotropic drag; recovers UCM model
+- :math:`\alpha = 0.5`: Maximum anisotropy; strongest thinning
 - Typical values: 0.1–0.4 for most polymer melts and solutions
 
 Network Interpretation
@@ -127,7 +127,7 @@ where:
 
 - Polymer chains form a transient network of entanglements
 - Network junctions break and reform with rate dependent on local stress
-- Higher stress → faster junction breakage → lower effective viscosity
+- Higher stress leads to faster junction breakage and lower effective viscosity
 
 The quadratic :math:`\boldsymbol{\tau} \cdot \boldsymbol{\tau}` term represents the
 stress-induced acceleration of network relaxation.
@@ -524,7 +524,7 @@ where :math:`H(t)` is the Heaviside step function.
 
 - **Peak strain**: :math:`\gamma_{\text{peak}} \sim 2\text{–}3` strain units (depends on Wi and :math:`\alpha`)
 - **Overshoot ratio**: :math:`\sigma_{\text{peak}}/\sigma_{\text{ss}}` increases with Wi
-- Higher :math:`\alpha` → smaller overshoot (stronger nonlinear damping)
+- Higher :math:`\alpha` gives smaller overshoot (stronger nonlinear damping)
 - **High-Wi scaling**: :math:`\gamma_{\text{peak}} \sim \text{const}` (2–3), :math:`\sigma_{\text{peak}}/\sigma_{\text{ss}} \sim \text{Wi}^{1/2}`
 
 Stress Relaxation
@@ -810,7 +810,7 @@ where :math:`x = \gamma/\gamma_0`, :math:`y = \dot{\gamma}/(\gamma_0\omega)`, an
    * - Higher harmonics
      - Present due to quadratic stress term
    * - Lissajous shape
-     - Ellipse → tilted/distorted at high :math:`\gamma_0`
+     - Ellipse, tilted/distorted at high :math:`\gamma_0`
    * - :math:`I_{3/1}` scaling
      - :math:`I_{3/1} \sim \gamma_0^2` in MAOS regime
 
@@ -908,22 +908,22 @@ Parameters
      - Units
      - Bounds
      - Physical Meaning
-   * - eta_p
+   * - :math:`\eta_p`
      - :math:`\eta_p`
      - Pa·s
      - (1e-3, 1e6)
      - Polymer zero-shear viscosity
-   * - lambda_1
+   * - :math:`\lambda`
      - :math:`\lambda`
      - s
      - (1e-6, 1e4)
      - Characteristic relaxation time
-   * - alpha
+   * - :math:`\alpha`
      - :math:`\alpha`
      - —
      - [0, 0.5]
      - Mobility anisotropy factor
-   * - eta_s
+   * - :math:`\eta_s`
      - :math:`\eta_s`
      - Pa·s
      - [0, 1e4)
@@ -1024,13 +1024,13 @@ Validity Range
      - Range
      - Notes
    * - Weissenberg number
-     - Wi ≲ 100
+     - :math:`\text{Wi} \lesssim 100`
      - Numerical stability limit
    * - Shear rate
      - :math:`\dot{\gamma} < 1/\lambda` to :math:`100/\lambda`
      - Power-law region
    * - Strain (startup)
-     - :math:`\gamma` ≲ 10
+     - :math:`\gamma \lesssim 10`
      - Overshoot captured
    * - Temperature
      - Near reference T
@@ -1069,15 +1069,15 @@ Weissenberg Number Regimes
      - Viscosity
      - Physics
    * - Newtonian
-     - Wi ≪ 1
+     - :math:`\text{Wi} \ll 1`
      - :math:`\eta \approx \eta_0`
      - Linear response, no thinning
    * - Transition
-     - Wi ~ 1
+     - :math:`\text{Wi} \sim 1`
      - Onset of thinning
      - Nonlinear effects begin
    * - Power-law
-     - Wi ≫ 1
+     - :math:`\text{Wi} \gg 1`
      - :math:`\eta \sim \text{Wi}^{n-1}`
      - Strong shear-thinning
 
@@ -1180,7 +1180,7 @@ From Normal Stress Measurements
 
 **What this reveals:**
 
-- **Degree of molecular anisotropy**: Higher :math:`\alpha` → more anisotropic drag
+- **Degree of molecular anisotropy**: Higher :math:`\alpha` indicates more anisotropic drag
 - **Material classification**: Polymer melts (:math:`\alpha \sim 0.1\text{–}0.3`), wormlike micelles (:math:`\alpha \sim 0.3\text{–}0.5`)
 - **Experimental techniques**: Cone-and-plate (for :math:`N_1`), parallel-plate edge measurements or cone-partitioned plate (for :math:`N_2`)
 
@@ -1230,11 +1230,11 @@ Combined Multi-Protocol Analysis
 
 **Recommended fitting sequence:**
 
-1. **SAOS** → :math:`\eta_p, \lambda, \eta_s` (linear parameters, :math:`\alpha`-independent)
-2. **Flow curve** → refine :math:`\eta_p, \lambda`; determine :math:`\alpha` from thinning shape
-3. **Normal stresses** → fix :math:`\alpha = -2N_2/N_1` (most direct route)
-4. **Startup** → validate overshoot predictions, refine :math:`\alpha`
-5. **Relaxation/Creep** → confirm time constants, validate nonlinear response
+1. **SAOS**: :math:`\eta_p, \lambda, \eta_s` (linear parameters, :math:`\alpha`-independent)
+2. **Flow curve**: refine :math:`\eta_p, \lambda`; determine :math:`\alpha` from thinning shape
+3. **Normal stresses**: fix :math:`\alpha = -2N_2/N_1` (most direct route)
+4. **Startup**: validate overshoot predictions, refine :math:`\alpha`
+5. **Relaxation/Creep**: confirm time constants, validate nonlinear response
 
 **Parameter-to-data mapping:**
 
@@ -1259,7 +1259,7 @@ Combined Multi-Protocol Analysis
      - ✓
      - ✓
      - ✓
-     - Thinning shape → :math:`\alpha`
+     - Thinning shape gives :math:`\alpha`
    * - :math:`N_1, N_2`
      - —
      - —
@@ -1451,7 +1451,7 @@ Initial Parameter Estimates
    * - Time to steady state
      - :math:`\lambda \approx t_{\text{ss}} / (3\text{–}5)`
    * - Overshoot magnitude
-     - Higher :math:`\alpha` → smaller overshoot
+     - Higher :math:`\alpha` gives smaller overshoot
    * - Initial slope in startup
      - :math:`G = \eta_p/\lambda` from :math:`d\sigma/d\gamma|_0`
 
@@ -1764,10 +1764,11 @@ References
 .. [2] Giesekus, H. (1983). "Stressing behaviour in simple shear flow as
    predicted by a new constitutive model for polymer fluids."
    *J. Non-Newtonian Fluid Mech.*, **12**, 367-374.
+   https://doi.org/10.1016/0377-0257(83)85009-5
 
 .. [3] Bird, R.B., Armstrong, R.C., & Hassager, O. (1987).
    *Dynamics of Polymeric Liquids, Vol. 1: Fluid Mechanics.* 2nd ed.
-   Wiley-Interscience. Chapter 4.
+   Wiley-Interscience. Chapter 4. ISBN: 978-0-471-80245-7
 
 .. [4] Larson, R.G. (1988). *Constitutive Equations for Polymer Melts and Solutions.*
    Butterworths. Chapter 4.
@@ -1780,39 +1781,49 @@ References
 
 .. [7] Yoo, J.Y., & Choi, H.C. (1989). "On the steady simple shear flows of the
    one-mode Giesekus fluid." *Rheol. Acta*, **28**, 13-24.
+   https://doi.org/10.1007/BF01354764
 
 .. [8] Schleiniger, G., & Weinacht, R.J. (1991). "Steady Poiseuille flows for a
    Giesekus fluid." *J. Non-Newtonian Fluid Mech.*, **40**, 79-102.
+   https://doi.org/10.1016/0377-0257(91)87027-U
 
 .. [9] Quinzani, L.M., Armstrong, R.C., & Brown, R.A. (1994). "Birefringence and
    laser-Doppler velocimetry (LDV) studies of viscoelastic flow through a
    planar contraction." *J. Non-Newtonian Fluid Mech.*, **52**, 1-36.
+   https://doi.org/10.1016/0377-0257(94)85056-9
 
 .. [10] Magda, J.J., & Baek, S.G. (1994). "Concentrated entangled and semidilute
    entangled polystyrene solutions and the second normal stress difference."
    *Polymer*, **35**, 1187-1194.
+   https://doi.org/10.1016/0032-3861(94)90010-8
 
-.. [11] Lee, C.S., Tripp, B.C., & Magda, J.J. (1992). "Does :math:`N_2` depend on
-   the shear rate in polymer melts?" *Rheol. Acta*, **31**, 306-314.
+.. [11] Lee, C.S., Tripp, B.C., & Magda, J.J. (1992). "Does :math:`N_1` or
+   :math:`N_2` control the onset of edge fracture?" *Rheol. Acta*, **31**, 306-308.
+   https://doi.org/10.1007/BF00366509
 
 .. [12] Quinzani, L.M., McKinley, G.H., Brown, R.A., & Armstrong, R.C. (1990).
    "Modeling the rheology of polyisobutylene solutions."
    *J. Rheol.*, **34**, 705-748.
+   https://doi.org/10.1122/1.550148
 
 .. [13] Debbaut, B., & Crochet, M.J. (1988). "Extensional effects in complex flows."
    *J. Non-Newtonian Fluid Mech.*, **30**, 169-184.
+   https://doi.org/10.1016/0377-0257(88)85023-7
 
 .. [14] Hulsen, M.A., Fattal, R., & Kupferman, R. (2005). "Flow of viscoelastic
    fluids past a cylinder at high Weissenberg number: Stabilized simulations
    using matrix logarithms." *J. Non-Newtonian Fluid Mech.*, **127**, 27-39.
+   https://doi.org/10.1016/j.jnnfm.2005.01.002
 
 .. [15] Guénette, R., & Fortin, M. (1995). "A new mixed finite element method for
    computing viscoelastic flows." *J. Non-Newtonian Fluid Mech.*, **60**, 27-52.
+   https://doi.org/10.1016/0377-0257(95)01372-3
 
 .. [16] Hyun, K., Wilhelm, M., Klein, C.O., Cho, K.S., Nam, J.G., Ahn, K.H.,
    Lee, S.J., Ewoldt, R.H., & McKinley, G.H. (2011). "A review of nonlinear
    oscillatory shear tests: Analysis and application of large amplitude
    oscillatory shear (LAOS)." *Prog. Polym. Sci.*, **36**, 1697-1753.
+   https://doi.org/10.1016/j.progpolymsci.2011.02.002
 
 .. [17] Dealy, J.M., & Wissbrun, K.F. (1990). *Melt Rheology and its Role in
    Plastics Processing.* Van Nostrand Reinhold.

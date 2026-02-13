@@ -37,6 +37,7 @@ import numpy as np
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import log_fit
 from rheojax.models.fluidity.saramito._base import FluiditySaramitoBase
 from rheojax.models.fluidity.saramito._kernels import (
@@ -61,6 +62,12 @@ logger = logging.getLogger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FluiditySaramitoLocal(FluiditySaramitoBase):

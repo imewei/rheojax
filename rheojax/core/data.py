@@ -240,6 +240,7 @@ class RheoData:
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )
@@ -267,6 +268,7 @@ class RheoData:
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )
@@ -284,6 +286,7 @@ class RheoData:
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )
@@ -526,6 +529,43 @@ class RheoData:
 
         return mode
 
+    @property
+    def deformation_mode(self) -> str:
+        """Get deformation mode from metadata.
+
+        Returns 'shear' if not explicitly set. Possible values:
+        'shear', 'tension', 'bending', 'compression'.
+        """
+        return self.metadata.get("deformation_mode", "shear")
+
+    @property
+    def storage_modulus_label(self) -> str:
+        """Get appropriate storage modulus label based on deformation mode.
+
+        Returns "E'" for tensile/bending/compression, "G'" for shear.
+        """
+        from rheojax.core.test_modes import DeformationMode
+
+        try:
+            dm = DeformationMode(self.deformation_mode)
+            return "E'" if dm.is_tensile() else "G'"
+        except ValueError:
+            return "G'"
+
+    @property
+    def loss_modulus_label(self) -> str:
+        """Get appropriate loss modulus label based on deformation mode.
+
+        Returns 'E"' for tensile/bending/compression, 'G"' for shear.
+        """
+        from rheojax.core.test_modes import DeformationMode
+
+        try:
+            dm = DeformationMode(self.deformation_mode)
+            return 'E"' if dm.is_tensile() else 'G"'
+        except ValueError:
+            return 'G"'
+
     def __getitem__(self, idx):
         """Support indexing and slicing."""
         if isinstance(idx, (int, np.integer)):
@@ -538,6 +578,7 @@ class RheoData:
                 x_units=self.x_units,
                 y_units=self.y_units,
                 domain=self.domain,
+                initial_test_mode=self._explicit_test_mode,
                 metadata=self.metadata.copy(),
                 validate=False,
             )
@@ -554,6 +595,7 @@ class RheoData:
                 x_units=self.x_units,
                 y_units=self.y_units,
                 domain=self.domain,
+                initial_test_mode=self._explicit_test_mode,
                 metadata=self.metadata.copy(),
                 validate=False,
             )
@@ -564,6 +606,7 @@ class RheoData:
                 x_units=self.x_units,
                 y_units=self.y_units,
                 domain=self.domain,
+                initial_test_mode=self._explicit_test_mode,
                 metadata=self.metadata.copy(),
                 validate=False,
             )
@@ -580,6 +623,7 @@ class RheoData:
                 x_units=self.x_units,
                 y_units=self.y_units,
                 domain=self.domain,
+                initial_test_mode=self._explicit_test_mode,
                 metadata=self.metadata.copy(),
                 validate=False,
             )
@@ -590,6 +634,7 @@ class RheoData:
                 x_units=self.x_units,
                 y_units=self.y_units,
                 domain=self.domain,
+                initial_test_mode=self._explicit_test_mode,
                 metadata=self.metadata.copy(),
                 validate=False,
             )
@@ -610,6 +655,7 @@ class RheoData:
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )
@@ -643,6 +689,7 @@ class RheoData:
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )
@@ -700,6 +747,7 @@ class RheoData:
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )
@@ -728,6 +776,7 @@ class RheoData:
                 else None
             ),
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )
@@ -760,6 +809,7 @@ class RheoData:
                 else None
             ),
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )
@@ -834,6 +884,7 @@ class RheoData:
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
+            initial_test_mode=self._explicit_test_mode,
             metadata=self.metadata.copy(),
             validate=False,
         )

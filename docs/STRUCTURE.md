@@ -159,7 +159,7 @@ Working files, reports, and analysis documents are preserved in `.archive/` but 
 - **7 transforms** with mathematical derivations
 - **6-section User Guide** structured as a 16-week graduate course
 - **9 learning pathways** for different user backgrounds
-- **170+ example notebooks** across all model families
+- **240+ example notebooks** across all model families
 - **GUI reference** for interactive analysis (PyQt/PySide6)
 - **Furo theme** with custom CSS, light/dark modes
 

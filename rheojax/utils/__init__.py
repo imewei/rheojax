@@ -1,4 +1,4 @@
-"""Utility functions for the rheo package.
+"""Utility functions for the rheojax package.
 
 This module provides:
 - Mittag-Leffler function implementations
@@ -16,6 +16,11 @@ from rheojax.utils.device import (
 from rheojax.utils.metrics import (
     compute_fit_quality,
     r2_complex,
+)
+from rheojax.utils.modulus_conversion import (
+    POISSON_PRESETS,
+    convert_modulus,
+    convert_rheodata,
 )
 from rheojax.utils.optimization import (
     OptimizationResult,
@@ -44,8 +49,8 @@ __all__ = [
     # Metrics utilities
     "compute_fit_quality",
     "r2_complex",
-    # These will be imported as they are implemented
-    # "mittag_leffler",
-    # "numerical_derivatives",
-    # "interpolate_data",
+    # Modulus conversion (DMTA/DMA support)
+    "convert_modulus",
+    "convert_rheodata",
+    "POISSON_PRESETS",
 ]

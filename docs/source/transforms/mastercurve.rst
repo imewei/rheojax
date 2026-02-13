@@ -104,6 +104,10 @@ Parameters
      - Dict mapping parameter names to (min, max).
      - ``None``
      - e.g. ``{"C1": (5, 25), "C2": (20, 150)}``.
+   * - ``auto_shift``
+     - Compute shift factors automatically via overlap optimization (no WLF/Arrhenius model).
+     - ``False``
+     - Best for unknown systems; bypasses parametric shift models.
    * - ``loss``
      - Residual metric (``"l2"`` or ``"log"``).
      - ``"l2"``
@@ -148,6 +152,27 @@ Usage
    a_T = mc.get_shift_factors()["a_T"]
    C1, C2 = mc.get_wlf_parameters()
 
+Auto Shift Factors (Model-Free)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the temperature dependence is unknown or does not follow WLF/Arrhenius, use
+``auto_shift=True`` to let the optimizer find shift factors directly from overlap
+quality without assuming a parametric model:
+
+.. code-block:: python
+
+   from rheojax.transforms import Mastercurve
+
+   mc = Mastercurve(reference_temp=60, auto_shift=True)
+   mastercurve, shift_factors = mc.transform(datasets)
+
+   # Retrieve the model-free shift factors
+   temps, log_aT = mc.get_auto_shift_factors()
+
+This is especially useful for DMTA temperature sweeps where a single WLF or Arrhenius
+model may not capture the full :math:`T_g` transition region.  See
+``examples/transforms/06-mastercurve_auto_shift.ipynb`` for a complete tutorial.
+
 Troubleshooting
 ---------------
 
@@ -166,8 +191,14 @@ References
 - Williams, M. L., Landel, R. F., & Ferry, J. D. "The Temperature Dependence of Relaxation
   Mechanisms in Amorphous Polymers." *J. Am. Chem. Soc.* 77, 3701-3707 (1955).
 - Ferry, J. D. *Viscoelastic Properties of Polymers*, 3rd ed. Wiley, 1980.
-- Dealy, J. M. & Plazek, D. J. "Time-Temperature Superposition-A User's Guide." *Rheol.
-  Bull.* 83, 16-23 (2014).
+- Dealy, J. M. & Plazek, D. J. "Time-Temperature Superposition — A Users Guide." *Rheol.
+  Bull.* 78(2), 16-21 (2009).
+
+.. seealso::
+
+   For DMTA temperature sweep data, see :doc:`/models/dmta/dmta_workflows`
+   Workflow 2 (master curve from multi-T DMTA) and
+   ``examples/dmta/07_dmta_tts_pipeline.ipynb``.
 
 See also
 --------

@@ -55,7 +55,7 @@ Convert between time and frequency domains:
 **Output**:
 
 - Frequency-domain G*(ω)
-- G'(ω) and G''(ω)
+- :math:`G'(\omega)` and :math:`G''(\omega)`
 
 IFFT (Inverse Fourier Transform)
 --------------------------------

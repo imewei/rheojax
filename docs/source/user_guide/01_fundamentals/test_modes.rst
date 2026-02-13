@@ -27,8 +27,8 @@ Different experimental techniques probe different aspects of material behavior:
 
 - **Frequency domain vs. time domain**: SAOS vs. relaxation/creep
 - **Linear vs. nonlinear**: Small strain (SAOS/relaxation/creep) vs. large strain/rate (flow)
-- **Storage vs. dissipation**: G' vs. G" vs. η
-- **Timescale range**: Fast (high ω) vs. slow (low ω)
+- **Storage vs. dissipation**: :math:`G'` vs. :math:`G''` vs. :math:`\eta`
+- **Timescale range**: Fast (high :math:`\omega`) vs. slow (low :math:`\omega`)
 
 No single test mode provides complete characterization—each reveals complementary information.
 
@@ -43,19 +43,19 @@ Test Mode Summary Table
      - Protocol
      - Description
    * - ``RELAXATION``
-     - Stress relaxation G(t)
+     - Stress relaxation :math:`G(t)`
      - Step strain, measure stress decay over time
    * - ``CREEP``
-     - Creep compliance J(t)
+     - Creep compliance :math:`J(t)`
      - Step stress, measure strain growth over time
    * - ``OSCILLATION``
-     - SAOS G*(ω)
+     - SAOS :math:`G^*(\omega)`
      - Small-amplitude oscillatory shear, complex modulus
    * - ``FLOW_CURVE``
-     - Steady-state η(γ̇)
+     - Steady-state :math:`\eta(\dot{\gamma})`
      - Viscosity vs shear rate at equilibrium
    * - ``STARTUP``
-     - Transient σ(t,γ̇)
+     - Transient :math:`\sigma(t,\dot{\gamma})`
      - Stress overshoot/undershoot at fixed shear rate
    * - ``ROTATION``
      - Legacy steady shear
@@ -69,29 +69,29 @@ The Six Test Modes
 
 **What it is**: Apply sinusoidal strain, measure sinusoidal stress response
 
-**Input**: γ(t) = γ₀ sin(ωt)
+**Input**: :math:`\gamma(t) = \gamma_0 \sin(\omega t)`
 
-**Output**: σ(t) = γ₀[G'(ω) sin(ωt) + G"(ω) cos(ωt)]
+**Output**: :math:`\sigma(t) = \gamma_0[G'(\omega) \sin(\omega t) + G''(\omega) \cos(\omega t)]`
 
 **Measured quantities**:
 
-- G'(ω) — Storage modulus (elastic component, in-phase)
-- G"(ω) — Loss modulus (viscous component, out-of-phase)
-- tan(δ) = G"/G' — Loss tangent (damping ratio)
-- η*(ω) = √[(G')² + (G")²] / ω — Complex viscosity
+- :math:`G'(\omega)` — Storage modulus (elastic component, in-phase)
+- :math:`G''(\omega)` — Loss modulus (viscous component, out-of-phase)
+- :math:`\tan(\delta) = G''/G'` — Loss tangent (damping ratio)
+- :math:`\eta^*(\omega) = \sqrt{(G')^2 + (G'')^2} / \omega` — Complex viscosity
 
-**Frequency sweep**: Vary ω from ~0.01 to ~100 rad/s
+**Frequency sweep**: Vary :math:`\omega` from ~0.01 to ~100 rad/s
 
 **Why it's powerful**:
 
 - Probes linear viscoelasticity (non-destructive)
-- Direct access to G' and G" across timescales
+- Direct access to :math:`G'` and :math:`G''` across timescales
 - Easiest to model mathematically (Fourier transform of relaxation)
 - Most common test in rheology
 
 **Limitations**:
 
-- Limited to small strains (γ₀ typically < 1%)
+- Limited to small strains (:math:`\gamma_0` typically < 1%)
 - May miss nonlinear behavior
 - Requires stable oscillation (not all instruments can do low frequencies well)
 
@@ -104,8 +104,8 @@ The Six Test Modes
 
 **Example applications**:
 
-- Polymer melts: Molecular weight distribution from G' and G" curves
-- Gels: Gelation monitoring (crossover of G' and G")
+- Polymer melts: Molecular weight distribution from :math:`G'` and :math:`G''` curves
+- Gels: Gelation monitoring (crossover of :math:`G'` and :math:`G''`)
 - Suspensions: Particle network structure
 
 2. Stress Relaxation
@@ -113,13 +113,13 @@ The Six Test Modes
 
 **What it is**: Apply step strain, measure stress decay over time
 
-**Input**: γ(t) = γ₀ H(t) — Step strain at t=0
+**Input**: :math:`\gamma(t) = \gamma_0 H(t)` — Step strain at :math:`t=0`
 
-**Output**: σ(t) = G(t) γ₀ — Stress decays as material relaxes
+**Output**: :math:`\sigma(t) = G(t) \gamma_0` — Stress decays as material relaxes
 
 **Measured quantity**:
 
-- G(t) — Relaxation modulus (stress/strain as function of time)
+- :math:`G(t)` — Relaxation modulus (stress/strain as function of time)
 
 **Time range**: Typically 0.01 s to 1000 s
 
@@ -155,13 +155,13 @@ The Six Test Modes
 
 **What it is**: Apply constant stress, measure strain increase over time
 
-**Input**: σ(t) = σ₀ H(t) — Step stress at t=0
+**Input**: :math:`\sigma(t) = \sigma_0 H(t)` — Step stress at :math:`t=0`
 
-**Output**: γ(t) = J(t) σ₀ — Strain increases as material creeps
+**Output**: :math:`\gamma(t) = J(t) \sigma_0` — Strain increases as material creeps
 
 **Measured quantity**:
 
-- J(t) — Creep compliance (strain/stress as function of time)
+- :math:`J(t)` — Creep compliance (strain/stress as function of time)
 
 **Time range**: Typically 0.1 s to 10,000 s (hours)
 
@@ -197,13 +197,13 @@ The Six Test Modes
 
 **What it is**: Apply constant shear rate, measure viscosity at equilibrium
 
-**Input**: γ̇ = constant — Shear rate (s⁻¹)
+**Input**: :math:`\dot{\gamma}` = constant — Shear rate (s :math:`^{-1}`)
 
-**Output**: σ = η(γ̇) · γ̇ — Shear stress
+**Output**: :math:`\sigma = \eta(\dot{\gamma}) \cdot \dot{\gamma}` — Shear stress
 
 **Measured quantity**:
 
-- η(γ̇) — Viscosity as a function of shear rate
+- :math:`\eta(\dot{\gamma})` — Viscosity as a function of shear rate
 
 **Shear rate range**: Typically 0.01 to 1000 s⁻¹
 
@@ -221,7 +221,7 @@ The Six Test Modes
 - Nonlinear regime (can't predict from linear viscoelasticity)
 - Edge effects, wall slip, sample expulsion
 - May structurally damage sample
-- Not directly related to G' and G" (except at very small γ̇)
+- Not directly related to :math:`G'` and :math:`G''` (except at very small :math:`\dot{\gamma}`)
 
 **When to use**:
 
@@ -242,13 +242,13 @@ The Six Test Modes
 
 **What it is**: Apply constant shear rate, measure transient stress evolution
 
-**Input**: γ̇ = constant (suddenly applied at t=0)
+**Input**: :math:`\dot{\gamma}` = constant (suddenly applied at :math:`t=0`)
 
-**Output**: σ(t) — Stress as function of time at fixed shear rate
+**Output**: :math:`\sigma(t)` — Stress as function of time at fixed shear rate
 
 **Measured quantity**:
 
-- σ(t, γ̇) — Transient stress response (often shows overshoot/undershoot)
+- :math:`\sigma(t, \dot{\gamma})` — Transient stress response (often shows overshoot/undershoot)
 
 **Time range**: Typically 0.01 to 100 s
 
@@ -287,15 +287,15 @@ The Six Test Modes
 
 **What it is**: Apply sinusoidal strain at large amplitudes, analyze nonlinear stress response
 
-**Input**: γ(t) = γ₀ sin(ωt) with γ₀ >> linear limit
+**Input**: :math:`\gamma(t) = \gamma_0 \sin(\omega t)` with :math:`\gamma_0 \gg` linear limit
 
-**Output**: σ(t) — Non-sinusoidal stress waveform
+**Output**: :math:`\sigma(t)` — Non-sinusoidal stress waveform
 
 **Measured quantities**:
 
-- Higher harmonics: σ₃/σ₁, σ₅/σ₁
+- Higher harmonics: :math:`\sigma_3/\sigma_1`, :math:`\sigma_5/\sigma_1`
 - Chebyshev coefficients (e₁, e₃, v₁, v₃)
-- Lissajous-Bowditch curves (σ vs γ, σ vs γ̇)
+- Lissajous-Bowditch curves (:math:`\sigma` vs :math:`\gamma`, :math:`\sigma` vs :math:`\dot{\gamma}`)
 - SPP decomposition (sequence of physical processes)
 
 **RheoJAX test mode**: ``test_mode='oscillation'`` with SPP models
@@ -316,7 +316,7 @@ The Six Test Modes
 
 **When to use**:
 
-- Distinguishing materials with similar G', G"
+- Distinguishing materials with similar :math:`G'`, :math:`G''`
 - Studying yielding and flow transitions
 - Material fingerprinting and quality control
 - Research on nonlinear constitutive behavior
@@ -467,7 +467,7 @@ Practical Guidelines
 
 **Use SAOS when**:
 
-- You need G' and G" for modeling
+- You need :math:`G'` and :math:`G''` for modeling
 - Material is stable over long time
 - You want non-destructive testing
 - You're monitoring gelation or curing
@@ -578,6 +578,37 @@ Model Compatibility with Test Modes
      - ✗
      - ✓
 
+.. _test_modes_dmta:
+
+7. DMTA / DMA (Tensile Oscillation)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**What it is**: Apply oscillatory tensile (or bending/compression) deformation and measure :math:`E^*(\omega)`
+
+**Instruments**: DMTA (TA Instruments RSA-G2, Netzsch DMA, Mettler Toledo DMA/SDTA, PerkinElmer DMA 8000)
+
+**Output**: :math:`E'(\omega)` (storage modulus, tensile) and :math:`E''(\omega)` (loss modulus, tensile)
+
+**Relationship to shear**: :math:`E = 2(1+\nu)G` where :math:`\nu` is the Poisson ratio
+
+**In RheoJAX**: All oscillation-capable models (41 of 53) accept DMTA data directly:
+
+.. code-block:: python
+
+   from rheojax.models import FractionalZenerSolidSolid
+
+   model = FractionalZenerSolidSolid()
+   model.fit(omega, E_star,
+             test_mode='oscillation',
+             deformation_mode='tension',
+             poisson_ratio=0.5)  # rubber
+
+   # predict() returns E* automatically
+   E_pred = model.predict(omega, test_mode='oscillation')
+
+RheoJAX converts :math:`E^* \to G^*` before fitting (model parameters stay in shear space)
+and converts back on ``predict()``. See :doc:`/models/dmta/index` for theory and workflows.
+
 **Key distinctions**:
 
 - **Linear viscoelastic** (Classical, Fractional, IKH): SAOS, relaxation, creep
@@ -597,20 +628,20 @@ Worked Example: Multi-Mode Characterization
 
 1. **SAOS frequency sweep** (10⁻² to 10² rad/s)
 
-   - Result: G' ~ ω², G" ~ ω at low ω (liquid-like)
-   - Crossover at ω_c ≈ 1 rad/s → τ ≈ 1 s
+   - Result: :math:`G' \sim \omega^2`, :math:`G'' \sim \omega` at low :math:`\omega` (liquid-like)
+   - Crossover at :math:`\omega_c \approx 1` rad/s :math:`\to \tau \approx 1` s
    - Fit: Fractional Maxwell Liquid (FML)
 
 2. **Stress relaxation** (t = 0.01 to 100 s)
 
-   - Result: G(t) decays from 10⁵ Pa to <100 Pa
+   - Result: :math:`G(t)` decays from :math:`10^5` Pa to <100 Pa
    - Confirms liquid-like behavior (no plateau)
    - Validates FML fit from SAOS
 
-3. **Steady shear flow** (γ̇ = 10⁻² to 10³ s⁻¹)
+3. **Steady shear flow** (:math:`\dot{\gamma} = 10^{-2}` to :math:`10^3` s :math:`^{-1}`)
 
-   - Result: Shear thinning (η decreases with γ̇)
-   - Zero-shear viscosity η₀ ≈ 10⁵ Pa·s
+   - Result: Shear thinning (:math:`\eta` decreases with :math:`\dot{\gamma}`)
+   - Zero-shear viscosity :math:`\eta_0 \approx 10^5` Pa·s
    - Fit: Carreau model for processing predictions
 
 **Outcome**: Complete characterization for both linear viscoelasticity (SAOS/relaxation) and nonlinear flow (steady shear).
@@ -621,13 +652,13 @@ Key Concepts
 .. admonition:: Main Takeaways
    :class: tip
 
-   1. **SAOS**: Frequency-dependent G' and G", most common test, linear regime
+   1. **SAOS**: Frequency-dependent :math:`G'` and :math:`G''`, most common test, linear regime
 
-   2. **Stress Relaxation**: Time-domain G(t), direct measurement of relaxation spectrum
+   2. **Stress Relaxation**: Time-domain :math:`G(t)`, direct measurement of relaxation spectrum
 
-   3. **Creep**: Long-term deformation J(t), good for weak gels and stability
+   3. **Creep**: Long-term deformation :math:`J(t)`, good for weak gels and stability
 
-   4. **Steady Shear Flow**: Nonlinear viscosity η(γ̇), for processing design
+   4. **Steady Shear Flow**: Nonlinear viscosity :math:`\eta(\dot{\gamma})`, for processing design
 
    5. **Linear tests are related** via Fourier/Laplace transforms—fitting one predicts others
 
@@ -638,15 +669,15 @@ Key Concepts
 
       Hint: Think about processing conditions (shear rate)
 
-   2. **Why can't you use a flow curve (η vs γ̇) to predict SAOS behavior (G' vs ω)?**
+   2. **Why can't you use a flow curve** (:math:`\eta` **vs** :math:`\dot{\gamma}`) **to predict SAOS behavior** (:math:`G'` **vs** :math:`\omega`) **?**
 
       Hint: Linear vs. nonlinear regimes
 
-   3. **A material has G' = G" = 1000 Pa at 1 rad/s. Can you predict G(t) at t = 1 s exactly?**
+   3. **A material has** :math:`G' = G'' = 1000` **Pa at 1 rad/s. Can you predict** :math:`G(t)` **at** :math:`t = 1` **s exactly?**
 
       Hint: Need full frequency sweep, not single point
 
-   4. **You observe stress relaxation G(t) from 10⁵ Pa to 10³ Pa over 100 s. Is this a liquid or solid?**
+   4. **You observe stress relaxation** :math:`G(t)` **from** :math:`10^5` **Pa to** :math:`10^3` **Pa over 100 s. Is this a liquid or solid?**
 
       Hint: Check if it plateaus or continues decaying
 
@@ -671,11 +702,11 @@ Further Reading
 Summary
 -------
 
-Four major test modes probe different aspects of rheology: **SAOS** (frequency-dependent G', G"), **stress relaxation** (time-domain G(t)), **creep** (long-term J(t)), and **steady shear flow** (nonlinear η(γ̇)). Linear viscoelastic tests (SAOS, relaxation, creep) are mathematically related, while flow tests probe nonlinear behavior. Choose test modes based on your material and research question.
+Four major test modes probe different aspects of rheology: **SAOS** (frequency-dependent :math:`G'`, :math:`G''`), **stress relaxation** (time-domain :math:`G(t)`), **creep** (long-term :math:`J(t)`), and **steady shear flow** (nonlinear :math:`\eta(\dot{\gamma})`). Linear viscoelastic tests (SAOS, relaxation, creep) are mathematically related, while flow tests probe nonlinear behavior. Choose test modes based on your material and research question.
 
 Next Steps
 ----------
 
 Proceed to: :doc:`parameter_interpretation`
 
-Learn the physical meaning of rheological parameters like G', G", τ, and α.
+Learn the physical meaning of rheological parameters like :math:`G'`, :math:`G''`, :math:`\tau`, and :math:`\alpha`.

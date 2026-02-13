@@ -27,7 +27,7 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import Protocol, TestMode
+from rheojax.core.test_modes import DeformationMode, Protocol, TestMode
 from rheojax.logging import get_logger
 from rheojax.models.fikh._base import FIKHBase
 from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
@@ -49,6 +49,12 @@ ArrayLike = np.ndarray | jnp.ndarray | list | tuple
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FMLIKH(FIKHBase):
@@ -567,7 +573,6 @@ class FMLIKH(FIKHBase):
         t = jnp.asarray(X)
         sigma_0 = kwargs.get("sigma_0", 60.0)
         sigma_applied = kwargs.get("sigma_applied", 100.0)
-        gamma_dot = kwargs.get("gamma_dot", 0.0)
         T_init = kwargs.get("T_init", None)
 
         total_result = jnp.zeros_like(t)

@@ -500,7 +500,7 @@ The diffusion rates follow simple Arrhenius:
 **Key properties:**
 
 - The diffusion activation energy :math:`E_a^{diff}` is typically
-  1.5--3:math:`\times` larger than :math:`E_a^{mat}`, reflecting the
+  1.5--3\ :math:`\times` larger than :math:`E_a^{mat}`, reflecting the
   higher barrier for coordinated multi-bond rearrangement.
 - The diffusion rate is **stress-independent** (not TST-activated)
   because it represents thermally driven Brownian motion.
@@ -611,67 +611,87 @@ References
 1. Vernerey, F.J., Long, R. & Brighenti, R. (2017). "A statistically-based
    continuum theory for polymers with transient networks." *J. Mech. Phys.
    Solids*, 107, 1--20.
+   https://doi.org/10.1016/j.jmps.2017.05.016
 
 2. Vernerey, F.J. (2018). "Transient response of nonlinear polymer networks:
    A kinetic theory." *J. Mech. Phys. Solids*, 115, 230--247.
+   https://doi.org/10.1016/j.jmps.2018.02.018
+   :download:`PDF <../../../reference/vernerey_2018_tnt_kinetic_theory.pdf>`
 
 3. Vernerey, F.J., Brighenti, R., Long, R. & Shen, T. (2018). "Statistical
    Damage Mechanics of Polymer Networks." *Macromolecules*, 51(17), 6609--6622.
+   https://doi.org/10.1021/acs.macromol.8b01052
 
 4. Meng, F., Saed, M.O. & Terentjev, E.M. (2019). "Elasticity and Relaxation
    in Full and Partial Vitrimer Networks." *Macromolecules*, 52(19), 7423--7429.
+   https://doi.org/10.1021/acs.macromol.9b01123
 
 5. Shen, T., Song, Z., Cai, S. & Vernerey, F.J. (2021). "Nonsteady fracture
    of transient networks: The case of vitrimer." *PNAS*, 118(29), e2105974118.
+   https://doi.org/10.1073/pnas.2105974118
 
 6. Song, Z., Wang, Z. & Cai, S. (2021). "Mechanics of vitrimer with hybrid
    networks." *Mech. Mater.*, 153, 103687.
+   https://doi.org/10.1016/j.mechmat.2020.103687
 
 7. Papon, A., Montes, H., Lequeux, F. et al. (2012). "Glass-transition
    temperature gradient in nanocomposites: Evidence from nuclear magnetic
-   resonance and differential scanning calorimetry." *Soft Matter*, 8(15),
-   4090--4096.
+   resonance and differential scanning calorimetry." *Phys. Rev. Lett.*,
+   108, 065702. https://doi.org/10.1103/PhysRevLett.108.065702
 
 8. Berriot, J., Montes, H., Lequeux, F. et al. (2002). "Filler-elastomer
    interaction in model filled rubbers, a :sup:`1`\ H NMR study."
    *J. Non-Crystalline Solids*, 307--310, 719--724.
+   https://doi.org/10.1016/S0022-3093(02)01552-1
 
 9. Duan, P., Zhao, H., Chen, Q. et al. (2023). "Insights into Uniaxial
    Tension and Relaxation of Nanorod-Filled Polymer Vitrimer Nanocomposites:
-   A Molecular Dynamics Simulation." *Macromolecules*, 56(11), 4468--4481.
+   A Molecular Dynamics Simulation." *Macromolecules*, 56(12), 4468--4481.
+   https://doi.org/10.1021/acs.macromol.3c00296
 
 10. Li, Z., Zhao, H., Duan, P., Zhang, L. & Liu, J. (2024). "Manipulating
     the Properties of Polymer Vitrimer Nanocomposites by Designing Dual Dynamic
-    Covalent Bonds." *Langmuir*, 40(14), 7550--7560.
+    Covalent Bonds." *Langmuir*, 40(14), 7769--7780.
+    https://doi.org/10.1021/acs.langmuir.4c00699
 
 11. Duan, P., Zhao, H., Liu, M. et al. (2024). "Molecular Insights into the
     Topological Transition, Fracture, and Self-Healing Behavior of Vitrimer
-    Composites with Exchangeable Interfaces." *Macromolecules*, 57, 7561--7573.
+    Composites with Exchangeable Interfaces." *Macromolecules*, 57, 9725--9736.
+    https://doi.org/10.1021/acs.macromol.4c01541
 
 12. Kim, J., Thompson, B.R., Tominaga, T. et al. (2024). "Suppression of
     Segmental Chain Dynamics on a Particle's Surface in Well-Dispersed Polymer
     Nanocomposites." *ACS Macro Lett.*, 13(6), 720--725.
+    https://doi.org/10.1021/acsmacrolett.4c00168
 
 13. Karim, M.R., Vernerey, F. & Sain, T. (2025). "Constitutive Modeling of
     Vitrimers and Their Nanocomposites Based on Transient Network Theory."
     *Macromolecules*, 58(10), 4899--4912.
+    https://doi.org/10.1021/acs.macromol.4c02872
+    :download:`PDF <../../../reference/karim_2025_vitrimer_nanocomposites.pdf>`
 
 14. Li, Z., Zhao, H., Zhang, L., Liu, J. et al. (2025). "Designing
     All-Vitrimer Nanocomposites to Combine Low Energy Consumption, Mechanical
-    Robust and Recyclability." *Nano Energy*, 142, 111199.
+    Robust and Recyclability." *Nano Energy*, 142, 111215.
 
-15. Alkhoury, K., Chester, S.A. & Vernerey, F.J. (2025). "Dynamic networks
-    containing multiple bond types." *J. Mech. Phys. Solids*.
+15. Alkhoury, K. & Chester, S.A. (2025). "A chemo-thermo-mechanically coupled
+    theory of photo-reacting polymers: Application to modeling photo-degradation
+    with irradiation-driven heat transfer." *J. Mech. Phys. Solids*, 197, 106050.
+    https://doi.org/10.1016/j.jmps.2025.106050
 
 16. Wagner, R.J. & Silberstein, M.N. (2025). "A foundational framework for
     the mesoscale modeling of dynamic elastomers and gels." *J. Mech. Phys.
     Solids*, 194, 105914.
+    https://doi.org/10.1016/j.jmps.2024.105914
 
 17. Hayashi, M. & Ricarte, R.G. (2025). "Towards the next development of
     vitrimers: Recent key topics for the practical application and understanding
     of the fundamental physics." *Prog. Polym. Sci.*, 170, 102026.
+    https://doi.org/10.1016/j.progpolymsci.2025.102026
+    :download:`PDF <../../../reference/hayashi_ricarte_2025_vitrimers_review.pdf>`
 
 18. Zhao, H., Wei, X., Fang, Y. et al. (2022). "Molecular dynamics simulation
     of the structural, mechanical, and reprocessing properties of vitrimers
     based on a dynamic covalent polymer network." *Macromolecules*, 55,
     1091--1103.
+    https://doi.org/10.1021/acs.macromol.1c02034

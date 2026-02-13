@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Complex creep with glassy compliance, fractional retardation, and viscous flow
-- **Parameters:** 5 (Jg, Jk, :math:`\alpha, \tauk, \eta_1`)
+- **Parameters:** 5 (:math:`J_g, J_k, \alpha, \tau_k, \eta_1`)
 - **Key equation:** :math:`J(t) = J_g + \frac{t^{\alpha}}{\eta_1\Gamma(1+\alpha)} + J_k[1 - E_{\alpha}(-(t/\tau_k)^{\alpha})]`
 - **Test modes:** Relaxation, creep, oscillation
 - **Material examples:** Polymer composites, asphalt binders, bituminous materials, viscoelastic solids under load
@@ -187,29 +187,29 @@ material insights and actionable knowledge.
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Glassy Compliance (Jg)**:
+**Glassy Compliance (** :math:`J_g` **)**:
    The instantaneous elastic response upon stress application.
 
-   - **For graduate students**: Jg reflects short-range bond stretching and
-     angle deformation in the glassy state. For polymers, Jg ≈ 1/G∞ where
-     G∞ is the glassy modulus (~1 GPa for many polymers).
-   - **For practitioners**: Jg sets the immediate strain upon loading. Critical
+   - **For graduate students**: :math:`J_g` reflects short-range bond stretching and
+     angle deformation in the glassy state. For polymers, :math:`J_g \approx 1/G_\infty` where
+     :math:`G_\infty` is the glassy modulus (~1 GPa for many polymers).
+   - **For practitioners**: :math:`J_g` sets the immediate strain upon loading. Critical
      for impact resistance and short-time deformation.
 
-**Kelvin Compliance (Jk)**:
+**Kelvin Compliance (** :math:`J_k` **)**:
    Controls the magnitude of delayed (retarded) elastic deformation.
 
-   - Retardation magnitude: :math:`\DeltaJ` = Jk
+   - Retardation magnitude: :math:`\Delta J = J_k`
    - For polymers, relates to chain rearrangements in constrained environments
-   - Typical values: :math:`10 \times 10^{-6-10}`\ :math:`^{-2 Pa}`\ :math:`^{-1}`
+   - Typical values: :math:`10^{-6}` to :math:`10^{-2}` Pa\ :math:`^{-1}`
 
 **Fractional Order (** :math:`\alpha` **)**:
    Governs the breadth of the retardation spectrum and power-law character.
 
-   - :math:`\alpha` **→ 0.2-0.3**: Very broad spectrum, highly heterogeneous (filled systems)
-   - :math:`\alpha` **→ 0.4-0.5**: Moderate breadth, typical for polymer composites
-   - :math:`\alpha` **→ 0.6-0.7**: Narrower spectrum, more uniform structure
-   - :math:`\alpha` **→ 1**: Exponential retardation (classical Burgers)
+   - :math:`\alpha \approx 0.2`--0.3: Very broad spectrum, highly heterogeneous (filled systems)
+   - :math:`\alpha \approx 0.4`--0.5: Moderate breadth, typical for polymer composites
+   - :math:`\alpha \approx 0.6`--0.7: Narrower spectrum, more uniform structure
+   - :math:`\alpha \to 1`: Exponential retardation (classical Burgers)
 
    *Physical interpretation*: Lower :math:`\alpha` indicates greater polydispersity in
    relaxation times arising from structural heterogeneity, filler distribution,
@@ -222,7 +222,7 @@ Parameter Interpretation
    - For polymers, relates to molecular weight via :math:`\eta_1 \sim M_w^{3.4}` (reptation)
    - Determines processability and long-term dimensional stability
 
-**Retardation Time (** :math:`\tauk` **)**:
+**Retardation Time (** :math:`\tau_k` **)**:
    Characteristic timescale for the fractional Kelvin-Voigt relaxation.
 
    - Marks the transition from glassy to retardation-dominated regime
@@ -239,7 +239,7 @@ Material Classification
      - Material Type
      - Examples
      - Key Characteristics
-   * - High Jk/Jg (> 10)
+   * - High :math:`J_k/J_g` (> 10)
      - Soft viscoelastic solid
      - Polymer composites, filled elastomers
      - Large delayed compliance
@@ -259,27 +259,27 @@ Material Classification
 Diagnostic Indicators
 ~~~~~~~~~~~~~~~~~~~~~
 
-- **Jg ≈ 0 or poorly constrained**: Insufficient early-time data; use faster
-  sampling or estimate from high-frequency G'
-- **Linear J(t) at all times**: No retardation; use simple Maxwell liquid instead
+- :math:`J_g \approx 0` **or poorly constrained**: Insufficient early-time data; use faster
+  sampling or estimate from high-frequency :math:`G'`
+- **Linear** :math:`J(t)` **at all times**: No retardation; use simple Maxwell liquid instead
 - :math:`\alpha` **near bounds (0.05 or 0.95)**: Data may not support fractional behavior;
   try classical Burgers (:math:`\alpha` = 1)
-- **Strong Jk-** :math:`\tauk` **correlation**: Need better data coverage in intermediate regime
+- **Strong** :math:`J_k` **-** :math:`\tau_k` **correlation**: Need better data coverage in intermediate regime
 
 Application Examples
 ~~~~~~~~~~~~~~~~~~~~
 
 **Asphalt Pavement Design**:
    Use Burgers model to predict rutting under sustained traffic load. The
-   terminal flow (:math:`\eta_1`) determines permanent deformation rate, while Jk and :math:`\alpha`
+   terminal flow (:math:`\eta_1`) determines permanent deformation rate, while :math:`J_k` and :math:`\alpha`
    control elastic recovery.
 
 **Polymer Composite Selection**:
-   Compare Jk values between formulations. Lower Jk means better dimensional
+   Compare :math:`J_k` values between formulations. Lower :math:`J_k` means better dimensional
    stability under load. Monitor :math:`\alpha` for filler dispersion quality.
 
 **Food Texture Analysis**:
-   Fit creep data from cheese or dough. High Jk indicates soft, easily
+   Fit creep data from cheese or dough. High :math:`J_k` indicates soft, easily
    deformable texture. Use :math:`\alpha` to quantify structural heterogeneity.
 
 Fitting Guidance
@@ -307,7 +307,7 @@ Fitting Guidance
 
 - Fit in log(compliance) space for better conditioning
 - Use weighted least squares with log-spaced weights
-- Constrain Jg < Jk (glassy stiffer than Kelvin)
+- Constrain :math:`J_g < J_k` (glassy stiffer than Kelvin)
 - Verify residuals are random, not systematic
 
 **Common Pitfalls:**
@@ -415,7 +415,7 @@ Fitting Strategies
 **Initialization from Creep Data:**
 
 1. :math:`J_g`: Extrapolate :math:`J(t \to 0)` (instantaneous compliance)
-2. :math:`\eta_1`: Slope of :math:`J(t)` at long time → :math:`1/\eta_1`
+2. :math:`\eta_1`: Slope of :math:`J(t)` at long time :math:`\to 1/\eta_1`
 3. :math:`J_k`: Mid-time plateau height minus :math:`J_g`
 4. :math:`\tau_k`: Time where retardation is half-complete
 5. :math:`\alpha`: Curvature of retardation region in log-log plot
@@ -459,8 +459,8 @@ Limiting Behavior
 - :math:`\alpha \to 1`: Classical Burgers with exponential Kelvin retardation
 - :math:`J_k \to 0`: Maxwell + fractional flow only (no retardation)
 - :math:`\eta_1 \to \infty`: Fractional Kelvin-Voigt (bounded creep, no flow)
-- :math:`\tau_k \to 0`: Instantaneous Kelvin response → :math:`J(t) = J_g + J_k + t/\eta_1`
-- :math:`\tau_k \to \infty`: Kelvin arm inactive → simple Maxwell
+- :math:`\tau_k \to 0`: Instantaneous Kelvin response, :math:`J(t) = J_g + J_k + t/\eta_1`
+- :math:`\tau_k \to \infty`: Kelvin arm inactive, simple Maxwell
 
 Model Comparison
 ----------------
@@ -501,6 +501,7 @@ Tips & Best Practices
 1. **Fit creep first**: Compliance space more natural for Burgers model
 2. **Verify terminal flow**: Confirm linear :math:`J(t)` vs :math:`t` at long time
 3. **Check bounds**: Ensure :math:`J_g < J_k` (physically meaningful)
+
 4. **Use transforms**: Apply :doc:`../../transforms/fft` to convert creep → oscillation
 5. **Log-log plots**: Visualize all three regimes clearly
 

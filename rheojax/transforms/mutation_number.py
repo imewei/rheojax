@@ -173,19 +173,22 @@ class MutationNumber(BaseTransform):
         if self.extrapolation_model == "exponential":
             # Fit G(t) = A * exp(-t/tau)
             # ln(G) = ln(A) - t/tau
-            log_G = jnp.log(G_fit + 1e-10)  # Avoid log(0)
+            log_G = jnp.log(jnp.maximum(G_fit, 1e-10))  # Clamp positive before log
 
             # Linear regression
             t_mean = jnp.mean(t_fit)
             log_G_mean = jnp.mean(log_G)
 
-            slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / jnp.sum(
-                (t_fit - t_mean) ** 2
+            denom = jnp.sum((t_fit - t_mean) ** 2)
+            slope = jnp.where(
+                denom > 1e-30,
+                jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / denom,
+                0.0,
             )
             intercept = log_G_mean - slope * t_mean
 
-            # Extract parameters
-            tau = -1.0 / slope
+            # Extract parameters (guard slope near zero)
+            tau = -1.0 / jnp.where(jnp.abs(slope) > 1e-20, slope, -1e-20)
             A = jnp.exp(intercept)
 
             # Integrate from t_max to infinity
@@ -198,14 +201,17 @@ class MutationNumber(BaseTransform):
             # Fit G(t) = A * t^(-n)
             # ln(G) = ln(A) - n*ln(t)
             log_t = jnp.log(t_fit)
-            log_G = jnp.log(G_fit + 1e-10)
+            log_G = jnp.log(jnp.maximum(G_fit, 1e-10))
 
             # Linear regression
             log_t_mean = jnp.mean(log_t)
             log_G_mean = jnp.mean(log_G)
 
-            n = -jnp.sum((log_t - log_t_mean) * (log_G - log_G_mean)) / jnp.sum(
-                (log_t - log_t_mean) ** 2
+            denom = jnp.sum((log_t - log_t_mean) ** 2)
+            n = jnp.where(
+                denom > 1e-30,
+                -jnp.sum((log_t - log_t_mean) * (log_G - log_G_mean)) / denom,
+                0.0,
             )
             A = jnp.exp(log_G_mean + n * log_t_mean)
 
@@ -358,7 +364,8 @@ class MutationNumber(BaseTransform):
         slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / (
             jnp.sum((t_fit - t_mean) ** 2) + 1e-10
         )
-        tau = -1.0 / (slope + 1e-10)
+        safe_slope = slope if abs(float(slope)) > 1e-20 else -1e-20
+        tau = -1.0 / safe_slope
 
         # Reasonable tau bounds
         if tau <= 0 or tau >= 1e6:
@@ -456,8 +463,8 @@ class MutationNumber(BaseTransform):
         float
             Mutation number clamped to [0, 1]
         """
-        if G_0_relax <= 0 or integral_tG <= 0:
-            # Fallback estimate: Δ ≈ 1 - G_eq/G_0
+        if G_0_relax <= 0 or integral_tG <= 0 or G_0 <= 0:
+            # Fallback estimate: Δ ≈ 1 - G_eq/G_0 (guard G_0 = 0)
             delta = (1.0 - G_eq / G_0) if G_0 > 0 else 0.0
         else:
             # Δ = [∫G_relax(t)dt]² / [G_0_relax × ∫t×G_relax(t)dt]

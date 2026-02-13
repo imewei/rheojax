@@ -19,6 +19,7 @@ Quick Reference
 .. autoclass:: FIKH
    :members:
    :show-inheritance:
+   :no-index:
 
 
 Notation Guide
@@ -115,27 +116,27 @@ providing a thermodynamically consistent model for materials with power-law memo
 Physical Interpretation of Fractional Order
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The fractional order :math:`\alpha` ∈ (0, 1) controls the **memory strength**:
+The fractional order :math:`\alpha \in (0, 1)` controls the **memory strength**:
 
-- :math:`\alpha` **→ 1**: Weak memory, fast exponential recovery (recovers MIKH)
-- :math:`\alpha` **= 0.5**: Intermediate power-law relaxation (square-root memory)
-- :math:`\alpha` **→ 0**: Strong memory, very slow "glassy" dynamics
+- :math:`\alpha \to 1`: Weak memory, fast exponential recovery (recovers MIKH)
+- :math:`\alpha = 0.5`: Intermediate power-law relaxation (square-root memory)
+- :math:`\alpha \to 0`: Strong memory, very slow "glassy" dynamics
 
 **Microstructural interpretation**: In complex fluids, :math:`\alpha` relates to the **breadth
 of the relaxation spectrum**. A single exponential relaxation (narrow spectrum)
-corresponds to :math:`\alpha` = 1. As the spectrum broadens (multiple timescales), effective
+corresponds to :math:`\alpha = 1`. As the spectrum broadens (multiple timescales), effective
 :math:`\alpha` decreases. From Cole-Cole analysis, the depression angle :math:`\theta = (1-\alpha)\pi/2`.
 
 **Connection to stretched exponentials**: The Mittag-Leffler function :math:`E_{\alpha(-x)}`
 that appears in FIKH solutions interpolates between:
 
-- E_1(-x) = exp(-x) (pure exponential)
-- :math:`E_{\alpha(-x) for \alpha}` < 1: stretched exponential at short times, power-law at long times
+- :math:`E_1(-x) = \exp(-x)` (pure exponential)
+- :math:`E_\alpha(-x)` for :math:`\alpha < 1`: stretched exponential at short times, power-law at long times
 
 Caputo Fractional Derivative
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For 0 < :math:`\alpha` < 1, the **Caputo fractional derivative** is defined as:
+For :math:`0 < \alpha < 1`, the **Caputo fractional derivative** is defined as:
 
 .. math::
 
@@ -143,12 +144,12 @@ For 0 < :math:`\alpha` < 1, the **Caputo fractional derivative** is defined as:
 
 Key properties:
 
-- D\ :math:`^{\alpha}` (constant) = 0 (compatible with physical initial conditions)
-- As :math:`\alpha \to 1`: D\ :math:`^{\alpha}` f → df/dt (recovers ordinary derivative)
-- Introduces **power-law memory** with kernel (t-s)^(-:math:`\alpha`)
+- :math:`D^\alpha` (constant) :math:`= 0` (compatible with physical initial conditions)
+- As :math:`\alpha \to 1`: :math:`D^\alpha f \to df/dt` (recovers ordinary derivative)
+- Introduces **power-law memory** with kernel :math:`(t-s)^{-\alpha}`
 
 **Why Caputo over Riemann-Liouville?** The Caputo derivative allows physical
-interpretation of initial conditions: D\ :math:`^{\alpha(constant) = 0, so \lambda(0) = \lambda_0}` is meaningful.
+interpretation of initial conditions: :math:`D^\alpha(\text{constant}) = 0`, so :math:`\lambda(0) = \lambda_0` is meaningful.
 The Riemann-Liouville derivative would require specifying fractional-order initial
 conditions, which lack physical interpretation.
 
@@ -170,8 +171,8 @@ For the fractional structure equation D\ :math:`^{\alpha \lambda = -(\lambda-\la
 
 **Asymptotic behavior:**
 
-- **Short times** (t ≪ :math:`\tau`): :math:`\lambda(t) \approx \lambda_0 + (\lambda_eq - \lambda_0) \cdot (t/\tau)^\alpha / \Gamma(1+\alpha)` (stretched exponential onset)
-- **Long times** (t ≫ :math:`\tau`): :math:`\lambda(t) \approx \lambda_eq - (\lambda_eq - \lambda_0) \cdot (\tau/t)^\alpha / \Gamma(1-\alpha)` (power-law tail)
+- **Short times** (:math:`t \ll \tau`): :math:`\lambda(t) \approx \lambda_0 + (\lambda_{eq} - \lambda_0) \cdot (t/\tau)^\alpha / \Gamma(1+\alpha)` (stretched exponential onset)
+- **Long times** (:math:`t \gg \tau`): :math:`\lambda(t) \approx \lambda_{eq} - (\lambda_{eq} - \lambda_0) \cdot (\tau/t)^\alpha / \Gamma(1-\alpha)` (power-law tail)
 
 This interpolation between stretched exponential and power-law is the key
 signature of fractional kinetics in experimental data.
@@ -204,8 +205,8 @@ The FIKH model retains the Maxwell viscoelastic element from MIKH:
 
    \frac{d\sigma}{dt} = G(\dot{\gamma} - \dot{\gamma}^p) - \frac{G}{\eta}\sigma
 
-- **Short times** (t ≪ :math:`\tau = \eta/G`): Elastic response, :math:`\sigma \approx G \cdot \gamma`
-- **Long times** (t ≫ :math:`\tau`): Viscous relaxation, :math:`\sigma` → 0 under constant strain
+- **Short times** (:math:`t \ll \tau = \eta/G`): Elastic response, :math:`\sigma \approx G \cdot \gamma`
+- **Long times** (:math:`t \gg \tau`): Viscous relaxation, :math:`\sigma \to 0` under constant strain
 
 The Maxwell viscosity :math:`\eta` sets the characteristic relaxation time :math:`\tau = \eta/G` for
 the elastic stress, while the **fractional** kinetics govern the structural
@@ -246,17 +247,17 @@ The defining feature of FIKH is the **fractional structure evolution**:
 
 Where:
 
-- :math:`\lambda` ∈ [0, 1]: Structure parameter (1 = fully structured, 0 = broken)
-- :math:`\tau_thix`: Thixotropic rebuilding time scale [s]
-- :math:`\Gamma`: Structural breakdown coefficient [-]
-- :math:`\alpha` ∈ (0, 1): Fractional order (memory strength)
+- :math:`\lambda \in [0, 1]`: Structure parameter (1 = fully structured, 0 = broken)
+- :math:`\tau_{\text{thix}}`: Thixotropic rebuilding time scale [s]
+- :math:`\Gamma`: Structural breakdown coefficient [--]
+- :math:`\alpha \in (0, 1)`: Fractional order (memory strength)
 
 **Physical interpretation of terms:**
 
-- **Build-up** (1-:math:`\lambda`)/:math:`\tau_thix`: Structure recovers toward :math:`\lambda` = 1 via Brownian motion
+- **Build-up** :math:`(1-\lambda)/\tau_{\text{thix}}`: Structure recovers toward :math:`\lambda = 1` via Brownian motion
 - **Breakdown** :math:`\Gamma \cdot \lambda \cdot |\dot{\gamma}^p|`: Shear breaks structure proportional to current structure and flow rate
 
-**Contrast with MIKH:** In MIKH (:math:`\alpha` = 1), this becomes :math:`d\lambda/dt` = ..., giving exponential
+**Contrast with MIKH:** In MIKH (:math:`\alpha = 1`), this becomes :math:`d\lambda/dt = \ldots`, giving exponential
 dynamics. The fractional derivative introduces memory: the rate of structure
 change depends not just on current state, but on the entire history of :math:`\lambda`.
 
@@ -285,9 +286,9 @@ For thermal-coupled FIKH (``include_thermal=True``):
 
 Where:
 
-- :math:`\chi` ≈ 0.9: Taylor-Quinney coefficient (fraction of plastic work → heat)
-- h: Heat transfer coefficient [W/(:math:`m^2 \cdot K`)]
-- T_env: Environmental temperature [K]
+- :math:`\chi \approx 0.9`: Taylor-Quinney coefficient (fraction of plastic work :math:`\to` heat)
+- :math:`h`: Heat transfer coefficient [W/(:math:`m^2 \cdot K`)]
+- :math:`T_{\text{env}}`: Environmental temperature [K]
 
 This coupling enables prediction of **thermal runaway** at high shear rates
 and **thermal droop** in flow curves.
@@ -358,7 +359,7 @@ Dimensionless Groups
    Wi_\alpha = \dot{\gamma} \cdot \tau_{thix}^{1/\alpha}
 
 Ratio of shear rate to the effective (fractional) structure buildup rate.
-Note the 1/:math:`\alpha` exponent reflecting fractional time scaling.
+Note the :math:`1/\alpha` exponent reflecting fractional time scaling.
 
 **Deborah Number (De):**
 
@@ -374,8 +375,8 @@ Ratio of Maxwell relaxation time to experimental time scale.
 
    Me = \frac{t_{exp}}{\tau_{thix}} \cdot (t_{exp}/\tau_{thix})^{1-\alpha}
 
-Characterizes the importance of memory effects. Me ≫ 1 means strong
-history dependence; Me ≪ 1 approaches Markovian (memoryless) limit.
+Characterizes the importance of memory effects. :math:`Me \gg 1` means strong
+history dependence; :math:`Me \ll 1` approaches Markovian (memoryless) limit.
 
 
 Governing Equations
@@ -447,7 +448,7 @@ Start-up of Steady Shear
 
    \lambda(t) \approx \lambda_{ss} + (\lambda_0 - \lambda_{ss}) E_\alpha\left(-\left(\frac{t}{\tau_{eff}}\right)^\alpha\right)
 
-where :math:`\tau_eff = \tau_thix / (1 + \Gamma \cdot \tau_thix \cdot |\dot{\gamma}|)`.
+where :math:`\tau_{\text{eff}} = \tau_{\text{thix}} / (1 + \Gamma \cdot \tau_{\text{thix}} \cdot |\dot{\gamma}|)`.
 
 **Signatures:**
 
@@ -478,7 +479,7 @@ For strains below yield, structure rebuilds according to:
 - Long time: :math:`\lambda(t) \approx 1 - (1-\lambda_0)(\tau/t)^\alpha / \Gamma(1-\alpha)` (power-law approach)
 
 The stress may **increase** during relaxation (anti-thixotropic recovery) as
-:math:`\lambda` → 1 increases the modulus.
+:math:`\lambda \to 1` increases the modulus.
 
 Creep (Step Stress)
 ^^^^^^^^^^^^^^^^^^^
@@ -505,7 +506,7 @@ dissipation exceeds heat loss.
 SAOS (Small Amplitude Oscillatory)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Protocol**: :math:`\gamma(t) = \gamma_0 \cdot sin(\omegat), \gamma_0` ≪ 1 (linear regime)
+**Protocol**: :math:`\gamma(t) = \gamma_0 \cdot \sin(\omega t)`, :math:`\gamma_0 \ll 1` (linear regime)
 
 For fractional viscoelastic response at equilibrium :math:`\lambda_eq`, the complex modulus
 follows a **fractional Maxwell** form:
@@ -531,7 +532,7 @@ follows a **fractional Maxwell** form:
 LAOS (Large Amplitude Oscillatory)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Protocol**: :math:`\gamma(t) = \gamma_0 \cdot sin(\omegat), \gamma_0` finite (nonlinear, may yield)
+**Protocol**: :math:`\gamma(t) = \gamma_0 \cdot \sin(\omega t)`, :math:`\gamma_0` finite (nonlinear, may yield)
 
 Full coupled system requiring numerical integration. The fractional memory
 introduces:
@@ -553,42 +554,42 @@ Parameter Interpretation
 
 **Fractional Order** :math:`\alpha` **:**
 
-- :math:`\alpha` **≈ 0.9-1.0**: Material behaves like classical thixotropic fluid (single timescale)
-- :math:`\alpha` **≈ 0.5-0.7**: Broad distribution of restructuring timescales (typical for gels)
-- :math:`\alpha` **< 0.3**: "Glassy" dynamics with very long memory (aging-dominated)
+- :math:`\alpha \approx 0.9\text{--}1.0`: Material behaves like classical thixotropic fluid (single timescale)
+- :math:`\alpha \approx 0.5\text{--}0.7`: Broad distribution of restructuring timescales (typical for gels)
+- :math:`\alpha < 0.3`: "Glassy" dynamics with very long memory (aging-dominated)
 
 *Physical interpretation*: :math:`\alpha` relates to the breadth of the relaxation spectrum.
-From Cole-Cole analysis, depression angle :math:`\theta = (1-\alpha)\pi/2`. Materials with :math:`\alpha` ≈ 0.5
-show 45° depression, indicating a very broad spectrum.
+From Cole-Cole analysis, depression angle :math:`\theta = (1-\alpha)\pi/2`. Materials with :math:`\alpha \approx 0.5`
+show :math:`45°` depression, indicating a very broad spectrum.
 
 *Practical measurement*: Fit Cole-Cole plot from frequency sweep, or fit
 recovery data to stretched exponential (:math:`\beta \approx \alpha` for moderate stretching).
 
-**Thixotropic Timescale** :math:`\tau_thix` **:**
+**Thixotropic Timescale** :math:`\tau_{\text{thix}}` **:**
 
 - Sets the characteristic time for structure recovery at rest
-- Larger :math:`\tau_thix` → slower rebuilding → more thixotropic
-- Compare to process timescales: :math:`\tau_thix` >> t_process means structure won't recover
-- Typical values: 1-1000 s for industrial fluids
+- Larger :math:`\tau_{\text{thix}}` :math:`\to` slower rebuilding :math:`\to` more thixotropic
+- Compare to process timescales: :math:`\tau_{\text{thix}} \gg t_{\text{process}}` means structure won't recover
+- Typical values: 1--1000 s for industrial fluids
 
 **Breakdown Coefficient** :math:`\Gamma` **:**
 
 - Rate of structure destruction under flow
-- :math:`\Gamma \cdot \tau_thix` product determines equilibrium structure at given shear rate
-- :math:`\lambda_eq = 1/(1 + \Gamma \cdot \tau_thix \cdot |\dot{\gamma}|)`
-- Critical shear rate: :math:`\dot{\gamma}_crit = 1/(\Gamma \cdot \tau_thix) where \lambda` drops to 0.5
+- :math:`\Gamma \cdot \tau_{\text{thix}}` product determines equilibrium structure at given shear rate
+- :math:`\lambda_{eq} = 1/(1 + \Gamma \cdot \tau_{\text{thix}} \cdot |\dot{\gamma}|)`
+- Critical shear rate: :math:`\dot{\gamma}_{\text{crit}} = 1/(\Gamma \cdot \tau_{\text{thix}})` where :math:`\lambda` drops to 0.5
 
 **Yield Stress Parameters:**
 
-- :math:`\sigma_y0`: Residual yield when fully destructured (:math:`\lambda` = 0)
-- :math:`\Delta\sigma_y`: Additional yield from structure (total yield at :math:`\lambda=1 is \sigma_y0 + \Delta\sigma_y`)
-- Ratio :math:`\Delta\sigma_y/\sigma_y0` indicates how much structure contributes to yielding
+- :math:`\sigma_{y0}`: Residual yield when fully destructured (:math:`\lambda = 0`)
+- :math:`\Delta\sigma_y`: Additional yield from structure (total yield at :math:`\lambda = 1` is :math:`\sigma_{y0} + \Delta\sigma_y`)
+- Ratio :math:`\Delta\sigma_y/\sigma_{y0}` indicates how much structure contributes to yielding
 
 **Thermal Parameters:**
 
-- **E_a**: Viscosity activation energy [J/mol]. Typical: 20-50 kJ/mol for polymers
-- **E_y**: Yield activation energy. Lower E_y → yield is less temperature-sensitive
-- Higher E_a/E_y ratio → viscosity drops faster than yield with temperature
+- :math:`E_a`: Viscosity activation energy [J/mol]. Typical: 20--50 kJ/mol for polymers
+- :math:`E_y`: Yield activation energy. Lower :math:`E_y` :math:`\to` yield is less temperature-sensitive
+- Higher :math:`E_a/E_y` ratio :math:`\to` viscosity drops faster than yield with temperature
 
 Derived Quantities
 ~~~~~~~~~~~~~~~~~~
@@ -647,19 +648,19 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - :math:`\alpha > 0.8, \tau_thix` < 10 s
+   * - :math:`\alpha > 0.8`, :math:`\tau_{\text{thix}} < 10` s
      - Near-exponential, fast recovery
      - Simple gels, light emulsions
      - Consider using MIKH instead
-   * - :math:`\alpha` = 0.5-0.8, :math:`\tau_thix` = 10-100 s
+   * - :math:`\alpha = 0.5\text{--}0.8`, :math:`\tau_{\text{thix}} = 10\text{--}100` s
      - Moderate memory, stretched recovery
      - Waxy crude oils, drilling muds
      - Standard FIKH application range
-   * - :math:`\alpha < 0.5, \tau_thix` > 100 s
+   * - :math:`\alpha < 0.5`, :math:`\tau_{\text{thix}} > 100` s
      - Strong memory, slow glassy dynamics
      - Aging glasses, cement pastes
      - Long history buffer needed (n_history > 500)
-   * - High E_a (> 50 kJ/mol)
+   * - High :math:`E_a` (> 50 kJ/mol)
      - Strong temperature sensitivity
      - Waxy crude oils, polymers
      - Consider thermal coupling critical
@@ -669,30 +670,30 @@ Process Design Insights
 
 **Pipeline Restart** (waxy crude):
 
-- Fit FIKH to startup data at T_restart
+- Fit FIKH to startup data at :math:`T_{\text{restart}}`
 - Compute restart pressure from steady-state stress at desired flow rate
-- Account for thermal effects: higher h → less softening → higher restart pressure
+- Account for thermal effects: higher :math:`h` :math:`\to` less softening :math:`\to` higher restart pressure
 - Use delay time formula to estimate how long the pipeline can sit before gelation
 
 **Product Stability:**
 
-- Compare :math:`\tau_thix` to shelf-life timescales
-- If :math:`\tau_thix` >> shelf_time → product remains broken (poor stability)
-- Recommendation: :math:`\tau_thix` < 0.1 × expected_storage_time for structure recovery
+- Compare :math:`\tau_{\text{thix}}` to shelf-life timescales
+- If :math:`\tau_{\text{thix}} \gg t_{\text{shelf}}` :math:`\to` product remains broken (poor stability)
+- Recommendation: :math:`\tau_{\text{thix}} < 0.1 \times t_{\text{storage}}` for structure recovery
 - Lower :math:`\alpha` (stronger memory) means slower recovery but more stable once recovered
 
 **Processing Windows:**
 
-- Critical shear rate :math:`\dot{\gamma}_crit = 1/(\Gamma \cdot \tau_thix)` defines transition from structured to flowing
-- Design mixers/pumps to operate above :math:`\dot{\gamma}_crit` for easy flow
-- Storage vessels should see :math:`\dot{\gamma} << \dot{\gamma}_crit` for structure recovery
-- Temperature control: higher T → lower yield → easier processing but more energy
+- Critical shear rate :math:`\dot{\gamma}_{\text{crit}} = 1/(\Gamma \cdot \tau_{\text{thix}})` defines transition from structured to flowing
+- Design mixers/pumps to operate above :math:`\dot{\gamma}_{\text{crit}}` for easy flow
+- Storage vessels should see :math:`\dot{\gamma} \ll \dot{\gamma}_{\text{crit}}` for structure recovery
+- Temperature control: higher :math:`T` :math:`\to` lower yield :math:`\to` easier processing but more energy
 
 **Quality Control:**
 
 - Monitor :math:`\alpha` over production batches: consistent :math:`\alpha` indicates consistent microstructure
-- Track :math:`\tau_thix`: increasing :math:`\tau_thix` may indicate contamination or degradation
-- Plot (:math:`\alpha, \tau_thix`) phase space to identify batch-to-batch variability
+- Track :math:`\tau_{\text{thix}}`: increasing :math:`\tau_{\text{thix}}` may indicate contamination or degradation
+- Plot :math:`(\alpha, \tau_{\text{thix}})` phase space to identify batch-to-batch variability
 
 
 Industrial Applications
@@ -710,7 +711,7 @@ When a pipeline shuts down, wax precipitates and forms a gel network with
 complex relaxation dynamics. Key parameter ranges:
 
 - :math:`\alpha` **= 0.5-0.7**: Power-law recovery from hierarchical crystal structure
-- :math:`\tau_thix` **= 100-10,000 s**: Long aging times for gelled pipelines
+- :math:`\tau_{\text{thix}}` **= 100--10,000 s**: Long aging times for gelled pipelines
 - :math:`\sigma_y,0 + \Delta\sigma_y` **= 50-500 Pa**: Gel strength depends on cooling rate and rest time
 
 **Engineering implications:**
@@ -727,7 +728,7 @@ Water-based drilling fluids with clay platelets exhibit fractional behavior from
 distributed particle-particle bond energies:
 
 - :math:`\alpha` **= 0.4-0.7**: Depending on clay type and concentration
-- :math:`\tau_thix` **= 1-100 s**: Faster than crude oils due to smaller particles
+- :math:`\tau_{\text{thix}}` **= 1--100 s**: Faster than crude oils due to smaller particles
 - **Thermal coupling**: Critical for deep wells (high T)
 
 **Borehole stability:**
@@ -773,7 +774,7 @@ Base Parameters (Always Present)
      - Shear modulus
    * - ``eta``
      - :math:`10^6`
-     - (10\ :math:`^{-3, 10^1^2}`)
+     - (:math:`10^{-3}`, :math:`10^{12}`)
      - Pa·s
      - Maxwell viscosity (:math:`\tau = \eta/G`)
    * - ``C``
@@ -803,7 +804,7 @@ Base Parameters (Always Present)
      - Structural yield stress contribution
    * - ``tau_thix``
      - 1.0
-     - (10\ :math:`^{-6, 10^1^2}`)
+     - (:math:`10^{-6}`, :math:`10^{12}`)
      - s
      - Thixotropic rebuilding time
    * - ``Gamma``
@@ -912,8 +913,8 @@ Initialization Strategy
 
 1. **Estimate** :math:`\alpha` **from Cole-Cole**: Fit frequency sweep, measure depression angle :math:`\theta`,
    compute :math:`\alpha = 1 - 2\theta/\pi`
-2. **Flow curve first**: Fit :math:`\sigma_y0, \Delta\sigma_y, \tau_thix, \Gamma, \eta_inf` from steady-state data
-3. **Startup second**: Fix flow curve params, fit G, C, :math:`\gamma_dyn` from transient
+2. **Flow curve first**: Fit :math:`\sigma_{y0}, \Delta\sigma_y, \tau_{\text{thix}}, \Gamma, \eta_\infty` from steady-state data
+3. **Startup second**: Fix flow curve params, fit :math:`G`, :math:`C`, :math:`\gamma_{\text{dyn}}` from transient
 4. **Relaxation/creep**: Fine-tune :math:`\eta` (Maxwell viscosity) and verify :math:`\alpha`
 
 :math:`\alpha` **estimation from recovery data:**
@@ -944,9 +945,9 @@ Protocol Selection
    * - Protocol
      - Best for
    * - ``flow_curve``
-     - Steady-state parameters (:math:`\sigma_y0, \Delta\sigma_y, \eta_inf`)
+     - Steady-state parameters (:math:`\sigma_{y0}, \Delta\sigma_y, \eta_\infty`)
    * - ``startup``
-     - Elasticity (G), hardening (C, :math:`\gamma_dyn`), transient :math:`\alpha` effects
+     - Elasticity (:math:`G`), hardening (:math:`C`, :math:`\gamma_{\text{dyn}}`), transient :math:`\alpha` effects
    * - ``relaxation``
      - Maxwell viscosity (:math:`\eta`), :math:`\alpha` verification from power-law tail
    * - ``creep``
@@ -974,9 +975,9 @@ Troubleshooting
    * - MCMC convergence (R-hat > 1.1)
      - Use NLSQ warm-start; increase num_warmup; check :math:`\alpha` prior bounds
    * - Numerical instabilities (NaN)
-     - Check :math:`\tau_thix` > 1e-6; reduce dt or increase n_history for small :math:`\alpha`
+     - Check :math:`\tau_{\text{thix}} > 10^{-6}`; reduce dt or increase n_history for small :math:`\alpha`
    * - Slow computation
-     - Use model.precompile(); reduce n_history if :math:`\alpha` > 0.7; consider MIKH if :math:`\alpha` ≈ 1
+     - Use model.precompile(); reduce n_history if :math:`\alpha > 0.7`; consider MIKH if :math:`\alpha \approx 1`
 
 
 Parameter Estimation Methods
@@ -1079,7 +1080,7 @@ The L1 scheme is a first-order accurate discretization of the Caputo derivative:
 
    \|D^{\alpha}\lambda - D^{\alpha}_h\lambda\| \leq C \cdot h^{2-\alpha}
 
-where h = :math:`\Deltat`. **Important**: Lower :math:`\alpha` requires finer time steps for same accuracy.
+where h = :math:`\Delta t`. **Important**: Lower :math:`\alpha` requires finer time steps for same accuracy.
 
 **Coefficient computation** (precomputed for efficiency):
 
@@ -1125,7 +1126,7 @@ rather than storing the entire history:
 
 **When to Increase n_history:**
 
-- Long simulations (t >> :math:`\tau_thix`)
+- Long simulations (:math:`t \gg \tau_{\text{thix}}`)
 - Very small :math:`\alpha` (< 0.3)
 - Accuracy-critical applications
 - Oscillatory protocols (LAOS)
@@ -1290,13 +1291,13 @@ Bayesian Fitting
 Limiting Behavior
 -----------------
 
-:math:`\alpha` **→ 1 (Classical Limit):**
+:math:`\alpha \to 1` **(Classical Limit):**
 
 - Recovers exponential MIKH behavior
-- Mittag-Leffler :math:`E_1(-x)` = exp(-x)
+- Mittag-Leffler :math:`E_1(-x) = \exp(-x)`
 - Use standard MIKH for computational efficiency
 
-:math:`\alpha` **→ 0 (Strong Memory Limit):**
+:math:`\alpha \to 0` **(Strong Memory Limit):**
 
 - Very slow power-law relaxation
 - Long "memory" of deformation history
@@ -1305,9 +1306,9 @@ Limiting Behavior
 
 **Thermal Coupling Effects:**
 
-- High E_a: Strong temperature sensitivity
-- Low h: Poor heat dissipation → thermal runaway risk
-- :math:`\chi` ~ 0.9: Most plastic work converts to heat
+- High :math:`E_a`: Strong temperature sensitivity
+- Low :math:`h`: Poor heat dissipation, thermal runaway risk
+- :math:`\chi \sim 0.9`: Most plastic work converts to heat
 
 
 Relation to Other Models
@@ -1320,7 +1321,7 @@ Relation to Other Models
    * - Model
      - Relationship to FIKH
    * - :doc:`../ikh/mikh`
-     - FIKH reduces to MIKH as :math:`\alpha` → 1 (exponential kinetics)
+     - FIKH reduces to MIKH as :math:`\alpha \to 1` (exponential kinetics)
    * - :doc:`fmlikh`
      - Multi-mode extension with N fractional modes
    * - :doc:`../ikh/ml_ikh`
@@ -1337,9 +1338,11 @@ References
 **Fractional Calculus:**
 
 .. [1] Podlubny, I. (1999). *Fractional Differential Equations*. Academic Press.
+   ISBN: 978-0-12-558840-9
 
 .. [2] Mainardi, F. (2010). *Fractional Calculus and Waves in Linear Viscoelasticity*.
    Imperial College Press.
+   https://doi.org/10.1142/p614
 
 .. [3] Diethelm, K. (2010). *The Analysis of Fractional Differential Equations*.
    Springer. https://doi.org/10.1007/978-3-642-14574-2
@@ -1348,34 +1351,43 @@ References
 
 .. [4] Li, C. and Zeng, F. (2015). *Numerical Methods for Fractional Calculus*.
    CRC Press.
+   https://doi.org/10.1201/b18503
 
 **Fractional Rheology:**
 
 .. [5] Jaishankar, A. and McKinley, G. H. (2013). "Power-law rheology in the bulk
    and at the interface: quasi-properties and fractional constitutive equations."
    *Proc. R. Soc. A*, 469(2149), 20120284.
+   https://doi.org/10.1098/rspa.2012.0284
 
 .. [6] Jaishankar, A. and McKinley, G. H. (2014). "A fractional K-BKZ constitutive
    formulation for describing the nonlinear rheology of multiscale complex fluids."
    *J. Rheol.*, 58, 1751-1788.
+   https://doi.org/10.1122/1.4892114
 
 **IKH Foundation:**
 
 .. [7] Dimitriou, C. J. and McKinley, G. H. (2014). "A comprehensive constitutive
    law for waxy crude oil: a thixotropic yield stress fluid." *Soft Matter*,
    10, 6619-6644.
+   https://doi.org/10.1039/C4SM00578C
+   :download:`PDF <../../../reference/dimitriou_mckinley_2014_waxy_crude.pdf>`
 
 .. [8] Geri, M., Venkatesan, R., Sambath, K., and McKinley, G. H. (2017).
    "Thermokinematic memory and the thixotropic elasto-viscoplasticity of
    waxy crude oils." *J. Rheol.*, 61(3), 427-454.
+   https://doi.org/10.1122/1.4978259
+   :download:`PDF <../../../reference/geri_2017_thermokinematic_memory.pdf>`
 
 **Thixotropic Modeling:**
 
 .. [9] de Souza Mendes, P. R. and Thompson, R. L. (2019). "Time-dependent yield
    stress materials." *Curr. Opin. Colloid Interface Sci.*, 43, 15-25.
+   https://doi.org/10.1016/j.cocis.2019.01.018
 
 .. [10] Larson, R. G. and Wei, Y. (2019). "A review of thixotropy and its
    rheological modeling." *J. Rheol.*, 63(3), 477-501.
+   https://doi.org/10.1122/1.5055031
 
 
 See Also

@@ -1449,11 +1449,20 @@ References
 ----------
 
 1. Tanaka, F., & Edwards, S. F. (1992). Viscoelastic properties of physically crosslinked networks. *Macromolecules*, 25, 1516-1523.
+   DOI: 10.1021/ma00031a024
 2. Bell, G. I. (1978). Models for the specific adhesion of cells to cells. *Science*, 200(4342), 618-627.
+   DOI: 10.1126/science.347575
 3. Warner, H. R. (1972). Kinetic theory and rheology of dilute suspensions of finitely extendible dumbbells. *Industrial & Engineering Chemistry Fundamentals*, 11(3), 379-387.
+   DOI: 10.1021/i160043a017
 4. Cates, M. E. (1987). Reptation of living polymers. *Macromolecules*, 20(9), 2289-2296.
+   DOI: 10.1021/ma00175a038
 5. Leibler, L., Rubinstein, M., & Colby, R. H. (1991). Dynamics of reversible networks. *Macromolecules*, 24(16), 4701-4707.
+   DOI: 10.1021/ma00016a034
 6. Rubinstein, M., & Colby, R. H. (2003). *Polymer Physics*. Oxford University Press.
+   ISBN: 978-0198520597
 7. Annable, T., et al. (1993). The rheology of solutions of associating polymers. *Journal of Rheology*, 37(4), 695-726.
+   DOI: 10.1122/1.550391
 8. Evans, E., & Ritchie, K. (1997). Dynamic strength of molecular adhesion bonds. *Biophysical Journal*, 72(4), 1541-1555.
+   DOI: 10.1016/S0006-3495(97)78802-7
 9. McLeish, T. C. B. (2002). Tube theory of entangled polymer dynamics. *Advances in Physics*, 51(6), 1379-1527.
+   DOI: 10.1080/00018730210153216

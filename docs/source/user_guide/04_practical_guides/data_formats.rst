@@ -27,7 +27,7 @@ Constructor Signature
        y,                          # Dependent variable (real or complex)
        domain='time',              # 'time' or 'frequency'
        x_units=None,               # e.g., 's', 'rad/s', '1/s'
-       y_units=None,               # e.g., 'Pa', '1/Pa', 'Pa*s'
+       y_units=None,               # e.g., 'Pa', '1/Pa', 'Pa·s'
        initial_test_mode=None,     # 'relaxation', 'creep', 'oscillation', 'rotation'
        metadata=None,              # dict with additional context
    )
@@ -56,7 +56,7 @@ Key Fields
      - Units of x (e.g., ``'s'``, ``'rad/s'``, ``'1/s'``)
    * - ``y_units``
      - str | None
-     - Units of y (e.g., ``'Pa'``, ``'1/Pa'``, ``'Pa*s'``)
+     - Units of y (e.g., ``'Pa'``, ``'1/Pa'``, ``'Pa·s'``)
    * - ``initial_test_mode``
      - str | None
      - Explicit test mode; auto-detected if not provided
@@ -241,7 +241,7 @@ Small-amplitude oscillatory shear measures frequency-dependent viscoelasticity.
    print(f"G' range: {data.storage_modulus.min():.0f} - {data.storage_modulus.max():.0f} Pa")
    print(f"G'' range: {data.loss_modulus.min():.0f} - {data.loss_modulus.max():.0f} Pa")
 
-**Alternative: separate G' and G'' arrays**:
+**Alternative: separate :math:`G'` and :math:`G''` arrays**:
 
 .. code-block:: python
 
@@ -250,6 +250,87 @@ Small-amplitude oscillatory shear measures frequency-dependent viscoelasticity.
    data = RheoData(x=omega, y=G_star, domain='frequency')
 
 **Compatible models**: Maxwell, Zener, Springpot, all Fractional models, SGR models, Generalized Maxwell
+
+DMTA / DMA Oscillation (Tensile)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Dynamic Mechanical Thermal Analysis measures frequency-dependent viscoelasticity in tension, bending, or compression.
+
+**Physical setup**: Apply sinusoidal tensile (or bending) deformation, measure force response
+
+**Output**: Complex Young's modulus :math:`E^*(\omega) = E'(\omega) + i E''(\omega)`
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 30 50
+
+   * - Field
+     - Value
+     - Notes
+   * - **x**
+     - angular frequency ``omega`` (rad/s)
+     - Positive, typically log-spaced
+   * - **y**
+     - complex Young's modulus ``E*(omega)`` (Pa)
+     - **Complex**: ``E' + 1j * E''``
+   * - **domain**
+     - ``'frequency'``
+     - Required
+   * - **test_mode**
+     - ``'oscillation'``
+     - Same as shear SAOS
+   * - **deformation_mode**
+     - ``'tension'``
+     - Passed to ``fit()`` / ``predict()``
+   * - **poisson_ratio**
+     - float (e.g., 0.5 for rubber)
+     - Required for E* → G* conversion
+
+**Example with E* data**:
+
+.. code-block:: python
+
+   from rheojax.models import FractionalZenerSolidSolid
+
+   # DMTA data: E*(omega) = E'(omega) + i*E''(omega)
+   omega = np.logspace(-2, 2, 50)
+   E_prime = 3e9 * np.ones(50)
+   E_double_prime = 1e8 * omega**0.3
+   E_star = E_prime + 1j * E_double_prime
+
+   # Fit — model converts E* → G* internally
+   model = FractionalZenerSolidSolid()
+   model.fit(omega, E_star,
+             test_mode='oscillation',
+             deformation_mode='tension',
+             poisson_ratio=0.5)
+
+   # predict() returns E* automatically
+   E_pred = model.predict(omega, test_mode='oscillation')
+
+**CSV auto-detection**: The CSV reader auto-detects ``E'`` and ``E''`` columns
+and sets ``deformation_mode='tension'`` in metadata:
+
+.. code-block:: python
+
+   from rheojax.io import load_csv
+
+   data = load_csv("dmta_data.csv", x_col="f", y_cols=["E' (Pa)", "E'' (Pa)"])
+   print(data.deformation_mode)  # "tension" (auto-detected)
+
+**Poisson's ratio presets**: Use ``POISSON_PRESETS`` for common materials:
+
+.. code-block:: python
+
+   from rheojax.utils.modulus_conversion import POISSON_PRESETS
+
+   nu = POISSON_PRESETS["rubber"]            # 0.50
+   nu = POISSON_PRESETS["glassy_polymer"]    # 0.35
+   nu = POISSON_PRESETS["semicrystalline"]   # 0.40
+
+**Compatible models**: All 41 oscillation-capable models (Classical, Fractional, SGR, IKH, HVM, HVNM, etc.)
+
+See :doc:`/models/dmta/index` for the complete DMTA guide.
 
 Rotation (Steady Shear Flow)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -271,7 +352,7 @@ Steady shear flow measures viscosity as a function of shear rate.
      - shear rate :math:`\dot{\gamma}` (1/s)
      - Positive
    * - **y**
-     - viscosity :math:`\eta` (Pa*s) or stress :math:`\sigma` (Pa)
+     - viscosity :math:`\eta` (Pa·s) or stress :math:`\sigma` (Pa)
      - Real
    * - **domain**
      - ``'time'`` (or unspecified)
@@ -296,7 +377,7 @@ Steady shear flow measures viscosity as a function of shear rate.
        x=gamma_dot,
        y=eta,
        x_units='1/s',
-       y_units='Pa*s',
+       y_units='Pa·s',
        initial_test_mode='rotation',
    )
 
@@ -722,8 +803,14 @@ Quick Reference Table
      - ``rotation``
      - ``time``
      - gamma_dot (1/s)
-     - eta (Pa*s) or sigma (Pa)
+     - eta (Pa·s) or sigma (Pa)
      - --
+   * - **DMTA**
+     - ``oscillation``
+     - ``frequency``
+     - omega (rad/s)
+     - E*(omega) (Pa) **complex**
+     - ``deformation_mode``, ``poisson_ratio``
    * - **Mastercurve**
      - --
      - ``frequency``
@@ -839,6 +926,12 @@ For oscillation data, you can construct complex arrays in several ways:
    print(data.storage_modulus)  # G'
    print(data.loss_modulus)     # G''
    print(data.tan_delta)        # tan(delta) = G''/G'
+
+.. note::
+
+   For DMTA/DMA data, the CSV reader auto-detects E'/E'' columns and stores
+   ``deformation_mode='tension'`` in ``metadata``.
+   See :doc:`/models/dmta/dmta_workflows` Workflow 4 for details.
 
 Further Reading
 ---------------

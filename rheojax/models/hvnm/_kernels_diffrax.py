@@ -225,7 +225,6 @@ def _make_hvnm_startup_vector_field(
         lambda_crit = args["lambda_crit"]
         # NP params
         G_I_eff = args["G_I_eff"]
-        X_phi = args["X_phi"]
         X_I = args["X_I"]
         nu_0_int = args["nu_0_int"]
         E_a_int = args["E_a_int"]

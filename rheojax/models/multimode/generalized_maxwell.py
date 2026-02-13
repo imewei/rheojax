@@ -32,7 +32,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode
+from rheojax.core.test_modes import DeformationMode, TestMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.optimization import OptimizationResult
 from rheojax.utils.prony import (
@@ -69,6 +69,12 @@ logger = get_logger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.STARTUP,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class GeneralizedMaxwell(BaseModel):
@@ -1523,10 +1529,9 @@ class GeneralizedMaxwell(BaseModel):
         if test_mode == "relaxation":
             return self._predict_relaxation_jit(jnp.asarray(X), E_inf, E_i, tau_i)
         elif test_mode == "oscillation":
-            # Return complex modulus as (M, 2) for Bayesian likelihood
+            # _predict_oscillation_jit returns (2, M); transpose to (M, 2)
             E_star = self._predict_oscillation_jit(jnp.asarray(X), E_inf, E_i, tau_i)
-            # E_star is now (M, 2) from the updated _predict_oscillation_jit
-            return E_star
+            return E_star.T
         elif test_mode == "creep":
             return self._predict_creep_jit(
                 jnp.asarray(X), E_inf, E_i, tau_i, sigma_0=1.0

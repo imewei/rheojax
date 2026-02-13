@@ -44,6 +44,7 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.utils.mittag_leffler import mittag_leffler_e2
 
 # Module logger
@@ -57,6 +58,12 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class FractionalMaxwellLiquid(BaseModel):

@@ -93,7 +93,7 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     # 1. Check for exponential decay: log(G) vs t should be linear
     slope_exp = 0.0
     try:
-        log_G = np.log(G_t)
+        log_G = np.log(np.maximum(G_t, 1e-30))
         slope_exp, intercept_exp, r_exp, _, _ = linregress(t, log_G)
         r_exp_sq = r_exp**2
         logger.debug(
@@ -108,8 +108,8 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     # 2. Check for power-law decay: log(G) vs log(t) should be linear
     slope_pow = 0.0
     try:
-        log_t = np.log(t)
-        log_G = np.log(G_t)
+        log_t = np.log(np.maximum(t, 1e-30))
+        log_G = np.log(np.maximum(G_t, 1e-30))
         slope_pow, intercept_pow, r_pow, _, _ = linregress(log_t, log_G)
         r_pow_sq = r_pow**2
         logger.debug(

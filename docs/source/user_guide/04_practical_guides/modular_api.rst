@@ -112,7 +112,7 @@ Control parameter initialization:
 
    # Set individual parameters
    maxwell.parameters.set_value('G_s', 1e5)      # Pa
-   maxwell.parameters.set_value('eta_s', 1e3)    # Pa*s
+   maxwell.parameters.set_value('eta_s', 1e3)    # Pa·s
 
    # Set multiple parameters
    maxwell.parameters.set_values({
@@ -214,7 +214,7 @@ Fit model to data:
    G_s = maxwell.parameters.get_value('G_s')
    eta_s = maxwell.parameters.get_value('eta_s')
    print(f"G_s = {G_s:.2e} Pa")
-   print(f"eta_s = {eta_s:.2e} Pa*s")
+   print(f"eta_s = {eta_s:.2e} Pa·s")
 
    # Make predictions
    y_pred = maxwell.predict(X)
@@ -773,7 +773,7 @@ Integration with External Libraries
 scikit-learn Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-rheo models follow scikit-learn API:
+rheojax models follow scikit-learn API:
 
 .. code-block:: python
 
@@ -781,7 +781,7 @@ rheo models follow scikit-learn API:
    from sklearn.model_selection import GridSearchCV
    from sklearn.base import BaseEstimator
 
-   # Wrap rheo model for scikit-learn
+   # Wrap rheojax model for scikit-learn
    class RheoEstimator(BaseEstimator):
        def __init__(self, G_s=1e5, eta_s=1e3):
            self.G_s = G_s

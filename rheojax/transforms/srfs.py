@@ -589,6 +589,10 @@ def detect_shear_banding(
         threshold=threshold,
     )
 
+    if len(gamma_dot) < 2:
+        logger.debug("Insufficient data for banding detection (need >= 2 points)")
+        return False, None
+
     # Sort by shear rate
     sort_idx = np.argsort(gamma_dot)
     gamma_dot = gamma_dot[sort_idx]
@@ -747,7 +751,10 @@ def compute_shear_band_coexistence(
     high_idx = np.searchsorted(gamma_dot_sorted, gamma_dot_high_bound)
 
     # Estimate stress plateau as average in banding region
-    stress_plateau = np.mean(sigma_sorted[low_idx : high_idx + 1])
+    banding_slice = sigma_sorted[low_idx : high_idx + 1]
+    if len(banding_slice) == 0:
+        return None
+    stress_plateau = np.mean(banding_slice)
 
     # Find coexisting shear rates at stress plateau
     # These are the intersections of horizontal line at stress_plateau
@@ -1037,7 +1044,9 @@ def compute_thixotropic_stress(
 
     # Viscosity from power-law (SGR-like)
     gamma_dot_safe = np.maximum(np.abs(gamma_dot), 1e-12)
-    eta_factor = np.power(gamma_dot_safe * tau0, x - 2.0)
+    exponent = np.clip(x - 2.0, -10.0, 10.0)
+    eta_factor = np.power(gamma_dot_safe * tau0, exponent)
+    eta_factor = np.clip(eta_factor, 1e-30, 1e30)
 
     # Stress = G_eff * gamma_dot * tau0 * eta_factor
     sigma = G_eff * gamma_dot * tau0 * eta_factor

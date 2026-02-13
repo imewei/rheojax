@@ -130,6 +130,22 @@ Follow this decision tree to identify the appropriate transform for your analysi
    │     • Automatic unit conversion
    │     • Use Cases: Strain rate from strain, acceleration, velocity
    │
+   ├─ STRAIN-RATE EFFECTS (soft glassy materials)?
+   │  └─ SRFS ★★★☆☆
+   │     • Strain-Rate Frequency Superposition
+   │     • Master curves from multi-rate oscillatory data
+   │     • Shear banding detection (non-monotonic flow curve)
+   │     • Power-law shift factors → estimate SGR x parameter
+   │     • Use Cases: Soft glasses, emulsions, thixotropic fluids
+   │
+   ├─ LAOS YIELD STRESS (nonlinear intracycle analysis)?
+   │  └─ SPP Decomposer ★★★★☆
+   │     • Sequence of Physical Processes (Rogers framework)
+   │     • Instantaneous G'(t), G''(t) within each cycle
+   │     • Cole-Cole trajectories for yielding identification
+   │     • Static vs dynamic yield stress extraction
+   │     • Use Cases: Yield stress fluids, LAOS characterization
+   │
    └─ MULTI-STEP ANALYSIS (combine transforms)?
       └─ See "Common Workflow Pipelines" section below
 
@@ -232,7 +248,7 @@ Mastercurve
 
 * List of RheoData objects (frequency sweeps at different temperatures)
 * Each RheoData must have ``metadata['temperature']`` in Kelvin
-* Complex modulus data: G* = [G', G"] or equivalent
+* Complex modulus data: G* = [:math:`G'`, :math:`G''`] or equivalent
 
 **Output:**
 
@@ -659,6 +675,189 @@ Smooth Derivative
 * Noisy experimental data
 
 
+SRFS (Strain-Rate Frequency Superposition)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Purpose:** Collapse multi-rate oscillatory data onto a master curve by shifting in the strain-rate domain, analogous to time-temperature superposition (TTS) but for soft glassy materials.
+
+**Key Capabilities:**
+
+* **Master Curve Construction:** Merge :math:`G'(\omega)` sweeps at different :math:`\dot{\gamma}` onto one reference curve
+* **Shift Factor Analysis:** Extract power-law exponent to estimate SGR noise temperature :math:`x`
+* **Shear Banding Detection:** Identify non-monotonic constitutive curves from flow data
+* **Thixotropy Kinetics:** Structural parameter :math:`\lambda(t)` evolution under flow
+
+**Theory:**
+
+For SGR-type soft glasses, moduli at different strain rates superpose via:
+
+.. math::
+
+   G'(\omega, \dot{\gamma}) = b(\dot{\gamma}) \, G'_{\text{master}}(a(\dot{\gamma}) \cdot \omega)
+
+with :math:`a(\dot{\gamma}) \sim \dot{\gamma}^{-1/(x-1)}` and :math:`b(\dot{\gamma}) \sim \dot{\gamma}^{-1}` for ideal SGR materials.
+
+**Input Requirements:**
+
+* Multi-rate oscillatory frequency sweeps: :math:`G'(\omega)` and :math:`G''(\omega)` at 3+ strain rates
+* Known strain rate for each sweep
+
+**Output:**
+
+* Master curve RheoData at reference strain rate
+* Horizontal and vertical shift factors per rate
+* Estimated :math:`x` parameter from shift factor scaling
+
+**Key Parameters:**
+
+.. list-table:: SRFS Parameters
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Parameter
+     - Default
+     - Description
+   * - ``reference_rate``
+     - ``1.0``
+     - Reference strain rate for the master curve
+   * - ``method``
+     - ``'auto'``
+     - Shift factor method: 'auto', 'power_law', 'empirical'
+   * - ``vertical_shift``
+     - ``True``
+     - Apply vertical (modulus) shifting in addition to horizontal
+
+**Example Usage:**
+
+.. code-block:: python
+
+   from rheojax.transforms import SRFS
+   import numpy as np
+
+   # Multi-rate oscillatory data
+   rates = [0.01, 0.1, 1.0, 10.0]
+   omega = np.logspace(-2, 2, 50)
+   G_star_data = {rate: measure_modulus(omega, rate) for rate in rates}
+
+   # Build SRFS master curve
+   srfs = SRFS(reference_rate=1.0)
+   master_curve, shift_factors = srfs.transform(omega, G_star_data)
+
+   # Extract x from shift factor scaling
+   # log(a) = -1/(x-1) * log(gamma_dot)
+   from scipy.stats import linregress
+   log_rates = np.log10(rates)
+   log_a = np.log10(shift_factors['a'])
+   slope, _, r_value, _, _ = linregress(log_rates, log_a)
+   x_est = 1 - 1/slope
+   print(f"Estimated x = {x_est:.3f} (R² = {r_value**2:.4f})")
+
+**Best For:**
+
+* Soft glassy materials (concentrated emulsions, colloidal gels, pastes)
+* Yield stress fluids with strain-rate-dependent microstructure
+* Thixotropic systems where structure evolves with deformation
+* Validating SGR model predictions
+
+
+SPP Decomposer
+~~~~~~~~~~~~~~~
+
+**Purpose:** Perform intracycle LAOS analysis using the Sequence of Physical Processes (SPP) framework, extracting time-resolved instantaneous moduli and yield stress from nonlinear oscillatory data.
+
+**Key Capabilities:**
+
+* **Instantaneous Moduli:** Time-resolved :math:`G'(t)` and :math:`G''(t)` within each oscillation cycle
+* **Cole-Cole Trajectories:** Plot :math:`G'_t` vs :math:`G''_t` to visualize yielding sequences
+* **Yield Stress Extraction:** Robust static/dynamic yield stress from LAOS amplitude sweeps
+* **Nonlinear Fingerprinting:** Classify yielding type (abrupt vs gradual, cage vs flow yield)
+
+**Theory:**
+
+SPP defines instantaneous moduli from the stress response :math:`\sigma(t)` to sinusoidal
+strain :math:`\gamma(t) = \gamma_0 \sin(\omega t)`:
+
+.. math::
+
+   G'_t = \frac{\dot{\sigma}}{\dot{\gamma}}, \quad
+   G''_t \omega = \frac{d\sigma}{dt}\bigg|_{\gamma=\text{const}}
+
+These reduce to the linear viscoelastic :math:`G', G''` at small amplitude but reveal rich
+intracycle structure at large amplitudes.
+
+**Input Requirements:**
+
+* Time-domain LAOS data: stress :math:`\sigma(t)` and strain :math:`\gamma(t)`
+* Known strain amplitude :math:`\gamma_0` and angular frequency :math:`\omega`
+* Sufficient points per cycle (typically 500-1000)
+
+**Output:**
+
+* Instantaneous moduli arrays :math:`G'(t)`, :math:`G''(t)` over one cycle
+* Cole-Cole trajectory array :math:`[G'_t, G''_t]`
+* Cycle-averaged and maximum moduli, yield indicator
+
+**Key Parameters:**
+
+.. list-table:: SPP Decomposer Parameters
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Parameter
+     - Default
+     - Description
+   * - ``gamma_0``
+     - Required
+     - Strain amplitude for analysis
+   * - ``omega``
+     - Required
+     - Angular frequency (rad/s)
+   * - ``n_points``
+     - ``1000``
+     - Points per cycle for analysis
+   * - ``smooth_derivatives``
+     - ``True``
+     - Apply Savitzky-Golay smoothing to stress derivatives
+   * - ``window_length``
+     - ``21``
+     - Smoothing window size (must be odd)
+
+**Example Usage:**
+
+.. code-block:: python
+
+   from rheojax.transforms import SPPDecomposer
+   import numpy as np
+
+   # LAOS data
+   gamma_0, omega = 0.5, 1.0
+   t = np.linspace(0, 2*np.pi/omega, 1000)
+   gamma = gamma_0 * np.sin(omega * t)
+   stress = experimental_stress(t)  # Your measured data
+
+   spp = SPPDecomposer(gamma_0=gamma_0, omega=omega)
+   result = spp.transform(t, gamma, stress)
+
+   # Cole-Cole trajectory
+   import matplotlib.pyplot as plt
+   plt.plot(result.Gp_instantaneous, result.Gpp_instantaneous)
+   plt.xlabel(r"$G'_t$ (Pa)")
+   plt.ylabel(r"$G''_t$ (Pa)")
+   plt.title("SPP Cole-Cole Trajectory")
+   plt.close("all")
+
+   # Yield stress from amplitude sweep
+   yield_stress = spp.extract_yield_stress(amplitude_sweep_results)
+   print(f"Yield stress: {yield_stress:.2f} Pa")
+
+**Best For:**
+
+* LAOS yield stress determination (more robust than Fourier methods)
+* Identifying yielding mechanisms (Type I abrupt vs Type II gradual)
+* Distinguishing cage yield from flow yield
+* Validating constitutive models against SPP trajectories
+
+
 Common Workflow Pipelines
 --------------------------
 
@@ -1075,6 +1274,52 @@ Smooth Derivative
      - ``polyorder >= deriv + 2``
      - Ensure polynomial order sufficient
 
+SRFS
+~~~~
+
+.. list-table:: SRFS Parameter Selection Guide
+   :header-rows: 1
+   :widths: 25 35 40
+
+   * - Material/Scenario
+     - Recommended Settings
+     - Rationale
+   * - Concentrated emulsions
+     - ``method='power_law'``, ``vertical_shift=True``
+     - SGR power-law scaling expected; modulus softening under flow
+   * - Unknown soft glass
+     - ``method='auto'``, ``vertical_shift=True``
+     - Let optimizer determine shift model
+   * - Thixotropic fluid
+     - ``method='empirical'``, ``vertical_shift=True``
+     - Non-ideal SGR; empirical shifts more flexible
+   * - Validate SGR x
+     - Fit ``slope = -1/(x-1)`` to ``log(a)`` vs ``log(γ̇)``
+     - Direct physics extraction from shift factors
+
+SPP Decomposer
+~~~~~~~~~~~~~~~
+
+.. list-table:: SPP Decomposer Parameter Selection Guide
+   :header-rows: 1
+   :widths: 25 35 40
+
+   * - Application
+     - Recommended Settings
+     - Rationale
+   * - Yield stress extraction
+     - ``smooth_derivatives=True``, ``window_length=21``
+     - Smoothing essential for clean :math:`G'_t` features
+   * - High-resolution trajectory
+     - ``n_points=2000``, ``smooth_derivatives=True``
+     - More points capture subtle yielding features
+   * - Noisy stress signal
+     - ``window_length=31-51``, ``poly_order=3``
+     - Wider window for aggressive noise removal
+   * - Fast screening
+     - ``n_points=500``, ``smooth_derivatives=True``
+     - Fewer points for quick amplitude sweep analysis
+
 
 Next Steps
 ----------
@@ -1082,7 +1327,7 @@ Next Steps
 * **Detailed transform documentation:** :doc:`/transforms/index` for individual transform pages
 * **User guide:** :doc:`/user_guide/transforms` for usage patterns and examples
 * **API reference:** :doc:`/api/transforms` for complete API documentation
-* **Example notebooks:** 6 transform examples in ``examples/transforms/`` directory
+* **Example notebooks:** 8 transform examples in ``examples/transforms/`` directory
 * **Pipeline integration:** :doc:`/user_guide/pipeline_api` for fluent transform chaining
 
 **Need a transform not listed?** Transforms are extensible via ``BaseTransform`` - see :doc:`/developer/contributing`.

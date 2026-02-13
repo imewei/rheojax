@@ -2078,7 +2078,7 @@ Related Material Systems
 12. **Hourdet, D., L'alloret, F., & Audebert, R. (1994)**
     "Reversible thermothickening of aqueous polymer solutions"
     *Polymer*, 35(12), 2624-2630.
-    DOI: 10.1016/0032-3861(94)90393-X
+    DOI: 10.1016/0032-3861(94)90390-5
 
     *Temperature-dependent association in HEUR (thermal activation of* :math:`\tau_a`, :math:`\tau_b`).
 

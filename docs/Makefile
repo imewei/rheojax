@@ -8,6 +8,10 @@ SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = source
 BUILDDIR      = build
 
+# Suppress intermediate-pass hyperref warnings from multi-pass xelatex compilation
+# (cross-references are unresolved until the final pass; latexmk handles rerun automatically)
+export LATEXOPTS ?= -interaction=batchmode
+
 # Put it first so that "make" without argument is like "make help".
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)

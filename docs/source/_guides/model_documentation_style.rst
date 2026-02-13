@@ -234,14 +234,14 @@ Example "What You Can Learn" Entry
    **x (Effective Noise Temperature)**:
       Fitted value reveals the material's position relative to the glass transition:
 
-      - **Low values (x < 1)**: Glass phase. Material exhibits aging, yield stress,
+      - **Low values** (:math:`x < 1`): Glass phase. Material exhibits aging, yield stress,
         and cannot reach equilibrium. Indicates strong interparticle attraction or
         high crowding.
 
-      - **Near critical (x ≈ 1)**: Glass transition. Maximum sensitivity to
+      - **Near critical** (:math:`x \approx 1`): Glass transition. Maximum sensitivity to
         processing conditions. Small formulation changes have large rheological effects.
 
-      - **High values (x > 1.5)**: Fluid phase. Material flows easily and reaches
+      - **High values** (:math:`x > 1.5`): Fluid phase. Material flows easily and reaches
         equilibrium. Indicates weak attractions or low volume fraction.
 
       *For graduate students*: The SGR model predicts :math:`x - 1` as the power-law

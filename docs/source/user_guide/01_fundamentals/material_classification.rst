@@ -9,7 +9,7 @@ Material Classification
    After completing this section, you will be able to:
 
    1. Classify materials as liquid-like, solid-like, or gel-like from rheological data
-   2. Identify key signatures in G' and G" frequency sweeps
+   2. Identify key signatures in :math:`G'` and :math:`G''` frequency sweeps
    3. Distinguish between physical gels, chemical gels, and viscoelastic liquids
    4. Predict material behavior from modulus frequency dependence
    5. Select appropriate models based on material classification
@@ -18,7 +18,7 @@ Material Classification
    :class: important
 
    - :doc:`what_is_rheology` — Core rheology concepts
-   - Understanding of G' (storage modulus) and G" (loss modulus)
+   - Understanding of :math:`G'` (storage modulus) and :math:`G''` (loss modulus)
 
 The Classification Problem
 ---------------------------
@@ -60,23 +60,23 @@ Rheological Signature
 
 In a **frequency sweep** (Small-Amplitude Oscillatory Shear, SAOS):
 
-**Low frequencies (ω → 0)**:
+**Low frequencies** (:math:`\omega \to 0`):
 
-- G" > G' (loss dominates)
-- G" ~ ω¹ (linear with frequency)
-- G' ~ ω² (quadratic with frequency)
+- :math:`G'' > G'` (loss dominates)
+- :math:`G'' \sim \omega^1` (linear with frequency)
+- :math:`G' \sim \omega^2` (quadratic with frequency)
 
 **High frequencies**:
 
-- G' > G" (storage dominates — elastic-like on short timescales)
-- Both G' and G" increase
+- :math:`G' > G''` (storage dominates --- elastic-like on short timescales)
+- Both :math:`G'` and :math:`G''` increase
 
-**Crossover frequency (ω_c)**:
+**Crossover frequency** (:math:`\omega_c`):
 
-- Point where G' = G" (transition from liquid-like to solid-like)
-- Related to characteristic relaxation time: τ ~ 1/ω_c
+- Point where :math:`G' = G''` (transition from liquid-like to solid-like)
+- Related to characteristic relaxation time: :math:`\tau \sim 1/\omega_c`
 
-**Physical interpretation**: At low frequencies (long observation times), the material has time to flow—viscous dissipation (G") dominates. At high frequencies (short observation times), molecular rearrangements can't keep up—elastic storage (G') dominates.
+**Physical interpretation**: At low frequencies (long observation times), the material has time to flow --- viscous dissipation (:math:`G''`) dominates. At high frequencies (short observation times), molecular rearrangements can't keep up --- elastic storage (:math:`G'`) dominates.
 
 Mathematical Models
 ~~~~~~~~~~~~~~~~~~~
@@ -90,7 +90,7 @@ Appropriate models for viscoelastic liquids:
 Examples
 ~~~~~~~~
 
-- **Polymer melts**: Polystyrene, polyethylene above T_g
+- **Polymer melts**: Polystyrene, polyethylene above :math:`T_g`
 - **Polymer solutions**: DNA solutions, xanthan gum solutions
 - **Micellar solutions**: Surfactant solutions above CMC
 
@@ -152,18 +152,18 @@ Rheological Signature
 
 In a **frequency sweep**:
 
-**Low frequencies (ω → 0)**:
+**Low frequencies** (:math:`\omega \to 0`):
 
-- G' > G" (storage dominates)
-- G' → G_e (plateau at equilibrium modulus)
-- G" → 0 or small constant
+- :math:`G' > G''` (storage dominates)
+- :math:`G' \to G_e` (plateau at equilibrium modulus)
+- :math:`G'' \to 0` or small constant
 
 **High frequencies**:
 
-- Both G' and G" increase
-- G' remains larger than G"
+- Both :math:`G'` and :math:`G''` increase
+- :math:`G'` remains larger than :math:`G''`
 
-**No terminal flow**: Unlike liquids, there is NO crossover where G" exceeds G' at low frequencies.
+**No terminal flow**: Unlike liquids, there is NO crossover where :math:`G''` exceeds :math:`G'` at low frequencies.
 
 **Physical interpretation**: The crosslinked network can store elastic energy indefinitely. Even at long timescales, the material does not flow—it remains solid-like.
 
@@ -234,14 +234,14 @@ In a **frequency sweep**:
 
 **Across all frequencies**:
 
-- G' ~ ω^α (power-law scaling)
-- G" ~ ω^α (parallel scaling)
-- G' ≈ G" (often within same order of magnitude)
-- Exponent α between 0 and 1 (typically 0.1-0.5)
+- :math:`G' \sim \omega^\alpha` (power-law scaling)
+- :math:`G'' \sim \omega^\alpha` (parallel scaling)
+- :math:`G' \approx G''` (often within same order of magnitude)
+- Exponent :math:`\alpha` between 0 and 1 (typically 0.1--0.5)
 
-**Log-log plot**: Both G' and G" are nearly parallel straight lines
+**Log-log plot**: Both :math:`G'` and :math:`G''` are nearly parallel straight lines
 
-**Physical interpretation**: Gels have a fractal or near-critical network structure with relaxation times spanning many decades. The power-law exponent α characterizes the breadth of the relaxation spectrum.
+**Physical interpretation**: Gels have a fractal or near-critical network structure with relaxation times spanning many decades. The power-law exponent :math:`\alpha` characterizes the breadth of the relaxation spectrum.
 
 Types of Gels
 ~~~~~~~~~~~~~
@@ -258,7 +258,7 @@ Types of Gels
 
 **Weak gels / soft solids**:
 
-- G' slightly > G" across frequencies
+- :math:`G'` slightly :math:`> G''` across frequencies
 - Small equilibrium modulus
 - Examples: Yogurt, mayonnaise, soft pastes
 
@@ -473,11 +473,11 @@ Key Concepts
 .. admonition:: Main Takeaways
    :class: tip
 
-   1. **Viscoelastic liquids**: G" > G' at low frequencies, flow at long times (Maxwell, FML)
+   1. **Viscoelastic liquids**: :math:`G'' > G'` at low frequencies, flow at long times (Maxwell, FML)
 
-   2. **Viscoelastic solids**: G' > G" everywhere, G' plateaus at G_e (Zener, FZSS)
+   2. **Viscoelastic solids**: :math:`G' > G''` everywhere, :math:`G'` plateaus at :math:`G_e` (Zener, FZSS)
 
-   3. **Gels**: G' ≈ G" with power-law scaling G' ~ ω^α (FMG, SpringPot)
+   3. **Gels**: :math:`G' \approx G''` with power-law scaling :math:`G' \sim \omega^\alpha` (FMG, SpringPot)
 
    4. **Classification determines model selection** and expected behavior
 
@@ -486,15 +486,15 @@ Key Concepts
 .. admonition:: Self-Check Questions
    :class: tip
 
-   1. **A material has G' = 100 Pa and G" = 1000 Pa at 0.01 rad/s. What type of material is it likely to be?**
+   1. **A material has** :math:`G' = 100` **Pa and** :math:`G'' = 1000` **Pa at 0.01 rad/s. What type of material is it likely to be?**
 
-      Hint: Compare G' and G" at low frequency
+      Hint: Compare :math:`G'` and :math:`G''` at low frequency
 
-   2. **You observe G' = 5000 Pa at all frequencies from 0.01 to 100 rad/s, while G" varies from 100 to 500 Pa. What classification?**
+   2. **You observe** :math:`G' = 5000` **Pa at all frequencies from 0.01 to 100 rad/s, while** :math:`G''` **varies from 100 to 500 Pa. What classification?**
 
-      Hint: Look for a plateau in G'
+      Hint: Look for a plateau in :math:`G'`
 
-   3. **Both G' and G" scale as ω^0.4 over 3 decades of frequency. What material type?**
+   3. **Both** :math:`G'` **and** :math:`G''` **scale as** :math:`\omega^{0.4}` **over 3 decades of frequency. What material type?**
 
       Hint: Parallel power-law scaling
 
@@ -502,7 +502,7 @@ Key Concepts
 
       Hint: Need to see frequency dependence to distinguish types
 
-   5. **A material shows G" > G' at low frequencies but also has a small plateau in G'. What might this indicate?**
+   5. **A material shows** :math:`G'' > G'` **at low frequencies but also has a small plateau in** :math:`G'`. **What might this indicate?**
 
       Hint: Could be intermediate case or weak gel
 
@@ -523,7 +523,7 @@ Further Reading
 Summary
 -------
 
-Materials are classified rheologically into **viscoelastic liquids** (G" > G' at low ω, terminal flow), **viscoelastic solids** (G' plateaus at G_e, no flow), and **gels** (power-law scaling G' ~ ω^α). Classification is based on frequency sweep signatures and determines appropriate models and expected behavior.
+Materials are classified rheologically into **viscoelastic liquids** (:math:`G'' > G'` at low :math:`\omega`, terminal flow), **viscoelastic solids** (:math:`G'` plateaus at :math:`G_e`, no flow), and **gels** (power-law scaling :math:`G' \sim \omega^\alpha`). Classification is based on frequency sweep signatures and determines appropriate models and expected behavior.
 
 Next Steps
 ----------

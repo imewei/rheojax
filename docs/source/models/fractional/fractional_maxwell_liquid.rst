@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Viscoelastic liquid, power-law relaxation without terminal flow plateau
-- **Parameters:** 3 (Gm, :math:`\alpha, \tau_\alpha`)
+- **Parameters:** 3 (:math:`G_m`, :math:`\alpha`, :math:`\tau_\alpha`)
 - **Key equation:** :math:`G(t) = G_m t^{-\alpha} E_{1-\alpha,1-\alpha}(-t^{1-\alpha}/\tau_\alpha)`
 - **Test modes:** Oscillation, relaxation, creep, flow curve
 - **Material examples:** Polymer melts (linear/branched), concentrated polymer solutions, complex fluids
@@ -73,7 +73,7 @@ The FML model represents **viscoelastic liquids** with zero equilibrium modulus 
 
 The series configuration ensures that sustained stress eventually leads to unbounded strain growth (flow), distinguishing this from solid-like models.
 
-**For FML specifically**, the fractional order :math:`\alpha` directly controls the slope in log-log plots of G'(:math:`\omega`) and G"(:math:`\omega`), with both moduli scaling as :math:`\omega`\ :math:`^{\alpha}` in the power-law region. Typical :math:`\alpha` ranges for FML applications:
+**For FML specifically**, the fractional order :math:`\alpha` directly controls the slope in log-log plots of :math:`G'(\omega)` and :math:`G''(\omega)`, with both moduli scaling as :math:`\omega^{\alpha}` in the power-law region. Typical :math:`\alpha` ranges for FML applications:
 
 - Polymer melts (linear homopolymers): :math:`\alpha` ≈ 0.7-0.9
 - Polymer melts (branched): :math:`\alpha` ≈ 0.5-0.7
@@ -123,8 +123,8 @@ Governing Equations
 where :math:`G_m` is the Maxwell modulus, :math:`E_{\alpha,\beta}(z)` is the two-parameter Mittag-Leffler function, and :math:`\tau_\alpha` is the characteristic relaxation time with units of s\ :sup:`alpha`.
 
 **Physical interpretation:**
-   - Short times (t << :math:`\tau_\alpha`): G(t) ≈ Gm (elastic plateau)
-   - Intermediate times: G(t) ~ t^(-:math:`\alpha`) (power-law relaxation)
+   - Short times (:math:`t \ll \tau_\alpha`): :math:`G(t) \approx G_m` (elastic plateau)
+   - Intermediate times: :math:`G(t) \sim t^{-\alpha}` (power-law relaxation)
    - Long times: Stretched exponential decay toward zero
 
 **Complex Modulus**:
@@ -145,9 +145,9 @@ Decomposing into storage and loss moduli:
    G''(\omega) = G_m \frac{(\omega\tau_\alpha)^\alpha \sin(\alpha\pi/2)}{1 + 2(\omega\tau_\alpha)^\alpha \cos(\alpha\pi/2) + (\omega\tau_\alpha)^{2\alpha}}
 
 **Frequency-Domain Behavior:**
-   - High :math:`\omega (\omega >> 1/\tau_\alpha)`: G' → Gm, G" → 0 (elastic plateau)
-   - Intermediate :math:`\omega (\omega` ~ 1/:math:`\tau_\alpha`): G', G" ~ :math:`\omega^\alpha` (power-law scaling, parallel slopes)
-   - Low :math:`\omega (\omega << 1/\tau_\alpha)`: G' ~ :math:`\omega^(2\alpha), G`" ~ :math:`\omega^\alpha` (liquid-like terminal regime)
+   - High :math:`\omega` (:math:`\omega \gg 1/\tau_\alpha`): :math:`G' \to G_m`, :math:`G'' \to 0` (elastic plateau)
+   - Intermediate :math:`\omega` (:math:`\omega \sim 1/\tau_\alpha`): :math:`G', G'' \sim \omega^\alpha` (power-law scaling, parallel slopes)
+   - Low :math:`\omega` (:math:`\omega \ll 1/\tau_\alpha`): :math:`G' \sim \omega^{2\alpha}`, :math:`G'' \sim \omega^\alpha` (liquid-like terminal regime)
 
 **Creep Compliance**:
 
@@ -157,8 +157,8 @@ Decomposing into storage and loss moduli:
    J(t) = \frac{1}{G_m} + \frac{t^\alpha}{G_m \tau_\alpha^\alpha} E_{\alpha,1+\alpha}\left(-\left(\frac{t}{\tau_\alpha}\right)^\alpha\right)
 
 **Physical interpretation:**
-   - Short times: J(t) ≈ 1/Gm (elastic compliance)
-   - Long times: Unbounded growth J(t) → ∞ (liquid-like flow)
+   - Short times: :math:`J(t) \approx 1/G_m` (elastic compliance)
+   - Long times: Unbounded growth :math:`J(t) \to \infty` (liquid-like flow)
 
 The Mittag-Leffler function provides a smooth interpolation between exponential decay (when alpha=1) and stretched exponential or power-law relaxation (when 0 < alpha < 1):
 
@@ -203,7 +203,7 @@ The Fractional Maxwell Liquid model has three parameters:
 
 - **alpha**: Quantifies relaxation spectrum breadth. Lower :math:`\alpha` → broader spectra from molecular weight polydispersity, branching, or complex intermolecular interactions. For linear polymers, :math:`\alpha` ≈ 0.7-0.9; for branched polymers, :math:`\alpha` ≈ 0.5-0.7.
 
-- **tau_alpha**: Average relaxation time scale. Has unusual units (s\ :math:`^{\alpha}`) due to fractional calculus. For polymer melts, relates to molecular weight via :math:`\tau_\alpha` ~ Mw^(3.4). Typical values: :math:`10 \times 10^{-3-10^3}` s depending on molecular weight and temperature.
+- **tau_alpha**: Average relaxation time scale. Has unusual units (s\ :math:`^{\alpha}`) due to fractional calculus. For polymer melts, relates to molecular weight via :math:`\tau_\alpha \sim M_w^{3.4}`. Typical values: :math:`10 \times 10^{-3-10^3}` s depending on molecular weight and temperature.
 
 Validity and Assumptions
 ------------------------
@@ -319,7 +319,7 @@ Application Examples
 ~~~~~~~~~~~~~~~~~~~~
 
 **Polymer Grade Verification**:
-   Fit FML to frequency sweep, compare :math:`\alpha and \tau_\alpha` to specifications. A batch
+   Fit FML to frequency sweep, compare :math:`\alpha` and :math:`\tau_\alpha` to specifications. A batch
    with lower :math:`\alpha` likely has broader MWD or unexpected branching.
 
 **Processing Optimization**:
@@ -354,9 +354,9 @@ Fitting Guidance
 
 **Optimization Tips:**
 
-- Fit simultaneously to G' and G" for better constraint
+- Fit simultaneously to :math:`G'` and :math:`G''` for better constraint
 - Use log-weighted least squares
-- Verify power-law region (parallel G', G" slopes)
+- Verify power-law region (parallel :math:`G'`, :math:`G''` slopes)
 - Check residuals for systematic deviations
 
 **Common Pitfalls:**
@@ -417,7 +417,7 @@ The Fractional Maxwell Liquid exhibits characteristic behavior across different 
 
       G(t) \sim G_m, \quad G^*(\omega) \sim G_m
 
-   The material behaves as an elastic solid with modulus Gm. This regime captures the instantaneous response before relaxation mechanisms activate.
+   The material behaves as an elastic solid with modulus :math:`G_m`. This regime captures the instantaneous response before relaxation mechanisms activate.
 
 **Intermediate Regime** (:math:`t \sim \tau_\alpha` or :math:`\omega \sim 1/\tau_\alpha`):
    The Mittag-Leffler function provides a smooth crossover between elastic plateau and power-law relaxation. This is the **fingerprint** of fractional viscoelasticity:
@@ -447,19 +447,19 @@ Comparison with Classical Maxwell
 
 **Classical Maxwell (** :math:`\alpha` **= 1):**
    - Single relaxation time :math:`\tau`
-   - Exponential relaxation: G(t) = Gm exp(-t/:math:`\tau`)
+   - Exponential relaxation: :math:`G(t) = G_m \exp(-t/\tau)`
    - Narrow relaxation spectrum (Lorentzian)
-   - Low-frequency behavior: G' ~ :math:`\omega^2, G`" ~ :math:`\omega` (classical liquid)
+   - Low-frequency behavior: :math:`G' \sim \omega^2`, :math:`G'' \sim \omega` (classical liquid)
 
 **Fractional Maxwell Liquid (0 <** :math:`\alpha` **< 1):**
    - Continuous distribution of relaxation times
-   - Power-law relaxation: G(t) ~ t^(-:math:`\alpha`)
+   - Power-law relaxation: :math:`G(t) \sim t^{-\alpha}`
    - Broad relaxation spectrum
-   - Low-frequency behavior: G' ~ :math:`\omega^(2\alpha), G`" ~ :math:`\omega^\alpha` (generalized liquid)
+   - Low-frequency behavior: :math:`G' \sim \omega^{2\alpha}`, :math:`G'' \sim \omega^\alpha` (generalized liquid)
 
 **When to Use Fractional:**
    - Power-law relaxation observed in stress relaxation experiments
-   - Log-log plots of G' and G" show parallel slopes over multiple decades
+   - Log-log plots of :math:`G'` and :math:`G''` show parallel slopes over multiple decades
    - Polymer melts with broad molecular weight distribution
    - Concentrated solutions with complex intermolecular interactions
 
@@ -519,16 +519,16 @@ How It Works
 When ``test_mode='oscillation'``, the initialization system:
 
 1. **Extracts frequency features** from :math:`|G^*|(\omega)` data:
-   - High-frequency plateau → estimates Gm
+   - High-frequency plateau → estimates :math:`G_m`
    - Transition frequency :math:`\omega_mid` (maximum slope of :math:`|G^*|`) → estimates :math:`\tau_\alpha = 1/\omega_mid`
    - Slope in power-law region → estimates fractional order :math:`\alpha`
 
 2. **Estimates fractional order** from parallel slopes:
-   - Identifies region where G'(:math:`\omega`) and G"(:math:`\omega`) have parallel slopes
+   - Identifies region where :math:`G'(\omega)` and :math:`G''(\omega)` have parallel slopes
    - Extracts slope via linear regression in log-log space
-   - Maps slope directly to :math:`\alpha (slope \approx \alpha` in power-law region)
+   - Maps slope directly to :math:`\alpha` (slope :math:`\approx \alpha` in power-law region)
 
-3. **Clips to parameter bounds** to ensure Gm > 0, 0 < :math:`\alpha < 1, \tau_\alpha` > 0
+3. **Clips to parameter bounds** to ensure :math:`G_m > 0`, :math:`0 < \alpha < 1`, :math:`\tau_\alpha > 0`
 
 Benefits
 ~~~~~~~~
@@ -601,7 +601,7 @@ Related Models
 ~~~~~~~~~~~~~~
 
 - :doc:`fractional_maxwell_gel` — uses a dashpot instead of a spring for gel-like systems with terminal flow
-- :doc:`fractional_maxwell_model` — generalized two-order series analogue with independent :math:`\alpha and \beta`
+- :doc:`fractional_maxwell_model` — generalized two-order series analogue with independent :math:`\alpha` and :math:`\beta`
 - :doc:`fractional_jeffreys` — adds a parallel dashpot for finite zero-shear viscosity
 - :doc:`../classical/maxwell` — classical limit (:math:`\alpha` → 1, exponential relaxation)
 - :doc:`../classical/springpot` — fundamental SpringPot element theory
@@ -611,7 +611,7 @@ Transforms
 
 - :doc:`../../transforms/fft` — convert relaxation data to :math:`G^*(\omega)` before fitting
 - :doc:`../../transforms/mastercurve` — time-temperature superposition for polymer melts
-- :doc:`../../transforms/derivatives` — compute loss tangent tan :math:`\delta` from G' and G"
+- :doc:`../../transforms/derivatives` — compute loss tangent :math:`\tan\delta` from :math:`G'` and :math:`G''`
 
 Examples
 ~~~~~~~~

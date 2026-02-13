@@ -24,7 +24,7 @@ By completing this section, you will be able to:
 1. Define rheology and explain its importance in materials science
 2. Classify materials as liquids, solids, or gels based on rheological behavior
 3. Identify and distinguish between four major test modes (SAOS, relaxation, creep, flow)
-4. Interpret physical meaning of rheological parameters (G', G", η, τ, α)
+4. Interpret physical meaning of rheological parameters (:math:`G'`, :math:`G''`, :math:`\eta`, :math:`\tau`, :math:`\alpha`)
 5. Recognize viscoelastic behavior in experimental data
 
 Section Contents
@@ -72,10 +72,10 @@ It bridges solid mechanics (elasticity) and fluid mechanics (viscosity).
 
 **Parameters** have physical interpretations:
 
-- **G', G"**: Storage and loss moduli (stiffness and damping)
-- **η**: Viscosity (resistance to flow)
-- **τ**: Characteristic relaxation time (timescale of response)
-- **α**: Fractional order (distribution of relaxation times)
+- :math:`G'`, :math:`G''`: Storage and loss moduli (stiffness and damping)
+- :math:`\eta`: Viscosity (resistance to flow)
+- :math:`\tau`: Characteristic relaxation time (timescale of response)
+- :math:`\alpha`: Fractional order (distribution of relaxation times)
 
 Learning Resources
 ------------------
@@ -102,7 +102,7 @@ Assessment
 
    ☐ Explain the difference between elastic and viscous behavior
 
-   ☐ Classify a material as liquid-like, solid-like, or gel-like from G' and G" data
+   ☐ Classify a material as liquid-like, solid-like, or gel-like from :math:`G'` and :math:`G''` data
 
    ☐ Choose the appropriate test mode for a given material and question
 

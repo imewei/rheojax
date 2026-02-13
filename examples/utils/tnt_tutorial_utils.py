@@ -20,7 +20,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
 # =============================================================================
 # FAST_MODE Configuration
 # =============================================================================
@@ -807,7 +806,7 @@ def print_nu_interpretation(nu: float) -> None:
 
     print(f"\nRegime: {regime}")
     print(f"\n{description}")
-    print(f"\nPhysical implications:")
+    print("\nPhysical implications:")
     print(f"  - Effective lifetime: tau_eff = tau_b * exp(-{nu:.1f} * (lambda - 1))")
     print(f"  - At lambda = 2: tau_eff/tau_b = {np.exp(-nu):.4f}")
     print(f"  - At lambda = 3: tau_eff/tau_b = {np.exp(-2*nu):.4g}")

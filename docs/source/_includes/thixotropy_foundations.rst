@@ -9,7 +9,7 @@
 
    - **Breakdown**: Shear disrupts network bonds, aggregates, or particle structures
    - **Buildup (aging)**: Brownian motion, attractive forces, or reaction kinetics rebuild structure
-   - **Structure parameter** (λ): Dimensionless variable tracking microstructural state (0-1)
+   - **Structure parameter** (:math:`\lambda`): Dimensionless variable tracking microstructural state (0-1)
 
    **Characteristic Experimental Signatures:**
 

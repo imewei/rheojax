@@ -40,6 +40,7 @@ import numpy as np
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.hvnm._base import HVNMBase
 from rheojax.models.hvnm._kernels import (
     hvnm_ber_rate_constant_interphase,
@@ -78,6 +79,12 @@ logger = logging.getLogger(__name__)
         Protocol.CREEP,
         Protocol.LAOS,
     ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
+    ],
 )
 @ModelRegistry.register(
     "hvnm",
@@ -88,6 +95,12 @@ logger = logging.getLogger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class HVNMLocal(HVNMBase):
@@ -790,11 +803,12 @@ class HVNMLocal(HVNMBase):
         self._gamma_0 = kwargs.get("gamma_0")
         self._omega_laos = kwargs.get("omega")
 
-        # Filter out fitting-specific kwargs
+        # Filter out fitting-specific and BaseModel kwargs
         fwd_kwargs = {
             k: v for k, v in kwargs.items()
             if k not in (
-                "test_mode", "use_log_residuals", "use_jax", "method",
+                "test_mode", "deformation_mode", "poisson_ratio",
+                "use_log_residuals", "use_jax", "method",
                 "max_iter", "use_multi_start", "n_starts", "perturb_factor",
             )
         }
@@ -836,7 +850,10 @@ class HVNMLocal(HVNMBase):
             [self.parameters.get_value(n) for n in self.parameters.keys()],
             dtype=jnp.float64,
         )
-        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
+        fwd_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
+        }
         return np.asarray(
             self.model_function(X, param_values, test_mode=test_mode, **fwd_kwargs)
         )

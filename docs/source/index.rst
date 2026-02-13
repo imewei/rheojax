@@ -8,13 +8,15 @@ high-performance framework for analyzing experimental rheology data. Built on JA
 differentiation and GPU acceleration, RheoJAX combines powerful numerical capabilities with an
 intuitive API for seamless end-to-end analysis.
 
-.. image:: https://img.shields.io/badge/python-3.12+-blue.svg
-   :target: https://www.python.org/downloads/
-   :alt: Python 3.12+
+.. only:: html
 
-.. image:: https://img.shields.io/badge/License-MIT-yellow.svg
-   :target: https://opensource.org/licenses/MIT
-   :alt: MIT License
+   .. image:: https://img.shields.io/badge/python-3.12+-blue.svg
+      :target: https://www.python.org/downloads/
+      :alt: Python 3.12+
+
+   .. image:: https://img.shields.io/badge/License-MIT-yellow.svg
+      :target: https://opensource.org/licenses/MIT
+      :alt: MIT License
 
 ----
 
@@ -33,8 +35,10 @@ At a Glance
      - 7 transforms (FFT, mastercurve/TTS, SRFS, SPP, OWChirp, derivatives, mutation number)
    * - **Performance**
      - 10-100x speedups via JAX; 5-270x optimization via NLSQ
+   * - **DMTA/DMA**
+     - Automatic E* ↔ G* conversion for 41+ oscillation models with tensile deformation mode
    * - **Notebooks**
-     - 170+ tutorial notebooks across all model families and protocols
+     - 244 tutorial notebooks across 21 categories covering all model families and protocols
 
 Key Features
 ------------
@@ -54,7 +58,7 @@ Key Features
    Matplotlib-based plots with three built-in styles (default, publication, presentation)
 
 **Extensible Design**
-   Plugin system for custom models and transforms with registry-based discovery (Phase 2)
+   Plugin system for custom models and transforms with registry-based discovery
 
 Quick Start
 -----------

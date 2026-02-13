@@ -159,7 +159,53 @@ TestMode
    - ``CREEP``: Creep compliance test
    - ``OSCILLATION``: Oscillatory (SAOS/LAOS) test
    - ``ROTATION``: Steady shear (flow curve) test
+   - ``FLOW_CURVE``: Steady-state stress vs shear rate
+   - ``STARTUP``: Transient stress at constant shear rate
+   - ``LAOS``: Large Amplitude Oscillatory Shear
    - ``UNKNOWN``: Unknown or ambiguous test type
+
+DeformationMode
+~~~~~~~~~~~~~~~
+
+.. autoclass:: rheojax.core.test_modes.DeformationMode
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :noindex:
+
+   Deformation geometry for rheological measurements. Controls whether
+   models work with shear modulus G* or Young's modulus E*.
+
+   **Values:**
+
+   - ``SHEAR``: Rotational rheometer geometry (measures G*)
+   - ``TENSION``: DMTA/DMA tensile geometry (measures E*)
+   - ``BENDING``: DMTA/DMA bending geometry (measures E*)
+   - ``COMPRESSION``: DMTA/DMA compression geometry (measures E*)
+
+   **Conversion:**
+
+   .. math::
+
+      E^*(\omega) = 2(1 + \nu) \, G^*(\omega)
+
+   where :math:`\nu` is the Poisson's ratio of the material.
+
+   **Usage with models:**
+
+   .. code-block:: python
+
+      from rheojax.models import Maxwell
+
+      model = Maxwell()
+      model.fit(
+          omega, E_star,
+          test_mode='oscillation',
+          deformation_mode='tension',
+          poisson_ratio=0.5,  # rubber
+      )
+
+   See :mod:`rheojax.utils.modulus_conversion` for array-level conversion utilities.
 
 Functions
 ~~~~~~~~~
@@ -265,11 +311,16 @@ Registry
    :undoc-members:
    :show-inheritance:
 
-The registry system provides a centralized way to discover and instantiate models and transforms.
-This will be fully implemented in Phase 2.
+The registry system provides a centralized way to discover and instantiate models and transforms
+by name, protocol, or deformation mode.
 
-.. note::
-   Full registry functionality (model and transform registration) will be available in Phase 2.
+Inventory (Protocols & Capabilities)
+------------------------------------
+
+.. automodule:: rheojax.core.inventory
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Examples
 --------
@@ -354,8 +405,8 @@ Test Mode Detection
     if data.test_mode == TestMode.RELAXATION:
         print("This is a stress relaxation test")
 
-Using Base Classes (Phase 2)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using Base Classes
+~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -382,12 +433,12 @@ Using Base Classes (Phase 2)
     model.fit(time, stress)
     predictions = model.predict(time)
 
-Bayesian Inference (Phase 3)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Bayesian Inference
+~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-    from rheojax.models.maxwell import Maxwell
+    from rheojax.models import Maxwell
     import numpy as np
 
     # Generate data

@@ -30,7 +30,7 @@ Quick Links
 
 **Phase 2 (Models and Transforms)**:
 
-- :doc:`api/models` - All 24 rheological models (classical, fractional, flow, multi-mode, SGR, SPP)
+- :doc:`api/models` - All 53 rheological models (classical, fractional, flow, multi-mode, SGR, STZ, EPM, fluidity, Saramito, DMT, IKH, FIKH, HL, Giesekus, ITT-MCT, TNT, VLB, HVM, HVNM, SPP)
 - :doc:`api/transforms` - All 7 data transforms (FFT, mastercurve, mutation, OWChirp, smoothing, SRFS, SPP)
 - :doc:`api/pipeline` - Pipeline API for high-level workflows
 
@@ -77,12 +77,13 @@ Core Components
 - :class:`rheojax.core.registry.ModelRegistry` - Model discovery and instantiation
 - :class:`rheojax.core.registry.TransformRegistry` - Transform discovery and instantiation
 
-**Test Modes**:
+**Test Modes & Deformation**:
 
-- :class:`rheojax.core.test_modes.TestMode` - Test mode enumeration
+- :class:`rheojax.core.test_modes.TestMode` - Test mode enumeration (OSCILLATION, RELAXATION, CREEP, ...)
+- :class:`rheojax.core.test_modes.DeformationMode` - Deformation geometry (SHEAR, TENSION, BENDING, COMPRESSION)
 - :func:`rheojax.core.test_modes.detect_test_mode` - Automatic test mode detection
 
-Models (27 total)
+Models (53 total)
 ~~~~~~~~~~~~~~~~~
 
 **Classical Models (3)**:
@@ -142,7 +143,69 @@ Models (27 total)
 - :class:`rheojax.models.LatticeEPM` - Mesoscopic lattice model (FFT-based)
 - :class:`rheojax.models.TensorialEPM` - Tensorial scaffolding
 
-Transforms (5 total)
+**Fluidity Models (2)**:
+
+- :class:`rheojax.models.FluidityLocal` - Local fluidity with aging/rejuvenation
+- :class:`rheojax.models.FluidityNonlocal` - Nonlocal fluidity with cooperativity length
+
+**Fluidity-Saramito EVP Models (2)**:
+
+- :class:`rheojax.models.FluiditySaramitoLocal` - Tensorial EVP with fluidity coupling
+- :class:`rheojax.models.FluiditySaramitoNonlocal` - Nonlocal Saramito EVP
+
+**DMT Thixotropic Models (2)**:
+
+- :class:`rheojax.models.DMTLocal` - de Souza Mendes-Thompson (0D)
+- :class:`rheojax.models.DMTNonlocal` - DMT with structure diffusion (1D)
+
+**IKH Models (2)**:
+
+- :class:`rheojax.models.MIKH` - Single-mode isotropic-kinematic hardening
+- :class:`rheojax.models.MLIKH` - Multi-layer IKH
+
+**FIKH Models (2)**:
+
+- :class:`rheojax.models.FIKH` - Fractional IKH (Caputo structure kinetics)
+- :class:`rheojax.models.FMLIKH` - Fractional multi-layer IKH
+
+**Hébraud-Lequeux Model (1)**:
+
+- :class:`rheojax.models.HebraudLequeux` - Mean-field soft glass model
+
+**Giesekus Models (2)**:
+
+- :class:`rheojax.models.GiesekusSingleMode` - Nonlinear differential constitutive
+- :class:`rheojax.models.GiesekusMultiMode` - Multi-mode Giesekus
+
+**ITT-MCT Models (2)**:
+
+- :class:`rheojax.models.ITTMCTSchematic` - F\ :sub:`12` schematic MCT
+- :class:`rheojax.models.ITTMCTIsotropic` - Isotropic MCT with S(k) input
+
+**TNT Models (5)**:
+
+- :class:`rheojax.models.TNTSingleMode` - Single-mode transient network
+- :class:`rheojax.models.TNTLoopBridge` - Loop-bridge conversion kinetics
+- :class:`rheojax.models.TNTStickyRouse` - Sticky Rouse chain dynamics
+- :class:`rheojax.models.TNTCates` - Living polymer (worm-like micelles)
+- :class:`rheojax.models.TNTMultiSpecies` - Multi-species bond network
+
+**VLB Models (4)**:
+
+- :class:`rheojax.models.VLBLocal` - Vernerey-Long-Brighenti (local)
+- :class:`rheojax.models.VLBMultiNetwork` - Multi-network VLB
+- :class:`rheojax.models.VLBVariant` - VLB with modified kinetics
+- :class:`rheojax.models.VLBNonlocal` - Nonlocal VLB (1D PDE)
+
+**HVM Model (1)**:
+
+- :class:`rheojax.models.HVMLocal` - Hybrid vitrimer (3 sub-networks)
+
+**HVNM Model (1)**:
+
+- :class:`rheojax.models.HVNMLocal` - Hybrid vitrimer nanocomposite (4 sub-networks)
+
+Transforms (7 total)
 ~~~~~~~~~~~~~~~~~~~~
 
 - :class:`rheojax.transforms.FFTAnalysis` - Time -> frequency domain (FFT)
@@ -150,6 +213,8 @@ Transforms (5 total)
 - :class:`rheojax.transforms.MutationNumber` - Viscoelastic character quantification
 - :class:`rheojax.transforms.OWChirp` - Optimal waveform analysis for LAOS
 - :class:`rheojax.transforms.SmoothDerivative` - Noise-robust differentiation
+- :class:`rheojax.transforms.SRFS` - Strain-rate frequency superposition
+- :class:`rheojax.transforms.SPPDecomposer` - Sequence of Physical Processes decomposition
 
 Pipeline API
 ~~~~~~~~~~~~
@@ -227,7 +292,7 @@ API Design Principles
 Consistency
 ~~~~~~~~~~~
 
-All rheo classes follow consistent patterns:
+All rheojax classes follow consistent patterns:
 
 **Models**:
 
@@ -261,7 +326,7 @@ All rheo classes follow consistent patterns:
 scikit-learn Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-rheo models are compatible with scikit-learn:
+rheojax models are compatible with scikit-learn:
 
 - ``fit(X, y)``, ``predict(X)``, ``score(X, y)`` methods
 - ``get_params()``, ``set_params(**params)`` for hyperparameter access

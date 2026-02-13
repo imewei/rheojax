@@ -107,7 +107,7 @@ Parameters
      - Equilibrium modulus
    * - ``c_alpha``
      - :math:`c_\alpha`
-     - Pa*s^alpha
+     - Pa·s\ :sup:`α`
      - [1e-3, 1e9]
      - SpringPot constant
    * - ``alpha``
@@ -195,7 +195,7 @@ Material Classification
      - Stiff crosslinked solid
      - Vulcanized rubber, thermosets
      - Load-bearing, minimal creep
-   * - Ge ~ :math:`10^3-10^4 Pa, \alpha` ~ 0.4-0.6
+   * - :math:`G_e \sim 10^3-10^4` Pa, :math:`\alpha \sim 0.4-0.6`
      - Soft viscoelastic solid
      - Gels, soft tissues, elastomers
      - Damping, vibration isolation
@@ -261,7 +261,7 @@ Fitting Guidance
 
 **Optimization Tips:**
 
-- Verify equilibrium plateau Ge is reached (G' → Ge at low :math:`\omega`)
+- Verify equilibrium plateau :math:`G_e` is reached (:math:`G' \to G_e` at low :math:`\omega`)
 - Use log-weighted least squares
 - Constrain Ge > 0 (solid-like behavior required)
 - Check that :math:`\alpha` is well-constrained (not at bounds)
@@ -447,7 +447,7 @@ Basic Fitting
 
    # Access fitted parameters
    print(f"Ge = {model.parameters.get_value('Ge'):.2e} Pa")
-   print(f"c_alpha = {model.parameters.get_value('c_alpha'):.2e} Pa·s^alpha")
+   print(f"c_alpha = {model.parameters.get_value('c_alpha'):.2e} Pa·s^α")
    print(f"alpha = {model.parameters.get_value('alpha'):.3f}")
    print(f"tau = {model.parameters.get_value('tau'):.2e} s")
    print(f"R² = {result.r_squared:.4f}")

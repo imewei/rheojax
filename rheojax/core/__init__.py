@@ -1,4 +1,4 @@
-"""Core abstractions and common functionality for the rheo package.
+"""Core abstractions and common functionality for the rheojax package.
 
 This module provides:
 - Base classes for models and transforms
@@ -17,7 +17,12 @@ from .parameters import (
     SharedParameterSet,
 )
 from .registry import ModelRegistry, PluginInfo, PluginType, Registry, TransformRegistry
-from .test_modes import TestMode, detect_test_mode, validate_test_mode
+from .test_modes import (
+    DeformationMode,
+    TestMode,
+    detect_test_mode,
+    validate_test_mode,
+)
 
 __all__ = [
     # Base classes
@@ -38,7 +43,8 @@ __all__ = [
     "PluginInfo",
     "ModelRegistry",
     "TransformRegistry",
-    # Test modes
+    # Test modes and deformation geometry
+    "DeformationMode",
     "TestMode",
     "detect_test_mode",
     "validate_test_mode",

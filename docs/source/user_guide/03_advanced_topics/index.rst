@@ -81,7 +81,7 @@ Key Skills Summary
 
 .. code-block:: python
 
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
 
    # 1. NLSQ point estimate (fast)
    model = Maxwell()

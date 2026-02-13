@@ -15,7 +15,7 @@ assess whether the system remains quasi-steady while parameters are being estima
 
 - **Structural evolution quantification:** Track gelation, curing, aging dynamics
 - **Quasi-steady validation:** Verify rheological models applicability
-- **Gel point detection:** Winter-Chambon criterion via tan δ monitoring
+- **Gel point detection:** Winter-Chambon criterion via :math:`\tan\delta` monitoring
 - **Thixotropy assessment:** Identify time-dependent structural recovery
 
 Mathematical Theory
@@ -36,10 +36,10 @@ where :math:`G'(t)` is the storage modulus measured in a time sweep.
 
 **Physical interpretation:**
 
-- **δ(t) = 0:** Material structure unchanged (stable, equilibrium)
-- **δ(t) < 0.2:** Quasi-steady (< 20% structural change)
-- **δ(t) ≈ 1:** Material structure changed by ~π-fold (significant evolution)
-- **δ(t) >> 1:** Rapid structural transformation (gelation, curing, yielding)
+- :math:`\delta(t) = 0`: Material structure unchanged (stable, equilibrium)
+- :math:`\delta(t) < 0.2`: Quasi-steady (< 20% structural change)
+- :math:`\delta(t) \approx 1`: Material structure changed by :math:`\sim\pi`-fold (significant evolution)
+- :math:`\delta(t) \gg 1`: Rapid structural transformation (gelation, curing, yielding)
 
 **Generalized form for arbitrary observables:**
 
@@ -48,7 +48,7 @@ where :math:`G'(t)` is the storage modulus measured in a time sweep.
    \delta(t) = \frac{1}{\pi} \int_0^t \left| \frac{1}{\phi(t)} \frac{d\phi}{dt} \right| dt
    = \frac{1}{\pi} \int_0^t \left| \frac{d \ln \phi(t)}{dt} \right| dt
 
-where :math:`\phi(t)` can be G'(t), G''(t), η(t), or any rheological observable.
+where :math:`\phi(t)` can be :math:`G'(t)`, :math:`G''(t)`, :math:`\eta(t)`, or any rheological observable.
 
 **Normalization by characteristic time:**
 
@@ -58,12 +58,12 @@ For non-oscillatory data, normalize by a characteristic time :math:`\tau_c`:
 
    \delta(t) = \frac{\tau_c}{\pi} \int_0^t \left| \frac{d \ln \phi(t)}{dt} \right| dt
 
-This makes δ dimensionless and comparable across different materials.
+This makes :math:`\delta` dimensionless and comparable across different materials.
 
 Loss Tangent and Viscoelastic Character
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The **loss tangent** (tan δ) is the ratio of viscous to elastic response:
+The **loss tangent** (:math:`\tan\delta`) is the ratio of viscous to elastic response:
 
 .. math::
 
@@ -75,24 +75,24 @@ The **loss tangent** (tan δ) is the ratio of viscous to elastic response:
    :header-rows: 1
    :widths: 25 25 50
 
-   * - tan δ value
+   * - :math:`\tan\delta` value
      - Material character
      - Energy dissipation
-   * - **tan δ < 1**
+   * - :math:`\tan\delta < 1`
      - **Solid-like** (elastic)
-     - Stores more energy than dissipates (G' > G'')
-   * - **tan δ = 1**
+     - Stores more energy than dissipates (:math:`G' > G''`)
+   * - :math:`\tan\delta = 1`
      - **Balanced** (crossover)
-     - Equal storage and dissipation (G' = G'')
-   * - **tan δ > 1**
+     - Equal storage and dissipation (:math:`G' = G''`)
+   * - :math:`\tan\delta > 1`
      - **Liquid-like** (viscous)
-     - Dissipates more energy than stores (G'' > G')
+     - Dissipates more energy than stores (:math:`G'' > G'`)
 
 **Frequency dependence:**
 
-- **Viscoelastic liquids:** tan δ > 1 at low ω, crossover to tan δ < 1 at high ω
-- **Viscoelastic solids:** tan δ < 1 across all frequencies
-- **Critical gels:** tan δ = constant (frequency-independent)
+- **Viscoelastic liquids:** :math:`\tan\delta > 1` at low :math:`\omega`, crossover to :math:`\tan\delta < 1` at high :math:`\omega`
+- **Viscoelastic solids:** :math:`\tan\delta < 1` across all frequencies
+- **Critical gels:** :math:`\tan\delta = \text{constant}` (frequency-independent)
 
 Winter-Chambon Criterion for Gel Point
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,13 +100,13 @@ Winter-Chambon Criterion for Gel Point
 At the **gel point** (sol-gel transition), the material exhibits **critical behavior** with
 unique rheological signatures.
 
-**Winter-Chambon criterion:** At gel point, tan δ becomes **frequency-independent**:
+**Winter-Chambon criterion:** At gel point, :math:`\tan\delta` becomes **frequency-independent**:
 
 .. math::
 
    \tan \delta(\omega) = \frac{G''(\omega)}{G'(\omega)} = \tan\left(\frac{n\pi}{2}\right) = \text{constant}
 
-where :math:`n` is the relaxation exponent (0 < n < 1).
+where :math:`n` is the relaxation exponent (:math:`0 < n < 1`).
 
 **Power-law behavior at gel point:**
 
@@ -118,15 +118,15 @@ Both moduli scale identically with frequency—the signature of a **critical gel
 
 **Relaxation exponent interpretation:**
 
-- **n ≈ 0.5:** Typical for most polymer gels (percolation theory prediction ≈ 2/3)
-- **n < 0.5:** Solid-like gel (G' > G'')
-- **n > 0.5:** Liquid-like gel (G'' > G')
+- :math:`n \approx 0.5`: Typical for most polymer gels (percolation theory prediction :math:`\approx 2/3`)
+- :math:`n < 0.5`: Solid-like gel (:math:`G' > G''`)
+- :math:`n > 0.5`: Liquid-like gel (:math:`G'' > G'`)
 
 **Gel point determination methods:**
 
-1. **Multi-frequency time sweep:** Plot tan δ vs time for multiple frequencies; gel point = intersection point
-2. **Winter-Chambon plot:** Plot log G' vs log G''; gel point = time where slope = 1
-3. **Crossover point (approximate):** Simple criterion G' = G'' (tan δ = 1)
+1. **Multi-frequency time sweep:** Plot :math:`\tan\delta` vs time for multiple frequencies; gel point = intersection point
+2. **Winter-Chambon plot:** Plot :math:`\log G'` vs :math:`\log G''`; gel point = time where slope = 1
+3. **Crossover point (approximate):** Simple criterion :math:`G' = G''` (:math:`\tan\delta = 1`)
 
 **Connection to percolation theory:**
 
@@ -134,7 +134,7 @@ Both moduli scale identically with frequency—the signature of a **critical gel
 
    n = \frac{\Delta}{\Delta + \beta}
 
-where Δ, β are critical exponents (Δ ≈ 2.5, β ≈ 0.7 in 3D) → n ≈ 0.67.
+where :math:`\Delta`, :math:`\beta` are critical exponents (:math:`\Delta \approx 2.5`, :math:`\beta \approx 0.7` in 3D) giving :math:`n \approx 0.67`.
 
 Structural Evolution and Thixotropy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -150,14 +150,14 @@ During recovery after shearing stops:
 
    \delta_{\text{recovery}}(t) = \frac{1}{\pi} \int_{t_0}^t \left| \frac{d \ln \eta(t)}{dt} \right| dt
 
-- **δ_recovery < 0.1:** Fast recovery (< 10% viscosity change remaining)
-- **δ_recovery > 1:** Slow recovery (structural rebuilding ongoing)
+- :math:`\delta_{\text{recovery}} < 0.1`: Fast recovery (< 10% viscosity change remaining)
+- :math:`\delta_{\text{recovery}} > 1`: Slow recovery (structural rebuilding ongoing)
 
 **Applications:**
 
-- **Paints and coatings:** Quantify leveling time (δ should be < 0.2 after application)
+- **Paints and coatings:** Quantify leveling time (:math:`\delta` should be < 0.2 after application)
 - **Foods (yogurt, mayonnaise):** Assess mouthfeel recovery after swallowing
-- **3D printing inks:** Balance printability (low δ during extrusion) vs shape retention (high δ after deposition)
+- **3D printing inks:** Balance printability (low :math:`\delta` during extrusion) vs shape retention (high :math:`\delta` after deposition)
 
 Interpretation
 --------------
@@ -181,9 +181,9 @@ Interpretation
 
 **Practical decision rules:**
 
-- **δ < 0.1:** Rheological parameters can be assumed constant (safe for model fitting)
-- **0.1 ≤ δ < 0.5:** Moderate evolution (verify model fit residuals, consider shorter time windows)
-- **δ ≥ 0.5:** Significant structural change (time-dependent models required, or segment data)
+- :math:`\delta < 0.1`: Rheological parameters can be assumed constant (safe for model fitting)
+- :math:`0.1 \le \delta < 0.5`: Moderate evolution (verify model fit residuals, consider shorter time windows)
+- :math:`\delta \ge 0.5`: Significant structural change (time-dependent models required, or segment data)
 
 Validity Conditions
 -------------------
@@ -197,11 +197,11 @@ Validity Conditions
 
 **Additional considerations:**
 
-- **Noise amplification:** Derivative of noisy data amplifies high-frequency fluctuations
-  → always smooth before differentiating
+- **Noise amplification:** Derivative of noisy data amplifies high-frequency fluctuations;
+  always smooth before differentiating
 - **Non-monotonic data:** Segment into monotonic regions (e.g., gelation followed by
   degradation)
-- **Temperature drift:** Correct for thermal expansion before computing δ
+- **Temperature drift:** Correct for thermal expansion before computing :math:`\delta`
 
 Algorithm
 ---------
@@ -209,7 +209,7 @@ Algorithm
 Step-by-Step Procedure
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-**Input:** Time-resolved rheological observable :math:`\phi(t)` sampled at :math:`t_i`, i = 1...N.
+**Input:** Time-resolved rheological observable :math:`\phi(t)` sampled at :math:`t_i`, :math:`i = 1 \ldots N`.
 
 **Output:** Mutation number :math:`\delta(t)`, flags for quasi-steady validation.
 
@@ -257,12 +257,12 @@ Step-by-Step Procedure
 Computational Complexity
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Smoothing:** O(N) (Savitzky-Golay)
-- **Derivative:** O(N) (finite differences)
-- **Integration:** O(N) (cumulative sum)
-- **Total:** O(N)
+- **Smoothing:** :math:`O(N)` (Savitzky-Golay)
+- **Derivative:** :math:`O(N)` (finite differences)
+- **Integration:** :math:`O(N)` (cumulative sum)
+- **Total:** :math:`O(N)`
 
-Very efficient even for long time-series (N > 10,000 points).
+Very efficient even for long time-series (:math:`N > 10{,}000` points).
 
 Parameters
 ----------
@@ -288,14 +288,14 @@ Parameters
      - 0.1 conservative, 0.2 exploratory.
      - ``0.2``
    * - ``normalize``
-     - Normalize by pi (historical definition) or leave raw.
+     - Normalize by :math:`\pi` (historical definition) or leave raw.
      - Set ``False`` for custom scaling.
      - ``True``
 
 Parameter Selection Guidelines
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Characteristic time τ_c:**
+**Characteristic time** :math:`\tau_c`:
 
 - **Maxwell-like fluids:** :math:`\tau_c = \eta_0 / G_0` (ratio of zero-shear viscosity to modulus)
 - **Gels:** :math:`\tau_c = 1 / \omega_c` (reciprocal of crossover frequency)
@@ -306,13 +306,13 @@ Parameter Selection Guidelines
 
 - **Smooth data (SNR > 30 dB):** Small window (0.5-1.0 s)
 - **Noisy data (SNR < 20 dB):** Large window (2-5 s) to suppress fluctuations
-- **General rule:** window ≥ 5× sampling interval
+- **General rule:** window :math:`\ge 5\times` sampling interval
 
 **Threshold mn_threshold:**
 
-- **Conservative (δ < 0.1):** Minimal structural change allowed (< 10%)
-- **Standard (δ < 0.2):** Typical quasi-steady criterion (< 20%)
-- **Exploratory (δ < 0.5):** Moderate evolution acceptable (< 50%)
+- **Conservative** (:math:`\delta < 0.1`): Minimal structural change allowed (< 10%)
+- **Standard** (:math:`\delta < 0.2`): Typical quasi-steady criterion (< 20%)
+- **Exploratory** (:math:`\delta < 0.5`): Moderate evolution acceptable (< 50%)
 
 Input / Output Specifications
 -----------------------------
@@ -340,7 +340,7 @@ When to Use Mutation Number
 **2. Thixotropic recovery analysis:**
 
 - Quantify structural rebuilding after shear cessation
-- Optimize formulation for printability (high δ) vs shape retention (low δ)
+- Optimize formulation for printability (high :math:`\delta`) vs shape retention (low :math:`\delta`)
 - Assess mouthfeel recovery in food products
 
 **3. Aging and structural evolution:**
@@ -351,9 +351,9 @@ When to Use Mutation Number
 
 **4. Quality control:**
 
-- Verify batch-to-batch consistency (δ should be reproducible)
-- Identify processing-induced structural damage (high δ indicates instability)
-- Validate rheometer calibration (δ ≈ 0 for stable reference materials)
+- Verify batch-to-batch consistency (:math:`\delta` should be reproducible)
+- Identify processing-induced structural damage (high :math:`\delta` indicates instability)
+- Validate rheometer calibration (:math:`\delta \approx 0` for stable reference materials)
 
 Input Data Requirements
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -361,20 +361,20 @@ Input Data Requirements
 **Minimum requirements:**
 
 - **Time-resolved measurement:** Continuous monitoring at fixed frequency (e.g., 1 Hz)
-- **Sufficient duration:** At least 2× characteristic timescale (t ≥ 2τ_c)
-- **Adequate sampling:** At least 10 points per characteristic time (Δt ≤ 0.1τ_c)
-- **Monotonic observable:** G', G'', η should be monotonic (or segmented)
+- **Sufficient duration:** At least :math:`2\times` characteristic timescale (:math:`t \ge 2\tau_c`)
+- **Adequate sampling:** At least 10 points per characteristic time (:math:`\Delta t \le 0.1\tau_c`)
+- **Monotonic observable:** :math:`G'`, :math:`G''`, :math:`\eta` should be monotonic (or segmented)
 
 **Recommended:**
 
 - **High SNR:** Signal-to-noise ratio > 20 dB (minimize derivative noise)
-- **Temperature control:** ±0.1°C stability (thermal drift affects δ)
+- **Temperature control:** :math:`\pm 0.1` °C stability (thermal drift affects :math:`\delta`)
 - **Strain within LVR:** Linear viscoelastic region to avoid nonlinear artifacts
 
 Output Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~
 
-**Mutation number profile δ(t):**
+**Mutation number profile** :math:`\delta(t)`:
 
 - **Linear increase:** Constant structural evolution rate (exponential curing, gelation)
 - **Plateau:** Equilibrium reached (complete cure, stable gel)
@@ -392,8 +392,8 @@ Boolean indicators where :math:`\delta(t) > \delta_{\text{threshold}}`:
 
 **Summary statistics:**
 
-- **Mean δ:** Average structural change rate
-- **Max δ:** Peak evolution rate (identifies critical transition times)
+- **Mean** :math:`\delta`: Average structural change rate
+- **Max** :math:`\delta`: Peak evolution rate (identifies critical transition times)
 - **Duty cycle:** Fraction of time in rapid mutation regime
 
 Integration with RheoJAX Models
@@ -405,16 +405,16 @@ Quasi-Steady Validation Workflow
 **Before fitting rheological models:**
 
 1. **Compute mutation number** for time-resolved data
-2. **Identify quasi-steady windows** where δ < 0.2
+2. **Identify quasi-steady windows** where :math:`\delta < 0.2`
 3. **Fit models only within quasi-steady regions**
-4. **Reject fits if δ > 0.5** (significant structural evolution)
+4. **Reject fits if** :math:`\delta > 0.5` (significant structural evolution)
 
 **Example workflow:**
 
 .. code-block:: python
 
    from rheojax.transforms import MutationNumber
-   from rheojax.models.fractional_maxwell_gel import FractionalMaxwellGel
+   from rheojax.models import FractionalMaxwellGel
 
    # 1. Compute mutation number
    mn = MutationNumber(tau_c=10.0, mn_threshold=0.2)
@@ -443,12 +443,12 @@ Models That Benefit from Mutation Number
 
 **Classical models:**
 
-- :doc:`../models/classical/zener` — Verify equilibrium modulus Ge is truly time-independent
+- :doc:`../models/classical/zener` — Verify equilibrium modulus :math:`G_e` is truly time-independent
 
 Gel Point Detection Integration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Combine mutation number with tan δ monitoring:**
+**Combine mutation number with** :math:`\tan\delta` **monitoring:**
 
 .. code-block:: python
 
@@ -541,13 +541,13 @@ Diagnostic Checks
 
 **2. Derivative noise level:**
 
-Smooth data before computing δ to avoid noise amplification:
+Smooth data before computing :math:`\delta` to avoid noise amplification:
 
 .. math::
 
    \text{SNR}_{\text{derivative}} = \frac{\text{mean}|d\ln\phi/dt|}{\text{std}|d\ln\phi/dt|}
 
-- **SNR > 10:** Good (reliable δ)
+- **SNR > 10:** Good (reliable :math:`\delta`)
 - **SNR < 5:** Poor (increase smoothing window)
 
 **3. Quasi-steady fraction:**
@@ -556,33 +556,33 @@ Smooth data before computing δ to avoid noise amplification:
 
    f_{\text{quasi}} = \frac{\sum_i (\delta_i < \delta_{\text{threshold}})}{N}
 
-- **f_quasi > 0.8:** Mostly quasi-steady (safe for steady-state model fitting)
-- **f_quasi < 0.5:** Rapidly evolving (time-dependent models required)
+- :math:`f_{\text{quasi}} > 0.8`: Mostly quasi-steady (safe for steady-state model fitting)
+- :math:`f_{\text{quasi}} < 0.5`: Rapidly evolving (time-dependent models required)
 
 Common Failure Modes
 ~~~~~~~~~~~~~~~~~~~~~
 
-**1. Oscillating δ on flat plateaus:**
+**1. Oscillating** :math:`\delta` **on flat plateaus:**
 
-- **Symptom:** δ fluctuates despite constant G', G''
+- **Symptom:** :math:`\delta` fluctuates despite constant :math:`G'`, :math:`G''`
 - **Cause:** Derivative noise amplification
 - **Fix:** Increase ``window_seconds`` or apply heavier smoothing (Savitzky-Golay order 5)
 
 **2. False alarms at instrument re-zero:**
 
-- **Symptom:** δ spike when rheometer re-calibrates
+- **Symptom:** :math:`\delta` spike when rheometer re-calibrates
 - **Cause:** Sudden gap adjustment or torque reset
 - **Fix:** Mask or drop segments where strain/stress below detection limit
 
-**3. Auto τ_c too small:**
+**3. Auto** :math:`\tau_c` **too small:**
 
-- **Symptom:** δ >> 1 even for stable materials
-- **Cause:** Incorrect automatic τ_c estimation
+- **Symptom:** :math:`\delta \gg 1` even for stable materials
+- **Cause:** Incorrect automatic :math:`\tau_c` estimation
 - **Fix:** Provide explicit ``tau_c`` value or limit search range via ``tau_c_bounds``
 
 **4. Units mismatch:**
 
-- **Symptom:** NaN or inf in δ computation
+- **Symptom:** NaN or inf in :math:`\delta` computation
 - **Cause:** Observable contains zeros or negative values
 - **Fix:** Ensure :math:`\phi(t) > 0` before taking logarithms (offset if needed)
 
@@ -593,7 +593,7 @@ Parameter Sensitivity
 
 - **Small window (0.5 s):** Captures rapid changes but amplifies noise
 - **Large window (5 s):** Suppresses noise but misses fast transitions
-- **Optimal:** window ≈ 2-5× sampling interval
+- **Optimal:** window :math:`\approx 2\text{-}5\times` sampling interval
 
 **Threshold sensitivity:**
 
@@ -602,7 +602,7 @@ Parameter Sensitivity
 
 **Normalization sensitivity:**
 
-- **With π normalization:** Historical definition, δ ≈ 1 for π-fold change
+- **With** :math:`\pi` **normalization:** Historical definition, :math:`\delta \approx 1` for :math:`\pi`-fold change
 - **Without normalization:** Raw cumulative change, easier to interpret
 
 Cross-Validation Techniques
@@ -610,7 +610,7 @@ Cross-Validation Techniques
 
 **1. Multi-observable comparison:**
 
-Compute δ for both G'(t) and G''(t); should agree within 20%:
+Compute :math:`\delta` for both :math:`G'(t)` and :math:`G''(t)`; should agree within 20%:
 
 .. code-block:: python
 
@@ -622,7 +622,7 @@ Compute δ for both G'(t) and G''(t); should agree within 20%:
 
 **2. Repeated measurements:**
 
-Verify δ reproducibility across batches or trials:
+Verify :math:`\delta` reproducibility across batches or trials:
 
 .. code-block:: python
 
@@ -668,9 +668,9 @@ Determine gel point and validate quasi-steady regime for model fitting.
 
 **Input Data:**
 
-- Time sweep: 0-600 s at ω = 1 rad/s, γ = 1%
-- G'(t): 10 Pa → 5000 Pa (sol-gel transition)
-- G''(t): 5 Pa → 800 Pa
+- Time sweep: 0-600 s at :math:`\omega = 1` rad/s, :math:`\gamma = 1\%`
+- :math:`G'(t)`: 10 Pa to 5000 Pa (sol-gel transition)
+- :math:`G''(t)`: 5 Pa to 800 Pa
 - Sampling: 1 Hz (600 points)
 
 **Step-by-step analysis:**
@@ -730,15 +730,15 @@ Determine gel point and validate quasi-steady regime for model fitting.
 
 **Interpretation:**
 
-- **Gel point:** t_gel ≈ 300 s (peak mutation rate)
-- **tan δ_gel ≈ 0.625:** Corresponds to n ≈ 0.4 (solid-like gel)
-- **δ(t_gel) < 0.5:** Moderate mutation (quasi-steady approximation marginal at gel point)
+- **Gel point:** :math:`t_{\text{gel}} \approx 300` s (peak mutation rate)
+- :math:`\tan\delta_{\text{gel}} \approx 0.625`: Corresponds to :math:`n \approx 0.4` (solid-like gel)
+- :math:`\delta(t_{\text{gel}}) < 0.5`: Moderate mutation (quasi-steady approximation marginal at gel point)
 - **Quasi-steady windows:** Fit models to pre-gel (sol) and post-gel (gel) separately
 
 **Recommended models:**
 
-- **Pre-gel (t < 250 s):** Maxwell or FractionalMaxwellLiquid (liquid-like)
-- **Post-gel (t > 450 s):** Zener or FractionalZenerSS (solid-like with Ge)
+- **Pre-gel** (:math:`t < 250` s): Maxwell or FractionalMaxwellLiquid (liquid-like)
+- **Post-gel** (:math:`t > 450` s): Zener or FractionalZenerSS (solid-like with :math:`G_e`)
 
 Troubleshooting
 ---------------
@@ -759,10 +759,8 @@ References
 
 - Chambon, F. & Winter, H. H. "Linear viscoelasticity at the gel point of a crosslinking PDMS."
   *J. Rheol.* 31, 683-697 (1987).
-- Mours, M. & Winter, H. H. "Relaxation patterns in rheometric perspective: mutation time."
-  *Rheol. Acta* 33, 385-397 (1994).
-- Winter, H. H. & Mours, M. "The crossover modulus: a static universal." *Rheol. Acta* 47,
-  655-659 (2008).
+- Mours, M. & Winter, H. H. "Time-resolved rheometry."
+  *Rheol. Acta* 33, 385-397 (1994). https://doi.org/10.1007/BF00366581
 - Winter, H.H., Chambon, F. (1986). "Analysis of Linear Viscoelasticity of a Crosslinking
   Polymer at the Gel Point." *Journal of Rheology*, 30(2), 367-382.
 

@@ -266,11 +266,11 @@ VLBVariant supports the standard NLSQ + NUTS pipeline:
 .. code-block:: python
 
    # NLSQ warm start
-   model.fit(omega, G_star, test_mode="oscillation")
+   model.fit(omega, G_star, test_mode='oscillation')
 
    # Bayesian posterior
    result = model.fit_bayesian(
-       omega, G_star, test_mode="oscillation",
+       omega, G_star, test_mode='oscillation',
        num_warmup=1000, num_samples=2000,
    )
 

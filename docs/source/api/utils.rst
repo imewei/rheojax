@@ -1,7 +1,7 @@
 Utilities (rheojax.utils)
 =========================
 
-The utils module provides numerical utilities for rheological analysis, including special functions and optimization tools.
+The utils module provides numerical utilities for rheological analysis, including special functions, optimization tools, fit quality metrics, device detection, and modulus conversion for DMTA support.
 
 Mittag-Leffler Functions
 ------------------------
@@ -608,33 +608,33 @@ The decay type detection uses statistical analysis on log-transformed data:
 
 **Exponential Decay Detection**
 
-Linear regression on log(G) vs t:
+Linear regression on :math:`\log(G)` vs :math:`t`:
 
 .. math::
 
    \log G(t) = \log G_0 - \frac{t}{\tau}
 
-High R^2 (> 0.90) indicates exponential decay (Maxwell-like behavior).
+High :math:`R^2` (> 0.90) indicates exponential decay (Maxwell-like behavior).
 
 **Power-Law Decay Detection**
 
-Linear regression on log(G) vs log(t):
+Linear regression on :math:`\log(G)` vs :math:`\log(t)`:
 
 .. math::
 
    \log G(t) = \log G_0 - \alpha \log t
 
-High R^2 (> 0.90) indicates power-law decay (gel-like behavior).
+High :math:`R^2` (> 0.90) indicates power-law decay (gel-like behavior).
 
 **Stretched Exponential Detection**
 
-Linear regression on log(-log(G/G_0)) vs log(t):
+Linear regression on :math:`\log(-\log(G/G_0))` vs :math:`\log(t)`:
 
 .. math::
 
    \log\left(-\log\frac{G(t)}{G_0}\right) = \beta \log t + \text{const}
 
-High R^2 (> 0.90) indicates stretched exponential behavior.
+High :math:`R^2` (> 0.90) indicates stretched exponential behavior.
 
 Material Type Classification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -655,8 +655,8 @@ Material type is determined by the decay ratio:
 
 Material type is determined by low-frequency behavior:
 
-- **Solid**: G' > G" at lowest frequency (elastic dominant)
-- **Liquid**: G" > G' at lowest frequency (viscous dominant)
+- **Solid**: :math:`G' > G''` at lowest frequency (elastic dominant)
+- **Liquid**: :math:`G'' > G'` at lowest frequency (viscous dominant)
 
 Examples
 ~~~~~~~~
@@ -704,7 +704,7 @@ Automatic Checking During Fit
 
 .. code-block:: python
 
-    from rheojax.models.maxwell import Maxwell
+    from rheojax.models import Maxwell
     import numpy as np
 
     # Enable automatic compatibility checking
@@ -927,7 +927,7 @@ least-squares fitting can encounter problems:
 **Problem**: Linear residuals :math:`\sum (y_{\text{pred}} - y_{\text{exp}})^2` are dominated
 by high-magnitude points, causing poor fits at low values.
 
-**Example**: For G' spanning 100 Pa to 1e6 Pa:
+**Example**: For :math:`G'` spanning 100 Pa to 1e6 Pa:
 
 - High-frequency error (1e6 Pa): residual ~ 1e12
 - Low-frequency error (100 Pa): residual ~ 1e4
@@ -1085,6 +1085,277 @@ See Also
 - :doc:`core` - BaseModel integration with automatic strategy selection
 - :doc:`../user_guide/getting_started` - Basic fitting examples
 - :mod:`rheojax.utils.optimization` - Optimization functions using these strategies
+
+Modulus Conversion (DMTA Support)
+---------------------------------
+
+.. automodule:: rheojax.utils.modulus_conversion
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The modulus conversion module provides utilities for converting between
+shear modulus G* and Young's modulus E* for DMTA/DMA data analysis.
+
+The fundamental relationship from isotropic linear elasticity:
+
+.. math::
+
+   E^*(\omega) = 2(1 + \nu) \, G^*(\omega)
+
+where :math:`\nu` is the Poisson's ratio of the material.
+
+Functions
+~~~~~~~~~
+
+.. autofunction:: rheojax.utils.modulus_conversion.convert_modulus
+   :noindex:
+
+   Array-level conversion between E* and G* using Poisson's ratio.
+
+   Converts complex modulus arrays in either direction:
+
+   - ``tension`` → ``shear``: :math:`G^* = E^* / 2(1+\nu)`
+   - ``shear`` → ``tension``: :math:`E^* = 2(1+\nu) \, G^*`
+
+.. autofunction:: rheojax.utils.modulus_conversion.convert_rheodata
+   :noindex:
+
+   RheoData-level conversion with automatic metadata update (units, deformation_mode).
+
+Material Presets
+~~~~~~~~~~~~~~~~
+
+.. data:: rheojax.utils.modulus_conversion.POISSON_PRESETS
+
+   Dictionary of common Poisson's ratio values by material class:
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 30 20 50
+
+      * - Material
+        - :math:`\nu`
+        - Notes
+      * - ``rubber`` / ``elastomer``
+        - 0.50
+        - Incompressible (E = 3G)
+      * - ``hydrogel``
+        - 0.50
+        - Water-swollen networks
+      * - ``semicrystalline``
+        - 0.40
+        - PE, PP, PA, PET
+      * - ``thermoset``
+        - 0.38
+        - Epoxies, polyesters
+      * - ``glassy_polymer``
+        - 0.35
+        - PS, PMMA, PC below Tg
+      * - ``metal``
+        - 0.30
+        - Steel, aluminum
+      * - ``foam``
+        - 0.30
+        - Open-cell foams
+
+Examples
+~~~~~~~~
+
+Array-Level Conversion
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    import numpy as np
+    from rheojax.utils.modulus_conversion import convert_modulus, POISSON_PRESETS
+
+    # DMTA data: E* from tensile DMA
+    omega = np.logspace(-2, 2, 50)
+    E_prime = 3e9 * np.ones(50)       # E' (Pa)
+    E_double_prime = 1e8 * omega**0.3  # E'' (Pa)
+    E_star = E_prime + 1j * E_double_prime
+
+    # Convert to G* for rubber (v=0.5, factor=3)
+    G_star = convert_modulus(E_star, "tension", "shear", poisson_ratio=0.5)
+    # G* = E* / 3 for rubber
+
+    # Use preset Poisson's ratio
+    nu = POISSON_PRESETS["glassy_polymer"]  # 0.35
+    G_star = convert_modulus(E_star, "tension", "shear", poisson_ratio=nu)
+
+Fitting DMTA Data Directly
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.models import Maxwell
+
+    # All models accept deformation_mode in fit()/predict()
+    model = Maxwell()
+    model.fit(
+        omega, E_star,
+        test_mode='oscillation',
+        deformation_mode='tension',
+        poisson_ratio=0.5,
+    )
+
+    # predict() returns E* when fitted with tensile deformation_mode
+    E_pred = model.predict(omega, test_mode='oscillation')
+
+Device Utilities
+----------------
+
+.. automodule:: rheojax.utils.device
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The device module provides GPU detection and diagnostic utilities for RheoJAX.
+These functions help users identify available compute resources and configure
+JAX for optimal performance.
+
+Functions
+~~~~~~~~~
+
+.. autofunction:: rheojax.utils.device.check_gpu_availability
+   :noindex:
+
+   Checks if GPU hardware and CUDA are available but JAX is running CPU-only.
+   Prints a helpful message with installation instructions if GPU is not being used.
+
+.. autofunction:: rheojax.utils.device.get_device_info
+   :noindex:
+
+   Returns comprehensive device information including JAX version, backend,
+   device list, GPU hardware name, SM version, and system CUDA version.
+
+.. autofunction:: rheojax.utils.device.get_gpu_memory_info
+   :noindex:
+
+   Queries nvidia-smi for GPU memory utilization (total, used, free, utilization %).
+   Returns empty dict on systems without NVIDIA GPUs.
+
+.. autofunction:: rheojax.utils.device.print_device_summary
+   :noindex:
+
+   Prints a formatted summary of the compute environment (JAX version, devices,
+   GPU memory). Useful at the start of scripts and notebooks.
+
+Examples
+~~~~~~~~
+
+Quick Environment Check
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils import print_device_summary, check_gpu_availability
+
+    # Print full device summary at script start
+    print_device_summary()
+    # JAX Device Summary
+    # ==================
+    # JAX version: 0.8.3
+    # Devices: [CpuDevice(id=0)]
+    # Using: CPU-only
+
+    # Programmatic check
+    using_gpu = check_gpu_availability(warn=False)
+    if not using_gpu:
+        print("Running on CPU — consider installing JAX with CUDA support")
+
+Detailed Device Info
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils import get_device_info, get_gpu_memory_info
+
+    info = get_device_info()
+    print(f"JAX {info['jax_version']} on {info['jax_backend']}")
+    print(f"GPU hardware: {info['gpu_hardware'] or 'None'}")
+    print(f"System CUDA: {info['system_cuda_version'] or 'Not found'}")
+
+    # GPU memory (if available)
+    mem = get_gpu_memory_info()
+    if mem:
+        print(f"GPU Memory: {mem['used_mb']}/{mem['total_mb']} MB")
+
+See Also
+~~~~~~~~
+
+- :doc:`../development_status` - Technology stack and GPU requirements
+- ``make install-jax-gpu`` - Automated GPU JAX installation
+
+
+Fit Quality Metrics
+-------------------
+
+.. automodule:: rheojax.utils.metrics
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+The metrics module provides standard statistical measures for evaluating
+model fit quality after NLSQ optimization or Bayesian inference.
+
+Functions
+~~~~~~~~~
+
+.. autofunction:: rheojax.utils.metrics.compute_fit_quality
+   :noindex:
+
+   Computes R², RMSE, and normalized RMSE for real-valued data.
+   Handles multi-dimensional arrays (flattened automatically).
+
+.. autofunction:: rheojax.utils.metrics.r2_complex
+   :noindex:
+
+   Computes R² for complex-valued modulus data (G*, E*) using magnitude comparison.
+   Useful for oscillation fits where predictions are complex.
+
+Examples
+~~~~~~~~
+
+Real-Valued Fit Assessment
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    import numpy as np
+    from rheojax.utils import compute_fit_quality
+
+    # After model fitting
+    y_data = np.array([1000, 800, 650, 500, 320, 200])
+    y_pred = np.array([1010, 790, 660, 495, 325, 195])
+
+    metrics = compute_fit_quality(y_data, y_pred)
+    print(f"R² = {metrics['R2']:.4f}")     # 0.9997
+    print(f"RMSE = {metrics['RMSE']:.1f}")  # 7.9 Pa
+    print(f"NRMSE = {metrics['nrmse']:.4f}")  # 0.0099
+
+Complex Modulus Fit Assessment
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    import numpy as np
+    from rheojax.utils import r2_complex
+
+    # Oscillation data (G' + iG'')
+    G_star_data = np.array([1e5 + 1e3j, 5e4 + 5e3j, 1e4 + 2e4j])
+    G_star_pred = np.array([9.9e4 + 1.1e3j, 5.1e4 + 4.9e3j, 1.05e4 + 2.1e4j])
+
+    r2 = r2_complex(G_star_data, G_star_pred)
+    print(f"R² (magnitude) = {r2:.4f}")
+
+See Also
+~~~~~~~~
+
+- :doc:`core` - BaseModel ``fit()`` returns optimization results with fit statistics
+- :doc:`../user_guide/02_model_usage/fitting_strategies` - Fitting strategy guide
+
 
 EPM Kernels
 -----------

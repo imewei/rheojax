@@ -8,9 +8,9 @@ Quick Reference
 ---------------
 
 - **Use when:** Shear banding, wall slip, non-homogeneous flows in yield-stress fluids
-- **Parameters:** 10 (G, tau_y, K, n_flow, f_eq, f_inf, theta, a, n_rejuv, xi); gap_width is a constructor arg
+- **Parameters:** 10 (:math:`G`, :math:`\tau_y`, :math:`K`, :math:`n_{\text{flow}}`, :math:`f_{\text{eq}}`, :math:`f_\infty`, :math:`\theta`, :math:`a`, :math:`n_{\text{rejuv}}`, :math:`\xi`); gap_width is a constructor arg
 - **Key equation:** :math:`\partial_t f = (f_{\rm loc}(\sigma) - f)/\theta + \xi^2 \nabla^2 f`
-- **Test modes:** Rotation, start-up, creep, oscillation (with spatial profiles)
+- **Test modes:** Rotation, startup, creep, oscillation (with spatial profiles)
 - **Material examples:** Concentrated emulsions, Carbopol gels, colloidal pastes, suspensions in microchannels
 
 Notation Guide
@@ -567,21 +567,21 @@ Parameter Interpretation
 :math:`\xi` **(Cooperativity Length)**:
    Characteristic length scale over which plastic rearrangements induce cooperative flow in neighboring regions.
    *For graduate students*: :math:`\xi \sim 3`-10 × d_particle (colloidal cage size, droplet diameter). Governs fluidity diffusion via :math:`\partial f/\partial t = \ldots + \xi^2 \nabla^2 f`. Dimensionless confinement ratio :math:`H/\xi` controls bulk (:math:`H/\xi \gg 10`) vs nonlocal (:math:`H/\xi \sim 1`-10) regimes. Shear band interface width :math:`\sim \xi`. Relates to correlation length of yielding events.
-   *For practitioners*: Measure from gap-dependent flow curves: :math:`\sigma_{y,app}(H) = \sigma_{y,bulk} \cdot [1 - c(\xi/H)]`. Typical values: emulsions (10 :math:`\mu\text{m}` droplets) :math:`\xi` ~ 30-50 :math:`\mu\text{m}`, colloidal glasses :math:`\xi` ~ 1-10 :math:`\mu\text{m}`. Critical for microfluidic design (H < :math:`10\xi` shows strong confinement).
+   *For practitioners*: Measure from gap-dependent flow curves: :math:`\sigma_{y,\text{app}}(H) = \sigma_{y,\text{bulk}} \cdot [1 - c(\xi/H)]`. Typical values: emulsions (10 :math:`\mu\text{m}` droplets) :math:`\xi \sim 30\text{--}50` :math:`\mu\text{m}`, colloidal glasses :math:`\xi \sim 1\text{--}10` :math:`\mu\text{m}`. Critical for microfluidic design (:math:`H < 10\xi` shows strong confinement).
 
 :math:`\theta` **(Reorganization Time)**:
    Timescale for local structural equilibration, analogous to :math:`\tau_{age}` in local model.
-   *For graduate students*: Competes with diffusive timescale t_diff ~ H^2/:math:`\xi^2`. Ratio :math:`\theta/t_diff` determines if spatial gradients persist (:math:`\theta` >> t_diff) or homogenize (:math:`\theta` << t_diff) during transients. Fluidity diffusivity D_f = :math:`\xi^2/\theta`.
-   *For practitioners*: Extract from startup dynamics. Typical: :math:`\theta` = 0.1-100 s. Fast relaxation (:math:`\theta` < 1 s) = rapidly homogenizing flows, slow relaxation (:math:`\theta` > 10 s) = persistent heterogeneity.
+   *For graduate students*: Competes with diffusive timescale :math:`t_{\text{diff}} \sim H^2/\xi^2`. Ratio :math:`\theta/t_{\text{diff}}` determines if spatial gradients persist (:math:`\theta \gg t_{\text{diff}}`) or homogenize (:math:`\theta \ll t_{\text{diff}}`) during transients. Fluidity diffusivity :math:`D_f = \xi^2/\theta`.
+   *For practitioners*: Extract from startup dynamics. Typical: :math:`\theta = 0.1\text{--}100` s. Fast relaxation (:math:`\theta < 1` s) = rapidly homogenizing flows, slow relaxation (:math:`\theta > 10` s) = persistent heterogeneity.
 
 **H (Gap Width)**:
    Geometric parameter controlling confinement effects via dimensionless ratio H/:math:`\xi`.
-   *For graduate students*: Key control parameter. H/:math:`\xi` >> 10 recovers bulk/local behavior. H/:math:`\xi` ~ 1-10 exhibits enhanced apparent fluidity, reduced yield stress. H/:math:`\xi` < 1 = fully cooperative homogenized flow. Universal confinement scaling: :math:`\sigma_{y,app}/\sigma_{y,bulk}` ~ f(H/:math:`\xi`).
-   *For practitioners*: Perform gap-dependent measurements to extract :math:`\xi`. For processing, H > :math:`10\xi` ensures bulk-like behavior. Narrower gaps (microfluidics, thin films) require nonlocal modeling.
+   *For graduate students*: Key control parameter. :math:`H/\xi \gg 10` recovers bulk/local behavior. :math:`H/\xi \sim 1\text{--}10` exhibits enhanced apparent fluidity, reduced yield stress. :math:`H/\xi < 1` = fully cooperative homogenized flow. Universal confinement scaling: :math:`\sigma_{y,\text{app}}/\sigma_{y,\text{bulk}} \sim f(H/\xi)`.
+   *For practitioners*: Perform gap-dependent measurements to extract :math:`\xi`. For processing, :math:`H > 10\xi` ensures bulk-like behavior. Narrower gaps (microfluidics, thin films) require nonlocal modeling.
 
 **f_w (Wall Fluidity, Dirichlet BC)**:
    Enhanced fluidity at walls due to boundary slip or roughness effects.
-   *For graduate students*: Boundary condition: f(y=0,H) = f_w. Physical origin: wall-particle interactions, reduced coordination at boundaries. Creates fluidity boundary layers with thickness ~ :math:`\xi`. Controls apparent slip velocity v_slip ~ :math:`\xi`·f_w\ :math:`\cdot \sigma`.
+   *For graduate students*: Boundary condition: f(y=0,H) = f_w. Physical origin: wall-particle interactions, reduced coordination at boundaries. Creates fluidity boundary layers with thickness :math:`\sim \xi`. Controls apparent slip velocity :math:`v_{\text{slip}} \sim \xi \cdot f_w \cdot \sigma`.
    *For practitioners*: Fit from velocity profiles or apparent slip measurements. f_w = 0 (no-flux Neumann BC) vs f_w > 0 (slip). Roughness or surfactants modify f_w.
 
 Material Classification

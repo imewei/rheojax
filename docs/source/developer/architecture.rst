@@ -9,7 +9,7 @@ Design Philosophy
 JAX-First Design
 ~~~~~~~~~~~~~~~~
 
-All numerical operations in rheo use JAX for:
+All numerical operations in rheojax use JAX for:
 
 **Automatic Differentiation**
     Exact gradients for optimization without manual derivatives
@@ -25,8 +25,9 @@ All numerical operations in rheo use JAX for:
 
 .. code-block:: python
 
-    import jax
-    import jax.numpy as jnp
+    # ALWAYS use safe_import_jax() — never import jax directly
+    from rheojax.core.jax_config import safe_import_jax
+    jax, jnp = safe_import_jax()  # Ensures float64 is enabled
 
     @jax.jit
     def relaxation_modulus(t, E, tau):
@@ -62,31 +63,60 @@ Module Structure
 
 .. code-block:: text
 
-    rheo/
+    rheojax/
     |--- core/               # Core abstractions
-    |   |--- base.py        # BaseModel, BaseTransform
-    |   |--- data.py        # RheoData container
-    |   |--- parameters.py  # Parameter system
-    |   |--- test_modes.py  # Test mode detection
-    |   \--- registry.py    # Model/transform registry
-    |--- models/            # Rheological models (Phase 2)
-    |   |--- maxwell.py
-    |   |--- zener.py
-    |   \--- ...
-    |--- transforms/        # Data transforms (Phase 2)
-    |   |--- fft.py
-    |   |--- mastercurve.py
-    |   \--- ...
-    |--- utils/             # Utilities
-    |   |--- mittag_leffler.py  # Special functions
-    |   \--- optimization.py    # Fitting tools
-    |--- io/                # File I/O
-    |   |--- readers/       # Data readers
-    |   \--- writers/       # Data writers
-    |--- visualization/     # Plotting
-    |   |--- plotter.py
-    |   \--- templates.py
-    \--- pipelines/         # High-level workflows (Phase 2)
+    |   |--- base.py         # BaseModel (BayesianMixin), BaseTransform
+    |   |--- bayesian.py     # Bayesian inference engine (NumPyro NUTS)
+    |   |--- data.py         # RheoData container (JAX-native)
+    |   |--- parameters.py   # ParameterSet with bounds/priors
+    |   |--- test_modes.py   # Test mode detection + DeformationMode enum
+    |   |--- registry.py     # ModelRegistry + TransformRegistry
+    |   |--- inventory.py    # Protocol enum + model capability discovery
+    |   \--- jax_config.py   # safe_import_jax() for float64
+    |--- models/             # 53 rheological models across 22 families
+    |   |--- classical/      # Maxwell, Zener, SpringPot
+    |   |--- fractional/     # FML, FZSS, FMG, Burgers, etc. (11 models)
+    |   |--- flow/           # PowerLaw, Carreau, HB, Bingham, Cross, CY
+    |   |--- multimode/      # GeneralizedMaxwell (Prony series)
+    |   |--- giesekus/       # SingleMode, MultiMode (tensor ODE)
+    |   |--- sgr/            # SGRConventional, SGRGeneric
+    |   |--- fluidity/       # Local, Nonlocal + Saramito variants (4)
+    |   |--- epm/            # LatticeEPM, TensorialEPM
+    |   |--- ikh/            # MIKH, MLIKH
+    |   |--- fikh/           # FIKH, FMLIKH (fractional IKH)
+    |   |--- dmt/            # DMTLocal, DMTNonlocal (thixotropy)
+    |   |--- hl/             # HebraudLequeux
+    |   |--- stz/            # STZConventional
+    |   |--- spp/            # SPPYieldStress (LAOS)
+    |   |--- itt_mct/        # ITTMCTSchematic, Isotropic (MCT)
+    |   |--- tnt/            # SingleMode, Cates, LoopBridge, etc. (5)
+    |   |--- vlb/            # Local, MultiNetwork, Variant, Nonlocal
+    |   |--- hvm/            # HVMLocal (vitrimer, 3 subnetworks)
+    |   \--- hvnm/           # HVNMLocal (nanocomposite, 4 subnetworks)
+    |--- transforms/         # 7 data transforms
+    |   |--- fft.py          # FFT spectral analysis
+    |   |--- mastercurve.py  # TTS + auto shift factors
+    |   |--- owchirp.py      # OWChirp LAOS analysis
+    |   |--- srfs.py         # Strain-Rate Frequency Superposition
+    |   |--- spp.py          # SPP decomposition
+    |   |--- mutation_number.py  # Mutation number
+    |   \--- smooth_derivative.py  # Savitzky-Golay derivatives
+    |--- utils/              # Utilities
+    |   |--- optimization.py     # NLSQ interface (5-270x vs scipy)
+    |   |--- prony.py            # Prony series decomposition
+    |   |--- mct_kernels.py      # MCT numerical kernels
+    |   |--- modulus_conversion.py  # E* ↔ G* conversion (DMTA)
+    |   \--- initialization/     # Smart parameter initialization
+    |--- pipeline/           # High-level workflows
+    |   |--- base.py         # Pipeline (fluent API)
+    |   |--- bayesian.py     # BayesianPipeline (ArviZ diagnostics)
+    |   \--- workflows.py    # Batch processing
+    |--- io/                 # File I/O
+    |   |--- readers/        # TRIOS, CSV, Excel, Anton Paar, auto-detect
+    |   \--- writers/        # HDF5, Excel writers
+    |--- visualization/      # Plotting (3 styles)
+    |--- logging/            # Structured logging (JAX-safe)
+    \--- gui/                # PyQt/PySide6 interface
 
 Component Relationships
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -94,33 +124,35 @@ Component Relationships
 .. code-block:: text
 
     +---------------------------------------------+
-    |           User Applications                  |
+    |        User Applications / GUI               |
     \------------------+---------------------------+
                       |
     +-----------------v---------------------------+
-    |            Pipelines (Phase 2)               |
-    |  High-level workflows and analysis chains    |
+    |         Pipeline / BayesianPipeline          |
+    |    Fluent workflows + batch processing       |
     \------------------+---------------------------+
                       |
          +------------+------------+
          |            |            |
-    +----v---+   +---v----+  +---v--------+
-    | Models |   |Transforms| |Visualization|
-    |(Phase2)|   | (Phase2) | |   (Phase1) |
-    \-----+---+   \----+-----+ \----+--------+
+    +----v----+  +---v-----+ +---v-----------+
+    | Models  |  |Transforms| | Visualization |
+    | (53)    |  |   (7)    | | (3 styles)    |
+    \----+----+  \----+-----+ \----+----------+
          |           |            |
     +----v-----------v------------v--------+
     |           Core Components             |
-    |  RheoData, Parameters, Base Classes   |
+    |  RheoData, Parameters, BayesianMixin  |
+    |  Registry, DeformationMode, Logging   |
     \-----+--------------------------+-------+
          |                          |
     +----v-----+              +----v-----+
     |   I/O    |              |  Utils   |
-    | (Phase1) |              |(Phase1)  |
-    \-----------+              \-----------+
+    | (readers |              | (NLSQ,   |
+    |  writers)|              |  Prony)  |
+    \----------+              \----------+
          |                          |
     +----v--------------------------v----+
-    |         JAX / NumPy / SciPy         |
+    |    JAX / NLSQ / NumPyro / ArviZ    |
     |      (Numerical Foundation)         |
     \--------------------------------------+
 
@@ -132,20 +164,29 @@ Model Hierarchy
 
 .. code-block:: text
 
-    BaseModel (ABC)
-    |--- ViscoelasticModel
-    |   |--- Maxwell
-    |   |--- Zener
-    |   |--- KelvinVoigt
-    |   \--- GeneralizedMaxwell
-    |--- FractionalModel
-    |   |--- FractionalMaxwell
-    |   |--- FractionalZener
-    |   \--- FractionalKelvinVoigt
-    \--- FlowModel
-        |--- PowerLaw
-        |--- Carreau
-        \--- HerschelBulkley
+    BaseModel (ABC) + BayesianMixin
+    |--- Classical: Maxwell, Zener, SpringPot
+    |--- Fractional: FML, FZSS, FMG, FKV, Burgers, etc. (11 models)
+    |--- Flow: PowerLaw, Carreau, CarreauYasuda, Cross, HB, Bingham
+    |--- GeneralizedMaxwell (multi-mode Prony series)
+    |--- Giesekus: Single/MultiMode (tensor ODE)
+    |--- SGR: Conventional, GENERIC (soft glassy rheology)
+    |--- Fluidity: Local, Nonlocal + Saramito Local/Nonlocal
+    |--- EPM: Lattice, Tensorial (elasto-plastic)
+    |--- IKH/FIKH: MIKH, MLIKH, FIKH, FMLIKH (kinematic hardening)
+    |--- DMT: Local, Nonlocal (thixotropy)
+    |--- HL, STZ, SPP (single-model families)
+    |--- ITT-MCT: Schematic, Isotropic (mode-coupling theory)
+    |--- TNT: SingleMode, Cates, LoopBridge, MultiSpecies, StickyRouse
+    |--- VLBBase → VLBLocal, MultiNetwork, Variant, Nonlocal
+    |--- VLBBase → HVMBase → HVMLocal (vitrimer)
+    \--- VLBBase → HVMBase → HVNMBase → HVNMLocal (nanocomposite)
+
+    All 53 models support: .fit(), .predict(), .fit_bayesian(),
+    .sample_prior(), .get_credible_intervals()
+
+    DMTA: 41+ oscillation-capable models accept deformation_mode='tension'
+    for automatic E* ↔ G* conversion
 
 Transform Hierarchy
 ~~~~~~~~~~~~~~~~~~~
@@ -153,17 +194,13 @@ Transform Hierarchy
 .. code-block:: text
 
     BaseTransform (ABC)
-    |--- FrequencyTransform
-    |   |--- FFT
-    |   \--- InverseFFT
-    |--- DataTransform
-    |   |--- Smoothing
-    |   |--- Interpolation
-    |   \--- Resampling
-    \--- AnalysisTransform
-        |--- Mastercurve
-        |--- OWChirp
-        \--- MutationNumber
+    |--- FFT                # Spectral analysis
+    |--- Mastercurve        # TTS (WLF, Arrhenius, auto shift)
+    |--- OWChirp            # LAOS frequency-domain analysis
+    |--- MutationNumber     # Thermorheological simplicity check
+    |--- SmoothDerivative   # Savitzky-Golay smoothing
+    |--- SRFS               # Strain-rate frequency superposition
+    \--- SPP                # Sequence of Physical Processes (LAOS)
 
 Extension Points
 ----------------
@@ -278,15 +315,16 @@ Models and transforms are registered for discovery:
 
     from rheojax.core.registry import ModelRegistry, TransformRegistry
 
-    # Register model (Phase 2)
+    # Register model with protocols and optional deformation modes
     @ModelRegistry.register(
         name="CustomModel",
-        test_modes=["relaxation", "creep"]
+        protocols=[Protocol.RELAXATION, Protocol.CREEP, Protocol.OSCILLATION],
+        deformation_modes=[DeformationMode.SHEAR, DeformationMode.TENSION]
     )
     class CustomModel(BaseModel):
         pass
 
-    # Register transform (Phase 2)
+    # Register transform
     @TransformRegistry.register(name="CustomTransform")
     class CustomTransform(BaseTransform):
         pass
@@ -345,7 +383,7 @@ JAX Integration Details
 Array Handling
 ~~~~~~~~~~~~~~
 
-rheo supports both NumPy and JAX arrays seamlessly:
+rheojax supports both NumPy and JAX arrays seamlessly:
 
 .. code-block:: python
 
@@ -523,7 +561,7 @@ Aim for >90% test coverage:
 .. code-block:: bash
 
     # Run tests with coverage
-    pytest --cov=rheo --cov-report=html
+    pytest --cov=rheojax --cov-report=html
 
     # View coverage report
     open htmlcov/index.html

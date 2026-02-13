@@ -29,7 +29,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import TestMode, detect_test_mode
+from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
 from rheojax.logging import get_logger, log_fit
 
 # Module logger
@@ -43,6 +43,12 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class Zener(BaseModel):
@@ -240,7 +246,7 @@ class Zener(BaseModel):
 
         return self
 
-    def _predict(self, X):
+    def _predict(self, X, **kwargs):
         """Predict response based on input data.
 
         Args:

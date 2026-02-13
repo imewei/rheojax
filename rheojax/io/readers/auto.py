@@ -14,6 +14,19 @@ from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
 
+# Exceptions that indicate a real system-level failure, NOT a format mismatch.
+# These must never be caught by the reader cascade.
+_FATAL_EXCEPTIONS = (
+    KeyboardInterrupt,
+    SystemExit,
+    MemoryError,
+    PermissionError,
+    OSError,
+)
+
+# File size threshold for warning (100 MB)
+_FILE_SIZE_WARNING_BYTES = 100 * 1024 * 1024
+
 
 def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     """Automatically detect file format and load data.
@@ -41,6 +54,25 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     if not filepath.exists():
         logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
+
+    if filepath.is_dir():
+        raise IsADirectoryError(f"Expected a file, got a directory: {filepath}")
+
+    # Warn about large files that may consume significant memory
+    file_size = filepath.stat().st_size
+    if file_size > _FILE_SIZE_WARNING_BYTES:
+        size_mb = file_size / (1024 * 1024)
+        logger.warning(
+            "Large file detected — loading may consume significant memory",
+            filepath=str(filepath),
+            size_mb=f"{size_mb:.1f}",
+        )
+        warnings.warn(
+            f"File is {size_mb:.0f} MB. Loading may consume significant memory. "
+            f"Consider using chunked reading if available.",
+            ResourceWarning,
+            stacklevel=2,
+        )
 
     extension = filepath.suffix.lower()
 
@@ -91,6 +123,8 @@ def _try_trios_then_anton_then_csv(
         result = load_trios(filepath, **kwargs)
         logger.debug("TRIOS reader succeeded", filepath=str(filepath))
         return result
+    except _FATAL_EXCEPTIONS:
+        raise
     except Exception as e:
         logger.debug("TRIOS reader failed", filepath=str(filepath), error=str(e))
         warnings.warn(
@@ -102,6 +136,8 @@ def _try_trios_then_anton_then_csv(
         result = load_anton_paar(filepath, **kwargs)
         logger.debug("Anton Paar reader succeeded", filepath=str(filepath))
         return result
+    except _FATAL_EXCEPTIONS:
+        raise
     except Exception as e:
         logger.debug("Anton Paar reader failed", filepath=str(filepath), error=str(e))
         warnings.warn(
@@ -114,6 +150,8 @@ def _try_trios_then_anton_then_csv(
         result = _try_csv(filepath, **kwargs)
         logger.debug("CSV reader succeeded", filepath=str(filepath))
         return result
+    except _FATAL_EXCEPTIONS:
+        raise
     except Exception as e:
         logger.error(
             "Could not parse file with any reader",
@@ -165,18 +203,27 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                     x_col = df.columns[columns_lower.index(col_name)]
                     break
 
-            # Try to find stress/modulus column
-            y_col = None
-            for col_name in [
-                "stress",
-                "strain",
-                "modulus",
-                "storage modulus",
-                "viscosity",
-            ]:
-                if col_name in columns_lower:
-                    y_col = df.columns[columns_lower.index(col_name)]
-                    break
+            # Try to find complex modulus pair (E'/E'' or G'/G'')
+            y_cols_pair = _detect_modulus_pair(df.columns, columns_lower)
+            if y_cols_pair is not None:
+                kwargs["y_cols"] = y_cols_pair
+                kwargs.pop("y_col", None)
+                y_col = "FOUND_PAIR"
+            else:
+                y_col = None
+
+            # Try to find stress/modulus column (single y)
+            if y_cols_pair is None:
+                for col_name in [
+                    "stress",
+                    "strain",
+                    "modulus",
+                    "storage modulus",
+                    "viscosity",
+                ]:
+                    if col_name in columns_lower:
+                        y_col = df.columns[columns_lower.index(col_name)]
+                        break
 
             if x_col is None or y_col is None:
                 logger.error(
@@ -189,14 +236,15 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                     "Please specify x_col and y_col."
                 )
 
+            kwargs["x_col"] = x_col
+            if y_col != "FOUND_PAIR":
+                kwargs["y_col"] = y_col
             logger.debug(
                 "Auto-detected columns",
                 filepath=str(filepath),
                 x_col=x_col,
-                y_col=y_col,
+                y_col=y_col if y_col != "FOUND_PAIR" else kwargs.get("y_cols"),
             )
-            kwargs["x_col"] = x_col
-            kwargs["y_col"] = y_col
 
         except Exception as e:
             logger.error(
@@ -260,6 +308,8 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
                 "Reader succeeded", filepath=str(filepath), reader=reader_name.lower()
             )
             return result
+        except _FATAL_EXCEPTIONS:
+            raise
         except Exception as e:
             logger.debug(
                 "Reader failed",
@@ -269,12 +319,63 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
             )
             errors.append(f"{reader_name}: {e}")
 
-    # All readers failed
+    # All readers failed — chain the last error for traceback context
     error_msg = "Could not parse file with any available reader:\n" + "\n".join(errors)
     logger.error(
         "All readers failed",
         filepath=str(filepath),
         tried_readers=[r[0] for r in readers],
-        exc_info=True,
     )
     raise ValueError(error_msg)
+
+
+def _detect_modulus_pair(
+    columns: list[str], columns_lower: list[str]
+) -> list[str] | None:
+    """Detect E'/E'' or G'/G'' column pairs for complex modulus construction.
+
+    Searches for common DMTA (E'/E'') and shear (G'/G'') column patterns.
+
+    Args:
+        columns: Original column names
+        columns_lower: Lowercased column names
+
+    Returns:
+        List of [storage, loss] column names, or None if no pair found
+    """
+    import re
+
+    # Patterns for storage/loss modulus pairs: (storage_pattern, loss_pattern)
+    pair_patterns = [
+        # E'/E'' (DMTA)
+        (re.compile(r"^e['\u2032]", re.IGNORECASE), re.compile(r'^e[""\u2033]', re.IGNORECASE)),
+        # E_stor/E_loss (pyvisco style)
+        (re.compile(r"^e[-_]?stor", re.IGNORECASE), re.compile(r"^e[-_]?loss", re.IGNORECASE)),
+        # G'/G'' (shear)
+        (re.compile(r"^g['\u2032]", re.IGNORECASE), re.compile(r'^g[""\u2033]', re.IGNORECASE)),
+        # G_stor/G_loss
+        (re.compile(r"^g[-_]?stor", re.IGNORECASE), re.compile(r"^g[-_]?loss", re.IGNORECASE)),
+        # Storage Modulus / Loss Modulus (generic)
+        (
+            re.compile(r"storage\s+modulus", re.IGNORECASE),
+            re.compile(r"loss\s+modulus", re.IGNORECASE),
+        ),
+    ]
+
+    for stor_pat, loss_pat in pair_patterns:
+        stor_col = None
+        loss_col = None
+        for _i, col in enumerate(columns):
+            if stor_pat.search(col):
+                stor_col = col
+            if loss_pat.search(col):
+                loss_col = col
+        if stor_col is not None and loss_col is not None:
+            logger.debug(
+                "Detected modulus pair",
+                storage=stor_col,
+                loss=loss_col,
+            )
+            return [stor_col, loss_col]
+
+    return None

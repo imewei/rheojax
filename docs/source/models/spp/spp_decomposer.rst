@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Large Amplitude Oscillatory Shear (LAOS) analysis of yield-stress fluids, colloidal glasses, soft glassy materials
-- **Parameters:** Extracted quantities (G_cage, sigma_sy, sigma_dy, I3/I1, S-factor, T-factor)
+- **Parameters:** Extracted quantities (:math:`G_{\text{cage}}`, :math:`\sigma_{sy}`, :math:`\sigma_{dy}`, :math:`I_3/I_1`, S-factor, T-factor)
 - **Key equation:** :math:`\sigma(t) = G'_t(t)\gamma(t) + \frac{G''_t(t)}{\omega}\dot{\gamma}(t) + \sigma_d(t)`
 - **Test modes:** LAOS (time-domain stress-strain waveforms)
 - **Material examples:** Colloidal glasses, microgel pastes, concentrated emulsions, foams, polymer gels
@@ -530,7 +530,7 @@ and industrial applications.
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**G_cage (Cage Modulus)**:
+**:math:`G_{\text{cage}}` (Cage Modulus)**:
    The cage modulus measures the elastic strength of the confining microstructural cage.
 
    *For graduate students*: :math:`G_\text{cage} = d\sigma/d\gamma|_{\sigma=0}` is amplitude-independent, unlike :math:`G'(\gamma_0)`.
@@ -538,15 +538,15 @@ Parameter Interpretation
    loading protocols. Compare with theoretical predictions: :math:`G_\text{cage} \approx \phi^2 k_B T / a^3` for hard
    spheres where :math:`\phi` is volume fraction and :math:`a` is particle radius.
 
-   *For practitioners*: G_cage provides a true material property unaffected by strain
-   amplitude. Use for batch-to-batch QC of complex fluids. Typical values: 10-1000 Pa
-   (colloidal glasses), 100-10000 Pa (polymer gels), 1-100 Pa (emulsions).
+   *For practitioners*: :math:`G_{\text{cage}}` provides a true material property unaffected by strain
+   amplitude. Use for batch-to-batch QC of complex fluids. Typical values: 10--1000 Pa
+   (colloidal glasses), 100--10000 Pa (polymer gels), 1--100 Pa (emulsions).
 
 :math:`\sigma_{y,static}` **(Static Yield Stress)**:
    Stress required to initiate flow from rest, measured at strain reversal.
 
-   *For graduate students*: :math:`\sigma_{y,static}` > :math:`\sigma_{y,dynamic}` due to cage reformation during
-   momentary rest. The ratio :math:`\sigma_{y,static}/\sigma_{y,dynamic}` ≈ 2-3 reveals thixotropic strength
+   *For graduate students*: :math:`\sigma_{y,static} > \sigma_{y,dynamic}` due to cage reformation during
+   momentary rest. The ratio :math:`\sigma_{y,static}/\sigma_{y,dynamic} \approx 2\text{--}3` reveals thixotropic strength
    and cage reformation kinetics.
 
    *For practitioners*: Critical for applications requiring material to hold shape
@@ -556,7 +556,7 @@ Parameter Interpretation
    Stress during continuous flow, measured at rate reversal.
 
    *For graduate students*: Connects to steady-shear yield stress extrapolation.
-   Both yield stresses scale as :math:`\sigma_y` ∝ :math:`\gamma_0^n` where n ≈ 0.2 for colloidal systems.
+   Both yield stresses scale as :math:`\sigma_y \propto \gamma_0^n` where :math:`n \approx 0.2` for colloidal systems.
 
    *For practitioners*: Determines minimum stress for maintained flow. Use for
    pump sizing and flow assurance calculations.
@@ -564,11 +564,11 @@ Parameter Interpretation
 **I_3/I_1 (Nonlinearity Ratio)**:
    Third harmonic ratio quantifying degree of nonlinearity.
 
-   *For graduate students*: I_3/I_1 grows as ~\ :math:`\gamma_0^2` in weakly nonlinear regime.
+   *For graduate students*: :math:`I_3/I_1` grows as :math:`\sim\gamma_0^2` in weakly nonlinear regime.
    Larger values indicate stronger deviation from linear viscoelasticity and
    correlate with yield stress behavior.
 
-   *For practitioners*: I_3/I_1 > 0.1 indicates significant nonlinearity. Use as
+   *For practitioners*: :math:`I_3/I_1 > 0.1` indicates significant nonlinearity. Use as
    quick screening metric for yield stress presence.
 
 Material Classification
@@ -582,27 +582,27 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - G_cage > 1000 Pa
+   * - :math:`G_\text{cage} > 1000` Pa
      - Stiff microstructure
      - Dense colloids, filled polymers
      - High yield stress, difficult pumping
-   * - G_cage < 100 Pa
+   * - :math:`G_\text{cage} < 100` Pa
      - Soft microstructure
      - Dilute emulsions, weak gels
      - Easy flow, poor shape retention
-   * - :math:`\sigma_{sy}/\sigma_{dy}` > 3
+   * - :math:`\sigma_{sy}/\sigma_{dy} > 3`
      - Strong thixotropy
      - Paints, drilling muds
      - Time-dependent processing
-   * - :math:`\sigma_{sy}/\sigma_{dy}` ≈ 1.5
+   * - :math:`\sigma_{sy}/\sigma_{dy} \approx 1.5`
      - Weak thixotropy
      - Food emulsions, cosmetics
      - Near-instantaneous recovery
-   * - I_3/I_1 > 0.3
+   * - :math:`I_3/I_1 > 0.3`
      - Highly nonlinear
      - Yield stress fluids, gels
      - Large amplitude processing needed
-   * - I_3/I_1 < 0.05
+   * - :math:`I_3/I_1 < 0.05`
      - Weakly nonlinear
      - Polymer solutions
      - SAOS sufficient for characterization
@@ -610,7 +610,7 @@ Material Classification
 Physical Insights from SPP Decomposition
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Cage Modulus (G_cage) — Microstructural Stiffness:**
+**Cage Modulus (**:math:`G_{\text{cage}}`**) --- Microstructural Stiffness:**
 
 The cage modulus directly measures the elastic strength of the confining microstructural cage:
 
@@ -640,10 +640,10 @@ SPP distinguishes two physically distinct yield stresses:
    - Connects to steady-shear yield stress extrapolation
    - Scales as :math:`\sigma_{y,\text{dynamic}} \propto \gamma_0^{0.2}` with same exponent
 
-**Ratio interpretation**: :math:`\sigma_{y,\text{static}} / \sigma_{y,\text{dynamic}} \approx 2-3` reveals information about:
-   - Cage reformation kinetics (fast reformation → larger ratio)
-   - Thixotropic strength (strong thixotropy → larger ratio)
-   - Structural memory (long memory → larger ratio)
+**Ratio interpretation**: :math:`\sigma_{y,\text{static}} / \sigma_{y,\text{dynamic}} \approx 2\text{--}3` reveals information about:
+   - Cage reformation kinetics (fast reformation leads to larger ratio)
+   - Thixotropic strength (strong thixotropy leads to larger ratio)
+   - Structural memory (long memory leads to larger ratio)
 
 **Intracycle Processes — Yielding Sequence:**
 
@@ -720,7 +720,7 @@ correspond to the output variables in the MATLAB SPPplus v2.1 implementation.
      - Instantaneous viscous response
    * - :math:`|G^*_t(t)|`
      - Magnitude of complex modulus
-     - :math:`\sqrt{G'^2_t + G''^2_t}`
+     - :math:`\sqrt{{G'_t}^2 + {G''_t}^2}`
    * - :math:`\tan(\delta_t)`
      - Time-dependent loss tangent
      - :math:`G''_t / G'_t`
@@ -816,25 +816,25 @@ The SPP decomposer extracts the following physical parameters:
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**G_cage (Cage Modulus)**:
+**:math:`G_{\text{cage}}` (Cage Modulus)**:
    Instantaneous elastic slope at zero stress, measuring cage stiffness independently of deformation history.
    *For graduate students*: :math:`G_{\text{cage}} = d\sigma/d\gamma|_{\sigma=0}` represents true microstructural stiffness. Unlike :math:`G'(\gamma_0)` which decreases at large amplitudes due to cage breaking, :math:`G_{\text{cage}}` remains constant. In small-amplitude limit: :math:`\lim_{\gamma_0 \to 0} G_{\text{cage}} = \lim_{\gamma_0 \to 0} G'`. Relates to plateau modulus in entangled polymers or colloidal cage elastic modulus. For hard-sphere colloids: :math:`G_{\text{cage}} \sim k_BT/(\pi a^3) \phi` where a is particle radius, :math:`\phi` is volume fraction.
-   *For practitioners*: Extract from Lissajous slope at origin or SPP decomposition. Typical ranges: colloidal glasses 10-100 Pa, microgel pastes 100-1000 Pa, polymer gels 1000-10000 Pa. Higher G_cage = stiffer microstructural cages.
+   *For practitioners*: Extract from Lissajous slope at origin or SPP decomposition. Typical ranges: colloidal glasses 10-100 Pa, microgel pastes 100-1000 Pa, polymer gels 1000-10000 Pa. Higher :math:`G_{\text{cage}}` = stiffer microstructural cages.
 
 :math:`\sigma_{sy}` **,** :math:`\sigma_{dy}` **(Static and Dynamic Yield Stresses)**:
-   Two distinct yield stresses: :math:`\sigma_{sy}` at strain reversal (:math:`\dot{\gamma}` = 0, :math:`\gamma` = ±\ :math:`\gamma_0`), :math:`\sigma_{dy}` at rate reversal (:math:`\dot{\gamma}` = 0, :math:`\gamma` ≠ 0).
-   *For graduate students*: Power-law scaling: :math:`\sigma_{sy}(\gamma_0) \sim \gamma_0^{n_{sy}}`, :math:`\sigma_{dy}(\gamma_0) \sim \gamma_0^{n_{dy}}` with n ≈ 0.2 typical for hard-sphere colloids (Rogers et al. 2011). Ratio :math:`\sigma_{sy}/\sigma_{dy}` ~ 2-3 quantifies cage reformation kinetics during momentary rest at strain extrema. Connects to Herschel-Bulkley yield via extrapolation: :math:`\sigma_{y,HB} \approx \sigma_{dy}(\gamma_0 \to 0)`.
+   Two distinct yield stresses: :math:`\sigma_{sy}` at strain reversal (:math:`\dot{\gamma} = 0`, :math:`\gamma = \pm\gamma_0`), :math:`\sigma_{dy}` at rate reversal (:math:`\dot{\gamma} = 0`, :math:`\gamma \neq 0`).
+   *For graduate students*: Power-law scaling: :math:`\sigma_{sy}(\gamma_0) \sim \gamma_0^{n_{sy}}`, :math:`\sigma_{dy}(\gamma_0) \sim \gamma_0^{n_{dy}}` with :math:`n \approx 0.2` typical for hard-sphere colloids (Rogers et al. 2011). Ratio :math:`\sigma_{sy}/\sigma_{dy} \sim 2\text{--}3` quantifies cage reformation kinetics during momentary rest at strain extrema. Connects to Herschel-Bulkley yield via extrapolation: :math:`\sigma_{y,HB} \approx \sigma_{dy}(\gamma_0 \to 0)`.
    *For practitioners*: Static yield (higher) = restart stress from rest. Dynamic yield (lower) = continuous flow stress. Large ratio (> 3) indicates strong thixotropy or fast cage reformation. Extract from SPP at multiple :math:`\gamma_0`.
 
-**I_3/I_1 (Third Harmonic Ratio)**:
+**:math:`I_3/I_1` (Third Harmonic Ratio)**:
    Ratio of third to first harmonic intensities, quantifying degree of nonlinearity in LAOS.
    *For graduate students*: Fourier decomposition: :math:`\sigma(t) = \sum_n I_n \sin(n\omega t + \phi_n)`. :math:`I_3/I_1` measures deviation from linear viscoelasticity. For small :math:`\gamma_0`: :math:`I_3/I_1 \sim \gamma_0^2`. Saturation at large :math:`\gamma_0` indicates full yielding. Connects to Pipkin space: :math:`I_3/I_1` contours reveal nonlinear regime boundaries.
-   *For practitioners*: I_3/I_1 < 0.01 (linear regime), 0.01-0.1 (nonlinear), > 0.1 (strongly nonlinear/yielding). Use to define transition amplitude :math:`\gamma_{0,NL}` where material enters nonlinear regime.
+   *For practitioners*: :math:`I_3/I_1 < 0.01` (linear regime), 0.01--0.1 (nonlinear), :math:`> 0.1` (strongly nonlinear/yielding). Use to define transition amplitude :math:`\gamma_{0,NL}` where material enters nonlinear regime.
 
 **S, T (Stiffening/Thickening Factors)**:
    Dimensionless factors quantifying intracycle strain stiffening (S) and shear thickening (T).
-   *For graduate students*: Defined via rates dG'_t/:math:`d\gamma` (S-factor) and dG''_t/d(:math:`\dot{\gamma}/\omega`) (T-factor) per Rogers (2017). Positive values indicate stiffening/thickening, negative indicate softening/thinning. Transitions between regimes reveal yielding sequence.
-   *For practitioners*: Use S and T to identify intracycle phases: elastic extension (S ≈ 0, T ≈ 0), yielding (S < 0, T changes sign), flow (S ≈ 0, T < 0), reformation (S > 0, T > 0).
+   *For graduate students*: Defined via rates :math:`dG'_t/d\gamma` (S-factor) and :math:`dG''_t/d(\dot{\gamma}/\omega)` (T-factor) per Rogers (2017). Positive values indicate stiffening/thickening, negative indicate softening/thinning. Transitions between regimes reveal yielding sequence.
+   *For practitioners*: Use S and T to identify intracycle phases: elastic extension (:math:`S \approx 0`, :math:`T \approx 0`), yielding (:math:`S < 0`, T changes sign), flow (:math:`S \approx 0`, :math:`T < 0`), reformation (:math:`S > 0`, :math:`T > 0`).
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -847,15 +847,15 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - G_cage = 10-100 Pa
+   * - :math:`G_{\text{cage}}` = 10--100 Pa
      - Soft cages
-     - Colloidal glasses (:math:`\phi` ~ 0.6), microgels
+     - Colloidal glasses (:math:`\phi \sim 0.6`), microgels
      - Low yield stress, gentle handling needed
-   * - G_cage = 100-1000 Pa
+   * - :math:`G_{\text{cage}}` = 100--1000 Pa
      - Moderate stiffness
      - Concentrated emulsions, foams, pastes
      - Moderate processing stresses
-   * - G_cage > 1000 Pa
+   * - :math:`G_{\text{cage}} > 1000` Pa
      - Stiff cages
      - Polymer gels, filled elastomers
      - High processing stresses, robust structures
@@ -871,25 +871,25 @@ Material Classification
      - Strong thixotropy, slow reformation
      - Aged pastes, strongly thixotropic gels
      - Long rest-time dependence
-   * - I_3/I_1 < 0.01
+   * - :math:`I_3/I_1 < 0.01`
      - Linear regime
      - All materials at small :math:`\gamma_0`
      - SAOS applicable
-   * - I_3/I_1 = 0.01-0.1
+   * - :math:`I_3/I_1` = 0.01--0.1
      - Nonlinear transition
      - Near yielding
      - MAOS/LAOS needed
-   * - I_3/I_1 > 0.1
+   * - :math:`I_3/I_1 > 0.1`
      - Strongly nonlinear, full yielding
      - LAOS at large :math:`\gamma_0`
      - Yielding cycle clearly observed
 
-**sigma_sy/sigma_dy (Yield Stresses)**:
+**:math:`\sigma_{sy}/\sigma_{dy}` (Yield Stresses)**:
    - **Physical meaning**: Stress thresholds for cage rupture and reformation
    - **Rate dependence**: Both scale as :math:`\dot{\gamma}_0^{0.2}`
    - **Ratio**: :math:`\sigma_{y,\text{static}} / \sigma_{y,\text{dynamic}} \approx 2.75`
 
-**I3/I1 (Third Harmonic Ratio)**:
+**:math:`I_3/I_1` (Third Harmonic Ratio)**:
    - **Physical meaning**: Degree of nonlinearity in stress response
    - **Linear regime**: :math:`I_3/I_1 \to 0`
    - **Nonlinear regime**: :math:`I_3/I_1 \sim 0.1 - 0.3`
@@ -1242,25 +1242,31 @@ References
 .. [1] Rogers, S. A., Erwin, B. M., Vlassopoulos, D., & Cloitre, M. "A sequence of
    physical processes determined and quantified in LAOS: Application to a yield stress
    fluid." *J. Rheol.* **55**, 435-458 (2011). https://doi.org/10.1122/1.3544591
+   :download:`PDF <../../../reference/rogers_2011_spp_laos.pdf>`
 
 .. [2] Rogers, S. A. "In search of physical meaning: defining transient parameters for
    nonlinear viscoelasticity." *Rheol. Acta* **56**, 501-525 (2017).
    https://doi.org/10.1007/s00397-017-1008-1
+   :download:`PDF <../../../reference/rogers_2017_spp_transient.pdf>`
 
 .. [3] Rogers, S. A. "A sequence of physical processes determined and quantified in
    LAOS: An instantaneous local 2D/3D approach." *J. Rheol.* **56**, 1129-1151 (2012).
    https://doi.org/10.1122/1.4726083
+   :download:`PDF <../../../reference/rogers_2012_spp_instantaneous.pdf>`
 
 .. [4] Rogers, S. A. & Lettinga, M. P. "A sequence of physical processes determined
    and quantified in large-amplitude oscillatory shear (LAOS): Application to theoretical
    nonlinear models." *J. Rheol.* **56**, 1-25 (2012). https://doi.org/10.1122/1.3662962
+   :download:`PDF <../../../reference/rogers_lettinga_2012_spp_nonlinear.pdf>`
 
 .. [5] Ewoldt, R., Hosoi, A., & McKinley, G. "New measures for characterizing nonlinear
    viscoelasticity in large amplitude oscillatory shear." *J. Rheol.* **52**, 1427-1458 (2008).
+   https://doi.org/10.1122/1.2970095
 
 .. [6] Hyun, K., et al. "A review of nonlinear oscillatory shear tests: Analysis and
    application of large amplitude oscillatory shear (LAOS)." *Prog. Polym. Sci.* **36**,
    1697-1753 (2011).
+   https://doi.org/10.1016/j.progpolymsci.2011.02.002
 
 .. [7] Ewoldt, R. H. and McKinley, G. H. "Mapping thixo-elasto-visco-plastic behavior."
    *Rheol. Acta* **56**, 195-210 (2017). https://doi.org/10.1007/s00397-017-1001-8
@@ -1273,14 +1279,17 @@ References
    materials in soft condensed matter." *Rev. Mod. Phys.* **89**, 035005 (2017).
    https://doi.org/10.1103/RevModPhys.89.035005
 
-.. [10] van Puyvelde, P., Velankar, S., and Mewis, J. "Rheology and morphology of
-   compatibilized polymer blends." In *Polymer Blends Handbook*, Springer, 421-626 (2014).
-   https://doi.org/10.1007/978-94-007-6064-6_7
+.. [10] Kamal, M. R., Utracki, L. A., and Mirzadeh, A. "Rheology of Polymer Alloys
+   and Blends." In *Polymer Blends Handbook*, Springer, 725-873 (2014).
+   https://doi.org/10.1007/978-94-007-6064-6_9
 
-.. [11] Le, T. D., et al. "LAOS rheological characterization of food materials:
-   Comparison of Fourier-transform and SPP analysis methods." *Food Research
-   International* **165**, 112478 (2023). https://doi.org/10.1016/j.foodres.2023.112478
+.. [11] Le, A. N. M., et al. "Large amplitude oscillatory shear (LAOS) rheological
+   characterization of green tea-fortified gels: Comparison of Fourier-transform and
+   SPP analysis methods." *Food Research International* **174**, 113587 (2023).
+   https://doi.org/10.1016/j.foodres.2023.113587
 
-.. [12] Duvarci, O. C., et al. "Comparison of LAOS analysis methods: SPP versus
-   Fourier-Chebyshev decomposition for wheat flour doughs." *Food Hydrocolloids*
-   **128**, 107570 (2022). https://doi.org/10.1016/j.foodhyd.2022.107570
+.. [12] Erturk, M. Y., Rogers, S. A., and Kokini, J. L. "Comparison of sequence of
+   physical processes (SPP) and Fourier transform coupled with Chebyshev polynomials
+   methods to interpret large amplitude oscillatory shear (LAOS) response of viscoelastic
+   doughs and dough ingredients." *Food Hydrocolloids* **128**, 107558 (2022).
+   https://doi.org/10.1016/j.foodhyd.2022.107558

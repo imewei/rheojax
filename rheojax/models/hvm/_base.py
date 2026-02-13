@@ -26,12 +26,10 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
-from rheojax.models.vlb._base import VLBBase
-
 from rheojax.models.hvm._kernels import (
-    _R_GAS,
     hvm_ber_rate_constant,
 )
+from rheojax.models.vlb._base import VLBBase
 
 jax, jnp = safe_import_jax()
 
@@ -273,7 +271,7 @@ class HVMBase(VLBBase):
             Effective E-network relaxation time (s)
         """
         k0 = self.compute_ber_rate_at_equilibrium()
-        return 1.0 / (2.0 * max(k0, 1e-30))
+        return 1.0 / (2.0 * float(jnp.maximum(k0, 1e-30)))
 
     def get_network_fractions(self) -> dict[str, float]:
         """Compute modulus fractions for each subnetwork.
@@ -284,7 +282,7 @@ class HVMBase(VLBBase):
             Keys: 'f_P', 'f_E', 'f_D' with values in [0, 1]
         """
         G_tot = self.G_P + self.G_E + self.G_D
-        G_tot = max(G_tot, 1e-30)
+        G_tot = float(jnp.maximum(G_tot, 1e-30))
         return {
             "f_P": self.G_P / G_tot,
             "f_E": self.G_E / G_tot,

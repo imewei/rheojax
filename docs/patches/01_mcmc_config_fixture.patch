@@ -1,7 +1,7 @@
 --- a/tests/conftest.py
 +++ b/tests/conftest.py
 @@ -1,6 +1,7 @@
- """Shared fixtures and configuration for rheo test suite.
+ """Shared fixtures and configuration for rheojax test suite.
 
  This module provides:
 +- Adaptive MCMC configuration for Bayesian tests

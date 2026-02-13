@@ -65,7 +65,7 @@ Load data, fit model, and visualize in 4 lines:
    results = pipeline.get_results()
    G_s = results['parameters']['G_s']
    eta_s = results['parameters']['eta_s']
-   print(f"G_s = {G_s:.2e} Pa, eta_s = {eta_s:.2e} Pa*s")
+   print(f"G_s = {G_s:.2e} Pa, eta_s = {eta_s:.2e} Pa·s")
 
 Core Pipeline Operations
 ------------------------
@@ -658,7 +658,7 @@ Complete batch workflow:
    ax2.bar(x, eta_s_values)
    ax2.set_xticks(x)
    ax2.set_xticklabels(sample_names, rotation=45, ha='right')
-   ax2.set_ylabel('eta_s (Pa*s)')
+   ax2.set_ylabel('eta_s (Pa·s)')
    ax2.set_title('Viscosity Comparison')
 
    plt.tight_layout()

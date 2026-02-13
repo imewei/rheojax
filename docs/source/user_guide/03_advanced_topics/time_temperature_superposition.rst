@@ -6,7 +6,7 @@ Time-Temperature Superposition (TTS)
 Overview
 --------
 
-**Time-Temperature Superposition (TTS)** is a powerful principle in rheology enabling extension of measurement frequency ranges by 4-8 decades through temperature sweeps. Instead of mechanically accessing ω = 10⁻⁶ to 10⁶ rad/s (requires 12 decades, impossible for most instruments), measure at 5-10 temperatures and **shift** data horizontally to create a **mastercurve** at a reference temperature.
+**Time-Temperature Superposition (TTS)** is a powerful principle in rheology enabling extension of measurement frequency ranges by 4-8 decades through temperature sweeps. Instead of mechanically accessing :math:`\omega = 10^{-6}` to :math:`10^6` rad/s (requires 12 decades, impossible for most instruments), measure at 5-10 temperatures and **shift** data horizontally to create a **mastercurve** at a reference temperature.
 
 **Physical basis**: The temperature dependence of molecular relaxation processes is **separable** from their fundamental shape. Increasing temperature accelerates all relaxation processes by the same factor, equivalent to shifting the time scale.
 
@@ -21,7 +21,7 @@ Overview
 where :math:`a_T` is the **shift factor** depending on temperature T and reference temperature :math:`T_{\text{ref}}`.
 
 **Applicability**:
-   - **Valid for**: Amorphous polymers above T_g, polymer melts, viscoelastic liquids
+   - **Valid for**: Amorphous polymers above :math:`T_g`, polymer melts, viscoelastic liquids
    - **Requires**: Thermorheologically simple materials (all relaxation modes shift equally)
    - **Fails for**: Crystalline polymers, multi-phase systems with different T-dependencies, materials undergoing phase transitions
 
@@ -40,17 +40,17 @@ WLF Equation (Williams-Landel-Ferry)
 **Parameters**:
    - :math:`C_1`: Dimensionless constant (universal ≈ 17.44)
    - :math:`C_2`: Temperature constant in Kelvin (universal ≈ 51.6 K)
-   - :math:`T_{\text{ref}}`: Reference temperature (often T_g + 50°C)
+   - :math:`T_{\text{ref}}`: Reference temperature (often :math:`T_g` + 50 °C)
 
-**Universal values** (reference at T_g):
+**Universal values** (reference at :math:`T_g`):
    - :math:`C_1 = 17.44`, :math:`C_2 = 51.6` K when :math:`T_{\text{ref}} = T_g`
-   - Valid for most polymers within :math:`T_g` to :math:`T_g + 100°C`
+   - Valid for most polymers within :math:`T_g` to :math:`T_g + 100` °C
 
 **Material-specific values**: Can be optimized for better accuracy (see ``optimize_wlf_parameters()``).
 
 **Physical interpretation**:
    - Free volume theory: Molecular mobility increases with free volume
-   - :math:`C_1` relates to fractional free volume at T_g
+   - :math:`C_1` relates to fractional free volume at :math:`T_g`
    - :math:`C_2` relates to thermal expansion coefficient
 
 **Usage example**:
@@ -78,7 +78,7 @@ WLF Equation (Williams-Landel-Ferry)
 Arrhenius Equation
 ~~~~~~~~~~~~~~~~~~
 
-**Exponential temperature dependence** for high-temperature flows (T ≫ T_g):
+**Exponential temperature dependence** for high-temperature flows (:math:`T \gg T_g`):
 
 .. math::
 
@@ -94,7 +94,7 @@ Arrhenius Equation
    - Higher :math:`E_a` → stronger temperature dependence
 
 **When to use Arrhenius**:
-   - High temperatures (T > T_g + 100°C)
+   - High temperatures (:math:`T > T_g + 100` °C)
    - Polymer melts well above glass transition
    - Liquids without glass transition (oils, solvents)
 
@@ -129,8 +129,8 @@ When to Use Each Method
      - WLF
      - Arrhenius
    * - Temperature range
-     - T_g to T_g + 100°C
-     - T > T_g + 100°C
+     - :math:`T_g` to :math:`T_g + 100` °C
+     - :math:`T > T_g + 100` °C
    * - Material state
      - Rubbery plateau
      - Viscous melt
@@ -138,14 +138,14 @@ When to Use Each Method
      - Free volume theory
      - Activation energy
    * - Typical materials
-     - Amorphous polymers near T_g
+     - Amorphous polymers near :math:`T_g`
      - Polymer melts, oils
    * - Shift factor curvature
      - Non-linear (curved)
      - Linear (straight line)
    * - Parameter availability
-     - Universal C1, C2 available
-     - Material-specific E_a needed
+     - Universal :math:`C_1`, :math:`C_2` available
+     - Material-specific :math:`E_a` needed
 
 Automatic Shift Method (NEW in v0.2.2)
 ---------------------------------------
@@ -176,7 +176,7 @@ Fit adjacent curves, find their **intersection** in the overlap or gap region, c
       - Keep removal if exponent error improves (lower uncertainty in b)
 
 3. **Compute pairwise shifts**:
-      - For adjacent temperatures T_i and T_{i+1}
+      - For adjacent temperatures :math:`T_i` and :math:`T_{i+1}`
       - Sample 10 points in overlap/gap region
       - Compute inverse power-law: :math:`x = \left(\frac{y - e}{a}\right)^{1/b}`
       - Average log shift: :math:`\log(a_T) = \text{mean}(\log_{10}(x_{\text{top}} / x_{\text{bot}}))`
@@ -187,7 +187,7 @@ Fit adjacent curves, find their **intersection** in the overlap or gap region, c
       - Accumulate shifts: :math:`\log(a_{T_i}) = \log(a_{T_{i-1}}) + \Delta \log(a_T)`
 
 **Advantages**:
-   - No material parameters needed (WLF C1, C2 or Arrhenius E_a)
+   - No material parameters needed (WLF :math:`C_1`, :math:`C_2` or Arrhenius :math:`E_a`)
    - Handles non-standard materials (blends, composites)
    - Robust to outliers (first-point removal)
    - JAX-accelerated (fast NLSQ fitting)
@@ -275,9 +275,9 @@ When Auto-Shift is Appropriate
       - Modified polymer (plasticizers, fillers)
 
 2. **Non-standard temperature ranges**:
-      - T range outside WLF validity (T_g to T_g+100°C)
+      - T range outside WLF validity (:math:`T_g` to :math:`T_g + 100` °C)
       - High-temperature melts where WLF breaks down
-      - Low-temperature regime near T_g where Arrhenius fails
+      - Low-temperature regime near :math:`T_g` where Arrhenius fails
 
 3. **Quick screening**:
       - Exploratory measurements
@@ -309,8 +309,8 @@ When Manual Shift is Better
       - Auto-shift unreliable with sparse data
 
 4. **Physical interpretation required**:
-      - Need activation energy E_a for reaction kinetics
-      - Compare C1, C2 across material batches
+      - Need activation energy :math:`E_a` for reaction kinetics
+      - Compare :math:`C_1`, :math:`C_2` across material batches
       - Fundamental understanding of molecular mobility
 
 Hybrid Workflow: Auto → Validate → Refine with Manual
@@ -399,11 +399,11 @@ Temperature Sweep Protocols
 1. **Setup**:
       - Geometry: Tension, compression, or torsion (material-dependent)
       - Sample: Rectangular bar (10×5×1 mm typical)
-      - Fixed frequency: ω = 1 rad/s (or 1 Hz = 6.28 rad/s)
+      - Fixed frequency: :math:`\omega = 1` rad/s (or 1 Hz = 6.28 rad/s)
       - Strain amplitude: 0.1-1% (within LVR, verified by amplitude sweep)
 
 2. **Temperature ramp**:
-      - Range: T_g - 50°C to T_g + 100°C (e.g., -50°C to 150°C for PMMA)
+      - Range: :math:`T_g - 50` °C to :math:`T_g + 100` °C (e.g., -50 °C to 150 °C for PMMA)
       - Ramp rate: 2-5°C/min (slow enough for thermal equilibrium)
       - Data points: Every 2-5°C (50-100 points total)
 
@@ -423,9 +423,9 @@ Storage/Loss Modulus Master Curves
 **Frequency sweep mastercurve** (isothermal at multiple T):
 
 1. **Isothermal frequency sweeps**:
-      - Temperatures: 5-10 values spanning T_g to T_g+100°C
+      - Temperatures: 5-10 values spanning :math:`T_g` to :math:`T_g + 100` °C
       - Example for PMMA: T = 110°C, 120°C, 130°C, 140°C, 150°C
-      - Frequency range per T: ω = 10⁻² to 10² rad/s (4 decades)
+      - Frequency range per T: :math:`\omega = 10^{-2}` to :math:`10^2` rad/s (4 decades)
       - Points per decade: 10 (total 40 points per T)
 
 2. **Time-temperature superposition**:
@@ -480,9 +480,9 @@ Storage/Loss Modulus Master Curves
       plt.show()
 
 **Expected behavior**:
-   - Low ω: Rubbery plateau (:math:`E' \approx 10^6` Pa, nearly constant)
-   - Mid ω: Transition region (:math:`E'` increases, :math:`E''` peak)
-   - High ω: Glassy plateau (:math:`E' \approx 3 \times 10^9` Pa)
+   - Low :math:`\omega`: Rubbery plateau (:math:`E' \approx 10^6` Pa, nearly constant)
+   - Mid :math:`\omega`: Transition region (:math:`E'` increases, :math:`E''` peak)
+   - High :math:`\omega`: Glassy plateau (:math:`E' \approx 3 \times 10^9` Pa)
 
 Rheometer Applications (Fluid Dynamics)
 ----------------------------------------
@@ -583,14 +583,14 @@ Troubleshooting
      - Horizontal shift insufficient
      - Enable vertical_shift=True, or data has density/T effects
    * - Shift factors nonphysical
-     - Negative a_T or extreme values
+     - Negative :math:`a_T` or extreme values
      - Wrong T units (use Kelvin), or material not simple
    * - Auto-shift fails
      - RuntimeError in power-law fit
      - Insufficient overlap between curves, increase T range
    * - WLF extrapolation poor
      - Mastercurve breaks down at edges
-     - T outside T_g to T_g+100°C, use Arrhenius
+     - T outside :math:`T_g` to :math:`T_g + 100` °C, use Arrhenius
    * - Sparse data (< 10 pts/curve)
      - Auto-shift unreliable
      - Use manual WLF/Arrhenius with literature values

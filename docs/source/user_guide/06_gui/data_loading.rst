@@ -57,8 +57,8 @@ Dependent Variables (Y)
 
 Select from:
 
-- **G' (Storage Modulus)**: Elastic component
-- **G'' (Loss Modulus)**: Viscous component
+- :math:`G'` **(Storage Modulus)**: Elastic component
+- :math:`G''` **(Loss Modulus)**: Viscous component
 - **G(t) (Relaxation Modulus)**: Time-dependent modulus
 - **η (Viscosity)**: Shear viscosity
 - **J(t) (Creep Compliance)**: Creep response
@@ -66,10 +66,10 @@ Select from:
 Complex Data
 ------------
 
-For complex modulus data (G* = G' + iG''):
+For complex modulus data (:math:`G^* = G' + iG''`):
 
-1. Select **G'** for Y column
-2. Select **G''** for Y2 column
+1. Select :math:`G'` for Y column
+2. Select :math:`G''` for Y2 column
 3. Data will be handled as complex
 
 Test Mode Detection
@@ -77,7 +77,7 @@ Test Mode Detection
 
 RheoJAX automatically detects the test mode based on column names:
 
-- **Oscillation**: Columns contain "omega", "freq", "G'", "G''"
+- **Oscillation**: Columns contain "omega", "freq", :math:`G'`, :math:`G''`
 - **Relaxation**: Columns contain "time", "G(t)", "relaxation"
 - **Creep**: Columns contain "time", "J(t)", "compliance"
 - **Flow**: Columns contain "shear rate", "viscosity", "stress"

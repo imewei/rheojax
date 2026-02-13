@@ -841,7 +841,7 @@ Parameters
      - (10\ :sup:`-6`, 10\ :sup:`4`)
      - s
      - Mean bond lifetime (characteristic relaxation time of the network)
-   * - **eta_s**
+   * - :math:`\eta_s`
      - :math:`\eta_s`
      - 0.0
      - (0, 10\ :sup:`4`)
@@ -1063,7 +1063,7 @@ What You Can Learn
 Fitting the Tanaka-Edwards model to experimental data provides the following physical
 insights:
 
-**From SAOS (G', G'' vs. ω):**
+**From SAOS (:math:`G'`, :math:`G''` vs. ω):**
 
 1. **Network modulus (G)**: High-frequency plateau of :math:`G'` gives :math:`G` directly.
    This is related to chain density via :math:`G \approx n_{chains} k_B T`, allowing

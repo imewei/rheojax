@@ -106,6 +106,7 @@ import numpy as np
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
     tnt_multimode_ode_rhs,
@@ -122,6 +123,12 @@ logger = logging.getLogger(__name__)
 @ModelRegistry.register(
     "tnt_sticky_rouse",
     protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
+    ],
 )
 class TNTStickyRouse(TNTBase):
     """Sticky Rouse model for associative polymers.

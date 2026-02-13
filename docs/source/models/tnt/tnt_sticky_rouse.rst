@@ -1691,12 +1691,12 @@ Foundational Papers
 Experimental Validation
 -----------------------
 
-4. **Chen, Q., Liang, S., & Colby, R. H. (2013).**
-   "Linear viscoelastic response and steady shear viscosity of native cellulose in 1-ethyl-3-methylimidazolium acetate."
-   *ACS Macro Letters*, 2(8), 741-744.
-   DOI: 10.1021/mz400333z
+4. **Chen, Q., Tudryn, G. J., & Colby, R. H. (2013).**
+   "Ionomer dynamics and the sticky Rouse model."
+   *Journal of Rheology*, 57(5), 1441-1462.
+   DOI: 10.1122/1.4818868
 
-   - Sticky Rouse behavior in cellulose solutions
+   - Sticky Rouse behavior in ionomer solutions
    - Power-law relaxation validation
 
 5. **Baxandall, L. G. (1989).**

@@ -510,18 +510,15 @@ not introduce shear thinning.
 
 .. math::
 
-   N_1 &= G(S_{xx} - S_{yy}) \approx G \left[(2-\xi)(\tau_b \dot{\gamma})^2 - (-\xi(\tau_b \dot{\gamma})^2)\right]
+   N_1 &= G(S_{xx} - S_{yy}) \approx G \left[(2-\xi)(\tau_b \dot{\gamma})^2 - (-\xi(\tau_b \dot{\gamma})^2)\right] \\
+       &= G(2-\xi + \xi)(\tau_b \dot{\gamma})^2 = 2G(\tau_b \dot{\gamma})^2
 
-   &= G(2-\xi + \xi)(\tau_b \dot{\gamma})^2 = 2G(\tau_b \dot{\gamma})^2
-
-Wait, that gives the same :math:`N_1` as the upper-convected case! Let me recalculate.
-
-Actually, :math:`S_{yy} = 1 - \xi (\tau_b \dot{\gamma})^2`, so :math:`S_{yy} - 1 = -\xi (\tau_b \dot{\gamma})^2`.
+Since :math:`S_{yy} = 1 - \xi (\tau_b \dot{\gamma})^2`, i.e. :math:`S_{yy} - 1 = -\xi (\tau_b \dot{\gamma})^2`:
 
 .. math::
 
-   N_1 = G(S_{xx} - S_{yy}) = G\left[(2-\xi)(\tau_b \dot{\gamma})^2 - (-\xi (\tau_b \dot{\gamma})^2)\right]
-   = G(2-\xi + \xi)(\tau_b \dot{\gamma})^2 = 2G(\tau_b \dot{\gamma})^2
+   N_1 &= G(S_{xx} - S_{yy}) = G\left[(2-\xi)(\tau_b \dot{\gamma})^2 - (-\xi (\tau_b \dot{\gamma})^2)\right] \\
+       &= G(2-\xi + \xi)(\tau_b \dot{\gamma})^2 = 2G(\tau_b \dot{\gamma})^2
 
 So :math:`N_1` is **unchanged** to :math:`O(Wi^2)`. This is correct: the slip parameter
 affects :math:`N_2` but not :math:`N_1` at leading order.
@@ -660,15 +657,12 @@ But :math:`\boldsymbol{\kappa} = \mathbf{D} + \mathbf{W}`, so:
 .. math::
 
    \text{conv}_{\text{GS}} &= (1-\xi)[(\mathbf{D} + \mathbf{W}) \cdot \delta \mathbf{S} + \delta \mathbf{S} \cdot (\mathbf{D} - \mathbf{W})]
-   + \xi[\mathbf{W} \cdot \delta \mathbf{S} - \delta \mathbf{S} \cdot \mathbf{W}]
-
+   + \xi[\mathbf{W} \cdot \delta \mathbf{S} - \delta \mathbf{S} \cdot \mathbf{W}] \\
    &= (1-\xi)[\mathbf{D} \cdot \delta \mathbf{S} + \delta \mathbf{S} \cdot \mathbf{D}
    + \mathbf{W} \cdot \delta \mathbf{S} - \delta \mathbf{S} \cdot \mathbf{W}]
-   + \xi[\mathbf{W} \cdot \delta \mathbf{S} - \delta \mathbf{S} \cdot \mathbf{W}]
-
+   + \xi[\mathbf{W} \cdot \delta \mathbf{S} - \delta \mathbf{S} \cdot \mathbf{W}] \\
    &= (1-\xi)[\mathbf{D} \cdot \delta \mathbf{S} + \delta \mathbf{S} \cdot \mathbf{D}]
-   + [(1-\xi) + \xi][\mathbf{W} \cdot \delta \mathbf{S} - \delta \mathbf{S} \cdot \mathbf{W}]
-
+   + [(1-\xi) + \xi][\mathbf{W} \cdot \delta \mathbf{S} - \delta \mathbf{S} \cdot \mathbf{W}] \\
    &= (1-\xi)[\mathbf{D} \cdot \delta \mathbf{S} + \delta \mathbf{S} \cdot \mathbf{D}]
    + [\mathbf{W} \cdot \delta \mathbf{S} - \delta \mathbf{S} \cdot \mathbf{W}]
 
@@ -827,9 +821,9 @@ the statement in the template that "SAOS is the same as base TNT".
 Let me check the code implementation. Looking at `single_mode.py`, the `predict_saos` method
 uses `tnt_saos_moduli_vec` which is defined in `_kernels.py`. The function signature is:
 
-```python
-def tnt_saos_moduli(omega: float, G: float, tau_b: float, eta_s: float)
-```
+.. code-block:: python
+
+   def tnt_saos_moduli(omega: float, G: float, tau_b: float, eta_s: float)
 
 It doesn't take :math:`\xi` as an argument! So the implementation assumes SAOS is independent
 of :math:`\xi`. But my linearization suggests otherwise.
@@ -906,7 +900,7 @@ Parameters
      - (10\ :sup:`-6`, 10\ :sup:`4`)
      - s
      - Mean bond lifetime
-   * - **eta_s**
+   * - :math:`\eta_s`
      - :math:`\eta_s`
      - 0.0
      - (0, 10\ :sup:`4`)
@@ -949,7 +943,7 @@ or cone-partitioned plate rheometry.
 - **Wormlike micelles**: :math:`\xi = 0.1-0.3`
 - **Colloidal suspensions**: :math:`\xi = 0-0.5` (depends on particle shape and interaction)
 
-**Other parameters (G, τ_b, η_s):**
+**Other parameters (** :math:`G, \tau_b, \eta_s` **):**
 
 See :ref:`model-tnt-tanaka-edwards` for detailed interpretation of :math:`G`, :math:`\tau_b`,
 and :math:`\eta_s`. These parameters have the same physical meaning as in the base TNT model.
@@ -999,7 +993,7 @@ Regimes and Behavior
 - :math:`N_1` and :math:`N_2` both negligible
 - Effect of :math:`\xi` is small
 
-**Moderate Wi (Wi ~ 1):**
+**Moderate Wi** (:math:`\text{Wi} \sim 1`):
 
 - :math:`N_1 \sim G (\tau_b \dot{\gamma})^2`
 - :math:`N_2 \approx -(\xi/2) N_1` becomes measurable
@@ -1035,7 +1029,7 @@ Fitting the TNT Non-Affine model to experimental data provides:
 1. **Zero-shear viscosity (η₀)**: Same as base TNT, independent of :math:`\xi`
 2. **Model validation**: Constant :math:`\eta` confirms constant breakage assumption
 
-**From SAOS (G', G'' vs. ω):**
+**From SAOS (** :math:`G', G''` **vs.** :math:`\omega` **):**
 
 1. **Network modulus (G)** and **bond lifetime (τ_b)**: Same interpretation as base TNT
 2. **Note**: RheoJAX implementation uses base TNT formula (ξ-independent) for SAOS
@@ -1653,9 +1647,11 @@ References
 
 .. [4] Bird RB, Armstrong RC, Hassager O (1987) *Dynamics of Polymeric Liquids, Volume 1:
    Fluid Mechanics*, 2nd edition. Wiley-Interscience, New York.
+   ISBN: 978-0471802457
 
 .. [5] Larson RG (1999) *The Structure and Rheology of Complex Fluids*. Oxford University
    Press, New York.
+   ISBN: 978-0195121971
 
 .. [6] Fielding SM (2007) Complex dynamics of shear banded flows. *Soft Matter* 3:1262-1279.
    https://doi.org/10.1039/b707980j
@@ -1670,10 +1666,10 @@ References
 .. [9] Dhont JKG, Briels WJ (2008) Gradient and vorticity banding. *Rheol. Acta* 47:257-281.
    https://doi.org/10.1007/s00397-007-0245-0
 
-.. [10] Schweizer T, Hostettler J (2008) A cone-partitioned plate rheometer cell with
+.. [10] Schweizer T, Schmidheiny W (2013) A cone-partitioned plate rheometer cell with
    three partitions (CPP3) to determine shear stress and both normal stress differences
-   for small quantities of polymeric fluids. *J. Rheol.* 52:1071-1085.
-   https://doi.org/10.1122/1.2946437
+   in single experiments. *J. Rheol.* 57(3):841-856.
+   https://doi.org/10.1122/1.4798559
 
 .. [11] Ewoldt RH, Hosoi AE, McKinley GH (2008) New measures for characterizing nonlinear
    viscoelasticity in large amplitude oscillatory shear. *J. Rheol.* 52:1427-1458.
@@ -1682,3 +1678,8 @@ References
 .. [12] Gurnon AK, Wagner NJ (2012) Large amplitude oscillatory shear (LAOS) measurements
    to obtain constitutive equation model parameters: Giesekus model of banding and
    nonbanding wormlike micelles. *J. Rheol.* 56:333-351. https://doi.org/10.1122/1.3684751
+
+.. [13] Assadi S, Lamont SC, Hansoge N, Liu Z, Crespo-Cuevas V, Salmon F & Vernerey FJ
+   (2025) Nonaffine motion and network reorganization in entangled polymer networks.
+   *Soft Matter* 21:2096-2113. https://doi.org/10.1039/d4sm01278j
+   :download:`PDF <../../../reference/assadi_2025_nonaffine_entangled.pdf>`

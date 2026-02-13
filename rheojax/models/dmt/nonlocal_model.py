@@ -19,6 +19,7 @@ import numpy as np
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 from rheojax.models.dmt._base import DMTBase
 from rheojax.models.dmt._kernels import (
@@ -41,6 +42,7 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.CREEP,
     ],
+    deformation_modes=[DeformationMode.SHEAR],
 )
 class DMTNonlocal(DMTBase):
     r"""Nonlocal (1D) DMT model for shear banding analysis.

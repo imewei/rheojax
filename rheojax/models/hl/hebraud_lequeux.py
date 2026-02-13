@@ -17,6 +17,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.hl_kernels import (
     creep_kernel,
@@ -51,6 +52,12 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class HebraudLequeux(BaseModel):

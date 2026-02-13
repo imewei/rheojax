@@ -71,8 +71,8 @@ reveals the sequence of physical processes:
 
 **Interpretation:**
 
-- **Point on G' axis**: Pure elastic response (Hookean solid)
-- **Point on G'' axis**: Pure viscous response (Newtonian liquid)
+- **Point on** :math:`G'` **axis**: Pure elastic response (Hookean solid)
+- **Point on** :math:`G''` **axis**: Pure viscous response (Newtonian liquid)
 - **Trajectory loop**: Mixed viscoelastic with varying contributions
 - **Crossing behavior**: Indicates yielding or structural transitions
 
@@ -139,7 +139,7 @@ Basic SPP Analysis
 
 .. code-block:: python
 
-   from rheojax.transforms import SPP
+   from rheojax.transforms import SPPDecomposer
    import numpy as np
 
    # LAOS data: time, strain, stress
@@ -148,7 +148,7 @@ Basic SPP Analysis
    stress = experimental_stress(t)  # Your measured data
 
    # Create SPP transform
-   spp = SPP(gamma_0=gamma_0, omega=omega)
+   spp = SPPDecomposer(gamma_0=gamma_0, omega=omega)
 
    # Decompose into instantaneous moduli
    result = spp.transform(t, gamma, stress)
@@ -163,14 +163,14 @@ Yield Stress Extraction
 
 .. code-block:: python
 
-   from rheojax.transforms import SPP
+   from rheojax.transforms import SPPDecomposer
    import numpy as np
 
    # Amplitude sweep data
    amplitudes = np.logspace(-1, 1, 20)
    stress_data = {amp: measure_stress(amp) for amp in amplitudes}
 
-   spp = SPP(omega=1.0)
+   spp = SPPDecomposer(omega=1.0)
 
    # Process each amplitude
    results = []
@@ -197,7 +197,7 @@ Cole-Cole Visualization
 
    import matplotlib.pyplot as plt
 
-   spp = SPP(gamma_0=0.5, omega=1.0)
+   spp = SPPDecomposer(gamma_0=0.5, omega=1.0)
    result = spp.transform(t, gamma, stress)
 
    # Create Cole-Cole plot
@@ -227,8 +227,8 @@ Integration with Models
 
 .. code-block:: python
 
-   from rheojax.transforms import SPP
-   from rheojax.models import HerschelBulkley, SPPDecomposer
+   from rheojax.transforms import SPPDecomposer
+   from rheojax.models import HerschelBulkley
 
    # Fit Herschel-Bulkley to flow curve
    hb = HerschelBulkley()
@@ -236,7 +236,7 @@ Integration with Models
    sigma_y_flow = hb.parameters.get_value('sigma_y')
 
    # Extract yield stress from LAOS via SPP
-   spp = SPP(gamma_0=1.0, omega=1.0)
+   spp = SPPDecomposer(gamma_0=1.0, omega=1.0)
    sigma_y_spp = spp.extract_yield_stress(laos_results)
 
    # Compare methods
@@ -275,7 +275,7 @@ The SPP transform returns a result object with:
      - Loss modulus vs time within cycle
    * - ``phase``
      - (n_points,)
-     - Phase angle (0 to 2π)
+     - Phase angle (0 to :math:`2\pi`)
    * - ``Gp_average``
      - scalar
      - Cycle-averaged storage modulus
@@ -284,13 +284,13 @@ The SPP transform returns a result object with:
      - Cycle-averaged loss modulus
    * - ``Gp_max``
      - scalar
-     - Maximum instantaneous G'
+     - Maximum instantaneous :math:`G'`
    * - ``yield_indicator``
      - scalar
      - Yield metric (ratio of max to average)
    * - ``cole_cole_trajectory``
      - (n_points, 2)
-     - [G'_t, G''_t] for plotting
+     - [:math:`G'_t`, :math:`G''_t`] for plotting
 
 
 See Also
@@ -302,6 +302,7 @@ See Also
 - :doc:`fft` — Fourier-based LAOS analysis (complementary approach)
 - :doc:`../models/flow/herschel_bulkley` — Yield stress from flow curves
 - :doc:`../models/epm/index` — Elasto-plastic models for yielding
+- ``examples/advanced/10-spp-laos-tutorial.ipynb`` — SPP LAOS analysis tutorial notebook
 
 
 API References

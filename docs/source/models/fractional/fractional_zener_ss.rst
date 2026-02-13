@@ -65,7 +65,7 @@ Notation Guide
      - Time
      - s
    * - :math:`\tan\delta`
-     - Loss tangent (G''/G')
+     - Loss tangent (:math:`G''/G'`)
      - —
 
 Physical Foundations
@@ -167,7 +167,7 @@ Material Classification
      - Stiff filled elastomer
      - Carbon black rubber, nanocomposites
      - Strong damping, broad spectrum
-   * - Moderate Ge, Gm ~ Ge, :math:`\alpha` ~ 0.4
+   * - Moderate Ge, :math:`G_m \sim G_e`, :math:`\alpha \sim 0.4`
      - Crosslinked network
      - Hydrogels, thermosets
      - Balanced transient/equilibrium
@@ -181,7 +181,7 @@ Diagnostic Indicators
 
 - **Gm/Ge > 100**: Transient response dominates; verify measurements at short times
 - :math:`\alpha` **near bounds (0.05 or 0.95)**: Data may not support fractional behavior
-- **Poor fit in transition region**: Need better coverage around :math:`\omega` ~ 1/:math:`\tau_\alpha`
+- **Poor fit in transition region**: Need better coverage around :math:`\omega \sim 1/\tau_\alpha`
 - **Ge poorly constrained**: Low-frequency data insufficient; extend range
 
 Fitting Guidance
@@ -209,7 +209,7 @@ Fitting Guidance
 
 - Use smart initialization (automatic for oscillation mode)
 - Verify both plateaus are captured in data
-- Fit simultaneously to G' and G" with equal weighting
+- Fit simultaneously to :math:`G'` and :math:`G''` with equal weighting
 - Use log-weighted least squares for better conditioning
 - Check residuals for systematic deviations
 
@@ -262,9 +262,9 @@ Time Domain
    \]
 
 **Physical interpretation:**
-   - At t = 0: G(0) = Ge + Gm (instantaneous modulus, glassy response)
-   - At t → ∞: G(∞) = Ge (equilibrium modulus, permanent network)
-   - Intermediate times: Power-law relaxation G(t) - Ge ~ t^(-:math:`\alpha`)
+   - At :math:`t = 0`: :math:`G(0) = G_e + G_m` (instantaneous modulus, glassy response)
+   - At :math:`t \to \infty`: :math:`G(\infty) = G_e` (equilibrium modulus, permanent network)
+   - Intermediate times: Power-law relaxation :math:`G(t) - G_e \sim t^{-\alpha}`
 
 **Creep compliance:**
 
@@ -278,8 +278,8 @@ Time Domain
    \]
 
 **Physical interpretation:**
-   - At t = 0: J(0) = 1/(Ge + Gm) (instantaneous compliance)
-   - At t → ∞: J(∞) = 1/Ge (equilibrium compliance)
+   - At :math:`t = 0`: :math:`J(0) = 1/(G_e + G_m)` (instantaneous compliance)
+   - At :math:`t \to \infty`: :math:`J(\infty) = 1/G_e` (equilibrium compliance)
    - The material creeps from initial to equilibrium compliance following power-law kinetics
 
 Frequency Domain
@@ -305,10 +305,10 @@ Decomposing into storage and loss moduli reveals:
    G''(\omega) = G_m \frac{(\omega\tau_\alpha)^\alpha \sin(\alpha\pi/2)}{1 + 2(\omega\tau_\alpha)^\alpha \cos(\alpha\pi/2) + (\omega\tau_\alpha)^{2\alpha}}
 
 **Frequency-domain behavior:**
-   - Low :math:`\omega`: G' → Ge (elastic plateau), G" → 0
-   - Transition region (:math:`\omega` ~ 1/:math:`\tau_\alpha`): Power-law scaling G', G" ~ :math:`\omega^\alpha` with slope :math:`\alpha` in log-log plot
-   - High :math:`\omega`: G' → Ge + Gm (second plateau), G" decreases as :math:`\omega^(-\alpha)`
-   - Loss tangent tan :math:`\delta` = G"/G' exhibits a maximum at the transition frequency
+   - Low :math:`\omega`: :math:`G' \to G_e` (elastic plateau), :math:`G'' \to 0`
+   - Transition region (:math:`\omega \sim 1/\tau_\alpha`): Power-law scaling :math:`G', G'' \sim \omega^\alpha` with slope :math:`\alpha` in log-log plot
+   - High :math:`\omega`: :math:`G' \to G_e + G_m` (second plateau), :math:`G''` decreases as :math:`\omega^{-\alpha}`
+   - Loss tangent :math:`\tan\delta = G''/G'` exhibits a maximum at the transition frequency
 
 Parameters
 ----------
@@ -366,23 +366,23 @@ Validity and Assumptions
 Regimes and Behavior
 --------------------
 
-**Short-Time / High-Frequency Regime** (t << :math:`\tau_\alpha or \omega >> 1/\tau_\alpha`):
-   - Both springs contribute: G(t) → Ge + Gm
-   - Elastic plateau: G'(:math:`\omega`) → Ge + Gm
-   - Material behaves as stiff solid with modulus Ge + Gm
-   - Minimal energy dissipation: G" → 0
+**Short-Time / High-Frequency Regime** (:math:`t \ll \tau_\alpha` or :math:`\omega \gg 1/\tau_\alpha`):
+   - Both springs contribute: :math:`G(t) \to G_e + G_m`
+   - Elastic plateau: :math:`G'(\omega) \to G_e + G_m`
+   - Material behaves as stiff solid with modulus :math:`G_e + G_m`
+   - Minimal energy dissipation: :math:`G'' \to 0`
 
-**Intermediate Regime** (t ~ :math:`\tau_\alpha or \omega` ~ 1/:math:`\tau_\alpha`):
-   - Power-law relaxation: G(t) - Ge ~ (t/:math:`\tau_\alpha`)^(-:math:`\alpha`)
-   - Frequency-domain: G'(:math:`\omega`), G"(:math:`\omega`) ~ :math:`\omega^\alpha` (parallel slopes in log-log plot)
-   - Loss tangent maximum: tan :math:`\delta` peaks at transition frequency
+**Intermediate Regime** (:math:`t \sim \tau_\alpha` or :math:`\omega \sim 1/\tau_\alpha`):
+   - Power-law relaxation: :math:`G(t) - G_e \sim (t/\tau_\alpha)^{-\alpha}`
+   - Frequency-domain: :math:`G'(\omega), G''(\omega) \sim \omega^\alpha` (parallel slopes in log-log plot)
+   - Loss tangent maximum: :math:`\tan\delta` peaks at transition frequency
    - This is the **fingerprint** of fractional viscoelasticity
 
-**Long-Time / Low-Frequency Regime** (t >> :math:`\tau_\alpha or \omega << 1/\tau_\alpha`):
-   - Equilibrium plateau: G(t) → Ge
-   - Elastic plateau: G'(:math:`\omega`) → Ge
+**Long-Time / Low-Frequency Regime** (:math:`t \gg \tau_\alpha` or :math:`\omega \ll 1/\tau_\alpha`):
+   - Equilibrium plateau: :math:`G(t) \to G_e`
+   - Elastic plateau: :math:`G'(\omega) \to G_e`
    - Permanent network structure dominates
-   - Solid-like behavior: G' > G", material does not flow
+   - Solid-like behavior: :math:`G' > G''`, material does not flow
 
 Comparison with Classical Zener Model
 --------------------------------------
@@ -391,19 +391,19 @@ The FZSS model offers significant advantages over the classical Zener model:
 
 **Classical Zener (** :math:`\alpha` **= 1):**
    - Single relaxation time :math:`\tau`
-   - Exponential relaxation: G(t) = Ge + Gm exp(-t/:math:`\tau`)
+   - Exponential relaxation: :math:`G(t) = G_e + G_m \exp(-t/\tau)`
    - Narrow relaxation spectrum (Lorentzian)
    - Often insufficient for real materials with heterogeneous microstructures
 
 **Fractional Zener (0 <** :math:`\alpha` **< 1):**
    - Continuous distribution of relaxation times
-   - Power-law relaxation: G(t) - Ge ~ t^(-:math:`\alpha`)
+   - Power-law relaxation: :math:`G(t) - G_e \sim t^{-\alpha}`
    - Broad relaxation spectrum (power-law or log-normal distribution)
    - Captures material heterogeneity with fewer parameters
 
 **When to Use Fractional:**
    - Material exhibits power-law relaxation in intermediate time range
-   - Log-log plots of G' and G" show parallel slopes (not classical Lorentzian peak)
+   - Log-log plots of :math:`G'` and :math:`G''` show parallel slopes (not classical Lorentzian peak)
    - Need to fit data spanning 3+ decades in frequency/time
    - Classical multi-mode Zener requires too many parameters (> 5)
 
@@ -417,7 +417,7 @@ Limiting Behavior
 
 The FZSS model recovers simpler models in specific limits:
 
-- :math:`\alpha` **→ 1**: Classical Zener model with exponential decay: G(t) = Ge + Gm exp(-t/:math:`\tau_\alpha`)
+- :math:`\alpha` **→ 1**: Classical Zener model with exponential decay: :math:`G(t) = G_e + G_m \exp(-t/\tau_\alpha)`
 - :math:`\alpha` **→ 0**: Ge dominates, Gm contribution becomes frequency-independent elastic addition
 - **Gm → 0**: Purely elastic solid with modulus Ge (no relaxation)
 - **Ge → 0**: Fractional Maxwell Liquid (FML) — material flows under stress
@@ -462,13 +462,13 @@ How It Works
 When ``test_mode='oscillation'``, the initialization system:
 
 1. **Extracts frequency features** from :math:`|G^*|(\omega)` data:
-   - Low-frequency plateau → estimates Ge
-   - High-frequency plateau → estimates Ge + Gm (thus Gm = high_plateau - low_plateau)
+   - Low-frequency plateau → estimates :math:`G_e`
+   - High-frequency plateau → estimates :math:`G_e + G_m` (thus :math:`G_m` = high_plateau - low_plateau)
    - Transition frequency :math:`\omega_mid` (steepest slope) → estimates :math:`\tau_\alpha = 1/\omega_mid`
    - Slope in transition region → estimates fractional order :math:`\alpha`
 
 2. **Estimates fractional order** from loss tangent slope:
-   - Analyzes slope of tan :math:`\delta` = G"/G' in intermediate frequency range
+   - Analyzes slope of :math:`\tan\delta = G''/G'` in intermediate frequency range
    - Maps slope to :math:`\alpha` using power-law scaling theory
 
 3. **Clips to parameter bounds** to ensure physical validity

@@ -531,7 +531,7 @@ class Pipeline:
         Save the most recent plot to file.
 
         Convenience method for exporting plots with publication-quality defaults.
-        Wraps rheo.visualization.plotter.save_figure() to enable fluent API chaining.
+        Wraps rheojax.visualization.plotter.save_figure() to enable fluent API chaining.
 
         Parameters
         ----------
@@ -543,7 +543,7 @@ class Pipeline:
             Resolution for raster formats (PNG).
         **kwargs : dict
             Additional arguments passed to save_figure().
-            See rheo.visualization.plotter.save_figure() for details.
+            See rheojax.visualization.plotter.save_figure() for details.
 
         Returns
         -------
@@ -580,7 +580,7 @@ class Pipeline:
         See Also
         --------
         plot : Generate plot with automatic type selection
-        rheo.visualization.plotter.save_figure : Core export function
+        rheojax.visualization.plotter.save_figure : Core export function
 
         Notes
         -----
@@ -700,7 +700,7 @@ class Pipeline:
         # Extract all parameter values from the model's ParameterSet
         return {
             name: self._last_model.parameters.get_value(name)
-            for name in self._last_model.parameters._parameters.keys()
+            for name in self._last_model.parameters.keys()
         }
 
     def clone(self) -> Pipeline:

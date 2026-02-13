@@ -63,6 +63,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
     build_tnt_creep_ode_rhs,
@@ -95,6 +96,12 @@ StressType = Literal["linear", "fene"]
         Protocol.CREEP,
         Protocol.LAOS,
     ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
+    ],
 )
 @ModelRegistry.register(
     "tnt",
@@ -105,6 +112,12 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class TNTSingleMode(TNTBase):

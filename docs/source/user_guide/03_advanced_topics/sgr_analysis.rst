@@ -19,8 +19,8 @@ under a single theoretical picture.
 
    SGR treats soft materials as collections of mesoscopic **trapped elements** that can
    yield and rearrange via an activated hopping process. The single dimensionless parameter
-   **x** (effective noise temperature) controls whether the material behaves as a glass
-   (x < 1), a power-law fluid (1 < x < 2), or a Newtonian liquid (x ≥ 2).
+   :math:`x` (effective noise temperature) controls whether the material behaves as a glass
+   (:math:`x < 1`), a power-law fluid (:math:`1 < x < 2`), or a Newtonian liquid (:math:`x \geq 2`).
 
 Unlike phenomenological models (Maxwell, Kelvin-Voigt) that describe material response
 without microscopic interpretation, SGR provides a **physical picture** connecting
@@ -33,8 +33,8 @@ When to Use SGR
 
 - **Soft glassy materials**: Foams, concentrated emulsions, pastes, slurries, colloidal gels
 - **Yield stress fluids**: Materials with solid-to-liquid transitions under stress
-- **Aging materials**: Systems whose properties evolve over time (x < 1)
-- **Power-law rheology**: Materials showing G' ~ G'' ~ ω^n across broad frequency ranges
+- **Aging materials**: Systems whose properties evolve over time (:math:`x < 1`)
+- **Power-law rheology**: Materials showing :math:`G' \sim G'' \sim \omega^n` across broad frequency ranges
 - **Shear rejuvenation**: Systems fluidized by deformation
 - **Phase classification**: Determining whether a material is a glass, fluid, or near transition
 
@@ -47,30 +47,30 @@ When to Use SGR
 Material Classification
 -----------------------
 
-The SGR framework classifies materials by their effective noise temperature x:
+The SGR framework classifies materials by their effective noise temperature :math:`x`:
 
 .. list-table:: SGR Phase Diagram
    :header-rows: 1
    :widths: 15 25 60
 
    * - Regime
-     - x Range
+     - :math:`x` Range
      - Physical Characteristics
    * - **Glass**
-     - x < 1
+     - :math:`x < 1`
      - Aging, yield stress, metastable, non-ergodic
    * - **Transition**
-     - x ≈ 1
-     - Critical behavior, G' ≈ G'', borderline yield
+     - :math:`x \approx 1`
+     - Critical behavior, :math:`G' \approx G''`, borderline yield
    * - **Power-law Fluid**
-     - 1 < x < 2
-     - G' ~ G'' ~ ω^(x-1), viscoelastic liquid
+     - :math:`1 < x < 2`
+     - :math:`G' \sim G'' \sim \omega^{x-1}`, viscoelastic liquid
    * - **Newtonian**
-     - x ≥ 2
+     - :math:`x \geq 2`
      - Exponential relaxation, simple viscous flow
 
-The **glass transition** at x = 1 is not a thermodynamic phase transition but a
-**dynamical arrest**: below x = 1, the system cannot equilibrate on any finite timescale.
+The **glass transition** at :math:`x = 1` is not a thermodynamic phase transition but a
+**dynamical arrest**: below :math:`x = 1`, the system cannot equilibrate on any finite timescale.
 
 Theoretical Foundations
 =======================
@@ -81,12 +81,12 @@ The Trap Model Picture
 SGR models the material as many mesoscopic **elements**—local regions containing
 multiple particles/droplets/bubbles—each characterized by:
 
-1. **Local strain** l: The strain stored in that element
-2. **Trap depth** E: The energy barrier to rearrangement (how "stuck" it is)
-3. **Elastic constant** k: Local stiffness (typically equal to G₀)
+1. **Local strain** :math:`l`: The strain stored in that element
+2. **Trap depth** :math:`E`: The energy barrier to rearrangement (how "stuck" it is)
+3. **Elastic constant** :math:`k`: Local stiffness (typically equal to :math:`G_0`)
 
 Elements are trapped in local energy minima ("cages") until activated by noise.
-The **exponential trap distribution** ρ(E) = exp(-E) means deep traps are exponentially
+The **exponential trap distribution** :math:`\rho(E) = \exp(-E)` means deep traps are exponentially
 rare—a consequence of entropic arguments.
 
 Activation and Yielding
@@ -99,9 +99,9 @@ Elements yield with rate:
    \Gamma(E, l) = \Gamma_0 \exp\left(-\frac{E - \frac{1}{2}kl^2}{x}\right)
 
 where:
-   - Γ₀ = 1/τ₀ is the attempt frequency
-   - x is the effective noise temperature
-   - ½kl² is the elastic energy (lowers the barrier)
+   - :math:`\Gamma_0 = 1/\tau_0` is the attempt frequency
+   - :math:`x` is the effective noise temperature
+   - :math:`\frac{1}{2}kl^2` is the elastic energy (lowers the barrier)
 
 **Key physics**: Large local strain makes yielding more likely by reducing the effective
 barrier height.
@@ -109,34 +109,34 @@ barrier height.
 Effective Noise Temperature
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The parameter x is **not** thermal temperature (which is essentially fixed at room
-temperature for soft materials). Instead, x represents an **effective noise level**
+The parameter :math:`x` is **not** thermal temperature (which is essentially fixed at room
+temperature for soft materials). Instead, :math:`x` represents an **effective noise level**
 arising from:
 
 - **Mechanical noise**: Rearrangements of neighbors creating local fluctuations
-- **Shear rejuvenation**: Applied deformation increasing x
-- **Aging**: Gradual decrease of x as system settles into deeper traps
+- **Shear rejuvenation**: Applied deformation increasing :math:`x`
+- **Aging**: Gradual decrease of :math:`x` as system settles into deeper traps
 - **External perturbations**: Vibrations, stirring, etc.
 
 Connecting x to Rheology
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The remarkable power of SGR is that **x alone determines rheological character**:
+The remarkable power of SGR is that :math:`x` **alone determines rheological character**:
 
 .. math::
 
    G'(\omega) \sim G''(\omega) \sim \omega^{x-1} \quad \text{for } 1 < x < 2
 
 This gives:
-   - Phase angle: δ = π(x-1)/2 = constant (frequency-independent)
-   - Flow index: n = x - 1 in Herschel-Bulkley-like steady shear
-   - Loss tangent: tan(δ) = tan(π(x-1)/2) = constant
+   - Phase angle: :math:`\delta = \pi(x-1)/2` = constant (frequency-independent)
+   - Flow index: :math:`n = x - 1` in Herschel-Bulkley-like steady shear
+   - Loss tangent: :math:`\tan(\delta) = \tan(\pi(x-1)/2)` = constant
 
-**How to estimate x from data**:
+**How to estimate** :math:`x` **from data**:
 
-1. Plot log G' vs log ω
-2. Fit linear region to get slope m
-3. x ≈ m + 1
+1. Plot :math:`\log G'` vs :math:`\log \omega`
+2. Fit linear region to get slope :math:`m`
+3. :math:`x \approx m + 1`
 
 Or from loss tangent:
 
@@ -165,7 +165,7 @@ The standard SGR model for rheological fitting:
    print(f"Effective temperature: x = {x:.3f}")
    print(f"Phase: {'glass' if x < 1 else 'fluid'}")
 
-**Parameters**: x (noise temperature), G₀ (modulus scale), τ₀ (attempt time)
+**Parameters**: :math:`x` (noise temperature), :math:`G_0` (modulus scale), :math:`\tau_0` (attempt time)
 
 **Use for**: Standard fitting, phase classification, steady shear flow curves
 
@@ -248,7 +248,7 @@ Basic SGR Analysis Workflow
 Bayesian Inference for x
 ------------------------
 
-Since x is the critical parameter determining phase behavior, **Bayesian inference
+Since :math:`x` is the critical parameter determining phase behavior, **Bayesian inference
 is highly recommended** to quantify uncertainty:
 
 .. code-block:: python
@@ -336,10 +336,10 @@ SGR can predict shear banding when the flow curve is non-monotonic:
        band_info = srfs.compute_shear_band_coexistence(model, applied_rate=1.0)
        print(f"High-rate band fraction: {band_info['high_fraction']:.2f}")
 
-Aging Dynamics (x < 1)
-----------------------
+Aging Dynamics (:math:`x < 1`)
+------------------------------
 
-For glassy materials (x < 1), properties evolve with waiting time:
+For glassy materials (:math:`x < 1`), properties evolve with waiting time:
 
 .. code-block:: python
 
@@ -435,19 +435,19 @@ SGR vs Other Models
    * - **SGR**
      - Physical interpretation, phase classification, aging
      - Mean-field (no spatial correlations)
-     - x (noise temp), G₀, τ₀
+     - :math:`x` (noise temp), :math:`G_0`, :math:`\tau_0`
    * - **Fractional Maxwell**
      - Mathematical convenience, broad relaxation
      - No microscopic picture
-     - G, τ, α (fractional order)
+     - :math:`G`, :math:`\tau`, :math:`\alpha` (fractional order)
    * - **Herschel-Bulkley**
      - Simple yield stress fitting
      - Steady shear only, no dynamics
-     - σ_y, K, n
+     - :math:`\sigma_y`, :math:`K`, :math:`n`
    * - **Multi-mode Maxwell**
      - Discrete relaxation spectrum
      - Many parameters, no physical basis
-     - Gᵢ, τᵢ for each mode
+     - :math:`G_i`, :math:`\tau_i` for each mode
 
 **When to choose SGR over fractional models:**
 
@@ -481,11 +481,11 @@ elastoplastic models, or mesoscale simulations).
 Phenomenological Noise Temperature
 ----------------------------------
 
-The origin of x is **not derived from first principles**:
+The origin of :math:`x` is **not derived from first principles**:
 
 - Must be fitted to data or estimated
 - Physical mechanism of "noise" unclear
-- Cannot predict x from molecular properties alone
+- Cannot predict :math:`x` from molecular properties alone
 
 For fundamental understanding, pair SGR with molecular dynamics simulations.
 
@@ -501,10 +501,10 @@ Real soft glasses have **polydisperse** element sizes:
 Thixotropy Limitations
 ----------------------
 
-Basic SGR treats x as constant. For strongly thixotropic materials:
+Basic SGR treats :math:`x` as constant. For strongly thixotropic materials:
 
-- x should be time-dependent: x(t)
-- Consider structural parameter extensions: λ ∈ [0, 1]
+- :math:`x` should be time-dependent: :math:`x(t)`
+- Consider structural parameter extensions: :math:`\lambda \in [0, 1]`
 - See SRFS transform for thixotropy detection
 
 Tutorial Notebooks
@@ -521,7 +521,7 @@ This tutorial covers:
 
 - Loading frequency sweep data for soft glassy materials
 - Fitting SGRConventional and SGRGeneric models
-- Phase classification from fitted x parameter
+- Phase classification from fitted :math:`x` parameter
 - Bayesian uncertainty quantification
 - SRFS transform for flow curve analysis
 - Shear banding detection and analysis
@@ -554,7 +554,7 @@ References
 
 **Thermodynamic Extensions:**
 
-- Fuereder, I. & Ilg, P. (2013). "GENERIC treatment of soft glassy rheology."
+- Fuereder, I. & Ilg, P. (2013). "Nonequilibrium thermodynamics of the soft glassy rheology model."
   *Phys. Rev. E* 88, 042134.
   https://doi.org/10.1103/PhysRevE.88.042134
 
@@ -566,11 +566,13 @@ References
 
 - Fielding, S. M., Cates, M. E., & Sollich, P. (2009). "Shear banding, aging and
   noise dynamics in soft glassy materials." *Soft Matter* 5, 2378-2382.
+  https://doi.org/10.1039/B812394M
 
 **Reviews:**
 
 - Bonn, D., Denn, M. M., Berthier, L., Divoux, T., & Manneville, S. (2017).
   "Yield stress materials in soft condensed matter." *Rev. Mod. Phys.* 89, 035005.
+  https://doi.org/10.1103/RevModPhys.89.035005
 
 See Also
 ========

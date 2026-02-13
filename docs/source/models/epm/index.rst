@@ -20,7 +20,7 @@ Quick Reference
      - Scalar stress (:math:`\sigma_{xy}`), fast avalanche dynamics
    * - TensorialEPM
      - ``from rheojax.models import TensorialEPM``
-     - Full tensor, normal stresses (N_1, N_2), anisotropic yielding
+     - Full tensor, normal stresses (:math:`N_1`, :math:`N_2`), anisotropic yielding
 
 
 Overview
@@ -83,7 +83,7 @@ When to Use Which Model
      - TensorialEPM
    * - Flow curve fitting
      - ✓ Fast (3-5x faster)
-     - ✓ Use if N_1 data available
+     - ✓ Use if :math:`N_1` data available
    * - Yield stress determination
      - ✓ Sufficient
      - ✓ More accurate for anisotropic
@@ -92,10 +92,10 @@ When to Use Which Model
      - ✓ Quantitative
    * - Normal stress differences
      - ✗ Cannot capture
-     - ✓ N_1, N_2 predictions
+     - ✓ :math:`N_1`, :math:`N_2` predictions
    * - Shear banding analysis
      - ~ Qualitative (:math:`\sigma_{xy}` gradients)
-     - ✓ Quantitative (N_1 gradients)
+     - ✓ Quantitative (:math:`N_1` gradients)
    * - Anisotropic materials
      - ✗
      - ✓ Hill criterion
@@ -148,7 +148,7 @@ complete mathematical details with boxed governing equations.
      - :ref:`epm-creep`
    * - ``oscillation``
      - Sinusoidal shear (SAOS/LAOS)
-     - G', G'', Lissajous figures
+     - :math:`G'`, :math:`G''`, Lissajous figures
      - :ref:`epm-oscillation`
 
 .. tip::
@@ -167,7 +167,7 @@ typically 10-100 particle diameters). At this scale:
 
 - Material is coarse-grained into discrete blocks with local stress :math:`\sigma_{ij}`
 - Plastic yielding is localized and stochastic (quenched disorder)
-- Stress redistribution follows long-range Eshelby coupling (quadrupolar, ~1/r^2)
+- Stress redistribution follows long-range Eshelby coupling (quadrupolar, :math:`\sim 1/r^2`)
 - Avalanches emerge from cascading plastic events
 
 **Ideal materials:**
@@ -178,7 +178,7 @@ typically 10-100 particle diameters). At this scale:
 - Granular suspensions
 - Emulsions near jamming
 
-**Athermal limit:** EPMs assume yielding is purely stress-driven (T → 0). For thermal
+**Athermal limit:** EPMs assume yielding is purely stress-driven (:math:`T \to 0`). For thermal
 activation, consider SGR models instead.
 
 
@@ -204,7 +204,7 @@ Key Parameters
    * - Disorder strength
      - :math:`\sigma_{c,\text{std}}`
      - 0.1-0.5× :math:`\sigma_{c,\text{mean}}`
-     - Heterogeneity → avalanche statistics
+     - Heterogeneity; controls avalanche statistics
    * - Plastic time
      - :math:`\tau_{pl}`
      - 0.01-10 s
@@ -231,15 +231,15 @@ Key Parameters
    * - Poisson ratio
      - :math:`\nu`
      - 0.40-0.49
-     - Plane strain coupling → N_1 magnitude
+     - Plane strain coupling; :math:`N_1` magnitude
    * - Normal relax. time
-     - :math:`\tau_{pl}_{normal}`
-     - 0.1-10× :math:`\tau_{pl}_{shear}`
+     - :math:`\tau_{pl,normal}`
+     - 0.1-10× :math:`\tau_{pl,shear}`
      - Can differ for anisotropic materials
-   * - N_1 weight
-     - w_N1
+   * - :math:`N_1` weight
+     - :math:`w_{N_1}`
      - 0.1-10
-     - Prioritize N_1 in combined fitting
+     - Prioritize :math:`N_1` in combined fitting
    * - Hill H
      - H
      - 0.5-2.0
@@ -247,7 +247,7 @@ Key Parameters
    * - Hill N
      - N
      - 1.5-5.0
-     - Shear amplification (H=1, N=3 → von Mises)
+     - Shear amplification (:math:`H=1, N=3` recovers von Mises)
 
 
 Quick Start
@@ -266,12 +266,12 @@ Quick Start
    # Fit to flow curve
    gamma_dot = np.logspace(-2, 1, 20)
    stress = np.array([...])  # experimental data
-   model.fit(gamma_dot, stress, test_mode="flow_curve")
+   model.fit(gamma_dot, stress, test_mode='flow_curve')
 
    # Bayesian inference with 4 chains
    result = model.fit_bayesian(
        gamma_dot, stress,
-       test_mode="flow_curve",
+       test_mode='flow_curve',
        num_warmup=500,
        num_samples=1000,
        num_chains=4,
@@ -289,10 +289,10 @@ Quick Start
    model = TensorialEPM(L=32, dt=0.01, w_N1=2.0)
 
    # Fit to shear data
-   model.fit(gamma_dot, stress_exp, test_mode="flow_curve")
+   model.fit(gamma_dot, stress_exp, test_mode='flow_curve')
 
    # Get N₁ predictions
-   result = model.predict(gamma_dot, test_mode="flow_curve")
+   result = model.predict(gamma_dot, test_mode='flow_curve')
    N1 = result.metadata["N1"]
 
 
@@ -312,20 +312,25 @@ References
 1. Picard, G., Ajdari, A., Lequeux, F., and Bocquet, L. (2004). "Elastic consequences
    of a single plastic event: A step towards the microscopic modeling of the flow
    of yield stress fluids." *European Physical Journal E*, 15, 371-381.
+   https://doi.org/10.1140/epje/i2004-10054-8
 
 2. Nicolas, A., Ferrero, E. E., Martens, K., and Barrat, J.-L. (2018). "Deformation
    and flow of amorphous solids: Insights from elastoplastic models." *Reviews of
    Modern Physics*, 90, 045006.
+   https://doi.org/10.1103/RevModPhys.90.045006
 
 3. Eshelby, J. D. (1957). "The determination of the elastic field of an ellipsoidal
    inclusion, and related problems." *Proceedings of the Royal Society A*, 241, 376-396.
+   https://doi.org/10.1098/rspa.1957.0133
 
 4. Lin, J., Lerner, E., Rosso, A., and Wyart, M. (2014). "Scaling description of the
    yielding transition in soft amorphous solids at zero temperature." *PNAS*, 111,
    14382-14387.
+   https://doi.org/10.1073/pnas.1406391111
 
 5. Budrikis, Z., Castellanos, D. F., Sandfeld, S., Zaiser, M., and Zapperi, S. (2017).
    "Universal features of amorphous plasticity." *Nature Communications*, 8, 15928.
+   https://doi.org/10.1038/ncomms15928
 
 
 See Also

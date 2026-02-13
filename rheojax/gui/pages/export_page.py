@@ -418,7 +418,9 @@ class ExportPage(QWidget):
         data_ext = self._get_data_extension()
 
         state = self._store.get_state()
-        datasets = getattr(state, "datasets", {}) or {}
+        datasets = getattr(state, "datasets", None)
+        if datasets is None:
+            datasets = {}
         if not datasets:
             QMessageBox.information(
                 self, "Batch Export", "No datasets available to export."
@@ -430,9 +432,9 @@ class ExportPage(QWidget):
         total_size = 0
         for name, ds in datasets.items():
             try:
-                rheo = self._dataset_to_rheodata(ds)
+                rheojax = self._dataset_to_rheodata(ds)
                 file_path = output_dir / f"{name}.{data_ext}"
-                self._export_service.export_data(rheo, file_path, data_ext)
+                self._export_service.export_data(rheojax, file_path, data_ext)
                 exported.append(str(file_path))
                 # Get file size if available
                 if file_path.exists():
@@ -785,8 +787,8 @@ class ExportPage(QWidget):
                 for dataset_id, dataset in state.datasets.items():
                     if dataset.x_data is not None and dataset.y_data is not None:
                         filepath = output_dir / f"data_{dataset_id}.{data_format}"
-                        rheo = self._dataset_to_rheodata(dataset)
-                        self._export_service.export_data(rheo, filepath, data_format)
+                        rheojax = self._dataset_to_rheodata(dataset)
+                        self._export_service.export_data(rheojax, filepath, data_format)
                         exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))

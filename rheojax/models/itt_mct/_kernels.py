@@ -180,13 +180,13 @@ def f12_volterra_flow_curve_rhs(
 ) -> jnp.ndarray:
     """ODE right-hand side for steady flow correlator evolution.
 
-    State vector: [Φ, K₁, K₂, ..., Kₙ, γ_accumulated]
+    State vector: [Φ, K₁, K₂, ..., K_n, γ_accumulated]
     where Kᵢ are Prony mode auxiliary variables.
 
     Parameters
     ----------
     state : jnp.ndarray
-        Current state [Φ, K₁...Kₙ, γ]
+        Current state [Φ, K₁...K_n, γ]
     t : float
         Current time
     gamma_dot : float
@@ -213,7 +213,7 @@ def f12_volterra_flow_curve_rhs(
     Returns
     -------
     jnp.ndarray
-        Time derivatives [dΦ/dt, dK₁/dt, ..., dKₙ/dt, dγ/dt]
+        Time derivatives [dΦ/dt, dK₁/dt, ..., dK_n/dt, dγ/dt]
     """
     # Unpack state
     phi = state[0]
@@ -355,7 +355,7 @@ def f12_volterra_startup_rhs(
 ) -> jnp.ndarray:
     """ODE right-hand side for startup flow.
 
-    State vector: [Φ, K₁, ..., Kₙ, γ, σ]
+    State vector: [Φ, K₁, ..., K_n, γ, σ]
 
     Tracks stress evolution σ(t) = γ̇ ∫₀^t G(t') dt' during startup.
 
@@ -420,7 +420,7 @@ def f12_equilibrium_correlator_rhs(
 ) -> jnp.ndarray:
     """ODE for equilibrium (quiescent) correlator Φ_eq(t).
 
-    State: [Φ, K₁, ..., Kₙ]
+    State: [Φ, K₁, ..., K_n]
 
     No strain decorrelation - pure relaxation dynamics.
     """
@@ -515,7 +515,7 @@ def f12_volterra_creep_rhs(
 ) -> jnp.ndarray:
     """ODE right-hand side for creep at constant stress.
 
-    State: [Φ, K₁, ..., Kₙ, γ, γ̇]
+    State: [Φ, K₁, ..., K_n, γ, γ̇]
 
     The shear rate γ̇(t) is implicitly determined by the constraint
     σ₀ = ∫ γ̇(t') G(t,t') dt'.
@@ -595,7 +595,7 @@ def f12_volterra_relaxation_rhs(
 ) -> jnp.ndarray:
     """ODE right-hand side for stress relaxation after cessation of flow.
 
-    State: [Φ, K₁, ..., Kₙ, σ]
+    State: [Φ, K₁, ..., K_n, σ]
 
     After stopping, γ̇ = 0 but the correlator continues to evolve
     with memory of the pre-shear history.
@@ -664,7 +664,7 @@ def f12_volterra_laos_rhs(
 ) -> jnp.ndarray:
     """ODE right-hand side for LAOS.
 
-    State: [Φ, K₁, ..., Kₙ, γ, σ]
+    State: [Φ, K₁, ..., K_n, γ, σ]
 
     Applied strain: γ(t) = γ₀ sin(ωt)
     Strain rate: γ̇(t) = γ₀ ω cos(ωt)
@@ -730,7 +730,7 @@ def extract_laos_harmonics(
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Extract Fourier harmonics from LAOS stress response.
 
-    σ(t) = Σₙ [σ'ₙ sin(nωt) + σ''ₙ cos(nωt)]
+    σ(t) = Σ_n [σ'_n sin(nωt) + σ''_n cos(nωt)]
 
     Parameters
     ----------

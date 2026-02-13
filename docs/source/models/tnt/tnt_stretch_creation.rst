@@ -1373,14 +1373,17 @@ Foundational Theory
 -------------------
 
 1. **Tanaka, F., & Edwards, S. F.** (1992). Viscoelastic properties of physically crosslinked networks. 1. Transient network theory. *Macromolecules*, 25(5), 1516-1523.
+   https://doi.org/10.1021/ma00031a024
 
    - Original transient network theory (base model)
 
-2. **Flory, P. J.** (1947). Thermodynamics of crystallization in high polymers. IV. A theory of crystalline states and fusion in polymers, copolymers, and their mixtures with diluents. *Journal of Chemical Physics*, 15(6), 397-408.
+2. **Flory, P. J.** (1947). Thermodynamics of crystallization in high polymers. I. Crystallization induced by stretching. *Journal of Chemical Physics*, 15(6), 397-408.
+   https://doi.org/10.1063/1.1746537
 
    - Classical theory of strain-induced crystallization
 
 3. **James, H. M., & Guth, E.** (1943). Theory of the elastic properties of rubber. *Journal of Chemical Physics*, 11(10), 455-481.
+   https://doi.org/10.1063/1.1723785
 
    - Non-Gaussian network theory (precursor to FENE)
 
@@ -1388,14 +1391,17 @@ Mechanophore and Adaptive Networks
 -----------------------------------
 
 4. **Vernerey, F. J., Long, R., & Brighenti, R.** (2017). A statistically-based continuum theory for polymers with transient networks. *Journal of the Mechanics and Physics of Solids*, 107, 1-20.
+   https://doi.org/10.1016/j.jmps.2017.05.016
 
    - Modern continuum framework for adaptive networks
 
 5. **Wang, Q., Gossweiler, G. R., Craig, S. L., & Zhao, X.** (2014). Cephalopod-inspired design of electro-mechano-chemically responsive elastomers for on-demand fluorescent patterning. *Nature Communications*, 5, 4899.
+   https://doi.org/10.1038/ncomms5899
 
    - Mechanophore-crosslinked elastomers (experimental)
 
 6. **Creton, C.** (2017). 50th Anniversary Perspective: Networks and Gels: Soft but Dynamic and Tough. *Macromolecules*, 50(21), 8297-8316.
+   https://doi.org/10.1021/acs.macromol.7b01698
 
    - Review of dynamic networks and toughening mechanisms
 
@@ -1403,10 +1409,12 @@ Strain Crystallization
 ----------------------
 
 7. **Candau, N., Laghmach, R., Chazeau, L., Chenal, J.-M., Gauthier, C., Biben, T., & Munch, E.** (2014). Strain-induced crystallization of natural rubber and cross-link densities heterogeneities. *Macromolecules*, 47(16), 5815-5824.
+   https://doi.org/10.1021/ma5006843
 
    - Modern experimental study of strain crystallization
 
 8. **Tosaka, M.** (2007). Strain-induced crystallization of crosslinked natural rubber as revealed by X-ray diffraction using synchrotron radiation. *Polymer Journal*, 39(12), 1207-1220.
+   https://doi.org/10.1295/polymj.PJ2007059
 
    - In-situ X-ray studies of crystallization kinetics
 
@@ -1414,10 +1422,12 @@ Numerical Methods
 -----------------
 
 9. **Hulsen, M. A., Fattal, R., & Kupferman, R.** (2005). Flow of viscoelastic fluids past a cylinder at high Weissenberg number: Stabilized simulations using matrix logarithms. *Journal of Non-Newtonian Fluid Mechanics*, 127(1), 27-39.
+   https://doi.org/10.1016/j.jnnfm.2005.01.002
 
    - Numerical techniques for viscoelastic constitutive equations
 
 10. **Owens, R. G., & Phillips, T. N.** (2002). *Computational Rheology*. Imperial College Press.
+    ISBN: 978-1860941863
 
     - Comprehensive reference for solving rheological ODEs/PDEs
 
@@ -1425,9 +1435,11 @@ Related Experimental Techniques
 --------------------------------
 
 11. **Hyun, K., Wilhelm, M., Klein, C. O., Cho, K. S., Nam, J. G., Ahn, K. H., Lee, S. J., Ewoldt, R. H., & McKinley, G. H.** (2011). A review of nonlinear oscillatory shear tests: Analysis and application of large amplitude oscillatory shear (LAOS). *Progress in Polymer Science*, 36(12), 1697-1753.
+    https://doi.org/10.1016/j.progpolymsci.2011.02.002
 
     - LAOS methodology for probing nonlinear response
 
-12. **Negi, A. S., & Osuji, C. O.** (2010). New insights on fumed colloidal rheology—shear thickening and vorticity-aligned structures in flocculating dispersions. *Rheologica Acta*, 49(5), 493-500.
+12. **Negi, A. S., & Osuji, C. O.** (2009). New insights on fumed colloidal rheology--shear thickening and vorticity-aligned structures in flocculating dispersions. *Rheologica Acta*, 48(8), 871-881.
+    https://doi.org/10.1007/s00397-008-0341-9
 
     - Flow-induced structure formation (related phenomenology)

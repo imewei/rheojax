@@ -237,7 +237,7 @@ Save complete session state:
 
 1. **File > Save Project** or **Ctrl+S**
 2. Choose location
-3. Save as ``.rheo`` project file
+3. Save as ``.rheojax`` project file
 
 Project files contain:
 
@@ -254,7 +254,7 @@ Load Project
 Resume previous work:
 
 1. **File > Open Project** or **Ctrl+O**
-2. Select ``.rheo`` file
+2. Select ``.rheojax`` file
 3. All state restored
 
 Auto-Save
@@ -303,7 +303,7 @@ Generate Python script:
 Best Practices
 ==============
 
-1. **Use project files**: Save `.rheo` for session recovery
+1. **Use project files**: Save `.rheojax` for session recovery
 2. **Export incrementally**: Save results as you progress
 3. **Use PDF for publications**: Vector format, high quality
 4. **Include metadata**: Enable metadata export

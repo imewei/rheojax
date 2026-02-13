@@ -23,14 +23,14 @@ import numpy as np
 try:
     from ikh_tutorial_utils import (
         load_ml_ikh_flow_curve,
-        load_pnas_startup,
         load_pnas_laos,
+        load_pnas_startup,
     )
 except ModuleNotFoundError:
     from utils.ikh_tutorial_utils import (
         load_ml_ikh_flow_curve,
-        load_pnas_startup,
         load_pnas_laos,
+        load_pnas_startup,
     )
 
 
@@ -525,10 +525,10 @@ def interpret_glass_state(info: dict[str, Any]) -> str:
         lines.append(f"Volume fraction: phi = {phi:.4f}")
         lines.append(f"MCT transition: phi_MCT = {phi_mct:.4f}")
         if is_glass:
-            lines.append(f"  -> phi > phi_MCT: cage effect dominates")
+            lines.append("  -> phi > phi_MCT: cage effect dominates")
             lines.append("  -> Material shows yield stress")
         else:
-            lines.append(f"  -> phi < phi_MCT: particles can diffuse")
+            lines.append("  -> phi < phi_MCT: particles can diffuse")
             lines.append("  -> Material flows")
 
     return "\n".join(lines)

@@ -139,7 +139,9 @@ References
 - A.N. Tikhonov and V.Y. Arsenin, *Solutions of Ill-Posed Problems*, Winston (1977).
 - D. Garcia, "Robust smoothing of gridded data in one and higher dimensions," *Comput.
   Stat. Data Anal.* 54, 1167–1178 (2010).
-- P. Press et al., *Numerical Recipes in Python*, Cambridge University Press (2020).
+- W. H. Press, S. A. Teukolsky, W. T. Vetterling, & B. P. Flannery,
+  *Numerical Recipes: The Art of Scientific Computing*, 3rd ed.,
+  Cambridge University Press (2007). ISBN: 978-0521880688
 
 See also
 --------

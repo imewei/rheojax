@@ -27,7 +27,6 @@ from typing import Literal
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.core.parameters import ParameterSet
 from rheojax.models.hvm._base import HVMBase
 from rheojax.models.hvnm._kernels import (
     _R_GAS,

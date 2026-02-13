@@ -170,7 +170,7 @@ class OWChirp(BaseTransform):
         n_freqs = len(frequencies)
 
         # Initialize coefficient array
-        coefficients = jnp.zeros((n_freqs, n_times), dtype=jnp.complex64)
+        coefficients = jnp.zeros((n_freqs, n_times), dtype=jnp.complex128)
 
         # Compute wavelet transform at each frequency
         for i, freq in enumerate(frequencies):
@@ -179,7 +179,8 @@ class OWChirp(BaseTransform):
             for j, t_center in enumerate(t):
                 wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)
                 # Inner product
-                coeff = jnp.sum(signal * jnp.conj(wavelet)) * (t[1] - t[0])
+                dt = t[1] - t[0] if len(t) > 1 else 1.0
+                coeff = jnp.sum(signal * jnp.conj(wavelet)) * dt
                 coefficients = coefficients.at[i, j].set(coeff)
 
         return coefficients
@@ -205,8 +206,9 @@ class OWChirp(BaseTransform):
         Array
             Wavelet coefficients
         """
+        if len(t) < 2:
+            raise ValueError("Wavelet transform requires at least 2 time points")
         dt = t[1] - t[0]
-        len(t)
 
         coefficients_list = []
 

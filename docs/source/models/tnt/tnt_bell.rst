@@ -961,8 +961,14 @@ References
 ----------
 
 1. **Bell, G.I.** (1978). Science 200, 618-627.
+   https://doi.org/10.1126/science.347575
 2. **Tanaka, F., & Edwards, S.F.** (1992). JNFM 43, 247-271.
+   https://doi.org/10.1016/0377-0257(92)80027-U
 3. **Evans, E., & Ritchie, K.** (1997). Biophys J 72, 1541-1555.
+   https://doi.org/10.1016/S0006-3495(97)78802-7
 4. **Hänggi, P., et al.** (1990). Rev Mod Phys 62, 251-341.
+   https://doi.org/10.1103/RevModPhys.62.251
 5. **Vaccaro, A., & Marrucci, G.** (2000). JNFM 92, 261-273.
+   https://doi.org/10.1016/S0377-0257(00)00095-1
 6. **Tripathi, A., et al.** (2006). Macromolecules 39, 1981-1999.
+   https://doi.org/10.1021/ma051614x

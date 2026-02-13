@@ -72,8 +72,8 @@ The SPP method analyzes stress response :math:`\sigma(t)` to sinusoidal strain
 Plotting :math:`G'_t` vs :math:`G''_t` traces a trajectory revealing the
 sequence of physical processes during oscillation.
 
-**Perfect elastic solid**: Point at (G', 0)
-**Perfect viscous liquid**: Point at (0, G'')
+**Perfect elastic solid**: Point at :math:`(G', 0)`
+**Perfect viscous liquid**: Point at :math:`(0, G'')`
 **Yielding material**: Trajectory shows transitions between regimes
 
 
@@ -89,7 +89,7 @@ When to Use SPP Analysis
      - Alternative
    * - Linear viscoelastic (SAOS)
      - No (overkill)
-     - Standard G', G''
+     - Standard :math:`G'`, :math:`G''`
    * - LAOS with mild nonlinearity
      - Yes
      - Fourier analysis (FT rheology)
@@ -247,7 +247,6 @@ References
 
 5. Lee, C.-W., Rogers, S.A., & McKinley, G.H. (2024). "SPP+ extensions for improved
    yield stress characterization." *J. Rheol.*, 68, 271–287.
-   https://doi.org/10.1122/8.0000760
 
 6. Hyun, K. et al. (2011). "A review of nonlinear oscillatory shear tests: Analysis
    and application of large amplitude oscillatory shear (LAOS)." *Prog. Polym. Sci.*,

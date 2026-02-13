@@ -24,7 +24,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-
 import numpyro
 import numpyro.distributions as dist
 from numpyro.distributions import transforms as dist_transforms
@@ -98,10 +97,9 @@ class BayesianResult:
             num_samples=self.num_samples,
             num_chains=self.num_chains,
         )
-        # Ensure posterior_samples are numpy arrays
+        # Ensure posterior_samples are float64 numpy arrays
         for name, samples in self.posterior_samples.items():
-            if not isinstance(samples, np.ndarray):
-                self.posterior_samples[name] = np.asarray(samples, dtype=np.float64)
+            self.posterior_samples[name] = np.asarray(samples, dtype=np.float64)
         logger.debug(
             "BayesianResult initialized",
             parameter_names=list(self.posterior_samples.keys()),
@@ -436,6 +434,10 @@ class BayesianMixin:
 
         for name in param_names:
             param = self.parameters.get(name)
+            if param is None:
+                raise ValueError(
+                    f"Parameter '{name}' not found in model parameters"
+                )
             if param.bounds is None:
                 raise ValueError(
                     f"Parameter '{name}' must have bounds for Bayesian inference"
@@ -513,10 +515,19 @@ class BayesianMixin:
             value = raw_value
             if value is None or not np.isfinite(value):
                 value = self._compute_default_midpoint(lower_raw, upper_raw)
+            original = value
             if np.isfinite(safe_lower):
                 value = max(value, safe_lower)
             if np.isfinite(safe_upper):
                 value = min(value, safe_upper)
+            if value != original:
+                logger.debug(
+                    "Bayesian warm-start clamped",
+                    parameter=name,
+                    original=original,
+                    clamped=value,
+                    interval=(float(safe_lower), float(safe_upper)),
+                )
             return float(value)
 
         warm_start: dict[str, float] = {}
@@ -855,8 +866,8 @@ class BayesianMixin:
         )
         return intervals
 
-    # Cache for precompiled NumPyro models (keyed by test_mode + is_complex)
-    _precompiled_models: dict[tuple[str, bool], Any] = {}
+    # NOTE: Precompilation cache is stored per-instance (set in precompile_bayesian).
+    # This avoids cross-model contamination from a shared class-level dict.
 
     def precompile_bayesian(
         self,
@@ -974,8 +985,10 @@ class BayesianMixin:
 
         compile_time = time.perf_counter() - start_time
 
-        # Cache the model key for reference
+        # Cache the model key for reference (per-instance dict)
         cache_key = (str(test_mode), is_complex_data)
+        if not hasattr(self, "_precompiled_models"):
+            self._precompiled_models = {}
         self._precompiled_models[cache_key] = True
 
         logger.info(
@@ -1046,26 +1059,18 @@ class BayesianMixin:
         model_name = getattr(self, "__class__", type(self)).__name__
 
         # Capture protocol-specific arguments from nuts_kwargs
-        # Handle both underscore and non-underscore variants for backward compatibility
+        # These must NOT be passed to NUTS — they go to model_function instead
         protocol_kwargs = {}
-        # Protocol-specific kwargs that should NOT be passed to NUTS
-        # These are extracted and stored in _last_fit_kwargs for model_function access
-        canonical_keys = [
-            "strain", "sigma_0", "sigma_applied", "gamma_0", "gamma_dot", "omega", "n_cycles",
-            "gdot",  # HL model startup shear rate
-            "t_wait",  # Aging/waiting time
-        ]
-        # Also accept common aliases without underscores (gamma0 -> gamma_0)
-        aliases = {"gamma0": "gamma_0", "sigma0": "sigma_0"}
+        protocol_keys_all = {
+            "strain", "sigma_0", "sigma_applied", "gamma_0", "gamma_dot",
+            "omega", "n_cycles", "gdot", "t_wait",
+            # Also accept non-underscore aliases
+            "gamma0", "sigma0",
+        }
 
-        for key in canonical_keys:
-            if key in nuts_kwargs:
+        for key in list(nuts_kwargs):
+            if key in protocol_keys_all:
                 protocol_kwargs[key] = nuts_kwargs.pop(key)
-
-        # Handle aliases
-        for alias, canonical in aliases.items():
-            if alias in nuts_kwargs:
-                protocol_kwargs[canonical] = nuts_kwargs.pop(alias)
 
         with log_bayesian(
             logger,
@@ -1083,16 +1088,15 @@ class BayesianMixin:
             y_array = y_from_rheo if y_from_rheo is not None else y
             self._test_mode = test_mode  # Cache for future calls
 
-            # Merge protocol kwargs into _last_fit_kwargs so model_function can access them
-            # Use original key names (gamma0 without underscore) for model compatibility
+            # Merge protocol kwargs into _last_fit_kwargs.
+            # Preserve values set by NLSQ _fit() (e.g., internal metadata like
+            # _stress_scale, _tau_est); only override keys explicitly passed
+            # to fit_bayesian(). Never clear protocol kwargs from _fit() —
+            # they are the ground truth for the model_function.
             if protocol_kwargs:
                 if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:
                     self._last_fit_kwargs = {}
-                # Map canonical names back to model-expected names
-                reverse_aliases = {"gamma_0": "gamma0", "sigma_0": "sigma0"}
-                for key, value in protocol_kwargs.items():
-                    model_key = reverse_aliases.get(key, key)
-                    self._last_fit_kwargs[model_key] = value
+                self._last_fit_kwargs.update(protocol_kwargs)
 
             logger.info(
                 "Bayesian inference started",
@@ -1244,11 +1248,18 @@ class BayesianMixin:
 
             # Guard against NaN/Inf from ODE-based models (LAOS, startup)
             # that can diverge for extreme parameter combinations during
-            # NUTS initialization. Replacing with zeros yields very low
-            # likelihood, naturally steering the sampler away.
-            predictions_raw = jnp.where(
-                jnp.isfinite(predictions_raw), predictions_raw, 0.0
+            # NUTS exploration. Two-part strategy:
+            # 1) Explicit log-probability penalty to reject NaN regions
+            # 2) Replace NaN with 0.0 to prevent downstream tracing errors
+            is_finite = jnp.isfinite(predictions_raw)
+            all_finite = jnp.all(is_finite)
+            numpyro.factor(
+                "finite_check", jnp.where(all_finite, 0.0, -1e18)
             )
+            numpyro.deterministic(
+                "num_nonfinite", jnp.sum(~is_finite).astype(jnp.float64)
+            )
+            predictions_raw = jnp.where(is_finite, predictions_raw, 0.0)
 
             # Handle complex vs real predictions
             if is_complex_data:
@@ -1299,32 +1310,51 @@ class BayesianMixin:
         Args:
             mcmc: NumPyro MCMC object after sampling
             posterior_samples: Dictionary of posterior samples
+            num_samples: Number of samples per chain
+            num_chains: Number of MCMC chains
 
         Returns:
             Dictionary with diagnostic information:
-                - r_hat: R-hat (Gelman-Rubin) statistic per parameter
-                - ess: Effective sample size per parameter
-                - divergences: Number of divergent transitions
+                - r_hat: R-hat (Gelman-Rubin) statistic per parameter (NaN if failed)
+                - ess: Effective sample size per parameter (NaN if failed)
+                - divergences: Number of divergent transitions (-1 if unknown)
+                - diagnostics_valid: Whether all diagnostics computed successfully
         """
         diagnostics: dict[str, Any] = {}
+        all_valid = True
 
         # Get NumPyro diagnostics
         try:
+            # Reshape samples to (num_chains, num_draws) for diagnostic functions.
+            # mcmc.get_samples() flattens across chains, so we must reshape.
+            # NumPyro's split_gelman_rubin splits each chain in half before
+            # computing, so it works with num_chains >= 1.
+            # effective_sample_size also accepts (num_chains, num_draws).
+
             # R-hat (should be < 1.01 for good convergence)
             r_hat_dict = {}
             for name in posterior_samples.keys():
                 try:
-                    # NumPyro computes split R-hat
-                    r_hat_value = numpyro.diagnostics.split_gelman_rubin(
-                        {name: posterior_samples[name]}
-                    )
-                    if isinstance(r_hat_value, dict):
-                        r_hat_dict[name] = float(r_hat_value.get(name, 1.0))
+                    samples_flat = posterior_samples[name]
+                    if num_chains >= 2:
+                        samples_shaped = samples_flat.reshape(
+                            num_chains, num_samples
+                        )
                     else:
-                        r_hat_dict[name] = float(r_hat_value)
-                except Exception:
-                    # Fallback value if R-hat computation fails
-                    r_hat_dict[name] = 1.0
+                        # Single chain: split_gelman_rubin will split in half
+                        samples_shaped = samples_flat.reshape(1, -1)
+                    r_hat_value = numpyro.diagnostics.split_gelman_rubin(
+                        samples_shaped
+                    )
+                    r_hat_dict[name] = float(r_hat_value)
+                except Exception as exc:
+                    logger.warning(
+                        "R-hat computation failed for parameter",
+                        parameter=name,
+                        error=str(exc),
+                    )
+                    r_hat_dict[name] = float("nan")
+                    all_valid = False
 
             diagnostics["r_hat"] = r_hat_dict
 
@@ -1332,16 +1362,26 @@ class BayesianMixin:
             ess_dict = {}
             for name in posterior_samples.keys():
                 try:
-                    ess_value = numpyro.diagnostics.effective_sample_size(
-                        {name: posterior_samples[name]}
-                    )
-                    if isinstance(ess_value, dict):
-                        ess_dict[name] = float(ess_value.get(name, 0.0))
+                    samples_flat = posterior_samples[name]
+                    if num_chains >= 2:
+                        samples_shaped = samples_flat.reshape(
+                            num_chains, num_samples
+                        )
                     else:
-                        ess_dict[name] = float(ess_value)
-                except Exception:
-                    # Fallback: estimate ESS as number of samples
-                    ess_dict[name] = float(len(posterior_samples[name]))
+                        # Single chain: add chain dimension for ESS computation
+                        samples_shaped = samples_flat.reshape(1, -1)
+                    ess_value = numpyro.diagnostics.effective_sample_size(
+                        samples_shaped
+                    )
+                    ess_dict[name] = float(ess_value)
+                except Exception as exc:
+                    logger.warning(
+                        "ESS computation failed for parameter",
+                        parameter=name,
+                        error=str(exc),
+                    )
+                    ess_dict[name] = float("nan")
+                    all_valid = False
 
             diagnostics["ess"] = ess_dict
 
@@ -1350,7 +1390,11 @@ class BayesianMixin:
                 divergences = mcmc.get_extra_fields()["diverging"]
                 num_divergences = int(np.sum(divergences))
             except (KeyError, AttributeError):
+                logger.warning(
+                    "Divergence information not available from MCMC extra fields"
+                )
                 num_divergences = 0
+                all_valid = False
 
             diagnostics["divergences"] = num_divergences
             diagnostics["total_samples"] = int(num_samples * num_chains)
@@ -1358,16 +1402,41 @@ class BayesianMixin:
             diagnostics["num_samples_per_chain"] = int(num_samples)
 
         except Exception as e:
-            # If diagnostics computation fails, return minimal info
-            diagnostics["r_hat"] = dict.fromkeys(posterior_samples.keys(), 1.0)
-            diagnostics["ess"] = {
-                name: float(len(samples)) for name, samples in posterior_samples.items()
-            }
-            diagnostics["divergences"] = 0
+            logger.error(
+                "Diagnostics computation failed entirely",
+                error=str(e),
+                exc_info=True,
+            )
+            warnings.warn(
+                f"MCMC diagnostics computation failed: {e}. "
+                "R-hat, ESS, and divergence values are unavailable. "
+                "Posterior samples may be unreliable — inspect trace plots manually.",
+                RuntimeWarning,
+                stacklevel=3,
+            )
+            diagnostics["r_hat"] = dict.fromkeys(
+                posterior_samples.keys(), float("nan")
+            )
+            diagnostics["ess"] = dict.fromkeys(
+                posterior_samples.keys(), float("nan")
+            )
+            diagnostics["divergences"] = -1
             diagnostics["total_samples"] = int(num_samples * num_chains)
             diagnostics["num_chains"] = int(num_chains)
             diagnostics["num_samples_per_chain"] = int(num_samples)
             diagnostics["error"] = str(e)
+            all_valid = False
+
+        diagnostics["diagnostics_valid"] = all_valid
+
+        actual_divergences = diagnostics.get("divergences", -1)
+        if actual_divergences > 0:
+            logger.warning(
+                "Divergent transitions detected",
+                divergences=actual_divergences,
+                total_samples=num_samples * num_chains,
+                hint="Try: different seed=, increased num_warmup, or higher target_accept_prob",
+            )
 
         return diagnostics
 

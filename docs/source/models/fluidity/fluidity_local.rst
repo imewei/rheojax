@@ -8,9 +8,9 @@ Quick Reference
 ---------------
 
 - **Use when:** Yield-stress fluids, thixotropic materials, aging systems with homogeneous (spatially uniform) flow
-- **Parameters:** 9 (G, tau_y, K, n_flow, f_eq, f_inf, theta, a, n_rejuv)
+- **Parameters:** 9 (:math:`G`, :math:`\tau_y`, :math:`K`, :math:`n_{\text{flow}}`, :math:`f_{\text{eq}}`, :math:`f_\infty`, :math:`\theta`, :math:`a`, :math:`n_{\text{rejuv}}`)
 - **Key equation:** :math:`\dot{\sigma} = G\dot{\gamma} - f(t)\sigma`
-- **Test modes:** Oscillation, relaxation, creep, steady shear, start-up, LAOS
+- **Test modes:** Oscillation, relaxation, creep, steady shear, startup, LAOS
 - **Material examples:** Mayonnaise, drilling muds, waxy crude oils, colloidal gels, greases, thixotropic paints
 
 Notation Guide
@@ -52,7 +52,7 @@ The key physical insight is the competition between two opposing processes:
 This competition naturally produces:
    - Yield stress behavior (solid-like at rest)
    - Thixotropy (time-dependent viscosity)
-   - Stress overshoots in start-up flows
+   - Stress overshoots in startup flows
    - Power-law creep and relaxation
 
 Historical Context
@@ -371,29 +371,29 @@ Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 **f (Fluidity)**:
-   Time-dependent inverse relaxation time f = 1/:math:`\tau`, providing direct interpretation of effective viscosity :math:`\eta_{eff}(t)` = G/f(t).
-   *For graduate students*: f tracks microstructural state: low f (f → f_eq) = highly structured solid-like, high f (f → f_∞) = broken-down liquid-like. Evolution: :math:`df/dt = (f_{eq} - f)/\tau_{age} + a|\dot{\gamma}|^n(f_{\infty} - f)`. At steady state: :math:`f_{ss} = [f_{eq}/\tau_{age} + a|\dot{\gamma}|^n \cdot f_{\infty}]/[1/\tau_{age} + a|\dot{\gamma}|^n]`. Connects to SGR effective temperature x via f ~ x.
-   *For practitioners*: Measure indirectly via :math:`\eta(t)` = G/f(t) in startup tests. For yield-stress fluids, f_eq ≈ 0 (solid at rest), :math:`f_{\infty} = G/\eta_{\infty}` (liquid at high shear).
+   Time-dependent inverse relaxation time :math:`f = 1/\tau`, providing direct interpretation of effective viscosity :math:`\eta_{\text{eff}}(t) = G/f(t)`.
+   *For graduate students*: :math:`f` tracks microstructural state: low :math:`f` (:math:`f \to f_{\text{eq}}`) = highly structured solid-like, high :math:`f` (:math:`f \to f_\infty`) = broken-down liquid-like. Evolution: :math:`df/dt = (f_{\text{eq}} - f)/\tau_{\text{age}} + a|\dot{\gamma}|^n(f_\infty - f)`. At steady state: :math:`f_{ss} = [f_{\text{eq}}/\tau_{\text{age}} + a|\dot{\gamma}|^n \cdot f_\infty]/[1/\tau_{\text{age}} + a|\dot{\gamma}|^n]`. Connects to SGR effective temperature :math:`x` via :math:`f \sim x`.
+   *For practitioners*: Measure indirectly via :math:`\eta(t) = G/f(t)` in startup tests. For yield-stress fluids, :math:`f_{\text{eq}} \approx 0` (solid at rest), :math:`f_\infty = G/\eta_\infty` (liquid at high shear).
 
 **f_eq (Equilibrium Fluidity)**:
    Fluidity at complete rest, controlling yield stress behavior.
-   *For graduate students*: For true yield-stress fluids, f_eq → 0, giving :math:`\sigma_y` = G·lim(:math:`\dot{\gamma}`/f_ss) as :math:`\dot{\gamma}` → 0. Nonzero f_eq produces viscoelastic liquid (no yield stress). Sets solid-like viscosity :math:`\eta_{rest}` = G/f_eq.
-   *For practitioners*: f_eq ≈ 10^-6 to 10^-3 s^-1 for yield-stress fluids (mayonnaise, drilling muds). f_eq > 10^-2 s^-1 indicates viscoelastic liquid without true yield stress.
+   *For graduate students*: For true yield-stress fluids, :math:`f_{\text{eq}} \to 0`, giving :math:`\sigma_y = G \cdot \lim(\dot{\gamma}/f_{ss})` as :math:`\dot{\gamma} \to 0`. Nonzero :math:`f_{\text{eq}}` produces viscoelastic liquid (no yield stress). Sets solid-like viscosity :math:`\eta_{\text{rest}} = G/f_{\text{eq}}`.
+   *For practitioners*: :math:`f_{\text{eq}} \approx 10^{-6}` to :math:`10^{-3}` s\ :sup:`-1` for yield-stress fluids (mayonnaise, drilling muds). :math:`f_{\text{eq}} > 10^{-2}` s\ :sup:`-1` indicates viscoelastic liquid without true yield stress.
 
 **f_∞ (Infinite-Shear Fluidity)**:
    Fluidity limit at very high shear rates (fully broken-down structure).
-   *For graduate students*: Sets minimum viscosity :math:`\eta_{\infty}` = G/f_∞ at high shear. Difference f_∞ - f_eq quantifies maximum structural change. Shear-thinning ratio :math:`\eta_{rest}/\eta_{\infty}` = f_∞/f_eq (typically 10^3-10^6 for strong thixotropic materials).
-   *For practitioners*: Extract from high-shear plateau in flow curves. Typical: f_∞ = 10^-1 to 10^2 s^-1. Higher f_∞ = lower high-shear viscosity.
+   *For graduate students*: Sets minimum viscosity :math:`\eta_{\infty} = G/f_\infty` at high shear. Difference :math:`f_\infty - f_{\text{eq}}` quantifies maximum structural change. Shear-thinning ratio :math:`\eta_{\text{rest}}/\eta_{\infty} = f_\infty/f_{\text{eq}}` (typically :math:`10^3`--:math:`10^6` for strong thixotropic materials).
+   *For practitioners*: Extract from high-shear plateau in flow curves. Typical: :math:`f_\infty = 10^{-1}` to :math:`10^2` s\ :sup:`-1`. Higher :math:`f_\infty` = lower high-shear viscosity.
 
 :math:`\tau_{age}` **(Aging Timescale)**:
    Characteristic time for structure rebuilding at rest.
-   *For graduate students*: First-order aging kinetics: f → f_eq with time constant :math:`\tau_{age}`. Sets width of thixotropic hysteresis loops and stress overshoot position in startup. Competes with rejuvenation time :math:`\tau_{rej} \sim 1/(a|\dot{\gamma}|^n)`. For thermally-activated processes, :math:`\tau_{age} \sim \tau_0 \exp(\Delta E_{build}/k_B T)`.
-   *For practitioners*: Measure via rest-time dependent startup tests or creep recovery. Fast aging (:math:`\tau_{age}` = 1-10 s) vs slow aging (:math:`\tau_{age}` = 10^2-10^4 s). Critical for pumping restart protocols.
+   *For graduate students*: First-order aging kinetics: :math:`f \to f_{\text{eq}}` with time constant :math:`\tau_{\text{age}}`. Sets width of thixotropic hysteresis loops and stress overshoot position in startup. Competes with rejuvenation time :math:`\tau_{\text{rej}} \sim 1/(a|\dot{\gamma}|^n)`. For thermally-activated processes, :math:`\tau_{\text{age}} \sim \tau_0 \exp(\Delta E_{\text{build}}/k_B T)`.
+   *For practitioners*: Measure via rest-time dependent startup tests or creep recovery. Fast aging (:math:`\tau_{\text{age}} = 1\text{--}10` s) vs slow aging (:math:`\tau_{\text{age}} = 10^2\text{--}10^4` s). Critical for pumping restart protocols.
 
 **a, n (Rejuvenation Parameters)**:
    Control shear-induced breakdown: :math:`df/dt|_{rej} = a|\dot{\gamma}|^n(f_{\infty} - f)`.
-   *For graduate students*: a is breakdown amplitude, n is rate sensitivity (n = 1 linear, n > 1 superlinear). Characteristic shear rate: :math:`\dot{\gamma}_c` ~ (1/(:math:`a\tau_{age}`))^(1/n) where structure is half-broken. Connects to Herschel-Bulkley exponent via steady-state analysis.
-   *For practitioners*: Extract from flow curve curvature. Typical: a ~ 0.1-10, n ~ 0.5-1.5. Higher a or n = more rapid breakdown under flow.
+   *For graduate students*: :math:`a` is breakdown amplitude, :math:`n` is rate sensitivity (:math:`n = 1` linear, :math:`n > 1` superlinear). Characteristic shear rate: :math:`\dot{\gamma}_c \sim (1/(a\tau_{\text{age}}))^{1/n}` where structure is half-broken. Connects to Herschel-Bulkley exponent via steady-state analysis.
+   *For practitioners*: Extract from flow curve curvature. Typical: :math:`a \sim 0.1\text{--}10`, :math:`n \sim 0.5\text{--}1.5`. Higher :math:`a` or :math:`n` = more rapid breakdown under flow.
 
 Material Classification
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -406,23 +406,23 @@ Material Classification
      - Material Behavior
      - Typical Materials
      - Processing Implications
-   * - f_eq < 10^-4 s^-1, :math:`\tau_{age}` > 100 s
+   * - :math:`f_{\text{eq}} < 10^{-4}` s\ :sup:`-1`, :math:`\tau_{\text{age}} > 100` s
      - Strong yield stress, slow aging
      - Waxy crude oils, cement pastes
      - High yield stress, long memory, pumping challenges
-   * - f_eq = 10^-4 to 10^-2 s^-1, :math:`\tau_{age}` = 10-100 s
+   * - :math:`f_{\text{eq}} = 10^{-4}` to :math:`10^{-2}` s\ :sup:`-1`, :math:`\tau_{\text{age}} = 10\text{--}100` s
      - Moderate yield stress, intermediate aging
      - Mayonnaise, drilling muds, paints
      - Pronounced thixotropy, restart protocols needed
-   * - f_eq > 10^-2 s^-1, :math:`\tau_{age}` < 10 s
+   * - :math:`f_{\text{eq}} > 10^{-2}` s\ :sup:`-1`, :math:`\tau_{\text{age}} < 10` s
      - Weak/no yield stress, fast recovery
      - Soft gels, cosmetics, dilute emulsions
      - Minimal thixotropy, easy flow
-   * - n ≈ 1
+   * - :math:`n \approx 1`
      - Linear breakdown
      - Simple thixotropic fluids
      - Predictable shear-thinning
-   * - n > 1.5
+   * - :math:`n > 1.5`
      - Superlinear breakdown
      - Complex soft solids with abrupt yielding
      - Strong rate-dependence, flow instabilities
@@ -583,7 +583,7 @@ Parameter Initialization
 
 **Step 1**: Fit exponential decay in step-strain relaxation to get :math:`\tau_{\rm age}`
 
-**Step 2**: Measure stress overshoot magnitude and peak time in start-up
+**Step 2**: Measure stress overshoot magnitude and peak time in startup
 
 **Step 3**: Use overshoot characteristics to estimate :math:`a, n`
 
@@ -696,7 +696,7 @@ Transient Start-Up
    # Fit to flow curve first
    model.fit(gamma_dot, sigma_ss, test_mode='steady_shear')
 
-   # Predict start-up transient
+   # Predict startup transient
    t = np.linspace(0, 100, 1000)
    gamma_dot_0 = 1.0  # Applied shear rate
    sigma_t = model.predict_startup(t, gamma_dot_0)

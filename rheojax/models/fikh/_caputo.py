@@ -104,7 +104,6 @@ def caputo_derivative_l1(
     # Compute differences: f_{n-k} - f_{n-k-1}
     # With history = [f_{n-N+1}, ..., f_{n-1}, f_n], we need:
     # f_n - f_{n-1}, f_{n-1} - f_{n-2}, ..., f_{n-N+2} - f_{n-N+1}
-    n_hist = f_history.shape[0]
     diffs = f_history[1:] - f_history[:-1]  # Shape: (n_hist-1,) or (n_hist-1, d)
 
     # Reverse to match L1 indexing: newest first

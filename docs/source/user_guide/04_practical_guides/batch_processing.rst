@@ -44,7 +44,7 @@ Manual Batch Processing
 .. code-block:: python
 
    from rheojax.io.readers import auto_read
-   from rheojax.models.maxwell import Maxwell
+   from rheojax.models import Maxwell
 
    data_dir = pathlib.Path('experiments/')
    results = {}

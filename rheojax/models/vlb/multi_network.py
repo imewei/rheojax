@@ -59,6 +59,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.vlb._base import VLBBase
 from rheojax.models.vlb._kernels import (
     vlb_creep_compliance_dual_vec,
@@ -82,6 +83,12 @@ logger = logging.getLogger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
+    ],
+    deformation_modes=[
+        DeformationMode.SHEAR,
+        DeformationMode.TENSION,
+        DeformationMode.BENDING,
+        DeformationMode.COMPRESSION,
     ],
 )
 class VLBMultiNetwork(VLBBase):
@@ -408,7 +415,10 @@ class VLBMultiNetwork(VLBBase):
         params = jnp.array(param_values)
 
         # Remove test_mode from kwargs to avoid duplicate
-        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
+        fwd_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
+        }
         return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
 
     # =========================================================================

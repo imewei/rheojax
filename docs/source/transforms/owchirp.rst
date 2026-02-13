@@ -107,9 +107,9 @@ while maintaining signal energy. For a signal of duration :math:`T` with taper f
 
 **Taper parameter selection:**
 
-- **ε = 0.10:** Minimal tapering, maximizes flat-top duration, risk of spectral leakage
-- **ε = 0.15 (default):** Balanced trade-off, recommended for most applications
-- **ε = 0.20:** Aggressive tapering, reduced leakage but shorter effective duration
+- :math:`\varepsilon` **= 0.10:** Minimal tapering, maximizes flat-top duration, risk of spectral leakage
+- :math:`\varepsilon` **= 0.15 (default):** Balanced trade-off, recommended for most applications
+- :math:`\varepsilon` **= 0.20:** Aggressive tapering, reduced leakage but shorter effective duration
 
 **Comparison with Tukey taper:**
 
@@ -713,7 +713,7 @@ Temperature Calibration Best Practices
 For multi-temperature OWCh experiments:
 
 1. **Amplitude selection:** Conduct preliminary OWCh trials at thermal extremes
-   (e.g., :math:`-40°C` and :math:`150°C`) to establish amplitude bounds
+   (e.g., :math:`-40\,^\circ\text{C}` and :math:`150\,^\circ\text{C}`) to establish amplitude bounds
 
 2. **Interpolation:** For intermediate temperatures, interpolate amplitude values;
    refine near major transitions (e.g., :math:`T_g`)
@@ -752,7 +752,7 @@ Validation Summary
 ------------------
 
 Perego et al. (2025) validated OWCh against discrete frequency sweeps (DFS) and multi-wave
-superposition over a temperature range of :math:`-40°C` to :math:`150°C`:
+superposition over a temperature range of :math:`-40\,^\circ\text{C}` to :math:`150\,^\circ\text{C}`:
 
 - **Excellent agreement** among OWCh, DFS, and multi-wave methods at all temperatures
 - **WLF parameters** from OWCh within 6% of DFS values
@@ -809,6 +809,7 @@ References
   optimally windowed chirp signals in industrial rheological measurements: method
   development and data processing." *Rheol. Acta* 64, 391–406 (2025).
   DOI: `10.1007/s00397-025-01511-0 <https://doi.org/10.1007/s00397-025-01511-0>`_
+  :download:`PDF <../../reference/perego_2025_owchirp.pdf>`
 
 - Geri, M., Keshavarz, B., Divoux, T., Clasen, C., Curtis, D.J., & McKinley, G.H.
   "Time-resolved mechanical spectroscopy of soft materials via optimally windowed chirps."
@@ -816,14 +817,14 @@ References
 
 **Extensions and Variants:**
 
-- Hudson-Kershaw, R.E., Das, M., McKinley, G.H., & Curtis, D.J. "σ-OWCh: optimally windowed
+- Hudson-Kershaw, R.E., Das, M., McKinley, G.H., & Curtis, D.J. ":math:`\sigma`-OWCh: optimally windowed
   chirp rheometry using combined motor transducer/single head rheometers."
   *J. Non-Newtonian Fluid Mech.* 333 (2024). DOI: `10.1016/j.jnnfm.2024.105307 <https://doi.org/10.1016/j.jnnfm.2024.105307>`_
 
 - Athanasiou, T., Geri, M., Roose, P., McKinley, G.H., & Petekidis, G. "High-frequency
   optimally windowed chirp rheometry for rapidly evolving viscoelastic materials:
   application to a crosslinking thermoset." *J. Rheol.* 68(3), 445–462 (2024).
-  DOI: `10.1122/8.00007937 <https://doi.org/10.1122/8.00007937>`_
+  DOI: `10.1122/8.0000793 <https://doi.org/10.1122/8.0000793>`_
 
 - Rathinaraj, J.D.J., Hendricks, J., McKinley, G.H., & Clasen, C. "Orthochirp: a fast
   spectro-mechanical probe for monitoring transient microstructural evolution of complex
@@ -834,7 +835,7 @@ References
 
 - Hossain, M.T., Macosko, C.W., McKinley, G.H., & Ewoldt, R.H. "Instrument stiffness
   artifacts: avoiding bad data with operational limit lines of G_max and E_max."
-  *Rheol. Acta* 64, 1–13 (2025). DOI: `10.1007/s00397-024-01481-9 <https://doi.org/10.1007/s00397-024-01481-9>`_
+  *Rheol. Acta* 64, 67–79 (2025). DOI: `10.1007/s00397-024-01481-9 <https://doi.org/10.1007/s00397-024-01481-9>`_
 
 - Lennon, K.R., McKinley, G.H., & Swan, J.W. "A data-driven method for automated data
   superposition with applications in soft matter science." *Data-Centric Engineering* 4,

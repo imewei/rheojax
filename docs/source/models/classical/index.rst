@@ -167,7 +167,7 @@ Quick Start
    model.fit(omega, G_star, test_mode='oscillation')
 
    # Equilibrium modulus
-   G_eq = model.parameters.get_value('G2')
+   G_eq = model.parameters.get_value('Ge')
 
 **SpringPot element:**
 
@@ -209,7 +209,7 @@ References
    *Philosophical Transactions*, 157, 49-88. https://www.jstor.org/stable/108968
 
 2. Zener, C.M. (1948). *Elasticity and Anelasticity of Metals*.
-   University of Chicago Press. https://doi.org/10.1002/9781118661275
+   University of Chicago Press.
 
 3. Ferry, J.D. (1980). *Viscoelastic Properties of Polymers*, 3rd ed.
    John Wiley & Sons. ISBN: 978-0471048947.

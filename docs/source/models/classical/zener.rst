@@ -7,7 +7,7 @@ Quick Reference
 ---------------
 
 - **Use when:** Viscoelastic solid with finite equilibrium modulus, creep-recovery tests
-- **Parameters:** 3 (Ge, Gm, :math:`\eta`)
+- **Parameters:** 3 (:math:`G_e`, :math:`G_m`, :math:`\eta`)
 - **Key equation:** :math:`G(t) = G_s + G_p \exp(-t/\tau)` where :math:`\tau = \eta_p/G_p`
 - **Test modes:** Oscillation, relaxation, creep, flow curve
 - **Material examples:** Cross-linked PDMS, vulcanized rubber, hydrogels, biological tissues
@@ -139,7 +139,7 @@ Material Examples with Typical Parameters
    * - Epoxy (cured)
      - :math:`2 \times 10^9`
      - :math:`5 \times 10^8`
-     - :math:`5 \times 10^1^0`
+     - :math:`5 \times 10^{10}`
      - 100
      - [5]
 
@@ -353,7 +353,7 @@ Parameter Interpretation
    - **Relation to initial modulus**: :math:`G_0 = G_s + G_p`
    - **Diagnostic**: :math:`G_p = G(0) - G(\infty)` from relaxation data
 
-:math:`\etap` **(Maxwell Dashpot Viscosity)**:
+:math:`\eta_p` **(Maxwell Dashpot Viscosity)**:
    - **Physical meaning**: Controls timescale of stress relaxation
    - **Molecular origin**: Chain friction, reptation, or bond breakage/reformation
    - **Typical ranges**: :math:`10^2 - 10^{10}` Pa·s (highly material-dependent)
@@ -456,9 +456,9 @@ Limiting Cases
 
    G''(\omega) \approx \frac{G_p \eta_p}{G_s^2} \omega \sim \omega
 
-**Interpretation**: Elastic solid-like (G' > G''), but with residual dissipation from Maxwell arm.
+**Interpretation**: Elastic solid-like (:math:`G' > G''`), but with residual dissipation from Maxwell arm.
 
-**High frequency (** :math:`\omega` **→ ∞, glassy region)**:
+**High frequency (** :math:`\omega \to \infty` **, glassy region)**:
 
 .. math::
 
@@ -490,7 +490,7 @@ Asymptotic Behavior Summary
    * - Low :math:`\omega \ll 1/\tau_\epsilon`
      - :math:`\to G_s`
      - :math:`\sim \omega`
-     - Elastic solid (G' > G'')
+     - Elastic solid (:math:`G' > G''`)
    * - :math:`\omega \approx 1/\tau_\epsilon`
      - :math:`\approx G_s + G_p/2`
      - :math:`\approx G_p/2` (peak)
@@ -574,7 +574,7 @@ Parameter Interpretation
 
    *For practitioners*: High :math:`G_p` means strong viscous dissipation (damping), useful for vibration isolation
 
-:math:`\etap` **(Maxwell Dashpot Viscosity)**:
+:math:`\eta_p` **(Maxwell Dashpot Viscosity)**:
    Fitted :math:`\eta_p` controls stress relaxation timescale:
 
    - **Short** :math:`\tau_\epsilon = \eta_p/G_p` **(<0.1 s)**: Fast relaxation, minimal processing history
@@ -919,7 +919,7 @@ Validation Strategies
    - Check near :math:`G''` peak (most sensitive region)
 
 **Statistical metrics**:
-   - :math:`R^2 > 0.98` for :math:`G'`, :math:`R^2 > 0.95` for :math:`G''` (G'' is noisier)
+   - :math:`R^2 > 0.98` for :math:`G'`, :math:`R^2 > 0.95` for :math:`G''` (:math:`G''` is noisier)
    - RMSE in log-space < 0.1
 
 **2. Physical Plausibility Checks**
@@ -968,7 +968,7 @@ Worked Example with Numbers
 **Optimization** (NLSQ, 150 iterations):
    - Fitted: :math:`G_s = 4.8 \times 10^4` Pa, :math:`G_p = 2.1 \times 10^5` Pa, :math:`\eta_p = 2.05 \times 10^4` Pa·s
    - :math:`R^2 = 0.996` (excellent)
-   - Validation: :math:`\tau_\epsilon = 2.05 \times 10^4 / 2.1 \times 10^5 = 0.098` s ≈ 0.1 s ✓
+   - Validation: :math:`\tau_\epsilon = 2.05 \times 10^4 / 2.1 \times 10^5 = 0.098` s :math:`\approx` 0.1 s
 
 **Physical interpretation**:
    - Cross-link density: :math:`\nu_c = G_s / RT = 4.8 \times 10^4 / (8.314 \times 298) = 19.4` mol/:math:`m^3`
@@ -1215,11 +1215,12 @@ References
 .. [3] Macosko, C. W. *Rheology: Principles, Measurements, and Applications*.
    Wiley-VCH, New York (1994). ISBN: 978-0471185758
 
-.. [4] Lakes, R. S. *Viscoelastic Solids*. CRC Press (1999).
+.. [4] Lakes, R. S. *Viscoelastic Solids*. CRC Press (1998).
    ISBN: 978-0849396588. Focused on solid viscoelasticity with engineering applications.
 
-.. [5] Christensen, R. M. *Theory of Viscoelasticity*, 2nd Edition. Dover (1982).
-   ISBN: 978-0486428802. Mathematical foundations with composite materials applications.
+.. [5] Christensen, R. M. *Theory of Viscoelasticity*, 2nd Edition. Academic Press (1982);
+   reprinted Dover (2003). ISBN: 978-0486428802. Mathematical foundations with composite
+   materials applications.
 
 .. [6] Zener, C. *Elasticity and Anelasticity of Metals*. University of Chicago
    Press (1948). Original work on anelastic relaxation in metals.

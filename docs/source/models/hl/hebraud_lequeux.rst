@@ -129,7 +129,7 @@ where:
 - The stronger the plastic activity :math:`\Gamma`, the stronger the noise :math:`D`.
 
 This self-consistency creates a **feedback loop**:
-More stress → More yielding (:math:`\Gamma \uparrow`) → More noise (:math:`D \uparrow`) → Stress spreads out (diffuses) → More blocks reach :math:`\sigma_c` → More yielding.
+More stress :math:`\to` More yielding (:math:`\Gamma \uparrow`) :math:`\to` More noise (:math:`D \uparrow`) :math:`\to` Stress spreads out (diffuses) :math:`\to` More blocks reach :math:`\sigma_c` :math:`\to` More yielding.
 
 Glass Transition
 ~~~~~~~~~~~~~~~~
@@ -142,7 +142,7 @@ The parameter :math:`\alpha` controls the stability of this feedback loop, leadi
 - **Yield stress** :math:`\sigma_y > 0` emerges.
 - **Aging**: Relaxation timescales grow with waiting time (simple aging, :math:`\mu=1`).
 
-:math:`\alpha` **≥ 0.5 (Fluid phase)**:
+:math:`\alpha \geq 0.5` **(Fluid phase)**:
 - Noise is sufficient to maintain a steady distribution extending beyond :math:`\sigma_c`.
 - System flows at any non-zero stress.
 - **No yield stress** (:math:`\sigma_y = 0`).
@@ -221,7 +221,7 @@ Analytical solutions exist for the fluid phase. For the glass phase (:math:`\alp
 
    \Sigma(\dot{\gamma}) \approx \Sigma_y + A \dot{\gamma}^{1/2}
 
-The exponent **n = 0.5** is a universal prediction of the HL model (and mean-field EPMs generally) for the yielding transition.
+The exponent :math:`n = 0.5` is a universal prediction of the HL model (and mean-field EPMs generally) for the yielding transition.
 
 Start-up Shear
 ~~~~~~~~~~~~~~
@@ -357,8 +357,8 @@ Material Classification Table
    * - **0.3 <** :math:`\alpha` **< 0.5**
      - Soft Glass
      - Foams, emulsions, pastes
-     - Moderate yield stress, shear thinning n=0.5
-   * - :math:`\alpha` **≈ 0.5**
+     - Moderate yield stress, shear thinning :math:`n = 0.5`
+   * - :math:`\alpha \approx 0.5`
      - Critical Gel
      - Jamming transition
      - Power-law fluid, divergence of viscosity
@@ -390,7 +390,7 @@ Scaling Predictions
      - HL Scaling Prediction
    * - **Flow Curve**
      - Glass (:math:`\alpha < 0.5`)
-     - :math:`\Sigma = \Sigma_y + A \dot{\gamma}^{0.5}` (Herschel-Bulkley n=0.5)
+     - :math:`\Sigma = \Sigma_y + A \dot{\gamma}^{0.5}` (Herschel-Bulkley :math:`n = 0.5`)
    * -
      - Fluid (:math:`\alpha \to 0.5`)
      - :math:`\Sigma \sim \dot{\gamma}^{1/2}` (Critical scaling)
@@ -471,11 +471,11 @@ Glassy State Example
    gdot = np.logspace(-2, 1, 20)
    # Load experimental data: stress_data = load_data(...)
    stress_data = 10.0 + 5.0 * gdot**0.5  # Example: Herschel-Bulkley
-   model.fit(gdot, stress_data, test_mode="steady_shear")
+   model.fit(gdot, stress_data, test_mode='steady_shear')
 
    # Predict Creep
    time = np.linspace(0, 100, 1000)
-   gamma_creep = model.predict(time, test_mode="creep", sigma_applied=12.0)
+   gamma_creep = model.predict(time, test_mode='creep', sigma_applied=12.0)
 
 Bayesian Inference
 ~~~~~~~~~~~~~~~~~~
@@ -498,7 +498,7 @@ predictions. Quantifying uncertainty in :math:`\alpha` is therefore critical.
    # Bayesian inference with NUTS
    result = model.fit_bayesian(
        gdot, stress_data,
-       test_mode="steady_shear",
+       test_mode='steady_shear',
        num_warmup=1000,
        num_samples=2000,
        num_chains=4
@@ -584,7 +584,7 @@ Advanced Usage: Multiple Protocols
    # 1. Fit Flow Curve
    gdot = np.logspace(-2, 1, 20)
    stress_data = 10.0 + 5.0 * gdot**0.5  # Example data
-   model.fit(gdot, stress_data, test_mode="steady_shear")
+   model.fit(gdot, stress_data, test_mode='steady_shear')
 
    # 2. Predict multiple protocols
    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
@@ -599,21 +599,21 @@ Advanced Usage: Multiple Protocols
 
    # Creep (above yield)
    time = np.linspace(0, 100, 1000)
-   J_pred = model.predict(time, test_mode="creep", sigma_applied=12.0)
+   J_pred = model.predict(time, test_mode='creep', sigma_applied=12.0)
    axes[0, 1].plot(time, J_pred)
    axes[0, 1].set_xlabel('Time (s)')
    axes[0, 1].set_ylabel('Compliance J(t) (1/Pa)')
    axes[0, 1].set_title('Creep (σ > σ_y)')
 
    # Relaxation
-   G_pred = model.predict(time, test_mode="relaxation", gamma0=0.1)
+   G_pred = model.predict(time, test_mode='relaxation', gamma0=0.1)
    axes[1, 0].semilogy(time, G_pred)
    axes[1, 0].set_xlabel('Time (s)')
    axes[1, 0].set_ylabel('G(t) (Pa)')
    axes[1, 0].set_title('Stress Relaxation')
 
    # Startup
-   stress_startup = model.predict(time[:200], test_mode="startup", gdot=1.0)
+   stress_startup = model.predict(time[:200], test_mode='startup', gdot=1.0)
    axes[1, 1].plot(time[:200], stress_startup)
    axes[1, 1].set_xlabel('Time (s)')
    axes[1, 1].set_ylabel('Stress (Pa)')
@@ -747,7 +747,7 @@ Fitting Guidance
 Initialization Strategy
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-**Step 1: Determine phase (** :math:`\alpha` **< 0.5 or** :math:`\alpha` **≥ 0.5)**
+**Step 1: Determine phase** (:math:`\alpha < 0.5` **or** :math:`\alpha \geq 0.5`)
 - **Yield stress observed**: Start with :math:`\alpha` = 0.3 (glass).
 - **No yield stress**: Start with :math:`\alpha` = 0.7 (fluid).
 
@@ -770,9 +770,9 @@ Parameter Bounds
      - Physical Constraint
    * - ``alpha``
      - 0.1-1.5
-     - :math:`\alpha` < 0.5 (glass), :math:`\alpha` ≥ 0.5 (fluid)
+     - :math:`\alpha < 0.5` (glass), :math:`\alpha \geq 0.5` (fluid)
    * - ``sigma_c``
-     - 0.5-2× :math:`\Sigma_y`
+     - :math:`0.5\text{--}2 \times \Sigma_y`
      - Local yield threshold
    * - ``tau``
      - 0.01-100 s
@@ -786,10 +786,10 @@ Common Fitting Issues
 *Cause*: Data doesn't constrain the model, or material isn't well-described by HL.
 *Solution*: Set tight bounds ``alpha.bounds = (0.1, 0.8)``. Check if data shows yield stress behavior.
 
-**Issue: Flow curve slope doesn't match n = 0.5**
+**Issue: Flow curve slope doesn't match** :math:`n = 0.5`
 
 *Cause*: Material may have different yielding exponent (power-law solid, polymer contribution).
-*Solution*: Consider Herschel-Bulkley with free exponent. HL universally predicts n = 0.5.
+*Solution*: Consider Herschel-Bulkley with free exponent. HL universally predicts :math:`n = 0.5`.
 
 **Issue: Poor fit to transient data with good flow curve fit**
 
@@ -1086,7 +1086,7 @@ References
 
 .. [8] Fielding, S. M. "Viscoelasticity and rheology near the soft glassy rheology transition."
    *Physical Review E*, **76**, 016311 (2007).
-   https://doi.org/10.1103/PhysRevE.76.016311
+   https://doi.org/10.1039/b707980j
 
 .. [9] Bouchbinder, E. & Langer, J. S. "Nonequilibrium thermodynamics of driven amorphous materials. I. Internal degrees of freedom and volume deformation."
    *Physical Review E*, **80**, 031131 (2009).
@@ -1098,7 +1098,6 @@ References
 
 .. [11] Benzi, R., Divoux, T., Barber, C., Grosso, G., & Sbragaglia, M. "Stress-dependent elastic modulus and the yieldstress fluid."
    *Physical Review E*, **91**, 023301 (2015).
-   https://doi.org/10.1103/PhysRevE.91.023301
 
 .. [12] Ferrero, E. E., Martens, K., & Barrat, J.-L. "Relaxation in yield stress systems through elastically interacting activated events."
    *Physical Review Letters*, **113**, 248301 (2014).
@@ -1121,8 +1120,8 @@ References
    https://doi.org/10.1103/PhysRevE.57.7192
 
 .. [17] Martens, K., Bocquet, L., & Barrat, J.-L. "Connecting diffusion and dynamical heterogeneities in actively deformed amorphous systems."
-   *Physical Review E*, **86**, 011106 (2012).
-   https://doi.org/10.1103/PhysRevE.86.011106
+   *Physical Review Letters*, **106**, 156001 (2011).
+   https://doi.org/10.1103/PhysRevLett.106.156001
 
 .. [18] Lin, J., Lerner, E., Rosso, A., & Wyart, M. "Scaling description of the yielding transition in soft amorphous solids at zero temperature."
    *Proceedings of the National Academy of Sciences*, **111**, 14382-14387 (2014).
@@ -1182,7 +1181,7 @@ Glossary
       The total rate of plastic yielding events, :math:`\Gamma(t) = \tau^{-1} \int_{|\sigma|>\sigma_c} P d\sigma`.
 
    Coupling Parameter
-      The parameter :math:`\alpha` controlling mechanical noise strength. Determines glass (< 0.5) vs fluid (≥ 0.5) behavior.
+      The parameter :math:`\alpha` controlling mechanical noise strength. Determines glass (:math:`< 0.5`) vs fluid (:math:`\geq 0.5`) behavior.
 
    Elastic Loading
       The deterministic drift of stress distribution due to applied shear: :math:`-G_0 \dot{\gamma} \partial_\sigma P`.
