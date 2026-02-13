@@ -2733,6 +2733,7 @@ dependencies = [
     { name = "numpyro" },
     { name = "pandas" },
     { name = "scipy" },
+    { name = "xarray" },
 ]
 
 [package.optional-dependencies]
@@ -2841,6 +2842,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.17.0,<2.0.0" },
     { name = "sphinx", marker = "extra == 'dev'", specifier = ">=9.1.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'dev'", specifier = ">=3.6.2" },
+    { name = "xarray", specifier = ">=2026.1.0,<2027.0.0" },
     { name = "xlrd", marker = "extra == 'io'", specifier = ">=2.0.2" },
 ]
 provides-extras = ["dev", "ml", "io", "gui", "gui-dev", "all"]

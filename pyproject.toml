@@ -92,6 +92,9 @@ dependencies = [
     "arviz-base>=0.8.2",
     "arviz-stats>=0.8.0",
     "arviz-plots>=0.8.0",
+
+    # Data structures (used directly in bayesian.py for InferenceData)
+    "xarray>=2026.1.0,<2027.0.0",
 ]
 
 [project.optional-dependencies]
