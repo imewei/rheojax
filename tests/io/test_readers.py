@@ -203,24 +203,74 @@ class TestCSVReader:
         assert data.y_units == "Pa"
 
 
+_openpyxl = pytest.importorskip("openpyxl", reason="openpyxl required for Excel tests")
+
+
 class TestExcelReader:
     """Tests for Excel reader (7.5)."""
 
-    @pytest.mark.skip(reason="Requires openpyxl/xlrd installation")
+    def _create_excel(self, filepath, data_dict, sheet_name="Sheet1"):
+        """Helper to create an Excel file from a dict of columns."""
+        import openpyxl
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = sheet_name
+        headers = list(data_dict.keys())
+        ws.append(headers)
+        n_rows = len(next(iter(data_dict.values())))
+        for i in range(n_rows):
+            ws.append([data_dict[h][i] for h in headers])
+        wb.save(filepath)
+
     def test_excel_basic_read(self, tmp_path):
         """Test basic Excel file reading."""
-        # Would require creating an actual Excel file with openpyxl
-        pass
+        filepath = tmp_path / "test.xlsx"
+        self._create_excel(filepath, {
+            "time (s)": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "stress (Pa)": [100, 200, 300, 400, 500],
+        })
 
-    @pytest.mark.skip(reason="Requires openpyxl installation")
+        data = load_excel(str(filepath), x_col="time (s)", y_col="stress (Pa)")
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 5
+
     def test_excel_sheet_selection(self, tmp_path):
         """Test Excel sheet selection."""
-        pass
+        import openpyxl
 
-    @pytest.mark.skip(reason="Requires openpyxl installation")
+        filepath = tmp_path / "multi_sheet.xlsx"
+        wb = openpyxl.Workbook()
+        # First sheet (default)
+        ws1 = wb.active
+        ws1.title = "Empty"
+        ws1.append(["a", "b"])
+
+        # Second sheet with actual data
+        ws2 = wb.create_sheet("Data")
+        ws2.append(["time", "stress"])
+        for i in range(5):
+            ws2.append([float(i + 1), float((i + 1) * 100)])
+        wb.save(filepath)
+
+        data = load_excel(
+            str(filepath), x_col="time", y_col="stress", sheet="Data"
+        )
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 5
+
     def test_excel_column_mapping(self, tmp_path):
-        """Test Excel column mapping."""
-        pass
+        """Test Excel column mapping by index."""
+        filepath = tmp_path / "indexed.xlsx"
+        self._create_excel(filepath, {
+            "col_A": [1.0, 2.0, 3.0],
+            "col_B": [10.0, 20.0, 30.0],
+        })
+
+        data = load_excel(str(filepath), x_col=0, y_col=1)
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 3
+        np.testing.assert_allclose(data.x, [1.0, 2.0, 3.0])
 
 
 class TestAntonPaarReader:
