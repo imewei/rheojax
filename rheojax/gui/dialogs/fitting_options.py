@@ -19,6 +19,7 @@ from rheojax.gui.compat import (
     QLabel,
     QPushButton,
     QSpinBox,
+    Qt,
     QVBoxLayout,
     QWidget,
 )
@@ -80,9 +81,34 @@ class FittingOptionsDialog(QDialog):
         algo_layout = QFormLayout()
 
         self.algo_combo = QComboBox()
-        self.algo_combo.addItems(["NLSQ (default)", "L-BFGS-B", "Trust Region"])
+        self.algo_combo.addItems(
+            ["NLSQ (default)", "NLSQ Global", "L-BFGS-B", "Trust Region"]
+        )
         self.algo_combo.currentTextChanged.connect(self._on_algorithm_changed)
         algo_layout.addRow("Optimization Method:", self.algo_combo)
+
+        # Jacobian mode
+        self.jacobian_combo = QComboBox()
+        self.jacobian_combo.addItems(["Auto", "Forward (fwd)", "Reverse (rev)"])
+        self.jacobian_combo.setToolTip(
+            "Jacobian computation mode: Auto selects based on problem size. "
+            "Forward is better for few parameters, Reverse for many."
+        )
+        self.jacobian_combo.currentTextChanged.connect(
+            lambda text: self._on_option_changed("jacobian_mode", text)
+        )
+        algo_layout.addRow("Jacobian Mode:", self.jacobian_combo)
+
+        # Stability check
+        self.stability_check = QCheckBox("Enable stability checks")
+        self.stability_check.setChecked(False)
+        self.stability_check.setToolTip(
+            "Run stability analysis on the fitted parameters"
+        )
+        self.stability_check.stateChanged.connect(
+            lambda s: self._on_option_changed("stability", "auto" if s != 0 else None)
+        )
+        algo_layout.addRow("", self.stability_check)
 
         algo_group.setLayout(algo_layout)
         layout.addWidget(algo_group)
@@ -204,9 +230,8 @@ class FittingOptionsDialog(QDialog):
         # Algorithm
         if "algorithm" in self.current_options:
             algo = self.current_options["algorithm"]
-            from PySide6.QtCore import Qt
-
-            idx = self.algo_combo.findText(algo, flags=Qt.MatchFlag.MatchExactly)
+            # Use MatchStartsWith so "NLSQ" matches "NLSQ (default)"
+            idx = self.algo_combo.findText(algo, flags=Qt.MatchFlag.MatchStartsWith)
             if idx >= 0:
                 self.algo_combo.setCurrentIndex(idx)
 
@@ -237,6 +262,21 @@ class FittingOptionsDialog(QDialog):
         if "verbose" in self.current_options:
             self.verbose_check.setChecked(self.current_options["verbose"])
 
+        # Jacobian mode
+        if "jacobian_mode" in self.current_options:
+            jac = self.current_options["jacobian_mode"]
+            jac_map = {"fwd": "Forward (fwd)", "rev": "Reverse (rev)"}
+            text = jac_map.get(jac, "Auto")
+            idx = self.jacobian_combo.findText(text)
+            if idx >= 0:
+                self.jacobian_combo.setCurrentIndex(idx)
+
+        # Stability
+        if "stability" in self.current_options:
+            self.stability_check.setChecked(
+                self.current_options["stability"] is not None
+            )
+
     def _on_algorithm_changed(self, text: str) -> None:
         """Handle algorithm combo box change."""
         logger.debug(
@@ -257,8 +297,6 @@ class FittingOptionsDialog(QDialog):
 
     def _on_multistart_changed(self, state: int) -> None:
         """Handle multi-start checkbox change."""
-        from PySide6.QtCore import Qt
-
         enabled = state == Qt.CheckState.Checked.value
         self.num_starts_spin.setEnabled(enabled)
         logger.debug(
@@ -279,6 +317,8 @@ class FittingOptionsDialog(QDialog):
         self.num_starts_spin.setValue(5)
         self.use_bounds_check.setChecked(True)
         self.verbose_check.setChecked(False)
+        self.jacobian_combo.setCurrentIndex(0)  # Auto
+        self.stability_check.setChecked(False)
 
     def _on_accepted(self) -> None:
         """Handle dialog accepted."""
@@ -328,6 +368,18 @@ class FittingOptionsDialog(QDialog):
         # Add num_starts only if multistart is enabled
         if options["multistart"]:
             options["num_starts"] = self.num_starts_spin.value()
+
+        # Jacobian mode
+        jacobian_text = self.jacobian_combo.currentText()
+        if "fwd" in jacobian_text.lower():
+            options["jacobian_mode"] = "fwd"
+        elif "rev" in jacobian_text.lower():
+            options["jacobian_mode"] = "rev"
+        # else: Auto (omit to let backend decide)
+
+        # Stability
+        if self.stability_check.isChecked():
+            options["stability"] = "auto"
 
         return options
 

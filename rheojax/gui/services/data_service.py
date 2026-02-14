@@ -49,7 +49,6 @@ class DataService:
             ".xls",
             ".dat",
             ".tri",
-            ".rdf",
         ]
         logger.debug(
             "DataService initialized",
