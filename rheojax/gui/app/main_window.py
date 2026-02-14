@@ -411,6 +411,15 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.test_mode_rotation.triggered.connect(
             lambda: self._on_set_test_mode("rotation")
         )
+        self.menu_bar.test_mode_flow_curve.triggered.connect(
+            lambda: self._on_set_test_mode("flow_curve")
+        )
+        self.menu_bar.test_mode_startup.triggered.connect(
+            lambda: self._on_set_test_mode("startup")
+        )
+        self.menu_bar.test_mode_laos.triggered.connect(
+            lambda: self._on_set_test_mode("laos")
+        )
         self.menu_bar.auto_detect_mode_action.triggered.connect(
             self._on_auto_detect_mode
         )
@@ -503,6 +512,121 @@ class RheoJAXMainWindow(QMainWindow):
         # SPP LAOS models
         self.menu_bar.model_spp_yield_stress.triggered.connect(
             lambda: self._on_select_model("spp_yield_stress")
+        )
+
+        # STZ models
+        self.menu_bar.model_stz_conventional.triggered.connect(
+            lambda: self._on_select_model("stz_conventional")
+        )
+
+        # EPM models
+        self.menu_bar.model_lattice_epm.triggered.connect(
+            lambda: self._on_select_model("lattice_epm")
+        )
+        self.menu_bar.model_tensorial_epm.triggered.connect(
+            lambda: self._on_select_model("tensorial_epm")
+        )
+
+        # Fluidity models
+        self.menu_bar.model_fluidity_local.triggered.connect(
+            lambda: self._on_select_model("fluidity_local")
+        )
+        self.menu_bar.model_fluidity_nonlocal.triggered.connect(
+            lambda: self._on_select_model("fluidity_nonlocal")
+        )
+
+        # Fluidity-Saramito EVP models
+        self.menu_bar.model_saramito_local.triggered.connect(
+            lambda: self._on_select_model("fluidity_saramito_local")
+        )
+        self.menu_bar.model_saramito_nonlocal.triggered.connect(
+            lambda: self._on_select_model("fluidity_saramito_nonlocal")
+        )
+
+        # IKH models
+        self.menu_bar.model_mikh.triggered.connect(
+            lambda: self._on_select_model("mikh")
+        )
+        self.menu_bar.model_mlikh.triggered.connect(
+            lambda: self._on_select_model("ml_ikh")
+        )
+
+        # FIKH models
+        self.menu_bar.model_fikh.triggered.connect(
+            lambda: self._on_select_model("fikh")
+        )
+        self.menu_bar.model_fmlikh.triggered.connect(
+            lambda: self._on_select_model("fmlikh")
+        )
+
+        # Hébraud-Lequeux
+        self.menu_bar.model_hebraud_lequeux.triggered.connect(
+            lambda: self._on_select_model("hebraud_lequeux")
+        )
+
+        # ITT-MCT models
+        self.menu_bar.model_itt_mct_schematic.triggered.connect(
+            lambda: self._on_select_model("itt_mct_schematic")
+        )
+        self.menu_bar.model_itt_mct_isotropic.triggered.connect(
+            lambda: self._on_select_model("itt_mct_isotropic")
+        )
+
+        # DMT models
+        self.menu_bar.model_dmt_local.triggered.connect(
+            lambda: self._on_select_model("dmt_local")
+        )
+        self.menu_bar.model_dmt_nonlocal.triggered.connect(
+            lambda: self._on_select_model("dmt_nonlocal")
+        )
+
+        # Giesekus models
+        self.menu_bar.model_giesekus_single.triggered.connect(
+            lambda: self._on_select_model("giesekus_single")
+        )
+        self.menu_bar.model_giesekus_multi.triggered.connect(
+            lambda: self._on_select_model("giesekus_multi")
+        )
+
+        # TNT models
+        self.menu_bar.model_tnt_single_mode.triggered.connect(
+            lambda: self._on_select_model("tnt_single_mode")
+        )
+        self.menu_bar.model_tnt_cates.triggered.connect(
+            lambda: self._on_select_model("tnt_cates")
+        )
+        self.menu_bar.model_tnt_loop_bridge.triggered.connect(
+            lambda: self._on_select_model("tnt_loop_bridge")
+        )
+        self.menu_bar.model_tnt_multi_species.triggered.connect(
+            lambda: self._on_select_model("tnt_multi_species")
+        )
+        self.menu_bar.model_tnt_sticky_rouse.triggered.connect(
+            lambda: self._on_select_model("tnt_sticky_rouse")
+        )
+
+        # VLB models
+        self.menu_bar.model_vlb_local.triggered.connect(
+            lambda: self._on_select_model("vlb_local")
+        )
+        self.menu_bar.model_vlb_multi_network.triggered.connect(
+            lambda: self._on_select_model("vlb_multi_network")
+        )
+        self.menu_bar.model_vlb_variant.triggered.connect(
+            lambda: self._on_select_model("vlb_variant")
+        )
+        self.menu_bar.model_vlb_nonlocal.triggered.connect(
+            lambda: self._on_select_model("vlb_nonlocal")
+        )
+
+        # HVM models
+        self.menu_bar.model_hvm_local.triggered.connect(
+            lambda: self._on_select_model("hvm_local")
+        )
+
+        # HVNM models
+        self.menu_bar.model_hvnm_local.triggered.connect(
+            lambda: self._on_select_model("hvnm_local")
         )
 
     def _connect_transforms_menu(self) -> None:

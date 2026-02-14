@@ -380,6 +380,39 @@ class MenuBar(QMenuBar):
         )
         self.test_mode_menu.addAction(self.test_mode_rotation)
 
+        self.test_mode_flow_curve = QAction("&Flow Curve", self)
+        self.test_mode_flow_curve.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Data",
+                action="set_test_mode",
+                mode="flow_curve",
+            )
+        )
+        self.test_mode_menu.addAction(self.test_mode_flow_curve)
+
+        self.test_mode_startup = QAction("&Startup", self)
+        self.test_mode_startup.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Data",
+                action="set_test_mode",
+                mode="startup",
+            )
+        )
+        self.test_mode_menu.addAction(self.test_mode_startup)
+
+        self.test_mode_laos = QAction("&LAOS", self)
+        self.test_mode_laos.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Data",
+                action="set_test_mode",
+                mode="laos",
+            )
+        )
+        self.test_mode_menu.addAction(self.test_mode_laos)
+
         # Auto-detect Test Mode
         self.auto_detect_mode_action = QAction("&Auto-detect Test Mode", self)
         self.auto_detect_mode_action.setShortcut(QKeySequence("Ctrl+D"))
@@ -653,6 +686,340 @@ class MenuBar(QMenuBar):
             )
         )
         spp_menu.addAction(self.model_spp_yield_stress)
+
+        models_menu.addSeparator()
+
+        # STZ Models submenu
+        stz_menu = models_menu.addMenu("ST&Z (Shear Transformation Zone)")
+        self.model_stz_conventional = QAction("STZ Conventional", self)
+        self.model_stz_conventional.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="STZ",
+                model="STZConventional",
+            )
+        )
+        stz_menu.addAction(self.model_stz_conventional)
+
+        # EPM Models submenu
+        epm_menu = models_menu.addMenu("&EPM (Elasto-Plastic)")
+        self.model_lattice_epm = QAction("Lattice EPM", self)
+        self.model_lattice_epm.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="EPM",
+                model="LatticeEPM",
+            )
+        )
+        epm_menu.addAction(self.model_lattice_epm)
+        self.model_tensorial_epm = QAction("Tensorial EPM", self)
+        self.model_tensorial_epm.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="EPM",
+                model="TensorialEPM",
+            )
+        )
+        epm_menu.addAction(self.model_tensorial_epm)
+
+        # Fluidity Models submenu
+        fluidity_menu = models_menu.addMenu("F&luidity")
+        self.model_fluidity_local = QAction("Fluidity Local", self)
+        self.model_fluidity_local.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fluidity",
+                model="FluidityLocal",
+            )
+        )
+        fluidity_menu.addAction(self.model_fluidity_local)
+        self.model_fluidity_nonlocal = QAction("Fluidity Nonlocal", self)
+        self.model_fluidity_nonlocal.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Fluidity",
+                model="FluidityNonlocal",
+            )
+        )
+        fluidity_menu.addAction(self.model_fluidity_nonlocal)
+
+        # Fluidity-Saramito EVP Models submenu
+        saramito_menu = models_menu.addMenu("Saramito (&EVP)")
+        self.model_saramito_local = QAction("Saramito Local", self)
+        self.model_saramito_local.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Saramito",
+                model="SaramitoLocal",
+            )
+        )
+        saramito_menu.addAction(self.model_saramito_local)
+        self.model_saramito_nonlocal = QAction("Saramito Nonlocal", self)
+        self.model_saramito_nonlocal.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Saramito",
+                model="SaramitoNonlocal",
+            )
+        )
+        saramito_menu.addAction(self.model_saramito_nonlocal)
+
+        # IKH Models submenu
+        ikh_menu = models_menu.addMenu("&IKH (Isotropic Kinematic)")
+        self.model_mikh = QAction("MIKH", self)
+        self.model_mikh.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="IKH",
+                model="MIKH",
+            )
+        )
+        ikh_menu.addAction(self.model_mikh)
+        self.model_mlikh = QAction("MLIKH", self)
+        self.model_mlikh.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="IKH",
+                model="MLIKH",
+            )
+        )
+        ikh_menu.addAction(self.model_mlikh)
+
+        # FIKH Models submenu
+        fikh_menu = models_menu.addMenu("FI&KH (Fractional IKH)")
+        self.model_fikh = QAction("FIKH", self)
+        self.model_fikh.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="FIKH",
+                model="FIKH",
+            )
+        )
+        fikh_menu.addAction(self.model_fikh)
+        self.model_fmlikh = QAction("FMLIKH", self)
+        self.model_fmlikh.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="FIKH",
+                model="FMLIKH",
+            )
+        )
+        fikh_menu.addAction(self.model_fmlikh)
+
+        # Hébraud-Lequeux Models submenu
+        hl_menu = models_menu.addMenu("Hébraud-&Lequeux")
+        self.model_hebraud_lequeux = QAction("Hébraud-Lequeux", self)
+        self.model_hebraud_lequeux.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="HL",
+                model="HebraudLequeux",
+            )
+        )
+        hl_menu.addAction(self.model_hebraud_lequeux)
+
+        # ITT-MCT Models submenu
+        itt_mct_menu = models_menu.addMenu("ITT-&MCT")
+        self.model_itt_mct_schematic = QAction("Schematic (F₁₂)", self)
+        self.model_itt_mct_schematic.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="ITT-MCT",
+                model="Schematic",
+            )
+        )
+        itt_mct_menu.addAction(self.model_itt_mct_schematic)
+        self.model_itt_mct_isotropic = QAction("Isotropic (ISM)", self)
+        self.model_itt_mct_isotropic.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="ITT-MCT",
+                model="Isotropic",
+            )
+        )
+        itt_mct_menu.addAction(self.model_itt_mct_isotropic)
+
+        # DMT Thixotropic Models submenu
+        dmt_menu = models_menu.addMenu("&DMT (Thixotropic)")
+        self.model_dmt_local = QAction("DMT Local", self)
+        self.model_dmt_local.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="DMT",
+                model="DMTLocal",
+            )
+        )
+        dmt_menu.addAction(self.model_dmt_local)
+        self.model_dmt_nonlocal = QAction("DMT Nonlocal", self)
+        self.model_dmt_nonlocal.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="DMT",
+                model="DMTNonlocal",
+            )
+        )
+        dmt_menu.addAction(self.model_dmt_nonlocal)
+
+        # Giesekus Models submenu
+        giesekus_menu = models_menu.addMenu("&Giesekus")
+        self.model_giesekus_single = QAction("Single Mode", self)
+        self.model_giesekus_single.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Giesekus",
+                model="SingleMode",
+            )
+        )
+        giesekus_menu.addAction(self.model_giesekus_single)
+        self.model_giesekus_multi = QAction("Multi Mode", self)
+        self.model_giesekus_multi.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="Giesekus",
+                model="MultiMode",
+            )
+        )
+        giesekus_menu.addAction(self.model_giesekus_multi)
+
+        # TNT Transient Network Models submenu
+        tnt_menu = models_menu.addMenu("&TNT (Transient Network)")
+        self.model_tnt_single_mode = QAction("Single Mode", self)
+        self.model_tnt_single_mode.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="TNT",
+                model="SingleMode",
+            )
+        )
+        tnt_menu.addAction(self.model_tnt_single_mode)
+        self.model_tnt_cates = QAction("Cates", self)
+        self.model_tnt_cates.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="TNT",
+                model="Cates",
+            )
+        )
+        tnt_menu.addAction(self.model_tnt_cates)
+        self.model_tnt_loop_bridge = QAction("Loop-Bridge", self)
+        self.model_tnt_loop_bridge.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="TNT",
+                model="LoopBridge",
+            )
+        )
+        tnt_menu.addAction(self.model_tnt_loop_bridge)
+        self.model_tnt_multi_species = QAction("Multi-Species", self)
+        self.model_tnt_multi_species.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="TNT",
+                model="MultiSpecies",
+            )
+        )
+        tnt_menu.addAction(self.model_tnt_multi_species)
+        self.model_tnt_sticky_rouse = QAction("Sticky Rouse", self)
+        self.model_tnt_sticky_rouse.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="TNT",
+                model="StickyRouse",
+            )
+        )
+        tnt_menu.addAction(self.model_tnt_sticky_rouse)
+
+        # VLB Models submenu
+        vlb_menu = models_menu.addMenu("V&LB (Viscoelastic Liquid-Bridge)")
+        self.model_vlb_local = QAction("Local", self)
+        self.model_vlb_local.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="VLB",
+                model="Local",
+            )
+        )
+        vlb_menu.addAction(self.model_vlb_local)
+        self.model_vlb_multi_network = QAction("Multi-Network", self)
+        self.model_vlb_multi_network.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="VLB",
+                model="MultiNetwork",
+            )
+        )
+        vlb_menu.addAction(self.model_vlb_multi_network)
+        self.model_vlb_variant = QAction("Variant (Bell/FENE)", self)
+        self.model_vlb_variant.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="VLB",
+                model="Variant",
+            )
+        )
+        vlb_menu.addAction(self.model_vlb_variant)
+        self.model_vlb_nonlocal = QAction("Nonlocal", self)
+        self.model_vlb_nonlocal.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="VLB",
+                model="Nonlocal",
+            )
+        )
+        vlb_menu.addAction(self.model_vlb_nonlocal)
+
+        # HVM Hybrid Vitrimer Models submenu
+        hvm_menu = models_menu.addMenu("H&VM (Hybrid Vitrimer)")
+        self.model_hvm_local = QAction("HVM Local", self)
+        self.model_hvm_local.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="HVM",
+                model="HVMLocal",
+            )
+        )
+        hvm_menu.addAction(self.model_hvm_local)
+
+        # HVNM Vitrimer Nanocomposite Models submenu
+        hvnm_menu = models_menu.addMenu("HVN&M (Vitrimer Nanocomposite)")
+        self.model_hvnm_local = QAction("HVNM Local", self)
+        self.model_hvnm_local.triggered.connect(
+            lambda: logger.debug(
+                "Menu item selected",
+                menu="Models",
+                submenu="HVNM",
+                model="HVNMLocal",
+            )
+        )
+        hvnm_menu.addAction(self.model_hvnm_local)
 
         logger.debug(
             "Menu created", menu="Models", action_count=models_menu.actions().__len__()

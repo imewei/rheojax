@@ -83,6 +83,11 @@ def normalize_model_name(model_name: str) -> str:
         "hvm local": "hvm_local",
         "vitrimer": "hvm_local",
         "hybrid vitrimer": "hvm_local",
+        # Giesekus
+        "giesekus_single_mode": "giesekus_single",
+        "giesekus_multi_mode": "giesekus_multi",
+        "giesekus single mode": "giesekus_single",
+        "giesekus multi mode": "giesekus_multi",
         # HVNM
         "hvnm": "hvnm_local",
         "hvnm local": "hvnm_local",
