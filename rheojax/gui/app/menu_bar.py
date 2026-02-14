@@ -819,37 +819,26 @@ class MenuBar(QMenuBar):
         logger.debug("Creating menu", menu="Tools")
         tools_menu = self.addMenu("&Tools")
 
-        # Python Console
+        # Python Console (not yet implemented)
         self.tools_console = QAction("&Python Console", self)
         self.tools_console.setShortcut(QKeySequence("Ctrl+Shift+P"))
-        self.tools_console.setStatusTip("Open Python console")
-        self.tools_console.triggered.connect(
-            lambda: logger.debug(
-                "Action triggered", action="python_console", menu="Tools"
-            )
-        )
+        self.tools_console.setStatusTip("Python console (coming soon)")
+        self.tools_console.setEnabled(False)
         tools_menu.addAction(self.tools_console)
 
         tools_menu.addSeparator()
 
-        # JAX Profiler
+        # JAX Profiler (not yet implemented)
         self.tools_jax_profiler = QAction("&JAX Profiler", self)
-        self.tools_jax_profiler.setStatusTip("Profile JAX performance")
-        self.tools_jax_profiler.triggered.connect(
-            lambda: logger.debug(
-                "Action triggered", action="jax_profiler", menu="Tools"
-            )
-        )
+        self.tools_jax_profiler.setStatusTip("JAX profiler (coming soon)")
+        self.tools_jax_profiler.setEnabled(False)
         tools_menu.addAction(self.tools_jax_profiler)
 
         # Memory Monitor
+        # Memory Monitor (not yet implemented)
         self.tools_memory_monitor = QAction("&Memory Monitor", self)
-        self.tools_memory_monitor.setStatusTip("Monitor memory usage")
-        self.tools_memory_monitor.triggered.connect(
-            lambda: logger.debug(
-                "Action triggered", action="memory_monitor", menu="Tools"
-            )
-        )
+        self.tools_memory_monitor.setStatusTip("Memory monitor (coming soon)")
+        self.tools_memory_monitor.setEnabled(False)
         tools_menu.addAction(self.tools_memory_monitor)
 
         tools_menu.addSeparator()

@@ -111,14 +111,17 @@ class DatasetTree(QTreeWidget):
 
         logger.debug("Rendering", widget=self.__class__.__name__)
 
-    def add_dataset(self, dataset_state: DatasetState) -> None:
+    def add_dataset(self, dataset_state: DatasetState | None) -> None:
         """Add dataset to tree.
 
         Parameters
         ----------
-        dataset_state : DatasetState
+        dataset_state : DatasetState | None
             Dataset state object containing dataset information
         """
+        if dataset_state is None:
+            return
+
         logger.debug(
             "User interaction",
             widget=self.__class__.__name__,

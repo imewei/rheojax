@@ -361,8 +361,9 @@ class StateStore:
 
             elif action_type == "FIT_PROGRESS":
                 progress = action.get("progress", 0)
+                job_id = action.get("job_id", "")
                 if self._signals:
-                    self._signals.fit_progress.emit("", int(progress))
+                    self._signals.fit_progress.emit(job_id, int(progress))
 
             elif action_type == "FITTING_COMPLETED":
                 if self._signals:
@@ -666,20 +667,22 @@ class StateStore:
                 pipeline = state.pipeline_state.clone()
                 try:
                     step_enum = PipelineStep[step.upper()] if step else None
-                except Exception:
+                except (KeyError, AttributeError):
+                    valid = [s.name for s in PipelineStep]
                     logger.error(
                         "Invalid pipeline step",
                         step=step,
-                        exc_info=True,
+                        valid_steps=valid,
                     )
                     step_enum = None
                 try:
                     status_enum = StepStatus[status.upper()] if status else None
-                except Exception:
+                except (KeyError, AttributeError):
+                    valid = [s.name for s in StepStatus]
                     logger.error(
                         "Invalid step status",
                         status=status,
-                        exc_info=True,
+                        valid_statuses=valid,
                     )
                     status_enum = None
                 if step_enum and status_enum:

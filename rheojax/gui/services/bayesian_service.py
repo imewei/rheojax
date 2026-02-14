@@ -395,9 +395,13 @@ class BayesianService:
 
             return diagnostics
 
+        except ImportError:
+            from rheojax.gui.utils._dependency_guard import require_dependency
+
+            require_dependency("arviz", "Bayesian diagnostics", "pip install arviz")
         except Exception as e:
             logger.error(f"Diagnostic calculation failed: {e}", exc_info=True)
-            return {"error": str(e)}
+            return {"error": str(e), "diagnostics_valid": False}
 
     def get_credible_intervals(
         self,
@@ -492,7 +496,11 @@ class BayesianService:
         )
         try:
             import arviz as az
+        except ImportError:
+            from rheojax.gui.utils._dependency_guard import require_dependency
 
+            require_dependency("arviz", "Bayesian model comparison", "pip install arviz")
+        try:
             comparison = {}
 
             for result in results:

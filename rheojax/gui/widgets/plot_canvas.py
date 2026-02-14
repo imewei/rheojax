@@ -457,27 +457,32 @@ class PlotCanvas(QWidget):
 
         for data_x, data_y, label in self._plot_data:
             # Calculate distance in display coordinates
+            xlim = self.axes.get_xlim()
+            ylim = self.axes.get_ylim()
+            x_range = (
+                (np.log10(xlim[1]) - np.log10(xlim[0]))
+                if self.axes.get_xscale() == "log"
+                else (xlim[1] - xlim[0])
+            )
+            y_range = (
+                (np.log10(ylim[1]) - np.log10(ylim[0]))
+                if self.axes.get_yscale() == "log"
+                else (ylim[1] - ylim[0])
+            )
+            if abs(x_range) < 1e-30 or abs(y_range) < 1e-30:
+                continue
+
             for i in range(len(data_x)):
                 # Convert to display coordinates for distance calculation
                 if self.axes.get_xscale() == "log":
-                    dx = (np.log10(x) - np.log10(data_x[i])) / (
-                        np.log10(self.axes.get_xlim()[1])
-                        - np.log10(self.axes.get_xlim()[0])
-                    )
+                    dx = (np.log10(x) - np.log10(data_x[i])) / x_range
                 else:
-                    dx = (x - data_x[i]) / (
-                        self.axes.get_xlim()[1] - self.axes.get_xlim()[0]
-                    )
+                    dx = (x - data_x[i]) / x_range
 
                 if self.axes.get_yscale() == "log":
-                    dy = (np.log10(y) - np.log10(data_y[i])) / (
-                        np.log10(self.axes.get_ylim()[1])
-                        - np.log10(self.axes.get_ylim()[0])
-                    )
+                    dy = (np.log10(y) - np.log10(data_y[i])) / y_range
                 else:
-                    dy = (y - data_y[i]) / (
-                        self.axes.get_ylim()[1] - self.axes.get_ylim()[0]
-                    )
+                    dy = (y - data_y[i]) / y_range
 
                 dist = np.sqrt(dx**2 + dy**2)
 

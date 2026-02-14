@@ -643,14 +643,30 @@ class DataPage(QWidget):
 
             store = StateStore()
 
+            _VALID_TEST_MODES = {
+                "oscillation", "relaxation", "creep", "flow_curve",
+                "startup", "laos", "unknown",
+            }
+            first_dataset_id: str | None = None
+
             for idx, rheo_data in enumerate(datasets):
                 # Auto-detect test mode if not specified
                 detected_mode = test_mode
                 if detected_mode is None:
                     detected_mode = self._data_service.detect_test_mode(rheo_data)
 
+                # Validate test_mode against known modes
+                if detected_mode and detected_mode not in _VALID_TEST_MODES:
+                    logger.warning(
+                        "Unknown test_mode detected, defaulting to 'oscillation'",
+                        detected=detected_mode,
+                    )
+                    detected_mode = "oscillation"
+
                 # Generate dataset_id
                 dataset_id = str(uuid.uuid4())
+                if first_dataset_id is None:
+                    first_dataset_id = dataset_id
 
                 # Segment name for multi-segment files
                 if len(datasets) > 1:
@@ -671,6 +687,12 @@ class DataPage(QWidget):
                         "y2_data": getattr(rheo_data, "y2", None),
                         "metadata": getattr(rheo_data, "metadata", {}),
                     },
+                )
+
+            # For multi-segment files, ensure the first segment is active
+            if len(datasets) > 1 and first_dataset_id:
+                store.dispatch(
+                    "SET_ACTIVE_DATASET", {"dataset_id": first_dataset_id}
                 )
 
             # Log successful import

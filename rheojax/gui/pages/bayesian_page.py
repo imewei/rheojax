@@ -433,6 +433,16 @@ class BayesianPage(QWidget):
             warm_start_dict = self._select_warm_start_params(model_name, dataset.id)
             if warm_start_dict:
                 self._status_text.append(f"Using NLSQ warm-start: {warm_start_dict}")
+            else:
+                self._status_text.append(
+                    "Warning: warm-start requested but no NLSQ fit found for "
+                    f"{model_name}/{dataset.id}. Running with default priors."
+                )
+                logger.warning(
+                    "Warm-start requested but no NLSQ result available",
+                    model_name=model_name,
+                    dataset_id=dataset.id,
+                )
 
         # Log inference start
         logger.info(
@@ -487,10 +497,22 @@ class BayesianPage(QWidget):
     ) -> dict[str, float] | None:
         """Pick warm-start parameters that match the current model/dataset."""
         state = self._store.get_state()
+        # Validate that the dataset_id matches the active dataset
+        if dataset_id != state.active_dataset_id:
+            logger.warning(
+                "Warm-start dataset mismatch — skipping",
+                requested=dataset_id,
+                active=state.active_dataset_id,
+            )
+            return None
         key = f"{model_name}_{dataset_id}"
         fit_result = state.fit_results.get(key)
         if fit_result and hasattr(fit_result, "parameters"):
-            return dict(fit_result.parameters)
+            try:
+                return {str(k): float(v) for k, v in fit_result.parameters.items()}
+            except (TypeError, ValueError, AttributeError) as exc:
+                logger.warning("Failed to extract warm-start params", error=str(exc))
+                return None
         return None
 
     def _on_cancel_clicked(self) -> None:
@@ -1114,7 +1136,7 @@ class BayesianPage(QWidget):
         self._set_fit_plot_figure(fig)
 
     def _edit_priors(self) -> None:
-        """Show priors editor dialog."""
+        """Show priors editor dialog and consume result."""
         from rheojax.gui.dialogs.bayesian_options import BayesianOptionsDialog
 
         dialog = BayesianOptionsDialog(
@@ -1123,7 +1145,13 @@ class BayesianPage(QWidget):
             },
             parent=self,
         )
-        dialog.exec()
+        if dialog.exec_() == dialog.DialogCode.Accepted:
+            options = dialog.get_options()
+            self._preset_priors = options.get("priors", self._preset_priors)
+            logger.debug(
+                "Priors updated from dialog",
+                has_priors=self._preset_priors is not None,
+            )
 
     def _apply_preset(self, name: str) -> None:
         """Apply sampler/prior presets derived from example notebooks."""

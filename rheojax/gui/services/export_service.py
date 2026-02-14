@@ -157,6 +157,11 @@ class ExportService:
             )
             logger.debug("Exiting export_parameters successfully")
 
+        except ImportError as e:
+            from rheojax.gui.utils._dependency_guard import require_dependency
+
+            pkg = "h5py" if "h5py" in str(e) else "pandas"
+            require_dependency(pkg, f"exporting to {format}")
         except Exception as e:
             logger.error(
                 "Parameter export failed",

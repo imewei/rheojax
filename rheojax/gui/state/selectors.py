@@ -2,6 +2,13 @@
 
 This module provides computed properties and derived state queries
 for the RheoJAX GUI state.
+
+Important
+---------
+Selectors return **cloned / read-only views** of state data.  Callers must
+never mutate the returned objects — mutations will not propagate back to the
+store and may lead to stale UI.  Use ``store.dispatch()`` or
+``store.update_state()`` to change state.
 """
 
 from pathlib import Path

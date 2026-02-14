@@ -281,6 +281,16 @@ class FitWorker(QRunnable):
             # Emit failure signal
             self.signals.failed.emit(error_msg)
 
+        finally:
+            # Release JAX compilation caches to avoid memory buildup
+            import gc
+
+            gc.collect()
+            try:
+                jax.clear_caches()
+            except Exception:
+                pass
+
     def check_cancellation(self) -> None:
         """Check if job should be cancelled.
 

@@ -415,6 +415,7 @@ class PlotService:
 
         except Exception as e:
             logger.error(f"Failed to create fit plot: {e}", exc_info=True)
+            plt.close("all")
             raise
 
     def create_residual_plot(
@@ -475,6 +476,7 @@ class PlotService:
 
         except Exception as e:
             logger.error(f"Failed to create residual plot: {e}", exc_info=True)
+            plt.close("all")
             raise
 
     def create_arviz_plot(
@@ -506,6 +508,11 @@ class PlotService:
         self._apply_style_context(style)
         try:
             import arviz as az
+        except ImportError:
+            from rheojax.gui.utils._dependency_guard import require_dependency
+
+            require_dependency("arviz", "Bayesian diagnostic plots", "pip install arviz")
+        try:
 
             # Convert to InferenceData
             posterior_samples = result.posterior_samples
@@ -560,6 +567,7 @@ class PlotService:
 
         except Exception as e:
             logger.error(f"ArviZ plot failed: {e}", exc_info=True)
+            plt.close("all")  # Prevent figure leak on error
             raise RuntimeError(f"Plot creation failed: {e}") from e
 
     def create_data_plot(
@@ -630,6 +638,7 @@ class PlotService:
 
         except Exception as e:
             logger.error(f"Failed to create data plot: {e}", exc_info=True)
+            plt.close("all")
             raise
 
     def _apply_style_context(self, style: str) -> None:

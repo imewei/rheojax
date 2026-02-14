@@ -24,7 +24,20 @@ try:
     # Priority 1: qtpy abstraction layer (best compatibility)
     from qtpy import QT_VERSION as _qt_version
     from qtpy import QtCore, QtGui, QtWidgets
-    from qtpy.QtCore import QObject, QPoint, QSize, Qt, QThread, QTimer, Signal, Slot
+    from qtpy.QtCore import (
+        QObject,
+        QPoint,
+        QRectF,
+        QRunnable,
+        QSettings,
+        QSize,
+        Qt,
+        QThread,
+        QThreadPool,
+        QTimer,
+        Signal,
+        Slot,
+    )
     from qtpy.QtGui import (
         QAction,
         QBrush,
@@ -105,9 +118,13 @@ except ImportError:
         from PySide6.QtCore import (
             QObject,
             QPoint,
+            QRectF,
+            QRunnable,
+            QSettings,
             QSize,
             Qt,
             QThread,
+            QThreadPool,
             QTimer,
             Signal,
             Slot,
@@ -189,7 +206,18 @@ except ImportError:
             # Priority 3: PyQt6 (fallback)
             from PyQt6 import QtCore, QtGui, QtWidgets
             from PyQt6.QtCore import PYQT_VERSION_STR as _qt_version
-            from PyQt6.QtCore import QObject, QPoint, QSize, Qt, QThread, QTimer
+            from PyQt6.QtCore import (
+                QObject,
+                QPoint,
+                QRectF,
+                QRunnable,
+                QSettings,
+                QSize,
+                Qt,
+                QThread,
+                QThreadPool,
+                QTimer,
+            )
             from PyQt6.QtCore import pyqtSignal as Signal
             from PyQt6.QtCore import pyqtSlot as Slot
             from PyQt6.QtGui import (
@@ -302,7 +330,11 @@ __all__ = [
     "Slot",
     "Qt",
     "QObject",
+    "QRectF",
+    "QRunnable",
+    "QSettings",
     "QThread",
+    "QThreadPool",
     "QTimer",
     "QSize",
     "QPoint",

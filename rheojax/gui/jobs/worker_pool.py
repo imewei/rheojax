@@ -245,6 +245,11 @@ class WorkerPool(QObject):
                 self._job_signals[job_id] = signals
 
             conn_type = Qt.QueuedConnection if HAS_PYSIDE6 else None
+            if conn_type is None:
+                logger.warning(
+                    "PySide6 not available — worker signals connected without "
+                    "QueuedConnection; cross-thread safety not guaranteed",
+                )
 
             if hasattr(signals, "completed"):
                 if conn_type is not None:

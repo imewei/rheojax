@@ -170,7 +170,6 @@ class ModelService:
         """Initialize model service."""
         logger.debug("Initializing ModelService")
         self._registry = Registry.get_instance()
-        self._model_cache = {}
         logger.debug("ModelService initialized", registry_available=True)
 
     def _normalize_model_name(self, model_name: str) -> str:

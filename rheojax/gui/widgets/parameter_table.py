@@ -110,14 +110,8 @@ class ParameterTable(QTableWidget):
             action="set_parameters",
             num_parameters=len(parameters),
         )
-        # Disconnect signal temporarily to avoid triggering during setup
-        # Use try/finally to ensure signal is reconnected even if exception occurs
-        try:
-            self.itemChanged.disconnect(self._on_item_changed)
-        except (TypeError, RuntimeError):
-            # Signal may not be connected yet
-            logger.debug("itemChanged disconnect skipped; not connected")
-
+        # Block signals during bulk update to avoid triggering per-cell callbacks
+        self.blockSignals(True)
         try:
             # Clear existing rows
             self.setRowCount(0)
@@ -159,11 +153,7 @@ class ParameterTable(QTableWidget):
                 # Apply styling based on state
                 self._update_row_styling(row, param_state)
         finally:
-            # Always reconnect signal, even if exception occurred
-            try:
-                self.itemChanged.connect(self._on_item_changed)
-            except (TypeError, RuntimeError):
-                logger.debug("itemChanged reconnect skipped; already connected")
+            self.blockSignals(False)
         logger.debug(
             "Parameters loaded",
             widget=self.__class__.__name__,

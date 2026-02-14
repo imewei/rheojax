@@ -118,6 +118,7 @@ class RheoJAXMainWindow(QMainWindow):
         self._has_unsaved_changes = False
         self.worker_pool: WorkerPool | None = None
         self._job_types: dict[str, str] = {}
+        self._job_metadata: dict[str, dict] = {}  # Capture context at submission time
         self._plot_style: str = "default"
         self._current_workflow_mode: WorkflowMode = WorkflowMode.FITTING
 
@@ -1102,23 +1103,26 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_job_completed(self, job_id: str, result: object) -> None:
         job_type = self._job_types.pop(job_id, "")
+        meta = self._job_metadata.pop(job_id, {})
         logger.info("Job completed", job_id=job_id, job_type=job_type)
         self.status_bar.hide_progress()
+        # Use metadata captured at submission time to avoid race on dataset switch
+        state = self.store.get_state()
+        dataset_id = meta.get("dataset_id") or state.active_dataset_id
+        model_name = meta.get("model_name") or state.active_model_name
         if job_type == "fit":
             # Persist result in state and refresh UI
-            state = self.store.get_state()
             self.store.dispatch(
                 "STORE_FIT_RESULT",
                 {
                     "result": result,
-                    "dataset_id": state.active_dataset_id,
-                    "model_name": state.active_model_name,
+                    "dataset_id": dataset_id,
+                    "model_name": model_name,
                 },
             )
-            stored = self.store.get_active_fit_result()
-            if stored:
-                self.fit_page.apply_fit_result(stored)
-                self._update_fit_plot(stored)
+            # Apply result directly — don't re-read from store (avoids key mismatch)
+            self.fit_page.apply_fit_result(result)
+            self._update_fit_plot(result)
             # Re-enable Fit page controls even if downstream UI work fails.
             self.store.dispatch("FITTING_COMPLETED", {"result": result})
             self.store.dispatch(
@@ -1127,13 +1131,12 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.show_message("Fit complete", 3000)
             self._auto_save_if_enabled()
         elif job_type == "bayesian":
-            state = self.store.get_state()
             self.store.dispatch(
                 "STORE_BAYESIAN_RESULT",
                 {
                     "result": result,
-                    "dataset_id": state.active_dataset_id,
-                    "model_name": state.active_model_name,
+                    "dataset_id": dataset_id,
+                    "model_name": model_name,
                 },
             )
             self.store.dispatch(
@@ -1452,17 +1455,11 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.show_message("Select data and model before fitting", 4000)
             return
 
-        # Build RheoData from state
+        # Build RheoData from state (handles y2_data → complex G* for oscillation)
         try:
-            from rheojax.core.data import RheoData
+            from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
-            rheo_data = RheoData(
-                x=dataset.x_data,
-                y=dataset.y_data,
-                metadata=dataset.metadata,
-                initial_test_mode=dataset.test_mode,
-                validate=False,
-            )
+            rheo_data = rheodata_from_dataset_state(dataset)
         except Exception as exc:
             logger.error(
                 "Cannot start fit: failed to build RheoData",
@@ -1536,6 +1533,10 @@ class RheoJAXMainWindow(QMainWindow):
                 worker,
                 on_job_registered=lambda jid: self._job_types.__setitem__(jid, "fit"),
             )
+            self._job_metadata[job_id] = {
+                "model_name": model_name,
+                "dataset_id": dataset.id,
+            }
             logger.info("Fit job submitted", job_id=job_id, model_name=model_name)
         except Exception as exc:
             logger.error("Fit job submission failed", error=str(exc), exc_info=True)
@@ -1576,14 +1577,9 @@ class RheoJAXMainWindow(QMainWindow):
             return
 
         try:
-            from rheojax.core.data import RheoData
+            from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
-            rheo_data = RheoData(
-                x=dataset.x_data,
-                y=dataset.y_data,
-                metadata=dataset.metadata,
-                initial_test_mode=dataset.test_mode,
-            )
+            rheo_data = rheodata_from_dataset_state(dataset)
         except Exception as exc:
             logger.error(
                 "Cannot start Bayesian: failed to build RheoData",
@@ -1609,6 +1605,10 @@ class RheoJAXMainWindow(QMainWindow):
             worker,
             on_job_registered=lambda jid: self._job_types.__setitem__(jid, "bayesian"),
         )
+        self._job_metadata[job_id] = {
+            "model_name": model_name,
+            "dataset_id": dataset.id,
+        }
         logger.info("Bayesian job submitted", job_id=job_id, model_name=model_name)
         self._on_job_started(job_id)
 

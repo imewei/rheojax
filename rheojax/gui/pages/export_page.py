@@ -588,10 +588,13 @@ class ExportPage(QWidget):
             )
             current_step = 0
 
-            # Export parameters
+            # Export parameters (filtered to active dataset)
             if config["include_parameters"] and state.fit_results:
                 progress.setLabelText("Exporting parameters...")
+                active_id = state.active_dataset_id
                 for result_id, result in state.fit_results.items():
+                    if active_id and not result_id.endswith(active_id):
+                        continue
                     filepath = output_dir / f"parameters_{result_id}.{data_format}"
                     self._export_service.export_parameters(
                         result, filepath, data_format
@@ -603,20 +606,23 @@ class ExportPage(QWidget):
             if progress.wasCanceled():
                 return
 
-            # Export credible intervals
+            # Export credible intervals (filtered to active dataset)
             if config["include_intervals"] and state.bayesian_results:
                 progress.setLabelText("Exporting credible intervals...")
                 for result_id, result in state.bayesian_results.items():
+                    if active_id and not result_id.endswith(active_id):
+                        continue
                     filepath = (
                         output_dir / f"credible_intervals_{result_id}.{data_format}"
                     )
                     # Export intervals as parameters-like structure
-                    if result.credible_intervals:
+                    intervals = getattr(result, "credible_intervals", None)
+                    if intervals:
                         import json
 
                         intervals_dict = {
                             k: {"lower": v[0], "upper": v[1]}
-                            for k, v in result.credible_intervals.items()
+                            for k, v in intervals.items()
                         }
                         with open(filepath.with_suffix(".json"), "w") as f:
                             json.dump(intervals_dict, f, indent=2)
@@ -627,10 +633,12 @@ class ExportPage(QWidget):
             if progress.wasCanceled():
                 return
 
-            # Export posterior samples
+            # Export posterior samples (filtered to active dataset)
             if config["include_posteriors"] and state.bayesian_results:
                 progress.setLabelText("Exporting posterior samples...")
                 for result_id, result in state.bayesian_results.items():
+                    if active_id and not result_id.endswith(active_id):
+                        continue
                     filepath = (
                         output_dir / f"posterior_samples_{result_id}.{data_format}"
                     )
