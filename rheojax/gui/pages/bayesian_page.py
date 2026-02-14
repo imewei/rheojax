@@ -202,6 +202,33 @@ class BayesianPage(QWidget):
         )
         layout.addWidget(self._warmstart_check)
 
+        # Deformation mode (DMTA / DMA support)
+        deform_label = QLabel("Deformation Mode:")
+        layout.addWidget(deform_label)
+        self._deformation_combo = QComboBox()
+        self._deformation_combo.addItems(
+            ["Shear", "Tension", "Bending", "Compression"]
+        )
+        self._deformation_combo.setToolTip(
+            "Select deformation mode (Tension for DMTA/DMA data)"
+        )
+        layout.addWidget(self._deformation_combo)
+
+        poisson_layout = QHBoxLayout()
+        poisson_layout.addWidget(QLabel("Poisson:"))
+        from rheojax.gui.compat import QDoubleSpinBox
+
+        self._poisson_spin = QDoubleSpinBox()
+        self._poisson_spin.setRange(0.0, 0.5)
+        self._poisson_spin.setValue(0.5)
+        self._poisson_spin.setSingleStep(0.05)
+        self._poisson_spin.setDecimals(3)
+        self._poisson_spin.setToolTip(
+            "Poisson ratio for E*-G* conversion (rubber=0.5, glassy=0.35)"
+        )
+        poisson_layout.addWidget(self._poisson_spin)
+        layout.addLayout(poisson_layout)
+
         # Priors editor button
         btn_priors = QPushButton("Edit Priors...")
         btn_priors.setToolTip("View or edit prior distributions used for this run")
@@ -456,6 +483,10 @@ class BayesianPage(QWidget):
             page="BayesianPage",
         )
 
+        # Get DMTA deformation mode and Poisson ratio from UI
+        deform_text = self._deformation_combo.currentText().lower()
+        poisson_val = self._poisson_spin.value()
+
         # Create and run worker (only pass args BayesianWorker accepts)
         self._current_worker = BayesianWorker(
             model_name=model_name,
@@ -464,6 +495,8 @@ class BayesianPage(QWidget):
             num_samples=config.get("num_samples", 2000),
             num_chains=config.get("num_chains", 4),
             warm_start=warm_start_dict,
+            deformation_mode=deform_text if deform_text != "shear" else None,
+            poisson_ratio=poisson_val if deform_text != "shear" else None,
         )
 
         # Connect signals with QueuedConnection to ensure slots run on GUI thread

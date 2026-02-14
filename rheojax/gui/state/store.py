@@ -219,6 +219,10 @@ class AppState:
     # Provenance
     transform_history: list[TransformRecord] = field(default_factory=list)
 
+    # DMTA / Deformation
+    deformation_mode: str = "shear"  # shear, tension, bending, compression
+    poisson_ratio: float = 0.5  # rubber default
+
     # Settings
     workflow_mode: WorkflowMode = WorkflowMode.FITTING
     current_seed: int = 42
@@ -527,6 +531,8 @@ class StateStore:
             "theme",
             "last_export_dir",
             "recent_projects",
+            "deformation_mode",
+            "poisson_ratio",
         ]:
             old_val = getattr(old_state, attr, None)
             new_val = getattr(new_state, attr, None)
@@ -561,6 +567,26 @@ class StateStore:
                 if isinstance(new_mode, WorkflowMode):
                     return replace(state, workflow_mode=new_mode)
                 return state
+
+            return updater
+
+        if action_type == "SET_DEFORMATION_MODE":
+            mode = action.get("deformation_mode", "shear")
+
+            def updater(state: AppState) -> AppState:
+                if state.deformation_mode == mode:
+                    return state
+                return replace(state, deformation_mode=mode, is_modified=True)
+
+            return updater
+
+        if action_type == "SET_POISSON_RATIO":
+            ratio = action.get("poisson_ratio", 0.5)
+
+            def updater(state: AppState) -> AppState:
+                if state.poisson_ratio == ratio:
+                    return state
+                return replace(state, poisson_ratio=ratio, is_modified=True)
 
             return updater
 

@@ -159,6 +159,43 @@ class FitPage(QWidget):
         context_layout.addLayout(model_row)
         layout.addWidget(context_group)
 
+        # Deformation mode (DMTA / DMA support)
+        deform_group = QGroupBox("Deformation")
+        deform_layout = QVBoxLayout(deform_group)
+
+        deform_mode_row = QHBoxLayout()
+        deform_mode_row.addWidget(QLabel("Mode:"))
+        self._deformation_combo = QComboBox()
+        self._deformation_combo.addItems(
+            ["Shear", "Tension", "Bending", "Compression"]
+        )
+        self._deformation_combo.currentTextChanged.connect(
+            self._on_deformation_mode_changed
+        )
+        deform_mode_row.addWidget(self._deformation_combo, 1)
+        deform_layout.addLayout(deform_mode_row)
+
+        poisson_row = QHBoxLayout()
+        poisson_row.addWidget(QLabel("Poisson Ratio:"))
+        from rheojax.gui.compat import QDoubleSpinBox
+
+        self._poisson_spin = QDoubleSpinBox()
+        self._poisson_spin.setRange(0.0, 0.5)
+        self._poisson_spin.setValue(0.5)
+        self._poisson_spin.setSingleStep(0.05)
+        self._poisson_spin.setDecimals(3)
+        self._poisson_spin.valueChanged.connect(self._on_poisson_ratio_changed)
+        poisson_row.addWidget(self._poisson_spin)
+
+        self._poisson_preset = QComboBox()
+        self._poisson_preset.addItems(
+            ["Rubber (0.500)", "Glassy (0.350)", "Semicrystalline (0.400)", "Custom"]
+        )
+        self._poisson_preset.currentTextChanged.connect(self._on_poisson_preset_changed)
+        poisson_row.addWidget(self._poisson_preset)
+        deform_layout.addLayout(poisson_row)
+        layout.addWidget(deform_group)
+
         compat_group = QGroupBox("Compatibility")
         compat_layout = QVBoxLayout(compat_group)
         self._compat_label = QLabel("Select a model and dataset")
@@ -484,6 +521,35 @@ class FitPage(QWidget):
             self._compat_label.setText(f"Mode set to {mode}")
             self._compat_label.setStyleSheet("color: #555;")
 
+    def _on_deformation_mode_changed(self, mode: str) -> None:
+        """Update deformation mode in store."""
+        logger.debug("Deformation mode changed", mode=mode, page="FitPage")
+        if mode:
+            self._store.dispatch(
+                "SET_DEFORMATION_MODE",
+                {"deformation_mode": mode.lower()},
+            )
+
+    def _on_poisson_ratio_changed(self, value: float) -> None:
+        """Update Poisson ratio in store."""
+        logger.debug("Poisson ratio changed", value=value, page="FitPage")
+        self._store.dispatch("SET_POISSON_RATIO", {"poisson_ratio": value})
+        # Switch preset to Custom if user manually edits
+        self._poisson_preset.blockSignals(True)
+        self._poisson_preset.setCurrentText("Custom")
+        self._poisson_preset.blockSignals(False)
+
+    def _on_poisson_preset_changed(self, text: str) -> None:
+        """Apply Poisson ratio preset."""
+        presets = {
+            "Rubber (0.500)": 0.5,
+            "Glassy (0.350)": 0.35,
+            "Semicrystalline (0.400)": 0.4,
+        }
+        value = presets.get(text)
+        if value is not None:
+            self._poisson_spin.setValue(value)
+
     def _on_quick_model_changed(self, index: int) -> None:
         """Handle quick model combo changes."""
         model_name = self._quick_model_combo.itemData(index)
@@ -681,10 +747,16 @@ class FitPage(QWidget):
             page="FitPage",
         )
         initial_params = self._get_initial_params_for_fit(model_name)
+        options = dict(self._fit_options)
+        # Include DMTA deformation mode / Poisson ratio
+        deform = self._deformation_combo.currentText().lower()
+        if deform != "shear":
+            options["deformation_mode"] = deform
+            options["poisson_ratio"] = self._poisson_spin.value()
         payload = {
             "model_name": str(model_name),
             "dataset_id": str(dataset.id),
-            "options": dict(self._fit_options),
+            "options": options,
             "initial_params": initial_params,
         }
         logger.info(

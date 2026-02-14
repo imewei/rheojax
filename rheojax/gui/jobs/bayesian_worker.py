@@ -145,6 +145,8 @@ class BayesianWorker(QRunnable):
         priors: dict[str, Any] | None = None,
         seed: int = 0,
         cancel_token: CancellationToken | None = None,
+        deformation_mode: str | None = None,
+        poisson_ratio: float | None = None,
     ):
         """Initialize Bayesian worker.
 
@@ -168,6 +170,10 @@ class BayesianWorker(QRunnable):
             Random seed for reproducibility
         cancel_token : CancellationToken, optional
             Token for cancellation support
+        deformation_mode : str, optional
+            Deformation mode for DMTA (e.g., 'tension', 'shear')
+        poisson_ratio : float, optional
+            Poisson ratio for E*-G* conversion
         """
         if not HAS_PYSIDE6:
             raise ImportError(
@@ -187,6 +193,8 @@ class BayesianWorker(QRunnable):
         self._warm_start = warm_start
         self._priors = priors or {}
         self._seed = seed
+        self._deformation_mode = deformation_mode
+        self._poisson_ratio = poisson_ratio
 
         # Track progress
         self._current_stage = "warmup"
@@ -338,6 +346,11 @@ class BayesianWorker(QRunnable):
             from rheojax.gui.services.bayesian_service import BayesianService
 
             svc = BayesianService()
+            mcmc_kwargs: dict[str, Any] = {"seed": self._seed}
+            if self._deformation_mode is not None:
+                mcmc_kwargs["deformation_mode"] = self._deformation_mode
+            if self._poisson_ratio is not None:
+                mcmc_kwargs["poisson_ratio"] = self._poisson_ratio
             bayesian_result = svc.run_mcmc(
                 self._model_name,
                 self._data,
@@ -347,7 +360,7 @@ class BayesianWorker(QRunnable):
                 warm_start=self._warm_start,
                 test_mode=test_mode,
                 progress_callback=progress_callback,
-                seed=self._seed,
+                **mcmc_kwargs,
             )
 
             sampling_time = time.perf_counter() - start_time
