@@ -20,14 +20,11 @@ Example:
 from __future__ import annotations
 
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import numpyro
-import numpyro.distributions as dist
-from numpyro.distributions import transforms as dist_transforms
-from numpyro.infer import MCMC, NUTS, init_to_uniform, init_to_value
 
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
@@ -39,8 +36,25 @@ logger = get_logger(__name__)
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
 
+def _import_numpyro():
+    """Lazy-import NumPyro and its submodules.
+
+    Returns all NumPyro symbols needed by BayesianMixin. Python caches
+    modules after the first import, so subsequent calls are a cheap dict
+    lookup (~µs). This avoids the ~800ms startup cost when only NLSQ
+    (non-Bayesian) workflows are used.
+    """
+    import numpyro
+    import numpyro.distributions as dist
+    from numpyro.distributions import transforms as dist_transforms
+    from numpyro.infer import MCMC, NUTS, init_to_uniform, init_to_value
+
+    return numpyro, dist, dist_transforms, MCMC, NUTS, init_to_uniform, init_to_value
+
+
 if TYPE_CHECKING:
     from jax import Array
+    from numpyro.infer import MCMC
 
     from rheojax.core.parameters import ParameterSet
 
@@ -88,6 +102,7 @@ class BayesianResult:
     mcmc: MCMC | None = None
     model_comparison: dict[str, float] = field(default_factory=dict)
     _inference_data: Any | None = field(default=None, repr=False)
+    _inference_data_ll: Any | None = field(default=None, repr=False)
 
     def __post_init__(self):
         """Validate result after initialization."""
@@ -105,7 +120,7 @@ class BayesianResult:
             parameter_names=list(self.posterior_samples.keys()),
         )
 
-    def to_inference_data(self) -> Any:
+    def to_inference_data(self, log_likelihood: bool = False) -> Any:
         """Convert to ArviZ InferenceData format for advanced visualization.
 
         Converts the NumPyro MCMC result to ArviZ InferenceData format, which
@@ -113,19 +128,21 @@ class BayesianResult:
         The conversion preserves all NUTS-specific diagnostics including energy,
         divergences, and tree depth information.
 
-        The conversion automatically computes pointwise log-likelihood values
-        required for Bayesian model comparison metrics (WAIC and LOO). This
-        enables usage of az.waic(), az.loo(), and az.compare() for objective
-        model selection.
-
         The InferenceData object is cached after first conversion to avoid
-        repeated conversion overhead.
+        repeated conversion overhead. The ``log_likelihood=False`` and
+        ``log_likelihood=True`` variants are cached independently.
+
+        Args:
+            log_likelihood: If True, compute pointwise log-likelihood for
+                WAIC/LOO model comparison (az.waic(), az.loo()). This
+                re-evaluates the model for all samples (~600-800ms slower).
+                Default False for faster conversion when only plotting.
 
         Returns:
             ArviZ InferenceData object containing:
                 - posterior: Posterior samples for all parameters
                 - sample_stats: NUTS diagnostics (energy, divergences, etc.)
-                - log_likelihood: Pointwise log-likelihood for WAIC/LOO
+                - log_likelihood: Only when ``log_likelihood=True``
                 - Additional groups as available from NumPyro
 
         Raises:
@@ -134,22 +151,23 @@ class BayesianResult:
 
         Example:
             >>> result = model.fit_bayesian(X, y)
-            >>> idata = result.to_inference_data()
-            >>>
-            >>> # Now use ArviZ plotting functions
-            >>> import arviz as az
+            >>> idata = result.to_inference_data()  # Fast: no log-lik
             >>> az.plot_trace(idata)
-            >>> az.plot_pair(idata)
-            >>> az.plot_energy(idata)
+            >>>
+            >>> # For model comparison (slower):
+            >>> idata_ll = result.to_inference_data(log_likelihood=True)
+            >>> az.waic(idata_ll)
 
         Note:
             Requires arviz package: pip install arviz
             The MCMC object must be present (automatically stored by fit_bayesian).
         """
 
-        logger.debug("Converting BayesianResult to InferenceData")
+        logger.debug(
+            "Converting BayesianResult to InferenceData",
+            log_likelihood=log_likelihood,
+        )
 
-        # Return cached version if available
         def _ensure_energy(idata):
             """Guarantee energy diagnostic exists for ArviZ energy plots."""
             sample_stats = getattr(idata, "sample_stats", None)
@@ -159,7 +177,6 @@ class BayesianResult:
             try:
                 extra_fields = self.mcmc.get_extra_fields(group_by_chain=True)
             except TypeError:
-                # Older NumPyro versions may not support group_by_chain kwarg.
                 extra_fields = self.mcmc.get_extra_fields()
             except Exception as exc:
                 logger.debug(
@@ -179,11 +196,9 @@ class BayesianResult:
             import xarray as xr
 
             energy_array = np.asarray(energy_field)
-            # ArviZ expects shape (chain, draw) for sample_stats variables.
             try:
                 energy_array = energy_array.reshape(self.num_chains, -1)
             except ValueError:
-                # Fallback to adding a singleton chain dimension if reshape fails.
                 energy_array = np.expand_dims(energy_array, axis=0)
 
             idata.sample_stats = sample_stats.assign(
@@ -191,8 +206,12 @@ class BayesianResult:
             )
             return idata
 
-        if self._inference_data is not None:
-            logger.debug("Returning cached InferenceData")
+        # Return cached version if available
+        if log_likelihood and self._inference_data_ll is not None:
+            logger.debug("Returning cached InferenceData (with log_likelihood)")
+            return _ensure_energy(self._inference_data_ll)
+        if not log_likelihood and self._inference_data is not None:
+            logger.debug("Returning cached InferenceData (without log_likelihood)")
             return _ensure_energy(self._inference_data)
 
         # Import arviz (lazy import)
@@ -218,17 +237,25 @@ class BayesianResult:
             )
 
         # Convert using ArviZ's from_numpyro utility
-        # This preserves all NUTS diagnostics (energy, divergences, etc.)
-        # log_likelihood=True computes pointwise log-likelihood for WAIC/LOO model comparison
-        logger.debug("Creating InferenceData from MCMC object")
-        self._inference_data = az.from_numpyro(self.mcmc, log_likelihood=True)
+        logger.debug(
+            "Creating InferenceData from MCMC object",
+            log_likelihood=log_likelihood,
+        )
+        idata = az.from_numpyro(self.mcmc, log_likelihood=log_likelihood)
         logger.info(
             "InferenceData created successfully",
             num_chains=self.num_chains,
             num_samples=self.num_samples,
+            log_likelihood=log_likelihood,
         )
 
-        return _ensure_energy(self._inference_data)
+        # Cache separately: with and without log_likelihood
+        if log_likelihood:
+            self._inference_data_ll = idata
+        else:
+            self._inference_data = idata
+
+        return _ensure_energy(idata)
 
 
 class BayesianMixin:
@@ -575,6 +602,8 @@ class BayesianMixin:
         Args:
             seed: Random seed for reproducibility. If None, uses 0.
         """
+        _, _, _, MCMC, NUTS, init_to_uniform, init_to_value = _import_numpyro()
+
         logger.debug(
             "Starting NUTS sampling",
             num_warmup=num_warmup,
@@ -629,8 +658,25 @@ class BayesianMixin:
         # Use provided seed or default to 0 for reproducibility
         rng_seed = seed if seed is not None else 0
 
-        # Encourage higher acceptance to reduce divergences in stiff fractional models.
-        nuts_kwargs.setdefault("target_accept_prob", 0.99)
+        # Warm-start-aware NUTS defaults: when the sampler starts near the
+        # posterior mode (from NLSQ), we can use a less conservative acceptance
+        # rate and shallower tree depth for faster warmup.
+        has_warm_start = (
+            bool(warm_start_values)
+            and hasattr(self, "fitted_")
+            and self.fitted_
+        )
+        if has_warm_start:
+            nuts_kwargs.setdefault("target_accept_prob", 0.90)
+            nuts_kwargs.setdefault("max_tree_depth", 8)
+            logger.debug(
+                "Using warm-start NUTS defaults",
+                target_accept_prob=nuts_kwargs.get("target_accept_prob"),
+                max_tree_depth=nuts_kwargs.get("max_tree_depth"),
+            )
+        else:
+            # Conservative defaults for cold-start exploration
+            nuts_kwargs.setdefault("target_accept_prob", 0.99)
 
         # Separate MCMC args from NUTS args
         mcmc_kwargs = {}
@@ -1215,6 +1261,7 @@ class BayesianMixin:
 
         Returns a callable model function with test_mode captured in closure.
         """
+        numpyro, dist, dist_transforms, _, _, _, _ = _import_numpyro()
         prior_factory = getattr(self, "bayesian_prior_factory", None)
 
         # Extract scale values for likelihood
@@ -1320,6 +1367,50 @@ class BayesianMixin:
 
         return numpyro_model
 
+    @staticmethod
+    def _compute_per_param_diagnostic(
+        posterior_samples: dict[str, np.ndarray],
+        num_chains: int,
+        num_samples: int,
+        diagnostic_fn: Callable,
+        label: str,
+    ) -> tuple[dict[str, float], bool]:
+        """Compute a per-parameter diagnostic (R-hat or ESS).
+
+        Reshapes flat posterior samples to (num_chains, num_samples) and applies
+        the given NumPyro diagnostic function to each parameter.
+
+        Args:
+            posterior_samples: Parameter name -> flat samples array.
+            num_chains: Number of MCMC chains.
+            num_samples: Samples per chain.
+            diagnostic_fn: NumPyro function (e.g. split_gelman_rubin, effective_sample_size).
+            label: Human-readable label for log messages (e.g. "R-hat", "ESS").
+
+        Returns:
+            (result_dict, all_succeeded) where result_dict maps parameter names
+            to diagnostic values (NaN on failure).
+        """
+        result_dict: dict[str, float] = {}
+        all_succeeded = True
+        for name in posterior_samples:
+            try:
+                samples_flat = posterior_samples[name]
+                if num_chains >= 2:
+                    samples_shaped = samples_flat.reshape(num_chains, num_samples)
+                else:
+                    samples_shaped = samples_flat.reshape(1, -1)
+                result_dict[name] = float(diagnostic_fn(samples_shaped))
+            except Exception as exc:
+                logger.warning(
+                    f"{label} computation failed for parameter",
+                    parameter=name,
+                    error=str(exc),
+                )
+                result_dict[name] = float("nan")
+                all_succeeded = False
+        return result_dict, all_succeeded
+
     def _compute_diagnostics(
         self,
         mcmc: MCMC,
@@ -1342,74 +1433,26 @@ class BayesianMixin:
                 - divergences: Number of divergent transitions (-1 if unknown)
                 - diagnostics_valid: Whether all diagnostics computed successfully
         """
+        numpyro, _, _, _, _, _, _ = _import_numpyro()
+
         diagnostics: dict[str, Any] = {}
         all_valid = True
 
-        # Get NumPyro diagnostics
         try:
-            # Reshape samples to (num_chains, num_draws) for diagnostic functions.
-            # mcmc.get_samples() flattens across chains, so we must reshape.
-            # NumPyro's split_gelman_rubin splits each chain in half before
-            # computing, so it works with num_chains >= 1.
-            # effective_sample_size also accepts (num_chains, num_draws).
-
-            # R-hat (should be < 1.01 for good convergence)
-            r_hat_dict = {}
-            for name in posterior_samples.keys():
-                try:
-                    samples_flat = posterior_samples[name]
-                    if num_chains >= 2:
-                        samples_shaped = samples_flat.reshape(
-                            num_chains, num_samples
-                        )
-                    else:
-                        # Single chain: split_gelman_rubin will split in half.
-                        # This provides approximate diagnostics but is less
-                        # reliable than multi-chain R-hat.
-                        samples_shaped = samples_flat.reshape(1, -1)
-                    r_hat_value = numpyro.diagnostics.split_gelman_rubin(
-                        samples_shaped
-                    )
-                    r_hat_dict[name] = float(r_hat_value)
-                except Exception as exc:
-                    logger.warning(
-                        "R-hat computation failed for parameter",
-                        parameter=name,
-                        error=str(exc),
-                    )
-                    r_hat_dict[name] = float("nan")
-                    all_valid = False
-
+            r_hat_dict, r_hat_ok = self._compute_per_param_diagnostic(
+                posterior_samples, num_chains, num_samples,
+                numpyro.diagnostics.split_gelman_rubin, "R-hat",
+            )
             diagnostics["r_hat"] = r_hat_dict
+            all_valid = all_valid and r_hat_ok
 
-            # Effective Sample Size (should be > 400 ideally)
-            ess_dict = {}
-            for name in posterior_samples.keys():
-                try:
-                    samples_flat = posterior_samples[name]
-                    if num_chains >= 2:
-                        samples_shaped = samples_flat.reshape(
-                            num_chains, num_samples
-                        )
-                    else:
-                        # Single chain: add chain dimension for ESS computation
-                        samples_shaped = samples_flat.reshape(1, -1)
-                    ess_value = numpyro.diagnostics.effective_sample_size(
-                        samples_shaped
-                    )
-                    ess_dict[name] = float(ess_value)
-                except Exception as exc:
-                    logger.warning(
-                        "ESS computation failed for parameter",
-                        parameter=name,
-                        error=str(exc),
-                    )
-                    ess_dict[name] = float("nan")
-                    all_valid = False
-
+            ess_dict, ess_ok = self._compute_per_param_diagnostic(
+                posterior_samples, num_chains, num_samples,
+                numpyro.diagnostics.effective_sample_size, "ESS",
+            )
             diagnostics["ess"] = ess_dict
+            all_valid = all_valid and ess_ok
 
-            # Divergences (should be 0)
             try:
                 divergences = mcmc.get_extra_fields()["diverging"]
                 num_divergences = int(np.sum(divergences))

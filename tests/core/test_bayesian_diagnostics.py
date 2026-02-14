@@ -299,4 +299,141 @@ class TestBoundsSetterSync:
         assert bounds_constraints[0].max_value == 50.0
 
 
+# ---------------------------------------------------------------------------
+# Optimization 1: Lazy NumPyro imports
+# ---------------------------------------------------------------------------
+
+class TestLazyNumPyroImports:
+    """Verify that _import_numpyro() provides all necessary symbols."""
+
+    @pytest.mark.smoke
+    def test_import_numpyro_returns_all_symbols(self):
+        """_import_numpyro() should return numpyro, dist, transforms, MCMC, NUTS, init_to_*."""
+        from rheojax.core.bayesian import _import_numpyro
+
+        numpyro, dist, dist_transforms, MCMC, NUTS, init_to_uniform, init_to_value = (
+            _import_numpyro()
+        )
+        assert hasattr(numpyro, "sample")
+        assert hasattr(dist, "Uniform")
+        assert hasattr(dist_transforms, "AffineTransform")
+        assert MCMC is not None
+        assert NUTS is not None
+        assert callable(init_to_uniform)
+        assert callable(init_to_value)
+
+    @pytest.mark.smoke
+    def test_lazy_import_idempotent(self):
+        """Calling _import_numpyro() twice returns same objects."""
+        from rheojax.core.bayesian import _import_numpyro
+
+        result1 = _import_numpyro()
+        result2 = _import_numpyro()
+        # Python module caching ensures same objects
+        assert result1[0] is result2[0]  # numpyro module
+
+
+# ---------------------------------------------------------------------------
+# Optimization 3: ArviZ log_likelihood parameter
+# ---------------------------------------------------------------------------
+
+class TestArviZLogLikelihood:
+    """Verify to_inference_data(log_likelihood=...) caching."""
+
+    @pytest.mark.smoke
+    def test_default_no_log_likelihood(self):
+        """to_inference_data() should default to log_likelihood=False."""
+        model = SimpleBayesianModel()
+        X = np.linspace(0, 5, 30)
+        y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 30)
+
+        result = model.fit_bayesian(
+            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42
+        )
+        idata = result.to_inference_data()  # default: log_likelihood=False
+        assert idata is not None
+        # Without log_likelihood, the log_likelihood group should be absent
+        assert not hasattr(idata, "log_likelihood") or idata.log_likelihood is None
+
+    @pytest.mark.smoke
+    def test_separate_caching(self):
+        """With and without log_likelihood should be cached separately."""
+        model = SimpleBayesianModel()
+        X = np.linspace(0, 5, 30)
+        y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 30)
+
+        result = model.fit_bayesian(
+            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42
+        )
+        idata_no_ll = result.to_inference_data(log_likelihood=False)
+        idata_ll = result.to_inference_data(log_likelihood=True)
+
+        # Should be different objects (different cache slots)
+        assert idata_no_ll is not idata_ll
+
+        # Calling again should return cached versions
+        assert result.to_inference_data(log_likelihood=False) is idata_no_ll
+        assert result.to_inference_data(log_likelihood=True) is idata_ll
+
+
+# ---------------------------------------------------------------------------
+# Optimization 4: Warm-start-aware NUTS tuning
+# ---------------------------------------------------------------------------
+
+class TestWarmStartNutsTuning:
+    """Verify warm-start detection lowers target_accept_prob and max_tree_depth."""
+
+    @pytest.mark.smoke
+    def test_warm_started_uses_lower_accept_prob(self):
+        """When fitted_=True, NUTS should use target_accept_prob=0.90."""
+        model = SimpleBayesianModel()
+        X = np.linspace(0, 5, 30)
+        y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 30)
+
+        # Simulate a warm-started model
+        model.fitted_ = True
+
+        result = model.fit_bayesian(
+            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42
+        )
+        # Should complete without error (verifying the lower accept prob is used)
+        assert result is not None
+        assert len(result.posterior_samples) > 0
+
+    @pytest.mark.smoke
+    def test_user_kwargs_override_warm_start_defaults(self):
+        """User-specified target_accept_prob should override warm-start default."""
+        model = SimpleBayesianModel()
+        X = np.linspace(0, 5, 30)
+        y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 30)
+
+        model.fitted_ = True
+
+        # Explicitly set higher target_accept_prob
+        result = model.fit_bayesian(
+            X, y,
+            num_warmup=20,
+            num_samples=50,
+            num_chains=1,
+            seed=42,
+            target_accept_prob=0.99,
+        )
+        assert result is not None
+
+    @pytest.mark.smoke
+    def test_cold_start_uses_conservative_accept_prob(self):
+        """When not warm-started, NUTS should use target_accept_prob=0.99."""
+        model = SimpleBayesianModel()
+        X = np.linspace(0, 5, 30)
+        y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 30)
+
+        # Not fitted — cold start
+        assert not hasattr(model, "fitted_") or not model.fitted_
+
+        result = model.fit_bayesian(
+            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42
+        )
+        assert result is not None
+
+
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")

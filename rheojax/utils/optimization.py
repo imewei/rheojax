@@ -48,6 +48,154 @@ jax, jnp = safe_import_jax()
 type ArrayLike = np.ndarray | list | float
 
 
+def _validate_optimization_result(
+    result: OptimizationResult,
+    residuals: np.ndarray,
+    mse_threshold: float = 1e6,
+) -> None:
+    """Validate optimization result against pathological outcomes.
+
+    Checks for non-finite or astronomically large residuals that indicate
+    the optimizer "succeeded" numerically but produced meaningless parameters.
+
+    Args:
+        result: OptimizationResult to validate (uses result.fun for RSS).
+        residuals: Residual vector at the optimal point.
+        mse_threshold: Maximum allowed mean squared error (default: 1e6).
+
+    Raises:
+        RuntimeError: If MSE exceeds threshold or is non-finite.
+    """
+    residual_count = residuals.size if residuals.size else 1
+    mse = result.fun / residual_count
+    if not np.isfinite(mse) or mse > mse_threshold:
+        logger.error(
+            "Optimization failed: residual norm extremely large",
+            mean_squared_error=float(mse) if np.isfinite(mse) else "inf",
+            residual_count=residual_count,
+            rss=float(result.fun),
+        )
+        raise RuntimeError(
+            "Optimization failed: residual norm remains extremely large. "
+            "Try providing better initial values, looser bounds, or scaling the data."
+        )
+
+
+def _extract_bounds(
+    parameters: ParameterSet,
+) -> tuple[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+    """Extract initial values and bounds arrays from a ParameterSet.
+
+    Converts ParameterSet bounds (which may contain None) into the
+    (lower_array, upper_array) format expected by SciPy and NLSQ.
+
+    Args:
+        parameters: ParameterSet with initial values and bounds.
+
+    Returns:
+        (x0, (lower_bounds, upper_bounds)) where x0 is the initial values
+        array and bounds are float64 arrays with -inf/+inf for missing bounds.
+    """
+    x0 = np.asarray(parameters.get_values(), dtype=np.float64)
+    bounds_list = parameters.get_bounds()
+
+    lower_list: list[float] = []
+    upper_list: list[float] = []
+    for bound_pair in bounds_list:
+        if bound_pair is None or (bound_pair[0] is None and bound_pair[1] is None):
+            lower_list.append(-np.inf)
+            upper_list.append(np.inf)
+        else:
+            lower_list.append(bound_pair[0] if bound_pair[0] is not None else -np.inf)
+            upper_list.append(bound_pair[1] if bound_pair[1] is not None else np.inf)
+
+    lower = np.asarray(lower_list, dtype=np.float64)
+    upper = np.asarray(upper_list, dtype=np.float64)
+    return x0, (lower, upper)
+
+
+def _run_scipy_least_squares(
+    objective: Callable[[np.ndarray], float | np.ndarray],
+    x0: np.ndarray,
+    bounds: tuple[np.ndarray, np.ndarray],
+    ftol: float,
+    xtol: float,
+    gtol: float,
+    max_iter: int,
+) -> OptimizationResult:
+    """Run SciPy's TRF least squares and return an OptimizationResult.
+
+    Shared implementation for both the explicit method='scipy' path and the
+    NLSQ failure fallback path. Computes covariance from the Jacobian when
+    available.
+
+    Args:
+        objective: Residual function (values -> residual vector or scalar).
+        x0: Initial parameter values.
+        bounds: (lower_bounds, upper_bounds) arrays.
+        ftol: Function tolerance.
+        xtol: Parameter tolerance.
+        gtol: Gradient tolerance.
+        max_iter: Maximum iterations (max_nfev = max_iter * 10).
+
+    Returns:
+        OptimizationResult with optimal parameters and covariance.
+    """
+    from scipy.optimize import least_squares as scipy_least_squares
+
+    def residual_fn(values: np.ndarray) -> np.ndarray:
+        res = objective(values)
+        if isinstance(res, jnp.ndarray):
+            res = np.asarray(res)
+        return np.asarray(res, dtype=np.float64)
+
+    scipy_result = scipy_least_squares(
+        residual_fn,
+        x0,
+        bounds=bounds,
+        ftol=ftol,
+        xtol=xtol,
+        gtol=gtol,
+        max_nfev=max_iter * 10,
+        method="trf",
+    )
+
+    cost_value = getattr(scipy_result, "cost", None)
+    jac = None
+    pcov = None
+    if scipy_result.jac is not None:
+        jac = np.asarray(scipy_result.jac, dtype=np.float64)
+        residuals = residual_fn(scipy_result.x)
+        pcov = compute_covariance_from_jacobian(jac, residuals)
+
+    return OptimizationResult(
+        x=np.asarray(scipy_result.x, dtype=np.float64),
+        fun=(
+            float(2.0 * scipy_result.cost)
+            if hasattr(scipy_result, "cost")
+            else float(np.sum(residual_fn(scipy_result.x) ** 2))
+        ),
+        jac=jac,
+        pcov=pcov,
+        success=bool(scipy_result.success),
+        message=str(scipy_result.message),
+        nit=int(getattr(scipy_result, "nit", scipy_result.nfev)),
+        nfev=int(scipy_result.nfev),
+        njev=int(getattr(scipy_result, "njev", 0)),
+        optimality=(
+            float(getattr(scipy_result, "optimality", np.nan))
+            if getattr(scipy_result, "optimality", None) is not None
+            else None
+        ),
+        active_mask=(
+            np.asarray(scipy_result.active_mask)
+            if getattr(scipy_result, "active_mask", None) is not None
+            else None
+        ),
+        cost=float(cost_value) if cost_value is not None else None,
+    )
+
+
 def compute_covariance_from_jacobian(
     jac: np.ndarray,
     residuals: np.ndarray | None = None,
@@ -858,27 +1006,8 @@ def nlsq_optimize(
         raise ValueError("parameters must be ParameterSet")
 
     # Get initial values and bounds from ParameterSet
-    x0 = parameters.get_values()
-    original_values = np.asarray(x0, dtype=np.float64).copy()
-    bounds_list = parameters.get_bounds()
-
-    # Convert bounds to NLSQ/SciPy format: (lower_array, upper_array)
-    lower_bounds_list: list[float] = []
-    upper_bounds_list: list[float] = []
-    for bound_pair in bounds_list:
-        if bound_pair is None or (bound_pair[0] is None and bound_pair[1] is None):
-            lower_bounds_list.append(-np.inf)
-            upper_bounds_list.append(np.inf)
-        else:
-            lower = bound_pair[0] if bound_pair[0] is not None else -np.inf
-            upper = bound_pair[1] if bound_pair[1] is not None else np.inf
-            lower_bounds_list.append(lower)
-            upper_bounds_list.append(upper)
-
-    lower_bounds = np.asarray(lower_bounds_list, dtype=np.float64)
-    upper_bounds = np.asarray(upper_bounds_list, dtype=np.float64)
-    nlsq_bounds = (lower_bounds, upper_bounds)
-    x0 = np.asarray(x0, dtype=np.float64)
+    x0, nlsq_bounds = _extract_bounds(parameters)
+    original_values = x0.copy()
 
     # If method='scipy', use SciPy directly (bypasses NLSQ autodiff issues with Diffrax)
     if method == "scipy":
@@ -886,62 +1015,11 @@ def nlsq_optimize(
             "Using SciPy least_squares directly (method='scipy')",
             n_params=len(x0),
         )
-        from scipy.optimize import least_squares as scipy_least_squares
-
-        def residual_fn(values: np.ndarray) -> np.ndarray:
-            res = objective(values)
-            if isinstance(res, jnp.ndarray):
-                res = np.asarray(res)
-            return np.asarray(res, dtype=np.float64)
-
-        scipy_result = scipy_least_squares(
-            residual_fn,
-            x0,
-            bounds=nlsq_bounds,
-            ftol=ftol,
-            xtol=xtol,
-            gtol=gtol,
-            max_nfev=max_iter * 10,
-            method="trf",
+        result = _run_scipy_least_squares(
+            objective, x0, nlsq_bounds, ftol, xtol, gtol, max_iter
         )
-
-        # Update parameters with optimized values
-        parameters.set_values(scipy_result.x)
-
-        cost_value = getattr(scipy_result, "cost", None)
-        jac = None
-        pcov = None
-        if scipy_result.jac is not None:
-            jac = np.asarray(scipy_result.jac, dtype=np.float64)
-            residuals = residual_fn(scipy_result.x)
-            pcov = compute_covariance_from_jacobian(jac, residuals)
-
-        return OptimizationResult(
-            x=np.asarray(scipy_result.x, dtype=np.float64),
-            fun=(
-                float(2.0 * scipy_result.cost)
-                if hasattr(scipy_result, "cost")
-                else float(np.sum(residual_fn(scipy_result.x) ** 2))
-            ),
-            jac=jac,
-            pcov=pcov,
-            success=bool(scipy_result.success),
-            message=str(scipy_result.message),
-            nit=int(getattr(scipy_result, "nit", scipy_result.nfev)),
-            nfev=int(scipy_result.nfev),
-            njev=int(getattr(scipy_result, "njev", 0)),
-            optimality=(
-                float(getattr(scipy_result, "optimality", np.nan))
-                if getattr(scipy_result, "optimality", None) is not None
-                else None
-            ),
-            active_mask=(
-                np.asarray(scipy_result.active_mask)
-                if getattr(scipy_result, "active_mask", None) is not None
-                else None
-            ),
-            cost=float(cost_value) if cost_value is not None else None,
-        )
+        parameters.set_values(result.x)
+        return result
 
     logger.info(
         "Starting NLSQ optimization",
@@ -960,7 +1038,8 @@ def nlsq_optimize(
     logger.debug(
         "Initial parameter values",
         x0=x0.tolist() if hasattr(x0, "tolist") else list(x0),
-        bounds=bounds_list,
+        lower_bounds=nlsq_bounds[0].tolist(),
+        upper_bounds=nlsq_bounds[1].tolist(),
     )
 
     # NLSQ expects a residual function that returns a vector of residuals
@@ -1000,63 +1079,9 @@ def nlsq_optimize(
     def _scipy_fallback(initial_guess: np.ndarray) -> OptimizationResult:
         """Fallback to SciPy's least_squares when NLSQ fails."""
         logger.info("Using SciPy least_squares fallback")
-        from scipy.optimize import least_squares as scipy_least_squares
-
-        def residual_fn(values: np.ndarray) -> np.ndarray:
-            res = objective(values)
-            if isinstance(res, jnp.ndarray):
-                res = np.asarray(res)
-            return np.asarray(res, dtype=np.float64)
-
-        scipy_result = scipy_least_squares(
-            residual_fn,
-            initial_guess,
-            bounds=nlsq_bounds,
-            ftol=ftol,
-            xtol=xtol,
-            gtol=gtol,
-            max_nfev=max_iter * 10,
-            method="trf",
+        return _run_scipy_least_squares(
+            objective, initial_guess, nlsq_bounds, ftol, xtol, gtol, max_iter
         )
-
-        cost_value = getattr(scipy_result, "cost", None)
-
-        # Extract Jacobian and compute covariance
-        jac = None
-        pcov = None
-        if scipy_result.jac is not None:
-            jac = np.asarray(scipy_result.jac, dtype=np.float64)
-            residuals = residual_fn(scipy_result.x)
-            pcov = compute_covariance_from_jacobian(jac, residuals)
-
-        result = OptimizationResult(
-            x=np.asarray(scipy_result.x, dtype=np.float64),
-            fun=(
-                float(2.0 * scipy_result.cost)
-                if hasattr(scipy_result, "cost")
-                else float(np.sum(residual_fn(scipy_result.x) ** 2))
-            ),
-            jac=jac,
-            pcov=pcov,
-            success=bool(scipy_result.success),
-            message=str(scipy_result.message),
-            nit=int(getattr(scipy_result, "nit", scipy_result.nfev)),
-            nfev=int(scipy_result.nfev),
-            njev=int(getattr(scipy_result, "njev", 0)),
-            optimality=(
-                float(getattr(scipy_result, "optimality", np.nan))
-                if getattr(scipy_result, "optimality", None) is not None
-                else None
-            ),
-            active_mask=(
-                np.asarray(scipy_result.active_mask)
-                if getattr(scipy_result, "active_mask", None) is not None
-                else None
-            ),
-            cost=float(cost_value) if cost_value is not None else None,
-        )
-
-        return result
 
     # Create NLSQ optimizer instance and run optimization
     try:
@@ -1109,22 +1134,11 @@ def nlsq_optimize(
     result.fun = float(jnp.sum(residuals_np**2))
 
     # Guard against false "success" with astronomically large residuals
-    residual_count = residuals_np.size if residuals_np.size else 1
-    mean_squared_error = result.fun / residual_count
-    if not np.isfinite(mean_squared_error) or mean_squared_error > 1e6:
-        logger.error(
-            "Optimization failed: residual norm extremely large",
-            mean_squared_error=(
-                float(mean_squared_error) if np.isfinite(mean_squared_error) else "inf"
-            ),
-            residual_count=residual_count,
-            rss=float(result.fun),
-        )
+    try:
+        _validate_optimization_result(result, residuals_np)
+    except RuntimeError:
         parameters.set_values(original_values)
-        raise RuntimeError(
-            "Optimization failed: residual norm remains extremely large. "
-            "Try providing better initial values, looser bounds, or scaling the data."
-        )
+        raise
 
     # Update ParameterSet with optimal values
     parameters.set_values(result.x)
@@ -1553,14 +1567,7 @@ def nlsq_curve_fit(
     )
 
     # Extract p0 and bounds from ParameterSet
-    p0 = np.asarray(parameters.get_values(), dtype=np.float64)
-    bounds_list = parameters.get_bounds()
-    lower = np.array(
-        [b[0] if b[0] is not None else -np.inf for b in bounds_list], dtype=np.float64
-    )
-    upper = np.array(
-        [b[1] if b[1] is not None else np.inf for b in bounds_list], dtype=np.float64
-    )
+    p0, (lower, upper) = _extract_bounds(parameters)
 
     # Convert x_data and y_data to numpy arrays
     x_data_np = np.asarray(x_data, dtype=np.float64)

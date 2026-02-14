@@ -414,6 +414,78 @@ class BaseModel(BayesianMixin, ABC):
 
         return self
 
+    def precompile(
+        self,
+        test_mode: str = "relaxation",
+        X: ArrayLike | None = None,
+        y: ArrayLike | None = None,
+    ) -> float:
+        """Precompile NLSQ residual functions to eliminate JIT cold-start.
+
+        Triggers JIT compilation by running a minimal fit (``max_iter=1``)
+        with dummy data. The model parameters are reset afterwards so
+        the model is left in its original state.
+
+        This is useful for interactive sessions or benchmarks where the
+        ~870ms first-fit JIT overhead should be excluded.
+
+        Args:
+            test_mode: Test mode to precompile for (default: 'relaxation').
+            X: Optional input data for shape inference. If None, uses a
+                10-point logspace array.
+            y: Optional output data. If None, generates ones matching X.
+
+        Returns:
+            Compilation time in seconds.
+
+        Example:
+            >>> model = Maxwell()
+            >>> t = model.precompile(test_mode='relaxation')
+            >>> print(f"Compiled in {t:.2f}s")
+            >>> model.fit(X, y)  # No JIT overhead
+        """
+        import time
+
+        logger.info("Starting NLSQ precompilation", model=self.__class__.__name__)
+
+        # Save current state
+        saved_params = {
+            name: self.parameters.get_value(name) for name in self.parameters
+        }
+        saved_fitted = self.fitted_
+
+        # Generate dummy data if not provided
+        if X is None:
+            X = np.logspace(-2, 2, 10, dtype=np.float64)
+        X_arr = np.asarray(X, dtype=np.float64)
+        if y is None:
+            y = np.ones_like(X_arr, dtype=np.float64)
+
+        start_time = time.perf_counter()
+
+        try:
+            self._fit(X_arr, y, test_mode=test_mode, max_iter=1)
+        except Exception as e:
+            logger.warning(
+                "NLSQ precompilation fit failed — JIT may still have compiled",
+                error=str(e),
+            )
+
+        compile_time = time.perf_counter() - start_time
+
+        # Restore original state
+        for name, value in saved_params.items():
+            self.parameters.set_value(name, value)
+        self.fitted_ = saved_fitted
+
+        logger.info(
+            "NLSQ precompilation completed",
+            compile_time_seconds=compile_time,
+            model=self.__class__.__name__,
+        )
+
+        return compile_time
+
     def fit_bayesian(  # type: ignore[override]  # extends BayesianMixin signature with DMTA params
         self,
         X: ArrayLike,

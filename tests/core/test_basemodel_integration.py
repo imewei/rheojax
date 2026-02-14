@@ -129,6 +129,7 @@ def test_warm_start_workflow_fit_then_fit_bayesian():
         num_samples=400,
         num_chains=1,
         initial_values=initial_values,
+        target_accept_prob=0.99,
     )
 
     # Check that Bayesian result is obtained
@@ -315,3 +316,54 @@ def test_basemodel_fit_method_signature_backward_compatible():
     result3 = model3.fit(t, G_true, max_iter=500, use_jax=True)
     assert result3 is model3
     assert model3.fitted_ is True
+
+
+# ---------------------------------------------------------------------------
+# Optimization 2: NLSQ precompile()
+# ---------------------------------------------------------------------------
+
+
+class TestPrecompile:
+    """Tests for BaseModel.precompile() JIT precompilation."""
+
+    @pytest.mark.smoke
+    def test_precompile_returns_time(self):
+        """precompile() should return compilation time as a float."""
+        model = Maxwell()
+        t = model.precompile(test_mode="relaxation")
+        assert isinstance(t, float)
+        assert t > 0
+
+    @pytest.mark.smoke
+    def test_precompile_preserves_parameters(self):
+        """precompile() should not alter model parameters."""
+        model = Maxwell()
+        # Record original values
+        orig_G0 = model.parameters.get_value("G0")
+        orig_eta = model.parameters.get_value("eta")
+        orig_fitted = model.fitted_
+
+        model.precompile(test_mode="relaxation")
+
+        # Parameters should be restored
+        assert model.parameters.get_value("G0") == orig_G0
+        assert model.parameters.get_value("eta") == orig_eta
+        assert model.fitted_ == orig_fitted
+
+    @pytest.mark.smoke
+    def test_precompile_with_custom_data(self):
+        """precompile() should accept custom X and y arrays."""
+        model = Maxwell()
+        X = np.logspace(-1, 2, 20, dtype=np.float64)
+        y = np.exp(-X) * 1e5
+        t = model.precompile(test_mode="relaxation", X=X, y=y)
+        assert isinstance(t, float)
+        assert t > 0
+
+    @pytest.mark.smoke
+    def test_precompile_does_not_set_fitted(self):
+        """An unfitted model should remain unfitted after precompile()."""
+        model = Maxwell()
+        assert model.fitted_ is False
+        model.precompile()
+        assert model.fitted_ is False
