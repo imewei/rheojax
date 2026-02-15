@@ -1054,10 +1054,10 @@ class BayesianMixin:
         compile_time = time.perf_counter() - start_time
 
         # Cache the model key for reference (per-instance dict)
-        cache_key = (str(test_mode), is_complex_data)
+        precompile_key = (str(test_mode), is_complex_data)
         if not hasattr(self, "_precompiled_models"):
             self._precompiled_models = {}
-        self._precompiled_models[cache_key] = True
+        self._precompiled_models[precompile_key] = True
 
         logger.info(
             "Bayesian precompilation completed",
@@ -1260,7 +1260,25 @@ class BayesianMixin:
         """Build the NumPyro probabilistic model function.
 
         Returns a callable model function with test_mode captured in closure.
+        Uses a per-instance cache keyed by (test_mode, is_complex, param_names,
+        protocol_kwargs) to avoid rebuilding identical closures during repeated
+        fit_bayesian() calls.
         """
+        # Build hashable cache key
+        cache_key = (
+            str(test_mode),
+            is_complex_data,
+            tuple(param_names),
+            tuple(sorted(
+                (k, v) for k, v in protocol_kwargs.items()
+                if not isinstance(v, np.ndarray)
+            )),
+        )
+        if not hasattr(self, "_closure_cache"):
+            self._closure_cache = {}
+        if cache_key in self._closure_cache:
+            return self._closure_cache[cache_key]
+
         numpyro, dist, dist_transforms, _, _, _, _ = _import_numpyro()
         prior_factory = getattr(self, "bayesian_prior_factory", None)
 
@@ -1365,6 +1383,7 @@ class BayesianMixin:
                     "obs", dist.Normal(loc=predictions_raw, scale=sigma), obs=y
                 )
 
+        self._closure_cache[cache_key] = numpyro_model
         return numpyro_model
 
     @staticmethod
