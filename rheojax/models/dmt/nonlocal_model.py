@@ -301,92 +301,100 @@ class DMTNonlocal(DMTBase):
         # Initialize velocity (linear profile for homogeneous flow)
         v = jnp.linspace(0, V_wall, self.n_points)
 
-        # Storage for trajectory
-        t_list = []
-        lam_list = []
-        gamma_dot_list = []
-        v_list = []
-        stress_list = []
+        # Close over constants for lax.scan (avoid self references)
+        dy = self.dy
+        dy_sq = dy**2
+        D_lambda = params["D_lambda"]
+        t_eq = params["t_eq"]
+        a_param = params["a"]
+        c_param = params["c"]
 
-        # Time stepping
-        for step in range(n_steps):
-            t = step * dt
-            t_list.append(t)
-
-            # Compute local shear rate
-            gamma_dot = self._compute_shear_rate_from_velocity(v)
-            gamma_dot_list.append(np.array(gamma_dot))
-
-            # Compute local viscosity
-            if self.closure == "exponential":
-                eta = jax.vmap(
-                    lambda lam_i, gd: viscosity_exponential(
-                        lam_i, params["eta_0"], params["eta_inf"]
-                    )
-                )(lam, gamma_dot)
-            else:
-                eta = jax.vmap(
-                    lambda lam_i, gd: viscosity_herschel_bulkley_regularized(
-                        lam_i,
-                        gd,
-                        params["tau_y0"],
-                        params["K0"],
-                        params["n_flow"],
-                        params["eta_inf"],
-                        params["m1"],
-                        params["m2"],
-                    )
-                )(lam, gamma_dot)
-
-            # Compute stress (uniform for low Re)
-            stress = jnp.mean(eta * gamma_dot)
-            stress_list.append(float(stress))
-
-            # Store profiles
-            lam_list.append(np.array(lam))
-            v_list.append(np.array(v))
-
-            # Update structure: local evolution + diffusion
-            # dλ/dt = (local) + D_λ ∂²λ/∂y²
-            local_rate = jax.vmap(
-                lambda lam_i, gd: structure_evolution(
-                    lam_i, gd, params["t_eq"], params["a"], params["c"]
-                )
-            )(lam, gamma_dot)
-
-            diffusion = params["D_lambda"] * self._laplacian(lam)
-            dlam_dt = local_rate + diffusion
-
-            lam = jnp.clip(lam + dt * dlam_dt, 0.0, 1.0)
-
-            # Update velocity (stress-driven approach)
-            # In steady Couette, we adjust velocity to maintain V_wall BC
-            # while distributing shear according to local viscosity
-            # v(y) = ∫₀^y (Σ/η(y')) dy'
-            # For simplicity, use iterative approach
-
-            # Compute target shear rate from uniform stress
-            if self.closure == "exponential":
-                gamma_dot_target = stress / eta
-            else:
-                # Iterative for HB
-                gamma_dot_target = stress / jnp.maximum(eta, 1e-10)
-
-            # Reconstruct velocity from shear rate
-            v_new = jnp.concatenate(
-                [jnp.array([0.0]), jnp.cumsum(gamma_dot_target[:-1]) * self.dy]
+        def _laplacian_pure(field):
+            """Laplacian with Neumann BCs (no self reference)."""
+            lap = jnp.zeros_like(field)
+            lap = lap.at[1:-1].set(
+                (field[:-2] - 2 * field[1:-1] + field[2:]) / dy_sq
             )
+            lap = lap.at[0].set(2 * (field[1] - field[0]) / dy_sq)
+            lap = lap.at[-1].set(2 * (field[-2] - field[-1]) / dy_sq)
+            return lap
 
-            # Rescale to match wall velocity
-            v = v_new * V_wall / jnp.maximum(v_new[-1], 1e-10)
+        def _shear_rate_pure(v_prof):
+            """Shear rate from velocity (no self reference)."""
+            gd = jnp.zeros_like(v_prof)
+            gd = gd.at[1:-1].set((v_prof[2:] - v_prof[:-2]) / (2 * dy))
+            gd = gd.at[0].set((v_prof[1] - v_prof[0]) / dy)
+            gd = gd.at[-1].set((v_prof[-1] - v_prof[-2]) / dy)
+            return gd
 
+        # Build viscosity function based on closure type (branch outside scan)
+        if self.closure == "exponential":
+            eta_0 = params["eta_0"]
+            eta_inf = params["eta_inf"]
+
+            def _viscosity_fn(lam_arr, gd_arr):
+                return jax.vmap(
+                    lambda l, g: viscosity_exponential(l, eta_0, eta_inf)
+                )(lam_arr, gd_arr)
+        else:
+            tau_y0 = params["tau_y0"]
+            K0 = params["K0"]
+            n_flow = params["n_flow"]
+            eta_inf_hb = params["eta_inf"]
+            m1 = params["m1"]
+            m2 = params["m2"]
+
+            def _viscosity_fn(lam_arr, gd_arr):
+                return jax.vmap(
+                    lambda l, g: viscosity_herschel_bulkley_regularized(
+                        l, g, tau_y0, K0, n_flow, eta_inf_hb, m1, m2
+                    )
+                )(lam_arr, gd_arr)
+
+        def scan_step(carry, _):
+            """Single time step (pure JAX, no host transfers)."""
+            lam_c, v_c = carry
+
+            # Shear rate from velocity
+            gamma_dot_c = _shear_rate_pure(v_c)
+
+            # Viscosity
+            eta = _viscosity_fn(lam_c, gamma_dot_c)
+
+            # Stress (uniform for low Re)
+            stress = jnp.mean(eta * gamma_dot_c)
+
+            # Structure evolution + diffusion
+            local_rate = jax.vmap(
+                lambda l, g: structure_evolution(l, g, t_eq, a_param, c_param)
+            )(lam_c, gamma_dot_c)
+            diffusion = D_lambda * _laplacian_pure(lam_c)
+            lam_new = jnp.clip(lam_c + dt * (local_rate + diffusion), 0.0, 1.0)
+
+            # Velocity reconstruction from uniform stress
+            gamma_dot_target = stress / jnp.maximum(eta, 1e-10)
+            v_new = jnp.concatenate(
+                [jnp.array([0.0]), jnp.cumsum(gamma_dot_target[:-1]) * dy]
+            )
+            v_new = v_new * V_wall / jnp.maximum(v_new[-1], 1e-10)
+
+            outputs = (stress, lam_c, v_c, gamma_dot_c)
+            return (lam_new, v_new), outputs
+
+        # Run scan — single JIT-compiled loop, no host transfers
+        (lam_final, v_final), (stress_all, lam_all, v_all, gd_all) = (
+            jax.lax.scan(scan_step, (lam, v), None, length=n_steps)
+        )
+
+        # Single vectorized transfer at the end
+        t_out = np.arange(n_steps) * dt
         return {
-            "t": np.array(t_list),
+            "t": t_out,
             "y": self.y,
-            "lam": np.array(lam_list),
-            "gamma_dot": np.array(gamma_dot_list),
-            "velocity": np.array(v_list),
-            "stress": np.array(stress_list),
+            "lam": np.asarray(lam_all),
+            "gamma_dot": np.asarray(gd_all),
+            "velocity": np.asarray(v_all),
+            "stress": np.asarray(stress_all),
         }
 
     # =========================================================================

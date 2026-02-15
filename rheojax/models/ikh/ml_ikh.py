@@ -287,6 +287,22 @@ class MLIKH(IKHBase):
             description="High-shear viscosity",
         )
 
+    def _stack_mode_params(self, params, names=None):
+        """Stack per-mode parameters in a single pass.
+
+        Reduces repeated dict lookups + jnp.stack calls from O(N*names)
+        to O(1) per prediction, which matters during Bayesian inference
+        (4000-8000 evaluations).
+        """
+        n = self._n_modes
+        if names is None:
+            names = ["G", "C", "gamma_dyn", "sigma_y0",
+                     "delta_sigma_y", "tau_thix", "Gamma"]
+        return {
+            name: jnp.stack([params[f"{name}_{i}"] for i in range(1, n + 1)])
+            for name in names
+        }
+
     def _predict_from_params(self, times, strains, params):
         """Predict using parameter dictionary (for NLSQ/Bayesian)."""
         if self._yield_mode == "per_mode":
@@ -296,34 +312,9 @@ class MLIKH(IKHBase):
 
     def _predict_per_mode(self, times, strains, params):
         """Predict with per-mode yield surfaces."""
-        # Stack parameters for vectorized kernel
-        G = jnp.stack([params[f"G_{i}"] for i in range(1, self._n_modes + 1)])
-        C = jnp.stack([params[f"C_{i}"] for i in range(1, self._n_modes + 1)])
-        gamma_dyn = jnp.stack(
-            [params[f"gamma_dyn_{i}"] for i in range(1, self._n_modes + 1)]
-        )
-        sigma_y0 = jnp.stack(
-            [params[f"sigma_y0_{i}"] for i in range(1, self._n_modes + 1)]
-        )
-        delta_sigma_y = jnp.stack(
-            [params[f"delta_sigma_y_{i}"] for i in range(1, self._n_modes + 1)]
-        )
-        tau_thix = jnp.stack(
-            [params[f"tau_thix_{i}"] for i in range(1, self._n_modes + 1)]
-        )
-        Gamma = jnp.stack([params[f"Gamma_{i}"] for i in range(1, self._n_modes + 1)])
-
+        # Stack all per-mode parameters in a single pass
+        kernel_params = self._stack_mode_params(params)
         eta_inf = params["eta_inf"]
-
-        kernel_params = {
-            "G": G,
-            "C": C,
-            "gamma_dyn": gamma_dyn,
-            "sigma_y0": sigma_y0,
-            "delta_sigma_y": delta_sigma_y,
-            "tau_thix": tau_thix,
-            "Gamma": Gamma,
-        }
 
         return ml_ikh_scan_kernel(
             times,
@@ -336,11 +327,7 @@ class MLIKH(IKHBase):
 
     def _predict_weighted_sum(self, times, strains, params):
         """Predict with weighted-sum yield surface."""
-        tau_thix = jnp.stack(
-            [params[f"tau_thix_{i}"] for i in range(1, self._n_modes + 1)]
-        )
-        Gamma = jnp.stack([params[f"Gamma_{i}"] for i in range(1, self._n_modes + 1)])
-        w = jnp.stack([params[f"w_{i}"] for i in range(1, self._n_modes + 1)])
+        stacked = self._stack_mode_params(params, names=["tau_thix", "Gamma", "w"])
 
         kernel_params = {
             "G": params["G"],
@@ -350,9 +337,7 @@ class MLIKH(IKHBase):
             "sigma_y0": params["sigma_y0"],
             "k3": params["k3"],
             "eta_inf": params["eta_inf"],
-            "tau_thix": tau_thix,
-            "Gamma": Gamma,
-            "w": w,
+            **stacked,
         }
 
         return ml_ikh_weighted_sum_kernel(
@@ -375,28 +360,8 @@ class MLIKH(IKHBase):
         args = {"n_modes": self._n_modes}
 
         if self._yield_mode == "per_mode":
-            # Stack per-mode parameters into arrays
-            args["G"] = jnp.stack(
-                [params[f"G_{i}"] for i in range(1, self._n_modes + 1)]
-            )
-            args["C"] = jnp.stack(
-                [params[f"C_{i}"] for i in range(1, self._n_modes + 1)]
-            )
-            args["gamma_dyn"] = jnp.stack(
-                [params[f"gamma_dyn_{i}"] for i in range(1, self._n_modes + 1)]
-            )
-            args["sigma_y0"] = jnp.stack(
-                [params[f"sigma_y0_{i}"] for i in range(1, self._n_modes + 1)]
-            )
-            args["delta_sigma_y"] = jnp.stack(
-                [params[f"delta_sigma_y_{i}"] for i in range(1, self._n_modes + 1)]
-            )
-            args["tau_thix"] = jnp.stack(
-                [params[f"tau_thix_{i}"] for i in range(1, self._n_modes + 1)]
-            )
-            args["Gamma"] = jnp.stack(
-                [params[f"Gamma_{i}"] for i in range(1, self._n_modes + 1)]
-            )
+            # Stack all per-mode parameters in a single pass
+            args.update(self._stack_mode_params(params))
             # Default arrays for optional parameters
             args["eta"] = jnp.full(self._n_modes, 1e12)
             args["mu_p"] = jnp.full(self._n_modes, 1e-6)
@@ -410,18 +375,8 @@ class MLIKH(IKHBase):
             args["sigma_y0"] = params["sigma_y0"]
             args["k3"] = params.get("k3", 0.0)
             # Per-mode structure parameters
-            args["tau_thix"] = jnp.stack(
-                [params[f"tau_thix_{i}"] for i in range(1, self._n_modes + 1)]
-            )
-            args["Gamma"] = jnp.stack(
-                [params[f"Gamma_{i}"] for i in range(1, self._n_modes + 1)]
-            )
-            args["w"] = jnp.stack(
-                [
-                    params.get(f"w_{i}", 1.0 / self._n_modes)
-                    for i in range(1, self._n_modes + 1)
-                ]
-            )
+            stacked = self._stack_mode_params(params, names=["tau_thix", "Gamma", "w"])
+            args.update(stacked)
             args["eta"] = 1e12
             args["mu_p"] = 1e-6
 

@@ -327,7 +327,7 @@ class VLBNonlocal(VLBBase):
         else:
             sigma_elastic = G0 * mu_xy
 
-        eta_eff = max(eta_s, 1e-2 * G0 / max(k_d_0, 1e-30))
+        eta_eff = jnp.maximum(eta_s, 1e-2 * G0 / jnp.maximum(k_d_0, 1e-30))
         return (Sigma - sigma_elastic) / eta_eff
 
     # =========================================================================
@@ -407,18 +407,41 @@ class VLBNonlocal(VLBBase):
 
         mu_xy_profiles = np.asarray(sol.ys[:, 1 + 3 * n:1 + 4 * n])
 
-        # Compute gamma_dot profiles
-        gamma_dot_profiles = []
-        for i in range(len(t_out)):
-            fields = self._unpack_state(sol.ys[i])
-            gd = self._compute_gamma_dot_profile(fields)
-            gamma_dot_profiles.append(np.asarray(gd))
+        # Compute gamma_dot profiles vectorized over time axis
+        n = self.n_points
+        G0 = self.G0
+        k_d_0 = self.k_d_0
+        eta_s = float(self.parameters.get_value("eta_s") or 0.0)
+        eta_eff = jnp.maximum(eta_s, 1e-2 * G0 / jnp.maximum(k_d_0, 1e-30))
+
+        if self._stress_type == "fene":
+            L_max = float(self.parameters.get_value("L_max") or 10.0)
+
+            def _gamma_dot_single(state_i):
+                Sigma_i = state_i[0]
+                mu_xx_i = state_i[1:1 + n]
+                mu_yy_i = state_i[1 + n:1 + 2 * n]
+                mu_zz_i = state_i[1 + 2 * n:1 + 3 * n]
+                mu_xy_i = state_i[1 + 3 * n:1 + 4 * n]
+                sigma_el = jax.vmap(
+                    lambda xx, yy, zz, xy: vlb_stress_fene_xy(
+                        xx, yy, zz, xy, G0, L_max
+                    )
+                )(mu_xx_i, mu_yy_i, mu_zz_i, mu_xy_i)
+                return (Sigma_i - sigma_el) / eta_eff
+        else:
+            def _gamma_dot_single(state_i):
+                Sigma_i = state_i[0]
+                mu_xy_i = state_i[1 + 3 * n:1 + 4 * n]
+                return (Sigma_i - G0 * mu_xy_i) / eta_eff
+
+        gamma_dot_all = jax.vmap(_gamma_dot_single)(sol.ys)
 
         return {
             "t": t_out,
             "y": self.y,
             "mu_xy": mu_xy_profiles,
-            "gamma_dot": np.array(gamma_dot_profiles),
+            "gamma_dot": np.asarray(gamma_dot_all),
             "stress": stress_out,
         }
 
@@ -566,37 +589,46 @@ class VLBNonlocal(VLBBase):
         t_out = np.asarray(t_save)
         mu_xy_profiles = np.asarray(sol.ys[:, 3 * n:4 * n])
 
-        # Compute gamma_dot and velocity profiles
-        gamma_dot_profiles = []
-        velocity_profiles = []
-        for i in range(len(t_out)):
-            mu_xy_i = sol.ys[i, 3 * n:4 * n]
-            if self._stress_type == "fene":
-                mu_xx_i = sol.ys[i, :n]
-                mu_yy_i = sol.ys[i, n:2 * n]
-                mu_zz_i = sol.ys[i, 2 * n:3 * n]
+        # Compute gamma_dot and velocity profiles vectorized over time axis
+        G0_val = params["G0"]
+        eta_s_val = params["eta_s"]
+        k_d_0_val = params["k_d_0"]
+        eta_eff = jnp.maximum(
+            eta_s_val, 1e-2 * G0_val / jnp.maximum(k_d_0_val, 1e-30)
+        )
+        dy = self.dy
+
+        if self._stress_type == "fene":
+            def _creep_gamma_dot_single(state_i):
+                mu_xx_i = state_i[:n]
+                mu_yy_i = state_i[n:2 * n]
+                mu_zz_i = state_i[2 * n:3 * n]
+                mu_xy_i = state_i[3 * n:4 * n]
                 sigma_el = jax.vmap(
                     lambda xx, yy, zz, xy: vlb_stress_fene_xy(
-                        xx, yy, zz, xy, params["G0"], L_max
+                        xx, yy, zz, xy, G0_val, L_max
                     )
                 )(mu_xx_i, mu_yy_i, mu_zz_i, mu_xy_i)
-            else:
-                sigma_el = params["G0"] * mu_xy_i
+                return (sigma_0 - sigma_el) / eta_eff
+        else:
+            def _creep_gamma_dot_single(state_i):
+                mu_xy_i = state_i[3 * n:4 * n]
+                return (sigma_0 - G0_val * mu_xy_i) / eta_eff
 
-            eta_eff = max(params["eta_s"], 1e-2 * params["G0"] / max(params["k_d_0"], 1e-30))
-            gd = np.asarray((sigma_0 - sigma_el) / eta_eff)
-            gamma_dot_profiles.append(gd)
+        gamma_dot_all = jax.vmap(_creep_gamma_dot_single)(sol.ys)
 
-            # Velocity from integrating shear rate
-            v = np.concatenate([[0.0], np.cumsum(gd[:-1]) * self.dy])
-            velocity_profiles.append(v)
+        # Velocity from integrating shear rate: v(y) = integral(gamma_dot, dy)
+        def _velocity_single(gd):
+            return jnp.concatenate([jnp.array([0.0]), jnp.cumsum(gd[:-1]) * dy])
+
+        velocity_all = jax.vmap(_velocity_single)(gamma_dot_all)
 
         return {
             "t": t_out,
             "y": self.y,
             "mu_xy": mu_xy_profiles,
-            "gamma_dot": np.array(gamma_dot_profiles),
-            "velocity": np.array(velocity_profiles),
+            "gamma_dot": np.asarray(gamma_dot_all),
+            "velocity": np.asarray(velocity_all),
             "stress": np.full(len(t_out), sigma_0),
         }
 

@@ -583,11 +583,12 @@ class HebraudLequeux(BaseModel):
             sigma_max_norm = max(5.0 * sigma_c_norm, sigma_max_min_norm)
             ds = 2.0 * sigma_max_norm / (n_bins_pred - 1)
 
+            X_np = np.asarray(X_jax)  # Single vectorized transfer
             per_rate_schedule = [
                 _compute_dt_and_steps_for_rate(
-                    abs(float(X_jax[i])), tau_val, sigma_c_norm, ds=ds,
+                    abs(X_np[i]), tau_val, sigma_c_norm, ds=ds,
                 )
-                for i in range(len(X_jax))
+                for i in range(len(X_np))
             ]
             pred_norm = run_flow_curve(
                 X_jax,
@@ -732,11 +733,12 @@ class HebraudLequeux(BaseModel):
             ds = 2.0 * sigma_max_norm / (n_bins_bayes - 1)
 
             try:
+                X_np = np.asarray(X_jax)  # Single vectorized transfer
                 schedule = [
                     _compute_dt_and_steps_for_rate(
-                        abs(float(X_jax[i])), tau_est, sc_norm_est, ds=ds,
+                        abs(X_np[i]), tau_est, sc_norm_est, ds=ds,
                     )
-                    for i in range(len(X_jax))
+                    for i in range(len(X_np))
                 ]
                 # sigma_c tracer divided by stress_scale to get normalized
                 sigma_c_norm = sigma_c / stress_scale
