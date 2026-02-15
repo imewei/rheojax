@@ -49,7 +49,7 @@ class TestJAXvsNumPyPerformance:
         # Warm-up call (includes JIT compilation)
         try:
             _ = model_jax.predict(t[:10], test_mode="relaxation")
-        except:
+        except Exception:
             pass
 
         # Time JAX fitting
@@ -226,7 +226,7 @@ class TestMemoryProfiling:
                 pred = model.predict(t)
                 mem = process.memory_info().rss / 1024**2
                 mem_readings.append(mem)
-            except:
+            except Exception:
                 pass
 
         if len(mem_readings) >= 5:

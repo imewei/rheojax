@@ -475,7 +475,8 @@ class BaseModel(BayesianMixin, ABC):
 
         # Restore original state
         for name, value in saved_params.items():
-            self.parameters.set_value(name, value)
+            if value is not None:
+                self.parameters.set_value(name, value)
         self.fitted_ = saved_fitted
 
         logger.info(

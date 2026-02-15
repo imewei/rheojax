@@ -206,7 +206,7 @@ class HebraudLequeux(BaseModel):
             logger.info(f"Fitting HL model in mode: {test_mode}")
             ctx["test_mode"] = test_mode
 
-            if test_mode == "steady_shear":
+            if test_mode == "steady_shear" or test_mode == "flow_curve":
                 self._fit_steady_shear(X, y, **kwargs)
             elif test_mode == "creep":
                 self._fit_creep(X, y, **kwargs)
@@ -216,6 +216,11 @@ class HebraudLequeux(BaseModel):
                 self._fit_startup(X, y, **kwargs)
             elif test_mode == "laos":
                 self._fit_laos(X, y, **kwargs)
+            elif test_mode == "saos" or test_mode == "oscillation":
+                # SAOS fitting not fully implemented yet, but prevent dispatch error
+                # For now, we can alias to flow_curve if structurally similar 
+                # OR just raise NotImplementedError instead of ValueError
+                raise NotImplementedError(f"Fitting mode '{test_mode}' not implemented yet")
             else:
                 raise ValueError(f"Unsupported test mode: {test_mode}")
 
@@ -708,7 +713,7 @@ class HebraudLequeux(BaseModel):
             return dt, n_steps
 
         # Dispatch to kernels
-        if mode == "steady_shear":
+        if mode in ("steady_shear", "flow_curve"):
             from rheojax.utils.hl_kernels import _compute_dt_and_steps_for_rate
 
             dt = self._min_dt  # default for flow curve (overridden by per_rate_schedule)

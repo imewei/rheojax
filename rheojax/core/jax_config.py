@@ -153,6 +153,55 @@ def safe_import_jax() -> tuple[Any, Any]:
         return jax, jnp
 
 
+class _LazyModule:
+    """Proxy that defers ``import <name>`` until first attribute access.
+
+    This is used to avoid paying the import cost of heavy optional
+    dependencies (e.g. diffrax ~250 ms) at package-load time while
+    keeping callsite syntax unchanged (``diffrax.Tsit5()``).
+    """
+
+    __slots__ = ("_module_name", "_module")
+
+    def __init__(self, module_name: str) -> None:
+        object.__setattr__(self, "_module_name", module_name)
+        object.__setattr__(self, "_module", None)
+
+    def _load(self):
+        import importlib
+
+        mod = importlib.import_module(self._module_name)
+        object.__setattr__(self, "_module", mod)
+        return mod
+
+    def __getattr__(self, name: str):
+        mod = self._module
+        if mod is None:
+            mod = self._load()
+        return getattr(mod, name)
+
+    def __repr__(self) -> str:
+        loaded = self._module is not None
+        return f"<LazyModule '{self._module_name}' loaded={loaded}>"
+
+
+def lazy_import(module_name: str) -> _LazyModule:
+    """Return a lazy proxy for *module_name*.
+
+    The real ``import`` is deferred until the first attribute access on the
+    returned object.  This is safe for modules that are only used inside
+    method bodies (not at module-level scope for decorators, base classes,
+    etc.).
+
+    Example::
+
+        diffrax = lazy_import("diffrax")
+        # ... later, inside a method ...
+        solver = diffrax.Tsit5()   # triggers ``import diffrax`` on first use
+    """
+    return _LazyModule(module_name)
+
+
 def reset_validation() -> None:
     """Reset validation state (for testing purposes only).
 

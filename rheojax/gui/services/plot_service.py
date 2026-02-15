@@ -224,9 +224,13 @@ class PlotService:
             x = np.asarray(data.x)
             y = np.asarray(data.y)
             y_fit = fit_result.y_fit
-            if y_fit is None:
+            if y_fit is None or (hasattr(y_fit, "__len__") and len(y_fit) == 0):
                 raise ValueError("FitResult does not contain y_fit data")
             y_fit = np.asarray(y_fit)
+            if y_fit.size == 0 or y_fit.shape[0] != x.shape[0]:
+                raise ValueError(
+                    f"y_fit shape {y_fit.shape} incompatible with x shape {x.shape}"
+                )
 
             # Check for covariance matrix (for uncertainty bands)
             pcov = getattr(fit_result, "pcov", None)

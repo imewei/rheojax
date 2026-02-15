@@ -1227,7 +1227,13 @@ class ITTMCTSchematic(ITTMCTBase):
             "Use NLSQ fitting with bootstrap resampling for uncertainty quantification."
         )
 
-    def precompile(self) -> float:
+    def precompile(
+        self,
+        test_mode: str = "relaxation",
+        X=None,
+        y=None,
+        **kwargs,
+    ) -> float:
         """Pre-compile the diffrax ODE solver for fast subsequent calls.
 
         Triggers JIT compilation with dummy data so the first real prediction

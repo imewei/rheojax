@@ -13,7 +13,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy.stats import linregress
 
 from rheojax.logging import get_logger
 
@@ -68,6 +67,8 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
         n_points=len(t),
         t_range=(float(t.min()), float(t.max())) if len(t) > 0 else (0, 0),
     )
+
+    from scipy.stats import linregress
 
     if len(t) < 10 or len(G_t) < 10:
         logger.debug("Insufficient data points for decay detection", n_points=len(t))

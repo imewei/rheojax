@@ -26,7 +26,6 @@ from typing import Any
 
 import numpy as np
 
-
 # -- Timer utilities -----------------------------------------------------------
 
 
@@ -188,7 +187,7 @@ def profile_model(
 
     # -- Phase 4: Predict (post-fit) -------------------------------------------
     with timed_phase("predict() (post-fit)") as t:
-        y_pred = model.predict(X)
+        _y_pred = model.predict(X)
     timings.append(t)
 
     # -- Phase 5: Score (calls predict internally) -----------------------------
@@ -263,7 +262,7 @@ def profile_model(
     with timed_phase("RheoData creation (Pipeline.load)") as t:
         from rheojax.core.data import RheoData
 
-        rheo_data = RheoData(x=X, y=y, metadata={"test_mode": config["test_mode"]})
+        _rheo_data = RheoData(x=X, y=y, metadata={"test_mode": config["test_mode"]})
     timings.append(t)
 
     return timings
@@ -381,7 +380,7 @@ def print_report(all_timings: dict[str, list[TimingResult]]) -> None:
             print(f"\n  {model_key}:")
             print(f"    predict() call: {predict_t.wall_ms:.1f}ms")
             print(f"    score() in fit(): {fit_score_overhead:.1f}ms ({overhead_pct:.1f}% of fit time)")
-            print(f"    -> fit() calls score() (line 374), which calls predict() again")
+            print("    -> fit() calls score() (line 374), which calls predict() again")
             print(f"    -> This adds ~{fit_score_overhead:.0f}ms overhead to every fit() call")
 
 

@@ -31,9 +31,9 @@ References
 
 from typing import NamedTuple
 
-import diffrax
 
-from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import lazy_import, safe_import_jax
+diffrax = lazy_import("diffrax")
 from rheojax.logging import get_logger
 from rheojax.models.itt_mct._kernels import f12_memory, strain_decorrelation
 

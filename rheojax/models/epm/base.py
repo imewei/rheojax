@@ -1031,13 +1031,24 @@ class EPMBase(BaseModel):
 
     # --- Bayesian / Model Function Interface ---
 
-    def precompile(self, n_points: int = 5, verbose: bool = True) -> float:
+    def precompile(
+        self,
+        test_mode: str = "relaxation",
+        X=None,
+        y=None,
+        *,
+        n_points: int = 5,
+        verbose: bool = True,
+    ) -> float:
         """Pre-compile JIT kernels for faster Bayesian inference.
 
         Triggers JAX JIT compilation with dummy data so the first Bayesian
         inference call doesn't incur compilation overhead.
 
         Args:
+            test_mode: Accepted for parent compatibility (unused).
+            X: Accepted for parent compatibility (unused).
+            y: Accepted for parent compatibility (unused).
             n_points: Number of data points for dummy compilation (default 5).
             verbose: Whether to log compilation progress (default True).
 

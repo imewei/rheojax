@@ -42,11 +42,10 @@ from rheojax.utils.prony import (
     softmax_penalty,
 )
 
-# Import diffrax for transient simulations
-try:
-    import diffrax
-except ImportError:
-    diffrax = None  # type: ignore[assignment]  # Optional dependency for LAOS/startup
+# Lazy import diffrax for transient simulations (deferred to avoid ~250ms startup cost)
+from rheojax.core.jax_config import lazy_import as _lazy_import
+
+diffrax = _lazy_import("diffrax")
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -464,171 +463,201 @@ class GeneralizedMaxwell(BaseModel):
     def _apply_element_minimization(
         self, X: np.ndarray, y: np.ndarray, optimization_factor: float, **kwargs
     ) -> None:
-        """Apply element minimization with warm-start optimization (v0.4.0+).
+        """Apply element minimization with padded arrays to avoid JIT recompilation.
 
-        Performance optimization: 2-5x speedup through:
-        - Warm-start: N+1 solution initializes N fit
-        - Compilation reuse: Cached JAX-compiled functions across iterations
-        - Early termination: Stop when R² degrades below threshold
+        Performance optimization: eliminates JAX recompilation by keeping parameter
+        arrays at fixed N_max shape throughout the N-reduction loop. Inactive modes
+        are frozen via bounds (lower == upper) so they don't affect optimization.
+
+        Key insight: Setting E_i=0 for inactive modes naturally zeroes their
+        contribution in the additive Prony sum (0 * exp(-t/tau) = 0), so no
+        explicit masking is needed.
 
         Args:
             X: Independent variable (time or frequency)
             y: Dependent variable (modulus or compliance)
                 - For relaxation/creep: 1D array of shape (M,)
                 - For oscillation: 1D concatenated array [G', G"] of shape (2*M,)
-            optimization_factor: R² threshold multiplier (e.g., 1.5 means N_opt where R²_N ≥ 1.5 * R²_min)
+            optimization_factor: R² threshold multiplier (e.g., 1.5 means N_opt where R²_N >= 1.5 * R²_min)
             **kwargs: NLSQ optimizer arguments
         """
-        from rheojax.utils.prony import warm_start_from_n_modes
-
         # Store initial n_modes for diagnostics
-        n_initial = self._n_modes
+        n_max = self._n_modes
+        n_initial = n_max
 
-        # Compute R² for current fit
-        # For oscillation mode, need to flatten predictions to match 1D y
-        y_pred_current = self.predict(X)
-        if self._test_mode == "oscillation":
-            # predict() returns (M, 2), flatten to (2*M,) to match y
-            # ravel('F') is equivalent to .T.flatten() but avoids intermediate view
-            y_pred_current = y_pred_current.ravel("F")  # Column-major: [G', G"]
+        # Extract NLSQ kwargs
+        max_iter = kwargs.get("max_iter", 1000)
+        ftol = kwargs.get("ftol", 1e-6)
+        xtol = kwargs.get("xtol", 1e-6)
+        gtol = kwargs.get("gtol", 1e-6)
 
-        # Iterative N reduction with warm-start
-        fit_results = {}
-        best_params = None  # Store parameters from previous fit for warm-start
+        symbol = "E" if self._modulus_type == "tensile" else "G"
 
-        # Calculate R² threshold for early termination
-        # We'll compute this after first fit (N_initial)
+        # Convert data to JAX arrays (once)
+        X_jax = jnp.asarray(X)
+        y_jax = jnp.asarray(y)
+
+        # Compute data-based upper bound for moduli
+        E_max = float(jnp.max(jnp.abs(y_jax)) * 10)
+
+        # Select JIT prediction function based on test mode
+        # All prediction functions use E_i[:, None] broadcasting or jnp.sum(E_i * ...),
+        # so E_i=0 for inactive modes naturally contributes zero.
+        test_mode = self._test_mode
+
+        # Define padded objective function (always uses N_max-shaped arrays)
+        # This is JIT-compiled ONCE and reused for all n_active values.
+        if test_mode in ("relaxation",):
+            def objective(params):
+                E_inf = params[0]
+                E_i = params[1 : 1 + n_max]
+                tau_i = params[1 + n_max :]
+                pred = self._predict_relaxation_jit(X_jax, E_inf, E_i, tau_i)
+                return pred - y_jax
+        elif test_mode in ("oscillation", "laos"):
+            def objective(params):
+                E_inf = params[0]
+                E_i = params[1 : 1 + n_max]
+                tau_i = params[1 + n_max :]
+                pred = self._predict_oscillation_jit(X_jax, E_inf, E_i, tau_i)
+                return jnp.concatenate([pred[0], pred[1]]) - y_jax
+        elif test_mode == "creep":
+            def objective(params):
+                E_inf = params[0]
+                E_i = params[1 : 1 + n_max]
+                tau_i = params[1 + n_max :]
+                pred = self._predict_creep_jit(X_jax, E_inf, E_i, tau_i)
+                return pred - y_jax
+        elif test_mode == "startup":
+            gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+            def objective(params):
+                E_inf = params[0]
+                E_i = params[1 : 1 + n_max]
+                tau_i = params[1 + n_max :]
+                pred = self._predict_startup_jit(X_jax, E_inf, E_i, tau_i, gamma_dot)
+                return pred - y_jax
+        else:
+            raise ValueError(f"Element minimization not supported for test_mode: {test_mode}")
+
+        # Softmax penalty wrapper (also fixed shape)
+        def objective_step1(params):
+            E_i = params[1 : 1 + n_max]
+            residual = objective(params)
+            penalty = softmax_penalty(E_i, scale=1e-3)
+            return jnp.concatenate([residual, jnp.array([penalty])])
+
+        # Get current best params from the initial N_max fit
+        if self._nlsq_result is not None:
+            current_params = np.asarray(self._nlsq_result.x)
+        else:
+            E_inf = self.parameters.get_value(f"{symbol}_inf")
+            E_i = [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(n_max)]
+            tau_i = [self.parameters.get_value(f"tau_{i+1}") for i in range(n_max)]
+            current_params = np.array([E_inf] + E_i + tau_i)
+
+        # Iterative N reduction with padded arrays
+        fit_results: dict = {}
+        best_params = current_params.copy()
         r2_max = None
         r2_threshold = None
 
-        for n in range(self._n_modes, 0, -1):
-            # Create model with n modes
-            model_n = GeneralizedMaxwell(n_modes=n, modulus_type=self._modulus_type)
-
+        for n_active in range(n_max, 0, -1):
             try:
-                # Extract warm-start parameters if available
-                initial_params_n: np.ndarray | None
-                if best_params is not None:
-                    initial_params_n = np.asarray(warm_start_from_n_modes(
-                        best_params, n_target=n, modulus_type=self._modulus_type
-                    ))
-                else:
-                    initial_params_n = None
+                # Build bounds: active modes get normal bounds, inactive modes frozen
+                lower = np.zeros(2 * n_max + 1)
+                upper = np.zeros(2 * n_max + 1)
 
-                # Fit with n modes using warm-start
-                # Need to call the appropriate _fit_*_mode() method directly
-                # to pass initial_params
-                if self._test_mode == "relaxation":
-                    model_n._test_mode = "relaxation"
-                    model_n._fit_relaxation_mode(
-                        X,
-                        y,
-                        optimization_factor=None,
-                        initial_params=initial_params_n,
-                        **kwargs,
-                    )
-                elif self._test_mode == "oscillation":
-                    model_n._test_mode = "oscillation"
-                    model_n._fit_oscillation_mode(
-                        X,
-                        y,
-                        optimization_factor=None,
-                        initial_params=initial_params_n,
-                        **kwargs,
-                    )
-                elif self._test_mode == "creep":
-                    model_n._test_mode = "creep"
-                    model_n._fit_creep_mode(
-                        X,
-                        y,
-                        optimization_factor=None,
-                        initial_params=initial_params_n,
-                        **kwargs,
-                    )
-                elif self._test_mode == "startup":
-                    model_n._test_mode = "startup"
-                    model_n._fit_startup_mode(
-                        X,
-                        y,
-                        optimization_factor=None,
-                        initial_params=initial_params_n,
-                        **kwargs,
-                    )
-                elif self._test_mode == "steady_shear":
-                    model_n._test_mode = "steady_shear"
-                    model_n._fit_steady_shear_mode(
-                        X,
-                        y,
-                        optimization_factor=None,
-                        initial_params=initial_params_n,
-                        **kwargs,
-                    )
-                elif self._test_mode == "laos":
-                    # For linear model, LAOS = SAOS, use oscillation fitting
-                    model_n._test_mode = "laos"
-                    model_n._fit_laos_mode(
-                        X,
-                        y,
-                        optimization_factor=None,
-                        initial_params=initial_params_n,
-                        **kwargs,
-                    )
-                else:
-                    raise ValueError(f"Unknown test_mode: {self._test_mode}")
+                # E_inf bounds
+                lower[0] = 0.0
+                upper[0] = E_max
 
-                # Compute R²
-                y_pred_n = model_n.predict(X)
-                if self._test_mode == "oscillation":
-                    # ravel('F') is equivalent to .T.flatten() but avoids intermediate view
-                    y_pred_n = y_pred_n.ravel("F")
+                # E_i bounds: active modes get normal range, inactive nearly frozen.
+                # NLSQ TRF requires lower < upper strictly, so we use a tiny
+                # range for inactive modes. E_i < 1e-30 Pa is effectively zero
+                # (contribution = 1e-30 * exp(-t/tau) ≈ 0 for any physical data).
+                for i in range(n_max):
+                    if i < n_active:
+                        lower[1 + i] = 1e-12
+                        upper[1 + i] = E_max
+                    else:
+                        lower[1 + i] = 0.0
+                        upper[1 + i] = 1e-30
 
-                r2_n = compute_r_squared(y, y_pred_n)
+                # tau_i bounds: active modes get normal range, inactive nearly frozen.
+                # Must use >= 1e-15 gap around 1.0 due to float64 machine epsilon.
+                # tau_i value is irrelevant when E_i ≈ 0 (mode contributes nothing).
+                for i in range(n_max):
+                    if i < n_active:
+                        lower[1 + n_max + i] = 1e-6
+                        upper[1 + n_max + i] = 1e6
+                    else:
+                        lower[1 + n_max + i] = 1.0 - 1e-12
+                        upper[1 + n_max + i] = 1.0 + 1e-12
 
-                fit_results[n] = {"r2": r2_n, "model": model_n}
+                # Warm-start: zero out inactive modes from previous best
+                x0 = best_params.copy()
+                x0[1 + n_active : 1 + n_max] = 0.0  # Inactive E_i
+                x0[1 + n_max + n_active :] = 1.0  # Inactive tau_i
 
-                # Store parameters for next warm-start
-                # Extract from model_n.parameters or model_n._nlsq_result
-                if (
-                    hasattr(model_n, "_nlsq_result")
-                    and model_n._nlsq_result is not None
-                ):
-                    best_params = np.asarray(model_n._nlsq_result.x)
-                else:
-                    # Fallback: extract from ParameterSet
-                    symbol = "E" if self._modulus_type == "tensile" else "G"
-                    E_inf = model_n.parameters.get_value(f"{symbol}_inf")
-                    E_i = np.array(
-                        [
-                            model_n.parameters.get_value(f"{symbol}_{i+1}")
-                            for i in range(n)
-                        ]
+                # Clamp active params to bounds
+                x0 = np.clip(x0, lower, upper)
+
+                # Step 1: Fit with softmax penalty
+                result = self._nlsq_fit(
+                    objective_step1,
+                    x0,
+                    bounds=(lower, upper),
+                    max_nfev=max_iter,
+                    ftol=ftol,
+                    xtol=xtol,
+                    gtol=gtol,
+                )
+
+                # Check for negative E_i in active modes and refit if needed
+                params_opt = result.x
+                E_i_active = params_opt[1 : 1 + n_active]
+                if jnp.any(E_i_active < 0):
+                    result = self._nlsq_fit(
+                        objective,
+                        params_opt,
+                        bounds=(lower, upper),
+                        max_nfev=max_iter,
+                        ftol=ftol,
+                        xtol=xtol,
+                        gtol=gtol,
                     )
-                    tau_i = np.array(
-                        [model_n.parameters.get_value(f"tau_{i+1}") for i in range(n)]
-                    )
-                    best_params = np.concatenate([[E_inf], E_i, tau_i])
+                    params_opt = result.x
+
+                # Compute prediction for R²
+                residual = np.asarray(objective(params_opt))
+                y_pred = np.asarray(y) + residual
+                r2_n = compute_r_squared(y, y_pred)
+
+                fit_results[n_active] = {
+                    "r2": r2_n,
+                    "params": params_opt.copy(),
+                    "result": result,
+                }
+                best_params = params_opt.copy()
 
                 # Set R² threshold after first fit (highest N)
                 if r2_max is None:
                     r2_max = r2_n
-                    # Compute degradation tolerance
                     degradation_room = 1.0 - r2_max
                     allowed_degradation = degradation_room * (optimization_factor - 1.0)
                     r2_threshold = r2_max - allowed_degradation
 
                 # Early termination: stop if R² falls below threshold
-                # This prevents futile small-N fits
                 if r2_threshold is not None and r2_n < r2_threshold:
                     logger.info(
-                        f"Element minimization: early termination at n_modes={n} "
+                        f"Element minimization: early termination at n_modes={n_active} "
                         f"(R²={r2_n:.6f} < threshold={r2_threshold:.6f})"
                     )
                     break
 
             except (RuntimeError, ValueError) as e:
-                # Fitting failed for this N, skip
                 logger.warning(
-                    f"Element minimization: fitting failed for n_modes={n}: {e}"
+                    f"Element minimization: fitting failed for n_modes={n_active}: {e}"
                 )
                 break
 
@@ -637,14 +666,13 @@ class GeneralizedMaxwell(BaseModel):
         n_optimal = select_optimal_n(r2_values, optimization_factor=optimization_factor)
 
         # Store diagnostics with all required keys
-        # Convert dict to arrays for test compatibility
         n_modes_list = sorted(r2_values.keys())
         r2_list = [r2_values[n] for n in n_modes_list]
 
         self._element_minimization_diagnostics = {
             "n_initial": n_initial,
-            "r2": r2_list,  # R² values as list
-            "n_modes": n_modes_list,  # Corresponding n_modes as list
+            "r2": r2_list,
+            "n_modes": n_modes_list,
             "n_optimal": n_optimal,
             "optimization_factor": optimization_factor,
         }
@@ -655,11 +683,46 @@ class GeneralizedMaxwell(BaseModel):
                 f"Element minimization: reducing from {self._n_modes} to {n_optimal} modes"
             )
 
-            # Copy parameters from optimal model
-            optimal_model = cast(GeneralizedMaxwell, fit_results[n_optimal]["model"])
+            # Extract active parameters from padded result
+            optimal_params = fit_results[n_optimal]["params"]
+            E_inf_opt = optimal_params[0]
+            E_i_opt = optimal_params[1 : 1 + n_optimal]
+            tau_i_opt = optimal_params[1 + n_max : 1 + n_max + n_optimal]
+
+            # Rebuild ParameterSet with n_optimal modes
             self._n_modes = n_optimal
-            self.parameters = optimal_model.parameters
-            self._nlsq_result = optimal_model._nlsq_result
+            self.parameters = create_prony_parameter_set(
+                n_optimal, modulus_type=self._modulus_type
+            )
+
+            # Set fitted parameter values
+            param_values = {f"{symbol}_inf": float(E_inf_opt)}
+            param_values.update(
+                {f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(n_optimal)}
+            )
+            param_values.update(
+                {f"tau_{i+1}": float(tau_i_opt[i]) for i in range(n_optimal)}
+            )
+            self.parameters.set_values(param_values)
+
+            # Build slimmed-down NLSQ result for the optimal model
+            slim_x = np.concatenate([[E_inf_opt], E_i_opt, tau_i_opt])
+            optimal_result = fit_results[n_optimal]["result"]
+            self._nlsq_result = OptimizationResult(
+                x=slim_x,
+                fun=optimal_result.fun,
+                jac=None,
+                success=optimal_result.success,
+                message=optimal_result.message,
+                nit=optimal_result.nit,
+                nfev=optimal_result.nfev,
+                njev=optimal_result.njev,
+                optimality=optimal_result.optimality,
+                active_mask=None,
+                cost=optimal_result.cost,
+                grad=None,
+                nlsq_result=optimal_result.nlsq_result,
+            )
 
     def _fit_oscillation_mode(
         self,

@@ -47,12 +47,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import diffrax
 import numpy as np
 
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
-from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import lazy_import, safe_import_jax
+diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode, TestMode
@@ -2084,6 +2084,8 @@ class SGRConventional(BaseModel):
         Integrates the thixotropy kinetics equation:
             d(lambda)/dt = k_build * (1 - lambda) - k_break * gamma_dot * lambda
 
+        Uses JAX lax.scan for vectorized time-stepping (replaces Python for-loop).
+
         Args:
             t: Time array (s)
             gamma_dot: Shear rate array (1/s), same shape as t
@@ -2115,37 +2117,35 @@ class SGRConventional(BaseModel):
         k_build = self.parameters.get_value("k_build")
         k_break = self.parameters.get_value("k_break")
 
-        # Integrate using Euler method
-        dt = np.diff(t)
-        dt = np.concatenate([[0], dt])
+        # Compute dt array
+        t_jax = jnp.asarray(t)
+        dt = jnp.diff(t_jax, prepend=t_jax[0])
+        gamma_dot_abs = jnp.abs(jnp.asarray(gamma_dot))
 
-        lambda_t = np.zeros_like(t)
-        lambda_t[0] = lambda_initial
+        # lax.scan step function
+        def step(lambda_prev, inputs):
+            dt_i, gdot_i = inputs
 
-        for i in range(1, len(t)):
-            # Rate coefficients at current step
-            # Note: Using absolute value of gamma_dot for physical consistency
-            gamma_dot_curr = np.abs(gamma_dot[i])
-
-            # Equation: d(lambda)/dt = k_build - (k_build + k_break * gamma_dot) * lambda
-            # Form: dy/dt = A - B*y
+            # dy/dt = A - B*y with exponential integrator
             A = k_build
-            B = k_build + k_break * gamma_dot_curr
+            B = k_build + k_break * gdot_i
 
-            # Use exponential integrator (exact solution for constant gamma_dot over dt)
-            # lambda(t+dt) = (A/B) + (lambda(t) - A/B) * exp(-B*dt)
-            # Stable for any dt
+            # Exact exponential integration for B > 0; linear for B ≈ 0
+            lambda_ss = A / jnp.maximum(B, 1e-30)
+            decay = jnp.exp(-B * dt_i)
+            lambda_exp = lambda_ss + (lambda_prev - lambda_ss) * decay
+            lambda_lin = lambda_prev + A * dt_i
 
-            if B > 1e-12:
-                lambda_ss = A / B
-                decay = np.exp(-B * dt[i])
-                lambda_t[i] = lambda_ss + (lambda_t[i - 1] - lambda_ss) * decay
-            else:
-                # Limit B -> 0: Linear growth
-                lambda_t[i] = lambda_t[i - 1] + A * dt[i]
+            lambda_new = jnp.where(B > 1e-12, lambda_exp, lambda_lin)
+            lambda_new = jnp.clip(lambda_new, 0.0, 1.0)
 
-            # Clamp to [0, 1] for numerical safety
-            lambda_t[i] = np.clip(lambda_t[i], 0.0, 1.0)
+            return lambda_new, lambda_new
+
+        # Scan over time steps (skip first step where dt=0)
+        _, lambda_steps = jax.lax.scan(step, jnp.float64(lambda_initial), (dt[1:], gamma_dot_abs[1:]))
+
+        # Prepend initial value
+        lambda_t = np.asarray(jnp.concatenate([jnp.array([lambda_initial]), lambda_steps]))
 
         # Store trajectory
         self._lambda_trajectory = lambda_t

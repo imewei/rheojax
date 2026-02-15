@@ -26,9 +26,9 @@ Key Differences from HVM ODE
 
 from __future__ import annotations
 
-import diffrax
+from rheojax.core.jax_config import lazy_import, safe_import_jax
 
-from rheojax.core.jax_config import safe_import_jax
+diffrax = lazy_import("diffrax")
 from rheojax.models.hvm._kernels import (
     hvm_ber_rate_stress,
     hvm_ber_rate_stretch,

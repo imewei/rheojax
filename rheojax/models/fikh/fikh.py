@@ -770,7 +770,15 @@ class FIKH(FIKHBase):
             "limiting_case_E_a_0": "Isothermal FIKH behavior",
         }
 
-    def precompile(self, n_points: int = 100, verbose: bool = True) -> float:
+    def precompile(
+        self,
+        test_mode: str = "relaxation",
+        X=None,
+        y=None,
+        *,
+        n_points: int = 100,
+        verbose: bool = True,
+    ) -> float:
         """Precompile JIT kernels for faster subsequent predictions.
 
         Triggers JAX JIT compilation of the core FIKH kernels by running
@@ -778,6 +786,9 @@ class FIKH(FIKHBase):
         the compilation overhead on first real prediction.
 
         Args:
+            test_mode: Accepted for parent compatibility (unused).
+            X: Accepted for parent compatibility (unused).
+            y: Accepted for parent compatibility (unused).
             n_points: Number of time points for dummy data.
             verbose: Print compilation time if True.
 

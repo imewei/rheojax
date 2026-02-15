@@ -15,12 +15,12 @@ Supports two yield surface formulations:
 
 from typing import Literal
 
-import diffrax
 import numpy as np
 
 from rheojax.core.base import ArrayLike
 from rheojax.core.inventory import Protocol
-from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.jax_config import lazy_import, safe_import_jax
+diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode

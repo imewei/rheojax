@@ -755,7 +755,11 @@ class RheoJAXMainWindow(QMainWindow):
         try:
             signals = self.store.signals
             if signals is not None:
-                signals.state_changed.disconnect()
+                import warnings
+
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    signals.state_changed.disconnect()
         except (TypeError, RuntimeError):
             pass
         logger.info("Application shutdown complete")
@@ -1235,25 +1239,33 @@ class RheoJAXMainWindow(QMainWindow):
         dataset_id = meta.get("dataset_id") or state.active_dataset_id
         model_name = meta.get("model_name") or state.active_model_name
         if job_type == "fit":
-            # Persist result in state and refresh UI
-            self.store.dispatch(
-                "STORE_FIT_RESULT",
-                {
-                    "result": result,
-                    "dataset_id": dataset_id,
-                    "model_name": model_name,
-                },
-            )
-            # Apply result directly — don't re-read from store (avoids key mismatch)
-            self.fit_page.apply_fit_result(result)
-            self._update_fit_plot(result)
-            # Re-enable Fit page controls even if downstream UI work fails.
-            self.store.dispatch("FITTING_COMPLETED", {"result": result})
-            self.store.dispatch(
-                "SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"}
-            )
-            self.status_bar.show_message("Fit complete", 3000)
-            self._auto_save_if_enabled()
+            fit_success = getattr(result, "success", True)
+            if fit_success:
+                # Persist result in state and refresh UI
+                self.store.dispatch(
+                    "STORE_FIT_RESULT",
+                    {
+                        "result": result,
+                        "dataset_id": dataset_id,
+                        "model_name": model_name,
+                    },
+                )
+                self.fit_page.apply_fit_result(result)
+                self._update_fit_plot(result)
+                self.store.dispatch("FITTING_COMPLETED", {"result": result})
+                self.store.dispatch(
+                    "SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"}
+                )
+                self.status_bar.show_message("Fit complete", 3000)
+                self._auto_save_if_enabled()
+            else:
+                error_msg = getattr(result, "message", "Fit failed")
+                logger.warning("Fit unsuccessful", error=error_msg)
+                self.store.dispatch("FITTING_FAILED", {"error": error_msg})
+                self.store.dispatch(
+                    "SET_PIPELINE_STEP", {"step": "fit", "status": "ERROR"}
+                )
+                self.status_bar.show_message(f"Fit failed: {error_msg}", 5000)
         elif job_type == "bayesian":
             self.store.dispatch(
                 "STORE_BAYESIAN_RESULT",

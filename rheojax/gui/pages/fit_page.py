@@ -728,6 +728,8 @@ class FitPage(QWidget):
     def _on_fit_clicked(self) -> None:
         """Handle fit button click."""
         logger.debug("Button clicked", button_id="fit_button", page="FitPage")
+        # Immediately disable to prevent rapid-fire duplicate submissions
+        self._btn_fit.setEnabled(False)
         model_name = self._quick_model_combo.currentData()
         dataset = self._store.get_active_dataset()
 
@@ -738,6 +740,7 @@ class FitPage(QWidget):
                 has_dataset=dataset is not None,
                 page="FitPage",
             )
+            self._update_fit_enabled()
             return
 
         logger.debug(
