@@ -1328,17 +1328,10 @@ class RheoJAXMainWindow(QMainWindow):
             return
 
         try:
-            import numpy as np
-
-            from rheojax.core.data import RheoData
             from rheojax.gui.services.plot_service import PlotService
+            from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
-            rheo_data = RheoData(
-                x=dataset.x_data,
-                y=dataset.y_data,
-                metadata=dataset.metadata,
-                initial_test_mode=dataset.test_mode,
-            )
+            rheo_data = rheodata_from_dataset_state(dataset)
             plot_service = PlotService()
             fig = plot_service.create_fit_plot(
                 rheo_data,
@@ -1494,15 +1487,10 @@ class RheoJAXMainWindow(QMainWindow):
             return
 
         try:
-            from rheojax.core.data import RheoData
             from rheojax.gui.services.transform_service import TransformService
+            from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
-            rheo_data = RheoData(
-                x=dataset.x_data,
-                y=dataset.y_data,
-                metadata=dataset.metadata,
-                initial_test_mode=dataset.test_mode,
-            )
+            rheo_data = rheodata_from_dataset_state(dataset)
             transform_service = TransformService()
             # Use provided params or defaults from service
             if params is None:
@@ -2025,14 +2013,11 @@ class RheoJAXMainWindow(QMainWindow):
                         try:
                             dataset = self.store.get_active_dataset()
                             if dataset:
-                                from rheojax.core.data import RheoData
-
-                                rheo_data = RheoData(
-                                    x=dataset.x_data,
-                                    y=dataset.y_data,
-                                    metadata=dataset.metadata,
-                                    initial_test_mode=dataset.test_mode,
+                                from rheojax.gui.utils.rheodata import (
+                                    rheodata_from_dataset_state,
                                 )
+
+                                rheo_data = rheodata_from_dataset_state(dataset)
                                 fig = plot_service.create_fit_plot(
                                     rheo_data,
                                     fit_result,
