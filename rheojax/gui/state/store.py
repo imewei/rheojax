@@ -386,7 +386,10 @@ class StateStore:
 
             elif action_type == "FITTING_COMPLETED":
                 if self._signals:
-                    self._signals.fit_completed.emit("", "")
+                    self._signals.fit_completed.emit(
+                        str(action.get("model_name", "")),
+                        str(action.get("dataset_id", "")),
+                    )
 
             elif action_type == "FITTING_FAILED":
                 error = action.get("error", "")
@@ -412,7 +415,10 @@ class StateStore:
 
             elif action_type == "BAYESIAN_COMPLETED":
                 if self._signals:
-                    self._signals.bayesian_completed.emit("", "")
+                    self._signals.bayesian_completed.emit(
+                        str(action.get("model_name", "")),
+                        str(action.get("dataset_id", "")),
+                    )
 
             elif action_type == "BAYESIAN_FAILED":
                 error = action.get("error", "")
@@ -943,6 +949,26 @@ class StateStore:
 
             return updater
 
+        if action_type == "FITTING_FAILED":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.FIT] = StepStatus.ERROR
+                pipeline.current_step = PipelineStep.FIT
+                return replace(state, pipeline_state=pipeline)
+
+            return updater
+
+        if action_type == "BAYESIAN_FAILED":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.BAYESIAN] = StepStatus.ERROR
+                pipeline.current_step = PipelineStep.BAYESIAN
+                return replace(state, pipeline_state=pipeline)
+
+            return updater
+
         if action_type == "STORE_FIT_RESULT":
             payload = action.get("payload", action)
             model_name = payload.get("model_name")
@@ -1235,16 +1261,19 @@ class StateStore:
                 self._undo_stack.append(self._state.clone())
                 self._redo_stack.clear()
 
-            # Apply all updates
+            # Apply all updates (rollback on failure)
             for updater in updaters:
                 try:
                     self._state = updater(self._state)
                 except Exception:
                     logger.error(
-                        "Batch updater failed",
+                        "Batch updater failed, rolling back",
                         updater=getattr(updater, "__name__", str(updater)),
                         exc_info=True,
                     )
+                    self._state = old_state
+                    if track_undo and self._undo_stack:
+                        self._undo_stack.pop()
                     raise
 
             # Compute changed keys for logging
