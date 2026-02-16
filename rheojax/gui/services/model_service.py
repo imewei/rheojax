@@ -346,7 +346,7 @@ class ModelService:
                 min_bound=float(bounds[0]),
                 max_bound=float(bounds[1]),
                 fixed=False,
-                unit=getattr(param, "unit", ""),
+                unit=getattr(param, "units", ""),
                 description=getattr(param, "description", ""),
             )
         logger.debug(
@@ -693,12 +693,16 @@ class ModelService:
                 for name, value in params.items():
                     if name in model.parameters:
                         if isinstance(value, dict):
-                            # Handle dict with 'value', 'bounds', etc.
-                            model.parameters[name].value = value.get(
+                            # Handle dict with 'value', 'bounds', 'fixed'
+                            param_val = value.get(
                                 "value",
                                 value.get("default", model.parameters[name].value),
                             )
-                            if "bounds" in value:
+                            model.parameters[name].value = param_val
+                            if value.get("fixed"):
+                                # Lock parameter by setting bounds to (value, value)
+                                model.parameters[name].bounds = (param_val, param_val)
+                            elif "bounds" in value:
                                 model.parameters[name].bounds = value["bounds"]
                         else:
                             # Handle direct value
@@ -743,6 +747,22 @@ class ModelService:
             # Inject progress callback if provided and not already set
             if progress_callback and "callback" not in fit_kwargs:
                 fit_kwargs["callback"] = progress_callback
+
+            # Translate GUI option names to BaseModel.fit() parameter names
+            _GUI_TO_FIT_KEYS = {
+                "algorithm": "method",
+                "multistart": "use_multi_start",
+                "num_starts": "n_starts",
+            }
+            for gui_key, fit_key in _GUI_TO_FIT_KEYS.items():
+                if gui_key in fit_kwargs and fit_key not in fit_kwargs:
+                    fit_kwargs[fit_key] = fit_kwargs.pop(gui_key)
+                elif gui_key in fit_kwargs:
+                    fit_kwargs.pop(gui_key)
+
+            # Remove GUI-only keys that BaseModel.fit() does not accept
+            for gui_only in ("use_bounds", "verbose"):
+                fit_kwargs.pop(gui_only, None)
 
             # Fit (this uses NLSQ by default)
             model.fit(x, y, **fit_kwargs)

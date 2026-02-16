@@ -774,14 +774,31 @@ class FitPage(QWidget):
             self._empty_results.hide()
         self.fit_requested.emit(payload)
 
-    def _get_initial_params_for_fit(self, model_name: str) -> dict[str, float] | None:
-        """Return numeric initial params (state values if present else defaults)."""
+    def _get_initial_params_for_fit(
+        self, model_name: str
+    ) -> dict[str, float | dict] | None:
+        """Return initial params with value, bounds, and fixed state.
+
+        When the user has edited parameters in the GUI (state_params), each
+        entry is returned as a dict with ``value``, ``bounds``, and optionally
+        ``fixed`` so that :meth:`ModelService.fit` can forward bounds and lock
+        fixed parameters for the optimizer.
+
+        Falls back to bare float values from model defaults if state is empty.
+        """
         state_params = self._store.get_state().model_params
         if state_params:
             try:
-                return {
-                    name: float(param.value) for name, param in state_params.items()
-                }
+                result: dict[str, float | dict] = {}
+                for name, param in state_params.items():
+                    entry: dict[str, Any] = {
+                        "value": float(param.value),
+                        "bounds": (float(param.min_bound), float(param.max_bound)),
+                    }
+                    if param.fixed:
+                        entry["fixed"] = True
+                    result[name] = entry
+                return result
             except Exception:
                 logger.error(
                     "Failed to extract initial params from state",
