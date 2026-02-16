@@ -20,6 +20,7 @@ Example:
 from __future__ import annotations
 
 import warnings
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -1269,7 +1270,7 @@ class BayesianMixin:
             isinstance(v, np.ndarray) for v in protocol_kwargs.values()
         )
         if not hasattr(self, "_closure_cache"):
-            self._closure_cache = {}
+            self._closure_cache: OrderedDict = OrderedDict()
 
         if not has_ndarray_kwargs:
             prior_factory = getattr(self, "bayesian_prior_factory", None)
@@ -1283,6 +1284,7 @@ class BayesianMixin:
                 id(prior_factory),
             )
             if cache_key in self._closure_cache:
+                self._closure_cache.move_to_end(cache_key)
                 return self._closure_cache[cache_key]
         else:
             cache_key = None
@@ -1393,6 +1395,9 @@ class BayesianMixin:
 
         if cache_key is not None:
             self._closure_cache[cache_key] = numpyro_model
+            # LRU eviction: keep at most 32 cached closures
+            while len(self._closure_cache) > 32:
+                self._closure_cache.popitem(last=False)
         return numpyro_model
 
     @staticmethod

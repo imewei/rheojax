@@ -373,10 +373,15 @@ class DMTNonlocal(DMTBase):
 
             # Velocity reconstruction from uniform stress
             gamma_dot_target = stress / jnp.maximum(eta, 1e-10)
-            v_new = jnp.concatenate(
+            v_raw = jnp.concatenate(
                 [jnp.array([0.0]), jnp.cumsum(gamma_dot_target[:-1]) * dy]
             )
-            v_new = v_new * V_wall / jnp.maximum(v_new[-1], 1e-10)
+            # Guard: if v_raw[-1] is near-zero, scaling would amplify noise;
+            # fall back to V_wall denominator (linear profile) instead.
+            v_denom = jnp.where(
+                v_raw[-1] > 1e-6 * V_wall, v_raw[-1], V_wall
+            )
+            v_new = v_raw * V_wall / v_denom
 
             outputs = (stress, lam_c, v_c, gamma_dot_c)
             return (lam_new, v_new), outputs
