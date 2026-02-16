@@ -641,6 +641,9 @@ class MLIKH(IKHBase):
             )
             return y_pred - y_target
 
+        # Force method="scipy": diffrax ODE solvers use custom_vjp which is
+        # incompatible with NLSQ's forward-mode autodiff (jvp).
+        kwargs["method"] = "scipy"
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
 

@@ -408,11 +408,13 @@ class VLBVariant(VLBBase):
             ),
         )
 
+        # Force method="scipy" for VLBVariant: diffrax ODE solvers use custom_vjp
+        # which is incompatible with NLSQ's forward-mode autodiff (jvp).
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
+            method="scipy",
             max_iter=kwargs.get("max_iter", 2000),
         )
 
