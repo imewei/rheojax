@@ -750,7 +750,7 @@ class STZConventional(STZBase):
     # Bayesian Mixin Interface
     # =========================================================================
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.
 
         Routes to appropriate prediction based on test_mode.

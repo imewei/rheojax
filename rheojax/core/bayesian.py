@@ -23,7 +23,7 @@ import warnings
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import numpy as np
 
@@ -58,6 +58,15 @@ if TYPE_CHECKING:
     from numpyro.infer import MCMC
 
     from rheojax.core.parameters import ParameterSet
+
+
+class DiagnosticsDict(TypedDict, total=False):
+    """Typed structure for Bayesian convergence diagnostics."""
+
+    r_hat: dict[str, float]
+    ess: dict[str, float]
+    divergences: int
+    diagnostics_valid: bool
 
 
 @dataclass
@@ -97,7 +106,7 @@ class BayesianResult:
 
     posterior_samples: dict[str, np.ndarray]
     summary: dict[str, dict[str, float]]
-    diagnostics: dict[str, Any]
+    diagnostics: DiagnosticsDict
     num_samples: int
     num_chains: int
     mcmc: MCMC | None = None
@@ -1349,14 +1358,24 @@ class BayesianMixin:
             # 1) Per-element log-probability penalty to reject NaN regions
             # 2) Replace NaN with 0.0 to prevent downstream tracing errors
             is_finite = jnp.isfinite(predictions_raw)
-            # Per-element penalty: each NaN contributes -1e12 to log-prob,
+            # Per-element penalty: each NaN contributes -1e18 to log-prob,
             # ensuring NUTS strongly rejects parameter regions producing NaN.
-            finite_penalty = jnp.where(is_finite, 0.0, -1e12).sum()
+            finite_penalty = jnp.where(is_finite, 0.0, -1e18).sum()
             numpyro.factor("finite_check", finite_penalty)
             numpyro.deterministic(
                 "num_nonfinite", jnp.sum(~is_finite).astype(jnp.float64)
             )
             predictions_raw = jnp.where(is_finite, predictions_raw, 0.0)
+
+            # Normalize oscillation predictions: some models return (N,2) real
+            # arrays [G', G''] instead of complex G' + 1j*G''
+            if (
+                is_complex_data
+                and jnp.isrealobj(predictions_raw)
+                and predictions_raw.ndim == 2
+                and predictions_raw.shape[1] == 2
+            ):
+                predictions_raw = predictions_raw[:, 0] + 1j * predictions_raw[:, 1]
 
             # Handle complex vs real predictions
             if is_complex_data:

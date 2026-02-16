@@ -89,9 +89,8 @@ def load_dataset(
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.dataset_added.emit(dataset_id)
-        store._signals.dataset_selected.emit(dataset_id)
+    store.emit_signal("dataset_added", dataset_id)
+    store.emit_signal("dataset_selected", dataset_id)
 
     return dataset_id
 
@@ -139,8 +138,7 @@ def remove_dataset(dataset_id: str) -> None:
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.dataset_removed.emit(dataset_id)
+    store.emit_signal("dataset_removed", dataset_id)
 
 
 def set_active_dataset(dataset_id: str) -> None:
@@ -160,8 +158,7 @@ def set_active_dataset(dataset_id: str) -> None:
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.dataset_selected.emit(dataset_id)
+    store.emit_signal("dataset_selected", dataset_id)
 
 
 def update_dataset(dataset_id: str, **updates) -> None:
@@ -192,8 +189,7 @@ def update_dataset(dataset_id: str, **updates) -> None:
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.dataset_updated.emit(dataset_id)
+    store.emit_signal("dataset_updated", dataset_id)
 
 
 # Model Actions
@@ -222,8 +218,7 @@ def select_model(model_name: str, parameters: dict[str, ParameterState]) -> None
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.model_selected.emit(model_name)
+    store.emit_signal("model_selected", model_name)
 
 
 def update_parameter(name: str, value: float) -> None:
@@ -252,8 +247,8 @@ def update_parameter(name: str, value: float) -> None:
 
     store.update_state(updater)
 
-    if store._signals and store._state.active_model_name:
-        store._signals.model_params_changed.emit(store._state.active_model_name)
+    if store._state.active_model_name:
+        store.emit_signal("model_params_changed", store._state.active_model_name)
 
 
 def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> None:
@@ -290,8 +285,8 @@ def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> No
 
     store.update_state(updater)
 
-    if store._signals and store._state.active_model_name:
-        store._signals.model_params_changed.emit(store._state.active_model_name)
+    if store._state.active_model_name:
+        store.emit_signal("model_params_changed", store._state.active_model_name)
 
 
 def toggle_parameter_fixed(name: str, fixed: bool) -> None:
@@ -320,8 +315,8 @@ def toggle_parameter_fixed(name: str, fixed: bool) -> None:
 
     store.update_state(updater)
 
-    if store._signals and store._state.active_model_name:
-        store._signals.model_params_changed.emit(store._state.active_model_name)
+    if store._state.active_model_name:
+        store.emit_signal("model_params_changed", store._state.active_model_name)
 
 
 def reset_parameters(default_params: dict[str, ParameterState]) -> None:
@@ -339,8 +334,8 @@ def reset_parameters(default_params: dict[str, ParameterState]) -> None:
 
     store.update_state(updater)
 
-    if store._signals and store._state.active_model_name:
-        store._signals.model_params_changed.emit(store._state.active_model_name)
+    if store._state.active_model_name:
+        store.emit_signal("model_params_changed", store._state.active_model_name)
 
 
 # Fit Actions
@@ -358,8 +353,7 @@ def start_fit(model_name: str, dataset_id: str) -> None:
     """
     store = StateStore()
 
-    if store._signals:
-        store._signals.fit_started.emit(model_name, dataset_id)
+    store.emit_signal("fit_started", model_name, dataset_id)
 
 
 def store_fit_result(result: FitResult) -> None:
@@ -382,8 +376,7 @@ def store_fit_result(result: FitResult) -> None:
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.fit_completed.emit(result.model_name, result.dataset_id)
+    store.emit_signal("fit_completed", result.model_name, result.dataset_id)
 
 
 def fail_fit(model_name: str, dataset_id: str, error: str) -> None:
@@ -400,8 +393,7 @@ def fail_fit(model_name: str, dataset_id: str, error: str) -> None:
     """
     store = StateStore()
 
-    if store._signals:
-        store._signals.fit_failed.emit(model_name, dataset_id, error)
+    store.emit_signal("fit_failed", model_name, dataset_id, error)
 
 
 def set_active_model(model_name: str) -> dict:
@@ -571,8 +563,7 @@ def store_bayesian_result(result: BayesianResult) -> None:
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.bayesian_completed.emit(result.model_name, result.dataset_id)
+    store.emit_signal("bayesian_completed", result.model_name, result.dataset_id)
 
 
 def fail_bayesian(model_name: str, dataset_id: str, error: str) -> None:
@@ -589,8 +580,7 @@ def fail_bayesian(model_name: str, dataset_id: str, error: str) -> None:
     """
     store = StateStore()
 
-    if store._signals:
-        store._signals.bayesian_failed.emit(model_name, dataset_id, error)
+    store.emit_signal("bayesian_failed", model_name, dataset_id, error)
 
 
 def update_bayesian_progress(progress: float) -> dict:
@@ -690,8 +680,7 @@ def set_pipeline_step(step: PipelineStep, status: StepStatus) -> None:
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.pipeline_step_changed.emit(step.name, status.name)
+    store.emit_signal("pipeline_step_changed", step.name, status.name)
 
 
 # JAX Actions
@@ -712,8 +701,7 @@ def set_jax_device(device: str) -> None:
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.jax_device_changed.emit(device)
+    store.emit_signal("jax_device_changed", device)
 
 
 def update_jax_memory(used: int, total: int) -> None:
@@ -735,8 +723,7 @@ def update_jax_memory(used: int, total: int) -> None:
 
     store.update_state(updater, track_undo=False, emit_signal=False)
 
-    if store._signals:
-        store._signals.jax_memory_updated.emit(used, total)
+    store.emit_signal("jax_memory_updated", used, total)
 
 
 # Settings Actions
@@ -757,8 +744,7 @@ def set_theme(theme: str) -> None:
 
     store.update_state(updater, track_undo=False)
 
-    if store._signals:
-        store._signals.theme_changed.emit(theme)
+    store.emit_signal("theme_changed", theme)
 
 
 def set_seed(seed: int) -> None:
@@ -824,8 +810,7 @@ def save_project(path: Path) -> None:
 
     store.update_state(updater, track_undo=False)
 
-    if store._signals:
-        store._signals.project_saved.emit(str(path))
+    store.emit_signal("project_saved", str(path))
 
 
 def load_project(path: Path, state: AppState) -> None:
@@ -858,8 +843,7 @@ def load_project(path: Path, state: AppState) -> None:
     store.update_state(lambda _: updated_state, track_undo=False)
     store.clear_history()  # Clear undo history on load
 
-    if store._signals:
-        store._signals.project_loaded.emit(str(path))
+    store.emit_signal("project_loaded", str(path))
 
 
 def add_transform_record(
@@ -902,5 +886,4 @@ def add_transform_record(
 
     store.update_state(updater)
 
-    if store._signals:
-        store._signals.transform_applied.emit(transform_name, target_id)
+    store.emit_signal("transform_applied", transform_name, target_id)

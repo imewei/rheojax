@@ -1582,7 +1582,7 @@ class GeneralizedMaxwell(BaseModel):
         """
         return self._element_minimization_diagnostics
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference with NumPyro NUTS.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -1606,7 +1606,8 @@ class GeneralizedMaxwell(BaseModel):
         tau_i = params[1 + self._n_modes :]
 
         # Use stored test mode from last fit
-        test_mode = getattr(self, "_test_mode", "relaxation")
+        if test_mode is None:
+            test_mode = getattr(self, "_test_mode", "relaxation")
 
         # Route to appropriate prediction method
         if test_mode == "relaxation":

@@ -485,7 +485,7 @@ class FractionalKelvinVoigtZener(BaseModel):
         # Default to creep (primary mode for FKVZ)
         return self._predict_creep(X, Ge, Gk, alpha, tau)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.

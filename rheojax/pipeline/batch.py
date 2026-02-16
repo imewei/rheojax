@@ -142,6 +142,10 @@ class BatchPipeline:
                     )
                     return (file_path, None, None, e)
 
+            # NOTE: This uses concurrent.futures.ThreadPoolExecutor (not Qt threads).
+            # Designed for headless/pipeline use only. If called from the GUI,
+            # the calling thread blocks at as_completed(). Use WorkerPool for
+            # GUI integration.
             with ThreadPoolExecutor(max_workers=n_workers) as executor:
                 futures = {
                     executor.submit(process_one, fp): fp for fp in normalized_paths

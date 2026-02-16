@@ -358,24 +358,44 @@ class Parameter:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
-        return {
+        d = {
             "name": self.name,
             "value": self.value,
             "bounds": self.bounds,
             "units": self.units,
             "description": self.description,
         }
+        if self.constraints:
+            d["constraints"] = [
+                {
+                    "type": c.type,
+                    "min_value": getattr(c, "min_value", None),
+                    "max_value": getattr(c, "max_value", None),
+                }
+                for c in self.constraints
+            ]
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Parameter:
         """Create from dictionary representation."""
-        return cls(
+        param = cls(
             name=data["name"],
             value=data.get("value"),
             bounds=tuple(data["bounds"]) if data.get("bounds") else None,
             units=data.get("units"),
             description=data.get("description"),
         )
+        if "constraints" in data:
+            for c_data in data["constraints"]:
+                param.constraints.append(
+                    ParameterConstraint(
+                        type=c_data["type"],
+                        min_value=c_data.get("min_value"),
+                        max_value=c_data.get("max_value"),
+                    )
+                )
+        return param
 
 
 class ParameterSet:

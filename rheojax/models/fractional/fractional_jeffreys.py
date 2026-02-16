@@ -577,7 +577,7 @@ class FractionalJeffreysModel(BaseModel):
         # Default to relaxation
         return self._predict_relaxation(X, eta1, eta2, alpha, tau1)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.

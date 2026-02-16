@@ -17,7 +17,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from threading import RLock
+from threading import Lock, RLock
 from typing import Any, Optional
 
 from rheojax.gui.state.signals import StateSignals
@@ -275,6 +275,7 @@ class StateStore:
     """
 
     _instance: Optional["StateStore"] = None
+    _singleton_lock: Lock = Lock()
 
     # Class-level type annotations for instance attributes (singleton pattern)
     _state: AppState
@@ -286,18 +287,19 @@ class StateStore:
     _lock: RLock
 
     def __new__(cls) -> "StateStore":
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._state = AppState()
-            cls._instance._signals = StateSignals()
-            cls._instance._subscribers = []
-            cls._instance._undo_stack = []
-            cls._instance._redo_stack = []
-            cls._instance._max_undo_size = 50
-            cls._instance._lock = RLock()  # Thread safety lock
-            logger.debug(
-                "Initializing store", class_name=cls.__name__, max_undo_size=50
-            )
+        with cls._singleton_lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                cls._instance._state = AppState()
+                cls._instance._signals = StateSignals()
+                cls._instance._subscribers = []
+                cls._instance._undo_stack = []
+                cls._instance._redo_stack = []
+                cls._instance._max_undo_size = 50
+                cls._instance._lock = RLock()  # Thread safety lock
+                logger.debug(
+                    "Initializing store", class_name=cls.__name__, max_undo_size=50
+                )
         return cls._instance
 
     @classmethod
@@ -336,12 +338,29 @@ class StateStore:
         """
         return self._signals
 
+    def emit_signal(self, signal_name: str, *args) -> None:
+        """Emit a named signal if available.
+
+        Parameters
+        ----------
+        signal_name : str
+            Name of the signal attribute on the StateSignals instance.
+        *args
+            Arguments forwarded to the signal's ``emit()`` method.
+        """
+        if self._signals and hasattr(self._signals, signal_name):
+            getattr(self._signals, signal_name).emit(*args)
+
     def dispatch(self, action: Any, payload: Any | None = None) -> None:
         """Dispatch an action to update state.
 
         Supports two call patterns:
         - dispatch({"type": "SET_THEME", "theme": "dark"})
         - dispatch("SET_THEME", {"theme": "dark"})
+
+        Note: Subscriber notifications and Qt signal emissions occur outside
+        the lock. Signal ordering is not guaranteed to be strictly sequential
+        with respect to concurrent dispatches.
 
         Parameters
         ----------
@@ -509,13 +528,14 @@ class StateStore:
                     emit_signal=emit_signal,
                 )
 
-            # Copy subscribers list to avoid modification during iteration
+            # Snapshot state and subscribers to avoid races outside the lock
+            state_snapshot = self._state
             subscribers = list(self._subscribers)
 
         # Notify subscribers outside the lock to prevent deadlocks
         for subscriber in subscribers:
             try:
-                subscriber(self._state)
+                subscriber(state_snapshot)
             except Exception:
                 logger.error(
                     "Subscriber callback failed",
@@ -1285,13 +1305,14 @@ class StateStore:
                     changed_keys=changed_keys,
                 )
 
-            # Copy subscribers list
+            # Snapshot state and subscribers to avoid races outside the lock
+            state_snapshot = self._state
             subscribers = list(self._subscribers)
 
         # Notify subscribers outside the lock
         for subscriber in subscribers:
             try:
-                subscriber(self._state)
+                subscriber(state_snapshot)
             except Exception:
                 logger.error(
                     "Subscriber callback failed during batch update",
@@ -1315,7 +1336,8 @@ class StateStore:
         DatasetState | None
             Dataset state or None if not found
         """
-        return self._state.datasets.get(dataset_id)
+        with self._lock:
+            return self._state.datasets.get(dataset_id)
 
     def get_active_dataset(self) -> DatasetState | None:
         """Get the currently active dataset.
@@ -1325,9 +1347,10 @@ class StateStore:
         DatasetState | None
             Active dataset state or None
         """
-        if self._state.active_dataset_id:
-            return self._state.datasets.get(self._state.active_dataset_id)
-        return None
+        with self._lock:
+            if self._state.active_dataset_id:
+                return self._state.datasets.get(self._state.active_dataset_id)
+            return None
 
     def get_fit_result(self, key: str) -> FitResult | None:
         """Get fit result by key.
@@ -1342,7 +1365,8 @@ class StateStore:
         FitResult | None
             Fit result or None if not found
         """
-        return self._state.fit_results.get(key)
+        with self._lock:
+            return self._state.fit_results.get(key)
 
     def get_bayesian_result(self, key: str) -> BayesianResult | None:
         """Get Bayesian result by key.
@@ -1357,26 +1381,28 @@ class StateStore:
         BayesianResult | None
             Bayesian result or None if not found
         """
-        return self._state.bayesian_results.get(key)
+        with self._lock:
+            return self._state.bayesian_results.get(key)
 
     def get_active_fit_result(self) -> FitResult | None:
         """Return the fit result for the active model/dataset combo."""
-
-        state = self._state
-        if not state.active_model_name or not state.active_dataset_id:
-            return None
-        key = f"{state.active_model_name}_{state.active_dataset_id}"
-        return state.fit_results.get(key)
+        with self._lock:
+            state = self._state
+            if not state.active_model_name or not state.active_dataset_id:
+                return None
+            key = f"{state.active_model_name}_{state.active_dataset_id}"
+            return state.fit_results.get(key)
 
     def get_active_bayesian_result(self) -> BayesianResult | None:
         """Return the Bayesian result for the active model/dataset combo."""
-
-        state = self._state
-        if not state.active_model_name or not state.active_dataset_id:
-            return None
-        key = f"{state.active_model_name}_{state.active_dataset_id}"
-        return state.bayesian_results.get(key)
+        with self._lock:
+            state = self._state
+            if not state.active_model_name or not state.active_dataset_id:
+                return None
+            key = f"{state.active_model_name}_{state.active_dataset_id}"
+            return state.bayesian_results.get(key)
 
     def get_pipeline_state(self) -> PipelineState:
         """Return the current pipeline state."""
-        return self._state.pipeline_state
+        with self._lock:
+            return self._state.pipeline_state

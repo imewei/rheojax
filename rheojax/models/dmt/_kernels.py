@@ -193,57 +193,6 @@ def elastic_modulus(lam: jnp.ndarray, G0: float, m_G: float) -> jnp.ndarray:
     return G0 * jnp.power(lam_safe, m_G)
 
 
-@jax.jit
-def relaxation_time(
-    lam: jnp.ndarray,
-    gamma_dot: jnp.ndarray,
-    eta_0: float,
-    eta_inf: float,
-    G0: float,
-    m_G: float,
-    closure: str = "exponential",
-    tau_y0: float = 0.0,
-    K0: float = 0.0,
-    n_flow: float = 1.0,
-    m1: float = 1.0,
-    m2: float = 1.0,
-) -> jnp.ndarray:
-    """Maxwell relaxation time θ₁ = η/G.
-
-    Parameters
-    ----------
-    lam : array
-        Structure parameter
-    gamma_dot : array
-        Shear rate (needed for HB closure)
-    eta_0, eta_inf : float
-        Viscosity bounds
-    G0 : float
-        Elastic modulus at λ=1
-    m_G : float
-        Modulus exponent
-    closure : str
-        Viscosity closure type
-    tau_y0, K0, n_flow, m1, m2 : float
-        HB closure parameters (if applicable)
-
-    Returns
-    -------
-    array
-        Relaxation time θ₁(λ)
-    """
-    G = elastic_modulus(lam, G0, m_G)
-
-    if closure == "exponential":
-        eta = viscosity_exponential(lam, eta_0, eta_inf)
-    else:
-        eta = viscosity_herschel_bulkley_regularized(
-            lam, gamma_dot, tau_y0, K0, n_flow, eta_inf, m1, m2
-        )
-
-    return eta / jnp.maximum(G, 1e-10)
-
-
 # =============================================================================
 # Equilibrium Structure
 # =============================================================================

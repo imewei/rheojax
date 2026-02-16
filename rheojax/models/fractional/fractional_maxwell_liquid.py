@@ -525,7 +525,7 @@ class FractionalMaxwellLiquid(BaseModel):
             result = self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
         return np.array(result)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.

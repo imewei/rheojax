@@ -96,7 +96,7 @@ def breakage_bell(
         Breakage rate β (1/s)
     """
     tr_S = S_xx + S_yy + S_zz
-    stretch = jnp.sqrt(jnp.maximum(tr_S / 3.0, 0.0))
+    stretch = jnp.sqrt(jnp.maximum(tr_S / 3.0, 1e-30))
     return (1.0 / tau_b) * jnp.exp(nu * (stretch - 1.0))
 
 

@@ -127,7 +127,7 @@ def hvm_ber_rate_stress(
             sigma_E_xx**2 + sigma_E_yy**2
             - sigma_E_xx * sigma_E_yy
             + 3.0 * sigma_E_xy**2,
-            0.0,
+            1e-30,
         )
     )
     RT = _R_GAS * T
@@ -180,7 +180,7 @@ def hvm_ber_rate_stretch(
     # mu_zz = mu_nat_zz for simple shear (both equal to their respective values)
     # In simple shear, mu_E_zz ≈ mu_E_nat_zz, so we use the 2D trace difference
     delta_trace = (mu_E_xx - mu_E_nat_xx) + (mu_E_yy - mu_E_nat_yy)
-    delta_stretch = jnp.sqrt(jnp.maximum(jnp.abs(delta_trace) / 2.0, 0.0))
+    delta_stretch = jnp.sqrt(jnp.maximum(jnp.abs(delta_trace) / 2.0, 1e-30))
 
     RT = _R_GAS * T
     k0 = nu_0 * jnp.exp(-E_a / RT)
@@ -467,7 +467,7 @@ def hvm_damage_rhs(
     # Weighted effective stretch
     G_tot_transient = jnp.maximum(G_E + G_D, 1e-30)
     trace_eff = (G_E * trace_E_diff + G_D * trace_D) / G_tot_transient
-    lambda_eff = jnp.sqrt(jnp.maximum(1.0 + trace_eff / 2.0, 0.0))
+    lambda_eff = jnp.sqrt(jnp.maximum(1.0 + trace_eff / 2.0, 1e-30))
 
     # Damage evolution with cooperative shielding
     driving = jnp.maximum(lambda_eff - lambda_crit, 0.0)

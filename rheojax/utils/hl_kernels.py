@@ -19,13 +19,16 @@ References:
 from __future__ import annotations
 
 from functools import partial
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe import ensures float64
 jax, jnp = safe_import_jax()
-from jax import Array, jit, lax  # noqa: E402
+from jax import jit, lax  # noqa: E402
+
+if TYPE_CHECKING:
+    from jax import Array
 
 # ============================================================================
 # Types and Constants

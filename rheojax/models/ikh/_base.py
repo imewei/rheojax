@@ -110,7 +110,7 @@ class IKHBase(BaseModel):
 
             # Let's parse param_values back to dict for the kernel
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
 
             # Call kernel
             # We can't easily call model_function if it has different signature requirements.

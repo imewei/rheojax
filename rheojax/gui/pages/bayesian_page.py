@@ -471,6 +471,11 @@ class BayesianPage(QWidget):
                     dataset_id=dataset.id,
                 )
 
+        # Capture dataset_id and model_name at submission time to avoid
+        # TOCTOU race if active selection changes before _on_finished runs
+        self._submitted_dataset_id = dataset.id
+        self._submitted_model_name = model_name
+
         # Log inference start
         logger.info(
             "Bayesian inference started",
@@ -487,7 +492,10 @@ class BayesianPage(QWidget):
         deform_text = self._deformation_combo.currentText().lower()
         poisson_val = self._poisson_spin.value()
 
-        # Create and run worker (only pass args BayesianWorker accepts)
+        # Create and run worker (only pass args BayesianWorker accepts).
+        # NOTE: `dataset` (DatasetState) is passed mutably.  The worker should
+        # treat it as read-only; a deep-copy snapshot would be safer but the
+        # DatasetState ↔ RheoData conversion lives in gui/utils/rheodata.py.
         self._current_worker = BayesianWorker(
             model_name=model_name,
             data=dataset,
@@ -499,7 +507,10 @@ class BayesianPage(QWidget):
             poisson_ratio=poisson_val if deform_text != "shear" else None,
         )
 
-        # Connect signals with QueuedConnection to ensure slots run on GUI thread
+        # Connect BayesianWorker-specific signals with QueuedConnection.
+        # WorkerPool.submit() separately connects completed/failed for job
+        # lifecycle tracking; the connections below are for page-level UI
+        # updates and are NOT duplicates.
         self._current_worker.signals.progress.connect(
             self._on_worker_progress, Qt.ConnectionType.QueuedConnection
         )
@@ -635,9 +646,16 @@ class BayesianPage(QWidget):
         success = getattr(result, "success", True)
 
         if success:
-            state = self._store.get_state()
-            model_name = getattr(result, "model_name", None) or state.active_model_name
-            dataset_id = state.active_dataset_id
+            # Use captured values from submission time (TOCTOU-safe)
+            dataset_id = getattr(self, "_submitted_dataset_id", None)
+            model_name = (
+                getattr(result, "model_name", None)
+                or getattr(self, "_submitted_model_name", None)
+            )
+            if not dataset_id or not model_name:
+                state = self._store.get_state()
+                dataset_id = dataset_id or state.active_dataset_id
+                model_name = model_name or state.active_model_name
 
             if model_name and dataset_id:
                 diagnostics = getattr(result, "diagnostics", {}) or {}

@@ -243,7 +243,7 @@ class CarreauYasuda(BaseModel):
         # Convert back to numpy
         return np.array(viscosity)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.

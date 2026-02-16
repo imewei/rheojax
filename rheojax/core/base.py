@@ -838,7 +838,7 @@ class BaseModel(BayesianMixin, ABC):
             Dictionary of parameter names and values
         """
         if hasattr(self, "parameters") and self.parameters:
-            return self.parameters.to_dict()
+            return {name: self.parameters[name].value for name in self.parameters.keys()}
         return {}
 
     def set_params(self, **params) -> BaseModel:
