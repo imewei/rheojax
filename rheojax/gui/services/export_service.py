@@ -23,6 +23,24 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Convert metadata values to JSON-serializable types."""
+    sanitized: dict[str, Any] = {}
+    for key, value in metadata.items():
+        if isinstance(value, np.ndarray):
+            sanitized[key] = value.tolist()
+        elif isinstance(value, (np.integer, np.floating)):
+            sanitized[key] = value.item()
+        elif isinstance(value, dict):
+            sanitized[key] = _sanitize_metadata(value)
+        elif isinstance(value, (str, int, float, bool, type(None), list)):
+            sanitized[key] = value
+        else:
+            # Fallback: convert to string (datetime, Path, JAX arrays, etc.)
+            sanitized[key] = str(value)
+    return sanitized
+
+
 class ExportService:
     """Service for result export operations.
 
@@ -717,10 +735,10 @@ class ExportService:
                             "imag": np.imag(y).tolist(),
                         }
                     ),
-                    "metadata": data.metadata,
+                    "metadata": _sanitize_metadata(data.metadata),
                 }
                 with open(path, "w", encoding="utf-8") as f:
-                    json.dump(export_dict, f, indent=2)
+                    json.dump(export_dict, f, indent=2, default=str)
                 logger.debug("Wrote data to JSON")
 
             else:

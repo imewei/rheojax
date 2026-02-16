@@ -768,6 +768,7 @@ class DataService:
             y_units=y_units or data.y_units,
             domain=data.domain,
             metadata=data.metadata.copy(),
+            initial_test_mode=data.metadata.get("test_mode"),
         )
 
     def get_supported_formats(self) -> list[str]:
@@ -819,13 +820,14 @@ class DataService:
         x = np.asarray(data.x).copy()
         y = np.asarray(data.y).copy()
 
-        # Remove outliers
+        # Remove outliers (use magnitude for complex/oscillation data)
         if remove_outliers and len(y) > 4:
-            q1, q3 = np.percentile(y, [25, 75])
+            y_real = np.abs(y) if np.iscomplexobj(y) else y
+            q1, q3 = np.percentile(y_real, [25, 75])
             iqr = q3 - q1
             if iqr > 0:
-                mask = (y >= q1 - outlier_threshold * iqr) & (
-                    y <= q3 + outlier_threshold * iqr
+                mask = (y_real >= q1 - outlier_threshold * iqr) & (
+                    y_real <= q3 + outlier_threshold * iqr
                 )
                 x = x[mask]
                 y = y[mask]
@@ -863,4 +865,5 @@ class DataService:
             y_units=data.y_units,
             domain=data.domain,
             metadata=data.metadata.copy(),
+            initial_test_mode=data.metadata.get("test_mode"),
         )
