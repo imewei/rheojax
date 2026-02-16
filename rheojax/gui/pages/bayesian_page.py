@@ -749,8 +749,8 @@ class BayesianPage(QWidget):
         )
         QMessageBox.critical(self, "Inference Error", error_msg)
 
-    @Slot()
-    def _on_bayesian_started(self) -> None:
+    @Slot(str, str)
+    def _on_bayesian_started(self, model_name: str = "", dataset_id: str = "") -> None:
         """Handle Bayesian started signal from state."""
         self._overall_progress.setValue(0)
         self._status_text.clear()

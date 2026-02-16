@@ -506,20 +506,32 @@ class BayesianService:
             for result in results:
                 model_name = result.model_name
 
-                # Convert to InferenceData
-                idata_dict = {
-                    k: v.reshape(1, -1) if v.ndim == 1 else v
-                    for k, v in result.posterior_samples.items()
-                }
-                idata = az.from_dict(idata_dict)
+                # Use full InferenceData if available (includes log_likelihood)
+                idata = getattr(result, "inference_data", None)
+                if idata is None:
+                    # Fallback: construct from posterior samples only
+                    idata_dict = {
+                        k: v.reshape(1, -1) if v.ndim == 1 else v
+                        for k, v in result.posterior_samples.items()
+                    }
+                    idata = az.from_dict(idata_dict)
+
+                # WAIC/LOO require log_likelihood group
+                if not hasattr(idata, "log_likelihood"):
+                    logger.warning(
+                        "Skipping model comparison — no log_likelihood",
+                        model=model_name,
+                        criterion=criterion,
+                    )
+                    continue
 
                 # Calculate criterion
                 if criterion.lower() == "waic":
                     score = az.waic(idata)
-                    comparison[model_name] = float(score.waic)
+                    comparison[model_name] = float(score.elpd_waic)
                 elif criterion.lower() == "loo":
                     score = az.loo(idata)
-                    comparison[model_name] = float(score.loo)
+                    comparison[model_name] = float(score.elpd_loo)
                 else:
                     logger.warning(f"Unknown criterion: {criterion}")
 
