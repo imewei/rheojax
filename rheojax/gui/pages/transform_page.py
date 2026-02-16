@@ -625,14 +625,6 @@ class TransformPage(QWidget):
             self._config_layout.addWidget(spin_gamma0)
             self._param_controls.setdefault("spp", []).append(("gamma_0", spin_gamma0))
 
-            self._config_layout.addWidget(QLabel("Strain Amplitude:"))
-            spin_gamma = QDoubleSpinBox()
-            spin_gamma.setRange(0.001, 100)
-            spin_gamma.setValue(1.0)
-            spin_gamma.setDecimals(3)
-
-            self._config_layout.addWidget(spin_gamma)
-
             self._config_layout.addWidget(QLabel("Number of Harmonics:"))
             spin_harmonics = QDoubleSpinBox()
             spin_harmonics.setRange(1, 99)
@@ -750,13 +742,27 @@ class TransformPage(QWidget):
                 page="TransformPage",
             )
 
+    # Map display names to internal control keys used in _select_transform()
+    _TRANSFORM_KEY_MAP: dict[str, str] = {
+        "SPP Analysis": "spp",
+        "OW Chirp": "owchirp",
+        "Derivatives": "derivative",
+        "Mutation Number": "mutation_number",
+        "Mastercurve": "mastercurve",
+        "SRFS": "srfs",
+        "FFT": "fft",
+    }
+
     def get_selected_params(self) -> dict[str, Any]:
         """Return current parameter values for the selected transform."""
 
         if not self._selected_transform:
             return {}
 
-        key = self._selected_transform.lower().replace(" ", "_")
+        key = self._TRANSFORM_KEY_MAP.get(
+            self._selected_transform,
+            self._selected_transform.lower().replace(" ", "_"),
+        )
         params: dict[str, Any] = {}
         for name, widget in self._param_controls.get(key, []):
             if isinstance(widget, QDoubleSpinBox):
