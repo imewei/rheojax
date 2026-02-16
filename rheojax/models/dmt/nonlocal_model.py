@@ -334,7 +334,7 @@ class DMTNonlocal(DMTBase):
 
             def _viscosity_fn(lam_arr, gd_arr):
                 return jax.vmap(
-                    lambda l, g: viscosity_exponential(l, eta_0, eta_inf)
+                    lambda li, gi: viscosity_exponential(li, eta_0, eta_inf)
                 )(lam_arr, gd_arr)
         else:
             tau_y0 = params["tau_y0"]
@@ -346,8 +346,8 @@ class DMTNonlocal(DMTBase):
 
             def _viscosity_fn(lam_arr, gd_arr):
                 return jax.vmap(
-                    lambda l, g: viscosity_herschel_bulkley_regularized(
-                        l, g, tau_y0, K0, n_flow, eta_inf_hb, m1, m2
+                    lambda li, gi: viscosity_herschel_bulkley_regularized(
+                        li, gi, tau_y0, K0, n_flow, eta_inf_hb, m1, m2
                     )
                 )(lam_arr, gd_arr)
 
@@ -366,7 +366,7 @@ class DMTNonlocal(DMTBase):
 
             # Structure evolution + diffusion
             local_rate = jax.vmap(
-                lambda l, g: structure_evolution(l, g, t_eq, a_param, c_param)
+                lambda li, gi: structure_evolution(li, gi, t_eq, a_param, c_param)
             )(lam_c, gamma_dot_c)
             diffusion = D_lambda * _laplacian_pure(lam_c)
             lam_new = jnp.clip(lam_c + dt * (local_rate + diffusion), 0.0, 1.0)

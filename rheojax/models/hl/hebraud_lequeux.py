@@ -586,7 +586,7 @@ class HebraudLequeux(BaseModel):
             X_np = np.asarray(X_jax)  # Single vectorized transfer
             per_rate_schedule = [
                 _compute_dt_and_steps_for_rate(
-                    abs(X_np[i]), tau_val, sigma_c_norm, ds=ds,
+                    abs(float(X_np[i])), tau_val, sigma_c_norm, ds=ds,
                 )
                 for i in range(len(X_np))
             ]
@@ -736,7 +736,7 @@ class HebraudLequeux(BaseModel):
                 X_np = np.asarray(X_jax)  # Single vectorized transfer
                 schedule = [
                     _compute_dt_and_steps_for_rate(
-                        abs(X_np[i]), tau_est, sc_norm_est, ds=ds,
+                        abs(float(X_np[i])), tau_est, sc_norm_est, ds=ds,
                     )
                     for i in range(len(X_np))
                 ]

@@ -1260,24 +1260,32 @@ class BayesianMixin:
         """Build the NumPyro probabilistic model function.
 
         Returns a callable model function with test_mode captured in closure.
-        Uses a per-instance cache keyed by (test_mode, is_complex, param_names,
-        protocol_kwargs) to avoid rebuilding identical closures during repeated
-        fit_bayesian() calls.
+        Uses a per-instance cache keyed by all closure-captured state to avoid
+        rebuilding identical closures during repeated fit_bayesian() calls.
+        Skips caching when protocol_kwargs contains ndarrays (captured by ref).
         """
-        # Build hashable cache key
-        cache_key = (
-            str(test_mode),
-            is_complex_data,
-            tuple(param_names),
-            tuple(sorted(
-                (k, v) for k, v in protocol_kwargs.items()
-                if not isinstance(v, np.ndarray)
-            )),
+        # Skip cache when ndarrays in kwargs — closure captures them by reference
+        has_ndarray_kwargs = any(
+            isinstance(v, np.ndarray) for v in protocol_kwargs.values()
         )
         if not hasattr(self, "_closure_cache"):
             self._closure_cache = {}
-        if cache_key in self._closure_cache:
-            return self._closure_cache[cache_key]
+
+        if not has_ndarray_kwargs:
+            prior_factory = getattr(self, "bayesian_prior_factory", None)
+            cache_key = (
+                str(test_mode),
+                is_complex_data,
+                tuple(param_names),
+                tuple(sorted(protocol_kwargs.items())),
+                tuple(sorted(param_bounds.items())),
+                tuple(sorted(scale_info.items())),
+                id(prior_factory),
+            )
+            if cache_key in self._closure_cache:
+                return self._closure_cache[cache_key]
+        else:
+            cache_key = None
 
         numpyro, dist, dist_transforms, _, _, _, _ = _import_numpyro()
         prior_factory = getattr(self, "bayesian_prior_factory", None)
@@ -1383,7 +1391,8 @@ class BayesianMixin:
                     "obs", dist.Normal(loc=predictions_raw, scale=sigma), obs=y
                 )
 
-        self._closure_cache[cache_key] = numpyro_model
+        if cache_key is not None:
+            self._closure_cache[cache_key] = numpyro_model
         return numpyro_model
 
     @staticmethod
