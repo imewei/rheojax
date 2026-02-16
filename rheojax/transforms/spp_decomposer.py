@@ -29,7 +29,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from jax import Array
 
 from rheojax.core.base import BaseTransform
 from rheojax.core.inventory import TransformType
@@ -44,6 +43,7 @@ _, jnp = safe_import_jax()
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
+    from jax import Array
 
     from rheojax.core.data import RheoData
 

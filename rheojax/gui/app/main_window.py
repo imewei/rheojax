@@ -739,6 +739,13 @@ class RheoJAXMainWindow(QMainWindow):
         # Cleanup: stop workers and disconnect state signals to prevent
         # callbacks during teardown
         self.log("Shutting down...")
+
+        # Unsubscribe state store callback to prevent post-destroy invocation
+        try:
+            self.store.unsubscribe(self._on_state_changed)
+        except Exception:
+            pass
+
         try:
             if hasattr(self, "worker_pool"):
                 self.worker_pool.shutdown(wait=True, timeout_ms=5000)
@@ -754,6 +761,12 @@ class RheoJAXMainWindow(QMainWindow):
                     signals.state_changed.disconnect()
         except (TypeError, RuntimeError):
             pass
+
+        # Drain pending queued events to prevent delivery to destroyed widgets
+        from rheojax.gui.compat import QApplication
+
+        QApplication.processEvents()
+
         logger.info("Application shutdown complete")
         event.accept()
 
@@ -954,49 +967,56 @@ class RheoJAXMainWindow(QMainWindow):
             )
             self.store.dispatch("IMPORT_DATA", config)
 
-            # Perform the actual load immediately (synchronous import).
-            try:
-                from rheojax.gui.services.data_service import DataService
+            # Defer the blocking I/O to the next event loop iteration so the
+            # dialog close animation is not held up.
+            from rheojax.gui.compat import QTimer
 
-                service = DataService()
-                rheo_data = service.load_file(
-                    file_path=config["file_path"],
-                    x_col=config.get("x_column"),
-                    y_col=config.get("y_column"),
-                    y2_col=config.get("y2_column"),
-                    test_mode=config.get("test_mode"),
-                )
+            QTimer.singleShot(0, lambda cfg=config: self._do_import(cfg))
 
-                # Auto-detect test mode if requested
-                test_mode = config.get("test_mode")
-                if config.get("auto_detect_mode"):
-                    test_mode = service.detect_test_mode(rheo_data)
+    def _do_import(self, config: dict) -> None:
+        """Perform the deferred file import (blocking I/O)."""
+        try:
+            from rheojax.gui.services.data_service import DataService
 
-                self.store.dispatch(
-                    "IMPORT_DATA_SUCCESS",
-                    {
-                        "dataset_id": config["dataset_id"],
-                        "file_path": str(config["file_path"]),
-                        "name": Path(config["file_path"]).stem,
-                        "test_mode": test_mode or "unknown",
-                        "x_data": rheo_data.x,
-                        "y_data": rheo_data.y,
-                        "y2_data": getattr(rheo_data, "y2", None),
-                        "metadata": getattr(rheo_data, "metadata", {}),
-                    },
-                )
-                self.navigate_to("data")
-                logger.info(
-                    "Data import successful",
-                    dataset_id=config["dataset_id"],
-                    test_mode=test_mode,
-                )
-                self.status_bar.show_message("Data imported successfully", 3000)
-            except Exception as exc:
-                logger.error("Import failed", error=str(exc), exc_info=True)
-                self.log(f"Import failed: {exc}")
-                self.store.dispatch("IMPORT_DATA_FAILED", {"error": str(exc), **config})
-                self.status_bar.show_message(f"Import failed: {exc}", 5000)
+            service = DataService()
+            rheo_data = service.load_file(
+                file_path=config["file_path"],
+                x_col=config.get("x_column"),
+                y_col=config.get("y_column"),
+                y2_col=config.get("y2_column"),
+                test_mode=config.get("test_mode"),
+            )
+
+            # Auto-detect test mode if requested
+            test_mode = config.get("test_mode")
+            if config.get("auto_detect_mode"):
+                test_mode = service.detect_test_mode(rheo_data)
+
+            self.store.dispatch(
+                "IMPORT_DATA_SUCCESS",
+                {
+                    "dataset_id": config["dataset_id"],
+                    "file_path": str(config["file_path"]),
+                    "name": Path(config["file_path"]).stem,
+                    "test_mode": test_mode or "unknown",
+                    "x_data": rheo_data.x,
+                    "y_data": rheo_data.y,
+                    "y2_data": getattr(rheo_data, "y2", None),
+                    "metadata": getattr(rheo_data, "metadata", {}),
+                },
+            )
+            self.navigate_to("data")
+            logger.info(
+                "Data import successful",
+                dataset_id=config["dataset_id"],
+                test_mode=test_mode,
+            )
+            self.status_bar.show_message("Data imported successfully", 3000)
+        except Exception as exc:
+            logger.error("Import failed", error=str(exc), exc_info=True)
+            self.log(f"Import failed: {exc}")
+            self.store.dispatch("IMPORT_DATA_FAILED", {"error": str(exc), **config})
+            self.status_bar.show_message(f"Import failed: {exc}", 5000)
 
     @Slot()
     def _on_export(self) -> None:
@@ -1969,7 +1989,17 @@ class RheoJAXMainWindow(QMainWindow):
             self.log(f"Failed to update JAX status: {e}")
 
     def _auto_save_if_enabled(self) -> None:
-        """Auto-save project if a path is set and auto-save is enabled."""
+        """Auto-save project if a path is set and auto-save is enabled.
+
+        Defers the actual work to the next event loop iteration via
+        QTimer.singleShot so the caller is never blocked.
+        """
+        from rheojax.gui.compat import QTimer
+
+        QTimer.singleShot(0, self._do_auto_save)
+
+    def _do_auto_save(self) -> None:
+        """Perform the deferred auto-save."""
         try:
             state = self.store.get_state()
             if state.auto_save_enabled and state.project_path:

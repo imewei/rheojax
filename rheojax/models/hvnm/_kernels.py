@@ -235,7 +235,7 @@ def hvnm_ber_rate_interphase_stress(
             sigma_I_xx**2 + sigma_I_yy**2
             - sigma_I_xx * sigma_I_yy
             + 3.0 * sigma_I_xy**2,
-            0.0,
+            1e-30,
         )
     )
     RT = _R_GAS * T
@@ -299,7 +299,7 @@ def hvnm_ber_rate_interphase_stretch(
         Stretch-enhanced interfacial BER rate (1/s)
     """
     delta_trace = (mu_I_xx - mu_I_nat_xx) + (mu_I_yy - mu_I_nat_yy)
-    delta_stretch = jnp.sqrt(jnp.maximum(jnp.abs(delta_trace) / 2.0, 0.0))
+    delta_stretch = jnp.sqrt(jnp.maximum(jnp.abs(delta_trace) / 2.0, 1e-30))
 
     RT = _R_GAS * T
     k0 = nu_0_int * jnp.exp(-E_a_int / RT)
@@ -632,7 +632,7 @@ def hvnm_interfacial_damage_rhs(
     """
     # mu_I_zz ≈ 1 for simple shear
     tr_mu_I = mu_I_xx + mu_I_yy + 1.0
-    lambda_chain = jnp.sqrt(jnp.maximum(tr_mu_I / 3.0, 0.0))
+    lambda_chain = jnp.sqrt(jnp.maximum(tr_mu_I / 3.0, 1e-30))
 
     # Damage creation
     driving = jnp.maximum(lambda_chain - lambda_crit_int, 0.0)

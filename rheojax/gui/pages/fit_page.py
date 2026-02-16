@@ -961,6 +961,13 @@ class FitPage(QWidget):
     # External hooks from MainWindow
     def set_plot_figure(self, fig: Figure) -> None:
         """Replace the plot canvas figure."""
+        # Close old figure to prevent memory leak
+        import matplotlib.pyplot as plt
+
+        old_fig = self._plot_canvas.figure
+        if old_fig is not None and old_fig is not fig:
+            plt.close(old_fig)
+
         # Swap the FigureCanvas content
         self._plot_canvas.figure = fig
         self._plot_canvas.canvas.figure = fig

@@ -291,7 +291,7 @@ class SpringPot(BaseModel):
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.
@@ -309,7 +309,8 @@ class SpringPot(BaseModel):
         alpha = params[1]
 
         # Use stored test mode from last fit, or default to RELAXATION
-        test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
+        if test_mode is None:
+            test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
 
         # Dispatch to appropriate prediction method
         if test_mode == TestMode.RELAXATION:

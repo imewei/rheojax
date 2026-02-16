@@ -109,10 +109,13 @@ class WorkerPool(QObject):
     job_failed = Signal(str, str)  # job_id, error_message
     job_cancelled = Signal(str)  # job_id
 
+    _singleton_lock = Lock()
+
     def __new__(cls, max_threads: int = 4) -> "WorkerPool":
         """Create or return singleton instance."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
+        with cls._singleton_lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
         return cls._instance
 
     @classmethod
@@ -467,12 +470,23 @@ class WorkerPool(QObject):
         job_id = self._job_id_from_sender()
         if job_id:
             self._on_job_completed(job_id, result)
+        else:
+            logger.error(
+                "Worker completed but job_id lookup failed (sender=%s). Result lost.",
+                self.sender(),
+            )
 
     @Slot(str)
     def _on_worker_failed(self, error_message: str) -> None:
         job_id = self._job_id_from_sender()
         if job_id:
             self._on_job_failed(job_id, error_message)
+        else:
+            logger.error(
+                "Worker failed but job_id lookup failed (sender=%s). Error: %s",
+                self.sender(),
+                error_message,
+            )
 
     @Slot()
     def _on_worker_cancelled(self) -> None:

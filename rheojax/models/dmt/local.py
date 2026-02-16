@@ -1141,7 +1141,7 @@ class DMTLocal(DMTBase):
 
         return t_out, jnp.array(stress), jnp.array(lam)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function for DMT.
 
         Routes to appropriate JAX-traceable prediction based on test_mode.

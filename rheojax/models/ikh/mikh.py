@@ -217,7 +217,7 @@ class MIKH(IKHBase):
 
         def objective(param_values):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
             sigma_pred = ikh_flow_curve_steady_state(gamma_dot, **p_dict)
             return sigma_pred - sigma_target
 
@@ -237,7 +237,7 @@ class MIKH(IKHBase):
 
         def objective(param_values):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
             y_pred = self._simulate_transient(
                 t, p_dict, test_mode, gamma_dot, sigma_applied, sigma_0
             )
@@ -258,7 +258,7 @@ class MIKH(IKHBase):
 
         def objective(param_values):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
             sigma_pred = self._predict_from_params(times, strains, p_dict)
             return sigma_pred - sigma_target
 
@@ -308,7 +308,7 @@ class MIKH(IKHBase):
         def objective(param_values):
             """Compute residual using Maxwell analytical SAOS expressions."""
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
 
             G = p_dict["G"]
             eta = p_dict["eta"]
@@ -443,7 +443,7 @@ class MIKH(IKHBase):
         """
         test_mode = kwargs.get("test_mode", self._test_mode or "startup")
         params = self.parameters.get_values()
-        param_dict = dict(zip(self.parameters.keys(), params, strict=False))
+        param_dict = dict(zip(self.parameters.keys(), params, strict=True))
 
         if test_mode == "flow_curve":
             gamma_dot = jnp.asarray(X)
@@ -478,7 +478,7 @@ class MIKH(IKHBase):
             Stress vs time
         """
         params = dict(
-            zip(self.parameters.keys(), self.parameters.get_values(), strict=False)
+            zip(self.parameters.keys(), self.parameters.get_values(), strict=True)
         )
         return self._simulate_transient(
             jnp.asarray(t), params, "startup", gamma_dot=gamma_dot
@@ -495,7 +495,7 @@ class MIKH(IKHBase):
             Stress vs time
         """
         params = dict(
-            zip(self.parameters.keys(), self.parameters.get_values(), strict=False)
+            zip(self.parameters.keys(), self.parameters.get_values(), strict=True)
         )
         return self._simulate_transient(
             jnp.asarray(t), params, "relaxation", sigma_0=sigma_0
@@ -512,7 +512,7 @@ class MIKH(IKHBase):
             Strain vs time
         """
         params = dict(
-            zip(self.parameters.keys(), self.parameters.get_values(), strict=False)
+            zip(self.parameters.keys(), self.parameters.get_values(), strict=True)
         )
         return self._simulate_transient(
             jnp.asarray(t), params, "creep", sigma_applied=sigma_applied
@@ -537,7 +537,7 @@ class MIKH(IKHBase):
             t_arr,
             strain,
             dict(
-                zip(self.parameters.keys(), self.parameters.get_values(), strict=False)
+                zip(self.parameters.keys(), self.parameters.get_values(), strict=True)
             ),
         )
 
@@ -552,7 +552,7 @@ class MIKH(IKHBase):
         # Convert array to dict for kernel
         if isinstance(params, (np.ndarray, jnp.ndarray)):
             param_names = list(self.parameters.keys())
-            param_dict = dict(zip(param_names, params, strict=False))
+            param_dict = dict(zip(param_names, params, strict=True))
         else:
             param_dict = params
 

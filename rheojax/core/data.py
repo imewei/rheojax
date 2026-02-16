@@ -521,9 +521,9 @@ class RheoData:
         logger.debug("Detecting test mode from data characteristics")
         mode = detect_test_mode(self)
 
-        # Cache the result
+        # Cache in metadata only — don't set _explicit_test_mode to avoid
+        # conflating detected and explicitly-set modes
         self.metadata["detected_test_mode"] = mode
-        self._explicit_test_mode = mode
 
         logger.debug("Test mode detected", test_mode=mode)
 

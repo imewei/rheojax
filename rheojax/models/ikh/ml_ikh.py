@@ -561,7 +561,7 @@ class MLIKH(IKHBase):
 
         # Get parameters as dict
         params = self.parameters.get_values()
-        param_dict = dict(zip(self.parameters.keys(), params, strict=False))
+        param_dict = dict(zip(self.parameters.keys(), params, strict=True))
 
         if test_mode == "flow_curve":
             return self._predict_flow_curve_from_params(jnp.asarray(X), param_dict)
@@ -615,7 +615,7 @@ class MLIKH(IKHBase):
 
         def objective(param_values):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
             sigma_pred = self._predict_flow_curve_from_params(gamma_dot, p_dict)
             return sigma_pred - sigma_target
 
@@ -635,7 +635,7 @@ class MLIKH(IKHBase):
 
         def objective(param_values):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
             y_pred = self._simulate_transient(
                 t, p_dict, test_mode, gamma_dot, sigma_applied, sigma_0
             )
@@ -656,7 +656,7 @@ class MLIKH(IKHBase):
 
         def objective(param_values):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
             sigma_pred = self._predict_from_params(times, strains, p_dict)
             return sigma_pred - sigma_target
 
@@ -701,7 +701,7 @@ class MLIKH(IKHBase):
         def objective(param_values):
             """Compute residual using Maxwell analytical SAOS expressions."""
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
+            p_dict = dict(zip(p_names, param_values, strict=True))
 
             # Extract G and eta based on yield_mode
             if self._yield_mode == "per_mode":
@@ -755,7 +755,7 @@ class MLIKH(IKHBase):
         # Convert params to dict if array
         if isinstance(params, (np.ndarray, jnp.ndarray)):
             param_names = list(self.parameters.keys())
-            param_dict = dict(zip(param_names, params, strict=False))
+            param_dict = dict(zip(param_names, params, strict=True))
         else:
             param_dict = params
 

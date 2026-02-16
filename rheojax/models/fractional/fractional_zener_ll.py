@@ -552,7 +552,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         # Oscillation should typically use RheoData with domain='frequency'
         return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
 
-    def model_function(self, X, params, test_mode=None):
+    def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.
 
         This method is required by BayesianMixin for NumPyro NUTS sampling.

@@ -1095,7 +1095,7 @@ def vlb_breakage_bell(
         Effective dissociation rate (1/s)
     """
     tr_mu = mu_xx + mu_yy + mu_zz
-    stretch = jnp.sqrt(jnp.maximum(tr_mu / 3.0, 0.0))
+    stretch = jnp.sqrt(jnp.maximum(tr_mu / 3.0, 1e-30))
     return k_d_0 * jnp.exp(nu * (stretch - 1.0))
 
 
