@@ -71,6 +71,7 @@ class BayesianResult:
     posterior_samples: dict[str, Any]
     summary: dict[str, dict[str, float]]
     diagnostics: dict[str, Any]
+    num_warmup: int
     num_samples: int
     num_chains: int
     sampling_time: float
@@ -395,6 +396,7 @@ class BayesianWorker(QRunnable):
                 posterior_samples=bayesian_result.posterior_samples,
                 summary=bayesian_result.summary,
                 diagnostics=diagnostics,
+                num_warmup=self._num_warmup,
                 num_samples=self._num_samples,
                 num_chains=self._num_chains,
                 sampling_time=sampling_time,
