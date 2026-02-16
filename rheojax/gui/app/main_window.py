@@ -842,10 +842,22 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_save_file(self) -> None:
         """Handle save file action."""
         logger.debug("Save file action triggered")
-        self.log("Saving project...")
-        logger.info("Project saved")
-        self.status_bar.show_message("Project saved", 3000)
-        self._has_unsaved_changes = False
+
+        if not self._has_unsaved_changes:
+            self.status_bar.show_message("No unsaved changes", 2000)
+            return
+
+        # TODO: Implement project serialization (state → JSON/HDF5).
+        # For now, warn the user that save is not yet implemented.
+        from rheojax.gui.compat import QMessageBox
+
+        QMessageBox.information(
+            self,
+            "Save Not Yet Implemented",
+            "Project save is not yet implemented.\n"
+            "Use 'Export Results' from the Bayesian or Fit tabs to save individual results.",
+        )
+        logger.warning("Save file action: not yet implemented")
 
     @Slot()
     def _on_save_as(self) -> None:
