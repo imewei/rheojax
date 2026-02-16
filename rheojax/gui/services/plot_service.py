@@ -530,38 +530,39 @@ class PlotService:
                 "ArviZ InferenceData created", parameters=list(posterior_samples.keys())
             )
 
+            def _extract_figure(axes_result: Any) -> Figure:
+                """Extract Figure from ArviZ axes (single Axes, ndarray, or list)."""
+                import numpy as _np
+
+                if hasattr(axes_result, "figure"):
+                    return axes_result.figure
+                if isinstance(axes_result, _np.ndarray) and axes_result.size > 0:
+                    return axes_result.ravel()[0].figure
+                if isinstance(axes_result, list) and axes_result:
+                    first = axes_result[0]
+                    if isinstance(first, _np.ndarray) and first.size > 0:
+                        return first.ravel()[0].figure
+                    if hasattr(first, "figure"):
+                        return first.figure
+                return plt.gcf()
+
             # Create plot based on type
-            if plot_type == "trace":
-                axes = az.plot_trace(idata, **kwargs)
-                fig = axes.ravel()[0].figure
+            plot_funcs = {
+                "trace": az.plot_trace,
+                "pair": az.plot_pair,
+                "forest": az.plot_forest,
+                "energy": az.plot_energy,
+                "autocorr": az.plot_autocorr,
+                "rank": az.plot_rank,
+                "ess": az.plot_ess,
+            }
 
-            elif plot_type == "pair":
-                ax = az.plot_pair(idata, **kwargs)
-                fig = ax.figure if hasattr(ax, "figure") else ax.ravel()[0].figure
-
-            elif plot_type == "forest":
-                ax = az.plot_forest(idata, **kwargs)
-                fig = ax.figure if hasattr(ax, "figure") else plt.gcf()
-
-            elif plot_type == "energy":
-                ax = az.plot_energy(idata, **kwargs)
-                fig = ax.figure if hasattr(ax, "figure") else plt.gcf()
-
-            elif plot_type == "autocorr":
-                axes = az.plot_autocorr(idata, **kwargs)
-                fig = axes.ravel()[0].figure if hasattr(axes, "ravel") else plt.gcf()
-
-            elif plot_type == "rank":
-                axes = az.plot_rank(idata, **kwargs)
-                fig = axes.ravel()[0].figure if hasattr(axes, "ravel") else plt.gcf()
-
-            elif plot_type == "ess":
-                ax = az.plot_ess(idata, **kwargs)
-                fig = ax.figure if hasattr(ax, "figure") else plt.gcf()
-
-            else:
+            if plot_type not in plot_funcs:
                 logger.error(f"Unknown ArviZ plot type: {plot_type}")
                 raise ValueError(f"Unknown plot type: {plot_type}")
+
+            axes_result = plot_funcs[plot_type](idata, **kwargs)
+            fig = _extract_figure(axes_result)
 
             logger.info("Plot generated", plot_type=f"arviz_{plot_type}")
             logger.debug(
@@ -619,10 +620,11 @@ class PlotService:
 
             # Plot based on type
             if np.iscomplexobj(y):
-                G_prime = np.real(y)
-                G_double_prime = np.imag(y)
-                ax.loglog(x, G_prime, "o", label="G'", color=palette[0])
-                ax.loglog(x, G_double_prime, "s", label='G"', color=palette[1])
+                G_prime = np.abs(np.real(y))
+                G_double_prime = np.abs(np.imag(y))
+                eps = 1e-30  # Floor to avoid log(0)
+                ax.loglog(x, np.maximum(G_prime, eps), "o", label="G'", color=palette[0])
+                ax.loglog(x, np.maximum(G_double_prime, eps), "s", label='G"', color=palette[1])
                 ax.set_xlabel(data.x_units or "Frequency (rad/s)")
                 ax.set_ylabel(data.y_units or "Modulus (Pa)")
             else:
