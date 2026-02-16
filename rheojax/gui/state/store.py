@@ -141,7 +141,22 @@ class BayesianResult:
     timestamp: datetime
     num_warmup: int = 1000
     num_samples: int = 2000
+    num_chains: int = 4
     inference_data: Any | None = None  # Full ArviZ InferenceData with sample_stats
+
+    @property
+    def sampling_time(self) -> float:
+        """Alias for mcmc_time (compatibility with worker BayesianResult)."""
+        return self.mcmc_time
+
+    @property
+    def diagnostics(self) -> dict[str, Any]:
+        """Computed diagnostics dict (compatibility with worker BayesianResult)."""
+        return {
+            "r_hat": self.r_hat,
+            "ess": self.ess,
+            "divergences": self.divergences,
+        }
 
     def clone(self) -> "BayesianResult":
         """Create a deep copy of this Bayesian result."""
@@ -990,17 +1005,26 @@ class StateStore:
                 if not model_name or not dataset_id or result is None:
                     return state
 
-                bayes_state = (
-                    result
-                    if isinstance(result, BayesianResult)
-                    else BayesianResult(
+                if isinstance(result, BayesianResult):
+                    bayes_state = result
+                else:
+                    # Extract diagnostics from nested dict if present
+                    diag = getattr(result, "diagnostics", {}) or {}
+                    bayes_state = BayesianResult(
                         model_name=model_name,
                         dataset_id=str(dataset_id),
                         posterior_samples=getattr(result, "posterior_samples", {}),
-                        r_hat=getattr(result, "r_hat", {}),
-                        ess=getattr(result, "ess", {}),
-                        divergences=int(getattr(result, "divergences", 0)),
-                        credible_intervals=getattr(result, "credible_intervals", {}),
+                        r_hat=diag.get("r_hat", {})
+                        or getattr(result, "r_hat", {}),
+                        ess=diag.get("ess", {})
+                        or getattr(result, "ess", {}),
+                        divergences=int(
+                            diag.get("divergences", 0)
+                            or getattr(result, "divergences", 0)
+                        ),
+                        credible_intervals=getattr(
+                            result, "credible_intervals", {}
+                        ),
                         mcmc_time=float(
                             getattr(
                                 result,
@@ -1009,10 +1033,11 @@ class StateStore:
                             )
                         ),
                         timestamp=getattr(result, "timestamp", datetime.now()),
+                        summary=getattr(result, "summary", None),
                         num_warmup=int(getattr(result, "num_warmup", 0)),
                         num_samples=int(getattr(result, "num_samples", 0)),
+                        num_chains=int(getattr(result, "num_chains", 4)),
                     )
-                )
 
                 bayes = state.bayesian_results.copy()
                 key = f"{model_name}_{dataset_id}"

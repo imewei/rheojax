@@ -551,7 +551,7 @@ class BayesianPage(QWidget):
     def _on_cancel_clicked(self) -> None:
         """Handle cancel button click."""
         if self._current_worker:
-            self._current_worker.cancel()
+            self._current_worker.cancel_token.cancel()
             self._status_text.append("Cancelling...")
 
         self.cancel_requested.emit()
@@ -667,6 +667,9 @@ class BayesianPage(QWidget):
                     ),
                     num_samples=int(
                         getattr(result, "num_samples", self._samples_spin.value()) or 0
+                    ),
+                    num_chains=int(
+                        getattr(result, "num_chains", self._chains_spin.value()) or 4
                     ),
                     inference_data=getattr(result, "inference_data", None),
                 )
@@ -1400,21 +1403,13 @@ class BayesianPage(QWidget):
             value=prior_spec,
             page="BayesianPage",
         )
-        # Store prior specs in state using a nested dict structure
-        state = self._store.get_state()
+        # Store prior specs in the instance's preset_priors dict.
+        # These are forwarded to the BayesianWorker via config["priors"]
+        # in _on_run_clicked().
+        if self._preset_priors is None:
+            self._preset_priors = {}
 
-        # Initialize prior_specs dict if not present
-        if not hasattr(state, "prior_specs"):
-            # Store in pipeline_state metadata for now
-            state.pipeline_state.metadata["prior_specs"] = {}
-
-        prior_specs = state.pipeline_state.metadata.get("prior_specs", {})
-
-        if model_id not in prior_specs:
-            prior_specs[model_id] = {}
-
-        prior_specs[model_id][param_name] = prior_spec
-        state.pipeline_state.metadata["prior_specs"] = prior_specs
+        self._preset_priors[param_name] = prior_spec
 
     def show_posterior_summary(self, model_id: str) -> None:
         """Show posterior summary for a model.
