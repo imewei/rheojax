@@ -213,7 +213,7 @@ class FitWorker(QRunnable):
                 initial_params=self._initial_params,
                 options=self._options,
             )
-            result = service.fit(
+            service_result = service.fit(
                 self._model_name,
                 self._data,
                 params=self._initial_params,
@@ -223,14 +223,26 @@ class FitWorker(QRunnable):
 
             fit_time = time.perf_counter() - start_time
 
+            # Check for service-level failure
+            if not getattr(service_result, "success", True):
+                error_msg = getattr(service_result, "message", "Fit failed")
+                logger.error(
+                    "Fit service reported failure",
+                    model=self._model_name,
+                    message=error_msg,
+                )
+                self.signals.failed.emit(
+                    f"Fit failed for {self._model_name}: {error_msg}"
+                )
+                return
+
             # Extract fitted parameters and metrics from service result
-            fitted_params = result.parameters
-            metadata = getattr(result, "metadata", {}) or {}
+            fitted_params = service_result.parameters
+            metadata = getattr(service_result, "metadata", {}) or {}
             r_squared = metadata.get("r_squared", 0.0)
             mpe = metadata.get("mpe", 0.0)
-            chi_squared = float(getattr(result, "chi_squared", 0.0))
+            chi_squared = float(getattr(service_result, "chi_squared", 0.0))
             n_iterations = metadata.get("n_iterations", self._last_iteration)
-            success = getattr(result, "success", True)
 
             # Create worker-level result
             result = FitResult(
@@ -242,10 +254,10 @@ class FitWorker(QRunnable):
                 fit_time=fit_time,
                 timestamp=datetime.now(),
                 n_iterations=n_iterations,
-                success=success,
-                x_fit=getattr(result, "x_fit", None),
-                y_fit=getattr(result, "y_fit", None),
-                residuals=getattr(result, "residuals", None),
+                success=True,
+                x_fit=getattr(service_result, "x_fit", None),
+                y_fit=getattr(service_result, "y_fit", None),
+                residuals=getattr(service_result, "residuals", None),
             )
 
             logger.info(
@@ -255,7 +267,6 @@ class FitWorker(QRunnable):
                 r_squared=r_squared,
                 mpe=mpe,
                 n_iterations=n_iterations,
-                success=success,
             )
 
             # Emit completion signal
