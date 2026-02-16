@@ -340,10 +340,10 @@ class ColumnMappingPage(QWizardPage):
         """Auto-detect column mapping."""
         logger.debug("Auto-detecting column mapping", page=self.__class__.__name__)
         # Common column name patterns
-        x_patterns = ["freq", "frequency", "omega", "time", "t", "w"]
+        x_patterns = ["freq", "frequency", "omega", "time", "strain rate", "shear rate"]
         y_patterns = ["g'", "gp", "storage", "modulus", "eta", "viscosity", "stress"]
         y2_patterns = ["g''", "gpp", "loss"]
-        temp_patterns = ["temp", "temperature", "t"]
+        temp_patterns = ["temp", "temperature"]
 
         def find_match(combo: QComboBox, patterns: list[str]) -> None:
             """Find best match for column."""
