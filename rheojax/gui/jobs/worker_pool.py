@@ -12,7 +12,7 @@ from threading import Lock
 from typing import Any
 
 try:
-    from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal, Slot
+    from rheojax.gui.compat import QObject, QRunnable, Qt, QThreadPool, Signal, Slot
 
     HAS_PYSIDE6 = True
 except ImportError:

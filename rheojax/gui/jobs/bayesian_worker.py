@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any
 
 try:
-    from PySide6.QtCore import QObject, QRunnable, Signal
+    from rheojax.gui.compat import QObject, QRunnable, Signal
 
     HAS_PYSIDE6 = True
 except ImportError:
