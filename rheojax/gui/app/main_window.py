@@ -9,6 +9,8 @@ import uuid
 import webbrowser
 from pathlib import Path
 
+import numpy as np
+
 from rheojax.gui.app.menu_bar import MenuBar
 from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.compat import (
@@ -145,16 +147,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.setWindowTitle("RheoJAX - Rheological Analysis")
         if not getattr(self, "_start_maximized", False):
             self.resize(1400, 900)
-
-        # Bump global font size for readability
-        app = QApplication.instance()
-        if app is not None:
-            base_font: QFont = app.font()
-            if base_font.pointSize() > 0:
-                base_font.setPointSize(max(base_font.pointSize() + 2, 12))
-            else:
-                base_font.setPointSize(12)
-            app.setFont(base_font)
 
         # Menu bar
         self.menu_bar = MenuBar(self)
@@ -749,7 +741,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.log("Shutting down...")
         try:
             if hasattr(self, "worker_pool"):
-                self.worker_pool.cancel_all()
+                self.worker_pool.shutdown(wait=True, timeout_ms=5000)
         except Exception:
             pass
         try:
@@ -1016,8 +1008,6 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Quick export of current fit parameters if available
         try:
-            from PySide6.QtWidgets import QFileDialog
-
             from rheojax.gui.services.export_service import ExportService
 
             fit_result = self.store.get_active_fit_result()
@@ -1128,7 +1118,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.theme_light_action.setChecked(theme == "light")
         self.menu_bar.theme_dark_action.setChecked(theme == "dark")
         self.menu_bar.theme_auto_action.setChecked(theme == "auto")
-        self.store.dispatch("SET_THEME", {"theme": theme})
         self._apply_theme(theme)
         self.log(f"Theme changed to: {theme}")
         logger.info("Theme changed", theme=theme)
@@ -1304,6 +1293,8 @@ class RheoJAXMainWindow(QMainWindow):
             )
         if job_type == "fit":
             self.store.dispatch("FITTING_FAILED", {"error": str(error)})
+        elif job_type == "bayesian":
+            self.store.dispatch("BAYESIAN_FAILED", {"error": str(error)})
         self.log(f"Job {job_id} failed: {error}")
         self.status_bar.show_message(f"Job failed: {error}", 5000)
 
@@ -1317,6 +1308,8 @@ class RheoJAXMainWindow(QMainWindow):
             )
         if job_type == "fit":
             self.store.dispatch("FITTING_FAILED", {"error": "Cancelled"})
+        elif job_type == "bayesian":
+            self.store.dispatch("BAYESIAN_FAILED", {"error": "Cancelled"})
         self.log(f"Job {job_id} cancelled")
         self.status_bar.show_message("Job cancelled", 2000)
 
@@ -1958,10 +1951,8 @@ class RheoJAXMainWindow(QMainWindow):
             device = jax.devices()[0]
             device_name = str(device.device_kind)
 
-            # Check if float64 is enabled
-            from jax import config as jax_config
-
-            float64_enabled = jax_config.jax_enable_x64
+            # Check if float64 is enabled (use jax already imported via safe_import_jax)
+            float64_enabled = jax.config.jax_enable_x64
 
             # Get memory info (simplified - actual implementation would query device)
             memory_used = 0
