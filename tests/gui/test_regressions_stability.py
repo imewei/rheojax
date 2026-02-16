@@ -88,6 +88,12 @@ def test_bayesian_warm_start_picks_matching_fit(qtbot):
         {"model_name": "zener", "dataset_id": "d2", "result": DummyFit({"b": 2.0})},
     )
 
+    # Second dispatch changed active_dataset_id to "d2"; restore to "d1"
+    # so the warm-start mismatch guard doesn't reject our lookup.
+    from dataclasses import replace as _replace
+
+    store._state = _replace(store._state, active_dataset_id="d1")
+
     page = BayesianPage()
     qtbot.addWidget(page)
     warm = page._select_warm_start_params("maxwell", "d1")
