@@ -309,7 +309,8 @@ class TNTStickyRouse(TNTBase):
     # =========================================================================
 
     def model_function(
-        self, X: jnp.ndarray, params: jnp.ndarray, test_mode: str | None = None
+        self, X: jnp.ndarray, params: jnp.ndarray, test_mode: str | None = None,
+        **kwargs,
     ) -> jnp.ndarray:
         """Compute model prediction for given parameters.
 

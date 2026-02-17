@@ -399,6 +399,7 @@ class SPPYieldStress(BaseModel):
         X: Array,
         params: Array,
         test_mode: TestMode | None = None,
+        **kwargs,
     ) -> Array:
         """Model function for predictions and Bayesian inference.
 
