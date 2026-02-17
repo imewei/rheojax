@@ -5,15 +5,13 @@ Fit Worker
 Background worker for NLSQ model fitting operations.
 """
 
-import threading
 import time
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-# Serialize gc.collect() / jax.clear_caches() across worker threads
-_cleanup_lock = threading.Lock()
+from rheojax.gui.jobs._cleanup import cleanup_lock
 
 try:
     from rheojax.gui.compat import QObject, QRunnable, Signal
@@ -301,7 +299,7 @@ class FitWorker(QRunnable):
             # Serialize cleanup across workers to avoid concurrent gc/JIT issues
             import gc
 
-            with _cleanup_lock:
+            with cleanup_lock:
                 gc.collect()
                 try:
                     jax.clear_caches()
