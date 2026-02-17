@@ -388,27 +388,24 @@ class StateStore:
             # Emit relevant signals for UI reactivity
             if action_type == "SET_ACTIVE_MODEL":
                 model_name = action.get("model_name", "")
-                if self._signals:
-                    self._signals.model_selected.emit(model_name)
+                self.emit_signal("model_selected", model_name)
 
             elif action_type == "START_FITTING":
                 model_name = action.get("model_name", "")
                 dataset_id = action.get("dataset_id", "")
-                if self._signals:
-                    self._signals.fit_started.emit(model_name, dataset_id)
+                self.emit_signal("fit_started", model_name, dataset_id)
 
             elif action_type == "FIT_PROGRESS":
                 progress = action.get("progress", 0)
                 job_id = action.get("job_id", "")
-                if self._signals:
-                    self._signals.fit_progress.emit(job_id, int(progress))
+                self.emit_signal("fit_progress", job_id, int(progress))
 
             elif action_type == "FITTING_COMPLETED":
-                if self._signals:
-                    self._signals.fit_completed.emit(
-                        str(action.get("model_name", "")),
-                        str(action.get("dataset_id", "")),
-                    )
+                self.emit_signal(
+                    "fit_completed",
+                    str(action.get("model_name", "")),
+                    str(action.get("dataset_id", "")),
+                )
 
             elif action_type == "FITTING_FAILED":
                 error = action.get("error", "")
@@ -418,26 +415,23 @@ class StateStore:
                     error=error,
                     exc_info=True,
                 )
-                if self._signals:
-                    self._signals.fit_failed.emit("", "", error)
+                self.emit_signal("fit_failed", "", "", error)
 
             elif action_type == "START_BAYESIAN":
                 model_name = action.get("model_name", "")
                 dataset_id = action.get("dataset_id", "")
-                if self._signals:
-                    self._signals.bayesian_started.emit(model_name, dataset_id)
+                self.emit_signal("bayesian_started", model_name, dataset_id)
 
             elif action_type == "BAYESIAN_PROGRESS":
                 progress = action.get("progress", 0)
-                if self._signals:
-                    self._signals.bayesian_progress.emit("", int(progress))
+                self.emit_signal("bayesian_progress", "", int(progress))
 
             elif action_type == "BAYESIAN_COMPLETED":
-                if self._signals:
-                    self._signals.bayesian_completed.emit(
-                        str(action.get("model_name", "")),
-                        str(action.get("dataset_id", "")),
-                    )
+                self.emit_signal(
+                    "bayesian_completed",
+                    str(action.get("model_name", "")),
+                    str(action.get("dataset_id", "")),
+                )
 
             elif action_type == "BAYESIAN_FAILED":
                 error = action.get("error", "")
@@ -447,40 +441,36 @@ class StateStore:
                     error=error,
                     exc_info=True,
                 )
-                if self._signals:
-                    self._signals.bayesian_failed.emit("", "", error)
+                self.emit_signal("bayesian_failed", "", "", error)
 
             elif action_type == "STORE_BAYESIAN_RESULT":
                 payload = action.get("payload", action)
                 model_name = payload.get("model_name", "")
                 dataset_id = payload.get("dataset_id", "")
-                if self._signals and model_name and dataset_id:
-                    self._signals.bayesian_completed.emit(
-                        str(model_name), str(dataset_id)
+                if model_name and dataset_id:
+                    self.emit_signal(
+                        "bayesian_completed", str(model_name), str(dataset_id)
                     )
 
             elif action_type == "SET_THEME":
                 theme = action.get("theme", "light")
-                if self._signals:
-                    self._signals.theme_changed.emit(theme)
+                self.emit_signal("theme_changed", theme)
 
             elif action_type == "SET_PIPELINE_STEP":
                 step = action.get("step", "")
                 status = action.get("status", "")
-                if self._signals:
-                    self._signals.pipeline_step_changed.emit(step, status)
+                self.emit_signal("pipeline_step_changed", step, status)
 
             elif action_type == "TRANSFORM_APPLIED":
                 transform = action.get("transform", "")
                 dataset_id = action.get("dataset_id", "")
-                if self._signals:
-                    self._signals.transform_applied.emit(transform, dataset_id)
+                self.emit_signal("transform_applied", transform, dataset_id)
 
             elif action_type == "IMPORT_DATA_SUCCESS":
                 dataset_id = action.get("dataset_id")
-                if self._signals and dataset_id:
-                    self._signals.dataset_added.emit(dataset_id)
-                    self._signals.dataset_selected.emit(dataset_id)
+                if dataset_id:
+                    self.emit_signal("dataset_added", dataset_id)
+                    self.emit_signal("dataset_selected", dataset_id)
 
             elif action_type == "IMPORT_DATA_FAILED":
                 error = action.get("error", "")
@@ -544,8 +534,8 @@ class StateStore:
                 )
 
         # Emit Qt signal if available
-        if emit_signal and self._signals is not None:
-            self._signals.state_changed.emit()
+        if emit_signal:
+            self.emit_signal("state_changed")
 
     def _get_changed_keys(self, old_state: AppState, new_state: AppState) -> list[str]:
         """Compute which top-level keys changed between two states."""
@@ -1185,8 +1175,7 @@ class StateStore:
                     exc_info=True,
                 )
 
-        if self._signals is not None:
-            self._signals.state_changed.emit()
+        self.emit_signal("state_changed")
 
         return True
 
@@ -1231,8 +1220,7 @@ class StateStore:
                     exc_info=True,
                 )
 
-        if self._signals is not None:
-            self._signals.state_changed.emit()
+        self.emit_signal("state_changed")
 
         return True
 
@@ -1320,8 +1308,7 @@ class StateStore:
                     exc_info=True,
                 )
 
-        if self._signals is not None:
-            self._signals.state_changed.emit()
+        self.emit_signal("state_changed")
 
     def get_dataset(self, dataset_id: str) -> DatasetState | None:
         """Get dataset by ID.
