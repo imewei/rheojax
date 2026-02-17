@@ -492,13 +492,13 @@ class BayesianPage(QWidget):
         deform_text = self._deformation_combo.currentText().lower()
         poisson_val = self._poisson_spin.value()
 
-        # Create and run worker (only pass args BayesianWorker accepts).
-        # NOTE: `dataset` (DatasetState) is passed mutably.  The worker should
-        # treat it as read-only; a deep-copy snapshot would be safer but the
-        # DatasetState ↔ RheoData conversion lives in gui/utils/rheodata.py.
+        # Snapshot the dataset to prevent TOCTOU mutation if the user
+        # changes the active selection while inference is running.
+        dataset_snapshot = dataset.clone()
+
         self._current_worker = BayesianWorker(
             model_name=model_name,
-            data=dataset,
+            data=dataset_snapshot,
             num_warmup=config.get("num_warmup", 1000),
             num_samples=config.get("num_samples", 2000),
             num_chains=config.get("num_chains", 4),
