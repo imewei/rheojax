@@ -449,11 +449,22 @@ class BayesianMixin:
             scale_info["y_imag_scale"] = (
                 float(jnp.std(y_imag)) if y_imag.size else 0.0
             )
+            # Mean magnitude for sigma prior flooring (constant-data guard)
+            scale_info["y_real_mean"] = (
+                float(jnp.mean(jnp.abs(y_real))) if y_real.size else 0.0
+            )
+            scale_info["y_imag_mean"] = (
+                float(jnp.mean(jnp.abs(y_imag))) if y_imag.size else 0.0
+            )
 
             y_jax = jnp.concatenate([y_real, y_imag])
         else:
             y_np = np.asarray(y_array, dtype=np.float64)
             scale_info["data_scale"] = float(np.std(y_np)) if y_np.size else 0.0
+            # Mean magnitude for sigma prior flooring (constant-data guard)
+            scale_info["data_mean"] = (
+                float(np.mean(np.abs(y_np))) if y_np.size else 0.0
+            )
             y_jax = jnp.asarray(y_np, dtype=jnp.float64)
 
         return {
@@ -509,7 +520,10 @@ class BayesianMixin:
             span = max(upper - lower, eps * 10)
             half_span = max(span / 2.0 - eps, eps)
             pad = min(max(span * 1e-12, eps), half_span)
-            return lower + pad, upper - pad
+            safe_lower, safe_upper = lower + pad, upper - pad
+            if safe_lower >= safe_upper:
+                return lower, upper
+            return safe_lower, safe_upper
         if np.isfinite(lower):
             upper_guess = lower + max(abs(lower) * 2.0, 1.0)
             return lower + eps, upper_guess
@@ -771,11 +785,27 @@ class BayesianMixin:
         )
         samples = mcmc.get_samples()
 
+        # Get chain-grouped samples for diagnostics (explicit shape, not
+        # relying on implicit concatenation ordering from get_samples())
+        try:
+            samples_grouped = mcmc.get_samples(group_by_chain=True)
+        except Exception:
+            samples_grouped = None
+
         # Convert to numpy arrays (model parameters only)
         posterior_samples = {}
         for name in param_names:
             if name in samples:
                 posterior_samples[name] = np.asarray(samples[name], dtype=np.float64)
+
+        # Chain-grouped samples for diagnostics (avoids reshape assumption)
+        grouped_samples = {}
+        if samples_grouped is not None:
+            for name in param_names:
+                if name in samples_grouped:
+                    grouped_samples[name] = np.asarray(
+                        samples_grouped[name], dtype=np.float64
+                    )
 
         # Compute summary statistics
         summary = {}
@@ -792,7 +822,7 @@ class BayesianMixin:
 
         diagnostics = self._compute_diagnostics(
             mcmc,
-            posterior_samples,
+            grouped_samples if grouped_samples else posterior_samples,
             num_samples=num_samples,
             num_chains=num_chains,
         )
@@ -1243,8 +1273,14 @@ class BayesianMixin:
 
             # Add diagnostics to log context
             log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
-            max_r_hat = max(result.diagnostics.get("r_hat", {}).values(), default=1.0)
-            min_ess = min(result.diagnostics.get("ess", {}).values(), default=0.0)
+            r_hat_vals = result.diagnostics.get("r_hat", {}).values()
+            ess_vals = result.diagnostics.get("ess", {}).values()
+            max_r_hat = max(
+                (v for v in r_hat_vals if np.isfinite(v)), default=1.0
+            )
+            min_ess = min(
+                (v for v in ess_vals if np.isfinite(v)), default=0.0
+            )
             log_ctx["r_hat_max"] = max_r_hat
             log_ctx["ess_min"] = min_ess
 
@@ -1281,8 +1317,9 @@ class BayesianMixin:
         if not hasattr(self, "_closure_cache"):
             self._closure_cache: OrderedDict = OrderedDict()
 
-        if not has_ndarray_kwargs:
-            prior_factory = getattr(self, "bayesian_prior_factory", None)
+        prior_factory = getattr(self, "bayesian_prior_factory", None)
+        # Skip cache when prior_factory is set — id() can alias after GC
+        if not has_ndarray_kwargs and prior_factory is None:
             cache_key = (
                 str(test_mode),
                 is_complex_data,
@@ -1290,7 +1327,6 @@ class BayesianMixin:
                 tuple(sorted(protocol_kwargs.items())),
                 tuple(sorted(param_bounds.items())),
                 tuple(sorted(scale_info.items())),
-                id(prior_factory),
             )
             if cache_key in self._closure_cache:
                 self._closure_cache.move_to_end(cache_key)
@@ -1299,12 +1335,14 @@ class BayesianMixin:
             cache_key = None
 
         numpyro, dist, dist_transforms, _, _, _, _ = _import_numpyro()
-        prior_factory = getattr(self, "bayesian_prior_factory", None)
 
         # Extract scale values for likelihood
         y_real_scale = scale_info.get("y_real_scale") or 0.0
         y_imag_scale = scale_info.get("y_imag_scale") or 0.0
         data_scale = scale_info.get("data_scale") or 0.0
+        y_real_mean = scale_info.get("y_real_mean") or 0.0
+        y_imag_mean = scale_info.get("y_imag_mean") or 0.0
+        data_mean = scale_info.get("data_mean") or 0.0
 
         def numpyro_model(X, y=None):
             """NumPyro model with test_mode captured in closure."""
@@ -1385,8 +1423,9 @@ class BayesianMixin:
                 y_real_obs, y_imag_obs = y[:n], y[n:]
 
                 # Exponential priors on noise (inflated scale for robustness)
-                sigma_real_scale = max(y_real_scale * 10.0, 1e-9)
-                sigma_imag_scale = max(y_imag_scale * 10.0, 1e-9)
+                # Floor at 1% of mean magnitude to handle constant-data edge case
+                sigma_real_scale = max(y_real_scale * 10.0, y_real_mean * 0.01, 1e-3)
+                sigma_imag_scale = max(y_imag_scale * 10.0, y_imag_mean * 0.01, 1e-3)
                 sigma_real = numpyro.sample(
                     "sigma_real", dist.Exponential(rate=1.0 / sigma_real_scale)
                 )
@@ -1404,7 +1443,8 @@ class BayesianMixin:
                     obs=y_imag_obs,
                 )
             else:
-                sigma_scale = max(data_scale * 10.0, 1e-9)
+                # Floor at 1% of mean magnitude to handle constant-data edge case
+                sigma_scale = max(data_scale * 10.0, data_mean * 0.01, 1e-3)
                 sigma = numpyro.sample(
                     "sigma", dist.Exponential(rate=1.0 / sigma_scale)
                 )
@@ -1447,11 +1487,14 @@ class BayesianMixin:
         all_succeeded = True
         for name in posterior_samples:
             try:
-                samples_flat = posterior_samples[name]
-                if num_chains >= 2:
-                    samples_shaped = samples_flat.reshape(num_chains, num_samples)
+                samples_arr = posterior_samples[name]
+                # If already shaped (num_chains, num_samples), use directly
+                if samples_arr.ndim == 2:
+                    samples_shaped = samples_arr
+                elif num_chains >= 2:
+                    samples_shaped = samples_arr.reshape(num_chains, num_samples)
                 else:
-                    samples_shaped = samples_flat.reshape(1, -1)
+                    samples_shaped = samples_arr.reshape(1, -1)
                 result_dict[name] = float(diagnostic_fn(samples_shaped))
             except Exception as exc:
                 logger.warning(
