@@ -969,6 +969,12 @@ class RheoJAXMainWindow(QMainWindow):
 
             # Defer the blocking I/O to the next event loop iteration so the
             # dialog close animation is not held up.
+            # Guard prevents overlapping imports from rapid double-clicks.
+            if getattr(self, "_import_in_progress", False):
+                logger.warning("Import already in progress, ignoring duplicate")
+                return
+            self._import_in_progress = True
+
             from rheojax.gui.compat import QTimer
 
             QTimer.singleShot(0, lambda cfg=config: self._do_import(cfg))
@@ -1017,6 +1023,8 @@ class RheoJAXMainWindow(QMainWindow):
             self.log(f"Import failed: {exc}")
             self.store.dispatch("IMPORT_DATA_FAILED", {"error": str(exc), **config})
             self.status_bar.show_message(f"Import failed: {exc}", 5000)
+        finally:
+            self._import_in_progress = False
 
     @Slot()
     def _on_export(self) -> None:
