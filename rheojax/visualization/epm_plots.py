@@ -260,7 +260,7 @@ def plot_tensorial_fields(
         if not isinstance(ax, (list, np.ndarray)) or len(ax) != 3:
             raise ValueError("If ax provided, must be list/array of 3 axes")
         axes = ax
-        fig = axes[0].get_figure()  # type: ignore[assignment]
+        fig = axes[0].get_figure()
 
     # Find global stress scale for consistent colormaps
     max_stress = np.max(np.abs(stress))
@@ -320,7 +320,7 @@ def plot_normal_stress_field(
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
-        fig = ax.get_figure()  # type: ignore[assignment]
+        fig = ax.get_figure()
 
     # Plot with symmetric colormap centered at 0
     max_N1 = np.max(np.abs(N1))
@@ -388,7 +388,7 @@ def plot_von_mises_field(
         if not isinstance(ax, (list, np.ndarray)) or len(ax) != 2:
             raise ValueError("If ax provided, must be list/array of 2 axes")
         axes = ax
-        fig = axes[0].get_figure()  # type: ignore[assignment]
+        fig = axes[0].get_figure()
 
     # Left panel: σ_eff with viridis (sequential)
     im1 = axes[0].imshow(sigma_eff, cmap="viridis", origin="lower", **kwargs)
@@ -450,7 +450,7 @@ def plot_normal_stress_ratio(
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
-        fig = ax.get_figure()  # type: ignore[assignment]
+        fig = ax.get_figure()
 
     # Log-log plot
     ax.loglog(shear_rates, ratio, marker="o", **kwargs)

@@ -119,7 +119,7 @@ For real experimental data:
    # From light scattering or X-ray experiments
    k_data = np.array([...])  # Wave vectors
    sk_data = np.array([...])  # Structure factor
-   
+
    model = ITTMCTIsotropic(
        sk_source="user_provided",
        k_data=k_data,
@@ -554,14 +554,14 @@ Basic Prediction
 
    from rheojax.models.itt_mct import ITTMCTIsotropic
    import numpy as np
-   
+
    # Hard-sphere glass
    model = ITTMCTIsotropic(phi=0.55)
-   
+
    # Check glass state
    info = model.get_glass_transition_info()
    print(f"Glass: {info['is_glass']}")  # True for φ > 0.516
-   
+
    # Flow curve
    gamma_dot = np.logspace(-2, 2, 30)
    sigma = model.predict(gamma_dot, test_mode='flow_curve')
@@ -575,7 +575,7 @@ Inspect :math:`S(k)`
    sk_info = model.get_sk_info()
    print(f"S(k) peak at k = {sk_info['S_max_position']:.2f}")
    print(f"S(k) max = {sk_info['S_max']:.2f}")
-   
+
    # Access k-grid and S(k) directly
    import matplotlib.pyplot as plt
    plt.loglog(model.k_grid, model.S_k)
@@ -589,7 +589,7 @@ Update Parameters
 
    # Change volume fraction and recalculate S(k)
    model.update_structure_factor(phi=0.52)
-   
+
    # Or provide new experimental S(k)
    model.update_structure_factor(k_data=k_new, sk_data=sk_new)
 

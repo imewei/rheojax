@@ -132,9 +132,7 @@ class TestVLBNonlocalHomogeneous:
 
     def test_startup_uniform(self, vlb_nl_constant):
         """Startup with uniform IC stays uniform."""
-        result = vlb_nl_constant.simulate_startup(
-            gamma_dot_avg=1.0, t_end=10.0, dt=0.5
-        )
+        result = vlb_nl_constant.simulate_startup(gamma_dot_avg=1.0, t_end=10.0, dt=0.5)
         # gamma_dot profile should be nearly uniform
         gdot_final = result["gamma_dot"][-1]
         assert np.std(gdot_final) < 1e-3 * np.mean(np.abs(gdot_final) + 1e-10)
@@ -205,7 +203,9 @@ class TestVLBNonlocalBanding:
         )
         stress = result["stress"]
         # Stress should converge (late values should be stable)
-        rel_change = abs(float(stress[-1] - stress[-2])) / abs(float(stress[-1]) + 1e-20)
+        rel_change = abs(float(stress[-1] - stress[-2])) / abs(
+            float(stress[-1]) + 1e-20
+        )
         assert rel_change < 0.01
 
 
@@ -231,17 +231,13 @@ class TestVLBNonlocalProtocols:
 
     def test_startup_returns_dict(self, vlb_nl_constant):
         """simulate_startup returns correct structure."""
-        result = vlb_nl_constant.simulate_startup(
-            gamma_dot_avg=1.0, t_end=10.0, dt=1.0
-        )
+        result = vlb_nl_constant.simulate_startup(gamma_dot_avg=1.0, t_end=10.0, dt=1.0)
         assert "t" in result
         assert "stress" in result
 
     def test_creep_returns_dict(self, vlb_nl_constant):
         """simulate_creep returns correct structure."""
-        result = vlb_nl_constant.simulate_creep(
-            sigma_0=100.0, t_end=10.0, dt=1.0
-        )
+        result = vlb_nl_constant.simulate_creep(sigma_0=100.0, t_end=10.0, dt=1.0)
         assert "t" in result
         assert "stress" in result
 

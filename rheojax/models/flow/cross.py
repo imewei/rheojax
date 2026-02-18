@@ -37,7 +37,9 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("cross", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR])
+@ModelRegistry.register(
+    "cross", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR]
+)
 class Cross(BaseModel):
     """Cross model for non-Newtonian flow (ROTATION only).
 

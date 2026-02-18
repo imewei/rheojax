@@ -58,6 +58,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -275,8 +276,7 @@ class VLBVariant(VLBBase):
         Returns params in ParameterSet order: [G0, k_d_0, eta_s, (nu), (L_max), (E_a, T_ref)].
         """
         param_values = [
-            float(self.parameters.get_value(name)) # type: ignore[arg-type]
-            for name in self.parameters.keys()
+            float(self.parameters.get_value(name)) for name in self.parameters.keys()
         ]
         return jnp.array(param_values, dtype=jnp.float64)
 
@@ -441,13 +441,13 @@ class VLBVariant(VLBBase):
 
         # Build parameter array from ParameterSet
         param_values = [
-            float(self.parameters.get_value(name))
-            for name in self.parameters.keys()
+            float(self.parameters.get_value(name)) for name in self.parameters.keys()
         ]
         params = jnp.array(param_values)
 
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
+            k: v
+            for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
         return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
@@ -504,9 +504,7 @@ class VLBVariant(VLBBase):
         omega = kwargs.get("omega", self._omega_laos)
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:
-            return self._variant_flow_curve_internal(
-                X_jax, G0, k_d_0, eta_s, vp
-            )
+            return self._variant_flow_curve_internal(X_jax, G0, k_d_0, eta_s, vp)
 
         elif mode == "oscillation":
             # All VLB variants linearize to Maxwell in SAOS
@@ -557,9 +555,7 @@ class VLBVariant(VLBBase):
 
         else:
             logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
-            return self._variant_flow_curve_internal(
-                X_jax, G0, k_d_0, eta_s, vp
-            )
+            return self._variant_flow_curve_internal(X_jax, G0, k_d_0, eta_s, vp)
 
     # =========================================================================
     # Flow Curve (ODE to Steady State)
@@ -584,9 +580,13 @@ class VLBVariant(VLBBase):
         def solve_single(gdot):
             def ode_fn(ti, yi, args):
                 return variant_ode(
-                    ti, yi,
-                    args["gdot"], args["G0"], args["k_d_0"],
-                    args["nu"], args["L_max"],
+                    ti,
+                    yi,
+                    args["gdot"],
+                    args["G0"],
+                    args["k_d_0"],
+                    args["nu"],
+                    args["L_max"],
                 )
 
             args = {"gdot": gdot, "G0": G0, "k_d_0": k_d_0, **vp}
@@ -601,10 +601,17 @@ class VLBVariant(VLBBase):
             saveat = diffrax.SaveAt(ts=jnp.array([t_end]))
 
             sol = diffrax.diffeqsolve(
-                term, solver, 0.0, t_end, dt0, y0,
-                args=args, saveat=saveat,
+                term,
+                solver,
+                0.0,
+                t_end,
+                dt0,
+                y0,
+                args=args,
+                saveat=saveat,
                 stepsize_controller=controller,
-                max_steps=500_000, throw=False,
+                max_steps=500_000,
+                throw=False,
             )
 
             mu_final = sol.ys[0]
@@ -640,9 +647,13 @@ class VLBVariant(VLBBase):
 
         def ode_fn(ti, yi, args):
             return variant_ode(
-                ti, yi,
-                args["gamma_dot"], args["G0"], args["k_d_0"],
-                args["nu"], args["L_max"],
+                ti,
+                yi,
+                args["gamma_dot"],
+                args["G0"],
+                args["k_d_0"],
+                args["nu"],
+                args["L_max"],
             )
 
         args = {"gamma_dot": gamma_dot, "G0": G0, "k_d_0": k_d_0, **vp}
@@ -657,19 +668,33 @@ class VLBVariant(VLBBase):
         saveat = diffrax.SaveAt(ts=t)
 
         sol = diffrax.diffeqsolve(
-            term, solver, 0.0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            0.0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000, throw=False,
+            max_steps=500_000,
+            throw=False,
         )
 
         result = self._compute_stress_from_mu(
-            sol.ys[:, 0], sol.ys[:, 1], sol.ys[:, 2], sol.ys[:, 3],
-            G0, eta_s, gamma_dot, vp,
+            sol.ys[:, 0],
+            sol.ys[:, 1],
+            sol.ys[:, 2],
+            sol.ys[:, 3],
+            G0,
+            eta_s,
+            gamma_dot,
+            vp,
         )
         result = jnp.where(
             sol.result == diffrax.RESULTS.successful,
-            result, jnp.nan * jnp.ones_like(result),
+            result,
+            jnp.nan * jnp.ones_like(result),
         )
         return result
 
@@ -704,9 +729,12 @@ class VLBVariant(VLBBase):
 
         def ode_fn(ti, yi, args):
             return variant_relax_ode(
-                ti, yi,
-                args["G0"], args["k_d_0"],
-                args["nu"], args["L_max"],
+                ti,
+                yi,
+                args["G0"],
+                args["k_d_0"],
+                args["nu"],
+                args["L_max"],
             )
 
         args = {"G0": G0, "k_d_0": k_d_0, **vp}
@@ -720,19 +748,33 @@ class VLBVariant(VLBBase):
         saveat = diffrax.SaveAt(ts=t)
 
         sol = diffrax.diffeqsolve(
-            term, solver, 0.0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            0.0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000, throw=False,
+            max_steps=500_000,
+            throw=False,
         )
 
         result = self._compute_stress_from_mu(
-            sol.ys[:, 0], sol.ys[:, 1], sol.ys[:, 2], sol.ys[:, 3],
-            G0, eta_s, 0.0, vp,
+            sol.ys[:, 0],
+            sol.ys[:, 1],
+            sol.ys[:, 2],
+            sol.ys[:, 3],
+            G0,
+            eta_s,
+            0.0,
+            vp,
         )
         result = jnp.where(
             sol.result == diffrax.RESULTS.successful,
-            result, jnp.nan * jnp.ones_like(result),
+            result,
+            jnp.nan * jnp.ones_like(result),
         )
         return result
 
@@ -754,14 +796,21 @@ class VLBVariant(VLBBase):
 
         def ode_fn(ti, yi, args):
             return variant_creep_ode(
-                ti, yi,
-                args["sigma_applied"], args["G0"], args["k_d_0"],
-                args["eta_s"], args["nu"], args["L_max"],
+                ti,
+                yi,
+                args["sigma_applied"],
+                args["G0"],
+                args["k_d_0"],
+                args["eta_s"],
+                args["nu"],
+                args["L_max"],
             )
 
         args = {
             "sigma_applied": sigma_applied,
-            "G0": G0, "k_d_0": k_d_0, "eta_s": eta_s,
+            "G0": G0,
+            "k_d_0": k_d_0,
+            "eta_s": eta_s,
             **vp,
         }
         # Initial condition: elastic jump at t=0+
@@ -779,16 +828,24 @@ class VLBVariant(VLBBase):
         saveat = diffrax.SaveAt(ts=t)
 
         sol = diffrax.diffeqsolve(
-            term, solver, 0.0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            0.0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000, throw=False,
+            max_steps=500_000,
+            throw=False,
         )
 
         result = sol.ys[:, 4]  # gamma (strain)
         result = jnp.where(
             sol.result == diffrax.RESULTS.successful,
-            result, jnp.nan * jnp.ones_like(result),
+            result,
+            jnp.nan * jnp.ones_like(result),
         )
         return result
 
@@ -811,15 +868,21 @@ class VLBVariant(VLBBase):
 
         def ode_fn(ti, yi, args):
             return variant_laos_ode(
-                ti, yi,
-                args["gamma_0"], args["omega"],
-                args["G0"], args["k_d_0"],
-                args["nu"], args["L_max"],
+                ti,
+                yi,
+                args["gamma_0"],
+                args["omega"],
+                args["G0"],
+                args["k_d_0"],
+                args["nu"],
+                args["L_max"],
             )
 
         args = {
-            "gamma_0": gamma_0, "omega": omega,
-            "G0": G0, "k_d_0": k_d_0,
+            "gamma_0": gamma_0,
+            "omega": omega,
+            "G0": G0,
+            "k_d_0": k_d_0,
             **vp,
         }
         y0 = jnp.array([1.0, 1.0, 1.0, 0.0], dtype=jnp.float64)
@@ -833,21 +896,35 @@ class VLBVariant(VLBBase):
         saveat = diffrax.SaveAt(ts=t)
 
         sol = diffrax.diffeqsolve(
-            term, solver, t0, t1, dt0, y0,
-            args=args, saveat=saveat,
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000, throw=False,
+            max_steps=500_000,
+            throw=False,
         )
 
         strain = gamma_0 * jnp.sin(omega * t)
         gamma_dot_t = gamma_0 * omega * jnp.cos(omega * t)
         stress = self._compute_stress_from_mu(
-            sol.ys[:, 0], sol.ys[:, 1], sol.ys[:, 2], sol.ys[:, 3],
-            G0, eta_s, gamma_dot_t, vp,
+            sol.ys[:, 0],
+            sol.ys[:, 1],
+            sol.ys[:, 2],
+            sol.ys[:, 3],
+            G0,
+            eta_s,
+            gamma_dot_t,
+            vp,
         )
         stress = jnp.where(
             sol.result == diffrax.RESULTS.successful,
-            stress, jnp.nan * jnp.ones_like(stress),
+            stress,
+            jnp.nan * jnp.ones_like(stress),
         )
 
         return strain, stress
@@ -888,9 +965,7 @@ class VLBVariant(VLBBase):
         eta = sigma / np.maximum(np.asarray(gamma_dot), 1e-20)
         return sigma, eta
 
-    def predict_saos(
-        self, omega: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def predict_saos(self, omega: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Predict SAOS moduli (Maxwell, analytical).
 
         In the linear regime, Bell reduces to constant k_d = k_d_0.
@@ -909,12 +984,13 @@ class VLBVariant(VLBBase):
         """
         omega_jax = jnp.asarray(omega, dtype=jnp.float64)
         G_prime, G_double_prime = vlb_saos_moduli_vec(omega_jax, self.G0, self.k_d_0)
-        G_double_prime = G_double_prime + float(self.parameters.get_value("eta_s") or 0.0) * omega_jax
+        G_double_prime = (
+            G_double_prime
+            + float(self.parameters.get_value("eta_s") or 0.0) * omega_jax
+        )
         return np.asarray(G_prime), np.asarray(G_double_prime)
 
-    def predict_normal_stresses(
-        self, gamma_dot: np.ndarray
-    ) -> np.ndarray:
+    def predict_normal_stresses(self, gamma_dot: np.ndarray) -> np.ndarray:
         """Predict steady-state first normal stress difference N1.
 
         For Bell breakage, this requires ODE integration.
@@ -939,9 +1015,13 @@ class VLBVariant(VLBBase):
         def solve_n1(gdot):
             def ode_fn(ti, yi, args):
                 return variant_ode(
-                    ti, yi,
-                    args["gdot"], args["G0"], args["k_d_0"],
-                    args["nu"], args["L_max"],
+                    ti,
+                    yi,
+                    args["gdot"],
+                    args["G0"],
+                    args["k_d_0"],
+                    args["nu"],
+                    args["L_max"],
                 )
 
             args = {"gdot": gdot, "G0": G0, "k_d_0": k_d_0, **vp}
@@ -956,10 +1036,17 @@ class VLBVariant(VLBBase):
             saveat = diffrax.SaveAt(ts=jnp.array([t_end]))
 
             sol = diffrax.diffeqsolve(
-                term, solver, 0.0, t_end, dt0, y0,
-                args=args, saveat=saveat,
+                term,
+                solver,
+                0.0,
+                t_end,
+                dt0,
+                y0,
+                args=args,
+                saveat=saveat,
                 stepsize_controller=controller,
-                max_steps=500_000, throw=False,
+                max_steps=500_000,
+                throw=False,
             )
 
             mu_f = sol.ys[0]
@@ -998,9 +1085,7 @@ class VLBVariant(VLBBase):
         G0, k_d_0, eta_s = params[0], params[1], params[2]
         vp = self._unpack_variant_params(params)
 
-        stress = self._simulate_startup_internal(
-            t_jax, G0, k_d_0, eta_s, gamma_dot, vp
-        )
+        stress = self._simulate_startup_internal(t_jax, G0, k_d_0, eta_s, gamma_dot, vp)
 
         if return_full:
             return {
@@ -1094,7 +1179,7 @@ class VLBVariant(VLBBase):
             't', 'strain', 'stress', 'gamma_dot'
         """
         if t is None:
-            period = 2 * np.pi / omega # type: ignore[unreachable]
+            period = 2 * np.pi / omega
             t = np.linspace(0, n_cycles * period, n_cycles * 200)
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)
@@ -1114,9 +1199,7 @@ class VLBVariant(VLBBase):
         }
         return self._trajectory
 
-    def predict_uniaxial_extension(
-        self, eps_dot: np.ndarray
-    ) -> np.ndarray:
+    def predict_uniaxial_extension(self, eps_dot: np.ndarray) -> np.ndarray:
         """Predict steady-state extensional stress.
 
         For FENE-P, extensional stress is bounded (no singularity).
@@ -1161,10 +1244,17 @@ class VLBVariant(VLBBase):
                 saveat = diffrax.SaveAt(ts=jnp.array([t_end]))
 
                 sol = diffrax.diffeqsolve(
-                    term, solver, 0.0, t_end, dt0, y0,
-                    args=None, saveat=saveat,
+                    term,
+                    solver,
+                    0.0,
+                    t_end,
+                    dt0,
+                    y0,
+                    args=None,
+                    saveat=saveat,
                     stepsize_controller=controller,
-                    max_steps=500_000, throw=False,
+                    max_steps=500_000,
+                    throw=False,
                 )
 
                 mu_f = sol.ys[0]
@@ -1225,7 +1315,11 @@ class VLBVariant(VLBBase):
         magnitudes = 2.0 * np.abs(fft_vals) / n
 
         # Harmonics: I_1, I_3, I_5, ...
-        harmonics = magnitudes[1 : 2 * n_harmonics : 2] if len(magnitudes) > 2 * n_harmonics else magnitudes[1:]
+        harmonics = (
+            magnitudes[1 : 2 * n_harmonics : 2]
+            if len(magnitudes) > 2 * n_harmonics
+            else magnitudes[1:]
+        )
 
         I1 = harmonics[0] if len(harmonics) > 0 else 1e-30
         I3 = harmonics[1] if len(harmonics) > 1 else 0.0

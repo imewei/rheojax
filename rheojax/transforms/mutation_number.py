@@ -266,8 +266,8 @@ class MutationNumber(BaseTransform):
 
         logger.debug(
             "Data extracted",
-            data_points=len(t),  # type: ignore[arg-type]
-            time_range=(float(t[0]), float(t[-1])),  # type: ignore[index]
+            data_points=len(t),
+            time_range=(float(t[0]), float(t[-1])),
         )
 
         # Convert to JAX arrays
@@ -553,7 +553,7 @@ class MutationNumber(BaseTransform):
 
         return delta
 
-    def _transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
+    def _transform(self, data: RheoData) -> RheoData:
         """Transform relaxation data to mutation number.
 
         This returns a scalar RheoData with single mutation number value.

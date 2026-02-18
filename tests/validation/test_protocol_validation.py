@@ -313,9 +313,9 @@ class TestProtocolValidation:
 
         # ODE-based models may return internal grid sizes different from input
         # Only assert exact match for non-ODE models
-        assert actual_len >= 1, (
-            f"{model_name} returned empty result for {protocol.value}"
-        )
+        assert (
+            actual_len >= 1
+        ), f"{model_name} returned empty result for {protocol.value}"
 
     def test_all_models_have_protocols(self):
         """Verify that every registered model declares at least one protocol."""

@@ -63,6 +63,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -266,9 +267,19 @@ class VLBLocal(VLBBase):
 
         # Define model function for fitting (exclude test_mode from kwargs to avoid duplicates)
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
-            if k not in ("test_mode", "use_log_residuals", "use_jax", "method",
-                         "max_iter", "use_multi_start", "n_starts", "perturb_factor")
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in (
+                "test_mode",
+                "use_log_residuals",
+                "use_jax",
+                "method",
+                "max_iter",
+                "use_multi_start",
+                "n_starts",
+                "perturb_factor",
+            )
         }
 
         def model_fn(x_fit, params):
@@ -295,9 +306,7 @@ class VLBLocal(VLBBase):
         self.fitted_ = True
         self._nlsq_result = result
 
-        logger.info(
-            f"Fitted VLBLocal: G0={self.G0:.2e}, k_d={self.k_d:.2e}"
-        )
+        logger.info(f"Fitted VLBLocal: G0={self.G0:.2e}, k_d={self.k_d:.2e}")
 
         return self
 
@@ -335,14 +344,14 @@ class VLBLocal(VLBBase):
 
         # Build parameter array from ParameterSet (ordering matters)
         param_values = [
-            float(self.parameters.get_value(name))
-            for name in self.parameters.keys()
+            float(self.parameters.get_value(name)) for name in self.parameters.keys()
         ]
         params = jnp.array(param_values)
 
         # Remove test_mode from kwargs to avoid duplicate
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
+            k: v
+            for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
         return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
@@ -412,9 +421,7 @@ class VLBLocal(VLBBase):
         elif mode == "laos":
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
-            _, stress = self._simulate_laos_internal(
-                X_jax, G0, k_d, gamma_0, omega
-            )
+            _, stress = self._simulate_laos_internal(X_jax, G0, k_d, gamma_0, omega)
             return stress
 
         else:

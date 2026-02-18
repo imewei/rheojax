@@ -20,6 +20,7 @@ import numpy as np
 from rheojax.core.base import ArrayLike
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -296,8 +297,15 @@ class MLIKH(IKHBase):
         """
         n = self._n_modes
         if names is None:
-            names = ["G", "C", "gamma_dyn", "sigma_y0",
-                     "delta_sigma_y", "tau_thix", "Gamma"]
+            names = [
+                "G",
+                "C",
+                "gamma_dyn",
+                "sigma_y0",
+                "delta_sigma_y",
+                "tau_thix",
+                "Gamma",
+            ]
         return {
             name: jnp.stack([params[f"{name}_{i}"] for i in range(1, n + 1)])
             for name in names
@@ -538,7 +546,7 @@ class MLIKH(IKHBase):
         result = jnp.where(
             sol.result == diffrax.RESULTS.successful,
             result,
-            jnp.nan * jnp.ones_like(result)
+            jnp.nan * jnp.ones_like(result),
         )
 
         # Add viscous contribution for startup
@@ -680,7 +688,9 @@ class MLIKH(IKHBase):
         else:
             return self._fit_saos_frequency_domain(X, y, **kwargs)
 
-    def _fit_saos_frequency_domain(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MLIKH":
+    def _fit_saos_frequency_domain(
+        self, X: ArrayLike, y: ArrayLike, **kwargs
+    ) -> "MLIKH":
         """Fit to frequency-domain SAOS data using Maxwell analytical expressions.
 
         Args:
@@ -763,7 +773,9 @@ class MLIKH(IKHBase):
 
         # Extract protocol-specific args from kwargs or fall back to instance attrs
         gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", None))
-        sigma_applied = kwargs.get("sigma_applied", getattr(self, "_fit_sigma_applied", None))
+        sigma_applied = kwargs.get(
+            "sigma_applied", getattr(self, "_fit_sigma_applied", None)
+        )
         sigma_0 = kwargs.get("sigma_0", getattr(self, "_fit_sigma_0", None))
 
         if mode == "flow_curve":
@@ -788,7 +800,9 @@ class MLIKH(IKHBase):
 
                 for i in range(1, self._n_modes + 1):
                     G_i = param_dict[f"G_{i}"]
-                    eta_i = param_dict.get(f"eta_{i}", 1e12)  # High viscosity if not specified
+                    eta_i = param_dict.get(
+                        f"eta_{i}", 1e12
+                    )  # High viscosity if not specified
                     tau_i = eta_i / G_i
 
                     wt_i = omega * tau_i

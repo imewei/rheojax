@@ -228,9 +228,7 @@ def _solve_giesekus_f_quartic(
 
         # ds_xx/df: d(disc_xx)/ds_xy = 4α(2Wi - 2α·s_xy)
         # ds_xx/ds_xy = 4α(2Wi - 2α·s_xy) / (4α·√disc_xx) = (2Wi - 2α·s_xy)/√disc_xx
-        ds_xx_df = (
-            2.0 * (wi - alpha_safe * s_xy) * wi / (sqrt_disc_xx + 1e-30)
-        )
+        ds_xx_df = 2.0 * (wi - alpha_safe * s_xy) * wi / (sqrt_disc_xx + 1e-30)
 
         # dR/df = 1 - ds_yy/df + α(s_xx+s_yy) + α·f·(ds_xx/df + ds_yy/df)
         return (

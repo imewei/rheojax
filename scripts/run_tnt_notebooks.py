@@ -10,6 +10,7 @@ Features:
 - Single-notebook and batch execution modes
 - Issue inventory generation
 """
+
 import argparse
 import io
 import json
@@ -21,6 +22,7 @@ import warnings
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import nbformat
 from nbclient import NotebookClient
@@ -55,14 +57,16 @@ class WarningCapture:
         self._old_showwarning = None
 
     def _showwarning(self, message, category, filename, lineno, file=None, line=None):
-        self.warnings.append({
-            "message": str(message),
-            "category": category.__name__,
-            "filename": str(filename),
-            "lineno": lineno,
-            "line": line,
-            "classified_as": categorize_warning(str(message)),
-        })
+        self.warnings.append(
+            {
+                "message": str(message),
+                "category": category.__name__,
+                "filename": str(filename),
+                "lineno": lineno,
+                "line": line,
+                "classified_as": categorize_warning(str(message)),
+            }
+        )
         # Still show the warning in stderr
         if self._old_showwarning:
             self._old_showwarning(message, category, filename, lineno, file, line)
@@ -79,8 +83,10 @@ class WarningCapture:
 def setup_headless_matplotlib():
     """Configure matplotlib for headless execution."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     plt.ioff()
 
 
@@ -197,7 +203,7 @@ def run_notebook(
         result["stderr"] = stderr_capture.getvalue()
 
     # If passed but has warnings, note it
-    if result["status"] == "PASS" and result["warnings_count"] > 0:
+    if result["status"] == "PASS" and result["warnings_count"] > 0:  # type: ignore[operator]
         result["status"] = "PASS_WITH_WARNINGS"
 
     # Write per-notebook log
@@ -257,7 +263,7 @@ def generate_issue_inventory(results: list[dict], output_path: Path):
             if r["warnings_count"] > 0:
                 f.write("\n**Top Warnings**:\n")
                 # Group warnings by category
-                by_cat = {}
+                by_cat: dict[str, list[dict[str, Any]]] = {}
                 for w in r["warnings"][:20]:  # Limit to first 20
                     cat = w["classified_as"]
                     if cat not in by_cat:
@@ -274,7 +280,7 @@ def generate_issue_inventory(results: list[dict], output_path: Path):
 
         # Root cause summary
         f.write("## Root Cause Categories\n\n")
-        causes = {}
+        causes: dict[str, int] = {}
         for r in results:
             if r["suspected_cause"]:
                 causes[r["suspected_cause"]] = causes.get(r["suspected_cause"], 0) + 1
@@ -376,7 +382,9 @@ def main():
                 "TIMEOUT": "\u23f1",
             }.get(result["status"], "?")
 
-            print(f"{status_symbol} ({result['runtime_seconds']:.1f}s, {result['warnings_count']} warnings)")
+            print(
+                f"{status_symbol} ({result['runtime_seconds']:.1f}s, {result['warnings_count']} warnings)"
+            )
 
             if result["status"] in ("FAIL", "TIMEOUT"):
                 print(f"    Cause: {result['suspected_cause']}")
@@ -393,16 +401,23 @@ def main():
         # Write master log
         master_log = log_dir / f"run_{timestamp}.json"
         with open(master_log, "w") as f:
-            json.dump({
-                "timestamp": timestamp,
-                "timeout": args.timeout,
-                "total": len(results),
-                "passed": sum(1 for r in results if r["status"] == "PASS"),
-                "passed_warnings": sum(1 for r in results if r["status"] == "PASS_WITH_WARNINGS"),
-                "failed": sum(1 for r in results if r["status"] == "FAIL"),
-                "timed_out": sum(1 for r in results if r["status"] == "TIMEOUT"),
-                "results": results,
-            }, f, indent=2, default=str)
+            json.dump(
+                {
+                    "timestamp": timestamp,
+                    "timeout": args.timeout,
+                    "total": len(results),
+                    "passed": sum(1 for r in results if r["status"] == "PASS"),
+                    "passed_warnings": sum(
+                        1 for r in results if r["status"] == "PASS_WITH_WARNINGS"
+                    ),
+                    "failed": sum(1 for r in results if r["status"] == "FAIL"),
+                    "timed_out": sum(1 for r in results if r["status"] == "TIMEOUT"),
+                    "results": results,
+                },
+                f,
+                indent=2,
+                default=str,
+            )
         print(f"Master log: {master_log}")
 
         # Summary

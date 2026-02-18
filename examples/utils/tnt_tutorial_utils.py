@@ -435,11 +435,15 @@ def plot_conformation_tensor_evolution(
     try:
         result = model.simulate_startup(time, gamma_dot=gamma_dot)
         if isinstance(result, tuple) and len(result) >= 2:
-            _stress = np.asarray(result[1]) if len(result) > 1 else np.asarray(result[0])
+            _stress = (
+                np.asarray(result[1]) if len(result) > 1 else np.asarray(result[0])
+            )
         else:
             _stress = np.asarray(result)
     except (AttributeError, TypeError):
-        _stress = np.asarray(model.predict(time, test_mode="startup", gamma_dot=gamma_dot))
+        _stress = np.asarray(
+            model.predict(time, test_mode="startup", gamma_dot=gamma_dot)
+        )
 
     # Analytical conformation tensor for constant breakage (Tanaka-Edwards)
     tau_b = float(model.parameters.get_value("tau_b"))
@@ -463,13 +467,18 @@ def plot_conformation_tensor_evolution(
     ax1.axhline(1.0, color="gray", ls="--", alpha=0.5, label="Equilibrium")
     ax1.set_xlabel("Time [s]", fontsize=12)
     ax1.set_ylabel("Conformation tensor component", fontsize=12)
-    ax1.set_title(
-        f"Conformation Tensor (Wi = {Wi:.2f})", fontsize=13
-    )
+    ax1.set_title(f"Conformation Tensor (Wi = {Wi:.2f})", fontsize=13)
     ax1.legend(fontsize=10)
     ax1.grid(True, alpha=0.3)
 
-    ax2.plot(time, stretch, "-", lw=2, color="C3", label=r"$\lambda = \sqrt{\mathrm{tr}(S)/3}$")
+    ax2.plot(
+        time,
+        stretch,
+        "-",
+        lw=2,
+        color="C3",
+        label=r"$\lambda = \sqrt{\mathrm{tr}(S)/3}$",
+    )
     ax2.axhline(1.0, color="gray", ls="--", alpha=0.5, label="Equilibrium")
     ax2.set_xlabel("Time [s]", fontsize=12)
     ax2.set_ylabel("Chain stretch ratio", fontsize=12)
@@ -516,18 +525,41 @@ def plot_weissenberg_number_effects(
     nonlinear = Wi > 2.0
 
     if np.any(linear):
-        ax.loglog(gamma_dot_range[linear], stress[linear], "o",
-                  color="C0", ms=4, label="Wi < 0.5 (linear)")
+        ax.loglog(
+            gamma_dot_range[linear],
+            stress[linear],
+            "o",
+            color="C0",
+            ms=4,
+            label="Wi < 0.5 (linear)",
+        )
     if np.any(transition):
-        ax.loglog(gamma_dot_range[transition], stress[transition], "s",
-                  color="C1", ms=4, label="0.5 < Wi < 2 (transition)")
+        ax.loglog(
+            gamma_dot_range[transition],
+            stress[transition],
+            "s",
+            color="C1",
+            ms=4,
+            label="0.5 < Wi < 2 (transition)",
+        )
     if np.any(nonlinear):
-        ax.loglog(gamma_dot_range[nonlinear], stress[nonlinear], "^",
-                  color="C2", ms=4, label="Wi > 2 (nonlinear)")
+        ax.loglog(
+            gamma_dot_range[nonlinear],
+            stress[nonlinear],
+            "^",
+            color="C2",
+            ms=4,
+            label="Wi > 2 (nonlinear)",
+        )
 
     # Mark Wi = 1 crossover
-    ax.axvline(1.0 / tau_b, color="red", ls="--", alpha=0.5,
-               label=f"Wi = 1 (1/tau_b = {1.0/tau_b:.2g} 1/s)")
+    ax.axvline(
+        1.0 / tau_b,
+        color="red",
+        ls="--",
+        alpha=0.5,
+        label=f"Wi = 1 (1/tau_b = {1.0/tau_b:.2g} 1/s)",
+    )
 
     ax.set_xlabel("Shear rate [1/s]", fontsize=12)
     ax.set_ylabel("Stress [Pa]", fontsize=12)
@@ -580,7 +612,7 @@ def plot_variant_comparison(
                 y_pred = np.asarray(model.predict(x_data, test_mode="flow_curve"))
             elif protocol == "saos":
                 G_p, G_pp = model.predict_saos(x_data)
-                y_pred = np.sqrt(np.asarray(G_p)**2 + np.asarray(G_pp)**2)
+                y_pred = np.sqrt(np.asarray(G_p) ** 2 + np.asarray(G_pp) ** 2)
             else:
                 y_pred = np.asarray(
                     model.predict(x_data, test_mode=protocol, **predict_kwargs)
@@ -597,7 +629,9 @@ def plot_variant_comparison(
 
     ax.set_xlabel(_get_xlabel(protocol), fontsize=12)
     ax.set_ylabel(_get_ylabel(protocol), fontsize=12)
-    ax.set_title(f"TNT Variant Comparison: {protocol.replace('_', ' ').title()}", fontsize=13)
+    ax.set_title(
+        f"TNT Variant Comparison: {protocol.replace('_', ' ').title()}", fontsize=13
+    )
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3, which="both")
 
@@ -654,7 +688,7 @@ def plot_bell_nu_sweep(
             elif protocol == "saos":
                 # SAOS is independent of nu (linear regime)
                 G_p, G_pp = model.predict_saos(x_data)
-                y_pred = np.sqrt(np.asarray(G_p)**2 + np.asarray(G_pp)**2)
+                y_pred = np.sqrt(np.asarray(G_p) ** 2 + np.asarray(G_pp) ** 2)
             else:
                 y_pred = np.asarray(
                     model.predict(x_data, test_mode=protocol, **predict_kwargs)
@@ -665,17 +699,18 @@ def plot_bell_nu_sweep(
         y_pred = np.asarray(y_pred).flatten()
 
         if protocol in ("flow_curve", "relaxation", "saos"):
-            ax.loglog(x_data, y_pred, "-", color=color, lw=2,
-                      label=f"nu = {nu}")
+            ax.loglog(x_data, y_pred, "-", color=color, lw=2, label=f"nu = {nu}")
         else:
-            ax.plot(x_data, y_pred, "-", color=color, lw=2,
-                    label=f"nu = {nu}")
+            ax.plot(x_data, y_pred, "-", color=color, lw=2, label=f"nu = {nu}")
 
     model.parameters.set_value("nu", original_nu)
 
     ax.set_xlabel(_get_xlabel(protocol), fontsize=12)
     ax.set_ylabel(_get_ylabel(protocol), fontsize=12)
-    ax.set_title(f"Bell Force Sensitivity Sweep: {protocol.replace('_', ' ').title()}", fontsize=13)
+    ax.set_title(
+        f"Bell Force Sensitivity Sweep: {protocol.replace('_', ' ').title()}",
+        fontsize=13,
+    )
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3, which="both")
 
@@ -714,7 +749,7 @@ def plot_mode_decomposition(
             y_total = np.asarray(model.predict(x_data, test_mode="flow_curve"))
         elif protocol == "saos":
             G_p, G_pp = model.predict_saos(x_data)
-            y_total = np.sqrt(np.asarray(G_p)**2 + np.asarray(G_pp)**2)
+            y_total = np.sqrt(np.asarray(G_p) ** 2 + np.asarray(G_pp) ** 2)
         else:
             y_total = np.asarray(
                 model.predict(x_data, test_mode=protocol, **predict_kwargs)
@@ -742,22 +777,42 @@ def plot_mode_decomposition(
             G_star_k = np.sqrt(G_p_k**2 + G_pp_k**2)
 
             if logscale:
-                ax.loglog(x_data, G_star_k, "--", color=colors[k], lw=2,
-                          label=f"Mode {k}: G={G_k:.0f}, tau={tau_k:.2g}")
+                ax.loglog(
+                    x_data,
+                    G_star_k,
+                    "--",
+                    color=colors[k],
+                    lw=2,
+                    label=f"Mode {k}: G={G_k:.0f}, tau={tau_k:.2g}",
+                )
             else:
-                ax.plot(x_data, G_star_k, "--", color=colors[k], lw=2,
-                        label=f"Mode {k}: G={G_k:.0f}, tau={tau_k:.2g}")
+                ax.plot(
+                    x_data,
+                    G_star_k,
+                    "--",
+                    color=colors[k],
+                    lw=2,
+                    label=f"Mode {k}: G={G_k:.0f}, tau={tau_k:.2g}",
+                )
 
         # Solvent contribution
         if eta_s > 0:
             sigma_s = eta_s * x_data
             if logscale:
-                ax.loglog(x_data, sigma_s, ":", color="gray", lw=1.5,
-                          label=f"Solvent (eta_s={eta_s:.2g})")
+                ax.loglog(
+                    x_data,
+                    sigma_s,
+                    ":",
+                    color="gray",
+                    lw=1.5,
+                    label=f"Solvent (eta_s={eta_s:.2g})",
+                )
 
     ax.set_xlabel(_get_xlabel(protocol), fontsize=12)
     ax.set_ylabel(_get_ylabel(protocol), fontsize=12)
-    ax.set_title(f"Mode Decomposition: {protocol.replace('_', ' ').title()}", fontsize=13)
+    ax.set_title(
+        f"Mode Decomposition: {protocol.replace('_', ' ').title()}", fontsize=13
+    )
     ax.legend(fontsize=9, loc="best")
     ax.grid(True, alpha=0.3, which="both")
 
@@ -851,8 +906,7 @@ def plot_cates_cole_cole(
     theta = np.linspace(0, np.pi, 200)
     G_p_ref = (G_0 / 2) * (1 + np.cos(theta))
     G_pp_ref = (G_0 / 2) * np.sin(theta)
-    ax.plot(G_p_ref, G_pp_ref, "k--", lw=1.5, alpha=0.5,
-            label="Single-mode Maxwell")
+    ax.plot(G_p_ref, G_pp_ref, "k--", lw=1.5, alpha=0.5, label="Single-mode Maxwell")
 
     ax.set_xlabel("G' [Pa]", fontsize=12)
     ax.set_ylabel("G'' [Pa]", fontsize=12)
@@ -913,8 +967,9 @@ def plot_loop_bridge_fraction(
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
 
     ax1.semilogx(gamma_dot_range, f_B_ss, "-", lw=2.5, color="C0")
-    ax1.axhline(f_B_eq, color="gray", ls="--", alpha=0.5,
-                label=f"f_B_eq = {f_B_eq:.2f}")
+    ax1.axhline(
+        f_B_eq, color="gray", ls="--", alpha=0.5, label=f"f_B_eq = {f_B_eq:.2f}"
+    )
     ax1.set_xlabel("Shear rate [1/s]", fontsize=12)
     ax1.set_ylabel("Bridge fraction f_B", fontsize=12)
     ax1.set_title("Bridge Fraction vs Shear Rate", fontsize=13)
@@ -922,10 +977,10 @@ def plot_loop_bridge_fraction(
     ax1.legend(fontsize=10)
     ax1.grid(True, alpha=0.3)
 
-    ax2.loglog(gamma_dot_range, tau_b_eff, "-", lw=2.5, color="C1",
-               label="tau_b_eff (Bell)")
-    ax2.axhline(tau_b, color="gray", ls="--", alpha=0.5,
-                label=f"tau_b = {tau_b:.2g} s")
+    ax2.loglog(
+        gamma_dot_range, tau_b_eff, "-", lw=2.5, color="C1", label="tau_b_eff (Bell)"
+    )
+    ax2.axhline(tau_b, color="gray", ls="--", alpha=0.5, label=f"tau_b = {tau_b:.2g} s")
     ax2.set_xlabel("Shear rate [1/s]", fontsize=12)
     ax2.set_ylabel("Effective lifetime [s]", fontsize=12)
     ax2.set_title("Force-Dependent Bond Lifetime", fontsize=13)
@@ -1024,12 +1079,21 @@ def plot_sticky_rouse_effective_times(
 
     modes = np.arange(n_modes)
 
-    ax1.semilogy(modes, tau_R_vals, "o-", ms=8, lw=2, color="C0",
-                 label=r"$\tau_{R,k}$ (Rouse)")
-    ax1.semilogy(modes, tau_eff_vals, "s--", ms=8, lw=2, color="C2",
-                 label=r"$\tau_{\mathrm{eff},k} = \max(\tau_{R,k}, \tau_s)$")
-    ax1.axhline(tau_s, color="red", ls=":", alpha=0.7,
-                label=f"tau_s = {tau_s:.2g} s (sticker)")
+    ax1.semilogy(
+        modes, tau_R_vals, "o-", ms=8, lw=2, color="C0", label=r"$\tau_{R,k}$ (Rouse)"
+    )
+    ax1.semilogy(
+        modes,
+        tau_eff_vals,
+        "s--",
+        ms=8,
+        lw=2,
+        color="C2",
+        label=r"$\tau_{\mathrm{eff},k} = \max(\tau_{R,k}, \tau_s)$",
+    )
+    ax1.axhline(
+        tau_s, color="red", ls=":", alpha=0.7, label=f"tau_s = {tau_s:.2g} s (sticker)"
+    )
     ax1.set_xlabel("Mode index k", fontsize=12)
     ax1.set_ylabel("Relaxation time [s]", fontsize=12)
     ax1.set_title("Rouse vs Effective Times", fontsize=13)
@@ -1037,8 +1101,13 @@ def plot_sticky_rouse_effective_times(
     ax1.legend(fontsize=9)
     ax1.grid(True, alpha=0.3)
 
-    ax2.bar(modes, G_vals, color=plt.cm.Set2(np.linspace(0, 0.8, n_modes)),
-            edgecolor="black", alpha=0.8)
+    ax2.bar(
+        modes,
+        G_vals,
+        color=plt.cm.Set2(np.linspace(0, 0.8, n_modes)),
+        edgecolor="black",
+        alpha=0.8,
+    )
     ax2.set_xlabel("Mode index k", fontsize=12)
     ax2.set_ylabel("Modulus G_k [Pa]", fontsize=12)
     ax2.set_title("Mode Moduli", fontsize=13)
@@ -1071,8 +1140,12 @@ def plot_tnt_family_comparison(
         Matplotlib figure.
     """
     return plot_variant_comparison(
-        x_data, protocol, models=models, y_data=y_data,
-        figsize=figsize, **predict_kwargs,
+        x_data,
+        protocol,
+        models=models,
+        y_data=y_data,
+        figsize=figsize,
+        **predict_kwargs,
     )
 
 
@@ -1384,14 +1457,14 @@ def print_parameter_comparison(
             median = float(np.median(samples))
             lo = float(np.percentile(samples, 2.5))
             hi = float(np.percentile(samples, 97.5))
-            print(f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]")
+            print(
+                f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]"
+            )
         except (KeyError, AttributeError):
             pass
 
 
-def compute_fit_quality(
-    y_data: np.ndarray, y_pred: np.ndarray
-) -> dict[str, float]:
+def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     """Compute fit quality metrics (R-squared, RMSE, NRMSE).
 
     Args:

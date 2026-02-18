@@ -35,6 +35,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
@@ -1062,9 +1063,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         elif mode == "laos":
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
-            _, stress = self._simulate_laos_internal(
-                X_jax, p_values, gamma_0, omega
-            )
+            _, stress = self._simulate_laos_internal(X_jax, p_values, gamma_0, omega)
             return stress
 
         return jnp.zeros_like(X_jax)
@@ -1162,4 +1161,4 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         float
             Critical stress σ_c ≈ τ_y (Pa)
         """
-        return self.parameters.get_value("tau_y0")  # type: ignore[return-value]
+        return self.parameters.get_value("tau_y0")

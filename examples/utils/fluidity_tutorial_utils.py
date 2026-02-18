@@ -95,7 +95,9 @@ def load_mucus_creep() -> tuple[np.ndarray, np.ndarray]:
         FileNotFoundError: If data file not found.
     """
     module_dir = Path(__file__).parent
-    data_path = module_dir / ".." / "data" / "creep" / "biological" / "creep_mucus_data.csv"
+    data_path = (
+        module_dir / ".." / "data" / "creep" / "biological" / "creep_mucus_data.csv"
+    )
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -187,7 +189,9 @@ def generate_synthetic_startup(
     stress_clean = np.asarray(stress_clean).flatten()
 
     # Add noise
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     return time, stress
@@ -228,7 +232,9 @@ def generate_synthetic_creep(
     strain_clean = np.asarray(strain_clean).flatten()
 
     # Add noise
-    noise = rng.normal(0, noise_level * np.mean(np.abs(strain_clean)), size=strain_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(strain_clean)), size=strain_clean.shape
+    )
     strain = strain_clean + noise
 
     return time, strain
@@ -272,7 +278,9 @@ def generate_synthetic_relaxation(
         stress_clean = stress_clean * (sigma_0 / stress_clean[0])
 
     # Add noise
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     return time, stress
@@ -326,10 +334,14 @@ def generate_synthetic_laos(
 
     # Ensure lengths match
     if len(stress_clean) != len(time):
-        stress_clean = np.interp(time, np.linspace(0, t_end, len(stress_clean)), stress_clean)
+        stress_clean = np.interp(
+            time, np.linspace(0, t_end, len(stress_clean)), stress_clean
+        )
 
     # Add noise
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     return {
@@ -471,7 +483,17 @@ def print_convergence_summary(
         True if all convergence criteria pass, False otherwise.
     """
     if param_names is None:
-        param_names = ["G", "tau_y", "K", "n_flow", "f_eq", "f_inf", "theta", "a", "n_rejuv"]
+        param_names = [
+            "G",
+            "tau_y",
+            "K",
+            "n_flow",
+            "f_eq",
+            "f_inf",
+            "theta",
+            "a",
+            "n_rejuv",
+        ]
 
     diag = result.diagnostics
 
@@ -540,7 +562,9 @@ def print_parameter_comparison(
             median = float(np.median(samples))
             lo = float(np.percentile(samples, 2.5))
             hi = float(np.percentile(samples, 97.5))
-            print(f"{name:>12s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]")
+            print(
+                f"{name:>12s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]"
+            )
         except (KeyError, AttributeError):
             pass
 
@@ -585,7 +609,17 @@ def get_fluidity_param_names(
     Returns:
         List of parameter names.
     """
-    base_params = ["G", "tau_y", "K", "n_flow", "f_eq", "f_inf", "theta", "a", "n_rejuv"]
+    base_params = [
+        "G",
+        "tau_y",
+        "K",
+        "n_flow",
+        "f_eq",
+        "f_inf",
+        "theta",
+        "a",
+        "n_rejuv",
+    ]
 
     if model_variant == "nonlocal":
         return base_params + ["xi"]
@@ -668,7 +702,11 @@ def detect_shear_banding(
     gamma_dot_field = np.asarray(gamma_dot_field)
 
     # Coefficient of variation
-    cv = np.std(gamma_dot_field) / np.mean(gamma_dot_field) if np.mean(gamma_dot_field) > 0 else 0.0
+    cv = (
+        np.std(gamma_dot_field) / np.mean(gamma_dot_field)
+        if np.mean(gamma_dot_field) > 0
+        else 0.0
+    )
 
     # Max/min ratio
     min_val = np.min(gamma_dot_field)

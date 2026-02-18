@@ -557,7 +557,12 @@ class FractionalJeffreysModel(BaseModel):
         tau1 = self.parameters.get_value("tau1")
 
         # Dispatch based on test_mode if set, otherwise auto-detect
-        assert eta1 is not None and eta2 is not None and alpha is not None and tau1 is not None
+        assert (
+            eta1 is not None
+            and eta2 is not None
+            and alpha is not None
+            and tau1 is not None
+        )
         test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             return self._predict_oscillation(X, eta1, eta2, alpha, tau1)
@@ -565,7 +570,12 @@ class FractionalJeffreysModel(BaseModel):
             return self._predict_relaxation(X, eta1, eta2, alpha, tau1)
         elif test_mode in ("creep", TestMode.CREEP):
             return self._predict_creep(X, eta1, eta2, alpha, tau1)
-        elif test_mode in ("flow_curve", "rotation", TestMode.FLOW_CURVE, TestMode.ROTATION):
+        elif test_mode in (
+            "flow_curve",
+            "rotation",
+            TestMode.FLOW_CURVE,
+            TestMode.ROTATION,
+        ):
             return self._predict_rotation(X, eta1, eta2, alpha, tau1)
 
         # Auto-detect test mode (legacy fallback)

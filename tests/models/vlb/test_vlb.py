@@ -335,7 +335,7 @@ class TestVLBLocalLAOS:
 
         G_star_laos = stress_amp / strain_amp
         Gp, Gpp = vlb_local.predict_saos(np.array([omega]))
-        G_star_saos = np.sqrt(float(Gp[0])**2 + float(Gpp[0])**2)
+        G_star_saos = np.sqrt(float(Gp[0]) ** 2 + float(Gpp[0]) ** 2)
 
         assert G_star_laos == pytest.approx(G_star_saos, rel=0.02)
 
@@ -346,9 +346,7 @@ class TestVLBLocalLAOS:
         period = 2 * np.pi / omega
         t = np.linspace(0, 5 * period, 500)
 
-        stress = vlb_local.predict(
-            t, test_mode="laos", gamma_0=gamma_0, omega=omega
-        )
+        stress = vlb_local.predict(t, test_mode="laos", gamma_0=gamma_0, omega=omega)
         assert stress.shape == t.shape
         assert not np.any(np.isnan(np.asarray(stress)))
 
@@ -500,10 +498,9 @@ class TestVLBMultiNetworkAnalytical:
 
         G0, kd0 = 500.0, 0.1
         G1, kd1 = 500.0, 10.0
-        expected = (
-            G0 * gamma_dot / kd0 * (1 - np.exp(-kd0 * t))
-            + G1 * gamma_dot / kd1 * (1 - np.exp(-kd1 * t))
-        )
+        expected = G0 * gamma_dot / kd0 * (
+            1 - np.exp(-kd0 * t)
+        ) + G1 * gamma_dot / kd1 * (1 - np.exp(-kd1 * t))
         np.testing.assert_allclose(sigma, expected, rtol=1e-8)
 
     def test_flow_curve_newtonian(self, vlb_multi_2):
@@ -518,9 +515,7 @@ class TestVLBMultiNetworkAnalytical:
     def test_sls_creep(self, vlb_multi_perm):
         """1 mode + permanent should give SLS creep (bounded)."""
         t = np.linspace(0, 50, 200)
-        gamma = vlb_multi_perm.predict(
-            t, test_mode="creep", sigma_applied=100.0
-        )
+        gamma = vlb_multi_perm.predict(t, test_mode="creep", sigma_applied=100.0)
         gamma = np.asarray(gamma)
 
         # SLS: J(t) = 1/(G0+Ge) + [G0/(Ge*(G0+Ge))]*(1-exp(-t/tau_ret))
@@ -556,9 +551,7 @@ class TestVLBCrossProtocol:
         sigma_startup = vlb_local.simulate_startup(t, gamma_dot=gamma_dot)
         # Flow curve
         sigma_flow = vlb_local.predict(np.array([gamma_dot]), test_mode="flow_curve")
-        assert float(sigma_startup[0]) == pytest.approx(
-            float(sigma_flow[0]), rel=1e-6
-        )
+        assert float(sigma_startup[0]) == pytest.approx(float(sigma_flow[0]), rel=1e-6)
 
     def test_saos_crossover_vs_relaxation(self, vlb_local):
         """Crossover frequency should match relaxation rate."""

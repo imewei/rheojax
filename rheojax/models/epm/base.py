@@ -81,7 +81,9 @@ def _jit_flow_curve_single(
         redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
 
         # Update
-        new_stress = stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        new_stress = (
+            stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        )
         new_strain = strain_curr + gdot * dt
 
         return (new_stress, thresholds_curr, new_strain, key_curr), jnp.mean(new_stress)
@@ -91,7 +93,7 @@ def _jit_flow_curve_single(
     )
 
     # Average second half for steady state
-    steady_stress = jnp.mean(history[n_steps // 2:])
+    steady_stress = jnp.mean(history[n_steps // 2 :])
     return steady_stress
 
 
@@ -126,7 +128,9 @@ def _jit_flow_curve_batch(
 
     def single_rate(gdot_key):
         gdot, k = gdot_key
-        return _jit_flow_curve_single(gdot, k, propagator_q, params_array, dt, n_steps, L)
+        return _jit_flow_curve_single(
+            gdot, k, propagator_q, params_array, dt, n_steps, L
+        )
 
     return jax.vmap(single_rate)((shear_rates, keys))
 
@@ -192,7 +196,9 @@ def _jit_startup_kernel(
         redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
 
         # Update
-        new_stress = stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        new_stress = (
+            stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        )
         new_strain = strain_curr + gamma_dot * dt
 
         return (new_stress, thresholds_curr, new_strain, key_curr), jnp.mean(new_stress)
@@ -273,7 +279,9 @@ def _jit_relaxation_kernel(
         # Update (no loading)
         new_stress = stress_curr + (relaxation_rate + redistribution_rate) * dt
 
-        return (new_stress, thresholds_curr, strain_curr, key_curr), jnp.mean(new_stress) / strain_step
+        return (new_stress, thresholds_curr, strain_curr, key_curr), jnp.mean(
+            new_stress
+        ) / strain_step
 
     _, moduli_scan = jax.lax.scan(
         body_fn, (stress, thresholds, strain, k2), None, length=n_steps
@@ -357,7 +365,9 @@ def _jit_creep_kernel(
         redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
 
         # Update
-        new_stress = stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        new_stress = (
+            stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        )
         new_strain = strain_curr + gdot_new * dt
 
         return (new_stress, thresholds_curr, new_strain, key_curr, gdot_new), new_strain
@@ -438,7 +448,9 @@ def _jit_oscillation_kernel(
         redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
 
         # Update
-        new_stress = stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        new_stress = (
+            stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+        )
         new_strain = strain_curr + gdot * dt
 
         return (new_stress, thresholds_curr, new_strain, key_curr), jnp.mean(new_stress)
@@ -1085,13 +1097,15 @@ class EPMBase(BaseModel):
         seed = 42
         key = jax.random.PRNGKey(seed)
         shear_rates = jnp.logspace(-1, 1, n_points)
-        params_array = jnp.array([
-            self.parameters.get_value("mu"),
-            self.parameters.get_value("tau_pl"),
-            self.parameters.get_value("sigma_c_mean"),
-            self.parameters.get_value("sigma_c_std"),
-            self.parameters.get_value("smoothing_width"),
-        ])
+        params_array = jnp.array(
+            [
+                self.parameters.get_value("mu"),
+                self.parameters.get_value("tau_pl"),
+                self.parameters.get_value("sigma_c_mean"),
+                self.parameters.get_value("sigma_c_std"),
+                self.parameters.get_value("smoothing_width"),
+            ]
+        )
 
         # Scale propagator
         propagator_q = self._propagator_q_norm * params_array[0]
@@ -1209,10 +1223,14 @@ class EPMBase(BaseModel):
             )
         elif mode == "startup":
             gamma_dot = getattr(self, "_cached_gamma_dot", 0.1)
-            return self._model_startup_jit(X_jax, key, propagator_q, params_array, gamma_dot)
+            return self._model_startup_jit(
+                X_jax, key, propagator_q, params_array, gamma_dot
+            )
         elif mode == "relaxation":
             gamma = getattr(self, "_cached_gamma", 0.1)
-            return self._model_relaxation_jit(X_jax, key, propagator_q, params_array, gamma)
+            return self._model_relaxation_jit(
+                X_jax, key, propagator_q, params_array, gamma
+            )
         elif mode == "creep":
             stress = getattr(self, "_cached_stress", 1.0)
             return self._model_creep_jit(X_jax, key, propagator_q, params_array, stress)

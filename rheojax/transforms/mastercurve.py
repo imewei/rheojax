@@ -713,7 +713,7 @@ class Mastercurve(BaseTransform):
         )
 
         return RheoData(
-            x=x_shifted,  # type: ignore[arg-type]
+            x=x_shifted,
             y=y_shifted,
             x_units=data.x_units,
             y_units=data.y_units,
@@ -722,7 +722,7 @@ class Mastercurve(BaseTransform):
             validate=False,
         )
 
-    def _transform(  # type: ignore[override]
+    def _transform(
         self, data: RheoData | list[RheoData]
     ) -> RheoData | tuple[RheoData, dict[float, float]]:
         """Apply horizontal shift to single-temperature data or create mastercurve.
@@ -747,7 +747,7 @@ class Mastercurve(BaseTransform):
         if isinstance(data, list):
             input_shape = (len(data),)
         else:
-            input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)  # type: ignore[arg-type]
+            input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
 
         with log_transform(
             logger,
@@ -762,13 +762,13 @@ class Mastercurve(BaseTransform):
                 result = self.create_mastercurve(data, return_shifts=True)
                 if isinstance(result, tuple):
                     mastercurve, shift_factors = result
-                    ctx["output_shape"] = (len(mastercurve.x),)  # type: ignore[arg-type]
+                    ctx["output_shape"] = (len(mastercurve.x),)
                     ctx["n_temperatures"] = len(shift_factors)
                 return result  # type: ignore[return-value]
 
             # Handle single dataset
             result = self._transform_single(data)
-            ctx["output_shape"] = (len(result.x),)  # type: ignore[arg-type]
+            ctx["output_shape"] = (len(result.x),)
             return result
 
     def create_mastercurve(
@@ -832,7 +832,7 @@ class Mastercurve(BaseTransform):
         # Compute shift factors
         if self._auto_shift:
             # Use automatic shift factor calculation
-            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)  # type: ignore[arg-type]
+            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)
             shift_factors = {
                 T: 10.0**log_aT
                 for T, log_aT in zip(temperatures, log_aT_array, strict=False)
@@ -991,8 +991,12 @@ class Mastercurve(BaseTransform):
 
                 sort_i = np.argsort(x_i)
                 sort_j = np.argsort(x_j)
-                y_i_interp = np.interp(x_common, x_i[sort_i], np.asarray(data_i.y)[sort_i])
-                y_j_interp = np.interp(x_common, x_j[sort_j], np.asarray(data_j.y)[sort_j])
+                y_i_interp = np.interp(
+                    x_common, x_i[sort_i], np.asarray(data_i.y)[sort_i]
+                )
+                y_j_interp = np.interp(
+                    x_common, x_j[sort_j], np.asarray(data_j.y)[sort_j]
+                )
 
                 # Compute RMSE
                 error = np.sqrt(np.mean((y_i_interp - y_j_interp) ** 2))

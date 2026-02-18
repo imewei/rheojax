@@ -203,7 +203,9 @@ TRIOS_COLUMN_MAPPINGS: dict[str, ColumnMapping] = {
     "tensile_storage_modulus": ColumnMapping(
         canonical_name="tensile_storage_modulus",
         patterns=[
-            r"^e'$", r"^e_prime$", r"^e_stor$",
+            r"^e'$",
+            r"^e_prime$",
+            r"^e_stor$",
             r"^tensile[\s_]?storage[\s_]?modulus$",
             r"^young'?s?[\s_]?storage[\s_]?modulus$",
         ],
@@ -215,7 +217,10 @@ TRIOS_COLUMN_MAPPINGS: dict[str, ColumnMapping] = {
     "tensile_loss_modulus": ColumnMapping(
         canonical_name="tensile_loss_modulus",
         patterns=[
-            r"^e''$", r'^e"$', r"^e_double_prime$", r"^e_loss$",
+            r"^e''$",
+            r'^e"$',
+            r"^e_double_prime$",
+            r"^e_loss$",
             r"^tensile[\s_]?loss[\s_]?modulus$",
             r"^young'?s?[\s_]?loss[\s_]?modulus$",
         ],
@@ -367,8 +372,8 @@ def detect_test_type(
 
     # Check for oscillation (highest priority) — includes tensile moduli (DMTA)
     has_shear_moduli = has_column("storage_modulus") or has_column("loss_modulus")
-    has_tensile_moduli = (
-        has_column("tensile_storage_modulus") or has_column("tensile_loss_modulus")
+    has_tensile_moduli = has_column("tensile_storage_modulus") or has_column(
+        "tensile_loss_modulus"
     )
     if has_column("angular_frequency") and (has_shear_moduli or has_tensile_moduli):
         logger.debug("Detected test type: oscillation")
@@ -550,7 +555,7 @@ def select_xy_columns(
             y2_col=y2_col,
         )
 
-    return x_col, y_col, y2_col  # type: ignore[return-value]
+    return x_col, y_col, y2_col
 
 
 def convert_unit(

@@ -124,7 +124,8 @@ def hvm_ber_rate_stress(
     # 2D von Mises stress
     sigma_vm = jnp.sqrt(
         jnp.maximum(
-            sigma_E_xx**2 + sigma_E_yy**2
+            sigma_E_xx**2
+            + sigma_E_yy**2
             - sigma_E_xx * sigma_E_yy
             + 3.0 * sigma_E_xy**2,
             1e-30,
@@ -193,9 +194,7 @@ def hvm_ber_rate_stretch(
 
 
 @jax.jit
-def hvm_permanent_stress_shear(
-    gamma: float, G_P: float, D: float
-) -> float:
+def hvm_permanent_stress_shear(gamma: float, G_P: float, D: float) -> float:
     """Permanent network (P) shear stress with damage.
 
     sigma_P = (1 - D) * G_P * gamma
@@ -218,9 +217,7 @@ def hvm_permanent_stress_shear(
 
 
 @jax.jit
-def hvm_exchangeable_stress(
-    mu_E_xy: float, mu_E_nat_xy: float, G_E: float
-) -> float:
+def hvm_exchangeable_stress(mu_E_xy: float, mu_E_nat_xy: float, G_E: float) -> float:
     """Exchangeable network (E) shear stress.
 
     sigma_E = G_E * (mu^E_xy - mu^E_nat_xy)
@@ -543,8 +540,12 @@ def hvm_saos_moduli(
 
 
 def _hvm_saos_G_prime(
-    omega: float, G_P: float, G_E: float, G_D: float,
-    k_BER_0: float, k_d_D: float,
+    omega: float,
+    G_P: float,
+    G_E: float,
+    G_D: float,
+    k_BER_0: float,
+    k_d_D: float,
 ) -> float:
     """Helper returning only G' for vmap."""
     G_p, _ = hvm_saos_moduli(omega, G_P, G_E, G_D, k_BER_0, k_d_D)
@@ -552,8 +553,12 @@ def _hvm_saos_G_prime(
 
 
 def _hvm_saos_G_double_prime(
-    omega: float, G_P: float, G_E: float, G_D: float,
-    k_BER_0: float, k_d_D: float,
+    omega: float,
+    G_P: float,
+    G_E: float,
+    G_D: float,
+    k_BER_0: float,
+    k_d_D: float,
 ) -> float:
     """Helper returning only G'' for vmap."""
     _, G_pp = hvm_saos_moduli(omega, G_P, G_E, G_D, k_BER_0, k_d_D)

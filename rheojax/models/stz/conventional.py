@@ -12,6 +12,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
@@ -366,7 +367,7 @@ class STZConventional(STZBase):
         result = jnp.where(
             sol.result == diffrax.RESULTS.successful,
             result,
-            jnp.nan * jnp.ones_like(result)
+            jnp.nan * jnp.ones_like(result),
         )
 
         return result
@@ -652,7 +653,7 @@ class STZConventional(STZBase):
         stress = jnp.where(
             sol.result == diffrax.RESULTS.successful,
             stress,
-            jnp.nan * jnp.ones_like(stress)
+            jnp.nan * jnp.ones_like(stress),
         )
 
         # Compute strain

@@ -163,7 +163,7 @@ class DMTNonlocal(DMTBase):
         """
         D_lambda = self.parameters.get_value("D_lambda")
         t_eq = self.parameters.get_value("t_eq")
-        return np.sqrt(D_lambda * t_eq)  # type: ignore[operator]
+        return np.sqrt(D_lambda * t_eq)
 
     # =========================================================================
     # Required Abstract Methods
@@ -312,9 +312,7 @@ class DMTNonlocal(DMTBase):
         def _laplacian_pure(field):
             """Laplacian with Neumann BCs (no self reference)."""
             lap = jnp.zeros_like(field)
-            lap = lap.at[1:-1].set(
-                (field[:-2] - 2 * field[1:-1] + field[2:]) / dy_sq
-            )
+            lap = lap.at[1:-1].set((field[:-2] - 2 * field[1:-1] + field[2:]) / dy_sq)
             lap = lap.at[0].set(2 * (field[1] - field[0]) / dy_sq)
             lap = lap.at[-1].set(2 * (field[-2] - field[-1]) / dy_sq)
             return lap
@@ -336,6 +334,7 @@ class DMTNonlocal(DMTBase):
                 return jax.vmap(
                     lambda li, gi: viscosity_exponential(li, eta_0, eta_inf)
                 )(lam_arr, gd_arr)
+
         else:
             tau_y0 = params["tau_y0"]
             K0 = params["K0"]
@@ -378,17 +377,15 @@ class DMTNonlocal(DMTBase):
             )
             # Guard: if v_raw[-1] is near-zero, scaling would amplify noise;
             # fall back to V_wall denominator (linear profile) instead.
-            v_denom = jnp.where(
-                v_raw[-1] > 1e-6 * V_wall, v_raw[-1], V_wall
-            )
+            v_denom = jnp.where(v_raw[-1] > 1e-6 * V_wall, v_raw[-1], V_wall)
             v_new = v_raw * V_wall / v_denom
 
             outputs = (stress, lam_c, v_c, gamma_dot_c)
             return (lam_new, v_new), outputs
 
         # Run scan — single JIT-compiled loop, no host transfers
-        (lam_final, v_final), (stress_all, lam_all, v_all, gd_all) = (
-            jax.lax.scan(scan_step, (lam, v), None, length=n_steps)
+        (lam_final, v_final), (stress_all, lam_all, v_all, gd_all) = jax.lax.scan(
+            scan_step, (lam, v), None, length=n_steps
         )
 
         # Single vectorized transfer at the end
@@ -492,7 +489,7 @@ class DMTNonlocal(DMTBase):
         # Copy parameters
         for name in local_model.parameters.keys():
             if name in self.parameters.keys():
-                self.parameters.set_value(name, local_model.parameters.get_value(name))  # type: ignore[arg-type]
+                self.parameters.set_value(name, local_model.parameters.get_value(name))
 
         self._fitted = True
         return self
@@ -517,7 +514,7 @@ class DMTNonlocal(DMTBase):
             for name in self.parameters.keys():
                 if name in local_model.parameters.keys():
                     local_model.parameters.set_value(
-                        name, self.parameters.get_value(name)  # type: ignore[arg-type]
+                        name, self.parameters.get_value(name)
                     )
             return local_model._predict_flow_curve(gamma_dot)
         else:
@@ -573,7 +570,7 @@ class DMTNonlocal(DMTBase):
 
         for i, idx in enumerate(time_indices):
             t_val = result["t"][idx]
-            color = plt.cm.viridis(i / (len(time_indices) - 1))  # type: ignore[attr-defined]
+            color = plt.cm.viridis(i / (len(time_indices) - 1))
 
             # Structure profile
             axes[0].plot(

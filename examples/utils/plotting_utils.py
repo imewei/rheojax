@@ -397,7 +397,9 @@ def plot_arviz_diagnostics(result, param_names, fast_mode=False):
 
     # 1. Trace plot
     try:
-        axes = az.plot_trace(idata, var_names=var_names, figsize=(12, 2.5 * len(var_names)))
+        axes = az.plot_trace(
+            idata, var_names=var_names, figsize=(12, 2.5 * len(var_names))
+        )
         fig = axes.ravel()[0].figure
         fig.suptitle("Trace Plots", fontsize=14, y=1.02)
         plt.tight_layout()

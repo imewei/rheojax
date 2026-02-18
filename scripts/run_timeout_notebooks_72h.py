@@ -15,6 +15,7 @@ Usage:
     uv run python scripts/run_timeout_notebooks_72h.py --single 01_hl_flow_curve.ipynb
     uv run python scripts/run_timeout_notebooks_72h.py --dry-run
 """
+
 import argparse
 import json
 import os
@@ -124,7 +125,10 @@ def run_notebook(
         for cell in nb.cells:
             if cell.cell_type == "code" and hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.get("output_type") == "stream" and output.get("name") == "stderr":
+                    if (
+                        output.get("output_type") == "stream"
+                        and output.get("name") == "stderr"
+                    ):
                         text = output.get("text", "")
                         if text.strip():
                             for line in text.split("\n"):
@@ -157,11 +161,11 @@ def run_notebook(
 
         # Human-readable runtime
         runtime_sec = result["runtime_seconds"]
-        if runtime_sec >= 3600:
-            hours = runtime_sec / 3600
+        if runtime_sec >= 3600:  # type: ignore[operator]
+            hours = runtime_sec / 3600  # type: ignore[operator]
             result["runtime_human"] = f"{hours:.2f} hours"
-        elif runtime_sec >= 60:
-            minutes = runtime_sec / 60
+        elif runtime_sec >= 60:  # type: ignore[operator]
+            minutes = runtime_sec / 60  # type: ignore[operator]
             result["runtime_human"] = f"{minutes:.1f} minutes"
         else:
             result["runtime_human"] = f"{runtime_sec:.1f} seconds"
@@ -177,12 +181,14 @@ def run_notebook(
             f.write(f"Finished: {end_time.isoformat()}\n")
             f.write(f"Runtime: {result['runtime_human']}\n")
             f.write(f"Status: {result['status']}\n")
-            f.write(f"Cells executed: {result['executed_cells']}/{result['cell_count']}\n")
-            f.write(f"Warnings: {len(result['warnings'])}\n\n")
+            f.write(
+                f"Cells executed: {result['executed_cells']}/{result['cell_count']}\n"
+            )
+            f.write(f"Warnings: {len(result['warnings'])}\n\n")  # type: ignore[arg-type]
 
             if result["warnings"]:
                 f.write("=== WARNINGS ===\n")
-                for w in result["warnings"][:100]:
+                for w in result["warnings"][:100]:  # type: ignore[index]
                     f.write(f"  {w}\n")
                 f.write("\n")
 
@@ -204,7 +210,10 @@ def categorize_issue(result: dict[str, Any]) -> str:
             warnings_text = " ".join(result["warnings"][:20])
             if "divergence" in warnings_text.lower():
                 return "numpyro_divergence"
-            if "DeprecationWarning" in warnings_text or "FutureWarning" in warnings_text:
+            if (
+                "DeprecationWarning" in warnings_text
+                or "FutureWarning" in warnings_text
+            ):
                 return "deprecation_warning"
             return "pass_with_warnings"
         return "clean_pass"
@@ -258,7 +267,8 @@ def main():
     notebooks_to_run = TIMEOUT_NOTEBOOKS
     if args.single:
         notebooks_to_run = [
-            (suite, nb) for suite, nb in TIMEOUT_NOTEBOOKS
+            (suite, nb)
+            for suite, nb in TIMEOUT_NOTEBOOKS
             if nb == args.single or nb.replace(".ipynb", "") == args.single
         ]
         if not notebooks_to_run:
@@ -315,7 +325,9 @@ def main():
             "TIMEOUT": "⏰",
         }.get(result["status"], "?")
 
-        print(f"    Status: {status_emoji} {result['status']} ({result['runtime_human']})")
+        print(
+            f"    Status: {status_emoji} {result['status']} ({result['runtime_human']})"
+        )
         print(f"    Category: {result['category']}")
         if result["warnings"]:
             print(f"    Warnings: {len(result['warnings'])}")
@@ -329,14 +341,19 @@ def main():
     # Save master results JSON
     master_log = log_dir / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     with open(master_log, "w") as f:
-        json.dump({
-            "run_type": "72h_timeout_notebooks",
-            "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
-            "total_runtime_seconds": total_runtime,
-            "timeout_per_notebook": args.timeout,
-            "results": results,
-        }, f, indent=2, default=str)
+        json.dump(
+            {
+                "run_type": "72h_timeout_notebooks",
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat(),
+                "total_runtime_seconds": total_runtime,
+                "timeout_per_notebook": args.timeout,
+                "results": results,
+            },
+            f,
+            indent=2,
+            default=str,
+        )
 
     # Generate summary report
     summary_path = log_dir / "summary.md"
@@ -349,7 +366,9 @@ def main():
         f.write("| Notebook | Status | Runtime | Category |\n")
         f.write("|----------|--------|---------|----------|\n")
         for r in results:
-            f.write(f"| {r['notebook']} | {r['status']} | {r['runtime_human']} | {r['category']} |\n")
+            f.write(
+                f"| {r['notebook']} | {r['status']} | {r['runtime_human']} | {r['category']} |\n"
+            )
 
         f.write("\n## Statistics\n\n")
         passed = sum(1 for r in results if r["status"] == "PASS")

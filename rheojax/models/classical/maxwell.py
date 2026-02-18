@@ -297,8 +297,8 @@ class Maxwell(BaseModel):
             baseline = float(np.median(g_sorted[-tail:]))
             transient = g_sorted - baseline
 
-            g0_bounds = self.parameters.get("G0").bounds or (1e-3, 1e9) # type: ignore[union-attr]
-            eta_bounds = self.parameters.get("eta").bounds or (1e-6, 1e12) # type: ignore[union-attr]
+            g0_bounds = self.parameters.get("G0").bounds or (1e-3, 1e9)
+            eta_bounds = self.parameters.get("eta").bounds or (1e-6, 1e12)
 
             # Attempt to estimate parameters from the first two signal-dominant points
             positive_mask = transient > 0
@@ -537,7 +537,7 @@ class Maxwell(BaseModel):
         """
         G0 = self.parameters.get_value("G0")
         eta = self.parameters.get_value("eta")
-        return eta / G0 # type: ignore[operator]
+        return eta / G0
 
     def __repr__(self) -> str:
         """String representation of Maxwell model."""

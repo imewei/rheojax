@@ -1,4 +1,3 @@
-
 import argparse
 import os
 import sys
@@ -12,6 +11,7 @@ from nbclient import NotebookClient
 # 96 hours in seconds
 TIMEOUT_96H = 96 * 60 * 60
 
+
 def setup_environment() -> dict[str, str]:
     """Set up deterministic environment variables."""
     print("Setting up environment...")
@@ -23,19 +23,23 @@ def setup_environment() -> dict[str, str]:
     env["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=1"
     env["FAST_MODE"] = "0"  # Ensure slow mode for deep testing
-    
+
     # Isolate Jupyter environment to avoid PermissionError/Config issues
     import tempfile
+
     temp_jupyter_dir = tempfile.mkdtemp(prefix="jupyter_runtime_")
     env["JUPYTER_CONFIG_DIR"] = os.path.join(temp_jupyter_dir, "config")
     env["JUPYTER_DATA_DIR"] = os.path.join(temp_jupyter_dir, "data")
     env["JUPYTER_RUNTIME_DIR"] = os.path.join(temp_jupyter_dir, "runtime")
     env["IPYTHONDIR"] = os.path.join(temp_jupyter_dir, "ipython")
-    
+
     return env
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Run a SINGLE notebook with 96h timeout")
+    parser = argparse.ArgumentParser(
+        description="Run a SINGLE notebook with 96h timeout"
+    )
     parser.add_argument("notebook_path", type=Path, help="Path to the notebook file")
     args = parser.parse_args()
 
@@ -81,7 +85,7 @@ def main():
         try:
             nbformat.write(nb, notebook_path.name)
             print(f"Saved partial notebook to {notebook_path.name}")
-        except:
+        except Exception:
             print("Could not save partial notebook")
         sys.exit(1)
     finally:
@@ -90,6 +94,7 @@ def main():
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         print(f"Runtime: {duration:.1f} seconds")
+
 
 if __name__ == "__main__":
     main()

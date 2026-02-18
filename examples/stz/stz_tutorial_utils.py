@@ -165,7 +165,9 @@ def load_mucus_creep() -> tuple[np.ndarray, np.ndarray]:
         FileNotFoundError: If data file not found.
     """
     module_dir = Path(__file__).parent
-    data_path = module_dir / ".." / "data" / "creep" / "biological" / "creep_mucus_data.csv"
+    data_path = (
+        module_dir / ".." / "data" / "creep" / "biological" / "creep_mucus_data.csv"
+    )
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -196,7 +198,11 @@ def load_polystyrene_oscillation(
     """
     module_dir = Path(__file__).parent
     data_path = (
-        module_dir / ".." / "data" / "oscillation" / "polystyrene"
+        module_dir
+        / ".."
+        / "data"
+        / "oscillation"
+        / "polystyrene"
         / f"oscillation_ps{temp}_data.csv"
     )
 
@@ -342,7 +348,9 @@ def generate_synthetic_startup(
 
     # Add noise
     rng = np.random.default_rng(seed)
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     return time, stress
@@ -406,7 +414,9 @@ def generate_synthetic_laos(
 
     # Add noise to stress only
     rng = np.random.default_rng(seed)
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     return time, strain_clean, stress

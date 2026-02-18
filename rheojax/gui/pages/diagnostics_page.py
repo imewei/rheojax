@@ -27,6 +27,7 @@ from rheojax.gui.compat import (
     Signal,
     Slot,
 )
+from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, StateStore
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas
@@ -168,7 +169,9 @@ class DiagnosticsPage(QWidget):
             "No diagnostics yet. Run Bayesian inference to populate metrics."
         )
         empty_label.setAlignment(Qt.AlignCenter)
-        empty_label.setStyleSheet("color: #666; padding: 6px;")
+        empty_label.setStyleSheet(
+            f"color: {ColorPalette.TEXT_SECONDARY}; padding: {Spacing.SM}px;"
+        )
         layout.addWidget(empty_label)
         self._empty_label = empty_label
 
@@ -469,11 +472,11 @@ class DiagnosticsPage(QWidget):
             values["R-hat (max)"] = f"{max_rhat:.4f}"
             # Color code: green if <1.01, yellow if <1.1, red otherwise
             if max_rhat > 1.1:
-                self._set_table_value_color(6, "#F44336")  # Red
+                self._set_table_value_color(6, ColorPalette.ERROR)  # Red
             elif max_rhat > 1.01:
-                self._set_table_value_color(6, "#FFC107")  # Yellow
+                self._set_table_value_color(6, ColorPalette.WARNING)  # Yellow
             else:
-                self._set_table_value_color(6, "#4CAF50")  # Green
+                self._set_table_value_color(6, ColorPalette.SUCCESS)  # Green
 
         # Get ESS min
         if result.ess:
@@ -481,18 +484,18 @@ class DiagnosticsPage(QWidget):
             values["Effective Sample Size (min)"] = f"{min_ess:.0f}"
             # Color code: green if >400, yellow if >100, red otherwise
             if min_ess < 100:
-                self._set_table_value_color(5, "#F44336")  # Red
+                self._set_table_value_color(5, ColorPalette.ERROR)  # Red
             elif min_ess < 400:
-                self._set_table_value_color(5, "#FFC107")  # Yellow
+                self._set_table_value_color(5, ColorPalette.WARNING)  # Yellow
             else:
-                self._set_table_value_color(5, "#4CAF50")  # Green
+                self._set_table_value_color(5, ColorPalette.SUCCESS)  # Green
 
         # Get divergences
         values["Divergences"] = str(result.divergences)
         if result.divergences > 0:
-            self._set_table_value_color(7, "#F44336")  # Red
+            self._set_table_value_color(7, ColorPalette.ERROR)  # Red
         else:
-            self._set_table_value_color(7, "#4CAF50")  # Green
+            self._set_table_value_color(7, ColorPalette.SUCCESS)  # Green
 
         # Update table
         for i, metric in enumerate(self._metric_names):

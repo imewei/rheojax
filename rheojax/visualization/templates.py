@@ -142,8 +142,8 @@ def plot_modulus_frequency(
                 **kwargs,
             )
 
-            axes[0].set_title("Storage Modulus (G')")  # type: ignore[index]
-            axes[1].set_title("Loss Modulus (G'')")  # type: ignore[index]
+            axes[0].set_title("Storage Modulus (G')")
+            axes[1].set_title("Loss Modulus (G'')")
 
             logger.debug("Figure created", plot_type="modulus_frequency")
             return fig, axes
@@ -265,7 +265,7 @@ def plot_mastercurve(
             reference_temp = datasets[0].metadata.get("temperature", 25)
 
         # Plot each dataset
-        colors = plt.cm.viridis(np.linspace(0, 1, len(datasets)))  # type: ignore[attr-defined]
+        colors = plt.cm.viridis(np.linspace(0, 1, len(datasets)))
 
         for i, data in enumerate(datasets):
             temp = data.metadata.get("temperature", None)
@@ -479,7 +479,9 @@ def plot_model_fit(
 
                 # G' residuals
                 residuals_gp = np.real(y_data) - np.real(y_pred)
-                gp_denom = np.where(np.abs(np.real(y_data)) > 1e-12, np.real(y_data), 1.0)
+                gp_denom = np.where(
+                    np.abs(np.real(y_data)) > 1e-12, np.real(y_data), 1.0
+                )
                 axes[1, 0].semilogx(
                     x_data,
                     residuals_gp / gp_denom * 100,
@@ -499,7 +501,9 @@ def plot_model_fit(
 
                 # G'' residuals
                 residuals_gpp = np.imag(y_data) - np.imag(y_pred)
-                gpp_denom = np.where(np.abs(np.imag(y_data)) > 1e-12, np.imag(y_data), 1.0)
+                gpp_denom = np.where(
+                    np.abs(np.imag(y_data)) > 1e-12, np.imag(y_data), 1.0
+                )
                 axes[1, 1].semilogx(
                     x_data,
                     residuals_gpp / gpp_denom * 100,
@@ -541,7 +545,7 @@ def plot_model_fit(
                 )
 
                 if model_name:
-                    axes[0].set_title(f"Model Fit: {model_name}")  # type: ignore[index]
+                    axes[0].set_title(f"Model Fit: {model_name}")
 
                 logger.debug("Figure created", plot_type="model_fit")
                 return fig, axes

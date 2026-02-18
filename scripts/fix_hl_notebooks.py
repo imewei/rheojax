@@ -68,7 +68,7 @@ def apply_common_fixes(nb):
         if "verify_float64()" in src and "FAST_MODE" not in src:
             src = src.replace(
                 "verify_float64()\n",
-                "verify_float64()\n\nFAST_MODE = os.environ.get(\"FAST_MODE\", \"1\") == \"1\"\n",
+                'verify_float64()\n\nFAST_MODE = os.environ.get("FAST_MODE", "1") == "1"\n',
             )
 
         set_source(cell, src)
@@ -307,27 +307,17 @@ def main():
             nb = fix_nb01(nb)
         elif nb_name == "02_hl_relaxation.ipynb":
             nb = fix_nb_bayesian_generic(
-                nb, "relaxation",
-                ["posterior_relaxation.json"]
+                nb, "relaxation", ["posterior_relaxation.json"]
             )
         elif nb_name == "03_hl_creep.ipynb":
-            nb = fix_nb_bayesian_generic(
-                nb, "creep",
-                ["posterior_creep.json"]
-            )
+            nb = fix_nb_bayesian_generic(nb, "creep", ["posterior_creep.json"])
         elif nb_name == "04_hl_saos.ipynb":
             nb = fix_nb04(nb)
         elif nb_name == "05_hl_startup.ipynb":
-            nb = fix_nb_bayesian_generic(
-                nb, "startup",
-                ["posterior_startup.json"]
-            )
+            nb = fix_nb_bayesian_generic(nb, "startup", ["posterior_startup.json"])
             fix_nb05_06_synthetic_fit(nb)
         elif nb_name == "06_hl_laos.ipynb":
-            nb = fix_nb_bayesian_generic(
-                nb, "laos",
-                ["posterior_laos.json"]
-            )
+            nb = fix_nb_bayesian_generic(nb, "laos", ["posterior_laos.json"])
             fix_nb05_06_synthetic_fit(nb)
 
         write_nb(path, nb)

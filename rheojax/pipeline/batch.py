@@ -172,7 +172,7 @@ class BatchPipeline:
                     logger.debug(
                         "File processed successfully",
                         filepath=str(file_path),
-                        n_points=len(result.x) if result else 0,  # type: ignore[arg-type]
+                        n_points=len(result.x) if result else 0,
                     )
                 except Exception as e:
                     self.errors.append((file_path, e))
@@ -263,7 +263,7 @@ class BatchPipeline:
             Tuple of (result_data, metrics)
         """
         # Clone template pipeline
-        pipeline = self._clone_pipeline(self.template_pipeline)  # type: ignore[arg-type]
+        pipeline = self._clone_pipeline(self.template_pipeline)
         path = Path(file_path)
 
         # Load data
@@ -362,7 +362,7 @@ class BatchPipeline:
             row = {
                 "file_path": str(path_obj),
                 "file_name": path_obj.name,
-                "n_points": len(result.x),  # type: ignore[arg-type]
+                "n_points": len(result.x),
             }
             row.update(metrics)
             summary_data.append(row)

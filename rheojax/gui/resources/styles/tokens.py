@@ -3,6 +3,11 @@ RheoJAX GUI Design Tokens.
 
 Centralized design system constants for consistent styling across the application.
 These tokens complement the QSS stylesheets and can be used programmatically.
+
+Design direction: "Precision Laboratory"
+- Warm stone neutrals (not cold slate) evoke lab notebook paper
+- Deep, rich primary blue with subtle gradient accents
+- Refined typography with geometric sans-serif priority
 """
 
 from dataclasses import dataclass
@@ -13,15 +18,17 @@ from typing import ClassVar
 class ColorPalette:
     """Color palette for the RheoJAX GUI.
 
-    Based on the UI Pro Max recommendations for scientific dashboard applications.
-    Uses a professional color scheme with trust blue as primary.
+    Uses warm stone neutrals with a deep scientific blue primary.
+    The warmth of the neutral tones contrasts with the precision of
+    the blue and purple accents — like a well-lit materials lab.
     """
 
-    # Primary colors (JAX-inspired blue)
-    PRIMARY: ClassVar[str] = "#2563EB"
-    PRIMARY_HOVER: ClassVar[str] = "#1D4ED8"
-    PRIMARY_PRESSED: ClassVar[str] = "#1E40AF"
+    # Primary colors (deep scientific blue)
+    PRIMARY: ClassVar[str] = "#1D4ED8"
+    PRIMARY_HOVER: ClassVar[str] = "#1E40AF"
+    PRIMARY_PRESSED: ClassVar[str] = "#1E3A8A"
     PRIMARY_LIGHT: ClassVar[str] = "#DBEAFE"
+    PRIMARY_SUBTLE: ClassVar[str] = "#EFF6FF"
 
     # Accent colors (Bayesian/scientific purple)
     ACCENT: ClassVar[str] = "#7C3AED"
@@ -30,47 +37,49 @@ class ColorPalette:
     ACCENT_LIGHT: ClassVar[str] = "#EDE9FE"
 
     # Semantic colors
-    SUCCESS: ClassVar[str] = "#10B981"
-    SUCCESS_HOVER: ClassVar[str] = "#059669"
+    SUCCESS: ClassVar[str] = "#059669"
+    SUCCESS_HOVER: ClassVar[str] = "#047857"
     SUCCESS_LIGHT: ClassVar[str] = "#D1FAE5"
 
-    WARNING: ClassVar[str] = "#F59E0B"
-    WARNING_HOVER: ClassVar[str] = "#D97706"
+    WARNING: ClassVar[str] = "#D97706"
+    WARNING_HOVER: ClassVar[str] = "#B45309"
     WARNING_LIGHT: ClassVar[str] = "#FEF3C7"
 
-    ERROR: ClassVar[str] = "#EF4444"
-    ERROR_HOVER: ClassVar[str] = "#DC2626"
+    ERROR: ClassVar[str] = "#DC2626"
+    ERROR_HOVER: ClassVar[str] = "#B91C1C"
     ERROR_LIGHT: ClassVar[str] = "#FEE2E2"
 
-    INFO: ClassVar[str] = "#3B82F6"
+    INFO: ClassVar[str] = "#2563EB"
     INFO_LIGHT: ClassVar[str] = "#DBEAFE"
 
-    # Background colors
+    # Background colors (warm stone tones)
     BG_BASE: ClassVar[str] = "#FFFFFF"
-    BG_SURFACE: ClassVar[str] = "#F8FAFC"
+    BG_SURFACE: ClassVar[str] = "#FAFAF9"
     BG_ELEVATED: ClassVar[str] = "#FFFFFF"
-    BG_HOVER: ClassVar[str] = "#F1F5F9"
-    BG_ACTIVE: ClassVar[str] = "#E2E8F0"
+    BG_HOVER: ClassVar[str] = "#F5F5F4"
+    BG_ACTIVE: ClassVar[str] = "#E7E5E4"
+    BG_CANVAS: ClassVar[str] = "#F5F5F4"
 
-    # Text colors
-    TEXT_PRIMARY: ClassVar[str] = "#1E293B"
-    TEXT_SECONDARY: ClassVar[str] = "#475569"
-    TEXT_MUTED: ClassVar[str] = "#64748B"
-    TEXT_DISABLED: ClassVar[str] = "#94A3B8"
+    # Text colors (warm charcoal)
+    TEXT_PRIMARY: ClassVar[str] = "#1C1917"
+    TEXT_SECONDARY: ClassVar[str] = "#57534E"
+    TEXT_MUTED: ClassVar[str] = "#78716C"
+    TEXT_DISABLED: ClassVar[str] = "#A8A29E"
     TEXT_INVERSE: ClassVar[str] = "#FFFFFF"
 
-    # Border colors
-    BORDER_DEFAULT: ClassVar[str] = "#E2E8F0"
-    BORDER_HOVER: ClassVar[str] = "#CBD5E1"
-    BORDER_FOCUS: ClassVar[str] = "#2563EB"
+    # Border colors (warm stone)
+    BORDER_DEFAULT: ClassVar[str] = "#D6D3D1"
+    BORDER_HOVER: ClassVar[str] = "#A8A29E"
+    BORDER_FOCUS: ClassVar[str] = "#1D4ED8"
+    BORDER_SUBTLE: ClassVar[str] = "#E7E5E4"
 
-    # Chart/visualization colors
-    CHART_1: ClassVar[str] = "#2563EB"  # Blue
+    # Chart/visualization colors (refined, high-contrast set)
+    CHART_1: ClassVar[str] = "#1D4ED8"  # Deep blue
     CHART_2: ClassVar[str] = "#7C3AED"  # Purple
-    CHART_3: ClassVar[str] = "#10B981"  # Green
-    CHART_4: ClassVar[str] = "#F59E0B"  # Amber
-    CHART_5: ClassVar[str] = "#EF4444"  # Red
-    CHART_6: ClassVar[str] = "#EC4899"  # Pink
+    CHART_3: ClassVar[str] = "#059669"  # Emerald
+    CHART_4: ClassVar[str] = "#D97706"  # Amber
+    CHART_5: ClassVar[str] = "#DC2626"  # Red
+    CHART_6: ClassVar[str] = "#DB2777"  # Pink
 
 
 @dataclass(frozen=True)
@@ -92,11 +101,11 @@ class Spacing:
     # Component-specific spacing
     BUTTON_PADDING_H: ClassVar[int] = 16
     BUTTON_PADDING_V: ClassVar[int] = 8
-    INPUT_PADDING_H: ClassVar[int] = 10
-    INPUT_PADDING_V: ClassVar[int] = 6
-    CARD_PADDING: ClassVar[int] = 16
+    INPUT_PADDING_H: ClassVar[int] = 12
+    INPUT_PADDING_V: ClassVar[int] = 8
+    CARD_PADDING: ClassVar[int] = 20
     SECTION_GAP: ClassVar[int] = 24
-    PAGE_MARGIN: ClassVar[int] = 16
+    PAGE_MARGIN: ClassVar[int] = 20
 
 
 @dataclass(frozen=True)
@@ -104,10 +113,10 @@ class BorderRadius:
     """Border radius scale for consistent rounding."""
 
     NONE: ClassVar[int] = 0
-    SM: ClassVar[int] = 4  # Buttons, inputs
-    MD: ClassVar[int] = 6  # Cards, panels
-    LG: ClassVar[int] = 8  # Large cards
-    XL: ClassVar[int] = 12  # Dialogs
+    SM: ClassVar[int] = 4  # Small inputs, badges
+    MD: ClassVar[int] = 6  # Buttons, inputs
+    LG: ClassVar[int] = 8  # Cards, panels
+    XL: ClassVar[int] = 12  # Large cards, dialogs
     FULL: ClassVar[int] = 9999  # Circular/pill
 
 
@@ -115,16 +124,21 @@ class BorderRadius:
 class Typography:
     """Typography scale for consistent text sizing.
 
-    Uses a system font stack optimized for cross-platform rendering.
+    Prioritizes modern geometric sans-serifs that convey precision,
+    falling back to high-quality system fonts on each platform.
     """
 
-    # Font families
+    # Font families — geometric sans for scientific precision
     FONT_FAMILY: ClassVar[str] = (
-        '"Segoe UI", "SF Pro Text", "SF Pro Display", '
-        '"Helvetica Neue", "Helvetica", "Arial", "DejaVu Sans"'
+        '"Plus Jakarta Sans", "DM Sans", "Geist", '
+        '"SF Pro Display", "SF Pro Text", '
+        '"Segoe UI Variable", "Segoe UI", '
+        '"Cantarell", "Helvetica Neue", "Helvetica", sans-serif'
     )
     FONT_FAMILY_MONO: ClassVar[str] = (
-        '"SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace'
+        '"JetBrains Mono", "Cascadia Code", '
+        '"SF Mono", "Menlo", "Consolas", '
+        '"DejaVu Sans Mono", monospace'
     )
 
     # Font sizes (in pt)
@@ -149,9 +163,14 @@ class Shadows:
     """Shadow definitions for elevation effects."""
 
     # Box shadows (for use with QGraphicsDropShadowEffect)
-    SHADOW_SM: ClassVar[tuple[int, int, int, str]] = (0, 1, 3, "rgba(0, 0, 0, 0.1)")
-    SHADOW_MD: ClassVar[tuple[int, int, int, str]] = (0, 4, 6, "rgba(0, 0, 0, 0.1)")
-    SHADOW_LG: ClassVar[tuple[int, int, int, str]] = (0, 10, 15, "rgba(0, 0, 0, 0.1)")
+    SHADOW_SM: ClassVar[tuple[int, int, int, str]] = (0, 1, 3, "rgba(28, 25, 23, 0.06)")
+    SHADOW_MD: ClassVar[tuple[int, int, int, str]] = (0, 4, 8, "rgba(28, 25, 23, 0.08)")
+    SHADOW_LG: ClassVar[tuple[int, int, int, str]] = (
+        0,
+        10,
+        20,
+        "rgba(28, 25, 23, 0.10)",
+    )
 
 
 # Convenience class combining all tokens
@@ -224,7 +243,7 @@ def button_style(
         "warning": {
             "bg": colors.WARNING,
             "bg_hover": colors.WARNING_HOVER,
-            "text": colors.TEXT_PRIMARY,
+            "text": colors.TEXT_INVERSE,
             "border": "none",
         },
         "error": {
@@ -281,14 +300,12 @@ def card_style(elevated: bool = False) -> str:
     spacing = Spacing
     radius = BorderRadius
 
-    base = f"""
+    return f"""
         background-color: {colors.BG_ELEVATED};
         border: 1px solid {colors.BORDER_DEFAULT};
         border-radius: {radius.LG}px;
         padding: {spacing.CARD_PADDING}px;
     """
-
-    return base
 
 
 def status_badge_style(status: str) -> str:
@@ -337,7 +354,7 @@ def section_header_style() -> str:
         font-size: {typography.SIZE_LG}pt;
         font-weight: {typography.WEIGHT_SEMIBOLD};
         padding-bottom: 8px;
-        border-bottom: 1px solid {colors.BORDER_DEFAULT};
+        border-bottom: 2px solid {colors.BORDER_SUBTLE};
         margin-bottom: 12px;
     """
 

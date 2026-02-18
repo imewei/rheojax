@@ -10,6 +10,7 @@ Usage:
     uv run python scripts/run_all_notebooks_96h.py --dry-run
     uv run python scripts/run_all_notebooks_96h.py --subdir examples/fluidity
 """
+
 import argparse
 import json
 import os
@@ -117,7 +118,10 @@ def run_notebook(
         for cell in nb.cells:
             if cell.cell_type == "code" and hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.get("output_type") == "stream" and output.get("name") == "stderr":
+                    if (
+                        output.get("output_type") == "stream"
+                        and output.get("name") == "stderr"
+                    ):
                         text = output.get("text", "")
                         if text.strip():
                             for line in text.split("\n"):
@@ -150,11 +154,11 @@ def run_notebook(
 
         # Human-readable runtime
         runtime_sec = result["runtime_seconds"]
-        if runtime_sec >= 3600:
-            hours = runtime_sec / 3600
+        if runtime_sec >= 3600:  # type: ignore[operator]
+            hours = runtime_sec / 3600  # type: ignore[operator]
             result["runtime_human"] = f"{hours:.2f} hours"
-        elif runtime_sec >= 60:
-            minutes = runtime_sec / 60
+        elif runtime_sec >= 60:  # type: ignore[operator]
+            minutes = runtime_sec / 60  # type: ignore[operator]
             result["runtime_human"] = f"{minutes:.1f} minutes"
         else:
             result["runtime_human"] = f"{runtime_sec:.1f} seconds"
@@ -170,12 +174,14 @@ def run_notebook(
             f.write(f"Finished: {end_time.isoformat()}\n")
             f.write(f"Runtime: {result['runtime_human']}\n")
             f.write(f"Status: {result['status']}\n")
-            f.write(f"Cells executed: {result['executed_cells']}/{result['cell_count']}\n")
-            f.write(f"Warnings: {len(result['warnings'])}\n\n")
+            f.write(
+                f"Cells executed: {result['executed_cells']}/{result['cell_count']}\n"
+            )
+            f.write(f"Warnings: {len(result['warnings'])}\n\n")  # type: ignore[arg-type]
 
             if result["warnings"]:
                 f.write("=== WARNINGS ===\n")
-                for w in result["warnings"][:100]:
+                for w in result["warnings"][:100]:  # type: ignore[index]
                     f.write(f"  {w}\n")
                 f.write("\n")
 
@@ -197,7 +203,10 @@ def categorize_issue(result: dict[str, Any]) -> str:
             warnings_text = " ".join(result["warnings"][:20])
             if "divergence" in warnings_text.lower():
                 return "numpyro_divergence"
-            if "DeprecationWarning" in warnings_text or "FutureWarning" in warnings_text:
+            if (
+                "DeprecationWarning" in warnings_text
+                or "FutureWarning" in warnings_text
+            ):
                 return "deprecation_warning"
             return "pass_with_warnings"
         return "clean_pass"
@@ -217,7 +226,7 @@ def categorize_issue(result: dict[str, Any]) -> str:
     if "numpyro" in error_lower or "diverge" in error_lower:
         return "numpyro_error"
     if "stz" in error_lower or "dynamcis" in error_lower:
-         return "physics_error"
+        return "physics_error"
 
     return "other_error"
 
@@ -267,13 +276,15 @@ def main():
 
     # Filter out checkpoints, logs, archives, and templates
     notebooks_to_run = [
-        nb for nb in notebooks
+        nb
+        for nb in notebooks
         if not any(part.startswith(".") for part in nb.parts)
         and "archive" not in str(nb).lower()
         and "_run_logs" not in str(nb)
         and ".ipynb_checkpoints" not in str(nb)
         and "template" not in nb.name.lower()
-        and "golden_data" not in str(nb) # often contains support files, not runnable nbs? check later
+        and "golden_data"
+        not in str(nb)  # often contains support files, not runnable nbs? check later
     ]
 
     # Special check: verify golden_data doesn't contain notebooks we *should* run.
@@ -336,10 +347,10 @@ def main():
 
         # Log to stdout immediately if fail
         if result["status"] != "PASS":
-             print(f"    -> {result['category']}")
-             if result["error"]:
-                 first_line = result["error"].split('\n')[0][:80]
-                 print(f"    -> Error: {first_line}...")
+            print(f"    -> {result['category']}")
+            if result["error"]:
+                first_line = result["error"].split("\n")[0][:80]
+                print(f"    -> Error: {first_line}...")
 
     end_time_total = datetime.now()
     total_runtime = (end_time_total - start_time_total).total_seconds()
@@ -347,14 +358,19 @@ def main():
     # Save master results JSON
     master_log = log_dir / "master_run_stats.json"
     with open(master_log, "w") as f:
-        json.dump({
-            "run_type": "96h_full_sweep",
-            "start_time": start_time_total.isoformat(),
-            "end_time": end_time_total.isoformat(),
-            "total_runtime_seconds": total_runtime,
-            "timeout_per_notebook": args.timeout,
-            "results": results,
-        }, f, indent=2, default=str)
+        json.dump(
+            {
+                "run_type": "96h_full_sweep",
+                "start_time": start_time_total.isoformat(),
+                "end_time": end_time_total.isoformat(),
+                "total_runtime_seconds": total_runtime,
+                "timeout_per_notebook": args.timeout,
+                "results": results,
+            },
+            f,
+            indent=2,
+            default=str,
+        )
 
     # Generate summary report
     summary_path = log_dir / "summary.md"
@@ -374,7 +390,9 @@ def main():
         for r in results:
             # Shorten name for table
             name = r["notebook"]
-            f.write(f"| {name} | {r['status']} | {r['runtime_human']} | {r['category']} |\n")
+            f.write(
+                f"| {name} | {r['status']} | {r['runtime_human']} | {r['category']} |\n"
+            )
 
         if failed or timeouts:
             f.write("\n## Failures & Timeouts\n\n")
@@ -383,7 +401,9 @@ def main():
                     f.write(f"### {r['notebook']}\n")
                     f.write(f"- Status: **{r['status']}**\n")
                     f.write(f"- Category: `{r['category']}`\n")
-                    f.write(f"- Log: `{log_dir}/{r['notebook'].replace('.ipynb', '.log')}`\n")
+                    f.write(
+                        f"- Log: `{log_dir}/{r['notebook'].replace('.ipynb', '.log')}`\n"
+                    )
                     if r["error"]:
                         f.write(f"```\n{r['error'][:500]}\n```\n")
 

@@ -29,6 +29,7 @@ from rheojax.gui.compat import (
     Signal,
     Slot,
 )
+from rheojax.gui.resources.styles.tokens import button_style
 from rheojax.gui.services.export_service import ExportService
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.store import StateStore
@@ -269,22 +270,7 @@ class ExportPage(QWidget):
 
         # Export button
         self._btn_export = QPushButton("Export")
-        self._btn_export.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                font-weight: bold;
-                padding: 12px;
-                font-size: 12pt;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
-            }
-        """)
+        self._btn_export.setStyleSheet(button_style("success", "lg"))
         self._btn_export.clicked.connect(self._on_export_clicked)
         layout.addWidget(self._btn_export)
 

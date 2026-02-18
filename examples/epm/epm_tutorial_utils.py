@@ -44,7 +44,9 @@ def load_emulsion_flow_curve(phi: float = 0.80) -> tuple[np.ndarray, np.ndarray]
     return gamma_dot, stress
 
 
-def load_polystyrene_oscillation(temp: int = 145) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def load_polystyrene_oscillation(
+    temp: int = 145,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Load polystyrene oscillation data for a given temperature.
 
     Args:
@@ -58,8 +60,12 @@ def load_polystyrene_oscillation(temp: int = 145) -> tuple[np.ndarray, np.ndarra
     """
     module_dir = Path(__file__).parent
     data_path = (
-        module_dir / ".." / "data" / "oscillation" / "polystyrene" /
-        f"oscillation_ps{temp}_data.csv"
+        module_dir
+        / ".."
+        / "data"
+        / "oscillation"
+        / "polystyrene"
+        / f"oscillation_ps{temp}_data.csv"
     )
 
     if not data_path.exists():
@@ -86,7 +92,9 @@ def load_mucus_creep() -> tuple[np.ndarray, np.ndarray]:
         FileNotFoundError: If data file not found.
     """
     module_dir = Path(__file__).parent
-    data_path = module_dir / ".." / "data" / "creep" / "biological" / "creep_mucus_data.csv"
+    data_path = (
+        module_dir / ".." / "data" / "creep" / "biological" / "creep_mucus_data.csv"
+    )
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -115,8 +123,12 @@ def load_polymer_relaxation(name: str = "ps145") -> tuple[np.ndarray, np.ndarray
     """
     module_dir = Path(__file__).parent
     data_path = (
-        module_dir / ".." / "data" / "relaxation" / "polymers" /
-        f"stressrelaxation_{name}_data.csv"
+        module_dir
+        / ".."
+        / "data"
+        / "relaxation"
+        / "polymers"
+        / f"stressrelaxation_{name}_data.csv"
     )
 
     if not data_path.exists():

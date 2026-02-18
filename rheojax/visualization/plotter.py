@@ -152,7 +152,7 @@ def plot_rheo_data(
         # Select plot type based on domain and test mode
         if data.domain == "frequency" or test_mode == "oscillation":
             # Complex modulus data
-            if np.iscomplexobj(data.y):  # type: ignore[arg-type]
+            if np.iscomplexobj(data.y):
                 result = plot_frequency_domain(
                     _ensure_numpy(data.x),
                     _ensure_numpy(data.y),
@@ -393,7 +393,7 @@ def plot_frequency_domain(
 
             fig.tight_layout()
             logger.debug("Figure created", plot_type="frequency_domain")
-            return fig, [ax]  # type: ignore[return-value]
+            return fig, [ax]
 
     except Exception as e:
         logger.error(
@@ -664,7 +664,7 @@ def compute_uncertainty_band(
         if np.iscomplexobj(y_fit):
             # Return None for complex - uncertainty bands are harder to interpret
             logger.debug("Complex output detected, skipping uncertainty band")
-            return y_fit, None, None  # type: ignore[return-value]
+            return y_fit, None, None
 
         # Compute Jacobian: J[i, j] = dy[i] / dparam[j]
         # Use finite differences for robustness
@@ -691,7 +691,7 @@ def compute_uncertainty_band(
         except Exception:
             # Fallback if einsum fails
             logger.debug("Einsum failed for variance computation, returning None")
-            return y_fit, None, None  # type: ignore[return-value]
+            return y_fit, None, None
 
         # Compute z-score for confidence interval
         z = norm.ppf(1 - (1 - confidence) / 2)

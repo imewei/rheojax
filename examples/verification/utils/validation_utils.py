@@ -179,7 +179,9 @@ def validate_schema(
             if col in df.columns:
                 actual_type = df[col].dtype
                 if not np.issubdtype(actual_type, expected_type):
-                    type_errors.append(f"{col}: expected {expected_type}, got {actual_type}")
+                    type_errors.append(
+                        f"{col}: expected {expected_type}, got {actual_type}"
+                    )
         if type_errors:
             return ValidationResult(
                 check_name="schema_validation",
@@ -568,7 +570,9 @@ def compute_laos_harmonics(
         "I3_I1": float(I3_I1),
         "omega_recovered": float(omega_recovered),
         "omega_expected": float(omega_0),
-        "frequency_error": abs(omega_recovered - omega_0) / omega_0 if omega_0 > 0 else np.nan,
+        "frequency_error": (
+            abs(omega_recovered - omega_0) / omega_0 if omega_0 > 0 else np.nan
+        ),
     }
 
 
@@ -785,7 +789,9 @@ def plot_startup(
     ax = axes[0]
     ax.plot(time, stress, "b-", linewidth=1.5)
     if overshoot_info["has_overshoot"]:
-        ax.axhline(overshoot_info["sigma_ss"], color="r", linestyle="--", label="Steady state")
+        ax.axhline(
+            overshoot_info["sigma_ss"], color="r", linestyle="--", label="Steady state"
+        )
         ax.plot(
             overshoot_info["t_peak"],
             overshoot_info["sigma_max"],
@@ -1142,12 +1148,20 @@ def check_uniform_sampling(
             check_name="uniform_sampling",
             passed=False,
             message=f"Non-uniform sampling: dt_std/dt_mean = {rel_std:.3f} > {tolerance}",
-            details={"dt_mean": float(dt_mean), "dt_std": float(dt_std), "rel_std": float(rel_std)},
+            details={
+                "dt_mean": float(dt_mean),
+                "dt_std": float(dt_std),
+                "rel_std": float(rel_std),
+            },
         )
 
     return ValidationResult(
         check_name="uniform_sampling",
         passed=True,
         message=f"Uniform sampling: dt = {dt_mean:.4g} ± {dt_std:.2g} s",
-        details={"dt_mean": float(dt_mean), "dt_std": float(dt_std), "rel_std": float(rel_std)},
+        details={
+            "dt_mean": float(dt_mean),
+            "dt_std": float(dt_std),
+            "rel_std": float(rel_std),
+        },
     )

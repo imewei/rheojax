@@ -25,6 +25,7 @@ Usage:
     # Custom timeout (seconds)
     uv run python scripts/run_examples_notebooks_24h.py --timeout 3600
 """
+
 import argparse
 import json
 import os
@@ -58,21 +59,35 @@ def get_environment_snapshot() -> dict[str, Any]:
 
     # Key packages
     key_packages = [
-        "jax", "jaxlib", "nlsq", "numpyro", "arviz", "numpy", "scipy",
-        "matplotlib", "pandas", "nbformat", "nbclient", "interpax",
-        "optimistix", "optax", "equinox", "diffrax",
+        "jax",
+        "jaxlib",
+        "nlsq",
+        "numpyro",
+        "arviz",
+        "numpy",
+        "scipy",
+        "matplotlib",
+        "pandas",
+        "nbformat",
+        "nbclient",
+        "interpax",
+        "optimistix",
+        "optax",
+        "equinox",
+        "diffrax",
     ]
 
     for pkg in key_packages:
         try:
             version = importlib.metadata.version(pkg)
-            snapshot["packages"][pkg] = version
+            snapshot["packages"][pkg] = version  # type: ignore[index]
         except importlib.metadata.PackageNotFoundError:
-            snapshot["packages"][pkg] = "not installed"
+            snapshot["packages"][pkg] = "not installed"  # type: ignore[index]
 
     # JAX device info
     try:
         import jax
+
         snapshot["jax_devices"] = [str(d) for d in jax.devices()]
         snapshot["jax_default_backend"] = str(jax.default_backend())
     except Exception as e:
@@ -115,9 +130,13 @@ def run_notebook(
 
     # Determine suite from path (e.g., hl, stz, bayesian, etc.)
     relative_to_examples = notebook_path.relative_to(
-        notebook_path.parent.parent if notebook_path.parent.name != "examples" else notebook_path.parent
+        notebook_path.parent.parent
+        if notebook_path.parent.name != "examples"
+        else notebook_path.parent
     )
-    suite = relative_to_examples.parts[0] if len(relative_to_examples.parts) > 1 else "root"
+    suite = (
+        relative_to_examples.parts[0] if len(relative_to_examples.parts) > 1 else "root"
+    )
 
     result = {
         "notebook": notebook_path.name,
@@ -185,18 +204,25 @@ def run_notebook(
         for cell in nb.cells:
             if cell.cell_type == "code" and hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.get("output_type") == "stream" and output.get("name") == "stderr":
+                    if (
+                        output.get("output_type") == "stream"
+                        and output.get("name") == "stderr"
+                    ):
                         text = output.get("text", "")
                         if text.strip():
                             # Parse warnings from stderr
                             for line in text.split("\n"):
                                 line = line.strip()
-                                if line and ("Warning" in line or "warning" in line or
-                                             "Deprecat" in line or "Future" in line):
+                                if line and (
+                                    "Warning" in line
+                                    or "warning" in line
+                                    or "Deprecat" in line
+                                    or "Future" in line
+                                ):
                                     captured_warnings.append(line)
 
         result["warnings"] = list(set(captured_warnings))  # Deduplicate
-        result["warnings_count"] = len(result["warnings"])
+        result["warnings_count"] = len(result["warnings"])  # type: ignore[arg-type]
 
     except CellTimeoutError as e:
         result["status"] = "TIMEOUT"
@@ -237,7 +263,7 @@ def run_notebook(
 
                 if result["warnings"]:
                     f.write("=== WARNINGS ===\n")
-                    for w in result["warnings"][:100]:  # Limit to 100 warnings
+                    for w in result["warnings"][:100]:  # type: ignore[index]
                         f.write(f"  {w}\n")
                     f.write("\n")
 
@@ -258,11 +284,17 @@ def categorize_error(result: dict[str, Any]) -> str:
     if result["status"] == "PASS":
         if result["warnings_count"] > 0:
             warnings_text = " ".join(result["warnings"])
-            if "DeprecationWarning" in warnings_text or "FutureWarning" in warnings_text:
+            if (
+                "DeprecationWarning" in warnings_text
+                or "FutureWarning" in warnings_text
+            ):
                 return "deprecation_warning"
             if "RuntimeWarning" in warnings_text or "invalid value" in warnings_text:
                 return "numerical_warning"
-            if "divergence" in warnings_text.lower() or "divergent" in warnings_text.lower():
+            if (
+                "divergence" in warnings_text.lower()
+                or "divergent" in warnings_text.lower()
+            ):
                 return "numpyro_divergence"
             if "max_tree_depth" in warnings_text.lower():
                 return "numpyro_max_tree_depth"
@@ -292,7 +324,11 @@ def categorize_error(result: dict[str, Any]) -> str:
         return "jax_recompilation"
     if "xla" in error_lower or "jaxlib" in error_lower:
         return "jax_xla"
-    if "shape" in error_lower or "dimension" in error_lower or "broadcast" in error_lower:
+    if (
+        "shape" in error_lower
+        or "dimension" in error_lower
+        or "broadcast" in error_lower
+    ):
         return "shape_error"
     if "nan" in error_lower or "inf" in error_lower or "overflow" in error_lower:
         return "numerical_instability"
@@ -300,7 +336,11 @@ def categorize_error(result: dict[str, Any]) -> str:
         return "numpyro_divergence"
     if "numpyro" in error_lower or "mcmc" in error_lower or "nuts" in error_lower:
         return "numpyro_init"
-    if "memory" in error_lower or "oom" in error_lower or "resourceexhausted" in error_lower:
+    if (
+        "memory" in error_lower
+        or "oom" in error_lower
+        or "resourceexhausted" in error_lower
+    ):
         return "resource_oom"
     if "matplotlib" in error_lower or "figure" in error_lower:
         return "plotting_backend"
@@ -338,7 +378,8 @@ def find_notebooks(
 
     # Filter out hidden files, checkpoints, and archive directories
     notebooks = [
-        nb for nb in notebooks
+        nb
+        for nb in notebooks
         if not nb.name.startswith(".")
         and ".ipynb_checkpoints" not in str(nb)
         and "/archive/" not in str(nb)
@@ -395,7 +436,9 @@ def run_all_notebooks(
         )
         runtime_str = f"{result['runtime_seconds']:.1f}s"
 
-        status_line = f"         Status: {status_symbol} {result['status']} ({runtime_str})"
+        status_line = (
+            f"         Status: {status_symbol} {result['status']} ({runtime_str})"
+        )
         if result["warnings_count"] > 0:
             status_line += f" | Warnings: {result['warnings_count']}"
         status_line += f" | Category: {result['category']}"
@@ -409,30 +452,39 @@ def run_all_notebooks(
     total_runtime = (end_time - start_time).total_seconds()
 
     # Write master log as JSON
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     master_log = log_dir / f"run_{timestamp}.json"
 
-    clean_pass = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0)
-    pass_with_warnings = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0)
+    clean_pass = sum(
+        1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0
+    )
+    pass_with_warnings = sum(
+        1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0
+    )
     failed = sum(1 for r in results if r["status"] == "FAIL")
     timeouts = sum(1 for r in results if r["status"] == "TIMEOUT")
 
     with open(master_log, "w") as f:
-        json.dump({
-            "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
-            "total_runtime_seconds": total_runtime,
-            "timeout_per_notebook": timeout,
-            "summary": {
-                "clean_pass": clean_pass,
-                "pass_with_warnings": pass_with_warnings,
-                "fail": failed,
-                "timeout": timeouts,
-                "total": len(results),
+        json.dump(
+            {
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat(),
+                "total_runtime_seconds": total_runtime,
+                "timeout_per_notebook": timeout,
+                "summary": {
+                    "clean_pass": clean_pass,
+                    "pass_with_warnings": pass_with_warnings,
+                    "fail": failed,
+                    "timeout": timeouts,
+                    "total": len(results),
+                },
+                "environment": env_snapshot,
+                "results": results,
             },
-            "environment": env_snapshot,
-            "results": results,
-        }, f, indent=2, default=str)
+            f,
+            indent=2,
+            default=str,
+        )
 
     print(f"\nMaster log: {master_log}")
 
@@ -451,8 +503,12 @@ def generate_issue_inventory(
 
         # Summary statistics
         total = len(results)
-        clean_pass = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0)
-        pass_with_warnings = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0)
+        clean_pass = sum(
+            1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0
+        )
+        pass_with_warnings = sum(
+            1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0
+        )
         failed = sum(1 for r in results if r["status"] == "FAIL")
         timeouts = sum(1 for r in results if r["status"] == "TIMEOUT")
         total_runtime = sum(r["runtime_seconds"] for r in results)
@@ -463,10 +519,12 @@ def generate_issue_inventory(
         f.write(f"- **PASS with warnings**: {pass_with_warnings}\n")
         f.write(f"- **FAIL**: {failed}\n")
         f.write(f"- **TIMEOUT**: {timeouts}\n")
-        f.write(f"- **Total runtime**: {total_runtime:.1f}s ({total_runtime/3600:.2f} hours)\n\n")
+        f.write(
+            f"- **Total runtime**: {total_runtime:.1f}s ({total_runtime/3600:.2f} hours)\n\n"
+        )
 
         # Category breakdown
-        categories = {}
+        categories: dict[str, list[dict[str, Any]]] = {}
         for r in results:
             cat = r["category"]
             if cat not in categories:
@@ -479,7 +537,14 @@ def generate_issue_inventory(
         for cat in sorted(categories.keys()):
             items = categories[cat]
             if cat != "clean":
-                notebooks = ", ".join(r["notebook"][:20] + "..." if len(r["notebook"]) > 20 else r["notebook"] for r in items[:3])
+                notebooks = ", ".join(
+                    (
+                        r["notebook"][:20] + "..."
+                        if len(r["notebook"]) > 20
+                        else r["notebook"]
+                    )
+                    for r in items[:3]
+                )
                 if len(items) > 3:
                     notebooks += f" +{len(items)-3} more"
                 f.write(f"| {cat} | {len(items)} | {notebooks} |\n")
@@ -505,7 +570,9 @@ def generate_issue_inventory(
         f.write("|-------|-------|----------|--------|--------|\n")
         for suite in sorted(suites.keys()):
             s = suites[suite]
-            f.write(f"| {suite} | {s['clean']} | {s['warn']} | {s['fail']} | {s['timeout']} |\n")
+            f.write(
+                f"| {suite} | {s['clean']} | {s['warn']} | {s['fail']} | {s['timeout']} |\n"
+            )
         f.write("\n")
 
         # Full status table
@@ -515,7 +582,9 @@ def generate_issue_inventory(
 
         for r in results:
             runtime = f"{r['runtime_seconds']:.1f}s"
-            status_emoji = {"PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏰"}.get(r["status"], "?")
+            status_emoji = {"PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏰"}.get(
+                r["status"], "?"
+            )
             f.write(
                 f"| {r['notebook']} | {r['suite']} | {status_emoji} {r['status']} | {runtime} | {r['warnings_count']} | {r['category']} |\n"
             )
@@ -547,7 +616,13 @@ def generate_issue_inventory(
                 if r["traceback"]:
                     # Extract most relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [line for line in tb_lines if "rheojax" in line.lower() or "Error" in line or "Exception" in line][:15]
+                    relevant = [
+                        line
+                        for line in tb_lines
+                        if "rheojax" in line.lower()
+                        or "Error" in line
+                        or "Exception" in line
+                    ][:15]
                     if relevant:
                         f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))
@@ -573,8 +648,12 @@ def print_summary(results: list[dict[str, Any]]) -> None:
     print(f"{'=' * 70}")
 
     total = len(results)
-    clean_pass = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0)
-    pass_with_warnings = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0)
+    clean_pass = sum(
+        1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0
+    )
+    pass_with_warnings = sum(
+        1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0
+    )
     failed = sum(1 for r in results if r["status"] == "FAIL")
     timeouts = sum(1 for r in results if r["status"] == "TIMEOUT")
     total_runtime = sum(r["runtime_seconds"] for r in results)
@@ -657,9 +736,7 @@ def main():
         generate_issue_inventory(results, inventory_path, examples_dir)
 
     # Return exit code
-    has_issues = any(
-        r["status"] != "PASS" or r["warnings_count"] > 0 for r in results
-    )
+    has_issues = any(r["status"] != "PASS" or r["warnings_count"] > 0 for r in results)
     return 1 if has_issues else 0
 
 

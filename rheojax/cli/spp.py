@@ -446,7 +446,9 @@ def run_batch(args: Namespace) -> int:
             success_count += 1
 
         except Exception as e:
-            logger.error("Batch file processing failed", file=str(file_path), exc_info=True)
+            logger.error(
+                "Batch file processing failed", file=str(file_path), exc_info=True
+            )
             print(f"FAILED: {e}")
 
     print(f"\nCompleted: {success_count}/{len(files)} files processed successfully")

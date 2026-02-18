@@ -33,6 +33,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
@@ -767,16 +768,12 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         elif mode == "startup":
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
-            _, sigma, _ = self._simulate_startup_internal(
-                X_jax, p_values, gamma_dot
-            )
+            _, sigma, _ = self._simulate_startup_internal(X_jax, p_values, gamma_dot)
             return sigma
         elif mode == "creep":
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
-            gamma, _ = self._simulate_creep_internal(
-                X_jax, p_values, sigma_applied
-            )
+            gamma, _ = self._simulate_creep_internal(X_jax, p_values, sigma_applied)
             return gamma
 
         return jnp.zeros_like(X_jax)
@@ -804,16 +801,18 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         if test_mode in ["steady_shear", "rotation", "flow_curve"]:
             return self._predict_flow_curve(X)
         elif test_mode == "startup":
-            gamma_dot = kwargs.get("gamma_dot") or getattr(self, "_gamma_dot_applied", None)
+            gamma_dot = kwargs.get("gamma_dot") or getattr(
+                self, "_gamma_dot_applied", None
+            )
             if gamma_dot is None:
                 raise ValueError("startup prediction requires gamma_dot")
             _, sigma, _ = self.simulate_startup(X, gamma_dot)
             return sigma
         elif test_mode == "creep":
-            sigma = kwargs.get("sigma") or getattr(self, "_sigma_applied", None)  # type: ignore[assignment]
+            sigma = kwargs.get("sigma") or getattr(self, "_sigma_applied", None)
             if sigma is None:
                 raise ValueError("creep prediction requires sigma")
-            gamma, _ = self.simulate_creep(X, sigma)  # type: ignore[arg-type]
+            gamma, _ = self.simulate_creep(X, sigma)
             return gamma
 
         return np.zeros_like(X)

@@ -11,6 +11,7 @@ Features:
 - Issue inventory generation
 - Suite selection (fluidity, giesekus, or both)
 """
+
 import argparse
 import io
 import json
@@ -22,6 +23,7 @@ import warnings
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import nbformat
 from nbclient import NotebookClient
@@ -56,14 +58,16 @@ class WarningCapture:
         self._old_showwarning = None
 
     def _showwarning(self, message, category, filename, lineno, file=None, line=None):
-        self.warnings.append({
-            "message": str(message),
-            "category": category.__name__,
-            "filename": str(filename),
-            "lineno": lineno,
-            "line": line,
-            "classified_as": categorize_warning(str(message)),
-        })
+        self.warnings.append(
+            {
+                "message": str(message),
+                "category": category.__name__,
+                "filename": str(filename),
+                "lineno": lineno,
+                "line": line,
+                "classified_as": categorize_warning(str(message)),
+            }
+        )
         # Still show the warning in stderr
         if self._old_showwarning:
             self._old_showwarning(message, category, filename, lineno, file, line)
@@ -80,8 +84,10 @@ class WarningCapture:
 def setup_headless_matplotlib():
     """Configure matplotlib for headless execution."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     plt.ioff()
 
 
@@ -208,7 +214,7 @@ def run_notebook(
         result["stderr"] = stderr_capture.getvalue()
 
     # If passed but has warnings, note it
-    if result["status"] == "PASS" and result["warnings_count"] > 0:
+    if result["status"] == "PASS" and result["warnings_count"] > 0:  # type: ignore[operator]
         result["status"] = "PASS_WITH_WARNINGS"
 
     # Write per-notebook log
@@ -220,7 +226,9 @@ def run_notebook(
     return result
 
 
-def generate_issue_inventory(results: list[dict], output_path: Path, title: str = "Issue Inventory"):
+def generate_issue_inventory(
+    results: list[dict], output_path: Path, title: str = "Issue Inventory"
+):
     """Generate the issue inventory markdown file."""
     with open(output_path, "w") as f:
         f.write(f"# {title}\n\n")
@@ -247,11 +255,15 @@ def generate_issue_inventory(results: list[dict], output_path: Path, title: str 
             for suite in sorted(suites):
                 suite_results = [r for r in results if r.get("suite") == suite]
                 s_passed = sum(1 for r in suite_results if r["status"] == "PASS")
-                s_warnings = sum(1 for r in suite_results if r["status"] == "PASS_WITH_WARNINGS")
+                s_warnings = sum(
+                    1 for r in suite_results if r["status"] == "PASS_WITH_WARNINGS"
+                )
                 s_failed = sum(1 for r in suite_results if r["status"] == "FAIL")
                 s_timeout = sum(1 for r in suite_results if r["status"] == "TIMEOUT")
                 f.write(f"**{suite}**: {len(suite_results)} notebooks ")
-                f.write(f"(PASS: {s_passed}, WARN: {s_warnings}, FAIL: {s_failed}, TIMEOUT: {s_timeout})\n\n")
+                f.write(
+                    f"(PASS: {s_passed}, WARN: {s_warnings}, FAIL: {s_failed}, TIMEOUT: {s_timeout})\n\n"
+                )
 
         # Detailed per-notebook results
         f.write("## Detailed Results\n\n")
@@ -282,7 +294,7 @@ def generate_issue_inventory(results: list[dict], output_path: Path, title: str 
             if r["warnings_count"] > 0:
                 f.write("\n**Top Warnings**:\n")
                 # Group warnings by category
-                by_cat = {}
+                by_cat: dict[str, list[dict[str, Any]]] = {}
                 for w in r["warnings"][:20]:  # Limit to first 20
                     cat = w["classified_as"]
                     if cat not in by_cat:
@@ -299,7 +311,7 @@ def generate_issue_inventory(results: list[dict], output_path: Path, title: str 
 
         # Root cause summary
         f.write("## Root Cause Categories\n\n")
-        causes = {}
+        causes: dict[str, int] = {}
         for r in results:
             if r["suspected_cause"]:
                 causes[r["suspected_cause"]] = causes.get(r["suspected_cause"], 0) + 1
@@ -315,7 +327,9 @@ def generate_final_report(results: list[dict], output_path: Path, suite_name: st
         f.write(f"Generated: {datetime.now().isoformat()}\n\n")
 
         total = len(results)
-        passed = sum(1 for r in results if r["status"] in ("PASS", "PASS_WITH_WARNINGS"))
+        passed = sum(
+            1 for r in results if r["status"] in ("PASS", "PASS_WITH_WARNINGS")
+        )
         total_warnings = sum(r["warnings_count"] for r in results)
         total_runtime = sum(r["runtime_seconds"] for r in results)
 
@@ -323,7 +337,9 @@ def generate_final_report(results: list[dict], output_path: Path, suite_name: st
         f.write(f"- **Total notebooks**: {total}\n")
         f.write(f"- **All passed**: {passed == total}\n")
         f.write(f"- **Total warnings**: {total_warnings}\n")
-        f.write(f"- **Total runtime**: {total_runtime:.1f}s ({total_runtime/60:.1f}m)\n\n")
+        f.write(
+            f"- **Total runtime**: {total_runtime:.1f}s ({total_runtime/60:.1f}m)\n\n"
+        )
 
         f.write("## Per-Notebook Results\n\n")
         f.write("| Notebook | Status | Runtime | Warnings |\n")
@@ -339,7 +355,9 @@ def generate_final_report(results: list[dict], output_path: Path, suite_name: st
         f.write("\n## Reproduction Commands\n\n")
         f.write("```bash\n")
         f.write(f"# Run all {suite_name} notebooks\n")
-        f.write(f"uv run python scripts/run_fluidity_giesekus_notebooks.py --suite {suite_name.lower()}\n\n")
+        f.write(
+            f"uv run python scripts/run_fluidity_giesekus_notebooks.py --suite {suite_name.lower()}\n\n"
+        )
         f.write("# Run single notebook\n")
         if results:
             f.write(f"# {results[0]['reproduction_command']}\n")
@@ -456,9 +474,21 @@ def main():
         # Define suites to run
         suites_to_run = []
         if args.suite in ("fluidity", "both"):
-            suites_to_run.append(("fluidity", Path("examples/fluidity"), Path("examples/fluidity/_run_logs")))
+            suites_to_run.append(
+                (
+                    "fluidity",
+                    Path("examples/fluidity"),
+                    Path("examples/fluidity/_run_logs"),
+                )
+            )
         if args.suite in ("giesekus", "both"):
-            suites_to_run.append(("giesekus", Path("examples/giesekus"), Path("examples/giesekus/_run_logs")))
+            suites_to_run.append(
+                (
+                    "giesekus",
+                    Path("examples/giesekus"),
+                    Path("examples/giesekus/_run_logs"),
+                )
+            )
 
         print("Fluidity + Giesekus Notebook Runner")
         print("=" * 60)
@@ -507,7 +537,9 @@ def main():
                     "TIMEOUT": "\u23f1",
                 }.get(result["status"], "?")
 
-                print(f"{status_symbol} ({result['runtime_seconds']:.1f}s, {result['warnings_count']} warnings)")
+                print(
+                    f"{status_symbol} ({result['runtime_seconds']:.1f}s, {result['warnings_count']} warnings)"
+                )
 
                 if result["status"] in ("FAIL", "TIMEOUT"):
                     print(f"    Cause: {result['suspected_cause']}")
@@ -518,24 +550,43 @@ def main():
             # Generate per-suite inventory
             if not args.no_inventory:
                 inventory_path = log_dir / "issue_inventory.md"
-                generate_issue_inventory(suite_results, inventory_path, f"{suite_name.capitalize()} Issue Inventory")
+                generate_issue_inventory(
+                    suite_results,
+                    inventory_path,
+                    f"{suite_name.capitalize()} Issue Inventory",
+                )
                 print(f"\n{suite_name} inventory: {inventory_path}")
 
             # Write per-suite master log
             master_log = log_dir / f"run_{timestamp}.json"
             with open(master_log, "w") as f:
-                json.dump({
-                    "timestamp": timestamp,
-                    "suite": suite_name,
-                    "timeout": args.timeout,
-                    "cell_timeout": args.cell_timeout,
-                    "total": len(suite_results),
-                    "passed": sum(1 for r in suite_results if r["status"] == "PASS"),
-                    "passed_warnings": sum(1 for r in suite_results if r["status"] == "PASS_WITH_WARNINGS"),
-                    "failed": sum(1 for r in suite_results if r["status"] == "FAIL"),
-                    "timeout_count": sum(1 for r in suite_results if r["status"] == "TIMEOUT"),
-                    "results": suite_results,
-                }, f, indent=2, default=str)
+                json.dump(
+                    {
+                        "timestamp": timestamp,
+                        "suite": suite_name,
+                        "timeout": args.timeout,
+                        "cell_timeout": args.cell_timeout,
+                        "total": len(suite_results),
+                        "passed": sum(
+                            1 for r in suite_results if r["status"] == "PASS"
+                        ),
+                        "passed_warnings": sum(
+                            1
+                            for r in suite_results
+                            if r["status"] == "PASS_WITH_WARNINGS"
+                        ),
+                        "failed": sum(
+                            1 for r in suite_results if r["status"] == "FAIL"
+                        ),
+                        "timeout_count": sum(
+                            1 for r in suite_results if r["status"] == "TIMEOUT"
+                        ),
+                        "results": suite_results,
+                    },
+                    f,
+                    indent=2,
+                    default=str,
+                )
             print(f"{suite_name} master log: {master_log}")
 
         # Generate combined inventory if running both suites
@@ -543,31 +594,50 @@ def main():
             combined_log_dir = Path("examples/_run_logs")
             combined_log_dir.mkdir(parents=True, exist_ok=True)
 
-            combined_inventory = combined_log_dir / "fluidity_giesekus_issue_inventory.md"
-            generate_issue_inventory(all_results, combined_inventory, "Fluidity + Giesekus Issue Inventory")
+            combined_inventory = (
+                combined_log_dir / "fluidity_giesekus_issue_inventory.md"
+            )
+            generate_issue_inventory(
+                all_results, combined_inventory, "Fluidity + Giesekus Issue Inventory"
+            )
             print(f"\nCombined inventory: {combined_inventory}")
 
             # Combined master log
-            combined_master = combined_log_dir / f"fluidity_giesekus_run_{timestamp}.json"
+            combined_master = (
+                combined_log_dir / f"fluidity_giesekus_run_{timestamp}.json"
+            )
             with open(combined_master, "w") as f:
-                json.dump({
-                    "timestamp": timestamp,
-                    "timeout": args.timeout,
-                    "cell_timeout": args.cell_timeout,
-                    "total": len(all_results),
-                    "passed": sum(1 for r in all_results if r["status"] == "PASS"),
-                    "passed_warnings": sum(1 for r in all_results if r["status"] == "PASS_WITH_WARNINGS"),
-                    "failed": sum(1 for r in all_results if r["status"] == "FAIL"),
-                    "timeout_count": sum(1 for r in all_results if r["status"] == "TIMEOUT"),
-                    "results": all_results,
-                }, f, indent=2, default=str)
+                json.dump(
+                    {
+                        "timestamp": timestamp,
+                        "timeout": args.timeout,
+                        "cell_timeout": args.cell_timeout,
+                        "total": len(all_results),
+                        "passed": sum(1 for r in all_results if r["status"] == "PASS"),
+                        "passed_warnings": sum(
+                            1
+                            for r in all_results
+                            if r["status"] == "PASS_WITH_WARNINGS"
+                        ),
+                        "failed": sum(1 for r in all_results if r["status"] == "FAIL"),
+                        "timeout_count": sum(
+                            1 for r in all_results if r["status"] == "TIMEOUT"
+                        ),
+                        "results": all_results,
+                    },
+                    f,
+                    indent=2,
+                    default=str,
+                )
 
         # Summary
         print("\n" + "=" * 60)
         print("SUMMARY")
         print("=" * 60)
         passed = sum(1 for r in all_results if r["status"] == "PASS")
-        passed_warnings = sum(1 for r in all_results if r["status"] == "PASS_WITH_WARNINGS")
+        passed_warnings = sum(
+            1 for r in all_results if r["status"] == "PASS_WITH_WARNINGS"
+        )
         failed = sum(1 for r in all_results if r["status"] == "FAIL")
         timeout_count = sum(1 for r in all_results if r["status"] == "TIMEOUT")
 

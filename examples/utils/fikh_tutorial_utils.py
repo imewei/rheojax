@@ -353,9 +353,9 @@ def generate_synthetic_relaxation(
     time = np.logspace(-2, np.log10(t_end), n_points)
 
     # Use model's prediction method with sigma_0 for transient relaxation
-    result = model.predict(time, test_mode='relaxation', sigma_0=sigma_0)
+    result = model.predict(time, test_mode="relaxation", sigma_0=sigma_0)
     # Handle RheoData or array return
-    if hasattr(result, 'y'):
+    if hasattr(result, "y"):
         stress_clean = np.asarray(result.y).flatten()
     else:
         stress_clean = np.asarray(result).flatten()
@@ -398,9 +398,7 @@ def generate_synthetic_saos(
     rng = np.random.default_rng(seed)
 
     # Log-spaced frequency points
-    omega = np.logspace(
-        np.log10(omega_range[0]), np.log10(omega_range[1]), n_points
-    )
+    omega = np.logspace(np.log10(omega_range[0]), np.log10(omega_range[1]), n_points)
 
     # For SAOS, we simulate oscillatory strain and extract G', G''
     gamma_0 = 0.01  # Small amplitude for linear regime
@@ -420,8 +418,8 @@ def generate_synthetic_saos(
 
         try:
             # Get stress response
-            stress = model.predict(t, test_mode='startup', strain=strain)
-            if hasattr(stress, 'y'):
+            stress = model.predict(t, test_mode="startup", strain=strain)
+            if hasattr(stress, "y"):
                 stress = np.asarray(stress.y).flatten()
             else:
                 stress = np.asarray(stress).flatten()
@@ -444,12 +442,12 @@ def generate_synthetic_saos(
             # Fallback: use Maxwell model approximation
             try:
                 # For FMLIKH, sum the Maxwell responses
-                if hasattr(model, 'n_modes'):
+                if hasattr(model, "n_modes"):
                     G_p = 0.0
                     G_pp = 0.0
                     for i in range(model.n_modes):
-                        G_i = model.parameters.get_value(f'G_{i}')
-                        eta_i = model.parameters.get_value(f'eta_{i}')
+                        G_i = model.parameters.get_value(f"G_{i}")
+                        eta_i = model.parameters.get_value(f"eta_{i}")
                         tau_i = eta_i / max(G_i, 1e-12)
                         wt = w * tau_i
                         G_p += G_i * wt**2 / (1 + wt**2)
@@ -729,7 +727,9 @@ def compare_fikh_to_ikh(
 
     ax.set_xlabel("x", fontsize=12)
     ax.set_ylabel("y", fontsize=12)
-    ax.set_title(f"FIKH vs IKH Comparison: {protocol.replace('_', ' ').title()}", fontsize=13)
+    ax.set_title(
+        f"FIKH vs IKH Comparison: {protocol.replace('_', ' ').title()}", fontsize=13
+    )
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3, which="both")
 
@@ -770,7 +770,7 @@ def plot_structure_recovery(
         # Mittag-Leffler function approximation for recovery
         # λ(t) = 1 - E_α(-(t/τ)^α) ≈ 1 - exp(-(t/τ)^α / Γ(1+α))
         t_norm = t / tau_thix
-        recovery = 1 - np.exp(-t_norm**alpha / gamma_func(1 + alpha))
+        recovery = 1 - np.exp(-(t_norm**alpha) / gamma_func(1 + alpha))
 
         ax.plot(t, recovery, "-", color=color, lw=2, label=f"α = {alpha:.2f}")
 
@@ -781,7 +781,9 @@ def plot_structure_recovery(
     ax.set_xlabel("Time [s]", fontsize=12)
     ax.set_ylabel("Structure parameter λ", fontsize=12)
     ax.set_title("Thixotropic Structure Recovery vs Fractional Order", fontsize=13)
-    ax.axhline(0.63, color="gray", linestyle=":", alpha=0.5, label="λ = 0.63 (τ definition)")
+    ax.axhline(
+        0.63, color="gray", linestyle=":", alpha=0.5, label="λ = 0.63 (τ definition)"
+    )
     ax.legend(fontsize=10, loc="lower right")
     ax.grid(True, alpha=0.3)
     ax.set_ylim(0, 1.05)
@@ -843,13 +845,16 @@ def print_alpha_interpretation(alpha: float) -> None:
     # Physical implications
     print("\nPhysical Implications:")
     print(f"  • Memory kernel decay: t^(-{alpha:.2f})")
-    print(f"  • Recovery time scale: > τ_thix × Γ(1+{alpha:.2f}) = {tau_factor(alpha):.2f} × τ_thix")
+    print(
+        f"  • Recovery time scale: > τ_thix × Γ(1+{alpha:.2f}) = {tau_factor(alpha):.2f} × τ_thix"
+    )
     print(f"  • Relaxation modulus: Power-law with exponent ≈ -{alpha:.2f}")
 
 
 def tau_factor(alpha: float) -> float:
     """Compute effective time scale factor for given alpha."""
     from scipy.special import gamma as gamma_func
+
     return gamma_func(1 + alpha)
 
 
@@ -967,31 +972,33 @@ def get_fikh_param_names(include_thermal: bool = False) -> list[str]:
     """
     # Core FIKH parameters (12 isothermal)
     params = [
-        "G",              # Shear modulus (Pa)
-        "eta",            # Maxwell viscosity (Pa.s)
-        "C",              # Kinematic hardening modulus (Pa)
-        "gamma_dyn",      # Dynamic recovery parameter
-        "m",              # AF recovery exponent
-        "sigma_y0",       # Minimal yield stress (Pa)
+        "G",  # Shear modulus (Pa)
+        "eta",  # Maxwell viscosity (Pa.s)
+        "C",  # Kinematic hardening modulus (Pa)
+        "gamma_dyn",  # Dynamic recovery parameter
+        "m",  # AF recovery exponent
+        "sigma_y0",  # Minimal yield stress (Pa)
         "delta_sigma_y",  # Structural yield contribution (Pa)
-        "tau_thix",       # Thixotropic rebuilding time (s)
-        "Gamma",          # Thixotropic breakdown coefficient
-        "alpha_structure", # Fractional order (0 < α < 1)
-        "eta_inf",        # High-shear viscosity (Pa.s)
-        "mu_p",           # Plastic viscosity (Pa.s)
+        "tau_thix",  # Thixotropic rebuilding time (s)
+        "Gamma",  # Thixotropic breakdown coefficient
+        "alpha_structure",  # Fractional order (0 < α < 1)
+        "eta_inf",  # High-shear viscosity (Pa.s)
+        "mu_p",  # Plastic viscosity (Pa.s)
     ]
 
     if include_thermal:
-        params.extend([
-            "T_ref",    # Reference temperature (K)
-            "E_a",      # Viscosity activation energy (J/mol)
-            "E_y",      # Yield stress activation energy (J/mol)
-            "m_y",      # Structure exponent for yield
-            "rho_cp",   # Volumetric heat capacity (J/(m³·K))
-            "chi",      # Taylor-Quinney coefficient
-            "h",        # Heat transfer coefficient (W/(m²·K))
-            "T_env",    # Environmental temperature (K)
-        ])
+        params.extend(
+            [
+                "T_ref",  # Reference temperature (K)
+                "E_a",  # Viscosity activation energy (J/mol)
+                "E_y",  # Yield stress activation energy (J/mol)
+                "m_y",  # Structure exponent for yield
+                "rho_cp",  # Volumetric heat capacity (J/(m³·K))
+                "chi",  # Taylor-Quinney coefficient
+                "h",  # Heat transfer coefficient (W/(m²·K))
+                "T_env",  # Environmental temperature (K)
+            ]
+        )
 
     return params
 
@@ -1015,34 +1022,46 @@ def get_fmlikh_param_names(
 
     # Per-mode parameters
     for i in range(n_modes):
-        params.extend([
-            f"G_{i}",
-            f"eta_{i}",
-            f"C_{i}",
-            f"gamma_dyn_{i}",
-        ])
+        params.extend(
+            [
+                f"G_{i}",
+                f"eta_{i}",
+                f"C_{i}",
+                f"gamma_dyn_{i}",
+            ]
+        )
         if not shared_alpha:
             params.append(f"alpha_{i}")
 
     # Shared yield/thixotropy parameters
-    params.extend([
-        "m",
-        "sigma_y0",
-        "delta_sigma_y",
-        "tau_thix",
-        "Gamma",
-        "eta_inf",
-        "mu_p",
-    ])
+    params.extend(
+        [
+            "m",
+            "sigma_y0",
+            "delta_sigma_y",
+            "tau_thix",
+            "Gamma",
+            "eta_inf",
+            "mu_p",
+        ]
+    )
 
     if shared_alpha:
         params.append("alpha_structure")
 
     if include_thermal:
-        params.extend([
-            "T_ref", "E_a", "E_y", "m_y",
-            "rho_cp", "chi", "h", "T_env",
-        ])
+        params.extend(
+            [
+                "T_ref",
+                "E_a",
+                "E_y",
+                "m_y",
+                "rho_cp",
+                "chi",
+                "h",
+                "T_env",
+            ]
+        )
 
     return params
 
@@ -1149,7 +1168,9 @@ def print_parameter_comparison(
             median = float(np.median(samples))
             lo = float(np.percentile(samples, 2.5))
             hi = float(np.percentile(samples, 97.5))
-            print(f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]")
+            print(
+                f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]"
+            )
         except (KeyError, AttributeError):
             pass
 

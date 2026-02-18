@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Test notebooks and capture errors."""
+
 import sys
 from pathlib import Path
 
@@ -10,26 +11,32 @@ from nbclient import NotebookClient
 def test_notebook(nb_path: str, timeout: int = 120) -> dict:
     """Test a single notebook and return result."""
     import os
+
     # Change to notebook's directory for relative paths to work
     nb_abs_path = Path(nb_path).resolve()
     original_cwd = os.getcwd()
     try:
         os.chdir(nb_abs_path.parent)
         nb = nbformat.read(nb_abs_path, as_version=4)
-        client = NotebookClient(nb, timeout=timeout, kernel_name='python3')
+        client = NotebookClient(nb, timeout=timeout, kernel_name="python3")
         client.execute()
         return {"status": "PASS", "error": None}
     except Exception as e:
         # Extract error details
         error_msg = str(e)
         # Try to get the cell that failed
-        if hasattr(e, 'traceback'):
-            tb = ''.join(e.traceback[-5:]) if len(e.traceback) > 5 else ''.join(e.traceback)
+        if hasattr(e, "traceback"):
+            tb = (
+                "".join(e.traceback[-5:])
+                if len(e.traceback) > 5
+                else "".join(e.traceback)
+            )
         else:
             tb = error_msg[:500]
         return {"status": "FAIL", "error": tb}
     finally:
         os.chdir(original_cwd)
+
 
 if __name__ == "__main__":
     notebooks = sys.argv[1:]

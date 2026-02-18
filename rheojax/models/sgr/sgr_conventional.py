@@ -52,6 +52,7 @@ import numpy as np
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -248,7 +249,7 @@ class SGRConventional(BaseModel):
         self._gamma_0: float | None = None
         self._omega_laos: float | None = None
 
-    def _fit(  # type: ignore[override]
+    def _fit(
         self,
         X: np.ndarray,
         y: np.ndarray,
@@ -1596,7 +1597,7 @@ class SGRConventional(BaseModel):
         x_trajectory_jax = jnp.where(
             sol.result == diffrax.RESULTS.successful,
             x_trajectory_jax,
-            jnp.nan * jnp.ones_like(x_trajectory_jax)
+            jnp.nan * jnp.ones_like(x_trajectory_jax),
         )
 
         # Convert back to numpy
@@ -1666,7 +1667,9 @@ class SGRConventional(BaseModel):
             return self._predict_oscillation_jit(X_jax, x, G0_scale, tau0)
         elif mode == "startup":
             # Get gamma_dot from kwargs or instance attribute
-            gamma_dot = kwargs.get("gamma_dot") or getattr(self, "_startup_gamma_dot", 1.0)
+            gamma_dot = kwargs.get("gamma_dot") or getattr(
+                self, "_startup_gamma_dot", 1.0
+            )
             return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
         else:
             raise ValueError(f"Unsupported test mode: {mode}")
@@ -2142,10 +2145,14 @@ class SGRConventional(BaseModel):
             return lambda_new, lambda_new
 
         # Scan over time steps (skip first step where dt=0)
-        _, lambda_steps = jax.lax.scan(step, jnp.float64(lambda_initial), (dt[1:], gamma_dot_abs[1:]))
+        _, lambda_steps = jax.lax.scan(
+            step, jnp.float64(lambda_initial), (dt[1:], gamma_dot_abs[1:])
+        )
 
         # Prepend initial value
-        lambda_t = np.asarray(jnp.concatenate([jnp.array([lambda_initial]), lambda_steps]))
+        lambda_t = np.asarray(
+            jnp.concatenate([jnp.array([lambda_initial]), lambda_steps])
+        )
 
         # Store trajectory
         self._lambda_trajectory = lambda_t

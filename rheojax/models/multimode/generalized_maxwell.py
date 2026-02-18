@@ -30,6 +30,9 @@ import numpy as np
 
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
+
+# Lazy import diffrax for transient simulations (deferred to avoid ~250ms startup cost)
+from rheojax.core.jax_config import lazy_import as _lazy_import
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode, TestMode
@@ -41,9 +44,6 @@ from rheojax.utils.prony import (
     select_optimal_n,
     softmax_penalty,
 )
-
-# Lazy import diffrax for transient simulations (deferred to avoid ~250ms startup cost)
-from rheojax.core.jax_config import lazy_import as _lazy_import
 
 diffrax = _lazy_import("diffrax")
 
@@ -153,7 +153,7 @@ class GeneralizedMaxwell(BaseModel):
         # Store element minimization diagnostics
         self._element_minimization_diagnostics: dict[str, object] | None = None
 
-    def _fit(  # type: ignore[override]
+    def _fit(
         self,
         X: np.ndarray,
         y: np.ndarray,
@@ -301,13 +301,13 @@ class GeneralizedMaxwell(BaseModel):
 
         # Convert to OptimizationResult
         result = OptimizationResult(
-            x=np.asarray(nlsq_result.x),  # type: ignore[attr-defined]
-            fun=nlsq_result.cost,  # type: ignore[attr-defined]
-            jac=np.asarray(nlsq_result.jac) if nlsq_result.jac is not None else None,  # type: ignore[attr-defined]
-            success=nlsq_result.success,  # type: ignore[attr-defined]
-            message=nlsq_result.message,  # type: ignore[attr-defined]
-            nit=nlsq_result.nfev,  # type: ignore[attr-defined]
-            nfev=nlsq_result.nfev,  # type: ignore[attr-defined]
+            x=np.asarray(nlsq_result.x),
+            fun=nlsq_result.cost,
+            jac=np.asarray(nlsq_result.jac) if nlsq_result.jac is not None else None,
+            success=nlsq_result.success,
+            message=nlsq_result.message,
+            nit=nlsq_result.nfev,
+            nfev=nlsq_result.nfev,
             njev=nlsq_result.njev if hasattr(nlsq_result, "njev") else 0,
             optimality=(
                 nlsq_result.optimality if hasattr(nlsq_result, "optimality") else None
@@ -315,7 +315,7 @@ class GeneralizedMaxwell(BaseModel):
             active_mask=(
                 nlsq_result.active_mask if hasattr(nlsq_result, "active_mask") else None
             ),
-            cost=nlsq_result.cost,  # type: ignore[attr-defined]
+            cost=nlsq_result.cost,
             grad=(
                 np.asarray(nlsq_result.grad)
                 if hasattr(nlsq_result, "grad") and nlsq_result.grad is not None
@@ -452,8 +452,12 @@ class GeneralizedMaxwell(BaseModel):
         tau_i_opt = params_opt[1 + self._n_modes :]
 
         param_values = {f"{symbol}_inf": float(E_inf_opt)}
-        param_values.update({f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)})
-        param_values.update({f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)})
+        param_values.update(
+            {f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)}
+        )
+        param_values.update(
+            {f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
+        )
         self.parameters.set_values(param_values)
 
         # Element minimization
@@ -508,36 +512,46 @@ class GeneralizedMaxwell(BaseModel):
         # Define padded objective function (always uses N_max-shaped arrays)
         # This is JIT-compiled ONCE and reused for all n_active values.
         if test_mode in ("relaxation",):
+
             def objective(params):
                 E_inf = params[0]
                 E_i = params[1 : 1 + n_max]
                 tau_i = params[1 + n_max :]
                 pred = self._predict_relaxation_jit(X_jax, E_inf, E_i, tau_i)
                 return pred - y_jax
+
         elif test_mode in ("oscillation", "laos"):
+
             def objective(params):
                 E_inf = params[0]
                 E_i = params[1 : 1 + n_max]
                 tau_i = params[1 + n_max :]
                 pred = self._predict_oscillation_jit(X_jax, E_inf, E_i, tau_i)
                 return jnp.concatenate([pred[0], pred[1]]) - y_jax
+
         elif test_mode == "creep":
+
             def objective(params):
                 E_inf = params[0]
                 E_i = params[1 : 1 + n_max]
                 tau_i = params[1 + n_max :]
                 pred = self._predict_creep_jit(X_jax, E_inf, E_i, tau_i)
                 return pred - y_jax
+
         elif test_mode == "startup":
             gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+
             def objective(params):
                 E_inf = params[0]
                 E_i = params[1 : 1 + n_max]
                 tau_i = params[1 + n_max :]
                 pred = self._predict_startup_jit(X_jax, E_inf, E_i, tau_i, gamma_dot)
                 return pred - y_jax
+
         else:
-            raise ValueError(f"Element minimization not supported for test_mode: {test_mode}")
+            raise ValueError(
+                f"Element minimization not supported for test_mode: {test_mode}"
+            )
 
         # Softmax penalty wrapper (also fixed shape)
         def objective_step1(params):
@@ -876,8 +890,12 @@ class GeneralizedMaxwell(BaseModel):
         tau_i_opt = params_opt[1 + self._n_modes :]
 
         param_values = {f"{symbol}_inf": float(E_inf_opt)}
-        param_values.update({f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)})
-        param_values.update({f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)})
+        param_values.update(
+            {f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)}
+        )
+        param_values.update(
+            {f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
+        )
         self.parameters.set_values(param_values)
 
         # Element minimization
@@ -1019,8 +1037,12 @@ class GeneralizedMaxwell(BaseModel):
         tau_i_opt = params_opt[1 + self._n_modes :]
 
         param_values = {f"{symbol}_inf": float(E_inf_opt)}
-        param_values.update({f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)})
-        param_values.update({f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)})
+        param_values.update(
+            {f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)}
+        )
+        param_values.update(
+            {f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
+        )
         self.parameters.set_values(param_values)
 
         # Element minimization
@@ -1812,8 +1834,15 @@ class GeneralizedMaxwell(BaseModel):
         # Set parameters (batch update for 5-10% speedup)
         params_opt = result.x
         param_values = {f"{symbol}_inf": float(params_opt[0])}
-        param_values.update({f"{symbol}_{i+1}": float(params_opt[1 + i]) for i in range(self._n_modes)})
-        param_values.update({f"tau_{i+1}": float(params_opt[1 + self._n_modes + i]) for i in range(self._n_modes)})
+        param_values.update(
+            {f"{symbol}_{i+1}": float(params_opt[1 + i]) for i in range(self._n_modes)}
+        )
+        param_values.update(
+            {
+                f"tau_{i+1}": float(params_opt[1 + self._n_modes + i])
+                for i in range(self._n_modes)
+            }
+        )
         self.parameters.set_values(param_values)
 
         self._nlsq_result = result

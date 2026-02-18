@@ -331,10 +331,12 @@ class HVMBase(VLBBase):
         T_range = np.asarray(T_range)
 
         inv_T = 1000.0 / T_range
-        log_k = np.array([
-            np.log10(float(hvm_ber_rate_constant(self.nu_0, self.E_a, T_i)))
-            for T_i in T_range
-        ])
+        log_k = np.array(
+            [
+                np.log10(float(hvm_ber_rate_constant(self.nu_0, self.E_a, T_i)))
+                for T_i in T_range
+            ]
+        )
 
         return inv_T, log_k
 

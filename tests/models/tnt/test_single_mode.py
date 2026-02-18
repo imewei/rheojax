@@ -235,9 +235,7 @@ class TestFlowCurve:
         model = TNTSingleMode()
 
         gamma_dot = np.logspace(-2, 2, 20)
-        sigma, eta, N1 = model.predict_flow_curve(
-            gamma_dot, return_components=True
-        )
+        sigma, eta, N1 = model.predict_flow_curve(gamma_dot, return_components=True)
 
         assert sigma.shape == gamma_dot.shape
         assert eta.shape == gamma_dot.shape
@@ -255,9 +253,7 @@ class TestFlowCurve:
         model.parameters.set_value("eta_s", 0.0)
 
         gamma_dot = np.logspace(-2, 2, 20)
-        _, eta, _ = model.predict_flow_curve(
-            gamma_dot, return_components=True
-        )
+        _, eta, _ = model.predict_flow_curve(gamma_dot, return_components=True)
 
         # Viscosity should be constant = G·τ_b for all rates
         expected_eta = G * tau_b
@@ -484,9 +480,7 @@ class TestCreepSimulation:
         model.parameters.set_value("eta_s", 10.0)
 
         t = np.linspace(0, 10, 100)
-        gamma, gamma_dot = model.simulate_creep(
-            t, sigma_applied=50.0, return_rate=True
-        )
+        gamma, gamma_dot = model.simulate_creep(t, sigma_applied=50.0, return_rate=True)
 
         assert gamma.shape == t.shape
         assert gamma_dot.shape == t.shape
@@ -528,9 +522,7 @@ class TestLAOSSimulation:
         """Test LAOS simulation runs."""
         model = TNTSingleMode()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=0.5, omega=1.0, n_cycles=3
-        )
+        result = model.simulate_laos(t=None, gamma_0=0.5, omega=1.0, n_cycles=3)
 
         assert "t" in result
         assert "strain" in result
@@ -542,9 +534,7 @@ class TestLAOSSimulation:
         """Test LAOS response is periodic after transient."""
         model = TNTSingleMode()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=0.5, omega=1.0, n_cycles=5
-        )
+        result = model.simulate_laos(t=None, gamma_0=0.5, omega=1.0, n_cycles=5)
 
         stress = result["stress"]
         n_per_cycle = len(stress) // 5
@@ -565,9 +555,7 @@ class TestLAOSSimulation:
         omega = 1.0
         gamma_0 = 0.001  # Very small amplitude → linear
 
-        result = model.simulate_laos(
-            t=None, gamma_0=gamma_0, omega=omega, n_cycles=10
-        )
+        result = model.simulate_laos(t=None, gamma_0=gamma_0, omega=omega, n_cycles=10)
 
         # Extract last cycle stress amplitude
         stress = result["stress"]
@@ -586,9 +574,7 @@ class TestLAOSSimulation:
         """Test LAOS harmonic extraction."""
         model = TNTSingleMode()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=1.0, omega=1.0, n_cycles=5
-        )
+        result = model.simulate_laos(t=None, gamma_0=1.0, omega=1.0, n_cycles=5)
 
         harmonics = model.extract_laos_harmonics(result, n_harmonics=3)
 
@@ -760,9 +746,7 @@ class TestFitting:
         sigma_true = model_true.predict(gamma_dot, test_mode="flow_curve")
 
         np.random.seed(42)
-        sigma_noisy = sigma_true * (
-            1 + 0.02 * np.random.randn(len(sigma_true))
-        )
+        sigma_noisy = sigma_true * (1 + 0.02 * np.random.randn(len(sigma_true)))
 
         model_fit = TNTSingleMode()
         model_fit.fit(gamma_dot, sigma_noisy, test_mode="flow_curve")
@@ -849,9 +833,9 @@ class TestBellVariant:
         sigma_bell = model_bell.predict_flow_curve(gamma_dot)
 
         # Bell should give lower stress at high rates (enhanced thinning)
-        assert np.all(sigma_bell < sigma_basic), (
-            f"Bell stress {sigma_bell} should be below constant {sigma_basic}"
-        )
+        assert np.all(
+            sigma_bell < sigma_basic
+        ), f"Bell stress {sigma_bell} should be below constant {sigma_basic}"
 
     def test_bell_stress_overshoot(self):
         """Bell breakage should produce stress overshoot in startup flow.
@@ -875,9 +859,7 @@ class TestBellVariant:
 
         # Overshoot ratio > 1 for strong force sensitivity
         overshoot = sigma_max / sigma_ss
-        assert overshoot > 1.05, (
-            f"Expected Bell overshoot > 1.05, got {overshoot:.3f}"
-        )
+        assert overshoot > 1.05, f"Expected Bell overshoot > 1.05, got {overshoot:.3f}"
 
     def test_bell_model_function_flow_curve(self):
         """Test model_function works for Bell variant flow curve."""
@@ -1086,9 +1068,9 @@ class TestNonAffineVariant:
         sigma_gs = model_gs.predict_flow_curve(gamma_dot)
 
         # Should be very close (both reduce to UCM at xi=0)
-        assert np.allclose(sigma_basic, sigma_gs, rtol=0.05), (
-            f"xi=0 should match basic: {sigma_basic} vs {sigma_gs}"
-        )
+        assert np.allclose(
+            sigma_basic, sigma_gs, rtol=0.05
+        ), f"xi=0 should match basic: {sigma_basic} vs {sigma_gs}"
 
     def test_non_affine_all_protocols_run(self):
         """Verify non-affine variant can execute all 6 protocols."""

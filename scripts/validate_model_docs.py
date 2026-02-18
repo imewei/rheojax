@@ -146,17 +146,17 @@ def check_code_blocks(content: str) -> list[str]:
         # Check for placeholder text (but exclude Python f-strings and format strings)
         if "{" in block and "}" in block:
             # Remove f-strings and .format() patterns before checking
-            block_no_fstrings = re.sub(r'f["\'][^"\']*\{[^}]+\}[^"\']*["\']', '', block)
-            block_no_fstrings = re.sub(r'\.format\([^)]*\)', '', block_no_fstrings)
-            block_no_fstrings = re.sub(r'["\'][^"\']*\{[^}]+\}[^"\']*["\']', '', block_no_fstrings)
+            block_no_fstrings = re.sub(r'f["\'][^"\']*\{[^}]+\}[^"\']*["\']', "", block)
+            block_no_fstrings = re.sub(r"\.format\([^)]*\)", "", block_no_fstrings)
+            block_no_fstrings = re.sub(
+                r'["\'][^"\']*\{[^}]+\}[^"\']*["\']', "", block_no_fstrings
+            )
             if re.search(r"\{[a-z_]+\}", block_no_fstrings):
                 issues.append(f"Code block {i} contains unfilled placeholder")
 
         # Check for syntax issues
         if "import jax" in block and "from rheojax.core.jax_config" not in block:
-            issues.append(
-                f"Code block {i}: Direct jax import without safe_import_jax"
-            )
+            issues.append(f"Code block {i}: Direct jax import without safe_import_jax")
 
     return issues
 
@@ -186,14 +186,18 @@ def check_math_blocks(content: str) -> list[str]:
     issues = []
 
     # Check for unbalanced braces in math
-    math_blocks = re.findall(r"\.\. math::\n\n(.*?)(?=\n\n[^\s]|\Z)", content, re.DOTALL)
+    math_blocks = re.findall(
+        r"\.\. math::\n\n(.*?)(?=\n\n[^\s]|\Z)", content, re.DOTALL
+    )
 
     for i, block in enumerate(math_blocks, 1):
         # Count braces
         open_braces = block.count("{")
         close_braces = block.count("}")
         if open_braces != close_braces:
-            issues.append(f"Math block {i}: Unbalanced braces ({open_braces} open, {close_braces} close)")
+            issues.append(
+                f"Math block {i}: Unbalanced braces ({open_braces} open, {close_braces} close)"
+            )
 
     return issues
 
@@ -262,9 +266,7 @@ def validate_model_doc(file_path: Path) -> ValidationResult:
         if wycl_match:
             wycl_content = wycl_match.group(1)
             if len(wycl_content.strip()) < 200:
-                result.warnings.append(
-                    "'What You Can Learn' section appears too short"
-                )
+                result.warnings.append("'What You Can Learn' section appears too short")
             # Check for key subsections
             for subsection in ["Parameter Interpretation", "Material Classification"]:
                 if subsection not in wycl_content:
@@ -274,9 +276,13 @@ def validate_model_doc(file_path: Path) -> ValidationResult:
 
     # Line count thresholds
     if line_count < 200:
-        result.errors.append(f"Documentation too short: {line_count} lines (minimum 200)")
+        result.errors.append(
+            f"Documentation too short: {line_count} lines (minimum 200)"
+        )
     elif line_count < 400:
-        result.warnings.append(f"Documentation below target: {line_count} lines (target 500+)")
+        result.warnings.append(
+            f"Documentation below target: {line_count} lines (target 500+)"
+        )
 
     return result
 

@@ -120,11 +120,19 @@ def test_predict_returns_tensile_after_tensile_fit():
     eta = 1e4
     tau = eta / G0
     omega_tau = omega * tau
-    G_star = G0 * (omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2))
+    G_star = G0 * (
+        omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2)
+    )
     E_star = G_star * 3.0  # nu=0.5
 
     model = Maxwell()
-    model.fit(omega, E_star, test_mode="oscillation", deformation_mode="tension", poisson_ratio=0.5)
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=0.5,
+    )
 
     # Predict should return E*-space result
     pred = model.predict(omega, test_mode="oscillation")
@@ -145,7 +153,13 @@ def test_predict_shear_override():
     E_star = G_star * 3.0
 
     model = Maxwell()
-    model.fit(omega, E_star, test_mode="oscillation", deformation_mode="tension", poisson_ratio=0.5)
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=0.5,
+    )
 
     # Override to get G* directly
     pred_G = model.predict(omega, test_mode="oscillation", deformation_mode="shear")
@@ -163,7 +177,9 @@ def test_fit_without_deformation_mode_is_shear():
     eta = 1e4
     tau = eta / G0
     omega_tau = omega * tau
-    G_star = G0 * (omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2))
+    G_star = G0 * (
+        omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2)
+    )
 
     model = Maxwell()
     model.fit(omega, G_star, test_mode="oscillation")
@@ -185,7 +201,9 @@ def test_rheodata_autodetect_deformation_mode():
     eta = 1e4
     tau = eta / G0
     omega_tau = omega * tau
-    G_star = G0 * (omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2))
+    G_star = G0 * (
+        omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2)
+    )
     E_star = G_star * 3.0
 
     rheo = RheoData(
@@ -215,7 +233,9 @@ def test_maxwell_tension_params_equal_3x_shear():
     eta = 2e3
     tau = eta / G0
     omega_tau = omega * tau
-    G_star = G0 * (omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2))
+    G_star = G0 * (
+        omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2)
+    )
 
     # Fit in G-space
     model_shear = Maxwell()
@@ -225,7 +245,13 @@ def test_maxwell_tension_params_equal_3x_shear():
     # Fit same data as E* (3x) in tension mode
     E_star = G_star * 3.0
     model_tension = Maxwell()
-    model_tension.fit(omega, E_star, test_mode="oscillation", deformation_mode="tension", poisson_ratio=0.5)
+    model_tension.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=0.5,
+    )
     G0_tension = model_tension.parameters.get_value("G0")
 
     # Both should give same G-space parameters

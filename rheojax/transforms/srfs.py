@@ -230,7 +230,7 @@ class SRFS(BaseTransform):
         logger.debug(
             "Applying SRFS shift to single dataset",
             gamma_dot_ref=gamma_dot_ref,
-            data_points=len(data.x),  # type: ignore[arg-type]
+            data_points=len(data.x),
         )
 
         # Compute shift factor
@@ -254,7 +254,7 @@ class SRFS(BaseTransform):
         logger.debug(
             "Single dataset shifted",
             shift_factor=float(a_gamma_dot),
-            original_x_range=(float(data.x[0]), float(data.x[-1])),  # type: ignore[index]
+            original_x_range=(float(data.x[0]), float(data.x[-1])),
             shifted_x_range=(float(x_shifted[0]), float(x_shifted[-1])),
         )
 
@@ -268,7 +268,7 @@ class SRFS(BaseTransform):
             validate=False,
         )
 
-    def _transform(  # type: ignore[override]
+    def _transform(
         self,
         data: RheoData | list[RheoData],
         x: float | None = None,
@@ -319,7 +319,7 @@ class SRFS(BaseTransform):
 
         return self.create_mastercurve(data, x, tau0, return_shifts=return_shifts)
 
-    def transform(  # type: ignore[override]
+    def transform(
         self,
         data: RheoData | list[RheoData],
         x: float | None = None,

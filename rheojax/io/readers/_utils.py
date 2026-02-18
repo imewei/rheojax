@@ -84,8 +84,7 @@ _TEST_MODE_PATTERNS: dict[str, list[re.Pattern]] = {
         ]
     ],
     "relaxation": [
-        re.compile(p, re.IGNORECASE)
-        for p in [r"[EG]\s*\(\s*t\s*\)", r"relaxation"]
+        re.compile(p, re.IGNORECASE) for p in [r"[EG]\s*\(\s*t\s*\)", r"relaxation"]
     ],
     "creep": [
         re.compile(p, re.IGNORECASE)
@@ -110,27 +109,27 @@ _MODULUS_PATTERN = re.compile(r"[EG]['\"]", re.IGNORECASE)
 _TENSILE_MODULUS_PATTERNS: list[re.Pattern] = [
     re.compile(p, re.IGNORECASE)
     for p in [
-        r"E['\"]",           # E' or E''
-        r"E\*",              # E*
-        r"E[-_]?stor",       # E_stor, Estor, E-stor
-        r"E[-_]?loss",       # E_loss, Eloss, E-loss
-        r"Young",            # Young's modulus
-        r"tensile",          # Tensile modulus
+        r"E['\"]",  # E' or E''
+        r"E\*",  # E*
+        r"E[-_]?stor",  # E_stor, Estor, E-stor
+        r"E[-_]?loss",  # E_loss, Eloss, E-loss
+        r"Young",  # Young's modulus
+        r"tensile",  # Tensile modulus
         r"storage\s+modulus.*E",  # "Storage Modulus E'"
-        r"loss\s+modulus.*E",    # "Loss Modulus E'"
+        r"loss\s+modulus.*E",  # "Loss Modulus E'"
     ]
 ]
 
 _SHEAR_MODULUS_PATTERNS: list[re.Pattern] = [
     re.compile(p, re.IGNORECASE)
     for p in [
-        r"G['\"]",           # G' or G''
-        r"G\*",              # G*
-        r"G[-_]?stor",       # G_stor
-        r"G[-_]?loss",       # G_loss
+        r"G['\"]",  # G' or G''
+        r"G\*",  # G*
+        r"G[-_]?stor",  # G_stor
+        r"G[-_]?loss",  # G_loss
         r"shear\s+modulus",  # Shear modulus
         r"storage\s+modulus.*G",  # "Storage Modulus G'"
-        r"loss\s+modulus.*G",    # "Loss Modulus G'"
+        r"loss\s+modulus.*G",  # "Loss Modulus G'"
     ]
 ]
 

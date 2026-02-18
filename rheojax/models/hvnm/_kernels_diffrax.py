@@ -80,13 +80,23 @@ def _hvnm_initial_state(include_interfacial_damage: bool) -> jnp.ndarray:
     # I-network: [mu_I_xx=1, mu_I_yy=1, mu_I_xy=0]
     # I-network natural state: [mu_I_nat_xx=1, mu_I_nat_yy=1, mu_I_nat_xy=0]
     components = [
-        1.0, 1.0, 0.0,   # E-network
-        1.0, 1.0, 0.0,   # E-network natural state
-        1.0, 1.0, 0.0,   # D-network
-        0.0,              # gamma
-        0.0,              # D (matrix damage)
-        1.0, 1.0, 0.0,   # I-network
-        1.0, 1.0, 0.0,   # I-network natural state
+        1.0,
+        1.0,
+        0.0,  # E-network
+        1.0,
+        1.0,
+        0.0,  # E-network natural state
+        1.0,
+        1.0,
+        0.0,  # D-network
+        0.0,  # gamma
+        0.0,  # D (matrix damage)
+        1.0,
+        1.0,
+        0.0,  # I-network
+        1.0,
+        1.0,
+        0.0,  # I-network natural state
     ]
     if include_interfacial_damage:
         components.append(0.0)  # D_int
@@ -119,13 +129,23 @@ def _hvnm_relaxation_initial_state(
     mu_xy = gamma_step
 
     components = [
-        mu_xx, mu_yy, mu_xy,     # E-network (deformed)
-        1.0, 1.0, 0.0,           # E-network natural state (equilibrium)
-        mu_xx, mu_yy, mu_xy,     # D-network (deformed)
-        gamma_step,               # gamma
-        0.0,                      # D
-        mu_xx, mu_yy, mu_xy,     # I-network (deformed, with amplification applied)
-        1.0, 1.0, 0.0,           # I-network natural state (equilibrium)
+        mu_xx,
+        mu_yy,
+        mu_xy,  # E-network (deformed)
+        1.0,
+        1.0,
+        0.0,  # E-network natural state (equilibrium)
+        mu_xx,
+        mu_yy,
+        mu_xy,  # D-network (deformed)
+        gamma_step,  # gamma
+        0.0,  # D
+        mu_xx,
+        mu_yy,
+        mu_xy,  # I-network (deformed, with amplification applied)
+        1.0,
+        1.0,
+        0.0,  # I-network natural state (equilibrium)
     ]
     if include_interfacial_damage:
         components.append(0.0)  # D_int
@@ -160,8 +180,15 @@ def _compute_k_ber_matrix(
         )
     else:  # stretch
         return hvm_ber_rate_stretch(
-            mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-            G_E, nu_0, E_a, V_act, T,
+            mu_E_xx,
+            mu_E_yy,
+            mu_E_nat_xx,
+            mu_E_nat_yy,
+            G_E,
+            nu_0,
+            E_a,
+            V_act,
+            T,
         )
 
 
@@ -185,13 +212,25 @@ def _compute_k_ber_interphase(
         sigma_I_yy = G_I_eff * X_I * (mu_I_yy - mu_I_nat_yy)
         sigma_I_xy = G_I_eff * X_I * (mu_I_xy - mu_I_nat_xy)
         return hvnm_ber_rate_interphase_stress(
-            sigma_I_xx, sigma_I_yy, sigma_I_xy,
-            nu_0_int, E_a_int, V_act_int, T,
+            sigma_I_xx,
+            sigma_I_yy,
+            sigma_I_xy,
+            nu_0_int,
+            E_a_int,
+            V_act_int,
+            T,
         )
     else:  # stretch
         return hvnm_ber_rate_interphase_stretch(
-            mu_I_xx, mu_I_yy, mu_I_nat_xx, mu_I_nat_yy,
-            G_I_eff, nu_0_int, E_a_int, V_act_int, T,
+            mu_I_xx,
+            mu_I_yy,
+            mu_I_nat_xx,
+            mu_I_nat_yy,
+            G_I_eff,
+            nu_0_int,
+            E_a_int,
+            V_act_int,
+            T,
         )
 
 
@@ -251,27 +290,45 @@ def _make_hvnm_startup_vector_field(
         )
 
         # E-network evolution (6 equations, reusing HVM kernel)
-        (dmu_E_xx, dmu_E_yy, dmu_E_xy,
-         dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy) = hvm_exchangeable_rhs_shear(
-            mu_E_xx, mu_E_yy, mu_E_xy,
-            mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
-            gamma_dot, k_BER_mat,
+        dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
+            hvm_exchangeable_rhs_shear(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_xy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_E_nat_xy,
+                gamma_dot,
+                k_BER_mat,
+            )
         )
 
         # D-network evolution (3 equations, reusing VLB kernel)
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
-            mu_D_xx, mu_D_yy, 1.0, mu_D_xy, gamma_dot, k_d_D,
+            mu_D_xx,
+            mu_D_yy,
+            1.0,
+            mu_D_xy,
+            gamma_dot,
+            k_d_D,
         )
         dmu_D_xx = jnp.where(include_dissociative, dmu_D_xx, 0.0)
         dmu_D_yy = jnp.where(include_dissociative, dmu_D_yy, 0.0)
         dmu_D_xy = jnp.where(include_dissociative, dmu_D_xy, 0.0)
 
         # I-network evolution (6 equations, with strain amplification)
-        (dmu_I_xx, dmu_I_yy, dmu_I_xy,
-         dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy) = hvnm_interphase_rhs_shear(
-            mu_I_xx, mu_I_yy, mu_I_xy,
-            mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy,
-            gamma_dot, X_I, k_BER_int,
+        dmu_I_xx, dmu_I_yy, dmu_I_xy, dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy = (
+            hvnm_interphase_rhs_shear(
+                mu_I_xx,
+                mu_I_yy,
+                mu_I_xy,
+                mu_I_nat_xx,
+                mu_I_nat_yy,
+                mu_I_nat_xy,
+                gamma_dot,
+                X_I,
+                k_BER_int,
+            )
         )
 
         # Strain accumulation
@@ -281,28 +338,55 @@ def _make_hvnm_startup_vector_field(
         dD = jnp.where(
             include_damage,
             hvm_damage_rhs(
-                mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-                mu_D_xx, mu_D_yy, D_val,
-                G_P, G_E, G_D, Gamma_0, lambda_crit,
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_D_xx,
+                mu_D_yy,
+                D_val,
+                G_P,
+                G_E,
+                G_D,
+                Gamma_0,
+                lambda_crit,
             ),
             0.0,
         )
 
         # Build output
         derivs = [
-            dmu_E_xx, dmu_E_yy, dmu_E_xy,
-            dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy,
-            dmu_D_xx, dmu_D_yy, dmu_D_xy,
-            dgamma, dD,
-            dmu_I_xx, dmu_I_yy, dmu_I_xy,
-            dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy,
+            dmu_E_xx,
+            dmu_E_yy,
+            dmu_E_xy,
+            dmu_E_nat_xx,
+            dmu_E_nat_yy,
+            dmu_E_nat_xy,
+            dmu_D_xx,
+            dmu_D_yy,
+            dmu_D_xy,
+            dgamma,
+            dD,
+            dmu_I_xx,
+            dmu_I_yy,
+            dmu_I_xy,
+            dmu_I_nat_xx,
+            dmu_I_nat_yy,
+            dmu_I_nat_xy,
         ]
 
         if include_interfacial_damage:
             D_int_val = y[17]
             dD_int = hvnm_interfacial_damage_rhs(
-                mu_I_xx, mu_I_yy, D_int_val,
-                Gamma_0_int, lambda_crit_int, h_0, E_a_heal, n_h, T,
+                mu_I_xx,
+                mu_I_yy,
+                D_int_val,
+                Gamma_0_int,
+                lambda_crit_int,
+                h_0,
+                E_a_heal,
+                n_h,
+                T,
             )
             derivs.append(dD_int)
 
@@ -345,34 +429,63 @@ def _make_hvnm_relaxation_vector_field(
             y, G_I_eff, X_I, nu_0_int, E_a_int, V_act_int, T, kinetics
         )
 
-        (dmu_E_xx, dmu_E_yy, dmu_E_xy,
-         dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy) = hvm_exchangeable_rhs_shear(
-            mu_E_xx, mu_E_yy, mu_E_xy,
-            mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
-            gamma_dot, k_BER_mat,
+        dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
+            hvm_exchangeable_rhs_shear(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_xy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_E_nat_xy,
+                gamma_dot,
+                k_BER_mat,
+            )
         )
 
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
-            mu_D_xx, mu_D_yy, 1.0, mu_D_xy, gamma_dot, k_d_D,
+            mu_D_xx,
+            mu_D_yy,
+            1.0,
+            mu_D_xy,
+            gamma_dot,
+            k_d_D,
         )
         dmu_D_xx = jnp.where(include_dissociative, dmu_D_xx, 0.0)
         dmu_D_yy = jnp.where(include_dissociative, dmu_D_yy, 0.0)
         dmu_D_xy = jnp.where(include_dissociative, dmu_D_xy, 0.0)
 
-        (dmu_I_xx, dmu_I_yy, dmu_I_xy,
-         dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy) = hvnm_interphase_rhs_shear(
-            mu_I_xx, mu_I_yy, mu_I_xy,
-            mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy,
-            gamma_dot, X_I, k_BER_int,
+        dmu_I_xx, dmu_I_yy, dmu_I_xy, dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy = (
+            hvnm_interphase_rhs_shear(
+                mu_I_xx,
+                mu_I_yy,
+                mu_I_xy,
+                mu_I_nat_xx,
+                mu_I_nat_yy,
+                mu_I_nat_xy,
+                gamma_dot,
+                X_I,
+                k_BER_int,
+            )
         )
 
         derivs = [
-            dmu_E_xx, dmu_E_yy, dmu_E_xy,
-            dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy,
-            dmu_D_xx, dmu_D_yy, dmu_D_xy,
-            0.0, 0.0,  # dgamma = 0, dD = 0 during relaxation
-            dmu_I_xx, dmu_I_yy, dmu_I_xy,
-            dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy,
+            dmu_E_xx,
+            dmu_E_yy,
+            dmu_E_xy,
+            dmu_E_nat_xx,
+            dmu_E_nat_yy,
+            dmu_E_nat_xy,
+            dmu_D_xx,
+            dmu_D_yy,
+            dmu_D_xy,
+            0.0,
+            0.0,  # dgamma = 0, dD = 0 during relaxation
+            dmu_I_xx,
+            dmu_I_yy,
+            dmu_I_xy,
+            dmu_I_nat_xx,
+            dmu_I_nat_yy,
+            dmu_I_nat_xy,
         ]
 
         if include_interfacial_damage:
@@ -433,25 +546,43 @@ def _make_hvnm_laos_vector_field(
             y, G_I_eff, X_I, nu_0_int, E_a_int, V_act_int, T, kinetics
         )
 
-        (dmu_E_xx, dmu_E_yy, dmu_E_xy,
-         dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy) = hvm_exchangeable_rhs_shear(
-            mu_E_xx, mu_E_yy, mu_E_xy,
-            mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
-            gamma_dot, k_BER_mat,
+        dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
+            hvm_exchangeable_rhs_shear(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_xy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_E_nat_xy,
+                gamma_dot,
+                k_BER_mat,
+            )
         )
 
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
-            mu_D_xx, mu_D_yy, 1.0, mu_D_xy, gamma_dot, k_d_D,
+            mu_D_xx,
+            mu_D_yy,
+            1.0,
+            mu_D_xy,
+            gamma_dot,
+            k_d_D,
         )
         dmu_D_xx = jnp.where(include_dissociative, dmu_D_xx, 0.0)
         dmu_D_yy = jnp.where(include_dissociative, dmu_D_yy, 0.0)
         dmu_D_xy = jnp.where(include_dissociative, dmu_D_xy, 0.0)
 
-        (dmu_I_xx, dmu_I_yy, dmu_I_xy,
-         dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy) = hvnm_interphase_rhs_shear(
-            mu_I_xx, mu_I_yy, mu_I_xy,
-            mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy,
-            gamma_dot, X_I, k_BER_int,
+        dmu_I_xx, dmu_I_yy, dmu_I_xy, dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy = (
+            hvnm_interphase_rhs_shear(
+                mu_I_xx,
+                mu_I_yy,
+                mu_I_xy,
+                mu_I_nat_xx,
+                mu_I_nat_yy,
+                mu_I_nat_xy,
+                gamma_dot,
+                X_I,
+                k_BER_int,
+            )
         )
 
         dgamma = gamma_dot
@@ -459,27 +590,54 @@ def _make_hvnm_laos_vector_field(
         dD = jnp.where(
             include_damage,
             hvm_damage_rhs(
-                mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-                mu_D_xx, mu_D_yy, D_val,
-                G_P, G_E, G_D, Gamma_0, lambda_crit,
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_D_xx,
+                mu_D_yy,
+                D_val,
+                G_P,
+                G_E,
+                G_D,
+                Gamma_0,
+                lambda_crit,
             ),
             0.0,
         )
 
         derivs = [
-            dmu_E_xx, dmu_E_yy, dmu_E_xy,
-            dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy,
-            dmu_D_xx, dmu_D_yy, dmu_D_xy,
-            dgamma, dD,
-            dmu_I_xx, dmu_I_yy, dmu_I_xy,
-            dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy,
+            dmu_E_xx,
+            dmu_E_yy,
+            dmu_E_xy,
+            dmu_E_nat_xx,
+            dmu_E_nat_yy,
+            dmu_E_nat_xy,
+            dmu_D_xx,
+            dmu_D_yy,
+            dmu_D_xy,
+            dgamma,
+            dD,
+            dmu_I_xx,
+            dmu_I_yy,
+            dmu_I_xy,
+            dmu_I_nat_xx,
+            dmu_I_nat_yy,
+            dmu_I_nat_xy,
         ]
 
         if include_interfacial_damage:
             D_int_val = y[17]
             dD_int = hvnm_interfacial_damage_rhs(
-                mu_I_xx, mu_I_yy, D_int_val,
-                Gamma_0_int, lambda_crit_int, h_0, E_a_heal, n_h, T,
+                mu_I_xx,
+                mu_I_yy,
+                D_int_val,
+                Gamma_0_int,
+                lambda_crit_int,
+                h_0,
+                E_a_heal,
+                n_h,
+                T,
             )
             derivs.append(dD_int)
 
@@ -535,9 +693,20 @@ def _make_hvnm_creep_vector_field(
 
         # Current total stress
         sigma_elastic = hvnm_total_stress_shear(
-            gamma, mu_E_xy, mu_E_nat_xy, mu_D_xy,
-            mu_I_xy, mu_I_nat_xy,
-            G_P, G_E, G_D, G_I_eff, X_phi, X_I, D_val, D_int_val,
+            gamma,
+            mu_E_xy,
+            mu_E_nat_xy,
+            mu_D_xy,
+            mu_I_xy,
+            mu_I_nat_xy,
+            G_P,
+            G_E,
+            G_D,
+            G_I_eff,
+            X_phi,
+            X_I,
+            D_val,
+            D_int_val,
         )
         sigma_residual = sigma_0 - sigma_elastic
 
@@ -561,27 +730,45 @@ def _make_hvnm_creep_vector_field(
         gamma_dot = jnp.clip(gamma_dot, -1e10, 1e10)
 
         # E-network evolution
-        (dmu_E_xx, dmu_E_yy, dmu_E_xy,
-         dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy) = hvm_exchangeable_rhs_shear(
-            mu_E_xx, mu_E_yy, mu_E_xy,
-            mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
-            gamma_dot, k_BER_mat,
+        dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
+            hvm_exchangeable_rhs_shear(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_xy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_E_nat_xy,
+                gamma_dot,
+                k_BER_mat,
+            )
         )
 
         # D-network evolution
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
-            mu_D_xx, mu_D_yy, 1.0, mu_D_xy, gamma_dot, k_d_D,
+            mu_D_xx,
+            mu_D_yy,
+            1.0,
+            mu_D_xy,
+            gamma_dot,
+            k_d_D,
         )
         dmu_D_xx = jnp.where(include_dissociative, dmu_D_xx, 0.0)
         dmu_D_yy = jnp.where(include_dissociative, dmu_D_yy, 0.0)
         dmu_D_xy = jnp.where(include_dissociative, dmu_D_xy, 0.0)
 
         # I-network evolution
-        (dmu_I_xx, dmu_I_yy, dmu_I_xy,
-         dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy) = hvnm_interphase_rhs_shear(
-            mu_I_xx, mu_I_yy, mu_I_xy,
-            mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy,
-            gamma_dot, X_I, k_BER_int,
+        dmu_I_xx, dmu_I_yy, dmu_I_xy, dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy = (
+            hvnm_interphase_rhs_shear(
+                mu_I_xx,
+                mu_I_yy,
+                mu_I_xy,
+                mu_I_nat_xx,
+                mu_I_nat_yy,
+                mu_I_nat_xy,
+                gamma_dot,
+                X_I,
+                k_BER_int,
+            )
         )
 
         dgamma = gamma_dot
@@ -589,26 +776,53 @@ def _make_hvnm_creep_vector_field(
         dD = jnp.where(
             include_damage,
             hvm_damage_rhs(
-                mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-                mu_D_xx, mu_D_yy, D_val,
-                G_P, G_E, G_D, Gamma_0, lambda_crit,
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_D_xx,
+                mu_D_yy,
+                D_val,
+                G_P,
+                G_E,
+                G_D,
+                Gamma_0,
+                lambda_crit,
             ),
             0.0,
         )
 
         derivs = [
-            dmu_E_xx, dmu_E_yy, dmu_E_xy,
-            dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy,
-            dmu_D_xx, dmu_D_yy, dmu_D_xy,
-            dgamma, dD,
-            dmu_I_xx, dmu_I_yy, dmu_I_xy,
-            dmu_I_nat_xx, dmu_I_nat_yy, dmu_I_nat_xy,
+            dmu_E_xx,
+            dmu_E_yy,
+            dmu_E_xy,
+            dmu_E_nat_xx,
+            dmu_E_nat_yy,
+            dmu_E_nat_xy,
+            dmu_D_xx,
+            dmu_D_yy,
+            dmu_D_xy,
+            dgamma,
+            dD,
+            dmu_I_xx,
+            dmu_I_yy,
+            dmu_I_xy,
+            dmu_I_nat_xx,
+            dmu_I_nat_yy,
+            dmu_I_nat_xy,
         ]
 
         if include_interfacial_damage:
             dD_int = hvnm_interfacial_damage_rhs(
-                mu_I_xx, mu_I_yy, D_int_val,
-                Gamma_0_int, lambda_crit_int, h_0, E_a_heal, n_h, T,
+                mu_I_xx,
+                mu_I_yy,
+                D_int_val,
+                Gamma_0_int,
+                lambda_crit_int,
+                h_0,
+                E_a_heal,
+                n_h,
+                T,
             )
             derivs.append(dD_int)
 

@@ -499,7 +499,9 @@ class BayesianService:
         except ImportError:
             from rheojax.gui.utils._dependency_guard import require_dependency
 
-            require_dependency("arviz", "Bayesian model comparison", "pip install arviz")
+            require_dependency(
+                "arviz", "Bayesian model comparison", "pip install arviz"
+            )
         try:
             comparison = {}
 

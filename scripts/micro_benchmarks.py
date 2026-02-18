@@ -28,6 +28,7 @@ os.environ.setdefault("JAX_LOG_LEVEL", "WARNING")
 @dataclass
 class BenchResult:
     """Single benchmark result."""
+
     name: str
     wall_ms: float
     details: dict
@@ -52,6 +53,7 @@ def timed(name: str, details: dict | None = None):
 # =============================================================================
 # BENCHMARK 1: Redundant score() in BaseModel.fit()
 # =============================================================================
+
 
 def bench_score_overhead():
     """Measure overhead of redundant score() call inside fit().
@@ -90,7 +92,9 @@ def bench_score_overhead():
         m.fit(t, G_t, test_mode="relaxation")
         times_full.append((time.perf_counter() - start) * 1000)
     avg_full = np.median(times_full)
-    results.append(BenchResult("A) Full fit() [includes score]", avg_full, {"repeats": n_repeats}))
+    results.append(
+        BenchResult("A) Full fit() [includes score]", avg_full, {"repeats": n_repeats})
+    )
 
     # B) Direct _fit() — bypasses score()
     times_direct = []
@@ -102,7 +106,9 @@ def bench_score_overhead():
         m.fitted_ = True
         times_direct.append((time.perf_counter() - start) * 1000)
     avg_direct = np.median(times_direct)
-    results.append(BenchResult("B) Direct _fit() [no score]", avg_direct, {"repeats": n_repeats}))
+    results.append(
+        BenchResult("B) Direct _fit() [no score]", avg_direct, {"repeats": n_repeats})
+    )
 
     # C) score() alone
     m = Maxwell()
@@ -114,7 +120,9 @@ def bench_score_overhead():
         m.score(t, G_t)
         times_score.append((time.perf_counter() - start) * 1000)
     avg_score = np.median(times_score)
-    results.append(BenchResult("C) score() alone [isolated]", avg_score, {"repeats": n_repeats}))
+    results.append(
+        BenchResult("C) score() alone [isolated]", avg_score, {"repeats": n_repeats})
+    )
 
     # D) R² from NLSQ residual (proposed fix)
     times_r2_nlsq = []
@@ -125,10 +133,14 @@ def bench_score_overhead():
             ss_res = float(m._nlsq_result.fun)
             y_arr = np.asarray(G_t)
             ss_tot = float(np.sum((y_arr - np.mean(y_arr)) ** 2))
-            r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else None
+            _r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else None
         times_r2_nlsq.append((time.perf_counter() - start) * 1000)
     avg_r2 = np.median(times_r2_nlsq)
-    results.append(BenchResult("D) R² from NLSQ residual [proposed]", avg_r2, {"repeats": n_repeats}))
+    results.append(
+        BenchResult(
+            "D) R² from NLSQ residual [proposed]", avg_r2, {"repeats": n_repeats}
+        )
+    )
 
     for r in results:
         print(r)
@@ -144,6 +156,7 @@ def bench_score_overhead():
 # =============================================================================
 # BENCHMARK 2: GMM JIT Recompilation in Element Minimization
 # =============================================================================
+
 
 def bench_gmm_recompilation():
     """Measure JIT recompilation cost during GMM element minimization.
@@ -211,8 +224,10 @@ def bench_gmm_recompilation():
         _.block_until_ready()
         cached_ms = (time.perf_counter() - start2) * 1000
 
-        print(f"    N={n}: compile={compile_ms:.1f}ms, cached={cached_ms:.2f}ms, "
-              f"ratio={compile_ms/max(cached_ms, 0.01):.0f}x")
+        print(
+            f"    N={n}: compile={compile_ms:.1f}ms, cached={cached_ms:.2f}ms, "
+            f"ratio={compile_ms/max(cached_ms, 0.01):.0f}x"
+        )
 
     for r in results:
         print(r)
@@ -227,6 +242,7 @@ def bench_gmm_recompilation():
 # =============================================================================
 # BENCHMARK 3: SGR Thixotropy Python Loop vs lax.scan
 # =============================================================================
+
 
 def bench_sgr_loop():
     """Measure SGR thixotropy time-stepping overhead.
@@ -250,14 +266,16 @@ def bench_sgr_loop():
 
         # Warm-up JIT
         try:
-            model.fit(gamma_dot[:5], gamma_dot[:5] * 100, test_mode="flow_curve", max_iter=5)
+            model.fit(
+                gamma_dot[:5], gamma_dot[:5] * 100, test_mode="flow_curve", max_iter=5
+            )
         except Exception:
             pass
 
         # Measure predict with different data sizes
         for n_pts in [10, 20, 50]:
             gd = np.logspace(-3, 2, n_pts)
-            stress_true = 100 * gd**0.5  # Power-law mock
+            _stress_true = 100 * gd**0.5  # Power-law mock
 
             with timed(f"SGR flow_curve predict (n={n_pts})", {"n_points": n_pts}) as r:
                 try:
@@ -266,7 +284,7 @@ def bench_sgr_loop():
                     model.parameters.set_value("tau0", 1.0)
                     model._test_mode = "flow_curve"
                     model.fitted_ = True
-                    pred = model.predict(gd, test_mode="flow_curve")
+                    _pred = model.predict(gd, test_mode="flow_curve")
                 except Exception as e:
                     r.details["error"] = str(e)[:60]
             results.append(r)
@@ -276,10 +294,14 @@ def bench_sgr_loop():
 
         if len(results) >= 2:
             scaling = results[-1].wall_ms / max(results[0].wall_ms, 0.01)
-            print(f"\n  Scaling {results[0].details.get('n_points')}→"
-                  f"{results[-1].details.get('n_points')} pts: {scaling:.1f}x")
+            print(
+                f"\n  Scaling {results[0].details.get('n_points')}→"
+                f"{results[-1].details.get('n_points')} pts: {scaling:.1f}x"
+            )
             print("  (Linear scaling suggests Python loop dominance;")
-            print("   lax.scan would give constant-time compilation + vectorized execution)")
+            print(
+                "   lax.scan would give constant-time compilation + vectorized execution)"
+            )
 
     except ImportError as e:
         print(f"  SGR model not available: {e}")
@@ -293,8 +315,11 @@ def bench_sgr_loop():
 # MAIN
 # =============================================================================
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Micro-benchmarks for RheoJAX bottlenecks")
+    parser = argparse.ArgumentParser(
+        description="Micro-benchmarks for RheoJAX bottlenecks"
+    )
     parser.add_argument(
         "--bench",
         choices=["score", "gmm", "sgr", "all"],

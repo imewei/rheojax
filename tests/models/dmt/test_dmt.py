@@ -662,12 +662,8 @@ class TestDMTBayesian:
     def test_model_function_flow_curve_hb(self, dmt_herschel_bulkley):
         """Test model_function returns correct flow curve (HB)."""
         gamma_dot = jnp.logspace(-1, 2, 20)
-        params = jnp.array(
-            [v.value for v in dmt_herschel_bulkley.parameters.values()]
-        )
-        stress = dmt_herschel_bulkley.model_function(
-            gamma_dot, params, "flow_curve"
-        )
+        params = jnp.array([v.value for v in dmt_herschel_bulkley.parameters.values()])
+        stress = dmt_herschel_bulkley.model_function(gamma_dot, params, "flow_curve")
 
         assert stress.shape == (20,)
         assert jnp.all(jnp.isfinite(stress))
@@ -730,9 +726,7 @@ class TestDMTBayesian:
         gamma_0 = 0.1
         n_cycles = 3
         points_per_cycle = 64
-        t = jnp.linspace(
-            0, n_cycles * 2 * np.pi / omega, n_cycles * points_per_cycle
-        )
+        t = jnp.linspace(0, n_cycles * 2 * np.pi / omega, n_cycles * points_per_cycle)
         dmt_exponential._gamma_0 = gamma_0
         dmt_exponential._omega_laos = omega
         dmt_exponential._laos_lam_init = 1.0

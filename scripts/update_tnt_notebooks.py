@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Update TNT notebooks to use FAST_MODE configuration system."""
+
 import json
 import re
 from pathlib import Path
@@ -35,7 +36,9 @@ def update_notebook(notebook_path: Path) -> tuple[bool, str]:
                         ]:
                             if pattern in line and "get_bayesian_config" not in line:
                                 # Insert get_bayesian_config after this line
-                                cell["source"].insert(i + 1, "    get_bayesian_config,\n")
+                                cell["source"].insert(
+                                    i + 1, "    get_bayesian_config,\n"
+                                )
                                 updated = True
                                 messages.append("Added get_bayesian_config import")
                                 break
@@ -58,9 +61,7 @@ def update_notebook(notebook_path: Path) -> tuple[bool, str]:
                 # Extract any model-specific context from the existing cell
                 # Find the fit_bayesian call to preserve its parameters
                 fit_bayesian_match = re.search(
-                    r"(\w+)\.fit_bayesian\s*\([^)]+\)",
-                    source,
-                    re.DOTALL
+                    r"(\w+)\.fit_bayesian\s*\([^)]+\)", source, re.DOTALL
                 )
 
                 if fit_bayesian_match:
@@ -69,8 +70,12 @@ def update_notebook(notebook_path: Path) -> tuple[bool, str]:
 
                     # Extract test_mode and other kwargs from the call
                     call_text = fit_bayesian_match.group(0)
-                    test_mode_match = re.search(r'test_mode\s*=\s*["\'](\w+)["\']', call_text)
-                    test_mode = test_mode_match.group(1) if test_mode_match else "flow_curve"
+                    test_mode_match = re.search(
+                        r'test_mode\s*=\s*["\'](\w+)["\']', call_text
+                    )
+                    test_mode = (
+                        test_mode_match.group(1) if test_mode_match else "flow_curve"
+                    )
 
                     # Build new cell based on test_mode
                     extra_kwargs = ""
@@ -83,7 +88,7 @@ def update_notebook(notebook_path: Path) -> tuple[bool, str]:
                     elif test_mode == "laos":
                         extra_kwargs = "\n    gamma_0=gamma_0,\n    omega=omega,"
 
-                    new_source = f'''# Bayesian inference configuration (FAST_MODE controlled in tnt_tutorial_utils.py)
+                    new_source = f"""# Bayesian inference configuration (FAST_MODE controlled in tnt_tutorial_utils.py)
 bayesian_config = get_bayesian_config()
 NUM_WARMUP = bayesian_config["num_warmup"]
 NUM_SAMPLES = bayesian_config["num_samples"]
@@ -106,7 +111,7 @@ bayesian_result = {model_var}.fit_bayesian(
 )
 bayes_time = time.time() - start_time
 
-print(f"\\nBayesian inference completed in {{bayes_time:.1f}} seconds")'''
+print(f"\\nBayesian inference completed in {{bayes_time:.1f}} seconds")"""
 
                     cell["source"] = [new_source]
                     updated = True

@@ -221,6 +221,7 @@ class HVNMBase(HVMBase):
     def phi_eff(self) -> float:
         """Effective NP volume fraction (with glassy layer)."""
         from rheojax.models.hvnm._kernels import hvnm_effective_phi
+
         return float(hvnm_effective_phi(self.phi, self.R_NP, 1e-9))
 
     @property
@@ -546,16 +547,24 @@ class HVNMBase(HVMBase):
         T_range = np.asarray(T_range)
 
         inv_T = 1000.0 / T_range
-        log_k_mat = np.array([
-            np.log10(float(hvnm_ber_rate_constant_matrix(self.nu_0, self.E_a, Ti)))
-            for Ti in T_range
-        ])
-        log_k_int = np.array([
-            np.log10(float(
-                hvnm_ber_rate_constant_interphase(self.nu_0_int, self.E_a_int, Ti)
-            ))
-            for Ti in T_range
-        ])
+        log_k_mat = np.array(
+            [
+                np.log10(float(hvnm_ber_rate_constant_matrix(self.nu_0, self.E_a, Ti)))
+                for Ti in T_range
+            ]
+        )
+        log_k_int = np.array(
+            [
+                np.log10(
+                    float(
+                        hvnm_ber_rate_constant_interphase(
+                            self.nu_0_int, self.E_a_int, Ti
+                        )
+                    )
+                )
+                for Ti in T_range
+            ]
+        )
 
         return inv_T, log_k_mat, log_k_int
 

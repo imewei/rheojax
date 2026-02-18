@@ -552,7 +552,7 @@ def _prony_multistart(
         raise RuntimeError("All multi-start iterations failed")
 
     logger.debug(f"Multi-start Prony fit: best cost = {best_cost:.2e}")
-    return best_g, best_tau  # type: ignore[return-value]
+    return best_g, best_tau
 
 
 # =============================================================================

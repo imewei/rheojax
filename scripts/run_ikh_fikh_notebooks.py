@@ -143,8 +143,7 @@ def run_notebook(
         result["traceback"] = str(e)
         # Count cells executed before failure
         result["executed_cells"] = sum(
-            1 for c in nb.cells
-            if c.cell_type == "code" and c.get("execution_count")
+            1 for c in nb.cells if c.cell_type == "code" and c.get("execution_count")
         )
 
     except DeadKernelError as e:
@@ -170,7 +169,7 @@ def run_notebook(
         result["runtime_seconds"] = (end_time - start_time).total_seconds()
         result["warnings"] = captured_warnings
         result["warnings_count"] = len(captured_warnings)
-        result["category"] = categorize_issue(result["error"], captured_warnings)
+        result["category"] = categorize_issue(result["error"], captured_warnings)  # type: ignore[arg-type]
 
         # Write per-notebook log
         with open(log_file, "w") as f:
@@ -184,17 +183,17 @@ def run_notebook(
 
             if result["warnings"]:
                 f.write("\n=== WARNINGS ===\n")
-                for w in result["warnings"][:20]:
+                for w in result["warnings"][:20]:  # type: ignore[index]
                     f.write(f"{w}\n")
 
             if result["error"]:
                 f.write("\n=== ERROR ===\n")
-                f.write(result["error"][:5000])
+                f.write(result["error"][:5000])  # type: ignore[index]
                 f.write("\n")
 
             if result["traceback"] and result["status"] == "FAIL":
                 f.write("\n=== TRACEBACK ===\n")
-                f.write(result["traceback"][:10000])
+                f.write(result["traceback"][:10000])  # type: ignore[index]
                 f.write("\n")
 
     return result
@@ -225,7 +224,11 @@ def run_suite(
         results.append(result)
 
         status_icon = "✓" if result["status"] == "PASS" else "✗"
-        warn_str = f" ({result['warnings_count']} warnings)" if result["warnings_count"] > 0 else ""
+        warn_str = (
+            f" ({result['warnings_count']} warnings)"
+            if result["warnings_count"] > 0
+            else ""
+        )
         print(f"{status_icon} {result['runtime_seconds']:.1f}s{warn_str}")
 
         if result["status"] != "PASS":
@@ -243,14 +246,16 @@ def write_issue_inventory(
     output_path: Path,
 ):
     """Write combined issue inventory in markdown format."""
-    all_results = [
-        ("ikh", r) for r in ikh_results
-    ] + [
+    all_results = [("ikh", r) for r in ikh_results] + [
         ("fikh", r) for r in fikh_results
     ]
 
     # Count issues
-    issues = [(suite, r) for suite, r in all_results if r["status"] != "PASS" or r["warnings_count"] > 0]
+    issues = [
+        (suite, r)
+        for suite, r in all_results
+        if r["status"] != "PASS" or r["warnings_count"] > 0
+    ]
 
     with open(output_path, "w") as f:
         f.write("# IKH + FIKH Notebook Issue Inventory\n\n")
@@ -262,7 +267,9 @@ def write_issue_inventory(
         f.write("|-------|----------|--------|---------|----------|----------|\n")
 
         for suite, r in all_results:
-            f.write(f"| {suite} | {r['notebook']} | {r['status']} | {r['runtime_seconds']:.1f}s | {r['warnings_count']} | {r['category']} |\n")
+            f.write(
+                f"| {suite} | {r['notebook']} | {r['status']} | {r['runtime_seconds']:.1f}s | {r['warnings_count']} | {r['category']} |\n"
+            )
 
         # Detailed issues
         if issues:
@@ -289,7 +296,13 @@ def write_issue_inventory(
                 if r["traceback"] and r["status"] == "FAIL":
                     # Extract relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [line for line in tb_lines if "rheojax" in line.lower() or "Error" in line or "Exception" in line][:10]
+                    relevant = [
+                        line
+                        for line in tb_lines
+                        if "rheojax" in line.lower()
+                        or "Error" in line
+                        or "Exception" in line
+                    ][:10]
                     if relevant:
                         f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))
@@ -297,7 +310,9 @@ def write_issue_inventory(
 
                 # Reproduction command
                 f.write("\n**Reproduce**:\n```bash\n")
-                f.write(f"cd /Users/b80985/Projects/rheojax && uv run python scripts/run_ikh_fikh_notebooks.py --suite {suite} --single {r['notebook']}\n")
+                f.write(
+                    f"cd /Users/b80985/Projects/rheojax && uv run python scripts/run_ikh_fikh_notebooks.py --suite {suite} --single {r['notebook']}\n"
+                )
                 f.write("```\n\n")
 
     print(f"\nIssue inventory written to: {output_path}")
@@ -305,20 +320,36 @@ def write_issue_inventory(
 
 def main():
     parser = argparse.ArgumentParser(description="Run IKH and FIKH notebooks")
-    parser.add_argument("--suite", choices=["ikh", "fikh", "both"], default="both",
-                        help="Which suite to run")
-    parser.add_argument("--single", type=str, default=None,
-                        help="Run only a single notebook (by name)")
-    parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT,
-                        help=f"Timeout per notebook in seconds (default: {DEFAULT_TIMEOUT})")
-    parser.add_argument("--inventory-only", action="store_true",
-                        help="Only generate inventory from existing logs")
+    parser.add_argument(
+        "--suite",
+        choices=["ikh", "fikh", "both"],
+        default="both",
+        help="Which suite to run",
+    )
+    parser.add_argument(
+        "--single", type=str, default=None, help="Run only a single notebook (by name)"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help=f"Timeout per notebook in seconds (default: {DEFAULT_TIMEOUT})",
+    )
+    parser.add_argument(
+        "--inventory-only",
+        action="store_true",
+        help="Only generate inventory from existing logs",
+    )
 
     args = parser.parse_args()
 
     # Collect notebooks
-    ikh_notebooks = sorted(IKH_DIR.glob("*.ipynb")) if args.suite in ["ikh", "both"] else []
-    fikh_notebooks = sorted(FIKH_DIR.glob("*.ipynb")) if args.suite in ["fikh", "both"] else []
+    ikh_notebooks = (
+        sorted(IKH_DIR.glob("*.ipynb")) if args.suite in ["ikh", "both"] else []
+    )
+    fikh_notebooks = (
+        sorted(FIKH_DIR.glob("*.ipynb")) if args.suite in ["fikh", "both"] else []
+    )
 
     # Filter for single notebook
     if args.single:
@@ -348,8 +379,16 @@ def main():
         "end_time": datetime.now().isoformat(),
         "total_runtime_seconds": sum(r["runtime_seconds"] for r in all_results),
         "summary": {
-            "clean_pass": sum(1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] == 0),
-            "pass_with_warnings": sum(1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] > 0),
+            "clean_pass": sum(
+                1
+                for r in all_results
+                if r["status"] == "PASS" and r["warnings_count"] == 0
+            ),
+            "pass_with_warnings": sum(
+                1
+                for r in all_results
+                if r["status"] == "PASS" and r["warnings_count"] > 0
+            ),
             "fail": sum(1 for r in all_results if r["status"] == "FAIL"),
             "timeout": sum(1 for r in all_results if r["status"] == "TIMEOUT"),
             "total": len(all_results),
@@ -362,12 +401,24 @@ def main():
     if ikh_results:
         json_path = IKH_DIR / "_run_logs" / f"run_{timestamp}.json"
         with open(json_path, "w") as f:
-            json.dump({"suite": "ikh", "results": ikh_results, "summary": summary["summary"]}, f, indent=2)
+            json.dump(
+                {"suite": "ikh", "results": ikh_results, "summary": summary["summary"]},
+                f,
+                indent=2,
+            )
 
     if fikh_results:
         json_path = FIKH_DIR / "_run_logs" / f"run_{timestamp}.json"
         with open(json_path, "w") as f:
-            json.dump({"suite": "fikh", "results": fikh_results, "summary": summary["summary"]}, f, indent=2)
+            json.dump(
+                {
+                    "suite": "fikh",
+                    "results": fikh_results,
+                    "summary": summary["summary"],
+                },
+                f,
+                indent=2,
+            )
 
     # Combined summary
     combined_json = Path("examples/_run_logs") / f"ikh_fikh_run_{timestamp}.json"
@@ -388,10 +439,12 @@ def main():
     print(f"Fail: {summary['summary']['fail']}")
     print(f"Timeout: {summary['summary']['timeout']}")
     print(f"Total: {summary['summary']['total']}")
-    print(f"\nTotal runtime: {summary['total_runtime_seconds']:.1f}s ({summary['total_runtime_seconds']/60:.1f} min)")
+    print(
+        f"\nTotal runtime: {summary['total_runtime_seconds']:.1f}s ({summary['total_runtime_seconds']/60:.1f} min)"
+    )
 
     # Return non-zero if any failures
-    if summary['summary']['fail'] > 0 or summary['summary']['timeout'] > 0:
+    if summary["summary"]["fail"] > 0 or summary["summary"]["timeout"] > 0:
         return 1
     return 0
 

@@ -37,7 +37,11 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("bingham", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR])
+@ModelRegistry.register(
+    "bingham",
+    protocols=[Protocol.FLOW_CURVE],
+    deformation_modes=[DeformationMode.SHEAR],
+)
 class Bingham(BaseModel):
     """Bingham model for linear viscoplastic flow (ROTATION only).
 

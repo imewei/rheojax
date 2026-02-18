@@ -365,7 +365,9 @@ def load_pnas_laos(
     if omega not in omega_sheets:
         raise ValueError(f"omega must be 1, 3, or 5, got {omega}")
     if strain_amplitude_index not in range(12):
-        raise ValueError(f"strain_amplitude_index must be 0-11, got {strain_amplitude_index}")
+        raise ValueError(
+            f"strain_amplitude_index must be 0-11, got {strain_amplitude_index}"
+        )
 
     sheet = omega_sheets[omega]
     fpath = _DATA_DIR / "ikh" / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
@@ -456,8 +458,14 @@ def load_multi_technique() -> dict[str, ProtocolData]:
 
         if "Amplitude" in step_name:
             # Amplitude sweep: find oscillation strain and moduli
-            strain_idx = headers.index("Oscillation strain") if "Oscillation strain" in headers else 16
-            Gp_idx = headers.index("Storage modulus") if "Storage modulus" in headers else 19
+            strain_idx = (
+                headers.index("Oscillation strain")
+                if "Oscillation strain" in headers
+                else 16
+            )
+            Gp_idx = (
+                headers.index("Storage modulus") if "Storage modulus" in headers else 19
+            )
             Gdp_idx = headers.index("Loss modulus") if "Loss modulus" in headers else 18
             strain_pct = arr[:, strain_idx]
             G_prime = arr[:, Gp_idx] * 1e6  # MPa -> Pa
@@ -476,7 +484,9 @@ def load_multi_technique() -> dict[str, ProtocolData]:
 
         elif "Frequency" in step_name:
             omega_idx = 0
-            Gp_idx = headers.index("Storage modulus") if "Storage modulus" in headers else 19
+            Gp_idx = (
+                headers.index("Storage modulus") if "Storage modulus" in headers else 19
+            )
             Gdp_idx = headers.index("Loss modulus") if "Loss modulus" in headers else 18
             omega = arr[:, omega_idx]
             G_prime = arr[:, Gp_idx] * 1e6  # MPa -> Pa
@@ -656,14 +666,16 @@ def print_parameter_table(
 
 def setup_style():
     """Set up consistent matplotlib style for all notebooks."""
-    plt.rcParams.update({
-        "figure.dpi": 100,
-        "font.size": 11,
-        "axes.labelsize": 12,
-        "axes.titlesize": 13,
-        "legend.fontsize": 9,
-        "figure.figsize": (10, 5),
-    })
+    plt.rcParams.update(
+        {
+            "figure.dpi": 100,
+            "font.size": 11,
+            "axes.labelsize": 12,
+            "axes.titlesize": 13,
+            "legend.fontsize": 9,
+            "figure.figsize": (10, 5),
+        }
+    )
 
 
 def plot_raw_data(data: ProtocolData, ax: plt.Axes | None = None) -> plt.Figure:
@@ -770,7 +782,9 @@ def plot_ppc(
     x = data.x_masked
 
     n_total = len(list(posterior.values())[0])
-    draw_indices = np.random.default_rng(42).choice(n_total, size=min(n_draws, n_total), replace=False)
+    draw_indices = np.random.default_rng(42).choice(
+        n_total, size=min(n_draws, n_total), replace=False
+    )
 
     # Save original values
     orig_vals = {p: model.parameters.get_value(p) for p in param_names}
@@ -796,9 +810,22 @@ def plot_ppc(
         med = np.median(ppc_arr, axis=0)
 
         logscale = data.protocol in ("flow_curve", "oscillation", "relaxation")
-        plot_fn = ax.loglog if logscale else (ax.semilogx if data.protocol == "creep" else ax.plot)
+        plot_fn = (
+            ax.loglog
+            if logscale
+            else (ax.semilogx if data.protocol == "creep" else ax.plot)
+        )
 
-        plot_fn(x, data.y_masked, "o", ms=5, alpha=0.7, color="steelblue", label="Data", zorder=3)
+        plot_fn(
+            x,
+            data.y_masked,
+            "o",
+            ms=5,
+            alpha=0.7,
+            color="steelblue",
+            label="Data",
+            zorder=3,
+        )
         plot_fn(x, med, "-", lw=2, color="orangered", label="Median", zorder=2)
         ax.fill_between(x, lo, hi, alpha=0.25, color="orangered", label="95% CI")
 
@@ -833,7 +860,10 @@ def plot_trace_and_forest(
     plt.tight_layout()
 
     axes = az.plot_forest(
-        idata, var_names=param_names, combined=True, hdi_prob=0.95,
+        idata,
+        var_names=param_names,
+        combined=True,
+        hdi_prob=0.95,
         figsize=figsize_forest,
     )
     fig_forest = axes.ravel()[0].figure
@@ -861,8 +891,18 @@ def plot_saos_components(
     G_prime_pred, G_double_prime_pred = model.predict_saos(omega)
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.loglog(omega, G_prime_data, "s", ms=5, alpha=0.7, color="steelblue", label="G' data")
-    ax.loglog(omega, G_double_prime_data, "o", ms=5, alpha=0.7, color="coral", label="G'' data")
+    ax.loglog(
+        omega, G_prime_data, "s", ms=5, alpha=0.7, color="steelblue", label="G' data"
+    )
+    ax.loglog(
+        omega,
+        G_double_prime_data,
+        "o",
+        ms=5,
+        alpha=0.7,
+        color="coral",
+        label="G'' data",
+    )
     ax.loglog(omega, G_prime_pred, "-", lw=2, color="navy", label="G' fit")
     ax.loglog(omega, G_double_prime_pred, "--", lw=2, color="darkred", label="G'' fit")
     ax.set_xlabel(r"$\omega$ [rad/s]")
@@ -935,14 +975,16 @@ def save_results(
         if p not in posterior:
             continue
         samples = np.array(posterior[p])
-        rows.append({
-            "parameter": p,
-            "nlsq": nlsq.get(p),
-            "posterior_mean": float(np.mean(samples)),
-            "posterior_median": float(np.median(samples)),
-            "ci_2.5": float(np.percentile(samples, 2.5)),
-            "ci_97.5": float(np.percentile(samples, 97.5)),
-        })
+        rows.append(
+            {
+                "parameter": p,
+                "nlsq": nlsq.get(p),
+                "posterior_mean": float(np.mean(samples)),
+                "posterior_median": float(np.median(samples)),
+                "ci_2.5": float(np.percentile(samples, 2.5)),
+                "ci_97.5": float(np.percentile(samples, 97.5)),
+            }
+        )
     pd.DataFrame(rows).to_csv(os.path.join(output_dir, "summary.csv"), index=False)
     print(f"Saved to {output_dir}/")
 

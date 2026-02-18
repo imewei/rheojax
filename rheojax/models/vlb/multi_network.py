@@ -56,6 +56,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -257,14 +258,12 @@ class VLBMultiNetwork(VLBBase):
         tuple of (np.ndarray, np.ndarray)
             (G_modes, kd_modes) each shape (N,)
         """
-        G_arr = np.array([
-            float(self.parameters.get_value(f"G_{i}")) # type: ignore[arg-type]
-            for i in range(self._n_modes)
-        ])
-        kd_arr = np.array([
-            float(self.parameters.get_value(f"k_d_{i}")) # type: ignore[arg-type]
-            for i in range(self._n_modes)
-        ])
+        G_arr = np.array(
+            [float(self.parameters.get_value(f"G_{i}")) for i in range(self._n_modes)]
+        )
+        kd_arr = np.array(
+            [float(self.parameters.get_value(f"k_d_{i}")) for i in range(self._n_modes)]
+        )
         return G_arr, kd_arr
 
     def _unpack_mode_params(
@@ -284,8 +283,8 @@ class VLBMultiNetwork(VLBBase):
             are shape (N,) arrays
         """
         N = self._n_modes
-        G_modes = params[0: 2 * N: 2]  # G_0, G_1, ...
-        kd_modes = params[1: 2 * N: 2]  # k_d_0, k_d_1, ...
+        G_modes = params[0 : 2 * N : 2]  # G_0, G_1, ...
+        kd_modes = params[1 : 2 * N : 2]  # k_d_0, k_d_1, ...
         eta_s = params[2 * N]
         G_e = params[2 * N + 1] if self._include_permanent else 0.0
         return G_modes, kd_modes, eta_s, G_e
@@ -342,9 +341,19 @@ class VLBMultiNetwork(VLBBase):
 
         # Define model function for fitting (exclude test_mode from kwargs to avoid duplicates)
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
-            if k not in ("test_mode", "use_log_residuals", "use_jax", "method",
-                         "max_iter", "use_multi_start", "n_starts", "perturb_factor")
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in (
+                "test_mode",
+                "use_log_residuals",
+                "use_jax",
+                "method",
+                "max_iter",
+                "use_multi_start",
+                "n_starts",
+                "perturb_factor",
+            )
         }
 
         def model_fn(x_fit, params):
@@ -409,14 +418,14 @@ class VLBMultiNetwork(VLBBase):
             self._omega_laos = kwargs["omega"]
 
         param_values = [
-            float(self.parameters.get_value(name))
-            for name in self.parameters.keys()
+            float(self.parameters.get_value(name)) for name in self.parameters.keys()
         ]
         params = jnp.array(param_values)
 
         # Remove test_mode from kwargs to avoid duplicate
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
+            k: v
+            for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
         return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
@@ -658,10 +667,12 @@ class VLBMultiNetwork(VLBBase):
         }
 
         # Initial state: equilibrium
-        y0 = jnp.concatenate([
-            jnp.zeros(N),  # mu_xy = 0
-            jnp.ones(N),   # mu_xx = 1
-        ])
+        y0 = jnp.concatenate(
+            [
+                jnp.zeros(N),  # mu_xy = 0
+                jnp.ones(N),  # mu_xx = 1
+            ]
+        )
 
         term = diffrax.ODETerm(ode_fn)
         solver = diffrax.Tsit5()

@@ -644,7 +644,7 @@ def load_trios_excel(
             x_col, y_col, y2_col = select_xy_columns(seg_df, detected_mode)
 
             if x_col is None or y_col is None:
-                logger.warning(  # type: ignore[unreachable]
+                logger.warning(
                     f"Could not determine x/y columns for segment {seg_idx} "
                     f"in sheet '{sheet_name_str}'. "
                     f"Available columns: {list(seg_df.columns)}"

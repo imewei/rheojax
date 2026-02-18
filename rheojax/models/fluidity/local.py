@@ -12,6 +12,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
@@ -677,9 +678,7 @@ class FluidityLocal(FluidityBase):
         elif mode == "laos":
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
-            _, stress = self._simulate_laos_internal(
-                X_jax, p_values, gamma_0, omega
-            )
+            _, stress = self._simulate_laos_internal(X_jax, p_values, gamma_0, omega)
             return stress
 
         return jnp.zeros_like(X_jax)
@@ -731,9 +730,7 @@ class FluidityLocal(FluidityBase):
             omega = kwargs.get("omega", self._omega_laos)
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS prediction requires gamma_0 and omega")
-            _, stress = self._simulate_laos_internal(
-                X_jax, p, gamma_0, omega
-            )
+            _, stress = self._simulate_laos_internal(X_jax, p, gamma_0, omega)
             return np.array(stress)
 
         return np.zeros_like(X)

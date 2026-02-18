@@ -57,7 +57,12 @@ def load_clay_relaxation(aging_time: int = 600) -> tuple[np.ndarray, np.ndarray]
     """
     module_dir = Path(__file__).parent
     data_path = (
-        module_dir / ".." / "data" / "relaxation" / "clays" / f"rel_lapo_{aging_time}.csv"
+        module_dir
+        / ".."
+        / "data"
+        / "relaxation"
+        / "clays"
+        / f"rel_lapo_{aging_time}.csv"
     )
 
     if not data_path.exists():
@@ -146,14 +151,18 @@ def generate_hl_synthetic(
         time = np.linspace(0.01, t_end, n_points)
 
         # Fit with dummy data to set test_mode
-        model.fit(time, np.ones_like(time), test_mode="startup", gdot=gamma_dot, max_iter=1)
+        model.fit(
+            time, np.ones_like(time), test_mode="startup", gdot=gamma_dot, max_iter=1
+        )
         # Reset parameters
         model.parameters.set_value("alpha", params.get("alpha", 0.3))
         model.parameters.set_value("tau", params.get("tau", 1.0))
         model.parameters.set_value("sigma_c", params.get("sigma_c", 1.0))
 
         stress_clean = model.predict(time)
-        noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+        noise = rng.normal(
+            0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+        )
         stress = stress_clean + noise
 
         return time, stress
@@ -176,11 +185,13 @@ def generate_hl_synthetic(
 
         # G' ~ G0 * (omega*tau)^2 / (1 + (omega*tau)^2) but modified by alpha
         G_prime = G0 * (omega_tau ** (2 * alpha)) / (1 + omega_tau ** (2 * alpha))
-        G_double_prime = G0 * omega_tau ** alpha / (1 + omega_tau ** (2 * alpha))
+        G_double_prime = G0 * omega_tau**alpha / (1 + omega_tau ** (2 * alpha))
 
         # Add noise
         noise_p = rng.normal(0, noise_level * np.mean(G_prime), size=G_prime.shape)
-        noise_pp = rng.normal(0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape)
+        noise_pp = rng.normal(
+            0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape
+        )
 
         G_star = np.column_stack([G_prime + noise_p, G_double_prime + noise_pp])
         return omega, G_star
@@ -193,7 +204,12 @@ def generate_hl_synthetic(
 
         # Fit with dummy data to set test_mode
         model.fit(
-            time, np.ones_like(time), test_mode="laos", gamma0=gamma0, omega=omega, max_iter=1
+            time,
+            np.ones_like(time),
+            test_mode="laos",
+            gamma0=gamma0,
+            omega=omega,
+            max_iter=1,
         )
         # Reset parameters
         model.parameters.set_value("alpha", params.get("alpha", 0.3))
@@ -201,7 +217,9 @@ def generate_hl_synthetic(
         model.parameters.set_value("sigma_c", params.get("sigma_c", 1.0))
 
         stress_clean = model.predict(time)
-        noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+        noise = rng.normal(
+            0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+        )
         stress = stress_clean + noise
 
         return time, stress
@@ -394,8 +412,12 @@ def plot_glass_probability_histogram(
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 5))
 
-    ax.hist(alpha_samples, bins=50, density=True, alpha=0.7, color="C0", edgecolor="black")
-    ax.axvline(0.5, color="red", linestyle="--", linewidth=2, label="Glass transition (α=0.5)")
+    ax.hist(
+        alpha_samples, bins=50, density=True, alpha=0.7, color="C0", edgecolor="black"
+    )
+    ax.axvline(
+        0.5, color="red", linestyle="--", linewidth=2, label="Glass transition (α=0.5)"
+    )
 
     p_glass = compute_glass_probability(alpha_samples)
     ax.axvspan(0, 0.5, alpha=0.2, color="red", label=f"Glass (P={p_glass:.2%})")

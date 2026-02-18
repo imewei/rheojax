@@ -45,9 +45,9 @@ def test_flow_models_shear_only():
     for name in shear_only_models:
         info = ModelRegistry.get_info(name)
         modes = getattr(info, "deformation_modes", [])
-        assert modes == [DeformationMode.SHEAR], (
-            f"Flow model '{name}' should be SHEAR-only, got {modes}"
-        )
+        assert modes == [
+            DeformationMode.SHEAR
+        ], f"Flow model '{name}' should be SHEAR-only, got {modes}"
 
 
 @pytest.mark.smoke
@@ -63,9 +63,9 @@ def test_classical_models_dmta_compatible():
     for name in dmta_models:
         info = ModelRegistry.get_info(name)
         modes = set(getattr(info, "deformation_modes", []))
-        assert modes == expected_modes, (
-            f"Classical model '{name}' should have all 4 modes, got {modes}"
-        )
+        assert (
+            modes == expected_modes
+        ), f"Classical model '{name}' should have all 4 modes, got {modes}"
 
 
 @pytest.mark.smoke
@@ -80,9 +80,9 @@ def test_nonlocal_models_shear_only():
         if name in ModelRegistry.list_models():
             info = ModelRegistry.get_info(name)
             modes = getattr(info, "deformation_modes", [])
-            assert modes == [DeformationMode.SHEAR], (
-                f"Nonlocal model '{name}' should be SHEAR-only, got {modes}"
-            )
+            assert modes == [
+                DeformationMode.SHEAR
+            ], f"Nonlocal model '{name}' should be SHEAR-only, got {modes}"
 
 
 @pytest.mark.smoke

@@ -503,7 +503,7 @@ class FractionalMaxwellLiquid(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)  # type: ignore[return-value]
+            return self.predict_rheodata(X)
 
         # Handle raw array input
         from rheojax.core.test_modes import TestMode
@@ -518,7 +518,12 @@ class FractionalMaxwellLiquid(BaseModel):
             result = self._predict_oscillation_jax(x, Gm, alpha, tau_alpha)
         elif test_mode in ("creep", TestMode.CREEP):
             result = self._predict_creep_jax(x, Gm, alpha, tau_alpha)
-        elif test_mode in ("flow_curve", "rotation", TestMode.FLOW_CURVE, TestMode.ROTATION):
+        elif test_mode in (
+            "flow_curve",
+            "rotation",
+            TestMode.FLOW_CURVE,
+            TestMode.ROTATION,
+        ):
             # Flow curve: use relaxation-based prediction
             result = self._predict_relaxation_jax(x, Gm, alpha, tau_alpha)
         else:

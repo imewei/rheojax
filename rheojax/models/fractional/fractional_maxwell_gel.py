@@ -443,7 +443,7 @@ class FractionalMaxwellGel(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)  # type: ignore[return-value]
+            return self.predict_rheodata(X)
 
         # Handle raw array input
         from rheojax.core.test_modes import TestMode

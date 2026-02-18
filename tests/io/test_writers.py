@@ -273,9 +273,7 @@ class TestHDF5RoundTrip:
     def test_atomic_write_no_corrupt_on_error(self, tmp_path):
         """Verify atomic write: existing file preserved if write fails."""
         path = tmp_path / "existing.h5"
-        original_data = RheoData(
-            x=np.array([1.0]), y=np.array([10.0]), domain="time"
-        )
+        original_data = RheoData(x=np.array([1.0]), y=np.array([10.0]), domain="time")
         save_hdf5(original_data, path)
         original_size = path.stat().st_size
 
@@ -417,8 +415,6 @@ class TestCSVReaderEdgeCases:
         csv_file = tmp_path / "euro.csv"
         csv_file.write_text("time;stress\n0,1;100,5\n0,2;200,3\n")
 
-        result = load_csv(
-            csv_file, x_col="time", y_col="stress", delimiter=";"
-        )
+        result = load_csv(csv_file, x_col="time", y_col="stress", delimiter=";")
         assert isinstance(result, RheoData)
         assert len(result.x) == 2

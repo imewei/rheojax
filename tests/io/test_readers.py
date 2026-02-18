@@ -226,10 +226,13 @@ class TestExcelReader:
     def test_excel_basic_read(self, tmp_path):
         """Test basic Excel file reading."""
         filepath = tmp_path / "test.xlsx"
-        self._create_excel(filepath, {
-            "time (s)": [0.1, 0.2, 0.3, 0.4, 0.5],
-            "stress (Pa)": [100, 200, 300, 400, 500],
-        })
+        self._create_excel(
+            filepath,
+            {
+                "time (s)": [0.1, 0.2, 0.3, 0.4, 0.5],
+                "stress (Pa)": [100, 200, 300, 400, 500],
+            },
+        )
 
         data = load_excel(str(filepath), x_col="time (s)", y_col="stress (Pa)")
         assert isinstance(data, RheoData)
@@ -253,19 +256,20 @@ class TestExcelReader:
             ws2.append([float(i + 1), float((i + 1) * 100)])
         wb.save(filepath)
 
-        data = load_excel(
-            str(filepath), x_col="time", y_col="stress", sheet="Data"
-        )
+        data = load_excel(str(filepath), x_col="time", y_col="stress", sheet="Data")
         assert isinstance(data, RheoData)
         assert len(data.x) == 5
 
     def test_excel_column_mapping(self, tmp_path):
         """Test Excel column mapping by index."""
         filepath = tmp_path / "indexed.xlsx"
-        self._create_excel(filepath, {
-            "col_A": [1.0, 2.0, 3.0],
-            "col_B": [10.0, 20.0, 30.0],
-        })
+        self._create_excel(
+            filepath,
+            {
+                "col_A": [1.0, 2.0, 3.0],
+                "col_B": [10.0, 20.0, 30.0],
+            },
+        )
 
         data = load_excel(str(filepath), x_col=0, y_col=1)
         assert isinstance(data, RheoData)

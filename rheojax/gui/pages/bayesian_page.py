@@ -17,6 +17,7 @@ from rheojax.gui.compat import (
     QCheckBox,
     QComboBox,
     QFileDialog,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -24,6 +25,7 @@ from rheojax.gui.compat import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QSplitter,
     Qt,
@@ -37,6 +39,12 @@ from rheojax.gui.compat import (
 )
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
+from rheojax.gui.resources.styles.tokens import (
+    ColorPalette,
+    Spacing,
+    Typography,
+    button_style,
+)
 from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.services.model_service import ModelService
@@ -99,10 +107,22 @@ class BayesianPage(QWidget):
     def _setup_ui(self) -> None:
         """Set up the user interface."""
         main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+        )
+        main_layout.setSpacing(Spacing.LG)
 
-        # Left: Configuration (25%)
+        # Left: Configuration (25%) — scrollable for many controls
         left_panel = self._create_config_panel()
-        main_layout.addWidget(left_panel, 1)
+        left_scroll = QScrollArea()
+        left_scroll.setWidget(left_panel)
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        main_layout.addWidget(left_scroll, 1)
 
         # Center: Progress + Fit Plot (50%)
         center_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -206,9 +226,7 @@ class BayesianPage(QWidget):
         deform_label = QLabel("Deformation Mode:")
         layout.addWidget(deform_label)
         self._deformation_combo = QComboBox()
-        self._deformation_combo.addItems(
-            ["Shear", "Tension", "Bending", "Compression"]
-        )
+        self._deformation_combo.addItems(["Shear", "Tension", "Bending", "Compression"])
         self._deformation_combo.setToolTip(
             "Select deformation mode (Tension for DMTA/DMA data)"
         )
@@ -239,21 +257,7 @@ class BayesianPage(QWidget):
 
         # Run button
         self._btn_run = QPushButton("Run Bayesian Inference")
-        self._btn_run.setStyleSheet("""
-            QPushButton {
-                background-color: #9C27B0;
-                color: white;
-                font-weight: bold;
-                padding: 12px;
-                font-size: 11pt;
-            }
-            QPushButton:hover {
-                background-color: #7B1FA2;
-            }
-            QPushButton:disabled {
-                background-color: #BDBDBD;
-            }
-        """)
+        self._btn_run.setStyleSheet(button_style("accent", "lg"))
         self._btn_run.clicked.connect(self._on_run_clicked)
         layout.addWidget(self._btn_run)
 
@@ -287,7 +291,9 @@ class BayesianPage(QWidget):
         info_layout = QHBoxLayout()
         self._eta_label = QLabel("ETA: --:--")
         self._divergence_label = QLabel("Divergences: 0")
-        self._divergence_label.setStyleSheet("color: #F44336; font-weight: bold;")
+        self._divergence_label.setStyleSheet(
+            f"color: {ColorPalette.ERROR}; font-weight: bold;"
+        )
         info_layout.addWidget(self._eta_label)
         info_layout.addStretch()
         info_layout.addWidget(self._divergence_label)
@@ -310,7 +316,9 @@ class BayesianPage(QWidget):
             "No Bayesian fit plot yet. Run inference to see raw + fitted data."
         )
         self._fit_plot_placeholder.setAlignment(Qt.AlignCenter)
-        self._fit_plot_placeholder.setStyleSheet("color: #94A3B8; padding: 6px;")
+        self._fit_plot_placeholder.setStyleSheet(
+            f"color: {ColorPalette.TEXT_MUTED}; padding: {Spacing.SM}px;"
+        )
         layout.addWidget(self._fit_plot_placeholder)
 
         return panel
@@ -327,15 +335,13 @@ class BayesianPage(QWidget):
         self._rhat_label = QLabel("R-hat: --")
         self._ess_label = QLabel("ESS: --")
         warning_label = QLabel("Diagnostics: awaiting run")
-        warning_label.setStyleSheet("color: #e65100; padding: 2px;")
+        warning_label.setStyleSheet(
+            f"color: {ColorPalette.WARNING}; padding: {Spacing.XXS}px;"
+        )
         self._diag_warning = warning_label
-        # Use specific monospace fonts with fallbacks to avoid Qt font lookup warning
-        self._rhat_label.setStyleSheet(
-            'font-family: "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;'
-        )
-        self._ess_label.setStyleSheet(
-            'font-family: "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;'
-        )
+        # Use design token monospace font
+        self._rhat_label.setStyleSheet(f"font-family: {Typography.FONT_FAMILY_MONO};")
+        self._ess_label.setStyleSheet(f"font-family: {Typography.FONT_FAMILY_MONO};")
         diag_layout.addWidget(self._rhat_label)
         diag_layout.addWidget(self._ess_label)
         diag_layout.addWidget(warning_label)
@@ -625,7 +631,9 @@ class BayesianPage(QWidget):
         """
         self._divergence_label.setText(f"Divergences: {count}")
         if count > 0:
-            self._divergence_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            self._divergence_label.setStyleSheet(
+                f"color: {ColorPalette.ERROR}; font-weight: bold;"
+            )
             self._status_text.append(f"WARNING: {count} divergent transitions detected")
 
     @Slot(object)
@@ -648,9 +656,8 @@ class BayesianPage(QWidget):
         if success:
             # Use captured values from submission time (TOCTOU-safe)
             dataset_id = getattr(self, "_submitted_dataset_id", None)
-            model_name = (
-                getattr(result, "model_name", None)
-                or getattr(self, "_submitted_model_name", None)
+            model_name = getattr(result, "model_name", None) or getattr(
+                self, "_submitted_model_name", None
             )
             if not dataset_id or not model_name:
                 state = self._store.get_state()
@@ -793,11 +800,10 @@ class BayesianPage(QWidget):
         if rhat:
             max_rhat = max(rhat.values()) if rhat else 0
             status = "OK" if max_rhat < 1.01 else "WARNING"
-            color = "green" if max_rhat < 1.01 else "orange"
+            color = ColorPalette.SUCCESS if max_rhat < 1.01 else ColorPalette.WARNING
             self._rhat_label.setText(f"R-hat (max): {max_rhat:.4f} [{status}]")
             self._rhat_label.setStyleSheet(
-                f'color: {color}; font-family: "SF Mono", "Menlo", "Consolas", '
-                '"DejaVu Sans Mono", monospace;'
+                f"color: {color}; font-family: {Typography.FONT_FAMILY_MONO};"
             )
         else:
             self._rhat_label.setText("R-hat: --")
@@ -807,11 +813,10 @@ class BayesianPage(QWidget):
         if ess:
             min_ess = min(ess.values()) if ess else 0
             status = "OK" if min_ess > 400 else "LOW"
-            color = "green" if min_ess > 400 else "orange"
+            color = ColorPalette.SUCCESS if min_ess > 400 else ColorPalette.WARNING
             self._ess_label.setText(f"ESS (min): {min_ess:.0f} [{status}]")
             self._ess_label.setStyleSheet(
-                f'color: {color}; font-family: "SF Mono", "Menlo", "Consolas", '
-                '"DejaVu Sans Mono", monospace;'
+                f"color: {color}; font-family: {Typography.FONT_FAMILY_MONO};"
             )
         else:
             self._ess_label.setText("ESS: --")
@@ -820,13 +825,17 @@ class BayesianPage(QWidget):
         divergences = result.diagnostics.get("divergences", 0)
         if divergences > 0:
             self._divergence_label.setText(f"Divergences: {divergences}")
-            self._divergence_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            self._divergence_label.setStyleSheet(
+                f"color: {ColorPalette.ERROR}; font-weight: bold;"
+            )
             self._diag_warning.setText(
                 "Warning: Divergences detected; consider higher target_accept"
             )
         else:
             self._divergence_label.setText("Divergences: 0")
-            self._divergence_label.setStyleSheet("color: green; font-weight: bold;")
+            self._divergence_label.setStyleSheet(
+                f"color: {ColorPalette.SUCCESS}; font-weight: bold;"
+            )
             if "OK" in self._rhat_label.text() and "OK" in self._ess_label.text():
                 self._diag_warning.setText("Diagnostics look good")
 

@@ -58,10 +58,10 @@ def load_ml_ikh_flow_curve(
 
     # Column mapping based on Excel structure (row 2 has labels)
     col_map = {
-        "ARG2_up": (0, 1),      # stress sweep up
-        "ARG2_down": (2, 3),    # stress sweep down
-        "ARES_up": (5, 6),      # rate sweep up
-        "ARES_down": (7, 8),    # rate sweep down
+        "ARG2_up": (0, 1),  # stress sweep up
+        "ARG2_down": (2, 3),  # stress sweep down
+        "ARES_up": (5, 6),  # rate sweep up
+        "ARES_down": (7, 8),  # rate sweep down
     }
 
     col_rate, col_stress = col_map[instrument]
@@ -215,7 +215,9 @@ def load_pnas_startup(
     sheet = rate_sheets[closest]
 
     module_dir = Path(__file__).parent
-    data_path = module_dir / ".." / "data" / "ikh" / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
+    data_path = (
+        module_dir / ".." / "data" / "ikh" / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
+    )
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -272,10 +274,14 @@ def load_pnas_laos(
     sheet = omega_sheets[omega]
 
     if strain_amplitude_index not in range(12):
-        raise ValueError(f"strain_amplitude_index must be 0-11, got {strain_amplitude_index}")
+        raise ValueError(
+            f"strain_amplitude_index must be 0-11, got {strain_amplitude_index}"
+        )
 
     module_dir = Path(__file__).parent
-    data_path = module_dir / ".." / "data" / "ikh" / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
+    data_path = (
+        module_dir / ".." / "data" / "ikh" / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
+    )
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -346,7 +352,9 @@ def generate_synthetic_relaxation(
     stress_clean = np.asarray(stress_clean).flatten()
 
     # Add relative noise
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     # Ensure positive stress
@@ -433,7 +441,9 @@ def generate_synthetic_saos(
 
     # Add noise
     noise_p = rng.normal(0, noise_level * np.mean(G_prime), size=G_prime.shape)
-    noise_pp = rng.normal(0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape)
+    noise_pp = rng.normal(
+        0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape
+    )
 
     G_prime = G_prime + noise_p
     G_double_prime = G_double_prime + noise_pp
@@ -569,17 +579,17 @@ def get_mikh_param_names() -> list[str]:
         List of 11 MIKH parameter names.
     """
     return [
-        "G",            # Shear modulus (Pa)
-        "eta",          # Maxwell viscosity (Pa.s)
-        "C",            # Kinematic hardening modulus (Pa)
-        "gamma_dyn",    # Dynamic recovery strain
-        "m",            # Armstrong-Frederick exponent
-        "sigma_y0",     # Minimal yield stress (Pa)
-        "delta_sigma_y", # Structural yield contribution (Pa)
-        "tau_thix",     # Thixotropic rebuilding time (s)
-        "Gamma",        # Thixotropic breakdown coefficient
-        "eta_inf",      # High-shear viscosity (Pa.s)
-        "mu_p",         # Plastic viscosity (Pa.s)
+        "G",  # Shear modulus (Pa)
+        "eta",  # Maxwell viscosity (Pa.s)
+        "C",  # Kinematic hardening modulus (Pa)
+        "gamma_dyn",  # Dynamic recovery strain
+        "m",  # Armstrong-Frederick exponent
+        "sigma_y0",  # Minimal yield stress (Pa)
+        "delta_sigma_y",  # Structural yield contribution (Pa)
+        "tau_thix",  # Thixotropic rebuilding time (s)
+        "Gamma",  # Thixotropic breakdown coefficient
+        "eta_inf",  # High-shear viscosity (Pa.s)
+        "mu_p",  # Plastic viscosity (Pa.s)
     ]
 
 
@@ -600,26 +610,30 @@ def get_mlikh_param_names(
         # 7 parameters per mode + 1 global
         params = []
         for i in range(1, n_modes + 1):
-            params.extend([
-                f"G_{i}",
-                f"C_{i}",
-                f"gamma_dyn_{i}",
-                f"sigma_y0_{i}",
-                f"delta_sigma_y_{i}",
-                f"tau_thix_{i}",
-                f"Gamma_{i}",
-            ])
+            params.extend(
+                [
+                    f"G_{i}",
+                    f"C_{i}",
+                    f"gamma_dyn_{i}",
+                    f"sigma_y0_{i}",
+                    f"delta_sigma_y_{i}",
+                    f"tau_thix_{i}",
+                    f"Gamma_{i}",
+                ]
+            )
         params.append("eta_inf")
         return params
     else:
         # 5 global + 3 per mode
         params = ["G", "C", "gamma_dyn", "sigma_y0", "k3"]
         for i in range(1, n_modes + 1):
-            params.extend([
-                f"tau_thix_{i}",
-                f"Gamma_{i}",
-                f"w_{i}",
-            ])
+            params.extend(
+                [
+                    f"tau_thix_{i}",
+                    f"Gamma_{i}",
+                    f"w_{i}",
+                ]
+            )
         return params
 
 
@@ -711,7 +725,9 @@ def print_parameter_comparison(
             median = float(np.median(samples))
             lo = float(np.percentile(samples, 2.5))
             hi = float(np.percentile(samples, 97.5))
-            print(f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]")
+            print(
+                f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]"
+            )
         except (KeyError, AttributeError):
             pass
 

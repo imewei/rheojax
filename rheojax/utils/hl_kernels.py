@@ -484,7 +484,13 @@ def run_flow_curve(
         for i in range(len(gdots)):
             dt_i, steps_i = per_rate_schedule[i]
             stress_i = flow_curve_kernel(
-                gdots[i], alpha, tau, sigma_c, dt_i, sigma_max, n_bins,
+                gdots[i],
+                alpha,
+                tau,
+                sigma_c,
+                dt_i,
+                sigma_max,
+                n_bins,
                 steps_i,
             )
             results.append(stress_i)

@@ -149,7 +149,7 @@ class Pipeline:
                     self.data = result
 
                 self._apply_test_mode_metadata(self.data, explicit_mode)
-                ctx["n_points"] = len(self.data.x) if self.data else 0  # type: ignore[arg-type]
+                ctx["n_points"] = len(self.data.x) if self.data else 0
                 ctx["test_mode"] = explicit_mode
 
             except Exception as e:
@@ -209,7 +209,7 @@ class Pipeline:
                 # Apply transform to x and y data
                 # The transform operates on the y data
                 self.data.y = transform_obj.transform(self.data.y)
-                ctx["input_shape"] = len(self.data.x)  # type: ignore[arg-type]
+                ctx["input_shape"] = len(self.data.x)
             except Exception as e:
                 logger.error(
                     "Transform failed",
@@ -232,7 +232,7 @@ class Pipeline:
             return
 
         if data.metadata is None:
-            data.metadata = {}  # type: ignore[unreachable]
+            data.metadata = {}
 
         data.metadata["test_mode"] = mode
         data.metadata.setdefault("detected_test_mode", mode)
@@ -350,7 +350,7 @@ class Pipeline:
         if X is None:
             if self.data is None:
                 raise ValueError("No data available for prediction.")
-            X = self.data.x  # type: ignore[assignment]
+            X = self.data.x
 
         # Convert to numpy for prediction
         if isinstance(X, jnp.ndarray):
@@ -360,10 +360,10 @@ class Pipeline:
             "Generating predictions",
             pipeline_id=self._id,
             model=model.__class__.__name__,
-            n_points=len(X),  # type: ignore[arg-type]
+            n_points=len(X),
         )
 
-        predictions = model.predict(X)  # type: ignore[arg-type]
+        predictions = model.predict(X)
 
         return RheoData(
             x=X,
@@ -505,7 +505,7 @@ class Pipeline:
                 else:
                     raise ValueError(f"Unknown format: {format}")
 
-                ctx["n_points"] = len(self.data.x)  # type: ignore[arg-type]
+                ctx["n_points"] = len(self.data.x)
             except Exception as e:
                 logger.error(
                     "Failed to save data",
@@ -699,7 +699,7 @@ class Pipeline:
 
         # Extract all parameter values from the model's ParameterSet
         return {
-            name: self._last_model.parameters.get_value(name)  # type: ignore[misc]
+            name: self._last_model.parameters.get_value(name)
             for name in self._last_model.parameters.keys()
         }
 

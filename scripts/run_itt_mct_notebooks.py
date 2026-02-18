@@ -10,6 +10,7 @@ Features:
 - Deterministic seeding setup
 - Robust working-directory handling
 """
+
 import argparse
 import json
 import os
@@ -119,7 +120,10 @@ def run_notebook(
         for cell in nb.cells:
             if cell.cell_type == "code" and hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.get("output_type") == "stream" and output.get("name") == "stderr":
+                    if (
+                        output.get("output_type") == "stream"
+                        and output.get("name") == "stderr"
+                    ):
                         text = output.get("text", "")
                         if text.strip():
                             # Parse warnings from stderr
@@ -169,7 +173,7 @@ def run_notebook(
 
                 if result["warnings"]:
                     f.write("=== WARNINGS ===\n")
-                    for w in result["warnings"][:50]:  # Limit to 50 warnings
+                    for w in result["warnings"][:50]:  # type: ignore[index]
                         f.write(f"  {w}\n")
                     f.write("\n")
 
@@ -190,7 +194,10 @@ def categorize_error(result: dict[str, Any]) -> str:
     if result["status"] == "PASS":
         if result["warnings_count"] > 0:
             warnings_text = " ".join(result["warnings"])
-            if "DeprecationWarning" in warnings_text or "FutureWarning" in warnings_text:
+            if (
+                "DeprecationWarning" in warnings_text
+                or "FutureWarning" in warnings_text
+            ):
                 return "deprecation_warning"
             if "RuntimeWarning" in warnings_text or "invalid value" in warnings_text:
                 return "numerical_warning"
@@ -249,8 +256,7 @@ def run_suite(
         notebooks = [
             nb
             for nb in notebooks
-            if not nb.name.startswith(".")
-            and ".ipynb_checkpoints" not in str(nb)
+            if not nb.name.startswith(".") and ".ipynb_checkpoints" not in str(nb)
         ]
 
     print("\nITT-MCT Notebook Suite Runner")
@@ -293,7 +299,9 @@ def run_suite(
     print("SUMMARY")
     print(f"{'=' * 60}")
 
-    passed = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0)
+    passed = sum(
+        1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0
+    )
     passed_with_warnings = sum(
         1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0
     )
@@ -371,7 +379,11 @@ def generate_issue_inventory(results: list[dict[str, Any]], output_path: Path) -
                 if r["traceback"]:
                     # Extract most relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [line for line in tb_lines if "rheojax" in line or "Error" in line][:10]
+                    relevant = [
+                        line
+                        for line in tb_lines
+                        if "rheojax" in line or "Error" in line
+                    ][:10]
                     if relevant:
                         f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))
@@ -434,9 +446,7 @@ def main():
         generate_issue_inventory(results, inventory_path)
 
     # Return exit code
-    has_issues = any(
-        r["status"] != "PASS" or r["warnings_count"] > 0 for r in results
-    )
+    has_issues = any(r["status"] != "PASS" or r["warnings_count"] > 0 for r in results)
     return 1 if has_issues else 0
 
 

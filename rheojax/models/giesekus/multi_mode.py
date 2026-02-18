@@ -50,6 +50,7 @@ import numpy as np
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -229,13 +230,13 @@ class GiesekusMultiMode(BaseModel):
     @property
     def eta_s(self) -> float:
         """Get solvent viscosity η_s (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))  # type: ignore[arg-type]
+        return float(self.parameters.get_value("eta_s"))
 
     @property
     def eta_0(self) -> float:
         """Get zero-shear viscosity η₀ = η_s + Σ η_p,i (Pa·s)."""
         eta_p_total = sum(
-            self.parameters.get_value(f"eta_p_{i}") for i in range(self._n_modes)  # type: ignore[misc]
+            self.parameters.get_value(f"eta_p_{i}") for i in range(self._n_modes)
         )
         return self.eta_s + eta_p_total
 
@@ -256,9 +257,9 @@ class GiesekusMultiMode(BaseModel):
             raise IndexError(f"Mode index {mode_idx} out of range [0, {self._n_modes})")
 
         return {
-            "eta_p": float(self.parameters.get_value(f"eta_p_{mode_idx}")),  # type: ignore[arg-type]
-            "lambda_1": float(self.parameters.get_value(f"lambda_{mode_idx}")),  # type: ignore[arg-type]
-            "alpha": float(self.parameters.get_value(f"alpha_{mode_idx}")),  # type: ignore[arg-type]
+            "eta_p": float(self.parameters.get_value(f"eta_p_{mode_idx}")),
+            "lambda_1": float(self.parameters.get_value(f"lambda_{mode_idx}")),
+            "alpha": float(self.parameters.get_value(f"alpha_{mode_idx}")),
         }
 
     def set_mode_params(
@@ -310,9 +311,9 @@ class GiesekusMultiMode(BaseModel):
         # eta_p: indices 1, 4, 7, ... (stride 3 starting from 1)
         # lambda: indices 2, 5, 8, ... (stride 3 starting from 2)
         # alpha: indices 3, 6, 9, ... (stride 3 starting from 3)
-        eta_p = jnp.asarray(all_values[1::3][:self._n_modes], dtype=jnp.float64)
-        lambda_vals = jnp.asarray(all_values[2::3][:self._n_modes], dtype=jnp.float64)
-        alpha = jnp.asarray(all_values[3::3][:self._n_modes], dtype=jnp.float64)
+        eta_p = jnp.asarray(all_values[1::3][: self._n_modes], dtype=jnp.float64)
+        lambda_vals = jnp.asarray(all_values[2::3][: self._n_modes], dtype=jnp.float64)
+        alpha = jnp.asarray(all_values[3::3][: self._n_modes], dtype=jnp.float64)
 
         return eta_p, lambda_vals, alpha
 
@@ -402,7 +403,8 @@ class GiesekusMultiMode(BaseModel):
 
         # Forward kwargs (gamma_dot, sigma_applied, etc.) to model_function
         predict_kwargs = {
-            k: v for k, v in kwargs.items()
+            k: v
+            for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
         return self.model_function(x_jax, params, test_mode=test_mode, **predict_kwargs)

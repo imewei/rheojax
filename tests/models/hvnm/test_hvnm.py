@@ -49,8 +49,13 @@ def full_model():
 def unfilled_model():
     """HVNM with phi=0 (should recover HVM)."""
     return HVNMLocal.unfilled_vitrimer(
-        G_P=5000.0, G_E=3000.0, G_D=1000.0,
-        k_d_D=1.0, nu_0=1e10, E_a=80e3, T=300.0,
+        G_P=5000.0,
+        G_E=3000.0,
+        G_D=1000.0,
+        k_d_D=1.0,
+        nu_0=1e10,
+        E_a=80e3,
+        T=300.0,
     )
 
 
@@ -72,6 +77,7 @@ def filled_model():
 def hvm_model():
     """HVM reference model for comparison."""
     from rheojax.models import HVMLocal
+
     m = HVMLocal(kinetics="stress", include_dissociative=True)
     m.parameters.set_value("G_P", 5000.0)
     m.parameters.set_value("G_E", 3000.0)
@@ -115,12 +121,14 @@ class TestHVNMCreation:
     @pytest.mark.smoke
     def test_registry_lookup_hvnm_local(self):
         from rheojax.core.registry import ModelRegistry
+
         m = ModelRegistry.create("hvnm_local")
         assert isinstance(m, HVNMLocal)
 
     @pytest.mark.smoke
     def test_registry_lookup_hvnm(self):
         from rheojax.core.registry import ModelRegistry
+
         m = ModelRegistry.create("hvnm")
         assert isinstance(m, HVNMLocal)
 
@@ -247,9 +255,7 @@ class TestHVNMFlowCurve:
         """D-network viscous stress dominates at steady state."""
         gd = np.logspace(-2, 2, 50)
         result = filled_model.predict_flow_curve(gd, return_components=True)
-        np.testing.assert_allclose(
-            result["stress"], result["sigma_D"], rtol=1e-10
-        )
+        np.testing.assert_allclose(result["stress"], result["sigma_D"], rtol=1e-10)
 
     def test_monotonic_stress_rate(self, filled_model):
         gd = np.logspace(-2, 2, 50)
@@ -713,7 +719,10 @@ class TestHVNMBayesian:
         """model_function must accept JAX arrays without error."""
         omega = jnp.logspace(-2, 2, 20)
         params = jnp.array(
-            [default_model.parameters.get_value(n) for n in default_model.parameters.keys()],
+            [
+                default_model.parameters.get_value(n)
+                for n in default_model.parameters.keys()
+            ],
             dtype=jnp.float64,
         )
         result = default_model.model_function(omega, params, test_mode="oscillation")
@@ -724,7 +733,10 @@ class TestHVNMBayesian:
     def test_model_function_flow_curve(self, default_model):
         gd = jnp.logspace(-1, 1, 10)
         params = jnp.array(
-            [default_model.parameters.get_value(n) for n in default_model.parameters.keys()],
+            [
+                default_model.parameters.get_value(n)
+                for n in default_model.parameters.keys()
+            ],
             dtype=jnp.float64,
         )
         result = default_model.model_function(gd, params, test_mode="flow_curve")
@@ -734,7 +746,10 @@ class TestHVNMBayesian:
     def test_model_function_relaxation(self, default_model):
         t = jnp.logspace(-2, 2, 20)
         params = jnp.array(
-            [default_model.parameters.get_value(n) for n in default_model.parameters.keys()],
+            [
+                default_model.parameters.get_value(n)
+                for n in default_model.parameters.keys()
+            ],
             dtype=jnp.float64,
         )
         result = default_model.model_function(t, params, test_mode="relaxation")

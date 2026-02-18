@@ -36,7 +36,11 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("power_law", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR])
+@ModelRegistry.register(
+    "power_law",
+    protocols=[Protocol.FLOW_CURVE],
+    deformation_modes=[DeformationMode.SHEAR],
+)
 class PowerLaw(BaseModel):
     """Power Law model for non-Newtonian flow (ROTATION only).
 

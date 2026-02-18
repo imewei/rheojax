@@ -109,7 +109,7 @@ class BaseModel(BayesianMixin, ABC):
             from rheojax.utils.data_quality import detect_data_range_decades
 
             x_array = X.x if isinstance(X, RheoData) else X
-            decades = detect_data_range_decades(x_array)  # type: ignore[arg-type]
+            decades = detect_data_range_decades(x_array)
 
             if use_log_residuals is None:
                 if decades > 8.0:
@@ -305,8 +305,8 @@ class BaseModel(BayesianMixin, ABC):
                 # so that downstream _fit() uses the converted y, not RheoData.y
                 if deformation_mode is not None:
                     if y is None:
-                        y = X.y  # type: ignore[unreachable]
-                    X = X.x  # type: ignore[assignment]
+                        y = X.y
+                    X = X.x
 
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):
@@ -318,7 +318,9 @@ class BaseModel(BayesianMixin, ABC):
             if deformation_mode.is_tensile() and y is not None:
                 from rheojax.utils.modulus_conversion import convert_modulus
 
-                y = convert_modulus(y, deformation_mode, DeformationMode.SHEAR, poisson_ratio)
+                y = convert_modulus(
+                    y, deformation_mode, DeformationMode.SHEAR, poisson_ratio
+                )
                 logger.info(
                     "Converted tensile modulus to shear for fitting",
                     model=self.__class__.__name__,
@@ -487,7 +489,7 @@ class BaseModel(BayesianMixin, ABC):
 
         return compile_time
 
-    def fit_bayesian(  # type: ignore[override]  # extends BayesianMixin signature with DMTA params
+    def fit_bayesian(  # extends BayesianMixin signature with DMTA params
         self,
         X: ArrayLike,
         y: ArrayLike | None = None,
@@ -573,11 +575,11 @@ class BaseModel(BayesianMixin, ABC):
                 deformation_mode = X.metadata.get("deformation_mode", None)
                 if deformation_mode is not None:
                     if y is None:
-                        y = X.y  # type: ignore[assignment]
+                        y = X.y
                     # Preserve test_mode from RheoData before stripping to raw array
                     if test_mode is None:
                         test_mode = X.metadata.get("test_mode", None)
-                    X = X.x  # type: ignore[assignment]
+                    X = X.x
 
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):
@@ -588,7 +590,9 @@ class BaseModel(BayesianMixin, ABC):
             if deformation_mode.is_tensile() and y is not None:
                 from rheojax.utils.modulus_conversion import convert_modulus
 
-                y = convert_modulus(y, deformation_mode, DeformationMode.SHEAR, poisson_ratio)
+                y = convert_modulus(
+                    y, deformation_mode, DeformationMode.SHEAR, poisson_ratio
+                )
                 logger.info(
                     "Converted tensile modulus to shear for Bayesian inference",
                     model=self.__class__.__name__,
@@ -604,7 +608,7 @@ class BaseModel(BayesianMixin, ABC):
         if initial_values is None and self.fitted_:
             # Extract current parameter values as initial values
             initial_values = {
-                name: self.parameters.get_value(name) for name in self.parameters  # type: ignore[misc]
+                name: self.parameters.get_value(name) for name in self.parameters
             }
             logger.debug(
                 "Using NLSQ warm-start for Bayesian inference",
@@ -732,7 +736,11 @@ class BaseModel(BayesianMixin, ABC):
                 if dm.is_tensile():
                     from rheojax.utils.modulus_conversion import convert_modulus
 
-                    nu = poisson_ratio if poisson_ratio is not None else self._poisson_ratio
+                    nu = (
+                        poisson_ratio
+                        if poisson_ratio is not None
+                        else self._poisson_ratio
+                    )
                     result = convert_modulus(result, DeformationMode.SHEAR, dm, nu)
 
             logger.debug(
@@ -838,7 +846,9 @@ class BaseModel(BayesianMixin, ABC):
             Dictionary of parameter names and values
         """
         if hasattr(self, "parameters") and self.parameters:
-            return {name: self.parameters[name].value for name in self.parameters.keys()}
+            return {
+                name: self.parameters[name].value for name in self.parameters.keys()
+            }
         return {}
 
     def set_params(self, **params) -> BaseModel:

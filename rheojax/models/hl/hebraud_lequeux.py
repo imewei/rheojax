@@ -218,9 +218,11 @@ class HebraudLequeux(BaseModel):
                 self._fit_laos(X, y, **kwargs)
             elif test_mode == "saos" or test_mode == "oscillation":
                 # SAOS fitting not fully implemented yet, but prevent dispatch error
-                # For now, we can alias to flow_curve if structurally similar 
+                # For now, we can alias to flow_curve if structurally similar
                 # OR just raise NotImplementedError instead of ValueError
-                raise NotImplementedError(f"Fitting mode '{test_mode}' not implemented yet")
+                raise NotImplementedError(
+                    f"Fitting mode '{test_mode}' not implemented yet"
+                )
             else:
                 raise ValueError(f"Unsupported test mode: {test_mode}")
 
@@ -275,16 +277,27 @@ class HebraudLequeux(BaseModel):
                 ds_v = 2.0 * sigma_max_v / (n_bins_fit - 1)
                 schedule = [
                     _compute_dt_and_steps_for_rate(
-                        abs(float(g)), tau_v, sigma_c_v, ds=ds_v,
-                        max_steps=5_000, bucket_size=5_000,
+                        abs(float(g)),
+                        tau_v,
+                        sigma_c_v,
+                        ds=ds_v,
+                        max_steps=5_000,
+                        bucket_size=5_000,
                     )
                     for g in gdot
                 ]
-                pred = np.array(run_flow_curve(
-                    gdot_jax, alpha_v, tau_v, sigma_c_v,
-                    0.005, sigma_max_v, n_bins_fit,
-                    per_rate_schedule=schedule,
-                ))
+                pred = np.array(
+                    run_flow_curve(
+                        gdot_jax,
+                        alpha_v,
+                        tau_v,
+                        sigma_c_v,
+                        0.005,
+                        sigma_max_v,
+                        n_bins_fit,
+                        per_rate_schedule=schedule,
+                    )
+                )
                 pred_safe = np.maximum(np.abs(pred), 1e-10)
                 log_resid = np.log10(pred_safe) - np.log10(target_safe)
                 return float(np.mean(log_resid**2))
@@ -295,8 +308,8 @@ class HebraudLequeux(BaseModel):
         # x = [alpha, log10(tau), sigma_c_norm]
         # HL yield stress ≈ sigma_c/2, so sigma_c ~ 2 for normalized data
         starts = [
-            [0.10, -1.3, 2.5],   # alpha=0.10, tau=0.05, sigma_c=2.5
-            [0.30, -2.0, 3.0],   # alpha=0.30, tau=0.01, sigma_c=3.0
+            [0.10, -1.3, 2.5],  # alpha=0.10, tau=0.05, sigma_c=2.5
+            [0.30, -2.0, 3.0],  # alpha=0.30, tau=0.01, sigma_c=3.0
         ]
 
         best_x = starts[0]
@@ -306,9 +319,15 @@ class HebraudLequeux(BaseModel):
         for i, x0 in enumerate(starts):
             try:
                 res = minimize(
-                    cost_fn, x0, method="Nelder-Mead",
-                    options={"maxfev": 40, "xatol": 0.02,
-                             "fatol": 0.005, "adaptive": True},
+                    cost_fn,
+                    x0,
+                    method="Nelder-Mead",
+                    options={
+                        "maxfev": 40,
+                        "xatol": 0.02,
+                        "fatol": 0.005,
+                        "adaptive": True,
+                    },
                 )
                 if res.fun < best_cost:
                     best_cost = res.fun
@@ -344,9 +363,7 @@ class HebraudLequeux(BaseModel):
         self._last_fit_kwargs["_sigma_max_min_norm"] = sigma_max_min
         self._last_fit_kwargs["_n_bins_fit"] = n_bins_fit
         sc_phys = float(self.parameters.get_value("sigma_c") or 1.0)
-        self._last_fit_kwargs["_sigma_max"] = max(
-            5.0, self.grid_sigma_factor * sc_phys
-        )
+        self._last_fit_kwargs["_sigma_max"] = max(5.0, self.grid_sigma_factor * sc_phys)
 
     def _fit_creep(self, t: np.ndarray, compliance: np.ndarray, **kwargs):
         """Fit creep compliance."""
@@ -573,9 +590,7 @@ class HebraudLequeux(BaseModel):
 
             # Predict in normalized units (same as fitting) then scale back
             stress_scale = self._last_fit_kwargs.get("_stress_scale", 1.0)
-            sigma_max_min_norm = self._last_fit_kwargs.get(
-                "_sigma_max_min_norm", 5.0
-            )
+            sigma_max_min_norm = self._last_fit_kwargs.get("_sigma_max_min_norm", 5.0)
             n_bins_pred = self._last_fit_kwargs.get("_n_bins_fit", 501)
 
             tau_val = float(tau or 1.0)
@@ -586,7 +601,10 @@ class HebraudLequeux(BaseModel):
             X_np = np.asarray(X_jax)  # Single vectorized transfer
             per_rate_schedule = [
                 _compute_dt_and_steps_for_rate(
-                    abs(float(X_np[i])), tau_val, sigma_c_norm, ds=ds,
+                    abs(float(X_np[i])),
+                    tau_val,
+                    sigma_c_norm,
+                    ds=ds,
                 )
                 for i in range(len(X_np))
             ]
@@ -708,7 +726,11 @@ class HebraudLequeux(BaseModel):
                     raise RuntimeError(
                         "Cannot determine n_steps for Bayesian inference."
                     ) from e
-            cap = self._max_scan_steps_bayesian_creep if creep else self._max_scan_steps_bayesian
+            cap = (
+                self._max_scan_steps_bayesian_creep
+                if creep
+                else self._max_scan_steps_bayesian
+            )
             dt = max(self._min_dt, t_max / cap)
             n_steps = int(t_max / dt) + 1
             return dt, n_steps
@@ -717,12 +739,12 @@ class HebraudLequeux(BaseModel):
         if mode in ("steady_shear", "flow_curve"):
             from rheojax.utils.hl_kernels import _compute_dt_and_steps_for_rate
 
-            dt = self._min_dt  # default for flow curve (overridden by per_rate_schedule)
+            dt = (
+                self._min_dt
+            )  # default for flow curve (overridden by per_rate_schedule)
             # Run in normalized units (same as fitting) for consistency
             stress_scale = self._last_fit_kwargs.get("_stress_scale", 1.0)
-            sigma_max_min_norm = self._last_fit_kwargs.get(
-                "_sigma_max_min_norm", 5.0
-            )
+            sigma_max_min_norm = self._last_fit_kwargs.get("_sigma_max_min_norm", 5.0)
             n_bins_bayes = self._last_fit_kwargs.get("_n_bins_fit", 501)
 
             # Use stored NLSQ estimates for schedule (tau/sigma_c are tracers)
@@ -736,21 +758,35 @@ class HebraudLequeux(BaseModel):
                 X_np = np.asarray(X_jax)  # Single vectorized transfer
                 schedule = [
                     _compute_dt_and_steps_for_rate(
-                        abs(float(X_np[i])), tau_est, sc_norm_est, ds=ds,
+                        abs(float(X_np[i])),
+                        tau_est,
+                        sc_norm_est,
+                        ds=ds,
                     )
                     for i in range(len(X_np))
                 ]
                 # sigma_c tracer divided by stress_scale to get normalized
                 sigma_c_norm = sigma_c / stress_scale
                 pred_norm = run_flow_curve(
-                    X_jax, alpha, tau, sigma_c_norm,
-                    dt, sigma_max_norm, n_bins_bayes,
+                    X_jax,
+                    alpha,
+                    tau,
+                    sigma_c_norm,
+                    dt,
+                    sigma_max_norm,
+                    n_bins_bayes,
                     per_rate_schedule=schedule,
                 )
                 return pred_norm * stress_scale
             except Exception:
                 return run_flow_curve(
-                    X_jax, alpha, tau, sigma_c, dt, sigma_max, n_bins,
+                    X_jax,
+                    alpha,
+                    tau,
+                    sigma_c,
+                    dt,
+                    sigma_max,
+                    n_bins,
                 )
 
         elif mode == "creep":

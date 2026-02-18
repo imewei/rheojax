@@ -21,26 +21,14 @@ def fix_future_warning_suppression(source_lines: list[str]) -> tuple[list[str], 
         if 'warnings.filterwarnings("ignore", category=FutureWarning)' in line:
             # Replace with targeted suppression for equinox DeprecationWarning
             new_lines.append(
-                '# Suppress upstream equinox DeprecationWarning (jax.core.mapped_aval deprecated)\n'
+                "# Suppress upstream equinox DeprecationWarning (jax.core.mapped_aval deprecated)\n"
             )
-            new_lines.append(
-                'warnings.filterwarnings(\n'
-            )
-            new_lines.append(
-                '    "ignore",\n'
-            )
-            new_lines.append(
-                '    message="jax.core.*_aval is deprecated",\n'
-            )
-            new_lines.append(
-                '    category=DeprecationWarning,\n'
-            )
-            new_lines.append(
-                '    module="equinox",\n'
-            )
-            new_lines.append(
-                ')\n'
-            )
+            new_lines.append("warnings.filterwarnings(\n")
+            new_lines.append('    "ignore",\n')
+            new_lines.append('    message="jax.core.*_aval is deprecated",\n')
+            new_lines.append("    category=DeprecationWarning,\n")
+            new_lines.append('    module="equinox",\n')
+            new_lines.append(")\n")
             changed = True
         else:
             new_lines.append(line)
@@ -75,7 +63,11 @@ def add_plt_close_after_show(nb: dict) -> int:
     for cell in nb["cells"]:
         if cell["cell_type"] != "code":
             continue
-        src_lines = cell["source"] if isinstance(cell["source"], list) else cell["source"].splitlines(True)
+        src_lines = (
+            cell["source"]
+            if isinstance(cell["source"], list)
+            else cell["source"].splitlines(True)
+        )
         new_lines = []
         for i, line in enumerate(src_lines):
             stripped = line.strip()
@@ -106,7 +98,11 @@ def add_fast_mode(nb: dict) -> bool:
     for cell in nb["cells"]:
         if cell["cell_type"] != "code":
             continue
-        src = "".join(cell["source"]) if isinstance(cell["source"], list) else cell["source"]
+        src = (
+            "".join(cell["source"])
+            if isinstance(cell["source"], list)
+            else cell["source"]
+        )
 
         # Find cells with NUM_WARMUP = ... NUM_SAMPLES = ... pattern
         if "NUM_WARMUP" in src and "NUM_SAMPLES" in src and "fit_bayesian" in src:
@@ -114,7 +110,11 @@ def add_fast_mode(nb: dict) -> bool:
             if "FAST_MODE" in src:
                 continue
 
-            lines = cell["source"] if isinstance(cell["source"], list) else cell["source"].splitlines(True)
+            lines = (
+                cell["source"]
+                if isinstance(cell["source"], list)
+                else cell["source"].splitlines(True)
+            )
             new_lines = []
             inserted_fast_mode = False
 
@@ -129,8 +129,12 @@ def add_fast_mode(nb: dict) -> bool:
                 ):
                     # Insert FAST_MODE block before the NUM_WARMUP line
                     indent = line[: len(line) - len(line.lstrip())]
-                    new_lines.append(f"{indent}# FAST_MODE for CI: set FAST_MODE=1 env var for quick iteration\n")
-                    new_lines.append(f"{indent}FAST_MODE = os.environ.get('FAST_MODE', '0') == '1'\n")
+                    new_lines.append(
+                        f"{indent}# FAST_MODE for CI: set FAST_MODE=1 env var for quick iteration\n"
+                    )
+                    new_lines.append(
+                        f"{indent}FAST_MODE = os.environ.get('FAST_MODE', '0') == '1'\n"
+                    )
                     new_lines.append(f"{indent}if FAST_MODE:\n")
                     new_lines.append(f"{indent}    NUM_WARMUP = 50\n")
                     new_lines.append(f"{indent}    NUM_SAMPLES = 100\n")
@@ -142,10 +146,27 @@ def add_fast_mode(nb: dict) -> bool:
                     inserted_fast_mode = True
                     # Skip the original NUM_WARMUP, NUM_SAMPLES, NUM_CHAINS lines
                     continue
-                elif inserted_fast_mode and stripped.startswith(("NUM_SAMPLES", "NUM_CHAINS")) and "=" in stripped and not stripped.startswith("#"):
+                elif (
+                    inserted_fast_mode
+                    and stripped.startswith(("NUM_SAMPLES", "NUM_CHAINS"))
+                    and "=" in stripped
+                    and not stripped.startswith("#")
+                ):
                     # Skip these lines (replaced by FAST_MODE block above)
                     continue
-                elif inserted_fast_mode and stripped.startswith("#") and any(kw in stripped for kw in ["NUM_WARMUP", "NUM_SAMPLES", "NUM_CHAINS", "production"]):
+                elif (
+                    inserted_fast_mode
+                    and stripped.startswith("#")
+                    and any(
+                        kw in stripped
+                        for kw in [
+                            "NUM_WARMUP",
+                            "NUM_SAMPLES",
+                            "NUM_CHAINS",
+                            "production",
+                        ]
+                    )
+                ):
                     # Skip commented-out production config
                     continue
                 else:
@@ -164,11 +185,24 @@ def add_fast_mode_nonstandard(nb: dict) -> bool:
     for cell in nb["cells"]:
         if cell["cell_type"] != "code":
             continue
-        src = "".join(cell["source"]) if isinstance(cell["source"], list) else cell["source"]
+        src = (
+            "".join(cell["source"])
+            if isinstance(cell["source"], list)
+            else cell["source"]
+        )
 
         # Pattern: num_warmup=200, num_samples=500 inline in fit_bayesian call
-        if "fit_bayesian" in src and "num_warmup=" in src and "FAST_MODE" not in src and "NUM_WARMUP" not in src:
-            lines = cell["source"] if isinstance(cell["source"], list) else cell["source"].splitlines(True)
+        if (
+            "fit_bayesian" in src
+            and "num_warmup=" in src
+            and "FAST_MODE" not in src
+            and "NUM_WARMUP" not in src
+        ):
+            lines = (
+                cell["source"]
+                if isinstance(cell["source"], list)
+                else cell["source"].splitlines(True)
+            )
             new_lines = []
             inserted = False
 
@@ -177,10 +211,18 @@ def add_fast_mode_nonstandard(nb: dict) -> bool:
                 # Insert FAST_MODE block before fit_bayesian call
                 if not inserted and "fit_bayesian" in stripped:
                     indent = line[: len(line) - len(line.lstrip())]
-                    new_lines.append(f"\n{indent}# FAST_MODE for CI: set FAST_MODE=1 env var for quick iteration\n")
-                    new_lines.append(f"{indent}FAST_MODE = os.environ.get('FAST_MODE', '0') == '1'\n")
-                    new_lines.append(f"{indent}_num_warmup = 50 if FAST_MODE else 200\n")
-                    new_lines.append(f"{indent}_num_samples = 100 if FAST_MODE else 500\n")
+                    new_lines.append(
+                        f"\n{indent}# FAST_MODE for CI: set FAST_MODE=1 env var for quick iteration\n"
+                    )
+                    new_lines.append(
+                        f"{indent}FAST_MODE = os.environ.get('FAST_MODE', '0') == '1'\n"
+                    )
+                    new_lines.append(
+                        f"{indent}_num_warmup = 50 if FAST_MODE else 200\n"
+                    )
+                    new_lines.append(
+                        f"{indent}_num_samples = 100 if FAST_MODE else 500\n"
+                    )
                     new_lines.append(f"{indent}_num_chains = 1\n\n")
                     inserted = True
                     # Replace hardcoded values in the call
@@ -205,7 +247,11 @@ def ensure_os_import(nb: dict) -> bool:
     for cell in nb["cells"]:
         if cell["cell_type"] != "code":
             continue
-        src = "".join(cell["source"]) if isinstance(cell["source"], list) else cell["source"]
+        src = (
+            "".join(cell["source"])
+            if isinstance(cell["source"], list)
+            else cell["source"]
+        )
         if "import os" in src:
             return False  # Already imported
 
@@ -213,9 +259,17 @@ def ensure_os_import(nb: dict) -> bool:
     for cell in nb["cells"]:
         if cell["cell_type"] != "code":
             continue
-        src = "".join(cell["source"]) if isinstance(cell["source"], list) else cell["source"]
+        src = (
+            "".join(cell["source"])
+            if isinstance(cell["source"], list)
+            else cell["source"]
+        )
         if "import numpy" in src or "import matplotlib" in src:
-            lines = cell["source"] if isinstance(cell["source"], list) else cell["source"].splitlines(True)
+            lines = (
+                cell["source"]
+                if isinstance(cell["source"], list)
+                else cell["source"].splitlines(True)
+            )
             # Insert after the first import line
             for i, line in enumerate(lines):
                 if line.strip().startswith("import ") and "colab" not in line.lower():
@@ -247,7 +301,11 @@ def fix_notebook(nb_path: Path) -> dict:
     # 3. Fix FutureWarning suppression
     for cell in nb["cells"]:
         if cell["cell_type"] == "code":
-            lines = cell["source"] if isinstance(cell["source"], list) else cell["source"].splitlines(True)
+            lines = (
+                cell["source"]
+                if isinstance(cell["source"], list)
+                else cell["source"].splitlines(True)
+            )
             new_lines, changed = fix_future_warning_suppression(lines)
             if changed:
                 cell["source"] = new_lines

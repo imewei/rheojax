@@ -260,13 +260,13 @@ class BayesianPipeline(Pipeline):
             num_chains=num_chains,
         ) as ctx:
             result = self._last_model.fit_bayesian(
-                X,  # type: ignore[arg-type]
-                y,  # type: ignore[arg-type]
+                X,
+                y,
                 test_mode=test_mode,
                 num_warmup=num_warmup,
                 num_samples=num_samples,
                 num_chains=num_chains,
-                initial_values=initial_values,  # type: ignore[arg-type]
+                initial_values=initial_values,
                 **nuts_kwargs,
             )
 

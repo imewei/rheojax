@@ -41,6 +41,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -129,28 +130,42 @@ class VLBNonlocal(VLBBase):
 
         # Core parameters
         self.parameters.add(
-            name="G0", value=1e3, bounds=(1e0, 1e8),
-            units="Pa", description="Network modulus",
+            name="G0",
+            value=1e3,
+            bounds=(1e0, 1e8),
+            units="Pa",
+            description="Network modulus",
         )
         self.parameters.add(
-            name="k_d_0", value=1.0, bounds=(1e-6, 1e6),
-            units="1/s", description="Unstressed dissociation rate",
+            name="k_d_0",
+            value=1.0,
+            bounds=(1e-6, 1e6),
+            units="1/s",
+            description="Unstressed dissociation rate",
         )
         self.parameters.add(
-            name="eta_s", value=0.0, bounds=(0.0, 1e4),
-            units="Pa·s", description="Solvent viscosity",
+            name="eta_s",
+            value=0.0,
+            bounds=(0.0, 1e4),
+            units="Pa·s",
+            description="Solvent viscosity",
         )
 
         # Nonlocal parameter
         self.parameters.add(
-            name="D_mu", value=1e-8, bounds=(1e-14, 1e-4),
-            units="m²/s", description="Distribution tensor diffusivity",
+            name="D_mu",
+            value=1e-8,
+            bounds=(1e-14, 1e-4),
+            units="m²/s",
+            description="Distribution tensor diffusivity",
         )
 
         # Bell parameter
         if self._breakage == "bell":
             self.parameters.add(
-                name="nu", value=3.0, bounds=(0.0, 20.0),
+                name="nu",
+                value=3.0,
+                bounds=(0.0, 20.0),
                 units="dimensionless",
                 description="Force sensitivity (Bell model)",
             )
@@ -158,7 +173,9 @@ class VLBNonlocal(VLBBase):
         # FENE parameter
         if self._stress_type == "fene":
             self.parameters.add(
-                name="L_max", value=10.0, bounds=(1.5, 1000.0),
+                name="L_max",
+                value=10.0,
+                bounds=(1.5, 1000.0),
                 units="dimensionless",
                 description="Maximum chain extensibility (FENE-P spring)",
             )
@@ -217,10 +234,10 @@ class VLBNonlocal(VLBBase):
 
             # Unpack state (n is closed over as static)
             Sigma = state[0]
-            mu_xx = state[1:1 + n]
-            mu_yy = state[1 + n:1 + 2 * n]
-            mu_zz = state[1 + 2 * n:1 + 3 * n]
-            mu_xy = state[1 + 3 * n:1 + 4 * n]
+            mu_xx = state[1 : 1 + n]
+            mu_yy = state[1 + n : 1 + 2 * n]
+            mu_zz = state[1 + 2 * n : 1 + 3 * n]
+            mu_xy = state[1 + 3 * n : 1 + 4 * n]
 
             # Local dissociation rate
             if breakage == "bell":
@@ -261,10 +278,15 @@ class VLBNonlocal(VLBBase):
             mean_gd = jnp.mean(gamma_dot)
             dSigma = K * (gamma_dot_avg - mean_gd)
 
-            return jnp.concatenate([
-                jnp.array([dSigma]),
-                dmu_xx, dmu_yy, dmu_zz, dmu_xy,
-            ])
+            return jnp.concatenate(
+                [
+                    jnp.array([dSigma]),
+                    dmu_xx,
+                    dmu_yy,
+                    dmu_zz,
+                    dmu_xy,
+                ]
+            )
 
         return pde_rhs
 
@@ -294,20 +316,25 @@ class VLBNonlocal(VLBBase):
         mu_zz_0 = jnp.ones(n)
         mu_xy_0 = jnp.zeros(n)
 
-        return jnp.concatenate([
-            jnp.array([Sigma_0]),
-            mu_xx_0, mu_yy_0, mu_zz_0, mu_xy_0,
-        ])
+        return jnp.concatenate(
+            [
+                jnp.array([Sigma_0]),
+                mu_xx_0,
+                mu_yy_0,
+                mu_zz_0,
+                mu_xy_0,
+            ]
+        )
 
     def _unpack_state(self, state: jnp.ndarray) -> dict:
         """Unpack state vector into named fields."""
         n = self.n_points
         return {
             "Sigma": state[0],
-            "mu_xx": state[1:1 + n],
-            "mu_yy": state[1 + n:1 + 2 * n],
-            "mu_zz": state[1 + 2 * n:1 + 3 * n],
-            "mu_xy": state[1 + 3 * n:1 + 4 * n],
+            "mu_xx": state[1 : 1 + n],
+            "mu_yy": state[1 + n : 1 + 2 * n],
+            "mu_zz": state[1 + 2 * n : 1 + 3 * n],
+            "mu_xy": state[1 + 3 * n : 1 + 4 * n],
         }
 
     def _compute_gamma_dot_profile(self, state_fields: dict) -> jnp.ndarray:
@@ -322,8 +349,12 @@ class VLBNonlocal(VLBBase):
             L_max = float(self.parameters.get_value("L_max") or 10.0)
             sigma_elastic = jax.vmap(
                 lambda xx, yy, zz, xy: vlb_stress_fene_xy(xx, yy, zz, xy, G0, L_max)
-            )(state_fields["mu_xx"], state_fields["mu_yy"],
-              state_fields["mu_zz"], mu_xy)
+            )(
+                state_fields["mu_xx"],
+                state_fields["mu_yy"],
+                state_fields["mu_zz"],
+                mu_xy,
+            )
         else:
             sigma_elastic = G0 * mu_xy
 
@@ -395,17 +426,24 @@ class VLBNonlocal(VLBBase):
         controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
 
         sol = diffrax.diffeqsolve(
-            term, solver, 0.0, t_end, dt / 10.0, y0,
-            args=args, saveat=diffrax.SaveAt(ts=t_save),
+            term,
+            solver,
+            0.0,
+            t_end,
+            dt / 10.0,
+            y0,
+            args=args,
+            saveat=diffrax.SaveAt(ts=t_save),
             stepsize_controller=controller,
-            max_steps=5_000_000, throw=False,
+            max_steps=5_000_000,
+            throw=False,
         )
 
         # Extract profiles at each time
         t_out = np.asarray(t_save)
         stress_out = np.asarray(sol.ys[:, 0])
 
-        mu_xy_profiles = np.asarray(sol.ys[:, 1 + 3 * n:1 + 4 * n])
+        mu_xy_profiles = np.asarray(sol.ys[:, 1 + 3 * n : 1 + 4 * n])
 
         # Compute gamma_dot profiles vectorized over time axis
         n = self.n_points
@@ -419,20 +457,20 @@ class VLBNonlocal(VLBBase):
 
             def _gamma_dot_single(state_i):
                 Sigma_i = state_i[0]
-                mu_xx_i = state_i[1:1 + n]
-                mu_yy_i = state_i[1 + n:1 + 2 * n]
-                mu_zz_i = state_i[1 + 2 * n:1 + 3 * n]
-                mu_xy_i = state_i[1 + 3 * n:1 + 4 * n]
+                mu_xx_i = state_i[1 : 1 + n]
+                mu_yy_i = state_i[1 + n : 1 + 2 * n]
+                mu_zz_i = state_i[1 + 2 * n : 1 + 3 * n]
+                mu_xy_i = state_i[1 + 3 * n : 1 + 4 * n]
                 sigma_el = jax.vmap(
-                    lambda xx, yy, zz, xy: vlb_stress_fene_xy(
-                        xx, yy, zz, xy, G0, L_max
-                    )
+                    lambda xx, yy, zz, xy: vlb_stress_fene_xy(xx, yy, zz, xy, G0, L_max)
                 )(mu_xx_i, mu_yy_i, mu_zz_i, mu_xy_i)
                 return (Sigma_i - sigma_el) / eta_eff
+
         else:
+
             def _gamma_dot_single(state_i):
                 Sigma_i = state_i[0]
-                mu_xy_i = state_i[1 + 3 * n:1 + 4 * n]
+                mu_xy_i = state_i[1 + 3 * n : 1 + 4 * n]
                 return (Sigma_i - G0 * mu_xy_i) / eta_eff
 
         gamma_dot_all = jax.vmap(_gamma_dot_single)(sol.ys)
@@ -516,9 +554,9 @@ class VLBNonlocal(VLBBase):
             Sigma = args["Sigma"]
 
             mu_xx = state[0:n]
-            mu_yy = state[n:2 * n]
-            mu_zz = state[2 * n:3 * n]
-            mu_xy = state[3 * n:4 * n]
+            mu_yy = state[n : 2 * n]
+            mu_zz = state[2 * n : 3 * n]
+            mu_xy = state[3 * n : 4 * n]
 
             if breakage == "bell":
                 k_d = jax.vmap(
@@ -565,12 +603,14 @@ class VLBNonlocal(VLBBase):
         # Initial state: equilibrium + noise
         key = jax.random.PRNGKey(42)
         noise = 0.01 * jax.random.normal(key, shape=(n,))
-        y0 = jnp.concatenate([
-            jnp.ones(n) + noise,  # mu_xx
-            jnp.ones(n),          # mu_yy
-            jnp.ones(n),          # mu_zz
-            jnp.zeros(n),         # mu_xy
-        ])
+        y0 = jnp.concatenate(
+            [
+                jnp.ones(n) + noise,  # mu_xx
+                jnp.ones(n),  # mu_yy
+                jnp.ones(n),  # mu_zz
+                jnp.zeros(n),  # mu_xy
+            ]
+        )
 
         n_steps = int(t_end / dt)
         t_save = jnp.linspace(0.0, t_end, n_steps + 1)
@@ -580,39 +620,47 @@ class VLBNonlocal(VLBBase):
         controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
 
         sol = diffrax.diffeqsolve(
-            term, solver, 0.0, t_end, dt / 10.0, y0,
-            args=args, saveat=diffrax.SaveAt(ts=t_save),
+            term,
+            solver,
+            0.0,
+            t_end,
+            dt / 10.0,
+            y0,
+            args=args,
+            saveat=diffrax.SaveAt(ts=t_save),
             stepsize_controller=controller,
-            max_steps=5_000_000, throw=False,
+            max_steps=5_000_000,
+            throw=False,
         )
 
         t_out = np.asarray(t_save)
-        mu_xy_profiles = np.asarray(sol.ys[:, 3 * n:4 * n])
+        mu_xy_profiles = np.asarray(sol.ys[:, 3 * n : 4 * n])
 
         # Compute gamma_dot and velocity profiles vectorized over time axis
         G0_val = params["G0"]
         eta_s_val = params["eta_s"]
         k_d_0_val = params["k_d_0"]
-        eta_eff = jnp.maximum(
-            eta_s_val, 1e-2 * G0_val / jnp.maximum(k_d_0_val, 1e-30)
-        )
+        eta_eff = jnp.maximum(eta_s_val, 1e-2 * G0_val / jnp.maximum(k_d_0_val, 1e-30))
         dy = self.dy
 
         if self._stress_type == "fene":
+
             def _creep_gamma_dot_single(state_i):
                 mu_xx_i = state_i[:n]
-                mu_yy_i = state_i[n:2 * n]
-                mu_zz_i = state_i[2 * n:3 * n]
-                mu_xy_i = state_i[3 * n:4 * n]
+                mu_yy_i = state_i[n : 2 * n]
+                mu_zz_i = state_i[2 * n : 3 * n]
+                mu_xy_i = state_i[3 * n : 4 * n]
                 sigma_el = jax.vmap(
                     lambda xx, yy, zz, xy: vlb_stress_fene_xy(
                         xx, yy, zz, xy, G0_val, L_max
                     )
                 )(mu_xx_i, mu_yy_i, mu_zz_i, mu_xy_i)
                 return (sigma_0 - sigma_el) / eta_eff
+
         else:
+
             def _creep_gamma_dot_single(state_i):
-                mu_xy_i = state_i[3 * n:4 * n]
+                mu_xy_i = state_i[3 * n : 4 * n]
                 return (sigma_0 - G0_val * mu_xy_i) / eta_eff
 
         gamma_dot_all = jax.vmap(_creep_gamma_dot_single)(sol.ys)
@@ -636,9 +684,7 @@ class VLBNonlocal(VLBBase):
     # Banding Detection
     # =========================================================================
 
-    def detect_banding(
-        self, result: dict, threshold: float = 0.1
-    ) -> dict:
+    def detect_banding(self, result: dict, threshold: float = 0.1) -> dict:
         """Detect shear banding from steady-state profiles.
 
         Parameters

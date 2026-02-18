@@ -286,10 +286,12 @@ class FIKH(FIKHBase):
 
             if is_complex:
                 # Fit both G' and G'' by stacking residuals
-                residuals = jnp.concatenate([
-                    jnp.real(G_star_pred) - jnp.real(y_arr),
-                    jnp.imag(G_star_pred) - jnp.imag(y_arr),
-                ])
+                residuals = jnp.concatenate(
+                    [
+                        jnp.real(G_star_pred) - jnp.real(y_arr),
+                        jnp.imag(G_star_pred) - jnp.imag(y_arr),
+                    ]
+                )
             else:
                 # Fit to magnitude |G*|
                 residuals = jnp.abs(G_star_pred) - jnp.abs(y_arr)
@@ -431,7 +433,7 @@ class FIKH(FIKHBase):
 
         return sigma_series
 
-    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike: # type: ignore[override]
+    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
         """Predict based on test_mode.
 
         Args:
@@ -468,7 +470,9 @@ class FIKH(FIKHBase):
             omega = jnp.asarray(X)
             gamma_0 = kwargs.get("gamma_0", 0.01)
             n_cycles = kwargs.get("n_cycles", 5)
-            return self._predict_oscillation_from_params(omega, params, gamma_0, n_cycles)
+            return self._predict_oscillation_from_params(
+                omega, params, gamma_0, n_cycles
+            )
 
         else:
             # Strain-driven protocols (startup, laos)
@@ -706,7 +710,7 @@ class FIKH(FIKHBase):
             param_names = list(self.parameters.keys())
             param_dict = dict(zip(param_names, params, strict=False))
         else:
-            param_dict = dict(params) # type: ignore[arg-type]
+            param_dict = dict(params)
 
         mode_enum = self._validate_test_mode(mode)
 
@@ -735,7 +739,7 @@ class FIKH(FIKHBase):
             gamma_0 = kwargs.get("gamma_0", param_dict.pop("_gamma_0", 0.01))
             n_cycles = kwargs.get("n_cycles", param_dict.pop("_n_cycles", 5))
             G_star = self._predict_oscillation_from_params(
-                omega, param_dict, gamma_0, n_cycles # type: ignore[arg-type]
+                omega, param_dict, gamma_0, n_cycles
             )
             # Return magnitude for comparison with |G*| target
             return jnp.abs(G_star)
@@ -760,12 +764,12 @@ class FIKH(FIKHBase):
 
         return {
             "fractional_order": alpha,
-            "is_near_integer": alpha > 0.95, # type: ignore[operator]
+            "is_near_integer": alpha > 0.95,
             "memory_type": (
-                "weak (near exponential)" if alpha > 0.7 else "strong (power-law)" # type: ignore[operator]
+                "weak (near exponential)" if alpha > 0.7 else "strong (power-law)"
             ),
             "thermal_coupling": self.include_thermal,
-            "arrhenius_enabled": E_a > 0 if self.include_thermal else False, # type: ignore[operator]
+            "arrhenius_enabled": E_a > 0 if self.include_thermal else False,
             "limiting_case_alpha_1": "Classical MIKH behavior",
             "limiting_case_E_a_0": "Isothermal FIKH behavior",
         }

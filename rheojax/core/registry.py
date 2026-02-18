@@ -453,7 +453,10 @@ class Registry:
                         if isinstance(deformation_mode, str)
                         else deformation_mode
                     )
-                    if info.deformation_modes and target_dm not in info.deformation_modes:
+                    if (
+                        info.deformation_modes
+                        and target_dm not in info.deformation_modes
+                    ):
                         continue
                     elif not info.deformation_modes:
                         # Models without explicit deformation_modes are shear-only

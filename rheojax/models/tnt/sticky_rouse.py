@@ -103,6 +103,7 @@ import logging
 import numpy as np
 
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -309,7 +310,10 @@ class TNTStickyRouse(TNTBase):
     # =========================================================================
 
     def model_function(
-        self, X: jnp.ndarray, params: jnp.ndarray, test_mode: str | None = None,
+        self,
+        X: jnp.ndarray,
+        params: jnp.ndarray,
+        test_mode: str | None = None,
         **kwargs,
     ) -> jnp.ndarray:
         """Compute model prediction for given parameters.

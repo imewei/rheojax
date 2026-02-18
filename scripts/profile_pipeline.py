@@ -181,7 +181,9 @@ def profile_model(
     timings.append(t)
 
     # -- Phase 3: NLSQ fit (first call -- includes JIT) -----------------------
-    with timed_phase("NLSQ fit (cold -- includes JIT)", {"test_mode": config["test_mode"]}) as t:
+    with timed_phase(
+        "NLSQ fit (cold -- includes JIT)", {"test_mode": config["test_mode"]}
+    ) as t:
         model.fit(X, y, test_mode=config["test_mode"])
     timings.append(t)
 
@@ -237,7 +239,9 @@ def profile_model(
                     num_chains=num_chains,
                     seed=42,
                 )
-                t.details["divergences"] = bayes_result.diagnostics.get("num_divergences", "?")
+                t.details["divergences"] = bayes_result.diagnostics.get(
+                    "num_divergences", "?"
+                )
             except Exception as e:
                 t.details["error"] = str(e)[:60]
         timings.append(t)
@@ -246,7 +250,9 @@ def profile_model(
         if "error" not in t.details:
             with timed_phase("Diagnostics access (R-hat, ESS)") as t_diag:
                 diag = bayes_result.diagnostics
-                t_diag.details["r_hat_keys"] = len([k for k in diag if "r_hat" in k.lower()])
+                t_diag.details["r_hat_keys"] = len(
+                    [k for k in diag if "r_hat" in k.lower()]
+                )
             timings.append(t_diag)
 
             # -- Phase 10: ArviZ conversion -------------------------------------
@@ -370,18 +376,28 @@ def print_report(all_timings: dict[str, list[TimingResult]]) -> None:
 
     for model_key, timings in all_timings.items():
         predict_t = next((t for t in timings if t.name == "predict() (post-fit)"), None)
-        score_t = next((t for t in timings if t.name == "score() (includes predict)"), None)
+        score_t = next(
+            (t for t in timings if t.name == "score() (includes predict)"), None
+        )
         nlsq_cold = next((t for t in timings if "cold" in t.name), None)
 
         if predict_t and score_t and nlsq_cold:
             fit_score_overhead = score_t.wall_ms
-            overhead_pct = (fit_score_overhead / nlsq_cold.wall_ms * 100) if nlsq_cold.wall_ms > 0 else 0
+            overhead_pct = (
+                (fit_score_overhead / nlsq_cold.wall_ms * 100)
+                if nlsq_cold.wall_ms > 0
+                else 0
+            )
 
             print(f"\n  {model_key}:")
             print(f"    predict() call: {predict_t.wall_ms:.1f}ms")
-            print(f"    score() in fit(): {fit_score_overhead:.1f}ms ({overhead_pct:.1f}% of fit time)")
+            print(
+                f"    score() in fit(): {fit_score_overhead:.1f}ms ({overhead_pct:.1f}% of fit time)"
+            )
             print("    -> fit() calls score() (line 374), which calls predict() again")
-            print(f"    -> This adds ~{fit_score_overhead:.0f}ms overhead to every fit() call")
+            print(
+                f"    -> This adds ~{fit_score_overhead:.0f}ms overhead to every fit() call"
+            )
 
 
 # -- Main ----------------------------------------------------------------------
@@ -395,17 +411,27 @@ def main():
         default="all",
         help="Model to profile (default: all)",
     )
-    parser.add_argument("--skip-bayesian", action="store_true", help="Skip Bayesian inference")
-    parser.add_argument("--verbose", action="store_true", help="Include cProfile output")
-    parser.add_argument("--warmup", type=int, default=100, help="NUTS warmup iterations")
-    parser.add_argument("--samples", type=int, default=200, help="NUTS sample iterations")
+    parser.add_argument(
+        "--skip-bayesian", action="store_true", help="Skip Bayesian inference"
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Include cProfile output"
+    )
+    parser.add_argument(
+        "--warmup", type=int, default=100, help="NUTS warmup iterations"
+    )
+    parser.add_argument(
+        "--samples", type=int, default=200, help="NUTS sample iterations"
+    )
     parser.add_argument("--chains", type=int, default=1, help="Number of MCMC chains")
     args = parser.parse_args()
 
     # Suppress JAX/NumPyro logging noise
     os.environ.setdefault("JAX_LOG_LEVEL", "WARNING")
 
-    models_to_profile = list(MODEL_CONFIGS.keys()) if args.model == "all" else [args.model]
+    models_to_profile = (
+        list(MODEL_CONFIGS.keys()) if args.model == "all" else [args.model]
+    )
 
     all_timings: dict[str, list[TimingResult]] = {}
     for model_key in models_to_profile:

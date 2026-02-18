@@ -124,7 +124,7 @@ noise temperature :math:`x`:
    │            Classical liquid behavior
    │
    │  1 < x < 2 Power-Law Fluid
-   │            G' ~ G'' ~ ω^(x-1) 
+   │            G' ~ G'' ~ ω^(x-1)
    │            Flat loss tangent: tan δ = tan(πx/2)
    │            Broad relaxation spectrum
    │

@@ -163,7 +163,7 @@ class MastercurvePipeline(Pipeline):
         all_y = np.concatenate([np.array(d.y) for d in datasets])
         all_temps = np.concatenate(
             [
-                np.full(len(d.x), temp)  # type: ignore[arg-type]
+                np.full(len(d.x), temp)
                 for d, temp in zip(datasets, temperatures, strict=False)
             ]
         )
@@ -214,11 +214,7 @@ class MastercurvePipeline(Pipeline):
                     )
                     shift = np.inf
                 else:
-                    log_shift = (
-                        -C1
-                        * (temp - self.reference_temp)
-                        / denominator
-                    )
+                    log_shift = -C1 * (temp - self.reference_temp) / denominator
                     shift = 10**log_shift
 
             self.shift_factors[float(temp)] = shift
@@ -329,7 +325,11 @@ class ModelComparisonPipeline(Pipeline):
                 if nlsq_result is not None and nlsq_result.rmse is not None:
                     # Use NLSQ 0.6.0 CurveFitResult-compatible properties
                     rmse = nlsq_result.rmse
-                    r_squared = nlsq_result.r_squared if nlsq_result.r_squared is not None else 0.0
+                    r_squared = (
+                        nlsq_result.r_squared
+                        if nlsq_result.r_squared is not None
+                        else 0.0
+                    )
                     aic = nlsq_result.aic if nlsq_result.aic is not None else np.inf
                     bic = nlsq_result.bic if nlsq_result.bic is not None else np.inf
                 else:
@@ -498,7 +498,7 @@ class CreepToRelaxationPipeline(Pipeline):
         logger.info(
             "Starting creep to relaxation conversion",
             method=method,
-            data_points=len(creep_data.x),  # type: ignore[arg-type]
+            data_points=len(creep_data.x),
         )
         start_time = time.perf_counter()
 
@@ -619,7 +619,7 @@ class FrequencyToTimePipeline(Pipeline):
         logger.info(
             "Starting frequency to time conversion",
             n_points=n_points,
-            input_points=len(frequency_data.x),  # type: ignore[arg-type]
+            input_points=len(frequency_data.x),
         )
         start_time = time.perf_counter()
 
@@ -840,7 +840,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
 
             # Ensure required metadata is present for downstream transforms/models
             if data.metadata is None:
-                data.metadata = {}  # type: ignore[unreachable]
+                data.metadata = {}
             data.metadata.setdefault("test_mode", "oscillation")
             data.metadata.setdefault("gamma_0", gamma_0)
             data.metadata.setdefault("omega", self.omega)
@@ -861,7 +861,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
             )
 
             try:
-                decomposer.transform(data)  # type: ignore[arg-type]
+                decomposer.transform(data)
                 results = decomposer.get_results()
                 self.results[float(gamma_0)] = results
 

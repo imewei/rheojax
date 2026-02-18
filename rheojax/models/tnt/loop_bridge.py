@@ -66,6 +66,7 @@ import logging
 import numpy as np
 
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
@@ -550,7 +551,7 @@ class TNTLoopBridge(TNTBase):
             # Extrapolate from decay rate
             if len(t) > 5:
                 log_modulus = np.log(np.maximum(modulus, 1e-20))
-                slope = np.polyfit(t[:len(t)//2], log_modulus[:len(t)//2], 1)[0]
+                slope = np.polyfit(t[: len(t) // 2], log_modulus[: len(t) // 2], 1)[0]
                 tau_b_est = -1.0 / slope if slope < 0 else t[-1] / 3
             else:
                 tau_b_est = t[-1] / 3
@@ -690,8 +691,9 @@ class TNTLoopBridge(TNTBase):
                 )
             elif test_mode == "creep":
                 self.initialize_from_creep(
-                    np.asarray(x), np.asarray(y),
-                    sigma_applied=kwargs.get("sigma_applied", 1.0)
+                    np.asarray(x),
+                    np.asarray(y),
+                    sigma_applied=kwargs.get("sigma_applied", 1.0),
                 )
             elif test_mode == "relaxation":
                 self.initialize_from_relaxation(np.asarray(x), np.asarray(y))

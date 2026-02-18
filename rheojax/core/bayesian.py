@@ -37,6 +37,7 @@ logger = get_logger(__name__)
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
 
+
 def _import_numpyro():
     """Lazy-import NumPyro and its submodules.
 
@@ -67,6 +68,10 @@ class DiagnosticsDict(TypedDict, total=False):
     ess: dict[str, float]
     divergences: int
     diagnostics_valid: bool
+    total_samples: int
+    num_chains: int
+    num_samples_per_chain: int
+    error: str
 
 
 @dataclass
@@ -400,7 +405,7 @@ class BayesianMixin:
         # Normalize to TestMode enum
         # Try model's _validate_test_mode first for special cases (e.g., 'laos' -> STARTUP)
         if isinstance(test_mode, str):
-            if hasattr(self, '_validate_test_mode'):
+            if hasattr(self, "_validate_test_mode"):
                 try:
                     test_mode = self._validate_test_mode(test_mode)
                 except (ValueError, AttributeError):
@@ -443,12 +448,8 @@ class BayesianMixin:
             y_imag = jnp.imag(y_complex)
 
             # Compute scale from JAX arrays (std computation is fast)
-            scale_info["y_real_scale"] = (
-                float(jnp.std(y_real)) if y_real.size else 0.0
-            )
-            scale_info["y_imag_scale"] = (
-                float(jnp.std(y_imag)) if y_imag.size else 0.0
-            )
+            scale_info["y_real_scale"] = float(jnp.std(y_real)) if y_real.size else 0.0
+            scale_info["y_imag_scale"] = float(jnp.std(y_imag)) if y_imag.size else 0.0
             # Mean magnitude for sigma prior flooring (constant-data guard)
             scale_info["y_real_mean"] = (
                 float(jnp.mean(jnp.abs(y_real))) if y_real.size else 0.0
@@ -462,9 +463,7 @@ class BayesianMixin:
             y_np = np.asarray(y_array, dtype=np.float64)
             scale_info["data_scale"] = float(np.std(y_np)) if y_np.size else 0.0
             # Mean magnitude for sigma prior flooring (constant-data guard)
-            scale_info["data_mean"] = (
-                float(np.mean(np.abs(y_np))) if y_np.size else 0.0
-            )
+            scale_info["data_mean"] = float(np.mean(np.abs(y_np))) if y_np.size else 0.0
             y_jax = jnp.asarray(y_np, dtype=jnp.float64)
 
         return {
@@ -487,9 +486,7 @@ class BayesianMixin:
         for name in param_names:
             param = self.parameters.get(name)
             if param is None:
-                raise ValueError(
-                    f"Parameter '{name}' not found in model parameters"
-                )
+                raise ValueError(f"Parameter '{name}' not found in model parameters")
             if param.bounds is None:
                 raise ValueError(
                     f"Parameter '{name}' must have bounds for Bayesian inference"
@@ -686,9 +683,7 @@ class BayesianMixin:
         # posterior mode (from NLSQ), we can use a less conservative acceptance
         # rate and shallower tree depth for faster warmup.
         has_warm_start = (
-            bool(warm_start_values)
-            and hasattr(self, "fitted_")
-            and self.fitted_
+            bool(warm_start_values) and hasattr(self, "fitted_") and self.fitted_
         )
         if has_warm_start:
             nuts_kwargs.setdefault("target_accept_prob", 0.90)
@@ -1170,10 +1165,18 @@ class BayesianMixin:
         # These must NOT be passed to NUTS — they go to model_function instead
         protocol_kwargs = {}
         protocol_keys_all = {
-            "strain", "sigma_0", "sigma_applied", "gamma_0", "gamma_dot",
-            "omega", "n_cycles", "gdot", "t_wait",
+            "strain",
+            "sigma_0",
+            "sigma_applied",
+            "gamma_0",
+            "gamma_dot",
+            "omega",
+            "n_cycles",
+            "gdot",
+            "t_wait",
             # Also accept non-underscore aliases
-            "gamma0", "sigma0",
+            "gamma0",
+            "sigma0",
         }
 
         for key in list(nuts_kwargs):
@@ -1216,7 +1219,7 @@ class BayesianMixin:
             )
 
             # Phase 3: Prepare JAX data
-            jax_data = self._prepare_jax_data(X_array, y_array)  # type: ignore[arg-type]
+            jax_data = self._prepare_jax_data(X_array, y_array)
             X_jax = jax_data["X_jax"]
             y_jax = jax_data["y_jax"]
             is_complex_data = jax_data["is_complex"]
@@ -1224,7 +1227,7 @@ class BayesianMixin:
 
             # Phase 4: Get parameter bounds
             param_names = list(self.parameters)
-            param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)  # type: ignore[arg-type]
+            param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
 
             # Phase 5: Build NumPyro model (closure captures test_mode)
             numpyro_model = self._build_numpyro_model(
@@ -1275,12 +1278,8 @@ class BayesianMixin:
             log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
             r_hat_vals = result.diagnostics.get("r_hat", {}).values()
             ess_vals = result.diagnostics.get("ess", {}).values()
-            max_r_hat = max(
-                (v for v in r_hat_vals if np.isfinite(v)), default=1.0
-            )
-            min_ess = min(
-                (v for v in ess_vals if np.isfinite(v)), default=0.0
-            )
+            max_r_hat = max((v for v in r_hat_vals if np.isfinite(v)), default=1.0)
+            min_ess = min((v for v in ess_vals if np.isfinite(v)), default=0.0)
             log_ctx["r_hat_max"] = max_r_hat
             log_ctx["ess_min"] = min_ess
 
@@ -1512,7 +1511,7 @@ class BayesianMixin:
         posterior_samples: dict[str, np.ndarray],
         num_samples: int,
         num_chains: int,
-    ) -> dict[str, Any]:
+    ) -> DiagnosticsDict:
         """Compute convergence diagnostics from MCMC samples.
 
         Args:
@@ -1530,20 +1529,26 @@ class BayesianMixin:
         """
         numpyro, _, _, _, _, _, _ = _import_numpyro()
 
-        diagnostics: dict[str, Any] = {}
+        diagnostics: DiagnosticsDict = {}
         all_valid = True
 
         try:
             r_hat_dict, r_hat_ok = self._compute_per_param_diagnostic(
-                posterior_samples, num_chains, num_samples,
-                numpyro.diagnostics.split_gelman_rubin, "R-hat",
+                posterior_samples,
+                num_chains,
+                num_samples,
+                numpyro.diagnostics.split_gelman_rubin,
+                "R-hat",
             )
             diagnostics["r_hat"] = r_hat_dict
             all_valid = all_valid and r_hat_ok
 
             ess_dict, ess_ok = self._compute_per_param_diagnostic(
-                posterior_samples, num_chains, num_samples,
-                numpyro.diagnostics.effective_sample_size, "ESS",
+                posterior_samples,
+                num_chains,
+                num_samples,
+                numpyro.diagnostics.effective_sample_size,
+                "ESS",
             )
             diagnostics["ess"] = ess_dict
             all_valid = all_valid and ess_ok
@@ -1577,12 +1582,8 @@ class BayesianMixin:
                 RuntimeWarning,
                 stacklevel=3,
             )
-            diagnostics["r_hat"] = dict.fromkeys(
-                posterior_samples.keys(), float("nan")
-            )
-            diagnostics["ess"] = dict.fromkeys(
-                posterior_samples.keys(), float("nan")
-            )
+            diagnostics["r_hat"] = dict.fromkeys(posterior_samples.keys(), float("nan"))
+            diagnostics["ess"] = dict.fromkeys(posterior_samples.keys(), float("nan"))
             diagnostics["divergences"] = -1
             diagnostics["total_samples"] = int(num_samples * num_chains)
             diagnostics["num_chains"] = int(num_chains)

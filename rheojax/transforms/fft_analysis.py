@@ -159,7 +159,7 @@ class FFTAnalysis(BaseTransform):
         trend = slope * x + intercept
         return y - trend
 
-    def _transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
+    def _transform(self, data: RheoData) -> RheoData:
         """Apply FFT transform to time-domain data.
 
         Parameters
@@ -179,7 +179,7 @@ class FFTAnalysis(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
-        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)  # type: ignore[arg-type]
+        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
 
         with log_transform(
             logger,
@@ -287,7 +287,7 @@ class FFTAnalysis(BaseTransform):
                 validate=False,
             )
 
-    def _inverse_transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
+    def _inverse_transform(self, data: RheoData) -> RheoData:
         """Apply inverse FFT to return to time domain.
 
         Parameters

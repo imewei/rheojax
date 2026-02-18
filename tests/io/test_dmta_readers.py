@@ -63,18 +63,14 @@ def test_detect_tension_from_units():
 @pytest.mark.smoke
 def test_oscillation_detected_from_e_prime():
     """E' columns should still detect oscillation test mode."""
-    result = detect_test_mode_from_columns(
-        "frequency (Hz)", ["E' (Pa)", 'E" (Pa)']
-    )
+    result = detect_test_mode_from_columns("frequency (Hz)", ["E' (Pa)", 'E" (Pa)'])
     assert result == "oscillation"
 
 
 @pytest.mark.smoke
 def test_oscillation_detected_from_e_stor():
     """E_stor columns should detect oscillation test mode."""
-    result = detect_test_mode_from_columns(
-        "f", ["E_stor", "E_loss"]
-    )
+    result = detect_test_mode_from_columns("f", ["E_stor", "E_loss"])
     assert result == "oscillation"
 
 
@@ -91,9 +87,7 @@ def test_csv_explicit_deformation_mode():
     E_prime = 3e9 * omega**2 / (1 + omega**2)
     E_double_prime = 3e9 * omega / (1 + omega**2)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         f.write("omega (rad/s),E' (Pa),E'' (Pa)\n")
         for w, ep, epp in zip(omega, E_prime, E_double_prime):
             f.write(f"{w},{ep},{epp}\n")
@@ -121,9 +115,7 @@ def test_csv_auto_detect_deformation_mode():
     E_prime = 1e6 * np.ones_like(omega)
     E_double_prime = 1e5 * np.ones_like(omega)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         f.write("omega (rad/s),E' (Pa),E'' (Pa)\n")
         for w, ep, epp in zip(omega, E_prime, E_double_prime):
             f.write(f"{w},{ep},{epp}\n")
@@ -145,9 +137,7 @@ def test_csv_pyvisco_format():
     """pyvisco-style CSV (f, E_stor, E_loss, T, Set) should load correctly."""
     from rheojax.io.readers.csv_reader import load_csv
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         f.write("f,E_stor,E_loss,T,Set\n")
         # 5 frequency points
         for freq in [0.1, 1.0, 10.0, 50.0, 100.0]:
@@ -178,9 +168,7 @@ def test_csv_shear_columns_no_deformation_mode():
     G_prime = 1e6 * np.ones_like(omega)
     G_double_prime = 1e5 * np.ones_like(omega)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         f.write("omega (rad/s),G' (Pa),G'' (Pa)\n")
         for w, gp, gpp in zip(omega, G_prime, G_double_prime):
             f.write(f"{w},{gp},{gpp}\n")
@@ -230,11 +218,13 @@ def test_trios_select_xy_tensile_columns():
 
     from rheojax.io.readers.trios.common import select_xy_columns
 
-    df = pd.DataFrame({
-        "angular_frequency": [1.0, 10.0],
-        "e'": [1e6, 2e6],
-        "e''": [1e5, 2e5],
-    })
+    df = pd.DataFrame(
+        {
+            "angular_frequency": [1.0, 10.0],
+            "e'": [1e6, 2e6],
+            "e''": [1e5, 2e5],
+        }
+    )
     x_col, y_col, y2_col = select_xy_columns(df, "oscillation")
     assert x_col == "angular_frequency"
     # y_col and y2_col should be the E' and E'' columns

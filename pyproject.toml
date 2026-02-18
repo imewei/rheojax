@@ -311,4 +311,3 @@ disable_error_code = ["name-defined", "no-any-return"]
 [[tool.mypy.overrides]]
 module = ["rheojax.gui.*", "rheojax.cli.*"]
 ignore_errors = true  # GUI/CLI modules have PySide6 stub issues
-

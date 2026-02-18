@@ -1205,4 +1205,3 @@ References
    *Physical Review E*, **73**, 036126 (2006).
    https://doi.org/10.1103/PhysRevE.73.036126
    :download:`PDF <../../../reference/ottinger_2006_generic_open_systems.pdf>`
-

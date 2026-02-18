@@ -205,7 +205,9 @@ class Parameter:
                 self.constraints.insert(
                     0,
                     ParameterConstraint(
-                        type="bounds", min_value=self.bounds[0], max_value=self.bounds[1]
+                        type="bounds",
+                        min_value=self.bounds[0],
+                        max_value=self.bounds[1],
                     ),
                 )
 

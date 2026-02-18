@@ -38,7 +38,11 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("carreau_yasuda", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR])
+@ModelRegistry.register(
+    "carreau_yasuda",
+    protocols=[Protocol.FLOW_CURVE],
+    deformation_modes=[DeformationMode.SHEAR],
+)
 class CarreauYasuda(BaseModel):
     """Carreau-Yasuda model for non-Newtonian flow (ROTATION only).
 

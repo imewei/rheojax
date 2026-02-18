@@ -38,6 +38,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
@@ -219,6 +220,7 @@ class HVNMLocal(HVNMBase):
         X_phi = hvnm_guth_gold(phi)
         # Effective phi for interphase amplification
         from rheojax.models.hvnm._kernels import hvnm_effective_phi
+
         phi_eff = hvnm_effective_phi(phi, R_NP, delta_g)
         X_I = hvnm_guth_gold(phi_eff)
 
@@ -282,9 +284,7 @@ class HVNMLocal(HVNMBase):
         assert k_d_D is not None
 
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
-        sigma = hvnm_steady_shear_stress_vec(
-            gamma_dot_jax, G_D, k_d_D
-        )
+        sigma = hvnm_steady_shear_stress_vec(gamma_dot_jax, G_D, k_d_D)
 
         if return_components:
             eta_D = G_D / max(k_d_D, 1e-30)
@@ -337,10 +337,17 @@ class HVNMLocal(HVNMBase):
 
         G_prime, G_double_prime = hvnm_saos_moduli_vec(
             omega_jax,
-            G_P, G_E, G_D, d["G_I_eff"],
-            d["X_phi"], d["X_I"],
-            d["k_BER_mat_0"], k_d_D, d["k_BER_int_0"],
-            0.0, 0.0,  # D=0, D_int=0
+            G_P,
+            G_E,
+            G_D,
+            d["G_I_eff"],
+            d["X_phi"],
+            d["X_I"],
+            d["k_BER_mat_0"],
+            k_d_D,
+            d["k_BER_int_0"],
+            0.0,
+            0.0,  # D=0, D_int=0
         )
 
         if return_components:
@@ -385,7 +392,9 @@ class HVNMLocal(HVNMBase):
         args = self._get_ode_args()
 
         sol = hvnm_solve_startup(
-            t_jax, gamma_dot, args,
+            t_jax,
+            gamma_dot,
+            args,
             kinetics=self._kinetics,
             include_damage=self._include_damage,
             include_dissociative=self._include_dissociative,
@@ -394,9 +403,13 @@ class HVNMLocal(HVNMBase):
 
         ys = sol.ys
         assert ys is not None
-        D_int_col = jnp.where(
-            self._include_interfacial_damage, ys[:, 17], jnp.zeros(len(t_jax))
-        ) if self._include_interfacial_damage else jnp.zeros(len(t_jax))
+        D_int_col = (
+            jnp.where(
+                self._include_interfacial_damage, ys[:, 17], jnp.zeros(len(t_jax))
+            )
+            if self._include_interfacial_damage
+            else jnp.zeros(len(t_jax))
+        )
 
         # Compute total stress from state
         X_phi = args["X_phi"]
@@ -405,16 +418,20 @@ class HVNMLocal(HVNMBase):
 
         stress = jax.vmap(
             lambda y_D_int: hvnm_total_stress_shear(
-                y_D_int[0][9],     # gamma
-                y_D_int[0][2],     # mu_E_xy
-                y_D_int[0][5],     # mu_E_nat_xy
-                y_D_int[0][8],     # mu_D_xy
-                y_D_int[0][13],    # mu_I_xy
-                y_D_int[0][16],    # mu_I_nat_xy
-                G_P, G_E, G_D, G_I_eff,
-                X_phi, X_I,
-                y_D_int[0][10],    # D
-                y_D_int[1],        # D_int
+                y_D_int[0][9],  # gamma
+                y_D_int[0][2],  # mu_E_xy
+                y_D_int[0][5],  # mu_E_nat_xy
+                y_D_int[0][8],  # mu_D_xy
+                y_D_int[0][13],  # mu_I_xy
+                y_D_int[0][16],  # mu_I_nat_xy
+                G_P,
+                G_E,
+                G_D,
+                G_I_eff,
+                X_phi,
+                X_I,
+                y_D_int[0][10],  # D
+                y_D_int[1],  # D_int
             )
         )((ys, D_int_col))
 
@@ -487,7 +504,9 @@ class HVNMLocal(HVNMBase):
         args = self._get_ode_args()
 
         sol = hvnm_solve_relaxation(
-            t_jax, gamma_step, args,
+            t_jax,
+            gamma_step,
+            args,
             kinetics=self._kinetics,
             include_damage=self._include_damage,
             include_dissociative=self._include_dissociative,
@@ -497,8 +516,7 @@ class HVNMLocal(HVNMBase):
         ys = sol.ys
         assert ys is not None
         D_int_col = (
-            ys[:, 17] if self._include_interfacial_damage
-            else jnp.zeros(len(t_jax))
+            ys[:, 17] if self._include_interfacial_damage else jnp.zeros(len(t_jax))
         )
         X_phi = args["X_phi"]
         X_I = args["X_I"]
@@ -506,17 +524,28 @@ class HVNMLocal(HVNMBase):
 
         stress = jax.vmap(
             lambda y_D_int: hvnm_total_stress_shear(
-                y_D_int[0][9], y_D_int[0][2], y_D_int[0][5], y_D_int[0][8],
-                y_D_int[0][13], y_D_int[0][16],
-                G_P, G_E, G_D, G_I_eff,
-                X_phi, X_I, y_D_int[0][10], y_D_int[1],
+                y_D_int[0][9],
+                y_D_int[0][2],
+                y_D_int[0][5],
+                y_D_int[0][8],
+                y_D_int[0][13],
+                y_D_int[0][16],
+                G_P,
+                G_E,
+                G_D,
+                G_I_eff,
+                X_phi,
+                X_I,
+                y_D_int[0][10],
+                y_D_int[1],
             )
         )((ys, D_int_col))
 
         G_t = stress / jnp.maximum(jnp.abs(gamma_step), 1e-30)
         G_t = jnp.where(
             sol.result == diffrax.RESULTS.successful,
-            G_t, jnp.nan * jnp.ones_like(G_t),
+            G_t,
+            jnp.nan * jnp.ones_like(G_t),
         )
 
         if return_full:
@@ -566,7 +595,9 @@ class HVNMLocal(HVNMBase):
         assert args is not None
 
         sol = hvnm_solve_creep(
-            t_jax, sigma_0, args,
+            t_jax,
+            sigma_0,
+            args,
             kinetics=self._kinetics,
             include_damage=self._include_damage,
             include_dissociative=self._include_dissociative,
@@ -578,14 +609,14 @@ class HVNMLocal(HVNMBase):
         gamma = ys[:, 9]
         gamma = jnp.where(
             sol.result == diffrax.RESULTS.successful,
-            gamma, jnp.nan * jnp.ones_like(gamma),
+            gamma,
+            jnp.nan * jnp.ones_like(gamma),
         )
 
         if return_full:
             J_t = gamma / jnp.maximum(jnp.abs(sigma_0), 1e-30)
             D_int_col = (
-                ys[:, 17] if self._include_interfacial_damage
-                else jnp.zeros(len(t_jax))
+                ys[:, 17] if self._include_interfacial_damage else jnp.zeros(len(t_jax))
             )
             return {
                 "time": np.asarray(t),
@@ -642,7 +673,10 @@ class HVNMLocal(HVNMBase):
         args = self._get_ode_args()
 
         sol = hvnm_solve_laos(
-            t_jax, gamma_0, omega, args,
+            t_jax,
+            gamma_0,
+            omega,
+            args,
             kinetics=self._kinetics,
             include_damage=self._include_damage,
             include_dissociative=self._include_dissociative,
@@ -652,8 +686,7 @@ class HVNMLocal(HVNMBase):
         ys = sol.ys
         assert ys is not None
         D_int_col = (
-            ys[:, 17] if self._include_interfacial_damage
-            else jnp.zeros(len(t_jax))
+            ys[:, 17] if self._include_interfacial_damage else jnp.zeros(len(t_jax))
         )
         strain = gamma_0 * jnp.sin(omega * t_jax)
         gamma_dot_arr = gamma_0 * omega * jnp.cos(omega * t_jax)
@@ -663,19 +696,40 @@ class HVNMLocal(HVNMBase):
 
         stress = jax.vmap(
             lambda y_D_int: hvnm_total_stress_shear(
-                y_D_int[0][9], y_D_int[0][2], y_D_int[0][5], y_D_int[0][8],
-                y_D_int[0][13], y_D_int[0][16],
-                G_P, G_E, G_D, G_I_eff,
-                X_phi, X_I, y_D_int[0][10], y_D_int[1],
+                y_D_int[0][9],
+                y_D_int[0][2],
+                y_D_int[0][5],
+                y_D_int[0][8],
+                y_D_int[0][13],
+                y_D_int[0][16],
+                G_P,
+                G_E,
+                G_D,
+                G_I_eff,
+                X_phi,
+                X_I,
+                y_D_int[0][10],
+                y_D_int[1],
             )
         )((ys, D_int_col))
 
         N1 = jax.vmap(
             lambda y_D_int: hvnm_total_normal_stress_1(
-                y_D_int[0][0], y_D_int[0][1], y_D_int[0][3], y_D_int[0][4],
-                y_D_int[0][6], y_D_int[0][7],
-                y_D_int[0][11], y_D_int[0][12], y_D_int[0][14], y_D_int[0][15],
-                G_E, G_D, G_I_eff, X_I, y_D_int[1],
+                y_D_int[0][0],
+                y_D_int[0][1],
+                y_D_int[0][3],
+                y_D_int[0][4],
+                y_D_int[0][6],
+                y_D_int[0][7],
+                y_D_int[0][11],
+                y_D_int[0][12],
+                y_D_int[0][14],
+                y_D_int[0][15],
+                G_E,
+                G_D,
+                G_I_eff,
+                X_I,
+                y_D_int[1],
             )
         )((ys, D_int_col))
 
@@ -857,11 +911,20 @@ class HVNMLocal(HVNMBase):
 
         # Filter out fitting-specific and BaseModel kwargs
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
-            if k not in (
-                "test_mode", "deformation_mode", "poisson_ratio",
-                "use_log_residuals", "use_jax", "method",
-                "max_iter", "use_multi_start", "n_starts", "perturb_factor",
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in (
+                "test_mode",
+                "deformation_mode",
+                "poisson_ratio",
+                "use_log_residuals",
+                "use_jax",
+                "method",
+                "max_iter",
+                "use_multi_start",
+                "n_starts",
+                "perturb_factor",
             )
         }
 
@@ -903,7 +966,8 @@ class HVNMLocal(HVNMBase):
             dtype=jnp.float64,
         )
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
+            k: v
+            for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
         return np.asarray(
@@ -972,6 +1036,7 @@ class HVNMLocal(HVNMBase):
         G_I_eff = hvnm_interphase_modulus(G_E, beta_I, phi_I)
         X_phi = hvnm_guth_gold(phi)
         from rheojax.models.hvnm._kernels import hvnm_effective_phi
+
         phi_eff = hvnm_effective_phi(phi, R_NP, delta_g)
         X_I = hvnm_guth_gold(phi_eff)
         k_BER_mat_0 = hvnm_ber_rate_constant_matrix(nu_0, E_a, T)
@@ -982,10 +1047,18 @@ class HVNMLocal(HVNMBase):
 
         elif mode == "oscillation":
             G_prime, G_double_prime = hvnm_saos_moduli_vec(
-                X_jax, G_P, G_E, G_D, G_I_eff,
-                X_phi, X_I,
-                k_BER_mat_0, k_d_D, k_BER_int_0,
-                0.0, 0.0,  # D=0, D_int=0
+                X_jax,
+                G_P,
+                G_E,
+                G_D,
+                G_I_eff,
+                X_phi,
+                X_I,
+                k_BER_mat_0,
+                k_d_D,
+                k_BER_int_0,
+                0.0,
+                0.0,  # D=0, D_int=0
             )
             return jnp.sqrt(G_prime**2 + G_double_prime**2)
 
@@ -993,10 +1066,17 @@ class HVNMLocal(HVNMBase):
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return hvnm_startup_stress_linear_vec(
-                X_jax, gamma_dot,
-                G_P, G_E, G_D, G_I_eff,
-                X_phi, X_I,
-                k_BER_mat_0, k_d_D, k_BER_int_0,
+                X_jax,
+                gamma_dot,
+                G_P,
+                G_E,
+                G_D,
+                G_I_eff,
+                X_phi,
+                X_I,
+                k_BER_mat_0,
+                k_d_D,
+                k_BER_int_0,
                 0.0,  # D_int=0
             )
 
@@ -1006,18 +1086,33 @@ class HVNMLocal(HVNMBase):
                 k_diff_int = p_dict.get("k_diff_0_int", 0.0)
                 return hvnm_relaxation_modulus_with_diffusion_vec(
                     X_jax,
-                    G_P, G_E, G_D, G_I_eff,
-                    X_phi, X_I,
-                    k_BER_mat_0, k_d_D, k_BER_int_0,
-                    k_diff_mat, k_diff_int,
-                    0.0, 0.0,  # D=0, D_int=0
+                    G_P,
+                    G_E,
+                    G_D,
+                    G_I_eff,
+                    X_phi,
+                    X_I,
+                    k_BER_mat_0,
+                    k_d_D,
+                    k_BER_int_0,
+                    k_diff_mat,
+                    k_diff_int,
+                    0.0,
+                    0.0,  # D=0, D_int=0
                 )
             return hvnm_relaxation_modulus_vec(
                 X_jax,
-                G_P, G_E, G_D, G_I_eff,
-                X_phi, X_I,
-                k_BER_mat_0, k_d_D, k_BER_int_0,
-                0.0, 0.0,  # D=0, D_int=0
+                G_P,
+                G_E,
+                G_D,
+                G_I_eff,
+                X_phi,
+                X_I,
+                k_BER_mat_0,
+                k_d_D,
+                k_BER_int_0,
+                0.0,
+                0.0,  # D=0, D_int=0
             )
 
         elif mode == "creep":
@@ -1025,9 +1120,15 @@ class HVNMLocal(HVNMBase):
                 raise ValueError("creep mode requires sigma_applied")
             J = hvnm_creep_compliance_linear_vec(
                 X_jax,
-                G_P, G_E, G_D, G_I_eff,
-                X_phi, X_I,
-                k_BER_mat_0, k_d_D, k_BER_int_0,
+                G_P,
+                G_E,
+                G_D,
+                G_I_eff,
+                X_phi,
+                X_I,
+                k_BER_mat_0,
+                k_d_D,
+                k_BER_int_0,
             )
             return sigma_applied * J
 
@@ -1035,16 +1136,33 @@ class HVNMLocal(HVNMBase):
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             params_dict = {
-                "G_P": G_P, "G_E": G_E, "G_D": G_D, "k_d_D": k_d_D,
-                "nu_0": nu_0, "E_a": E_a, "V_act": V_act, "T": T,
-                "G_I_eff": G_I_eff, "X_phi": X_phi, "X_I": X_I,
-                "nu_0_int": nu_0_int, "E_a_int": E_a_int, "V_act_int": V_act_int,
-                "Gamma_0": 0.0, "lambda_crit": 10.0,
-                "Gamma_0_int": 0.0, "lambda_crit_int": 10.0,
-                "h_0": 0.0, "E_a_heal": 100e3, "n_h": 1.0,
+                "G_P": G_P,
+                "G_E": G_E,
+                "G_D": G_D,
+                "k_d_D": k_d_D,
+                "nu_0": nu_0,
+                "E_a": E_a,
+                "V_act": V_act,
+                "T": T,
+                "G_I_eff": G_I_eff,
+                "X_phi": X_phi,
+                "X_I": X_I,
+                "nu_0_int": nu_0_int,
+                "E_a_int": E_a_int,
+                "V_act_int": V_act_int,
+                "Gamma_0": 0.0,
+                "lambda_crit": 10.0,
+                "Gamma_0_int": 0.0,
+                "lambda_crit_int": 10.0,
+                "h_0": 0.0,
+                "E_a_heal": 100e3,
+                "n_h": 1.0,
             }
             sol = hvnm_solve_laos(
-                X_jax, gamma_0, omega, params_dict,
+                X_jax,
+                gamma_0,
+                omega,
+                params_dict,
                 kinetics=self._kinetics,
                 include_damage=False,
                 include_dissociative=self._include_dissociative,
@@ -1052,8 +1170,20 @@ class HVNMLocal(HVNMBase):
             )
             stress = jax.vmap(
                 lambda y: hvnm_total_stress_shear(
-                    y[9], y[2], y[5], y[8], y[13], y[16],
-                    G_P, G_E, G_D, G_I_eff, X_phi, X_I, y[10], 0.0,
+                    y[9],
+                    y[2],
+                    y[5],
+                    y[8],
+                    y[13],
+                    y[16],
+                    G_P,
+                    G_E,
+                    G_D,
+                    G_I_eff,
+                    X_phi,
+                    X_I,
+                    y[10],
+                    0.0,
                 )
             )(sol.ys)
             return stress

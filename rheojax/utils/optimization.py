@@ -426,7 +426,11 @@ class OptimizationResult:
         if r2 is None:
             return None
 
-        n = self.n_data if self.n_data is not None else (len(self.y_data) if self.y_data is not None else None)
+        n = (
+            self.n_data
+            if self.n_data is not None
+            else (len(self.y_data) if self.y_data is not None else None)
+        )
         if n is None or n == 0:
             return None
 
@@ -489,7 +493,11 @@ class OptimizationResult:
         if self.residuals is None:
             return None
 
-        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else None)
+        n = (
+            self.n_data
+            if self.n_data is not None
+            else (len(self.residuals) if self.residuals is not None else None)
+        )
         if n is None or n == 0:
             return None
 
@@ -522,7 +530,11 @@ class OptimizationResult:
         if self.residuals is None:
             return None
 
-        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else None)
+        n = (
+            self.n_data
+            if self.n_data is not None
+            else (len(self.residuals) if self.residuals is not None else None)
+        )
         if n is None or n == 0:
             return None
 
@@ -569,7 +581,11 @@ class OptimizationResult:
 
         from scipy import stats
 
-        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else 0)
+        n = (
+            self.n_data
+            if self.n_data is not None
+            else (len(self.residuals) if self.residuals is not None else 0)
+        )
         p = len(self.x)
 
         # Degrees of freedom
@@ -671,7 +687,11 @@ class OptimizationResult:
         from scipy import stats
 
         x_eval = np.asarray(x_eval, dtype=np.float64)
-        n = self.n_data if self.n_data is not None else (len(self.residuals) if self.residuals is not None else 0)
+        n = (
+            self.n_data
+            if self.n_data is not None
+            else (len(self.residuals) if self.residuals is not None else 0)
+        )
         p = len(self.x)
         dof = max(n - p, 1)
 
@@ -1094,7 +1114,7 @@ def nlsq_optimize(
     try:
         logger.debug("Creating NLSQ optimizer instance")
         optimizer = nlsq.LeastSquares()
-        nlsq_result = optimizer.least_squares(**nlsq_kwargs)  # type: ignore[arg-type]
+        nlsq_result = optimizer.least_squares(**nlsq_kwargs)
         logger.debug(
             "NLSQ optimization completed",
             success=nlsq_result.get("success", False),
@@ -1295,7 +1315,9 @@ def nlsq_multistart_optimize(
             perturbed.append(new_val)
         return perturbed
 
-    def run_single_optimization(start_idx: int, initial_values: list[float]) -> tuple[int, OptimizationResult | None]:
+    def run_single_optimization(
+        start_idx: int, initial_values: list[float]
+    ) -> tuple[int, OptimizationResult | None]:
         """Run a single optimization from given starting point."""
         # Create a fresh ParameterSet copy for thread-safe operation
         params_copy = ParameterSet()
@@ -1605,7 +1627,7 @@ def nlsq_curve_fit(
     try:
         # Call nlsq.curve_fit() - returns CurveFitResult (tuple unpacking compatible)
         curve_fit_result = nlsq_module.curve_fit(
-            f_wrapper, x_data_np, y_data_np, **curve_fit_kwargs  # type: ignore[arg-type]
+            f_wrapper, x_data_np, y_data_np, **curve_fit_kwargs
         )
 
         # CurveFitResult supports both tuple unpacking and attribute access

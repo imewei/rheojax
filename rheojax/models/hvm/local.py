@@ -37,6 +37,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
@@ -280,7 +281,9 @@ class HVMLocal(HVMBase):
         params = self._get_params_dict()
         assert params is not None
         sol = hvm_solve_startup(
-            t_jax, gamma_dot, params,
+            t_jax,
+            gamma_dot,
+            params,
             kinetics=self._kinetics,
             include_damage=self._include_damage,
             include_dissociative=self._include_dissociative,
@@ -292,9 +295,14 @@ class HVMLocal(HVMBase):
         # Compute stress from state
         stress = jax.vmap(
             lambda y: hvm_total_stress_shear(
-                y[9], y[2], y[5], y[8],
-                params["G_P"], params["G_E"],
-                params.get("G_D", 0.0), y[10],
+                y[9],
+                y[2],
+                y[5],
+                y[8],
+                params["G_P"],
+                params["G_E"],
+                params.get("G_D", 0.0),
+                y[10],
             )
         )(ys)
 
@@ -323,8 +331,14 @@ class HVMLocal(HVMBase):
                 "N1": np.asarray(
                     jax.vmap(
                         lambda y: hvm_normal_stress_1(
-                            y[0], y[1], y[3], y[4], y[6], y[7],
-                            params["G_P"], params["G_E"],
+                            y[0],
+                            y[1],
+                            y[3],
+                            y[4],
+                            y[6],
+                            y[7],
+                            params["G_P"],
+                            params["G_E"],
                             params.get("G_D", 0.0),
                         )
                     )(ys)
@@ -363,7 +377,9 @@ class HVMLocal(HVMBase):
         assert params is not None
 
         sol = hvm_solve_relaxation(
-            t_jax, gamma_step, params,
+            t_jax,
+            gamma_step,
+            params,
             kinetics=self._kinetics,
             include_damage=self._include_damage,
             include_dissociative=self._include_dissociative,
@@ -375,16 +391,22 @@ class HVMLocal(HVMBase):
         # G(t) = sigma(t) / gamma_step
         stress = jax.vmap(
             lambda y: hvm_total_stress_shear(
-                y[9], y[2], y[5], y[8],
-                params["G_P"], params["G_E"],
-                params.get("G_D", 0.0), y[10],
+                y[9],
+                y[2],
+                y[5],
+                y[8],
+                params["G_P"],
+                params["G_E"],
+                params.get("G_D", 0.0),
+                y[10],
             )
         )(ys)
 
         G_t = stress / jnp.maximum(jnp.abs(gamma_step), 1e-30)
         G_t = jnp.where(
             sol.result == diffrax.RESULTS.successful,
-            G_t, jnp.nan * jnp.ones_like(G_t),
+            G_t,
+            jnp.nan * jnp.ones_like(G_t),
         )
 
         if return_full:
@@ -431,7 +453,9 @@ class HVMLocal(HVMBase):
         assert params is not None
 
         sol = hvm_solve_creep(
-            t_jax, sigma_0, params,
+            t_jax,
+            sigma_0,
+            params,
             kinetics=self._kinetics,
             include_damage=self._include_damage,
             include_dissociative=self._include_dissociative,
@@ -442,7 +466,8 @@ class HVMLocal(HVMBase):
         gamma = ys[:, 9]
         gamma = jnp.where(
             sol.result == diffrax.RESULTS.successful,
-            gamma, jnp.nan * jnp.ones_like(gamma),
+            gamma,
+            jnp.nan * jnp.ones_like(gamma),
         )
 
         if return_full:
@@ -492,7 +517,10 @@ class HVMLocal(HVMBase):
         assert params is not None
 
         sol = hvm_solve_laos(
-            t_jax, gamma_0, omega, params,
+            t_jax,
+            gamma_0,
+            omega,
+            params,
             kinetics=self._kinetics,
             include_damage=self._include_damage,
             include_dissociative=self._include_dissociative,
@@ -505,16 +533,27 @@ class HVMLocal(HVMBase):
 
         stress = jax.vmap(
             lambda y: hvm_total_stress_shear(
-                y[9], y[2], y[5], y[8],
-                params["G_P"], params["G_E"],
-                params.get("G_D", 0.0), y[10],
+                y[9],
+                y[2],
+                y[5],
+                y[8],
+                params["G_P"],
+                params["G_E"],
+                params.get("G_D", 0.0),
+                y[10],
             )
         )(ys)
 
         N1 = jax.vmap(
             lambda y: hvm_normal_stress_1(
-                y[0], y[1], y[3], y[4], y[6], y[7],
-                params["G_P"], params["G_E"],
+                y[0],
+                y[1],
+                y[3],
+                y[4],
+                y[6],
+                y[7],
+                params["G_P"],
+                params["G_E"],
                 params.get("G_D", 0.0),
             )
         )(ys)
@@ -664,11 +703,20 @@ class HVMLocal(HVMBase):
 
         # Filter out fitting-specific and BaseModel kwargs
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
-            if k not in (
-                "test_mode", "deformation_mode", "poisson_ratio",
-                "use_log_residuals", "use_jax", "method",
-                "max_iter", "use_multi_start", "n_starts", "perturb_factor",
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in (
+                "test_mode",
+                "deformation_mode",
+                "poisson_ratio",
+                "use_log_residuals",
+                "use_jax",
+                "method",
+                "max_iter",
+                "use_multi_start",
+                "n_starts",
+                "perturb_factor",
             )
         }
 
@@ -723,7 +771,8 @@ class HVMLocal(HVMBase):
             dtype=jnp.float64,
         )
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
+            k: v
+            for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
         return np.asarray(
@@ -804,9 +853,7 @@ class HVMLocal(HVMBase):
         elif mode == "creep":
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
-            J = hvm_creep_compliance_linear_vec(
-                X_jax, G_P, G_E, G_D, k_ber_0, k_d_D
-            )
+            J = hvm_creep_compliance_linear_vec(X_jax, G_P, G_E, G_D, k_ber_0, k_d_D)
             return sigma_applied * J
 
         elif mode == "laos":
@@ -814,19 +861,36 @@ class HVMLocal(HVMBase):
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             # Use ODE solver for LAOS (cannot use analytical)
             params_dict = {
-                "G_P": G_P, "G_E": G_E, "G_D": G_D, "k_d_D": k_d_D,
-                "nu_0": nu_0, "E_a": E_a, "V_act": V_act, "T": T,
-                "Gamma_0": 0.0, "lambda_crit": 10.0,
+                "G_P": G_P,
+                "G_E": G_E,
+                "G_D": G_D,
+                "k_d_D": k_d_D,
+                "nu_0": nu_0,
+                "E_a": E_a,
+                "V_act": V_act,
+                "T": T,
+                "Gamma_0": 0.0,
+                "lambda_crit": 10.0,
             }
             sol = hvm_solve_laos(
-                X_jax, gamma_0, omega, params_dict,
+                X_jax,
+                gamma_0,
+                omega,
+                params_dict,
                 kinetics=self._kinetics,
                 include_damage=False,
                 include_dissociative=self._include_dissociative,
             )
             stress = jax.vmap(
                 lambda y: hvm_total_stress_shear(
-                    y[9], y[2], y[5], y[8], G_P, G_E, G_D, y[10],
+                    y[9],
+                    y[2],
+                    y[5],
+                    y[8],
+                    G_P,
+                    G_E,
+                    G_D,
+                    y[10],
                 )
             )(sol.ys)
             return stress
@@ -882,9 +946,7 @@ class HVMLocal(HVMBase):
         return model
 
     @classmethod
-    def zener(
-        cls, G_P: float = 1e4, G_D: float = 1e4, k_d_D: float = 1.0
-    ) -> HVMLocal:
+    def zener(cls, G_P: float = 1e4, G_D: float = 1e4, k_d_D: float = 1.0) -> HVMLocal:
         """Create Zener/SLS model (G_E=0).
 
         Parameters

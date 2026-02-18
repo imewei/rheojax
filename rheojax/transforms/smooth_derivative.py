@@ -306,7 +306,7 @@ class SmoothDerivative(BaseTransform):
 
         return dy_dx
 
-    def _transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
+    def _transform(self, data: RheoData) -> RheoData:
         """Compute smooth derivative of data.
 
         Parameters
@@ -321,7 +321,7 @@ class SmoothDerivative(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
-        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)  # type: ignore[arg-type]
+        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
 
         with log_transform(
             logger,
@@ -411,7 +411,7 @@ class SmoothDerivative(BaseTransform):
                 validate=False,
             )
 
-    def _inverse_transform(self, data: RheoData) -> RheoData:  # type: ignore[override]
+    def _inverse_transform(self, data: RheoData) -> RheoData:
         """Apply numerical integration (inverse of derivative).
 
         Parameters

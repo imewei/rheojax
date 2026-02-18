@@ -7,6 +7,7 @@ Usage:
     python scripts/run_hvm_notebooks.py --timeout 3600      # Custom timeout per notebook (seconds)
     python scripts/run_hvm_notebooks.py --single 06         # Run single notebook with verbose output
 """
+
 import argparse
 import datetime
 import io
@@ -54,6 +55,7 @@ def discover_notebooks(prefixes: list[str] | None = None) -> list[Path]:
 # ---------------------------------------------------------------------------
 # Single-notebook execution
 # ---------------------------------------------------------------------------
+
 
 class NotebookResult:
     """Outcome of executing one notebook."""
@@ -179,6 +181,7 @@ def run_notebook(nb_path: Path, timeout: int = 172800) -> NotebookResult:
 # Suite execution + reporting
 # ---------------------------------------------------------------------------
 
+
 def write_per_notebook_log(result: NotebookResult, log_dir: Path) -> None:
     """Write a per-notebook log file."""
     stem = result.path.stem
@@ -225,12 +228,16 @@ def write_master_log(results: list[NotebookResult], log_dir: Path) -> None:
     with open(master_path, "w") as f:
         f.write(f"HVM Notebook Suite — {_ts()}\n")
         f.write("=" * 70 + "\n")
-        f.write(f"Total: {len(results)} | PASS: {passed} | FAIL: {failed} | TIMEOUT: {timeout_count}\n")
+        f.write(
+            f"Total: {len(results)} | PASS: {passed} | FAIL: {failed} | TIMEOUT: {timeout_count}\n"
+        )
         f.write(f"Total runtime: {total_time:.1f}s ({total_time / 3600:.2f}h)\n\n")
 
         for r in results:
             status_icon = {"PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏱"}.get(r.status, "?")
-            f.write(f"  {status_icon} {r.path.name:<50s} {r.status:<8s} {_elapsed(r.runtime):<10s} warnings={len(r.warnings)}\n")
+            f.write(
+                f"  {status_icon} {r.path.name:<50s} {r.status:<8s} {_elapsed(r.runtime):<10s} warnings={len(r.warnings)}\n"
+            )
             if r.error_summary:
                 f.write(f"      Error: {r.error_summary[:200]}\n")
 
@@ -272,11 +279,15 @@ def write_issue_inventory(results: list[NotebookResult], log_dir: Path) -> None:
 
             if r.error_summary:
                 f.write(f"- **Error**: `{r.error_summary[:300]}`\n")
-                f.write(f"- **Traceback** (key frames):\n```\n{r.error_tb[:3000]}\n```\n")
+                f.write(
+                    f"- **Traceback** (key frames):\n```\n{r.error_tb[:3000]}\n```\n"
+                )
 
             f.write("- **Reproduction**:\n")
             f.write("  ```bash\n")
-            f.write(f"  python scripts/run_hvm_notebooks.py --single {r.path.stem[:2]}\n")
+            f.write(
+                f"  python scripts/run_hvm_notebooks.py --single {r.path.stem[:2]}\n"
+            )
             f.write("  ```\n\n")
 
     print(f"Issue inventory: {inv_path}")
@@ -286,11 +297,21 @@ def write_issue_inventory(results: list[NotebookResult], log_dir: Path) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(description="Run HVM notebook suite")
-    parser.add_argument("prefixes", nargs="*", help="Notebook prefixes to filter (e.g., 01 04)")
-    parser.add_argument("--timeout", type=int, default=172800, help="Per-notebook timeout in seconds (default: 172800 = 48h)")
-    parser.add_argument("--single", type=str, help="Run a single notebook by prefix (verbose)")
+    parser.add_argument(
+        "prefixes", nargs="*", help="Notebook prefixes to filter (e.g., 01 04)"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=172800,
+        help="Per-notebook timeout in seconds (default: 172800 = 48h)",
+    )
+    parser.add_argument(
+        "--single", type=str, help="Run a single notebook by prefix (verbose)"
+    )
     args = parser.parse_args()
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -304,7 +325,9 @@ def main():
         print(f"Running single notebook: {nb.name} (timeout={args.timeout}s)")
         result = run_notebook(nb, timeout=args.timeout)
         write_per_notebook_log(result, LOG_DIR)
-        print(f"\nStatus: {result.status} | Runtime: {_elapsed(result.runtime)} | Warnings: {len(result.warnings)}")
+        print(
+            f"\nStatus: {result.status} | Runtime: {_elapsed(result.runtime)} | Warnings: {len(result.warnings)}"
+        )
         if result.error_tb:
             print(f"\nError:\n{result.error_tb[:3000]}")
         return 0 if result.status == "PASS" else 1
@@ -328,7 +351,9 @@ def main():
         write_per_notebook_log(result, LOG_DIR)
 
         icon = {"PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏱"}.get(result.status, "?")
-        print(f"  {icon} {result.status} in {_elapsed(time.time() - t0)} | warnings={len(result.warnings)}")
+        print(
+            f"  {icon} {result.status} in {_elapsed(time.time() - t0)} | warnings={len(result.warnings)}"
+        )
         if result.error_summary:
             print(f"  Error: {result.error_summary[:200]}")
 
@@ -341,7 +366,9 @@ def main():
     failed = sum(1 for r in results if r.status == "FAIL")
     timeout_count = sum(1 for r in results if r.status == "TIMEOUT")
     print(f"\n{'=' * 70}")
-    print(f"FINAL: {passed} PASS | {failed} FAIL | {timeout_count} TIMEOUT out of {len(results)}")
+    print(
+        f"FINAL: {passed} PASS | {failed} FAIL | {timeout_count} TIMEOUT out of {len(results)}"
+    )
     print(f"{'=' * 70}")
 
     return 0 if failed == 0 and timeout_count == 0 else 1

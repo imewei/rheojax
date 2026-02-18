@@ -79,9 +79,7 @@ def save_hdf5(
         tmp_fd = None
         tmp_path = None
         try:
-            tmp_fd, tmp_path = tempfile.mkstemp(
-                dir=filepath.parent, suffix=".h5.tmp"
-            )
+            tmp_fd, tmp_path = tempfile.mkstemp(dir=filepath.parent, suffix=".h5.tmp")
             os.close(tmp_fd)
             tmp_fd = None
 
@@ -133,9 +131,7 @@ def save_hdf5(
                 # Store metadata
                 if data.metadata:
                     metadata_group = f.create_group("metadata")
-                    dropped = _write_metadata_recursive(
-                        metadata_group, data.metadata
-                    )
+                    dropped = _write_metadata_recursive(metadata_group, data.metadata)
                     logger.debug(
                         "Metadata written",
                         metadata_keys=list(data.metadata.keys()),
@@ -152,9 +148,7 @@ def save_hdf5(
                     import rheojax
 
                     f.attrs["rheojax_version"] = rheojax.__version__
-                    logger.debug(
-                        "Version stored", rheojax_version=rheojax.__version__
-                    )
+                    logger.debug("Version stored", rheojax_version=rheojax.__version__)
                 except ImportError:
                     pass
 
@@ -170,7 +164,7 @@ def save_hdf5(
                 except OSError:
                     pass
 
-        ctx["data_points"] = len(data.x)  # type: ignore[arg-type]
+        ctx["data_points"] = len(data.x)
         ctx["compression"] = compression
         ctx["has_metadata"] = bool(data.metadata)
 

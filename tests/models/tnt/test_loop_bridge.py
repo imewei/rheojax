@@ -130,9 +130,7 @@ class TestFlowCurve:
         model = TNTLoopBridge()
 
         gamma_dot = np.logspace(-1, 1, 10)
-        sigma, eta, N1 = model.predict_flow_curve(
-            gamma_dot, return_components=True
-        )
+        sigma, eta, N1 = model.predict_flow_curve(gamma_dot, return_components=True)
 
         assert sigma.shape == gamma_dot.shape
         assert eta.shape == gamma_dot.shape
@@ -151,9 +149,7 @@ class TestFlowCurve:
         model.parameters.set_value("eta_s", 0.0)
 
         gamma_dot = np.array([0.1, 1.0, 10.0])
-        _, eta, _ = model.predict_flow_curve(
-            gamma_dot, return_components=True
-        )
+        _, eta, _ = model.predict_flow_curve(gamma_dot, return_components=True)
 
         # Viscosity should decrease with rate (shear thinning)
         assert eta[0] > eta[1] > eta[2]
@@ -300,9 +296,7 @@ class TestStartupSimulation:
         model.parameters.set_value("nu", 2.0)  # Force sensitivity
 
         t = np.linspace(0, 5, 100)
-        _, f_B = model.simulate_startup(
-            t, gamma_dot=10.0, return_bridge_fraction=True
-        )
+        _, f_B = model.simulate_startup(t, gamma_dot=10.0, return_bridge_fraction=True)
 
         # Bridge fraction should decrease under strong flow
         assert f_B[0] > f_B[-1]
@@ -359,9 +353,7 @@ class TestRelaxationSimulation:
         model.parameters.set_value("f_B_eq", 0.5)
 
         t = np.linspace(0, 20, 200)
-        sigma = model.simulate_relaxation(
-            t, gamma_dot_preshear=1.0
-        )
+        sigma = model.simulate_relaxation(t, gamma_dot_preshear=1.0)
 
         # Stress should decay
         assert sigma[0] > sigma[-1]
@@ -407,9 +399,7 @@ class TestCreepSimulation:
         model.parameters.set_value("eta_s", 10.0)
 
         t = np.linspace(0, 10, 100)
-        gamma, gamma_dot = model.simulate_creep(
-            t, sigma_applied=50.0, return_rate=True
-        )
+        gamma, gamma_dot = model.simulate_creep(t, sigma_applied=50.0, return_rate=True)
 
         assert gamma.shape == t.shape
         assert gamma_dot.shape == t.shape
@@ -440,9 +430,7 @@ class TestLAOSSimulation:
         """Test LAOS simulation runs."""
         model = TNTLoopBridge()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=0.5, omega=1.0, n_cycles=3
-        )
+        result = model.simulate_laos(t=None, gamma_0=0.5, omega=1.0, n_cycles=3)
 
         assert "t" in result
         assert "strain" in result
@@ -454,9 +442,7 @@ class TestLAOSSimulation:
         """Test LAOS response becomes periodic after transient."""
         model = TNTLoopBridge()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=0.3, omega=1.0, n_cycles=5
-        )
+        result = model.simulate_laos(t=None, gamma_0=0.3, omega=1.0, n_cycles=5)
 
         stress = result["stress"]
         n_per_cycle = len(stress) // 5
@@ -470,9 +456,7 @@ class TestLAOSSimulation:
         """Test LAOS harmonic extraction."""
         model = TNTLoopBridge()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=0.5, omega=1.0, n_cycles=5
-        )
+        result = model.simulate_laos(t=None, gamma_0=0.5, omega=1.0, n_cycles=5)
 
         harmonics = model.extract_laos_harmonics(result, n_harmonics=3)
 
@@ -486,9 +470,7 @@ class TestLAOSSimulation:
         """Test bridge fraction oscillates during LAOS."""
         model = TNTLoopBridge()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=0.5, omega=1.0, n_cycles=3
-        )
+        result = model.simulate_laos(t=None, gamma_0=0.5, omega=1.0, n_cycles=3)
 
         f_B = result["f_B"]
 
@@ -511,7 +493,9 @@ class TestBayesianInterface:
         model = TNTLoopBridge()
 
         X = jnp.logspace(-1, 1, 5)
-        params = jnp.array([1000.0, 1.0, 5.0, 1.0, 0.5, 0.0])  # G, tau_b, tau_a, nu, f_B_eq, eta_s
+        params = jnp.array(
+            [1000.0, 1.0, 5.0, 1.0, 0.5, 0.0]
+        )  # G, tau_b, tau_a, nu, f_B_eq, eta_s
 
         y = model.model_function(X, params, test_mode="flow_curve")
 
@@ -584,9 +568,7 @@ class TestPhysicalConsistency:
         model = TNTLoopBridge()
 
         t = np.linspace(0, 10, 200)
-        _, f_B = model.simulate_startup(
-            t, gamma_dot=10.0, return_bridge_fraction=True
-        )
+        _, f_B = model.simulate_startup(t, gamma_dot=10.0, return_bridge_fraction=True)
 
         assert np.all(f_B >= 0)
         assert np.all(f_B <= 1)
@@ -597,9 +579,7 @@ class TestPhysicalConsistency:
         model.parameters.set_value("f_B_eq", 0.7)
 
         t = np.linspace(0, 5, 100)
-        _, f_B = model.simulate_startup(
-            t, gamma_dot=1.0, return_bridge_fraction=True
-        )
+        _, f_B = model.simulate_startup(t, gamma_dot=1.0, return_bridge_fraction=True)
 
         # Initial value should be close to f_B_eq
         assert np.isclose(f_B[0], 0.7, atol=0.01)
@@ -662,7 +642,9 @@ class TestFitting:
     """Tests for model fitting."""
 
     @pytest.mark.smoke
-    @pytest.mark.skip(reason="NLSQ forward-mode AD incompatible with diffrax custom_vjp")
+    @pytest.mark.skip(
+        reason="NLSQ forward-mode AD incompatible with diffrax custom_vjp"
+    )
     def test_fit_flow_curve(self):
         """Test fitting to flow curve data.
 
@@ -681,9 +663,7 @@ class TestFitting:
         sigma_true = model_true.predict(gamma_dot, test_mode="flow_curve")
 
         np.random.seed(42)
-        sigma_noisy = sigma_true * (
-            1 + 0.02 * np.random.randn(len(sigma_true))
-        )
+        sigma_noisy = sigma_true * (1 + 0.02 * np.random.randn(len(sigma_true)))
 
         model_fit = TNTLoopBridge()
         model_fit.fit(gamma_dot, sigma_noisy, test_mode="flow_curve")

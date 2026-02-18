@@ -113,7 +113,9 @@ COLUMN_MAPPINGS: dict[str, tuple[list[str], str, list[str]]] = {
     ),
     "tensile_storage_modulus": (
         [
-            r"^e'$", r"^e_prime$", r"^e_stor$",
+            r"^e'$",
+            r"^e_prime$",
+            r"^e_stor$",
             r"^tensile[\s_]?storage[\s_]?modulus$",
             r"^young'?s?[\s_]?storage[\s_]?modulus$",
         ],
@@ -122,7 +124,10 @@ COLUMN_MAPPINGS: dict[str, tuple[list[str], str, list[str]]] = {
     ),
     "tensile_loss_modulus": (
         [
-            r"^e''$", r'^e"$', r"^e_double_prime$", r"^e_loss$",
+            r"^e''$",
+            r'^e"$',
+            r"^e_double_prime$",
+            r"^e_loss$",
             r"^tensile[\s_]?loss[\s_]?modulus$",
             r"^young'?s?[\s_]?loss[\s_]?modulus$",
         ],
@@ -798,10 +803,7 @@ def _compute_complex_modulus(
         g_prime = df["storage_modulus"].values
         g_double_prime = df["loss_modulus"].values
         return g_prime + 1j * g_double_prime, "shear"
-    if (
-        "tensile_storage_modulus" in df.columns
-        and "tensile_loss_modulus" in df.columns
-    ):
+    if "tensile_storage_modulus" in df.columns and "tensile_loss_modulus" in df.columns:
         e_prime = df["tensile_storage_modulus"].values
         e_double_prime = df["tensile_loss_modulus"].values
         return e_prime + 1j * e_double_prime, "tension"
@@ -1512,7 +1514,7 @@ def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:
         rows.append(
             {
                 "Property": f"Interval {interval_idx} - Points",
-                "Value": str(len(rheo_data.x)),  # type: ignore[arg-type]
+                "Value": str(len(rheo_data.x)),
                 "Interval": str(interval_idx),
             }
         )
@@ -1579,7 +1581,7 @@ def _create_interval_dataframe(rheo_data: RheoData) -> pd.DataFrame:
     for aux_col in ["temperature_data", "normal_force", "torque", "phase_angle"]:
         if aux_col in rheo_data.metadata:
             aux_data = rheo_data.metadata[aux_col]
-            if len(aux_data) == len(rheo_data.x):  # type: ignore[arg-type]
+            if len(aux_data) == len(rheo_data.x):
                 col_name = _format_aux_column_name(aux_col, rheo_data.metadata)
                 data[col_name] = np.asarray(aux_data)
 

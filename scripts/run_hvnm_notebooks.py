@@ -10,6 +10,7 @@ Executes all notebooks under examples/hvnm/ with:
 - Timestamped master log + per-notebook logs
 - Clear PASS/FAIL/TIMEOUT summary
 """
+
 import json
 import os
 import re
@@ -35,9 +36,9 @@ def get_notebooks() -> list[Path]:
     notebooks = sorted(HVNM_DIR.glob("*.ipynb"))
     # Skip checkpoint files and hidden files
     notebooks = [
-        nb for nb in notebooks
-        if not nb.name.startswith(".")
-        and ".ipynb_checkpoints" not in str(nb)
+        nb
+        for nb in notebooks
+        if not nb.name.startswith(".") and ".ipynb_checkpoints" not in str(nb)
     ]
     return notebooks
 
@@ -145,7 +146,7 @@ def run_notebook(notebook_path: Path, log_path: Path) -> dict:
         f.write(f"Warnings: {result['warning_count']}\n")
         if result["warnings"]:
             f.write("\nWarnings:\n")
-            for w in result["warnings"]:
+            for w in result["warnings"]:  # type: ignore[attr-defined]
                 f.write(f"  - {w}\n")
         if result["error_traceback"]:
             f.write(f"\nError:\n{result['error_traceback']}\n")
@@ -194,9 +195,13 @@ def main():
         result = run_notebook(notebook, log_path)
         all_results.append(result)
 
-        status_icon = {"PASS": "PASS", "FAIL": "FAIL", "TIMEOUT": "TIMEOUT"}[result["status"]]
+        status_icon = {"PASS": "PASS", "FAIL": "FAIL", "TIMEOUT": "TIMEOUT"}[
+            result["status"]
+        ]
         runtime = format_duration(result["runtime_seconds"])
-        warn_str = f" [{result['warning_count']} warnings]" if result["warning_count"] else ""
+        warn_str = (
+            f" [{result['warning_count']} warnings]" if result["warning_count"] else ""
+        )
         print(f"{status_icon} ({runtime}){warn_str}")
 
         if result["status"] != "PASS":
@@ -228,7 +233,9 @@ def main():
         f.write(f"HVNM Notebook Suite Run — {timestamp}\n")
         f.write(f"{'=' * 60}\n\n")
         for r in all_results:
-            f.write(f"{r['notebook']}: {r['status']} ({format_duration(r['runtime_seconds'])})")
+            f.write(
+                f"{r['notebook']}: {r['status']} ({format_duration(r['runtime_seconds'])})"
+            )
             if r["warning_count"]:
                 f.write(f" [{r['warning_count']} warnings]")
             f.write("\n")

@@ -115,8 +115,15 @@ def _compute_k_ber(
         )
     else:  # stretch
         return hvm_ber_rate_stretch(
-            mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-            G_E, nu_0, E_a, V_act, T,
+            mu_E_xx,
+            mu_E_yy,
+            mu_E_nat_xx,
+            mu_E_nat_yy,
+            G_E,
+            nu_0,
+            E_a,
+            V_act,
+            T,
         )
 
 
@@ -158,16 +165,27 @@ def _make_startup_vector_field(
         k_BER = _compute_k_ber(y, G_E, nu_0, E_a, V_act, T, kinetics)
 
         # E-network evolution (6 equations)
-        (dmu_E_xx, dmu_E_yy, dmu_E_xy,
-         dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy) = hvm_exchangeable_rhs_shear(
-            mu_E_xx, mu_E_yy, mu_E_xy,
-            mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
-            gamma_dot, k_BER,
+        dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
+            hvm_exchangeable_rhs_shear(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_xy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_E_nat_xy,
+                gamma_dot,
+                k_BER,
+            )
         )
 
         # D-network evolution (3 equations, reusing VLB kernel)
         dmu_D_xx, dmu_D_yy, _dmu_D_zz, dmu_D_xy = vlb_mu_rhs_shear(
-            mu_D_xx, mu_D_yy, 1.0, mu_D_xy, gamma_dot, k_d_D,
+            mu_D_xx,
+            mu_D_yy,
+            1.0,
+            mu_D_xy,
+            gamma_dot,
+            k_d_D,
         )
 
         # Zero out D-network if not included
@@ -182,19 +200,37 @@ def _make_startup_vector_field(
         dD = jnp.where(
             include_damage,
             hvm_damage_rhs(
-                mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-                mu_D_xx, mu_D_yy, D_val,
-                G_P, G_E, G_D, Gamma_0, lambda_crit,
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_D_xx,
+                mu_D_yy,
+                D_val,
+                G_P,
+                G_E,
+                G_D,
+                Gamma_0,
+                lambda_crit,
             ),
             0.0,
         )
 
-        return jnp.array([
-            dmu_E_xx, dmu_E_yy, dmu_E_xy,
-            dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy,
-            dmu_D_xx, dmu_D_yy, dmu_D_xy,
-            dgamma, dD,
-        ])
+        return jnp.array(
+            [
+                dmu_E_xx,
+                dmu_E_yy,
+                dmu_E_xy,
+                dmu_E_nat_xx,
+                dmu_E_nat_yy,
+                dmu_E_nat_xy,
+                dmu_D_xx,
+                dmu_D_yy,
+                dmu_D_xy,
+                dgamma,
+                dD,
+            ]
+        )
 
     return vector_field
 
@@ -227,26 +263,46 @@ def _make_relaxation_vector_field(
 
         k_BER = _compute_k_ber(y, G_E, nu_0, E_a, V_act, T, kinetics)
 
-        (dmu_E_xx, dmu_E_yy, dmu_E_xy,
-         dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy) = hvm_exchangeable_rhs_shear(
-            mu_E_xx, mu_E_yy, mu_E_xy,
-            mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
-            gamma_dot, k_BER,
+        dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
+            hvm_exchangeable_rhs_shear(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_xy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_E_nat_xy,
+                gamma_dot,
+                k_BER,
+            )
         )
 
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
-            mu_D_xx, mu_D_yy, 1.0, mu_D_xy, gamma_dot, k_d_D,
+            mu_D_xx,
+            mu_D_yy,
+            1.0,
+            mu_D_xy,
+            gamma_dot,
+            k_d_D,
         )
         dmu_D_xx = jnp.where(include_dissociative, dmu_D_xx, 0.0)
         dmu_D_yy = jnp.where(include_dissociative, dmu_D_yy, 0.0)
         dmu_D_xy = jnp.where(include_dissociative, dmu_D_xy, 0.0)
 
-        return jnp.array([
-            dmu_E_xx, dmu_E_yy, dmu_E_xy,
-            dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy,
-            dmu_D_xx, dmu_D_yy, dmu_D_xy,
-            0.0, 0.0,  # dgamma = 0, dD = 0 during relaxation
-        ])
+        return jnp.array(
+            [
+                dmu_E_xx,
+                dmu_E_yy,
+                dmu_E_xy,
+                dmu_E_nat_xx,
+                dmu_E_nat_yy,
+                dmu_E_nat_xy,
+                dmu_D_xx,
+                dmu_D_yy,
+                dmu_D_xy,
+                0.0,
+                0.0,  # dgamma = 0, dD = 0 during relaxation
+            ]
+        )
 
     return vector_field
 
@@ -284,15 +340,26 @@ def _make_laos_vector_field(
         gamma_dot = gamma_0 * omega * jnp.cos(omega * t)
         k_BER = _compute_k_ber(y, G_E, nu_0, E_a, V_act, T, kinetics)
 
-        (dmu_E_xx, dmu_E_yy, dmu_E_xy,
-         dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy) = hvm_exchangeable_rhs_shear(
-            mu_E_xx, mu_E_yy, mu_E_xy,
-            mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
-            gamma_dot, k_BER,
+        dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
+            hvm_exchangeable_rhs_shear(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_xy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_E_nat_xy,
+                gamma_dot,
+                k_BER,
+            )
         )
 
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
-            mu_D_xx, mu_D_yy, 1.0, mu_D_xy, gamma_dot, k_d_D,
+            mu_D_xx,
+            mu_D_yy,
+            1.0,
+            mu_D_xy,
+            gamma_dot,
+            k_d_D,
         )
         dmu_D_xx = jnp.where(include_dissociative, dmu_D_xx, 0.0)
         dmu_D_yy = jnp.where(include_dissociative, dmu_D_yy, 0.0)
@@ -303,19 +370,37 @@ def _make_laos_vector_field(
         dD = jnp.where(
             include_damage,
             hvm_damage_rhs(
-                mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-                mu_D_xx, mu_D_yy, D_val,
-                G_P, G_E, G_D, Gamma_0, lambda_crit,
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_D_xx,
+                mu_D_yy,
+                D_val,
+                G_P,
+                G_E,
+                G_D,
+                Gamma_0,
+                lambda_crit,
             ),
             0.0,
         )
 
-        return jnp.array([
-            dmu_E_xx, dmu_E_yy, dmu_E_xy,
-            dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy,
-            dmu_D_xx, dmu_D_yy, dmu_D_xy,
-            dgamma, dD,
-        ])
+        return jnp.array(
+            [
+                dmu_E_xx,
+                dmu_E_yy,
+                dmu_E_xy,
+                dmu_E_nat_xx,
+                dmu_E_nat_yy,
+                dmu_E_nat_xy,
+                dmu_D_xx,
+                dmu_D_yy,
+                dmu_D_xy,
+                dgamma,
+                dD,
+            ]
+        )
 
     return vector_field
 
@@ -366,7 +451,14 @@ def _make_creep_vector_field(
         # For stability, we use the quasi-static approximation:
         # gamma_dot = sigma_residual / eta_eff
         sigma_elastic = hvm_total_stress_shear(
-            gamma, mu_E_xy, mu_E_nat_xy, mu_D_xy, G_P, G_E, G_D, D_val,
+            gamma,
+            mu_E_xy,
+            mu_E_nat_xy,
+            mu_D_xy,
+            G_P,
+            G_E,
+            G_D,
+            D_val,
         )
         sigma_residual = sigma_0 - sigma_elastic
 
@@ -386,15 +478,26 @@ def _make_creep_vector_field(
         # Clamp to prevent numerical blowup
         gamma_dot = jnp.clip(gamma_dot, -1e10, 1e10)
 
-        (dmu_E_xx, dmu_E_yy, dmu_E_xy,
-         dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy) = hvm_exchangeable_rhs_shear(
-            mu_E_xx, mu_E_yy, mu_E_xy,
-            mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
-            gamma_dot, k_BER,
+        dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
+            hvm_exchangeable_rhs_shear(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_xy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_E_nat_xy,
+                gamma_dot,
+                k_BER,
+            )
         )
 
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
-            mu_D_xx, mu_D_yy, 1.0, mu_D_xy, gamma_dot, k_d_D,
+            mu_D_xx,
+            mu_D_yy,
+            1.0,
+            mu_D_xy,
+            gamma_dot,
+            k_d_D,
         )
         dmu_D_xx = jnp.where(include_dissociative, dmu_D_xx, 0.0)
         dmu_D_yy = jnp.where(include_dissociative, dmu_D_yy, 0.0)
@@ -405,19 +508,37 @@ def _make_creep_vector_field(
         dD = jnp.where(
             include_damage,
             hvm_damage_rhs(
-                mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-                mu_D_xx, mu_D_yy, D_val,
-                G_P, G_E, G_D, Gamma_0, lambda_crit,
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_D_xx,
+                mu_D_yy,
+                D_val,
+                G_P,
+                G_E,
+                G_D,
+                Gamma_0,
+                lambda_crit,
             ),
             0.0,
         )
 
-        return jnp.array([
-            dmu_E_xx, dmu_E_yy, dmu_E_xy,
-            dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy,
-            dmu_D_xx, dmu_D_yy, dmu_D_xy,
-            dgamma, dD,
-        ])
+        return jnp.array(
+            [
+                dmu_E_xx,
+                dmu_E_yy,
+                dmu_E_xy,
+                dmu_E_nat_xx,
+                dmu_E_nat_yy,
+                dmu_E_nat_xy,
+                dmu_D_xx,
+                dmu_D_yy,
+                dmu_D_xy,
+                dgamma,
+                dD,
+            ]
+        )
 
     return vector_field
 
@@ -585,13 +706,22 @@ def hvm_solve_relaxation(
     mu_yy_init = 1.0
     mu_xy_init = gamma_step
 
-    y0 = jnp.array([
-        mu_xx_init, mu_yy_init, mu_xy_init,  # E-network (deformed)
-        1.0, 1.0, 0.0,                        # E-network natural state (at equilibrium)
-        mu_xx_init, mu_yy_init, mu_xy_init,   # D-network (deformed)
-        gamma_step,                            # gamma = gamma_step
-        0.0,                                   # D = 0
-    ], dtype=jnp.float64)
+    y0 = jnp.array(
+        [
+            mu_xx_init,
+            mu_yy_init,
+            mu_xy_init,  # E-network (deformed)
+            1.0,
+            1.0,
+            0.0,  # E-network natural state (at equilibrium)
+            mu_xx_init,
+            mu_yy_init,
+            mu_xy_init,  # D-network (deformed)
+            gamma_step,  # gamma = gamma_step
+            0.0,  # D = 0
+        ],
+        dtype=jnp.float64,
+    )
 
     args = {**params}
     args.setdefault("G_D", 0.0)

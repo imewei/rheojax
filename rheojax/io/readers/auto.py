@@ -97,10 +97,10 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
 
         # Add record count to context
         if isinstance(result, list):
-            io_ctx["records"] = sum(len(r.x) for r in result)  # type: ignore[arg-type, misc]
+            io_ctx["records"] = sum(len(r.x) for r in result)
             io_ctx["segments"] = len(result)
         else:
-            io_ctx["records"] = len(result.x)  # type: ignore[arg-type]
+            io_ctx["records"] = len(result.x)
 
         return result
 
@@ -348,13 +348,25 @@ def _detect_modulus_pair(
     # Patterns for storage/loss modulus pairs: (storage_pattern, loss_pattern)
     pair_patterns = [
         # E'/E'' (DMTA)
-        (re.compile(r"^e['\u2032]", re.IGNORECASE), re.compile(r'^e[""\u2033]', re.IGNORECASE)),
+        (
+            re.compile(r"^e['\u2032]", re.IGNORECASE),
+            re.compile(r'^e[""\u2033]', re.IGNORECASE),
+        ),
         # E_stor/E_loss (pyvisco style)
-        (re.compile(r"^e[-_]?stor", re.IGNORECASE), re.compile(r"^e[-_]?loss", re.IGNORECASE)),
+        (
+            re.compile(r"^e[-_]?stor", re.IGNORECASE),
+            re.compile(r"^e[-_]?loss", re.IGNORECASE),
+        ),
         # G'/G'' (shear)
-        (re.compile(r"^g['\u2032]", re.IGNORECASE), re.compile(r'^g[""\u2033]', re.IGNORECASE)),
+        (
+            re.compile(r"^g['\u2032]", re.IGNORECASE),
+            re.compile(r'^g[""\u2033]', re.IGNORECASE),
+        ),
         # G_stor/G_loss
-        (re.compile(r"^g[-_]?stor", re.IGNORECASE), re.compile(r"^g[-_]?loss", re.IGNORECASE)),
+        (
+            re.compile(r"^g[-_]?stor", re.IGNORECASE),
+            re.compile(r"^g[-_]?loss", re.IGNORECASE),
+        ),
         # Storage Modulus / Loss Modulus (generic)
         (
             re.compile(r"storage\s+modulus", re.IGNORECASE),

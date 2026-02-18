@@ -515,7 +515,9 @@ class PlotService:
         except ImportError:
             from rheojax.gui.utils._dependency_guard import require_dependency
 
-            require_dependency("arviz", "Bayesian diagnostic plots", "pip install arviz")
+            require_dependency(
+                "arviz", "Bayesian diagnostic plots", "pip install arviz"
+            )
         try:
 
             # Convert to InferenceData
@@ -623,8 +625,16 @@ class PlotService:
                 G_prime = np.abs(np.real(y))
                 G_double_prime = np.abs(np.imag(y))
                 eps = 1e-30  # Floor to avoid log(0)
-                ax.loglog(x, np.maximum(G_prime, eps), "o", label="G'", color=palette[0])
-                ax.loglog(x, np.maximum(G_double_prime, eps), "s", label='G"', color=palette[1])
+                ax.loglog(
+                    x, np.maximum(G_prime, eps), "o", label="G'", color=palette[0]
+                )
+                ax.loglog(
+                    x,
+                    np.maximum(G_double_prime, eps),
+                    "s",
+                    label='G"',
+                    color=palette[1],
+                )
                 ax.set_xlabel(data.x_units or "Frequency (rad/s)")
                 ax.set_ylabel(data.y_units or "Modulus (Pa)")
             else:

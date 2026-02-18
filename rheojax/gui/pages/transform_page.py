@@ -24,6 +24,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing, button_style
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.logging import get_logger
@@ -60,20 +61,28 @@ class TransformPage(QWidget):
 
         grid_widget = QWidget()
         grid_layout = QGridLayout(grid_widget)
-        grid_layout.setSpacing(15)
+        grid_layout.setSpacing(Spacing.LG)
 
         transforms = [
-            ("FFT", "Fast Fourier Transform for frequency analysis", "#FF5722"),
-            ("Mastercurve", "Time-temperature superposition", "#2196F3"),
-            ("SRFS", "Strain-rate frequency superposition", "#4CAF50"),
-            ("Mutation Number", "Calculate mutation number", "#9C27B0"),
-            ("OW Chirp", "Optimally-windowed chirp analysis", "#FF9800"),
+            (
+                "FFT",
+                "Fast Fourier Transform for frequency analysis",
+                ColorPalette.CHART_5,
+            ),
+            ("Mastercurve", "Time-temperature superposition", ColorPalette.CHART_1),
+            ("SRFS", "Strain-rate frequency superposition", ColorPalette.CHART_3),
+            ("Mutation Number", "Calculate mutation number", ColorPalette.CHART_2),
+            ("OW Chirp", "Optimally-windowed chirp analysis", ColorPalette.CHART_4),
             (
                 "SPP Analysis",
                 "LAOS yield stress and cage modulus extraction",
-                "#E91E63",
+                ColorPalette.CHART_6,
             ),
-            ("Derivatives", "Calculate numerical derivatives", "#607D8B"),
+            (
+                "Derivatives",
+                "Calculate numerical derivatives",
+                ColorPalette.TEXT_SECONDARY,
+            ),
         ]
 
         for i, (name, desc, color) in enumerate(transforms):
@@ -133,16 +142,14 @@ class TransformPage(QWidget):
         self._config_widget = QWidget()
         self._config_layout = QVBoxLayout(self._config_widget)
         placeholder = QLabel("Select a transform to configure")
-        placeholder.setStyleSheet("color: #666;")
+        placeholder.setStyleSheet(f"color: {ColorPalette.TEXT_SECONDARY};")
         self._config_layout.addWidget(placeholder)
         layout.addWidget(self._config_widget)
 
         layout.addStretch()
 
         btn_apply = QPushButton("Apply Transform")
-        btn_apply.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;"
-        )
+        btn_apply.setStyleSheet(button_style("success", "lg"))
         btn_apply.clicked.connect(self._apply_transform)
         layout.addWidget(btn_apply)
 
@@ -785,7 +792,7 @@ class TransformPage(QWidget):
             int(hex_color[2:4], 16),
             int(hex_color[4:6], 16),
         )
-        return f"#{int(r*0.9):02x}{int(g*0.9):02x}{int(b*0.9):02x}"
+        return f"#{int(r * 0.9):02x}{int(g * 0.9):02x}{int(b * 0.9):02x}"
 
     def apply_transform(
         self,
@@ -911,49 +918,49 @@ class TransformPage(QWidget):
                 "name": "FFT",
                 "key": "fft",
                 "description": "Fast Fourier Transform for frequency analysis",
-                "color": "#FF5722",
+                "color": ColorPalette.CHART_5,
                 "requires_multiple": False,
             },
             {
                 "name": "Mastercurve",
                 "key": "mastercurve",
                 "description": "Time-Temperature Superposition",
-                "color": "#2196F3",
+                "color": ColorPalette.CHART_1,
                 "requires_multiple": True,
             },
             {
                 "name": "SRFS",
                 "key": "srfs",
                 "description": "Strain-Rate Frequency Superposition",
-                "color": "#4CAF50",
+                "color": ColorPalette.CHART_3,
                 "requires_multiple": True,
             },
             {
                 "name": "Mutation Number",
                 "key": "mutation_number",
                 "description": "Calculate mutation number",
-                "color": "#9C27B0",
+                "color": ColorPalette.CHART_2,
                 "requires_multiple": False,
             },
             {
                 "name": "OW Chirp",
                 "key": "owchirp",
                 "description": "Optimally-windowed chirp analysis",
-                "color": "#FF9800",
+                "color": ColorPalette.CHART_4,
                 "requires_multiple": False,
             },
             {
                 "name": "SPP Analysis",
                 "key": "spp",
                 "description": "LAOS yield stress and cage modulus extraction",
-                "color": "#E91E63",
+                "color": ColorPalette.CHART_6,
                 "requires_multiple": False,
             },
             {
                 "name": "Derivatives",
                 "key": "derivative",
                 "description": "Calculate numerical derivatives",
-                "color": "#607D8B",
+                "color": ColorPalette.TEXT_SECONDARY,
                 "requires_multiple": False,
             },
         ]

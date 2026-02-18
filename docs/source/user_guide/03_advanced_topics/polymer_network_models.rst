@@ -17,7 +17,7 @@ complex time-dependent behavior combining solid-like elasticity and liquid-like 
    :class: tip
 
    Transient networks are characterized by two competing timescales:
-   
+
    - **Network relaxation time** (:math:`\tau_{\text{net}}`): How quickly crosslinks reform
    - **Applied deformation rate** (:math:`1/\dot{\gamma}`): How quickly the material is deformed
 
@@ -202,14 +202,14 @@ detachment.
 .. code-block:: python
 
    from rheojax.models import TNTSingleMode
-   
+
    model = TNTSingleMode()
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    G_0 = model.parameters.get_value('G_0')
    k_d_0 = model.parameters.get_value('k_d_0')
    beta = model.parameters.get_value('beta')
-   
+
    tau_net = 1.0 / k_d_0
    print(f"Network relaxation time: {tau_net:.2f} s")
 
@@ -246,13 +246,13 @@ scission and recombination. Key feature: **geometric mean relaxation time**.
 .. code-block:: python
 
    from rheojax.models import TNTCates
-   
+
    model = TNTCates()
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    tau_rep = model.parameters.get_value('tau_rep')
    tau_break = model.parameters.get_value('tau_break')
-   
+
    # Effective relaxation from competition of processes
    tau_eff = np.sqrt(tau_rep * tau_break)
    print(f"Reptation time: {tau_rep:.2f} s")
@@ -306,14 +306,14 @@ Only bridges contribute to stress.
 .. code-block:: python
 
    from rheojax.models import TNTLoopBridge
-   
+
    model = TNTLoopBridge()
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    phi_bridge_0 = model.parameters.get_value('phi_bridge_0')
    k_detach = model.parameters.get_value('k_detach')
    k_attach = model.parameters.get_value('k_attach')
-   
+
    print(f"Equilibrium bridge fraction: {phi_bridge_0:.2f}")
    print(f"Bridge lifetime: {1.0/k_detach:.2f} s")
 
@@ -362,10 +362,10 @@ broad relaxation spectra without assuming specific microstructure.
 .. code-block:: python
 
    from rheojax.models import TNTMultiSpecies
-   
+
    model = TNTMultiSpecies(n_species=3)
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    for i in range(3):
        G_i = model.parameters.get_value(f'G_{i}')
        k_d_i = model.parameters.get_value(f'k_d_{i}')
@@ -414,15 +414,15 @@ the backbone. Captures both chain relaxation and association/dissociation.
 .. code-block:: python
 
    from rheojax.models import TNTStickyRouse
-   
+
    model = TNTStickyRouse()
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    G_0 = model.parameters.get_value('G_0')
    tau_R = model.parameters.get_value('tau_R')
    tau_s = model.parameters.get_value('tau_s')
    N_s = model.parameters.get_value('N_s')
-   
+
    print(f"Rouse time: {tau_R:.2e} s")
    print(f"Sticker lifetime: {tau_s:.2e} s")
    print(f"Stickers per chain: {N_s:.0f}")
@@ -476,14 +476,14 @@ variants extend this base model.
 .. code-block:: python
 
    from rheojax.models import VLBLocal
-   
+
    model = VLBLocal()
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    G_0 = model.parameters.get_value('G_0')
    k_d_0 = model.parameters.get_value('k_d_0')
    k_a_0 = model.parameters.get_value('k_a_0')
-   
+
    tau_d = 1.0 / k_d_0
    tau_a = 1.0 / k_a_0
    print(f"Detachment time: {tau_d:.2f} s")
@@ -541,10 +541,10 @@ for polydisperse systems or multi-component materials.
 .. code-block:: python
 
    from rheojax.models import VLBMultiNetwork
-   
+
    model = VLBMultiNetwork(n_networks=3)
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    for i in range(3):
        G_i = model.parameters.get_value(f'G_0_{i}')
        k_d_i = model.parameters.get_value(f'k_d_0_{i}')
@@ -582,21 +582,21 @@ Captures shear thinning and strain stiffening.
 .. code-block:: python
 
    from rheojax.models import VLBVariant
-   
+
    # Bell model only
    model = VLBVariant(include_bell=True, include_fene=False)
    model.fit(gamma_dot, sigma, test_mode='flow_curve')
-   
+
    F_ref = model.parameters.get_value('F_ref')
    print(f"Bell force scale: {F_ref:.2e} N")
-   
+
    # FENE model only
    model_fene = VLBVariant(include_bell=False, include_fene=True)
    model_fene.fit(gamma_dot, sigma, test_mode='flow_curve')
-   
+
    b = model_fene.parameters.get_value('b')
    print(f"FENE parameter: {b:.1f} (dimensionless)")
-   
+
    # Combined Bell + FENE
    model_full = VLBVariant(include_bell=True, include_fene=True)
 
@@ -649,19 +649,19 @@ banding when constitutive curve is non-monotonic.
 .. code-block:: python
 
    from rheojax.models import VLBNonlocal
-   
+
    model = VLBNonlocal(n_points=51, gap_width=1e-3)
-   
+
    # Simulate steady shear with banding
    result = model.simulate_steady_shear(
        gamma_dot_avg=5.0,
        t_end=100.0
    )
-   
+
    # Extract spatial profiles
    y_coords = result['y']
    gamma_dot_profile = result['gamma_dot_profile']
-   
+
    # Detect banding
    banding = model.detect_banding(result, threshold=0.1)
    if banding['is_banded']:
@@ -719,22 +719,22 @@ Use the same model to predict all rheological tests:
 
    from rheojax.models import TNTSingleMode
    import numpy as np
-   
+
    model = TNTSingleMode()
-   
+
    # 1. Fit to SAOS data
    omega = np.logspace(-2, 2, 50)
    G_star_data = ...  # Complex modulus data
    model.fit(omega, G_star_data, test_mode='oscillation')
-   
+
    # 2. Predict stress relaxation
    t = np.logspace(-2, 2, 100)
    G_t = model.predict(t, test_mode='relaxation')
-   
+
    # 3. Predict flow curve
    gamma_dot = np.logspace(-3, 2, 50)
    sigma = model.predict(gamma_dot, test_mode='flow_curve')
-   
+
    # 4. Predict startup shear (stress overshoot)
    t_startup = np.linspace(0, 50, 500)
    sigma_startup = model.predict(
@@ -742,7 +742,7 @@ Use the same model to predict all rheological tests:
        test_mode='startup',
        gamma_dot=1.0
    )
-   
+
    # 5. Predict LAOS
    t_laos = np.linspace(0, 50, 1000)
    sigma_laos = model.predict(
@@ -760,23 +760,23 @@ The network relaxation time is a key physical parameter:
 .. code-block:: python
 
    from rheojax.models import VLBLocal
-   
+
    model = VLBLocal()
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    k_d = model.parameters.get_value('k_d_0')
    k_a = model.parameters.get_value('k_a_0')
-   
+
    # Total relaxation rate
    k_total = k_d + k_a
    tau_net = 1.0 / k_total
-   
+
    print(f"Network relaxation time: {tau_net:.2f} s")
-   
+
    # Compare to crossover frequency from SAOS
    omega_c = k_total
    print(f"Crossover frequency: {omega_c:.2f} rad/s")
-   
+
    # Verify: at ω = ω_c, G' ≈ G''
    G_star_crossover = model.predict(omega_c, test_mode='oscillation')
    print(f"G' = {np.real(G_star_crossover):.1f} Pa")
@@ -794,46 +794,46 @@ depend on network kinetics.
    from rheojax.models import TNTSingleMode
    import numpy as np
    import matplotlib.pyplot as plt
-   
+
    model = TNTSingleMode(G_0=1000.0, k_d_0=1.0, beta=0.5)
-   
+
    # Simulate startup at different shear rates
    t = np.linspace(0, 10, 500)
-   
+
    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-   
+
    for gamma_dot in [0.1, 1.0, 10.0]:
        sigma = model.predict(t, test_mode='startup', gamma_dot=gamma_dot)
-       
+
        # Find overshoot
        idx_max = np.argmax(sigma)
        t_overshoot = t[idx_max]
        sigma_max = sigma[idx_max]
        sigma_steady = sigma[-1]
-       
+
        overshoot_ratio = sigma_max / sigma_steady
-       
+
        # Plot stress vs time
        axes[0].plot(t, sigma, label=f'γ̇ = {gamma_dot} s⁻¹')
        axes[0].scatter([t_overshoot], [sigma_max], color='red', s=50, zorder=5)
-       
+
        # Plot stress vs strain (removes time effect)
        strain = gamma_dot * t
        axes[1].plot(strain, sigma, label=f'γ̇ = {gamma_dot} s⁻¹')
-       
+
        print(f"γ̇ = {gamma_dot} s⁻¹: overshoot at t = {t_overshoot:.2f} s, "
              f"ratio = {overshoot_ratio:.2f}")
-   
+
    axes[0].set_xlabel('Time (s)')
    axes[0].set_ylabel('Stress (Pa)')
    axes[0].set_title('Stress Overshoot vs Time')
    axes[0].legend()
-   
+
    axes[1].set_xlabel('Strain')
    axes[1].set_ylabel('Stress (Pa)')
    axes[1].set_title('Stress Overshoot vs Strain (Strain Softening)')
    axes[1].legend()
-   
+
    plt.tight_layout()
    plt.savefig('stress_overshoot_analysis.png', dpi=150)
 
@@ -856,11 +856,11 @@ Basic Bayesian Workflow
 
    from rheojax.models import VLBLocal
    from rheojax.pipeline.bayesian import BayesianPipeline
-   
+
    # 1. NLSQ point estimation (fast, GPU-accelerated)
    model = VLBLocal()
    model.fit(omega, G_star, test_mode='oscillation')
-   
+
    # 2. Bayesian inference with warm-start
    result = model.fit_bayesian(
        omega, G_star,
@@ -869,18 +869,18 @@ Basic Bayesian Workflow
        num_samples=2000,
        num_chains=4
    )
-   
+
    # 3. Check convergence
    print(f"R-hat: {result.diagnostics['r_hat']}")
    print(f"ESS: {result.diagnostics['ess']}")
    print(f"Divergences: {result.diagnostics['divergences']}")
-   
+
    # 4. Get credible intervals
    intervals = model.get_credible_intervals(
        result.posterior_samples,
        credibility=0.95
    )
-   
+
    for param, (low, high) in intervals.items():
        mean = np.mean(result.posterior_samples[param])
        print(f"{param}: {mean:.2e} [{low:.2e}, {high:.2e}]")
@@ -891,12 +891,12 @@ Using BayesianPipeline for Complete Workflow
 .. code-block:: python
 
    from rheojax.pipeline.bayesian import BayesianPipeline
-   
+
    pipeline = (BayesianPipeline()
        .load('wormlike_micelles.csv', x_col='omega', y_col='G_star')
        .fit_nlsq('tnt_cates')
        .fit_bayesian(num_samples=2000, num_warmup=1000))
-   
+
    # Generate all diagnostic plots
    (pipeline
        .plot_pair(divergences=True, show=False).save_figure('pair.pdf')
@@ -904,7 +904,7 @@ Using BayesianPipeline for Complete Workflow
        .plot_autocorr(show=False).save_figure('autocorr.pdf')
        .plot_rank(show=False).save_figure('rank.pdf')
        .plot_ess(kind='local', show=False).save_figure('ess.pdf'))
-   
+
    # Save results
    pipeline.save('bayesian_results.hdf5')
 
@@ -916,15 +916,15 @@ Network parameters often show correlations:
 .. code-block:: python
 
    import numpy as np
-   
+
    # Extract posterior samples
    G_0_samples = result.posterior_samples['G_0']
    k_d_samples = result.posterior_samples['k_d_0']
-   
+
    # Compute correlation
    correlation = np.corrcoef(G_0_samples, k_d_samples)[0, 1]
    print(f"Correlation(G_0, k_d_0): {correlation:.3f}")
-   
+
    # Visualize with pair plot
    pipeline.plot_pair(var_names=['G_0', 'k_d_0'], divergences=True)
 
@@ -952,45 +952,45 @@ Plot steady-shear flow curves showing shear thinning:
    from rheojax.models import VLBVariant
    import numpy as np
    import matplotlib.pyplot as plt
-   
+
    # Model with Bell force-enhanced detachment
    model = VLBVariant(include_bell=True, include_fene=False)
    model.parameters.set_value('G_0', 1000.0)
    model.parameters.set_value('k_d_0', 1.0)
    model.parameters.set_value('k_a_0', 0.1)
    model.parameters.set_value('F_ref', 1e-10)  # Bell force scale
-   
+
    gamma_dot = np.logspace(-3, 3, 100)
    sigma = model.predict(gamma_dot, test_mode='flow_curve')
-   
+
    # Compute apparent viscosity
    eta_app = sigma / gamma_dot
-   
+
    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-   
+
    # Flow curve
    axes[0].loglog(gamma_dot, sigma)
    axes[0].set_xlabel('Shear Rate (s⁻¹)')
    axes[0].set_ylabel('Shear Stress (Pa)')
    axes[0].set_title('Flow Curve (Bell Model)')
    axes[0].grid(True, alpha=0.3)
-   
+
    # Viscosity curve
    axes[1].loglog(gamma_dot, eta_app)
    axes[1].set_xlabel('Shear Rate (s⁻¹)')
    axes[1].set_ylabel('Apparent Viscosity (Pa·s)')
    axes[1].set_title('Shear Thinning')
    axes[1].grid(True, alpha=0.3)
-   
+
    # Add power-law fit at high rates
    idx_high = gamma_dot > 10.0
    log_eta = np.log(eta_app[idx_high])
    log_rate = np.log(gamma_dot[idx_high])
    n_fit = np.polyfit(log_rate, log_eta, 1)[0]
-   
+
    axes[1].text(0.05, 0.95, f'Power-law index: n = {n_fit:.2f}',
                 transform=axes[1].transAxes, verticalalignment='top')
-   
+
    plt.tight_layout()
    plt.savefig('flow_curve_analysis.png', dpi=150)
 
@@ -1004,40 +1004,40 @@ Compare multiple TNT/VLB models on same data:
    from rheojax.models import TNTSingleMode, TNTCates, VLBLocal
    import numpy as np
    import matplotlib.pyplot as plt
-   
+
    omega = np.logspace(-2, 2, 50)
    G_star_data = ...  # Your experimental data
-   
+
    models = {
        'TNT SingleMode': TNTSingleMode(),
        'TNT Cates': TNTCates(),
        'VLB Local': VLBLocal()
    }
-   
+
    fig, ax = plt.subplots(figsize=(8, 6))
-   
+
    # Plot data
    ax.loglog(omega, np.real(G_star_data), 'o', label="G' data", color='C0')
    ax.loglog(omega, np.imag(G_star_data), 's', label="G'' data", color='C1')
-   
+
    # Fit and plot each model
    for name, model in models.items():
        model.fit(omega, G_star_data, test_mode='oscillation')
        G_fit = model.predict(omega, test_mode='oscillation')
-       
+
        ax.loglog(omega, np.real(G_fit), '-', label=f"{name} G'", alpha=0.7)
        ax.loglog(omega, np.imag(G_fit), '--', label=f"{name} G''", alpha=0.7)
-       
+
        # Report R²
        r_squared = model._last_fit_result.r_squared
        print(f"{name}: R² = {r_squared:.4f}")
-   
+
    ax.set_xlabel('ω (rad/s)')
    ax.set_ylabel('G\', G\'\' (Pa)')
    ax.set_title('Model Comparison (SAOS)')
    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
    ax.grid(True, alpha=0.3)
-   
+
    plt.tight_layout()
    plt.savefig('saos_model_comparison.png', dpi=150)
 
@@ -1049,57 +1049,57 @@ Shear Banding Visualization (Nonlocal)
    from rheojax.models import VLBNonlocal
    import numpy as np
    import matplotlib.pyplot as plt
-   
+
    model = VLBNonlocal(n_points=51, gap_width=1e-3)
-   
+
    # Parameters that produce banding (non-monotonic flow curve)
    model.parameters.set_value('G_0', 1000.0)
    model.parameters.set_value('k_d_0', 1.0)
    model.parameters.set_value('k_a_0', 0.5)
    model.parameters.set_value('beta', 1.5)  # Strong nonlinearity
-   
+
    # Simulate steady shear
    result = model.simulate_steady_shear(
        gamma_dot_avg=5.0,
        t_end=200.0
    )
-   
+
    y = result['y']
    gamma_dot_profile = result['gamma_dot_profile']
    sigma_profile = result['stress_profile']
-   
+
    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-   
+
    # Shear rate profile
    axes[0].plot(y * 1e3, gamma_dot_profile)
    axes[0].set_xlabel('Position y (mm)')
    axes[0].set_ylabel('Local Shear Rate (s⁻¹)')
    axes[0].set_title('Shear Banding: Spatial Profile')
    axes[0].grid(True, alpha=0.3)
-   
+
    # Stress profile (should be constant)
    axes[1].plot(y * 1e3, sigma_profile)
    axes[1].set_xlabel('Position y (mm)')
    axes[1].set_ylabel('Local Stress (Pa)')
    axes[1].set_title('Stress Profile (Plateau)')
    axes[1].grid(True, alpha=0.3)
-   
+
    # Detect bands
    banding = model.detect_banding(result, threshold=0.1)
    if banding['is_banded']:
        low_idx = banding['low_band_indices']
        high_idx = banding['high_band_indices']
-       
+
        axes[0].axvspan(y[low_idx[0]]*1e3, y[low_idx[-1]]*1e3,
                        alpha=0.2, color='blue', label='Low-rate band')
        axes[0].axvspan(y[high_idx[0]]*1e3, y[high_idx[-1]]*1e3,
                        alpha=0.2, color='red', label='High-rate band')
        axes[0].legend()
-       
+
        print(f"Banding detected!")
        print(f"Low band: {len(low_idx)} points")
        print(f"High band: {len(high_idx)} points")
-   
+
    plt.tight_layout()
    plt.savefig('shear_banding_profile.png', dpi=150)
 

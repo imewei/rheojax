@@ -438,7 +438,7 @@ class FIKHBase(BaseModel, FractionalModelMixin):
             y0 = self._get_initial_state(mode, params, T_init, lambda_0=1.0)
 
         # Diffrax setup
-        term = diffrax.ODETerm(lambda ti, yi, args_i: ode_fn(ti, yi, args_i)) # type: ignore[arg-type]
+        term = diffrax.ODETerm(lambda ti, yi, args_i: ode_fn(ti, yi, args_i))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
 
@@ -468,7 +468,7 @@ class FIKHBase(BaseModel, FractionalModelMixin):
         result = jnp.where(
             sol.result == diffrax.RESULTS.successful,
             result,
-            jnp.nan * jnp.ones_like(result)
+            jnp.nan * jnp.ones_like(result),
         )
 
         # Add viscous background for startup

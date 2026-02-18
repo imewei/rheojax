@@ -224,12 +224,15 @@ class TestFlowCurve:
         eta_s = model.eta_s
 
         # Compute expected zero-shear viscosity
-        eta_0_expected = np.sum(
-            [
-                model.parameters.get_value(f"G_{k}") * tau_eff[k]
-                for k in range(model.n_modes)
-            ]
-        ) + eta_s
+        eta_0_expected = (
+            np.sum(
+                [
+                    model.parameters.get_value(f"G_{k}") * tau_eff[k]
+                    for k in range(model.n_modes)
+                ]
+            )
+            + eta_s
+        )
 
         # Low shear rate
         gamma_dot_low = 1e-4
@@ -589,13 +592,18 @@ class TestBayesianInterface:
 
         X = jnp.logspace(-1, 2, 10)
         # params = [G_0, tau_R_0, G_1, tau_R_1, G_2, tau_R_2, tau_s, eta_s]
-        params = jnp.array([
-            333.33, 10.0,  # Mode 0
-            333.33, 1.0,   # Mode 1
-            333.33, 0.1,   # Mode 2
-            0.1,           # tau_s
-            0.0            # eta_s
-        ])
+        params = jnp.array(
+            [
+                333.33,
+                10.0,  # Mode 0
+                333.33,
+                1.0,  # Mode 1
+                333.33,
+                0.1,  # Mode 2
+                0.1,  # tau_s
+                0.0,  # eta_s
+            ]
+        )
 
         y = model.model_function(X, params, test_mode="flow_curve")
 
@@ -684,10 +692,13 @@ class TestPhysicalConsistency:
         model.parameters.set_value("eta_s", 10.0)
 
         tau_eff = model.get_effective_times()
-        expected_eta_0 = sum(
-            model.parameters.get_value(f"G_{k}") * tau_eff[k]
-            for k in range(model.n_modes)
-        ) + model.eta_s
+        expected_eta_0 = (
+            sum(
+                model.parameters.get_value(f"G_{k}") * tau_eff[k]
+                for k in range(model.n_modes)
+            )
+            + model.eta_s
+        )
 
         eta_0 = model.predict_zero_shear_viscosity()
 

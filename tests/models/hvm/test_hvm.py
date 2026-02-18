@@ -395,10 +395,20 @@ class TestHVMStartup:
         t = np.linspace(0.01, 10, 50)
         result = hvm_default.simulate_startup(t, gamma_dot=1.0, return_full=True)
         expected_keys = {
-            "time", "stress", "strain", "N1", "damage",
-            "mu_E_xx", "mu_E_yy", "mu_E_xy",
-            "mu_E_nat_xx", "mu_E_nat_yy", "mu_E_nat_xy",
-            "mu_D_xx", "mu_D_yy", "mu_D_xy",
+            "time",
+            "stress",
+            "strain",
+            "N1",
+            "damage",
+            "mu_E_xx",
+            "mu_E_yy",
+            "mu_E_xy",
+            "mu_E_nat_xx",
+            "mu_E_nat_yy",
+            "mu_E_nat_xy",
+            "mu_D_xx",
+            "mu_D_yy",
+            "mu_D_xy",
         }
         assert set(result.keys()) == expected_keys
 
@@ -422,9 +432,7 @@ class TestHVMStartup:
         # ODE integrates from t[0], so gamma(t) = gamma_dot * (t - t[0]) at the saved points
         # Use a looser tolerance and skip first point
         expected_strain = 2.0 * t
-        np.testing.assert_allclose(
-            result["strain"][5:], expected_strain[5:], rtol=0.02
-        )
+        np.testing.assert_allclose(result["strain"][5:], expected_strain[5:], rtol=0.02)
 
 
 # =============================================================================
@@ -538,8 +546,15 @@ class TestHVMLAOS:
         t = np.linspace(0, 10, 100)
         result = hvm_default.simulate_laos(t, gamma_0=0.1, omega=1.0)
         expected_keys = {
-            "time", "strain", "stress", "gamma_dot",
-            "N1", "mu_E_xy", "mu_E_nat_xy", "mu_D_xy", "damage",
+            "time",
+            "strain",
+            "stress",
+            "gamma_dot",
+            "N1",
+            "mu_E_xy",
+            "mu_E_nat_xy",
+            "mu_D_xy",
+            "damage",
         }
         assert set(result.keys()) == expected_keys
 
@@ -650,7 +665,10 @@ class TestHVMBayesian:
         """model_function is callable with array params."""
         omega = np.logspace(-2, 2, 20)
         params = jnp.array(
-            [hvm_default.parameters.get_value(n) for n in hvm_default.parameters.keys()],
+            [
+                hvm_default.parameters.get_value(n)
+                for n in hvm_default.parameters.keys()
+            ],
             dtype=jnp.float64,
         )
         result = hvm_default.model_function(omega, params, test_mode="oscillation")
@@ -662,7 +680,10 @@ class TestHVMBayesian:
         """model_function works for flow_curve."""
         gdot = np.logspace(-2, 2, 10)
         params = jnp.array(
-            [hvm_default.parameters.get_value(n) for n in hvm_default.parameters.keys()],
+            [
+                hvm_default.parameters.get_value(n)
+                for n in hvm_default.parameters.keys()
+            ],
             dtype=jnp.float64,
         )
         result = hvm_default.model_function(gdot, params, test_mode="flow_curve")
@@ -674,7 +695,10 @@ class TestHVMBayesian:
         """model_function works for relaxation."""
         t = np.linspace(0.01, 10, 20)
         params = jnp.array(
-            [hvm_default.parameters.get_value(n) for n in hvm_default.parameters.keys()],
+            [
+                hvm_default.parameters.get_value(n)
+                for n in hvm_default.parameters.keys()
+            ],
             dtype=jnp.float64,
         )
         result = hvm_default.model_function(t, params, test_mode="relaxation")

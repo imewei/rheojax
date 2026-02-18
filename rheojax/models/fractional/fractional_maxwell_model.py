@@ -461,7 +461,7 @@ class FractionalMaxwellModel(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)  # type: ignore[return-value]
+            return self.predict_rheodata(X)
 
         # Handle raw array input
         from rheojax.core.test_modes import TestMode
@@ -471,7 +471,12 @@ class FractionalMaxwellModel(BaseModel):
         alpha = self.parameters.get_value("alpha")
         beta = self.parameters.get_value("beta")
         tau = self.parameters.get_value("tau")
-        assert c1 is not None and alpha is not None and beta is not None and tau is not None
+        assert (
+            c1 is not None
+            and alpha is not None
+            and beta is not None
+            and tau is not None
+        )
 
         test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
         if test_mode in ("oscillation", TestMode.OSCILLATION):
@@ -552,7 +557,12 @@ class FractionalMaxwellModel(BaseModel):
         alpha = self.parameters.get_value("alpha")
         beta = self.parameters.get_value("beta")
         tau = self.parameters.get_value("tau")
-        assert c1 is not None and alpha is not None and beta is not None and tau is not None
+        assert (
+            c1 is not None
+            and alpha is not None
+            and beta is not None
+            and tau is not None
+        )
 
         # Convert input to JAX
         x = jnp.asarray(rheo_data.x)
@@ -602,7 +612,12 @@ class FractionalMaxwellModel(BaseModel):
             alpha = self.parameters.get_value("alpha")
             beta = self.parameters.get_value("beta")
             tau = self.parameters.get_value("tau")
-            assert c1 is not None and alpha is not None and beta is not None and tau is not None
+            assert (
+                c1 is not None
+                and alpha is not None
+                and beta is not None
+                and tau is not None
+            )
             x = jnp.asarray(X)
 
             # Normalize test_mode to string

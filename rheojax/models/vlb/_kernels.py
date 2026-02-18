@@ -286,9 +286,7 @@ vlb_steady_n1_vec = jax.jit(jax.vmap(vlb_steady_n1, in_axes=(0, None, None)))
 
 
 @jax.jit
-def vlb_startup_stress(
-    t: float, gamma_dot: float, G0: float, k_d: float
-) -> float:
+def vlb_startup_stress(t: float, gamma_dot: float, G0: float, k_d: float) -> float:
     """Transient shear stress during startup flow.
 
     sigma(t) = G0 * (gamma_dot / k_d) * (1 - exp(-k_d * t))
@@ -323,9 +321,7 @@ vlb_startup_stress_vec = jax.jit(
 
 
 @jax.jit
-def vlb_startup_n1(
-    t: float, gamma_dot: float, G0: float, k_d: float
-) -> float:
+def vlb_startup_n1(t: float, gamma_dot: float, G0: float, k_d: float) -> float:
     """Transient first normal stress difference during startup.
 
     N1(t) = 2*G0*(gamma_dot/k_d)^2 * [1 - (1 + k_d*t)*exp(-k_d*t)]
@@ -354,9 +350,7 @@ def vlb_startup_n1(
     return 2.0 * G0 * Wi * Wi * (1.0 - (1.0 + kd_t) * jnp.exp(-kd_t))
 
 
-vlb_startup_n1_vec = jax.jit(
-    jax.vmap(vlb_startup_n1, in_axes=(0, None, None, None))
-)
+vlb_startup_n1_vec = jax.jit(jax.vmap(vlb_startup_n1, in_axes=(0, None, None, None)))
 
 
 @jax.jit
@@ -390,9 +384,7 @@ vlb_relaxation_modulus_vec = jax.jit(
 
 
 @jax.jit
-def vlb_saos_moduli(
-    omega: float, G0: float, k_d: float
-) -> tuple[float, float]:
+def vlb_saos_moduli(omega: float, G0: float, k_d: float) -> tuple[float, float]:
     """SAOS storage and loss moduli for single VLB network.
 
     G'(omega) = G0 * omega^2 * t_R^2 / (1 + omega^2 * t_R^2)
@@ -579,9 +571,7 @@ def vlb_multi_saos_vec(
 
     # G_modes: (M,) broadcast -> sum over modes axis
     G_prime = G_e + jnp.sum(G_modes[None, :] * wt2 / denom, axis=1)
-    G_double_prime = (
-        jnp.sum(G_modes[None, :] * wt / denom, axis=1) + eta_s * omega_arr
-    )
+    G_double_prime = jnp.sum(G_modes[None, :] * wt / denom, axis=1) + eta_s * omega_arr
 
     return G_prime, G_double_prime
 
@@ -663,9 +653,7 @@ def vlb_multi_startup_stress(
         Shear stress at time t (Pa)
     """
     t_R_modes = 1.0 / kd_modes
-    transient = jnp.sum(
-        G_modes * gdot * t_R_modes * (1.0 - jnp.exp(-kd_modes * t))
-    )
+    transient = jnp.sum(G_modes * gdot * t_R_modes * (1.0 - jnp.exp(-kd_modes * t)))
     permanent = G_e * gdot * t
     solvent = eta_s * gdot
     return transient + permanent + solvent
@@ -751,9 +739,7 @@ vlb_uniaxial_steady_vec = jax.jit(
 
 
 @jax.jit
-def vlb_uniaxial_transient(
-    t: float, eps_dot: float, G0: float, k_d: float
-) -> float:
+def vlb_uniaxial_transient(t: float, eps_dot: float, G0: float, k_d: float) -> float:
     """Transient extensional stress during startup extension.
 
     sigma_11(t) = G0 * [mu_11(t) - mu_22(t)]
@@ -831,9 +817,7 @@ def vlb_trouton_ratio(eps_dot: float, G0: float, k_d: float) -> float:
     return eta_E / eta_0
 
 
-vlb_trouton_ratio_vec = jax.jit(
-    jax.vmap(vlb_trouton_ratio, in_axes=(0, None, None))
-)
+vlb_trouton_ratio_vec = jax.jit(jax.vmap(vlb_trouton_ratio, in_axes=(0, None, None)))
 
 
 # =============================================================================
@@ -842,9 +826,7 @@ vlb_trouton_ratio_vec = jax.jit(
 
 
 @jax.jit
-def vlb_creep_compliance_dual(
-    t: float, G0: float, k_d: float, G_e: float
-) -> float:
+def vlb_creep_compliance_dual(t: float, G0: float, k_d: float, G_e: float) -> float:
     """Creep compliance for VLB network + permanent elastic network.
 
     This is the standard linear solid (SLS) / Zener compliance:
@@ -1105,9 +1087,7 @@ def vlb_breakage_bell(
 
 
 @jax.jit
-def vlb_fene_factor(
-    mu_xx: float, mu_yy: float, mu_zz: float, L_max: float
-) -> float:
+def vlb_fene_factor(mu_xx: float, mu_yy: float, mu_zz: float, L_max: float) -> float:
     """FENE-P Peterlin spring factor.
 
     f = L²/(L² - tr(mu) + 3)
@@ -1200,9 +1180,7 @@ def vlb_stress_fene_n1(
 
 
 @jax.jit
-def vlb_arrhenius_shift(
-    k_d_0: float, E_a: float, T: float, T_ref: float
-) -> float:
+def vlb_arrhenius_shift(k_d_0: float, E_a: float, T: float, T_ref: float) -> float:
     """Arrhenius temperature shift for dissociation rate.
 
     k_d(T) = k_d_0 · exp(-E_a/R · (1/T - 1/T_ref))
@@ -1351,9 +1329,7 @@ def build_vlb_creep_ode_rhs(breakage_type="constant", stress_type="linear"):
 
         # Elastic stress from distribution tensor
         if stress_type == "fene":
-            sigma_elastic = vlb_stress_fene_xy(
-                mu_xx, mu_yy, mu_zz, mu_xy, G0, L_max
-            )
+            sigma_elastic = vlb_stress_fene_xy(mu_xx, mu_yy, mu_zz, mu_xy, G0, L_max)
         else:
             sigma_elastic = G0 * mu_xy
 
@@ -1444,9 +1420,7 @@ def build_vlb_stress_fn(stress_type="linear"):
 
 
 @jax.jit
-def laplacian_1d_neumann_vlb(
-    field: jnp.ndarray, dy: float
-) -> jnp.ndarray:
+def laplacian_1d_neumann_vlb(field: jnp.ndarray, dy: float) -> jnp.ndarray:
     """1D Laplacian with Neumann (zero-flux) boundary conditions.
 
     ∂²f/∂y² using second-order central differences with ghost points
@@ -1505,9 +1479,9 @@ def build_vlb_nonlocal_pde_rhs(breakage_type="constant", stress_type="linear"):
 
         # Local dissociation rate at each spatial point
         if breakage_type == "bell":
-            k_d = jax.vmap(
-                lambda xx, yy, zz: vlb_breakage_bell(xx, yy, zz, k_d_0, nu)
-            )(mu_xx, mu_yy, mu_zz)
+            k_d = jax.vmap(lambda xx, yy, zz: vlb_breakage_bell(xx, yy, zz, k_d_0, nu))(
+                mu_xx, mu_yy, mu_zz
+            )
         else:
             k_d = jnp.full(n, k_d_0)
 
@@ -1545,9 +1519,14 @@ def build_vlb_nonlocal_pde_rhs(breakage_type="constant", stress_type="linear"):
         mean_gamma_dot = jnp.mean(gamma_dot)
         dSigma = K * (gamma_dot_avg - mean_gamma_dot)
 
-        return jnp.concatenate([
-            jnp.array([dSigma]),
-            dmu_xx, dmu_yy, dmu_zz, dmu_xy,
-        ])
+        return jnp.concatenate(
+            [
+                jnp.array([dSigma]),
+                dmu_xx,
+                dmu_yy,
+                dmu_zz,
+                dmu_xy,
+            ]
+        )
 
     return pde_rhs

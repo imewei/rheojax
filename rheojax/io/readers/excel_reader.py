@@ -185,10 +185,10 @@ def load_excel(
     # Extract y data (single column or complex modulus)
     is_complex = y_cols is not None
     if is_complex:
-        y_headers = [_get_column_header(df, col) for col in y_cols]  # type: ignore[union-attr]
+        y_headers = [_get_column_header(df, col) for col in y_cols]
         try:
-            g_prime_data = _get_column_data(df, y_cols[0])  # type: ignore[index]
-            g_double_prime_data = _get_column_data(df, y_cols[1])  # type: ignore[index]
+            g_prime_data = _get_column_data(df, y_cols[0])
+            g_double_prime_data = _get_column_data(df, y_cols[1])
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
@@ -199,9 +199,9 @@ def load_excel(
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
         logger.debug("Constructed complex modulus from G' and G''")
     else:
-        y_headers = [_get_column_header(df, y_col)]  # type: ignore[arg-type]
+        y_headers = [_get_column_header(df, y_col)]
         try:
-            y_data = _get_column_data(df, y_col)  # type: ignore[arg-type]
+            y_data = _get_column_data(df, y_col)
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_col=y_col, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e

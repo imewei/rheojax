@@ -180,13 +180,9 @@ class TestMaxwellLimit:
         wt_0 = omega * tau_b_0
         wt_1 = omega * tau_b_1
 
-        expected_Gp = (
-            G_0 * wt_0**2 / (1 + wt_0**2) + G_1 * wt_1**2 / (1 + wt_1**2)
-        )
+        expected_Gp = G_0 * wt_0**2 / (1 + wt_0**2) + G_1 * wt_1**2 / (1 + wt_1**2)
         expected_Gpp = (
-            G_0 * wt_0 / (1 + wt_0**2)
-            + G_1 * wt_1 / (1 + wt_1**2)
-            + eta_s * omega
+            G_0 * wt_0 / (1 + wt_0**2) + G_1 * wt_1 / (1 + wt_1**2) + eta_s * omega
         )
 
         assert np.allclose(G_prime, expected_Gp, rtol=1e-10)
@@ -498,9 +494,7 @@ class TestCreepSimulation:
         model.parameters.set_value("eta_s", 10.0)
 
         t = np.linspace(0, 10, 100)
-        gamma, gamma_dot = model.simulate_creep(
-            t, sigma_applied=50.0, return_rate=True
-        )
+        gamma, gamma_dot = model.simulate_creep(t, sigma_applied=50.0, return_rate=True)
 
         assert gamma.shape == t.shape
         assert gamma_dot.shape == t.shape

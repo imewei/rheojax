@@ -239,7 +239,9 @@ def posterior_predictive_saos(
     """
     param_names = list(model.parameters.keys())
     n_total = len(next(iter(posterior.values())))
-    indices = np.random.default_rng(0).choice(n_total, size=min(n_draws, n_total), replace=False)
+    indices = np.random.default_rng(0).choice(
+        n_total, size=min(n_draws, n_total), replace=False
+    )
 
     G_prime_all = []
     G_double_prime_all = []
@@ -281,7 +283,9 @@ def posterior_predictive_1d(
     """
     param_names = list(model.parameters.keys())
     n_total = len(next(iter(posterior.values())))
-    indices = np.random.default_rng(0).choice(n_total, size=min(n_draws, n_total), replace=False)
+    indices = np.random.default_rng(0).choice(
+        n_total, size=min(n_draws, n_total), replace=False
+    )
 
     draws = []
     for idx in indices:
@@ -328,13 +332,18 @@ def plot_trace_and_forest(
     trace_h = max(figsize_trace[1], 2.0 * n)
     forest_h = max(figsize_forest[1], 1.2 * n)
 
-    axes = az.plot_trace(idata, var_names=param_names, figsize=(figsize_trace[0], trace_h))
+    axes = az.plot_trace(
+        idata, var_names=param_names, figsize=(figsize_trace[0], trace_h)
+    )
     fig_trace = axes.ravel()[0].figure
     fig_trace.suptitle("HVM Trace Plots", fontsize=14, y=1.02)
     fig_trace.tight_layout(rect=[0, 0, 1, 0.98])
 
     axes = az.plot_forest(
-        idata, var_names=param_names, combined=True, hdi_prob=0.95,
+        idata,
+        var_names=param_names,
+        combined=True,
+        hdi_prob=0.95,
         figsize=(figsize_forest[0], forest_h),
     )
     fig_forest = axes.ravel()[0].figure
@@ -379,28 +388,52 @@ def plot_posterior_predictive_saos(
 
     # Data
     ax.loglog(omega, G_prime_data, "s", color="C0", label="G' (data)", markersize=6)
-    ax.loglog(omega, G_double_prime_data, "o", color="C1", label="G'' (data)", markersize=6)
+    ax.loglog(
+        omega, G_double_prime_data, "o", color="C1", label="G'' (data)", markersize=6
+    )
 
     # NLSQ
     if G_prime_nlsq is not None:
-        ax.loglog(omega_pred, G_prime_nlsq, "-", color="C0", alpha=0.5, label="G' (NLSQ)")
+        ax.loglog(
+            omega_pred, G_prime_nlsq, "-", color="C0", alpha=0.5, label="G' (NLSQ)"
+        )
     if G_double_prime_nlsq is not None:
-        ax.loglog(omega_pred, G_double_prime_nlsq, "-", color="C1", alpha=0.5, label="G'' (NLSQ)")
+        ax.loglog(
+            omega_pred,
+            G_double_prime_nlsq,
+            "-",
+            color="C1",
+            alpha=0.5,
+            label="G'' (NLSQ)",
+        )
 
     # Posterior bands
     if len(G_prime_draws) > 0:
         lo = np.percentile(G_prime_draws, alpha, axis=0)
         hi = np.percentile(G_prime_draws, 100 - alpha, axis=0)
         med = np.median(G_prime_draws, axis=0)
-        ax.fill_between(omega_pred, lo, hi, color="C0", alpha=0.15, label=f"G' {credibility:.0%} CI")
-        ax.loglog(omega_pred, med, "--", color="C0", linewidth=1.5, label="G' (Bayes median)")
+        ax.fill_between(
+            omega_pred, lo, hi, color="C0", alpha=0.15, label=f"G' {credibility:.0%} CI"
+        )
+        ax.loglog(
+            omega_pred, med, "--", color="C0", linewidth=1.5, label="G' (Bayes median)"
+        )
 
     if len(G_double_prime_draws) > 0:
         lo = np.percentile(G_double_prime_draws, alpha, axis=0)
         hi = np.percentile(G_double_prime_draws, 100 - alpha, axis=0)
         med = np.median(G_double_prime_draws, axis=0)
-        ax.fill_between(omega_pred, lo, hi, color="C1", alpha=0.15, label=f"G'' {credibility:.0%} CI")
-        ax.loglog(omega_pred, med, "--", color="C1", linewidth=1.5, label="G'' (Bayes median)")
+        ax.fill_between(
+            omega_pred,
+            lo,
+            hi,
+            color="C1",
+            alpha=0.15,
+            label=f"G'' {credibility:.0%} CI",
+        )
+        ax.loglog(
+            omega_pred, med, "--", color="C1", linewidth=1.5, label="G'' (Bayes median)"
+        )
 
     ax.set_xlabel("Angular Frequency (rad/s)")
     ax.set_ylabel("Modulus (Pa)")
@@ -470,14 +503,16 @@ def save_results(
         if p not in posterior:
             continue
         samples = np.array(posterior[p])
-        rows.append({
-            "parameter": p,
-            "nlsq": nlsq.get(p),
-            "posterior_mean": float(np.mean(samples)),
-            "posterior_median": float(np.median(samples)),
-            "ci_2.5": float(np.percentile(samples, 2.5)),
-            "ci_97.5": float(np.percentile(samples, 97.5)),
-        })
+        rows.append(
+            {
+                "parameter": p,
+                "nlsq": nlsq.get(p),
+                "posterior_mean": float(np.mean(samples)),
+                "posterior_median": float(np.median(samples)),
+                "ci_2.5": float(np.percentile(samples, 2.5)),
+                "ci_97.5": float(np.percentile(samples, 97.5)),
+            }
+        )
     pd.DataFrame(rows).to_csv(os.path.join(output_dir, "summary.csv"), index=False)
     print(f"Results saved to {output_dir}/")
 

@@ -354,9 +354,13 @@ class DMTLocal(DMTBase):
         params = self.get_parameter_dict()
 
         if self.include_elasticity:
-            t_out, stress, lam = self._simulate_startup_maxwell(t, dt, gamma_dot, lam_init, params)
+            t_out, stress, lam = self._simulate_startup_maxwell(
+                t, dt, gamma_dot, lam_init, params
+            )
         else:
-            t_out, stress, lam = self._simulate_startup_viscous(t, dt, gamma_dot, lam_init, params)
+            t_out, stress, lam = self._simulate_startup_viscous(
+                t, dt, gamma_dot, lam_init, params
+            )
 
         # Convert to numpy for public API
         return np.array(t_out), np.array(stress), np.array(lam)
@@ -1057,8 +1061,8 @@ class DMTLocal(DMTBase):
             sigma_prime.append(sp)
             sigma_double_prime.append(spp)
 
-        sigma_prime = np.array(sigma_prime)  # type: ignore[assignment]
-        sigma_double_prime = np.array(sigma_double_prime)  # type: ignore[assignment]
+        sigma_prime = np.array(sigma_prime)
+        sigma_double_prime = np.array(sigma_double_prime)
 
         # Normalized intensities I_n/I_1
         I_1 = np.sqrt(sigma_prime[0] ** 2 + sigma_double_prime[0] ** 2)
@@ -1070,8 +1074,8 @@ class DMTLocal(DMTBase):
         )
 
         return {
-            "sigma_prime": sigma_prime,  # type: ignore[dict-item]
-            "sigma_double_prime": sigma_double_prime,  # type: ignore[dict-item]
+            "sigma_prime": sigma_prime,
+            "sigma_double_prime": sigma_double_prime,
             "I_n_1": I_n_1,
         }
 
@@ -1093,12 +1097,8 @@ class DMTLocal(DMTBase):
         """Get parameter array and bounds for optimization."""
         param_names = list(self.parameters.keys())
         params = jnp.array([self.parameters.get_value(n) for n in param_names])
-        bounds_lower = jnp.array(
-            [self.parameters[n].bounds[0] for n in param_names]  # type: ignore[index]
-        )
-        bounds_upper = jnp.array(
-            [self.parameters[n].bounds[1] for n in param_names]  # type: ignore[index]
-        )
+        bounds_lower = jnp.array([self.parameters[n].bounds[0] for n in param_names])
+        bounds_upper = jnp.array([self.parameters[n].bounds[1] for n in param_names])
         return params, (bounds_lower, bounds_upper)
 
     def _params_array_to_dict(self, params_array: jnp.ndarray) -> dict:
@@ -1187,15 +1187,23 @@ class DMTLocal(DMTBase):
         """Flow curve prediction: σ(γ̇) at steady state."""
         if self.closure == "exponential":
             return steady_stress_exponential(
-                X_jax, p_values["eta_0"], p_values["eta_inf"],
-                p_values["a"], p_values["c"],
+                X_jax,
+                p_values["eta_0"],
+                p_values["eta_inf"],
+                p_values["a"],
+                p_values["c"],
             )
         else:
             return steady_stress_herschel_bulkley(
-                X_jax, p_values["tau_y0"], p_values["K0"],
-                p_values["n_flow"], p_values["eta_inf"],
-                p_values["a"], p_values["c"],
-                p_values["m1"], p_values["m2"],
+                X_jax,
+                p_values["tau_y0"],
+                p_values["K0"],
+                p_values["n_flow"],
+                p_values["eta_inf"],
+                p_values["a"],
+                p_values["c"],
+                p_values["m1"],
+                p_values["m2"],
             )
 
     def _model_function_oscillation(self, X_jax, p_values):
@@ -1205,14 +1213,17 @@ class DMTLocal(DMTBase):
         G = elastic_modulus(lam_0, p_values["G0"], p_values["m_G"])
 
         if self.closure == "exponential":
-            eta = viscosity_exponential(
-                lam_0, p_values["eta_0"], p_values["eta_inf"]
-            )
+            eta = viscosity_exponential(lam_0, p_values["eta_0"], p_values["eta_inf"])
         else:
             eta = viscosity_herschel_bulkley_regularized(
-                lam_0, 1e-6, p_values["tau_y0"], p_values["K0"],
-                p_values["n_flow"], p_values["eta_inf"],
-                p_values["m1"], p_values["m2"],
+                lam_0,
+                1e-6,
+                p_values["tau_y0"],
+                p_values["K0"],
+                p_values["n_flow"],
+                p_values["eta_inf"],
+                p_values["m1"],
+                p_values["m2"],
             )
 
         theta_1 = eta / jnp.maximum(G, 1e-10)
@@ -1229,11 +1240,15 @@ class DMTLocal(DMTBase):
         n_steps = X_jax.shape[0]
 
         if self.include_elasticity:
+
             def step(state, _):
                 sigma, lam = state
                 dlam = structure_evolution(
-                    lam, gamma_dot, p_values["t_eq"],
-                    p_values["a"], p_values["c"],
+                    lam,
+                    gamma_dot,
+                    p_values["t_eq"],
+                    p_values["a"],
+                    p_values["c"],
                 )
                 lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                 G = elastic_modulus(lam_new, p_values["G0"], p_values["m_G"])
@@ -1243,9 +1258,14 @@ class DMTLocal(DMTBase):
                     )
                 else:
                     eta = viscosity_herschel_bulkley_regularized(
-                        lam_new, gamma_dot, p_values["tau_y0"], p_values["K0"],
-                        p_values["n_flow"], p_values["eta_inf"],
-                        p_values["m1"], p_values["m2"],
+                        lam_new,
+                        gamma_dot,
+                        p_values["tau_y0"],
+                        p_values["K0"],
+                        p_values["n_flow"],
+                        p_values["eta_inf"],
+                        p_values["m1"],
+                        p_values["m2"],
                     )
                 theta_1 = eta / jnp.maximum(G, 1e-10)
                 dsigma = maxwell_stress_evolution(sigma, gamma_dot, G, theta_1)
@@ -1255,10 +1275,14 @@ class DMTLocal(DMTBase):
             init_state = (jnp.float64(0.0), jnp.float64(lam_init))
             _, stress = jax.lax.scan(step, init_state, None, length=n_steps)
         else:
+
             def step(lam, _):
                 dlam = structure_evolution(
-                    lam, gamma_dot, p_values["t_eq"],
-                    p_values["a"], p_values["c"],
+                    lam,
+                    gamma_dot,
+                    p_values["t_eq"],
+                    p_values["a"],
+                    p_values["c"],
                 )
                 lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                 if self.closure == "exponential":
@@ -1267,15 +1291,18 @@ class DMTLocal(DMTBase):
                     )
                 else:
                     eta = viscosity_herschel_bulkley_regularized(
-                        lam_new, gamma_dot, p_values["tau_y0"], p_values["K0"],
-                        p_values["n_flow"], p_values["eta_inf"],
-                        p_values["m1"], p_values["m2"],
+                        lam_new,
+                        gamma_dot,
+                        p_values["tau_y0"],
+                        p_values["K0"],
+                        p_values["n_flow"],
+                        p_values["eta_inf"],
+                        p_values["m1"],
+                        p_values["m2"],
                     )
                 return lam_new, eta * gamma_dot
 
-            _, stress = jax.lax.scan(
-                step, jnp.float64(lam_init), None, length=n_steps
-            )
+            _, stress = jax.lax.scan(step, jnp.float64(lam_init), None, length=n_steps)
 
         return stress
 
@@ -1319,6 +1346,7 @@ class DMTLocal(DMTBase):
         n_steps = X_jax.shape[0]
 
         if self.include_elasticity:
+
             def step(state, _):
                 lam, gamma_v, lam_prev = state
                 G = elastic_modulus(lam, p_values["G0"], p_values["m_G"])
@@ -1330,14 +1358,22 @@ class DMTLocal(DMTBase):
                     )
                 else:
                     gamma_dot_v = invert_stress_for_gamma_dot_hb(
-                        sigma_0, lam, p_values["tau_y0"], p_values["K0"],
-                        p_values["n_flow"], p_values["eta_inf"],
-                        p_values["m1"], p_values["m2"],
+                        sigma_0,
+                        lam,
+                        p_values["tau_y0"],
+                        p_values["K0"],
+                        p_values["n_flow"],
+                        p_values["eta_inf"],
+                        p_values["m1"],
+                        p_values["m2"],
                     )
 
                 dlam = structure_evolution(
-                    lam, gamma_dot_v, p_values["t_eq"],
-                    p_values["a"], p_values["c"],
+                    lam,
+                    gamma_dot_v,
+                    p_values["t_eq"],
+                    p_values["a"],
+                    p_values["c"],
                 )
                 lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                 gamma_v_new = gamma_v + dt * gamma_dot_v
@@ -1345,10 +1381,13 @@ class DMTLocal(DMTBase):
                 return (lam_new, gamma_v_new, lam), gamma_total
 
             init_state = (
-                jnp.float64(lam_init), jnp.float64(0.0), jnp.float64(lam_init)
+                jnp.float64(lam_init),
+                jnp.float64(0.0),
+                jnp.float64(lam_init),
             )
             _, gamma = jax.lax.scan(step, init_state, None, length=n_steps)
         else:
+
             def step(state, _):
                 lam, gamma = state
                 if self.closure == "exponential":
@@ -1357,14 +1396,22 @@ class DMTLocal(DMTBase):
                     )
                 else:
                     gamma_dot = invert_stress_for_gamma_dot_hb(
-                        sigma_0, lam, p_values["tau_y0"], p_values["K0"],
-                        p_values["n_flow"], p_values["eta_inf"],
-                        p_values["m1"], p_values["m2"],
+                        sigma_0,
+                        lam,
+                        p_values["tau_y0"],
+                        p_values["K0"],
+                        p_values["n_flow"],
+                        p_values["eta_inf"],
+                        p_values["m1"],
+                        p_values["m2"],
                     )
 
                 dlam = structure_evolution(
-                    lam, gamma_dot, p_values["t_eq"],
-                    p_values["a"], p_values["c"],
+                    lam,
+                    gamma_dot,
+                    p_values["t_eq"],
+                    p_values["a"],
+                    p_values["c"],
                 )
                 lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                 gamma_new = gamma + dt * gamma_dot
@@ -1386,11 +1433,15 @@ class DMTLocal(DMTBase):
         dt = X_jax[1] - X_jax[0]
 
         if self.include_elasticity:
+
             def step(state, sr):
                 sigma, lam = state
                 dlam = structure_evolution(
-                    lam, sr, p_values["t_eq"],
-                    p_values["a"], p_values["c"],
+                    lam,
+                    sr,
+                    p_values["t_eq"],
+                    p_values["a"],
+                    p_values["c"],
                 )
                 lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                 G = elastic_modulus(lam_new, p_values["G0"], p_values["m_G"])
@@ -1400,9 +1451,14 @@ class DMTLocal(DMTBase):
                     )
                 else:
                     eta = viscosity_herschel_bulkley_regularized(
-                        lam_new, sr, p_values["tau_y0"], p_values["K0"],
-                        p_values["n_flow"], p_values["eta_inf"],
-                        p_values["m1"], p_values["m2"],
+                        lam_new,
+                        sr,
+                        p_values["tau_y0"],
+                        p_values["K0"],
+                        p_values["n_flow"],
+                        p_values["eta_inf"],
+                        p_values["m1"],
+                        p_values["m2"],
                     )
                 theta_1 = eta / jnp.maximum(G, 1e-10)
                 dsigma = maxwell_stress_evolution(sigma, sr, G, theta_1)
@@ -1412,10 +1468,14 @@ class DMTLocal(DMTBase):
             init_state = (jnp.float64(0.0), jnp.float64(lam_init))
             _, stress = jax.lax.scan(step, init_state, strain_rate)
         else:
+
             def step(lam, sr):
                 dlam = structure_evolution(
-                    lam, sr, p_values["t_eq"],
-                    p_values["a"], p_values["c"],
+                    lam,
+                    sr,
+                    p_values["t_eq"],
+                    p_values["a"],
+                    p_values["c"],
                 )
                 lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                 if self.closure == "exponential":
@@ -1424,14 +1484,17 @@ class DMTLocal(DMTBase):
                     )
                 else:
                     eta = viscosity_herschel_bulkley_regularized(
-                        lam_new, sr, p_values["tau_y0"], p_values["K0"],
-                        p_values["n_flow"], p_values["eta_inf"],
-                        p_values["m1"], p_values["m2"],
+                        lam_new,
+                        sr,
+                        p_values["tau_y0"],
+                        p_values["K0"],
+                        p_values["n_flow"],
+                        p_values["eta_inf"],
+                        p_values["m1"],
+                        p_values["m2"],
                     )
                 return lam_new, eta * sr
 
-            _, stress = jax.lax.scan(
-                step, jnp.float64(lam_init), strain_rate
-            )
+            _, stress = jax.lax.scan(step, jnp.float64(lam_init), strain_rate)
 
         return stress

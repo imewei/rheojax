@@ -18,7 +18,6 @@ from rheojax.gui.compat import (
     QCloseEvent,
     QDockWidget,
     QFileDialog,
-    QFont,
     QInputDialog,
     QKeySequence,
     QMainWindow,

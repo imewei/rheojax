@@ -94,7 +94,9 @@ def load_mucus_creep() -> tuple[np.ndarray, np.ndarray]:
         FileNotFoundError: If data file not found.
     """
     module_dir = Path(__file__).parent
-    data_path = module_dir / ".." / "data" / "creep" / "biological" / "creep_mucus_data.csv"
+    data_path = (
+        module_dir / ".." / "data" / "creep" / "biological" / "creep_mucus_data.csv"
+    )
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -192,7 +194,9 @@ def generate_synthetic_startup(
     stress_clean = np.array(model.simulate_startup(time, gamma_dot=gamma_dot))
 
     # Add noise
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     return time, stress
@@ -244,8 +248,12 @@ def generate_synthetic_normal_stresses(
     N2_clean = np.array(N2_clean)
 
     # Add noise
-    noise_N1 = rng.normal(0, noise_level * np.mean(np.abs(N1_clean)), size=N1_clean.shape)
-    noise_N2 = rng.normal(0, noise_level * np.mean(np.abs(N2_clean)), size=N2_clean.shape)
+    noise_N1 = rng.normal(
+        0, noise_level * np.mean(np.abs(N1_clean)), size=N1_clean.shape
+    )
+    noise_N2 = rng.normal(
+        0, noise_level * np.mean(np.abs(N2_clean)), size=N2_clean.shape
+    )
     N1 = N1_clean + noise_N1
     N2 = N2_clean + noise_N2
 
@@ -305,10 +313,14 @@ def generate_synthetic_laos(
     # Handle case where simulate_laos returns just stress array
     if len(stress_clean) != len(time):
         # Fallback: interpolate or truncate
-        stress_clean = np.interp(time, np.linspace(0, t_end, len(stress_clean)), stress_clean)
+        stress_clean = np.interp(
+            time, np.linspace(0, t_end, len(stress_clean)), stress_clean
+        )
 
     # Add noise
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     return {
@@ -484,7 +496,9 @@ def print_parameter_comparison(
             median = float(np.median(samples))
             lo = float(np.percentile(samples, 2.5))
             hi = float(np.percentile(samples, 97.5))
-            print(f"{name:>12s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]")
+            print(
+                f"{name:>12s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]"
+            )
         except (KeyError, AttributeError):
             pass
 
@@ -571,7 +585,9 @@ def compute_weissenberg_number(
     return lambda_1 * gamma_dot
 
 
-def compute_deborah_number(omega: float | np.ndarray, lambda_1: float) -> float | np.ndarray:
+def compute_deborah_number(
+    omega: float | np.ndarray, lambda_1: float
+) -> float | np.ndarray:
     """Compute Deborah number De = λ·ω.
 
     The Deborah number characterizes the relative importance of
@@ -659,9 +675,14 @@ def plot_shear_thinning_regime(
 
     # Plot
     ax.loglog(gamma_dot, eta, "-", lw=2, color="C0", label="η(γ̇)")
-    ax.axhline(eta_0, color="gray", linestyle="--", alpha=0.7, label=f"η₀ = {eta_0:.1f} Pa·s")
+    ax.axhline(
+        eta_0, color="gray", linestyle="--", alpha=0.7, label=f"η₀ = {eta_0:.1f} Pa·s"
+    )
 
-    if gamma_dot_c is not None and gamma_dot_range[0] < gamma_dot_c < gamma_dot_range[1]:
+    if (
+        gamma_dot_c is not None
+        and gamma_dot_range[0] < gamma_dot_c < gamma_dot_range[1]
+    ):
         ax.axvline(
             gamma_dot_c,
             color="C3",

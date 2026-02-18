@@ -28,6 +28,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.state.store import StateStore
 from rheojax.logging import get_logger
@@ -80,7 +81,13 @@ class DataPage(QWidget):
     def setup_ui(self) -> None:
         """Setup user interface."""
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setContentsMargins(
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+        )
+        main_layout.setSpacing(Spacing.LG)
 
         # Left panel: File import
         left_panel = self._create_import_panel()
@@ -97,8 +104,8 @@ class DataPage(QWidget):
         """Create file import panel."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(Spacing.SM)
 
         # Drop zone
         self._drop_zone = DropZone()
@@ -147,7 +154,9 @@ class DataPage(QWidget):
         info_layout.addWidget(self._file_name_label)
 
         self._file_size_label = QLabel("")
-        self._file_size_label.setStyleSheet("font-size: 10pt; color: #444;")
+        self._file_size_label.setStyleSheet(
+            f"font-size: 10pt; color: {ColorPalette.TEXT_SECONDARY};"
+        )
         info_layout.addWidget(self._file_size_label)
 
         layout.addWidget(info_group)
@@ -174,9 +183,8 @@ class DataPage(QWidget):
         """Create data preview panel."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(Spacing.SM)
 
         # Header
         header = QLabel("Data Preview (first 100 rows)")
@@ -194,7 +202,9 @@ class DataPage(QWidget):
         # Empty state
         empty_label = QLabel("No dataset loaded. Use Browse or Load Example to begin.")
         empty_label.setAlignment(Qt.AlignCenter)
-        empty_label.setStyleSheet("color: #666; padding: 8px;")
+        empty_label.setStyleSheet(
+            f"color: {ColorPalette.TEXT_SECONDARY}; padding: {Spacing.SM}px;"
+        )
         layout.addWidget(empty_label)
         self._empty_label = empty_label
 
@@ -314,7 +324,9 @@ class DataPage(QWidget):
         # Empty state placeholder
         self._empty_state = QLabel("Drop a file or browse to import data")
         self._empty_state.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty_state.setStyleSheet("color: #94A3B8; padding: 8px;")
+        self._empty_state.setStyleSheet(
+            f"color: {ColorPalette.TEXT_MUTED}; padding: {Spacing.SM}px;"
+        )
         layout.addWidget(self._empty_state)
 
         return panel
@@ -408,7 +420,7 @@ class DataPage(QWidget):
                 self._preview_table.setHorizontalHeaderLabels(headers)
             else:
                 self._preview_table.setHorizontalHeaderLabels(
-                    [f"Col {i+1}" for i in range(len(self._preview_data[0]))]
+                    [f"Col {i + 1}" for i in range(len(self._preview_data[0]))]
                 )
 
             # Populate data
@@ -419,7 +431,7 @@ class DataPage(QWidget):
 
             # Update column mappers
             self._update_column_mappers(
-                headers or [f"Col {i+1}" for i in range(len(self._preview_data[0]))]
+                headers or [f"Col {i + 1}" for i in range(len(self._preview_data[0]))]
             )
 
             # Update metadata display with format info
@@ -644,8 +656,13 @@ class DataPage(QWidget):
             store = StateStore()
 
             _VALID_TEST_MODES = {
-                "oscillation", "relaxation", "creep", "flow_curve",
-                "startup", "laos", "unknown",
+                "oscillation",
+                "relaxation",
+                "creep",
+                "flow_curve",
+                "startup",
+                "laos",
+                "unknown",
             }
             first_dataset_id: str | None = None
 
@@ -691,9 +708,7 @@ class DataPage(QWidget):
 
             # For multi-segment files, ensure the first segment is active
             if len(datasets) > 1 and first_dataset_id:
-                store.dispatch(
-                    "SET_ACTIVE_DATASET", {"dataset_id": first_dataset_id}
-                )
+                store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": first_dataset_id})
 
             # Log successful import
             logger.info(
@@ -903,16 +918,16 @@ class DropZone(QFrame):
         logger.debug("Initializing", class_name=self.__class__.__name__)
         self.setAcceptDrops(True)
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #f9f9f9;
-                border: 2px dashed #ccc;
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {ColorPalette.BG_SURFACE};
+                border: 2px dashed {ColorPalette.BORDER_DEFAULT};
                 border-radius: 10px;
-            }
-            QFrame:hover {
-                border-color: #2196F3;
-                background-color: #f0f7ff;
-            }
+            }}
+            QFrame:hover {{
+                border-color: {ColorPalette.PRIMARY};
+                background-color: {ColorPalette.PRIMARY_SUBTLE};
+            }}
         """)
 
         layout = QVBoxLayout(self)
@@ -920,12 +935,16 @@ class DropZone(QFrame):
 
         icon_label = QLabel("Drop Files Here")
         icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setStyleSheet("font-size: 24pt; font-weight: bold; color: #999;")
+        icon_label.setStyleSheet(
+            f"font-size: 24pt; font-weight: bold; color: {ColorPalette.TEXT_MUTED};"
+        )
         layout.addWidget(icon_label)
 
         text_label = QLabel("Drag and drop data file here\n\nor click Browse to select")
         text_label.setAlignment(Qt.AlignCenter)
-        text_label.setStyleSheet("color: #666; font-size: 12pt;")
+        text_label.setStyleSheet(
+            f"color: {ColorPalette.TEXT_SECONDARY}; font-size: 12pt;"
+        )
         layout.addWidget(text_label)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:

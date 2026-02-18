@@ -350,7 +350,9 @@ class TestModelFunction:
         gamma_dot = np.logspace(-1, 2, 10)
 
         params = np.array([0.0, 4.5, 1.0, 0.1, 1e6])
-        with pytest.raises(NotImplementedError, match="Bayesian inference is not yet supported"):
+        with pytest.raises(
+            NotImplementedError, match="Bayesian inference is not yet supported"
+        ):
             model.model_function(
                 gamma_dot,
                 params,

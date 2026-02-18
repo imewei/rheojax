@@ -98,9 +98,7 @@ class TestTriosRealDataLoading:
         if isinstance(data, list):
             data = data[0]
 
-        assert data.domain in ("time", "frequency"), (
-            f"Unexpected domain: {data.domain}"
-        )
+        assert data.domain in ("time", "frequency"), f"Unexpected domain: {data.domain}"
 
     def test_units_present(self):
         """Verify units are extracted from TRIOS headers."""

@@ -497,7 +497,7 @@ class SGRGeneric(BaseModel):
     # BaseModel Interface Implementation
     # =========================================================================
 
-    def _fit(  # type: ignore[override]
+    def _fit(
         self,
         X: np.ndarray,
         y: np.ndarray,
@@ -1723,10 +1723,14 @@ class SGRGeneric(BaseModel):
             return lambda_new, lambda_new
 
         # Scan over time steps (skip first step where dt=0)
-        _, lambda_steps = jax.lax.scan(step, jnp.float64(lambda_initial), (dt[1:], gamma_dot_abs[1:]))
+        _, lambda_steps = jax.lax.scan(
+            step, jnp.float64(lambda_initial), (dt[1:], gamma_dot_abs[1:])
+        )
 
         # Prepend initial value
-        lambda_t = np.asarray(jnp.concatenate([jnp.array([lambda_initial]), lambda_steps]))
+        lambda_t = np.asarray(
+            jnp.concatenate([jnp.array([lambda_initial]), lambda_steps])
+        )
 
         # Store trajectory
         self._lambda_trajectory = lambda_t

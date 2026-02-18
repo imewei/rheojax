@@ -130,9 +130,7 @@ def hvnm_interphase_fraction(
 
 
 @jax.jit
-def hvnm_interphase_modulus(
-    G_E: float, beta_I: float, phi_I: float
-) -> float:
+def hvnm_interphase_modulus(G_E: float, beta_I: float, phi_I: float) -> float:
     """Effective interphase modulus.
 
     G_I_eff = beta_I * G_E * phi_I
@@ -193,9 +191,8 @@ def hvnm_ber_rate_matrix_stress(
     """
     # Import HVM kernel to avoid duplication
     from rheojax.models.hvm._kernels import hvm_ber_rate_stress
-    return hvm_ber_rate_stress(
-        sigma_E_xx, sigma_E_yy, sigma_E_xy, nu_0, E_a, V_act, T
-    )
+
+    return hvm_ber_rate_stress(sigma_E_xx, sigma_E_yy, sigma_E_xy, nu_0, E_a, V_act, T)
 
 
 @jax.jit
@@ -232,7 +229,8 @@ def hvnm_ber_rate_interphase_stress(
     """
     sigma_vm = jnp.sqrt(
         jnp.maximum(
-            sigma_I_xx**2 + sigma_I_yy**2
+            sigma_I_xx**2
+            + sigma_I_yy**2
             - sigma_I_xx * sigma_I_yy
             + 3.0 * sigma_I_xy**2,
             1e-30,
@@ -260,9 +258,17 @@ def hvnm_ber_rate_matrix_stretch(
     Delegates to HVM kernel.
     """
     from rheojax.models.hvm._kernels import hvm_ber_rate_stretch
+
     return hvm_ber_rate_stretch(
-        mu_E_xx, mu_E_yy, mu_E_nat_xx, mu_E_nat_yy,
-        G_E, nu_0, E_a, V_act, T,
+        mu_E_xx,
+        mu_E_yy,
+        mu_E_nat_xx,
+        mu_E_nat_yy,
+        G_E,
+        nu_0,
+        E_a,
+        V_act,
+        T,
     )
 
 
@@ -307,9 +313,7 @@ def hvnm_ber_rate_interphase_stretch(
 
 
 @jax.jit
-def hvnm_ber_rate_constant_matrix(
-    nu_0: float, E_a: float, T: float
-) -> float:
+def hvnm_ber_rate_constant_matrix(nu_0: float, E_a: float, T: float) -> float:
     """Thermal matrix BER rate at zero stress.
 
     k_BER^mat_0 = nu_0 * exp(-E_a / (R*T))
@@ -514,8 +518,11 @@ def hvnm_total_normal_stress_1(
     """
     N1_E = G_E * ((mu_E_xx - mu_E_nat_xx) - (mu_E_yy - mu_E_nat_yy))
     N1_D = G_D * (mu_D_xx - mu_D_yy)
-    N1_I = (1.0 - D_int) * G_I_eff * X_I * (
-        (mu_I_xx - mu_I_nat_xx) - (mu_I_yy - mu_I_nat_yy)
+    N1_I = (
+        (1.0 - D_int)
+        * G_I_eff
+        * X_I
+        * ((mu_I_xx - mu_I_nat_xx) - (mu_I_yy - mu_I_nat_yy))
     )
     return N1_E + N1_D + N1_I
 
@@ -733,9 +740,7 @@ def hvnm_saos_moduli(
         + G_I_contrib * wt_I2 / denom_I
     )
     G_double_prime = (
-        G_E * wt_E / denom_E
-        + G_D * wt_D / denom_D
-        + G_I_contrib * wt_I / denom_I
+        G_E * wt_E / denom_E + G_D * wt_D / denom_D + G_I_contrib * wt_I / denom_I
     )
 
     return G_prime, G_double_prime
@@ -783,9 +788,7 @@ def hvnm_saos_moduli_vec(
         + G_I_contrib * wt_I2 / denom_I
     )
     G_double_prime = (
-        G_E * wt_E / denom_E
-        + G_D * wt_D / denom_D
-        + G_I_contrib * wt_I / denom_I
+        G_E * wt_E / denom_E + G_D * wt_D / denom_D + G_I_contrib * wt_I / denom_I
     )
 
     return G_prime, G_double_prime
@@ -1053,8 +1056,7 @@ def hvnm_relaxation_modulus_with_diffusion(
     G_exch = G_E * jnp.exp(-(2.0 * k_BER_mat_0 + k_diff_mat) * t)
     G_diss = G_D * jnp.exp(-k_d_D * t)
     G_inter = (
-        (1.0 - D_int) * G_I_eff * X_I
-        * jnp.exp(-(2.0 * k_BER_int_0 + k_diff_int) * t)
+        (1.0 - D_int) * G_I_eff * X_I * jnp.exp(-(2.0 * k_BER_int_0 + k_diff_int) * t)
     )
     return G_perm + G_exch + G_diss + G_inter
 
@@ -1062,6 +1064,21 @@ def hvnm_relaxation_modulus_with_diffusion(
 hvnm_relaxation_modulus_with_diffusion_vec = jax.jit(
     jax.vmap(
         hvnm_relaxation_modulus_with_diffusion,
-        in_axes=(0, None, None, None, None, None, None, None, None, None, None, None, None, None),
+        in_axes=(
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
     )
 )

@@ -11,6 +11,7 @@ Features:
 - Robust working-directory handling
 - Combined suite support (HL + STZ)
 """
+
 import argparse
 import json
 import os
@@ -122,7 +123,10 @@ def run_notebook(
         for cell in nb.cells:
             if cell.cell_type == "code" and hasattr(cell, "outputs"):
                 for output in cell.outputs:
-                    if output.get("output_type") == "stream" and output.get("name") == "stderr":
+                    if (
+                        output.get("output_type") == "stream"
+                        and output.get("name") == "stderr"
+                    ):
                         text = output.get("text", "")
                         if text.strip():
                             # Parse warnings from stderr
@@ -175,7 +179,7 @@ def run_notebook(
 
                 if result["warnings"]:
                     f.write("=== WARNINGS ===\n")
-                    for w in result["warnings"][:50]:  # Limit to 50 warnings
+                    for w in result["warnings"][:50]:  # type: ignore[index]
                         f.write(f"  {w}\n")
                     f.write("\n")
 
@@ -196,7 +200,10 @@ def categorize_error(result: dict[str, Any]) -> str:
     if result["status"] == "PASS":
         if result["warnings_count"] > 0:
             warnings_text = " ".join(result["warnings"])
-            if "DeprecationWarning" in warnings_text or "FutureWarning" in warnings_text:
+            if (
+                "DeprecationWarning" in warnings_text
+                or "FutureWarning" in warnings_text
+            ):
                 return "deprecation_warning"
             if "RuntimeWarning" in warnings_text or "invalid value" in warnings_text:
                 return "numerical_warning"
@@ -256,8 +263,7 @@ def run_suite(
         notebooks = [
             nb
             for nb in notebooks
-            if not nb.name.startswith(".")
-            and ".ipynb_checkpoints" not in str(nb)
+            if not nb.name.startswith(".") and ".ipynb_checkpoints" not in str(nb)
         ]
 
     print(f"\n{suite_name.upper()} Notebook Suite")
@@ -295,7 +301,9 @@ def run_suite(
 
     # Write suite master log
     master_log = log_dir / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    passed = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0)
+    passed = sum(
+        1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0
+    )
     passed_with_warnings = sum(
         1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0
     )
@@ -374,8 +382,12 @@ def generate_combined_inventory(
 
         # Summary statistics
         total = len(all_results)
-        clean_pass = sum(1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] == 0)
-        pass_with_warnings = sum(1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] > 0)
+        clean_pass = sum(
+            1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] == 0
+        )
+        pass_with_warnings = sum(
+            1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] > 0
+        )
         failed = sum(1 for r in all_results if r["status"] == "FAIL")
         timeouts = sum(1 for r in all_results if r["status"] == "TIMEOUT")
 
@@ -426,7 +438,11 @@ def generate_combined_inventory(
                 if r["traceback"]:
                     # Extract most relevant frames
                     tb_lines = r["traceback"].split("\n")
-                    relevant = [line for line in tb_lines if "rheojax" in line or "Error" in line][:10]
+                    relevant = [
+                        line
+                        for line in tb_lines
+                        if "rheojax" in line or "Error" in line
+                    ][:10]
                     if relevant:
                         f.write("\n**Traceback (relevant)**:\n```\n")
                         f.write("\n".join(relevant))
@@ -443,7 +459,9 @@ def generate_combined_inventory(
     print(f"\nCombined issue inventory written to: {output_path}")
 
 
-def print_summary(hl_results: list[dict[str, Any]], stz_results: list[dict[str, Any]]) -> None:
+def print_summary(
+    hl_results: list[dict[str, Any]], stz_results: list[dict[str, Any]]
+) -> None:
     """Print final summary."""
     all_results = hl_results + stz_results
 
@@ -455,8 +473,12 @@ def print_summary(hl_results: list[dict[str, Any]], stz_results: list[dict[str, 
         if not results:
             continue
 
-        passed = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0)
-        passed_with_warnings = sum(1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0)
+        passed = sum(
+            1 for r in results if r["status"] == "PASS" and r["warnings_count"] == 0
+        )
+        passed_with_warnings = sum(
+            1 for r in results if r["status"] == "PASS" and r["warnings_count"] > 0
+        )
         failed = sum(1 for r in results if r["status"] == "FAIL")
         timeouts = sum(1 for r in results if r["status"] == "TIMEOUT")
         total_runtime = sum(r["runtime_seconds"] for r in results)
@@ -470,7 +492,9 @@ def print_summary(hl_results: list[dict[str, Any]], stz_results: list[dict[str, 
 
     # Combined
     total = len(all_results)
-    clean_pass = sum(1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] == 0)
+    clean_pass = sum(
+        1 for r in all_results if r["status"] == "PASS" and r["warnings_count"] == 0
+    )
     total_runtime = sum(r["runtime_seconds"] for r in all_results)
 
     print("\nCombined:")

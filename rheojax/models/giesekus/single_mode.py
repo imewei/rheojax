@@ -46,6 +46,7 @@ import numpy as np
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
@@ -270,7 +271,8 @@ class GiesekusSingleMode(GiesekusBase):
         params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s])
         # Filter out BaseModel kwargs that model_function doesn't expect
         fwd_kwargs = {
-            k: v for k, v in kwargs.items()
+            k: v
+            for k, v in kwargs.items()
             if k not in ("deformation_mode", "poisson_ratio")
         }
         return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
@@ -1142,9 +1144,9 @@ class GiesekusSingleMode(GiesekusBase):
             sigma_prime.append(sigma_n_prime)
             sigma_double_prime.append(sigma_n_double_prime)
 
-        sigma_prime = np.array(sigma_prime)  # type: ignore[assignment]
-        sigma_double_prime = np.array(sigma_double_prime)  # type: ignore[assignment]
-        intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)  # type: ignore[operator]
+        sigma_prime = np.array(sigma_prime)
+        sigma_double_prime = np.array(sigma_double_prime)
+        intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)
 
         return {
             "n": np.array(harmonics),

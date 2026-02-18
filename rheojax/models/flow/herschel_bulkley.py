@@ -37,7 +37,11 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register("herschel_bulkley", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR])
+@ModelRegistry.register(
+    "herschel_bulkley",
+    protocols=[Protocol.FLOW_CURVE],
+    deformation_modes=[DeformationMode.SHEAR],
+)
 class HerschelBulkley(BaseModel):
     """Herschel-Bulkley model for viscoplastic flow (ROTATION only).
 

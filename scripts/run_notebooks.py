@@ -14,6 +14,7 @@ Usage:
     # Custom log directory
     uv run python scripts/run_notebooks.py --subdir examples/fluidity --log-dir examples/fluidity/_run_logs
 """
+
 import argparse
 import gc
 import json
@@ -37,7 +38,9 @@ def _get_kernel_pids() -> set[int]:
     try:
         result = subprocess.run(
             ["pgrep", "-f", "ipykernel_launcher"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return {int(pid.strip()) for pid in result.stdout.splitlines() if pid.strip()}
     except Exception:
@@ -141,7 +144,7 @@ def run_notebook(
 
         # Extract warnings from executed notebook outputs
         result["warnings"] = extract_warnings_from_outputs(nb)
-        result["warnings_count"] = len(result["warnings"])
+        result["warnings_count"] = len(result["warnings"])  # type: ignore[arg-type]
 
         # Write back executed notebook (preserves outputs for inspection)
         nbformat.write(nb, notebook_path.name)
@@ -153,7 +156,7 @@ def run_notebook(
         # Still try to extract warnings from partial execution
         try:
             result["warnings"] = extract_warnings_from_outputs(nb)
-            result["warnings_count"] = len(result["warnings"])
+            result["warnings_count"] = len(result["warnings"])  # type: ignore[arg-type]
         except Exception:
             pass
     except TimeoutError:
@@ -189,11 +192,11 @@ def run_notebook(
             f.write(f"Warnings: {result['warnings_count']}\n")
             if result["warnings"]:
                 f.write("\n--- Warnings ---\n")
-                for w in result["warnings"]:
+                for w in result["warnings"]:  # type: ignore[attr-defined]
                     f.write(f"  {w}\n")
             if result["error"]:
                 f.write("\n--- Error ---\n")
-                f.write(result["error"])
+                f.write(result["error"])  # type: ignore[arg-type]
                 f.write("\n")
 
     return result
@@ -261,7 +264,9 @@ with open({result_file!r}, 'w') as f:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Jupyter notebooks and report results.")
+    parser = argparse.ArgumentParser(
+        description="Run Jupyter notebooks and report results."
+    )
     parser.add_argument(
         "--subdir",
         type=str,
@@ -340,7 +345,9 @@ def main():
             gc.collect()
             print(f"RETRY {retry} ...", end=" ", flush=True)
             time.sleep(10 * retry)  # Exponential backoff: 10s, 20s, 30s
-            result = run_notebook_isolated(notebook, timeout=args.timeout, log_dir=log_dir)
+            result = run_notebook_isolated(
+                notebook, timeout=args.timeout, log_dir=log_dir
+            )
 
         all_results.append(result)
         # Kill any leaked kernel processes to free system memory
@@ -353,7 +360,11 @@ def main():
             result["status"], "????"
         )
         runtime_str = f"{result['runtime_sec']:.1f}s"
-        warn_str = f" [{result['warnings_count']} warnings]" if result["warnings_count"] else ""
+        warn_str = (
+            f" [{result['warnings_count']} warnings]"
+            if result["warnings_count"]
+            else ""
+        )
         print(f"{status_icon} ({runtime_str}){warn_str}")
 
         if result["status"] != "PASS":

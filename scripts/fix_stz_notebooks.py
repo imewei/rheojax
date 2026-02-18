@@ -67,7 +67,9 @@ def fix_nb01(path: Path):
     # Fix setup cell: replace FutureWarning with targeted + add FAST_MODE + gc
     idx = find_cell_containing(nb, "warnings.filterwarnings")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """%matplotlib inline
+        set_cell_source(
+            nb["cells"][idx],
+            """%matplotlib inline
 import gc
 import os
 import warnings
@@ -90,12 +92,15 @@ warnings.filterwarnings("ignore", message=".*is_leaf.*", category=DeprecationWar
 FAST_MODE = int(os.environ.get("FAST_MODE", "1"))
 print(f"JAX version: {jax.__version__}")
 print(f"Devices: {jax.devices()}")
-print(f"FAST_MODE: {FAST_MODE}")""")
+print(f"FAST_MODE: {FAST_MODE}")""",
+        )
 
     # Fix Bayesian cell: FAST_MODE-aware config + gc + seed=100 for 0 divergences
     idx = find_cell_containing(nb, "NUM_WARMUP = 200")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """# Warm-start values from NLSQ
+        set_cell_source(
+            nb["cells"][idx],
+            """# Warm-start values from NLSQ
 initial_values = {
     name: model.parameters.get_value(name)
     for name in model.parameters.keys()
@@ -125,13 +130,16 @@ result = model.fit_bayesian(
     seed=100,
 )
 t_bayes = time.time() - t0
-print(f"\\nBayesian inference time: {t_bayes:.1f} s")""")
+print(f"\\nBayesian inference time: {t_bayes:.1f} s")""",
+        )
 
     # Fix posterior predictive cell to handle variable sample count
     idx = find_cell_containing(nb, "n_draws = min(200")
     if idx is not None:
         src = get_cell_source(nb["cells"][idx])
-        src = src.replace("n_draws = min(200,", "n_draws = min(50 if FAST_MODE else 200,")
+        src = src.replace(
+            "n_draws = min(200,", "n_draws = min(50 if FAST_MODE else 200,"
+        )
         set_cell_source(nb["cells"][idx], src)
 
     clear_all_outputs(nb)
@@ -148,7 +156,9 @@ def fix_nb02(path: Path):
     # Fix setup cell
     idx = find_cell_containing(nb, "warnings.filterwarnings")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """%matplotlib inline
+        set_cell_source(
+            nb["cells"][idx],
+            """%matplotlib inline
 import gc
 import os
 import time
@@ -171,12 +181,15 @@ warnings.filterwarnings("ignore", message=".*is_leaf.*", category=DeprecationWar
 FAST_MODE = int(os.environ.get("FAST_MODE", "1"))
 print(f"JAX version: {jax.__version__}")
 print(f"Devices: {jax.devices()}")
-print(f"FAST_MODE: {FAST_MODE}")""")
+print(f"FAST_MODE: {FAST_MODE}")""",
+        )
 
     # Fix overshoot sweep cell: reduce points in FAST_MODE
     idx = find_cell_containing(nb, "gdot_sweep = np.logspace")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """gdot_sweep = np.logspace(-1, 2, 8 if FAST_MODE else 20)
+        set_cell_source(
+            nb["cells"][idx],
+            """gdot_sweep = np.logspace(-1, 2, 8 if FAST_MODE else 20)
 overshoot_ratios = []
 
 for gdot in gdot_sweep:
@@ -215,12 +228,15 @@ ax.set_title("Overshoot Ratio vs Shear Rate")
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
 display(fig)
-plt.close(fig)""")
+plt.close(fig)""",
+        )
 
     # Fix Bayesian cell: FAST_MODE + gc + reduced samples for ODE
     idx = find_cell_containing(nb, "NUM_WARMUP = 200")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """initial_values = {
+        set_cell_source(
+            nb["cells"][idx],
+            """initial_values = {
     name: model.parameters.get_value(name)
     for name in model.parameters.keys()
 }
@@ -246,7 +262,8 @@ result = model.fit_bayesian(
     seed=42,
 )
 t_bayes = time.time() - t0
-print(f"Bayesian inference time: {t_bayes:.1f} s")""")
+print(f"Bayesian inference time: {t_bayes:.1f} s")""",
+        )
 
     clear_all_outputs(nb)
     save_notebook(nb, path)
@@ -262,7 +279,9 @@ def fix_nb03(path: Path):
     # Fix setup cell
     idx = find_cell_containing(nb, "warnings.filterwarnings")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """%matplotlib inline
+        set_cell_source(
+            nb["cells"][idx],
+            """%matplotlib inline
 import gc
 import os
 import time
@@ -285,7 +304,8 @@ warnings.filterwarnings("ignore", message=".*is_leaf.*", category=DeprecationWar
 FAST_MODE = int(os.environ.get("FAST_MODE", "1"))
 print(f"JAX version: {jax.__version__}")
 print(f"Devices: {jax.devices()}")
-print(f"FAST_MODE: {FAST_MODE}")""")
+print(f"FAST_MODE: {FAST_MODE}")""",
+        )
 
     # Fix aging sweep: add gc between fits
     idx = find_cell_containing(nb, "aging_results = {}")
@@ -294,19 +314,21 @@ print(f"FAST_MODE: {FAST_MODE}")""")
         # Add gc after each fit iteration
         src = src.replace(
             '        print(f"t_age={t_age:5d}s: FAILED ({e})")',
-            '        print(f"t_age={t_age:5d}s: FAILED ({e})")\n    del m\n    gc.collect()'
+            '        print(f"t_age={t_age:5d}s: FAILED ({e})")\n    del m\n    gc.collect()',
         )
         # Also add gc after successful fit
         src = src.replace(
-            '              f"R^2={aging_results[t_age][\'r_squared\']:.4f}")',
-            '              f"R^2={aging_results[t_age][\'r_squared\']:.4f}")\n    del m\n    gc.collect()'
+            "              f\"R^2={aging_results[t_age]['r_squared']:.4f}\")",
+            "              f\"R^2={aging_results[t_age]['r_squared']:.4f}\")\n    del m\n    gc.collect()",
         )
         set_cell_source(nb["cells"][idx], src)
 
     # Fix Bayesian cell: FAST_MODE + gc
     idx = find_cell_containing(nb, "NUM_WARMUP = 200")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """initial_values = {
+        set_cell_source(
+            nb["cells"][idx],
+            """initial_values = {
     name: model.parameters.get_value(name)
     for name in model.parameters.keys()
 }
@@ -336,7 +358,8 @@ result = model.fit_bayesian(
     seed=42,
 )
 t_bayes = time.time() - t0
-print(f"Bayesian inference time: {t_bayes:.1f} s")""")
+print(f"Bayesian inference time: {t_bayes:.1f} s")""",
+        )
 
     clear_all_outputs(nb)
     save_notebook(nb, path)
@@ -352,7 +375,9 @@ def fix_nb04(path: Path):
     # Fix setup cell
     idx = find_cell_containing(nb, "warnings.filterwarnings")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """%matplotlib inline
+        set_cell_source(
+            nb["cells"][idx],
+            """%matplotlib inline
 import gc
 import os
 import time
@@ -375,12 +400,15 @@ warnings.filterwarnings("ignore", message=".*is_leaf.*", category=DeprecationWar
 FAST_MODE = int(os.environ.get("FAST_MODE", "1"))
 print(f"JAX version: {jax.__version__}")
 print(f"Devices: {jax.devices()}")
-print(f"FAST_MODE: {FAST_MODE}")""")
+print(f"FAST_MODE: {FAST_MODE}")""",
+        )
 
     # Fix Bayesian cell: FAST_MODE + gc
     idx = find_cell_containing(nb, "NUM_WARMUP = 200")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """initial_values = {
+        set_cell_source(
+            nb["cells"][idx],
+            """initial_values = {
     name: model.parameters.get_value(name)
     for name in model.parameters.keys()
 }
@@ -406,7 +434,8 @@ result = model.fit_bayesian(
     seed=42,
 )
 t_bayes = time.time() - t0
-print(f"Bayesian inference time: {t_bayes:.1f} s")""")
+print(f"Bayesian inference time: {t_bayes:.1f} s")""",
+        )
 
     # Fix bifurcation demo: add gc between model simulations
     idx = find_cell_containing(nb, "sigma_y_fit = model.parameters.get_value")
@@ -414,7 +443,7 @@ print(f"Bayesian inference time: {t_bayes:.1f} s")""")
         src = get_cell_source(nb["cells"][idx])
         src = src.replace(
             "    strain_sim = m.predict(t_sim)",
-            "    strain_sim = m.predict(t_sim)\n    del m\n    gc.collect()"
+            "    strain_sim = m.predict(t_sim)\n    del m\n    gc.collect()",
         )
         set_cell_source(nb["cells"][idx], src)
 
@@ -432,7 +461,9 @@ def fix_nb05(path: Path):
     # Fix setup cell
     idx = find_cell_containing(nb, "warnings.filterwarnings")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """%matplotlib inline
+        set_cell_source(
+            nb["cells"][idx],
+            """%matplotlib inline
 import gc
 import os
 import time
@@ -455,12 +486,15 @@ warnings.filterwarnings("ignore", message=".*is_leaf.*", category=DeprecationWar
 FAST_MODE = int(os.environ.get("FAST_MODE", "1"))
 print(f"JAX version: {jax.__version__}")
 print(f"Devices: {jax.devices()}")
-print(f"FAST_MODE: {FAST_MODE}")""")
+print(f"FAST_MODE: {FAST_MODE}")""",
+        )
 
     # Fix Bayesian cell: FAST_MODE + gc
     idx = find_cell_containing(nb, "NUM_WARMUP = 200")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """initial_values = {
+        set_cell_source(
+            nb["cells"][idx],
+            """initial_values = {
     name: model.parameters.get_value(name)
     for name in model.parameters.keys()
 }
@@ -486,13 +520,16 @@ result = model.fit_bayesian(
     seed=42,
 )
 t_bayes = time.time() - t0
-print(f"Bayesian inference time: {t_bayes:.1f} s")""")
+print(f"Bayesian inference time: {t_bayes:.1f} s")""",
+        )
 
     # Fix posterior predictive cell to handle variable sample count
     idx = find_cell_containing(nb, "n_draws = min(200")
     if idx is not None:
         src = get_cell_source(nb["cells"][idx])
-        src = src.replace("n_draws = min(200,", "n_draws = min(50 if FAST_MODE else 200,")
+        src = src.replace(
+            "n_draws = min(200,", "n_draws = min(50 if FAST_MODE else 200,"
+        )
         set_cell_source(nb["cells"][idx], src)
 
     clear_all_outputs(nb)
@@ -509,7 +546,9 @@ def fix_nb06(path: Path):
     # Fix setup cell
     idx = find_cell_containing(nb, "warnings.filterwarnings")
     if idx is not None:
-        set_cell_source(nb["cells"][idx], """%matplotlib inline
+        set_cell_source(
+            nb["cells"][idx],
+            """%matplotlib inline
 import gc
 import os
 import time
@@ -531,7 +570,8 @@ warnings.filterwarnings("ignore", message=".*is_leaf.*", category=DeprecationWar
 FAST_MODE = int(os.environ.get("FAST_MODE", "1"))
 print(f"JAX version: {jax.__version__}")
 print(f"Devices: {jax.devices()}")
-print(f"FAST_MODE: {FAST_MODE}")""")
+print(f"FAST_MODE: {FAST_MODE}")""",
+        )
 
     # Fix LAOS amplitudes: fewer in FAST_MODE
     idx = find_cell_containing(nb, "amplitudes = [0.01, 0.1, 0.5, 2.0]")
@@ -539,7 +579,7 @@ print(f"FAST_MODE: {FAST_MODE}")""")
         src = get_cell_source(nb["cells"][idx])
         src = src.replace(
             "amplitudes = [0.01, 0.1, 0.5, 2.0]",
-            "amplitudes = [0.01, 0.5, 2.0] if FAST_MODE else [0.01, 0.1, 0.5, 2.0]"
+            "amplitudes = [0.01, 0.5, 2.0] if FAST_MODE else [0.01, 0.1, 0.5, 2.0]",
         )
         set_cell_source(nb["cells"][idx], src)
 
@@ -564,7 +604,9 @@ def main():
     fix_nb06(stz_dir / "06_stz_laos.ipynb")
 
     print("\n\nAll 6 STZ notebooks fixed!")
-    print("Run: FAST_MODE=1 uv run python scripts/run_notebooks.py --subdir examples/stz --timeout 345600 --log-dir examples/stz/_run_logs")
+    print(
+        "Run: FAST_MODE=1 uv run python scripts/run_notebooks.py --subdir examples/stz --timeout 345600 --log-dir examples/stz/_run_logs"
+    )
 
 
 if __name__ == "__main__":

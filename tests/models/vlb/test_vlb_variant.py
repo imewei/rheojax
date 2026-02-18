@@ -195,9 +195,7 @@ class TestVLBVariantRegression:
         """Startup matches VLBLocal to rtol < 1e-6."""
         p_l, p_v = self._params_pair()
         t = np.linspace(0.01, 10.0, 50)
-        local = vlb_local_ref.model_function(
-            t, p_l, test_mode="startup", gamma_dot=1.0
-        )
+        local = vlb_local_ref.model_function(t, p_l, test_mode="startup", gamma_dot=1.0)
         variant = vlb_constant.model_function(
             t, p_v, test_mode="startup", gamma_dot=1.0
         )
@@ -392,9 +390,7 @@ class TestVLBBellFeneCombined:
 
     def test_combined_shear_thinning_plus_hardening(self, vlb_bell_fene):
         """Bell+FENE: shear thinning (viscosity) but stress hardening."""
-        sigma, eta = vlb_bell_fene.predict_flow_curve(
-            np.array([0.1, 1.0, 10.0])
-        )
+        sigma, eta = vlb_bell_fene.predict_flow_curve(np.array([0.1, 1.0, 10.0]))
         # Shear thinning from Bell
         assert float(eta[0]) > float(eta[2])
         # Stress still increases with shear rate
@@ -518,9 +514,7 @@ class TestVLBVariantBayesian:
 
         @jax.jit
         def pred_startup(p):
-            return vlb_constant.model_function(
-                t, p, test_mode="startup", gamma_dot=1.0
-            )
+            return vlb_constant.model_function(t, p, test_mode="startup", gamma_dot=1.0)
 
         assert jnp.all(jnp.isfinite(pred_fc(params)))
         assert jnp.all(jnp.isfinite(pred_saos(params)))

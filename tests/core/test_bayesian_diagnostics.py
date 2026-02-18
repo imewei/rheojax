@@ -25,6 +25,7 @@ jax, jnp = safe_import_jax()
 # Test fixtures
 # ---------------------------------------------------------------------------
 
+
 class SimpleBayesianModel(BayesianMixin):
     """Minimal model for testing BayesianMixin internals."""
 
@@ -54,6 +55,7 @@ class NaNProducingModel(BayesianMixin):
 # ---------------------------------------------------------------------------
 # Finding 1: Diagnostics reshape for split_gelman_rubin
 # ---------------------------------------------------------------------------
+
 
 class TestDiagnosticReshape:
     """Verify _compute_diagnostics correctly reshapes samples."""
@@ -122,6 +124,7 @@ class TestDiagnosticReshape:
 # Finding 2: NaN guard penalty (per-element, not scalar)
 # ---------------------------------------------------------------------------
 
+
 class TestNaNGuard:
     """Verify NaN predictions are penalized, not silently zeroed."""
 
@@ -159,6 +162,7 @@ class TestNaNGuard:
 # Finding 3: Protocol kwargs roundtrip
 # ---------------------------------------------------------------------------
 
+
 class TestProtocolKwargsRoundtrip:
     """Verify protocol kwargs survive NLSQ→Bayesian without being cleared."""
 
@@ -175,8 +179,12 @@ class TestProtocolKwargsRoundtrip:
 
         # fit_bayesian with a user protocol kwarg
         result = model.fit_bayesian(
-            X, y,
-            num_warmup=10, num_samples=20, num_chains=1, seed=42,
+            X,
+            y,
+            num_warmup=10,
+            num_samples=20,
+            num_chains=1,
+            seed=42,
             test_mode="relaxation",
         )
 
@@ -188,6 +196,7 @@ class TestProtocolKwargsRoundtrip:
 # ---------------------------------------------------------------------------
 # Finding 6: _precompiled_models per-instance
 # ---------------------------------------------------------------------------
+
 
 class TestPrecompiledModelsIsolation:
     """Verify precompiled cache is per-instance, not shared."""
@@ -212,6 +221,7 @@ class TestPrecompiledModelsIsolation:
 # Divergence reporting fix
 # ---------------------------------------------------------------------------
 
+
 class TestDivergenceReporting:
     """Verify unknown divergences are reported as -1, not 0."""
 
@@ -233,6 +243,7 @@ class TestDivergenceReporting:
 # ---------------------------------------------------------------------------
 # score() NaN handling fix
 # ---------------------------------------------------------------------------
+
 
 class TestScoreNaNHandling:
     """Verify score() returns NaN instead of 0.0 for broken predictions."""
@@ -259,6 +270,7 @@ class TestScoreNaNHandling:
 # ---------------------------------------------------------------------------
 # Parameter bounds.setter constraint sync
 # ---------------------------------------------------------------------------
+
 
 class TestBoundsSetterSync:
     """Verify bounds.setter auto-updates bounds constraints."""
@@ -303,6 +315,7 @@ class TestBoundsSetterSync:
 # Optimization 1: Lazy NumPyro imports
 # ---------------------------------------------------------------------------
 
+
 class TestLazyNumPyroImports:
     """Verify that _import_numpyro() provides all necessary symbols."""
 
@@ -336,6 +349,7 @@ class TestLazyNumPyroImports:
 # ---------------------------------------------------------------------------
 # Optimization 3: ArviZ log_likelihood parameter
 # ---------------------------------------------------------------------------
+
 
 class TestArviZLogLikelihood:
     """Verify to_inference_data(log_likelihood=...) caching."""
@@ -380,6 +394,7 @@ class TestArviZLogLikelihood:
 # Optimization 4: Warm-start-aware NUTS tuning
 # ---------------------------------------------------------------------------
 
+
 class TestWarmStartNutsTuning:
     """Verify warm-start detection lowers target_accept_prob and max_tree_depth."""
 
@@ -411,7 +426,8 @@ class TestWarmStartNutsTuning:
 
         # Explicitly set higher target_accept_prob
         result = model.fit_bayesian(
-            X, y,
+            X,
+            y,
             num_warmup=20,
             num_samples=50,
             num_chains=1,

@@ -892,12 +892,12 @@ Initialization Strategy
    - :math:`\Gamma` from crossover frequency
 
 2. **Refine with flow curve**: Adjust:
-   
+
    - :math:`\gamma_c` from onset of shear thinning
    - :math:`\varepsilon` from presence/absence of yield stress
 
 3. **Validate with startup**: Check:
-   
+
    - Overshoot position and height
 
 Troubleshooting
@@ -983,14 +983,14 @@ Basic Flow Curve
 
    from rheojax.models.itt_mct import ITTMCTSchematic
    import numpy as np
-   
+
    # Create glass-state model
    model = ITTMCTSchematic(epsilon=0.1)
-   
+
    # Predict flow curve
    gamma_dot = np.logspace(-3, 3, 50)
    sigma = model.predict(gamma_dot, test_mode='flow_curve')
-   
+
    # Shows yield stress at low rates
    print(f"Yield stress ≈ {sigma[0]:.1f} Pa")
 
@@ -1002,13 +1002,13 @@ Linear Viscoelasticity
    # Get G', G''
    omega = np.logspace(-2, 3, 50)
    G_components = model.predict(
-       omega, 
-       test_mode='oscillation', 
+       omega,
+       test_mode='oscillation',
        return_components=True
    )
    G_prime = G_components[:, 0]
    G_double_prime = G_components[:, 1]
-   
+
    # Glass plateau
    print(f"G'(ω→0) ≈ {G_prime[0]:.1f} Pa")
 
@@ -1020,9 +1020,9 @@ Startup with Overshoot
    # High shear rate startup
    t = np.linspace(0, 10, 200)
    gamma_dot = 10.0  # 1/s
-   
+
    sigma = model.predict(t, test_mode='startup', gamma_dot=gamma_dot)
-   
+
    # Find overshoot
    i_max = np.argmax(sigma)
    print(f"Overshoot at t = {t[i_max]:.2f} s")
@@ -1036,11 +1036,11 @@ LAOS Harmonics
    # Extract nonlinear harmonics
    T = 2 * np.pi  # Period
    t = np.linspace(0, 5*T, 500)
-   
+
    sigma_prime, sigma_double_prime = model.get_laos_harmonics(
        t, gamma_0=0.2, omega=1.0, n_harmonics=3
    )
-   
+
    # Third harmonic ratio (nonlinearity measure)
    I_3_1 = np.abs(sigma_prime[1]) / np.abs(sigma_prime[0])
    print(f"I₃/I₁ = {I_3_1:.3f}")
@@ -1053,14 +1053,14 @@ Fitting Experimental Data
    # Load data
    gamma_dot_exp = np.array([...])  # Experimental shear rates
    sigma_exp = np.array([...])      # Experimental stresses
-   
+
    # Initial guess
    model = ITTMCTSchematic(epsilon=0.0)
    model.parameters.set_value('G_inf', 1e4)
-   
+
    # Fit
    model.fit(gamma_dot_exp, sigma_exp, test_mode='flow_curve')
-   
+
    # Check glass state
    info = model.get_glass_transition_info()
    print(f"Fitted ε = {info['epsilon']:.3f}")
@@ -1073,16 +1073,16 @@ Bayesian Inference
 
    # Fit with uncertainty quantification
    result = model.fit_bayesian(
-       gamma_dot_exp, sigma_exp, 
+       gamma_dot_exp, sigma_exp,
        test_mode='flow_curve',
        num_warmup=1000,
        num_samples=2000,
        num_chains=4
    )
-   
+
    # Get credible intervals
    intervals = model.get_credible_intervals(
-       result.posterior_samples, 
+       result.posterior_samples,
        credibility=0.95
    )
    print(f"v₂ = {intervals['v2']['mean']:.2f} "

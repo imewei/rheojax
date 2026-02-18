@@ -339,8 +339,8 @@ def iterative_n_reduction(fit_results_dict: dict[int, float]) -> dict[str, Array
     return {
         "n_modes": np.array(n_values),
         "r2": np.array(r2_values),
-        "r2_min": float(np.min(r2_values)),  # type: ignore[dict-item]
-        "r2_max": float(np.max(r2_values)),  # type: ignore[dict-item]
+        "r2_min": float(np.min(r2_values)),
+        "r2_max": float(np.max(r2_values)),
     }
 
 

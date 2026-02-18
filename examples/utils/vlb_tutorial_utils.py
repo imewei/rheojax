@@ -231,7 +231,9 @@ def load_pnas_laos(
     if omega not in omega_sheets:
         raise ValueError(f"omega must be 1, 3, or 5, got {omega}")
     if strain_amplitude_index not in range(12):
-        raise ValueError(f"strain_amplitude_index must be 0-11, got {strain_amplitude_index}")
+        raise ValueError(
+            f"strain_amplitude_index must be 0-11, got {strain_amplitude_index}"
+        )
 
     sheet = omega_sheets[omega]
     data_dir = Path(__file__).parent / ".." / "data" / "ikh"
@@ -343,7 +345,10 @@ def plot_trace_and_forest(
     plt.tight_layout()
 
     axes = az.plot_forest(
-        idata, var_names=param_names, combined=True, hdi_prob=0.95,
+        idata,
+        var_names=param_names,
+        combined=True,
+        hdi_prob=0.95,
         figsize=figsize_forest,
     )
     fig_forest = axes.ravel()[0].figure
@@ -388,7 +393,9 @@ def save_results(
         param_names = ["G0", "k_d"]
 
     # NLSQ parameters
-    nlsq = {p: float(getattr(model, p, model.parameters.get_value(p))) for p in param_names}
+    nlsq = {
+        p: float(getattr(model, p, model.parameters.get_value(p))) for p in param_names
+    }
     if extra_meta:
         nlsq.update(extra_meta)
     with open(os.path.join(output_dir, "fitted_params_nlsq.json"), "w") as f:
@@ -408,14 +415,16 @@ def save_results(
     rows = []
     for p in param_names:
         samples = np.array(posterior[p])
-        rows.append({
-            "parameter": p,
-            "nlsq": nlsq.get(p),
-            "posterior_mean": float(np.mean(samples)),
-            "posterior_median": float(np.median(samples)),
-            "ci_2.5": float(np.percentile(samples, 2.5)),
-            "ci_97.5": float(np.percentile(samples, 97.5)),
-        })
+        rows.append(
+            {
+                "parameter": p,
+                "nlsq": nlsq.get(p),
+                "posterior_mean": float(np.mean(samples)),
+                "posterior_median": float(np.median(samples)),
+                "ci_2.5": float(np.percentile(samples, 2.5)),
+                "ci_97.5": float(np.percentile(samples, 97.5)),
+            }
+        )
     pd.DataFrame(rows).to_csv(os.path.join(output_dir, "summary.csv"), index=False)
     print(f"Saved to {output_dir}/")
 

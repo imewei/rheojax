@@ -22,6 +22,7 @@ import numpy as np
 from rheojax.core.base import ArrayLike
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
@@ -285,7 +286,9 @@ class MIKH(IKHBase):
             # Frequency-domain: fit G' and G'' using Maxwell analytical solution
             return self._fit_saos_frequency_domain(X, y, **kwargs)
 
-    def _fit_saos_frequency_domain(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MIKH":
+    def _fit_saos_frequency_domain(
+        self, X: ArrayLike, y: ArrayLike, **kwargs
+    ) -> "MIKH":
         """Fit to frequency-domain SAOS data using Maxwell analytical expressions.
 
         Args:
@@ -417,7 +420,7 @@ class MIKH(IKHBase):
         result = jnp.where(
             sol.result == diffrax.RESULTS.successful,
             result,
-            jnp.nan * jnp.ones_like(result)
+            jnp.nan * jnp.ones_like(result),
         )
 
         # Add viscous contribution for startup
@@ -558,7 +561,9 @@ class MIKH(IKHBase):
 
         # Extract protocol-specific args from kwargs or fall back to defaults
         gamma_dot = kwargs.get("gamma_dot", param_dict.get("_gamma_dot", 0.0))
-        sigma_applied = kwargs.get("sigma_applied", param_dict.get("_sigma_applied", 100.0))
+        sigma_applied = kwargs.get(
+            "sigma_applied", param_dict.get("_sigma_applied", 100.0)
+        )
         sigma_0 = kwargs.get("sigma_0", param_dict.get("_sigma_0", 60.0))
 
         if mode == "flow_curve":

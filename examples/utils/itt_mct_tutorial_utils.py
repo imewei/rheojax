@@ -128,7 +128,9 @@ def generate_synthetic_relaxation_schematic(
     stress_clean = np.asarray(stress_clean).flatten()
 
     # Add relative noise
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     # Ensure positive stress
@@ -171,7 +173,9 @@ def generate_synthetic_relaxation_isotropic(
     stress_clean = model._predict_relaxation(time, gamma_pre=gamma_pre)
     stress_clean = np.asarray(stress_clean).flatten()
 
-    noise = rng.normal(0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
     stress = np.maximum(stress, 0.0)
 
@@ -273,7 +277,9 @@ def generate_synthetic_saos_isotropic(
     G_double_prime = G_components[:, 1]
 
     noise_p = rng.normal(0, noise_level * np.mean(G_prime), size=G_prime.shape)
-    noise_pp = rng.normal(0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape)
+    noise_pp = rng.normal(
+        0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape
+    )
 
     G_prime = np.maximum(G_prime + noise_p, 1e-10)
     G_double_prime = np.maximum(G_double_prime + noise_pp, 1e-10)
@@ -508,7 +514,9 @@ def interpret_glass_state(info: dict[str, Any]) -> str:
         lines.append(f"State: {state}")
         lines.append(f"Separation parameter: epsilon = {epsilon:.4f}")
         if is_glass:
-            f_neq = info.get("f_neq", compute_non_ergodicity_parameter(0, 4 * (1 + epsilon)))
+            f_neq = info.get(
+                "f_neq", compute_non_ergodicity_parameter(0, 4 * (1 + epsilon))
+            )
             lines.append(f"Non-ergodicity parameter: f = {f_neq:.4f}")
             lines.append("  -> Correlator plateaus at f > 0 (arrested dynamics)")
             lines.append("  -> Material shows yield stress")
@@ -546,11 +554,11 @@ def get_schematic_param_names() -> list[str]:
         List of 5 Schematic parameter names.
     """
     return [
-        "v1",       # Linear vertex coefficient (typically 0)
-        "v2",       # Quadratic vertex coefficient (glass at v2 > 4)
-        "Gamma",    # Bare relaxation rate (1/s)
+        "v1",  # Linear vertex coefficient (typically 0)
+        "v2",  # Quadratic vertex coefficient (glass at v2 > 4)
+        "Gamma",  # Bare relaxation rate (1/s)
         "gamma_c",  # Critical strain for cage breaking
-        "G_inf",    # High-frequency modulus (Pa)
+        "G_inf",  # High-frequency modulus (Pa)
     ]
 
 
@@ -561,10 +569,10 @@ def get_isotropic_param_names() -> list[str]:
         List of 5 ISM parameter names.
     """
     return [
-        "phi",      # Volume fraction (glass at phi > 0.516)
+        "phi",  # Volume fraction (glass at phi > 0.516)
         "sigma_d",  # Particle diameter (m)
-        "D0",       # Bare diffusion coefficient (m^2/s)
-        "kBT",      # Thermal energy (J)
+        "D0",  # Bare diffusion coefficient (m^2/s)
+        "kBT",  # Thermal energy (J)
         "gamma_c",  # Critical strain for cage breaking
     ]
 
@@ -642,7 +650,9 @@ def save_itt_mct_results(
     try:
         glass_info = model.get_glass_transition_info()
         # Convert any numpy types to Python types
-        glass_info_clean = {k: float(v) if hasattr(v, "item") else v for k, v in glass_info.items()}
+        glass_info_clean = {
+            k: float(v) if hasattr(v, "item") else v for k, v in glass_info.items()
+        }
         with open(output_dir / f"glass_info_{protocol}.json", "w") as f:
             json.dump(glass_info_clean, f, indent=2)
     except Exception:
@@ -693,7 +703,13 @@ def load_itt_mct_parameters(
             if model_name == "schematic":
                 params = {"v2": 4.2, "Gamma": 1.0, "gamma_c": 0.1, "G_inf": 1000.0}
             else:
-                params = {"phi": 0.55, "sigma_d": 1.0, "kBT": 1.0, "tau_0": 1.0, "gamma_c": 0.1}
+                params = {
+                    "phi": 0.55,
+                    "sigma_d": 1.0,
+                    "kBT": 1.0,
+                    "tau_0": 1.0,
+                    "gamma_c": 0.1,
+                }
 
     return params
 
@@ -715,9 +731,7 @@ def load_itt_mct_glass_info(
     info_file = output_dir / f"glass_info_{protocol}.json"
 
     if not info_file.exists():
-        raise FileNotFoundError(
-            f"No saved glass info for {model_name}/{protocol}."
-        )
+        raise FileNotFoundError(f"No saved glass info for {model_name}/{protocol}.")
 
     with open(info_file) as f:
         return json.load(f)
@@ -825,7 +839,9 @@ def print_parameter_comparison(
             median = float(np.median(samples))
             lo = float(np.percentile(samples, 2.5))
             hi = float(np.percentile(samples, 97.5))
-            print(f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]")
+            print(
+                f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]"
+            )
         except (KeyError, AttributeError):
             pass
 

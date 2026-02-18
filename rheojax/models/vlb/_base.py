@@ -351,7 +351,5 @@ class VLBBase(BaseModel):
             val = self.parameters.get_value(name)
             return f"{name}={float(val) if val is not None else 0.0:.3e}"
 
-        params_str = ", ".join(
-            _fmt(name) for name in list(self.parameters.keys())[:4]
-        )
+        params_str = ", ".join(_fmt(name) for name in list(self.parameters.keys())[:4])
         return f"{self.__class__.__name__}({params_str})"

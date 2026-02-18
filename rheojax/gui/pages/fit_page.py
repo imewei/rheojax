@@ -12,10 +12,12 @@ from matplotlib.figure import Figure
 from rheojax.gui.compat import (
     QAbstractItemView,
     QComboBox,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QScrollArea,
     Qt,
     QTextEdit,
     QVBoxLayout,
@@ -23,6 +25,7 @@ from rheojax.gui.compat import (
     Signal,
     Slot,
 )
+from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
 from rheojax.gui.services.model_service import ModelService, normalize_model_name
 from rheojax.gui.state.actions import (
     set_active_model,
@@ -96,10 +99,22 @@ class FitPage(QWidget):
     def _setup_ui(self) -> None:
         """Set up the user interface."""
         main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+            Spacing.PAGE_MARGIN,
+        )
+        main_layout.setSpacing(Spacing.LG)
 
-        # Left: Fit model controls (yellow rectangle in reference screenshot)
+        # Left: Fit model controls wrapped in scroll area
         left_panel = self._create_left_panel()
-        main_layout.addWidget(left_panel, 1)
+        left_scroll = QScrollArea()
+        left_scroll.setWidget(left_panel)
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        main_layout.addWidget(left_scroll, 1)
 
         # Center: Visualization (fit plot + residuals)
         center_panel = self._create_center_panel()
@@ -115,7 +130,9 @@ class FitPage(QWidget):
         layout.addWidget(self._plot_canvas, 3)
         self._plot_placeholder = QLabel("No fit plot yet. Run a fit to see results.")
         self._plot_placeholder.setAlignment(Qt.AlignCenter)
-        self._plot_placeholder.setStyleSheet("color: #94A3B8; padding: 6px;")
+        self._plot_placeholder.setStyleSheet(
+            f"color: {ColorPalette.TEXT_MUTED}; padding: {Spacing.SM}px;"
+        )
         layout.addWidget(self._plot_placeholder)
 
         # Residuals panel
@@ -128,6 +145,7 @@ class FitPage(QWidget):
         """Create left panel with fit controls and parameters."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
+        layout.setSpacing(Spacing.SM)
 
         # Match the reference screenshot: Context -> Compatibility -> buttons -> Fit Results
         context_group = QGroupBox("Context")
@@ -166,9 +184,7 @@ class FitPage(QWidget):
         deform_mode_row = QHBoxLayout()
         deform_mode_row.addWidget(QLabel("Mode:"))
         self._deformation_combo = QComboBox()
-        self._deformation_combo.addItems(
-            ["Shear", "Tension", "Bending", "Compression"]
-        )
+        self._deformation_combo.addItems(["Shear", "Tension", "Bending", "Compression"])
         self._deformation_combo.currentTextChanged.connect(
             self._on_deformation_mode_changed
         )
@@ -200,7 +216,7 @@ class FitPage(QWidget):
         compat_layout = QVBoxLayout(compat_group)
         self._compat_label = QLabel("Select a model and dataset")
         self._compat_label.setWordWrap(True)
-        self._compat_label.setStyleSheet("color: gray;")
+        self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_MUTED};")
         compat_layout.addWidget(self._compat_label)
         layout.addWidget(compat_group)
 
@@ -217,7 +233,9 @@ class FitPage(QWidget):
 
         self._empty_params = QLabel(self._empty_params_default_text)
         self._empty_params.setAlignment(Qt.AlignCenter)
-        self._empty_params.setStyleSheet("color: #666; padding: 6px;")
+        self._empty_params.setStyleSheet(
+            f"color: {ColorPalette.TEXT_SECONDARY}; padding: {Spacing.SM}px;"
+        )
         params_layout.addWidget(self._empty_params)
         layout.addWidget(params_group, 2)
 
@@ -244,7 +262,9 @@ class FitPage(QWidget):
 
         self._empty_results = QLabel("No fit results yet.")
         self._empty_results.setAlignment(Qt.AlignCenter)
-        self._empty_results.setStyleSheet("color: #94A3B8; padding: 8px;")
+        self._empty_results.setStyleSheet(
+            f"color: {ColorPalette.TEXT_MUTED}; padding: {Spacing.SM}px;"
+        )
         results_layout.addWidget(self._empty_results)
         layout.addWidget(results_group)
 
@@ -505,7 +525,7 @@ class FitPage(QWidget):
                 self._check_compatibility(model_name)
         else:
             self._compat_label.setText("Select a dataset to enable fitting")
-            self._compat_label.setStyleSheet("color: gray;")
+            self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_MUTED};")
 
         self._update_fit_enabled()
 
@@ -519,7 +539,7 @@ class FitPage(QWidget):
         if mode:
             self._store.dispatch("SET_TEST_MODE", {"test_mode": mode})
             self._compat_label.setText(f"Mode set to {mode}")
-            self._compat_label.setStyleSheet("color: #555;")
+            self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_SECONDARY};")
 
     def _on_deformation_mode_changed(self, mode: str) -> None:
         """Update deformation mode in store."""
@@ -605,7 +625,7 @@ class FitPage(QWidget):
         dataset = self._store.get_active_dataset()
         if dataset is None:
             self._compat_label.setText("No dataset loaded")
-            self._compat_label.setStyleSheet("color: gray;")
+            self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_MUTED};")
             self._is_compatible = False
             return
 
@@ -622,7 +642,7 @@ class FitPage(QWidget):
         if result.get("compatible", True):
             text = f"Compatible\nDecay: {result.get('decay_type', 'unknown')}"
             self._compat_label.setText(text)
-            self._compat_label.setStyleSheet("color: green;")
+            self._compat_label.setStyleSheet(f"color: {ColorPalette.SUCCESS};")
             self._is_compatible = True
             logger.debug(
                 "Compatibility check passed",
@@ -634,7 +654,7 @@ class FitPage(QWidget):
             warnings = result.get("warnings", [])
             text = "Compatibility issues:\n" + "\n".join(f"- {w}" for w in warnings[:3])
             self._compat_label.setText(text)
-            self._compat_label.setStyleSheet("color: orange;")
+            self._compat_label.setStyleSheet(f"color: {ColorPalette.WARNING};")
             self._is_compatible = False
             logger.debug(
                 "Compatibility check failed",

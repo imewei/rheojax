@@ -376,7 +376,9 @@ def load_pnas_laos(
     if omega not in omega_sheets:
         raise ValueError(f"omega must be 1, 3, or 5, got {omega}")
     if strain_amplitude_index not in range(12):
-        raise ValueError(f"strain_amplitude_index must be 0-11, got {strain_amplitude_index}")
+        raise ValueError(
+            f"strain_amplitude_index must be 0-11, got {strain_amplitude_index}"
+        )
 
     sheet = omega_sheets[omega]
     fpath = _resolve("ikh/PNAS_DigitalRheometerTwin_Dataset.xlsx")

@@ -403,7 +403,7 @@ class TensorialEPM(EPMBase):
             metadata=result_metadata,
         )
 
-    def _predict(self, X, **kwargs) -> RheoData:  # type: ignore[override]
+    def _predict(self, X, **kwargs) -> RheoData:
         """Simulate the model for the given protocol.
 
         Args:

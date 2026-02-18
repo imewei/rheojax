@@ -370,16 +370,15 @@ class FMLIKH(FIKHBase):
 
         # Extract kwargs relevant to transient simulation
         sim_kwargs = {
-            k: kwargs[k] for k in ("sigma_0", "sigma_applied", "gamma_dot", "T_init")
+            k: kwargs[k]
+            for k in ("sigma_0", "sigma_applied", "gamma_dot", "T_init")
             if k in kwargs
         }
 
         def objective(param_values):
             p_names = list(self.parameters.keys())
             p_dict = dict(zip(p_names, param_values, strict=False))
-            y_pred = self._predict_transient_multimode(
-                t, p_dict, mode, **sim_kwargs
-            )
+            y_pred = self._predict_transient_multimode(t, p_dict, mode, **sim_kwargs)
             return y_pred - y_target
 
         nlsq_optimize(objective, self.parameters, **kwargs)
@@ -426,10 +425,12 @@ class FMLIKH(FIKHBase):
             )
 
             if is_complex:
-                residuals = jnp.concatenate([
-                    jnp.real(G_star_pred) - jnp.real(y_arr),
-                    jnp.imag(G_star_pred) - jnp.imag(y_arr),
-                ])
+                residuals = jnp.concatenate(
+                    [
+                        jnp.real(G_star_pred) - jnp.real(y_arr),
+                        jnp.imag(G_star_pred) - jnp.imag(y_arr),
+                    ]
+                )
             else:
                 residuals = jnp.abs(G_star_pred) - jnp.abs(y_arr)
 
@@ -484,7 +485,8 @@ class FMLIKH(FIKHBase):
                 if self.include_thermal:
                     T_init = params.get("T_env", params.get("T_ref", 298.15))
                     stress_i, _ = fikh_scan_kernel_thermal(
-                        t, strain,
+                        t,
+                        strain,
                         n_history=self.n_history,
                         alpha=mode_alpha,
                         use_viscosity=(i == self._n_modes - 1),
@@ -493,7 +495,8 @@ class FMLIKH(FIKHBase):
                     )
                 else:
                     stress_i = fikh_scan_kernel_isothermal(
-                        t, strain,
+                        t,
+                        strain,
                         n_history=self.n_history,
                         alpha=mode_alpha,
                         use_viscosity=(i == self._n_modes - 1),
@@ -539,9 +542,11 @@ class FMLIKH(FIKHBase):
         """
         omega_arr = jnp.asarray(omega)
         params = self._get_params_dict()
-        return self._predict_oscillation_from_params(omega_arr, params, gamma_0, n_cycles)
+        return self._predict_oscillation_from_params(
+            omega_arr, params, gamma_0, n_cycles
+        )
 
-    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike: # type: ignore[override]
+    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
         """Predict based on test_mode."""
         test_mode = kwargs.get("test_mode", self._test_mode or "startup")
         mode = self._validate_test_mode(test_mode)
@@ -554,7 +559,9 @@ class FMLIKH(FIKHBase):
             omega = jnp.asarray(X)
             gamma_0 = kwargs.get("gamma_0", 0.01)
             n_cycles = kwargs.get("n_cycles", 5)
-            return self._predict_oscillation_from_params(omega, params, gamma_0, n_cycles)
+            return self._predict_oscillation_from_params(
+                omega, params, gamma_0, n_cycles
+            )
         elif mode in (TestMode.CREEP, TestMode.RELAXATION):
             return self._predict_transient_multimode(X, params, mode, **kwargs)
         else:
@@ -581,9 +588,7 @@ class FMLIKH(FIKHBase):
         total_result = jnp.zeros_like(t)
 
         # Compute total G for distributing sigma_0 across modes
-        G_total = sum(
-            params.get(f"G_{i}", 1e3) for i in range(self._n_modes)
-        )
+        G_total = sum(params.get(f"G_{i}", 1e3) for i in range(self._n_modes))
 
         for i in range(self._n_modes):
             mode_params = self._get_mode_params(params, i)
@@ -597,13 +602,18 @@ class FMLIKH(FIKHBase):
                 G_i = mode_params.get("G", 1e3)
                 mode_sigma_0 = sigma_0 * G_i / jnp.maximum(G_total, 1e-10)
                 result_i = self._simulate_transient(
-                    t, mode_params, mode.value,
-                    gamma_dot=0.0, sigma_0=mode_sigma_0,
+                    t,
+                    mode_params,
+                    mode.value,
+                    gamma_dot=0.0,
+                    sigma_0=mode_sigma_0,
                     T_init=T_init,
                 )
             else:  # CREEP
                 result_i = self._simulate_transient(
-                    t, mode_params, mode.value,
+                    t,
+                    mode_params,
+                    mode.value,
                     sigma_applied=sigma_applied,
                     T_init=T_init,
                 )
@@ -626,7 +636,7 @@ class FMLIKH(FIKHBase):
             param_names = list(self.parameters.keys())
             param_dict = dict(zip(param_names, params, strict=False))
         else:
-            param_dict = dict(params) # type: ignore[arg-type]
+            param_dict = dict(params)
 
         mode_enum = self._validate_test_mode(mode)
 
@@ -638,13 +648,11 @@ class FMLIKH(FIKHBase):
             gamma_0 = kwargs.get("gamma_0", param_dict.pop("_gamma_0", 0.01))
             n_cycles = kwargs.get("n_cycles", param_dict.pop("_n_cycles", 5))
             G_star = self._predict_oscillation_from_params(
-                omega, param_dict, gamma_0, n_cycles # type: ignore[arg-type]
+                omega, param_dict, gamma_0, n_cycles
             )
             return jnp.abs(G_star)
         elif mode_enum in (TestMode.CREEP, TestMode.RELAXATION):
-            return self._predict_transient_multimode(
-                X, param_dict, mode_enum, **kwargs
-            )
+            return self._predict_transient_multimode(X, param_dict, mode_enum, **kwargs)
         else:
             times, strains = self._extract_time_strain(X, **kwargs)
             return self._predict_from_params(times, strains, param_dict)
@@ -683,7 +691,7 @@ class FMLIKH(FIKHBase):
             if not self.shared_alpha:
                 mode_info["alpha"] = params.get(f"alpha_{i}", self.alpha_structure)
 
-            info["modes"].append(mode_info) # type: ignore[attr-defined]
+            info["modes"].append(mode_info)  # type: ignore[attr-defined]
 
         if self.shared_alpha:
             info["alpha_shared"] = params.get("alpha_structure", self.alpha_structure)

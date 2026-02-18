@@ -1050,17 +1050,13 @@ class StateStore:
                         model_name=model_name,
                         dataset_id=str(dataset_id),
                         posterior_samples=getattr(result, "posterior_samples", {}),
-                        r_hat=diag.get("r_hat", {})
-                        or getattr(result, "r_hat", {}),
-                        ess=diag.get("ess", {})
-                        or getattr(result, "ess", {}),
+                        r_hat=diag.get("r_hat", {}) or getattr(result, "r_hat", {}),
+                        ess=diag.get("ess", {}) or getattr(result, "ess", {}),
                         divergences=int(
                             diag.get("divergences", 0)
                             or getattr(result, "divergences", 0)
                         ),
-                        credible_intervals=getattr(
-                            result, "credible_intervals", {}
-                        ),
+                        credible_intervals=getattr(result, "credible_intervals", {}),
                         mcmc_time=float(
                             getattr(
                                 result,

@@ -530,7 +530,12 @@ class FractionalZenerSolidSolid(BaseModel):
         Gm = self.parameters.get_value("Gm")
         alpha = self.parameters.get_value("alpha")
         tau_alpha = self.parameters.get_value("tau_alpha")
-        assert Ge is not None and Gm is not None and alpha is not None and tau_alpha is not None
+        assert (
+            Ge is not None
+            and Gm is not None
+            and alpha is not None
+            and tau_alpha is not None
+        )
 
         # Auto-detect test mode based on input characteristics
         # NOTE: This is a heuristic - explicit test_mode is recommended

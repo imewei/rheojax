@@ -401,7 +401,11 @@ class FractionalKelvinVoigt(BaseModel):
             fitted_alpha = self.parameters.get_value("alpha")
 
             # Compute characteristic time
-            assert fitted_Ge is not None and fitted_c_alpha is not None and fitted_alpha is not None
+            assert (
+                fitted_Ge is not None
+                and fitted_c_alpha is not None
+                and fitted_alpha is not None
+            )
             tau_epsilon = self._compute_tau_epsilon(
                 fitted_Ge, fitted_c_alpha, fitted_alpha
             )
@@ -431,7 +435,7 @@ class FractionalKelvinVoigt(BaseModel):
         """
         # Handle RheoData input
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)  # type: ignore[return-value]
+            return self.predict_rheodata(X)
 
         # Handle raw array input (assume relaxation mode)
         x = jnp.asarray(X)

@@ -218,9 +218,7 @@ class TestFlowCurve:
         model = TNTCates()
 
         gamma_dot = np.logspace(-2, 2, 20)
-        sigma, eta, N1 = model.predict_flow_curve(
-            gamma_dot, return_components=True
-        )
+        sigma, eta, N1 = model.predict_flow_curve(gamma_dot, return_components=True)
 
         assert sigma.shape == gamma_dot.shape
         assert eta.shape == gamma_dot.shape
@@ -243,9 +241,7 @@ class TestFlowCurve:
         expected_eta = G_0 * tau_d
 
         gamma_dot = np.logspace(-2, 2, 20)
-        _, eta, _ = model.predict_flow_curve(
-            gamma_dot, return_components=True
-        )
+        _, eta, _ = model.predict_flow_curve(gamma_dot, return_components=True)
 
         # Viscosity should be constant for all rates
         assert np.allclose(eta, expected_eta, rtol=1e-6)
@@ -470,9 +466,7 @@ class TestCreepSimulation:
         model.parameters.set_value("eta_s", 10.0)
 
         t = np.linspace(0, 10, 100)
-        gamma, gamma_dot = model.simulate_creep(
-            t, sigma_applied=50.0, return_rate=True
-        )
+        gamma, gamma_dot = model.simulate_creep(t, sigma_applied=50.0, return_rate=True)
 
         assert gamma.shape == t.shape
         assert gamma_dot.shape == t.shape
@@ -512,9 +506,7 @@ class TestLAOSSimulation:
         """Test LAOS simulation runs."""
         model = TNTCates()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=0.5, omega=1.0, n_cycles=3
-        )
+        result = model.simulate_laos(t=None, gamma_0=0.5, omega=1.0, n_cycles=3)
 
         assert "t" in result
         assert "strain" in result
@@ -525,9 +517,7 @@ class TestLAOSSimulation:
         """Test LAOS response is periodic after transient."""
         model = TNTCates()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=0.5, omega=1.0, n_cycles=5
-        )
+        result = model.simulate_laos(t=None, gamma_0=0.5, omega=1.0, n_cycles=5)
 
         stress = result["stress"]
         n_per_cycle = len(stress) // 5
@@ -549,9 +539,7 @@ class TestLAOSSimulation:
         omega = 1.0
         gamma_0 = 0.001  # Very small amplitude
 
-        result = model.simulate_laos(
-            t=None, gamma_0=gamma_0, omega=omega, n_cycles=10
-        )
+        result = model.simulate_laos(t=None, gamma_0=gamma_0, omega=omega, n_cycles=10)
 
         # Extract last cycle stress amplitude
         stress = result["stress"]
@@ -570,9 +558,7 @@ class TestLAOSSimulation:
         """Test LAOS harmonic extraction."""
         model = TNTCates()
 
-        result = model.simulate_laos(
-            t=None, gamma_0=1.0, omega=1.0, n_cycles=5
-        )
+        result = model.simulate_laos(t=None, gamma_0=1.0, omega=1.0, n_cycles=5)
 
         harmonics = model.extract_laos_harmonics(result, n_harmonics=3)
 

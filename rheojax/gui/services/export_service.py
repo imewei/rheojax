@@ -138,7 +138,12 @@ class ExportService:
             elif format == "json":
                 # Convert numpy/JAX types to Python types
                 params_json = {
-                    k: float(v) if isinstance(v, (np.ndarray, np.floating, float)) or hasattr(v, "__jax_array__") else v
+                    k: (
+                        float(v)
+                        if isinstance(v, (np.ndarray, np.floating, float))
+                        or hasattr(v, "__jax_array__")
+                        else v
+                    )
                     for k, v in params.items()
                 }
                 with open(path, "w", encoding="utf-8") as f:

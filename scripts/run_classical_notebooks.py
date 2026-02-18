@@ -12,6 +12,7 @@ Usage:
     python scripts/run_classical_notebooks.py --single basic/01   # Run single notebook
     python scripts/run_classical_notebooks.py --subdir basic      # Run one subdir only
 """
+
 import argparse
 import datetime
 import io
@@ -37,8 +38,20 @@ LOG_DIR = EXAMPLES_DIR / "classical" / "_run_logs"
 
 # Model-family dirs to exclude
 MODEL_FAMILY_DIRS = {
-    "dmt", "epm", "fikh", "fluidity", "giesekus", "hl",
-    "hvm", "hvnm", "ikh", "itt_mct", "sgr", "stz", "tnt", "vlb",
+    "dmt",
+    "epm",
+    "fikh",
+    "fluidity",
+    "giesekus",
+    "hl",
+    "hvm",
+    "hvnm",
+    "ikh",
+    "itt_mct",
+    "sgr",
+    "stz",
+    "tnt",
+    "vlb",
 }
 
 # Other dirs to exclude
@@ -48,6 +61,7 @@ EXCLUDE_DIRS = {"outputs", "data", "_run_logs", "archive", "utils", "classical"}
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _ts() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -91,7 +105,8 @@ def discover_notebooks(
 
     if prefixes:
         filtered = [
-            p for p in filtered
+            p
+            for p in filtered
             if any(
                 p.stem.startswith(pfx)
                 or str(p.relative_to(EXAMPLES_DIR)).startswith(pfx)
@@ -105,6 +120,7 @@ def discover_notebooks(
 # ---------------------------------------------------------------------------
 # Single-notebook execution
 # ---------------------------------------------------------------------------
+
 
 class NotebookResult:
     """Outcome of executing one notebook."""
@@ -203,9 +219,7 @@ def run_notebook(nb_path: Path, timeout: int = 345600) -> NotebookResult:
                             result.warnings.append(stripped[:300])
 
         # Remove injected setup cell before saving
-        nb.cells = [
-            c for c in nb.cells if c.metadata.get("tags") != ["injected-setup"]
-        ]
+        nb.cells = [c for c in nb.cells if c.metadata.get("tags") != ["injected-setup"]]
 
         result.status = "PASS"
 
@@ -235,11 +249,14 @@ def run_notebook(nb_path: Path, timeout: int = 345600) -> NotebookResult:
 # Reporting
 # ---------------------------------------------------------------------------
 
+
 def write_per_notebook_log(result: NotebookResult, log_dir: Path) -> None:
     """Write a per-notebook log file."""
     # Use subdir__stem naming to avoid collisions
     rel = result.path.relative_to(EXAMPLES_DIR)
-    safe_name = "__".join(rel.parts[:-1]) + "__" + rel.stem if len(rel.parts) > 1 else rel.stem
+    safe_name = (
+        "__".join(rel.parts[:-1]) + "__" + rel.stem if len(rel.parts) > 1 else rel.stem
+    )
     log_path = log_dir / f"{safe_name}.log"
 
     with open(log_path, "w") as f:
@@ -284,11 +301,15 @@ def write_master_log(results: list[NotebookResult], log_dir: Path) -> None:
     with open(master_path, "w") as f:
         f.write(f"Classical Notebook Suite — {_ts()}\n")
         f.write("=" * 70 + "\n")
-        f.write(f"Total: {len(results)} | PASS: {passed} | FAIL: {failed} | TIMEOUT: {timeout}\n")
+        f.write(
+            f"Total: {len(results)} | PASS: {passed} | FAIL: {failed} | TIMEOUT: {timeout}\n"
+        )
         f.write(f"Total runtime: {total_time:.1f}s ({total_time / 3600:.2f}h)\n\n")
 
         for r in results:
-            icon = {"PASS": "\u2713", "FAIL": "\u2717", "TIMEOUT": "\u23f1"}.get(r.status, "?")
+            icon = {"PASS": "\u2713", "FAIL": "\u2717", "TIMEOUT": "\u23f1"}.get(
+                r.status, "?"
+            )
             f.write(
                 f"  {icon} {r.rel_path:<65s} {r.status:<8s} "
                 f"{_elapsed(r.runtime):<10s} warnings={len(r.warnings)}\n"
@@ -356,24 +377,30 @@ def write_issue_inventory(results: list[NotebookResult], log_dir: Path) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run classical (non-model-family) notebook suite"
     )
     parser.add_argument(
-        "prefixes", nargs="*",
+        "prefixes",
+        nargs="*",
         help="Notebook prefixes or subdir/prefix to filter",
     )
     parser.add_argument(
-        "--timeout", type=int, default=345600,
+        "--timeout",
+        type=int,
+        default=345600,
         help="Per-notebook timeout in seconds (default: 345600 = 96h)",
     )
     parser.add_argument(
-        "--single", type=str,
+        "--single",
+        type=str,
         help="Run single notebook by subdir/prefix (verbose)",
     )
     parser.add_argument(
-        "--subdir", type=str,
+        "--subdir",
+        type=str,
         help="Run only notebooks in a specific subdir (e.g., basic, bayesian)",
     )
     args = parser.parse_args()
@@ -386,7 +413,9 @@ def main():
             print(f"No notebook found matching '{args.single}'")
             return 1
         nb = nbs[0]
-        print(f"Running single notebook: {nb.relative_to(EXAMPLES_DIR)} (timeout={args.timeout}s)")
+        print(
+            f"Running single notebook: {nb.relative_to(EXAMPLES_DIR)} (timeout={args.timeout}s)"
+        )
         result = run_notebook(nb, timeout=args.timeout)
         write_per_notebook_log(result, LOG_DIR)
         print(
@@ -417,8 +446,12 @@ def main():
         results.append(result)
         write_per_notebook_log(result, LOG_DIR)
 
-        icon = {"PASS": "\u2713", "FAIL": "\u2717", "TIMEOUT": "\u23f1"}.get(result.status, "?")
-        print(f"  {icon} {result.status} in {_elapsed(time.time() - t0)} | warnings={len(result.warnings)}")
+        icon = {"PASS": "\u2713", "FAIL": "\u2717", "TIMEOUT": "\u23f1"}.get(
+            result.status, "?"
+        )
+        print(
+            f"  {icon} {result.status} in {_elapsed(time.time() - t0)} | warnings={len(result.warnings)}"
+        )
         if result.error_summary:
             print(f"  Error: {result.error_summary[:200]}")
 
@@ -431,7 +464,9 @@ def main():
     failed = sum(1 for r in results if r.status == "FAIL")
     timeout = sum(1 for r in results if r.status == "TIMEOUT")
     print(f"\n{'=' * 70}")
-    print(f"FINAL: {passed} PASS | {failed} FAIL | {timeout} TIMEOUT out of {len(results)}")
+    print(
+        f"FINAL: {passed} PASS | {failed} FAIL | {timeout} TIMEOUT out of {len(results)}"
+    )
     print(f"{'=' * 70}")
 
     return 0 if failed == 0 and timeout == 0 else 1
