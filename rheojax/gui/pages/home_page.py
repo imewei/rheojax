@@ -8,7 +8,6 @@ Landing page with quick start actions and recent projects.
 from pathlib import Path
 
 from rheojax.gui.compat import (
-    QFont,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -145,45 +144,44 @@ class HomePage(QWidget):
     def _create_header(self) -> QWidget:
         """Create hero header with gradient background."""
         header = QWidget()
-        header.setMinimumHeight(160)
+        header.setMinimumHeight(240)
         header.setStyleSheet("""
             QWidget {
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #1E3A8A, stop:0.5 #1D4ED8, stop:1 #2563EB
+                    stop:0 #0F172A, stop:0.4 #1E3A8A, stop:1 #4338CA
                 );
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             }
             QLabel { background-color: transparent; }
         """)
 
         layout = QVBoxLayout(header)
-        layout.setSpacing(Spacing.SM)
+        layout.setSpacing(Spacing.MD)
         layout.setContentsMargins(
-            Spacing.PAGE_MARGIN + 8,
+            Spacing.PAGE_MARGIN + 16,
             Spacing.XXL,
-            Spacing.PAGE_MARGIN + 8,
+            Spacing.PAGE_MARGIN + 16,
             Spacing.XL,
         )
 
+        # Top Row: Title + Version Badge
+        top_row = QHBoxLayout()
+        top_row.setSpacing(Spacing.LG)
+        top_row.setContentsMargins(0, 0, 0, 0)
+
         # Title
         title = QLabel("RheoJAX")
-        title_font = QFont()
-        title_font.setPointSize(36)
-        title_font.setWeight(QFont.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet("color: #FFFFFF; background-color: transparent;")
+        title.setStyleSheet("""
+            color: #FFFFFF;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 48px;
+            font-weight: 800;
+            background-color: transparent;
+        """)
+        top_row.addWidget(title)
 
-        # Subtitle
-        subtitle = QLabel("JAX-Accelerated Rheological Analysis")
-        subtitle_font = QFont()
-        subtitle_font.setPointSize(14)
-        subtitle_font.setWeight(QFont.Normal)
-        subtitle.setFont(subtitle_font)
-        subtitle.setStyleSheet(
-            "color: rgba(255, 255, 255, 0.85); background-color: transparent;"
-        )
-
-        # Version
+        # Version Badge
         try:
             from rheojax import __version__
 
@@ -191,16 +189,35 @@ class HomePage(QWidget):
         except ImportError:
             version_text = "v0.6.0"
 
-        version = QLabel(version_text)
-        version.setStyleSheet(
-            "color: rgba(255, 255, 255, 0.55);"
-            " font-size: 11pt;"
-            " background-color: transparent;"
-        )
+        version_badge = QLabel(version_text)
+        version_badge.setStyleSheet("""
+            QLabel {
+                color: #E2E8F0;
+                background-color: rgba(255, 255, 255, 0.15);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 6px;
+                padding: 4px 12px;
+                font-size: 13px;
+                font-weight: 600;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+        """)
+        top_row.addWidget(version_badge)
+        top_row.addStretch()  # Push everything to left
 
-        layout.addWidget(title)
+        layout.addLayout(top_row)
+
+        # Subtitle
+        subtitle = QLabel("JAX-Accelerated Rheological Analysis")
+        subtitle.setStyleSheet("""
+            color: #94A3B8;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 18px;
+            font-weight: 400;
+            background-color: transparent;
+        """)
         layout.addWidget(subtitle)
-        layout.addWidget(version)
+
         layout.addStretch()
 
         return header
@@ -339,44 +356,68 @@ class HomePage(QWidget):
 
     def _create_workflow_card(
         self, title: str, description: str, variant: str, mode: str
-    ) -> QPushButton:
-        """Create a workflow selection card."""
-        btn = QPushButton(f"{title}\n\n{description}")
-        btn.setMinimumHeight(120)
-        btn.setProperty("variant", variant)
+    ) -> QWidget:
+        """Create a workflow selection card using QFrame."""
+        card = QFrame()
+        card.setProperty("class", "card-clickable")
+        card.setCursor(Qt.PointingHandCursor)
+        card.setMinimumHeight(140)
 
-        variant_gradients = {
-            "primary": (
-                "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1D4ED8, stop:1 #2563EB)",
-                "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1E40AF, stop:1 #1D4ED8)",
-            ),
-            "success": (
-                "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #059669, stop:1 #10B981)",
-                "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #047857, stop:1 #059669)",
-            ),
-        }
-        bg_grad, bg_hover_grad = variant_gradients.get(
-            variant, variant_gradients["primary"]
-        )
+        # Apply specific styling for accent borders if needed based on variant
+        # (Though our CSS handles hover states generically)
 
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {bg_grad};
-                color: #FFFFFF;
-                border: none;
-                border-radius: 10px;
-                text-align: left;
-                padding: {Spacing.XL}px;
-                font-size: 12pt;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{
-                background-color: {bg_hover_grad};
-            }}
+        layout = QVBoxLayout(card)
+        layout.setSpacing(Spacing.SM)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+
+        # Title
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            font-size: 16px;
+            font-weight: 700;
+            color: #1E3A8A; /* Default to deep blue, CSS handles theme */
+            background-color: transparent;
+            border: none;
         """)
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.clicked.connect(lambda: self._select_workflow(mode))
-        return btn
+        # Specific color override for dark theme compatibility handled via QSS classes if needed,
+        # but for now we rely on the QSS generic color or specific variant handling.
+        # Ideally, we let QSS handle colors.
+        title_label.setObjectName("cardTitle")
+
+        layout.addWidget(title_label)
+
+        # Description
+        desc_label = QLabel(description)
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("""
+            font-size: 13px;
+            color: #64748B;
+            background-color: transparent;
+            border: none;
+        """)
+        layout.addWidget(desc_label)
+
+        layout.addStretch()
+
+        # Action Label (e.g. "Start ->")
+        action_label = QLabel("Start Workflow →")
+        action_label.setAlignment(Qt.AlignRight)
+        action_label.setStyleSheet("""
+            font-weight: 600;
+            color: #4338CA;
+            font-size: 12px;
+            background-color: transparent;
+            border: none;
+        """)
+        layout.addWidget(action_label)
+
+        # Make clickable
+        def on_click(event):
+            self._select_workflow(mode)
+
+        card.mousePressEvent = on_click
+
+        return card
 
     def _select_workflow(self, mode: str) -> None:
         """Handle workflow selection."""
