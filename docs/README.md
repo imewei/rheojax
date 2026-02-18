@@ -48,7 +48,7 @@ This documentation serves as both a **practical user guide** and a **comprehensi
 
 ## 📖 Documentation Structure
 
-### **1. Models Handbook** (20 Models Documented)
+### **1. Models Handbook** (53 Models Documented)
 
 Comprehensive documentation for all rheological models with handbook-quality depth:
 
@@ -104,7 +104,7 @@ Non-Newtonian fluid models for industrial applications:
 
 ---
 
-### **2. Transforms** (5 Transforms Documented)
+### **2. Transforms** (7 Transforms Documented)
 
 Data preprocessing and analysis tools with mathematical foundations:
 
@@ -113,9 +113,11 @@ Data preprocessing and analysis tools with mathematical foundations:
 - **[Mutation Number](source/transforms/mutation_number.rst)** - Material classification (tan δ), gel point detection
 - **[OWChirp](source/transforms/owchirp.rst)** - Fast time-resolved rheometry (10-100x speedup)
 - **[Smooth Derivative](source/transforms/smooth_derivative.rst)** - Noise-robust differentiation (Savitzky-Golay)
+- **[SPP](source/transforms/spp.rst)** - Sequence of Physical Processes LAOS analysis
+- **[SRFS](source/transforms/srfs.rst)** - Strain-Rate Frequency Superposition
 
 **Workflow Integration:**
-- 5 complete pipelines with code examples
+- 7 complete pipelines with code examples
 - Transform chaining compatibility matrix
 - Quality checkpoints between stages
 - Parameter selection guidelines
@@ -142,15 +144,15 @@ Comprehensive tutorials and conceptual explanations:
 Complete API documentation with autodoc:
 
 - **[Core](source/api/core.rst)** - BaseModel, RheoData, ParameterSet, BayesianMixin
-- **[Models](source/api/models.rst)** - All 20 rheological models
-- **[Transforms](source/api/transforms.rst)** - All 5 data transforms
+- **[Models](source/api/models.rst)** - All 53 rheological models
+- **[Transforms](source/api/transforms.rst)** - All 7 data transforms
 - **[Pipeline](source/api/pipeline.rst)** - Pipeline, BayesianPipeline, BatchPipeline
 - **[Visualization](source/api/visualization.rst)** - Plotter, BayesianPlotter, templates
 - **[Utilities](source/api/utils.rst)** - Optimization, initialization, compatibility
 
 ---
 
-### **5. Examples** (24 Jupyter Notebooks)
+### **5. Examples** (100+ Jupyter Notebooks)
 
 Executable tutorials covering all major features:
 
@@ -419,11 +421,11 @@ C1, C2 = mc.get_wlf_parameters()
 ## 📊 Documentation Statistics
 
 ### **Coverage**
-- **Models:** 20/20 (100%) - 3 classical, 11 fractional, 6 flow
-- **Transforms:** 5/5 (100%) - FFT, Mastercurve, MutationNumber, OWChirp, SmoothDerivative
-- **Test Modes:** 4/4 (100%) - SAOS, Relaxation, Creep, Flow
+- **Models:** 53/53 (100%) - Classical, Fractional, Flow, Multi-Mode, SGR, STZ, EPM, Fluidity, Saramito, IKH, FIKH, HL, SPP, ITT-MCT, DMT, Giesekus, TNT, VLB, HVM, HVNM
+- **Transforms:** 7/7 (100%) - FFT, Mastercurve, MutationNumber, OWChirp, SmoothDerivative, SPP, SRFS
+- **Test Modes:** 6/6 (100%) - SAOS, Relaxation, Creep, Flow, Startup, LAOS
 - **Material Types:** 10+ categories documented
-- **Examples:** 24 Jupyter notebooks
+- **Examples:** 100+ Jupyter notebooks
 
 ### **Quality Metrics**
 - **Total documentation:** 12,000+ words

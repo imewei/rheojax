@@ -24,6 +24,8 @@ These models are particularly well-suited for:
 - Waxy crude oils
 - Thixotropic pastes and slurries
 
+.. include:: /_includes/thixotropy_foundations.rst
+
 
 Model Hierarchy
 ---------------

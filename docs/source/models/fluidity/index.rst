@@ -27,6 +27,8 @@ These models are well-suited for:
 - Waxy crude oils
 - Cement and concrete
 
+.. include:: /_includes/thixotropy_foundations.rst
+
 
 Model Hierarchy
 ---------------

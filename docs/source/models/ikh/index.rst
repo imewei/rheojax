@@ -25,6 +25,8 @@ These models are particularly well-suited for:
 - Structured emulsions (dense emulsions, foams)
 - Thixotropic cements and pastes (self-leveling, 3D printing)
 
+.. include:: /_includes/thixotropy_foundations.rst
+
 Both models include comprehensive **Industrial Applications** sections with
 typical parameter ranges from field studies, and **Parameter Estimation Methods**
 covering sequential fitting, multi-start optimization, Bayesian inference,

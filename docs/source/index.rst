@@ -148,7 +148,6 @@ Contents
 
    installation
    quickstart
-   contributing
    development_status
 
 ----

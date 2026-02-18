@@ -32,7 +32,5 @@ python:
     # This ensures autodoc can import the package modules
     - method: pip
       path: .
-      extra_requirements:
-        - io
     # Install documentation-specific dependencies
     - requirements: docs/requirements-docs.txt
