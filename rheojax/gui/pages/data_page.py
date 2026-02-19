@@ -28,7 +28,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
+from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing, Typography
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.state.store import StateStore
 from rheojax.logging import get_logger
@@ -121,7 +121,8 @@ class DataPage(QWidget):
         # Example datasets dropdown
         example_group = QGroupBox("Load Example Dataset")
         example_group.setStyleSheet(
-            "QGroupBox { font-size: 10.5pt; font-weight: bold; }"
+            f"QGroupBox {{ font-size: {Typography.SIZE_SM}pt;"
+            f" font-weight: {Typography.WEIGHT_BOLD}; }}"
         )
         example_layout = QHBoxLayout(example_group)
         self._example_combo = QComboBox()
@@ -145,12 +146,18 @@ class DataPage(QWidget):
 
         # File info
         info_group = QGroupBox("File Information")
-        info_group.setStyleSheet("QGroupBox { font-size: 11pt; font-weight: bold; }")
+        info_group.setStyleSheet(
+            f"QGroupBox {{ font-size: {Typography.SIZE_MD_SM}pt;"
+            f" font-weight: {Typography.WEIGHT_BOLD}; }}"
+        )
         info_layout = QVBoxLayout(info_group)
 
         self._file_name_label = QLabel("No file selected")
         self._file_name_label.setWordWrap(True)
-        self._file_name_label.setStyleSheet("font-size: 11pt; font-weight: 500;")
+        self._file_name_label.setStyleSheet(
+            f"font-size: {Typography.SIZE_MD_SM}pt;"
+            f" font-weight: {Typography.WEIGHT_MEDIUM};"
+        )
         info_layout.addWidget(self._file_name_label)
 
         self._file_size_label = QLabel("")
@@ -188,7 +195,10 @@ class DataPage(QWidget):
 
         # Header
         header = QLabel("Data Preview (first 100 rows)")
-        header.setStyleSheet("font-weight: bold; font-size: 11pt; padding: 5px;")
+        header.setStyleSheet(
+            f"font-weight: {Typography.WEIGHT_BOLD}; font-size: {Typography.SIZE_MD_SM}pt;"
+            f" padding: {Spacing.XS}px;"
+        )
         layout.addWidget(header)
 
         # Table
@@ -218,7 +228,10 @@ class DataPage(QWidget):
 
         # Header
         header = QLabel("Column Mapping")
-        header.setStyleSheet("font-weight: bold; font-size: 11pt; padding: 5px;")
+        header.setStyleSheet(
+            f"font-weight: {Typography.WEIGHT_BOLD}; font-size: {Typography.SIZE_MD_SM}pt;"
+            f" padding: {Spacing.XS}px;"
+        )
         layout.addWidget(header)
 
         # Mapping controls
@@ -299,7 +312,9 @@ class DataPage(QWidget):
 
         # Metadata display
         metadata_label = QLabel("Metadata:")
-        metadata_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        metadata_label.setStyleSheet(
+            f"font-weight: {Typography.WEIGHT_BOLD}; margin-top: {Spacing.SM}px;"
+        )
         layout.addWidget(metadata_label)
 
         self._metadata_text = QTextEdit()
@@ -917,6 +932,11 @@ class DropZone(QFrame):
         super().__init__(parent)
         logger.debug("Initializing", class_name=self.__class__.__name__)
         self.setAcceptDrops(True)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setAccessibleName("File drop zone")
+        self.setAccessibleDescription(
+            "Drag and drop a data file here, or press Enter to browse"
+        )
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         self.setStyleSheet(f"""
             QFrame {{
@@ -936,7 +956,8 @@ class DropZone(QFrame):
         icon_label = QLabel("Drop Files Here")
         icon_label.setAlignment(Qt.AlignCenter)
         icon_label.setStyleSheet(
-            f"font-size: 24pt; font-weight: bold; color: {ColorPalette.TEXT_MUTED};"
+            f"font-size: {Typography.SIZE_HEADING}pt; font-weight: {Typography.WEIGHT_BOLD};"
+            f" color: {ColorPalette.TEXT_MUTED};"
         )
         layout.addWidget(icon_label)
 

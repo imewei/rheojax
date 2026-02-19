@@ -29,7 +29,7 @@ from rheojax.gui.compat import (
     Signal,
     Slot,
 )
-from rheojax.gui.resources.styles.tokens import button_style
+from rheojax.gui.resources.styles.tokens import Spacing, Typography, button_style
 from rheojax.gui.services.export_service import ExportService
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.store import StateStore
@@ -146,7 +146,12 @@ class ExportPage(QWidget):
         layout = QVBoxLayout(panel)
 
         # Data format
-        layout.addWidget(QLabel("Data Format:", styleSheet="font-weight: bold;"))
+        layout.addWidget(
+            QLabel(
+                "Data Format:",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};",
+            )
+        )
         self._data_format_combo = QComboBox()
         self._data_format_combo.addItems(["CSV", "Excel (XLSX)", "HDF5", "JSON"])
         self._data_format_combo.currentTextChanged.connect(self._on_data_format_changed)
@@ -154,7 +159,11 @@ class ExportPage(QWidget):
 
         # Figure format
         layout.addWidget(
-            QLabel("Figure Format:", styleSheet="font-weight: bold; margin-top: 15px;")
+            QLabel(
+                "Figure Format:",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
+                f" margin-top: {Spacing.LG}px;",
+            )
         )
         self._figure_format_combo = QComboBox()
         self._figure_format_combo.addItems(["PNG", "SVG", "PDF", "EPS"])
@@ -179,7 +188,11 @@ class ExportPage(QWidget):
 
         # Style preset
         layout.addWidget(
-            QLabel("Plot Style:", styleSheet="font-weight: bold; margin-top: 15px;")
+            QLabel(
+                "Plot Style:",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
+                f" margin-top: {Spacing.LG}px;",
+            )
         )
         self._style_combo = QComboBox()
         self._style_combo.addItems(["Publication", "Presentation", "Default"])
@@ -203,7 +216,9 @@ class ExportPage(QWidget):
         # Report template
         layout.addWidget(
             QLabel(
-                "Report Template:", styleSheet="font-weight: bold; margin-top: 15px;"
+                "Report Template:",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
+                f" margin-top: {Spacing.LG}px;",
             )
         )
         self._template_combo = QComboBox()
@@ -230,7 +245,12 @@ class ExportPage(QWidget):
         layout = QVBoxLayout(panel)
 
         # Output directory
-        layout.addWidget(QLabel("Output Directory:", styleSheet="font-weight: bold;"))
+        layout.addWidget(
+            QLabel(
+                "Output Directory:",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};",
+            )
+        )
 
         dir_layout = QHBoxLayout()
         self._output_dir_edit = QLineEdit()
@@ -246,7 +266,11 @@ class ExportPage(QWidget):
 
         # Preview
         layout.addWidget(
-            QLabel("Export Preview:", styleSheet="font-weight: bold; margin-top: 20px;")
+            QLabel(
+                "Export Preview:",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
+                f" margin-top: {Spacing.PAGE_MARGIN}px;",
+            )
         )
 
         self._preview_list = QListWidget()

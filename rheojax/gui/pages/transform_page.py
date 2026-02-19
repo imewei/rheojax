@@ -24,7 +24,12 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing, button_style
+from rheojax.gui.resources.styles.tokens import (
+    ColorPalette,
+    Spacing,
+    Typography,
+    button_style,
+)
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.logging import get_logger
@@ -118,18 +123,19 @@ class TransformPage(QWidget):
         card.setCursor(Qt.PointingHandCursor)
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        layout.setSpacing(Spacing.SM)
         name_label = QLabel(name)
-        name_label.setStyleSheet("color: white; font-size: 13pt; font-weight: bold;")
+        name_label.setStyleSheet(
+            f"color: {ColorPalette.TEXT_INVERSE}; font-size: {Typography.SIZE_MD}pt;"
+            f" font-weight: {Typography.WEIGHT_BOLD};"
+        )
 
         layout.addWidget(name_label)
         layout.addStretch()
 
         btn = QPushButton("Configure")
-        btn.setStyleSheet(
-            "background-color: white; color: black; font-weight: bold; padding: 5px;"
-        )
+        btn.setStyleSheet(button_style("secondary", "sm"))
         btn.clicked.connect(lambda: self._select_transform(name))
         layout.addWidget(btn)
 
@@ -165,7 +171,11 @@ class TransformPage(QWidget):
         before_widget = QWidget()
         before_layout = QVBoxLayout(before_widget)
         before_layout.addWidget(
-            QLabel("Before", styleSheet="font-weight: bold; font-size: 11pt;")
+            QLabel(
+                "Before",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
+                f" font-size: {Typography.SIZE_MD_SM}pt;",
+            )
         )
         self._before_canvas = PlotCanvas()
         before_layout.addWidget(self._before_canvas)
@@ -173,7 +183,11 @@ class TransformPage(QWidget):
         after_widget = QWidget()
         after_layout = QVBoxLayout(after_widget)
         after_layout.addWidget(
-            QLabel("After", styleSheet="font-weight: bold; font-size: 11pt;")
+            QLabel(
+                "After",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
+                f" font-size: {Typography.SIZE_MD_SM}pt;",
+            )
         )
         self._after_canvas = PlotCanvas()
         after_layout.addWidget(self._after_canvas)
@@ -199,7 +213,9 @@ class TransformPage(QWidget):
 
         self._config_layout.addWidget(
             QLabel(
-                f"{name} Parameters", styleSheet="font-weight: bold; font-size: 11pt;"
+                f"{name} Parameters",
+                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
+                f" font-size: {Typography.SIZE_MD_SM}pt;",
             )
         )
         self._param_controls.clear()

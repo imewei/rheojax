@@ -513,7 +513,7 @@ class DiagnosticsPage(QWidget):
         color : str
             Hex color code
         """
-        from PySide6.QtGui import QColor
+        from rheojax.gui.compat import QColor
 
         item = self._gof_table.item(row, 1)
         if item:

@@ -45,6 +45,7 @@ from rheojax.gui.pages.fit_page import FitPage
 from rheojax.gui.pages.home_page import HomePage
 from rheojax.gui.pages.transform_page import TransformPage
 from rheojax.gui.resources import load_stylesheet
+from rheojax.gui.resources.styles import ThemeManager
 from rheojax.gui.state.signals import StateSignals
 from rheojax.gui.state.store import (
     AppState,
@@ -1154,6 +1155,7 @@ class RheoJAXMainWindow(QMainWindow):
         chosen = "light" if theme == "auto" else theme
         try:
             app.setStyleSheet(load_stylesheet(chosen))
+            ThemeManager.set_theme(chosen)
         except Exception as exc:  # pragma: no cover - GUI runtime
             logger.error(
                 "Failed to apply theme", theme=theme, error=str(exc), exc_info=True

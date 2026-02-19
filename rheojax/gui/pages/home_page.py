@@ -20,12 +20,51 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles import ColorPalette, Spacing
+from rheojax.gui.resources.styles import (
+    BorderRadius,
+    ColorPalette,
+    Spacing,
+    Typography,
+    button_style,
+    themed,
+)
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.jax_status import JAXStatusWidget
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class ClickableFrame(QFrame):
+    """A QFrame subclass that emits a signal on click and handles keyboard activation."""
+
+    clicked = Signal()
+
+    def mousePressEvent(self, event) -> None:
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key_Return, Qt.Key_Space):
+            self.clicked.emit()
+        else:
+            super().keyPressEvent(event)
+
+
+class ClickableWidget(QWidget):
+    """A QWidget subclass that emits a signal on click and handles keyboard activation."""
+
+    clicked = Signal()
+
+    def mousePressEvent(self, event) -> None:
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key_Return, Qt.Key_Space):
+            self.clicked.emit()
+        else:
+            super().keyPressEvent(event)
 
 
 class HomePage(QWidget):
@@ -145,15 +184,15 @@ class HomePage(QWidget):
         """Create hero header with gradient background."""
         header = QWidget()
         header.setMinimumHeight(240)
-        header.setStyleSheet("""
-            QWidget {
+        header.setStyleSheet(f"""
+            QWidget {{
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #0F172A, stop:0.4 #1E3A8A, stop:1 #4338CA
+                    stop:0 {ColorPalette.PRIMARY_PRESSED}, stop:0.4 {ColorPalette.PRIMARY_PRESSED}, stop:1 {ColorPalette.ACCENT_PRESSED}
                 );
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            }
-            QLabel { background-color: transparent; }
+            }}
+            QLabel {{ background-color: transparent; }}
         """)
 
         layout = QVBoxLayout(header)
@@ -172,11 +211,11 @@ class HomePage(QWidget):
 
         # Title
         title = QLabel("RheoJAX")
-        title.setStyleSheet("""
-            color: #FFFFFF;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 48px;
-            font-weight: 800;
+        title.setStyleSheet(f"""
+            color: {ColorPalette.TEXT_INVERSE};
+            font-family: {Typography.FONT_FAMILY};
+            font-size: {Typography.SIZE_HERO}pt;
+            font-weight: {Typography.WEIGHT_BOLD};
             background-color: transparent;
         """)
         top_row.addWidget(title)
@@ -190,17 +229,17 @@ class HomePage(QWidget):
             version_text = "v0.6.0"
 
         version_badge = QLabel(version_text)
-        version_badge.setStyleSheet("""
-            QLabel {
-                color: #E2E8F0;
+        version_badge.setStyleSheet(f"""
+            QLabel {{
+                color: {ColorPalette.TEXT_INVERSE};
                 background-color: rgba(255, 255, 255, 0.15);
                 border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 6px;
-                padding: 4px 12px;
-                font-size: 13px;
-                font-weight: 600;
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            }
+                border-radius: {BorderRadius.MD}px;
+                padding: {Spacing.XS}px {Spacing.MD}px;
+                font-size: {Typography.SIZE_MD}pt;
+                font-weight: {Typography.WEIGHT_SEMIBOLD};
+                font-family: {Typography.FONT_FAMILY};
+            }}
         """)
         top_row.addWidget(version_badge)
         top_row.addStretch()  # Push everything to left
@@ -209,11 +248,11 @@ class HomePage(QWidget):
 
         # Subtitle
         subtitle = QLabel("JAX-Accelerated Rheological Analysis")
-        subtitle.setStyleSheet("""
-            color: #94A3B8;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 18px;
-            font-weight: 400;
+        subtitle.setStyleSheet(f"""
+            color: {ColorPalette.TEXT_DISABLED};
+            font-family: {Typography.FONT_FAMILY};
+            font-size: {Typography.SIZE_XL + 2}pt;
+            font-weight: {Typography.WEIGHT_NORMAL};
             background-color: transparent;
         """)
         layout.addWidget(subtitle)
@@ -279,40 +318,40 @@ class HomePage(QWidget):
         btn.setProperty("variant", variant)
         btn.setCursor(Qt.PointingHandCursor)
 
-        # Gradient backgrounds for each variant
+        # Gradient backgrounds for each variant (theme-aware tokens)
         variant_gradients = {
             "primary": (
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2563EB, stop:1 #1D4ED8)",
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1D4ED8, stop:1 #1E40AF)",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('PRIMARY_HOVER')}, stop:1 {themed('PRIMARY')})",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('PRIMARY')}, stop:1 {themed('PRIMARY_PRESSED')})",
             ),
             "success": (
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #10B981, stop:1 #059669)",
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #059669, stop:1 #047857)",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('SUCCESS_BRIGHT')}, stop:1 {themed('SUCCESS')})",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('SUCCESS')}, stop:1 {themed('SUCCESS_HOVER')})",
             ),
             "warning": (
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #F59E0B, stop:1 #D97706)",
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #D97706, stop:1 #B45309)",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('WARNING_BRIGHT')}, stop:1 {themed('WARNING')})",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('WARNING')}, stop:1 {themed('WARNING_HOVER')})",
             ),
             "error": (
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #EF4444, stop:1 #DC2626)",
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #DC2626, stop:1 #B91C1C)",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('ERROR_BRIGHT')}, stop:1 {themed('ERROR')})",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('ERROR')}, stop:1 {themed('ERROR_HOVER')})",
             ),
             "accent": (
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #8B5CF6, stop:1 #7C3AED)",
-                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #7C3AED, stop:1 #6D28D9)",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('ACCENT_BRIGHT')}, stop:1 {themed('ACCENT')})",
+                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('ACCENT')}, stop:1 {themed('ACCENT_HOVER')})",
             ),
         }
         bg_grad, bg_hover_grad = variant_gradients.get(
             variant, variant_gradients["primary"]
         )
-        text_color = "#FFFFFF"
+        text_color = themed("TEXT_INVERSE")
 
         btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {bg_grad};
                 color: {text_color};
                 border: none;
-                border-radius: 10px;
+                border-radius: {BorderRadius.XL}px;
                 text-align: left;
                 padding: {Spacing.LG}px {Spacing.XL}px;
                 font-size: 11pt;
@@ -357,41 +396,35 @@ class HomePage(QWidget):
     def _create_workflow_card(
         self, title: str, description: str, variant: str, mode: str
     ) -> QWidget:
-        """Create a workflow selection card using QFrame."""
-        card = QFrame()
+        """Create a workflow selection card using ClickableFrame."""
+        card = ClickableFrame()
+        card.setFrameShape(QFrame.StyledPanel)
         card.setProperty("class", "card-clickable")
         card.setCursor(Qt.PointingHandCursor)
         card.setMinimumHeight(140)
-
-        # Apply specific styling for accent borders if needed based on variant
-        # (Though our CSS handles hover states generically)
 
         layout = QVBoxLayout(card)
         layout.setSpacing(Spacing.SM)
         layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
 
-        # Title
+        # Title — use PRIMARY (readable on both light and dark surfaces)
         title_label = QLabel(title)
-        title_label.setStyleSheet("""
-            font-size: 16px;
-            font-weight: 700;
-            color: #1E3A8A; /* Default to deep blue, CSS handles theme */
+        title_label.setStyleSheet(f"""
+            font-size: {Typography.SIZE_XL}pt;
+            font-weight: {Typography.WEIGHT_BOLD};
+            color: {ColorPalette.PRIMARY};
             background-color: transparent;
             border: none;
         """)
-        # Specific color override for dark theme compatibility handled via QSS classes if needed,
-        # but for now we rely on the QSS generic color or specific variant handling.
-        # Ideally, we let QSS handle colors.
         title_label.setObjectName("cardTitle")
-
         layout.addWidget(title_label)
 
         # Description
         desc_label = QLabel(description)
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet("""
-            font-size: 13px;
-            color: #64748B;
+        desc_label.setStyleSheet(f"""
+            font-size: {Typography.SIZE_MD}pt;
+            color: {ColorPalette.TEXT_SECONDARY};
             background-color: transparent;
             border: none;
         """)
@@ -399,23 +432,25 @@ class HomePage(QWidget):
 
         layout.addStretch()
 
-        # Action Label (e.g. "Start ->")
-        action_label = QLabel("Start Workflow →")
+        # Action Label
+        action_label = QLabel("Start Workflow \u2192")
         action_label.setAlignment(Qt.AlignRight)
-        action_label.setStyleSheet("""
-            font-weight: 600;
-            color: #4338CA;
-            font-size: 12px;
+        action_label.setStyleSheet(f"""
+            font-weight: {Typography.WEIGHT_SEMIBOLD};
+            color: {ColorPalette.ACCENT};
+            font-size: {Typography.SIZE_BASE}pt;
             background-color: transparent;
             border: none;
         """)
         layout.addWidget(action_label)
 
-        # Make clickable
-        def on_click(event):
-            self._select_workflow(mode)
+        # Keyboard accessibility
+        card.setFocusPolicy(Qt.StrongFocus)
+        card.setAccessibleName(f"{title} workflow card")
+        card.setAccessibleDescription(description)
 
-        card.mousePressEvent = on_click
+        # Connect click signal to workflow selection
+        card.clicked.connect(lambda m=mode: self._select_workflow(m))
 
         return card
 
@@ -475,12 +510,12 @@ class HomePage(QWidget):
 
     def _create_recent_project_item(self, project_path: Path) -> QWidget:
         """Create a recent project item."""
-        widget = QWidget()
+        widget = ClickableWidget()
         widget.setStyleSheet(f"""
             QWidget {{
                 background-color: {ColorPalette.BG_SURFACE};
                 border: 1px solid {ColorPalette.BORDER_SUBTLE};
-                border-radius: 8px;
+                border-radius: {BorderRadius.LG}px;
             }}
             QWidget:hover {{
                 background-color: {ColorPalette.BG_HOVER};
@@ -509,8 +544,13 @@ class HomePage(QWidget):
         path_label.setWordWrap(True)
         layout.addWidget(path_label)
 
-        # Make clickable
-        def on_project_click(event, path=project_path):
+        # Keyboard accessibility
+        widget.setFocusPolicy(Qt.StrongFocus)
+        widget.setCursor(Qt.PointingHandCursor)
+        widget.setAccessibleName(f"Recent project: {project_path.stem}")
+
+        # Connect click signal
+        def on_project_open(path=project_path):
             logger.debug(
                 "Quick action triggered",
                 action="open_recent_project",
@@ -519,8 +559,7 @@ class HomePage(QWidget):
             )
             self.recent_project_opened.emit(path)
 
-        widget.mousePressEvent = on_project_click
-        widget.setCursor(Qt.PointingHandCursor)
+        widget.clicked.connect(on_project_open)
 
         return widget
 
@@ -549,16 +588,16 @@ class HomePage(QWidget):
             "Bayesian": "examples/data/pyRheo/fish_muscle/stressrelaxation_fishmuscle_data.csv",
         }
 
-        # Refined chart colors — deep, saturated tones
+        # Chart colors from design tokens
         chart_colors = [
-            "#1D4ED8",  # Deep blue
-            "#059669",  # Emerald
-            "#DC2626",  # Red
-            "#DB2777",  # Pink
-            "#7C3AED",  # Purple
-            "#0891B2",  # Cyan
-            "#D97706",  # Amber
-            "#57534E",  # Stone
+            ColorPalette.CHART_1,
+            ColorPalette.CHART_3,
+            ColorPalette.CHART_5,
+            ColorPalette.CHART_6,
+            ColorPalette.CHART_2,
+            ColorPalette.INFO,
+            ColorPalette.CHART_4,
+            ColorPalette.TEXT_SECONDARY,
         ]
 
         examples = [
@@ -609,7 +648,7 @@ class HomePage(QWidget):
 
     def _create_example_card(self, name: str, description: str, color: str) -> QWidget:
         """Create an example dataset card."""
-        card = QWidget()
+        card = ClickableWidget()
         darker = self._darken_color(color, 0.15)
         card.setStyleSheet(f"""
             QWidget {{
@@ -617,7 +656,7 @@ class HomePage(QWidget):
                     x1:0, y1:0, x2:1, y2:1,
                     stop:0 {color}, stop:1 {darker}
                 );
-                border-radius: 10px;
+                border-radius: {BorderRadius.XL}px;
             }}
         """)
         card.setCursor(Qt.PointingHandCursor)
@@ -625,27 +664,32 @@ class HomePage(QWidget):
 
         layout = QVBoxLayout(card)
         layout.setContentsMargins(Spacing.LG, Spacing.MD, Spacing.LG, Spacing.MD)
-        layout.setSpacing(2)
+        layout.setSpacing(Spacing.XXS)
 
         # Name
         name_label = QLabel(name)
         name_label.setStyleSheet(
-            "color: #FFFFFF; font-size: 12pt; font-weight: 700;"
-            " background-color: transparent;"
+            f"color: {ColorPalette.TEXT_INVERSE}; font-size: {Typography.SIZE_BASE}pt;"
+            f" font-weight: {Typography.WEIGHT_BOLD}; background-color: transparent;"
         )
         layout.addWidget(name_label)
 
         # Description
         desc_label = QLabel(description)
         desc_label.setStyleSheet(
-            "color: rgba(255, 255, 255, 0.80); font-size: 9pt; font-weight: normal;"
-            " background-color: transparent;"
+            f"color: rgba(255, 255, 255, 0.80); font-size: {Typography.SIZE_XS}pt;"
+            f" font-weight: {Typography.WEIGHT_NORMAL}; background-color: transparent;"
         )
         desc_label.setWordWrap(True)
         layout.addWidget(desc_label)
 
-        # Make clickable
-        def on_example_click(event, example_name=name):
+        # Keyboard accessibility
+        card.setFocusPolicy(Qt.StrongFocus)
+        card.setAccessibleName(f"Example dataset: {name}")
+        card.setAccessibleDescription(description)
+
+        # Connect click signal
+        def on_example_open(example_name=name):
             logger.debug(
                 "Quick action triggered",
                 action="select_example",
@@ -654,7 +698,7 @@ class HomePage(QWidget):
             )
             self.example_selected.emit(example_name)
 
-        card.mousePressEvent = on_example_click
+        card.clicked.connect(on_example_open)
 
         return card
 
@@ -731,26 +775,7 @@ class HomePage(QWidget):
             btn = QPushButton(title)
             btn.setProperty("variant", "secondary")
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {ColorPalette.BG_BASE};
-                    color: {ColorPalette.TEXT_PRIMARY};
-                    border: 1px solid {ColorPalette.BORDER_DEFAULT};
-                    border-radius: 8px;
-                    padding: {Spacing.MD}px {Spacing.LG}px;
-                    font-size: 11pt;
-                    font-weight: 500;
-                    text-align: left;
-                }}
-                QPushButton:hover {{
-                    background-color: {ColorPalette.PRIMARY_SUBTLE};
-                    border-color: {ColorPalette.PRIMARY};
-                    color: {ColorPalette.PRIMARY};
-                }}
-                QPushButton:pressed {{
-                    background-color: {ColorPalette.PRIMARY_LIGHT};
-                }}
-            """)
+            btn.setStyleSheet(button_style("secondary", "md"))
             btn.clicked.connect(lambda checked, u=url, t=title: self._open_url(u, t))
             layout.addWidget(btn)
 
