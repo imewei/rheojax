@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy.interpolate import CubicSpline
 
+import interpax
+
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
 
@@ -279,6 +281,33 @@ def create_sk_interpolator(
     return CubicSpline(k_data[sort_idx], sk_data[sort_idx], extrapolate=True)
 
 
+def create_sk_interpolator_jax(
+    k_data: np.ndarray,
+    sk_data: np.ndarray,
+) -> interpax.Interpolator1D:
+    """Create a JAX-compatible cubic spline interpolator for S(k).
+
+    Uses interpax for JIT-compatible, differentiable interpolation.
+    Suitable for use inside jax.jit-decorated functions.
+
+    Parameters
+    ----------
+    k_data : np.ndarray
+        Wave vectors at which S(k) is provided (sorted ascending)
+    sk_data : np.ndarray
+        Structure factor values
+
+    Returns
+    -------
+    interpax.Interpolator1D
+        JAX-native interpolator callable as sk_interp(k)
+    """
+    sort_idx = np.argsort(k_data)
+    k_sorted = jnp.asarray(k_data[sort_idx])
+    sk_sorted = jnp.asarray(sk_data[sort_idx])
+    return interpax.Interpolator1D(k_sorted, sk_sorted, method="cubic")
+
+
 # =============================================================================
 # Structure Factor Derivatives
 # =============================================================================
@@ -373,7 +402,6 @@ def mct_vertex_isotropic(
             return percus_yevick_sk(kk, phi)
 
     n_k = len(k)
-    V = np.zeros((n_k, n_k))
 
     # Get S(k) and S(q)
     sk = sk_func(k)
@@ -387,19 +415,21 @@ def mct_vertex_isotropic(
     # V(k,q) ∝ n * S(k) * S(q) * [k·q c(|k-q|) + k c(k) + q c(q)]²
     # This is a simplified form - full calculation requires angular integration
 
-    for i, ki in enumerate(k):
-        for j, qj in enumerate(q):
-            # Triangle constraint: |k-q| must be realizable
-            k_minus_q_min = abs(ki - qj)
-            k_minus_q_max = ki + qj
+    # Vectorized: compute all (i,j) pairs simultaneously via broadcasting
+    ki = k[:, None]   # (n_k, 1)
+    qj = q[None, :]   # (1, n_k)
 
-            # Approximate angular average using midpoint
-            k_minus_q = (k_minus_q_min + k_minus_q_max) / 2
-            s_kmq = sk_func(np.array([k_minus_q]))[0]
+    # Triangle constraint: |k-q| to k+q, midpoint approximation
+    k_minus_q_min = np.abs(ki - qj)     # (n_k, n_k)
+    k_minus_q_max = ki + qj              # (n_k, n_k)
+    k_minus_q = (k_minus_q_min + k_minus_q_max) / 2   # (n_k, n_k)
 
-            # Vertex coupling (simplified Verlet-Weis form)
-            coupling = ki * ck[i] + qj * cq[j]
-            V[i, j] = sk[i] * sq[j] * s_kmq * coupling**2
+    # Single vectorized sk_func call on raveled grid instead of n^2 scalar calls
+    s_kmq = sk_func(k_minus_q.ravel()).reshape(n_k, n_k)  # (n_k, n_k)
+
+    # Vertex coupling (simplified Verlet-Weis form) — broadcast ck/cq
+    coupling = ki * ck[:, None] + qj * cq[None, :]   # (n_k, n_k)
+    V = sk[:, None] * sq[None, :] * s_kmq * coupling**2
 
     # Normalize by density
     n_density = 6 * phi / np.pi  # Number density for unit diameter
