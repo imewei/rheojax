@@ -76,7 +76,7 @@ class BatchPipeline:
         self,
         file_paths: Iterable[str | Path],
         format: str = "auto",
-        parallel: bool = False,
+        parallel: bool = True,
         n_workers: int | None = None,
         **load_kwargs,
     ) -> BatchPipeline:
@@ -85,7 +85,7 @@ class BatchPipeline:
         Args:
             file_paths: List of file paths to process
             format: File format for loading
-            parallel: Whether to use parallel processing
+            parallel: Whether to use parallel processing (default: True)
             n_workers: Number of parallel workers (default: min(4, cpu_count))
             **load_kwargs: Additional arguments for data loading
 

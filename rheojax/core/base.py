@@ -6,6 +6,7 @@ for all models and transforms in the rheojax package, with full JAX support.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -371,15 +372,18 @@ class BaseModel(BayesianMixin, ABC):
             self.fitted_ = True
 
             # Log fit completion with key metrics
+            # Only compute R² when DEBUG logging is active — for ODE models
+            # score() triggers a full predict() call costing 100ms+.
             r2 = None
-            try:
-                r2 = self.score(X, y)
-            except Exception as exc:
-                logger.debug(
-                    "R² computation failed after fit",
-                    model=self.__class__.__name__,
-                    error=str(exc),
-                )
+            if logger.isEnabledFor(logging.DEBUG):
+                try:
+                    r2 = self.score(X, y)
+                except Exception as exc:
+                    logger.debug(
+                        "R² computation failed after fit",
+                        model=self.__class__.__name__,
+                        error=str(exc),
+                    )
 
             logger.info(
                 "Fit completed",

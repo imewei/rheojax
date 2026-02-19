@@ -21,13 +21,6 @@ from typing import Any
 
 import numpy as np
 
-try:
-    import jsonschema
-
-    HAS_JSONSCHEMA = True
-except ImportError:
-    HAS_JSONSCHEMA = False
-
 from rheojax.core.data import RheoData
 from rheojax.io.readers.trios.common import (
     DataSegment,
@@ -79,7 +72,9 @@ def validate_schema(
     """
     logger.debug("Validating JSON schema")
 
-    if not HAS_JSONSCHEMA:
+    try:
+        import jsonschema
+    except ImportError:
         logger.debug("jsonschema not installed, skipping validation")
         return True, []
 

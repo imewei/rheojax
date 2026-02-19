@@ -100,5 +100,17 @@ import logging
 logger = logging.getLogger(__name__)
 logger.info(f"Loading rheojax version {__version__}")
 
-# Core imports - models must be imported to register with ModelRegistry
-from . import models  # noqa: F401
+
+def __getattr__(name: str):
+    """Lazy-load top-level subpackages on first access.
+
+    This avoids the 270ms startup cost of eagerly importing all 53 models
+    and their heavy dependencies (scipy, numpyro) when rheojax is imported.
+    Model registration decorators fire the first time models are accessed.
+    """
+    if name == "models":
+        from . import models  # noqa: F401
+
+        globals()["models"] = models
+        return models
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

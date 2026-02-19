@@ -137,6 +137,17 @@ class Parameter:
         True
     """
 
+    __slots__ = (
+        "name",
+        "_bounds",
+        "units",
+        "description",
+        "constraints",
+        "_value",
+        "_clamp_on_set",
+        "_was_clamped",
+    )
+
     def __init__(
         self,
         name: str,
@@ -154,12 +165,13 @@ class Parameter:
         self._value: float | None = None
         self._clamp_on_set = False
         self._was_clamped = False
-        logger.debug(
-            "Creating parameter",
-            parameter=name,
-            bounds=bounds,
-            units=units,
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Creating parameter",
+                parameter=name,
+                bounds=bounds,
+                units=units,
+            )
         self._initialize(value)
 
     @property
@@ -254,12 +266,14 @@ class Parameter:
         clamped_during_init = False
         if self.bounds:
             lower, upper = self.bounds
-            logger.debug(
-                "Bound check",
-                parameter=self.name,
-                value=numeric_val,
-                bounds=self.bounds,
-            )
+            _debug = logger.isEnabledFor(10)  # logging.DEBUG == 10
+            if _debug:
+                logger.debug(
+                    "Bound check",
+                    parameter=self.name,
+                    value=numeric_val,
+                    bounds=self.bounds,
+                )
             if self._clamp_on_set:
                 if numeric_val < lower:
                     warnings.warn(
@@ -267,12 +281,13 @@ class Parameter:
                         RuntimeWarning,
                         stacklevel=2,
                     )
-                    logger.debug(
-                        "Value clamped to lower bound",
-                        parameter=self.name,
-                        original_value=numeric_val,
-                        clamped_value=lower,
-                    )
+                    if _debug:
+                        logger.debug(
+                            "Value clamped to lower bound",
+                            parameter=self.name,
+                            original_value=numeric_val,
+                            clamped_value=lower,
+                        )
                     numeric_val = lower
                     clamped_during_init = True
                 elif numeric_val > upper:
@@ -281,12 +296,13 @@ class Parameter:
                         RuntimeWarning,
                         stacklevel=2,
                     )
-                    logger.debug(
-                        "Value clamped to upper bound",
-                        parameter=self.name,
-                        original_value=numeric_val,
-                        clamped_value=upper,
-                    )
+                    if _debug:
+                        logger.debug(
+                            "Value clamped to upper bound",
+                            parameter=self.name,
+                            original_value=numeric_val,
+                            clamped_value=upper,
+                        )
                     numeric_val = upper
                     clamped_during_init = True
             elif numeric_val < lower or numeric_val > upper:
@@ -426,11 +442,15 @@ class ParameterSet:
         SharedParameterSet: For multi-model parameter sharing.
     """
 
+    __slots__ = ("_parameters", "_order", "_has_relative_constraints")
+
     def __init__(self):
         """Initialize empty parameter set."""
         self._parameters: dict[str, Parameter] = {}
         self._order: list[str] = []
-        logger.debug("ParameterSet created")
+        self._has_relative_constraints: bool = False
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug("ParameterSet created")
 
     def add(
         self,
@@ -454,13 +474,15 @@ class ParameterSet:
         Returns:
             The created Parameter object
         """
-        logger.debug(
-            "Adding parameter to set",
-            operation="add",
-            parameter=name,
-            value=value,
-            bounds=bounds,
-        )
+        _debug = logger.isEnabledFor(10)  # logging.DEBUG == 10
+        if _debug:
+            logger.debug(
+                "Adding parameter to set",
+                operation="add",
+                parameter=name,
+                value=value,
+                bounds=bounds,
+            )
         param = Parameter(
             name=name,
             value=value,
@@ -474,11 +496,17 @@ class ParameterSet:
         if name not in self._order:
             self._order.append(name)
 
-        logger.debug(
-            "Parameter added",
-            operation="add",
-            params=list(self._parameters.keys()),
-        )
+        # Track whether any relative constraints exist (for set_value optimization)
+        if constraints:
+            if any(c.type == "relative" for c in constraints):
+                self._has_relative_constraints = True
+
+        if _debug:
+            logger.debug(
+                "Parameter added",
+                operation="add",
+                params=list(self._parameters.keys()),
+            )
         return param
 
     def get(self, name: str) -> Parameter | None:
@@ -490,11 +518,12 @@ class ParameterSet:
         Returns:
             Parameter object or None if not found
         """
-        logger.debug(
-            "Getting parameter",
-            operation="get",
-            parameter=name,
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Getting parameter",
+                operation="get",
+                parameter=name,
+            )
         return self._parameters.get(name)
 
     def set_value(self, name: str, value: float):
@@ -508,12 +537,13 @@ class ParameterSet:
             KeyError: If parameter not found
             ValueError: If value violates constraints
         """
-        logger.debug(
-            "Setting parameter value",
-            operation="set_value",
-            parameter=name,
-            value=value,
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Setting parameter value",
+                operation="set_value",
+                parameter=name,
+                value=value,
+            )
         if name not in self._parameters:
             logger.error(
                 "Parameter not found",
@@ -525,10 +555,12 @@ class ParameterSet:
 
         param = self._parameters[name]
 
-        # Validate against constraints
-        context = {
-            p.name: p.value for p in self._parameters.values() if p.value is not None
-        }
+        # Build context dict only when relative constraints exist (>99% of models skip this)
+        context: dict[str, float] | None = None
+        if self._has_relative_constraints:
+            context = {
+                p.name: p.value for p in self._parameters.values() if p.value is not None
+            }
         if not param.validate(value, context):
             logger.error(
                 "Value violates constraints",
@@ -553,12 +585,13 @@ class ParameterSet:
             KeyError: If parameter not found
             ValueError: If bounds are invalid
         """
-        logger.debug(
-            "Setting parameter bounds",
-            operation="set_bounds",
-            parameter=name,
-            bounds=bounds,
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Setting parameter bounds",
+                operation="set_bounds",
+                parameter=name,
+                bounds=bounds,
+            )
         if name not in self._parameters:
             logger.error(
                 "Parameter not found",
@@ -603,12 +636,13 @@ class ParameterSet:
                     bounds=param.bounds,
                 )
                 values.append(0.0)
-        logger.debug(
-            "Getting all parameter values",
-            operation="get_values",
-            params=list(self._parameters.keys()),
-            num_params=len(values),
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Getting all parameter values",
+                operation="get_values",
+                params=list(self._parameters.keys()),
+                num_params=len(values),
+            )
         return np.array(values, dtype=np.float64)
 
     def set_values(self, values: ArrayLike | dict[str, float]):
@@ -620,11 +654,12 @@ class ParameterSet:
         Raises:
             ValueError: If wrong number of values (array) or unknown parameter (dict)
         """
-        logger.debug(
-            "Setting multiple parameter values",
-            operation="set_values",
-            params=list(self._parameters.keys()),
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Setting multiple parameter values",
+                operation="set_values",
+                params=list(self._parameters.keys()),
+            )
         if isinstance(values, dict):
             for name, value in values.items():
                 if name not in self._parameters:
@@ -664,12 +699,13 @@ class ParameterSet:
                 bounds.append(param.bounds)
             else:
                 bounds.append((None, None))
-        logger.debug(
-            "Getting all parameter bounds",
-            operation="get_bounds",
-            params=list(self._parameters.keys()),
-            num_params=len(bounds),
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Getting all parameter bounds",
+                operation="get_bounds",
+                params=list(self._parameters.keys()),
+                num_params=len(bounds),
+            )
         return bounds
 
     def get_value(self, name: str) -> float | None:
@@ -840,11 +876,12 @@ class ParameterSet:
             >>> # Or replace entire parameter:
             >>> params['alpha'] = Parameter('alpha', value=0.8, bounds=(0, 1))
         """
-        logger.debug(
-            "Setting parameter via subscript",
-            operation="__setitem__",
-            parameter=key,
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Setting parameter via subscript",
+                operation="__setitem__",
+                parameter=key,
+            )
         if isinstance(value, Parameter):
             # Replace entire parameter
             self._parameters[key] = value
@@ -866,21 +903,23 @@ class ParameterSet:
 
     def to_dict(self) -> dict[str, dict[str, Any]]:
         """Convert to dictionary representation."""
-        logger.debug(
-            "Converting ParameterSet to dict",
-            operation="to_dict",
-            params=list(self._parameters.keys()),
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Converting ParameterSet to dict",
+                operation="to_dict",
+                params=list(self._parameters.keys()),
+            )
         return {name: self._parameters[name].to_dict() for name in self._order}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ParameterSet:
         """Create from dictionary representation."""
-        logger.debug(
-            "Creating ParameterSet from dict",
-            operation="from_dict",
-            params=list(data.keys()),
-        )
+        if logger.isEnabledFor(10):  # logging.DEBUG == 10
+            logger.debug(
+                "Creating ParameterSet from dict",
+                operation="from_dict",
+                params=list(data.keys()),
+            )
         params = cls()
         for name, param_data in data.items():
             if isinstance(param_data, dict):

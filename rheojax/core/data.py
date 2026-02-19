@@ -82,6 +82,7 @@ class RheoData:
     metadata: dict[str, Any] = field(default_factory=dict)
     validate: bool = True
     _explicit_test_mode: str | None = field(default=None, repr=False, init=False)
+    _jax_cache: RheoData | None = field(default=None, repr=False, init=False)
 
     def __post_init__(self, initial_test_mode: str | None):
         """Initialize and validate RheoData."""
@@ -139,6 +140,12 @@ class RheoData:
         # Validate data if requested
         if self.validate:
             self._validate_data()
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """Invalidate JAX cache when x or y data is reassigned."""
+        super().__setattr__(name, value)
+        if name in ("x", "y") and hasattr(self, "_jax_cache"):
+            super().__setattr__("_jax_cache", None)
 
     def _ensure_array(self, data: ArrayLike) -> np.ndarray:
         """Ensure data is a proper array."""
@@ -228,13 +235,19 @@ class RheoData:
     def to_jax(self) -> RheoData:
         """Convert arrays to JAX arrays.
 
+        Returns cached result on subsequent calls — invalidated if x or y
+        are reassigned.
+
         Returns:
             New RheoData with JAX arrays
         """
+        if self._jax_cache is not None:
+            return self._jax_cache
+
         logger.debug(
             "Converting RheoData to JAX arrays", from_type="numpy", to_type="jax"
         )
-        return RheoData(
+        result = RheoData(
             x=jnp.array(self.x),
             y=jnp.array(self.y),
             x_units=self.x_units,
@@ -244,6 +257,8 @@ class RheoData:
             metadata=self.metadata.copy(),
             validate=False,
         )
+        self._jax_cache = result
+        return result
 
     def to_numpy(self) -> RheoData:
         """Convert arrays to NumPy arrays.
