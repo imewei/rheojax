@@ -220,7 +220,7 @@ class TestFluidityKernelsPDERHS:
             "xi": 1e-5,
             "N_y": N_y,
             "dy": 1e-3 / (N_y - 1),
-            "mode": "rate_controlled",
+            "mode": 0,  # rate_controlled
             "gamma_dot": 1.0,
         }
         dy = fluidity_nonlocal_pde_rhs(0.0, y, args)
@@ -241,7 +241,7 @@ class TestFluidityKernelsPDERHS:
             "xi": 1e-5,
             "N_y": N_y,
             "dy": 1e-3 / (N_y - 1),
-            "mode": "stress_controlled",
+            "mode": 1,  # stress_controlled
             "sigma_applied": 1000.0,
         }
         dy = fluidity_nonlocal_pde_rhs(0.0, y, args)

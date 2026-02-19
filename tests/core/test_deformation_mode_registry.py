@@ -13,6 +13,12 @@ from rheojax.core.test_modes import DeformationMode
 
 jax, jnp = safe_import_jax()
 
+# Trigger registration of all models (lazy imports require explicit loading)
+import rheojax.models as _rjm  # noqa: E402
+
+for _name in list(_rjm._LAZY_IMPORTS):
+    getattr(_rjm, _name)
+
 
 # ── Classification correctness ───────────────────────────────────────────
 
