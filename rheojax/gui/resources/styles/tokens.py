@@ -4,10 +4,11 @@ RheoJAX GUI Design Tokens.
 Centralized design system constants for consistent styling across the application.
 These tokens complement the QSS stylesheets and can be used programmatically.
 
-Design direction: "Precision Laboratory"
-- Warm stone neutrals (not cold slate) evoke lab notebook paper
-- Deep, rich primary blue with subtle gradient accents
-- Refined typography with geometric sans-serif priority
+Design direction: "Precision Laboratory" (v0.6.0+)
+- Warm stone neutrals for surfaces and text
+- Deep indigo primary (#4338CA) with violet accents
+- Inter font family with system fallbacks
+- Palette synchronized with light.qss / dark.qss
 """
 
 from dataclasses import dataclass
@@ -16,19 +17,19 @@ from typing import ClassVar
 
 @dataclass(frozen=True)
 class ColorPalette:
-    """Color palette for the RheoJAX GUI.
+    """Color palette for the RheoJAX GUI (light theme).
 
-    Uses warm stone neutrals with a deep scientific blue primary.
+    Uses warm stone neutrals with deep indigo primary (synced with QSS).
     The warmth of the neutral tones contrasts with the precision of
-    the blue and purple accents — like a well-lit materials lab.
+    the indigo and violet accents.
     """
 
-    # Primary colors (deep scientific blue)
-    PRIMARY: ClassVar[str] = "#1D4ED8"
-    PRIMARY_HOVER: ClassVar[str] = "#1E40AF"
-    PRIMARY_PRESSED: ClassVar[str] = "#1E3A8A"
-    PRIMARY_LIGHT: ClassVar[str] = "#DBEAFE"
-    PRIMARY_SUBTLE: ClassVar[str] = "#EFF6FF"
+    # Primary colors (deep indigo, synced with light.qss QPushButton gradient)
+    PRIMARY: ClassVar[str] = "#4338CA"  # indigo-700
+    PRIMARY_HOVER: ClassVar[str] = "#4F46E5"  # indigo-600
+    PRIMARY_PRESSED: ClassVar[str] = "#3730A3"  # indigo-800
+    PRIMARY_LIGHT: ClassVar[str] = "#E0E7FF"  # indigo-100
+    PRIMARY_SUBTLE: ClassVar[str] = "#EEF2FF"  # indigo-50
 
     # Accent colors (Bayesian/scientific purple)
     ACCENT: ClassVar[str] = "#7C3AED"
@@ -52,6 +53,12 @@ class ColorPalette:
     INFO: ClassVar[str] = "#2563EB"
     INFO_LIGHT: ClassVar[str] = "#DBEAFE"
 
+    # Bright variants (for gradient stops)
+    SUCCESS_BRIGHT: ClassVar[str] = "#10B981"  # emerald-500
+    WARNING_BRIGHT: ClassVar[str] = "#F59E0B"  # amber-500
+    ERROR_BRIGHT: ClassVar[str] = "#EF4444"  # red-500
+    ACCENT_BRIGHT: ClassVar[str] = "#8B5CF6"  # violet-500
+
     # Background colors (warm stone tones)
     BG_BASE: ClassVar[str] = "#FFFFFF"
     BG_SURFACE: ClassVar[str] = "#FAFAF9"
@@ -70,16 +77,131 @@ class ColorPalette:
     # Border colors (warm stone)
     BORDER_DEFAULT: ClassVar[str] = "#D6D3D1"
     BORDER_HOVER: ClassVar[str] = "#A8A29E"
-    BORDER_FOCUS: ClassVar[str] = "#1D4ED8"
+    BORDER_FOCUS: ClassVar[str] = "#6366F1"  # indigo-500, matches QSS focus ring
     BORDER_SUBTLE: ClassVar[str] = "#E7E5E4"
 
     # Chart/visualization colors (refined, high-contrast set)
-    CHART_1: ClassVar[str] = "#1D4ED8"  # Deep blue
+    CHART_1: ClassVar[str] = "#4338CA"  # Indigo (matches primary)
     CHART_2: ClassVar[str] = "#7C3AED"  # Purple
     CHART_3: ClassVar[str] = "#059669"  # Emerald
     CHART_4: ClassVar[str] = "#D97706"  # Amber
     CHART_5: ClassVar[str] = "#DC2626"  # Red
     CHART_6: ClassVar[str] = "#DB2777"  # Pink
+
+
+@dataclass(frozen=True)
+class DarkColorPalette:
+    """Dark theme color palette (values derived from dark.qss).
+
+    Mirrors the same attribute names as ColorPalette so that
+    ThemeManager.get_palette() can be used interchangeably.
+    """
+
+    # Primary colors (brighter indigo for dark backgrounds)
+    PRIMARY: ClassVar[str] = "#6366F1"  # indigo-500
+    PRIMARY_HOVER: ClassVar[str] = "#818CF8"  # indigo-400
+    PRIMARY_PRESSED: ClassVar[str] = "#4F46E5"  # indigo-600
+    PRIMARY_LIGHT: ClassVar[str] = "#312E81"  # indigo-900
+    PRIMARY_SUBTLE: ClassVar[str] = "#1E1B4B"  # indigo-950
+
+    # Accent colors
+    ACCENT: ClassVar[str] = "#A78BFA"  # violet-400
+    ACCENT_HOVER: ClassVar[str] = "#8B5CF6"
+    ACCENT_PRESSED: ClassVar[str] = "#7C3AED"
+    ACCENT_LIGHT: ClassVar[str] = "#312E81"
+
+    # Semantic colors (brighter for dark backgrounds)
+    SUCCESS: ClassVar[str] = "#34D399"  # emerald-400
+    SUCCESS_HOVER: ClassVar[str] = "#10B981"
+    SUCCESS_LIGHT: ClassVar[str] = "#064E3B"
+
+    WARNING: ClassVar[str] = "#FBBF24"  # amber-400
+    WARNING_HOVER: ClassVar[str] = "#F59E0B"
+    WARNING_LIGHT: ClassVar[str] = "#78350F"
+
+    ERROR: ClassVar[str] = "#F87171"  # red-400
+    ERROR_HOVER: ClassVar[str] = "#EF4444"
+    ERROR_LIGHT: ClassVar[str] = "#7F1D1D"
+
+    INFO: ClassVar[str] = "#60A5FA"
+    INFO_LIGHT: ClassVar[str] = "#1E3A5F"
+
+    # Bright variants (for gradient stops — same as light, high-contrast on any bg)
+    SUCCESS_BRIGHT: ClassVar[str] = "#10B981"
+    WARNING_BRIGHT: ClassVar[str] = "#F59E0B"
+    ERROR_BRIGHT: ClassVar[str] = "#EF4444"
+    ACCENT_BRIGHT: ClassVar[str] = "#8B5CF6"
+
+    # Background colors (slate dark)
+    BG_BASE: ClassVar[str] = "#0F172A"  # slate-900
+    BG_SURFACE: ClassVar[str] = "#1E293B"  # slate-800
+    BG_ELEVATED: ClassVar[str] = "#1E293B"
+    BG_HOVER: ClassVar[str] = "#334155"  # slate-700
+    BG_ACTIVE: ClassVar[str] = "#475569"  # slate-600
+    BG_CANVAS: ClassVar[str] = "#020617"  # slate-950
+
+    # Text colors (light for dark backgrounds)
+    TEXT_PRIMARY: ClassVar[str] = "#F8FAFC"  # slate-50
+    TEXT_SECONDARY: ClassVar[str] = "#94A3B8"  # slate-400
+    TEXT_MUTED: ClassVar[str] = "#64748B"  # slate-500
+    TEXT_DISABLED: ClassVar[str] = "#475569"  # slate-600
+    TEXT_INVERSE: ClassVar[str] = "#0F172A"
+
+    # Border colors (slate)
+    BORDER_DEFAULT: ClassVar[str] = "#334155"
+    BORDER_HOVER: ClassVar[str] = "#475569"
+    BORDER_FOCUS: ClassVar[str] = "#6366F1"
+    BORDER_SUBTLE: ClassVar[str] = "#1E293B"
+
+    # Chart colors (same as light — already high-contrast)
+    CHART_1: ClassVar[str] = "#4338CA"
+    CHART_2: ClassVar[str] = "#7C3AED"
+    CHART_3: ClassVar[str] = "#059669"
+    CHART_4: ClassVar[str] = "#D97706"
+    CHART_5: ClassVar[str] = "#DC2626"
+    CHART_6: ClassVar[str] = "#DB2777"
+
+
+class ThemeManager:
+    """Tracks active theme for programmatic style lookups.
+
+    Provides a class-level singleton that style helpers consult
+    to return theme-appropriate colors at call time.
+    """
+
+    _theme: ClassVar[str] = "light"
+
+    @classmethod
+    def set_theme(cls, theme: str) -> None:
+        """Set the active theme ('light' or 'dark')."""
+        cls._theme = theme
+
+    @classmethod
+    def is_dark(cls) -> bool:
+        """Return True if the active theme is dark."""
+        return cls._theme == "dark"
+
+    @classmethod
+    def get_palette(cls) -> type:
+        """Return the active color palette class."""
+        return DarkColorPalette if cls._theme == "dark" else ColorPalette
+
+
+def themed(token_name: str) -> str:
+    """Return the theme-appropriate value for a ColorPalette token.
+
+    Parameters
+    ----------
+    token_name : str
+        Attribute name on ColorPalette / DarkColorPalette (e.g. "PRIMARY").
+
+    Returns
+    -------
+    str
+        The hex color string for the active theme.
+    """
+    palette = ThemeManager.get_palette()
+    return getattr(palette, token_name)
 
 
 @dataclass(frozen=True)
@@ -124,16 +246,14 @@ class BorderRadius:
 class Typography:
     """Typography scale for consistent text sizing.
 
-    Prioritizes modern geometric sans-serifs that convey precision,
-    falling back to high-quality system fonts on each platform.
+    Prioritizes Inter (synced with QSS), falling back to high-quality
+    system fonts on each platform.
     """
 
-    # Font families — geometric sans for scientific precision
+    # Font families — Inter first (synced with light.qss / dark.qss)
     FONT_FAMILY: ClassVar[str] = (
-        '"Plus Jakarta Sans", "DM Sans", "Geist", '
-        '"SF Pro Display", "SF Pro Text", '
-        '"Segoe UI Variable", "Segoe UI", '
-        '"Cantarell", "Helvetica Neue", "Helvetica", sans-serif'
+        '"Inter", -apple-system, BlinkMacSystemFont, '
+        '"Segoe UI", "Roboto", "Helvetica Neue", sans-serif'
     )
     FONT_FAMILY_MONO: ClassVar[str] = (
         '"JetBrains Mono", "Cascadia Code", '
@@ -144,12 +264,14 @@ class Typography:
     # Font sizes (in pt)
     SIZE_XS: ClassVar[int] = 9
     SIZE_SM: ClassVar[int] = 10
+    SIZE_MD_SM: ClassVar[int] = 11  # Between SM and BASE
     SIZE_BASE: ClassVar[int] = 12
     SIZE_MD: ClassVar[int] = 13
     SIZE_LG: ClassVar[int] = 14
     SIZE_XL: ClassVar[int] = 16
     SIZE_XXL: ClassVar[int] = 20
     SIZE_HEADING: ClassVar[int] = 24
+    SIZE_HERO: ClassVar[int] = 36  # Hero/display titles
 
     # Font weights
     WEIGHT_NORMAL: ClassVar[int] = 400
@@ -203,7 +325,6 @@ def button_style(
     str
         QSS style string for the button
     """
-    colors = ColorPalette
     spacing = Spacing
     radius = BorderRadius
 
@@ -214,48 +335,48 @@ def button_style(
         "lg": {"padding": f"{spacing.MD}px {spacing.XL}px", "font_size": "12pt"},
     }
 
-    # Variant mappings
+    # Variant mappings (theme-aware via themed())
     variants = {
         "primary": {
-            "bg": colors.PRIMARY,
-            "bg_hover": colors.PRIMARY_HOVER,
-            "text": colors.TEXT_INVERSE,
+            "bg": themed("PRIMARY"),
+            "bg_hover": themed("PRIMARY_HOVER"),
+            "text": themed("TEXT_INVERSE"),
             "border": "none",
         },
         "secondary": {
-            "bg": colors.BG_SURFACE,
-            "bg_hover": colors.BG_HOVER,
-            "text": colors.TEXT_PRIMARY,
-            "border": f"1px solid {colors.BORDER_DEFAULT}",
+            "bg": themed("BG_SURFACE"),
+            "bg_hover": themed("BG_HOVER"),
+            "text": themed("TEXT_PRIMARY"),
+            "border": f"1px solid {themed('BORDER_DEFAULT')}",
         },
         "accent": {
-            "bg": colors.ACCENT,
-            "bg_hover": colors.ACCENT_HOVER,
-            "text": colors.TEXT_INVERSE,
+            "bg": themed("ACCENT"),
+            "bg_hover": themed("ACCENT_HOVER"),
+            "text": themed("TEXT_INVERSE"),
             "border": "none",
         },
         "success": {
-            "bg": colors.SUCCESS,
-            "bg_hover": colors.SUCCESS_HOVER,
-            "text": colors.TEXT_INVERSE,
+            "bg": themed("SUCCESS"),
+            "bg_hover": themed("SUCCESS_HOVER"),
+            "text": themed("TEXT_INVERSE"),
             "border": "none",
         },
         "warning": {
-            "bg": colors.WARNING,
-            "bg_hover": colors.WARNING_HOVER,
-            "text": colors.TEXT_INVERSE,
+            "bg": themed("WARNING"),
+            "bg_hover": themed("WARNING_HOVER"),
+            "text": themed("TEXT_INVERSE"),
             "border": "none",
         },
         "error": {
-            "bg": colors.ERROR,
-            "bg_hover": colors.ERROR_HOVER,
-            "text": colors.TEXT_INVERSE,
+            "bg": themed("ERROR"),
+            "bg_hover": themed("ERROR_HOVER"),
+            "text": themed("TEXT_INVERSE"),
             "border": "none",
         },
         "ghost": {
             "bg": "transparent",
-            "bg_hover": colors.BG_HOVER,
-            "text": colors.TEXT_PRIMARY,
+            "bg_hover": themed("BG_HOVER"),
+            "text": themed("TEXT_PRIMARY"),
             "border": "none",
         },
     }
@@ -265,20 +386,20 @@ def button_style(
 
     return f"""
         QPushButton {{
-            background-color: {v['bg']};
-            color: {v['text']};
-            border: {v['border']};
+            background-color: {v["bg"]};
+            color: {v["text"]};
+            border: {v["border"]};
             border-radius: {radius.MD}px;
-            padding: {s['padding']};
-            font-size: {s['font_size']};
+            padding: {s["padding"]};
+            font-size: {s["font_size"]};
             font-weight: 500;
         }}
         QPushButton:hover {{
-            background-color: {v['bg_hover']};
+            background-color: {v["bg_hover"]};
         }}
         QPushButton:disabled {{
-            background-color: {colors.BG_ACTIVE};
-            color: {colors.TEXT_DISABLED};
+            background-color: {themed("BG_ACTIVE")};
+            color: {themed("TEXT_DISABLED")};
         }}
     """
 
@@ -296,13 +417,12 @@ def card_style(elevated: bool = False) -> str:
     str
         QSS style string for the card
     """
-    colors = ColorPalette
     spacing = Spacing
     radius = BorderRadius
 
     return f"""
-        background-color: {colors.BG_ELEVATED};
-        border: 1px solid {colors.BORDER_DEFAULT};
+        background-color: {themed("BG_ELEVATED")};
+        border: 1px solid {themed("BORDER_DEFAULT")};
         border-radius: {radius.LG}px;
         padding: {spacing.CARD_PADDING}px;
     """
@@ -321,15 +441,14 @@ def status_badge_style(status: str) -> str:
     str
         QSS style string for the badge
     """
-    colors = ColorPalette
     radius = BorderRadius
 
     status_colors = {
-        "success": (colors.SUCCESS, colors.SUCCESS_LIGHT),
-        "warning": (colors.WARNING, colors.WARNING_LIGHT),
-        "error": (colors.ERROR, colors.ERROR_LIGHT),
-        "info": (colors.INFO, colors.INFO_LIGHT),
-        "pending": (colors.TEXT_MUTED, colors.BG_HOVER),
+        "success": (themed("SUCCESS"), themed("SUCCESS_LIGHT")),
+        "warning": (themed("WARNING"), themed("WARNING_LIGHT")),
+        "error": (themed("ERROR"), themed("ERROR_LIGHT")),
+        "info": (themed("INFO"), themed("INFO_LIGHT")),
+        "pending": (themed("TEXT_MUTED"), themed("BG_HOVER")),
     }
 
     fg, bg = status_colors.get(status, status_colors["pending"])
@@ -346,26 +465,24 @@ def status_badge_style(status: str) -> str:
 
 def section_header_style() -> str:
     """Generate section header style string."""
-    colors = ColorPalette
     typography = Typography
 
     return f"""
-        color: {colors.TEXT_PRIMARY};
+        color: {themed("TEXT_PRIMARY")};
         font-size: {typography.SIZE_LG}pt;
         font-weight: {typography.WEIGHT_SEMIBOLD};
         padding-bottom: 8px;
-        border-bottom: 2px solid {colors.BORDER_SUBTLE};
+        border-bottom: 2px solid {themed("BORDER_SUBTLE")};
         margin-bottom: 12px;
     """
 
 
 def empty_state_style() -> str:
     """Generate empty state placeholder style string."""
-    colors = ColorPalette
     spacing = Spacing
 
     return f"""
-        color: {colors.TEXT_MUTED};
+        color: {themed("TEXT_MUTED")};
         padding: {spacing.XL}px;
         font-size: 11pt;
     """
@@ -374,6 +491,9 @@ def empty_state_style() -> str:
 # Export all tokens and helpers
 __all__ = [
     "ColorPalette",
+    "DarkColorPalette",
+    "ThemeManager",
+    "themed",
     "Spacing",
     "BorderRadius",
     "Typography",

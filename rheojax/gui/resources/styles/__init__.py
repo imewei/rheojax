@@ -10,15 +10,18 @@ from pathlib import Path
 from rheojax.gui.resources.styles.tokens import (
     BorderRadius,
     ColorPalette,
+    DarkColorPalette,
     DesignTokens,
     Shadows,
     Spacing,
+    ThemeManager,
     Typography,
     button_style,
     card_style,
     empty_state_style,
     section_header_style,
     status_badge_style,
+    themed,
 )
 
 STYLES_DIR = Path(__file__).parent
@@ -31,6 +34,9 @@ __all__ = [
     "STYLES_DIR",
     # Design tokens
     "ColorPalette",
+    "DarkColorPalette",
+    "ThemeManager",
+    "themed",
     "Spacing",
     "BorderRadius",
     "Typography",
