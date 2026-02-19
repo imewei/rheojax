@@ -28,7 +28,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-import numpyro.distributions as dist
+
+if TYPE_CHECKING:
+    import numpyro.distributions as dist
 
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
@@ -553,6 +555,8 @@ class SPPYieldStress(BaseModel):
         dist.Distribution or None
             NumPyro distribution, or None to use default uniform
         """
+        import numpyro.distributions as dist
+
         # Scale parameters: LogNormal priors
         if name == "G_cage":
             # Cage modulus typically 100-10000 Pa for soft materials

@@ -434,9 +434,9 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         y0 = jnp.concatenate([jnp.array([0.0]), f_field_init])
 
         term = diffrax.ODETerm(
-            lambda ti, yi, args_i: saramito_nonlocal_pde_rhs(
+            jax.checkpoint(lambda ti, yi, args_i: saramito_nonlocal_pde_rhs(
                 cast(float, ti), yi, args_i
-            )
+            ))
         )
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
@@ -512,9 +512,9 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         y0 = jnp.concatenate([jnp.array([sigma_applied]), f_field_init])
 
         term = diffrax.ODETerm(
-            lambda ti, yi, args_i: saramito_nonlocal_pde_rhs(
+            jax.checkpoint(lambda ti, yi, args_i: saramito_nonlocal_pde_rhs(
                 cast(float, ti), yi, args_i
-            )
+            ))
         )
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)

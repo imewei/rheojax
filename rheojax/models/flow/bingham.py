@@ -22,8 +22,6 @@ from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
-from functools import partial
-
 import numpy as np
 
 from rheojax.core.base import BaseModel, ParameterSet
@@ -223,9 +221,9 @@ class Bingham(BaseModel):
         # Compute stress using the internal JAX method
         return self._predict_stress(X, sigma_y, eta_p)
 
-    @partial(jax.jit, static_argnums=(0,))
+    @staticmethod
+    @jax.jit
     def _predict_stress(
-        self,
         gamma_dot: jnp.ndarray,
         sigma_y: float,
         eta_p: float,
@@ -252,9 +250,9 @@ class Bingham(BaseModel):
         # Apply yield condition using jnp.where
         return jnp.where(abs_gamma_dot > threshold, stress_above_yield, 0.0)
 
-    @partial(jax.jit, static_argnums=(0,))
+    @staticmethod
+    @jax.jit
     def _predict_viscosity(
-        self,
         gamma_dot: jnp.ndarray,
         sigma_y: float,
         eta_p: float,

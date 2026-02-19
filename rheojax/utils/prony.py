@@ -290,14 +290,17 @@ def compute_r_squared(y_true: ArrayLike, y_pred: ArrayLike) -> float:
         >>> print(f"{r2:.4f}")
         0.9960
     """
-    y_true_arr = jnp.asarray(y_true)
-    y_pred_arr = jnp.asarray(y_pred)
+    # Use pure numpy: this is a scalar metric with no benefit from JAX dispatch.
+    # The original JAX path had 23x overhead due to host→device transfer and the
+    # Python-level `if ss_tot == 0` branch forcing device→host synchronisation.
+    y_true_arr = np.asarray(y_true)
+    y_pred_arr = np.asarray(y_pred)
 
     # Residual sum of squares
-    ss_res = jnp.sum((y_true_arr - y_pred_arr) ** 2)
+    ss_res = np.sum((y_true_arr - y_pred_arr) ** 2)
 
     # Total sum of squares
-    ss_tot = jnp.sum((y_true_arr - jnp.mean(y_true_arr)) ** 2)
+    ss_tot = np.sum((y_true_arr - np.mean(y_true_arr)) ** 2)
 
     # Handle edge case where all y_true are identical (R² undefined)
     if ss_tot == 0.0:

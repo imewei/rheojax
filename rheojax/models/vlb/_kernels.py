@@ -1276,7 +1276,7 @@ def build_vlb_ode_rhs(breakage_type="constant", stress_type="linear"):
 
         return jnp.array([dmu_xx, dmu_yy, dmu_zz, dmu_xy])
 
-    return ode_rhs
+    return jax.checkpoint(ode_rhs)
 
 
 def build_vlb_relaxation_ode_rhs(breakage_type="constant", stress_type="linear"):
@@ -1293,7 +1293,7 @@ def build_vlb_relaxation_ode_rhs(breakage_type="constant", stress_type="linear")
     def ode_rhs(t, state, G0, k_d_0, nu, L_max):
         return rate_ode(t, state, 0.0, G0, k_d_0, nu, L_max)
 
-    return ode_rhs
+    return jax.checkpoint(ode_rhs)
 
 
 def build_vlb_creep_ode_rhs(breakage_type="constant", stress_type="linear"):
@@ -1358,7 +1358,7 @@ def build_vlb_creep_ode_rhs(breakage_type="constant", stress_type="linear"):
 
         return jnp.array([dmu_xx, dmu_yy, dmu_zz, dmu_xy, gamma_dot])
 
-    return ode_rhs
+    return jax.checkpoint(ode_rhs)
 
 
 def build_vlb_laos_ode_rhs(breakage_type="constant", stress_type="linear"):
@@ -1378,7 +1378,7 @@ def build_vlb_laos_ode_rhs(breakage_type="constant", stress_type="linear"):
         gamma_dot = gamma_0 * omega * jnp.cos(omega * t)
         return rate_ode(t, state, gamma_dot, G0, k_d_0, nu, L_max)
 
-    return ode_rhs
+    return jax.checkpoint(ode_rhs)
 
 
 # =============================================================================
@@ -1529,4 +1529,4 @@ def build_vlb_nonlocal_pde_rhs(breakage_type="constant", stress_type="linear"):
             ]
         )
 
-    return pde_rhs
+    return jax.checkpoint(pde_rhs)

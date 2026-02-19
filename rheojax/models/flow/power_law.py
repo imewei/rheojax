@@ -21,8 +21,6 @@ from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
-from functools import partial
-
 import numpy as np
 
 from rheojax.core.base import BaseModel, ParameterSet
@@ -208,10 +206,9 @@ class PowerLaw(BaseModel):
         # Compute viscosity using the internal JAX method
         return self._predict_viscosity(X, K, n)
 
-    @partial(jax.jit, static_argnums=(0,))
-    def _predict_viscosity(
-        self, gamma_dot: jnp.ndarray, K: float, n: float
-    ) -> jnp.ndarray:
+    @staticmethod
+    @jax.jit
+    def _predict_viscosity(gamma_dot: jnp.ndarray, K: float, n: float) -> jnp.ndarray:
         """Compute viscosity: η(γ̇) = K |γ̇|^(n-1).
 
         Args:
@@ -224,10 +221,9 @@ class PowerLaw(BaseModel):
         """
         return K * jnp.power(jnp.maximum(jnp.abs(gamma_dot), 1e-30), n - 1.0)
 
-    @partial(jax.jit, static_argnums=(0,))
-    def _predict_stress(
-        self, gamma_dot: jnp.ndarray, K: float, n: float
-    ) -> jnp.ndarray:
+    @staticmethod
+    @jax.jit
+    def _predict_stress(gamma_dot: jnp.ndarray, K: float, n: float) -> jnp.ndarray:
         """Compute shear stress: σ(γ̇) = K |γ̇|^n.
 
         Args:

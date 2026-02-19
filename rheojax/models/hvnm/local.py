@@ -403,13 +403,7 @@ class HVNMLocal(HVNMBase):
 
         ys = sol.ys
         assert ys is not None
-        D_int_col = (
-            jnp.where(
-                self._include_interfacial_damage, ys[:, 17], jnp.zeros(len(t_jax))
-            )
-            if self._include_interfacial_damage
-            else jnp.zeros(len(t_jax))
-        )
+        D_int_col = ys[:, 17]  # Always 18-component state; zero when damage not included
 
         # Compute total stress from state
         X_phi = args["X_phi"]
@@ -516,7 +510,7 @@ class HVNMLocal(HVNMBase):
         ys = sol.ys
         assert ys is not None
         D_int_col = (
-            ys[:, 17] if self._include_interfacial_damage else jnp.zeros(len(t_jax))
+            ys[:, 17]  # Always 18-component state; zero when damage not included
         )
         X_phi = args["X_phi"]
         X_I = args["X_I"]
@@ -616,7 +610,7 @@ class HVNMLocal(HVNMBase):
         if return_full:
             J_t = gamma / jnp.maximum(jnp.abs(sigma_0), 1e-30)
             D_int_col = (
-                ys[:, 17] if self._include_interfacial_damage else jnp.zeros(len(t_jax))
+                ys[:, 17]  # Always 18-component state; zero when damage not included
             )
             return {
                 "time": np.asarray(t),
@@ -686,7 +680,7 @@ class HVNMLocal(HVNMBase):
         ys = sol.ys
         assert ys is not None
         D_int_col = (
-            ys[:, 17] if self._include_interfacial_damage else jnp.zeros(len(t_jax))
+            ys[:, 17]  # Always 18-component state; zero when damage not included
         )
         strain = gamma_0 * jnp.sin(omega * t_jax)
         gamma_dot_arr = gamma_0 * omega * jnp.cos(omega * t_jax)

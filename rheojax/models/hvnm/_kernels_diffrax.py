@@ -61,17 +61,17 @@ def _hvnm_initial_state(include_interfacial_damage: bool) -> jnp.ndarray:
     - gamma = 0             (no strain)
     - D = 0                 (no matrix damage)
     - mu^I = mu^I_nat = I  (interphase at natural state)
-    - D_int = 0             (no interfacial damage, if included)
+    - D_int = 0             (no interfacial damage)
 
     Parameters
     ----------
     include_interfacial_damage : bool
-        Whether to include D_int in state vector
+        Whether interfacial damage is active (D_int slot always present)
 
     Returns
     -------
     jnp.ndarray
-        Initial state vector (17 or 18 components)
+        Initial state vector (always 18 components)
     """
     # E-network: [mu_E_xx=1, mu_E_yy=1, mu_E_xy=0]
     # E-network natural state: [mu_E_nat_xx=1, mu_E_nat_yy=1, mu_E_nat_xy=0]
@@ -79,6 +79,7 @@ def _hvnm_initial_state(include_interfacial_damage: bool) -> jnp.ndarray:
     # gamma=0, D=0
     # I-network: [mu_I_xx=1, mu_I_yy=1, mu_I_xy=0]
     # I-network natural state: [mu_I_nat_xx=1, mu_I_nat_yy=1, mu_I_nat_xy=0]
+    # D_int=0 (interfacial damage, zero when not included)
     components = [
         1.0,
         1.0,
@@ -97,9 +98,8 @@ def _hvnm_initial_state(include_interfacial_damage: bool) -> jnp.ndarray:
         1.0,
         1.0,
         0.0,  # I-network natural state
+        0.0,  # D_int (interfacial damage, zero when not included)
     ]
-    if include_interfacial_damage:
-        components.append(0.0)  # D_int
 
     return jnp.array(components, dtype=jnp.float64)
 
@@ -117,12 +117,12 @@ def _hvnm_relaxation_initial_state(
     gamma_step : float
         Applied step strain
     include_interfacial_damage : bool
-        Whether to include D_int in state vector
+        Whether interfacial damage is active (D_int slot always present)
 
     Returns
     -------
     jnp.ndarray
-        Deformed initial state vector
+        Deformed initial state vector (always 18 components)
     """
     mu_xx = 1.0 + 2.0 * gamma_step**2
     mu_yy = 1.0
@@ -146,9 +146,8 @@ def _hvnm_relaxation_initial_state(
         1.0,
         1.0,
         0.0,  # I-network natural state (equilibrium)
+        0.0,  # D_int (interfacial damage, zero when not included)
     ]
-    if include_interfacial_damage:
-        components.append(0.0)  # D_int
 
     return jnp.array(components, dtype=jnp.float64)
 
@@ -275,13 +274,14 @@ def _make_hvnm_startup_vector_field(
         E_a_heal = args["E_a_heal"]
         n_h = args["n_h"]
 
-        # Unpack state
+        # Unpack state (always 18 components)
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
         mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy = y[3], y[4], y[5]
         mu_D_xx, mu_D_yy, mu_D_xy = y[6], y[7], y[8]
         D_val = y[10]
         mu_I_xx, mu_I_yy, mu_I_xy = y[11], y[12], y[13]
         mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy = y[14], y[15], y[16]
+        D_int_val = y[17]
 
         # Compute dual BER rates
         k_BER_mat = _compute_k_ber_matrix(y, G_E, nu_0, E_a, V_act, T, kinetics)
@@ -354,8 +354,24 @@ def _make_hvnm_startup_vector_field(
             0.0,
         )
 
-        # Build output
-        derivs = [
+        # Interfacial damage (zero when not included)
+        dD_int = jnp.where(
+            include_interfacial_damage,
+            hvnm_interfacial_damage_rhs(
+                mu_I_xx,
+                mu_I_yy,
+                D_int_val,
+                Gamma_0_int,
+                lambda_crit_int,
+                h_0,
+                E_a_heal,
+                n_h,
+                T,
+            ),
+            0.0,
+        )
+
+        return jnp.array([
             dmu_E_xx,
             dmu_E_yy,
             dmu_E_xy,
@@ -373,26 +389,10 @@ def _make_hvnm_startup_vector_field(
             dmu_I_nat_xx,
             dmu_I_nat_yy,
             dmu_I_nat_xy,
-        ]
+            dD_int,
+        ])
 
-        if include_interfacial_damage:
-            D_int_val = y[17]
-            dD_int = hvnm_interfacial_damage_rhs(
-                mu_I_xx,
-                mu_I_yy,
-                D_int_val,
-                Gamma_0_int,
-                lambda_crit_int,
-                h_0,
-                E_a_heal,
-                n_h,
-                T,
-            )
-            derivs.append(dD_int)
-
-        return jnp.array(derivs)
-
-    return vector_field
+    return jax.checkpoint(vector_field)
 
 
 def _make_hvnm_relaxation_vector_field(
@@ -468,7 +468,7 @@ def _make_hvnm_relaxation_vector_field(
             )
         )
 
-        derivs = [
+        return jnp.array([
             dmu_E_xx,
             dmu_E_yy,
             dmu_E_xy,
@@ -486,14 +486,10 @@ def _make_hvnm_relaxation_vector_field(
             dmu_I_nat_xx,
             dmu_I_nat_yy,
             dmu_I_nat_xy,
-        ]
+            0.0,  # dD_int = 0 during relaxation
+        ])
 
-        if include_interfacial_damage:
-            derivs.append(0.0)  # No interfacial damage during relaxation
-
-        return jnp.array(derivs)
-
-    return vector_field
+    return jax.checkpoint(vector_field)
 
 
 def _make_hvnm_laos_vector_field(
@@ -532,12 +528,14 @@ def _make_hvnm_laos_vector_field(
         E_a_heal = args["E_a_heal"]
         n_h = args["n_h"]
 
+        # Unpack state (always 18 components)
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
         mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy = y[3], y[4], y[5]
         mu_D_xx, mu_D_yy, mu_D_xy = y[6], y[7], y[8]
         D_val = y[10]
         mu_I_xx, mu_I_yy, mu_I_xy = y[11], y[12], y[13]
         mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy = y[14], y[15], y[16]
+        D_int_val = y[17]
 
         gamma_dot = gamma_0 * omega * jnp.cos(omega * t)
 
@@ -606,7 +604,24 @@ def _make_hvnm_laos_vector_field(
             0.0,
         )
 
-        derivs = [
+        # Interfacial damage (zero when not included)
+        dD_int = jnp.where(
+            include_interfacial_damage,
+            hvnm_interfacial_damage_rhs(
+                mu_I_xx,
+                mu_I_yy,
+                D_int_val,
+                Gamma_0_int,
+                lambda_crit_int,
+                h_0,
+                E_a_heal,
+                n_h,
+                T,
+            ),
+            0.0,
+        )
+
+        return jnp.array([
             dmu_E_xx,
             dmu_E_yy,
             dmu_E_xy,
@@ -624,26 +639,10 @@ def _make_hvnm_laos_vector_field(
             dmu_I_nat_xx,
             dmu_I_nat_yy,
             dmu_I_nat_xy,
-        ]
+            dD_int,
+        ])
 
-        if include_interfacial_damage:
-            D_int_val = y[17]
-            dD_int = hvnm_interfacial_damage_rhs(
-                mu_I_xx,
-                mu_I_yy,
-                D_int_val,
-                Gamma_0_int,
-                lambda_crit_int,
-                h_0,
-                E_a_heal,
-                n_h,
-                T,
-            )
-            derivs.append(dD_int)
-
-        return jnp.array(derivs)
-
-    return vector_field
+    return jax.checkpoint(vector_field)
 
 
 def _make_hvnm_creep_vector_field(
@@ -682,6 +681,7 @@ def _make_hvnm_creep_vector_field(
         E_a_heal = args["E_a_heal"]
         n_h = args["n_h"]
 
+        # Unpack state (always 18 components)
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
         mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy = y[3], y[4], y[5]
         mu_D_xx, mu_D_yy, mu_D_xy = y[6], y[7], y[8]
@@ -792,7 +792,24 @@ def _make_hvnm_creep_vector_field(
             0.0,
         )
 
-        derivs = [
+        # Interfacial damage (zero when not included)
+        dD_int = jnp.where(
+            include_interfacial_damage,
+            hvnm_interfacial_damage_rhs(
+                mu_I_xx,
+                mu_I_yy,
+                D_int_val,
+                Gamma_0_int,
+                lambda_crit_int,
+                h_0,
+                E_a_heal,
+                n_h,
+                T,
+            ),
+            0.0,
+        )
+
+        return jnp.array([
             dmu_E_xx,
             dmu_E_yy,
             dmu_E_xy,
@@ -810,25 +827,10 @@ def _make_hvnm_creep_vector_field(
             dmu_I_nat_xx,
             dmu_I_nat_yy,
             dmu_I_nat_xy,
-        ]
+            dD_int,
+        ])
 
-        if include_interfacial_damage:
-            dD_int = hvnm_interfacial_damage_rhs(
-                mu_I_xx,
-                mu_I_yy,
-                D_int_val,
-                Gamma_0_int,
-                lambda_crit_int,
-                h_0,
-                E_a_heal,
-                n_h,
-                T,
-            )
-            derivs.append(dD_int)
-
-        return jnp.array(derivs)
-
-    return vector_field
+    return jax.checkpoint(vector_field)
 
 
 # =============================================================================

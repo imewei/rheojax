@@ -23,8 +23,6 @@ from rheojax.core.jax_config import safe_import_jax
 
 jax, jnp = safe_import_jax()
 
-from functools import partial
-
 import numpy as np
 
 from rheojax.core.base import BaseModel, ParameterSet
@@ -271,9 +269,9 @@ class CarreauYasuda(BaseModel):
         # Compute prediction using the internal JAX method
         return self._predict_viscosity(X, eta0, eta_inf, lambda_, n, a)
 
-    @partial(jax.jit, static_argnums=(0,))
+    @staticmethod
+    @jax.jit
     def _predict_viscosity(
-        self,
         gamma_dot: jnp.ndarray,
         eta0: float,
         eta_inf: float,
@@ -299,9 +297,9 @@ class CarreauYasuda(BaseModel):
         factor = jnp.power(1.0 + jnp.power(lambda_gamma, a), (n - 1.0) / a)
         return eta_inf + (eta0 - eta_inf) * factor
 
-    @partial(jax.jit, static_argnums=(0,))
+    @staticmethod
+    @jax.jit
     def _predict_stress(
-        self,
         gamma_dot: jnp.ndarray,
         eta0: float,
         eta_inf: float,
@@ -323,7 +321,9 @@ class CarreauYasuda(BaseModel):
             Shear stress (Pa)
         """
         # σ(γ̇) = η(γ̇) * γ̇
-        viscosity = self._predict_viscosity(gamma_dot, eta0, eta_inf, lambda_, n, a)
+        viscosity = CarreauYasuda._predict_viscosity(
+            gamma_dot, eta0, eta_inf, lambda_, n, a
+        )
         return viscosity * jnp.abs(gamma_dot)
 
     def predict_stress(self, gamma_dot: np.ndarray) -> np.ndarray:

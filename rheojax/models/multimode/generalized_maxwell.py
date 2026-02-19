@@ -575,38 +575,29 @@ class GeneralizedMaxwell(BaseModel):
         r2_max = None
         r2_threshold = None
 
+        # Pre-compute base bounds arrays (all-active case) and inactive values.
+        # Only the active/inactive boundary changes per iteration, so we update
+        # slices in-place instead of rebuilding from scratch each time.
+        lower = np.zeros(2 * n_max + 1)
+        upper = np.zeros(2 * n_max + 1)
+        lower[0] = 0.0
+        upper[0] = E_max
+        # Start with all modes active
+        lower[1 : 1 + n_max] = 1e-12
+        upper[1 : 1 + n_max] = E_max
+        lower[1 + n_max :] = 1e-6
+        upper[1 + n_max :] = 1e6
+
         for n_active in range(n_max, 0, -1):
             try:
-                # Build bounds: active modes get normal bounds, inactive modes frozen
-                lower = np.zeros(2 * n_max + 1)
-                upper = np.zeros(2 * n_max + 1)
-
-                # E_inf bounds
-                lower[0] = 0.0
-                upper[0] = E_max
-
-                # E_i bounds: active modes get normal range, inactive nearly frozen.
-                # NLSQ TRF requires lower < upper strictly, so we use a tiny
-                # range for inactive modes. E_i < 1e-30 Pa is effectively zero
-                # (contribution = 1e-30 * exp(-t/tau) ≈ 0 for any physical data).
-                for i in range(n_max):
-                    if i < n_active:
-                        lower[1 + i] = 1e-12
-                        upper[1 + i] = E_max
-                    else:
-                        lower[1 + i] = 0.0
-                        upper[1 + i] = 1e-30
-
-                # tau_i bounds: active modes get normal range, inactive nearly frozen.
-                # Must use >= 1e-15 gap around 1.0 due to float64 machine epsilon.
-                # tau_i value is irrelevant when E_i ≈ 0 (mode contributes nothing).
-                for i in range(n_max):
-                    if i < n_active:
-                        lower[1 + n_max + i] = 1e-6
-                        upper[1 + n_max + i] = 1e6
-                    else:
-                        lower[1 + n_max + i] = 1.0 - 1e-12
-                        upper[1 + n_max + i] = 1.0 + 1e-12
+                # Freeze modes beyond n_active.
+                # E_i bounds: inactive nearly frozen (NLSQ TRF requires lower < upper).
+                # E_i < 1e-30 Pa is effectively zero.
+                lower[1 + n_active : 1 + n_max] = 0.0
+                upper[1 + n_active : 1 + n_max] = 1e-30
+                # tau_i bounds: inactive nearly frozen around 1.0.
+                lower[1 + n_max + n_active :] = 1.0 - 1e-12
+                upper[1 + n_max + n_active :] = 1.0 + 1e-12
 
                 # Warm-start: zero out inactive modes from previous best
                 x0 = best_params.copy()

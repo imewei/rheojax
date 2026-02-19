@@ -23,7 +23,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 import numpy as np
-from scipy.signal import savgol_filter
 
 from rheojax.logging import get_logger
 from rheojax.utils.initialization.constants import FEATURE_CONFIG, PARAM_BOUNDS
@@ -98,6 +97,8 @@ def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
 
     # Smooth to reduce noise using configurable parameters
     if len(G_mag) >= FEATURE_CONFIG.savgol_window:
+        from scipy.signal import savgol_filter
+
         G_mag_smooth = savgol_filter(
             G_mag,
             window_length=FEATURE_CONFIG.savgol_window,

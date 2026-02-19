@@ -400,6 +400,7 @@ class DMTLocal(DMTBase):
             stress = eta * gamma_dot
             return lam_new, (stress, lam_new)
 
+        step = jax.checkpoint(step)
         _, (stress, lam) = jax.lax.scan(step, lam_init, None, length=len(t))
 
         # Return JAX arrays (conversion to numpy happens in public methods)
@@ -456,6 +457,7 @@ class DMTLocal(DMTBase):
 
             return (sigma_new, lam_new), (sigma_new, lam_new)
 
+        step = jax.checkpoint(step)
         init_state = (0.0, lam_init)  # Zero initial stress
         _, (stress, lam) = jax.lax.scan(step, init_state, None, length=len(t))
 
@@ -583,6 +585,7 @@ class DMTLocal(DMTBase):
 
             return (sigma_new, lam_new), (sigma_new, lam_new)
 
+        step = jax.checkpoint(step)
         init_state = (sigma_init, lam_init)
         _, (stress, lam) = jax.lax.scan(step, init_state, None, length=n_steps)
 
@@ -711,6 +714,7 @@ class DMTLocal(DMTBase):
 
             return (lam_new, gamma_new), (gamma_new, gamma_dot, lam_new)
 
+        step = jax.checkpoint(step)
         init_state = (lam_init, 0.0)
         _, (gamma, gamma_dot, lam) = jax.lax.scan(
             step, init_state, None, length=n_steps
@@ -789,6 +793,7 @@ class DMTLocal(DMTBase):
             return (lam_new, gamma_v_new, lam), (gamma_total, gamma_dot_total, lam_new)
 
         # State: (λ, γ_v, λ_prev)
+        step = jax.checkpoint(step)
         init_state = (lam_init, 0.0, lam_init)
         _, (gamma, gamma_dot, lam) = jax.lax.scan(
             step, init_state, None, length=n_steps
@@ -966,6 +971,7 @@ class DMTLocal(DMTBase):
 
                 return (sigma_new, lam_new), (sigma_new, lam_new)
 
+            step = jax.checkpoint(step)
             init_state = (0.0, lam_init)
             _, (stress, lam) = jax.lax.scan(step, init_state, strain_rate)
         else:
@@ -995,6 +1001,7 @@ class DMTLocal(DMTBase):
                 stress = eta * sr
                 return lam_new, (stress, lam_new)
 
+            step = jax.checkpoint(step)
             _, (stress, lam) = jax.lax.scan(step, lam_init, strain_rate)
 
         return {
@@ -1272,6 +1279,7 @@ class DMTLocal(DMTBase):
                 sigma_new = sigma + dt * dsigma
                 return (sigma_new, lam_new), sigma_new
 
+            step = jax.checkpoint(step)
             init_state = (jnp.float64(0.0), jnp.float64(lam_init))
             _, stress = jax.lax.scan(step, init_state, None, length=n_steps)
         else:
@@ -1302,6 +1310,7 @@ class DMTLocal(DMTBase):
                     )
                 return lam_new, eta * gamma_dot
 
+            step = jax.checkpoint(step)
             _, stress = jax.lax.scan(step, jnp.float64(lam_init), None, length=n_steps)
 
         return stress
@@ -1334,6 +1343,7 @@ class DMTLocal(DMTBase):
             sigma_new = sigma + dt * dsigma
             return (sigma_new, lam_new), sigma_new
 
+        step = jax.checkpoint(step)
         init_state = (jnp.float64(sigma_init), jnp.float64(lam_init))
         _, stress = jax.lax.scan(step, init_state, None, length=n_steps)
         return stress
@@ -1380,6 +1390,7 @@ class DMTLocal(DMTBase):
                 gamma_total = gamma_e + gamma_v_new
                 return (lam_new, gamma_v_new, lam), gamma_total
 
+            step = jax.checkpoint(step)
             init_state = (
                 jnp.float64(lam_init),
                 jnp.float64(0.0),
@@ -1417,6 +1428,7 @@ class DMTLocal(DMTBase):
                 gamma_new = gamma + dt * gamma_dot
                 return (lam_new, gamma_new), gamma_new
 
+            step = jax.checkpoint(step)
             init_state = (jnp.float64(lam_init), jnp.float64(0.0))
             _, gamma = jax.lax.scan(step, init_state, None, length=n_steps)
 
@@ -1465,6 +1477,7 @@ class DMTLocal(DMTBase):
                 sigma_new = sigma + dt * dsigma
                 return (sigma_new, lam_new), sigma_new
 
+            step = jax.checkpoint(step)
             init_state = (jnp.float64(0.0), jnp.float64(lam_init))
             _, stress = jax.lax.scan(step, init_state, strain_rate)
         else:
@@ -1495,6 +1508,7 @@ class DMTLocal(DMTBase):
                     )
                 return lam_new, eta * sr
 
+            step = jax.checkpoint(step)
             _, stress = jax.lax.scan(step, jnp.float64(lam_init), strain_rate)
 
         return stress

@@ -769,6 +769,8 @@ def ikh_scan_kernel(times, strains, use_viscosity=True, **params):
         )
         return new_state, stress
 
+    scan_fn = jax.checkpoint(scan_fn)
+
     # Run scan
     inputs = (dts, d_gammas)
     _, stress_series = jax.lax.scan(scan_fn, init_state, inputs)
@@ -861,6 +863,8 @@ def ml_ikh_scan_kernel(
             total_stress = total_stress + eta_inf * gamma_dot
 
         return new_state_tuple, total_stress
+
+    step_fn = jax.checkpoint(step_fn)
 
     _, stress_series = jax.lax.scan(step_fn, init_state, (dts, d_gammas))
 
@@ -975,6 +979,8 @@ def ml_ikh_weighted_sum_kernel(times, strains, num_modes, use_viscosity=True, **
 
         new_state = (sigma_final, alpha_final, lambdas_final)
         return new_state, sigma_total
+
+    step_fn = jax.checkpoint(step_fn)
 
     init_state = (init_sigma, init_alpha, init_lambdas)
     _, stress_series = jax.lax.scan(step_fn, init_state, (dts, d_gammas))

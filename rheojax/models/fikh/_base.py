@@ -347,6 +347,9 @@ class FIKHBase(BaseModel, FractionalModelMixin):
     ) -> jnp.ndarray:
         """Get initial state vector for ODE integration.
 
+        Always returns 5-component state: [primary, alpha, T, gamma_p, lambda].
+        When isothermal, T slot = T_ref.
+
         Args:
             mode: Protocol mode.
             params: Parameter dictionary.
@@ -355,29 +358,18 @@ class FIKHBase(BaseModel, FractionalModelMixin):
             lambda_0: Initial structure parameter.
 
         Returns:
-            Initial state array.
+            Initial state array (always 5 components).
         """
         T_ref = params.get("T_ref", 298.15)
         T_0 = T_init if T_init is not None else T_ref
 
-        if self.include_thermal:
-            # State: [σ, α, T, γᵖ, λ]
-            if mode == "relaxation" and sigma_0 is not None:
-                return jnp.array([sigma_0, 0.0, T_0, 0.0, lambda_0])
-            elif mode == "creep":
-                # State: [γ, α, T, γᵖ, λ]
-                return jnp.array([0.0, 0.0, T_0, 0.0, lambda_0])
-            else:
-                return jnp.array([0.0, 0.0, T_0, 0.0, lambda_0])
+        # Always 5-component state: [primary, alpha, T, gamma_p, lambda]
+        if mode == "relaxation" and sigma_0 is not None:
+            return jnp.array([sigma_0, 0.0, T_0, 0.0, lambda_0])
+        elif mode == "creep":
+            return jnp.array([0.0, 0.0, T_0, 0.0, lambda_0])
         else:
-            # State: [σ, α, γᵖ, λ]
-            if mode == "relaxation" and sigma_0 is not None:
-                return jnp.array([sigma_0, 0.0, 0.0, lambda_0])
-            elif mode == "creep":
-                # State: [γ, α, γᵖ, λ]
-                return jnp.array([0.0, 0.0, 0.0, lambda_0])
-            else:
-                return jnp.array([0.0, 0.0, 0.0, lambda_0])
+            return jnp.array([0.0, 0.0, T_0, 0.0, lambda_0])
 
     def _simulate_transient(
         self,
@@ -406,23 +398,22 @@ class FIKHBase(BaseModel, FractionalModelMixin):
         import diffrax
 
         from rheojax.models.fikh._kernels import (
-            fikh_creep_ode_rhs,
-            fikh_maxwell_ode_rhs,
+            _make_fikh_creep_ode_rhs,
+            _make_fikh_maxwell_ode_rhs,
         )
 
         # Build args
         args = dict(params)
-        args["include_thermal"] = self.include_thermal
 
-        # Select ODE function and initial state
+        # Select ODE function (factory creates checkpointed RHS)
         if mode == "creep":
-            ode_fn = fikh_creep_ode_rhs
+            ode_fn = _make_fikh_creep_ode_rhs(self.include_thermal)
             args["sigma_applied"] = (
                 sigma_applied if sigma_applied is not None else 100.0
             )
             y0 = self._get_initial_state(mode, params, T_init, lambda_0=1.0)
         elif mode == "relaxation":
-            ode_fn = fikh_maxwell_ode_rhs
+            ode_fn = _make_fikh_maxwell_ode_rhs(self.include_thermal)
             args["gamma_dot"] = 0.0
             sigma_init = (
                 sigma_0
@@ -433,7 +424,7 @@ class FIKHBase(BaseModel, FractionalModelMixin):
                 mode, params, T_init, sigma_0=sigma_init, lambda_0=0.5
             )
         else:  # startup
-            ode_fn = fikh_maxwell_ode_rhs
+            ode_fn = _make_fikh_maxwell_ode_rhs(self.include_thermal)
             args["gamma_dot"] = gamma_dot if gamma_dot is not None else 1.0
             y0 = self._get_initial_state(mode, params, T_init, lambda_0=1.0)
 

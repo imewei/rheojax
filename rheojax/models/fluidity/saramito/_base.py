@@ -305,8 +305,8 @@ class FluiditySaramitoBase(BaseModel):
             "t_a": params["t_a"],
             "b": params["b"],
             "n_rej": params["n_rej"],
-            # Coupling mode
-            "coupling_mode": self.coupling,
+            # Coupling mode (int for JAX compatibility: 0=minimal, 1=full)
+            "coupling_mode": 1 if self.coupling == "full" else 0,
         }
 
         # Add full coupling parameters if active

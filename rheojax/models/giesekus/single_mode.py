@@ -494,7 +494,7 @@ class GiesekusSingleMode(GiesekusBase):
         }
         y0 = jnp.zeros(4, dtype=jnp.float64)
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -573,7 +573,7 @@ class GiesekusSingleMode(GiesekusBase):
         }
         y0 = jnp.zeros(4, dtype=jnp.float64)
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -661,7 +661,7 @@ class GiesekusSingleMode(GiesekusBase):
 
         args = {"eta_p": eta_p, "lambda_1": lambda_1, "alpha": alpha}
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -733,7 +733,7 @@ class GiesekusSingleMode(GiesekusBase):
 
         args = {"eta_p": self.eta_p, "lambda_1": self.lambda_1, "alpha": self.alpha}
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -829,7 +829,7 @@ class GiesekusSingleMode(GiesekusBase):
             "eta_s": eta_s,
         }
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -907,7 +907,7 @@ class GiesekusSingleMode(GiesekusBase):
             "eta_s": self.eta_s,
         }
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -991,7 +991,7 @@ class GiesekusSingleMode(GiesekusBase):
             "alpha": alpha,
         }
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 

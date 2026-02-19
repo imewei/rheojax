@@ -618,7 +618,7 @@ class GiesekusMultiMode(BaseModel):
             "alpha": alpha_modes,
         }
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -643,9 +643,9 @@ class GiesekusMultiMode(BaseModel):
         )
 
         # Sum τ_xy from all modes (index 2 in each mode's 4-element block)
-        tau_xy_total = jnp.zeros(len(t), dtype=jnp.float64)
-        for i in range(self._n_modes):
-            tau_xy_total = tau_xy_total + sol.ys[:, 4 * i + 2]
+        # Use vectorized index selection instead of a Python loop
+        mode_xy_indices = jnp.arange(self._n_modes) * 4 + 2  # [2, 6, 10, ...]
+        tau_xy_total = jnp.sum(sol.ys[:, mode_xy_indices], axis=1)
 
         # Add solvent contribution
         total_stress = tau_xy_total + self.eta_s * gamma_dot
@@ -704,7 +704,7 @@ class GiesekusMultiMode(BaseModel):
             "alpha": alpha_modes,
         }
 
-        term = diffrax.ODETerm(ode_fn)
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -748,10 +748,9 @@ class GiesekusMultiMode(BaseModel):
             result["tau_xy_total"] = tau_xy_total_final
             return result
 
-        # Sum τ_xy from all modes
-        tau_xy_total = np.zeros(len(t))
-        for i in range(self._n_modes):
-            tau_xy_total += np.asarray(sol.ys[:, 4 * i + 2])
+        # Sum τ_xy from all modes (vectorized over mode index)
+        mode_xy_indices = jnp.arange(self._n_modes) * 4 + 2  # [2, 6, 10, ...]
+        tau_xy_total = np.asarray(jnp.sum(sol.ys[:, mode_xy_indices], axis=1))
 
         total_stress = tau_xy_total + self.eta_s * gamma_dot
 

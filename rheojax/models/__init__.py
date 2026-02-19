@@ -124,100 +124,110 @@ Usage:
     >>> models = ModelRegistry.list_models()
 """
 
-# Classical models
-from rheojax.models.classical import Maxwell, SpringPot, Zener
+# Lazy import map: public name -> (submodule, attribute_name)
+# Each entry triggers the minimum imports needed on first access.
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    # Classical models
+    "Maxwell": ("rheojax.models.classical", "Maxwell"),
+    "Zener": ("rheojax.models.classical", "Zener"),
+    "SpringPot": ("rheojax.models.classical", "SpringPot"),
+    # DMT thixotropic models
+    "DMTLocal": ("rheojax.models.dmt", "DMTLocal"),
+    "DMTNonlocal": ("rheojax.models.dmt", "DMTNonlocal"),
+    # EPM models
+    "LatticeEPM": ("rheojax.models.epm", "LatticeEPM"),
+    "TensorialEPM": ("rheojax.models.epm", "TensorialEPM"),
+    # FIKH (Fractional IKH) models
+    "FIKH": ("rheojax.models.fikh", "FIKH"),
+    "FMLIKH": ("rheojax.models.fikh", "FMLIKH"),
+    # Flow models
+    "Bingham": ("rheojax.models.flow", "Bingham"),
+    "Carreau": ("rheojax.models.flow", "Carreau"),
+    "CarreauYasuda": ("rheojax.models.flow", "CarreauYasuda"),
+    "Cross": ("rheojax.models.flow", "Cross"),
+    "HerschelBulkley": ("rheojax.models.flow", "HerschelBulkley"),
+    "PowerLaw": ("rheojax.models.flow", "PowerLaw"),
+    # Fluidity models
+    "FluidityLocal": ("rheojax.models.fluidity", "FluidityLocal"),
+    "FluidityNonlocal": ("rheojax.models.fluidity", "FluidityNonlocal"),
+    # Fluidity-Saramito EVP models
+    "FluiditySaramitoLocal": ("rheojax.models.fluidity.saramito", "FluiditySaramitoLocal"),
+    "FluiditySaramitoNonlocal": ("rheojax.models.fluidity.saramito", "FluiditySaramitoNonlocal"),
+    # Fractional models
+    "FBM": ("rheojax.models.fractional", "FBM"),
+    "FJM": ("rheojax.models.fractional", "FJM"),
+    "FKVZ": ("rheojax.models.fractional", "FKVZ"),
+    "FPT": ("rheojax.models.fractional", "FPT"),
+    "FZLL": ("rheojax.models.fractional", "FZLL"),
+    "FZSL": ("rheojax.models.fractional", "FZSL"),
+    "FZSS": ("rheojax.models.fractional", "FZSS"),
+    "FractionalBurgersModel": ("rheojax.models.fractional", "FractionalBurgersModel"),
+    "FractionalJeffreysModel": ("rheojax.models.fractional", "FractionalJeffreysModel"),
+    "FractionalKelvinVoigt": ("rheojax.models.fractional", "FractionalKelvinVoigt"),
+    "FractionalKelvinVoigtZener": ("rheojax.models.fractional", "FractionalKelvinVoigtZener"),
+    "FractionalMaxwellGel": ("rheojax.models.fractional", "FractionalMaxwellGel"),
+    "FractionalMaxwellLiquid": ("rheojax.models.fractional", "FractionalMaxwellLiquid"),
+    "FractionalMaxwellModel": ("rheojax.models.fractional", "FractionalMaxwellModel"),
+    "FractionalPoyntingThomson": ("rheojax.models.fractional", "FractionalPoyntingThomson"),
+    "FractionalZenerLiquidLiquid": ("rheojax.models.fractional", "FractionalZenerLiquidLiquid"),
+    "FractionalZenerSolidLiquid": ("rheojax.models.fractional", "FractionalZenerSolidLiquid"),
+    "FractionalZenerSolidSolid": ("rheojax.models.fractional", "FractionalZenerSolidSolid"),
+    # Giesekus nonlinear viscoelastic models
+    "GiesekusMultiMode": ("rheojax.models.giesekus", "GiesekusMultiMode"),
+    "GiesekusSingleMode": ("rheojax.models.giesekus", "GiesekusSingleMode"),
+    # HL models
+    "HebraudLequeux": ("rheojax.models.hl", "HebraudLequeux"),
+    # HVM (Hybrid Vitrimer Model) models
+    "HVMLocal": ("rheojax.models.hvm", "HVMLocal"),
+    # HVNM (Hybrid Vitrimer Nanocomposite Model) models
+    "HVNMLocal": ("rheojax.models.hvnm", "HVNMLocal"),
+    # IKH models
+    "MIKH": ("rheojax.models.ikh", "MIKH"),
+    "MLIKH": ("rheojax.models.ikh", "MLIKH"),
+    # ITT-MCT models
+    "ITTMCTIsotropic": ("rheojax.models.itt_mct", "ITTMCTIsotropic"),
+    "ITTMCTSchematic": ("rheojax.models.itt_mct", "ITTMCTSchematic"),
+    # Multi-mode models
+    "GeneralizedMaxwell": ("rheojax.models.multimode", "GeneralizedMaxwell"),
+    # SGR models
+    "SGRConventional": ("rheojax.models.sgr", "SGRConventional"),
+    "SGRGeneric": ("rheojax.models.sgr", "SGRGeneric"),
+    # SPP models
+    "SPPYieldStress": ("rheojax.models.spp", "SPPYieldStress"),
+    # STZ models
+    "STZConventional": ("rheojax.models.stz", "STZConventional"),
+    # TNT (Transient Network Theory) models
+    "TNTCates": ("rheojax.models.tnt", "TNTCates"),
+    "TNTLoopBridge": ("rheojax.models.tnt", "TNTLoopBridge"),
+    "TNTMultiSpecies": ("rheojax.models.tnt", "TNTMultiSpecies"),
+    "TNTSingleMode": ("rheojax.models.tnt", "TNTSingleMode"),
+    "TNTStickyRouse": ("rheojax.models.tnt", "TNTStickyRouse"),
+    # VLB (Vernerey-Long-Brighenti) transient network models
+    "VLBLocal": ("rheojax.models.vlb", "VLBLocal"),
+    "VLBMultiNetwork": ("rheojax.models.vlb", "VLBMultiNetwork"),
+    "VLBNonlocal": ("rheojax.models.vlb", "VLBNonlocal"),
+    "VLBVariant": ("rheojax.models.vlb", "VLBVariant"),
+}
 
-# DMT thixotropic models
-from rheojax.models.dmt import DMTLocal, DMTNonlocal
 
-# EPM models
-from rheojax.models.epm import LatticeEPM, TensorialEPM
+def __getattr__(name: str):
+    """Lazy-load model classes on first access.
 
-# FIKH (Fractional IKH) models
-from rheojax.models.fikh import FIKH, FMLIKH
+    Model registration decorators (@ModelRegistry.register) fire when the
+    model's submodule is first imported here, so the registry is populated
+    on demand rather than all at startup.
+    """
+    if name in _LAZY_IMPORTS:
+        import importlib
 
-# Flow models
-from rheojax.models.flow import (
-    Bingham,
-    Carreau,
-    CarreauYasuda,
-    Cross,
-    HerschelBulkley,
-    PowerLaw,
-)
+        module_path, attr = _LAZY_IMPORTS[name]
+        module = importlib.import_module(module_path)
+        obj = getattr(module, attr)
+        # Cache in module globals so subsequent access is a direct dict lookup
+        globals()[name] = obj
+        return obj
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-# Fluidity models
-from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
-
-# Fluidity-Saramito EVP models
-from rheojax.models.fluidity.saramito import (
-    FluiditySaramitoLocal,
-    FluiditySaramitoNonlocal,
-)
-
-# Fractional models
-from rheojax.models.fractional import (
-    FBM,
-    FJM,
-    FKVZ,
-    FPT,
-    FZLL,
-    FZSL,
-    FZSS,
-    FractionalBurgersModel,
-    FractionalJeffreysModel,
-    FractionalKelvinVoigt,
-    FractionalKelvinVoigtZener,
-    FractionalMaxwellGel,
-    FractionalMaxwellLiquid,
-    FractionalMaxwellModel,
-    FractionalPoyntingThomson,
-    FractionalZenerLiquidLiquid,
-    FractionalZenerSolidLiquid,
-    FractionalZenerSolidSolid,
-)
-
-# Giesekus nonlinear viscoelastic models
-from rheojax.models.giesekus import GiesekusMultiMode, GiesekusSingleMode
-
-# HL models
-from rheojax.models.hl import HebraudLequeux
-
-# HVM (Hybrid Vitrimer Model) models
-from rheojax.models.hvm import HVMLocal
-
-# HVNM (Hybrid Vitrimer Nanocomposite Model) models
-from rheojax.models.hvnm import HVNMLocal
-
-# IKH models
-from rheojax.models.ikh import MIKH, MLIKH
-
-# ITT-MCT models
-from rheojax.models.itt_mct import ITTMCTIsotropic, ITTMCTSchematic
-
-# Multi-mode models
-from rheojax.models.multimode import GeneralizedMaxwell
-
-# SGR models
-from rheojax.models.sgr import SGRConventional, SGRGeneric
-
-# SPP models
-from rheojax.models.spp import SPPYieldStress
-
-# STZ models
-from rheojax.models.stz import STZConventional
-
-# TNT (Transient Network Theory) models
-from rheojax.models.tnt import (
-    TNTCates,
-    TNTLoopBridge,
-    TNTMultiSpecies,
-    TNTSingleMode,
-    TNTStickyRouse,
-)
-
-# VLB (Vernerey-Long-Brighenti) transient network models
-from rheojax.models.vlb import VLBLocal, VLBMultiNetwork, VLBNonlocal, VLBVariant
 
 __all__ = [
     # Classical models

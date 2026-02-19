@@ -315,12 +315,10 @@ def fluidity_nonlocal_pde_rhs(
     Returns:
         dy/dt: Time derivative of state vector
     """
-    # Get grid info
-    N_y = args["N_y"]
-
-    # Unpack state
+    # Unpack state — infer N_y from state vector shape to avoid
+    # non-static integer in args (required for jax.checkpoint compatibility)
     Sigma = y[0]
-    f_field = y[1 : N_y + 1]
+    f_field = y[1:]
 
     # Get parameters
     G = args["G"]
@@ -337,19 +335,16 @@ def fluidity_nonlocal_pde_rhs(
     # Average fluidity (for bulk response)
     f_avg = jnp.mean(f_field_safe)
 
-    # Mode determines stress evolution
-    mode = args.get("mode", "rate_controlled")
+    # Mode determines stress evolution (0=rate_controlled, 1=stress_controlled)
+    mode = args.get("mode", 0)
+    gamma_dot = args.get("gamma_dot", 0.0)
+    sigma_applied = args.get("sigma_applied", 0.0)
 
-    if mode == "stress_controlled":
-        # Stress is fixed
-        sigma_applied = args["sigma_applied"]
-        d_Sigma = 0.0
-        sigma_local = sigma_applied
-    else:
-        # Rate controlled: dΣ/dt = G(γ̇ - Σ*f_avg)
-        gamma_dot = args.get("gamma_dot", 0.0)
-        d_Sigma = G * (gamma_dot - Sigma * f_avg)
-        sigma_local = Sigma
+    # Rate controlled: dΣ/dt = G(γ̇ - Σ*f_avg)
+    d_Sigma_rate = G * (gamma_dot - Sigma * f_avg)
+    # Stress controlled: dΣ/dt = 0
+    d_Sigma = jnp.where(mode == 1, 0.0, d_Sigma_rate)
+    sigma_local = jnp.where(mode == 1, sigma_applied, Sigma)
 
     # Fluidity field evolution
     # 1. Local equilibrium fluidity from HB
@@ -402,12 +397,10 @@ def fluidity_nonlocal_creep_pde_rhs(
     Returns:
         dy/dt: Time derivative of state vector
     """
-    # Get grid info
-    N_y = args["N_y"]
-
-    # Unpack state
+    # Unpack state — infer N_y from state vector shape to avoid
+    # non-static integer in args (required for jax.checkpoint compatibility)
     gamma = y[0]  # noqa: F841 - kept for clarity
-    f_field = y[1 : N_y + 1]
+    f_field = y[1:]
 
     # Get parameters
     sigma_applied = args["sigma_applied"]

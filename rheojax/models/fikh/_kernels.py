@@ -541,210 +541,184 @@ def fikh_return_step_thermal(
 # =============================================================================
 
 
-def fikh_maxwell_ode_rhs(
-    t: float,
-    y: jnp.ndarray,
-    args: dict[str, Any],
-) -> jnp.ndarray:
-    """Maxwell ODE RHS for rate-controlled FIKH protocols.
+def _make_fikh_maxwell_ode_rhs(include_thermal: bool):
+    """Factory for Maxwell ODE RHS for rate-controlled FIKH protocols.
 
-    State vector y = [σ, α, T, γᵖ, λ] (5 components, thermal)
-    or y = [σ, α, γᵖ, λ] (4 components, isothermal)
+    State vector y = [sigma, alpha, T, gamma_p, lam] (always 5 components).
+    When isothermal, T slot holds T_ref and dT = 0.
 
-    Used for: startup, relaxation protocols.
-
-    Args:
-        t: Current time.
-        y: State vector.
-        args: Parameter dictionary including 'gamma_dot' for rate.
-
-    Returns:
-        dy/dt: Rate of change of state.
+    Parameters
+    ----------
+    include_thermal : bool
+        Whether thermal coupling is active.
     """
-    include_thermal = args.get("include_thermal", True)
 
-    if include_thermal:
-        sigma, alpha, T, _gamma_p, lam = y[0], y[1], y[2], y[3], y[4]
-    else:
-        sigma, alpha, _gamma_p, lam = y[0], y[1], y[2], y[3]
-        T = args.get("T_ref", 298.15)
+    def rhs(t, y, args):
+        sigma, alpha, T_state, _gamma_p, lam = y[0], y[1], y[2], y[3], y[4]
 
-    # Parameters
-    G = args["G"]
-    eta = args.get("eta", 1e6)
-    C = args.get("C", 0.0)
-    gamma_dyn = args.get("gamma_dyn", 1.0)
-    m = args.get("m", 1.0)
-    sigma_y0 = args["sigma_y0"]
-    delta_sigma_y = args.get("delta_sigma_y", 0.0)
-    tau_thix = args.get("tau_thix", 1.0)
-    Gamma_thix = args.get("Gamma", 0.5)
-    alpha_frac = args.get("alpha_structure", 0.5)
-    gamma_dot = args.get("gamma_dot", 0.0)
+        # Use state T if thermal, else T_ref from args
+        T_ref = args.get("T_ref", 298.15)
+        T = jnp.where(include_thermal, T_state, T_ref)
 
-    # Thermal parameters
-    T_ref = args.get("T_ref", 298.15)
-    E_a = args.get("E_a", 5e4)
-    E_y = args.get("E_y", 3e4)
-    m_y = args.get("m_y", 1.0)
-    rho_cp = args.get("rho_cp", 4e6)
-    chi = args.get("chi", 0.9)
-    h = args.get("h", 100.0)
-    T_env = args.get("T_env", 298.15)
+        # Parameters
+        G = args["G"]
+        eta = args.get("eta", 1e6)
+        C = args.get("C", 0.0)
+        gamma_dyn = args.get("gamma_dyn", 1.0)
+        m = args.get("m", 1.0)
+        sigma_y0 = args["sigma_y0"]
+        delta_sigma_y = args.get("delta_sigma_y", 0.0)
+        tau_thix = args.get("tau_thix", 1.0)
+        Gamma_thix = args.get("Gamma", 0.5)
+        alpha_frac = args.get("alpha_structure", 0.5)
+        gamma_dot = args.get("gamma_dot", 0.0)
 
-    # Temperature-dependent viscosity
-    eta_T = arrhenius_viscosity(eta, T, T_ref, E_a) if include_thermal else eta
+        # Thermal parameters
+        E_a = args.get("E_a", 5e4)
+        E_y = args.get("E_y", 3e4)
+        m_y = args.get("m_y", 1.0)
+        rho_cp = args.get("rho_cp", 4e6)
+        chi = args.get("chi", 0.9)
+        h = args.get("h", 100.0)
+        T_env = args.get("T_env", 298.15)
 
-    # Yield stress
-    sigma_y_base = sigma_y0 + delta_sigma_y * lam
-    sigma_y = (
-        thermal_yield_stress(sigma_y_base, lam, m_y, T, T_ref, E_y)
-        if include_thermal
-        else sigma_y_base
-    )
+        # Temperature-dependent viscosity
+        # arrhenius(eta, T_ref, T_ref, E_a) = eta * exp(0) = eta (exact when isothermal)
+        eta_T = arrhenius_viscosity(eta, T, T_ref, E_a)
 
-    # Effective stress
-    xi = sigma - alpha
-    xi_abs = jnp.abs(xi)
-    sign_xi = sign_safe(xi)
+        # Yield stress
+        sigma_y_base = sigma_y0 + delta_sigma_y * lam
+        sigma_y_thermal = thermal_yield_stress(sigma_y_base, lam, m_y, T, T_ref, E_y)
+        sigma_y = jnp.where(include_thermal, sigma_y_thermal, sigma_y_base)
 
-    # Plastic flow (Perzyna-type overstress)
-    mu_p = args.get("mu_p", 1e-3)
-    f_yield = xi_abs - sigma_y
-    gamma_dot_p = macaulay(f_yield) / jnp.maximum(mu_p, 1e-12) * sign_xi
+        # Effective stress
+        xi = sigma - alpha
+        xi_abs = jnp.abs(xi)
+        sign_xi = sign_safe(xi)
 
-    # Stress rate: dσ/dt = G(γ̇ - γ̇ᵖ) - σ/τ
-    tau_relax = eta_T / jnp.maximum(G, 1e-12)
-    d_sigma = G * (gamma_dot - gamma_dot_p) - sigma / tau_relax
+        # Plastic flow (Perzyna-type overstress)
+        mu_p = args.get("mu_p", 1e-3)
+        f_yield = xi_abs - sigma_y
+        gamma_dot_p = macaulay(f_yield) / jnp.maximum(mu_p, 1e-12) * sign_xi
 
-    # Backstress rate (Armstrong-Frederick)
-    alpha_abs = jnp.abs(alpha)
-    d_alpha = C * jnp.abs(gamma_dot_p) * sign_xi - gamma_dyn * jnp.power(
-        alpha_abs + 1e-20, m - 1
-    ) * alpha * jnp.abs(gamma_dot_p)
+        # Stress rate: dsigma/dt = G(gamma_dot - gamma_dot_p) - sigma/tau
+        tau_relax = eta_T / jnp.maximum(G, 1e-12)
+        d_sigma = G * (gamma_dot - gamma_dot_p) - sigma / tau_relax
 
-    # Plastic strain rate
-    d_gamma_p = jnp.abs(gamma_dot_p)
+        # Backstress rate (Armstrong-Frederick)
+        alpha_abs = jnp.abs(alpha)
+        d_alpha = C * jnp.abs(gamma_dot_p) * sign_xi - gamma_dyn * jnp.power(
+            alpha_abs + 1e-20, m - 1
+        ) * alpha * jnp.abs(gamma_dot_p)
 
-    # Structure evolution (integer-order approximation in ODE)
-    # For proper fractional: D^α λ = RHS, we use α → 1 limit in ODE
-    # The fractional behavior is captured in the scan kernel
-    gamma_1_alpha = jax.scipy.special.gamma(1.0 + alpha_frac)
-    tau_eff = tau_thix / gamma_1_alpha  # Effective time scale adjustment
-    d_lam = fractional_structure_rhs(lam, jnp.abs(gamma_dot_p), tau_eff, Gamma_thix)
+        # Plastic strain rate
+        d_gamma_p = jnp.abs(gamma_dot_p)
 
-    if include_thermal:
-        # Temperature rate
-        d_T = temperature_evolution_rate(
+        # Structure evolution
+        gamma_1_alpha = jax.scipy.special.gamma(1.0 + alpha_frac)
+        tau_eff = tau_thix / gamma_1_alpha
+        d_lam = fractional_structure_rhs(lam, jnp.abs(gamma_dot_p), tau_eff, Gamma_thix)
+
+        # Temperature rate (zero when isothermal)
+        d_T_thermal = temperature_evolution_rate(
             T, sigma, jnp.abs(gamma_dot_p), T_env, rho_cp, chi, h
         )
+        d_T = jnp.where(include_thermal, d_T_thermal, 0.0)
+
         return jnp.array([d_sigma, d_alpha, d_T, d_gamma_p, d_lam])
-    else:
-        return jnp.array([d_sigma, d_alpha, d_gamma_p, d_lam])
+
+    return jax.checkpoint(rhs)
 
 
-def fikh_creep_ode_rhs(
-    t: float,
-    y: jnp.ndarray,
-    args: dict[str, Any],
-) -> jnp.ndarray:
-    """Creep ODE RHS for stress-controlled FIKH protocol.
+def _make_fikh_creep_ode_rhs(include_thermal: bool):
+    """Factory for creep ODE RHS for stress-controlled FIKH protocol.
 
-    State vector y = [γ, α, T, γᵖ, λ] (5 components, thermal)
-    or y = [γ, α, γᵖ, λ] (4 components, isothermal)
+    State vector y = [gamma, alpha, T, gamma_p, lam] (always 5 components).
+    When isothermal, T slot holds T_ref and dT = 0.
 
-    Used for: creep protocol with constant applied stress.
-
-    Args:
-        t: Current time.
-        y: State vector.
-        args: Parameter dictionary including 'sigma_applied'.
-
-    Returns:
-        dy/dt: Rate of change of state.
+    Parameters
+    ----------
+    include_thermal : bool
+        Whether thermal coupling is active.
     """
-    include_thermal = args.get("include_thermal", True)
 
-    if include_thermal:
-        _gamma, alpha, T, _gamma_p, lam = y[0], y[1], y[2], y[3], y[4]
-    else:
-        _gamma, alpha, _gamma_p, lam = y[0], y[1], y[2], y[3]
-        T = args.get("T_ref", 298.15)
+    def rhs(t, y, args):
+        _gamma, alpha, T_state, _gamma_p, lam = y[0], y[1], y[2], y[3], y[4]
 
-    # Applied stress
-    sigma_applied = args.get("sigma_applied", 100.0)
-    sigma = sigma_applied
+        # Use state T if thermal, else T_ref from args
+        T_ref = args.get("T_ref", 298.15)
+        T = jnp.where(include_thermal, T_state, T_ref)
 
-    # Parameters
-    eta = args.get("eta", 1e6)
-    C = args.get("C", 0.0)
-    gamma_dyn = args.get("gamma_dyn", 1.0)
-    m = args.get("m", 1.0)
-    sigma_y0 = args["sigma_y0"]
-    delta_sigma_y = args.get("delta_sigma_y", 0.0)
-    tau_thix = args.get("tau_thix", 1.0)
-    Gamma_thix = args.get("Gamma", 0.5)
-    alpha_frac = args.get("alpha_structure", 0.5)
-    eta_inf = args.get("eta_inf", 0.0)
+        # Applied stress
+        sigma_applied = args.get("sigma_applied", 100.0)
+        sigma = sigma_applied
 
-    # Thermal parameters
-    T_ref = args.get("T_ref", 298.15)
-    E_a = args.get("E_a", 5e4)
-    E_y = args.get("E_y", 3e4)
-    m_y = args.get("m_y", 1.0)
-    rho_cp = args.get("rho_cp", 4e6)
-    chi = args.get("chi", 0.9)
-    h = args.get("h", 100.0)
-    T_env = args.get("T_env", 298.15)
+        # Parameters
+        eta = args.get("eta", 1e6)
+        C = args.get("C", 0.0)
+        gamma_dyn = args.get("gamma_dyn", 1.0)
+        m = args.get("m", 1.0)
+        sigma_y0 = args["sigma_y0"]
+        delta_sigma_y = args.get("delta_sigma_y", 0.0)
+        tau_thix = args.get("tau_thix", 1.0)
+        Gamma_thix = args.get("Gamma", 0.5)
+        alpha_frac = args.get("alpha_structure", 0.5)
+        eta_inf = args.get("eta_inf", 0.0)
 
-    # Temperature-dependent viscosity
-    eta_T = arrhenius_viscosity(eta, T, T_ref, E_a) if include_thermal else eta
+        # Thermal parameters
+        E_a = args.get("E_a", 5e4)
+        E_y = args.get("E_y", 3e4)
+        m_y = args.get("m_y", 1.0)
+        rho_cp = args.get("rho_cp", 4e6)
+        chi = args.get("chi", 0.9)
+        h = args.get("h", 100.0)
+        T_env = args.get("T_env", 298.15)
 
-    # Yield stress
-    sigma_y_base = sigma_y0 + delta_sigma_y * lam
-    sigma_y = (
-        thermal_yield_stress(sigma_y_base, lam, m_y, T, T_ref, E_y)
-        if include_thermal
-        else sigma_y_base
-    )
+        # Temperature-dependent viscosity
+        # arrhenius(eta, T_ref, T_ref, E_a) = eta * exp(0) = eta (exact when isothermal)
+        eta_T = arrhenius_viscosity(eta, T, T_ref, E_a)
 
-    # Effective stress
-    xi = sigma - alpha
-    xi_abs = jnp.abs(xi)
-    sign_xi = sign_safe(xi)
+        # Yield stress
+        sigma_y_base = sigma_y0 + delta_sigma_y * lam
+        sigma_y_thermal = thermal_yield_stress(sigma_y_base, lam, m_y, T, T_ref, E_y)
+        sigma_y = jnp.where(include_thermal, sigma_y_thermal, sigma_y_base)
 
-    # Plastic flow
-    mu_p = args.get("mu_p", 1e-3)
-    f_yield = xi_abs - sigma_y
-    gamma_dot_p = macaulay(f_yield) / jnp.maximum(mu_p, 1e-12) * sign_xi
+        # Effective stress
+        xi = sigma - alpha
+        xi_abs = jnp.abs(xi)
+        sign_xi = sign_safe(xi)
 
-    # Total strain rate from stress equilibrium: σ = G·(γ - γᵖ) + η_inf·γ̇
-    # For creep with constant σ: γ̇ = γ̇ᵖ + σ/(η + η_inf) (Maxwell-like)
-    # More rigorously: σ = σ_elastic + σ_viscous = G·(γ-γᵖ-γᵛ) + η·γ̇ᵛ
-    # Simplification for EVP creep:
-    d_gamma = gamma_dot_p + sigma / eta_T + eta_inf * gamma_dot_p / eta_T
+        # Plastic flow
+        mu_p = args.get("mu_p", 1e-3)
+        f_yield = xi_abs - sigma_y
+        gamma_dot_p = macaulay(f_yield) / jnp.maximum(mu_p, 1e-12) * sign_xi
 
-    # Backstress rate
-    alpha_abs = jnp.abs(alpha)
-    d_alpha = C * jnp.abs(gamma_dot_p) * sign_xi - gamma_dyn * jnp.power(
-        alpha_abs + 1e-20, m - 1
-    ) * alpha * jnp.abs(gamma_dot_p)
+        # Total strain rate
+        d_gamma = gamma_dot_p + sigma / eta_T + eta_inf * gamma_dot_p / eta_T
 
-    # Plastic strain rate
-    d_gamma_p = jnp.abs(gamma_dot_p)
+        # Backstress rate
+        alpha_abs = jnp.abs(alpha)
+        d_alpha = C * jnp.abs(gamma_dot_p) * sign_xi - gamma_dyn * jnp.power(
+            alpha_abs + 1e-20, m - 1
+        ) * alpha * jnp.abs(gamma_dot_p)
 
-    # Structure evolution
-    gamma_1_alpha = jax.scipy.special.gamma(1.0 + alpha_frac)
-    tau_eff = tau_thix / gamma_1_alpha
-    d_lam = fractional_structure_rhs(lam, jnp.abs(gamma_dot_p), tau_eff, Gamma_thix)
+        # Plastic strain rate
+        d_gamma_p = jnp.abs(gamma_dot_p)
 
-    if include_thermal:
-        d_T = temperature_evolution_rate(
+        # Structure evolution
+        gamma_1_alpha = jax.scipy.special.gamma(1.0 + alpha_frac)
+        tau_eff = tau_thix / gamma_1_alpha
+        d_lam = fractional_structure_rhs(lam, jnp.abs(gamma_dot_p), tau_eff, Gamma_thix)
+
+        # Temperature rate (zero when isothermal)
+        d_T_thermal = temperature_evolution_rate(
             T, sigma, jnp.abs(gamma_dot_p), T_env, rho_cp, chi, h
         )
+        d_T = jnp.where(include_thermal, d_T_thermal, 0.0)
+
         return jnp.array([d_gamma, d_alpha, d_T, d_gamma_p, d_lam])
-    else:
-        return jnp.array([d_gamma, d_alpha, d_gamma_p, d_lam])
+
+    return jax.checkpoint(rhs)
 
 
 # =============================================================================
@@ -808,7 +782,8 @@ def fikh_scan_kernel_isothermal(
         )
         return (new_state, new_history), stress
 
-    # Run scan
+    # Run scan with checkpointed scan function
+    scan_fn = jax.checkpoint(scan_fn)
     inputs = (dts, d_gammas)
     _, stress_series = jax.lax.scan(scan_fn, (init_state, init_history), inputs)
 
@@ -870,6 +845,7 @@ def fikh_scan_kernel_thermal(
         )
         return (new_state, new_history), (stress, T)
 
+    scan_fn = jax.checkpoint(scan_fn)
     _, (stress_series, T_series) = jax.lax.scan(
         scan_fn, (init_state, init_history), (dts, d_gammas)
     )

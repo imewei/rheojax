@@ -412,14 +412,12 @@ def saramito_local_ode_rhs(
     b = args["b"]
     n_rej = args["n_rej"]
 
-    # Coupling mode determines yield stress
-    coupling_mode = args.get("coupling_mode", "minimal")
-    if coupling_mode == "full":
-        tau_y_coupling = args.get("tau_y_coupling", 0.0)
-        m_yield = args.get("m_yield", 1.0)
-        tau_y = yield_stress_from_fluidity(f, tau_y0, tau_y_coupling, m_yield)
-    else:
-        tau_y = tau_y0
+    # Coupling mode determines yield stress (0=minimal, 1=full)
+    coupling_mode = args.get("coupling_mode", 0)
+    tau_y_coupling = args.get("tau_y_coupling", 0.0)
+    m_yield = args.get("m_yield", 1.0)
+    tau_y_full = yield_stress_from_fluidity(f, tau_y0, tau_y_coupling, m_yield)
+    tau_y = jnp.where(coupling_mode == 1, tau_y_full, tau_y0)
 
     # Ensure fluidity is positive
     f_safe = jnp.maximum(f, 1e-20)
@@ -503,14 +501,12 @@ def saramito_local_creep_ode_rhs(
     b = args["b"]
     n_rej = args["n_rej"]
 
-    # Coupling mode determines yield stress
-    coupling_mode = args.get("coupling_mode", "minimal")
-    if coupling_mode == "full":
-        tau_y_coupling = args.get("tau_y_coupling", 0.0)
-        m_yield = args.get("m_yield", 1.0)
-        tau_y = yield_stress_from_fluidity(f, tau_y0, tau_y_coupling, m_yield)
-    else:
-        tau_y = tau_y0
+    # Coupling mode determines yield stress (0=minimal, 1=full)
+    coupling_mode = args.get("coupling_mode", 0)
+    tau_y_coupling = args.get("tau_y_coupling", 0.0)
+    m_yield = args.get("m_yield", 1.0)
+    tau_y_full = yield_stress_from_fluidity(f, tau_y0, tau_y_coupling, m_yield)
+    tau_y = jnp.where(coupling_mode == 1, tau_y_full, tau_y0)
 
     # Ensure fluidity is positive
     f_safe = jnp.maximum(f, 1e-20)
@@ -581,14 +577,12 @@ def saramito_local_relaxation_ode_rhs(
     b = args["b"]
     n_rej = args["n_rej"]
 
-    # Coupling mode determines yield stress
-    coupling_mode = args.get("coupling_mode", "minimal")
-    if coupling_mode == "full":
-        tau_y_coupling = args.get("tau_y_coupling", 0.0)
-        m_yield = args.get("m_yield", 1.0)
-        tau_y = yield_stress_from_fluidity(f, tau_y0, tau_y_coupling, m_yield)
-    else:
-        tau_y = tau_y0
+    # Coupling mode determines yield stress (0=minimal, 1=full)
+    coupling_mode = args.get("coupling_mode", 0)
+    tau_y_coupling = args.get("tau_y_coupling", 0.0)
+    m_yield = args.get("m_yield", 1.0)
+    tau_y_full = yield_stress_from_fluidity(f, tau_y0, tau_y_coupling, m_yield)
+    tau_y = jnp.where(coupling_mode == 1, tau_y_full, tau_y0)
 
     # Ensure fluidity is positive
     f_safe = jnp.maximum(f, 1e-20)
@@ -873,12 +867,10 @@ def saramito_nonlocal_pde_rhs(
     Returns:
         dy/dt: Time derivative of state vector
     """
-    # Get grid info
-    N_y = args["N_y"]
-
-    # Unpack state
+    # Unpack state — N_y inferred from state vector shape to avoid
+    # non-static integer in args (required for jax.checkpoint compatibility)
     tau_xy_bulk = y[0]
-    f_field = y[1 : N_y + 1]
+    f_field = y[1:]
 
     # Get parameters
     G = args["G"]
@@ -892,14 +884,10 @@ def saramito_nonlocal_pde_rhs(
     dy = args["dy"]
     gamma_dot = args.get("gamma_dot", 0.0)
 
-    # Coupling mode
-    coupling_mode = args.get("coupling_mode", "minimal")
-    if coupling_mode == "full":
-        tau_y_coupling = args.get("tau_y_coupling", 0.0)
-        m_yield = args.get("m_yield", 1.0)
-    else:
-        tau_y_coupling = 0.0
-        m_yield = 1.0
+    # Coupling mode (0=minimal, 1=full)
+    coupling_mode = args.get("coupling_mode", 0)
+    tau_y_coupling = args.get("tau_y_coupling", 0.0)
+    m_yield = args.get("m_yield", 1.0)
 
     # Ensure fluidity is positive
     f_field_safe = jnp.maximum(f_field, 1e-20)
@@ -912,10 +900,9 @@ def saramito_nonlocal_pde_rhs(
     d_tau_bulk = G * (gamma_dot - tau_xy_bulk * f_avg)
 
     # Local yield stress (may depend on local fluidity)
-    if coupling_mode == "full":
-        tau_y_local = tau_y0 + tau_y_coupling / jnp.power(f_field_safe, m_yield)
-    else:
-        tau_y_local = tau_y0 * jnp.ones_like(f_field_safe)
+    tau_y_full = tau_y0 + tau_y_coupling / jnp.power(f_field_safe, m_yield)
+    tau_y_minimal = tau_y0 * jnp.ones_like(f_field_safe)
+    tau_y_local = jnp.where(coupling_mode == 1, tau_y_full, tau_y_minimal)
 
     # Local plasticity (assuming uniform stress in gap)
     alpha_local = jnp.clip(1.0 - tau_y_local / (jnp.abs(tau_xy_bulk) + 1e-20), 0.0, 1.0)

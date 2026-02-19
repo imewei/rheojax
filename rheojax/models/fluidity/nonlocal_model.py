@@ -393,10 +393,10 @@ class FluidityNonlocal(FluidityBase):
         else:
             pde_fn = fluidity_nonlocal_pde_rhs
             if mode == "startup":
-                args["mode"] = "rate_controlled"
+                args["mode"] = 0  # rate_controlled
                 args["gamma_dot"] = gamma_dot if gamma_dot is not None else 0.0
             else:  # relaxation
-                args["mode"] = "rate_controlled"
+                args["mode"] = 0  # rate_controlled
                 args["gamma_dot"] = 0.0
 
         # Initial state
@@ -404,7 +404,7 @@ class FluidityNonlocal(FluidityBase):
 
         # Diffrax setup - use Dopri5 for stiff PDEs (explicit, avoids tracer issues)
         term = diffrax.ODETerm(
-            lambda ti, yi, args_i: pde_fn(cast(float, ti), yi, args_i)
+            jax.checkpoint(lambda ti, yi, args_i: pde_fn(cast(float, ti), yi, args_i))
         )
         solver = diffrax.Dopri5()
         stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
@@ -656,7 +656,7 @@ class FluidityNonlocal(FluidityBase):
             "xi": params.get("xi", 1e-5),
             "N_y": self.N_y,
             "dy": self.dy,
-            "mode": "rate_controlled",
+            "mode": 0,  # rate_controlled
         }
 
         # Initial state
@@ -668,7 +668,7 @@ class FluidityNonlocal(FluidityBase):
             args_with_rate = {**args_i, "gamma_dot": gamma_dot_t}
             return fluidity_nonlocal_pde_rhs(ti, yi, args_with_rate)
 
-        term = diffrax.ODETerm(laos_pde)
+        term = diffrax.ODETerm(jax.checkpoint(laos_pde))
         solver = diffrax.Dopri5()
         stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
 

@@ -55,11 +55,8 @@ def _hvm_initial_state(include_dissociative: bool, include_damage: bool) -> jnp.
     # E-network natural state: mu_E_nat_xx=1, mu_E_nat_yy=1, mu_E_nat_xy=0
     y0 = jnp.array([1.0, 1.0, 0.0, 1.0, 1.0, 0.0], dtype=jnp.float64)
 
-    if include_dissociative:
-        # D-network: mu_D_xx=1, mu_D_yy=1, mu_D_xy=0
-        y0 = jnp.concatenate([y0, jnp.array([1.0, 1.0, 0.0], dtype=jnp.float64)])
-    else:
-        y0 = jnp.concatenate([y0, jnp.array([1.0, 1.0, 0.0], dtype=jnp.float64)])
+    # D-network: mu_D_xx=1, mu_D_yy=1, mu_D_xy=0 (always included in state, zeroed if not active)
+    y0 = jnp.concatenate([y0, jnp.array([1.0, 1.0, 0.0], dtype=jnp.float64)])
 
     # gamma = 0
     y0 = jnp.concatenate([y0, jnp.array([0.0], dtype=jnp.float64)])
@@ -105,26 +102,29 @@ def _compute_k_ber(
     mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
     mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy = y[3], y[4], y[5]
 
-    if kinetics == "stress":
-        # Compute E-network stress components for von Mises
-        sigma_E_xx = G_E * (mu_E_xx - mu_E_nat_xx)
-        sigma_E_yy = G_E * (mu_E_yy - mu_E_nat_yy)
-        sigma_E_xy = G_E * (mu_E_xy - mu_E_nat_xy)
-        return hvm_ber_rate_stress(
-            sigma_E_xx, sigma_E_yy, sigma_E_xy, nu_0, E_a, V_act, T
-        )
-    else:  # stretch
-        return hvm_ber_rate_stretch(
-            mu_E_xx,
-            mu_E_yy,
-            mu_E_nat_xx,
-            mu_E_nat_yy,
-            G_E,
-            nu_0,
-            E_a,
-            V_act,
-            T,
-        )
+    # Always compute both BER rate pathways
+    sigma_E_xx = G_E * (mu_E_xx - mu_E_nat_xx)
+    sigma_E_yy = G_E * (mu_E_yy - mu_E_nat_yy)
+    sigma_E_xy = G_E * (mu_E_xy - mu_E_nat_xy)
+
+    k_ber_stress = hvm_ber_rate_stress(
+        sigma_E_xx, sigma_E_yy, sigma_E_xy, nu_0, E_a, V_act, T
+    )
+    k_ber_stretch = hvm_ber_rate_stretch(
+        mu_E_xx,
+        mu_E_yy,
+        mu_E_nat_xx,
+        mu_E_nat_yy,
+        G_E,
+        nu_0,
+        E_a,
+        V_act,
+        T,
+    )
+
+    # Select based on kinetics type (closure-captured Python bool)
+    is_stress = (kinetics == "stress")
+    return jnp.where(is_stress, k_ber_stress, k_ber_stretch)
 
 
 # =============================================================================
@@ -232,7 +232,8 @@ def _make_startup_vector_field(
             ]
         )
 
-    return vector_field
+    # Wrap with checkpoint to trade compute for memory during NUTS reverse-mode AD
+    return jax.checkpoint(vector_field)
 
 
 def _make_relaxation_vector_field(
@@ -304,7 +305,7 @@ def _make_relaxation_vector_field(
             ]
         )
 
-    return vector_field
+    return jax.checkpoint(vector_field)
 
 
 def _make_laos_vector_field(
@@ -402,7 +403,7 @@ def _make_laos_vector_field(
             ]
         )
 
-    return vector_field
+    return jax.checkpoint(vector_field)
 
 
 def _make_creep_vector_field(
@@ -540,7 +541,7 @@ def _make_creep_vector_field(
             ]
         )
 
-    return vector_field
+    return jax.checkpoint(vector_field)
 
 
 # =============================================================================

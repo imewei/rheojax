@@ -425,7 +425,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
         # Diffrax setup
         term = diffrax.ODETerm(
-            lambda ti, yi, args_i: ode_fn(cast(float, ti), yi, args_i)
+            jax.checkpoint(lambda ti, yi, args_i: ode_fn(cast(float, ti), yi, args_i))
         )
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
@@ -544,7 +544,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         y0 = jnp.array([0.0, 0.0, 0.0, f_init, 0.0])
 
         term = diffrax.ODETerm(
-            lambda ti, yi, args_i: saramito_local_ode_rhs(cast(float, ti), yi, args_i)
+            jax.checkpoint(lambda ti, yi, args_i: saramito_local_ode_rhs(cast(float, ti), yi, args_i))
         )
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
@@ -632,9 +632,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         y0 = jnp.array([0.0, f_init])
 
         term = diffrax.ODETerm(
-            lambda ti, yi, args_i: saramito_local_creep_ode_rhs(
+            jax.checkpoint(lambda ti, yi, args_i: saramito_local_creep_ode_rhs(
                 cast(float, ti), yi, args_i
-            )
+            ))
         )
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
@@ -854,7 +854,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             args_with_rate = {**args_i, "gamma_dot": gamma_dot_t}
             return saramito_local_ode_rhs(ti, yi, args_with_rate)
 
-        term = diffrax.ODETerm(laos_ode)
+        term = diffrax.ODETerm(jax.checkpoint(laos_ode))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
 

@@ -878,7 +878,7 @@ def build_tnt_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
 
         return jnp.array([dS_xx, dS_yy, dS_zz, dS_xy])
 
-    return ode_rhs
+    return jax.checkpoint(ode_rhs)
 
 
 def build_tnt_creep_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
@@ -938,7 +938,7 @@ def build_tnt_creep_ode_rhs(breakage_type="constant", use_fene=False, use_gs=Fal
 
         return jnp.concatenate([d_conf, jnp.array([gamma_dot])])
 
-    return ode_rhs
+    return jax.checkpoint(ode_rhs)
 
 
 def build_tnt_laos_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
@@ -982,7 +982,7 @@ def build_tnt_laos_ode_rhs(breakage_type="constant", use_fene=False, use_gs=Fals
             xi,
         )
 
-    return ode_rhs
+    return jax.checkpoint(ode_rhs)
 
 
 def build_tnt_relaxation_ode_rhs(
@@ -1013,4 +1013,4 @@ def build_tnt_relaxation_ode_rhs(
             xi,
         )
 
-    return ode_rhs
+    return jax.checkpoint(ode_rhs)

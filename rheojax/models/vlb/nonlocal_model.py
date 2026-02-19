@@ -288,7 +288,7 @@ class VLBNonlocal(VLBBase):
                 ]
             )
 
-        return pde_rhs
+        return jax.checkpoint(pde_rhs)
 
     def _build_initial_state(self, perturbation: float = 0.01) -> jnp.ndarray:
         """Build initial state with small perturbation for symmetry breaking.
