@@ -159,14 +159,21 @@ class BayesianResult:
         }
 
     def clone(self) -> "BayesianResult":
-        """Create a deep copy of this Bayesian result."""
+        """Create a deep copy of this Bayesian result.
+
+        Large array data (posterior_samples, inference_data, summary) is
+        kept as a reference to avoid expensive deep-copies of JAX/NumPy
+        arrays and ArviZ InferenceData objects.  Small metadata dicts
+        (r_hat, ess, credible_intervals) are deep-copied for isolation.
+        """
         return replace(
             self,
             r_hat=copy.deepcopy(self.r_hat),
             ess=copy.deepcopy(self.ess),
             credible_intervals=copy.deepcopy(self.credible_intervals),
-            posterior_samples=self.posterior_samples,  # Keep reference
-            inference_data=self.inference_data,  # Keep reference
+            posterior_samples=self.posterior_samples,  # Large arrays — reference
+            inference_data=self.inference_data,  # ArviZ InferenceData — reference
+            summary=self.summary,  # Summary dict — reference (read-only)
         )
 
 
@@ -358,9 +365,12 @@ class StateStore:
         - dispatch({"type": "SET_THEME", "theme": "dark"})
         - dispatch("SET_THEME", {"theme": "dark"})
 
-        Note: Subscriber notifications and Qt signal emissions occur outside
-        the lock. Signal ordering is not guaranteed to be strictly sequential
-        with respect to concurrent dispatches.
+        Note: State mutation is atomic (protected by RLock), but subscriber
+        notifications and Qt signal emissions occur outside the lock.
+        Signal ordering is not guaranteed to be strictly sequential with
+        respect to concurrent dispatches.  Subscribers should read state
+        via ``get_state()`` rather than relying on signal arguments to
+        avoid observing stale values from interleaved dispatches.
 
         Parameters
         ----------
@@ -959,6 +969,26 @@ class StateStore:
 
             return updater
 
+        if action_type == "FITTING_COMPLETED":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.FIT] = StepStatus.COMPLETE
+                pipeline.current_step = PipelineStep.FIT
+                return replace(state, pipeline_state=pipeline)
+
+            return updater
+
+        if action_type == "BAYESIAN_COMPLETED":
+
+            def updater(state: AppState) -> AppState:
+                pipeline = state.pipeline_state.clone()
+                pipeline.steps[PipelineStep.BAYESIAN] = StepStatus.COMPLETE
+                pipeline.current_step = PipelineStep.BAYESIAN
+                return replace(state, pipeline_state=pipeline)
+
+            return updater
+
         if action_type == "FITTING_FAILED":
 
             def updater(state: AppState) -> AppState:
@@ -1069,6 +1099,7 @@ class StateStore:
                         num_warmup=int(getattr(result, "num_warmup", 0)),
                         num_samples=int(getattr(result, "num_samples", 0)),
                         num_chains=int(getattr(result, "num_chains", 4)),
+                        inference_data=getattr(result, "inference_data", None),
                     )
 
                 bayes = state.bayesian_results.copy()

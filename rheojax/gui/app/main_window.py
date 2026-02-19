@@ -1716,11 +1716,16 @@ class RheoJAXMainWindow(QMainWindow):
 
     @Slot()
     def _on_bayesian(self) -> None:
-        """Handle bayesian fit action."""
-        logger.debug("Bayesian action triggered")
-        self.log("Starting Bayesian inference...")
+        """Handle bayesian fit action from menu/shortcut.
+
+        Delegates to the BayesianPage's run mechanism which correctly
+        reads all GUI settings (warmup, samples, chains, warm-start,
+        deformation mode, Poisson ratio).
+        """
+        logger.debug("Bayesian action triggered (delegating to BayesianPage)")
         self.navigate_to("bayesian")
 
+        # Validate prerequisites before delegating
         dataset = self.store.get_active_dataset()
         model_name = self.store.get_state().active_model_name
         if dataset is None or model_name is None:
@@ -1729,41 +1734,9 @@ class RheoJAXMainWindow(QMainWindow):
             )
             return
 
-        try:
-            from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
-
-            rheo_data = rheodata_from_dataset_state(dataset)
-        except Exception as exc:
-            logger.error(
-                "Cannot start Bayesian: failed to build RheoData",
-                error=str(exc),
-                exc_info=True,
-            )
-            self.log(f"Cannot start Bayesian: {exc}")
-            self.status_bar.show_message("Unable to build dataset for Bayesian", 4000)
-            return
-
-        self.store.dispatch(
-            "SET_PIPELINE_STEP", {"step": "bayesian", "status": "ACTIVE"}
-        )
-        self.status_bar.show_progress(0, 0, "Running Bayesian inference...")
-
-        if not self.worker_pool:
-            self.status_bar.show_message("Worker pool unavailable", 3000)
-            self.store.dispatch("CANCEL_JOBS")
-            return
-
-        worker = BayesianWorker(model_name=model_name, data=rheo_data)
-        job_id = self.worker_pool.submit(
-            worker,
-            on_job_registered=lambda jid: self._job_types.__setitem__(jid, "bayesian"),
-        )
-        self._job_metadata[job_id] = {
-            "model_name": model_name,
-            "dataset_id": dataset.id,
-        }
-        logger.info("Bayesian job submitted", job_id=job_id, model_name=model_name)
-        self._on_job_started(job_id)
+        # Delegate to BayesianPage which handles warm-start, NUTS settings,
+        # deformation mode, Poisson ratio, and proper worker construction.
+        self.bayesian_page._on_run_clicked()
 
     @Slot()
     def _on_show_diagnostics(self) -> None:

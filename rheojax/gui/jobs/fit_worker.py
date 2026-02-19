@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from rheojax.gui.jobs._cleanup import cleanup_lock
+from rheojax.gui.jobs._cleanup import fit_cleanup_lock
 
 try:
     from rheojax.gui.compat import QObject, QRunnable, Signal
@@ -96,7 +96,7 @@ class FitWorkerSignals(QObject):
         Fitting was cancelled
     """
 
-    progress = Signal(int, float, str)  # iteration, loss, message
+    progress = Signal(int, int, str)  # percent, total, message
     completed = Signal(object)  # FitResult
     failed = Signal(str)  # error message
     cancelled = Signal()
@@ -299,7 +299,7 @@ class FitWorker(QRunnable):
             # Serialize cleanup across workers to avoid concurrent gc/JIT issues
             import gc
 
-            with cleanup_lock:
+            with fit_cleanup_lock:
                 gc.collect()
                 try:
                     jax.clear_caches()

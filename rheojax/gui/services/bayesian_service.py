@@ -295,6 +295,10 @@ class BayesianService:
     def get_diagnostics(self, result: BayesianResult | Any) -> dict[str, Any]:
         """Calculate MCMC diagnostics using ArviZ.
 
+        If the core BayesianResult already contains validated diagnostics
+        (diagnostics_valid=True), those are reused to avoid redundant
+        ArviZ computation.
+
         Parameters
         ----------
         result : BayesianResult or MCMC result
@@ -306,6 +310,25 @@ class BayesianService:
             Diagnostics including R-hat, ESS, divergences
         """
         logger.debug("Entering get_diagnostics")
+
+        # Reuse validated core diagnostics when available
+        core_diag = getattr(result, "diagnostics", None)
+        if isinstance(core_diag, dict) and core_diag.get("diagnostics_valid"):
+            logger.debug("Reusing validated core diagnostics")
+            r_hat = core_diag.get("r_hat", {})
+            ess = core_diag.get("ess", {})
+            divergences = int(core_diag.get("divergences", 0))
+            return {
+                "rhat": r_hat,
+                "r_hat": r_hat,
+                "ess": ess,
+                "divergences": divergences,
+                "max_rhat": max(r_hat.values()) if r_hat else None,
+                "max_r_hat": max(r_hat.values()) if r_hat else None,
+                "min_ess": min(ess.values()) if ess else None,
+                "warnings": [],
+            }
+
         try:
             import arviz as az
 

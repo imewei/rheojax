@@ -6,6 +6,8 @@ Usage:
     rheojax <command> [options]
 
 Commands:
+    fit       - NLSQ model fitting
+    bayesian  - Bayesian inference (NUTS sampling)
     spp       - SPP (Sequence of Physical Processes) analysis
     info      - Display package information
     inventory - List available models and transforms
@@ -33,11 +35,15 @@ def create_main_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Commands:
+  fit       NLSQ model fitting
+  bayesian  Bayesian inference (NUTS sampling)
   spp       SPP (Sequence of Physical Processes) analysis for LAOS data
   info      Display package version and configuration info
   inventory List available models and transforms with protocol support
 
 Examples:
+  rheojax fit data.csv --model maxwell --x-col time --y-col G_t
+  rheojax bayesian data.csv --model maxwell --x-col time --y-col G_t --warm-start
   rheojax spp analyze data.csv --omega 1.0 --gamma-0 0.5
   rheojax spp batch data_dir/ --omega 1.0
   rheojax info
@@ -56,6 +62,20 @@ For command-specific help:
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Fit subcommand
+    subparsers.add_parser(
+        "fit",
+        help="NLSQ model fitting",
+        add_help=False,  # Let the fit module handle help
+    )
+
+    # Bayesian subcommand
+    subparsers.add_parser(
+        "bayesian",
+        help="Bayesian inference (NUTS sampling)",
+        add_help=False,  # Let the bayesian module handle help
+    )
 
     # SPP subcommand
     subparsers.add_parser(
@@ -256,7 +276,19 @@ def main(args: list[str] | None = None) -> int:
     command = args[0]
     logger.debug("Dispatching to subcommand", command=command, subargs=args[1:])
 
-    if command == "spp":
+    if command == "fit":
+        logger.info("Running CLI command", command="fit")
+        from rheojax.cli.fit import main as fit_main
+
+        return fit_main(args[1:])
+
+    elif command == "bayesian":
+        logger.info("Running CLI command", command="bayesian")
+        from rheojax.cli.bayesian import main as bayesian_main
+
+        return bayesian_main(args[1:])
+
+    elif command == "spp":
         logger.info("Running CLI command", command="spp")
         from rheojax.cli.spp import main as spp_main
 

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from rheojax.gui.jobs._cleanup import cleanup_lock
+from rheojax.gui.jobs._cleanup import bayesian_cleanup_lock
 
 try:
     from rheojax.gui.compat import QObject, QRunnable, Signal
@@ -354,6 +354,13 @@ class BayesianWorker(QRunnable):
                 mcmc_kwargs["deformation_mode"] = self._deformation_mode
             if self._poisson_ratio is not None:
                 mcmc_kwargs["poisson_ratio"] = self._poisson_ratio
+
+            # Emit indeterminate progress during NUTS sampling.
+            # NumPyro NUTS does not support progress callbacks, so we
+            # signal an indeterminate state (current=0, total=0) with
+            # a descriptive message to keep the UI responsive.
+            self.signals.progress.emit(0, 0, "NUTS sampling in progress...")
+
             bayesian_result = svc.run_mcmc(
                 self._model_name,
                 self._data,
@@ -368,8 +375,9 @@ class BayesianWorker(QRunnable):
 
             sampling_time = time.perf_counter() - start_time
 
-            # Emit sampling stage (in case callback wasn't called)
+            # Emit sampling stage and 100% progress on completion
             self.signals.stage_changed.emit("sampling")
+            self.signals.progress.emit(100, 100, "Sampling complete")
 
             # Extract diagnostics
             diagnostics = bayesian_result.diagnostics
@@ -465,7 +473,7 @@ class BayesianWorker(QRunnable):
             # Serialize cleanup across workers to avoid concurrent gc/JIT issues
             import gc
 
-            with cleanup_lock:
+            with bayesian_cleanup_lock:
                 gc.collect()
                 try:
                     jax.clear_caches()

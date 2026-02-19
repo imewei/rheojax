@@ -471,10 +471,19 @@ class WorkerPool(QObject):
         if job_id:
             self._on_job_completed(job_id, result)
         else:
-            logger.error(
-                "Worker completed but job_id lookup failed (sender=%s). Result lost.",
-                self.sender(),
-            )
+            # Fallback: try to find job_id from worker attribute
+            job_id = self._job_id_from_result_fallback()
+            if job_id:
+                self._on_job_completed(job_id, result)
+            else:
+                logger.error(
+                    "Worker completed but job_id lookup failed (sender=%s). "
+                    "Emitting with synthetic job_id to avoid silent loss.",
+                    self.sender(),
+                )
+                # Emit with empty job_id so downstream handlers can still
+                # process the result rather than silently dropping it.
+                self.job_completed.emit("", result)
 
     @Slot(str)
     def _on_worker_failed(self, error_message: str) -> None:
@@ -482,18 +491,39 @@ class WorkerPool(QObject):
         if job_id:
             self._on_job_failed(job_id, error_message)
         else:
-            logger.error(
-                "Worker failed but job_id lookup failed (sender=%s). Error: %s",
-                self.sender(),
-                error_message,
-            )
+            job_id = self._job_id_from_result_fallback()
+            if job_id:
+                self._on_job_failed(job_id, error_message)
+            else:
+                logger.error(
+                    "Worker failed but job_id lookup failed (sender=%s). Error: %s",
+                    self.sender(),
+                    error_message,
+                )
+                self.job_failed.emit("", error_message)
 
     @Slot()
     def _on_worker_cancelled(self) -> None:
         job_id = self._job_id_from_sender()
         if job_id:
             self._on_job_cancelled(job_id)
+        else:
+            job_id = self._job_id_from_result_fallback()
+            if job_id:
+                self._on_job_cancelled(job_id)
 
+    def _job_id_from_result_fallback(self) -> str | None:
+        """Fallback job_id lookup when sender() fails.
+
+        Checks if there is exactly one active job, and returns its id.
+        This handles the common case of a single concurrent job.
+        """
+        with self._job_lock:
+            if len(self._active_jobs) == 1:
+                return next(iter(self._active_jobs))
+        return None
+
+    @Slot(int, int, str)
     def _on_worker_progress(self, *args: object) -> None:
         """Normalize worker progress signals and route them by sender.
 
