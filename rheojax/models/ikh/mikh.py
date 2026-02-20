@@ -323,7 +323,7 @@ class MIKH(IKHBase):
             G_double_prime = G * wt / (1 + wt**2)
 
             # Complex modulus magnitude
-            G_star_magnitude = jnp.sqrt(G_prime**2 + G_double_prime**2)
+            G_star_magnitude = jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
 
             return G_star_magnitude - target_magnitude
 
@@ -589,7 +589,7 @@ class MIKH(IKHBase):
             G_double_prime = G * wt / (1 + wt**2)
 
             # Return complex modulus magnitude
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
 
         else:
             # startup/laos modes need strain computed from kwargs

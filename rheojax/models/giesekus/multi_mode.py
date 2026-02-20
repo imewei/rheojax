@@ -517,7 +517,7 @@ class GiesekusMultiMode(BaseModel):
         if return_components:
             return np.asarray(G_prime), np.asarray(G_double_prime)
 
-        G_star_mag = jnp.sqrt(G_prime**2 + G_double_prime**2)
+        G_star_mag = jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
         return np.asarray(G_star_mag)
 
     def _predict_flow_curve_internal(

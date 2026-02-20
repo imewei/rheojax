@@ -472,7 +472,7 @@ class VLBMultiNetwork(VLBBase):
             G_prime, G_double_prime = vlb_multi_saos_vec(
                 X_jax, G_modes, kd_modes, G_e, eta_s
             )
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
 
         elif mode == "startup":
             if gamma_dot is None:

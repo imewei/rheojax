@@ -895,6 +895,16 @@ def _solve_hvnm_ode(
     return sol
 
 
+def _mask_failed_solution_ys(sol) -> jnp.ndarray:
+    """Extract sol.ys, masking with NaN if the solver failed.
+
+    diffrax throw=False returns garbage ys when the solver hits max_steps
+    or diverges. sol.result == 0 means success; nonzero means failure.
+    """
+    failed = sol.result != 0
+    return jnp.where(failed, jnp.nan, sol.ys)
+
+
 # =============================================================================
 # Public Solver Functions
 # =============================================================================

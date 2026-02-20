@@ -512,7 +512,7 @@ class VLBVariant(VLBBase):
             G_prime, G_double_prime = vlb_saos_moduli_vec(X_jax, G0, k_d_0)
             # Add solvent contribution
             G_double_prime = G_double_prime + eta_s * X_jax
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
 
         elif mode == "startup":
             if gamma_dot is None:

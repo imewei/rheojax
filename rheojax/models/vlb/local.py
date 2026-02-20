@@ -401,7 +401,7 @@ class VLBLocal(VLBBase):
 
         elif mode == "oscillation":
             G_prime, G_double_prime = vlb_saos_moduli_vec(X_jax, G0, k_d)
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
 
         elif mode == "startup":
             if gamma_dot is None:
@@ -552,7 +552,7 @@ class VLBLocal(VLBBase):
         G_prime, G_double_prime = vlb_saos_moduli_vec(w, self.G0, self.k_d)
         if return_components:
             return np.asarray(G_prime), np.asarray(G_double_prime)
-        G_star = jnp.sqrt(G_prime**2 + G_double_prime**2)
+        G_star = jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
         return np.asarray(G_star)
 
     def predict_normal_stresses(

@@ -642,8 +642,9 @@ class TestFitting:
     """Tests for model fitting."""
 
     @pytest.mark.smoke
-    @pytest.mark.skip(
-        reason="NLSQ forward-mode AD incompatible with diffrax custom_vjp"
+    @pytest.mark.xfail(
+        reason="NLSQ forward-mode AD incompatible with diffrax custom_vjp",
+        run=False,
     )
     def test_fit_flow_curve(self):
         """Test fitting to flow curve data.

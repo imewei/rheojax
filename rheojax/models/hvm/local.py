@@ -243,7 +243,7 @@ class HVMLocal(HVMBase):
 
         if return_components:
             return np.asarray(G_prime), np.asarray(G_double_prime)
-        return np.asarray(jnp.sqrt(G_prime**2 + G_double_prime**2))
+        return np.asarray(jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30)))
 
     # =========================================================================
     # Startup Shear
@@ -835,7 +835,7 @@ class HVMLocal(HVMBase):
             G_prime, G_double_prime = hvm_saos_moduli_vec(
                 X_jax, G_P, G_E, G_D, k_ber_0, k_d_D
             )
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
 
         elif mode == "startup":
             if gamma_dot is None:
@@ -881,6 +881,9 @@ class HVMLocal(HVMBase):
                 include_damage=False,
                 include_dissociative=self._include_dissociative,
             )
+            # Mask failed ODE solutions with NaN so Bayesian NaN guard rejects them
+            from rheojax.models.hvm._kernels_diffrax import _mask_failed_solution_ys
+            ys = _mask_failed_solution_ys(sol)
             stress = jax.vmap(
                 lambda y: hvm_total_stress_shear(
                     y[9],
@@ -892,7 +895,7 @@ class HVMLocal(HVMBase):
                     G_D,
                     y[10],
                 )
-            )(sol.ys)
+            )(ys)
             return stress
 
         else:

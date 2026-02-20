@@ -613,6 +613,17 @@ def _solve_hvm_ode(
     return sol
 
 
+def _mask_failed_solution_ys(sol: diffrax.Solution) -> jnp.ndarray:
+    """Extract sol.ys, masking with NaN if the solver failed.
+
+    diffrax throw=False returns garbage ys when the solver hits max_steps
+    or diverges. sol.result == 0 means success; nonzero means failure.
+    The BayesianMixin NaN guard then rejects these parameter regions.
+    """
+    failed = sol.result != 0
+    return jnp.where(failed, jnp.nan, sol.ys)
+
+
 # =============================================================================
 # Public Solver Functions
 # =============================================================================

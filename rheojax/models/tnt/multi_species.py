@@ -536,7 +536,7 @@ class TNTMultiSpecies(TNTBase):
             G_prime, G_double_prime = tnt_multimode_saos_moduli_vec(
                 X_jax, G_modes, tau_modes, eta_s
             )
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
 
         elif mode == "startup":
             if gamma_dot is None:
@@ -680,7 +680,7 @@ class TNTMultiSpecies(TNTBase):
         if return_components:
             return np.asarray(G_prime), np.asarray(G_double_prime)
 
-        G_star_mag = jnp.sqrt(G_prime**2 + G_double_prime**2)
+        G_star_mag = jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
         return np.asarray(G_star_mag)
 
     def predict_normal_stresses(

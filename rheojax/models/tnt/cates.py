@@ -245,7 +245,7 @@ class TNTCates(TNTBase):
     @property
     def tau_d(self) -> float:
         """Get effective relaxation time τ_d = √(τ_rep · τ_break) (s)."""
-        return float(jnp.sqrt(self.tau_rep * self.tau_break))
+        return float(jnp.sqrt(jnp.maximum(self.tau_rep * self.tau_break, 1e-30)))
 
     @property
     def eta_0(self) -> float:
@@ -394,7 +394,7 @@ class TNTCates(TNTBase):
         eta_s = params[3]
 
         # Compute effective relaxation time
-        tau_d = jnp.sqrt(tau_rep * tau_break)
+        tau_d = jnp.sqrt(jnp.maximum(tau_rep * tau_break, 1e-30))
 
         mode = test_mode or self._test_mode or "flow_curve"
         # Extract protocol parameters from kwargs or fall back to instance attributes
@@ -412,7 +412,7 @@ class TNTCates(TNTBase):
         elif mode == "oscillation":
             # SAOS with effective τ_d
             G_prime, G_double_prime = tnt_saos_moduli_vec(X_jax, G_0, tau_d, eta_s)
-            return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
 
         elif mode == "startup":
             if gamma_dot is None:
@@ -517,7 +517,7 @@ class TNTCates(TNTBase):
         if return_components:
             return np.asarray(G_prime), np.asarray(G_double_prime)
 
-        G_star_mag = jnp.sqrt(G_prime**2 + G_double_prime**2)
+        G_star_mag = jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
         return np.asarray(G_star_mag)
 
     def predict_normal_stresses(

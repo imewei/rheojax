@@ -576,7 +576,7 @@ def tnt_cates_effective_tau(tau_rep: float, tau_break: float) -> float:
     float
         Effective relaxation time τ_d (s)
     """
-    return jnp.sqrt(tau_rep * tau_break)
+    return jnp.sqrt(jnp.maximum(tau_rep * tau_break, 1e-30))
 
 
 # =============================================================================

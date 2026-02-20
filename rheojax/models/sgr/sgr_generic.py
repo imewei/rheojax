@@ -914,6 +914,9 @@ class SGRGeneric(BaseModel):
         gamma_dot = kwargs.get("gamma_dot", 1.0)
         is_stress = kwargs.get("is_stress", False)
 
+        # Store gamma_dot for prediction
+        self._startup_gamma_dot = gamma_dot
+
         if is_stress:
             eta_plus_data = eta_plus / gamma_dot
         else:
@@ -1414,6 +1417,10 @@ class SGRGeneric(BaseModel):
             return self._predict_relaxation(X)
         elif test_mode in ("steady_shear", "flow_curve"):
             return self._predict_steady_shear(X)
+        elif test_mode == "creep":
+            return self._predict_creep(X)
+        elif test_mode == "startup":
+            return self._predict_startup(X)
         else:
             raise ValueError(f"Unknown test_mode: {test_mode}")
 
@@ -1471,6 +1478,25 @@ class SGRGeneric(BaseModel):
 
         return np.array(eta_jax)
 
+    def _predict_creep(self, t: np.ndarray) -> np.ndarray:
+        """Predict creep compliance J(t)."""
+        x = self.parameters.get_value("x")
+        G0_scale = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
+        t_jax = jnp.asarray(t)
+        J_t_jax = self._predict_creep_jit(t_jax, x, G0_scale, tau0)
+        return np.array(J_t_jax)
+
+    def _predict_startup(self, t: np.ndarray) -> np.ndarray:
+        """Predict startup stress growth coefficient eta_plus(t)."""
+        x = self.parameters.get_value("x")
+        G0_scale = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
+        gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+        t_jax = jnp.asarray(t)
+        eta_plus_jax = self._predict_startup_jit(t_jax, x, G0_scale, tau0, gamma_dot)
+        return np.array(eta_plus_jax)
+
     def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference with NumPyro NUTS.
 
@@ -1501,6 +1527,18 @@ class SGRGeneric(BaseModel):
             return self._predict_relaxation_jit(X_jax, x, G0_scale, tau0)
         elif mode in ("steady_shear", "flow_curve"):
             return self._predict_steady_shear_jit(X_jax, x, G0_scale, tau0)
+        elif mode == "creep":
+            return self._predict_creep_jit(X_jax, x, G0_scale, tau0)
+        elif mode == "startup":
+            # Priority: explicit kwarg > _last_fit_kwargs > instance attr > default
+            # This prevents stale closure capture in JIT/NUTS contexts.
+            gamma_dot = kwargs.get("gamma_dot")
+            if gamma_dot is None:
+                last_kwargs = getattr(self, "_last_fit_kwargs", {}) or {}
+                gamma_dot = last_kwargs.get("gamma_dot")
+            if gamma_dot is None:
+                gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+            return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
         else:
             raise ValueError(f"Unsupported test mode: {mode}")
 
@@ -2382,21 +2420,22 @@ class SGRGeneric(BaseModel):
                 f"t.shape={t.shape}, gamma_dot.shape={gamma_dot.shape}"
             )
 
-        # Get parameters
+        # Get parameters (raise ValueError instead of bare assert per P2-4)
         x_eq = self.parameters.get_value("x_eq")
         alpha_aging = self.parameters.get_value("alpha_aging")
         beta_rejuv = self.parameters.get_value("beta_rejuv")
         x_ss_A = self.parameters.get_value("x_ss_A")
         x_ss_n = self.parameters.get_value("x_ss_n")
-        assert x_eq is not None
-        assert alpha_aging is not None
-        assert beta_rejuv is not None
-        assert x_ss_A is not None
-        assert x_ss_n is not None
+        for _name, _val in [("x_eq", x_eq), ("alpha_aging", alpha_aging),
+                             ("beta_rejuv", beta_rejuv), ("x_ss_A", x_ss_A),
+                             ("x_ss_n", x_ss_n)]:
+            if _val is None:
+                raise ValueError(f"Parameter '{_name}' is None — set it before calling evolve_x().")
 
         if x0 is None:
             x0 = self.parameters.get_value("x")
-        assert x0 is not None
+        if x0 is None:
+            raise ValueError("Initial x0 is None — provide x0 or set the 'x' parameter.")
 
         # Integrate using Euler method
         dt = np.diff(t)
