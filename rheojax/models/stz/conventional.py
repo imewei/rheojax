@@ -784,20 +784,24 @@ class STZConventional(STZBase):
                 p_values.get("ez", 1.0),
             )
         elif mode in ["startup", "relaxation", "creep"]:
+            gamma_dot = kwargs.get("gamma_dot", getattr(self, "_gamma_dot_applied", 1.0))
+            sigma = kwargs.get("sigma", kwargs.get("sigma_applied", getattr(self, "_sigma_applied", 0.0)))
             return self._simulate_transient_jit(
                 X_jax,
                 p_values,
                 mode,
-                self._gamma_dot_applied,
-                self._sigma_applied,
+                gamma_dot,
+                sigma,
                 None,
                 self.variant,
             )
         elif mode == "laos":
-            if self._gamma_0 is None or self._omega_laos is None:
+            gamma_0 = kwargs.get("gamma_0", getattr(self, "_gamma_0", None))
+            omega_laos = kwargs.get("omega", kwargs.get("omega_laos", getattr(self, "_omega_laos", None)))
+            if gamma_0 is None or omega_laos is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
-                X_jax, p_values, self._gamma_0, self._omega_laos, self.variant
+                X_jax, p_values, gamma_0, omega_laos, self.variant
             )
             return stress
 

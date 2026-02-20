@@ -620,7 +620,7 @@ def _mask_failed_solution_ys(sol: diffrax.Solution) -> jnp.ndarray:
     or diverges. sol.result == 0 means success; nonzero means failure.
     The BayesianMixin NaN guard then rejects these parameter regions.
     """
-    failed = sol.result != 0
+    failed = sol.result != diffrax.RESULTS.successful
     return jnp.where(failed, jnp.nan, sol.ys)
 
 

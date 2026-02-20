@@ -1129,6 +1129,8 @@ class HVNMLocal(HVNMBase):
         elif mode == "laos":
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
+            # Extract time from (2, N) stacked [time, strain] input
+            t_arr = X_jax[0] if X_jax.ndim == 2 else X_jax
             params_dict = {
                 "G_P": G_P,
                 "G_E": G_E,
@@ -1153,7 +1155,7 @@ class HVNMLocal(HVNMBase):
                 "n_h": 1.0,
             }
             sol = hvnm_solve_laos(
-                X_jax,
+                t_arr,
                 gamma_0,
                 omega,
                 params_dict,

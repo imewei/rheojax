@@ -1193,7 +1193,7 @@ class ITTMCTSchematic(ITTMCTBase):
         self,
         X: np.ndarray,
         params: np.ndarray,
-        test_mode: str = "flow_curve",
+        test_mode: str = None,
         **kwargs,
     ) -> np.ndarray:
         """Static model function for Bayesian inference.
@@ -1210,7 +1210,7 @@ class ITTMCTSchematic(ITTMCTBase):
             Independent variable
         params : np.ndarray
             Parameter array [v1, v2, Gamma, gamma_c, G_inf] in parameter order
-        test_mode : str, default "flow_curve"
+        test_mode : str, optional
             Protocol type
         **kwargs
             Additional protocol-specific parameters

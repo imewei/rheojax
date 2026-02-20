@@ -859,6 +859,8 @@ class HVMLocal(HVMBase):
         elif mode == "laos":
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
+            # Extract time from (2, N) stacked [time, strain] input
+            t_arr = X_jax[0] if X_jax.ndim == 2 else X_jax
             # Use ODE solver for LAOS (cannot use analytical)
             params_dict = {
                 "G_P": G_P,
@@ -873,7 +875,7 @@ class HVMLocal(HVMBase):
                 "lambda_crit": 10.0,
             }
             sol = hvm_solve_laos(
-                X_jax,
+                t_arr,
                 gamma_0,
                 omega,
                 params_dict,

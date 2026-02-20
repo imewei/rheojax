@@ -1636,13 +1636,13 @@ class GeneralizedMaxwell(BaseModel):
         elif test_mode == "steady_shear":
             return self._predict_steady_shear_jit(E_inf, E_i, tau_i)
         elif test_mode == "startup":
-            gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+            gamma_dot = kwargs.get("gamma_dot", getattr(self, "_startup_gamma_dot", 1.0))
             return self._predict_startup_jit(
                 jnp.asarray(X), E_inf, E_i, tau_i, gamma_dot
             )
         elif test_mode == "laos":
-            omega = getattr(self, "_laos_omega", 1.0)
-            gamma_0 = getattr(self, "_laos_gamma_0", 0.01)
+            omega = kwargs.get("omega", getattr(self, "_laos_omega", 1.0))
+            gamma_0 = kwargs.get("gamma_0", getattr(self, "_laos_gamma_0", 0.01))
             return self._predict_laos_jit(
                 jnp.asarray(X), E_inf, E_i, tau_i, omega, gamma_0
             )

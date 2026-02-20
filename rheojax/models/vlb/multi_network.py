@@ -741,7 +741,7 @@ class VLBMultiNetwork(VLBBase):
         G_p, G_pp = vlb_multi_saos_vec(w, G_modes, kd_modes, self.G_e, self.eta_s)
         if return_components:
             return np.asarray(G_p), np.asarray(G_pp)
-        return np.asarray(jnp.sqrt(G_p**2 + G_pp**2))
+        return np.asarray(jnp.sqrt(G_p**2 + G_pp**2 + 1e-30))
 
     def get_relaxation_spectrum(self) -> list[tuple[float, float]]:
         """Get relaxation spectrum as list of (G, tau) pairs.

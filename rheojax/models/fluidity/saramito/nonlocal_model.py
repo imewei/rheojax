@@ -500,7 +500,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
 
         args = self._get_nonlocal_pde_args(params)
         args["sigma_applied"] = sigma_applied
-        args["mode"] = "stress_controlled"
+        args["mode"] = 1  # stress_controlled (must be numeric for JAX tracing)
         args["gamma_dot"] = 0.0  # Will be computed internally
 
         # Initial conditions

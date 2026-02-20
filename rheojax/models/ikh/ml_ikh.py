@@ -27,6 +27,10 @@ from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
 from rheojax.models.ikh._base import IKHBase
 from rheojax.models.ikh._kernels import (
+    make_ml_ikh_creep_ode_rhs_per_mode,
+    make_ml_ikh_creep_ode_rhs_weighted_sum,
+    make_ml_ikh_maxwell_ode_rhs_per_mode,
+    make_ml_ikh_maxwell_ode_rhs_weighted_sum,
     ml_ikh_creep_ode_rhs_per_mode,
     ml_ikh_creep_ode_rhs_weighted_sum,
     ml_ikh_flow_curve_steady_state_per_mode,
@@ -428,7 +432,7 @@ class MLIKH(IKHBase):
         if self._yield_mode == "per_mode":
             if mode == "creep":
                 # State: [γ, α_1..α_N, λ_1..λ_N] (1+2N)
-                ode_fn = ml_ikh_creep_ode_rhs_per_mode
+                ode_fn = make_ml_ikh_creep_ode_rhs_per_mode(n)
                 args["sigma_applied"] = (
                     sigma_applied if sigma_applied is not None else 100.0
                 )
@@ -441,7 +445,7 @@ class MLIKH(IKHBase):
                 )
             elif mode == "startup":
                 # State: [σ_1..σ_N, α_1..α_N, λ_1..λ_N] (3N)
-                ode_fn = ml_ikh_maxwell_ode_rhs_per_mode
+                ode_fn = make_ml_ikh_maxwell_ode_rhs_per_mode(n)
                 args["gamma_dot"] = gamma_dot if gamma_dot is not None else 1.0
                 y0 = jnp.concatenate(
                     [
@@ -451,7 +455,7 @@ class MLIKH(IKHBase):
                     ]
                 )
             else:  # relaxation
-                ode_fn = ml_ikh_maxwell_ode_rhs_per_mode
+                ode_fn = make_ml_ikh_maxwell_ode_rhs_per_mode(n)
                 args["gamma_dot"] = 0.0
                 # Initial stress distributed across modes
                 sigma_init = (
@@ -470,7 +474,7 @@ class MLIKH(IKHBase):
         else:  # weighted_sum
             if mode == "creep":
                 # State: [γ, α, λ_1..λ_N] (2+N)
-                ode_fn = ml_ikh_creep_ode_rhs_weighted_sum
+                ode_fn = make_ml_ikh_creep_ode_rhs_weighted_sum(n)
                 args["sigma_applied"] = (
                     sigma_applied if sigma_applied is not None else 100.0
                 )
@@ -482,7 +486,7 @@ class MLIKH(IKHBase):
                 )
             elif mode == "startup":
                 # State: [σ, α, λ_1..λ_N] (2+N)
-                ode_fn = ml_ikh_maxwell_ode_rhs_weighted_sum
+                ode_fn = make_ml_ikh_maxwell_ode_rhs_weighted_sum(n)
                 args["gamma_dot"] = gamma_dot if gamma_dot is not None else 1.0
                 y0 = jnp.concatenate(
                     [
@@ -491,7 +495,7 @@ class MLIKH(IKHBase):
                     ]
                 )
             else:  # relaxation
-                ode_fn = ml_ikh_maxwell_ode_rhs_weighted_sum
+                ode_fn = make_ml_ikh_maxwell_ode_rhs_weighted_sum(n)
                 args["gamma_dot"] = 0.0
                 sigma_init = (
                     sigma_0 if sigma_0 is not None else (args["sigma_y0"] + args["k3"])
@@ -741,7 +745,7 @@ class MLIKH(IKHBase):
                 G_prime_total = G * wt**2 / (1 + wt**2)
                 G_double_prime_total = G * wt / (1 + wt**2)
 
-            G_star_magnitude = jnp.sqrt(G_prime_total**2 + G_double_prime_total**2)
+            G_star_magnitude = jnp.sqrt(G_prime_total**2 + G_double_prime_total**2 + 1e-30)
 
             return G_star_magnitude - target_magnitude
 
@@ -818,7 +822,7 @@ class MLIKH(IKHBase):
                 G_prime_total = G * wt**2 / (1 + wt**2)
                 G_double_prime_total = G * wt / (1 + wt**2)
 
-            return jnp.sqrt(G_prime_total**2 + G_double_prime_total**2)
+            return jnp.sqrt(G_prime_total**2 + G_double_prime_total**2 + 1e-30)
         else:  # startup, laos
             # startup/laos modes need strain computed from kwargs
             times, strains = self._extract_time_strain(X, **kwargs)

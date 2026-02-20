@@ -642,16 +642,8 @@ class TestFitting:
     """Tests for model fitting."""
 
     @pytest.mark.smoke
-    @pytest.mark.xfail(
-        reason="NLSQ forward-mode AD incompatible with diffrax custom_vjp",
-        run=False,
-    )
     def test_fit_flow_curve(self):
-        """Test fitting to flow curve data.
-
-        Note: TNTLoopBridge uses ODE-based flow curve which involves
-        diffrax custom_vjp, incompatible with NLSQ's forward-mode AD.
-        """
+        """Test fitting to flow curve data via scipy (NLSQ AD incompatible with diffrax)."""
         model_true = TNTLoopBridge()
         model_true.parameters.set_value("G", 1500.0)
         model_true.parameters.set_value("tau_b", 0.5)
@@ -667,7 +659,9 @@ class TestFitting:
         sigma_noisy = sigma_true * (1 + 0.02 * np.random.randn(len(sigma_true)))
 
         model_fit = TNTLoopBridge()
-        model_fit.fit(gamma_dot, sigma_noisy, test_mode="flow_curve")
+        model_fit.fit(
+            gamma_dot, sigma_noisy, test_mode="flow_curve", method="scipy"
+        )
 
         sigma_pred = model_fit.predict(gamma_dot, test_mode="flow_curve")
         r2 = 1 - np.sum((sigma_noisy - sigma_pred) ** 2) / np.sum(

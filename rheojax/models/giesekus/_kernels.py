@@ -544,7 +544,7 @@ def giesekus_complex_viscosity(
     G_prime, G_double_prime = giesekus_saos_moduli(omega, eta_p, lambda_1, eta_s)
 
     # |η*| = |G*|/ω = sqrt(G'² + G''²)/ω
-    G_star_mag = jnp.sqrt(G_prime * G_prime + G_double_prime * G_double_prime)
+    G_star_mag = jnp.sqrt(G_prime * G_prime + G_double_prime * G_double_prime + 1e-30)
     eta_star_mag = G_star_mag / omega
 
     # Phase angle: tan(δ) = G''/G'
