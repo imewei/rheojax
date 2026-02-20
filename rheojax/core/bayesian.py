@@ -333,19 +333,29 @@ class BayesianMixin:
         logger.debug("Bayesian requirements validated successfully")
 
     def _validate_parameter_bounds(self) -> None:
-        """Validate that all parameter bounds are valid (lower < upper)."""
+        """Validate that all parameter bounds are valid.
+
+        Parameters with equal lower and upper bounds (``bounds[0] == bounds[1]``)
+        are treated as **fixed** and silently skipped — they won't be sampled by
+        NUTS.  Only bounds where lower > upper are invalid.
+        """
         logger.debug("Validating parameter bounds")
         for name in self.parameters.keys():
             param = self.parameters.get(name)
             if param is None:
                 continue
             bounds = getattr(param, "bounds", None)
-            if (
-                bounds is not None
-                and bounds[0] is not None
-                and bounds[1] is not None
-                and bounds[0] >= bounds[1]
-            ):
+            if bounds is None or bounds[0] is None or bounds[1] is None:
+                continue
+            # Equal bounds → fixed parameter, skip (not sampled by NUTS)
+            if bounds[0] == bounds[1]:
+                logger.debug(
+                    "Parameter has equal bounds (fixed), skipping",
+                    parameter=name,
+                    value=bounds[0],
+                )
+                continue
+            if bounds[0] > bounds[1]:
                 logger.error(
                     "Invalid parameter bounds",
                     parameter=name,
@@ -353,7 +363,7 @@ class BayesianMixin:
                 )
                 raise ValueError(
                     f"Invalid bounds for parameter '{name}': {bounds}. "
-                    "Lower bound must be strictly less than upper bound."
+                    "Lower bound must be less than or equal to upper bound."
                 )
         logger.debug("Parameter bounds validated successfully")
 

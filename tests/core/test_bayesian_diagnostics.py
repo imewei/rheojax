@@ -68,7 +68,8 @@ class TestDiagnosticReshape:
         y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 50)
 
         result = model.fit_bayesian(
-            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42
+            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
 
         # Diagnostics should exist and be computed (not fallback)
@@ -115,7 +116,8 @@ class TestDiagnosticReshape:
         y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 50)
 
         result = model.fit_bayesian(
-            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42
+            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
         assert "diagnostics_valid" in result.diagnostics
 
@@ -137,7 +139,8 @@ class TestNaNGuard:
 
         # Should not crash — NaN regions rejected by penalty
         result = model.fit_bayesian(
-            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42
+            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
         assert result is not None
         assert len(result.posterior_samples["a"]) == 100
@@ -150,7 +153,8 @@ class TestNaNGuard:
         y = 2.0 * X + np.random.default_rng(42).normal(0, 0.1, 30)
 
         result = model.fit_bayesian(
-            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42
+            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
         # num_nonfinite should be tracked (may be in extra fields or samples)
         # The key thing is the model didn't crash and produced valid posteriors
@@ -233,7 +237,8 @@ class TestDivergenceReporting:
         y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 50)
 
         result = model.fit_bayesian(
-            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42
+            X, y, num_warmup=50, num_samples=100, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
 
         # Divergences should be a non-negative integer (actual count)
@@ -362,7 +367,8 @@ class TestArviZLogLikelihood:
         y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 30)
 
         result = model.fit_bayesian(
-            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42
+            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
         idata = result.to_inference_data()  # default: log_likelihood=False
         assert idata is not None
@@ -377,7 +383,8 @@ class TestArviZLogLikelihood:
         y = 2.0 * X + 1.0 + np.random.default_rng(42).normal(0, 0.1, 30)
 
         result = model.fit_bayesian(
-            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42
+            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
         idata_no_ll = result.to_inference_data(log_likelihood=False)
         idata_ll = result.to_inference_data(log_likelihood=True)
@@ -409,7 +416,8 @@ class TestWarmStartNutsTuning:
         model.fitted_ = True
 
         result = model.fit_bayesian(
-            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42
+            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
         # Should complete without error (verifying the lower accept prob is used)
         assert result is not None
@@ -433,6 +441,7 @@ class TestWarmStartNutsTuning:
             num_chains=1,
             seed=42,
             target_accept_prob=0.99,
+            test_mode="relaxation",
         )
         assert result is not None
 
@@ -447,9 +456,7 @@ class TestWarmStartNutsTuning:
         assert not hasattr(model, "fitted_") or not model.fitted_
 
         result = model.fit_bayesian(
-            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42
+            X, y, num_warmup=20, num_samples=50, num_chains=1, seed=42,
+            test_mode="relaxation",
         )
         assert result is not None
-
-
-pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")

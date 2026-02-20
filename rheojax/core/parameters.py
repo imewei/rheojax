@@ -913,7 +913,10 @@ class ParameterSet:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ParameterSet:
-        """Create from dictionary representation."""
+        """Create from dictionary representation.
+
+        Uses Parameter.from_dict() to preserve constraints (not just bounds).
+        """
         if logger.isEnabledFor(10):  # logging.DEBUG == 10
             logger.debug(
                 "Creating ParameterSet from dict",
@@ -923,17 +926,11 @@ class ParameterSet:
         params = cls()
         for name, param_data in data.items():
             if isinstance(param_data, dict):
-                params.add(
-                    name=name,
-                    value=param_data.get("value"),
-                    bounds=(
-                        tuple(param_data["bounds"])
-                        if param_data.get("bounds")
-                        else None
-                    ),
-                    units=param_data.get("units"),
-                    description=param_data.get("description"),
-                )
+                # Ensure name is in param_data for Parameter.from_dict
+                param_data_with_name = {**param_data, "name": name}
+                param = Parameter.from_dict(param_data_with_name)
+                params._parameters[name] = param
+                params._order.append(name)
         return params
 
 

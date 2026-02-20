@@ -176,6 +176,9 @@ class TestRegistryConsistency:
         )
 
     @pytest.mark.parametrize("model_name", ModelRegistry.list_models())
+    @pytest.mark.filterwarnings(
+        "ignore:.*No explicit implementation evidence.*:UserWarning"
+    )
     def test_protocol_implementation_evidence(self, model_name: str):
         """Check that declared protocols have implementation evidence.
 

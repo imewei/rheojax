@@ -340,7 +340,9 @@ class BaseModel(BayesianMixin, ABC):
             X, use_log_residuals, use_multi_start, n_starts
         )
 
-        # Pass optimization strategy to _fit via kwargs
+        # Pass optimization strategy to _fit via kwargs.
+        # These are consumed by _fit() and should NOT leak to model_function.
+        # Models' _fit() implementations should pop these before storing _last_fit_kwargs.
         kwargs["use_log_residuals"] = use_log_residuals
         kwargs["use_multi_start"] = use_multi_start
         kwargs["n_starts"] = n_starts
@@ -721,12 +723,20 @@ class BaseModel(BayesianMixin, ABC):
             try:
                 result = self._predict(X, **kwargs)
             except TypeError as e:
-                if "unexpected keyword argument" in str(e) and "test_mode" in str(e):
-                    # Some models' _predict() don't accept **kwargs
-                    # (e.g., Zener._predict(self, X)). Remove test_mode
-                    # since self._test_mode was already set above.
-                    kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
-                    result = self._predict(X, **kwargs)
+                if "unexpected keyword argument" in str(e):
+                    # Progressive kwargs stripping for models whose _predict()
+                    # doesn't accept all kwargs. First strip the offending kwarg,
+                    # then fall back to bare _predict(X) as last resort.
+                    offending = str(e)
+                    stripped = dict(kwargs)
+                    for key in list(stripped):
+                        if key in offending:
+                            del stripped[key]
+                    try:
+                        result = self._predict(X, **stripped)
+                    except TypeError:
+                        # Final fallback: bare call (13+ models have _predict(self, X) only)
+                        result = self._predict(X)
                 else:
                     raise
 

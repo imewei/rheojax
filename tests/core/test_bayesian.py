@@ -650,18 +650,6 @@ def test_credible_intervals_coverage():
     assert intervals["a"][0] < true_mean_a < intervals["a"][1]
 
 
-def test_reproducibility_with_seed_legacy():
-    """Test that Bayesian inference is reproducible with random seed.
-
-    Note: This test is now superseded by test_seed_parameter_reproducibility()
-    which uses the new seed parameter added in v0.6.0. Keeping for backward
-    compatibility documentation.
-    """
-    pytest.skip(
-        "Superseded by test_seed_parameter_reproducibility() - seed parameter now supported"
-    )
-
-
 def test_warm_start_complex_data_nuts_convergence():
     """Test warm-start with complex oscillatory data converges properly.
 
