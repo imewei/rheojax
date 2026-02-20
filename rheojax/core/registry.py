@@ -764,6 +764,12 @@ class ModelRegistry:
             >>> model = ModelRegistry.create('maxwell')
         """
         registry = cls._get_registry()
+        # If the model isn't registered yet, eagerly import all model modules
+        # to trigger @ModelRegistry.register decorators (lazy-import fallback)
+        if registry.get(name, PluginType.MODEL) is None:
+            from rheojax.models import _ensure_all_registered
+
+            _ensure_all_registered()
         return registry.create_instance(name, PluginType.MODEL, *args, **kwargs)
 
     @classmethod

@@ -388,6 +388,8 @@ class Parameter:
             "units": self.units,
             "description": self.description,
         }
+        if self.prior is not None:
+            d["prior"] = self.prior
         if self.constraints:
             d["constraints"] = [
                 {
@@ -411,6 +413,10 @@ class Parameter:
         )
         if "constraints" in data:
             for c_data in data["constraints"]:
+                # Skip bounds constraints — __init__ already creates one from
+                # the bounds= parameter, so appending another would duplicate
+                if c_data["type"] == "bounds":
+                    continue
                 param.constraints.append(
                     ParameterConstraint(
                         type=c_data["type"],

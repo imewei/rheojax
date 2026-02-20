@@ -1505,7 +1505,9 @@ class BayesianMixin:
                 if samples_arr.ndim == 2:
                     samples_shaped = samples_arr
                 elif num_chains >= 2:
-                    samples_shaped = samples_arr.reshape(num_chains, num_samples)
+                    # Use -1 to infer actual draws (may differ from num_samples
+                    # due to thinning, warmup inclusion, or early stopping)
+                    samples_shaped = samples_arr.reshape(num_chains, -1)
                 else:
                     samples_shaped = samples_arr.reshape(1, -1)
                 result_dict[name] = float(diagnostic_fn(samples_shaped))
