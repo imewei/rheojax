@@ -193,9 +193,8 @@ def main(args: list[str] | None = None) -> int:
 
     # Create model
     try:
-        from rheojax.core.registry import ModelRegistry
-
         import rheojax.models  # noqa: F401 — trigger registration
+        from rheojax.core.registry import ModelRegistry
 
         model = ModelRegistry.create(parsed.model)
         logger.debug("Model created", model=parsed.model)
@@ -230,6 +229,11 @@ def main(args: list[str] | None = None) -> int:
             print("  NLSQ warm-start complete")
             logger.info("NLSQ warm-start complete", model=parsed.model)
         except Exception as e:
+            # Reset partially-mutated state from failed fit to avoid
+            # leaking stale kwargs/test_mode into subsequent Bayesian inference
+            model._last_fit_kwargs = {}
+            model._test_mode = None
+            model.fitted_ = False
             print(f"  Warning: NLSQ warm-start failed ({e}), continuing with defaults")
             logger.warning("NLSQ warm-start failed", error=str(e))
 
@@ -271,8 +275,7 @@ def main(args: list[str] | None = None) -> int:
         )
         return 1
 
-    # Extract summary
-    summary = result.summary
+    # Extract diagnostics
     diagnostics = result.diagnostics
 
     # Build output dict

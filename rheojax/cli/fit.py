@@ -138,6 +138,11 @@ def main(args: list[str] | None = None) -> int:
         print(f"Error: File not found: {parsed.input_file}", file=sys.stderr)
         return 1
 
+    # Validate max_iter
+    if parsed.max_iter is not None and parsed.max_iter < 1:
+        print(f"Error: --max-iter must be >= 1, got {parsed.max_iter}", file=sys.stderr)
+        return 1
+
     # Load data
     try:
         from rheojax.io import auto_load
@@ -168,9 +173,8 @@ def main(args: list[str] | None = None) -> int:
 
     # Create model
     try:
-        from rheojax.core.registry import ModelRegistry
-
         import rheojax.models  # noqa: F401 — trigger registration
+        from rheojax.core.registry import ModelRegistry
 
         model = ModelRegistry.create(parsed.model)
         logger.debug("Model created", model=parsed.model)
