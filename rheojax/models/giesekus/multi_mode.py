@@ -454,7 +454,8 @@ class GiesekusMultiMode(BaseModel):
 
         elif mode == "startup":
             # Get gamma_dot from kwargs or instance attribute
-            gamma_dot = kwargs.get("gamma_dot") or self._gamma_dot_applied
+            # Use `if in kwargs` to avoid swallowing valid 0.0 values
+            gamma_dot = kwargs["gamma_dot"] if "gamma_dot" in kwargs else self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return self._simulate_startup_internal(

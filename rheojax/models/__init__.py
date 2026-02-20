@@ -210,6 +210,30 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
 }
 
 
+_all_registered = False
+
+
+def _ensure_all_registered() -> None:
+    """Eagerly import all model submodules to trigger @ModelRegistry.register decorators.
+
+    This is idempotent — subsequent calls are no-ops. Call this when you need
+    the full registry populated (e.g., ModelRegistry.create() by registry name,
+    test conftest, CLI model listing).
+    """
+    global _all_registered
+    if _all_registered:
+        return
+    import importlib
+
+    # Import each unique submodule exactly once
+    seen: set[str] = set()
+    for module_path, _ in _LAZY_IMPORTS.values():
+        if module_path not in seen:
+            seen.add(module_path)
+            importlib.import_module(module_path)
+    _all_registered = True
+
+
 def __getattr__(name: str):
     """Lazy-load model classes on first access.
 

@@ -317,7 +317,8 @@ class GiesekusSingleMode(GiesekusBase):
 
         elif mode == "startup":
             # Get gamma_dot from kwargs or instance attribute
-            gamma_dot = kwargs.get("gamma_dot") or self._gamma_dot_applied
+            # Use `if in kwargs` to avoid swallowing valid 0.0 values
+            gamma_dot = kwargs["gamma_dot"] if "gamma_dot" in kwargs else self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return self._simulate_startup_internal(
@@ -326,7 +327,7 @@ class GiesekusSingleMode(GiesekusBase):
 
         elif mode == "relaxation":
             # Get gamma_dot from kwargs or instance attribute
-            gamma_dot = kwargs.get("gamma_dot") or self._gamma_dot_applied
+            gamma_dot = kwargs["gamma_dot"] if "gamma_dot" in kwargs else self._gamma_dot_applied
             if gamma_dot is None:
                 raise ValueError("relaxation mode requires gamma_dot (pre-shear rate)")
             return self._simulate_relaxation_internal(
@@ -335,7 +336,7 @@ class GiesekusSingleMode(GiesekusBase):
 
         elif mode == "creep":
             # Get sigma_applied from kwargs or instance attribute
-            sigma_applied = kwargs.get("sigma_applied") or self._sigma_applied
+            sigma_applied = kwargs["sigma_applied"] if "sigma_applied" in kwargs else self._sigma_applied
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
             return self._simulate_creep_internal(
@@ -344,8 +345,8 @@ class GiesekusSingleMode(GiesekusBase):
 
         elif mode == "laos":
             # Get gamma_0 and omega from kwargs or instance attributes
-            gamma_0 = kwargs.get("gamma_0") or self._gamma_0
-            omega = kwargs.get("omega") or self._omega_laos
+            gamma_0 = kwargs["gamma_0"] if "gamma_0" in kwargs else self._gamma_0
+            omega = kwargs["omega"] if "omega" in kwargs else self._omega_laos
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(

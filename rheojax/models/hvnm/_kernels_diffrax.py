@@ -874,7 +874,7 @@ def _solve_hvnm_ode(
 
     t0 = t[0]
     t1 = t[-1]
-    dt0 = (t1 - t0) / jnp.maximum(jnp.float64(len(t)), 1000.0)
+    dt0 = (t1 - t0) / jnp.maximum(jnp.float64(t.shape[0]), 1000.0)
 
     saveat = diffrax.SaveAt(ts=t)
 
