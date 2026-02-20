@@ -198,6 +198,9 @@ def update_dataset(dataset_id: str, **updates) -> None:
 def select_model(model_name: str, parameters: dict[str, ParameterState]) -> None:
     """Select a model and initialize parameters.
 
+    Uses update_state directly (no reducer for model_params yet) but
+    still emits model_selected signal for downstream UI reactivity.
+
     Parameters
     ----------
     model_name : str
@@ -217,8 +220,8 @@ def select_model(model_name: str, parameters: dict[str, ParameterState]) -> None
         )
 
     store.update_state(updater)
-
-    store.emit_signal("model_selected", model_name)
+    # Also dispatch SET_ACTIVE_MODEL so the reducer + signal path fires
+    store.dispatch("SET_ACTIVE_MODEL", {"model_name": model_name})
 
 
 def update_parameter(name: str, value: float) -> None:
@@ -359,24 +362,23 @@ def start_fit(model_name: str, dataset_id: str) -> None:
 def store_fit_result(result: FitResult) -> None:
     """Store a completed fit result.
 
+    Routes through dispatch() to ensure pipeline state is updated
+    consistently (STORE_FIT_RESULT reducer sets FIT step to COMPLETE).
+
     Parameters
     ----------
     result : FitResult
         Fit result
     """
     store = StateStore()
-    result_key = f"{result.model_name}_{result.dataset_id}"
-
-    def updater(state: AppState) -> AppState:
-        new_results = state.fit_results.copy()
-        new_results[result_key] = result
-        return AppState(
-            **{**state.__dict__, "fit_results": new_results, "is_modified": True}
-        )
-
-    store.update_state(updater)
-
-    store.emit_signal("fit_completed", result.model_name, result.dataset_id)
+    store.dispatch(
+        "STORE_FIT_RESULT",
+        {
+            "model_name": result.model_name,
+            "dataset_id": result.dataset_id,
+            "result": result,
+        },
+    )
 
 
 def fail_fit(model_name: str, dataset_id: str, error: str) -> None:
@@ -546,24 +548,23 @@ def start_bayesian(model_name: str, dataset_id: str) -> dict:
 def store_bayesian_result(result: BayesianResult) -> None:
     """Store a completed Bayesian result.
 
+    Routes through dispatch() to ensure pipeline state is updated
+    consistently (STORE_BAYESIAN_RESULT reducer sets BAYESIAN step to COMPLETE).
+
     Parameters
     ----------
     result : BayesianResult
         Bayesian result
     """
     store = StateStore()
-    result_key = f"{result.model_name}_{result.dataset_id}"
-
-    def updater(state: AppState) -> AppState:
-        new_results = state.bayesian_results.copy()
-        new_results[result_key] = result
-        return AppState(
-            **{**state.__dict__, "bayesian_results": new_results, "is_modified": True}
-        )
-
-    store.update_state(updater)
-
-    store.emit_signal("bayesian_completed", result.model_name, result.dataset_id)
+    store.dispatch(
+        "STORE_BAYESIAN_RESULT",
+        {
+            "model_name": result.model_name,
+            "dataset_id": result.dataset_id,
+            "result": result,
+        },
+    )
 
 
 def fail_bayesian(model_name: str, dataset_id: str, error: str) -> None:
@@ -655,6 +656,8 @@ def bayesian_failed(error: str) -> dict:
 def set_pipeline_step(step: PipelineStep, status: StepStatus) -> None:
     """Update pipeline step status.
 
+    Routes through dispatch() for consistent signal emission.
+
     Parameters
     ----------
     step : PipelineStep
@@ -663,24 +666,10 @@ def set_pipeline_step(step: PipelineStep, status: StepStatus) -> None:
         New status
     """
     store = StateStore()
-
-    def updater(state: AppState) -> AppState:
-        from rheojax.gui.state.store import PipelineState
-
-        new_steps = state.pipeline_state.steps.copy()
-        new_steps[step] = status
-
-        new_pipeline = PipelineState(
-            steps=new_steps,
-            current_step=step,
-            error_message=state.pipeline_state.error_message,
-        )
-
-        return AppState(**{**state.__dict__, "pipeline_state": new_pipeline})
-
-    store.update_state(updater)
-
-    store.emit_signal("pipeline_step_changed", step.name, status.name)
+    store.dispatch(
+        "SET_PIPELINE_STEP",
+        {"step": step.name, "status": status.name},
+    )
 
 
 # JAX Actions

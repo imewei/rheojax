@@ -246,6 +246,9 @@ class WorkerPool(QObject):
                 pass
             if isinstance(signals, QObject):
                 self._job_signals[job_id] = signals
+                # Tag signals object with job_id for direct lookup
+                # when sender() works but dict reverse-lookup is ambiguous.
+                signals._pool_job_id = job_id  # type: ignore[attr-defined]
 
             conn_type = Qt.QueuedConnection if HAS_PYSIDE6 else None
             if conn_type is None:
@@ -451,7 +454,15 @@ class WorkerPool(QObject):
         )
 
     def _job_id_from_sender(self) -> str | None:
-        """Best-effort reverse lookup for job_id based on Qt sender()."""
+        """Best-effort reverse lookup for job_id based on Qt sender().
+
+        Uses a two-tier strategy:
+        1. Direct attribute lookup (O(1)) via ``_pool_job_id`` tag set in submit()
+        2. Dict reverse-lookup (O(n)) scanning ``_job_signals``
+
+        This resolves the race condition where ``_job_id_from_result_fallback``
+        returned None with 2+ concurrent jobs.
+        """
         try:
             sender = self.sender()
         except Exception:
@@ -460,6 +471,14 @@ class WorkerPool(QObject):
         if sender is None:
             return None
 
+        # Fast path: direct attribute lookup (set in submit)
+        pool_job_id = getattr(sender, "_pool_job_id", None)
+        if pool_job_id is not None:
+            with self._job_lock:
+                if pool_job_id in self._active_jobs:
+                    return pool_job_id
+
+        # Slow path: dict reverse-lookup
         for job_id, signals in list(self._job_signals.items()):
             if signals is sender:
                 return job_id

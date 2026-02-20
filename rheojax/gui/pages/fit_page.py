@@ -395,6 +395,8 @@ class FitPage(QWidget):
                 )
 
             self._store.update_state(updater, track_undo=False, emit_signal=True)
+            if model_name:
+                self._store.emit_signal("model_params_changed", model_name)
 
         self._parameter_table.set_parameters(params_to_show)
         self._parameter_table.setEnabled(True)
@@ -962,6 +964,11 @@ class FitPage(QWidget):
                     self._store.update_state(
                         updater, track_undo=False, emit_signal=True
                     )
+                    _mn = normalize_model_name(
+                        getattr(fit_result, "model_name", self._current_model or "")
+                    )
+                    if _mn:
+                        self._store.emit_signal("model_params_changed", _mn)
                     self._empty_params.hide()
                     self._parameter_table.setEnabled(True)
                     self._params_model_name = normalize_model_name(

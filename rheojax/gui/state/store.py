@@ -528,14 +528,16 @@ class StateStore:
                     emit_signal=emit_signal,
                 )
 
-            # Snapshot state and subscribers to avoid races outside the lock
-            state_snapshot = self._state
+            # Copy subscriber list to avoid mutation during iteration
             subscribers = list(self._subscribers)
 
-        # Notify subscribers outside the lock to prevent deadlocks
+        # Notify subscribers outside the lock to prevent deadlocks.
+        # Always read self._state (not a snapshot) so that if a subscriber
+        # triggers a nested dispatch, remaining subscribers see the latest
+        # state rather than a stale pre-nested-dispatch snapshot.
         for subscriber in subscribers:
             try:
-                subscriber(state_snapshot)
+                subscriber(self._state)
             except Exception:
                 logger.error(
                     "Subscriber callback failed",
@@ -644,8 +646,10 @@ class StateStore:
                     ds.metadata = {**ds.metadata, "test_mode": mode}
                     ds.is_modified = True
                     datasets[dataset_id] = ds
+                # Only update datasets — do NOT change current_tab as a side-effect.
+                # Tab navigation should be an explicit user action, not implicit.
                 return replace(
-                    state, datasets=datasets, current_tab="data", is_modified=True
+                    state, datasets=datasets, is_modified=True
                 )
 
             return updater
@@ -1320,14 +1324,13 @@ class StateStore:
                     changed_keys=changed_keys,
                 )
 
-            # Snapshot state and subscribers to avoid races outside the lock
-            state_snapshot = self._state
+            # Copy subscriber list to avoid mutation during iteration
             subscribers = list(self._subscribers)
 
-        # Notify subscribers outside the lock
+        # Notify subscribers outside the lock (read self._state for freshness)
         for subscriber in subscribers:
             try:
-                subscriber(state_snapshot)
+                subscriber(self._state)
             except Exception:
                 logger.error(
                     "Subscriber callback failed during batch update",

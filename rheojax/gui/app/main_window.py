@@ -34,7 +34,6 @@ from rheojax.gui.compat import (
 from rheojax.gui.dialogs.about import AboutDialog
 from rheojax.gui.dialogs.import_wizard import ImportWizard
 from rheojax.gui.dialogs.preferences import PreferencesDialog
-from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.fit_worker import FitWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.pages.bayesian_page import BayesianPage
