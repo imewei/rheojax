@@ -19,10 +19,9 @@ from collections.abc import Callable
 from functools import partial
 from typing import TYPE_CHECKING
 
+import interpax
 import numpy as np
 from scipy.interpolate import CubicSpline
-
-import interpax
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
@@ -102,8 +101,8 @@ def percus_yevick_sk(
     c_coeff = eta * a_coeff / 2
 
     # Fourier transform of c(r) - analytic result
-    # Avoid division by zero at k=0
-    q_safe = np.where(np.abs(q) < 1e-10, 1e-10, q)
+    # Avoid division by zero at k=0. Use 1.0 (not 1e-10) so q^6 stays finite.
+    q_safe = np.where(np.abs(q) < 1e-10, 1.0, q)
     q2 = q_safe * q_safe
     q3 = q2 * q_safe
     q4 = q2 * q2
@@ -165,8 +164,10 @@ def percus_yevick_sk_jax(
     b_coeff = -6 * eta * (1 + eta / 2) ** 2 / denom
     c_coeff = eta * a_coeff / 2
 
-    # Safe division
-    q_safe = jnp.where(jnp.abs(q) < 1e-10, 1e-10, q)
+    # Safe division: use 1.0 (not 1e-10) so the masked branch stays finite.
+    # jnp.where evaluates both branches — q_safe=1e-10 → q6=1e-60 → inf
+    # in the unused branch, which corrupts VJP gradients.
+    q_safe = jnp.where(jnp.abs(q) < 1e-10, 1.0, q)
     q2 = q_safe * q_safe
     q3 = q2 * q_safe
     q4 = q2 * q2

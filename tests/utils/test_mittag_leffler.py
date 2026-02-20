@@ -1,8 +1,8 @@
 """
 Tests for Mittag-Leffler function implementations.
 
-These tests validate correctness for rheological applications where |z| < 10.
-For larger |z|, the Pade approximation may have reduced accuracy.
+These tests validate correctness for rheological applications using
+the hybrid Taylor series / asymptotic expansion approach.
 
 Tests validate:
 1. Correctness against known analytical values
@@ -91,22 +91,9 @@ class TestMittagLefflerBasicFunctionality:
 class TestMittagLefflerAccuracy:
     """Test numerical accuracy for rheological range |z| < 10."""
 
-    @pytest.mark.parametrize(
-        "alpha",
-        [
-            pytest.param(
-                0.3,
-                marks=pytest.mark.xfail(
-                    reason="Pade approximation gives negative values for small alpha. Known limitation."
-                ),
-            ),
-            0.5,
-            0.7,
-            0.9,
-        ],
-    )
+    @pytest.mark.parametrize("alpha", [0.3, 0.5, 0.7, 0.9])
     def test_ml_e_small_arguments(self, alpha):
-        """Test accuracy for small |z| using Pade approximation."""
+        """Test accuracy for small |z| using hybrid Taylor/asymptotic."""
         z = jnp.linspace(0, 2, 10)
         result = mittag_leffler_e(z, alpha=alpha)
 
@@ -218,9 +205,6 @@ class TestMittagLefflerJAXCompatibility:
 
         assert result.shape == z_batch.shape
 
-    @pytest.mark.xfail(
-        reason="Gradient computation through Pade approximation produces NaN due to numerical instability in matrix solves and gamma functions. Known limitation."
-    )
     def test_ml_e_grad(self):
         """Test that gradient can be computed through mittag_leffler_e."""
 
@@ -259,12 +243,9 @@ class TestMittagLefflerEdgeCases:
         alpha = 0.5
         result = mittag_leffler_e(z, alpha=alpha)
 
-        # Should be very close to 1
-        np.testing.assert_allclose(result, 1.0, atol=1e-5)
+        # Should be very close to 1 (tighter tolerance with hybrid implementation)
+        np.testing.assert_allclose(result, 1.0, atol=1e-6)
 
-    @pytest.mark.xfail(
-        reason="Pade approximation gives negative values for z=5.0, alpha=0.5. Known limitation for large |z|."
-    )
     def test_ml_e_array_mixed_magnitudes(self):
         """Test array with both small and moderate |z| values."""
         z = jnp.array([0.01, 0.1, 0.5, 1.0, 2.0, 5.0])

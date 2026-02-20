@@ -1129,6 +1129,8 @@ def nlsq_optimize(
         )
         result = _scipy_fallback(x0)
         result.message = f"[SciPy fallback] {result.message} (NLSQ failed: {e})"
+        # Write back optimal params so model state reflects the fit
+        parameters.set_values(result.x)
         return result
 
     # Compute residuals at optimal point for covariance scaling
@@ -1152,7 +1154,9 @@ def nlsq_optimize(
         logger.warning(
             "NLSQ hit inner iteration limit; retrying with SciPy least_squares for stability."
         )
-        return _scipy_fallback(x0)
+        fallback_result = _scipy_fallback(x0)
+        parameters.set_values(fallback_result.x)
+        return fallback_result
 
     # Ensure x is float64
     result.x = np.asarray(result.x, dtype=np.float64)

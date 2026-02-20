@@ -22,13 +22,57 @@ from typing import Any
 import numpy as np
 import pytest
 
-# Force registration of all models by importing the models package
+# Force registration of all models (lazy imports require explicit access)
 import rheojax.models  # noqa: F401
+
+for _attr in list(rheojax.models._LAZY_IMPORTS):
+    getattr(rheojax.models, _attr)
+
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 
 jax, jnp = safe_import_jax()
+
+# Models that use simulation-based APIs, need fit() internal state,
+# or have protocols not yet implemented for generic predict().
+# These are excluded from the parametrized predict() test and tested
+# separately in TestSimulationProtocols.
+_KNOWN_SIMULATION_ONLY = {
+    ("dmt_local", "laos"),
+    ("dmt_nonlocal", "startup"),
+    ("dmt_nonlocal", "creep"),
+    ("lattice_epm", "startup"),
+    ("tensorial_epm", "startup"),
+    ("fluidity_local", "startup"),
+    ("fluidity_local", "laos"),
+    ("fluidity_nonlocal", "startup"),
+    ("fluidity_nonlocal", "laos"),
+    ("fluidity_saramito_local", "startup"),
+    ("fluidity_saramito_local", "laos"),
+    ("fluidity_saramito_nonlocal", "startup"),
+    ("fluidity_saramito_nonlocal", "creep"),
+    ("hebraud_lequeux", "startup"),
+    ("hebraud_lequeux", "laos"),
+    ("hebraud_lequeux", "oscillation"),
+    ("vlb_nonlocal", "flow_curve"),
+    ("vlb_nonlocal", "startup"),
+    ("vlb_nonlocal", "creep"),
+    ("mikh", "oscillation"),
+    ("ml_ikh", "oscillation"),
+    ("sgr_conventional", "laos"),
+    ("sgr_generic", "creep"),
+    ("sgr_generic", "startup"),
+    ("sgr_generic", "laos"),
+    ("spp_yield_stress", "flow_curve"),
+    ("spp_yield_stress", "laos"),
+    ("stz_conventional", "flow_curve"),
+    ("stz_conventional", "creep"),
+    ("stz_conventional", "relaxation"),
+    ("stz_conventional", "startup"),
+    ("stz_conventional", "oscillation"),
+    ("stz_conventional", "laos"),
+}
 
 
 class ProtocolDataFactory:
@@ -112,7 +156,9 @@ def get_model_protocol_pairs() -> list[tuple[str, Protocol]]:
         info = ModelRegistry.get_info(model_name)
         if info and info.protocols:
             for protocol in info.protocols:
-                pairs.append((model_name, protocol))
+                # Exclude simulation-only pairs (tested in TestSimulationProtocols)
+                if (model_name, protocol.value) not in _KNOWN_SIMULATION_ONLY:
+                    pairs.append((model_name, protocol))
     return pairs
 
 
@@ -197,54 +243,6 @@ def _try_predict_with_test_mode(model, X: np.ndarray, kwargs: dict) -> np.ndarra
 class TestProtocolValidation:
     """Validate that all models can execute predict() for their declared protocols."""
 
-    # Models that use simulation-based APIs (simulate_startup, simulate_laos)
-    # rather than standard predict(X, test_mode=...) for certain protocols.
-    # These need dedicated simulation methods and don't work with generic test data.
-    # Models that use simulation-based APIs, need fit() internal state,
-    # or have protocols not yet implemented for generic predict().
-    _KNOWN_SIMULATION_ONLY = {
-        ("dmt_local", "laos"),
-        ("dmt_nonlocal", "startup"),
-        ("dmt_nonlocal", "creep"),
-        ("lattice_epm", "startup"),
-        ("tensorial_epm", "startup"),
-        ("fluidity_local", "startup"),
-        ("fluidity_local", "laos"),
-        ("fluidity_nonlocal", "startup"),
-        ("fluidity_nonlocal", "laos"),
-        ("fluidity_saramito_local", "startup"),
-        ("fluidity_saramito_local", "laos"),
-        ("fluidity_saramito_nonlocal", "startup"),
-        ("fluidity_saramito_nonlocal", "creep"),
-        # HL PDE solver needs fit() to set grid params (_last_fit_kwargs)
-        ("hebraud_lequeux", "startup"),
-        ("hebraud_lequeux", "laos"),
-        ("hebraud_lequeux", "oscillation"),
-        # VLB nonlocal: PDE solver protocols not yet in predict()
-        ("vlb_nonlocal", "flow_curve"),
-        ("vlb_nonlocal", "startup"),
-        ("vlb_nonlocal", "creep"),
-        # IKH models require both time and frequency arrays for SAOS
-        ("mikh", "oscillation"),
-        ("ml_ikh", "oscillation"),
-        # SGR conventional LAOS needs fit() internal state
-        ("sgr_conventional", "laos"),
-        # SGR generic: creep/startup/laos not yet implemented
-        ("sgr_generic", "creep"),
-        ("sgr_generic", "startup"),
-        ("sgr_generic", "laos"),
-        # SPP yield stress: specialized LAOS decomposition, not standard predict
-        ("spp_yield_stress", "flow_curve"),
-        ("spp_yield_stress", "laos"),
-        # STZ: ODE solver needs fit() to set _last_fit_kwargs grid params
-        ("stz_conventional", "flow_curve"),
-        ("stz_conventional", "creep"),
-        ("stz_conventional", "relaxation"),
-        ("stz_conventional", "startup"),
-        ("stz_conventional", "oscillation"),
-        ("stz_conventional", "laos"),
-    }
-
     @pytest.mark.parametrize(
         "model_name,protocol",
         _MODEL_PROTOCOL_PAIRS,
@@ -268,13 +266,6 @@ class TestProtocolValidation:
             model_name: Registered model name
             protocol: Protocol enum value to test
         """
-        # Skip models that use simulation-only APIs for certain protocols
-        if (model_name, protocol.value) in self._KNOWN_SIMULATION_ONLY:
-            pytest.skip(
-                f"{model_name} uses simulation API for {protocol.value} "
-                f"(not standard predict)"
-            )
-
         # Create model from registry
         model = ModelRegistry.create(model_name)
 
@@ -374,3 +365,169 @@ class TestProtocolDataFactory:
         assert X.shape[0] == 2, "LAOS should have shape (2, N)"
         assert "gamma_0" in kwargs, "LAOS should include gamma_0"
         assert "omega" in kwargs, "LAOS should include omega"
+
+
+# =============================================================================
+# Simulation Protocol Tests
+# =============================================================================
+
+# Protocols not yet implemented or not supported via predict()/simulate_*()
+_NOT_IMPLEMENTED = {
+    ("spp_yield_stress", "laos"),  # LAOS decomposition is via SPP transform, not predict
+    ("fluidity_saramito_nonlocal", "creep"),  # JAX checkpoint + string type in diffrax
+}
+
+
+def _get_simulation_pairs() -> list[tuple[str, str]]:
+    """Get sorted (model_name, protocol_value) pairs for simulation-only tests."""
+    return sorted(_KNOWN_SIMULATION_ONLY)
+
+
+def _get_simulation_ids() -> list[str]:
+    """Generate descriptive test IDs for simulation pairs."""
+    return [f"{name}-{proto}" for name, proto in sorted(_KNOWN_SIMULATION_ONLY)]
+
+
+def _run_simulation_test(model, model_name: str, protocol: str):
+    """Execute the appropriate simulation/alternative API for a model/protocol pair.
+
+    Returns the result (non-None on success).
+    """
+    # --- Not implemented: xfail ---
+    if (model_name, protocol) in _NOT_IMPLEMENTED:
+        pytest.xfail(f"{model_name}/{protocol} not yet implemented")
+
+    # --- DMT ---
+    if model_name == "dmt_local" and protocol == "laos":
+        return model.simulate_laos(
+            gamma_0=1.0, omega=1.0, n_cycles=2, points_per_cycle=32
+        )
+    if model_name == "dmt_nonlocal" and protocol in ("startup", "creep"):
+        gdot = 10.0 if protocol == "startup" else 1.0
+        return model.simulate_steady_shear(gamma_dot_avg=gdot, t_end=1.0)
+
+    # --- Fluidity (simulate_laos as proxy for simulation-only protocols) ---
+    if model_name in ("fluidity_local", "fluidity_nonlocal"):
+        return model.simulate_laos(gamma_0=1.0, omega=1.0)
+
+    # --- Fluidity-Saramito ---
+    if model_name == "fluidity_saramito_local":
+        if protocol == "startup":
+            return model.simulate_startup(
+                t=np.linspace(0.01, 10, 20), gamma_dot=1.0
+            )
+        return model.simulate_laos(
+            gamma_0=1.0, omega=1.0, n_cycles=2, n_points_per_cycle=32
+        )
+    if model_name == "fluidity_saramito_nonlocal":
+        if protocol == "startup":
+            return model.simulate_startup(
+                t=np.linspace(0.01, 10, 20), gamma_dot=1.0
+            )
+        return model.simulate_creep(
+            t=np.linspace(0.01, 50, 20), sigma_applied=100.0
+        )
+
+    # --- VLB nonlocal ---
+    if model_name == "vlb_nonlocal":
+        if protocol == "flow_curve":
+            return model.simulate_steady_shear(gamma_dot_avg=1.0, t_end=10.0)
+        if protocol == "startup":
+            return model.simulate_startup(gamma_dot_avg=1.0, t_end=10.0)
+        return model.simulate_creep(sigma_0=100.0, t_end=10.0)
+
+    # --- SGR ---
+    if model_name in ("sgr_conventional", "sgr_generic") and protocol == "laos":
+        return model.simulate_laos(gamma_0=1.0, omega=1.0, n_cycles=2)
+
+    # --- STZ LAOS ---
+    if model_name == "stz_conventional" and protocol == "laos":
+        return model.simulate_laos(gamma_0=0.1, omega=1.0, n_cycles=2)
+
+    # --- SPP flow curve ---
+    if model_name == "spp_yield_stress" and protocol == "flow_curve":
+        return model.predict_flow_curve(gamma_dot_array=np.logspace(-2, 2, 10))
+
+    # --- Setup-then-predict for remaining cases ---
+    return _setup_and_predict(model, model_name, protocol)
+
+
+def _setup_and_predict(model, model_name: str, protocol: str):
+    """Set up required internal state and call predict().
+
+    For models whose protocols need internal state from fit() or
+    specialized data formats not covered by ProtocolDataFactory.
+    """
+    model._test_mode = protocol
+    model.fitted_ = True
+
+    # Model-specific state setup
+    if model_name == "hebraud_lequeux":
+        model._last_fit_kwargs = {
+            "grid_n_bins": 51,
+            "grid_sigma_factor": 5.0,
+            "gamma_dot": 1.0,
+            "sigma_applied": 100.0,
+        }
+
+    elif model_name in ("lattice_epm", "tensorial_epm"):
+        model._last_fit_kwargs = {"gamma_dot": 0.1}
+        if hasattr(model, "_cached_seed"):
+            model._cached_seed = 42
+
+    elif model_name in ("mikh", "ml_ikh"):
+        # IKH computes oscillation via small-amplitude LAOS simulation
+        # Needs (2, N) input with time+strain, plus gamma_0/omega kwargs
+        model._last_fit_kwargs = {}
+        omega_val = 1.0
+        gamma_0 = 0.01  # Small amplitude for linear regime
+        t = np.linspace(0, 4 * np.pi / omega_val, 50)
+        gamma = gamma_0 * np.sin(omega_val * t)
+        X = np.stack([t, gamma])
+        return _try_predict_with_test_mode(model, X, {
+            "test_mode": protocol,
+            "gamma_0": gamma_0,
+            "omega": omega_val,
+        })
+
+    elif model_name == "stz_conventional":
+        model._last_fit_kwargs = {
+            "gamma_dot": 1.0,
+            "sigma_applied": 100.0,
+        }
+        # STZ ODE needs direct attributes for shear rate / stress
+        model._gamma_dot_applied = 1.0
+        model._sigma_applied = 100.0
+
+    elif model_name == "spp_yield_stress":
+        model._last_fit_kwargs = {
+            "gamma_0": 1.0,
+            "omega": 1.0,
+        }
+
+    # Generate standard test data for this protocol
+    X, kwargs = ProtocolDataFactory.generate(Protocol(protocol))
+    return _try_predict_with_test_mode(model, X, kwargs)
+
+
+@pytest.mark.smoke
+class TestSimulationProtocols:
+    """Test protocols that use simulation APIs instead of predict().
+
+    These model/protocol pairs are excluded from TestProtocolValidation because
+    they require either:
+    - A dedicated simulation method (e.g. simulate_laos, simulate_startup)
+    - Internal state from a prior fit() call
+    - Data formats not supported by ProtocolDataFactory
+    """
+
+    @pytest.mark.parametrize(
+        "model_name,protocol",
+        _get_simulation_pairs(),
+        ids=_get_simulation_ids(),
+    )
+    def test_simulation_api_works(self, model_name: str, protocol: str):
+        """Verify that simulation-only protocols produce valid results."""
+        model = ModelRegistry.create(model_name)
+        result = _run_simulation_test(model, model_name, protocol)
+        assert result is not None

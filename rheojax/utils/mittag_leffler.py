@@ -241,11 +241,13 @@ def _mittag_leffler_hybrid(z, alpha, beta):
     """Hybrid implementation using vmap + blended regions for smoothness."""
 
     # Thresholds & Widths
-    # Tuned for smoothness and stability with n_iter=300 for Taylor series
-    THRESH_POS = 6.0
-    WIDTH_POS = 0.5
+    # Tuned for smoothness and stability with n_iter=300 for Taylor series.
+    # WIDTH_POS=0.2 ensures sigmoid leakage at z=0 is < 1e-17, preventing
+    # the positive asymptotic branch from corrupting small-z accuracy.
+    THRESH_POS = 8.0
+    WIDTH_POS = 0.2
 
-    # Safe cutoff for positive pure branch
+    # Safe cutoff for positive pure branch (> THRESH_POS + 4*WIDTH_POS)
     CUTOFF_POS = 10.0
 
     # Define the scalar kernel
@@ -267,7 +269,11 @@ def _mittag_leffler_hybrid(z, alpha, beta):
             return _ml_asymptotic_pos(z_val, a_val, b_val)
 
         def _pure_neg(_):
-            return _ml_asymptotic_neg(z_val, a_val, b_val)
+            # For alpha >= 1, the negative asymptotic expansion diverges;
+            # fall back to Taylor series which converges for all finite z.
+            val = _ml_asymptotic_neg(z_val, a_val, b_val)
+            val_taylor = _ml_taylor(z_val, a_val, b_val, n_iter=300)
+            return jnp.where(a_val < 1.0, val, val_taylor)
 
         def _blended_region(_):
             # Taylor series is computed everywhere in the blended region
@@ -285,7 +291,12 @@ def _mittag_leffler_hybrid(z, alpha, beta):
             # Use dynamic threshold as ceiling to avoid evaluating asymptotic series
             # in its divergent region (small |z|).
             z_neg_safe = jnp.minimum(z_val, thresh_neg)
-            val_neg = _ml_asymptotic_neg(z_neg_safe, a_val, b_val)
+            val_neg_raw = _ml_asymptotic_neg(z_neg_safe, a_val, b_val)
+
+            # The negative asymptotic expansion diverges for alpha >= 1
+            # (1/Gamma(b-ak) grows factorially while z^{-k} decays exponentially).
+            # Fall back to Taylor series which converges for all finite z.
+            val_neg = jnp.where(a_val < 1.0, val_neg_raw, val_taylor)
 
             # Blend Neg <-> Taylor (Left transition)
             # z < thresh_neg: Neg dominates
