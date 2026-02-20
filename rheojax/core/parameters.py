@@ -146,6 +146,7 @@ class Parameter:
         "_value",
         "_clamp_on_set",
         "_was_clamped",
+        "prior",
     )
 
     def __init__(
@@ -165,6 +166,7 @@ class Parameter:
         self._value: float | None = None
         self._clamp_on_set = False
         self._was_clamped = False
+        self.prior: dict[str, Any] | None = None
         if logger.isEnabledFor(10):  # logging.DEBUG == 10
             logger.debug(
                 "Creating parameter",
@@ -190,6 +192,9 @@ class Parameter:
                     if new_bounds is not None:
                         c.min_value = new_bounds[0]
                         c.max_value = new_bounds[1]
+                    else:
+                        c.min_value = None
+                        c.max_value = None
                     break
 
     def _initialize(self, value: float | None) -> None:

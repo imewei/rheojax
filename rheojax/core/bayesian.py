@@ -794,7 +794,11 @@ class BayesianMixin:
         # relying on implicit concatenation ordering from get_samples())
         try:
             samples_grouped = mcmc.get_samples(group_by_chain=True)
-        except Exception:
+        except Exception as exc:
+            logger.debug(
+                "group_by_chain failed, falling back to ungrouped samples",
+                error=str(exc),
+            )
             samples_grouped = None
 
         # Convert to numpy arrays (model parameters only)

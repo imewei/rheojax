@@ -290,7 +290,7 @@ def harmonic_reconstruction(
         sin_component = jnp.sum(stress_arr * jnp.sin(omega_n * t)) * 2.0 / n_points
 
         # Amplitude and phase
-        amplitude = jnp.sqrt(cos_component**2 + sin_component**2)
+        amplitude = jnp.sqrt(cos_component**2 + sin_component**2 + 1e-30)
         phase = jnp.arctan2(-cos_component, sin_component)
 
         return carry, (amplitude, phase)
@@ -763,10 +763,10 @@ def spp_fourier_analysis(
     rddd_dot_rd_x_rdd = jnp.sum(rddd * rd_x_rdd, axis=1)
     Gp_t_dot = -rd[:, 1] * rddd_dot_rd_x_rdd / jnp.maximum(rd_x_rdd[:, 2] ** 2, eps)
     Gpp_t_dot = rd[:, 0] * rddd_dot_rd_x_rdd / jnp.maximum(rd_x_rdd[:, 2] ** 2, eps)
-    G_speed = jnp.sqrt(Gp_t_dot**2 + Gpp_t_dot**2)
+    G_speed = jnp.sqrt(Gp_t_dot**2 + Gpp_t_dot**2 + 1e-30)
 
     # Complex modulus and phase angle
-    G_star_t = jnp.sqrt(Gp_t**2 + Gpp_t**2)
+    G_star_t = jnp.sqrt(Gp_t**2 + Gpp_t**2 + 1e-30)
     tan_delta_t = Gpp_t / jnp.maximum(jnp.abs(Gp_t), eps) * jnp.sign(Gp_t)
     is_Gp_neg = Gp_t < 0
     delta_t = jnp.arctan(tan_delta_t) + jnp.pi * is_Gp_neg
@@ -1727,10 +1727,10 @@ def spp_numerical_analysis(
     rddd_dot_rd_x_rdd = jnp.sum(rddd * rd_x_rdd, axis=1)
     Gp_t_dot = -rd[:, 1] * rddd_dot_rd_x_rdd / jnp.maximum(rd_x_rdd[:, 2] ** 2, eps)
     Gpp_t_dot = rd[:, 0] * rddd_dot_rd_x_rdd / jnp.maximum(rd_x_rdd[:, 2] ** 2, eps)
-    G_speed = jnp.sqrt(Gp_t_dot**2 + Gpp_t_dot**2)
+    G_speed = jnp.sqrt(Gp_t_dot**2 + Gpp_t_dot**2 + 1e-30)
 
     # Complex modulus magnitude
-    G_star_t = jnp.sqrt(Gp_t**2 + Gpp_t**2)
+    G_star_t = jnp.sqrt(Gp_t**2 + Gpp_t**2 + 1e-30)
 
     # Loss tangent and phase angle
     tan_delta_t = Gpp_t / jnp.maximum(jnp.abs(Gp_t), eps) * jnp.sign(Gp_t)

@@ -1100,8 +1100,16 @@ def nlsq_optimize(
     if compute_diagnostics:
         nlsq_kwargs["compute_diagnostics"] = compute_diagnostics
 
-    # Merge with user-provided kwargs
-    nlsq_kwargs.update(kwargs)
+    # Merge with user-provided kwargs, filtering out rheojax-specific ones
+    # that are not valid NLSQ optimizer parameters (prevents TypeError in NLSQ)
+    _RHEOJAX_RESERVED_KWARGS = {
+        "test_mode", "deformation_mode", "poisson_ratio",
+        "seed", "method", "num_warmup", "num_samples", "num_chains",
+        "gamma_dot", "sigma", "sigma_applied", "gamma_0", "omega_laos",
+        "return_components", "return_full", "t_wait", "n_cycles",
+    }
+    clean_kwargs = {k: v for k, v in kwargs.items() if k not in _RHEOJAX_RESERVED_KWARGS}
+    nlsq_kwargs.update(clean_kwargs)
 
     def _scipy_fallback(initial_guess: np.ndarray) -> OptimizationResult:
         """Fallback to SciPy's least_squares when NLSQ fails."""
@@ -1129,6 +1137,7 @@ def nlsq_optimize(
         )
         result = _scipy_fallback(x0)
         result.message = f"[SciPy fallback] {result.message} (NLSQ failed: {e})"
+        _validate_optimization_result(result)
         # Write back optimal params so model state reflects the fit
         parameters.set_values(result.x)
         return result
@@ -1765,6 +1774,8 @@ def nlsq_curve_fit(
         else:
             result = nlsq_optimize(objective, parameters, **kwargs)
 
+        # Annotate that this result came from a curve_fit→nlsq_optimize fallback
+        result.message = f"[curve_fit→nlsq_optimize fallback] {getattr(result, 'message', '')}"
         # Preserve y_data for R² calculation (not set by nlsq_optimize fallback)
         result.y_data = y_data_np
         result._model_fn = model_fn

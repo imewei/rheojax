@@ -372,10 +372,7 @@ class TestProtocolDataFactory:
 # =============================================================================
 
 # Protocols not yet implemented or not supported via predict()/simulate_*()
-_NOT_IMPLEMENTED = {
-    ("spp_yield_stress", "laos"),  # LAOS decomposition is via SPP transform, not predict
-    ("fluidity_saramito_nonlocal", "creep"),  # JAX checkpoint + string type in diffrax
-}
+_NOT_IMPLEMENTED: set[tuple[str, str]] = set()
 
 
 def _get_simulation_pairs() -> list[tuple[str, str]]:
@@ -444,9 +441,13 @@ def _run_simulation_test(model, model_name: str, protocol: str):
     if model_name == "stz_conventional" and protocol == "laos":
         return model.simulate_laos(gamma_0=0.1, omega=1.0, n_cycles=2)
 
-    # --- SPP flow curve ---
+    # --- SPP ---
     if model_name == "spp_yield_stress" and protocol == "flow_curve":
         return model.predict_flow_curve(gamma_dot_array=np.logspace(-2, 2, 10))
+    if model_name == "spp_yield_stress" and protocol == "laos":
+        return model.predict_amplitude_sweep(
+            gamma_0_array=np.logspace(-1, 1, 10), omega=1.0
+        )
 
     # --- Setup-then-predict for remaining cases ---
     return _setup_and_predict(model, model_name, protocol)

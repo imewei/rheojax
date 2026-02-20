@@ -248,8 +248,8 @@ class RheoData:
             "Converting RheoData to JAX arrays", from_type="numpy", to_type="jax"
         )
         result = RheoData(
-            x=jnp.array(self.x),
-            y=jnp.array(self.y),
+            x=jnp.array(self.x, dtype=jnp.float64),
+            y=jnp.array(self.y, dtype=jnp.float64),
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
