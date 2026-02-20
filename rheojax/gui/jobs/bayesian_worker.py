@@ -146,7 +146,7 @@ class BayesianWorker(QRunnable):
         num_chains: int = 4,
         warm_start: dict[str, float] | None = None,
         priors: dict[str, Any] | None = None,
-        seed: int = 0,
+        seed: int = 42,
         cancel_token: CancellationToken | None = None,
         deformation_mode: str | None = None,
         poisson_ratio: float | None = None,

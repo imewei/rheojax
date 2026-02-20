@@ -1353,7 +1353,7 @@ class BayesianPage(QWidget):
                 # Export as JSON
                 export_data = {
                     "model_name": result.model_name,
-                    "dataset_id": result.dataset_id,
+                    "dataset_id": getattr(result, "dataset_id", "unknown"),
                     "num_samples": result.num_samples,
                     "num_chains": result.num_chains,
                     "r_hat": result.r_hat,
@@ -1460,7 +1460,7 @@ class BayesianPage(QWidget):
         # Find result for this model
         target_result = None
         for result in state.bayesian_results.values():
-            if result.model_name == model_id or model_id in str(result.dataset_id):
+            if result.model_name == model_id or model_id in str(getattr(result, "dataset_id", "")):
                 target_result = result
                 break
 

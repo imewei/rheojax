@@ -58,7 +58,7 @@ class ResultsPanel(QWidget):
 
         lines = [
             f"Model: {result.model_name}",
-            f"Dataset: {result.dataset_id}",
+            f"Dataset: {getattr(result, 'dataset_id', 'N/A')}",
             f"R²: {result.r_squared:.4f}",
             f"MPE: {result.mpe:.2f}%",
             f"χ²: {result.chi_squared:.4f}",
@@ -87,7 +87,7 @@ class ResultsPanel(QWidget):
 
         lines = [
             f"Model: {result.model_name}",
-            f"Dataset: {result.dataset_id}",
+            f"Dataset: {getattr(result, 'dataset_id', 'N/A')}",
             f"Samples: {result.num_samples} x {result.num_chains} chains",
             f"Time: {result.sampling_time:.2f} s",
             f"Divergences: {result.diagnostics.get('divergences', 0)}",

@@ -138,7 +138,7 @@ class FitResult:
         Y values for fitted curve
     pcov : np.ndarray, optional
         Parameter covariance matrix (n_params x n_params) for uncertainty bands
-    metadata : dict
+    metadata : dict, optional
         Additional metadata (convergence info, etc.)
     """
 
@@ -151,7 +151,7 @@ class FitResult:
     x_fit: np.ndarray
     y_fit: np.ndarray
     pcov: np.ndarray | None = None
-    metadata: dict[str, Any] = None
+    metadata: dict[str, Any] | None = None
 
 
 class ModelService:
@@ -698,15 +698,16 @@ class ModelService:
                                 "value",
                                 value.get("default", model.parameters[name].value),
                             )
-                            model.parameters[name].value = param_val
+                            # Use set_value() to enforce bounds validation (F-007 fix)
+                            model.parameters.set_value(name, param_val)
                             if value.get("fixed"):
                                 # Lock parameter by setting bounds to (value, value)
                                 model.parameters[name].bounds = (param_val, param_val)
                             elif "bounds" in value:
                                 model.parameters[name].bounds = value["bounds"]
                         else:
-                            # Handle direct value
-                            model.parameters[name].value = value
+                            # Handle direct value — use set_value() for validation
+                            model.parameters.set_value(name, value)
                 logger.debug("Initial parameters set", n_params=len(params))
 
             # Extract data
@@ -877,10 +878,20 @@ class ModelService:
                     "njev": model._nlsq_result.njev,
                 }
 
+            # Propagate convergence status from NLSQ result (F-013 fix)
+            fit_success = True
+            fit_message = "Fit successful"
+            if nlsq_result is not None:
+                fit_success = getattr(nlsq_result, "success", True)
+                fit_message = getattr(nlsq_result, "message", fit_message)
+            elif hasattr(model, "_nlsq_result") and model._nlsq_result:
+                fit_success = getattr(model._nlsq_result, "success", True)
+                fit_message = getattr(model._nlsq_result, "message", fit_message)
+
             logger.info(
                 "Model fit complete",
                 model=model_name,
-                success=True,
+                success=fit_success,
                 r_squared=r_squared,
                 chi_squared=chi_squared,
                 rmse=rmse,
@@ -892,8 +903,8 @@ class ModelService:
                 parameters=fitted_params,
                 residuals=residuals,
                 chi_squared=chi_squared,
-                success=True,
-                message="Fit successful",
+                success=fit_success,
+                message=fit_message,
                 x_fit=x,
                 y_fit=y_pred,
                 pcov=pcov,
