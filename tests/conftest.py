@@ -620,8 +620,10 @@ def load_all_plugins():
     This ensures that all plugins are registered before any tests run,
     preventing registry isolation issues in the full test suite.
     """
-    # Import all model modules to trigger registration
-    import rheojax.models
+    # Eagerly import all model submodules to trigger @ModelRegistry.register
+    from rheojax.models import _ensure_all_registered
+
+    _ensure_all_registered()
 
     # Import all transform modules to trigger registration
     import rheojax.transforms
