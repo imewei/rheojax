@@ -65,6 +65,18 @@ class FitResult:
         Number of optimization iterations
     success : bool, optional
         Whether optimization converged successfully
+    message : str, optional
+        Convergence message from the optimizer
+    pcov : Any, optional
+        Parameter covariance matrix
+    rmse : float, optional
+        Root mean squared error
+    mae : float, optional
+        Mean absolute error
+    aic : float, optional
+        Akaike information criterion
+    bic : float, optional
+        Bayesian information criterion
     """
 
     model_name: str
@@ -76,9 +88,15 @@ class FitResult:
     timestamp: datetime
     n_iterations: int | None = None
     success: bool = True
+    message: str = ""
     x_fit: Any | None = None
     y_fit: Any | None = None
     residuals: Any | None = None
+    pcov: Any | None = None
+    rmse: float | None = None
+    mae: float | None = None
+    aic: float | None = None
+    bic: float | None = None
 
 
 class FitWorkerSignals(QObject):
@@ -256,10 +274,16 @@ class FitWorker(QRunnable):
                 fit_time=fit_time,
                 timestamp=datetime.now(),
                 n_iterations=n_iterations,
-                success=True,
+                success=getattr(service_result, "success", False),
+                message=getattr(service_result, "message", ""),
                 x_fit=getattr(service_result, "x_fit", None),
                 y_fit=getattr(service_result, "y_fit", None),
                 residuals=getattr(service_result, "residuals", None),
+                pcov=getattr(service_result, "pcov", None),
+                rmse=float(metadata.get("rmse", 0.0)) if metadata.get("rmse") is not None else None,
+                mae=float(metadata.get("mae", 0.0)) if metadata.get("mae") is not None else None,
+                aic=float(metadata.get("aic", 0.0)) if metadata.get("aic") is not None else None,
+                bic=float(metadata.get("bic", 0.0)) if metadata.get("bic") is not None else None,
             )
 
             logger.info(

@@ -1263,7 +1263,7 @@ class RheoJAXMainWindow(QMainWindow):
         dataset_id = meta.get("dataset_id") or state.active_dataset_id
         model_name = meta.get("model_name") or state.active_model_name
         if job_type == "fit":
-            fit_success = getattr(result, "success", True)
+            fit_success = getattr(result, "success", False)
             if fit_success:
                 # Persist result in state and refresh UI
                 self.store.dispatch(

@@ -162,7 +162,7 @@ def main(args: list[str] | None = None) -> int:
             if not data:
                 print("Error: No data segments found in file", file=sys.stderr)
                 return 1
-            print(f"Note: File contains {len(data)} segments, using first segment")
+            logger.warning("File contains %d segments, using first segment", len(data))
             data = data[0]
 
         logger.debug("Data loaded", shape=str(data.x.shape))
@@ -192,7 +192,9 @@ def main(args: list[str] | None = None) -> int:
             test_mode = data.metadata.get("test_mode")
     if test_mode is None:
         test_mode = "oscillation"
-        print(f"Note: No test mode detected, defaulting to '{test_mode}'")
+        logger.warning(
+            "No test mode detected, defaulting to '%s'", test_mode
+        )
 
     # Run fit
     try:

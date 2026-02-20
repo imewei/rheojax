@@ -242,8 +242,8 @@ class WorkerPool(QObject):
             # Preserve job_id on the worker for debugging.
             try:
                 worker.job_id = job_id  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not set job_id on worker", error=str(exc))
             if isinstance(signals, QObject):
                 self._job_signals[job_id] = signals
                 # Tag signals object with job_id for direct lookup

@@ -437,11 +437,9 @@ class StateStore:
                 self.emit_signal("bayesian_progress", "", int(progress))
 
             elif action_type == "BAYESIAN_COMPLETED":
-                self.emit_signal(
-                    "bayesian_completed",
-                    str(action.get("model_name", "")),
-                    str(action.get("dataset_id", "")),
-                )
+                # Signal emission handled by STORE_BAYESIAN_RESULT to avoid
+                # duplicate bayesian_completed signals when both actions fire.
+                pass
 
             elif action_type == "BAYESIAN_FAILED":
                 error = action.get("error", "")
@@ -1084,7 +1082,7 @@ class StateStore:
                         model_name=model_name,
                         dataset_id=str(dataset_id),
                         posterior_samples=getattr(result, "posterior_samples", {}),
-                        r_hat=diag.get("r_hat", {}) or getattr(result, "r_hat", {}),
+                        r_hat=diag.get("r_hat", diag.get("rhat", {})) or getattr(result, "r_hat", {}),
                         ess=diag.get("ess", {}) or getattr(result, "ess", {}),
                         divergences=int(
                             diag.get("divergences", 0)

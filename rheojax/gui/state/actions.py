@@ -374,8 +374,8 @@ def store_fit_result(result: FitResult) -> None:
     store.dispatch(
         "STORE_FIT_RESULT",
         {
-            "model_name": result.model_name,
-            "dataset_id": result.dataset_id,
+            "model_name": getattr(result, "model_name", "unknown"),
+            "dataset_id": getattr(result, "dataset_id", "unknown"),
             "result": result,
         },
     )
@@ -560,8 +560,8 @@ def store_bayesian_result(result: BayesianResult) -> None:
     store.dispatch(
         "STORE_BAYESIAN_RESULT",
         {
-            "model_name": result.model_name,
-            "dataset_id": result.dataset_id,
+            "model_name": getattr(result, "model_name", "unknown"),
+            "dataset_id": getattr(result, "dataset_id", "unknown"),
             "result": result,
         },
     )

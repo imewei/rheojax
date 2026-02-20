@@ -490,9 +490,10 @@ class DiagnosticsPage(QWidget):
             else:
                 self._set_table_value_color(5, ColorPalette.SUCCESS)  # Green
 
-        # Get divergences
-        values["Divergences"] = str(result.divergences)
-        if result.divergences > 0:
+        # Get divergences (-1 = unknown/unavailable)
+        display_divergences = max(result.divergences, 0)
+        values["Divergences"] = "unknown" if result.divergences == -1 else str(display_divergences)
+        if display_divergences > 0:
             self._set_table_value_color(7, ColorPalette.ERROR)  # Red
         else:
             self._set_table_value_color(7, ColorPalette.SUCCESS)  # Green
@@ -642,5 +643,5 @@ class DiagnosticsPage(QWidget):
             "min_ess": min(result.ess.values()) if result.ess else None,
             "converged": (max(result.r_hat.values()) < 1.1 if result.r_hat else False)
             and (min(result.ess.values()) > 400 if result.ess else False)
-            and result.divergences == 0,
+            and result.divergences <= 0,  # 0 = no divergences, -1 = unknown
         }

@@ -509,6 +509,8 @@ class BayesianPage(QWidget):
             num_samples=config.get("num_samples", 2000),
             num_chains=config.get("num_chains", 4),
             warm_start=warm_start_dict,
+            priors=config.get("priors"),
+            seed=config.get("seed", state.current_seed),
             deformation_mode=deform_text if deform_text != "shear" else None,
             poisson_ratio=poisson_val if deform_text != "shear" else None,
         )
@@ -821,8 +823,10 @@ class BayesianPage(QWidget):
         else:
             self._ess_label.setText("ESS: --")
 
-        # Divergences
+        # Divergences (-1 = unknown/unavailable)
         divergences = result.diagnostics.get("divergences", 0)
+        if divergences == -1:
+            divergences = 0  # Treat unknown as zero for display
         if divergences > 0:
             self._divergence_label.setText(f"Divergences: {divergences}")
             self._divergence_label.setStyleSheet(
@@ -1194,7 +1198,11 @@ class BayesianPage(QWidget):
 
             ax.legend()
         except Exception:
-            pass
+            logger.error(
+                "Failed to plot credible intervals",
+                page="BayesianPage",
+                exc_info=True,
+            )
 
         self._set_fit_plot_figure(fig)
 
