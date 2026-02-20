@@ -612,3 +612,124 @@ def run_laos(
     stress_full = jnp.concatenate([jnp.array([0.0]), stress_hist])
 
     return jnp.interp(time, time_full, stress_full)
+
+
+def saos_kernel(
+    omega_val: float,
+    alpha: float,
+    tau: float,
+    sigma_c: float,
+    gamma0: float = 0.01,
+    n_cycles: int = 10,
+    dt: float | None = None,
+    sigma_max: float = 5.0,
+    n_bins: int = 501,
+) -> tuple[float, float]:
+    """Extract G'(omega) and G''(omega) from small-amplitude LAOS.
+
+    Runs laos_kernel at small gamma0 (linear regime), then FFTs the last
+    cycle to extract the first harmonic.
+
+    Phase convention:
+        gamma(t) = gamma0 * sin(omega*t)
+        sigma(t) = gamma0 * [G' * sin(omega*t) + G'' * cos(omega*t)]
+
+    Args:
+        omega_val: Angular frequency (rad/s)
+        alpha: HL diffusion parameter
+        tau: Structural relaxation time (s)
+        sigma_c: Yield stress scale (Pa)
+        gamma0: Strain amplitude (default 0.01 for linear regime)
+        n_cycles: Number of oscillation cycles to simulate
+        dt: Time step (auto-computed if None)
+        sigma_max: Stress grid maximum
+        n_bins: Number of grid bins
+
+    Returns:
+        (G_prime, G_double_prime) tuple
+    """
+    period = 2.0 * jnp.pi / omega_val
+    if dt is None:
+        dt = min(0.005, float(period) / 100.0)
+
+    t_max = n_cycles * period
+    n_steps = int(t_max / dt) + 1
+
+    time_hist, stress_hist = laos_kernel(
+        n_steps, gamma0, omega_val, alpha, tau, sigma_c, dt, sigma_max, n_bins
+    )
+
+    # Extract last cycle
+    last_cycle_start = (n_cycles - 1) * period
+    mask = time_hist >= last_cycle_start
+    # Number of points in the last cycle
+    n_last = int(period / dt)
+    t_last = time_hist[-n_last:]
+    s_last = stress_hist[-n_last:]
+
+    # Fourier projection onto sin and cos at fundamental frequency
+    phase = omega_val * t_last
+    sin_vals = jnp.sin(phase)
+    cos_vals = jnp.cos(phase)
+
+    # Normalize: <sin^2> = 0.5, so multiply by 2/N
+    n_pts = len(t_last)
+    G_prime = 2.0 * jnp.sum(s_last * sin_vals) / (n_pts * gamma0)
+    G_double_prime = 2.0 * jnp.sum(s_last * cos_vals) / (n_pts * gamma0)
+
+    return float(G_prime), float(G_double_prime)
+
+
+def run_saos(
+    omega: Array,
+    alpha: float,
+    tau: float,
+    sigma_c: float,
+    gamma0: float = 0.01,
+    n_cycles: int = 10,
+    sigma_max: float = 5.0,
+    n_bins: int = 501,
+) -> Array:
+    """Compute G'(omega) and G''(omega) over a frequency array.
+
+    Args:
+        omega: Angular frequency array (rad/s)
+        alpha: HL diffusion parameter
+        tau: Structural relaxation time (s)
+        sigma_c: Yield stress scale (Pa)
+        gamma0: Strain amplitude (default 0.01)
+        n_cycles: Number of cycles per frequency
+        sigma_max: Stress grid maximum
+        n_bins: Number of grid bins
+
+    Returns:
+        Array of shape (M, 2) with columns [G', G'']
+    """
+    omega_np = jnp.asarray(omega)
+    n_freqs = len(omega_np)
+
+    G_prime_list = []
+    G_double_prime_list = []
+
+    for i in range(n_freqs):
+        omega_i = float(omega_np[i])
+        period_i = 2.0 * jnp.pi / omega_i
+        dt_i = min(0.005, float(period_i) / 100.0)
+
+        Gp, Gpp = saos_kernel(
+            omega_i,
+            alpha,
+            tau,
+            sigma_c,
+            gamma0=gamma0,
+            n_cycles=n_cycles,
+            dt=dt_i,
+            sigma_max=sigma_max,
+            n_bins=n_bins,
+        )
+        G_prime_list.append(Gp)
+        G_double_prime_list.append(Gpp)
+
+    return jnp.column_stack(
+        [jnp.array(G_prime_list), jnp.array(G_double_prime_list)]
+    )

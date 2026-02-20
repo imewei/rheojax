@@ -27,7 +27,9 @@ from rheojax.utils.hl_kernels import (
     run_flow_curve,
     run_laos,
     run_relaxation,
+    run_saos,
     run_startup,
+    saos_kernel,
     startup_kernel,
 )
 
@@ -191,7 +193,13 @@ class HebraudLequeux(BaseModel):
             raise ValueError("test_mode must be specified for HL fitting")
 
         self._test_mode = test_mode
-        self._last_fit_kwargs = kwargs
+        # Strip optimization meta-kwargs injected by BaseModel.fit() —
+        # these are consumed by _fit() and should not leak to model_function.
+        _optimization_keys = {"use_log_residuals", "use_multi_start", "n_starts",
+                              "perturb_factor", "_optimization_meta", "method"}
+        self._last_fit_kwargs = {
+            k: v for k, v in kwargs.items() if k not in _optimization_keys
+        }
 
         # Store metadata for Bayesian reconstruction
         if len(X) > 0:
@@ -217,12 +225,7 @@ class HebraudLequeux(BaseModel):
             elif test_mode == "laos":
                 self._fit_laos(X, y, **kwargs)
             elif test_mode == "saos" or test_mode == "oscillation":
-                # SAOS fitting not fully implemented yet, but prevent dispatch error
-                # For now, we can alias to flow_curve if structurally similar
-                # OR just raise NotImplementedError instead of ValueError
-                raise NotImplementedError(
-                    f"Fitting mode '{test_mode}' not implemented yet"
-                )
+                self._fit_oscillation(X, y, **kwargs)
             else:
                 raise ValueError(f"Unsupported test mode: {test_mode}")
 
@@ -364,6 +367,20 @@ class HebraudLequeux(BaseModel):
         self._last_fit_kwargs["_n_bins_fit"] = n_bins_fit
         sc_phys = float(self.parameters.get_value("sigma_c") or 1.0)
         self._last_fit_kwargs["_sigma_max"] = max(5.0, self.grid_sigma_factor * sc_phys)
+
+        # Precompute per-rate schedule for Bayesian model_function.
+        # This avoids np.asarray(X_jax) inside JIT which can fail if
+        # jit_model_args=True or NumPyro traces model arguments.
+        sc_norm_est = (sc_phys / stress_scale) if stress_scale > 0 else 1.0
+        sigma_max_norm = max(5.0 * sc_norm_est, sigma_max_min)
+        ds = 2.0 * sigma_max_norm / (n_bins_fit - 1)
+        tau_est = float(self.parameters.get_value("tau") or 1.0)
+        self._last_fit_kwargs["_precomputed_schedule"] = [
+            _compute_dt_and_steps_for_rate(
+                abs(float(gdot[i])), tau_est, sc_norm_est, ds=ds
+            )
+            for i in range(len(gdot))
+        ]
 
     def _fit_creep(self, t: np.ndarray, compliance: np.ndarray, **kwargs):
         """Fit creep compliance."""
@@ -569,6 +586,110 @@ class HebraudLequeux(BaseModel):
         if not result.success:
             logger.warning(f"Optimization warning: {result.message}")
 
+    def _fit_oscillation(self, omega: np.ndarray, G_star: np.ndarray, **kwargs):
+        """Fit SAOS oscillatory data (G', G'').
+
+        Uses scipy L-BFGS-B with log-space MSE cost, consistent with
+        the HL fitting pattern for derivative-free optimization.
+
+        Args:
+            omega: Angular frequency array (rad/s)
+            G_star: Complex modulus — either complex array or (M, 2) [G', G'']
+            **kwargs: Additional fitting arguments
+        """
+        from scipy.optimize import minimize
+
+        # Parse complex or (M, 2) format
+        if np.iscomplexobj(G_star):
+            G_prime_data = np.real(G_star)
+            G_double_prime_data = np.imag(G_star)
+        elif G_star.ndim == 2 and G_star.shape[1] == 2:
+            G_prime_data = G_star[:, 0]
+            G_double_prime_data = G_star[:, 1]
+        else:
+            raise ValueError(
+                "G_star must be complex array or (M, 2) array of [G', G'']"
+            )
+
+        # Grid sizing
+        sigma_max, n_bins = self._get_grid_params()
+        n_cycles = kwargs.get("n_cycles", 10)
+        gamma0_saos = kwargs.get("gamma0", 0.01)
+
+        # Safe log targets
+        Gp_safe = np.maximum(np.abs(G_prime_data), 1e-10)
+        Gpp_safe = np.maximum(np.abs(G_double_prime_data), 1e-10)
+
+        def cost_fn(x):
+            alpha_v = x[0]
+            tau_v = 10.0 ** x[1]
+            sigma_c_v = x[2]
+            if not (0.01 <= alpha_v <= 0.99):
+                return 1e6
+            if not (0.01 <= sigma_c_v <= 100.0):
+                return 1e6
+            try:
+                result = run_saos(
+                    jnp.asarray(omega),
+                    alpha_v,
+                    tau_v,
+                    sigma_c_v,
+                    gamma0=gamma0_saos,
+                    n_cycles=n_cycles,
+                    sigma_max=sigma_max,
+                    n_bins=n_bins,
+                )
+                pred = np.array(result)
+                pred_Gp = np.maximum(np.abs(pred[:, 0]), 1e-10)
+                pred_Gpp = np.maximum(np.abs(pred[:, 1]), 1e-10)
+                log_resid_Gp = np.log10(pred_Gp) - np.log10(Gp_safe)
+                log_resid_Gpp = np.log10(pred_Gpp) - np.log10(Gpp_safe)
+                return float(np.mean(log_resid_Gp**2 + log_resid_Gpp**2))
+            except Exception:
+                return 1e6
+
+        # Multi-start optimization
+        starts = [
+            [0.30, -1.0, 2.0],
+            [0.10, -2.0, 3.0],
+            [0.50, 0.0, 1.0],
+        ]
+        best_x = starts[0]
+        best_cost = np.inf
+
+        for i, x0 in enumerate(starts):
+            try:
+                res = minimize(
+                    cost_fn,
+                    x0,
+                    method="Nelder-Mead",
+                    options={"maxfev": 60, "xatol": 0.02, "fatol": 0.005, "adaptive": True},
+                )
+                if res.fun < best_cost:
+                    best_cost = res.fun
+                    best_x = res.x.copy()
+                    logger.info(
+                        f"SAOS start {i+1}/{len(starts)}: cost={res.fun:.5f}, "
+                        f"alpha={res.x[0]:.3f}, tau={10**res.x[1]:.3e}, "
+                        f"sigma_c={res.x[2]:.3f}"
+                    )
+            except Exception as e:
+                logger.warning(f"SAOS start {i+1} failed: {e}")
+
+        # Set fitted parameters
+        alpha_fit = float(np.clip(best_x[0], 0.01, 0.99))
+        tau_fit = float(10.0 ** np.clip(best_x[1], -6, 4))
+        sigma_c_fit = float(np.clip(best_x[2], 0.01, 100.0))
+
+        self.parameters.set_value("alpha", alpha_fit)
+        self.parameters.set_value("tau", tau_fit)
+        self.parameters.set_value("sigma_c", sigma_c_fit)
+
+        logger.info(
+            f"HL SAOS fit: alpha={alpha_fit:.3f}, tau={tau_fit:.3e}, "
+            f"sigma_c={sigma_c_fit:.3f}, cost={best_cost:.5f}"
+        )
+
     def _predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """Predict response using fitted parameters and stored test_mode."""
         if self._test_mode is None:
@@ -687,6 +808,17 @@ class HebraudLequeux(BaseModel):
                     int(n_bins),
                 )
             )
+        elif self._test_mode in ("oscillation", "saos"):
+            return np.array(
+                run_saos(
+                    X_jax,
+                    float(alpha or 0.5),
+                    float(tau or 1.0),
+                    float(sigma_c or 1.0),
+                    sigma_max=float(sigma_max),
+                    n_bins=int(n_bins),
+                )
+            )
         else:
             raise ValueError(f"Unknown test mode: {self._test_mode}")
 
@@ -755,16 +887,20 @@ class HebraudLequeux(BaseModel):
             ds = 2.0 * sigma_max_norm / (n_bins_bayes - 1)
 
             try:
-                X_np = np.asarray(X_jax)  # Single vectorized transfer
-                schedule = [
-                    _compute_dt_and_steps_for_rate(
-                        abs(float(X_np[i])),
-                        tau_est,
-                        sc_norm_est,
-                        ds=ds,
-                    )
-                    for i in range(len(X_np))
-                ]
+                # Use precomputed schedule from _fit() if available —
+                # avoids np.asarray(X_jax) which can fail during JIT tracing.
+                schedule = self._last_fit_kwargs.get("_precomputed_schedule")
+                if schedule is None:
+                    X_np = np.asarray(X_jax)
+                    schedule = [
+                        _compute_dt_and_steps_for_rate(
+                            abs(float(X_np[i])),
+                            tau_est,
+                            sc_norm_est,
+                            ds=ds,
+                        )
+                        for i in range(len(X_np))
+                    ]
                 # sigma_c tracer divided by stress_scale to get normalized
                 sigma_c_norm = sigma_c / stress_scale
                 pred_norm = run_flow_curve(
@@ -836,6 +972,18 @@ class HebraudLequeux(BaseModel):
             time_full = jnp.concatenate([jnp.array([0.0]), time_hist])
             stress_full = jnp.concatenate([jnp.array([0.0]), stress_hist])
             return jnp.interp(X_jax, time_full, stress_full)
+
+        elif mode in ("oscillation", "saos"):
+            # SAOS for Bayesian: use fewer cycles for speed
+            return run_saos(
+                X_jax,
+                alpha,
+                tau,
+                sigma_c,
+                n_cycles=5,
+                sigma_max=sigma_max,
+                n_bins=n_bins,
+            )
 
         else:
             raise ValueError(f"Unknown test mode for Bayesian: {mode}")
