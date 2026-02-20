@@ -215,6 +215,11 @@ filterwarnings = [
     # Suppress warnings from dependencies
     "ignore:invalid value encountered:RuntimeWarning:scipy",
     "ignore:invalid value encountered:RuntimeWarning:nlsq",
+    # Equinox DeprecationWarnings from JAX internals
+    "ignore:jax.core.mapped_aval is deprecated:DeprecationWarning",
+    "ignore:jax.core.unmapped_aval is deprecated:DeprecationWarning",
+    # SGR shear banding physics warning (expected in tests)
+    "ignore:Shear banding detected in flow curve:UserWarning",
 ]
 
 [tool.black]
