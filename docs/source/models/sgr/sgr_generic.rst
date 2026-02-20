@@ -9,7 +9,7 @@ Quick Reference
 - **Use when:** Thermodynamic consistency required, entropy production analysis, nonequilibrium thermodynamics research
 - **Parameters:** 4+ (:math:`x`, :math:`G_0`, :math:`\tau_0`, dissipation parameters)
 - **Key equation:** GENERIC framework with Poisson bracket + friction matrix
-- **Test modes:** Oscillation, relaxation, nonequilibrium thermodynamics validation
+- **Test modes:** Oscillation, relaxation, creep, startup, steady shear (flow curve), LAOS
 - **Material examples:** Same as SGR Conventional, plus thermodynamic model validation
 
 Notation Guide
@@ -994,6 +994,7 @@ Entropy Production Analysis
 
 .. code-block:: python
 
+   import numpy as np
    from rheojax.models import SGRGeneric
 
    model = SGRGeneric()
@@ -1002,8 +1003,9 @@ Entropy Production Analysis
    model.parameters.set_value('tau0', 0.01)
 
    # Compute entropy production under steady shear
-   gamma_dot = 1.0  # s^-1
-   S_dot = model.entropy_production_rate(gamma_dot)
+   # State vector: [sigma, lambda] where lambda is structural parameter
+   state = np.array([50.0, 0.8])  # stress=50 Pa, lambda=0.8
+   S_dot = model.entropy_production_rate(state)
 
    print(f"Entropy production rate: {S_dot:.4f} J/(K·m³·s)")
 
@@ -1023,11 +1025,11 @@ Free Energy Landscape
    model.parameters.set_value('G0', 100.0)
    model.parameters.set_value('tau0', 0.01)
 
-   # Compute free energy as function of mean strain
-   strains = np.linspace(-1, 1, 100)
-   F = model.free_energy(strains)
+   # Compute free energy for a given state [sigma, lambda]
+   state = np.array([10.0, 0.5])  # stress=10 Pa, lambda=0.5
+   F = model.free_energy(state)
 
-   # For x < 1, free energy has multiple minima (glassy metastability)
+   # For x < 1, the free energy landscape has multiple minima (glassy metastability)
 
 Fluctuation-Dissipation Verification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1096,6 +1098,7 @@ Thermodynamic Validation
 
 .. code-block:: python
 
+   import numpy as np
    from rheojax.models import SGRGeneric
 
    model = SGRGeneric()
@@ -1105,7 +1108,8 @@ Thermodynamic Validation
 
    # Fit to data, then check entropy production for thermodynamic consistency
    model.fit(omega, G_star_data, test_mode='oscillation')
-   S_prod = model.entropy_production_rate(gamma_dot=1.0)
+   state = np.array([50.0, 0.8])  # representative [sigma, lambda]
+   S_prod = model.entropy_production_rate(state)
    print(f"Entropy production rate: {S_prod:.4f} (should be >= 0)")
 
 Comparison with Conventional SGR
@@ -1136,7 +1140,8 @@ Comparison with Conventional SGR
    np.testing.assert_allclose(G_conv, G_generic, rtol=1e-10)
 
    # But SGRGeneric provides additional thermodynamic information
-   S_prod = generic.entropy_production_rate(gamma_dot=1.0)
+   state = np.array([50.0, 0.8])  # representative [sigma, lambda]
+   S_prod = generic.entropy_production_rate(state)
    print(f"Entropy production: {S_prod:.4f}")
 
 See Also

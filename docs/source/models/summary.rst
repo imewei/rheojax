@@ -242,7 +242,7 @@ The table below provides a comprehensive overview of all models across key chara
    * - :doc:`SGR GENERIC </models/sgr/sgr_generic>`
      - SGR
      - 3
-     - R, C, O
+     - R, C, O, Flow, Startup, LAOS
      - Soft Glass
      - No (flows)
      - ★★★★★
@@ -359,7 +359,7 @@ The table below provides a comprehensive overview of all models across key chara
    * - :doc:`Hébraud-Lequeux </models/hl/hebraud_lequeux>`
      - HL
      - 3-4
-     - R, O
+     - R, C, O, Flow, Startup, LAOS
      - Soft matter
      - No
      - ★★★★☆
