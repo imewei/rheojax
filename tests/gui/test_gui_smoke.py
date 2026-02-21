@@ -359,13 +359,15 @@ class TestStateManagement:
 
         result = FitResult(
             model_name="Maxwell",
-            dataset_id="test-123",
             parameters={"G0": 1000.0, "tau": 0.1},
+            chi_squared=0.01,
+            success=True,
+            message="Converged successfully",
+            timestamp=datetime.now(),
+            dataset_id="test-123",
             r_squared=0.95,
             mpe=0.05,
-            chi_squared=0.01,
             fit_time=0.5,
-            timestamp=datetime.now(),
             num_iterations=42,
             convergence_message="Converged successfully",
         )
@@ -387,13 +389,15 @@ class TestStateManagement:
 
         original = FitResult(
             model_name="Zener",
-            dataset_id="test",
             parameters={"G0": 1000.0, "tau": 0.1},
+            chi_squared=0.01,
+            success=True,
+            message="Converged",
+            timestamp=datetime.now(),
+            dataset_id="test",
             r_squared=0.95,
             mpe=0.05,
-            chi_squared=0.01,
             fit_time=0.5,
-            timestamp=datetime.now(),
         )
 
         cloned = original.clone()
@@ -401,6 +405,76 @@ class TestStateManagement:
         assert cloned.model_name == original.model_name
         assert cloned.parameters is not original.parameters
         assert cloned is not original
+
+    @pytest.mark.smoke
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
+    def test_bayesian_result_single_source(self) -> None:
+        """BayesianResult should only be defined in gui/state/store.py."""
+        from rheojax.gui.state.store import BayesianResult as StoreBR
+        from rheojax.gui.services.bayesian_service import BayesianResult as ServiceBR
+        from rheojax.gui.jobs.bayesian_worker import BayesianResult as WorkerBR
+
+        assert StoreBR is ServiceBR, "Service BayesianResult should be imported from store"
+        assert StoreBR is WorkerBR, "Worker BayesianResult should be imported from store"
+
+    @pytest.mark.smoke
+    @pytest.mark.skipif(
+        not HAS_PYSIDE6, reason="PySide6 not installed (state/__init__.py requires it)"
+    )
+    def test_bayesian_result_canonical_fields(self) -> None:
+        """BayesianResult should have all canonical fields."""
+        from datetime import datetime
+
+        from rheojax.gui.state.store import BayesianResult
+
+        result = BayesianResult(
+            model_name="maxwell",
+            dataset_id="ds-001",
+            posterior_samples={"G": [1.0, 2.0]},
+            summary={"G": {"mean": 1.5}},
+            r_hat={"G": 1.001},
+            ess={"G": 500.0},
+            divergences=0,
+            credible_intervals={"G": (0.8, 2.2)},
+            mcmc_time=12.5,
+            timestamp=datetime.now(),
+            num_warmup=500,
+            num_samples=1000,
+            num_chains=4,
+        )
+        assert result.sampling_time == 12.5
+        assert result.diagnostics["r_hat"] == {"G": 1.001}
+        assert result.diagnostics["ess"] == {"G": 500.0}
+        assert result.diagnostics["divergences"] == 0
+
+    @pytest.mark.smoke
+    def test_protocol_to_test_mode_mapping(self) -> None:
+        """Protocol enums should map to test mode strings."""
+        from rheojax.core.inventory import Protocol
+
+        expected = {
+            Protocol.OSCILLATION: "oscillation",
+            Protocol.RELAXATION: "relaxation",
+            Protocol.CREEP: "creep",
+            Protocol.STARTUP: "startup",
+            Protocol.FLOW_CURVE: "flow_curve",
+            Protocol.LAOS: "laos",
+        }
+        for protocol, mode_str in expected.items():
+            assert protocol.value == mode_str
+
+    @pytest.mark.smoke
+    def test_fractional_model_protocols(self) -> None:
+        """Fractional models should only report OSCILLATION, RELAXATION, CREEP."""
+        from rheojax.core.inventory import Protocol
+        from rheojax.core.registry import ModelRegistry
+
+        info = ModelRegistry.get_info("fractional_zener_ss")
+        assert info is not None
+        protocol_values = {p.value for p in info.protocols}
+        assert protocol_values == {"oscillation", "relaxation", "creep"}
 
 
 # =============================================================================
