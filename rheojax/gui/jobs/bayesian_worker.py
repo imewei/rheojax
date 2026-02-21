@@ -7,7 +7,6 @@ Background worker for Bayesian inference with NUTS sampling.
 
 import time
 import traceback
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -33,53 +32,13 @@ except ImportError:
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.gui.jobs.cancellation import CancellationError, CancellationToken
+from rheojax.gui.state.store import BayesianResult
 from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class BayesianResult:
-    """Results from Bayesian inference with NUTS sampling.
-
-    Attributes
-    ----------
-    model_name : str
-        Name of the fitted model
-    posterior_samples : dict
-        Dictionary mapping parameter names to posterior samples
-    summary : dict
-        Summary statistics (mean, std, quantiles) for each parameter
-    diagnostics : dict
-        Convergence diagnostics (R-hat, ESS, divergences)
-    num_samples : int
-        Number of posterior samples per chain
-    num_chains : int
-        Number of MCMC chains
-    sampling_time : float
-        Total sampling duration in seconds
-    timestamp : datetime
-        When the sampling was completed
-    credible_intervals : dict, optional
-        Credible intervals for each parameter
-    inference_data : Any, optional
-        Full ArviZ InferenceData with sample_stats for energy plots
-    """
-
-    model_name: str
-    posterior_samples: dict[str, Any]
-    summary: dict[str, dict[str, float]]
-    diagnostics: dict[str, Any]
-    num_warmup: int
-    num_samples: int
-    num_chains: int
-    sampling_time: float
-    timestamp: datetime
-    credible_intervals: dict[str, tuple[float, float]] | None = None
-    inference_data: Any | None = None
 
 
 class BayesianWorkerSignals(QObject):
@@ -355,23 +314,38 @@ class BayesianWorker(QRunnable):
             if self._poisson_ratio is not None:
                 mcmc_kwargs["poisson_ratio"] = self._poisson_ratio
 
-            # Emit indeterminate progress during NUTS sampling.
-            # NumPyro NUTS does not support progress callbacks, so we
-            # signal an indeterminate state (current=0, total=0) with
-            # a descriptive message to keep the UI responsive.
-            self.signals.progress.emit(0, 0, "NUTS sampling in progress...")
+            # F-009 fix: Emit periodic elapsed-time updates during NUTS sampling
+            # since NumPyro NUTS does not support progress callbacks.
+            import threading
 
-            bayesian_result = svc.run_mcmc(
-                self._model_name,
-                self._data,
-                num_warmup=self._num_warmup,
-                num_samples=self._num_samples,
-                num_chains=self._num_chains,
-                warm_start=self._warm_start,
-                test_mode=test_mode,
-                progress_callback=progress_callback,
-                **mcmc_kwargs,
-            )
+            _nuts_done = threading.Event()
+            _nuts_start = time.perf_counter()
+
+            def _elapsed_timer():
+                while not _nuts_done.wait(timeout=5.0):
+                    elapsed = time.perf_counter() - _nuts_start
+                    self.signals.progress.emit(
+                        0, 0, f"NUTS sampling... ({elapsed:.0f}s elapsed)"
+                    )
+
+            timer_thread = threading.Thread(target=_elapsed_timer, daemon=True)
+            timer_thread.start()
+
+            try:
+                bayesian_result = svc.run_mcmc(
+                    self._model_name,
+                    self._data,
+                    num_warmup=self._num_warmup,
+                    num_samples=self._num_samples,
+                    num_chains=self._num_chains,
+                    warm_start=self._warm_start,
+                    test_mode=test_mode,
+                    progress_callback=progress_callback,
+                    **mcmc_kwargs,
+                )
+            finally:
+                _nuts_done.set()
+                timer_thread.join(timeout=1.0)
 
             sampling_time = time.perf_counter() - start_time
 
@@ -403,15 +377,18 @@ class BayesianWorker(QRunnable):
             # Create result
             result = BayesianResult(
                 model_name=self._model_name,
+                dataset_id="",  # Filled by BayesianPage._on_finished()
                 posterior_samples=bayesian_result.posterior_samples,
                 summary=bayesian_result.summary,
-                diagnostics=diagnostics,
+                r_hat=diagnostics.get("r_hat") or diagnostics.get("rhat") or {},
+                ess=diagnostics.get("ess", {}),
+                divergences=int(diagnostics.get("divergences", 0) or 0),
+                credible_intervals=credible_intervals,
+                mcmc_time=sampling_time,
+                timestamp=datetime.now(),
                 num_warmup=self._num_warmup,
                 num_samples=self._num_samples,
                 num_chains=self._num_chains,
-                sampling_time=sampling_time,
-                timestamp=datetime.now(),
-                credible_intervals=credible_intervals,
                 inference_data=getattr(bayesian_result, "inference_data", None),
             )
 

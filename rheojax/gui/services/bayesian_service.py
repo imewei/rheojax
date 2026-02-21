@@ -8,7 +8,7 @@ Service for Bayesian inference with NumPyro and ArviZ diagnostics.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import numpy as np
@@ -16,39 +16,11 @@ import numpy as np
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
 from rheojax.gui.services.model_service import normalize_model_name
-from rheojax.gui.state.store import DatasetState
+from rheojax.gui.state.store import BayesianResult, DatasetState
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class BayesianResult:
-    """Result from Bayesian inference.
-
-    Attributes
-    ----------
-    model_name : str
-        Name of the model
-    posterior_samples : dict
-        Posterior samples for each parameter
-    summary : dict
-        Summary statistics (mean, std, median, quantiles) for each parameter
-    diagnostics : dict
-        R-hat, ESS, divergences, etc.
-    metadata : dict
-        MCMC configuration and metadata
-    inference_data : Any, optional
-        Full ArviZ InferenceData with sample_stats for energy plots
-    """
-
-    model_name: str
-    posterior_samples: dict[str, np.ndarray]
-    summary: dict[str, dict[str, float]]
-    diagnostics: dict[str, Any]
-    metadata: dict[str, Any]
-    inference_data: Any | None = None
 
 
 class BayesianService:
@@ -278,10 +250,18 @@ class BayesianService:
 
             return BayesianResult(
                 model_name=model_name,
+                dataset_id="",  # Filled by BayesianPage
                 posterior_samples=posterior_samples,
                 summary=result.summary,
-                diagnostics=diagnostics,
-                metadata=metadata,
+                r_hat=diagnostics.get("r_hat", {}),
+                ess=diagnostics.get("ess", {}),
+                divergences=int(diagnostics.get("divergences", 0) or 0),
+                credible_intervals={},  # Computed by worker
+                mcmc_time=0.0,  # Measured by worker
+                timestamp=datetime.now(),
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                num_chains=num_chains,
                 inference_data=inference_data,
             )
 
@@ -344,16 +324,12 @@ class BayesianService:
             # Convert to ArviZ format
             # Reshape samples: (n_chains, n_draws)
             idata_dict = {}
-            # Try to infer chain count from result metadata when available
+            # Try to infer chain count from result
             num_chains = None
-            if isinstance(result, BayesianResult):
-                num_chains = (
-                    result.metadata.get("num_chains") if result.metadata else None
-                )
-            elif hasattr(result, "metadata") and isinstance(result.metadata, dict):
+            if hasattr(result, "metadata") and isinstance(result.metadata, dict):
                 num_chains = result.metadata.get("num_chains")
 
-            # Fall back to core BayesianResult.num_chains when metadata is absent
+            # Fall back to num_chains attribute (canonical BayesianResult or core)
             if num_chains is None and hasattr(result, "num_chains"):
                 try:
                     num_chains = int(result.num_chains)
