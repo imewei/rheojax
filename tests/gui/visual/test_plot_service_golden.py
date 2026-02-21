@@ -79,13 +79,15 @@ def _generate_fit_plot(path: Path) -> None:
     data = RheoData(x=x, y=y, metadata={"test_mode": "oscillation"})
     fit_result = FitResult(
         model_name="test_model",
-        dataset_id="dummy",
         parameters={},
+        chi_squared=0.1,
+        success=True,
+        message="converged",
+        timestamp=None,
+        dataset_id="dummy",
         r_squared=0.99,
         mpe=1.0,
-        chi_squared=0.1,
         fit_time=0.5,
-        timestamp=None,
         num_iterations=10,
         convergence_message="",
         x_fit=x,

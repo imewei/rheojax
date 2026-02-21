@@ -1055,13 +1055,15 @@ class StateStore:
                     if isinstance(result, FitResult)
                     else FitResult(
                         model_name=model_name,
-                        dataset_id=str(dataset_id),
                         parameters=getattr(result, "parameters", {}),
+                        chi_squared=float(getattr(result, "chi_squared", 0.0)),
+                        success=bool(getattr(result, "success", True)),
+                        message=str(getattr(result, "message", "")),
+                        timestamp=getattr(result, "timestamp", datetime.now()),
+                        dataset_id=str(dataset_id),
                         r_squared=float(getattr(result, "r_squared", 0.0)),
                         mpe=float(getattr(result, "mpe", 0.0)),
-                        chi_squared=float(getattr(result, "chi_squared", 0.0)),
                         fit_time=float(getattr(result, "fit_time", 0.0)),
-                        timestamp=getattr(result, "timestamp", datetime.now()),
                         num_iterations=getattr(
                             result,
                             "num_iterations",

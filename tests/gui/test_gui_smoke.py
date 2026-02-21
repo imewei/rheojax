@@ -412,9 +412,9 @@ class TestStateManagement:
     )
     def test_bayesian_result_single_source(self) -> None:
         """BayesianResult should only be defined in gui/state/store.py."""
-        from rheojax.gui.state.store import BayesianResult as StoreBR
-        from rheojax.gui.services.bayesian_service import BayesianResult as ServiceBR
         from rheojax.gui.jobs.bayesian_worker import BayesianResult as WorkerBR
+        from rheojax.gui.services.bayesian_service import BayesianResult as ServiceBR
+        from rheojax.gui.state.store import BayesianResult as StoreBR
 
         assert StoreBR is ServiceBR, "Service BayesianResult should be imported from store"
         assert StoreBR is WorkerBR, "Worker BayesianResult should be imported from store"
