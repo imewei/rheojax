@@ -7,7 +7,6 @@ Bayesian inference interface with prior specification and MCMC monitoring.
 
 import json
 import uuid
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +54,6 @@ from rheojax.gui.state.actions import (
     store_bayesian_result,
     update_bayesian_progress,
 )
-from rheojax.gui.state.store import BayesianResult as StoredBayesianResult
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
@@ -667,39 +665,9 @@ class BayesianPage(QWidget):
                 model_name = model_name or state.active_model_name
 
             if model_name and dataset_id:
-                diagnostics = getattr(result, "diagnostics", {}) or {}
-                stored_result = StoredBayesianResult(
-                    model_name=str(model_name),
-                    dataset_id=str(dataset_id),
-                    posterior_samples=getattr(result, "posterior_samples", {}),
-                    summary=getattr(result, "summary", None),
-                    r_hat=diagnostics.get("r_hat", {}) or getattr(result, "r_hat", {}),
-                    ess=diagnostics.get("ess", {}) or getattr(result, "ess", {}),
-                    divergences=int(
-                        diagnostics.get(
-                            "divergences", getattr(result, "divergences", 0)
-                        )
-                        or 0
-                    ),
-                    credible_intervals=getattr(result, "credible_intervals", {}) or {},
-                    mcmc_time=float(
-                        getattr(
-                            result, "sampling_time", getattr(result, "mcmc_time", 0.0)
-                        )
-                        or 0.0
-                    ),
-                    timestamp=getattr(result, "timestamp", datetime.now()),
-                    num_warmup=int(
-                        getattr(result, "num_warmup", self._warmup_spin.value()) or 0
-                    ),
-                    num_samples=int(
-                        getattr(result, "num_samples", self._samples_spin.value()) or 0
-                    ),
-                    num_chains=int(
-                        getattr(result, "num_chains", self._chains_spin.value()) or 4
-                    ),
-                    inference_data=getattr(result, "inference_data", None),
-                )
+                from dataclasses import replace as dc_replace
+
+                stored_result = dc_replace(result, dataset_id=str(dataset_id))
                 store_bayesian_result(stored_result)
                 self._store.dispatch(
                     "SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"}
