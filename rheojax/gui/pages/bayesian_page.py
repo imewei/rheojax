@@ -467,8 +467,28 @@ class BayesianPage(QWidget):
             QMessageBox.warning(self, "No Data", "Please load a dataset first.")
             return
 
+        # F-HL-019 fix: Warn about HL memory requirements for PDE-based NUTS
+        _mn_lower = model_name.lower()
+        if "hebraud" in _mn_lower or "hl" == _mn_lower or _mn_lower.startswith("hl_"):
+            test_mode_check = dataset.test_mode if hasattr(dataset, "test_mode") else ""
+            if test_mode_check in ("creep", "relaxation", "startup", "laos", "oscillation"):
+                reply = QMessageBox.question(
+                    self,
+                    "HL Memory Warning",
+                    "The Hébraud-Lequeux model uses a PDE solver (lax.scan) which "
+                    "requires forward-mode AD through 500-2000 scan steps per "
+                    "NUTS leapfrog step.\n\n"
+                    "This can exceed 16 GB RAM with num_chains=4.\n"
+                    "Consider using num_chains=1 and fewer warmup samples.\n\n"
+                    "Continue anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
         # F-006 fix: Warn about EPM memory requirements for large lattices
-        if "epm" in model_name.lower():
+        if "epm" in _mn_lower:
             try:
                 from rheojax.core.registry import ModelRegistry
 
@@ -592,6 +612,14 @@ class BayesianPage(QWidget):
         # changes the active selection while inference is running.
         dataset_snapshot = dataset.clone()
 
+        # F-HL-005 fix: Extract fitted model state from FitResult so
+        # stateful models (HL, DMT, ITT-MCT) can restore _last_fit_kwargs,
+        # _fit_data_metadata, etc. on the fresh Bayesian model instance.
+        fitted_model_state = None
+        active_fit = self._store.get_active_fit_result()
+        if active_fit and hasattr(active_fit, "metadata") and active_fit.metadata:
+            fitted_model_state = active_fit.metadata.get("fitted_model_state")
+
         self._current_worker = BayesianWorker(
             model_name=model_name,
             data=dataset_snapshot,
@@ -603,6 +631,7 @@ class BayesianPage(QWidget):
             seed=config.get("seed", state.current_seed),
             deformation_mode=deform_text if deform_text != "shear" else None,
             poisson_ratio=poisson_val if deform_text != "shear" else None,
+            fitted_model_state=fitted_model_state,
         )
 
         # Connect BayesianWorker-specific signals with QueuedConnection.
@@ -742,98 +771,77 @@ class BayesianPage(QWidget):
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
 
-        # BayesianWorker's BayesianResult has .success bool (default True)
-        success = getattr(result, "success", True)
+        # Use captured values from submission time (TOCTOU-safe)
+        dataset_id = getattr(self, "_submitted_dataset_id", None)
+        model_name = getattr(result, "model_name", None) or getattr(
+            self, "_submitted_model_name", None
+        )
+        if not dataset_id or not model_name:
+            state = self._store.get_state()
+            dataset_id = dataset_id or state.active_dataset_id
+            model_name = model_name or state.active_model_name
 
-        if success:
-            # Use captured values from submission time (TOCTOU-safe)
-            dataset_id = getattr(self, "_submitted_dataset_id", None)
-            model_name = getattr(result, "model_name", None) or getattr(
-                self, "_submitted_model_name", None
-            )
-            if not dataset_id or not model_name:
-                state = self._store.get_state()
-                dataset_id = dataset_id or state.active_dataset_id
-                model_name = model_name or state.active_model_name
-
-            if model_name and dataset_id:
-                try:
-                    from dataclasses import replace as dc_replace
-
-                    stored_result = dc_replace(result, dataset_id=str(dataset_id))
-                except TypeError:
-                    logger.warning(
-                        "BayesianResult type mismatch in _on_finished, "
-                        "falling back to manual construction",
-                        exc_info=True,
-                    )
-                    stored_result = BayesianResult(
-                        model_name=str(model_name),
-                        dataset_id=str(dataset_id),
-                        posterior_samples=getattr(result, "posterior_samples", {}),
-                        summary=getattr(result, "summary", None),
-                        r_hat=getattr(result, "r_hat", {}),
-                        ess=getattr(result, "ess", {}),
-                        divergences=int(getattr(result, "divergences", 0) or 0),
-                        credible_intervals=getattr(result, "credible_intervals", {}),
-                        mcmc_time=float(getattr(result, "mcmc_time", 0.0) or 0.0),
-                        timestamp=getattr(result, "timestamp", datetime.now()),
-                        num_warmup=int(getattr(result, "num_warmup", 0) or 0),
-                        num_samples=int(getattr(result, "num_samples", 0) or 0),
-                        num_chains=int(getattr(result, "num_chains", 4) or 4),
-                        inference_data=getattr(result, "inference_data", None),
-                    )
-                store_bayesian_result(stored_result)
-                self._store.dispatch(
-                    "SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"}
-                )
-            else:
-                # Fall back to updating pipeline status only.
-                self._store.dispatch(
-                    "SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"}
-                )
-
-            # Update diagnostics display
-            self._update_diagnostics(result)
-
-            # Update raw + fitted plot
+        if model_name and dataset_id:
             try:
-                self._update_fit_plot_from_posterior(result)
-            except Exception:
-                # Plotting is best-effort; keep the Bayesian results UI usable.
-                logger.error(
-                    "Failed to update fit plot from posterior",
-                    page="BayesianPage",
+                from dataclasses import replace as dc_replace
+
+                stored_result = dc_replace(result, dataset_id=str(dataset_id))
+            except TypeError:
+                logger.warning(
+                    "BayesianResult type mismatch in _on_finished, "
+                    "falling back to manual construction",
                     exc_info=True,
                 )
+                stored_result = BayesianResult(
+                    model_name=str(model_name),
+                    dataset_id=str(dataset_id),
+                    posterior_samples=getattr(result, "posterior_samples", {}),
+                    summary=getattr(result, "summary", None),
+                    r_hat=getattr(result, "r_hat", {}),
+                    ess=getattr(result, "ess", {}),
+                    divergences=int(getattr(result, "divergences", 0) or 0),
+                    credible_intervals=getattr(result, "credible_intervals", {}),
+                    mcmc_time=float(getattr(result, "mcmc_time", 0.0) or 0.0),
+                    timestamp=getattr(result, "timestamp", datetime.now()),
+                    num_warmup=int(getattr(result, "num_warmup", 0) or 0),
+                    num_samples=int(getattr(result, "num_samples", 0) or 0),
+                    num_chains=int(getattr(result, "num_chains", 4) or 4),
+                    inference_data=getattr(result, "inference_data", None),
+                )
+            # store_bayesian_result dispatches STORE_BAYESIAN_RESULT, whose
+            # reducer already sets pipeline step to COMPLETE.
+            store_bayesian_result(stored_result)
 
-            # Update credible intervals table
-            self._update_intervals_table(result)
+        # Update diagnostics display
+        self._update_diagnostics(result)
 
-            # Log inference completion
-            sampling_time = getattr(result, "sampling_time", 0.0)
-            logger.info(
-                "Bayesian inference completed",
-                model_name=model_name,
-                dataset_id=dataset_id,
-                sampling_time=sampling_time,
-                page="BayesianPage",
-            )
-
-            self._status_text.append("Bayesian inference completed successfully!")
-            self._status_text.append(f"Sampling time: {sampling_time:.2f}s")
-            self.run_completed.emit(result)
-        else:
-            # Get message if available, otherwise use generic
-            message = getattr(result, "message", "Inference did not converge")
-            self._store.dispatch(bayesian_failed(message))
-            self._status_text.append(f"Bayesian inference failed: {message}")
+        # Update raw + fitted plot
+        try:
+            self._update_fit_plot_from_posterior(result)
+        except Exception:
+            # Plotting is best-effort; keep the Bayesian results UI usable.
             logger.error(
-                "Bayesian inference failed",
-                message=message,
+                "Failed to update fit plot from posterior",
                 page="BayesianPage",
+                exc_info=True,
             )
-            QMessageBox.warning(self, "Inference Failed", message)
+
+        # Update credible intervals table
+        self._update_intervals_table(result)
+
+        # Log inference completion
+        sampling_time = getattr(result, "sampling_time", 0.0)
+        logger.info(
+            "Bayesian inference completed",
+            model_name=model_name,
+            dataset_id=dataset_id,
+            sampling_time=sampling_time,
+            page="BayesianPage",
+        )
+
+        self._status_text.append("Bayesian inference completed successfully!")
+        self._status_text.append(f"Sampling time: {sampling_time:.2f}s")
+        self.run_completed.emit(result)
 
     @Slot(str)
     def _on_error(self, error_msg: str) -> None:
@@ -1148,6 +1156,14 @@ class BayesianPage(QWidget):
         )
 
         y_draws: list[np.ndarray] = []
+        # F-HL-005 fix: Pass fitted_model_state via model_kwargs for predict()
+        active_fit = self._store.get_active_fit_result()
+        if active_fit and hasattr(active_fit, "metadata") and active_fit.metadata:
+            _fms = active_fit.metadata.get("fitted_model_state")
+            if _fms:
+                model_kwargs = dict(model_kwargs or {})
+                model_kwargs["fitted_model_state"] = _fms
+
         for idx in draw_indices:
             params = self._posterior_params_at_index(posterior_samples, int(idx))
             if not params:
@@ -1161,6 +1177,11 @@ class BayesianPage(QWidget):
                     model_kwargs=model_kwargs,
                 )
                 y_pred_arr = np.asarray(y_pred)
+                # F-HL-007 fix: Accept (N, 2) output from oscillation models
+                # (HL, GMM, etc.) that return [G', G'']. Convert to complex
+                # for the existing plotting pipeline.
+                if y_pred_arr.ndim == 2 and y_pred_arr.shape[1] == 2 and y_pred_arr.shape[0] == len(x):
+                    y_pred_arr = y_pred_arr[:, 0] + 1j * y_pred_arr[:, 1]
                 if y_pred_arr.shape == x.shape:
                     y_draws.append(y_pred_arr)
             except Exception:

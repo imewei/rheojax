@@ -46,6 +46,9 @@ __all__ = [
     "BayesianWorker",
     "BayesianWorkerSignals",
     "BayesianResult",
+    "TransformWorker",
+    "TransformWorkerSignals",
+    "TransformResult",
 ]
 
 
@@ -88,7 +91,19 @@ def __getattr__(name: str):
 
         return BayesianWorkerSignals
     elif name == "BayesianResult":
-        from rheojax.gui.jobs.bayesian_worker import BayesianResult
+        from rheojax.gui.state.store import BayesianResult
 
         return BayesianResult
+    elif name == "TransformWorker":
+        from rheojax.gui.jobs.transform_worker import TransformWorker
+
+        return TransformWorker
+    elif name == "TransformWorkerSignals":
+        from rheojax.gui.jobs.transform_worker import TransformWorkerSignals
+
+        return TransformWorkerSignals
+    elif name == "TransformResult":
+        from rheojax.gui.jobs.transform_worker import TransformResult
+
+        return TransformResult
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
