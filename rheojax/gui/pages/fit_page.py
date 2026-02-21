@@ -330,6 +330,15 @@ class FitPage(QWidget):
         # Load/initialize model parameters for the Parameters section
         self._load_parameters_for_model(model_name)
 
+        # F-003 fix: Validate DMTA support for selected model
+        self._update_deformation_combo(model_name)
+
+        # Filter test mode combo to model-supported protocols
+        self._update_test_mode_combo(model_name)
+
+        # F-002 fix: Warn if model doesn't support fitting (prediction-only)
+        self._check_fitting_support(model_name)
+
         # Check compatibility with active dataset
         self._check_compatibility(model_name)
 
@@ -337,6 +346,70 @@ class FitPage(QWidget):
         self._update_fit_enabled()
 
         self._sync_quick_model_selection(model_name)
+
+    def _update_deformation_combo(self, model_name: str) -> None:
+        """Enable/disable deformation mode combo based on model DMTA support."""
+        supported = self._model_service.get_supported_deformation_modes(model_name)
+        has_tension = "tension" in supported
+        self._deformation_combo.setEnabled(has_tension)
+        if not has_tension:
+            # Reset to Shear for shear-only models
+            was_blocked = self._deformation_combo.blockSignals(True)
+            self._deformation_combo.setCurrentIndex(0)  # "Shear"
+            self._deformation_combo.blockSignals(was_blocked)
+            self._deformation_combo.setToolTip(
+                f"Model '{model_name}' supports shear deformation only"
+            )
+        else:
+            self._deformation_combo.setToolTip(
+                "Select deformation mode (Tension for DMTA/DMA data)"
+            )
+
+    def _update_test_mode_combo(self, model_name: str) -> None:
+        """Filter test mode combo to show only modes supported by the model."""
+        from rheojax.core.registry import ModelRegistry
+
+        info = ModelRegistry.get_info(model_name)
+        if info is None or not info.protocols:
+            return  # Keep current combo items if model not found
+
+        supported_modes = [p.value for p in info.protocols]
+
+        # Preserve current selection if still valid
+        current = self._mode_combo.currentText()
+
+        was_blocked = self._mode_combo.blockSignals(True)
+        self._mode_combo.clear()
+        self._mode_combo.addItems(supported_modes)
+
+        # Restore selection if still valid, else pick first
+        idx = self._mode_combo.findText(current)
+        if idx >= 0:
+            self._mode_combo.setCurrentIndex(idx)
+        else:
+            self._mode_combo.setCurrentIndex(0)
+        self._mode_combo.blockSignals(was_blocked)
+
+        # Dispatch the (possibly changed) mode to store
+        new_mode = self._mode_combo.currentText()
+        if new_mode and new_mode != current:
+            self._store.dispatch("SET_TEST_MODE", {"test_mode": new_mode})
+
+    def _check_fitting_support(self, model_name: str) -> None:
+        """Disable fit button and show warning for prediction-only models."""
+        if not self._model_service.supports_fitting(model_name):
+            self._btn_fit.setEnabled(False)
+            self._btn_fit.setToolTip(
+                f"Model '{model_name}' supports prediction only (fitting not implemented)"
+            )
+            self._status_text.setText(
+                f"Note: {model_name} is prediction-only. "
+                "Use predict() with manual parameters."
+            )
+            self._fitting_supported = False
+        else:
+            self._btn_fit.setToolTip("")
+            self._fitting_supported = True
 
     def _load_parameters_for_model(self, model_name: str) -> None:
         """Initialize the parameter table from state or model defaults."""
@@ -641,6 +714,25 @@ class FitPage(QWidget):
             model_name, rheo_data, rheo_data.metadata.get("test_mode")
         )
 
+        # GUI-005 fix: check_model_compatibility() only handles oscillation,
+        # relaxation, and flow test modes. For startup, creep, LAOS, etc.,
+        # default to compatible and let the model raise if there's an issue.
+        test_mode = rheo_data.metadata.get("test_mode", "unknown")
+        if test_mode not in ("oscillation", "relaxation", "flow_curve", "flow"):
+            self._compat_label.setText(
+                f"Mode '{test_mode}': compatibility check not available, assuming OK"
+            )
+            self._compat_label.setStyleSheet(f"color: {ColorPalette.SUCCESS};")
+            self._is_compatible = True
+            logger.debug(
+                "Compatibility check skipped for unsupported mode",
+                model=model_name,
+                test_mode=test_mode,
+                page="FitPage",
+            )
+            self._update_fit_enabled()
+            return
+
         if result.get("compatible", True):
             text = f"Compatible\nDecay: {result.get('decay_type', 'unknown')}"
             self._compat_label.setText(text)
@@ -754,6 +846,14 @@ class FitPage(QWidget):
         self._btn_fit.setEnabled(False)
         model_name = self._quick_model_combo.currentData()
         dataset = self._store.get_active_dataset()
+
+        # F-002 guard: block fitting for prediction-only models
+        if not getattr(self, "_fitting_supported", True):
+            self._status_text.setText(
+                f"Model '{model_name}' does not support fitting."
+            )
+            self._update_fit_enabled()
+            return
 
         if not model_name or not dataset:
             logger.debug(
@@ -874,7 +974,7 @@ class FitPage(QWidget):
     def _on_fitting_failed(
         self, _model_name: str, _dataset_id: str, error: str
     ) -> None:
-        """Handle fitting failure signal."""
+        """Handle fitting failure signal — show persistent error in results panel."""
         logger.error(
             "Fitting failed",
             model=_model_name,
@@ -884,10 +984,24 @@ class FitPage(QWidget):
         )
         self._btn_fit.setText("Fit Model")
         self._update_fit_enabled()
+        # F-002 fix: Show persistent, clearly-formatted error in results panel
+        model_label = _model_name or self._current_model or "unknown"
+        lines = [
+            "Fit FAILED",
+            "",
+            f"Model: {model_label}",
+        ]
         if error:
-            self._status_text.setText(f"Fit failed:\n{error}")
-            if hasattr(self, "_empty_results"):
-                self._empty_results.hide()
+            lines.append("")
+            lines.append(f"Error: {error}")
+        lines.append("")
+        lines.append("Check model-data compatibility and parameter bounds.")
+        self._status_text.setText("\n".join(lines))
+        self._status_text.setStyleSheet(
+            f"color: {ColorPalette.ERROR if hasattr(ColorPalette, 'ERROR') else '#e74c3c'};"
+        )
+        if hasattr(self, "_empty_results"):
+            self._empty_results.hide()
 
     def _show_fit_options(self) -> None:
         """Show fitting options dialog."""
@@ -929,6 +1043,8 @@ class FitPage(QWidget):
             page="FitPage",
         )
 
+        # Reset error styling from any previous failure (F-002)
+        self._status_text.setStyleSheet("")
         lines: list[str] = ["Fit successful!", ""]
         if r2 is not None:
             lines.append(f"R²: {float(r2):.4f}")
@@ -939,12 +1055,31 @@ class FitPage(QWidget):
         if fit_time is not None:
             lines.append(f"Time: {float(fit_time):.2f}s")
 
+        # F-006: Extract pcov for parameter uncertainties
+        pcov = getattr(fit_result, "pcov", None)
+        param_names_sorted = sorted(params.keys()) if params else []
+        param_uncertainties: dict[str, float] = {}
+        if pcov is not None and params:
+            try:
+                pcov_arr = np.asarray(pcov)
+                if pcov_arr.ndim == 2 and pcov_arr.shape[0] == len(params):
+                    for i, name in enumerate(param_names_sorted):
+                        var = pcov_arr[i, i]
+                        if var > 0:
+                            param_uncertainties[name] = float(np.sqrt(var))
+            except Exception:
+                pass
+
         if params:
             lines.append("")
             lines.append("Parameters:")
-            for name, value in sorted(params.items()):
+            for name in param_names_sorted:
+                value = params[name]
                 try:
-                    lines.append(f"  {name}: {float(value):.6g}")
+                    line = f"  {name}: {float(value):.6g}"
+                    if name in param_uncertainties:
+                        line += f" ± {param_uncertainties[name]:.3g}"
+                    lines.append(line)
                 except Exception:
                     lines.append(f"  {name}: {value}")
 
@@ -1018,5 +1153,13 @@ class FitPage(QWidget):
         dataset = self._store.get_active_dataset()
         model_name = self._quick_model_combo.currentData()
         compatible = getattr(self, "_is_compatible", False)
-        enabled = dataset is not None and bool(model_name) and compatible
+        # GUI-013 fix: Include _fitting_supported in the enabled check so that
+        # prediction-only models (e.g., TensorialEPM) cannot trigger a fit.
+        fitting_supported = getattr(self, "_fitting_supported", True)
+        enabled = (
+            dataset is not None
+            and bool(model_name)
+            and compatible
+            and fitting_supported
+        )
         self._btn_fit.setEnabled(enabled)
