@@ -8,7 +8,7 @@ Service for model fitting, prediction, and parameter management.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -22,6 +22,48 @@ if TYPE_CHECKING:
     from rheojax.gui.state.store import ParameterState
 
 logger = get_logger(__name__)
+
+
+def infer_model_kwargs(model_name: str, param_names: list[str]) -> dict[str, Any]:
+    """Infer model constructor kwargs from parameter names.
+
+    For GeneralizedMaxwell: count G_i/E_i parameters to determine n_modes
+    after element minimization may have reduced the mode count.
+
+    Parameters
+    ----------
+    model_name : str
+        Name of the model (e.g., "generalized_maxwell")
+    param_names : list[str]
+        Parameter names from NLSQ warm-start or posterior samples
+
+    Returns
+    -------
+    dict
+        Model initialization kwargs (e.g., {"n_modes": 2})
+    """
+    import re
+
+    model_kwargs: dict[str, Any] = {}
+
+    if "maxwell" in model_name.lower() and "generalized" in model_name.lower():
+        # Match G_1, G_2, ... or E_1, E_2, ... (tensile DMTA)
+        g_pattern = re.compile(r"^[GE]_(\d+)$")
+        g_indices = [
+            int(m.group(1))
+            for name in param_names
+            if (m := g_pattern.match(name))
+        ]
+        if g_indices:
+            n_modes = max(g_indices)
+            model_kwargs["n_modes"] = n_modes
+            logger.debug(
+                "Inferred n_modes from parameter names",
+                model=model_name,
+                n_modes=n_modes,
+            )
+
+    return model_kwargs
 
 
 def normalize_model_name(model_name: str) -> str:
@@ -114,44 +156,8 @@ def _is_placeholder_model(model_name: str | None) -> bool:
     return key == "" or key.startswith("select model")
 
 
-@dataclass
-class FitResult:
-    """Result from model fitting.
-
-    Attributes
-    ----------
-    model_name : str
-        Name of the fitted model
-    parameters : dict
-        Fitted parameter values
-    residuals : np.ndarray
-        Residuals from fit
-    chi_squared : float
-        Chi-squared goodness of fit
-    success : bool
-        Whether fit was successful
-    message : str
-        Status message
-    x_fit : np.ndarray
-        X values for fitted curve
-    y_fit : np.ndarray
-        Y values for fitted curve
-    pcov : np.ndarray, optional
-        Parameter covariance matrix (n_params x n_params) for uncertainty bands
-    metadata : dict, optional
-        Additional metadata (convergence info, etc.)
-    """
-
-    model_name: str
-    parameters: dict[str, float]
-    residuals: np.ndarray
-    chi_squared: float
-    success: bool
-    message: str
-    x_fit: np.ndarray
-    y_fit: np.ndarray
-    pcov: np.ndarray | None = None
-    metadata: dict[str, Any] | None = None
+# Import canonical FitResult from store (single source of truth)
+from rheojax.gui.state.store import FitResult
 
 
 class ModelService:
@@ -460,6 +466,47 @@ class ModelService:
                 "error": str(e),
             }
 
+    def get_supported_deformation_modes(self, model_name: str) -> list[str]:
+        """Return list of supported deformation mode strings for a model.
+
+        Returns empty list for shear-only models (no DMTA support).
+        """
+        if _is_placeholder_model(model_name):
+            return []
+        try:
+            from rheojax.core.registry import ModelRegistry
+
+            model_name = self._normalize_model_name(model_name)
+            reg_info = ModelRegistry.get_info(model_name)
+            if reg_info and reg_info.deformation_modes:
+                return [dm.value for dm in reg_info.deformation_modes]
+        except Exception:
+            logger.debug(
+                "Could not get deformation modes",
+                model=model_name,
+                exc_info=True,
+            )
+        return []
+
+    def supports_fitting(self, model_name: str) -> bool:
+        """Check if a model supports NLSQ fitting (not just prediction).
+
+        Some models (e.g., TensorialEPM) can only predict, not fit.
+        Returns False if the model's _fit() raises NotImplementedError.
+        """
+        if _is_placeholder_model(model_name):
+            return False
+        try:
+            model_name = self._normalize_model_name(model_name)
+            model = self._registry.create_instance(model_name, plugin_type="model")
+            # Check if _fit is explicitly overridden to raise NotImplementedError
+            import inspect
+
+            source = inspect.getsource(model._fit)
+            return "NotImplementedError" not in source
+        except Exception:
+            return True  # Assume fittable if we can't check
+
     def check_compatibility(
         self, model_name: str, data: RheoData, test_mode: str | None = None
     ) -> dict[str, Any]:
@@ -745,6 +792,21 @@ class ModelService:
             # Add test_mode to fit_kwargs
             fit_kwargs["test_mode"] = test_mode
 
+            # F-002: Extract protocol-specific kwargs from data metadata
+            # Models like FIKH/FMLIKH need strain, gamma_dot, sigma_applied, etc.
+            _PROTOCOL_KWARGS = (
+                "strain", "gamma_dot", "sigma_applied", "sigma_0",
+                "gamma_0", "omega_laos", "omega", "T_init", "T", "n_cycles",
+                "t_wait", "return_components", "return_full",
+                # HL-specific kwargs (non-standard names)
+                "gdot", "stress_target", "gamma0",
+                # ITT-MCT-specific kwargs
+                "gamma_pre", "use_diffrax", "t_max", "n_harmonics",
+            )
+            for key in _PROTOCOL_KWARGS:
+                if key not in fit_kwargs and key in data.metadata:
+                    fit_kwargs[key] = data.metadata[key]
+
             # Inject progress callback if provided and not already set
             if progress_callback and "callback" not in fit_kwargs:
                 fit_kwargs["callback"] = progress_callback
@@ -861,6 +923,42 @@ class ModelService:
                 "mpe": mpe,
             }
 
+            # F-HL-005 fix: Capture fitted model state for stateful models
+            # (HL, DMT, ITT-MCT, etc.) so BayesianService can restore it.
+            _fitted_model_state = {}
+            for attr in (
+                "_last_fit_kwargs",
+                "_fit_data_metadata",
+                "_use_forward_mode_ad",
+                # HVNM/HVM/VLB protocol state (model_function reads these
+                # instead of _last_fit_kwargs for startup/creep/LAOS context)
+                "_gamma_dot_applied",
+                "_sigma_applied",
+                "_gamma_0",
+                "_omega_laos",
+                # IKH/ML-IKH protocol state for model_function
+                "_fit_gamma_dot",
+                "_fit_sigma_applied",
+                "_fit_sigma_0",
+                # SGR startup protocol state for model_function
+                "_startup_gamma_dot",
+                # GMM protocol state for startup/LAOS model_function
+                "_laos_omega",
+                "_laos_gamma_0",
+                "_n_modes",
+                # ITT-MCT Prony decomposition state
+                "_prony_amplitudes",
+                "_prony_times",
+                "_memory_form",
+                "_use_lorentzian",
+                "n_prony_modes",
+            ):
+                val = getattr(model, attr, None)
+                if val is not None:
+                    _fitted_model_state[attr] = val
+            if _fitted_model_state:
+                metadata["fitted_model_state"] = _fitted_model_state
+
             # Extract pcov (parameter covariance) from NLSQ result for uncertainty bands
             pcov = None
             if nlsq_result is not None:
@@ -901,13 +999,20 @@ class ModelService:
             return FitResult(
                 model_name=model_name,
                 parameters=fitted_params,
-                residuals=residuals,
                 chi_squared=chi_squared,
                 success=fit_success,
                 message=fit_message,
+                timestamp=datetime.now(),
+                r_squared=float(r_squared) if r_squared is not None else 0.0,
+                mpe=float(mpe) if mpe is not None else 0.0,
+                residuals=residuals,
                 x_fit=x,
                 y_fit=y_pred,
                 pcov=pcov,
+                rmse=float(rmse) if rmse is not None else None,
+                mae=float(mae) if mae is not None else None,
+                aic=float(aic) if aic is not None else None,
+                bic=float(bic) if bic is not None else None,
                 metadata=metadata,
             )
 
@@ -921,13 +1026,13 @@ class ModelService:
             return FitResult(
                 model_name=model_name,
                 parameters={},
-                residuals=np.array([]),
                 chi_squared=np.inf,
                 success=False,
                 message=f"Fit failed: {e}",
+                timestamp=datetime.now(),
+                residuals=np.array([]),
                 x_fit=np.array([]),
                 y_fit=np.array([]),
-                pcov=None,
                 metadata={"error": str(e)},
             )
 
@@ -982,6 +1087,39 @@ class ModelService:
 
             # Mark as fitted
             model.fitted_ = True
+
+            # F-HL-006 fix: Set _test_mode on fresh model instance so that
+            # stateful models (HL, DMT, etc.) whose _predict() checks
+            # self._test_mode don't raise ValueError.
+            if test_mode and hasattr(model, "_test_mode"):
+                model._test_mode = test_mode
+
+            # Transfer fitted model state if provided (protocol kwargs, grid settings)
+            fitted_state = model_kwargs.pop("fitted_model_state", None) if model_kwargs else None
+            if fitted_state and isinstance(fitted_state, dict):
+                for attr in (
+                    "_last_fit_kwargs",
+                    "_fit_data_metadata",
+                    # HVNM/HVM/VLB protocol state for model_function
+                    "_gamma_dot_applied",
+                    "_sigma_applied",
+                    "_gamma_0",
+                    "_omega_laos",
+                    # IKH/ML-IKH protocol state for model_function
+                    "_fit_gamma_dot",
+                    "_fit_sigma_applied",
+                    "_fit_sigma_0",
+                    # SGR startup protocol state for model_function
+                    "_startup_gamma_dot",
+                    # ITT-MCT Prony decomposition state
+                    "_prony_amplitudes",
+                    "_prony_times",
+                    "_memory_form",
+                    "_use_lorentzian",
+                    "n_prony_modes",
+                ):
+                    if attr in fitted_state:
+                        setattr(model, attr, fitted_state[attr])
 
             # Predict
             if test_mode is None:

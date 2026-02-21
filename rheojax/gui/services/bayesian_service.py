@@ -140,8 +140,18 @@ class BayesianService:
         )
         try:
             model_name = normalize_model_name(model_name)
+            # F-GMM-001: Infer model kwargs (e.g., n_modes) from warm-start
+            from rheojax.gui.services.model_service import infer_model_kwargs
+
+            model_kwargs = (
+                infer_model_kwargs(model_name, list(warm_start.keys()))
+                if warm_start
+                else {}
+            )
             # Create model instance
-            model = self._registry.create_instance(model_name, plugin_type="model")
+            model = self._registry.create_instance(
+                model_name, plugin_type="model", **model_kwargs
+            )
 
             # Normalize DatasetState -> RheoData
             if isinstance(data, DatasetState):
@@ -155,6 +165,39 @@ class BayesianService:
                     if name in model.parameters:
                         model.parameters[name].value = value
 
+            # F-HL-005 fix: Transfer fitted state for stateful models (HL, DMT,
+            # ITT-MCT, Fluidity-Saramito) that cache protocol kwargs and grid
+            # settings in instance variables during _fit(). Without this, the
+            # fresh model uses fallback defaults in model_function().
+            fitted_state = kwargs.pop("fitted_model_state", None)
+            if fitted_state and isinstance(fitted_state, dict):
+                for attr in (
+                    "_last_fit_kwargs",
+                    "_fit_data_metadata",
+                    "_use_forward_mode_ad",
+                    # HVNM/HVM/VLB protocol state for model_function
+                    "_gamma_dot_applied",
+                    "_sigma_applied",
+                    "_gamma_0",
+                    "_omega_laos",
+                    # IKH/ML-IKH protocol state for model_function
+                    "_fit_gamma_dot",
+                    "_fit_sigma_applied",
+                    "_fit_sigma_0",
+                    # SGR startup protocol state for model_function
+                    "_startup_gamma_dot",
+                    # GMM protocol state for startup/LAOS model_function
+                    "_laos_omega",
+                    "_laos_gamma_0",
+                    "_n_modes",
+                ):
+                    if attr in fitted_state:
+                        setattr(model, attr, fitted_state[attr])
+            # Always set _test_mode on the fresh model so model_function()
+            # and _predict() don't raise ValueError.
+            if hasattr(model, "_test_mode"):
+                model._test_mode = test_mode
+
             # Extract data
             x = np.asarray(data.x)
             y = np.asarray(data.y)
@@ -162,6 +205,18 @@ class BayesianService:
             # Determine test mode
             if test_mode is None:
                 test_mode = data.metadata.get("test_mode", "oscillation")
+
+            # F-GMM-003: Extract protocol kwargs from data metadata
+            # (mirrors model_service.fit() lines 753-766)
+            _PROTOCOL_KWARGS = (
+                "gamma_dot", "sigma_applied", "sigma_0", "gamma_0",
+                "omega", "omega_laos", "strain", "gdot", "t_wait",
+                "stress_target", "gamma_pre", "n_cycles",
+            )
+            if hasattr(data, "metadata") and data.metadata:
+                for key in _PROTOCOL_KWARGS:
+                    if key not in kwargs and key in data.metadata:
+                        kwargs[key] = data.metadata[key]
 
             logger.info(
                 "Starting Bayesian inference",

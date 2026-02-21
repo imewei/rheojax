@@ -109,6 +109,7 @@ class BayesianWorker(QRunnable):
         cancel_token: CancellationToken | None = None,
         deformation_mode: str | None = None,
         poisson_ratio: float | None = None,
+        fitted_model_state: dict[str, Any] | None = None,
     ):
         """Initialize Bayesian worker.
 
@@ -157,6 +158,7 @@ class BayesianWorker(QRunnable):
         self._seed = seed
         self._deformation_mode = deformation_mode
         self._poisson_ratio = poisson_ratio
+        self._fitted_model_state = fitted_model_state
 
         # Track progress
         self._current_stage = "warmup"
@@ -184,11 +186,23 @@ class BayesianWorker(QRunnable):
             # Import inside run() to avoid JAX initialization issues
             from rheojax.core.registry import ModelRegistry
 
+            # F-GMM-001: Infer model kwargs (e.g., n_modes) from warm-start
+            from rheojax.gui.services.model_service import infer_model_kwargs
+
+            model_kwargs = (
+                infer_model_kwargs(
+                    self._model_name, list(self._warm_start.keys())
+                )
+                if self._warm_start
+                else {}
+            )
+
             try:
-                model = ModelRegistry.create(self._model_name)
+                model = ModelRegistry.create(self._model_name, **model_kwargs)
                 logger.debug(
                     "Model created from registry",
                     model=self._model_name,
+                    model_kwargs=model_kwargs or None,
                 )
             except KeyError:
                 raise ValueError(
@@ -215,17 +229,30 @@ class BayesianWorker(QRunnable):
                             parameter=name,
                         )
 
-            # Apply custom priors if provided
+            # GUI-004/GUI-006 fix: Apply custom priors if provided.
+            # TODO(GUI-004): This is currently a dead code path. The priors
+            # are set on `model.parameters[name].prior` here, but
+            # BayesianService.run_mcmc() creates a NEW model instance
+            # internally, discarding these assignments. Furthermore,
+            # BayesianMixin.fit_bayesian() does not read `param.prior`.
+            # Fixing the full prior pipeline requires changes to
+            # BayesianMixin (core/bayesian.py), which is outside GUI scope.
             if self._priors:
-                logger.info(
-                    "Using custom priors",
-                    parameters=list(self._priors.keys()),
-                )
+                # Warn the user that configured priors will not propagate
+                if any(
+                    name in model.parameters for name in self._priors
+                ):
+                    logger.warning(
+                        "User-configured priors are not yet propagated to "
+                        "NUTS inference. BayesianService creates a fresh "
+                        "model instance, discarding prior assignments.",
+                        parameters=list(self._priors.keys()),
+                    )
                 for name, prior in self._priors.items():
                     if name in model.parameters:
                         model.parameters[name].prior = prior
                         logger.debug(
-                            "Applied custom prior",
+                            "Applied custom prior (will be discarded by service)",
                             parameter=name,
                         )
                     else:
@@ -234,17 +261,22 @@ class BayesianWorker(QRunnable):
                             parameter=name,
                         )
 
-            # Get test mode from data
+            # Get test mode from data.
+            # GUI-014 fix: DatasetState.test_mode is a required str field,
+            # so the None/missing branch is effectively dead code. Keep the
+            # metadata fallback for robustness but replace the dead warning
+            # with a debug assertion.
             test_mode = getattr(self._data, "test_mode", None)
             if test_mode is None:
                 if hasattr(self._data, "metadata"):
                     test_mode = self._data.metadata.get("test_mode", "oscillation")
                 else:
                     test_mode = "oscillation"
-                    logger.warning(
-                        "No test_mode found, defaulting to oscillation",
-                        default_mode=test_mode,
-                    )
+                logger.debug(
+                    "test_mode not found on data object, using fallback",
+                    resolved_mode=test_mode,
+                    data_type=type(self._data).__name__,
+                )
 
             # Track sampling start time for progress logging
             sampling_start_time = time.perf_counter()
@@ -313,6 +345,9 @@ class BayesianWorker(QRunnable):
                 mcmc_kwargs["deformation_mode"] = self._deformation_mode
             if self._poisson_ratio is not None:
                 mcmc_kwargs["poisson_ratio"] = self._poisson_ratio
+            # F-HL-005 fix: Pass fitted model state for stateful models
+            if self._fitted_model_state:
+                mcmc_kwargs["fitted_model_state"] = self._fitted_model_state
 
             # F-009 fix: Emit periodic elapsed-time updates during NUTS sampling
             # since NumPyro NUTS does not support progress callbacks.

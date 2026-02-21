@@ -203,6 +203,7 @@ class BayesianPage(QWidget):
                 "Custom",
                 "Bayesian Demo (chains=4, 1000/2000)",
                 "GMM Quick (chains=1, 500/1000)",
+                "HVM/HVNM ODE (chains=1, 50/100)",
                 "SPP LAOS (chains=4, 1000/2000)",
                 "SPP Dense (chains=4, 2000/2000)",
             ]
@@ -513,6 +514,37 @@ class BayesianPage(QWidget):
             except Exception:
                 pass  # Don't block Bayesian if check fails
 
+        # F-HVM-OOM fix: Warn about HVM/HVNM memory requirements for ODE-based NUTS
+        if "hvm" in _mn_lower or "hvnm" in _mn_lower:
+            reply = QMessageBox.question(
+                self,
+                "HVM/HVNM Memory Warning",
+                "HVM/HVNM models use an 11-18 component ODE system with TST "
+                "kinetics, requiring forward + backward ODE solves per NUTS "
+                "leapfrog step.\n\n"
+                "This can exceed 16 GB RAM with num_chains=4.\n"
+                "Consider using num_chains=1 and 50-100 warmup samples for "
+                "initial exploration.\n\n"
+                "Continue anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+        # F-MCT-002 fix: ITT-MCT models don't support Bayesian inference
+        if "itt_mct" in _mn_lower or _mn_lower == "mct":
+            QMessageBox.warning(
+                self,
+                "Bayesian Not Supported",
+                "ITT-MCT models do not support Bayesian inference.\n\n"
+                "The Prony decomposition depends on model parameters, "
+                "making MCMC sampling computationally prohibitive.\n\n"
+                "Use NLSQ fitting with bootstrap resampling for "
+                "uncertainty quantification.",
+            )
+            return
+
         # Get configuration
         config = {
             "num_warmup": self._warmup_spin.value(),
@@ -781,36 +813,42 @@ class BayesianPage(QWidget):
             dataset_id = dataset_id or state.active_dataset_id
             model_name = model_name or state.active_model_name
 
-        if model_name and dataset_id:
-            try:
-                from dataclasses import replace as dc_replace
+        # Always store the result — fall back to result's own identifiers
+        # if the user changed dataset/model during NUTS.
+        _model = model_name or getattr(result, "model_name", "unknown")
+        _dsid = dataset_id or getattr(result, "dataset_id", "unknown")
+        try:
+            from dataclasses import replace as dc_replace
 
-                stored_result = dc_replace(result, dataset_id=str(dataset_id))
-            except TypeError:
-                logger.warning(
-                    "BayesianResult type mismatch in _on_finished, "
-                    "falling back to manual construction",
-                    exc_info=True,
-                )
-                stored_result = BayesianResult(
-                    model_name=str(model_name),
-                    dataset_id=str(dataset_id),
-                    posterior_samples=getattr(result, "posterior_samples", {}),
-                    summary=getattr(result, "summary", None),
-                    r_hat=getattr(result, "r_hat", {}),
-                    ess=getattr(result, "ess", {}),
-                    divergences=int(getattr(result, "divergences", 0) or 0),
-                    credible_intervals=getattr(result, "credible_intervals", {}),
-                    mcmc_time=float(getattr(result, "mcmc_time", 0.0) or 0.0),
-                    timestamp=getattr(result, "timestamp", datetime.now()),
-                    num_warmup=int(getattr(result, "num_warmup", 0) or 0),
-                    num_samples=int(getattr(result, "num_samples", 0) or 0),
-                    num_chains=int(getattr(result, "num_chains", 4) or 4),
-                    inference_data=getattr(result, "inference_data", None),
-                )
-            # store_bayesian_result dispatches STORE_BAYESIAN_RESULT, whose
-            # reducer already sets pipeline step to COMPLETE.
-            store_bayesian_result(stored_result)
+            stored_result = dc_replace(
+                result, model_name=str(_model), dataset_id=str(_dsid),
+            )
+        except TypeError:
+            logger.warning(
+                "BayesianResult type mismatch in _on_finished, "
+                "falling back to manual construction",
+                exc_info=True,
+            )
+            stored_result = BayesianResult(
+                model_name=str(_model),
+                dataset_id=str(_dsid),
+                posterior_samples=getattr(result, "posterior_samples", {}),
+                summary=getattr(result, "summary", None),
+                r_hat=getattr(result, "r_hat", {}),
+                ess=getattr(result, "ess", {}),
+                divergences=int(getattr(result, "divergences", 0) or 0),
+                credible_intervals=getattr(result, "credible_intervals", {}),
+                mcmc_time=float(getattr(result, "mcmc_time", 0.0) or 0.0),
+                timestamp=getattr(result, "timestamp", datetime.now()),
+                num_warmup=int(getattr(result, "num_warmup", 0) or 0),
+                num_samples=int(getattr(result, "num_samples", 0) or 0),
+                num_chains=int(getattr(result, "num_chains", 4) or 4),
+                inference_data=getattr(result, "inference_data", None),
+                diagnostics_valid=bool(getattr(result, "diagnostics_valid", True)),
+            )
+        # store_bayesian_result dispatches STORE_BAYESIAN_RESULT, whose
+        # reducer already sets pipeline step to COMPLETE.
+        store_bayesian_result(stored_result)
 
         # Update diagnostics display
         self._update_diagnostics(result)
@@ -1021,41 +1059,12 @@ class BayesianPage(QWidget):
     ) -> dict[str, Any]:
         """Infer model initialization kwargs from parameter names.
 
-        For models like GeneralizedMaxwell that require n_modes during init,
-        we count the numbered parameters to determine the correct configuration.
-
-        Parameters
-        ----------
-        model_name : str
-            Name of the model
-        param_names : list[str]
-            List of parameter names from posterior samples
-
-        Returns
-        -------
-        dict
-            Model initialization kwargs (e.g., {"n_modes": 4})
+        Delegates to the shared ``infer_model_kwargs`` utility so that
+        BayesianWorker and BayesianService use the same logic.
         """
-        import re
+        from rheojax.gui.services.model_service import infer_model_kwargs
 
-        model_kwargs: dict[str, Any] = {}
-
-        # Handle GeneralizedMaxwell: count G_i or tau_i parameters
-        if "maxwell" in model_name.lower() and "generalized" in model_name.lower():
-            # Count G_i parameters (excluding G_inf)
-            g_pattern = re.compile(r"^G_(\d+)$")
-            g_indices = []
-            for name in param_names:
-                match = g_pattern.match(name)
-                if match:
-                    g_indices.append(int(match.group(1)))
-
-            if g_indices:
-                n_modes = max(g_indices)
-                model_kwargs["n_modes"] = n_modes
-                logger.debug(f"Inferred n_modes={n_modes} for {model_name}")
-
-        return model_kwargs
+        return infer_model_kwargs(model_name, param_names)
 
     def _posterior_draw_indices(
         self, posterior_samples: dict[str, Any], max_draws: int
@@ -1398,6 +1407,14 @@ class BayesianPage(QWidget):
                 "sigma_static": {"dist": "halfnormal", "scale": 100.0},
                 "sigma_dynamic": {"dist": "halfnormal", "scale": 100.0},
             }
+        elif name.startswith("HVM/HVNM"):
+            # HVM ODE-based NUTS needs conservative settings
+            self._warmup_spin.setValue(50)
+            self._samples_spin.setValue(100)
+            self._chains_spin.setValue(1)
+            self._hdi_combo.setCurrentText("0.90")
+            self._warmstart_check.setChecked(True)
+            self._current_preset = "hvm"
         elif name.startswith("SPP Dense"):
             self._warmup_spin.setValue(2000)
             self._samples_spin.setValue(2000)

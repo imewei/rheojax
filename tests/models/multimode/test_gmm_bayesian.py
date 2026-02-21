@@ -248,3 +248,102 @@ class TestGMMBayesianPriorSafetyIntegration:
 
         # Prior std should be positive but not huge
         # Prior std may be large if using fallback (bounds-based) priors
+
+
+class TestGMMBayesianPipelineBugs:
+    """Regression tests for F-GMM-001/002/003 GUI Bayesian pipeline bugs."""
+
+    @pytest.mark.smoke
+    def test_infer_model_kwargs_gmm(self):
+        """F-GMM-001: infer_model_kwargs detects n_modes from G_i and E_i names."""
+        from rheojax.gui.services.model_service import infer_model_kwargs
+
+        # Shear: G_inf, G_1, G_2, tau_1, tau_2 → n_modes=2
+        result = infer_model_kwargs(
+            "generalized_maxwell", ["G_inf", "G_1", "G_2", "tau_1", "tau_2"]
+        )
+        assert result == {"n_modes": 2}
+
+        # Tensile DMTA: E_inf, E_1, E_2, E_3 → n_modes=3
+        result = infer_model_kwargs(
+            "Generalized Maxwell",
+            ["E_inf", "E_1", "E_2", "E_3", "tau_1", "tau_2", "tau_3"],
+        )
+        assert result == {"n_modes": 3}
+
+        # Single mode
+        result = infer_model_kwargs(
+            "generalized_maxwell", ["G_inf", "G_1", "tau_1"]
+        )
+        assert result == {"n_modes": 1}
+
+        # Non-GMM model returns empty dict
+        result = infer_model_kwargs("maxwell", ["G", "tau"])
+        assert result == {}
+
+        # Empty param list returns empty dict
+        result = infer_model_kwargs("generalized_maxwell", [])
+        assert result == {}
+
+    @pytest.mark.smoke
+    def test_model_function_laos_kwargs(self):
+        """F-GMM-002: model_function uses _laos_omega/_laos_gamma_0 from self attrs."""
+        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+
+        # Set params and test_mode manually (simulate post-fit state)
+        model.parameters.set_value("G_inf", 1e5)
+        model.parameters.set_value("G_1", 5e5)
+        model.parameters.set_value("tau_1", 1.0)
+        model._test_mode = "laos"
+
+        t = jnp.linspace(0, 2 * jnp.pi, 50)
+        params = jnp.array([1e5, 5e5, 1.0])
+
+        # Default LAOS kwargs: omega=1.0, gamma_0=0.01
+        pred_default = model.model_function(t, params)
+        assert pred_default.shape == t.shape
+        assert jnp.all(jnp.isfinite(pred_default))
+
+        # Set _laos_gamma_0=0.5 → different amplitude
+        model._laos_gamma_0 = 0.5
+        pred_custom = model.model_function(t, params)
+        assert pred_custom.shape == t.shape
+        assert jnp.all(jnp.isfinite(pred_custom))
+
+        # Predictions must differ (stress ∝ gamma_0 for linear LAOS)
+        assert not jnp.allclose(pred_default, pred_custom, rtol=0.01)
+
+    @pytest.mark.smoke
+    def test_bayesian_after_element_minimization(self):
+        """F-GMM-001: fit_bayesian works after element minimization reduces n_modes."""
+        np.random.seed(42)
+        t = np.logspace(-2, 1, 30)
+        # Single-mode data: minimization should reduce n_modes from 3 to <=2
+        G_true = 1e6 + 5e5 * np.exp(-t / 0.5)
+        G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
+
+        model = GeneralizedMaxwell(n_modes=3, modulus_type="shear")
+        model.fit(
+            t, G_data, test_mode="relaxation", optimization_factor=1.5
+        )
+
+        n_final = model._n_modes
+        assert n_final <= 3  # May have been reduced
+
+        # Bayesian with the same model instance (Python API — already works)
+        result = model.fit_bayesian(
+            t, G_data,
+            test_mode="relaxation",
+            num_warmup=50,
+            num_samples=50,
+            num_chains=1,
+        )
+
+        # Posterior should have n_final modes, not 3
+        expected_params = {f"G_{i+1}" for i in range(n_final)} | {
+            f"tau_{i+1}" for i in range(n_final)
+        } | {"G_inf"}
+        for name in expected_params:
+            assert name in result.posterior_samples, (
+                f"Missing {name} in posterior (n_modes={n_final})"
+            )
