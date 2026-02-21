@@ -98,21 +98,34 @@ class DatasetState:
 
 @dataclass
 class FitResult:
-    """Result from NLSQ point estimation fit."""
+    """Canonical result from NLSQ point estimation fit.
+
+    This is the single source of truth for fit results across the GUI.
+    All GUI modules (fit_worker, model_service, pages) import from here.
+    """
 
     model_name: str
-    dataset_id: str
     parameters: dict[str, float]
-    r_squared: float
-    mpe: float
     chi_squared: float
-    fit_time: float
+    success: bool
+    message: str
     timestamp: datetime
+    # Optional fields — populated when available
+    dataset_id: str = ""
+    r_squared: float = 0.0
+    mpe: float = 0.0
+    fit_time: float = 0.0
     num_iterations: int = 0
     convergence_message: str = ""
     x_fit: Any | None = None
     y_fit: Any | None = None
     residuals: Any | None = None
+    pcov: Any | None = None
+    rmse: float | None = None
+    mae: float | None = None
+    aic: float | None = None
+    bic: float | None = None
+    metadata: dict[str, Any] | None = None
 
     def clone(self) -> "FitResult":
         """Create a deep copy of this fit result."""
@@ -122,6 +135,7 @@ class FitResult:
             x_fit=self.x_fit,
             y_fit=self.y_fit,
             residuals=self.residuals,
+            metadata=copy.deepcopy(self.metadata) if self.metadata else None,
         )
 
 
@@ -156,6 +170,16 @@ class BayesianResult:
             "r_hat": self.r_hat,
             "ess": self.ess,
             "divergences": self.divergences,
+        }
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        """Synthesized metadata dict for backward compatibility."""
+        return {
+            "model_name": self.model_name,
+            "num_warmup": self.num_warmup,
+            "num_samples": self.num_samples,
+            "num_chains": self.num_chains,
         }
 
     def clone(self) -> "BayesianResult":
@@ -419,13 +443,18 @@ class StateStore:
 
             elif action_type == "FITTING_FAILED":
                 error = action.get("error", "")
+                model_name = action.get("model_name", "")
+                dataset_id = action.get("dataset_id", "")
                 logger.error(
                     "Fitting failed",
                     action_type=action_type,
+                    model_name=model_name,
+                    dataset_id=dataset_id,
                     error=error,
                     exc_info=True,
                 )
-                self.emit_signal("fit_failed", "", "", error)
+                # F-005 fix: pass model_name and dataset_id (not empty strings)
+                self.emit_signal("fit_failed", model_name, dataset_id, error)
 
             elif action_type == "START_BAYESIAN":
                 model_name = action.get("model_name", "")

@@ -7,6 +7,7 @@ Bayesian inference interface with prior specification and MCMC monitoring.
 
 import json
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +45,7 @@ from rheojax.gui.resources.styles.tokens import (
     Typography,
     button_style,
 )
-from rheojax.gui.services.bayesian_service import BayesianResult, BayesianService
+from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.services.plot_service import PlotService
@@ -54,7 +55,7 @@ from rheojax.gui.state.actions import (
     store_bayesian_result,
     update_bayesian_progress,
 )
-from rheojax.gui.state.store import StateStore
+from rheojax.gui.state.store import BayesianResult, StateStore
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.logging import get_logger
@@ -756,9 +757,32 @@ class BayesianPage(QWidget):
                 model_name = model_name or state.active_model_name
 
             if model_name and dataset_id:
-                from dataclasses import replace as dc_replace
+                try:
+                    from dataclasses import replace as dc_replace
 
-                stored_result = dc_replace(result, dataset_id=str(dataset_id))
+                    stored_result = dc_replace(result, dataset_id=str(dataset_id))
+                except TypeError:
+                    logger.warning(
+                        "BayesianResult type mismatch in _on_finished, "
+                        "falling back to manual construction",
+                        exc_info=True,
+                    )
+                    stored_result = BayesianResult(
+                        model_name=str(model_name),
+                        dataset_id=str(dataset_id),
+                        posterior_samples=getattr(result, "posterior_samples", {}),
+                        summary=getattr(result, "summary", None),
+                        r_hat=getattr(result, "r_hat", {}),
+                        ess=getattr(result, "ess", {}),
+                        divergences=int(getattr(result, "divergences", 0) or 0),
+                        credible_intervals=getattr(result, "credible_intervals", {}),
+                        mcmc_time=float(getattr(result, "mcmc_time", 0.0) or 0.0),
+                        timestamp=getattr(result, "timestamp", datetime.now()),
+                        num_warmup=int(getattr(result, "num_warmup", 0) or 0),
+                        num_samples=int(getattr(result, "num_samples", 0) or 0),
+                        num_chains=int(getattr(result, "num_chains", 4) or 4),
+                        inference_data=getattr(result, "inference_data", None),
+                    )
                 store_bayesian_result(stored_result)
                 self._store.dispatch(
                     "SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"}

@@ -135,7 +135,7 @@ def test_fit_result_structure():
         chi_squared=0.01,
         fit_time=1.5,
         timestamp=datetime.now(),
-        n_iterations=100,
+        num_iterations=100,
         success=True,
     )
 
@@ -164,28 +164,37 @@ def test_bayesian_result_structure():
         "tau": {"mean": 1.0, "std": 0.1},
     }
 
-    diagnostics = {
-        "r_hat": {"G0": 1.01, "tau": 1.00},
-        "ess": {"G0": 1800, "tau": 1900},
-        "divergences": 0,
-    }
-
     result = BayesianResult(
         model_name="maxwell",
+        dataset_id="test-ds-001",
         posterior_samples=posterior_samples,
         summary=summary,
-        diagnostics=diagnostics,
+        r_hat={"G0": 1.001, "tau": 1.002},
+        ess={"G0": 500.0, "tau": 450.0},
+        divergences=0,
+        credible_intervals={"G0": (8e5, 1.2e6), "tau": (0.8, 1.2)},
+        mcmc_time=10.5,
+        timestamp=datetime.now(),
         num_samples=2000,
         num_chains=4,
-        sampling_time=10.5,
-        timestamp=datetime.now(),
-        credible_intervals={"G0": (8e5, 1.2e6), "tau": (0.8, 1.2)},
+        num_warmup=1000,
     )
 
     assert result.model_name == "maxwell"
+    assert result.dataset_id == "test-ds-001"
     assert result.num_samples == 2000
     assert result.num_chains == 4
+    assert result.num_warmup == 1000
+    # diagnostics is now a computed property returning a dict
     assert result.diagnostics["divergences"] == 0
+    assert result.diagnostics["r_hat"]["G0"] == 1.001
+    assert result.diagnostics["ess"]["tau"] == 450.0
+    # sampling_time is a property alias for mcmc_time
+    assert result.sampling_time == 10.5
+    assert result.mcmc_time == 10.5
+    # metadata is a synthesized property
+    assert result.metadata["model_name"] == "maxwell"
+    assert result.metadata["num_chains"] == 4
 
     print("[OK] BayesianResult structure tests passed")
 
