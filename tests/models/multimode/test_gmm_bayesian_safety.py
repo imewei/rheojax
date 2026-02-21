@@ -141,11 +141,27 @@ class TestTieredPriorConstruction:
 
     def test_suspicious_convergence_uses_safer_priors(self):
         """Test that suspicious convergence uses safer priors decoupled from Hessian."""
-        # Skip this test - creating truly suspicious (but not failed) convergence
-        # is difficult with GMM's robust classification
-        pytest.skip(
-            "GMM classification is very relaxed, difficult to create suspicious scenario"
-        )
+        # Fit a model to get valid state, then test prior construction
+        # with the "suspicious" classification directly.
+        np.random.seed(42)
+        t = np.logspace(-3, 2, 50)
+        G_true = 1e6 + 5e5 * np.exp(-t / 0.1)
+        G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
+
+        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model.fit(t, G_data, test_mode="relaxation")
+
+        # Construct priors with explicit "suspicious" classification
+        priors = model._construct_bayesian_priors("suspicious", prior_mode="warn")
+
+        # Suspicious priors should still exist for all parameters
+        assert "G_inf" in priors
+        assert "G_1" in priors
+        assert "tau_1" in priors
+
+        # Suspicious priors should be wider than "good" priors
+        good_priors = model._construct_bayesian_priors("good", prior_mode="warn")
+        assert priors["G_1"]["std"] >= good_priors["G_1"]["std"]
 
     def test_hard_failure_strict_mode_raises_error(self):
         """Test that hard failure in strict mode raises informative error."""
@@ -202,8 +218,26 @@ class TestBayesianIntegration:
     """Test integration of prior safety with fit_bayesian() workflow."""
 
     def test_fit_bayesian_uses_prior_safety(self):
-        """Test that fit_bayesian() integrates with prior safety mechanism."""
-        # Skip this test - requires full Bayesian integration (Task 4.2)
-        pytest.skip(
-            "Bayesian integration not yet implemented (requires Task 4.2: model_function)"
+        """Test that fit_bayesian() runs end-to-end with prior safety."""
+        np.random.seed(42)
+        t = np.logspace(-2, 1, 25)
+        G_true = 1e6 + 5e5 * np.exp(-t / 0.1)
+        G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
+
+        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model.fit(t, G_data, test_mode="relaxation")
+
+        # fit_bayesian should work with NLSQ warm-start
+        result = model.fit_bayesian(
+            t,
+            G_data,
+            test_mode="relaxation",
+            num_warmup=50,
+            num_samples=50,
+            num_chains=1,
         )
+
+        # Verify posterior samples exist for all parameters
+        assert "G_inf" in result.posterior_samples
+        assert "G_1" in result.posterior_samples
+        assert "tau_1" in result.posterior_samples

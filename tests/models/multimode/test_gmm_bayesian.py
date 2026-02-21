@@ -60,8 +60,8 @@ class TestGMMBayesianInference:
         params = jnp.array([0.0, 1e6, 0.1])  # [G_inf, G_1, tau_1]
         predictions = model.model_function(omega, params)
 
-        # Verify predictions have correct shape for complex modulus
-        assert predictions.shape == (2, len(omega))  # [G', G"]
+        # model_function returns (M, 2) for oscillation — [G', G"] per point
+        assert predictions.shape == (len(omega), 2)
         assert jnp.all(jnp.isfinite(predictions))
 
     def test_model_function_creep_mode(self):

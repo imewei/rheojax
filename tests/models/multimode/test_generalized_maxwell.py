@@ -19,16 +19,11 @@ jax, jnp = safe_import_jax()
 class TestGMMRelaxationMode:
     """Test GMM relaxation mode prediction and fitting."""
 
-    @pytest.mark.skip(
-        reason="N=1 single-mode fitting is ill-conditioned (G_inf vs G_1 trade-off)"
-    )
     def test_n1_mode_recovers_maxwell_parameters(self):
-        """GMM with N=1 should recover single Maxwell element parameters.
+        """GMM with N=1 should recover total modulus and relaxation time.
 
-        Note: This test is skipped because fitting pure exponential decay with
-        GMM (G_inf + G_1) is ill-conditioned - the optimizer can arbitrarily
-        split the modulus between G_inf and G_1 while achieving the same fit quality.
-        Use N>=2 for well-conditioned parameter recovery.
+        Individual G_inf vs G_1 split is ill-conditioned, but total modulus
+        (G_inf + G_1) and tau_1 are well-identified.
         """
         # Create synthetic Maxwell data (single mode)
         t = np.logspace(-3, 2, 50)
