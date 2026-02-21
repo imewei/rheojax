@@ -175,9 +175,10 @@ class BayesianService:
                     "_last_fit_kwargs",
                     "_fit_data_metadata",
                     "_use_forward_mode_ad",
-                    # HVNM/HVM/VLB protocol state for model_function
+                    # HVNM/HVM/VLB/STZ protocol state for model_function
                     "_gamma_dot_applied",
                     "_sigma_applied",
+                    "_sigma_0",
                     "_gamma_0",
                     "_omega_laos",
                     # IKH/ML-IKH protocol state for model_function
@@ -186,6 +187,9 @@ class BayesianService:
                     "_fit_sigma_0",
                     # SGR startup protocol state for model_function
                     "_startup_gamma_dot",
+                    # SPP protocol state for model_function
+                    "_yield_type",
+                    "_omega",
                     # GMM protocol state for startup/LAOS model_function
                     "_laos_omega",
                     "_laos_gamma_0",

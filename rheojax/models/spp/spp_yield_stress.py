@@ -253,9 +253,9 @@ class SPPYieldStress(BaseModel):
         yield_type = kwargs.get("yield_type", "static")
         self._yield_type = yield_type
 
-        if test_mode == TestMode.OSCILLATION:
+        if test_mode in (TestMode.OSCILLATION, TestMode.LAOS):
             self._fit_oscillation(X_array, y_array, yield_type)
-        elif test_mode == TestMode.ROTATION:
+        elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             self._fit_rotation(X_array, y_array)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
@@ -438,14 +438,14 @@ class SPPYieldStress(BaseModel):
         n_power_law = params[6]
         # noise = params[7]  # Used only in likelihood
 
-        if test_mode == TestMode.OSCILLATION:
+        if test_mode in (TestMode.OSCILLATION, TestMode.LAOS):
             yield_type = getattr(self, "_yield_type", "static")
             if yield_type == "dynamic":
                 return self._predict_dynamic_yield(X, sigma_dy_scale, sigma_dy_exp)
             return self._predict_oscillation(
                 X, G_cage, sigma_sy_scale, sigma_sy_exp, eta_inf
             )
-        elif test_mode == TestMode.ROTATION:
+        elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             return self._predict_rotation(X, sigma_dy_scale, eta_inf, n_power_law)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
@@ -574,26 +574,26 @@ class SPPYieldStress(BaseModel):
             # Viscosity: wide log-normal prior
             return dist.LogNormal(loc=jnp.log(1.0), scale=3.0)
 
-        # Exponent parameters: Beta priors on [0, 2]
+        # Exponent parameters: Beta priors on [0, 2] matching bounds
         elif name == "sigma_sy_exp":
-            # Exponent bounded [0,1]; time-domain yield often linear/sublinear
+            # Exponent bounded [0, 2]; mode at 1.0 (symmetric Beta)
             return dist.TransformedDistribution(
                 dist.Beta(2.0, 2.0),
-                dist.transforms.AffineTransform(loc=0.0, scale=1.0),
+                dist.transforms.AffineTransform(loc=0.0, scale=2.0),
             )
 
         elif name == "sigma_dy_exp":
-            # Often sublinear scaling (exp < 1) bounded [0,1]
+            # Often sublinear scaling; mode < 1.0 (skewed Beta)
             return dist.TransformedDistribution(
                 dist.Beta(2.0, 3.0),  # Skewed toward lower values
-                dist.transforms.AffineTransform(loc=0.0, scale=1.0),
+                dist.transforms.AffineTransform(loc=0.0, scale=2.0),
             )
 
         elif name == "n_power_law":
-            # Power-law index: often 0.3-0.8 for yield stress fluids
+            # Power-law index bounded [0.01, 2.0]; often 0.3-0.8
             return dist.TransformedDistribution(
                 dist.Beta(2.0, 2.0),
-                dist.transforms.AffineTransform(loc=0.01, scale=0.99),
+                dist.transforms.AffineTransform(loc=0.01, scale=1.99),
             )
 
         elif name == "noise":
@@ -632,12 +632,10 @@ class SPPYieldStress(BaseModel):
         """
         gamma_0_jax = jnp.asarray(gamma_0_array, dtype=jnp.float64)
 
-        self.parameters.get_value("G_cage")
         sigma_sy_scale = self.parameters.get_value("sigma_sy_scale")
         sigma_sy_exp = self.parameters.get_value("sigma_sy_exp")
         sigma_dy_scale = self.parameters.get_value("sigma_dy_scale")
         sigma_dy_exp = self.parameters.get_value("sigma_dy_exp")
-        self.parameters.get_value("eta_inf")
 
         result = {"gamma_0": gamma_0_array}
 

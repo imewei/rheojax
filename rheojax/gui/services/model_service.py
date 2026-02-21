@@ -63,6 +63,25 @@ def infer_model_kwargs(model_name: str, param_names: list[str]) -> dict[str, Any
                 n_modes=n_modes,
             )
 
+    if "stz" in model_name.lower():
+        # Infer variant from parameter names:
+        # minimal: no tau_beta, no m_inf
+        # standard: has tau_beta, no m_inf
+        # full: has tau_beta and m_inf
+        has_tau_beta = "tau_beta" in param_names
+        has_m_inf = "m_inf" in param_names
+        if has_m_inf:
+            model_kwargs["variant"] = "full"
+        elif has_tau_beta:
+            model_kwargs["variant"] = "standard"
+        else:
+            model_kwargs["variant"] = "minimal"
+        logger.debug(
+            "Inferred STZ variant from parameter names",
+            model=model_name,
+            variant=model_kwargs["variant"],
+        )
+
     return model_kwargs
 
 
@@ -135,6 +154,13 @@ def normalize_model_name(model_name: str) -> str:
         "hvnm local": "hvnm_local",
         "vitrimer nanocomposite": "hvnm_local",
         "hybrid vitrimer nanocomposite": "hvnm_local",
+        # SPP
+        "spp": "spp_yield_stress",
+        "spp yield stress": "spp_yield_stress",
+        # STZ
+        "stz": "stz_conventional",
+        "stz conventional": "stz_conventional",
+        "shear transformation zone": "stz_conventional",
     }
 
     if key in alias_map.values():
@@ -395,19 +421,13 @@ class ModelService:
 
             # Get registry info for protocols
             from rheojax.core.registry import ModelRegistry
-            from rheojax.core.test_modes import TestModeEnum
 
             reg_info = ModelRegistry.get_info(model_name)
             supported_modes = []
 
             if reg_info and reg_info.protocols:
-                # Use registered protocols
-                for p in reg_info.protocols:
-                    tm = TestModeEnum.from_protocol(p)
-                    if tm != TestModeEnum.UNKNOWN:
-                        supported_modes.append(tm.value)
-                # Deduplicate
-                supported_modes = list(dict.fromkeys(supported_modes))
+                # Use Protocol.value directly to match fit_page combo labels
+                supported_modes = [p.value for p in reg_info.protocols]
             else:
                 # Fallback to heuristics (should not happen for migrated models)
                 supported_modes = ["relaxation", "creep", "oscillation"]
@@ -930,10 +950,11 @@ class ModelService:
                 "_last_fit_kwargs",
                 "_fit_data_metadata",
                 "_use_forward_mode_ad",
-                # HVNM/HVM/VLB protocol state (model_function reads these
+                # HVNM/HVM/VLB/STZ protocol state (model_function reads these
                 # instead of _last_fit_kwargs for startup/creep/LAOS context)
                 "_gamma_dot_applied",
                 "_sigma_applied",
+                "_sigma_0",
                 "_gamma_0",
                 "_omega_laos",
                 # IKH/ML-IKH protocol state for model_function
@@ -946,6 +967,9 @@ class ModelService:
                 "_laos_omega",
                 "_laos_gamma_0",
                 "_n_modes",
+                # SPP protocol state for model_function
+                "_yield_type",
+                "_omega",
                 # ITT-MCT Prony decomposition state
                 "_prony_amplitudes",
                 "_prony_times",
@@ -1100,9 +1124,10 @@ class ModelService:
                 for attr in (
                     "_last_fit_kwargs",
                     "_fit_data_metadata",
-                    # HVNM/HVM/VLB protocol state for model_function
+                    # HVNM/HVM/VLB/STZ protocol state for model_function
                     "_gamma_dot_applied",
                     "_sigma_applied",
+                    "_sigma_0",
                     "_gamma_0",
                     "_omega_laos",
                     # IKH/ML-IKH protocol state for model_function
@@ -1111,6 +1136,9 @@ class ModelService:
                     "_fit_sigma_0",
                     # SGR startup protocol state for model_function
                     "_startup_gamma_dot",
+                    # SPP protocol state for model_function
+                    "_yield_type",
+                    "_omega",
                     # ITT-MCT Prony decomposition state
                     "_prony_amplitudes",
                     "_prony_times",
