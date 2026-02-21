@@ -228,6 +228,9 @@ class BayesianPage(QWidget):
         self._deformation_combo.setToolTip(
             "Select deformation mode (Tension for DMTA/DMA data)"
         )
+        self._deformation_combo.currentTextChanged.connect(
+            self._on_deformation_mode_changed
+        )
         layout.addWidget(self._deformation_combo)
 
         poisson_layout = QHBoxLayout()
@@ -242,6 +245,7 @@ class BayesianPage(QWidget):
         self._poisson_spin.setToolTip(
             "Poisson ratio for E*-G* conversion (rubber=0.5, glassy=0.35)"
         )
+        self._poisson_spin.valueChanged.connect(self._on_poisson_ratio_changed)
         poisson_layout.addWidget(self._poisson_spin)
         layout.addLayout(poisson_layout)
 
@@ -375,6 +379,7 @@ class BayesianPage(QWidget):
             self._store.signals.model_selected.connect(self._on_model_changed)
             self._store.signals.bayesian_started.connect(self._on_bayesian_started)
             self._store.signals.bayesian_completed.connect(self._on_bayesian_completed)
+            self._store.signals.state_changed.connect(self._sync_deformation_from_store)
 
     @Slot()
     def _on_model_changed(self) -> None:
@@ -384,8 +389,65 @@ class BayesianPage(QWidget):
 
         if model_name:
             self._model_label.setText(f"Model: {model_name}")
+            # F-010 fix: Validate DMTA support for selected model
+            self._update_deformation_combo(model_name)
         else:
             self._model_label.setText("Model: (select in Fit tab)")
+
+    def _update_deformation_combo(self, model_name: str) -> None:
+        """Enable/disable deformation mode combo based on model DMTA support."""
+        try:
+            from rheojax.gui.services.model_service import ModelService
+
+            svc = ModelService()
+            supported = svc.get_supported_deformation_modes(model_name)
+        except Exception:
+            supported = []
+        has_tension = "tension" in supported
+        self._deformation_combo.setEnabled(has_tension)
+        if not has_tension:
+            was_blocked = self._deformation_combo.blockSignals(True)
+            self._deformation_combo.setCurrentIndex(0)  # "Shear"
+            self._deformation_combo.blockSignals(was_blocked)
+            self._deformation_combo.setToolTip(
+                f"Model '{model_name}' supports shear deformation only"
+            )
+        else:
+            self._deformation_combo.setToolTip(
+                "Select deformation mode (Tension for DMTA/DMA data)"
+            )
+
+    @Slot()
+    def _sync_deformation_from_store(self) -> None:
+        """Sync deformation mode and Poisson ratio from store state."""
+        state = self._store.get_state()
+
+        # Sync deformation combo
+        mode_text = state.deformation_mode.capitalize()  # "shear" -> "Shear"
+        current = self._deformation_combo.currentText()
+        if current != mode_text:
+            was_blocked = self._deformation_combo.blockSignals(True)
+            idx = self._deformation_combo.findText(mode_text)
+            if idx >= 0:
+                self._deformation_combo.setCurrentIndex(idx)
+            self._deformation_combo.blockSignals(was_blocked)
+
+        # Sync Poisson ratio
+        if abs(self._poisson_spin.value() - state.poisson_ratio) > 1e-6:
+            was_blocked = self._poisson_spin.blockSignals(True)
+            self._poisson_spin.setValue(state.poisson_ratio)
+            self._poisson_spin.blockSignals(was_blocked)
+
+    def _on_deformation_mode_changed(self, mode: str) -> None:
+        """Dispatch deformation mode change to store (bidirectional sync)."""
+        if mode:
+            self._store.dispatch(
+                "SET_DEFORMATION_MODE", {"deformation_mode": mode.lower()}
+            )
+
+    def _on_poisson_ratio_changed(self, value: float) -> None:
+        """Dispatch Poisson ratio change to store (bidirectional sync)."""
+        self._store.dispatch("SET_POISSON_RATIO", {"poisson_ratio": value})
 
     def _on_run_clicked(self) -> None:
         """Handle run button click."""
@@ -403,6 +465,32 @@ class BayesianPage(QWidget):
         if not dataset:
             QMessageBox.warning(self, "No Data", "Please load a dataset first.")
             return
+
+        # F-006 fix: Warn about EPM memory requirements for large lattices
+        if "epm" in model_name.lower():
+            try:
+                from rheojax.core.registry import ModelRegistry
+
+                model_cls = ModelRegistry.get(model_name)
+                if model_cls is not None:
+                    tmp = model_cls()
+                    lattice_L = getattr(tmp, "L", 64)
+                    if lattice_L > 32:
+                        reply = QMessageBox.question(
+                            self,
+                            "EPM Memory Warning",
+                            f"EPM model with L={lattice_L} lattice requires significant "
+                            f"memory for Bayesian inference (~{lattice_L**2 * 8 // 1024} KB "
+                            "per field × forward+backward passes).\n\n"
+                            "Consider reducing L to 16-32 for systems with <32 GB RAM.\n\n"
+                            "Continue anyway?",
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.Yes,
+                        )
+                        if reply == QMessageBox.StandardButton.No:
+                            return
+            except Exception:
+                pass  # Don't block Bayesian if check fails
 
         # Get configuration
         config = {
@@ -475,10 +563,13 @@ class BayesianPage(QWidget):
                     dataset_id=dataset.id,
                 )
 
-        # Capture dataset_id and model_name at submission time to avoid
-        # TOCTOU race if active selection changes before _on_finished runs
+        # Capture dataset_id, model_name, and a dataset snapshot at submission
+        # time to avoid TOCTOU race if active selection changes before
+        # _on_finished runs. The snapshot is used for posterior plotting
+        # (GUI-011 fix).
         self._submitted_dataset_id = dataset.id
         self._submitted_model_name = model_name
+        self._submitted_dataset_snapshot = dataset.clone()
 
         # Log inference start
         logger.info(
@@ -983,7 +1074,13 @@ class BayesianPage(QWidget):
 
     def _update_fit_plot_from_posterior(self, result: Any) -> None:
         """Render raw data + posterior-representative fitted curve."""
-        dataset = self._store.get_active_dataset()
+        # GUI-011 fix: Use the dataset snapshot captured at inference start
+        # rather than the current active dataset, to avoid TOCTOU race where
+        # the user changes the active dataset while inference is running.
+        dataset = getattr(self, "_submitted_dataset_snapshot", None)
+        if dataset is None:
+            # Fallback to active dataset if no snapshot available
+            dataset = self._store.get_active_dataset()
         if dataset is None:
             logger.debug("plot_update skipped: no active dataset")
             return
