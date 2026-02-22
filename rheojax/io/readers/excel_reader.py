@@ -12,6 +12,7 @@ from rheojax.io.readers._utils import (
     VALID_TEST_MODES,
     VALID_TRANSFORMS,
     construct_complex_modulus,
+    detect_deformation_mode_from_columns,
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
@@ -33,6 +34,7 @@ def load_excel(
     y_units: str | None = None,
     domain: str | None = None,
     test_mode: str | None = None,
+    deformation_mode: str | None = None,
     temperature: float | None = None,
     metadata: dict | None = None,
     intended_transform: str | None = None,
@@ -55,6 +57,9 @@ def load_excel(
         domain: Data domain ('time' or 'frequency', auto-detected if None).
         test_mode: Test mode ('relaxation', 'creep', 'oscillation', 'rotation').
             Auto-detected if None.
+        deformation_mode: Deformation mode ('shear', 'tension', 'bending',
+            'compression'). Auto-detected from column names if None.
+            If 'tension'/'bending'/'compression', sets metadata for DMTA support.
         temperature: Temperature in Kelvin for TTS workflows.
         metadata: Additional metadata dict to merge.
         intended_transform: Transform type for metadata validation. One of
@@ -286,12 +291,26 @@ def load_excel(
         for msg in warning_messages:
             warnings.warn(msg, UserWarning, stacklevel=2)
 
+    # Auto-detect deformation mode from y column names if not provided
+    if deformation_mode is None:
+        detected_deformation = detect_deformation_mode_from_columns(y_headers, y_units)
+        if detected_deformation is not None:
+            deformation_mode = detected_deformation
+            logger.debug(
+                "Auto-detected deformation mode", deformation_mode=deformation_mode
+            )
+
+    # Store deformation mode in metadata for BaseModel.fit() auto-detection
+    if deformation_mode is not None:
+        final_metadata["deformation_mode"] = deformation_mode
+
     logger.info(
         "File parsed",
         filepath=str(filepath),
         n_records=len(x_data),
         test_mode=detected_test_mode,
         domain=domain,
+        deformation_mode=deformation_mode,
     )
 
     return RheoData(

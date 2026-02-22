@@ -49,6 +49,8 @@ __all__ = [
     "TransformWorker",
     "TransformWorkerSignals",
     "TransformResult",
+    "PreviewWorker",
+    "PreviewWorkerSignals",
 ]
 
 
@@ -106,4 +108,12 @@ def __getattr__(name: str):
         from rheojax.gui.jobs.transform_worker import TransformResult
 
         return TransformResult
+    elif name == "PreviewWorker":
+        from rheojax.gui.jobs.preview_worker import PreviewWorker
+
+        return PreviewWorker
+    elif name == "PreviewWorkerSignals":
+        from rheojax.gui.jobs.preview_worker import PreviewWorkerSignals
+
+        return PreviewWorkerSignals
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

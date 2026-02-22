@@ -15,6 +15,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
 
@@ -184,6 +186,16 @@ def main(args: list[str] | None = None) -> int:
         print("Use 'rheojax inventory' to see available models", file=sys.stderr)
         return 1
 
+    # Validate loaded data
+    x_arr = np.asarray(data.x)
+    y_arr = np.asarray(data.y)
+    if np.any(~np.isfinite(x_arr)):
+        print("Error: Data contains NaN/Inf values in x column", file=sys.stderr)
+        return 1
+    if not np.iscomplexobj(y_arr) and np.any(~np.isfinite(y_arr)):
+        print("Error: Data contains NaN/Inf values in y column", file=sys.stderr)
+        return 1
+
     # Determine test mode
     test_mode = parsed.test_mode
     if test_mode is None:
@@ -191,10 +203,22 @@ def main(args: list[str] | None = None) -> int:
         if test_mode is None and hasattr(data, "metadata"):
             test_mode = data.metadata.get("test_mode")
     if test_mode is None:
-        test_mode = "oscillation"
-        logger.warning(
-            "No test mode detected, defaulting to '%s'", test_mode
+        print(
+            "Error: Could not auto-detect test mode. "
+            "Use --test-mode to specify (oscillation, relaxation, creep, "
+            "flow_curve, startup, laos).",
+            file=sys.stderr,
         )
+        return 1
+
+    # Validate complex data for oscillation mode
+    if test_mode == "oscillation" and not np.iscomplexobj(y_arr):
+        print(
+            "Error: Oscillation test mode requires complex y data (G' + iG''). "
+            "Use --y-cols to specify storage and loss modulus columns.",
+            file=sys.stderr,
+        )
+        return 1
 
     # Run fit
     try:

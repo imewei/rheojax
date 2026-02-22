@@ -72,6 +72,16 @@ def rheodata_from_dataset_state(dataset: DatasetState) -> RheoData:
                 y2_shape=y2_arr.shape,
             )
             y_arr = y_arr.astype(float) + 1j * y2_arr.astype(float)
+        else:
+            logger.error(
+                "Shape mismatch between y and y2 data",
+                y_shape=y_arr.shape,
+                y2_shape=y2_arr.shape,
+            )
+            raise ValueError(
+                f"Cannot combine G'/G'': shape mismatch "
+                f"y={y_arr.shape}, y2={y2_arr.shape}"
+            )
 
     try:
         rheo_data = RheoData(

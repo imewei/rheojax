@@ -28,6 +28,20 @@ _FATAL_EXCEPTIONS = (
 _FILE_SIZE_WARNING_BYTES = 100 * 1024 * 1024
 
 
+def _inject_provenance(
+    result: RheoData | list[RheoData],
+    format_detected: str,
+    readers_attempted: list[str],
+) -> None:
+    """Inject format provenance metadata into parse results."""
+    targets = result if isinstance(result, list) else [result]
+    for r in targets:
+        if hasattr(r, "metadata") and isinstance(r.metadata, dict):
+            r.metadata["format_detected"] = format_detected
+            if len(readers_attempted) > 1:
+                r.metadata["readers_attempted"] = readers_attempted
+
+
 def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
     """Automatically detect file format and load data.
 
@@ -117,11 +131,15 @@ def _try_trios_then_anton_then_csv(
     Returns:
         RheoData object(s)
     """
+    attempted: list[str] = []
+
     # Try TRIOS first
     try:
+        attempted.append("trios")
         logger.debug("Trying TRIOS reader", filepath=str(filepath))
         result = load_trios(filepath, **kwargs)
         logger.debug("TRIOS reader succeeded", filepath=str(filepath))
+        _inject_provenance(result, "trios", attempted)
         return result
     except _FATAL_EXCEPTIONS:
         raise
@@ -132,9 +150,11 @@ def _try_trios_then_anton_then_csv(
         )
 
     try:
+        attempted.append("anton_paar")
         logger.debug("Trying Anton Paar reader", filepath=str(filepath))
         result = load_anton_paar(filepath, **kwargs)
         logger.debug("Anton Paar reader succeeded", filepath=str(filepath))
+        _inject_provenance(result, "anton_paar", attempted)
         return result
     except _FATAL_EXCEPTIONS:
         raise
@@ -146,9 +166,11 @@ def _try_trios_then_anton_then_csv(
 
     # Try CSV as fallback
     try:
+        attempted.append("csv")
         logger.debug("Trying CSV reader", filepath=str(filepath))
         result = _try_csv(filepath, **kwargs)
         logger.debug("CSV reader succeeded", filepath=str(filepath))
+        _inject_provenance(result, "csv", attempted)
         return result
     except _FATAL_EXCEPTIONS:
         raise
@@ -256,7 +278,9 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                 f"Could not auto-detect columns: {e}. Please specify x_col and y_col."
             ) from e
 
-    return load_csv(filepath, **kwargs)
+    result = load_csv(filepath, **kwargs)
+    _inject_provenance(result, "csv", ["csv"])
+    return result
 
 
 def _try_excel(filepath: Path, **kwargs) -> RheoData:
@@ -276,7 +300,9 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
         logger.error("x_col and y_col required for Excel files", filepath=str(filepath))
         raise ValueError("For Excel files, please specify x_col and y_col parameters")
 
-    return load_excel(filepath, **kwargs)
+    result = load_excel(filepath, **kwargs)
+    _inject_provenance(result, "excel", ["excel"])
+    return result
 
 
 def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
@@ -293,20 +319,23 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
         ValueError: If no reader can parse the file
     """
     readers = [
-        ("TRIOS", lambda: load_trios(filepath, **kwargs)),
-        ("ANTON_PAAR", lambda: load_anton_paar(filepath, **kwargs)),
-        ("CSV", lambda: _try_csv(filepath, **kwargs)),
-        ("EXCEL", lambda: _try_excel(filepath, **kwargs)),
+        ("trios", lambda: load_trios(filepath, **kwargs)),
+        ("anton_paar", lambda: load_anton_paar(filepath, **kwargs)),
+        ("csv", lambda: _try_csv(filepath, **kwargs)),
+        ("excel", lambda: _try_excel(filepath, **kwargs)),
     ]
 
     errors = []
+    attempted: list[str] = []
     for reader_name, reader_func in readers:
         try:
+            attempted.append(reader_name)
             logger.debug("Trying reader", filepath=str(filepath), reader=reader_name)
             result = reader_func()
             logger.debug(
-                "Reader succeeded", filepath=str(filepath), reader=reader_name.lower()
+                "Reader succeeded", filepath=str(filepath), reader=reader_name
             )
+            _inject_provenance(result, reader_name, attempted)
             return result
         except _FATAL_EXCEPTIONS:
             raise

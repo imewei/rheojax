@@ -327,6 +327,8 @@ def load_csv(
         "y_column": y_cols if is_complex else y_col,
         "encoding": used_encoding,
     }
+    if used_encoding != default_encoding:
+        source_metadata["encoding_fallback"] = True
 
     # Merge with user metadata
     final_metadata = {**source_metadata}

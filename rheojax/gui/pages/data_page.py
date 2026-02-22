@@ -24,10 +24,12 @@ from rheojax.gui.compat import (
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
+    QThreadPool,
     QVBoxLayout,
     QWidget,
     Signal,
 )
+from rheojax.gui.jobs.preview_worker import PreviewWorker
 from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing, Typography
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.state.store import StateStore
@@ -399,89 +401,111 @@ class DataPage(QWidget):
         self.file_dropped.emit(file_path)
 
     def _load_preview(self) -> None:
-        """Load and display data preview."""
+        """Load and display data preview asynchronously.
+
+        Offloads file I/O to a background thread to prevent UI freezes
+        on large files. Results are delivered via signals to
+        ``_on_preview_loaded`` / ``_on_preview_failed``.
+        """
         if not self._current_file_path:
             return
 
-        try:
-            preview_result = self._data_service.preview_file(
-                self._current_file_path, max_rows=100
-            )
+        # Show loading state
+        self._file_name_label.setText(f"Loading: {self._current_file_path.name}...")
+        self._preview_table.setEnabled(False)
 
-            self._preview_data = preview_result.get("data", [])
-            headers = preview_result.get("headers", [])
-            metadata = preview_result.get("metadata", {})
+        worker = PreviewWorker(
+            data_service=self._data_service,
+            file_path=self._current_file_path,
+            max_rows=100,
+        )
+        worker.signals.completed.connect(self._on_preview_loaded)
+        worker.signals.failed.connect(self._on_preview_failed)
+        QThreadPool.globalInstance().start(worker)
 
-            if not self._preview_data:
-                self._preview_table.clear()
-                self._file_name_label.setText("File loaded but no previewable rows")
-                self._metadata_text.clear()
-                if hasattr(self, "_empty_state"):
-                    self._empty_state.show()
-                return
+    def _on_preview_loaded(self, preview_result: dict) -> None:
+        """Handle successful preview load (called on main thread via signal)."""
+        self._preview_table.setEnabled(True)
 
-            # Detect file format for user feedback
-            detected_format = self._detect_file_format()
-            metadata["format"] = detected_format
+        self._preview_data = preview_result.get("data", [])
+        headers = preview_result.get("headers", [])
+        metadata = preview_result.get("metadata", {})
 
-            # Update table
+        if not self._preview_data:
             self._preview_table.clear()
-            self._preview_table.setRowCount(len(self._preview_data))
-            self._preview_table.setColumnCount(
-                len(headers) if headers else len(self._preview_data[0])
-            )
-
-            if headers:
-                self._preview_table.setHorizontalHeaderLabels(headers)
-            else:
-                self._preview_table.setHorizontalHeaderLabels(
-                    [f"Col {i + 1}" for i in range(len(self._preview_data[0]))]
-                )
-
-            # Populate data
-            for row_idx, row_data in enumerate(self._preview_data):
-                for col_idx, value in enumerate(row_data):
-                    item = QTableWidgetItem(str(value))
-                    self._preview_table.setItem(row_idx, col_idx, item)
-
-            # Update column mappers
-            self._update_column_mappers(
-                headers or [f"Col {i + 1}" for i in range(len(self._preview_data[0]))]
-            )
-
-            # Update metadata display with format info
-            metadata_lines = []
-            if detected_format:
-                metadata_lines.append(f"format: {detected_format}")
-            metadata_lines.extend(
-                [f"{k}: {v}" for k, v in metadata.items() if k != "format"]
-            )
-            self._metadata_text.setText("\n".join(metadata_lines))
-
-            if hasattr(self, "_empty_state"):
-                self._empty_state.hide()
-
-            # Log successful data load with record count
-            logger.info(
-                "Data load completed",
-                filepath=str(self._current_file_path),
-                record_count=len(self._preview_data),
-                column_count=len(headers) if headers else len(self._preview_data[0]),
-                page="DataPage",
-            )
-
-        except Exception as e:
-            logger.error(
-                "Failed to load data preview",
-                filepath=str(self._current_file_path),
-                error=str(e),
-                page="DataPage",
-                exc_info=True,
-            )
-            self._file_name_label.setText(f"Error loading file: {str(e)}")
-            self._file_size_label.setText("")
-            self._preview_table.clear()
+            self._file_name_label.setText("File loaded but no previewable rows")
             self._metadata_text.clear()
+            if hasattr(self, "_empty_state"):
+                self._empty_state.show()
+            return
+
+        # Restore file name label
+        if self._current_file_path:
+            self._file_name_label.setText(f"File: {self._current_file_path.name}")
+
+        # Detect file format for user feedback
+        detected_format = self._detect_file_format()
+        metadata["format"] = detected_format
+
+        # Update table
+        self._preview_table.clear()
+        self._preview_table.setRowCount(len(self._preview_data))
+        self._preview_table.setColumnCount(
+            len(headers) if headers else len(self._preview_data[0])
+        )
+
+        if headers:
+            self._preview_table.setHorizontalHeaderLabels(headers)
+        else:
+            self._preview_table.setHorizontalHeaderLabels(
+                [f"Col {i + 1}" for i in range(len(self._preview_data[0]))]
+            )
+
+        # Populate data
+        for row_idx, row_data in enumerate(self._preview_data):
+            for col_idx, value in enumerate(row_data):
+                item = QTableWidgetItem(str(value))
+                self._preview_table.setItem(row_idx, col_idx, item)
+
+        # Update column mappers
+        self._update_column_mappers(
+            headers or [f"Col {i + 1}" for i in range(len(self._preview_data[0]))]
+        )
+
+        # Update metadata display with format info
+        metadata_lines = []
+        if detected_format:
+            metadata_lines.append(f"format: {detected_format}")
+        metadata_lines.extend(
+            [f"{k}: {v}" for k, v in metadata.items() if k != "format"]
+        )
+        self._metadata_text.setText("\n".join(metadata_lines))
+
+        if hasattr(self, "_empty_state"):
+            self._empty_state.hide()
+
+        # Log successful data load with record count
+        logger.info(
+            "Data load completed",
+            filepath=str(self._current_file_path),
+            record_count=len(self._preview_data),
+            column_count=len(headers) if headers else len(self._preview_data[0]),
+            page="DataPage",
+        )
+
+    def _on_preview_failed(self, error_msg: str) -> None:
+        """Handle failed preview load (called on main thread via signal)."""
+        self._preview_table.setEnabled(True)
+        logger.error(
+            "Failed to load data preview",
+            filepath=str(self._current_file_path),
+            error=error_msg,
+            page="DataPage",
+        )
+        self._file_name_label.setText(f"Error loading file: {error_msg}")
+        self._file_size_label.setText("")
+        self._preview_table.clear()
+        self._metadata_text.clear()
 
     def _detect_file_format(self) -> str:
         """Detect the file format for user feedback."""
