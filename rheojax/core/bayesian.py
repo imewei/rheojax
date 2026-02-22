@@ -1191,6 +1191,7 @@ class BayesianMixin:
             # Also accept non-underscore aliases
             "gamma0",
             "sigma0",
+            "stress_target",
         }
 
         for key in list(nuts_kwargs):
@@ -1307,6 +1308,55 @@ class BayesianMixin:
 
             return result
 
+    @staticmethod
+    def _prior_dict_to_dist(prior_spec: dict, dist_module):
+        """Convert a prior specification dict to a NumPyro distribution.
+
+        Supports prior dicts from the GUI PriorsEditor with format:
+            {"type": "normal", "loc": 1000, "scale": 500}
+            {"type": "uniform", "low": 0, "high": 100}
+            {"type": "lognormal", "loc": 0, "scale": 1}
+            {"type": "exponential", "rate": 0.01}
+            {"type": "halfnormal", "scale": 500}
+
+        Returns None if the spec is unrecognized.
+        """
+        dist_type = prior_spec.get("type", "").lower()
+        try:
+            if dist_type == "normal":
+                return dist_module.Normal(
+                    loc=float(prior_spec["loc"]),
+                    scale=float(prior_spec["scale"]),
+                )
+            elif dist_type == "uniform":
+                return dist_module.Uniform(
+                    low=float(prior_spec["low"]),
+                    high=float(prior_spec["high"]),
+                )
+            elif dist_type == "lognormal":
+                return dist_module.LogNormal(
+                    loc=float(prior_spec.get("loc", 0)),
+                    scale=float(prior_spec.get("scale", 1)),
+                )
+            elif dist_type == "exponential":
+                return dist_module.Exponential(
+                    rate=float(prior_spec["rate"]),
+                )
+            elif dist_type in ("halfnormal", "half_normal"):
+                return dist_module.HalfNormal(
+                    scale=float(prior_spec["scale"]),
+                )
+            elif dist_type == "truncatednormal":
+                return dist_module.TruncatedNormal(
+                    loc=float(prior_spec["loc"]),
+                    scale=float(prior_spec["scale"]),
+                    low=float(prior_spec.get("low", float("-inf"))),
+                    high=float(prior_spec.get("high", float("inf"))),
+                )
+        except (KeyError, TypeError, ValueError):
+            pass
+        return None
+
     def _build_numpyro_model(
         self,
         param_names: list[str],
@@ -1331,8 +1381,13 @@ class BayesianMixin:
             self._closure_cache: OrderedDict = OrderedDict()
 
         prior_factory = getattr(self, "bayesian_prior_factory", None)
-        # Skip cache when prior_factory is set — id() can alias after GC
-        if not has_ndarray_kwargs and prior_factory is None:
+        # Check if any Parameter has a .prior dict set (from GUI PriorsEditor)
+        _has_param_priors = any(
+            getattr(p, "prior", None) is not None
+            for p in getattr(getattr(self, "parameters", None), "values", lambda: [])()
+        )
+        # Skip cache when prior_factory or param-level priors are set
+        if not has_ndarray_kwargs and prior_factory is None and not _has_param_priors:
             cache_key = (
                 str(test_mode),
                 is_complex_data,
@@ -1366,6 +1421,16 @@ class BayesianMixin:
                 custom_dist = None
                 if callable(prior_factory):
                     custom_dist = prior_factory(name, lower, upper)
+
+                # F-001 fix: Check Parameter.prior dict (set by GUI PriorsEditor)
+                if custom_dist is None and hasattr(self, "parameters"):
+                    param_obj = self.parameters.get(name)
+                    if param_obj is not None:
+                        param_prior = getattr(param_obj, "prior", None)
+                        if param_prior is not None and isinstance(param_prior, dict):
+                            custom_dist = BayesianMixin._prior_dict_to_dist(
+                                param_prior, dist
+                            )
 
                 if custom_dist is not None:
                     params_dict[name] = numpyro.sample(name, custom_dist)
@@ -1421,12 +1486,18 @@ class BayesianMixin:
             # Normalize oscillation predictions: some models return (N,2) real
             # arrays [G', G''] instead of complex G' + 1j*G''
             if (
-                is_complex_data
-                and jnp.isrealobj(predictions_raw)
+                jnp.isrealobj(predictions_raw)
                 and predictions_raw.ndim == 2
                 and predictions_raw.shape[1] == 2
             ):
-                predictions_raw = predictions_raw[:, 0] + 1j * predictions_raw[:, 1]
+                if is_complex_data:
+                    # Convert [G', G''] → complex G* for joint real/imag fitting
+                    predictions_raw = predictions_raw[:, 0] + 1j * predictions_raw[:, 1]
+                else:
+                    # Data is |G*| (scalar) — compute magnitude from components
+                    predictions_raw = jnp.sqrt(
+                        predictions_raw[:, 0] ** 2 + predictions_raw[:, 1] ** 2
+                    )
 
             # Handle complex vs real predictions
             if is_complex_data:

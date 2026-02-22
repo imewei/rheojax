@@ -424,6 +424,8 @@ class Parameter:
                         max_value=c_data.get("max_value"),
                     )
                 )
+        if data.get("prior") is not None:
+            param.prior = data["prior"]
         return param
 
 
